@@ -43,7 +43,7 @@ Work produced with Claude must be attributed:
 
 - **Backend**: `./gradlew spotlessApply` before committing; `./gradlew build` must pass (runs Spotless check + ArchUnit). Every source file needs an `SPDX-License-Identifier: AGPL-3.0-only` header.
 - **Frontend**: `pnpm format && pnpm lint && pnpm build` from `frontend/`.
-- Respect the module boundaries ([ADR-0004](docs/adr/0004-hexagonal-architecture-enforced-by-archunit.md)) — the domain stays framework-free.
+- Respect the layered boundaries ([ADR-0004](docs/adr/0004-layered-architecture-enforced-by-archunit.md)) — `web → service → repository → entity`; the published contracts (`qnop-spi`, `qnop-api`) stay Spring-free.
 
 ## Architecture decisions
 

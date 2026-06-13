@@ -18,7 +18,7 @@ Given the open-core model ([ADR-0002](0002-open-core-via-polyrepo-and-published-
 ## Consequences
 
 - Composition is by classpath, not by `if (edition == ...)`. The core never references commercial types.
-- Enterprise modules are "just another adapter" implementing a published interface — consistent with [ADR-0004](0004-hexagonal-architecture-enforced-by-archunit.md).
+- Enterprise modules are "just another implementation" of a published interface — consistent with the layered architecture ([ADR-0004](0004-layered-architecture-enforced-by-archunit.md)).
 - The SPI is a public API surface: it must be designed and versioned deliberately.
 
 ## Alternatives considered

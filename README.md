@@ -38,10 +38,10 @@ cp .env.example .env && docker compose up -d
 ## Repository layout
 
 ```
-qnop-spi/ qnop-domain/ qnop-application/   # core: boundary, domain, use cases
-qnop-persistence/ qnop-storage/ qnop-document/ qnop-security/ qnop-web/   # adapters
-qnop-api/            # published REST API contract (DTOs + OpenAPI)
-qnop-bootstrap/            # composition root + architecture tests
+qnop-spi/            # published plugin contract (Spring-free)
+qnop-api/            # published REST contract: DTOs + OpenAPI (Spring-free)
+qnop-core/           # entity/ repository/ service/  (the Spring backend core)
+qnop-web/            # @RestControllers + Spring Boot bootstrap (the runnable)
 build-logic/         # Gradle convention plugins
 frontend/            # Vite + React + MUI SPA
 docs/ARCHITECTURE.md # the map

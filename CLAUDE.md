@@ -37,8 +37,8 @@ Backend (repo root):
 ./gradlew build              # compile + Spotless check + ArchUnit tests (the full gate)
 ./gradlew spotlessApply      # auto-format & insert SPDX headers (run before committing)
 ./gradlew test               # tests only
-./gradlew :qnop-bootstrap:test --tests "io.qnop.architecture.ArchitectureRulesTest"   # a single test
-./gradlew :qnop-domain:build # build one module
+./gradlew :qnop-web:test --tests "io.qnop.architecture.ArchitectureRulesTest"   # a single test
+./gradlew :qnop-core:build   # build one module
 ```
 
 Frontend (`cd frontend`):
@@ -60,16 +60,19 @@ cp .env.example .env && docker compose up -d   # Postgres + MinIO (not yet consu
 
 ## Architecture (essentials)
 
-Ports-and-adapters, enforced by ArchUnit. The SPI is the AGPL/commercial boundary. Dependency direction:
+Layered (Spring), enforced by ArchUnit. **Four modules** (ADR-0004):
 
 ```
-qnop-spi ← qnop-domain ← qnop-application ← {persistence, storage, document, security, web} ← qnop-bootstrap
-qnop-api ← qnop-web        (web implements the published REST contract)
+qnop-web    @RestControllers + Spring Boot bootstrap (runnable) ──▶ qnop-api  (published REST contract)
+   │ calls
+   ▼
+qnop-core   io.qnop.service ▸ io.qnop.repository ▸ io.qnop.entity ──▶ qnop-spi  (published plugin contract)
 ```
 
-- `qnop-domain` is **framework-free** (no Spring/JPA/web) — ArchUnit fails the build otherwise.
-- `qnop-bootstrap` is the only wiring point (composition root).
-- **Two published, versioned contracts** (both ArchUnit-guarded as pure): `qnop-spi` = the plugin/extension boundary; `qnop-api` = the public REST contract (DTOs + OpenAPI for third parties + a generated client). See ADR-0015.
+- Layering rule (ArchUnit): `web → service → repository → entity`; controllers never touch repositories directly, and entities never leak to the web layer (the service maps them to `qnop-api` DTOs).
+- JPA entities are the model — **no** separate pure-domain model, **no** domain↔entity mapper. Only entity⇄DTO mapping, in the service layer.
+- **Guardrail:** keep the complex logic (re-anchoring, workflow state machine) as plain DB-free testable code in `io.qnop.service`, not inside `@Transactional` methods needing a live `EntityManager`.
+- **Two published, versioned, Spring-free contracts** (ArchUnit-guarded as pure): `qnop-spi` = plugin boundary; `qnop-api` = public REST contract. See ADR-0003/0015.
 - Commercial features are NOT in this repo; they live in a separate private `qnop-enterprise` repo that builds against the published `qnop-spi` artifact and plugs in via Spring `@AutoConfiguration` + `@ConditionalOnMissingBean` (classpath = edition). See ADR-0002/0003.
 
 ## License

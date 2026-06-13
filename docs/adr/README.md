@@ -15,7 +15,7 @@ Important architecture decisions are recorded here as ADRs (see [ADR-0001](0001-
 | [0001](0001-record-architecture-decisions.md) | Record architecture decisions as ADRs | Accepted |
 | [0002](0002-open-core-via-polyrepo-and-published-spi.md) | Open-core distribution via polyrepo + published SPI artifact | Accepted |
 | [0003](0003-agpl-boundary-is-the-spi.md) | The AGPL boundary is the SPI | Accepted |
-| [0004](0004-hexagonal-architecture-enforced-by-archunit.md) | Hexagonal architecture enforced by ArchUnit | Accepted |
+| [0004](0004-layered-architecture-enforced-by-archunit.md) | Layered architecture with published contracts, enforced by ArchUnit | Accepted |
 | [0005](0005-binary-documents-in-object-storage.md) | Binary documents in S3-compatible object storage | Accepted |
 | [0006](0006-gradle-kotlin-dsl-jdk21.md) | Gradle Kotlin DSL, convention plugins, JDK 21 | Accepted |
 | [0007](0007-spdx-dco-license-scanning.md) | SPDX headers, DCO, license scanning in CI | Accepted |

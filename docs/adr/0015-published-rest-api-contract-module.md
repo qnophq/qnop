@@ -16,7 +16,7 @@ Introduce a dedicated module **`qnop-api`** holding the **REST contract**: reque
 - A **published, semantically versioned artifact**, parallel to `qnop-spi`: the SPI is the *plugin* contract, `qnop-api` is the *REST* contract.
 - **Implemented by `qnop-web`**: controllers depend on `qnop-api` and map between its DTOs and application types.
 
-ArchUnit enforces that `qnop-api` stays a pure contract (no dependency on domain/application/adapters/Spring) and is consumed only by adapters/bootstrap within the build ([ADR-0004](0004-hexagonal-architecture-enforced-by-archunit.md)).
+ArchUnit enforces that `qnop-api` stays a pure contract (no dependency on Spring or the internal modules) and is consumed only by the service and web layers within the build ([ADR-0004](0004-layered-architecture-enforced-by-archunit.md)).
 
 The public API carries URL versioning (`/api/v1`) and a deprecation policy. **Contract-first** (OpenAPI as the source of truth, generate DTOs/stubs) vs. **code-first** is deferred to Phase 1; the module exists from Phase 0 as an empty shell so the boundary is set before any endpoint is written.
 

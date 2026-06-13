@@ -16,43 +16,25 @@ The seam between them is the SPI ([ADR-0002](adr/0002-open-core-via-polyrepo-and
 
 ## Backend module map
 
-Ports-and-adapters (hexagonal), with module dependencies enforced by ArchUnit ([ADR-0004](adr/0004-hexagonal-architecture-enforced-by-archunit.md)):
+Layered architecture — `web → service → repository → entity` — enforced by ArchUnit ([ADR-0004](adr/0004-layered-architecture-enforced-by-archunit.md)), with two published, Spring-free contracts:
 
 ```
-            ┌─────────────┐
-            │  qnop-spi   │  pure interfaces + DTOs  ← the AGPL/commercial boundary
-            └─────────────┘
-                   ▲
-            ┌─────────────┐
-            │ qnop-domain │  entities, value objects, workflow state machine (framework-free)
-            └─────────────┘
-                   ▲
-          ┌──────────────────┐
-          │ qnop-application │  use cases + ports (interfaces the adapters implement)
-          └──────────────────┘
-              ▲   ▲   ▲   ▲   ▲
-   ┌──────────┘   │   │   │   └──────────┐
-┌────────────┐ ┌────────┐ ┌──────────┐ ┌──────────┐ ┌──────────┐
-│persistence │ │storage │ │ document │ │ security │ │   web    │   adapters
-└────────────┘ └────────┘ └──────────┘ └──────────┘ └──────────┘
-              ▲   ▲   ▲   ▲   ▲
-            ┌──────────────────┐
-            │  qnop-bootstrap  │  composition root / Spring Boot bootstrap (Community build)
-            └──────────────────┘
+qnop-web    @RestControllers + Spring Boot bootstrap (the runnable)   ──▶  qnop-api
+  │  calls                                                                  (published REST
+  ▼                                                                          contract: DTOs+OpenAPI)
+qnop-core
+  io.qnop.service     business logic · workflow state machine ·         ──▶  qnop-spi
+                      anchoring · entity⇄DTO mapping · SPI defaults           (published plugin
+  io.qnop.repository  Spring Data repositories                                contract)
+  io.qnop.entity      JPA entities — the model
 ```
 
-| Module | Responsibility |
-|--------|----------------|
-| `qnop-spi` | Extension-point interfaces + DTOs. Published artifact; consumed by the enterprise repo. No logic. |
-| `qnop-domain` | Entities, value objects, the review workflow state machine. No Spring/JPA/web. |
-| `qnop-application` | Use cases; defines ports (repository & provider interfaces); orchestrates SPI calls. |
-| `qnop-persistence` | JPA adapters + Flyway migrations (PostgreSQL). |
-| `qnop-storage` | `StorageProvider` default adapter over the S3 API. |
-| `qnop-document` | Text extraction (PDFBox/POI), conversion, annotation anchoring. |
-| `qnop-security` | Authn/authz, user & team model. |
-| `qnop-api` | **Published** REST API contract: request/response DTOs + OpenAPI. Pure types, no server deps; consumed externally and by `qnop-web`. |
-| `qnop-web` | REST controllers implementing `qnop-api`; DTO mapping. |
-| `qnop-bootstrap` | The only wiring point; builds the Community server; hosts the ArchUnit test. |
+| Module | Spring? | Responsibility |
+|--------|---------|----------------|
+| `qnop-spi` | no | Published plugin contract: extension-point interfaces + DTOs. Consumed by the enterprise repo. |
+| `qnop-api` | no | Published REST contract: request/response DTOs + OpenAPI. Consumed externally and by `qnop-core`/`qnop-web`. |
+| `qnop-core` | yes | `io.qnop.entity` (JPA entities = the model), `io.qnop.repository` (Spring Data), `io.qnop.service` (business logic, workflow state machine, anchoring, entity⇄DTO mapping, SPI default beans). |
+| `qnop-web` | yes | `io.qnop.web` (`@RestController`s implementing `qnop-api`) + `io.qnop.bootstrap` (Spring Boot main/config). The runnable Community module; hosts the ArchUnit test. |
 
 ### Published artifacts
 

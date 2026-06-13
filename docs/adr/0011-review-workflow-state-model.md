@@ -10,7 +10,7 @@ A review moves through a coordinated workflow: a document is reviewed, reviewers
 
 ## Decision (direction — to be finalized in Phase 1)
 
-Use an **explicit, enum-based state machine in `qnop-domain`** (framework-free), not Spring Statemachine.
+Use an **explicit, enum-based state machine** in the service layer (`qnop-core`, `io.qnop.service`), kept as plain DB-free testable logic ([ADR-0004](0004-layered-architecture-enforced-by-archunit.md)), not Spring Statemachine.
 
 Proposed states:
 
@@ -23,7 +23,7 @@ DRAFT → IN_REVIEW → CHANGES_REQUESTED → IN_REVIEW (after new version) → 
 - Annotation lifecycle is a small sub-machine: `OPEN → ACCEPTED | REJECTED`.
 - Every transition emits an append-only `AuditEvent`.
 
-Model transitions as a transition table + guard functions, applied through a single `transition()` choke-point in `qnop-application`.
+Model transitions as a transition table + guard functions, applied through a single `transition()` choke-point in the service layer.
 
 ## Rationale
 

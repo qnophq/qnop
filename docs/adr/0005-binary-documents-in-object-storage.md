@@ -12,7 +12,7 @@ qnop stores uploaded documents (PDF, DOCX) and their immutable versions. Structu
 
 - **PostgreSQL** holds relational data only: users, teams, documents (metadata), document versions (metadata + storage reference), reviews, annotations (anchor payload as `jsonb`), workflow state, audit log.
 - **Binary documents live in S3-compatible object storage**, never as Postgres `bytea`/large objects.
-- Access goes through a `StorageProvider` SPI/port; the default adapter (`qnop-storage`) uses the **AWS SDK for Java v2** with `endpointOverride` + path-style, so the backend (MinIO On-Prem, S3/GCS in SaaS) is a deploy-time config choice.
+- Access goes through a `StorageProvider` SPI; the default implementation (in `qnop-core`, `io.qnop.service`) uses the **AWS SDK for Java v2** with `endpointOverride` + path-style, so the backend (MinIO On-Prem, S3/GCS in SaaS) is a deploy-time config choice.
 - File↔metadata consistency uses an upload-then-commit pattern with a reaper for orphaned objects.
 
 ## Consequences

@@ -20,18 +20,12 @@ dependencyResolutionManagement {
 }
 
 // --- AGPL core modules ---------------------------------------------------
-// Boundary between open-source core and commercial add-ons is `qnop-spi`
-// (see docs/adr/0003-agpl-boundary-is-the-spi.md). Enterprise modules live
-// in a separate private repository and are NOT included here.
+// Layered architecture (see docs/adr/0004-layered-architecture-enforced-by-archunit.md).
+// Two modules are published, Spring-free contracts; commercial add-ons (in a
+// separate private repository) link only against qnop-spi (ADR-0002/0003).
 include(
-    "qnop-spi",          // pure extension-point interfaces + DTOs (published artifact)
-    "qnop-domain",       // framework-free entities, value objects, workflow state machine
-    "qnop-application",  // use cases, ports, orchestration
-    "qnop-persistence",  // JPA adapters, Flyway migrations
-    "qnop-storage",      // StorageProvider default adapter (S3/MinIO)
-    "qnop-document",      // text extraction / conversion / anchoring adapters
-    "qnop-security",     // authn/authz, user & team model
-    "qnop-api",          // published REST API contract: DTOs + OpenAPI (consumed externally)
-    "qnop-web",          // REST controllers implementing qnop-api
-    "qnop-bootstrap",    // composition root / Spring Boot bootstrap (Community build)
+    "qnop-spi",   // published plugin contract: extension-point interfaces + DTOs (Spring-free)
+    "qnop-api",   // published REST contract: request/response DTOs + OpenAPI (Spring-free)
+    "qnop-core",  // entity/ repository/ service/ + SPI default beans (the Spring backend core)
+    "qnop-web",   // @RestControllers implementing qnop-api + Spring Boot bootstrap/config
 )
