@@ -1,0 +1,30 @@
+# Version catalog — single source of truth for dependency versions.
+# SPDX-License-Identifier: AGPL-3.0-only
+
+[versions]
+# --- Applied in Phase 0 -------------------------------------------------
+junit = "5.12.2"
+archunit = "1.4.1"
+# NOTE: keep `spotless` in sync with build-logic/build.gradle.kts (precompiled
+# script plugins cannot read this catalog at plugin-resolution time).
+spotless = "8.6.0"
+
+# --- Pinned for later phases (NOT yet applied) --------------------------
+# Backend application stack — introduced when the bootable server lands
+# (deferred; see docs/adr/0011-review-workflow-state-model.md and the Phase 1 plan).
+springBoot = "4.1.0"
+postgresql = "42.7.5"
+flyway = "11.7.2"
+awsSdk = "2.31.6"            # software.amazon.awssdk:s3 — vendor-neutral S3 client
+pdfbox = "3.0.5"            # PDF text extraction with glyph positions
+poi = "5.4.1"              # .docx structural extraction (XWPF)
+
+[libraries]
+junit-bom = { group = "org.junit", name = "junit-bom", version.ref = "junit" }
+junit-jupiter = { group = "org.junit.jupiter", name = "junit-jupiter" }
+junit-platform-launcher = { group = "org.junit.platform", name = "junit-platform-launcher" }
+archunit-junit5 = { group = "com.tngtech.archunit", name = "archunit-junit5", version.ref = "archunit" }
+
+[plugins]
+spotless = { id = "com.diffplug.spotless", version.ref = "spotless" }
+spring-boot = { id = "org.springframework.boot", version.ref = "springBoot" }

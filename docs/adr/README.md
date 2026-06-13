@@ -1,0 +1,50 @@
+# Architecture Decision Records
+
+Important architecture decisions are recorded here as ADRs (see [ADR-0001](0001-record-architecture-decisions.md)). Each record is immutable once **Accepted**; to change a decision, add a new ADR that supersedes the old one (and update the old one's status).
+
+## Status legend
+
+- **Accepted** — decided and in force.
+- **Proposed** — the direction is set, but details are deferred to a later phase. Not yet binding.
+- **Superseded by ADR-NNNN** — replaced.
+
+## Index
+
+| ADR | Title | Status |
+|-----|-------|--------|
+| [0001](0001-record-architecture-decisions.md) | Record architecture decisions as ADRs | Accepted |
+| [0002](0002-open-core-via-polyrepo-and-published-spi.md) | Open-core distribution via polyrepo + published SPI artifact | Accepted |
+| [0003](0003-agpl-boundary-is-the-spi.md) | The AGPL boundary is the SPI | Accepted |
+| [0004](0004-hexagonal-architecture-enforced-by-archunit.md) | Hexagonal architecture enforced by ArchUnit | Accepted |
+| [0005](0005-binary-documents-in-object-storage.md) | Binary documents in S3-compatible object storage | Accepted |
+| [0006](0006-gradle-kotlin-dsl-jdk21.md) | Gradle Kotlin DSL, convention plugins, JDK 21 | Accepted |
+| [0007](0007-spdx-dco-license-scanning.md) | SPDX headers, DCO, license scanning in CI | Accepted |
+| [0008](0008-contribution-and-branching-workflow.md) | Contribution & branching workflow | Accepted |
+| [0009](0009-multi-layer-annotation-anchoring.md) | Multi-layer annotation anchoring | Proposed |
+| [0010](0010-docx-representation-strategy.md) | DOCX representation strategy | Proposed |
+| [0011](0011-review-workflow-state-model.md) | Review workflow state model | Proposed |
+| [0012](0012-edition-vs-entitlements.md) | Edition vs. entitlements / license gating | Proposed |
+| [0013](0013-redis-and-search-deferred.md) | Redis & search index deferred | Proposed |
+| [0014](0014-frontend-enterprise-separation.md) | Frontend enterprise separation | Proposed |
+
+## Template
+
+```markdown
+# ADR-NNNN: <title>
+
+- **Status:** Proposed | Accepted | Superseded by ADR-NNNN
+- **Date:** YYYY-MM-DD
+- **Deciders:** <who>
+
+## Context
+What problem are we solving? What forces and constraints apply?
+
+## Decision
+The decision, stated plainly.
+
+## Consequences
+What becomes easier, what becomes harder, what we explicitly defer.
+
+## Alternatives considered
+What we rejected and why.
+```

@@ -1,0 +1,68 @@
+# SPDX-License-Identifier: AGPL-3.0-only
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  backend:
+    name: Backend (build + ArchUnit + Spotless)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+      - uses: gradle/actions/setup-gradle@v4
+      # `build` runs spotlessCheck (formatting + SPDX header) and the ArchUnit
+      # conformance tests via the `check` task.
+      - run: ./gradlew build --stacktrace
+
+  frontend:
+    name: Frontend (lint + format + build)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: pnpm
+          cache-dependency-path: frontend/pnpm-lock.yaml
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm format:check
+      - run: pnpm lint
+      - run: pnpm build
+
+  license-headers:
+    name: License headers (SPDX)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      # ADR-0007: every Java / Kotlin-DSL source file must declare an SPDX
+      # identifier. A full dependency-license scanner is added in a later phase
+      # (tracked in ADR-0007) once real dependencies exist.
+      - name: Verify SPDX identifiers
+        run: |
+          missing=0
+          while IFS= read -r f; do
+            if ! grep -q "SPDX-License-Identifier" "$f"; then
+              echo "::error file=$f::missing SPDX-License-Identifier"
+              missing=1
+            fi
+          done < <(find . -type f \( -name '*.java' -o -name '*.kts' \) \
+                   -not -path './**/build/*' -not -path './.gradle/*')
+          exit $missing
