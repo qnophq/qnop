@@ -9,7 +9,7 @@ plugins {
     id("com.diffplug.spotless")
 }
 
-group = "de.qnop"
+group = "io.qnop"
 version = "0.1.0-SNAPSHOT"
 
 java {

@@ -37,7 +37,7 @@ Backend (repo root):
 ./gradlew build              # compile + Spotless check + ArchUnit tests (the full gate)
 ./gradlew spotlessApply      # auto-format & insert SPDX headers (run before committing)
 ./gradlew test               # tests only
-./gradlew :qnop-app:test --tests "de.qnop.architecture.ArchitectureRulesTest"   # a single test
+./gradlew :qnop-app:test --tests "io.qnop.architecture.ArchitectureRulesTest"   # a single test
 ./gradlew :qnop-domain:build # build one module
 ```
 
