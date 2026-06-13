@@ -24,7 +24,7 @@ A compiling **skeleton**, not a running app. Deliberately deferred to **Phase 1*
 
 ## Stack
 
-- **Backend**: Java 21, Gradle (Kotlin DSL) multi-module, Spring Boot 4.x (introduced in Phase 1). Convention plugin in `build-logic/`; versions in `gradle/libs.versions.toml`.
+- **Backend**: Java 21, Gradle (Kotlin DSL) multi-module, Spring Boot 4.x (introduced in Phase 1). Convention plugin in `build-logic/`; dependency versions in `gradle/libs.versions.toml`; **project version in the root `VERSION` file** (single source of truth, read by the convention plugin).
 - **Frontend**: Vite + React 19 + TypeScript + MaterialUI, package manager **pnpm** (`frontend/`).
 - **Persistence**: PostgreSQL + Flyway; S3-compatible object storage (MinIO locally) for binary documents.
 - **Quality**: Spotless (google-java-format + SPDX header), ArchUnit (hexagonal boundaries), JUnit 5.

@@ -14,6 +14,7 @@ A growing multi-module backend needs a maintainable, type-safe build with shared
 - Shared build configuration lives in an included build, `build-logic/`, as a precompiled convention plugin `qnop.java-conventions` (Java toolchain, Spotless, test framework) — **no** `allprojects {}`/`subprojects {}` cross-configuration.
 - Dependency versions are centralized in a **version catalog** (`gradle/libs.versions.toml`).
 - **JDK 21 (LTS)** toolchain, pinned via Gradle toolchains.
+- The **project version is the single source of truth in the root `VERSION` file**; the convention plugin reads it via `providers.fileContents(layout.settingsDirectory.file("VERSION"))` so all modules share it and the configuration cache invalidates when it changes.
 - Code formatting and the SPDX license header are enforced by **Spotless** (`google-java-format`); see [ADR-0007](0007-spdx-dco-license-scanning.md).
 
 ## Consequences

@@ -10,7 +10,9 @@ plugins {
 }
 
 group = "io.qnop"
-version = "0.1.0-SNAPSHOT"
+// Single source of truth: the project version lives in the root VERSION file.
+// Read via the provider API so the configuration cache invalidates when it changes.
+version = providers.fileContents(layout.settingsDirectory.file("VERSION")).asText.get().trim()
 
 java {
     toolchain {
