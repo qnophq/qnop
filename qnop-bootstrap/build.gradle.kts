@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 //
-// qnop-app — composition root for the Community build and host of the
+// qnop-bootstrap — composition root for the Community build and host of the
 // architecture-conformance tests. The Spring Boot plugin and the bootable
 // server are deliberately introduced in Phase 1 (deferred), so this module is
 // currently a plain aggregator that wires the modules together.

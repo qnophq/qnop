@@ -44,7 +44,7 @@ class ArchitectureRulesTest {
                 "io.qnop.security..",
                 "io.qnop.web..")
             .layer("Bootstrap")
-            .definedBy("io.qnop.app..")
+            .definedBy("io.qnop.bootstrap..")
             // SPI is intentionally accessible from every layer.
             .whereLayer("Bootstrap")
             .mayNotBeAccessedByAnyLayer()

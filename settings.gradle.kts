@@ -32,5 +32,5 @@ include(
     "qnop-document",      // text extraction / conversion / anchoring adapters
     "qnop-security",     // authn/authz, user & team model
     "qnop-web",          // REST controllers, DTO mapping, OpenAPI
-    "qnop-app",          // composition root / Spring Boot bootstrap (Community build)
+    "qnop-bootstrap",    // composition root / Spring Boot bootstrap (Community build)
 )

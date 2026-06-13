@@ -37,7 +37,7 @@ Backend (repo root):
 ./gradlew build              # compile + Spotless check + ArchUnit tests (the full gate)
 ./gradlew spotlessApply      # auto-format & insert SPDX headers (run before committing)
 ./gradlew test               # tests only
-./gradlew :qnop-app:test --tests "io.qnop.architecture.ArchitectureRulesTest"   # a single test
+./gradlew :qnop-bootstrap:test --tests "io.qnop.architecture.ArchitectureRulesTest"   # a single test
 ./gradlew :qnop-domain:build # build one module
 ```
 
@@ -63,11 +63,11 @@ cp .env.example .env && docker compose up -d   # Postgres + MinIO (not yet consu
 Ports-and-adapters, enforced by ArchUnit. The SPI is the AGPL/commercial boundary. Dependency direction:
 
 ```
-qnop-spi ← qnop-domain ← qnop-application ← {persistence, storage, document, security, web} ← qnop-app
+qnop-spi ← qnop-domain ← qnop-application ← {persistence, storage, document, security, web} ← qnop-bootstrap
 ```
 
 - `qnop-domain` is **framework-free** (no Spring/JPA/web) — ArchUnit fails the build otherwise.
-- `qnop-app` is the only wiring point (composition root).
+- `qnop-bootstrap` is the only wiring point (composition root).
 - Commercial features are NOT in this repo; they live in a separate private `qnop-enterprise` repo that builds against the published `qnop-spi` artifact and plugs in via Spring `@AutoConfiguration` + `@ConditionalOnMissingBean` (classpath = edition). See ADR-0002/0003.
 
 ## License

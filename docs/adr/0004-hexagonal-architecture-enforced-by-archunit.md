@@ -21,10 +21,10 @@ qnop-storage      → application    (S3 adapter)
 qnop-document     → application    (extraction/conversion/anchoring adapter)
 qnop-security     → application    (authn/authz adapter)
 qnop-web          → application    (REST adapter)
-qnop-app          → all adapters   (composition root; the only wiring point)
+qnop-bootstrap          → all adapters   (composition root; the only wiring point)
 ```
 
-The SPI is the subset of ports that may be implemented commercially. These directions are **enforced in CI by an ArchUnit test** in `qnop-app` (`ArchitectureRulesTest`), including a rule that the domain depends on no framework (`org.springframework..`, `jakarta.persistence..`) or adapter package.
+The SPI is the subset of ports that may be implemented commercially. These directions are **enforced in CI by an ArchUnit test** in `qnop-bootstrap` (`ArchitectureRulesTest`), including a rule that the domain depends on no framework (`org.springframework..`, `jakarta.persistence..`) or adapter package.
 
 ## Consequences
 

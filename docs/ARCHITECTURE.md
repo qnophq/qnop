@@ -36,9 +36,9 @@ Ports-and-adapters (hexagonal), with module dependencies enforced by ArchUnit ([
 │persistence │ │storage │ │ document │ │ security │ │   web    │   adapters
 └────────────┘ └────────┘ └──────────┘ └──────────┘ └──────────┘
               ▲   ▲   ▲   ▲   ▲
-            ┌─────────────────┐
-            │    qnop-app     │  composition root / Spring Boot bootstrap (Community build)
-            └─────────────────┘
+            ┌──────────────────┐
+            │  qnop-bootstrap  │  composition root / Spring Boot bootstrap (Community build)
+            └──────────────────┘
 ```
 
 | Module | Responsibility |
@@ -51,7 +51,7 @@ Ports-and-adapters (hexagonal), with module dependencies enforced by ArchUnit ([
 | `qnop-document` | Text extraction (PDFBox/POI), conversion, annotation anchoring. |
 | `qnop-security` | Authn/authz, user & team model. |
 | `qnop-web` | REST controllers, DTO mapping, OpenAPI. |
-| `qnop-app` | The only wiring point; builds the Community server; hosts the ArchUnit test. |
+| `qnop-bootstrap` | The only wiring point; builds the Community server; hosts the ArchUnit test. |
 
 ## Frontend
 

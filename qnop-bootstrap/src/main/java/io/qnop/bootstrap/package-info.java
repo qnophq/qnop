@@ -1,4 +1,4 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 
 /** Composition root / Spring Boot bootstrap (Community build). */
-package io.qnop.app;
+package io.qnop.bootstrap;
