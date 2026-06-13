@@ -14,7 +14,7 @@ spotless = "8.6.0"
 # (deferred; see docs/adr/0011-review-workflow-state-model.md and the Phase 1 plan).
 springBoot = "4.1.0"
 postgresql = "42.7.5"
-flyway = "11.7.2"
+liquibase = "5.0.3"
 awsSdk = "2.31.6"            # software.amazon.awssdk:s3 — vendor-neutral S3 client
 pdfbox = "3.0.5"            # PDF text extraction with glyph positions
 poi = "5.4.1"              # .docx structural extraction (XWPF)

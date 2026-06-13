@@ -20,14 +20,14 @@ Commits follow Conventional Commits and are signed off (`git commit -s`, DCO). S
 
 ## Current state — Phase 0
 
-A compiling **skeleton**, not a running app. Deliberately deferred to **Phase 1** (do not assume they exist): the domain core + workflow state machine, the SPI interfaces + Community defaults, and the bootable Spring Boot server (`/api/edition`, Postgres/Flyway/S3 wiring). Backend modules currently hold only `package-info` placeholders. The frontend is a shell and does **not** call the backend yet. `docker-compose.yml` is prepared but not yet consumed.
+A compiling **skeleton**, not a running app. Deliberately deferred to **Phase 1** (do not assume they exist): the domain core + workflow state machine, the SPI interfaces + Community defaults, and the bootable Spring Boot server (`/api/edition`, Postgres/Liquibase/S3 wiring). Backend modules currently hold only `package-info` placeholders. The frontend is a shell and does **not** call the backend yet. `docker-compose.yml` is prepared but not yet consumed.
 
 ## Stack
 
 - **Backend**: Java 21, Gradle (Kotlin DSL) multi-module, Spring Boot 4.x (introduced in Phase 1). Convention plugin in `build-logic/`; dependency versions in `gradle/libs.versions.toml`; **project version in the root `VERSION` file** (single source of truth, read by the convention plugin).
 - **Frontend**: Vite + React 19 + TypeScript + MaterialUI, package manager **pnpm** (`frontend/`).
-- **Persistence**: PostgreSQL + Flyway; S3-compatible object storage (MinIO locally) for binary documents.
-- **Quality**: Spotless (google-java-format + SPDX header), ArchUnit (hexagonal boundaries), JUnit 5.
+- **Persistence**: PostgreSQL + Liquibase; S3-compatible object storage (MinIO locally) for binary documents.
+- **Quality**: Spotless (google-java-format + SPDX header), ArchUnit (layered boundaries), JUnit 5.
 
 ## Common commands
 

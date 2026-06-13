@@ -63,7 +63,7 @@ A Vite + React + TypeScript + MaterialUI SPA (`frontend/`) talking to the Spring
 ## Phase roadmap
 
 - **Phase 0 (this milestone)** — repo conventions, ADRs, governance; compiling Gradle multi-module skeleton (modules are placeholders); local infra (`docker-compose`); frontend shell; CI. **No domain code, SPI, or bootable server yet.**
-- **Phase 1** — domain core + workflow state machine; SPI interfaces + Community defaults; bootable Spring Boot server (Postgres/Flyway/S3, `/api/edition`); ingest pipeline; basic anchoring; auth.
+- **Phase 1** — domain core + workflow state machine; SPI interfaces + Community defaults; bootable Spring Boot server (Postgres/Liquibase/S3, `/api/edition`); ingest pipeline; basic anchoring; auth.
 - **Phase 2** — fuzzy re-anchoring, real-time presence (Redis), caching.
 - **Phase 3+** — enterprise AI modules, license entitlements, search/pgvector as needed.
 
@@ -72,7 +72,7 @@ A Vite + React + TypeScript + MaterialUI SPA (`frontend/`) talking to the Spring
 | Layer | Choice |
 |-------|--------|
 | Backend | Java 21, Spring Boot 4.x (Phase 1), Gradle (Kotlin DSL) multi-module |
-| Persistence | PostgreSQL + Flyway; S3/MinIO object storage |
+| Persistence | PostgreSQL + Liquibase; S3/MinIO object storage |
 | Frontend | Vite, React 19, TypeScript, MaterialUI |
 | Build/quality | Convention plugins, Spotless (google-java-format), ArchUnit, JUnit 5 |
 | CI | GitHub Actions: backend build + ArchUnit + Spotless, frontend lint/build, SPDX scan |

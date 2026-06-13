@@ -18,7 +18,7 @@ qnop is open-core:
 
 - **Backend**: Java 21 · Gradle (Kotlin DSL) multi-module · Spring Boot 4.x (Phase 1)
 - **Frontend**: Vite · React 19 · TypeScript · MaterialUI (`frontend/`)
-- **Data**: PostgreSQL + Flyway · S3-compatible object storage (MinIO locally)
+- **Data**: PostgreSQL + Liquibase · S3-compatible object storage (MinIO locally)
 
 ## Getting started
 
