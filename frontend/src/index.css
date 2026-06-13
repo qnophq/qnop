@@ -1,0 +1,6 @@
+/* Layout primitives only; MUI CssBaseline owns the reset and base styles. */
+html,
+body,
+#root {
+  height: 100%;
+}

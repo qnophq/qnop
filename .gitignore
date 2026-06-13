@@ -1,0 +1,25 @@
+# --- Gradle / JVM ---
+.gradle/
+**/build/
+!src/**/build/
+*.class
+
+# --- Node / frontend ---
+node_modules/
+frontend/dist/
+frontend/.vite/
+
+# --- Local env & secrets ---
+.env
+.env.local
+*.local
+
+# --- IDE / OS ---
+.idea/
+*.iml
+.vscode/
+.DS_Store
+
+# --- qnop local data (docker volumes are named, but keep stray dumps out) ---
+/data/
+*.log
