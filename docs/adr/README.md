@@ -26,6 +26,7 @@ Important architecture decisions are recorded here as ADRs (see [ADR-0001](0001-
 | [0012](0012-edition-vs-entitlements.md) | Edition vs. entitlements / license gating | Proposed |
 | [0013](0013-redis-and-search-deferred.md) | Redis & search index deferred | Proposed |
 | [0014](0014-frontend-enterprise-separation.md) | Frontend enterprise separation | Proposed |
+| [0015](0015-published-rest-api-contract-module.md) | Published REST API contract module (qnop-api) | Accepted |
 
 ## Template
 

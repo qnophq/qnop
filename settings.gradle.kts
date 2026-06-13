@@ -31,6 +31,7 @@ include(
     "qnop-storage",      // StorageProvider default adapter (S3/MinIO)
     "qnop-document",      // text extraction / conversion / anchoring adapters
     "qnop-security",     // authn/authz, user & team model
-    "qnop-web",          // REST controllers, DTO mapping, OpenAPI
+    "qnop-api",          // published REST API contract: DTOs + OpenAPI (consumed externally)
+    "qnop-web",          // REST controllers implementing qnop-api
     "qnop-bootstrap",    // composition root / Spring Boot bootstrap (Community build)
 )

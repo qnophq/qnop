@@ -64,10 +64,12 @@ Ports-and-adapters, enforced by ArchUnit. The SPI is the AGPL/commercial boundar
 
 ```
 qnop-spi ← qnop-domain ← qnop-application ← {persistence, storage, document, security, web} ← qnop-bootstrap
+qnop-api ← qnop-web        (web implements the published REST contract)
 ```
 
 - `qnop-domain` is **framework-free** (no Spring/JPA/web) — ArchUnit fails the build otherwise.
 - `qnop-bootstrap` is the only wiring point (composition root).
+- **Two published, versioned contracts** (both ArchUnit-guarded as pure): `qnop-spi` = the plugin/extension boundary; `qnop-api` = the public REST contract (DTOs + OpenAPI for third parties + a generated client). See ADR-0015.
 - Commercial features are NOT in this repo; they live in a separate private `qnop-enterprise` repo that builds against the published `qnop-spi` artifact and plugs in via Spring `@AutoConfiguration` + `@ConditionalOnMissingBean` (classpath = edition). See ADR-0002/0003.
 
 ## License

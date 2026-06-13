@@ -40,6 +40,7 @@ cp .env.example .env && docker compose up -d
 ```
 qnop-spi/ qnop-domain/ qnop-application/   # core: boundary, domain, use cases
 qnop-persistence/ qnop-storage/ qnop-document/ qnop-security/ qnop-web/   # adapters
+qnop-api/            # published REST API contract (DTOs + OpenAPI)
 qnop-bootstrap/            # composition root + architecture tests
 build-logic/         # Gradle convention plugins
 frontend/            # Vite + React + MUI SPA

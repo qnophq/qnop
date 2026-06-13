@@ -50,8 +50,16 @@ Ports-and-adapters (hexagonal), with module dependencies enforced by ArchUnit ([
 | `qnop-storage` | `StorageProvider` default adapter over the S3 API. |
 | `qnop-document` | Text extraction (PDFBox/POI), conversion, annotation anchoring. |
 | `qnop-security` | Authn/authz, user & team model. |
-| `qnop-web` | REST controllers, DTO mapping, OpenAPI. |
+| `qnop-api` | **Published** REST API contract: request/response DTOs + OpenAPI. Pure types, no server deps; consumed externally and by `qnop-web`. |
+| `qnop-web` | REST controllers implementing `qnop-api`; DTO mapping. |
 | `qnop-bootstrap` | The only wiring point; builds the Community server; hosts the ArchUnit test. |
+
+### Published artifacts
+
+Two modules are versioned, externally-consumable stability surfaces:
+
+- **`qnop-spi`** — the *plugin* contract (extension points implemented by the commercial edition).
+- **`qnop-api`** — the *REST* contract (DTOs + OpenAPI for third-party integrators and a generated frontend/SDK client), with `/api/v1` URL versioning and a deprecation policy ([ADR-0015](adr/0015-published-rest-api-contract-module.md)).
 
 ## Frontend
 

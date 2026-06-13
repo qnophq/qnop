@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 //
-// qnop-web — REST controllers, DTO mapping and OpenAPI. Adapter: drives the
-// application use cases. (Phase 1)
+// qnop-web — REST controllers implementing the published qnop-api contract.
+// Adapter: drives the application use cases. (Phase 1)
 
 plugins {
     id("qnop.java-conventions")
@@ -9,6 +9,7 @@ plugins {
 
 dependencies {
     implementation(project(":qnop-application"))
+    implementation(project(":qnop-api")) // implements the published REST contract
 
     testImplementation(platform(libs.junit.bom))
     testImplementation(libs.junit.jupiter)

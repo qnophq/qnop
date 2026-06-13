@@ -45,6 +45,8 @@ class ArchitectureRulesTest {
                 "io.qnop.web..")
             .layer("Bootstrap")
             .definedBy("io.qnop.bootstrap..")
+            .layer("Api")
+            .definedBy("io.qnop.api..")
             // SPI is intentionally accessible from every layer.
             .whereLayer("Bootstrap")
             .mayNotBeAccessedByAnyLayer()
@@ -54,6 +56,9 @@ class ArchitectureRulesTest {
             .mayOnlyBeAccessedByLayers("Adapters", "Bootstrap")
             .whereLayer("Domain")
             .mayOnlyBeAccessedByLayers("Application", "Adapters", "Bootstrap")
+            // The published REST contract is consumed by the web adapter only.
+            .whereLayer("Api")
+            .mayOnlyBeAccessedByLayers("Adapters", "Bootstrap")
             .allowEmptyShould(true);
 
     rule.check(QNOP_CLASSES);
@@ -72,6 +77,32 @@ class ArchitectureRulesTest {
                 "jakarta.persistence..",
                 "io.qnop.persistence..",
                 "io.qnop.web..")
+            .allowEmptyShould(true);
+
+    rule.check(QNOP_CLASSES);
+  }
+
+  @Test
+  void restApiContractStaysPure() {
+    // qnop-api is a published wire contract (ADR-0015): DTOs + OpenAPI only,
+    // free of framework and internal-module dependencies so external consumers
+    // can depend on it without pulling the server.
+    ArchRule rule =
+        com.tngtech.archunit.lang.syntax.ArchRuleDefinition.noClasses()
+            .that()
+            .resideInAPackage("io.qnop.api..")
+            .should()
+            .dependOnClassesThat()
+            .resideInAnyPackage(
+                "org.springframework..",
+                "io.qnop.domain..",
+                "io.qnop.application..",
+                "io.qnop.persistence..",
+                "io.qnop.storage..",
+                "io.qnop.document..",
+                "io.qnop.security..",
+                "io.qnop.web..",
+                "io.qnop.bootstrap..")
             .allowEmptyShould(true);
 
     rule.check(QNOP_CLASSES);
