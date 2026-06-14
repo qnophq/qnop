@@ -28,6 +28,13 @@
 # `statuses: write` permissions on the CLA job match the action's README
 # requirements at the pinned SHA — do not narrow without re-reading the
 # action's docs at the pinned version.
+#
+# PREREQUISITE (ADR-0016): the `cla-signatures` branch must already exist and
+# be UNPROTECTED, holding an initialized `signatures/cla.json`
+# (`{"signedContributors": []}`). The action does NOT create a non-default
+# branch — without it the first run fails with "Branch cla-signatures not
+# found". `CLA_TOKEN` below is OPTIONAL; `GITHUB_TOKEN` is enough for
+# same-repo signature storage.
 # ---------------------------------------------------------------------------
 name: CLA
 
