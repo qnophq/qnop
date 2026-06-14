@@ -44,7 +44,7 @@ Backend (repo root):
 ./gradlew build              # compile + Spotless check + ArchUnit tests (the full gate)
 ./gradlew spotlessApply      # auto-format & insert SPDX headers (run before committing)
 ./gradlew test               # tests only
-./gradlew :qnop-web:test --tests "io.qnop.architecture.ArchitectureRulesTest"   # a single test
+./gradlew :qnop-app:test --tests "io.qnop.architecture.ArchitectureRulesTest"   # a single test
 ./gradlew :qnop-core:build   # build one module
 ```
 
@@ -70,7 +70,7 @@ cp .env.example .env && docker compose up -d   # Postgres + MinIO (not yet consu
 Layered (Spring), enforced by ArchUnit. **Four modules** (ADR-0004):
 
 ```
-qnop-web    @RestControllers + Spring Boot bootstrap (runnable) ──▶ qnop-api  (published REST contract)
+qnop-app    @RestControllers + Spring Boot bootstrap (runnable) ──▶ qnop-api  (published REST contract)
    │ calls
    ▼
 qnop-core   io.qnop.service ▸ io.qnop.repository ▸ io.qnop.entity ──▶ qnop-spi  (published plugin contract)

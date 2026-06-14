@@ -34,7 +34,7 @@ cp .env.example .env && docker compose up -d
 ./gradlew build
 
 # Run the server (uses the docker-compose Postgres)
-./gradlew :qnop-web:bootRun
+./gradlew :qnop-app:bootRun
 
 # Frontend
 cd frontend && pnpm install && pnpm dev
@@ -46,7 +46,7 @@ cd frontend && pnpm install && pnpm dev
 qnop-spi/            # published plugin contract (Spring-free)
 qnop-api/            # published REST contract: DTOs + OpenAPI (Spring-free)
 qnop-core/           # entity/ repository/ service/  (the Spring backend core)
-qnop-web/            # @RestControllers + Spring Boot bootstrap (the runnable)
+qnop-app/            # @RestControllers + Spring Boot bootstrap (the runnable)
 build-logic/         # Gradle convention plugins
 frontend/            # Vite + React + MUI SPA
 docs/ARCHITECTURE.md # the map
