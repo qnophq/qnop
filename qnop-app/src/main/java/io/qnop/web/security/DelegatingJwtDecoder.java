@@ -23,6 +23,7 @@ package io.qnop.web.security;
 import io.qnop.service.TokenRevocationService;
 import java.time.Instant;
 import org.springframework.beans.factory.annotation.Qualifier;
+import org.springframework.security.oauth2.jwt.BadJwtException;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.security.oauth2.jwt.JwtDecoder;
 import org.springframework.security.oauth2.jwt.JwtException;
@@ -55,11 +56,13 @@ public class DelegatingJwtDecoder implements JwtDecoder {
     String jti = jwt.getId();
     String subject = jwt.getSubject();
     Instant issuedAt = jwt.getIssuedAt();
+    // BadJwtException (not a plain JwtException) so the resource server maps these to a 401
+    // (InvalidBearerTokenException) rather than a 500 (AuthenticationServiceException).
     if (jti == null || subject == null || issuedAt == null) {
-      throw new JwtException("Token missing a required claim (jti/sub/iat)");
+      throw new BadJwtException("Token missing a required claim (jti/sub/iat)");
     }
     if (tokenRevocationService.isRevoked(jti, subject, issuedAt)) {
-      throw new JwtException("Token has been revoked");
+      throw new BadJwtException("Token has been revoked");
     }
     return jwt;
   }
