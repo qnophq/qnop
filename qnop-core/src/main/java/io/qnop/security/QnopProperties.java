@@ -23,6 +23,7 @@ package io.qnop.security;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Pattern;
+import java.time.Duration;
 import java.util.List;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.validation.annotation.Validated;
@@ -50,6 +51,11 @@ public record QnopProperties(@Valid Auth auth, @Valid Cors cors) {
    * @param encryptionKey password for symmetric text encryption; must be a strong, non-default
    *     secret
    * @param encryptionSalt hex-encoded salt for symmetric text encryption (Encryptors.delux)
+   * @param accessTokenTtl lifetime of a self-issued access token (default 15m, issue #17)
+   * @param refreshTokenTtl lifetime of a refresh token / its cookie (default 7d, issue #17)
+   * @param issuer the {@code iss} claim of self-issued tokens (default {@code qnop})
+   * @param cookieSecure whether the refresh cookie carries {@code Secure} (default true; set false
+   *     only for local HTTP dev — browsers drop {@code Secure} cookies on plain HTTP)
    */
   public record Auth(
       @ValidSecret String jwtSecret,
@@ -59,7 +65,19 @@ public record QnopProperties(@Valid Auth auth, @Valid Cors cors) {
               regexp = "^[0-9a-fA-F]{16,}$",
               message =
                   "qnop.auth.encryption-salt must be a hex-encoded string of at least 16 characters")
-          String encryptionSalt) {}
+          String encryptionSalt,
+      Duration accessTokenTtl,
+      Duration refreshTokenTtl,
+      String issuer,
+      Boolean cookieSecure) {
+
+    public Auth {
+      accessTokenTtl = accessTokenTtl != null ? accessTokenTtl : Duration.ofMinutes(15);
+      refreshTokenTtl = refreshTokenTtl != null ? refreshTokenTtl : Duration.ofDays(7);
+      issuer = (issuer == null || issuer.isBlank()) ? "qnop" : issuer;
+      cookieSecure = cookieSecure == null ? Boolean.TRUE : cookieSecure;
+    }
+  }
 
   /**
    * Cross-origin resource sharing policy.

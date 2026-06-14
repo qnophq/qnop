@@ -24,6 +24,9 @@ dependencies {
     implementation(libs.spring.boot.starter.actuator)
     // Servlet security filter chain (io.qnop.web.security, issue #10 / ADR-0022).
     implementation(libs.spring.boot.starter.security)
+    // Resource-server filter that validates the bearer JWT on each request, plus
+    // the JWT (Nimbus) types used by the web-layer decoder/cookie glue (issue #17).
+    implementation(libs.spring.boot.starter.oauth2.resource.server)
     // The bootstrap registers the sibling data packages explicitly via
     // @EntityScan / @EnableJpaRepositories (issue #11), so this module takes a
     // direct JPA dependency for those compile-time symbols (Hibernate itself
