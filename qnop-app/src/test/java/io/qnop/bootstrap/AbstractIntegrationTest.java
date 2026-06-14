@@ -33,7 +33,9 @@ import org.testcontainers.junit.jupiter.Testcontainers;
  * (Testcontainers, ADR-0020) and supplies strong {@code QNOP_AUTH_*} secrets so the security
  * foundation's fail-fast validation (ADR-0021) is satisfied. Requires Docker.
  */
-@SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
+@SpringBootTest(
+    classes = QnopApplication.class,
+    webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 @Testcontainers
 public abstract class AbstractIntegrationTest {
 
