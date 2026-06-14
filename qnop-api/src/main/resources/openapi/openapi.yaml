@@ -147,6 +147,242 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
+  /admin/email/test:
+    post:
+      tags:
+        - AdminEmail
+      summary: Send a test email
+      description: |
+        Sends a fixed test message to the given recipient using the current SMTP
+        settings, to verify mail delivery. Superadmin only. Never returns a 5xx
+        for a delivery problem — the outcome is reported in the body `status`.
+      operationId: sendTestEmail
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SendTestEmailRequest'
+      responses:
+        '200':
+          description: Send attempt completed (see `status` for the outcome)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SendTestEmailResponse'
+        '400':
+          description: Invalid recipient
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Caller is not a superadmin
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /admin/email/templates:
+    get:
+      tags:
+        - AdminEmail
+      summary: List mail templates
+      description: |
+        Returns the effective content of every known mail template at the
+        configured default locale, marking whether each comes from a stored
+        override (`DATABASE`) or the built-in default (`DEFAULT`). Superadmin only.
+      operationId: listMailTemplates
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: All mail templates
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MailTemplateListResponse'
+        '401':
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Caller is not a superadmin
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /admin/email/templates/{key}:
+    get:
+      tags:
+        - AdminEmail
+      summary: Get a mail template
+      operationId: getMailTemplate
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/MailTemplateKeyParam'
+      responses:
+        '200':
+          description: The effective template content
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MailTemplateResponse'
+        '404':
+          description: Unknown template key
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Caller is not a superadmin
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+    put:
+      tags:
+        - AdminEmail
+      summary: Create or update a mail template override
+      operationId: updateMailTemplate
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/MailTemplateKeyParam'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateMailTemplateRequest'
+      responses:
+        '200':
+          description: The saved template
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MailTemplateResponse'
+        '400':
+          description: Invalid template content
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Unknown template key
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Caller is not a superadmin
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+    delete:
+      tags:
+        - AdminEmail
+      summary: Reset a mail template to its default
+      description: Removes the stored override, reverting to the built-in default.
+      operationId: resetMailTemplate
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/MailTemplateKeyParam'
+      responses:
+        '204':
+          description: Override removed (or none existed)
+        '404':
+          description: Unknown template key
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Caller is not a superadmin
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /admin/email/templates/{key}/preview:
+    post:
+      tags:
+        - AdminEmail
+      summary: Preview a mail template
+      description: |
+        Renders the template with the supplied variables (or representative sample
+        data when none are given), without sending. Superadmin only.
+      operationId: previewMailTemplate
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/MailTemplateKeyParam'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PreviewMailTemplateRequest'
+      responses:
+        '200':
+          description: The rendered preview
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MailTemplatePreviewResponse'
+        '400':
+          description: Render error (e.g. a referenced variable is missing)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Unknown template key
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Caller is not a superadmin
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
   /auth/login:
     post:
       tags:
@@ -287,6 +523,14 @@ components:
         `Authorization: Bearer <token>` on authenticated endpoints. The auth flow
         itself is introduced in a later issue; the scheme is declared here so the
         contract is complete from the first endpoint.
+  parameters:
+    MailTemplateKeyParam:
+      name: key
+      in: path
+      required: true
+      description: The template storage key (e.g. `auth.password_reset`).
+      schema:
+        type: string
   schemas:
     Edition:
       type: string
@@ -510,6 +754,122 @@ components:
         - accessToken
         - tokenType
         - expiresInSeconds
+    SendTestEmailRequest:
+      type: object
+      description: Request to send a test email.
+      properties:
+        recipient:
+          type: string
+          format: email
+          description: Address the test message is sent to.
+      required:
+        - recipient
+    SendStatus:
+      type: string
+      description: Outcome of a mail send attempt.
+      enum:
+        - SENT
+        - SKIPPED
+        - FAILED
+    SendTestEmailResponse:
+      type: object
+      description: Outcome of a test-email send (never a transport-level error to the client).
+      properties:
+        status:
+          $ref: '#/components/schemas/SendStatus'
+        detail:
+          type: string
+          description: Human-readable detail (e.g. "SMTP is not configured").
+      required:
+        - status
+        - detail
+    MailTemplateSource:
+      type: string
+      description: Where the effective template content originates.
+      enum:
+        - DATABASE
+        - DEFAULT
+    MailTemplateResponse:
+      type: object
+      description: The effective content of one mail template.
+      properties:
+        key:
+          type: string
+          description: Stable template storage key (e.g. `auth.password_reset`).
+        locale:
+          type: string
+        subject:
+          type: string
+        bodyPlain:
+          type: string
+        bodyHtml:
+          type: string
+          description: Optional HTML alternative; absent when the template is plain-text only.
+        source:
+          $ref: '#/components/schemas/MailTemplateSource'
+        updatedAt:
+          type: string
+          format: date-time
+          description: When a stored override was last saved; absent for built-in defaults.
+        updatedBy:
+          type: string
+          description: Id of the admin who last saved the override; absent for built-in defaults.
+      required:
+        - key
+        - locale
+        - subject
+        - bodyPlain
+        - source
+    MailTemplateListResponse:
+      type: object
+      properties:
+        templates:
+          type: array
+          items:
+            $ref: '#/components/schemas/MailTemplateResponse'
+      required:
+        - templates
+    UpdateMailTemplateRequest:
+      type: object
+      description: Create-or-update a per-locale template override.
+      properties:
+        locale:
+          type: string
+        subject:
+          type: string
+        bodyPlain:
+          type: string
+        bodyHtml:
+          type: string
+          description: Optional HTML alternative.
+      required:
+        - locale
+        - subject
+        - bodyPlain
+    PreviewMailTemplateRequest:
+      type: object
+      description: Render a template without sending.
+      properties:
+        locale:
+          type: string
+          description: Locale to render; falls back to the default language when omitted.
+        variables:
+          type: object
+          additionalProperties:
+            type: string
+          description: Template variables; representative sample data is used when omitted.
+    MailTemplatePreviewResponse:
+      type: object
+      properties:
+        subject:
+          type: string
+        bodyPlain:
+          type: string
+        bodyHtml:
+          type: string
+      required:
+        - subject
+        - bodyPlain
     ErrorResponse:
       type: object
       description: |

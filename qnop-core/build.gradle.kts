@@ -39,7 +39,14 @@ dependencies {
     implementation(libs.spring.security.oauth2.jose)
     implementation(libs.caffeine)
 
+    // Mail subsystem (issue #19): runtime SMTP (JavaMailSender) + logic-less
+    // Mustache rendering of DB-stored, admin-editable templates.
+    implementation(libs.spring.boot.starter.mail)
+    implementation(libs.jmustache)
+
     testImplementation(platform(libs.junit.bom))
     testImplementation(libs.junit.jupiter)
     testRuntimeOnly(libs.junit.platform.launcher)
+    // Brings AssertJ + Mockito for the mail-layer unit tests (stubbed JavaMailSender).
+    testImplementation(libs.spring.boot.starter.test)
 }
