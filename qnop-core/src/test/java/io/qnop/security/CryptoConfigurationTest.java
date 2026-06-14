@@ -40,7 +40,11 @@ class CryptoConfigurationTest {
         new QnopProperties.Auth(
             "crypto-test-jwt-secret-0123456789-abc",
             "crypto-test-encryption-key-0123456789",
-            "0123456789abcdef0123456789abcdef"),
+            "0123456789abcdef0123456789abcdef",
+            null,
+            null,
+            null,
+            null),
         new QnopProperties.Cors(List.of()));
   }
 

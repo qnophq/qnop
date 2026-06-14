@@ -77,15 +77,6 @@ public record QnopProperties(@Valid Auth auth, @Valid Cors cors) {
       issuer = (issuer == null || issuer.isBlank()) ? "qnop" : issuer;
       cookieSecure = cookieSecure == null ? Boolean.TRUE : cookieSecure;
     }
-
-    /**
-     * Convenience constructor for the secret-only fields; token/cookie settings fall back to their
-     * defaults. Spring binds via the canonical record constructor, so this is for programmatic
-     * construction (mainly tests) only.
-     */
-    public Auth(String jwtSecret, String encryptionKey, String encryptionSalt) {
-      this(jwtSecret, encryptionKey, encryptionSalt, null, null, null, null);
-    }
   }
 
   /**

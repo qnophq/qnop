@@ -38,7 +38,11 @@ class JwtKeyServiceTest {
             new QnopProperties.Auth(
                 "jwt-key-service-test-secret-0123456789",
                 "jwt-key-service-test-enckey-0123456789",
-                "0123456789abcdef0123456789abcdef"),
+                "0123456789abcdef0123456789abcdef",
+                null,
+                null,
+                null,
+                null),
             new QnopProperties.Cors(List.of()));
     return new JwtKeyService(properties);
   }
