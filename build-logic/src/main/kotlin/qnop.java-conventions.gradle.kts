@@ -1,3 +1,4 @@
+// Copyright (c) 2026-present devtank42 GmbH
 // SPDX-License-Identifier: AGPL-3.0-only
 //
 // Shared Java conventions for every qnop module: toolchain, formatting,
@@ -29,8 +30,9 @@ tasks.withType<JavaCompile>().configureEach {
 spotless {
     java {
         googleJavaFormat()
-        // ADR-0007: every source file carries an SPDX identifier.
-        licenseHeader("// SPDX-License-Identifier: AGPL-3.0-only\n\n")
+        // ADR-0007 + ADR-0019: every source file carries a copyright notice and
+        // an SPDX identifier. The block lives in the root `license-header.txt`.
+        licenseHeaderFile(rootProject.file("license-header.txt"))
         removeUnusedImports()
         trimTrailingWhitespace()
         endWithNewline()

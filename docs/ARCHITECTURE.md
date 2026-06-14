@@ -2,6 +2,8 @@
 
 qnop ("Qualified Notes on Papers") is an enterprise **document review** system. Reviewers (individual users or teams) mark up lines/regions of a document, comment, and run a coordinated review workflow: comments are accepted or rejected, changes produce new document versions, and a review finalizes when no open annotations remain.
 
+**Supported formats — text first.** The initial scope is reviewing **textual documents: PDF, DOCX, and Markdown (`.md`)**. Other formats (e.g. images, and possibly more later) may follow once the text workflow is solid; those additional formats are a likely **Enterprise** feature rather than Community scope. The ingest → extract/anchor → render pipeline is designed so a new format is an added implementation behind the existing seams (cf. [ADR-0009](adr/0009-multi-layer-annotation-anchoring.md), [ADR-0010](adr/0010-docx-representation-strategy.md)), not a core rewrite.
+
 This document is the map. The binding decisions and their rationale live as [ADRs](adr/README.md); this overview links to them rather than repeating them.
 
 ## Distribution model (open-core)

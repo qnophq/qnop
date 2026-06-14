@@ -1,3 +1,4 @@
+// Copyright (c) 2026-present devtank42 GmbH
 // SPDX-License-Identifier: AGPL-3.0-only
 //
 // qnop-spi — the extension-point boundary between the AGPL core and commercial

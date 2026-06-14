@@ -1,3 +1,4 @@
+// Copyright (c) 2026-present devtank42 GmbH
 // SPDX-License-Identifier: AGPL-3.0-only
 //
 // qnop-web — the runnable Community module: @RestControllers implementing the

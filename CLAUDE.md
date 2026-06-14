@@ -4,19 +4,25 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project
 
-**qnop** — "Qualified Notes on Papers": an enterprise **document review** system. Reviewers (individual users or teams) mark up lines/regions of PDF/DOCX documents, comment, and run a coordinated review workflow (comments accepted/rejected → new document versions → finalized when no open annotations remain). Open-core: an AGPL Community edition plus commercial add-ons (e.g. AI features) and a possible SaaS.
+**qnop** — "Qualified Notes on Papers": an enterprise **document review** system. Reviewers (individual users or teams) mark up lines/regions of documents, comment, and run a coordinated review workflow (comments accepted/rejected → new document versions → finalized when no open annotations remain). Open-core: an AGPL Community edition plus commercial add-ons (e.g. AI features) and a possible SaaS.
+
+**Scope of supported formats.** The focus is on reviewing **textual documents first — PDF, DOCX, and Markdown (`.md`)**. Other formats (e.g. images, and later possibly more) may follow once the text workflow is solid; such additional formats are a likely **Enterprise** feature rather than Community scope. Design the ingest/anchoring/rendering seams so a new format is an added implementation, not a core rewrite.
 
 Read `docs/ARCHITECTURE.md` and `docs/adr/` first — they hold the binding decisions and rationale.
 
 ## Working rules (binding — see ADR-0008)
 
 1. **Issue first** — every change starts with a GitHub issue.
-2. **Never commit or push to `main`** — it is integration-only/protected.
-3. **Feature branch → PR** — branches `feat/…`, `fix/…`, `docs/…`, `chore/…`; the PR references its issue.
-4. **Claude attribution everywhere** — commits get a `Co-Authored-By: Claude <noreply@anthropic.com>` trailer; issues and PRs get an attribution line in the body (e.g. `🤖 Mitarbeit: Claude … via Claude Code`).
+2. **Never commit or push to `main`** — it is integration-only/protected (ruleset deferred until the repo is public or the org is on Team — see ADR-0018; convention is binding now).
+3. **Feature branch → PR** — branch names follow Conventional Branch (rule 9): `feat/…`, `fix/…`, `chore/…`, `hotfix/…`, `release/…`; the PR references its issue.
+4. **Claude attribution everywhere** — commits get a `Co-Authored-By: Claude <noreply@anthropic.com>` trailer; issues and PRs get an attribution line in the body: `🤖 Co-Author: Claude (Opus 4.x) via Claude Code`.
 5. **Record important architecture decisions as ADRs** in `docs/adr/` (template in its README). Add the ADR in the same PR as the change.
+6. **Sign the CLA** (`CLA.md`, ADR-0016) — enforced on PRs by the CLA-Assistant workflow; maintainers/bots are allowlisted.
+7. **English everywhere in the project** — issues, PR descriptions, commit messages, documentation, ADRs, and code comments are written in English. This holds even when the working chat language is German: chat may be German, but anything that lands in the repo, an issue, or a PR is English.
+8. **Clean copyright on every source file** — the copyright + SPDX header from the root `license-header.txt` (`Copyright (c) 2026-present devtank42 GmbH`, AGPL-3.0-only). Enforced for Java via Spotless; see ADR-0019. Run `./gradlew spotlessApply` before committing.
+9. **Conventional Commits & Conventional Branches** — commit messages follow [Conventional Commits](https://www.conventionalcommits.org/en/v1.0.0/) (`<type>: <subject>`, types `feat|fix|refactor|docs|test|chore|perf|ci|build`). Branch names follow [Conventional Branch](https://conventionalbranch.org/): `<type>/<kebab-description>`, type ∈ `{feat, fix, hotfix, release, chore}` (`feat`/`fix` are the accepted short forms of `feature`/`bugfix`), lowercase + hyphens only, optional issue number — e.g. `feat/issue-123-new-login`. `main`/`master`/`develop` carry no prefix.
 
-Commits follow Conventional Commits and are signed off (`git commit -s`, DCO). See `CONTRIBUTING.md`.
+Commits are signed off (`git commit -s`, DCO). See `CONTRIBUTING.md`.
 
 ## Current state — Phase 0
 
@@ -28,6 +34,7 @@ A compiling **skeleton**, not a running app. Deliberately deferred to **Phase 1*
 - **Frontend**: Vite + React 19 + TypeScript + MaterialUI, package manager **pnpm** (`frontend/`).
 - **Persistence**: PostgreSQL + Liquibase; S3-compatible object storage (MinIO locally) for binary documents.
 - **Quality**: Spotless (google-java-format + SPDX header), ArchUnit (layered boundaries), JUnit 5.
+- **Dependencies**: self-hosted Renovate via GitHub Actions; org preset in public `qnophq/.github`, extended by `.github/renovate.json` (ADR-0017). Don't hand-bump deps; review Renovate PRs.
 
 ## Common commands
 
