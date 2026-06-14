@@ -90,6 +90,8 @@ public class SecurityConfiguration {
                     .requestMatchers(
                         "/api/v1/auth/login", "/api/v1/auth/refresh", "/api/v1/auth/logout")
                     .permitAll()
+                    .requestMatchers("/api/v1/admin/**")
+                    .hasRole("SUPERADMIN")
                     .anyRequest()
                     .authenticated())
         .oauth2ResourceServer(oauth2 -> oauth2.jwt(jwt -> jwt.decoder(jwtDecoder)))

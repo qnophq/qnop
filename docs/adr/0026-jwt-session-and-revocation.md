@@ -1,4 +1,4 @@
-# ADR-0025: JWT access tokens, rotating refresh tokens, and revocation
+# ADR-0026: JWT access tokens, rotating refresh tokens, and revocation
 
 - **Status:** Accepted
 - **Date:** 2026-06-15
