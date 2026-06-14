@@ -27,6 +27,7 @@ import java.util.EnumSet;
 import java.util.Properties;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicReference;
+import org.springframework.context.annotation.Lazy;
 import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.mail.javamail.JavaMailSenderImpl;
 import org.springframework.stereotype.Component;
@@ -54,7 +55,10 @@ public class MailSenderProvider implements SettingsChangeListener {
   private final ApplicationSettingsService settings;
   private final AtomicReference<JavaMailSender> cached = new AtomicReference<>();
 
-  public MailSenderProvider(ApplicationSettingsService settings) {
+  // @Lazy breaks the construction cycle: ApplicationSettingsService injects the
+  // List<SettingsChangeListener> (which includes this bean), while this bean
+  // needs the settings service. A lazy proxy defers resolution until first use.
+  public MailSenderProvider(@Lazy ApplicationSettingsService settings) {
     this.settings = settings;
   }
 
