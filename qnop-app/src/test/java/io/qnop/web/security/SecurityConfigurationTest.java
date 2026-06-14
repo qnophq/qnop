@@ -49,7 +49,11 @@ class SecurityConfigurationTest extends AbstractIntegrationTest {
 
   @Test
   void healthEndpointIsPublic() throws Exception {
-    assertThat(get("/actuator/health").statusCode()).isEqualTo(200);
+    // "Public" means the security chain does not challenge the request — it must not be
+    // 401/403. The health status itself (UP, 200) is asserted by QnopApplicationContextTest;
+    // asserting it here too would couple this test to transient health aggregation (e.g. a
+    // brief 503 during readiness/shutdown).
+    assertThat(get("/actuator/health").statusCode()).isNotIn(401, 403);
   }
 
   @Test
