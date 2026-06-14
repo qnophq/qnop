@@ -12,7 +12,7 @@ services:
     image: postgres:17
     environment:
       POSTGRES_USER: ${POSTGRES_USER:-qnop}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-qnop_dev}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-qnop}
       POSTGRES_DB: ${POSTGRES_DB:-qnop}
     ports:
       - '${POSTGRES_PORT:-5432}:5432'
@@ -31,7 +31,7 @@ services:
     command: server /data --console-address ":9001"
     environment:
       MINIO_ROOT_USER: ${S3_ACCESS_KEY:-qnop}
-      MINIO_ROOT_PASSWORD: ${S3_SECRET_KEY:-qnop_dev_secret}
+      MINIO_ROOT_PASSWORD: ${S3_SECRET_KEY:-qnop_secret}
     ports:
       - '${S3_PORT:-9000}:9000' # S3 API
       - '${S3_CONSOLE_PORT:-9001}:9001' # web console

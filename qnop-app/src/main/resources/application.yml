@@ -1,15 +1,17 @@
 # SPDX-License-Identifier: AGPL-3.0-only
 #
 # Base application config for the qnop Community server (ADR-0020).
-# Datasource defaults target the local docker-compose Postgres; production must
-# override via the environment (QNOP_DB_* or standard SPRING_DATASOURCE_*).
+# The datasource reads the same POSTGRES_* variables that docker-compose uses
+# (see .env.example), so a single .env drives both the DB container and the app.
+# Defaults target the local docker-compose Postgres; production overrides via the
+# environment (POSTGRES_* or the standard SPRING_DATASOURCE_* keys).
 spring:
   application:
     name: qnop
   datasource:
-    url: ${QNOP_DB_URL:jdbc:postgresql://localhost:5432/qnop}
-    username: ${QNOP_DB_USERNAME:qnop}
-    password: ${QNOP_DB_PASSWORD:qnop_dev}
+    url: jdbc:postgresql://${POSTGRES_HOST:localhost}:${POSTGRES_PORT:5432}/${POSTGRES_DB:qnop}
+    username: ${POSTGRES_USER:qnop}
+    password: ${POSTGRES_PASSWORD:qnop}
   jpa:
     # Liquibase owns the schema; Hibernate never alters it.
     hibernate:
