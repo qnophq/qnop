@@ -28,23 +28,23 @@ jobs:
       # conformance tests via the `check` task.
       - run: ./gradlew build --stacktrace
 
-  frontend:
+  qnop-ui:
     name: Frontend (lint + format + build)
     runs-on: ubuntu-latest
     defaults:
       run:
-        working-directory: frontend
+        working-directory: qnop-ui
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
         with:
-          # action runs from the repo root; read the pnpm version from frontend/
-          package_json_file: frontend/package.json
+          # action runs from the repo root; read the pnpm version from qnop-ui/
+          package_json_file: qnop-ui/package.json
       - uses: actions/setup-node@v4
         with:
           node-version: '24'
           cache: pnpm
-          cache-dependency-path: frontend/pnpm-lock.yaml
+          cache-dependency-path: qnop-ui/pnpm-lock.yaml
       - run: pnpm install --frozen-lockfile
       - run: pnpm format:check
       - run: pnpm lint
