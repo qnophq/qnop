@@ -10,7 +10,7 @@ Phase 0 left a compiling skeleton with no runnable server. Phase 1 (identity & a
 
 ## Decision
 
-- **`qnop-web` is the bootable module.** It carries the Spring Boot Gradle plugin; `io.qnop.bootstrap.QnopApplication` is the entry point. Because the layered modules use sibling packages, scanning is pointed at the `io.qnop` root with explicit `@EntityScan("io.qnop.entity")` and `@EnableJpaRepositories("io.qnop.repository")`.
+- **`qnop-app` is the bootable module.** It carries the Spring Boot Gradle plugin; `io.qnop.bootstrap.QnopApplication` is the entry point. Because the layered modules use sibling packages, component scanning is pointed at the `io.qnop` root via `@SpringBootApplication(scanBasePackages = "io.qnop")`. Explicit `@EntityScan`/`@EnableJpaRepositories` for `io.qnop.entity`/`io.qnop.repository` are added with the data model (#11), once entities and repositories exist.
 - **PostgreSQL is the database; Liquibase owns the schema.** The master changelog lives in `qnop-core` (`classpath:/db/changelog/db.changelog-master.yaml`); JPA runs with `hibernate.ddl-auto=none` so Hibernate never alters the schema. Real changesets land under `db/changelog/migrations/` from #11 onward.
 - **Versions via the Spring Boot BOM.** `spring-boot-dependencies` (imported with `platform(...)`) manages the Spring stack, JPA/Hibernate, the PostgreSQL driver, Liquibase and Testcontainers. The previous standalone `postgresql`/`liquibase` version pins are dropped in favour of the BOM.
 - **Configuration via environment.** `application.yml` reads `QNOP_DB_URL`/`QNOP_DB_USERNAME`/`QNOP_DB_PASSWORD` with local-dev defaults that match `docker-compose.yml`; production overrides via the environment.

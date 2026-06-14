@@ -5,9 +5,9 @@
 // build-logic/ (applied per module), NOT in allprojects/subprojects blocks.
 //
 // The Spring Boot plugin is declared here with `apply false` so it loads once in
-// the shared root classloader scope. Without this, applying it in qnop-web alone
+// the shared root classloader scope. Without this, applying it in qnop-app alone
 // splits the plugin classloader and Spotless's shared build service clashes with
-// its sibling modules. The runnable module (qnop-web) applies it without a version.
+// its sibling modules. The runnable module (qnop-app) applies it without a version.
 
 plugins {
     alias(libs.plugins.spring.boot) apply false

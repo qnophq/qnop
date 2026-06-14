@@ -28,5 +28,5 @@ include(
     "qnop-spi",   // published plugin contract: extension-point interfaces + DTOs (Spring-free)
     "qnop-api",   // published REST contract: request/response DTOs + OpenAPI (Spring-free)
     "qnop-core",  // entity/ repository/ service/ + SPI default beans (the Spring backend core)
-    "qnop-web",   // @RestControllers implementing qnop-api + Spring Boot bootstrap/config
+    "qnop-app",   // @RestControllers implementing qnop-api + Spring Boot bootstrap/config
 )

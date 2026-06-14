@@ -21,7 +21,7 @@ The seam between them is the SPI ([ADR-0002](adr/0002-open-core-via-polyrepo-and
 Layered architecture — `web → service → repository → entity` — enforced by ArchUnit ([ADR-0004](adr/0004-layered-architecture-enforced-by-archunit.md)), with two published, Spring-free contracts:
 
 ```
-qnop-web    @RestControllers + Spring Boot bootstrap (the runnable)   ──▶  qnop-api
+qnop-app    @RestControllers + Spring Boot bootstrap (the runnable)   ──▶  qnop-api
   │  calls                                                                  (published REST
   ▼                                                                          contract: DTOs+OpenAPI)
 qnop-core
@@ -34,9 +34,9 @@ qnop-core
 | Module | Spring? | Responsibility |
 |--------|---------|----------------|
 | `qnop-spi` | no | Published plugin contract: extension-point interfaces + DTOs. Consumed by the enterprise repo. |
-| `qnop-api` | no | Published REST contract: request/response DTOs + OpenAPI. Consumed externally and by `qnop-core`/`qnop-web`. |
+| `qnop-api` | no | Published REST contract: request/response DTOs + OpenAPI. Consumed externally and by `qnop-core`/`qnop-app`. |
 | `qnop-core` | yes | `io.qnop.entity` (JPA entities = the model), `io.qnop.repository` (Spring Data), `io.qnop.service` (business logic, workflow state machine, anchoring, entity⇄DTO mapping, SPI default beans). |
-| `qnop-web` | yes | `io.qnop.web` (`@RestController`s implementing `qnop-api`) + `io.qnop.bootstrap` (Spring Boot main/config). The runnable Community module; hosts the ArchUnit test. |
+| `qnop-app` | yes | `io.qnop.web` (`@RestController`s implementing `qnop-api`) + `io.qnop.bootstrap` (Spring Boot main/config). The runnable Community module; hosts the ArchUnit test. |
 
 ### Published artifacts
 

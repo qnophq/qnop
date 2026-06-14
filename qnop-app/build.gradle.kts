@@ -1,7 +1,7 @@
 // Copyright (c) 2026-present devtank42 GmbH
 // SPDX-License-Identifier: AGPL-3.0-only
 //
-// qnop-web — the runnable Community module: @RestControllers implementing the
+// qnop-app — the runnable Community module: @RestControllers implementing the
 // published qnop-api contract, plus the Spring Boot bootstrap/config
 // (io.qnop.bootstrap). Depends on qnop-core (services) and qnop-api (DTOs).
 // Hosts the architecture-conformance tests. This module carries the Spring Boot
