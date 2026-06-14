@@ -1,0 +1,216 @@
+# SPDX-License-Identifier: AGPL-3.0-only
+#
+# qnop REST API contract — single source of truth (ADR-0015, ADR-0021).
+# qnop-api-model generates DTOs from the `components/schemas`; qnop-api-endpoint
+# generates Spring MVC interfaces from the `paths`. URL versioning is /api/v1
+# (realized by a controller path prefix in qnop-app, see ApiPathConfig).
+openapi: 3.1.0
+info:
+  title: qnop API
+  version: v1
+  description: |
+    **qnop** ("Qualified Notes on Papers") is an enterprise document-review system.
+    This is the published, versioned REST contract consumed by the qnop frontend
+    and by third-party integrators. It carries `/api/v1` URL versioning and a
+    deprecation policy (ADR-0015).
+  license:
+    name: AGPL-3.0-only
+    url: https://www.gnu.org/licenses/agpl-3.0.html
+servers:
+  - url: /api/v1
+    description: Versioned API root
+tags:
+  - name: ServerConfig
+    description: |
+      Public, unauthenticated server configuration the frontend needs before a
+      user is authenticated (edition flag, branding, enabled login providers,
+      upload limits, supported document formats).
+paths:
+  /config:
+    get:
+      tags:
+        - ServerConfig
+      summary: Get public server configuration
+      description: |
+        Returns non-sensitive, operator-configurable server settings the client
+        needs before authentication — the running edition, branding, the enabled
+        OIDC login providers, the upload size limit, and the supported document
+        formats.
+
+        This endpoint is **public** (no authentication). The response is
+        intentionally small and stable: new top-level keys may be added, existing
+        ones are never removed.
+      operationId: getServerConfig
+      security: []
+      responses:
+        '200':
+          description: Current public server configuration
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ServerConfigResponse'
+              example:
+                version: "0.1.0-SNAPSHOT"
+                edition: COMMUNITY
+                general:
+                  siteName: qnop
+                  defaultTimezone: UTC
+                auth:
+                  oidcProviders: []
+                  selfRegistrationEnabled: false
+                upload:
+                  maxDocumentSizeMb: 50
+                supportedFormats:
+                  - PDF
+                  - DOCX
+                  - MD
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: |
+        JWT access token issued by the qnop auth subsystem (epic #7). Sent as
+        `Authorization: Bearer <token>` on authenticated endpoints. The auth flow
+        itself is introduced in a later issue; the scheme is declared here so the
+        contract is complete from the first endpoint.
+  schemas:
+    Edition:
+      type: string
+      description: |
+        The running qnop edition, determined by the classpath (ADR-0003): the
+        presence of the commercial JARs. `COMMUNITY` is the AGPL build.
+      enum:
+        - COMMUNITY
+        - ENTERPRISE
+    SupportedFormat:
+      type: string
+      description: A document format qnop can ingest and review.
+      enum:
+        - PDF
+        - DOCX
+        - MD
+    OidcProviderLoginInfo:
+      type: object
+      description: |
+        Public login information for one enabled OIDC provider. Only non-sensitive
+        fields appear here — never client secrets or issuer URIs.
+      properties:
+        id:
+          type: string
+          description: Stable provider id used to build the login URL.
+        name:
+          type: string
+          description: Human-readable provider name rendered on the login button.
+        loginUrl:
+          type: string
+          description: Relative URL the frontend redirects to in order to start login.
+      required:
+        - id
+        - name
+        - loginUrl
+    ServerConfigGeneral:
+      type: object
+      description: General, application-wide public configuration.
+      properties:
+        siteName:
+          type: string
+          description: |
+            Operator-branded display name shown in the browser tab, top bar, and
+            footer. DB-backed via application settings (issue #16); the frontend
+            falls back to `qnop` when empty.
+        defaultTimezone:
+          type: string
+          description: |
+            Server default timezone (IANA id, e.g. `UTC`, `Europe/Berlin`) used as
+            the display fallback for users without a personal preference.
+      required:
+        - siteName
+        - defaultTimezone
+    ServerConfigAuth:
+      type: object
+      description: |
+        Public authentication configuration used by the login page to render the
+        local form and any enabled OIDC provider buttons.
+      properties:
+        oidcProviders:
+          type: array
+          description: |
+            OIDC providers currently enabled in the database. Empty when none is
+            active. One "Login with <name>" button is rendered per entry (issue #21).
+          items:
+            $ref: '#/components/schemas/OidcProviderLoginInfo'
+        selfRegistrationEnabled:
+          type: boolean
+          description: |
+            Whether the operator has enabled public self-registration (issue #20).
+            The backend enforces the gate independently; flipping this client-side
+            cannot bypass the controller check.
+      required:
+        - oidcProviders
+        - selfRegistrationEnabled
+    ServerConfigUpload:
+      type: object
+      description: Upload-related public configuration.
+      properties:
+        maxDocumentSizeMb:
+          type: integer
+          format: int32
+          description: |
+            Maximum allowed document size in megabytes. Uploads exceeding this are
+            rejected with HTTP 413. Operator-configurable.
+      required:
+        - maxDocumentSizeMb
+    ServerConfigResponse:
+      type: object
+      description: |
+        Public, non-sensitive server configuration. Intentionally small and
+        stable — new top-level keys may be added, existing ones are not removed.
+      properties:
+        version:
+          type: string
+          description: |
+            Server version string (e.g. "0.1.0-SNAPSHOT"). Sourced from build
+            metadata at startup; "unknown" when build info is unavailable.
+        edition:
+          $ref: '#/components/schemas/Edition'
+        general:
+          $ref: '#/components/schemas/ServerConfigGeneral'
+        auth:
+          $ref: '#/components/schemas/ServerConfigAuth'
+        upload:
+          $ref: '#/components/schemas/ServerConfigUpload'
+        supportedFormats:
+          type: array
+          description: Document formats this server can ingest and review.
+          items:
+            $ref: '#/components/schemas/SupportedFormat'
+      required:
+        - version
+        - edition
+        - general
+        - auth
+        - upload
+        - supportedFormats
+    ErrorResponse:
+      type: object
+      description: |
+        Standard error envelope returned for non-2xx responses across the API.
+        Carries a stable machine-readable `code` and a human-readable `message`;
+        sensitive internals are never leaked (java/security rule).
+      properties:
+        code:
+          type: string
+          description: Stable, machine-readable error code (e.g. `NOT_FOUND`).
+        message:
+          type: string
+          description: Human-readable, non-sensitive error description.
+        timestamp:
+          type: string
+          format: date-time
+          description: Server timestamp (RFC 3339) when the error was produced.
+      required:
+        - code
+        - message
+        - timestamp

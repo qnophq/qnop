@@ -27,13 +27,7 @@ import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import org.junit.jupiter.api.Test;
-import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.web.server.LocalServerPort;
-import org.springframework.boot.testcontainers.service.connection.ServiceConnection;
-import org.springframework.test.context.ActiveProfiles;
-import org.testcontainers.containers.PostgreSQLContainer;
-import org.testcontainers.junit.jupiter.Container;
-import org.testcontainers.junit.jupiter.Testcontainers;
 
 /**
  * Boots the full Spring context against a real PostgreSQL (Testcontainers, ADR-0020), lets
@@ -41,13 +35,7 @@ import org.testcontainers.junit.jupiter.Testcontainers;
  * endpoint returns {@code 200 UP}. Uses the JDK HTTP client to stay free of any test-client
  * dependency. Requires Docker.
  */
-@SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
-@ActiveProfiles("test")
-@Testcontainers
-class QnopApplicationContextTest {
-
-  @Container @ServiceConnection
-  static PostgreSQLContainer<?> postgres = new PostgreSQLContainer<>("postgres:17");
+class QnopApplicationContextTest extends AbstractIntegrationTest {
 
   @LocalServerPort int port;
 

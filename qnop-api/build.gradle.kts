@@ -1,18 +1,11 @@
 // Copyright (c) 2026-present devtank42 GmbH
 // SPDX-License-Identifier: AGPL-3.0-only
 //
-// qnop-api — the PUBLISHED REST API contract (ADR-0015): request/response DTOs
-// and the OpenAPI definition. PURE types — no Spring/server dependencies — so
-// external consumers and a generated TS/SDK client can depend on it without
-// pulling the server. Implemented by qnop-app; versioned like qnop-spi.
-// (Contents land in Phase 1.)
-
-plugins {
-    id("qnop.java-conventions")
-}
-
-dependencies {
-    testImplementation(platform(libs.junit.bom))
-    testImplementation(libs.junit.jupiter)
-    testRuntimeOnly(libs.junit.platform.launcher)
-}
+// qnop-api — container project for the PUBLISHED REST API contract (ADR-0015,
+// ADR-0021). It builds nothing itself; it only holds the single source-of-truth
+// OpenAPI spec at src/main/resources/openapi/openapi.yaml. Two submodules
+// generate from that spec:
+//   - qnop-api-model    : pure, Spring-free DTOs (the external stability surface)
+//   - qnop-api-endpoint : Spring MVC interfaces implemented by qnop-app
+//
+// No plugins are applied here on purpose (no sources to compile/format).

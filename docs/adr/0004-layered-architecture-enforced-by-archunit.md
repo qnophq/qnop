@@ -4,6 +4,7 @@
 - **Date:** 2026-06-13
 - **Deciders:** qnop core team
 - **Supersedes:** the initial hexagonal/ports-and-adapters proposal (10 modules)
+- **Amended by:** [ADR-0021](0021-openapi-first-contract-tooling.md) — `qnop-api` is split into the `qnop-api-model` (pure DTOs) and `qnop-api-endpoint` (Spring MVC interfaces) submodules; the purity rule applies to the model package.
 
 ## Context
 
@@ -21,7 +22,7 @@ Adopt a **layered architecture in four Gradle modules**:
 | Module | Spring? | Role |
 |--------|---------|------|
 | `qnop-spi` | no | Published plugin contract — extension-point interfaces + DTOs. |
-| `qnop-api` | no | Published REST contract — request/response DTOs + OpenAPI. |
+| `qnop-api` | no | Published REST contract — request/response DTOs + OpenAPI. Split into `qnop-api-model` (pure DTOs) + `qnop-api-endpoint` (Spring MVC interfaces) per [ADR-0021](0021-openapi-first-contract-tooling.md). |
 | `qnop-core` | yes | `io.qnop.entity` (JPA entities = the model), `io.qnop.repository` (Spring Data), `io.qnop.service` (business logic, workflow state machine, anchoring, API mapping, SPI default beans). |
 | `qnop-app` | yes | `io.qnop.web` (`@RestController`s implementing `qnop-api`) + `io.qnop.bootstrap` (Spring Boot main/config). The runnable Community module. |
 

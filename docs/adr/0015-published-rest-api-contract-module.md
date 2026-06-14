@@ -3,6 +3,7 @@
 - **Status:** Accepted
 - **Date:** 2026-06-13
 - **Deciders:** qnop core team
+- **Amended by:** [ADR-0021](0021-openapi-first-contract-tooling.md) — resolves the contract-first decision deferred below (OpenAPI is the source of truth) and splits the module into `qnop-api-model` (Spring-free DTOs; purity enforced here) + `qnop-api-endpoint` (generated Spring MVC interfaces).
 
 ## Context
 

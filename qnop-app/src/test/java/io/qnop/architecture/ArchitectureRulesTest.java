@@ -62,9 +62,15 @@ class ArchitectureRulesTest {
             .definedBy("io.qnop.service..")
             .layer("Web")
             .definedBy("io.qnop.web..", "io.qnop.bootstrap..")
+            .layer("Security")
+            .definedBy("io.qnop.security..")
             // Spi is intentionally consumable by everyone (plugin contract).
             .whereLayer("Web")
             .mayNotBeAccessedByAnyLayer()
+            // The security/crypto foundation (ADR-0022) is used by the service and web
+            // layers; it never depends back on them (see securityFoundationStaysPure).
+            .whereLayer("Security")
+            .mayOnlyBeAccessedByLayers("Web", "Service")
             .whereLayer("Service")
             .mayOnlyBeAccessedByLayers("Web")
             .whereLayer("Repository")
@@ -104,14 +110,17 @@ class ArchitectureRulesTest {
   }
 
   @Test
-  void restApiContractStaysPure() {
-    // qnop-api is the published REST contract (ADR-0015): DTOs + OpenAPI only,
-    // free of framework and internal-module dependencies so external consumers
-    // can depend on it without pulling the server.
+  void restApiModelStaysPure() {
+    // qnop-api-model is the published REST DTO surface (ADR-0015, ADR-0021):
+    // generated POJOs only, free of Spring and internal-module dependencies so
+    // external consumers (and a generated TS/SDK client) can depend on it without
+    // pulling the server. The Spring MVC *interfaces* live in qnop-api-endpoint
+    // (io.qnop.api.v1.endpoint, NOT ...model) and intentionally depend on Spring —
+    // implemented by the web layer, so only the model package is held to purity.
     ArchRule rule =
         ArchRuleDefinition.noClasses()
             .that()
-            .resideInAPackage("io.qnop.api..")
+            .resideInAPackage("io.qnop.api.v1.model..")
             .should()
             .dependOnClassesThat()
             .resideInAnyPackage(
@@ -121,6 +130,28 @@ class ArchitectureRulesTest {
                 "io.qnop.repository..",
                 "io.qnop.service..",
                 "io.qnop.web..")
+            .allowEmptyShould(true);
+
+    rule.check(QNOP_CLASSES);
+  }
+
+  @Test
+  void securityFoundationStaysPure() {
+    // io.qnop.security (qnop-core) is the framework-light crypto foundation (ADR-0022):
+    // it may use Spring, but must never depend on the application's own web, service,
+    // repository, entity or DTO layers — those depend on it, not the other way round.
+    ArchRule rule =
+        ArchRuleDefinition.noClasses()
+            .that()
+            .resideInAPackage("io.qnop.security..")
+            .should()
+            .dependOnClassesThat()
+            .resideInAnyPackage(
+                "io.qnop.web..",
+                "io.qnop.service..",
+                "io.qnop.repository..",
+                "io.qnop.entity..",
+                "io.qnop.api..")
             .allowEmptyShould(true);
 
     rule.check(QNOP_CLASSES);

@@ -18,10 +18,12 @@ dependencies {
     implementation(platform(libs.spring.boot.dependencies)) // BOM: manages versions
 
     implementation(project(":qnop-core"))
-    implementation(project(":qnop-api"))
+    implementation(project(":qnop-api:qnop-api-endpoint")) // generated Spring interfaces (+ DTOs transitively)
 
     implementation(libs.spring.boot.starter.web)
     implementation(libs.spring.boot.starter.actuator)
+    // Servlet security filter chain (io.qnop.web.security, issue #10 / ADR-0022).
+    implementation(libs.spring.boot.starter.security)
     // The bootstrap registers the sibling data packages explicitly via
     // @EntityScan / @EnableJpaRepositories (issue #11), so this module takes a
     // direct JPA dependency for those compile-time symbols (Hibernate itself
@@ -38,6 +40,12 @@ dependencies {
     testImplementation(libs.junit.jupiter)
     testImplementation(libs.archunit.junit5)
     testImplementation(libs.spring.boot.starter.test)
+    testImplementation(libs.spring.boot.webmvc.test) // @WebMvcTest slice (Boot 4 module)
+    testImplementation(libs.spring.security.test)
+    // The fail-fast binding test (QnopPropertiesBindingTest) drives Bean Validation +
+    // ValidationAutoConfiguration directly; qnop-core keeps validation as an
+    // implementation dependency, so the app test classpath needs it explicitly.
+    testImplementation(libs.spring.boot.starter.validation)
     testImplementation(libs.spring.boot.testcontainers)
     testImplementation(libs.testcontainers.postgresql)
     testImplementation(libs.testcontainers.junit.jupiter)

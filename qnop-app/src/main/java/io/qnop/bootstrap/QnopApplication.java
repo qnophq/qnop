@@ -20,8 +20,10 @@
  */
 package io.qnop.bootstrap;
 
+import io.qnop.security.QnopProperties;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
+import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.boot.persistence.autoconfigure.EntityScan;
 import org.springframework.data.jpa.repository.config.EnableJpaRepositories;
 
@@ -34,6 +36,7 @@ import org.springframework.data.jpa.repository.config.EnableJpaRepositories;
  * sibling packages, so they are registered explicitly (the data model arrived with issue #11).
  */
 @SpringBootApplication(scanBasePackages = "io.qnop")
+@EnableConfigurationProperties(QnopProperties.class)
 @EntityScan("io.qnop.entity")
 @EnableJpaRepositories("io.qnop.repository")
 public class QnopApplication {

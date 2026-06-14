@@ -15,14 +15,21 @@ dependencies {
     implementation(platform(libs.spring.boot.dependencies)) // BOM: manages versions
 
     implementation(project(":qnop-spi")) // implements the extension-point defaults
-    implementation(project(":qnop-api")) // maps to/from the published REST DTOs
+    // Maps entities to/from the published REST DTOs. Depends on the Spring-free
+    // model only (not qnop-api-endpoint) — the service layer must not see the
+    // Spring MVC interfaces (ADR-0021).
+    implementation(project(":qnop-api:qnop-api-model"))
 
     // Persistence: JPA entities + Spring Data repositories live in this module.
     implementation(libs.spring.boot.starter.data.jpa)
 
-    // Symmetric encryption for secrets at rest (oidc_provider.client_secret); the
-    // TextEncryptor + fail-fast key validation are the minimal slice of the security
-    // foundation (issue #10) brought forward for the identity schema (issue #11).
+    // Security & crypto foundation (issue #10, ADR-0022): the framework-light
+    // io.qnop.security layer — validated properties, BCrypt, TextEncryptor, HKDF.
+    // The servlet filter chain lives in qnop-app; core stays free of
+    // spring-security-web by depending only on spring-security-crypto. The
+    // identity schema (issue #11) uses TextEncryptor to encrypt the OIDC client
+    // secret at rest.
+    implementation(libs.spring.boot.starter.validation)
     implementation(libs.spring.security.crypto)
 
     testImplementation(platform(libs.junit.bom))

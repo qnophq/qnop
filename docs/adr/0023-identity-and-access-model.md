@@ -40,12 +40,12 @@ authenticated and externally provisioned (OIDC) users.
   `@UuidGenerator(style = VERSION_7)` (Hibernate ORM 7). Time-ordered UUIDs keep
   B-tree index locality without a DB round-trip; the local image is Postgres 17,
   which has no native `uuidv7()`.
-- **Client secrets are encrypted at rest.** The secret is stored via a JPA
-  `AttributeConverter` backed by a Spring Security `TextEncryptor`
-  (`Encryptors.delux`). The minimal crypto foundation — `qnop.auth.encryption-key`
-  / `encryption-salt` (env `QNOP_AUTH_*`) plus fail-fast validation that rejects a
-  blank or placeholder key — is **brought forward from #10** so no secret is ever
-  written in clear, starting with this first migration.
+- **Client secrets are encrypted at rest** via a JPA `AttributeConverter`
+  (`EncryptedStringConverter`) backed by the `TextEncryptor` from the
+  security/crypto foundation (`io.qnop.security.CryptoConfiguration`, ADR-0022).
+  The converter is a Spring bean, so Hibernate resolves it through Spring's bean
+  container and injects the application encryptor. `oidc_provider.client_secret`
+  is therefore never written in clear, from the first identity migration onward.
 
 ## Consequences
 
@@ -53,10 +53,9 @@ authenticated and externally provisioned (OIDC) users.
   linking is a deliberate future change (drop the `user_id` unique constraint).
 - Encrypted columns are non-deterministic and therefore cannot be queried or
   used as unique keys — acceptable, secrets are never lookup keys.
-- **Issue #10 is reduced:** the `TextEncryptor` + key validation are delivered
-  here. The broader `SecurityConfiguration` (filter chains, CSP/CORS, JWT/HKDF
-  derivation, the `io.qnop.security` package and its ArchUnit placement) remains
-  #10's scope.
+- Encryption depends on the security/crypto foundation (ADR-0022): the
+  `qnop.auth.encryption-key` / `encryption-salt` secrets must be configured, and
+  the context fails fast otherwise.
 - The test suite gains real-Postgres coverage of the CHECK/partial-unique/cascade
   behaviour (Testcontainers), which is the reason ADR-0020 chose Postgres over H2.
 

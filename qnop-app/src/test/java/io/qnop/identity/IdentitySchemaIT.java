@@ -23,6 +23,7 @@ package io.qnop.identity;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import io.qnop.bootstrap.AbstractIntegrationTest;
 import io.qnop.entity.OidcIdentity;
 import io.qnop.entity.OidcProvider;
 import io.qnop.entity.OidcProviderType;
@@ -34,30 +35,20 @@ import io.qnop.repository.UserRepository;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.boot.testcontainers.service.connection.ServiceConnection;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.jdbc.core.JdbcTemplate;
-import org.springframework.test.context.ActiveProfiles;
 import org.springframework.transaction.annotation.Transactional;
-import org.testcontainers.containers.PostgreSQLContainer;
-import org.testcontainers.junit.jupiter.Container;
-import org.testcontainers.junit.jupiter.Testcontainers;
 
 /**
  * Verifies the identity schema (issue #11) against a real PostgreSQL (ADR-0020): UUIDv7 generation,
  * the Postgres-only CHECK and partial-unique constraints that JPA cannot express, encryption of the
- * OIDC client secret at rest, and the {@code ON DELETE CASCADE} foreign keys. Each test runs in a
- * rolled-back transaction for isolation. Requires Docker.
+ * OIDC client secret at rest (via the {@code TextEncryptor} from the security foundation,
+ * ADR-0022), and the {@code ON DELETE CASCADE} foreign keys. Each test runs in a rolled-back
+ * transaction for isolation. Extends {@link AbstractIntegrationTest}, which boots the full context
+ * against Testcontainers and supplies the auth secrets. Requires Docker.
  */
-@SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.NONE)
-@ActiveProfiles("test")
-@Testcontainers
 @Transactional
-class IdentitySchemaIT {
-
-  @Container @ServiceConnection
-  static PostgreSQLContainer<?> postgres = new PostgreSQLContainer<>("postgres:17");
+class IdentitySchemaIT extends AbstractIntegrationTest {
 
   @Autowired UserRepository users;
   @Autowired OidcProviderRepository providers;

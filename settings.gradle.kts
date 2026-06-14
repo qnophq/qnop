@@ -22,11 +22,18 @@ dependencyResolutionManagement {
 
 // --- AGPL core modules ---------------------------------------------------
 // Layered architecture (see docs/adr/0004-layered-architecture-enforced-by-archunit.md).
-// Two modules are published, Spring-free contracts; commercial add-ons (in a
-// separate private repository) link only against qnop-spi (ADR-0002/0003).
+// Commercial add-ons (in a separate private repository) link only against
+// qnop-spi (ADR-0002/0003).
+//
+// The published REST contract (qnop-api) is split into two submodules (ADR-0021):
+// qnop-api-model holds the pure DTOs (Spring-free — the external stability
+// surface), qnop-api-endpoint the generated Spring MVC interfaces that qnop-app
+// implements. The `:qnop-api` container project is created implicitly by the
+// path-includes and carries only the shared OpenAPI spec.
 include(
-    "qnop-spi",   // published plugin contract: extension-point interfaces + DTOs (Spring-free)
-    "qnop-api",   // published REST contract: request/response DTOs + OpenAPI (Spring-free)
-    "qnop-core",  // entity/ repository/ service/ + SPI default beans (the Spring backend core)
-    "qnop-app",   // @RestControllers implementing qnop-api + Spring Boot bootstrap/config
+    "qnop-spi",                    // published plugin contract: extension-point interfaces + DTOs (Spring-free)
+    "qnop-api:qnop-api-model",     // published REST DTOs (java generator, models-only) — Spring-free
+    "qnop-api:qnop-api-endpoint",  // generated Spring MVC interfaces (spring generator, apis-only)
+    "qnop-core",                   // entity/ repository/ service/ + SPI default beans (the Spring backend core)
+    "qnop-app",                    // @RestControllers implementing qnop-api + Spring Boot bootstrap/config
 )
