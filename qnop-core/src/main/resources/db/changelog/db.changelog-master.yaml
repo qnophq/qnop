@@ -21,5 +21,8 @@ databaseChangeLog:
       file: migrations/0003-mail-template-schema.yaml
       relativeToChangelogFile: true
   - include:
+      file: migrations/0004-token-schema.yaml
+      relativeToChangelogFile: true
+  - include:
       file: migrations/0005-application-asset-schema.yaml
       relativeToChangelogFile: true
