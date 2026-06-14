@@ -18,8 +18,9 @@ Require every contributor to sign a **Contributor License Agreement** before the
 
 - `CLA.md` (repo root) states the grant: a perpetual, irrevocable copyright license **with the right to sublicense under any terms, including commercial**, plus a patent grant, representations, a corporate-contributor clause, and an explicit AI-agent clause (the human operator signs).
 - `.github/workflows/cla.yml` runs [`contributor-assistant/github-action`](https://github.com/contributor-assistant/github-action), pinned to a full commit SHA. Signatures are recorded in `signatures/cla.json` on a dedicated `cla-signatures` branch. The signing phrase is *"I have read the CLA Document and I hereby sign the CLA"*.
-- Allowlist: `bigpuritz,devtank42,*[bot]` (maintainers and bots are exempt).
-- The workflow requires a repo secret **`CLA_TOKEN`** (a fine-grained PAT with `contents` + `pull-requests` write) so the action can commit signatures and re-check status.
+- Allowlist: `bigpuritz,devtank42,*[bot]` (maintainers and bots are exempt). AI co-authors added via a `Co-Authored-By:` trailer (e.g. `Claude <noreply@anthropic.com>`) are **not** asked to sign — they have no GitHub login and, per CLA §8, the human operator signs, not the agent.
+- **One-time bootstrap (required):** the `cla-signatures` branch must already exist and be **unprotected**, holding an initialized `signatures/cla.json` (`{"signedContributors": []}`). The action does **not** create a non-default branch — without it the first run fails with *"Branch cla-signatures not found"*. (Bootstrapped as an orphan branch; the action then creates/updates the file itself.)
+- A repo secret **`CLA_TOKEN`** (PAT) is **optional** — useful for storing signatures in a remote repo or for extra robustness. The default `GITHUB_TOKEN` (with the job's `contents`/`pull-requests` write scopes) is sufficient for same-repo signature storage; verified green with no PAT set.
 
 ### Security model (the reason this ADR exists)
 
@@ -35,7 +36,7 @@ The `issue_comment` trigger is filtered to PR comments only (`github.event.issue
 
 - Easier: the project can legally offer commercial editions of contributed code; provenance is auditable in `signatures/cla.json`.
 - Harder: first-time external contributors must take one extra step (post the signing comment). The bot guides them automatically.
-- Operational dependency: the `CLA_TOKEN` secret must exist, or the workflow cannot record signatures. This is a one-time maintainer setup.
+- One-time setup: the unprotected `cla-signatures` branch with an initialized `signatures/cla.json` must exist before the first run (the action does not auto-create it). No secret is strictly required — `GITHUB_TOKEN` suffices; `CLA_TOKEN` stays optional.
 - The CLA is referenced from `CONTRIBUTING.md` (ADR-0008 workflow).
 
 ## Alternatives considered
