@@ -32,6 +32,8 @@ import io.qnop.entity.UserSource;
 import io.qnop.repository.OidcIdentityRepository;
 import io.qnop.repository.OidcProviderRepository;
 import io.qnop.repository.UserRepository;
+import jakarta.persistence.EntityManager;
+import jakarta.persistence.PersistenceContext;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -54,6 +56,7 @@ class IdentitySchemaIT extends AbstractIntegrationTest {
   @Autowired OidcProviderRepository providers;
   @Autowired OidcIdentityRepository identities;
   @Autowired JdbcTemplate jdbc;
+  @PersistenceContext EntityManager entityManager;
 
   @Test
   void persistsInternalUserWithGeneratedUuidV7() {
@@ -133,7 +136,11 @@ class IdentitySchemaIT extends AbstractIntegrationTest {
     UUID identityId = identity.getId();
 
     users.deleteById(user.getId());
-    users.flush();
+    // Flush the DELETE so the DB-level ON DELETE CASCADE fires, then clear the
+    // persistence context: the cascade happens in the database, outside Hibernate's
+    // awareness, so a cached OidcIdentity would otherwise mask the deletion.
+    entityManager.flush();
+    entityManager.clear();
 
     assertThat(identities.findById(identityId)).isEmpty();
   }
