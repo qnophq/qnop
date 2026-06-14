@@ -12,8 +12,13 @@ plugins {
 }
 
 dependencies {
+    implementation(platform(libs.spring.boot.dependencies)) // BOM: manages versions
+
     implementation(project(":qnop-spi")) // implements the extension-point defaults
     implementation(project(":qnop-api")) // maps to/from the published REST DTOs
+
+    // Persistence: JPA entities + Spring Data repositories live in this module.
+    implementation(libs.spring.boot.starter.data.jpa)
 
     testImplementation(platform(libs.junit.bom))
     testImplementation(libs.junit.jupiter)

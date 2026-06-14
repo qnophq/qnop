@@ -1,0 +1,13 @@
+# SPDX-License-Identifier: AGPL-3.0-only
+#
+# Liquibase master changelog (ADR-0020). Liquibase owns the schema; JPA runs
+# with ddl-auto=none. Real schema changesets land under
+# db/changelog/migrations/ and are wired in here as they are added (issue #11+).
+databaseChangeLog:
+  - changeSet:
+      id: 0000-baseline
+      author: qnop
+      comment: Baseline tag for a fresh database; no schema objects yet.
+      changes:
+        - tagDatabase:
+            tag: baseline
