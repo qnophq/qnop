@@ -4,7 +4,9 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project
 
-**qnop** — "Qualified Notes on Papers": an enterprise **document review** system. Reviewers (individual users or teams) mark up lines/regions of PDF/DOCX documents, comment, and run a coordinated review workflow (comments accepted/rejected → new document versions → finalized when no open annotations remain). Open-core: an AGPL Community edition plus commercial add-ons (e.g. AI features) and a possible SaaS.
+**qnop** — "Qualified Notes on Papers": an enterprise **document review** system. Reviewers (individual users or teams) mark up lines/regions of documents, comment, and run a coordinated review workflow (comments accepted/rejected → new document versions → finalized when no open annotations remain). Open-core: an AGPL Community edition plus commercial add-ons (e.g. AI features) and a possible SaaS.
+
+**Scope of supported formats.** The focus is on reviewing **textual documents first — PDF, DOCX, and Markdown (`.md`)**. Other formats (e.g. images, and later possibly more) may follow once the text workflow is solid; such additional formats are a likely **Enterprise** feature rather than Community scope. Design the ingest/anchoring/rendering seams so a new format is an added implementation, not a core rewrite.
 
 Read `docs/ARCHITECTURE.md` and `docs/adr/` first — they hold the binding decisions and rationale.
 
@@ -16,6 +18,8 @@ Read `docs/ARCHITECTURE.md` and `docs/adr/` first — they hold the binding deci
 4. **Claude attribution everywhere** — commits get a `Co-Authored-By: Claude <noreply@anthropic.com>` trailer; issues and PRs get an attribution line in the body (e.g. `🤖 Mitarbeit: Claude … via Claude Code`).
 5. **Record important architecture decisions as ADRs** in `docs/adr/` (template in its README). Add the ADR in the same PR as the change.
 6. **Sign the CLA** (`CLA.md`, ADR-0016) — enforced on PRs by the CLA-Assistant workflow; maintainers/bots are allowlisted.
+7. **English everywhere in the project** — issues, PR descriptions, commit messages, documentation, ADRs, and code comments are written in English. This holds even when the working chat language is German: chat may be German, but anything that lands in the repo, an issue, or a PR is English.
+8. **Clean copyright on every source file** — the copyright + SPDX header from the root `license-header.txt` (`Copyright (c) 2026-present devtank42 GmbH`, AGPL-3.0-only). Enforced for Java via Spotless; see ADR-0019. Run `./gradlew spotlessApply` before committing.
 
 Commits follow Conventional Commits and are signed off (`git commit -s`, DCO). See `CONTRIBUTING.md`.
 

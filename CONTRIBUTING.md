@@ -11,6 +11,10 @@ Thanks for contributing! qnop is the AGPL-3.0 Community core of an open-core pro
 5. **Sign the CLA** on your first PR (see below) — a bot will prompt you.
 6. CI must be green (backend build + ArchUnit + Spotless, frontend lint/build, SPDX check) before merge.
 
+## Language
+
+All project artifacts are written in **English**: issues, pull-request descriptions, commit messages, documentation, ADRs, and code comments. Maintainer chat may happen in another language, but anything that lands in the repo, an issue, or a PR is English.
+
 ## Commits
 
 Conventional Commits:
@@ -42,7 +46,7 @@ Work produced with Claude must be attributed:
 
 ## Code quality
 
-- **Backend**: `./gradlew spotlessApply` before committing; `./gradlew build` must pass (runs Spotless check + ArchUnit). Every source file needs an `SPDX-License-Identifier: AGPL-3.0-only` header.
+- **Backend**: `./gradlew spotlessApply` before committing; `./gradlew build` must pass (runs Spotless check + ArchUnit). Every source file carries the copyright + `SPDX-License-Identifier: AGPL-3.0-only` header from the root `license-header.txt` ([ADR-0019](docs/adr/0019-source-copyright-headers.md)); Spotless inserts it for Java automatically (add it by hand in `package-info.java` and frontend files).
 - **Frontend**: `pnpm format && pnpm lint && pnpm build` from `frontend/`.
 - Respect the layered boundaries ([ADR-0004](docs/adr/0004-layered-architecture-enforced-by-archunit.md)) — `web → service → repository → entity`; the published contracts (`qnop-spi`, `qnop-api`) stay Spring-free.
 

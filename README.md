@@ -2,7 +2,9 @@
 
 An enterprise **document review** system with a browser-first, maximally usable review experience.
 
-Reviewers — individual users or whole teams — mark up lines and regions of a document (PDF or Word), comment, and run a coordinated review workflow: comments are accepted or rejected, changes produce new document versions, and a review is finalized once no open annotations remain.
+Reviewers — individual users or whole teams — mark up lines and regions of a document, comment, and run a coordinated review workflow: comments are accepted or rejected, changes produce new document versions, and a review is finalized once no open annotations remain.
+
+The focus is on **textual documents first — PDF, Word (DOCX), and Markdown**. Support for further formats (for example images) may follow once the text review workflow is solid, and such formats are a likely **Enterprise** feature rather than part of the Community scope.
 
 > **Status: Phase 0 — project skeleton.** The structure, build, conventions and local infrastructure are in place; the domain core and the running server arrive in Phase 1. See [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) and the roadmap there.
 

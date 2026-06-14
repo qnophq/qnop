@@ -30,6 +30,7 @@ Important architecture decisions are recorded here as ADRs (see [ADR-0001](0001-
 | [0016](0016-contributor-license-agreement.md) | Contributor License Agreement enforced via CLA Assistant | Accepted |
 | [0017](0017-renovate-dependency-automation.md) | Dependency automation via self-hosted Renovate + org-wide preset | Accepted |
 | [0018](0018-main-branch-protection-ruleset.md) | main-branch protection via a repository ruleset (deferred) | Proposed |
+| [0019](0019-source-copyright-headers.md) | Source files carry a copyright notice (devtank42 GmbH) | Accepted |
 
 ## Template
 

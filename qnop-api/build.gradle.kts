@@ -1,3 +1,4 @@
+// Copyright (c) 2026-present devtank42 GmbH
 // SPDX-License-Identifier: AGPL-3.0-only
 //
 // qnop-api — the PUBLISHED REST API contract (ADR-0015): request/response DTOs

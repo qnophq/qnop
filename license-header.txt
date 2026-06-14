@@ -18,10 +18,3 @@
  *
  * SPDX-License-Identifier: AGPL-3.0-only
  */
-
-/* Layout primitives only; MUI CssBaseline owns the reset and base styles. */
-html,
-body,
-#root {
-  height: 100%;
-}
