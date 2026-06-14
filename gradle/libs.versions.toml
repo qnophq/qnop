@@ -25,6 +25,10 @@ jakartaAnnotation = "3.0.0"
 # so it carries an explicit version; caffeine IS BOM-managed (declared below
 # without a version). bucket4j_jdk17-core targets JDK 17+ (we run JDK 21).
 bucket4j = "8.18.0"
+# Mail subsystem (issue #19): logic-less Mustache for admin-editable templates,
+# safe to render untrusted template bodies. SMTP via spring-boot-starter-mail
+# (version managed by the Spring Boot BOM).
+jmustache = "1.16"
 
 # --- Pinned for later phases (NOT yet applied) -------------------------
 awsSdk = "2.31.6"            # software.amazon.awssdk:s3 — vendor-neutral S3 client
@@ -75,6 +79,9 @@ caffeine = { module = "com.github.ben-manes.caffeine:caffeine" }
 # Boot BOM, so it carries an explicit version. The Caffeine cache above backs the
 # per-key bucket store.
 bucket4j-core = { module = "com.bucket4j:bucket4j_jdk17-core", version.ref = "bucket4j" }
+# Mail subsystem (issue #19) — JavaMail + logic-less Mustache template rendering.
+spring-boot-starter-mail = { module = "org.springframework.boot:spring-boot-starter-mail" }
+jmustache = { module = "com.samskivert:jmustache", version.ref = "jmustache" }
 
 # Test
 spring-boot-starter-test = { module = "org.springframework.boot:spring-boot-starter-test" }
