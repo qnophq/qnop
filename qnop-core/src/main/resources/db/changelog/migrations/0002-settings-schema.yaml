@@ -1,0 +1,199 @@
+# SPDX-License-Identifier: AGPL-3.0-only
+#
+# Settings schema (issue #13): application_setting + user_setting, plus seed
+# defaults. Postgres-only CHECK constraints live here in Liquibase, NOT in JPA
+# annotations (ADR-0020). JPA runs ddl-auto=none, so the entity column mapping
+# must match these definitions exactly.
+databaseChangeLog:
+  - changeSet:
+      id: 0002-settings-application-setting
+      author: qnop
+      comment: Global, typed key/value application settings edited by superadmins (issue #16).
+      changes:
+        - createTable:
+            tableName: application_setting
+            columns:
+              - column:
+                  name: setting_key
+                  type: VARCHAR(128)
+                  constraints: { primaryKey: true, nullable: false }
+              - column: { name: setting_value, type: TEXT }
+              - column: { name: setting_desc, type: VARCHAR(512) }
+              - column:
+                  name: value_type
+                  type: VARCHAR(16)
+                  constraints: { nullable: false }
+              - column:
+                  name: updated_at
+                  type: TIMESTAMP WITH TIME ZONE
+                  defaultValueComputed: now()
+                  constraints: { nullable: false }
+              # Nullable audit reference; kept as a raw UUID column (no @ManyToOne).
+              - column: { name: updated_by, type: UUID }
+        - addForeignKeyConstraint:
+            baseTableName: application_setting
+            baseColumnNames: updated_by
+            referencedTableName: qnop_user
+            referencedColumnNames: id
+            constraintName: fk_application_setting_updated_by
+            onDelete: SET NULL
+        - sql:
+            comment: Postgres-only CHECK on the value-type enum (not expressible in JPA).
+            sql: |
+              ALTER TABLE application_setting ADD CONSTRAINT ck_application_setting_value_type
+                CHECK (value_type IN ('STRING', 'INTEGER', 'BOOLEAN', 'ENUM', 'PASSWORD'));
+
+  - changeSet:
+      id: 0002-settings-user-setting
+      author: qnop
+      comment: Per-user setting overrides; cascades when the user is deleted (issue #22).
+      changes:
+        - createTable:
+            tableName: user_setting
+            columns:
+              - column:
+                  name: id
+                  type: UUID
+                  constraints: { primaryKey: true, nullable: false }
+              - column:
+                  name: user_id
+                  type: UUID
+                  constraints: { nullable: false }
+              - column:
+                  name: setting_key
+                  type: VARCHAR(128)
+                  constraints: { nullable: false }
+              - column: { name: setting_value, type: TEXT }
+              - column:
+                  name: updated_at
+                  type: TIMESTAMP WITH TIME ZONE
+                  constraints: { nullable: false }
+        - addForeignKeyConstraint:
+            baseTableName: user_setting
+            baseColumnNames: user_id
+            referencedTableName: qnop_user
+            referencedColumnNames: id
+            constraintName: fk_user_setting_user
+            onDelete: CASCADE
+        - addUniqueConstraint:
+            tableName: user_setting
+            columnNames: user_id, setting_key
+            constraintName: ux_user_setting_user_key
+
+  - changeSet:
+      id: 0002-settings-seed
+      author: qnop
+      comment: Default application settings. Must mirror the ApplicationSettingKey registry (issue #16).
+      changes:
+        - insert:
+            tableName: application_setting
+            columns:
+              - column: { name: setting_key, value: "general.application_name" }
+              - column: { name: setting_value, value: "qnop" }
+              - column: { name: setting_desc, value: "Display name of this qnop instance." }
+              - column: { name: value_type, value: "STRING" }
+        - insert:
+            tableName: application_setting
+            columns:
+              - column: { name: setting_key, value: "general.base_url" }
+              - column: { name: setting_value, value: "" }
+              - column: { name: setting_desc, value: "Public base URL, used in generated links and emails." }
+              - column: { name: value_type, value: "STRING" }
+        - insert:
+            tableName: application_setting
+            columns:
+              - column: { name: setting_key, value: "general.default_language" }
+              - column: { name: setting_value, value: "en" }
+              - column: { name: setting_desc, value: "Default UI language (ISO 639-1)." }
+              - column: { name: value_type, value: "STRING" }
+        - insert:
+            tableName: application_setting
+            columns:
+              - column: { name: setting_key, value: "upload.max_file_size_mb" }
+              - column: { name: setting_value, value: "25" }
+              - column: { name: setting_desc, value: "Maximum document upload size in megabytes." }
+              - column: { name: value_type, value: "INTEGER" }
+        - insert:
+            tableName: application_setting
+            columns:
+              - column: { name: setting_key, value: "tracking.enabled" }
+              - column: { name: setting_value, value: "false" }
+              - column: { name: setting_desc, value: "Whether anonymous usage tracking is enabled." }
+              - column: { name: value_type, value: "BOOLEAN" }
+        - insert:
+            tableName: application_setting
+            columns:
+              - column: { name: setting_key, value: "tracking.provider" }
+              - column: { name: setting_value, value: "none" }
+              - column: { name: setting_desc, value: "Usage-tracking provider." }
+              - column: { name: value_type, value: "ENUM" }
+        - insert:
+            tableName: application_setting
+            columns:
+              - column: { name: setting_key, value: "smtp.host" }
+              - column: { name: setting_value, value: "" }
+              - column: { name: setting_desc, value: "SMTP server host." }
+              - column: { name: value_type, value: "STRING" }
+        - insert:
+            tableName: application_setting
+            columns:
+              - column: { name: setting_key, value: "smtp.port" }
+              - column: { name: setting_value, value: "587" }
+              - column: { name: setting_desc, value: "SMTP server port." }
+              - column: { name: value_type, value: "INTEGER" }
+        - insert:
+            tableName: application_setting
+            columns:
+              - column: { name: setting_key, value: "smtp.username" }
+              - column: { name: setting_value, value: "" }
+              - column: { name: setting_desc, value: "SMTP authentication username." }
+              - column: { name: value_type, value: "STRING" }
+        - insert:
+            tableName: application_setting
+            columns:
+              - column: { name: setting_key, value: "smtp.password" }
+              - column: { name: setting_value, value: "" }
+              - column: { name: setting_desc, value: "SMTP authentication password (stored encrypted, redacted in API)." }
+              - column: { name: value_type, value: "PASSWORD" }
+        - insert:
+            tableName: application_setting
+            columns:
+              - column: { name: setting_key, value: "smtp.from" }
+              - column: { name: setting_value, value: "" }
+              - column: { name: setting_desc, value: "Default From address for outgoing mail." }
+              - column: { name: value_type, value: "STRING" }
+        - insert:
+            tableName: application_setting
+            columns:
+              - column: { name: setting_key, value: "smtp.tls_enabled" }
+              - column: { name: setting_value, value: "true" }
+              - column: { name: setting_desc, value: "Whether to use STARTTLS for SMTP." }
+              - column: { name: value_type, value: "BOOLEAN" }
+        - insert:
+            tableName: application_setting
+            columns:
+              - column: { name: setting_key, value: "auth.self_registration_enabled" }
+              - column: { name: setting_value, value: "false" }
+              - column: { name: setting_desc, value: "Whether visitors may register their own local accounts." }
+              - column: { name: value_type, value: "BOOLEAN" }
+        - insert:
+            tableName: application_setting
+            columns:
+              - column: { name: setting_key, value: "auth.self_registration_default_role" }
+              - column: { name: setting_value, value: "USER" }
+              - column: { name: setting_desc, value: "Role assigned to self-registered users." }
+              - column: { name: value_type, value: "STRING" }
+        - insert:
+            tableName: application_setting
+            columns:
+              - column: { name: setting_key, value: "auth.password_reset_enabled" }
+              - column: { name: setting_value, value: "true" }
+              - column: { name: setting_desc, value: "Whether local users may reset their password by email." }
+              - column: { name: value_type, value: "BOOLEAN" }
+        - insert:
+            tableName: application_setting
+            columns:
+              - column: { name: setting_key, value: "auth.password_reset_token_ttl_minutes" }
+              - column: { name: setting_value, value: "30" }
+              - column: { name: setting_desc, value: "Validity window of a password-reset token, in minutes." }
+              - column: { name: value_type, value: "INTEGER" }
