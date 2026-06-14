@@ -19,5 +19,12 @@
  * SPDX-License-Identifier: AGPL-3.0-only
  */
 
-/** Published REST API contract: request/response DTOs and the OpenAPI definition. */
-package io.qnop.api;
+/**
+ * Published, Spring-free REST DTOs generated from {@code openapi.yaml} (ADR-0015, ADR-0021).
+ *
+ * <p>The OpenAPI generator emits the request/response types into this package at build time (under
+ * {@code build/generated}); this hand-written {@code package-info} is the stable documentation
+ * anchor for the published contract surface. The generated classes carry only Jackson and Jakarta
+ * Bean Validation annotations — never Spring — which ArchUnit enforces.
+ */
+package io.qnop.api.v1.model;

@@ -104,14 +104,17 @@ class ArchitectureRulesTest {
   }
 
   @Test
-  void restApiContractStaysPure() {
-    // qnop-api is the published REST contract (ADR-0015): DTOs + OpenAPI only,
-    // free of framework and internal-module dependencies so external consumers
-    // can depend on it without pulling the server.
+  void restApiModelStaysPure() {
+    // qnop-api-model is the published REST DTO surface (ADR-0015, ADR-0021):
+    // generated POJOs only, free of Spring and internal-module dependencies so
+    // external consumers (and a generated TS/SDK client) can depend on it without
+    // pulling the server. The Spring MVC *interfaces* live in qnop-api-endpoint
+    // (io.qnop.api.v1.endpoint, NOT ...model) and intentionally depend on Spring —
+    // implemented by the web layer, so only the model package is held to purity.
     ArchRule rule =
         ArchRuleDefinition.noClasses()
             .that()
-            .resideInAPackage("io.qnop.api..")
+            .resideInAPackage("io.qnop.api.v1.model..")
             .should()
             .dependOnClassesThat()
             .resideInAnyPackage(

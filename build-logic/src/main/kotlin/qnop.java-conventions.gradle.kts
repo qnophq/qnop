@@ -29,6 +29,10 @@ tasks.withType<JavaCompile>().configureEach {
 
 spotless {
     java {
+        // OpenAPI-generated sources (ADR-0021) live under build/generated; they
+        // carry no SPDX header and are not hand-maintained, so exclude them from
+        // formatting and license-header enforcement.
+        targetExclude("**/build/generated/**")
         googleJavaFormat()
         // ADR-0007 + ADR-0019: every source file carries a copyright notice and
         // an SPDX identifier. The block lives in the root `license-header.txt`.

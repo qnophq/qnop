@@ -18,7 +18,7 @@ dependencies {
     implementation(platform(libs.spring.boot.dependencies)) // BOM: manages versions
 
     implementation(project(":qnop-core"))
-    implementation(project(":qnop-api"))
+    implementation(project(":qnop-api:qnop-api-endpoint")) // generated Spring interfaces (+ DTOs transitively)
 
     implementation(libs.spring.boot.starter.web)
     implementation(libs.spring.boot.starter.actuator)
@@ -36,6 +36,7 @@ dependencies {
     testImplementation(libs.junit.jupiter)
     testImplementation(libs.archunit.junit5)
     testImplementation(libs.spring.boot.starter.test)
+    testImplementation(libs.spring.boot.webmvc.test) // @WebMvcTest slice (Boot 4 module)
     testImplementation(libs.spring.boot.testcontainers)
     testImplementation(libs.testcontainers.postgresql)
     testImplementation(libs.testcontainers.junit.jupiter)

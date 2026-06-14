@@ -34,7 +34,7 @@ qnop-core
 | Module | Spring? | Responsibility |
 |--------|---------|----------------|
 | `qnop-spi` | no | Published plugin contract: extension-point interfaces + DTOs. Consumed by the enterprise repo. |
-| `qnop-api` | no | Published REST contract: request/response DTOs + OpenAPI. Consumed externally and by `qnop-core`/`qnop-app`. |
+| `qnop-api` | no | Published REST contract: request/response DTOs + OpenAPI. Split into `qnop-api-model` (Spring-free DTOs) + `qnop-api-endpoint` (generated Spring MVC interfaces) per [ADR-0021](adr/0021-openapi-first-contract-tooling.md). Consumed externally and by `qnop-core`/`qnop-app`. |
 | `qnop-core` | yes | `io.qnop.entity` (JPA entities = the model), `io.qnop.repository` (Spring Data), `io.qnop.service` (business logic, workflow state machine, anchoring, entity⇄DTO mapping, SPI default beans). |
 | `qnop-app` | yes | `io.qnop.web` (`@RestController`s implementing `qnop-api`) + `io.qnop.bootstrap` (Spring Boot main/config). The runnable Community module; hosts the ArchUnit test. |
 
@@ -43,7 +43,7 @@ qnop-core
 Two modules are versioned, externally-consumable stability surfaces:
 
 - **`qnop-spi`** — the *plugin* contract (extension points implemented by the commercial edition).
-- **`qnop-api`** — the *REST* contract (DTOs + OpenAPI for third-party integrators and a generated frontend/SDK client), with `/api/v1` URL versioning and a deprecation policy ([ADR-0015](adr/0015-published-rest-api-contract-module.md)).
+- **`qnop-api`** — the *REST* contract (DTOs + OpenAPI for third-party integrators and a generated frontend/SDK client), with `/api/v1` URL versioning and a deprecation policy ([ADR-0015](adr/0015-published-rest-api-contract-module.md)). OpenAPI-first: a single `openapi.yaml` generates the Spring-free DTOs (`qnop-api-model`) and the Spring MVC interfaces (`qnop-api-endpoint`) the controllers implement ([ADR-0021](adr/0021-openapi-first-contract-tooling.md)).
 
 ## Frontend
 
