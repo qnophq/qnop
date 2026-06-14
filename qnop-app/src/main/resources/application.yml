@@ -30,3 +30,15 @@ management:
     health:
       probes:
         enabled: true
+
+# Security & crypto foundation (issue #10, ADR-0022). Secrets come from the
+# QNOP_AUTH_* environment namespace — no secure default is baked in; the
+# placeholder below trips @ValidSecret so a deployment that forgot to set real
+# values refuses to start. CORS origins gate SPA / front-end access.
+qnop:
+  auth:
+    jwt-secret: ${QNOP_AUTH_JWT_SECRET:CHANGE_ME}
+    encryption-key: ${QNOP_AUTH_ENCRYPTION_KEY:CHANGE_ME}
+    encryption-salt: ${QNOP_AUTH_ENCRYPTION_SALT:CHANGE_ME}
+  cors:
+    allowed-origins: ${QNOP_CORS_ALLOWED_ORIGINS:http://localhost:5173}

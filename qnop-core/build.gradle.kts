@@ -23,6 +23,13 @@ dependencies {
     // Persistence: JPA entities + Spring Data repositories live in this module.
     implementation(libs.spring.boot.starter.data.jpa)
 
+    // Security & crypto foundation (issue #10, ADR-0021): the framework-light
+    // io.qnop.security layer — validated properties, BCrypt, TextEncryptor, HKDF.
+    // The servlet filter chain lives in qnop-app; core stays free of
+    // spring-security-web by depending only on spring-security-crypto.
+    implementation(libs.spring.boot.starter.validation)
+    implementation(libs.spring.security.crypto)
+
     testImplementation(platform(libs.junit.bom))
     testImplementation(libs.junit.jupiter)
     testRuntimeOnly(libs.junit.platform.launcher)

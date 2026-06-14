@@ -22,6 +22,8 @@ dependencies {
 
     implementation(libs.spring.boot.starter.web)
     implementation(libs.spring.boot.starter.actuator)
+    // Servlet security filter chain (io.qnop.web.security, issue #10 / ADR-0021).
+    implementation(libs.spring.boot.starter.security)
     // JPA/Hibernate reaches the runtime classpath transitively via qnop-core; the
     // bootstrap gains explicit @EntityScan/@EnableJpaRepositories with the data
     // model (issue #11), which is when this module takes a direct JPA dependency.
@@ -37,6 +39,11 @@ dependencies {
     testImplementation(libs.archunit.junit5)
     testImplementation(libs.spring.boot.starter.test)
     testImplementation(libs.spring.boot.webmvc.test) // @WebMvcTest slice (Boot 4 module)
+    testImplementation(libs.spring.security.test)
+    // The fail-fast binding test (QnopPropertiesBindingTest) drives Bean Validation +
+    // ValidationAutoConfiguration directly; qnop-core keeps validation as an
+    // implementation dependency, so the app test classpath needs it explicitly.
+    testImplementation(libs.spring.boot.starter.validation)
     testImplementation(libs.spring.boot.testcontainers)
     testImplementation(libs.testcontainers.postgresql)
     testImplementation(libs.testcontainers.junit.jupiter)
