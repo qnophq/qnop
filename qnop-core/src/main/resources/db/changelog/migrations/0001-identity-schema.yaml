@@ -1,0 +1,182 @@
+# SPDX-License-Identifier: AGPL-3.0-only
+#
+# Identity schema (issue #11): qnop_user, oidc_provider, oidc_identity.
+# Postgres-only CHECK constraints and partial/functional unique indexes live
+# here in Liquibase, NOT in JPA annotations (ADR-0020). JPA runs ddl-auto=none,
+# so the entity column mapping must match these definitions exactly.
+databaseChangeLog:
+  - changeSet:
+      id: 0001-identity-qnop-user
+      author: qnop
+      comment: Identity table for internal (local) and external (OIDC) users.
+      changes:
+        - createTable:
+            tableName: qnop_user
+            columns:
+              - column:
+                  name: id
+                  type: UUID
+                  constraints: { primaryKey: true, nullable: false }
+              - column:
+                  name: display_name
+                  type: VARCHAR(255)
+                  constraints: { nullable: false }
+              - column:
+                  name: email
+                  type: VARCHAR(320)
+                  constraints: { nullable: false }
+              - column:
+                  name: source
+                  type: VARCHAR(16)
+                  constraints: { nullable: false }
+              - column: { name: username, type: VARCHAR(64) }
+              - column: { name: password_hash, type: VARCHAR(255) }
+              - column:
+                  name: enabled
+                  type: BOOLEAN
+                  defaultValueBoolean: true
+                  constraints: { nullable: false }
+              - column:
+                  name: password_change_required
+                  type: BOOLEAN
+                  defaultValueBoolean: false
+                  constraints: { nullable: false }
+              - column:
+                  name: is_superadmin
+                  type: BOOLEAN
+                  defaultValueBoolean: false
+                  constraints: { nullable: false }
+              - column: { name: password_invalidated_before, type: TIMESTAMP WITH TIME ZONE }
+              - column: { name: last_login_at, type: TIMESTAMP WITH TIME ZONE }
+              - column:
+                  name: created_at
+                  type: TIMESTAMP WITH TIME ZONE
+                  constraints: { nullable: false }
+              - column:
+                  name: updated_at
+                  type: TIMESTAMP WITH TIME ZONE
+                  constraints: { nullable: false }
+        - sql:
+            comment: Postgres-only CHECK + partial-unique constraints (not expressible in JPA).
+            splitStatements: true
+            sql: |
+              ALTER TABLE qnop_user ADD CONSTRAINT ck_qnop_user_source
+                CHECK (source IN ('INTERNAL', 'EXTERNAL'));
+              ALTER TABLE qnop_user ADD CONSTRAINT ck_qnop_user_credentials
+                CHECK (
+                  (source = 'INTERNAL' AND username IS NOT NULL AND password_hash IS NOT NULL)
+                  OR (source = 'EXTERNAL' AND username IS NULL AND password_hash IS NULL)
+                );
+              CREATE UNIQUE INDEX ux_qnop_user_email_internal
+                ON qnop_user (LOWER(email)) WHERE source = 'INTERNAL';
+              CREATE UNIQUE INDEX ux_qnop_user_username_internal
+                ON qnop_user (username) WHERE source = 'INTERNAL';
+
+  - changeSet:
+      id: 0001-identity-oidc-provider
+      author: qnop
+      comment: Configurable OIDC/OAuth2 identity providers (DB-backed, issue #21).
+      changes:
+        - createTable:
+            tableName: oidc_provider
+            columns:
+              - column:
+                  name: id
+                  type: UUID
+                  constraints: { primaryKey: true, nullable: false }
+              - column:
+                  name: name
+                  type: VARCHAR(100)
+                  constraints: { nullable: false }
+              - column:
+                  name: provider_type
+                  type: VARCHAR(16)
+                  constraints: { nullable: false }
+              - column:
+                  name: enabled
+                  type: BOOLEAN
+                  defaultValueBoolean: true
+                  constraints: { nullable: false }
+              - column:
+                  name: client_id
+                  type: VARCHAR(255)
+                  constraints: { nullable: false }
+              # Symmetrically encrypted at rest via EncryptedStringConverter (issue #10/#11).
+              - column: { name: client_secret_encrypted, type: VARCHAR(1024) }
+              - column: { name: issuer_uri, type: VARCHAR(512) }
+              - column: { name: scope, type: VARCHAR(512) }
+              - column: { name: authorization_uri, type: VARCHAR(512) }
+              - column: { name: token_uri, type: VARCHAR(512) }
+              - column: { name: user_info_uri, type: VARCHAR(512) }
+              - column: { name: jwk_set_uri, type: VARCHAR(512) }
+              - column: { name: user_name_attribute, type: VARCHAR(100) }
+              - column: { name: email_attribute, type: VARCHAR(100) }
+              - column: { name: display_name_attribute, type: VARCHAR(100) }
+              - column:
+                  name: created_at
+                  type: TIMESTAMP WITH TIME ZONE
+                  constraints: { nullable: false }
+              - column:
+                  name: updated_at
+                  type: TIMESTAMP WITH TIME ZONE
+                  constraints: { nullable: false }
+        - addUniqueConstraint:
+            tableName: oidc_provider
+            columnNames: name
+            constraintName: ux_oidc_provider_name
+        - sql:
+            comment: Postgres-only CHECK on the provider-type enum.
+            sql: |
+              ALTER TABLE oidc_provider ADD CONSTRAINT ck_oidc_provider_type
+                CHECK (provider_type IN ('OIDC', 'GITHUB', 'GOOGLE', 'FACEBOOK', 'OAUTH2'));
+
+  - changeSet:
+      id: 0001-identity-oidc-identity
+      author: qnop
+      comment: Links an external provider subject to a qnop_user (issue #11).
+      changes:
+        - createTable:
+            tableName: oidc_identity
+            columns:
+              - column:
+                  name: id
+                  type: UUID
+                  constraints: { primaryKey: true, nullable: false }
+              - column:
+                  name: oidc_provider_id
+                  type: UUID
+                  constraints: { nullable: false }
+              - column:
+                  name: subject
+                  type: VARCHAR(255)
+                  constraints: { nullable: false }
+              - column:
+                  name: user_id
+                  type: UUID
+                  constraints: { nullable: false }
+              - column:
+                  name: created_at
+                  type: TIMESTAMP WITH TIME ZONE
+                  constraints: { nullable: false }
+        - addForeignKeyConstraint:
+            baseTableName: oidc_identity
+            baseColumnNames: oidc_provider_id
+            referencedTableName: oidc_provider
+            referencedColumnNames: id
+            constraintName: fk_oidc_identity_provider
+            onDelete: CASCADE
+        - addForeignKeyConstraint:
+            baseTableName: oidc_identity
+            baseColumnNames: user_id
+            referencedTableName: qnop_user
+            referencedColumnNames: id
+            constraintName: fk_oidc_identity_user
+            onDelete: CASCADE
+        - addUniqueConstraint:
+            tableName: oidc_identity
+            columnNames: user_id
+            constraintName: ux_oidc_identity_user
+        - addUniqueConstraint:
+            tableName: oidc_identity
+            columnNames: oidc_provider_id, subject
+            constraintName: ux_oidc_identity_provider_subject

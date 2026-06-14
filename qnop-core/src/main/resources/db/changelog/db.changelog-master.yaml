@@ -11,3 +11,6 @@ databaseChangeLog:
       changes:
         - tagDatabase:
             tag: baseline
+  - include:
+      file: migrations/0001-identity-schema.yaml
+      relativeToChangelogFile: true

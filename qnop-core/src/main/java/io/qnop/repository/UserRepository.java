@@ -1,0 +1,39 @@
+/*
+ * Copyright (c) 2026-present devtank42 GmbH
+ *
+ * This file is part of qnop (Qualified Notes on Papers).
+ *
+ * qnop is free software: you can redistribute it and/or modify it under the
+ * terms of the GNU Affero General Public License as published by the Free
+ * Software Foundation, either version 3 of the License, or (at your option)
+ * any later version.
+ *
+ * qnop is distributed in the hope that it will be useful, but WITHOUT ANY
+ * WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS
+ * FOR A PARTICULAR PURPOSE. See the GNU Affero General Public License for more
+ * details.
+ *
+ * You should have received a copy of the GNU Affero General Public License
+ * along with qnop. If not, see <https://www.gnu.org/licenses/>.
+ *
+ * SPDX-License-Identifier: AGPL-3.0-only
+ */
+package io.qnop.repository;
+
+import io.qnop.entity.User;
+import io.qnop.entity.UserSource;
+import java.util.Optional;
+import java.util.UUID;
+import org.springframework.data.jpa.repository.JpaRepository;
+
+/** Data access for {@link User}. */
+public interface UserRepository extends JpaRepository<User, UUID> {
+
+  /** Finds an internal user by case-insensitive email (matches the partial-unique index). */
+  Optional<User> findByEmailIgnoreCaseAndSource(String email, UserSource source);
+
+  /** Finds an internal user by exact username. */
+  Optional<User> findByUsernameAndSource(String username, UserSource source);
+
+  boolean existsByEmailIgnoreCaseAndSource(String email, UserSource source);
+}

@@ -25,22 +25,28 @@ import org.springframework.boot.testcontainers.service.connection.ServiceConnect
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
 import org.testcontainers.containers.PostgreSQLContainer;
-import org.testcontainers.junit.jupiter.Container;
-import org.testcontainers.junit.jupiter.Testcontainers;
 
 /**
  * Base for full-context integration tests: boots the application against a real PostgreSQL
  * (Testcontainers, ADR-0020) and supplies strong {@code QNOP_AUTH_*} secrets so the security
  * foundation's fail-fast validation (ADR-0022) is satisfied. Requires Docker.
+ *
+ * <p>The container is a JVM-lifetime singleton (started once in a static initializer, never
+ * explicitly stopped — Ryuk reaps it). A per-class {@code @Testcontainers} lifecycle would stop and
+ * restart it between test classes, handing the second class a new port while Spring reuses the
+ * cached context built for the first — causing connection-refused failures.
  */
 @SpringBootTest(
     classes = QnopApplication.class,
     webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
-@Testcontainers
 public abstract class AbstractIntegrationTest {
 
-  @Container @ServiceConnection
-  static PostgreSQLContainer<?> postgres = new PostgreSQLContainer<>("postgres:17");
+  @ServiceConnection
+  static final PostgreSQLContainer<?> postgres = new PostgreSQLContainer<>("postgres:17");
+
+  static {
+    postgres.start();
+  }
 
   @DynamicPropertySource
   static void securitySecrets(DynamicPropertyRegistry registry) {

@@ -22,16 +22,20 @@ dependencies {
 
     implementation(libs.spring.boot.starter.web)
     implementation(libs.spring.boot.starter.actuator)
-    // Servlet security filter chain (io.qnop.web.security, issue #10 / ADR-0021).
+    // Servlet security filter chain (io.qnop.web.security, issue #10 / ADR-0022).
     implementation(libs.spring.boot.starter.security)
-    // JPA/Hibernate reaches the runtime classpath transitively via qnop-core; the
-    // bootstrap gains explicit @EntityScan/@EnableJpaRepositories with the data
-    // model (issue #11), which is when this module takes a direct JPA dependency.
+    // The bootstrap registers the sibling data packages explicitly via
+    // @EntityScan / @EnableJpaRepositories (issue #11), so this module takes a
+    // direct JPA dependency for those compile-time symbols (Hibernate itself
+    // still reaches the runtime classpath transitively via qnop-core).
+    implementation(libs.spring.boot.starter.data.jpa)
 
     // Runtime-only: the JDBC driver and the schema migrator (Liquibase owns the
     // schema; JPA ddl-auto=none). The changelog ships in qnop-core resources.
+    // spring-boot-liquibase carries LiquibaseAutoConfiguration (Boot 4 modularised
+    // it out of spring-boot-autoconfigure) and pulls liquibase-core transitively.
     runtimeOnly(libs.postgresql)
-    runtimeOnly(libs.liquibase.core)
+    runtimeOnly(libs.spring.boot.liquibase)
 
     testImplementation(platform(libs.spring.boot.dependencies)) // BOM also on the test classpath
     testImplementation(platform(libs.junit.bom))

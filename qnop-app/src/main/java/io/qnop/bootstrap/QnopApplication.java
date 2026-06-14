@@ -24,18 +24,21 @@ import io.qnop.security.QnopProperties;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
+import org.springframework.boot.persistence.autoconfigure.EntityScan;
+import org.springframework.data.jpa.repository.config.EnableJpaRepositories;
 
 /**
  * Spring Boot entry point for the qnop Community server.
  *
  * <p>The layered modules use sibling packages rather than sub-packages of this bootstrap, so
  * component scanning is pointed at the {@code io.qnop} root (see ADR-0004 for the layout and
- * ADR-0020 for the runtime wiring). Explicit {@code @EntityScan} / {@code @EnableJpaRepositories}
- * for {@code io.qnop.entity} / {@code io.qnop.repository} are added with the data model (issue
- * #11), once entities and repositories exist.
+ * ADR-0020 for the runtime wiring). JPA entities and Spring Data repositories live in their own
+ * sibling packages, so they are registered explicitly (the data model arrived with issue #11).
  */
 @SpringBootApplication(scanBasePackages = "io.qnop")
 @EnableConfigurationProperties(QnopProperties.class)
+@EntityScan("io.qnop.entity")
+@EnableJpaRepositories("io.qnop.repository")
 public class QnopApplication {
 
   public static void main(String[] args) {
