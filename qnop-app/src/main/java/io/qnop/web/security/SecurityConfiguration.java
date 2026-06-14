@@ -21,6 +21,9 @@
 package io.qnop.web.security;
 
 import io.qnop.security.QnopProperties;
+import io.qnop.web.security.ratelimit.ChangePasswordRateLimitFilter;
+import io.qnop.web.security.ratelimit.LoginRateLimitFilter;
+import io.qnop.web.security.ratelimit.RefreshRateLimitFilter;
 import java.util.List;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -32,6 +35,7 @@ import org.springframework.security.config.annotation.web.configuration.EnableWe
 import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.web.AuthenticationEntryPoint;
 import org.springframework.security.web.SecurityFilterChain;
+import org.springframework.security.web.access.intercept.AuthorizationFilter;
 import org.springframework.security.web.csrf.CookieCsrfTokenRepository;
 import org.springframework.security.web.csrf.CsrfFilter;
 import org.springframework.security.web.csrf.CsrfTokenRequestAttributeHandler;
@@ -72,7 +76,10 @@ public class SecurityConfiguration {
       HttpSecurity http,
       AuthenticationEntryPoint authenticationEntryPoint,
       CorsConfigurationSource corsConfigurationSource,
-      DelegatingJwtDecoder jwtDecoder)
+      DelegatingJwtDecoder jwtDecoder,
+      LoginRateLimitFilter loginRateLimitFilter,
+      RefreshRateLimitFilter refreshRateLimitFilter,
+      ChangePasswordRateLimitFilter changePasswordRateLimitFilter)
       throws Exception {
     http.csrf(
             csrf ->
@@ -80,6 +87,15 @@ public class SecurityConfiguration {
                     .csrfTokenRequestHandler(new CsrfTokenRequestAttributeHandler())
                     .requireCsrfProtectionMatcher(AUTH_CSRF_MATCHER))
         .addFilterAfter(new CsrfCookieFilter(), CsrfFilter.class)
+        // Rate-limit auth endpoints (issue #18, ADR-0027). The IP-keyed login/refresh limiters run
+        // before CSRF/auth processing so abuse is dropped as cheaply as possible; the
+        // change-password
+        // limiter runs after bearer authentication (before AuthorizationFilter) so it can key on
+        // the
+        // authenticated subject.
+        .addFilterBefore(loginRateLimitFilter, CsrfFilter.class)
+        .addFilterBefore(refreshRateLimitFilter, CsrfFilter.class)
+        .addFilterBefore(changePasswordRateLimitFilter, AuthorizationFilter.class)
         .cors(cors -> cors.configurationSource(corsConfigurationSource))
         .sessionManagement(
             session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))

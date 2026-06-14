@@ -27,6 +27,12 @@ dependencies {
     // Resource-server filter that validates the bearer JWT on each request, plus
     // the JWT (Nimbus) types used by the web-layer decoder/cookie glue (issue #17).
     implementation(libs.spring.boot.starter.oauth2.resource.server)
+    // Auth-endpoint rate limiting (io.qnop.web.security.ratelimit, issue #18 / ADR-0027):
+    // Bucket4j token buckets in a Caffeine cache. Caffeine is BOM-managed (also used by the
+    // #17 revocation denylist in qnop-core); declared here too because that is an
+    // implementation dependency and does not reach this module's compile classpath.
+    implementation(libs.bucket4j.core)
+    implementation(libs.caffeine)
     // The bootstrap registers the sibling data packages explicitly via
     // @EntityScan / @EnableJpaRepositories (issue #11), so this module takes a
     // direct JPA dependency for those compile-time symbols (Hibernate itself
