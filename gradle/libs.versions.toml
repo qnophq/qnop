@@ -39,6 +39,10 @@ spring-boot-starter-web = { module = "org.springframework.boot:spring-boot-start
 spring-boot-starter-actuator = { module = "org.springframework.boot:spring-boot-starter-actuator" }
 spring-boot-starter-data-jpa = { module = "org.springframework.boot:spring-boot-starter-data-jpa" }
 liquibase-core = { module = "org.liquibase:liquibase-core" }
+# Spring Boot 4 split LiquibaseAutoConfiguration out of spring-boot-autoconfigure
+# into this dedicated module; without it on the classpath Liquibase never runs.
+# Pulls liquibase-core transitively. Version via the Spring Boot BOM.
+spring-boot-liquibase = { module = "org.springframework.boot:spring-boot-liquibase" }
 postgresql = { module = "org.postgresql:postgresql" }
 
 # OpenAPI contract (ADR-0021). qnop-api-model needs only the annotation libraries

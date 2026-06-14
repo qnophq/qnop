@@ -32,8 +32,10 @@ dependencies {
 
     // Runtime-only: the JDBC driver and the schema migrator (Liquibase owns the
     // schema; JPA ddl-auto=none). The changelog ships in qnop-core resources.
+    // spring-boot-liquibase carries LiquibaseAutoConfiguration (Boot 4 modularised
+    // it out of spring-boot-autoconfigure) and pulls liquibase-core transitively.
     runtimeOnly(libs.postgresql)
-    runtimeOnly(libs.liquibase.core)
+    runtimeOnly(libs.spring.boot.liquibase)
 
     testImplementation(platform(libs.spring.boot.dependencies)) // BOM also on the test classpath
     testImplementation(platform(libs.junit.bom))
