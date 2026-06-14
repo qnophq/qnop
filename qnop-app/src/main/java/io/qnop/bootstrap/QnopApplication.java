@@ -20,8 +20,10 @@
  */
 package io.qnop.bootstrap;
 
+import io.qnop.security.QnopProperties;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
+import org.springframework.boot.context.properties.EnableConfigurationProperties;
 
 /**
  * Spring Boot entry point for the qnop Community server.
@@ -33,6 +35,7 @@ import org.springframework.boot.autoconfigure.SpringBootApplication;
  * #11), once entities and repositories exist.
  */
 @SpringBootApplication(scanBasePackages = "io.qnop")
+@EnableConfigurationProperties(QnopProperties.class)
 public class QnopApplication {
 
   public static void main(String[] args) {

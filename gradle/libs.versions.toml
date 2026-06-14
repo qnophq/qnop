@@ -50,11 +50,17 @@ swagger-annotations = { module = "io.swagger.core.v3:swagger-annotations", versi
 jakarta-validation-api = { module = "jakarta.validation:jakarta.validation-api", version.ref = "jakartaValidation" }
 jakarta-annotation-api = { module = "jakarta.annotation:jakarta.annotation-api", version.ref = "jakartaAnnotation" }
 
+# Security & crypto (issue #10) — versions managed by the Spring Boot BOM.
+spring-boot-starter-security = { module = "org.springframework.boot:spring-boot-starter-security" }
+spring-boot-starter-validation = { module = "org.springframework.boot:spring-boot-starter-validation" }
+spring-security-crypto = { module = "org.springframework.security:spring-security-crypto" }
+
 # Test
 spring-boot-starter-test = { module = "org.springframework.boot:spring-boot-starter-test" }
 # Spring Boot 4 split the web test slices into per-stack modules; @WebMvcTest now
 # lives in spring-boot-webmvc-test (package org.springframework.boot.webmvc.test).
 spring-boot-webmvc-test = { module = "org.springframework.boot:spring-boot-webmvc-test" }
+spring-security-test = { module = "org.springframework.security:spring-security-test" }
 spring-boot-testcontainers = { module = "org.springframework.boot:spring-boot-testcontainers" }
 # Testcontainers 2.x artifact ids carry the `testcontainers-` prefix; versions
 # are managed transitively by the Spring Boot BOM (testcontainers-bom).

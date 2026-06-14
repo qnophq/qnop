@@ -33,6 +33,7 @@ Important architecture decisions are recorded here as ADRs (see [ADR-0001](0001-
 | [0019](0019-source-copyright-headers.md) | Source files carry a copyright notice (devtank42 GmbH) | Accepted |
 | [0020](0020-bootable-server-and-test-database.md) | Bootable server: PostgreSQL + Liquibase + JPA, tests on Testcontainers | Accepted |
 | [0021](0021-openapi-first-contract-tooling.md) | OpenAPI-first REST contract tooling and the qnop-api submodule split | Accepted |
+| [0022](0022-security-crypto-foundation.md) | Security & crypto foundation — layer placement and primitives | Accepted |
 
 ## Template
 

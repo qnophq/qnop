@@ -62,9 +62,15 @@ class ArchitectureRulesTest {
             .definedBy("io.qnop.service..")
             .layer("Web")
             .definedBy("io.qnop.web..", "io.qnop.bootstrap..")
+            .layer("Security")
+            .definedBy("io.qnop.security..")
             // Spi is intentionally consumable by everyone (plugin contract).
             .whereLayer("Web")
             .mayNotBeAccessedByAnyLayer()
+            // The security/crypto foundation (ADR-0022) is used by the service and web
+            // layers; it never depends back on them (see securityFoundationStaysPure).
+            .whereLayer("Security")
+            .mayOnlyBeAccessedByLayers("Web", "Service")
             .whereLayer("Service")
             .mayOnlyBeAccessedByLayers("Web")
             .whereLayer("Repository")
@@ -124,6 +130,28 @@ class ArchitectureRulesTest {
                 "io.qnop.repository..",
                 "io.qnop.service..",
                 "io.qnop.web..")
+            .allowEmptyShould(true);
+
+    rule.check(QNOP_CLASSES);
+  }
+
+  @Test
+  void securityFoundationStaysPure() {
+    // io.qnop.security (qnop-core) is the framework-light crypto foundation (ADR-0022):
+    // it may use Spring, but must never depend on the application's own web, service,
+    // repository, entity or DTO layers — those depend on it, not the other way round.
+    ArchRule rule =
+        ArchRuleDefinition.noClasses()
+            .that()
+            .resideInAPackage("io.qnop.security..")
+            .should()
+            .dependOnClassesThat()
+            .resideInAnyPackage(
+                "io.qnop.web..",
+                "io.qnop.service..",
+                "io.qnop.repository..",
+                "io.qnop.entity..",
+                "io.qnop.api..")
             .allowEmptyShould(true);
 
     rule.check(QNOP_CLASSES);
