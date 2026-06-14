@@ -25,6 +25,10 @@ tags:
       Public, unauthenticated server configuration the frontend needs before a
       user is authenticated (edition flag, branding, enabled login providers,
       upload limits, supported document formats).
+  - name: AdminSettings
+    description: |
+      Superadmin-only administration of the global application settings
+      (issue #16). Sensitive values are masked as `***`.
 paths:
   /config:
     get:
@@ -64,6 +68,79 @@ paths:
                   - PDF
                   - DOCX
                   - MD
+  /admin/settings:
+    get:
+      tags:
+        - AdminSettings
+      summary: List application settings
+      description: |
+        Returns all global application settings with their current values
+        (sensitive values masked as `***`), declared types, and descriptions.
+        Superadmin only.
+      operationId: getAdminSettings
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Current application settings
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AdminSettingsResponse'
+        '401':
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Caller is not a superadmin
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+    patch:
+      tags:
+        - AdminSettings
+      summary: Update application settings
+      description: |
+        Applies a partial set of setting changes (`key` → raw value). Sending
+        `***` for a sensitive key leaves the stored secret unchanged. Returns the
+        full, updated settings. Superadmin only.
+      operationId: updateAdminSettings
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AdminSettingsUpdateRequest'
+      responses:
+        '200':
+          description: Updated application settings
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AdminSettingsResponse'
+        '400':
+          description: Unknown key or type-invalid value
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Caller is not a superadmin
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
 components:
   securitySchemes:
     bearerAuth:
@@ -193,6 +270,61 @@ components:
         - auth
         - upload
         - supportedFormats
+    SettingValueType:
+      type: string
+      description: The declared type of an application setting value.
+      enum:
+        - STRING
+        - INTEGER
+        - BOOLEAN
+        - ENUM
+        - PASSWORD
+    AdminSetting:
+      type: object
+      description: One application setting with its current (possibly masked) value.
+      properties:
+        key:
+          type: string
+          description: Stable dotted setting key (e.g. `smtp.host`).
+        value:
+          type: string
+          description: Current value; sensitive values are masked as `***`.
+        type:
+          $ref: '#/components/schemas/SettingValueType'
+        description:
+          type: string
+          description: Human-readable description of the setting.
+        sensitive:
+          type: boolean
+          description: Whether the value is a secret (masked here, encrypted at rest).
+      required:
+        - key
+        - type
+        - description
+        - sensitive
+    AdminSettingsResponse:
+      type: object
+      description: The full set of global application settings.
+      properties:
+        settings:
+          type: array
+          items:
+            $ref: '#/components/schemas/AdminSetting'
+      required:
+        - settings
+    AdminSettingsUpdateRequest:
+      type: object
+      description: |
+        Partial map of setting key to new raw value. Omitted keys are left
+        unchanged; `***` for a sensitive key keeps the stored secret.
+      properties:
+        values:
+          type: object
+          additionalProperties:
+            type: string
+          description: Map of setting key to new value.
+      required:
+        - values
     ErrorResponse:
       type: object
       description: |

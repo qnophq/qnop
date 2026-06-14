@@ -67,6 +67,8 @@ public class SecurityConfiguration {
             auth ->
                 auth.requestMatchers("/actuator/health", "/actuator/health/**")
                     .permitAll()
+                    .requestMatchers("/api/v1/admin/**")
+                    .hasRole("SUPERADMIN")
                     .anyRequest()
                     .authenticated())
         .httpBasic(httpBasic -> httpBasic.disable())
