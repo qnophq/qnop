@@ -41,8 +41,8 @@ Work produced with Claude must be attributed:
   ```
   Co-Authored-By: Claude <noreply@anthropic.com>
   ```
-- **Issues / PRs** — add an attribution line in the body, e.g.
-  `🤖 Mitarbeit: Claude (Opus 4.x) via Claude Code`.
+- **Issues / PRs** — add an attribution line in the body:
+  `🤖 Co-Author: Claude (Opus 4.x) via Claude Code`.
 
 ## Code quality
 

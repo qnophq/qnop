@@ -15,7 +15,7 @@ Read `docs/ARCHITECTURE.md` and `docs/adr/` first — they hold the binding deci
 1. **Issue first** — every change starts with a GitHub issue.
 2. **Never commit or push to `main`** — it is integration-only/protected (ruleset deferred until the repo is public or the org is on Team — see ADR-0018; convention is binding now).
 3. **Feature branch → PR** — branches `feat/…`, `fix/…`, `docs/…`, `chore/…`; the PR references its issue.
-4. **Claude attribution everywhere** — commits get a `Co-Authored-By: Claude <noreply@anthropic.com>` trailer; issues and PRs get an attribution line in the body (e.g. `🤖 Mitarbeit: Claude … via Claude Code`).
+4. **Claude attribution everywhere** — commits get a `Co-Authored-By: Claude <noreply@anthropic.com>` trailer; issues and PRs get an attribution line in the body: `🤖 Co-Author: Claude (Opus 4.x) via Claude Code`.
 5. **Record important architecture decisions as ADRs** in `docs/adr/` (template in its README). Add the ADR in the same PR as the change.
 6. **Sign the CLA** (`CLA.md`, ADR-0016) — enforced on PRs by the CLA-Assistant workflow; maintainers/bots are allowlisted.
 7. **English everywhere in the project** — issues, PR descriptions, commit messages, documentation, ADRs, and code comments are written in English. This holds even when the working chat language is German: chat may be German, but anything that lands in the repo, an issue, or a PR is English.
