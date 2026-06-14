@@ -1,0 +1,197 @@
+# SPDX-License-Identifier: AGPL-3.0-only
+#
+# Mail template schema (issue #14): per-locale email templates stored in the
+# database so operators can edit them at runtime (admin UI lands with #19). The
+# composite unique on (template_key, locale) makes future i18n purely additive —
+# a new locale is just another row, no schema change. Two body columns:
+# body_plain is always required (accessibility / spam-filter friendliness),
+# body_html is the optional alternative the mail layer sends as
+# multipart/alternative. Seeds ship usable English defaults out of the box;
+# Mustache placeholders ({{username}}, {{verificationLink}}/{{resetLink}},
+# {{expiresAtHuman}}, {{siteName}}) are rendered by MailTemplateService (#19).
+databaseChangeLog:
+  - changeSet:
+      id: 0003-create-mail-template
+      author: qnop
+      comment: Per-locale email template storage.
+      changes:
+        - createTable:
+            tableName: mail_template
+            columns:
+              - column:
+                  name: id
+                  type: UUID
+                  constraints: { primaryKey: true, nullable: false }
+              - column:
+                  name: template_key
+                  type: VARCHAR(128)
+                  constraints: { nullable: false }
+              - column:
+                  name: locale
+                  type: VARCHAR(16)
+                  constraints: { nullable: false }
+              - column:
+                  name: subject
+                  type: TEXT
+                  constraints: { nullable: false }
+              - column:
+                  name: body_plain
+                  type: TEXT
+                  constraints: { nullable: false }
+              - column: { name: body_html, type: TEXT }
+              - column:
+                  name: updated_at
+                  type: TIMESTAMP WITH TIME ZONE
+                  defaultValueComputed: now()
+                  constraints: { nullable: false }
+              - column: { name: updated_by, type: VARCHAR(255) }
+        - addUniqueConstraint:
+            tableName: mail_template
+            columnNames: template_key, locale
+            constraintName: ux_mail_template_key_locale
+        - createIndex:
+            tableName: mail_template
+            indexName: idx_mail_template_key
+            columns:
+              - column: { name: template_key }
+      rollback:
+        - dropTable:
+            tableName: mail_template
+
+  - changeSet:
+      id: 0003-seed-auth-registration-verification-en
+      author: qnop
+      comment: English default for the account-verification email.
+      changes:
+        - insert:
+            tableName: mail_template
+            columns:
+              - column: { name: id, valueComputed: gen_random_uuid() }
+              - column: { name: template_key, value: auth.registration_verification }
+              - column: { name: locale, value: en }
+              - column: { name: subject, value: "Verify your {{siteName}} account" }
+              - column:
+                  name: body_plain
+                  value: |
+                    Hi {{username}},
+
+                    Please verify your email address to finish setting up your
+                    {{siteName}} account. This link expires {{expiresAtHuman}}.
+
+                    {{verificationLink}}
+
+                    If you did not create an account, you can safely ignore this message.
+              - column:
+                  name: body_html
+                  value: |
+                    <!DOCTYPE html>
+                    <html>
+                      <body>
+                        <p>Hi {{username}},</p>
+                        <p>Please verify your email address to finish setting up your
+                          {{siteName}} account. This link expires {{expiresAtHuman}}.</p>
+                        <p><a href="{{verificationLink}}">Verify my email</a></p>
+                        <p>If the button does not work, paste this URL into your browser:<br>
+                          <a href="{{verificationLink}}">{{verificationLink}}</a></p>
+                        <p style="color:#666;font-size:0.9em;">If you did not create an account,
+                          you can safely ignore this message.</p>
+                      </body>
+                    </html>
+      rollback:
+        - delete:
+            tableName: mail_template
+            where: "template_key = 'auth.registration_verification' AND locale = 'en'"
+
+  - changeSet:
+      id: 0003-seed-auth-password-reset-en
+      author: qnop
+      comment: English default for the self-service password-reset email.
+      changes:
+        - insert:
+            tableName: mail_template
+            columns:
+              - column: { name: id, valueComputed: gen_random_uuid() }
+              - column: { name: template_key, value: auth.password_reset }
+              - column: { name: locale, value: en }
+              - column: { name: subject, value: "Reset your {{siteName}} password" }
+              - column:
+                  name: body_plain
+                  value: |
+                    Hi {{username}},
+
+                    We received a request to reset the password on your {{siteName}}
+                    account. Click the link below to choose a new one — it is valid
+                    {{expiresAtHuman}}.
+
+                    {{resetLink}}
+
+                    If you did not request a password reset, you can safely ignore this
+                    message — your existing password remains active.
+              - column:
+                  name: body_html
+                  value: |
+                    <!DOCTYPE html>
+                    <html>
+                      <body>
+                        <p>Hi {{username}},</p>
+                        <p>We received a request to reset the password on your {{siteName}}
+                          account. Click the button below to choose a new one — it is valid
+                          {{expiresAtHuman}}.</p>
+                        <p><a href="{{resetLink}}">Reset my password</a></p>
+                        <p>If the button does not work, paste this URL into your browser:<br>
+                          <a href="{{resetLink}}">{{resetLink}}</a></p>
+                        <p style="color:#666;font-size:0.9em;">If you did not request a password
+                          reset, you can safely ignore this message — your existing password
+                          remains active.</p>
+                      </body>
+                    </html>
+      rollback:
+        - delete:
+            tableName: mail_template
+            where: "template_key = 'auth.password_reset' AND locale = 'en'"
+
+  - changeSet:
+      id: 0003-seed-auth-admin-password-reset-en
+      author: qnop
+      comment: English default for the admin-initiated password-reset email.
+      changes:
+        - insert:
+            tableName: mail_template
+            columns:
+              - column: { name: id, valueComputed: gen_random_uuid() }
+              - column: { name: template_key, value: auth.admin_password_reset }
+              - column: { name: locale, value: en }
+              - column: { name: subject, value: "An administrator reset your {{siteName}} password" }
+              - column:
+                  name: body_plain
+                  value: |
+                    Hi {{username}},
+
+                    An administrator has initiated a password reset on your {{siteName}}
+                    account. Click the link below to choose a new password — it is valid
+                    {{expiresAtHuman}}.
+
+                    {{resetLink}}
+
+                    If you have questions about this change, contact your administrator.
+              - column:
+                  name: body_html
+                  value: |
+                    <!DOCTYPE html>
+                    <html>
+                      <body>
+                        <p>Hi {{username}},</p>
+                        <p>An administrator has initiated a password reset on your {{siteName}}
+                          account. Click the button below to choose a new password — it is valid
+                          {{expiresAtHuman}}.</p>
+                        <p><a href="{{resetLink}}">Choose new password</a></p>
+                        <p>If the button does not work, paste this URL into your browser:<br>
+                          <a href="{{resetLink}}">{{resetLink}}</a></p>
+                        <p style="color:#666;font-size:0.9em;">If you have questions about this
+                          change, contact your administrator.</p>
+                      </body>
+                    </html>
+      rollback:
+        - delete:
+            tableName: mail_template
+            where: "template_key = 'auth.admin_password_reset' AND locale = 'en'"
