@@ -17,3 +17,6 @@ databaseChangeLog:
   - include:
       file: migrations/0002-settings-schema.yaml
       relativeToChangelogFile: true
+  - include:
+      file: migrations/0003-mail-template-schema.yaml
+      relativeToChangelogFile: true
