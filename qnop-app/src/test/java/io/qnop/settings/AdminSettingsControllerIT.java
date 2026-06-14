@@ -21,6 +21,7 @@
 package io.qnop.settings;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -31,23 +32,35 @@ import io.qnop.service.ApplicationSettingKey;
 import io.qnop.service.ApplicationSettingsService;
 import java.util.Map;
 import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.http.MediaType;
 import org.springframework.security.test.context.support.WithMockUser;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.web.servlet.setup.MockMvcBuilders;
+import org.springframework.web.context.WebApplicationContext;
 
 /**
  * Verifies the admin settings endpoints (issue #16, ADR-0025) end-to-end through the real security
  * filter chain: the {@code /api/v1/admin/**} namespace requires {@code SUPERADMIN}, the GET returns
- * the (redacted) settings, and PATCH validates and applies updates. Requires Docker.
+ * the (redacted) settings, and PATCH validates and applies updates.
+ *
+ * <p>MockMvc is built explicitly with {@code springSecurity()} so {@code @WithMockUser} is honored
+ * by the filter chain (Spring Boot 4's {@code @AutoConfigureMockMvc} does not apply it on its own
+ * here). Requires Docker.
  */
-@AutoConfigureMockMvc
 class AdminSettingsControllerIT extends AbstractIntegrationTest {
 
-  @Autowired MockMvc mockMvc;
+  @Autowired WebApplicationContext context;
   @Autowired ApplicationSettingsService settings;
+
+  private MockMvc mockMvc;
+
+  @BeforeEach
+  void setUpMockMvc() {
+    mockMvc = MockMvcBuilders.webAppContextSetup(context).apply(springSecurity()).build();
+  }
 
   @AfterEach
   void resetMutatedKeys() {
