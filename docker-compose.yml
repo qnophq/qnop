@@ -1,9 +1,9 @@
-# Local development infrastructure for qnop.
-# SPDX-License-Identifier: AGPL-3.0-only
+# Local development infrastructure for qnop: PostgreSQL (consumed by the server,
+# ADR-0020) and MinIO for object storage (ADR-0005, not yet consumed).
 #
-# Prepared in Phase 0; no application consumes it yet (the bootable server lands
-# in Phase 1). Credentials below are LOCAL DEV ONLY — see .env.example. Never
-# reuse them outside local development.
+# All inputs are QNOP_-prefixed (see .env.example); compose maps them onto the
+# variable names the official images mandate (POSTGRES_* / MINIO_*). Credentials
+# are LOCAL DEV ONLY — never reuse them outside local development.
 #
 # Usage:  cp .env.example .env  &&  docker compose up -d
 
@@ -11,15 +11,15 @@ services:
   postgres:
     image: postgres:17
     environment:
-      POSTGRES_USER: ${POSTGRES_USER:-qnop}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-qnop}
-      POSTGRES_DB: ${POSTGRES_DB:-qnop}
+      POSTGRES_USER: ${QNOP_DB_USERNAME:-qnop}
+      POSTGRES_PASSWORD: ${QNOP_DB_PASSWORD:-qnop}
+      POSTGRES_DB: ${QNOP_DB_NAME:-qnop}
     ports:
-      - '${POSTGRES_PORT:-5432}:5432'
+      - '${QNOP_DB_PORT:-5432}:5432'
     volumes:
       - qnop_pgdata:/var/lib/postgresql/data
     healthcheck:
-      test: ['CMD-SHELL', 'pg_isready -U ${POSTGRES_USER:-qnop} -d ${POSTGRES_DB:-qnop}']
+      test: ['CMD-SHELL', 'pg_isready -U ${QNOP_DB_USERNAME:-qnop} -d ${QNOP_DB_NAME:-qnop}']
       interval: 10s
       timeout: 5s
       retries: 5
@@ -30,11 +30,11 @@ services:
     image: minio/minio:latest
     command: server /data --console-address ":9001"
     environment:
-      MINIO_ROOT_USER: ${S3_ACCESS_KEY:-qnop}
-      MINIO_ROOT_PASSWORD: ${S3_SECRET_KEY:-qnop_secret}
+      MINIO_ROOT_USER: ${QNOP_S3_ACCESS_KEY:-qnop}
+      MINIO_ROOT_PASSWORD: ${QNOP_S3_SECRET_KEY:-qnop_secret}
     ports:
-      - '${S3_PORT:-9000}:9000' # S3 API
-      - '${S3_CONSOLE_PORT:-9001}:9001' # web console
+      - '${QNOP_S3_PORT:-9000}:9000' # S3 API
+      - '${QNOP_S3_CONSOLE_PORT:-9001}:9001' # web console
     volumes:
       - qnop_miniodata:/data
     healthcheck:
