@@ -21,6 +21,13 @@ spring:
   liquibase:
     change-log: classpath:/db/changelog/db.changelog-master.yaml
 
+# qnop application secrets. No defaults: a missing/insecure key fails the context
+# fast (see EncryptionConfig). Set via env QNOP_AUTH_* in real deployments.
+qnop:
+  auth:
+    encryption-key: ${QNOP_AUTH_ENCRYPTION_KEY:}
+    encryption-salt: ${QNOP_AUTH_ENCRYPTION_SALT:}
+
 management:
   endpoints:
     web:

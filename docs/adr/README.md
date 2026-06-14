@@ -32,6 +32,7 @@ Important architecture decisions are recorded here as ADRs (see [ADR-0001](0001-
 | [0018](0018-main-branch-protection-ruleset.md) | main-branch protection via a repository ruleset (deferred) | Proposed |
 | [0019](0019-source-copyright-headers.md) | Source files carry a copyright notice (devtank42 GmbH) | Accepted |
 | [0020](0020-bootable-server-and-test-database.md) | Bootable server: PostgreSQL + Liquibase + JPA, tests on Testcontainers | Accepted |
+| [0021](0021-identity-and-access-model.md) | Identity & access model (schema level) | Accepted |
 
 ## Template
 

@@ -20,6 +20,11 @@ dependencies {
     // Persistence: JPA entities + Spring Data repositories live in this module.
     implementation(libs.spring.boot.starter.data.jpa)
 
+    // Symmetric encryption for secrets at rest (oidc_provider.client_secret); the
+    // TextEncryptor + fail-fast key validation are the minimal slice of the security
+    // foundation (issue #10) brought forward for the identity schema (issue #11).
+    implementation(libs.spring.security.crypto)
+
     testImplementation(platform(libs.junit.bom))
     testImplementation(libs.junit.jupiter)
     testRuntimeOnly(libs.junit.platform.launcher)

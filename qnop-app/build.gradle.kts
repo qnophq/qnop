@@ -22,9 +22,11 @@ dependencies {
 
     implementation(libs.spring.boot.starter.web)
     implementation(libs.spring.boot.starter.actuator)
-    // JPA/Hibernate reaches the runtime classpath transitively via qnop-core; the
-    // bootstrap gains explicit @EntityScan/@EnableJpaRepositories with the data
-    // model (issue #11), which is when this module takes a direct JPA dependency.
+    // The bootstrap registers the sibling data packages explicitly via
+    // @EntityScan / @EnableJpaRepositories (issue #11), so this module takes a
+    // direct JPA dependency for those compile-time symbols (Hibernate itself
+    // still reaches the runtime classpath transitively via qnop-core).
+    implementation(libs.spring.boot.starter.data.jpa)
 
     // Runtime-only: the JDBC driver and the schema migrator (Liquibase owns the
     // schema; JPA ddl-auto=none). The changelog ships in qnop-core resources.

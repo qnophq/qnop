@@ -1,0 +1,9 @@
+# SPDX-License-Identifier: AGPL-3.0-only
+#
+# Test profile overlay. The real datasource is provided at runtime by the
+# Testcontainers @ServiceConnection; here we only supply the auth secrets the
+# security context (EncryptionConfig) requires to start. Test-only values.
+qnop:
+  auth:
+    encryption-key: test-encryption-key-not-for-production
+    encryption-salt: 0123456789abcdef

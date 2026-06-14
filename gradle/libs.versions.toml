@@ -29,6 +29,8 @@ spring-boot-dependencies = { group = "org.springframework.boot", name = "spring-
 spring-boot-starter-web = { module = "org.springframework.boot:spring-boot-starter-web" }
 spring-boot-starter-actuator = { module = "org.springframework.boot:spring-boot-starter-actuator" }
 spring-boot-starter-data-jpa = { module = "org.springframework.boot:spring-boot-starter-data-jpa" }
+# Symmetric encryption (TextEncryptor) for secrets at rest; version via the Spring Boot BOM.
+spring-security-crypto = { module = "org.springframework.security:spring-security-crypto" }
 liquibase-core = { module = "org.liquibase:liquibase-core" }
 postgresql = { module = "org.postgresql:postgresql" }
 
