@@ -25,6 +25,12 @@ tags:
       Public, unauthenticated server configuration the frontend needs before a
       user is authenticated (edition flag, branding, enabled login providers,
       upload limits, supported document formats).
+  - name: Auth
+    description: |
+      Authentication: local username/email + password login, refresh-token
+      rotation, logout, and password change (issue #17). Access tokens are
+      short-lived JWTs sent as `Authorization: Bearer`; the rotating refresh
+      token lives in an HttpOnly, SameSite=Strict cookie scoped to `/api/v1/auth`.
 paths:
   /config:
     get:
@@ -64,6 +70,135 @@ paths:
                   - PDF
                   - DOCX
                   - MD
+  /auth/login:
+    post:
+      tags:
+        - Auth
+      summary: Authenticate with username/email and password
+      description: |
+        Verifies local credentials and, on success, returns a short-lived access
+        token in the body and sets the rotating refresh token as an HttpOnly
+        `qnop_refresh` cookie. Public (no bearer required).
+      operationId: login
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LoginRequest'
+      responses:
+        '200':
+          description: Authenticated — access token in body, refresh token in cookie.
+          headers:
+            Set-Cookie:
+              description: HttpOnly refresh-token cookie (`qnop_refresh`).
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TokenResponse'
+        '401':
+          description: Invalid credentials.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /auth/refresh:
+    post:
+      tags:
+        - Auth
+      summary: Rotate the refresh token and issue a new access token
+      description: |
+        Rotates the presented `qnop_refresh` cookie (single-use; replay of a
+        revoked token revokes the whole family) and returns a new access token,
+        setting a fresh refresh cookie. CSRF-protected (double-submit token).
+      operationId: refresh
+      security: []
+      parameters:
+        - name: qnop_refresh
+          in: cookie
+          required: false
+          description: The HttpOnly refresh-token cookie.
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Rotated — new access token in body, new refresh token in cookie.
+          headers:
+            Set-Cookie:
+              description: Fresh HttpOnly refresh-token cookie (`qnop_refresh`).
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TokenResponse'
+        '401':
+          description: Missing, unknown, expired, or reused refresh token.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /auth/logout:
+    post:
+      tags:
+        - Auth
+      summary: Log out — revoke the refresh-token family and clear the cookie
+      description: |
+        Revokes the refresh-token family behind the presented cookie and clears
+        it. Idempotent. CSRF-protected (double-submit token).
+      operationId: logout
+      security: []
+      parameters:
+        - name: qnop_refresh
+          in: cookie
+          required: false
+          description: The HttpOnly refresh-token cookie.
+          schema:
+            type: string
+      responses:
+        '204':
+          description: Logged out (cookie cleared).
+          headers:
+            Set-Cookie:
+              description: Clearing cookie for `qnop_refresh`.
+              schema:
+                type: string
+  /auth/change-password:
+    post:
+      tags:
+        - Auth
+      summary: Change the authenticated user's password
+      description: |
+        Verifies the current password, stores the new one, and invalidates all
+        existing tokens for the user (every active session must re-authenticate).
+        Requires a valid access token.
+      operationId: changePassword
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ChangePasswordRequest'
+      responses:
+        '204':
+          description: Password changed; existing tokens invalidated.
+        '400':
+          description: New password does not meet policy.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Missing/invalid access token or wrong current password.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
 components:
   securitySchemes:
     bearerAuth:
@@ -193,6 +328,56 @@ components:
         - auth
         - upload
         - supportedFormats
+    LoginRequest:
+      type: object
+      description: Local-login credentials (issue #17).
+      properties:
+        usernameOrEmail:
+          type: string
+          description: The internal user's username or email address.
+        password:
+          type: string
+          format: password
+          description: The user's plaintext password (verified against the BCrypt hash).
+      required:
+        - usernameOrEmail
+        - password
+    ChangePasswordRequest:
+      type: object
+      description: Password-change payload for the authenticated user (issue #17).
+      properties:
+        currentPassword:
+          type: string
+          format: password
+          description: The user's current password, re-verified before the change.
+        newPassword:
+          type: string
+          format: password
+          minLength: 12
+          description: The replacement password. Must meet the minimum-length policy.
+      required:
+        - currentPassword
+        - newPassword
+    TokenResponse:
+      type: object
+      description: |
+        A freshly issued access token (issue #17). The refresh token is delivered
+        out-of-band as an HttpOnly cookie and never appears in this body.
+      properties:
+        accessToken:
+          type: string
+          description: Signed JWT access token; send it in the Authorization header as a Bearer token.
+        tokenType:
+          type: string
+          description: Always `Bearer`.
+        expiresInSeconds:
+          type: integer
+          format: int64
+          description: Access-token lifetime in seconds from issuance.
+      required:
+        - accessToken
+        - tokenType
+        - expiresInSeconds
     ErrorResponse:
       type: object
       description: |
