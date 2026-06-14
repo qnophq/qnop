@@ -21,6 +21,10 @@ jacksonAnnotations = "2.21"
 swaggerAnnotations = "2.2.50"
 jakartaValidation = "3.1.1"
 jakartaAnnotation = "3.0.0"
+# Auth rate limiting (issue #18, ADR-0027). bucket4j is not in the Spring Boot BOM,
+# so it carries an explicit version; caffeine IS BOM-managed (declared below
+# without a version). bucket4j_jdk17-core targets JDK 17+ (we run JDK 21).
+bucket4j = "8.18.0"
 
 # --- Pinned for later phases (NOT yet applied) -------------------------
 awsSdk = "2.31.6"            # software.amazon.awssdk:s3 — vendor-neutral S3 client
@@ -66,6 +70,11 @@ spring-security-oauth2-jose = { module = "org.springframework.security:spring-se
 spring-boot-starter-oauth2-resource-server = { module = "org.springframework.boot:spring-boot-starter-oauth2-resource-server" }
 # In-memory cache for the JWT revocation (jti) denylist.
 caffeine = { module = "com.github.ben-manes.caffeine:caffeine" }
+
+# Auth rate limiting (issue #18, ADR-0027). Token-bucket limiter; not in the Spring
+# Boot BOM, so it carries an explicit version. The Caffeine cache above backs the
+# per-key bucket store.
+bucket4j-core = { module = "com.bucket4j:bucket4j_jdk17-core", version.ref = "bucket4j" }
 
 # Test
 spring-boot-starter-test = { module = "org.springframework.boot:spring-boot-starter-test" }

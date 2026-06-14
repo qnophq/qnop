@@ -21,6 +21,7 @@
 package io.qnop.bootstrap;
 
 import io.qnop.security.QnopProperties;
+import io.qnop.web.security.ratelimit.RateLimitProperties;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
@@ -36,7 +37,7 @@ import org.springframework.data.jpa.repository.config.EnableJpaRepositories;
  * sibling packages, so they are registered explicitly (the data model arrived with issue #11).
  */
 @SpringBootApplication(scanBasePackages = "io.qnop")
-@EnableConfigurationProperties(QnopProperties.class)
+@EnableConfigurationProperties({QnopProperties.class, RateLimitProperties.class})
 @EntityScan("io.qnop.entity")
 @EnableJpaRepositories("io.qnop.repository")
 public class QnopApplication {
