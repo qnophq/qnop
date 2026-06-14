@@ -229,6 +229,10 @@ class TokenSchemaIT extends AbstractIntegrationTest {
 
     assertThat(passwordResetTokens.findUnconsumedTokensForUser(user.getId())).hasSize(1);
 
+    // Detach the managed tokens first: their EAGER @ManyToOne to the user would
+    // otherwise trip Hibernate's transient-reference check on flush and mask the
+    // DB-level ON DELETE CASCADE we want to verify.
+    entityManager.clear();
     users.deleteById(user.getId());
     entityManager.flush();
     entityManager.clear();
