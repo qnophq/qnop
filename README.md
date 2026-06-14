@@ -24,17 +24,20 @@ qnop is open-core:
 
 ## Getting started
 
-Requires JDK 21, Node 24 + pnpm, and Docker.
+Requires JDK 21, Node 24 + pnpm, and Docker. **Docker must be running for the backend test suite** — tests boot a real PostgreSQL via Testcontainers (ADR-0020).
 
 ```bash
-# Backend — compile + format check + architecture tests
+# Local infrastructure (Postgres for bootRun + MinIO)
+cp .env.example .env && docker compose up -d
+
+# Backend — compile + format check + architecture & context tests
 ./gradlew build
+
+# Run the server (uses the docker-compose Postgres)
+./gradlew :qnop-web:bootRun
 
 # Frontend
 cd frontend && pnpm install && pnpm dev
-
-# Local infrastructure (Postgres + MinIO; not yet consumed in Phase 0)
-cp .env.example .env && docker compose up -d
 ```
 
 ## Repository layout

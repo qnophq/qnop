@@ -2,19 +2,18 @@
 # SPDX-License-Identifier: AGPL-3.0-only
 
 [versions]
-# --- Applied in Phase 0 -------------------------------------------------
+# --- Applied -----------------------------------------------------------
 junit = "5.12.2"
 archunit = "1.4.1"
 # NOTE: keep `spotless` in sync with build-logic/build.gradle.kts (precompiled
 # script plugins cannot read this catalog at plugin-resolution time).
 spotless = "8.6.0"
-
-# --- Pinned for later phases (NOT yet applied) --------------------------
-# Backend application stack — introduced when the bootable server lands
-# (deferred; see docs/adr/0011-review-workflow-state-model.md and the Phase 1 plan).
+# Spring Boot plugin + BOM. The BOM (spring-boot-dependencies) manages the
+# versions of the Spring stack, JPA/Hibernate, the PostgreSQL driver, Liquibase
+# and Testcontainers — so those artifacts are declared below WITHOUT versions.
 springBoot = "4.1.0"
-postgresql = "42.7.5"
-liquibase = "5.0.3"
+
+# --- Pinned for later phases (NOT yet applied) -------------------------
 awsSdk = "2.31.6"            # software.amazon.awssdk:s3 — vendor-neutral S3 client
 pdfbox = "3.0.5"            # PDF text extraction with glyph positions
 poi = "5.4.1"              # .docx structural extraction (XWPF)
@@ -24,6 +23,22 @@ junit-bom = { group = "org.junit", name = "junit-bom", version.ref = "junit" }
 junit-jupiter = { group = "org.junit.jupiter", name = "junit-jupiter" }
 junit-platform-launcher = { group = "org.junit.platform", name = "junit-platform-launcher" }
 archunit-junit5 = { group = "com.tngtech.archunit", name = "archunit-junit5", version.ref = "archunit" }
+
+# Spring Boot platform (BOM) — import via `platform(...)`; manages all versions below.
+spring-boot-dependencies = { group = "org.springframework.boot", name = "spring-boot-dependencies", version.ref = "springBoot" }
+spring-boot-starter-web = { module = "org.springframework.boot:spring-boot-starter-web" }
+spring-boot-starter-actuator = { module = "org.springframework.boot:spring-boot-starter-actuator" }
+spring-boot-starter-data-jpa = { module = "org.springframework.boot:spring-boot-starter-data-jpa" }
+liquibase-core = { module = "org.liquibase:liquibase-core" }
+postgresql = { module = "org.postgresql:postgresql" }
+
+# Test
+spring-boot-starter-test = { module = "org.springframework.boot:spring-boot-starter-test" }
+spring-boot-testcontainers = { module = "org.springframework.boot:spring-boot-testcontainers" }
+# Testcontainers 2.x artifact ids carry the `testcontainers-` prefix; versions
+# are managed transitively by the Spring Boot BOM (testcontainers-bom).
+testcontainers-postgresql = { module = "org.testcontainers:testcontainers-postgresql" }
+testcontainers-junit-jupiter = { module = "org.testcontainers:testcontainers-junit-jupiter" }
 
 [plugins]
 spotless = { id = "com.diffplug.spotless", version.ref = "spotless" }

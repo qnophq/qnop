@@ -24,9 +24,9 @@ Read `docs/ARCHITECTURE.md` and `docs/adr/` first — they hold the binding deci
 
 Commits are signed off (`git commit -s`, DCO). See `CONTRIBUTING.md`.
 
-## Current state — Phase 0
+## Current state — Phase 1 (in progress)
 
-A compiling **skeleton**, not a running app. Deliberately deferred to **Phase 1** (do not assume they exist): the domain core + workflow state machine, the SPI interfaces + Community defaults, and the bootable Spring Boot server (`/api/edition`, Postgres/Liquibase/S3 wiring). Backend modules currently hold only `package-info` placeholders. The frontend is a shell and does **not** call the backend yet. `docker-compose.yml` is prepared but not yet consumed.
+The Spring Boot server now **boots** with PostgreSQL + Liquibase + JPA wired (ADR-0020, issue #8); the domain is still empty. Still pending (do not assume they exist): the domain core + workflow state machine, the SPI interfaces + Community defaults, `/api/edition`, S3/object-storage wiring, the frontend↔backend integration, and the identity/auth subsystem (epic #7: users, OIDC, settings, mail, branding). Backend modules hold only `package-info` placeholders plus the `io.qnop.bootstrap` entry point. `docker-compose.yml` provides local Postgres for `bootRun`; the test suite spins up its own Postgres via **Testcontainers** (Docker required). MinIO is prepared but not yet consumed.
 
 ## Stack
 
