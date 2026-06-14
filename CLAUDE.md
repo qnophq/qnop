@@ -11,10 +11,11 @@ Read `docs/ARCHITECTURE.md` and `docs/adr/` first — they hold the binding deci
 ## Working rules (binding — see ADR-0008)
 
 1. **Issue first** — every change starts with a GitHub issue.
-2. **Never commit or push to `main`** — it is integration-only/protected.
+2. **Never commit or push to `main`** — it is integration-only/protected (ruleset deferred until the repo is public or the org is on Team — see ADR-0018; convention is binding now).
 3. **Feature branch → PR** — branches `feat/…`, `fix/…`, `docs/…`, `chore/…`; the PR references its issue.
 4. **Claude attribution everywhere** — commits get a `Co-Authored-By: Claude <noreply@anthropic.com>` trailer; issues and PRs get an attribution line in the body (e.g. `🤖 Mitarbeit: Claude … via Claude Code`).
 5. **Record important architecture decisions as ADRs** in `docs/adr/` (template in its README). Add the ADR in the same PR as the change.
+6. **Sign the CLA** (`CLA.md`, ADR-0016) — enforced on PRs by the CLA-Assistant workflow; maintainers/bots are allowlisted.
 
 Commits follow Conventional Commits and are signed off (`git commit -s`, DCO). See `CONTRIBUTING.md`.
 
@@ -28,6 +29,7 @@ A compiling **skeleton**, not a running app. Deliberately deferred to **Phase 1*
 - **Frontend**: Vite + React 19 + TypeScript + MaterialUI, package manager **pnpm** (`frontend/`).
 - **Persistence**: PostgreSQL + Liquibase; S3-compatible object storage (MinIO locally) for binary documents.
 - **Quality**: Spotless (google-java-format + SPDX header), ArchUnit (layered boundaries), JUnit 5.
+- **Dependencies**: self-hosted Renovate via GitHub Actions; org preset in public `qnophq/.github`, extended by `.github/renovate.json` (ADR-0017). Don't hand-bump deps; review Renovate PRs.
 
 ## Common commands
 

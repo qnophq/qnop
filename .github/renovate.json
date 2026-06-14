@@ -1,0 +1,119 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "extends": ["github>qnophq/.github"],
+  "packageRules": [
+    {
+      "description": "Spring Boot starters, BOM, security, and dependency-management plugin",
+      "matchManagers": ["gradle", "gradle-wrapper"],
+      "matchPackageNames": [
+        "/^org\\.springframework\\.boot/",
+        "/^org\\.springframework\\.security/",
+        "/^io\\.spring\\.dependency-management/"
+      ],
+      "groupName": "Spring Boot",
+      "groupSlug": "spring-boot"
+    },
+    {
+      "description": "JUnit 5 and ArchUnit",
+      "matchManagers": ["gradle"],
+      "matchPackageNames": [
+        "/^org\\.junit/",
+        "/^com\\.tngtech\\.archunit/"
+      ],
+      "groupName": "Test dependencies",
+      "groupSlug": "test-deps"
+    },
+    {
+      "description": "Liquibase database migrations",
+      "matchManagers": ["gradle"],
+      "matchPackageNames": ["/^org\\.liquibase/"],
+      "groupName": "Liquibase",
+      "groupSlug": "liquibase"
+    },
+    {
+      "description": "PostgreSQL JDBC driver",
+      "matchManagers": ["gradle"],
+      "matchPackageNames": ["/^org\\.postgresql/"],
+      "groupName": "PostgreSQL",
+      "groupSlug": "postgresql"
+    },
+    {
+      "description": "AWS SDK v2 (vendor-neutral S3 client for object storage)",
+      "matchManagers": ["gradle"],
+      "matchPackageNames": ["/^software\\.amazon\\.awssdk/"],
+      "groupName": "AWS SDK",
+      "groupSlug": "aws-sdk"
+    },
+    {
+      "description": "Document processing — Apache PDFBox and POI",
+      "matchManagers": ["gradle"],
+      "matchPackageNames": [
+        "/^org\\.apache\\.pdfbox/",
+        "/^org\\.apache\\.poi/"
+      ],
+      "groupName": "Document processing",
+      "groupSlug": "document-processing"
+    },
+    {
+      "description": "Build tooling — Spotless",
+      "matchManagers": ["gradle"],
+      "matchPackageNames": ["/^com\\.diffplug\\.spotless/"],
+      "groupName": "Build tooling",
+      "groupSlug": "build-tooling"
+    },
+    {
+      "description": "Gradle wrapper version",
+      "matchManagers": ["gradle-wrapper"],
+      "groupName": "Gradle wrapper",
+      "groupSlug": "gradle-wrapper"
+    },
+    {
+      "description": "Frontend — React and its type definitions",
+      "matchManagers": ["npm"],
+      "matchFileNames": ["frontend/**"],
+      "matchPackageNames": [
+        "/^react$/",
+        "/^react-dom$/",
+        "/^@types\\/react/"
+      ],
+      "groupName": "React",
+      "groupSlug": "react"
+    },
+    {
+      "description": "Frontend — MUI and Emotion",
+      "matchManagers": ["npm"],
+      "matchFileNames": ["frontend/**"],
+      "matchPackageNames": [
+        "/^@mui\\//",
+        "/^@emotion\\//"
+      ],
+      "groupName": "MUI",
+      "groupSlug": "mui"
+    },
+    {
+      "description": "Frontend — Vite and the React plugin",
+      "matchManagers": ["npm"],
+      "matchFileNames": ["frontend/**"],
+      "matchPackageNames": [
+        "/^vite$/",
+        "/^@vitejs\\//"
+      ],
+      "groupName": "Vite",
+      "groupSlug": "vite"
+    },
+    {
+      "description": "Frontend — ESLint, TypeScript, and Prettier tooling",
+      "matchManagers": ["npm"],
+      "matchFileNames": ["frontend/**"],
+      "matchPackageNames": [
+        "/^eslint/",
+        "/^@eslint\\//",
+        "/^typescript-eslint$/",
+        "/^typescript$/",
+        "/^prettier$/"
+      ],
+      "groupName": "Frontend lint/types tooling",
+      "groupSlug": "frontend-lint-types"
+    }
+  ]
+}

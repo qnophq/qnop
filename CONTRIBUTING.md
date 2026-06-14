@@ -8,7 +8,8 @@ Thanks for contributing! qnop is the AGPL-3.0 Community core of an open-core pro
 2. **Branch off `main`.** Use `feat/…`, `fix/…`, `docs/…`, `chore/…`, `refactor/…`, `test/…`.
 3. **Never commit or push directly to `main`.** `main` is integration-only and protected; all changes land via Pull Request.
 4. **Open a PR** that references its issue (e.g. `Closes #12`). Keep PRs focused.
-5. CI must be green (backend build + ArchUnit + Spotless, frontend lint/build, SPDX check) before merge.
+5. **Sign the CLA** on your first PR (see below) — a bot will prompt you.
+6. CI must be green (backend build + ArchUnit + Spotless, frontend lint/build, SPDX check) before merge.
 
 ## Commits
 
@@ -45,9 +46,21 @@ Work produced with Claude must be attributed:
 - **Frontend**: `pnpm format && pnpm lint && pnpm build` from `frontend/`.
 - Respect the layered boundaries ([ADR-0004](docs/adr/0004-layered-architecture-enforced-by-archunit.md)) — `web → service → repository → entity`; the published contracts (`qnop-spi`, `qnop-api`) stay Spring-free.
 
+## Contributor License Agreement (CLA)
+
+qnop is open-core: the AGPL-3.0 Community edition plus commercial add-ons. To keep that dual path legal, every contributor signs a one-time [CLA](CLA.md) granting the project the right to sublicense contributions (including under commercial terms). On your first PR a bot comments with instructions; you sign by posting:
+
+> I have read the CLA Document and I hereby sign the CLA
+
+If you use an AI coding agent, **you** (the human operator) sign on behalf of the submission. The DCO sign-off (above) and the CLA are complementary — both are required. Rationale: [ADR-0016](docs/adr/0016-contributor-license-agreement.md).
+
 ## Architecture decisions
 
 Significant decisions are recorded as [ADRs](docs/adr/README.md). If your change involves one, add an ADR in the same PR.
+
+## Dependency updates
+
+Dependencies are kept current by a self-hosted [Renovate](https://docs.renovatebot.com/) instance that opens grouped PRs (see [ADR-0017](docs/adr/0017-renovate-dependency-automation.md)). Review Renovate PRs like any other; do not bump dependencies by hand unless fixing an urgent security issue.
 
 ## License & dependencies
 

@@ -1,0 +1,97 @@
+# SPDX-License-Identifier: AGPL-3.0-only
+# ---------------------------------------------------------------------------
+# CLA Assistant
+#
+# SECURITY NOTE (ADR-0016)
+#
+# This workflow uses `pull_request_target`, which runs in the context of the
+# base repo with access to repo secrets — even for PRs from forks. That makes
+# it the single highest-risk workflow in this repository. Three layered
+# hardenings apply:
+#
+#   1. The `contributor-assistant/github-action` reference is pinned to a
+#      full commit SHA below. Renovate (`.github/renovate.json`, group
+#      "GitHub Actions") opens update PRs when the action releases a new
+#      version. Do not revert to a floating tag.
+#
+#   2. Permissions live at job level, not workflow level. The workflow-level
+#      `permissions: {}` drops every default; future jobs added to this file
+#      do NOT inherit the CLA job's write permissions.
+#
+#   3. This workflow must NEVER add `actions/checkout` or otherwise execute
+#      code from the PR head. `pull_request_target` + checkout + fork is the
+#      classic supply-chain exploit pattern. If you need to build/lint a PR's
+#      code, do it in a separate workflow on `pull_request` (fork-safe, no
+#      secrets). See ADR-0016 for the full threat model.
+#
+# The `actions: write`, `contents: write`, `pull-requests: write`, and
+# `statuses: write` permissions on the CLA job match the action's README
+# requirements at the pinned SHA — do not narrow without re-reading the
+# action's docs at the pinned version.
+# ---------------------------------------------------------------------------
+name: CLA
+
+on:
+  issue_comment:
+    types: [created]
+  pull_request_target:
+    types: [opened, closed, synchronize]
+
+permissions: {}
+
+jobs:
+  cla-check:
+    runs-on: ubuntu-latest
+
+    # GitHub fires `issue_comment` for both Issue AND PR comments — they share
+    # the same event payload. Without this filter, every comment on a regular
+    # Issue triggers the CLA action, which then tries to GraphQL-resolve a PR
+    # with the issue's number and crashes with "Could not resolve to a
+    # PullRequest". The `issue.pull_request` field is set only when the parent
+    # is a PR, so this is the canonical "PR comment only" filter. Uses
+    # `event_name` and a presence check — no untrusted user input is
+    # interpolated.
+    if: |
+      github.event_name == 'pull_request_target' ||
+      (github.event_name == 'issue_comment' && github.event.issue.pull_request != null)
+
+    # Match the action's documented permission requirements. Scoped to this
+    # job only so future jobs in this file do not inherit write access.
+    permissions:
+      actions: write
+      contents: write
+      pull-requests: write
+      statuses: write
+
+    steps:
+      - name: CLA Assistant
+        # v2.6.1 pinned by commit SHA. See ADR-0016.
+        # Maintained by Renovate (`.github/renovate.json`, group "GitHub Actions").
+        uses: contributor-assistant/github-action@ca4a40a7d1004f18d9960b404b97e5f30a505a08 # v2.6.1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PERSONAL_ACCESS_TOKEN: ${{ secrets.CLA_TOKEN }}
+        with:
+          path-to-signatures: signatures/cla.json
+          path-to-document: https://github.com/qnophq/qnop/blob/main/CLA.md
+          branch: cla-signatures
+          allowlist: bigpuritz,devtank42,*[bot]
+          create-file-commit-message: "chore: initialize CLA signatures file"
+          signed-commit-message: "chore: add $contributorName to CLA signatories"
+          custom-notsigned-prcomment: |
+            Thank you for your contribution! :tada:
+
+            Before we can merge this PR, you need to sign the **Contributor License Agreement (CLA)**.
+            This is required so that qnop can offer commercial add-ons and a possible SaaS alongside its AGPL-3.0 Community edition.
+
+            Please read [CLA.md](https://github.com/qnophq/qnop/blob/main/CLA.md) — it is short and written in plain language.
+
+            Then post the following comment **in this PR**:
+
+            > I have read the CLA Document and I hereby sign the CLA
+
+            If you are contributing on behalf of a company, an authorized representative of your employer must also post this comment.
+
+            If you use an AI coding agent, you (the human operator) sign on behalf of the submission.
+          custom-pr-sign-comment: I have read the CLA Document and I hereby sign the CLA
+          lock-pullrequest-aftermerge: false

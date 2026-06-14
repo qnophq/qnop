@@ -1,0 +1,40 @@
+# SPDX-License-Identifier: AGPL-3.0-only
+#
+# Self-hosted Renovate trigger for this repo.
+#
+# This workflow defines the schedule and permissions, then delegates the
+# actual Renovate run to the org-wide reusable workflow at
+# qnophq/.github/.github/workflows/renovate.yml. See ADR-0017 for the
+# rationale (org preset + self-hosted single-repo instance).
+#
+# Cron mirrors the `before 6am every weekday` schedule filter inside the org
+# default (Mon-Fri 04:00 UTC). workflow_dispatch lets any maintainer trigger
+# an on-demand run from the Actions tab or via `gh workflow run renovate.yml`.
+
+name: Renovate
+
+on:
+  schedule:
+    - cron: "0 4 * * 1-5"
+  workflow_dispatch:
+    inputs:
+      logLevel:
+        description: "Log level"
+        type: choice
+        default: "info"
+        options:
+          - info
+          - debug
+
+jobs:
+  renovate:
+    # Pinned to a qnophq/.github commit SHA; Renovate keeps it current.
+    uses: qnophq/.github/.github/workflows/renovate.yml@94c4381a80ff3297b4017be99f49bb9193f778d1 # main
+    # Permissions belong on the calling job, not on the reusable workflow.
+    # The reusable workflow inherits these for the duration of the call.
+    permissions:
+      contents: write       # branch + push
+      pull-requests: write  # open + label PRs
+      issues: write         # update Dependency Dashboard issue
+    with:
+      logLevel: ${{ inputs.logLevel || 'info' }}
