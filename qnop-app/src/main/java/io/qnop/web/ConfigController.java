@@ -20,7 +20,7 @@
  */
 package io.qnop.web;
 
-import io.qnop.api.v1.ServerConfigApi;
+import io.qnop.api.v1.endpoint.ServerConfigApi;
 import io.qnop.api.v1.model.Edition;
 import io.qnop.api.v1.model.ServerConfigAuth;
 import io.qnop.api.v1.model.ServerConfigGeneral;

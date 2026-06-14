@@ -109,7 +109,7 @@ class ArchitectureRulesTest {
     // generated POJOs only, free of Spring and internal-module dependencies so
     // external consumers (and a generated TS/SDK client) can depend on it without
     // pulling the server. The Spring MVC *interfaces* live in qnop-api-endpoint
-    // (io.qnop.api.v1, NOT ...model) and intentionally depend on Spring — they are
+    // (io.qnop.api.v1.endpoint, NOT ...model) and intentionally depend on Spring —
     // implemented by the web layer, so only the model package is held to purity.
     ArchRule rule =
         ArchRuleDefinition.noClasses()

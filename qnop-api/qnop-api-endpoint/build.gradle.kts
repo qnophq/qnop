@@ -37,7 +37,7 @@ openApiGenerate {
     generatorName.set("spring")
     inputSpec.set(specFile)
     outputDir.set("${layout.buildDirectory.get()}/generated")
-    apiPackage.set("io.qnop.api.v1")
+    apiPackage.set("io.qnop.api.v1.endpoint")
     modelPackage.set("io.qnop.api.v1.model") // imported from qnop-api-model, not regenerated
     configOptions.set(
         mapOf(
