@@ -56,7 +56,7 @@ Work produced with Claude must be attributed:
 ## Code quality
 
 - **Backend**: `./gradlew spotlessApply` before committing; `./gradlew build` must pass (runs Spotless check + ArchUnit). Every source file carries the copyright + `SPDX-License-Identifier: AGPL-3.0-only` header from the root `license-header.txt` ([ADR-0019](docs/adr/0019-source-copyright-headers.md)); Spotless inserts it for Java automatically (add it by hand in `package-info.java` and frontend files).
-- **Frontend**: `pnpm format && pnpm lint && pnpm build` from `frontend/`.
+- **Frontend**: `pnpm format && pnpm lint && pnpm build` from `qnop-ui/`.
 - Respect the layered boundaries ([ADR-0004](docs/adr/0004-layered-architecture-enforced-by-archunit.md)) — `web → service → repository → entity`; the published contracts (`qnop-spi`, `qnop-api`) stay Spring-free.
 
 ## Contributor License Agreement (CLA)

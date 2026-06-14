@@ -10,7 +10,7 @@ AGPL-3.0 extends to the JavaScript bundle shipped to the browser. The open-core 
 
 ## Decision (direction — to be finalized when enterprise UI is built)
 
-- The open-source frontend (this repo's `frontend/`) is AGPL and defines **plugin slots / extension points** for edition-specific UI (e.g. an AI-review panel mount).
+- The open-source frontend (this repo's `qnop-ui/`) is AGPL and defines **plugin slots / extension points** for edition-specific UI (e.g. an AI-review panel mount).
 - Enterprise UI components live in a **separate private npm package** in the `qnop-enterprise` repository and are composed into the commercial frontend build, mirroring the backend SPI model.
 - Feature visibility is driven at runtime by the entitlements from `/api/edition` ([ADR-0012](0012-edition-vs-entitlements.md)).
 

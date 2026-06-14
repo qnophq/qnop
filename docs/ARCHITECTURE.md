@@ -47,7 +47,7 @@ Two modules are versioned, externally-consumable stability surfaces:
 
 ## Frontend
 
-A Vite + React + TypeScript + MaterialUI SPA (`frontend/`) talking to the Spring REST API. Enterprise UI will be separated mirroring the backend ([ADR-0014](adr/0014-frontend-enterprise-separation.md)).
+A Vite + React + TypeScript + MaterialUI SPA (`qnop-ui/`) talking to the Spring REST API. Enterprise UI will be separated mirroring the backend ([ADR-0014](adr/0014-frontend-enterprise-separation.md)).
 
 ## Persistence topology
 

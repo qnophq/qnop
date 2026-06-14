@@ -31,7 +31,7 @@ The Spring Boot server now **boots** with PostgreSQL + Liquibase + JPA wired (AD
 ## Stack
 
 - **Backend**: Java 21, Gradle (Kotlin DSL) multi-module, Spring Boot 4.x (introduced in Phase 1). Convention plugin in `build-logic/`; dependency versions in `gradle/libs.versions.toml`; **project version in the root `VERSION` file** (single source of truth, read by the convention plugin).
-- **Frontend**: Vite + React 19 + TypeScript + MaterialUI, package manager **pnpm** (`frontend/`).
+- **Frontend**: Vite + React 19 + TypeScript + MaterialUI, package manager **pnpm** (`qnop-ui/`).
 - **Persistence**: PostgreSQL + Liquibase; S3-compatible object storage (MinIO locally) for binary documents.
 - **Quality**: Spotless (google-java-format + SPDX header), ArchUnit (layered boundaries), JUnit 5.
 - **Dependencies**: self-hosted Renovate via GitHub Actions; org preset in public `qnophq/.github`, extended by `.github/renovate.json` (ADR-0017). Don't hand-bump deps; review Renovate PRs.
@@ -48,7 +48,7 @@ Backend (repo root):
 ./gradlew :qnop-core:build   # build one module
 ```
 
-Frontend (`cd frontend`):
+Frontend (`cd qnop-ui`):
 
 ```bash
 pnpm install

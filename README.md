@@ -19,7 +19,7 @@ qnop is open-core:
 ## Tech stack
 
 - **Backend**: Java 21 · Gradle (Kotlin DSL) multi-module · Spring Boot 4.x (Phase 1)
-- **Frontend**: Vite · React 19 · TypeScript · MaterialUI (`frontend/`)
+- **Frontend**: Vite · React 19 · TypeScript · MaterialUI (`qnop-ui/`)
 - **Data**: PostgreSQL + Liquibase · S3-compatible object storage (MinIO locally)
 
 ## Getting started
@@ -37,7 +37,7 @@ cp .env.example .env && docker compose up -d
 ./gradlew :qnop-app:bootRun
 
 # Frontend
-cd frontend && pnpm install && pnpm dev
+cd qnop-ui && pnpm install && pnpm dev
 ```
 
 ## Repository layout
@@ -48,7 +48,7 @@ qnop-api/            # published REST contract: DTOs + OpenAPI (Spring-free)
 qnop-core/           # entity/ repository/ service/  (the Spring backend core)
 qnop-app/            # @RestControllers + Spring Boot bootstrap (the runnable)
 build-logic/         # Gradle convention plugins
-frontend/            # Vite + React + MUI SPA
+qnop-ui/             # Vite + React + MUI SPA
 docs/ARCHITECTURE.md # the map
 docs/adr/            # architecture decision records
 ```

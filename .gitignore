@@ -4,10 +4,10 @@
 !src/**/build/
 *.class
 
-# --- Node / frontend ---
+# --- Node / qnop-ui ---
 node_modules/
-frontend/dist/
-frontend/.vite/
+qnop-ui/dist/
+qnop-ui/.vite/
 
 # --- Local env & secrets ---
 .env

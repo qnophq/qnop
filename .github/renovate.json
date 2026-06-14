@@ -70,7 +70,7 @@
     {
       "description": "Frontend — React and its type definitions",
       "matchManagers": ["npm"],
-      "matchFileNames": ["frontend/**"],
+      "matchFileNames": ["qnop-ui/**"],
       "matchPackageNames": [
         "/^react$/",
         "/^react-dom$/",
@@ -82,7 +82,7 @@
     {
       "description": "Frontend — MUI and Emotion",
       "matchManagers": ["npm"],
-      "matchFileNames": ["frontend/**"],
+      "matchFileNames": ["qnop-ui/**"],
       "matchPackageNames": [
         "/^@mui\\//",
         "/^@emotion\\//"
@@ -93,7 +93,7 @@
     {
       "description": "Frontend — Vite and the React plugin",
       "matchManagers": ["npm"],
-      "matchFileNames": ["frontend/**"],
+      "matchFileNames": ["qnop-ui/**"],
       "matchPackageNames": [
         "/^vite$/",
         "/^@vitejs\\//"
@@ -104,7 +104,7 @@
     {
       "description": "Frontend — ESLint, TypeScript, and Prettier tooling",
       "matchManagers": ["npm"],
-      "matchFileNames": ["frontend/**"],
+      "matchFileNames": ["qnop-ui/**"],
       "matchPackageNames": [
         "/^eslint/",
         "/^@eslint\\//",
