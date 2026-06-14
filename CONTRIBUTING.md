@@ -5,7 +5,7 @@ Thanks for contributing! qnop is the AGPL-3.0 Community core of an open-core pro
 ## Workflow
 
 1. **Open an issue first.** Describe the intent before changing code.
-2. **Branch off `main`.** Use `feat/…`, `fix/…`, `docs/…`, `chore/…`, `refactor/…`, `test/…`.
+2. **Branch off `main`.** Name the branch per [Conventional Branch](https://conventionalbranch.org/) (see [Branches](#branches)): `feat/…`, `fix/…`, `chore/…`, `hotfix/…`, `release/…`.
 3. **Never commit or push directly to `main`.** `main` is integration-only and protected; all changes land via Pull Request.
 4. **Open a PR** that references its issue (e.g. `Closes #12`). Keep PRs focused.
 5. **Sign the CLA** on your first PR (see below) — a bot will prompt you.
@@ -15,9 +15,18 @@ Thanks for contributing! qnop is the AGPL-3.0 Community core of an open-core pro
 
 All project artifacts are written in **English**: issues, pull-request descriptions, commit messages, documentation, ADRs, and code comments. Maintainer chat may happen in another language, but anything that lands in the repo, an issue, or a PR is English.
 
+## Branches
+
+Branch names follow [Conventional Branch](https://conventionalbranch.org/): `<type>/<description>`.
+
+- **Types**: `feat` (= `feature`), `fix` (= `bugfix`), `hotfix`, `release`, `chore`.
+- **Description**: lowercase `a-z`, digits `0-9`, hyphen-separated; no underscores, spaces, or special characters; no leading/trailing/consecutive hyphens. Dots only in release versions (`release/v1.2.0`).
+- Optionally include an issue number, e.g. `feat/issue-123-new-login`.
+- `main` (and `master`/`develop`) carry no prefix.
+
 ## Commits
 
-Conventional Commits:
+[Conventional Commits](https://www.conventionalcommits.org/en/v1.0.0/):
 
 ```
 <type>: <subject>
@@ -27,7 +36,7 @@ Conventional Commits:
 Signed-off-by: Your Name <you@example.com>
 ```
 
-Types: `feat`, `fix`, `refactor`, `docs`, `test`, `chore`, `perf`, `ci`.
+Types: `feat`, `fix`, `refactor`, `docs`, `test`, `chore`, `perf`, `ci`, `build`.
 
 ### Developer Certificate of Origin (DCO)
 
