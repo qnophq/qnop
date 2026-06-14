@@ -41,4 +41,13 @@ spotless {
 
 tasks.withType<Test>().configureEach {
     useJUnitPlatform()
+    // Surface full exception traces for failures. The integration tests are
+    // CI-only (Testcontainers needs Docker), so a truncated stack in the CI log
+    // would otherwise leave failures undebuggable.
+    testLogging {
+        events("failed")
+        exceptionFormat = org.gradle.api.tasks.testing.logging.TestExceptionFormat.FULL
+        showStackTraces = true
+        showCauses = true
+    }
 }
