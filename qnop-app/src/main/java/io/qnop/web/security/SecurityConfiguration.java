@@ -32,7 +32,11 @@ import org.springframework.security.config.annotation.web.configuration.EnableWe
 import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.web.AuthenticationEntryPoint;
 import org.springframework.security.web.SecurityFilterChain;
+import org.springframework.security.web.csrf.CookieCsrfTokenRepository;
+import org.springframework.security.web.csrf.CsrfFilter;
+import org.springframework.security.web.csrf.CsrfTokenRequestAttributeHandler;
 import org.springframework.security.web.header.writers.ReferrerPolicyHeaderWriter;
+import org.springframework.security.web.util.matcher.RequestMatcher;
 import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
@@ -40,11 +44,14 @@ import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 /**
  * The servlet security filter chain for the Community server (issue #10, ADR-0022).
  *
- * <p>The API is stateless (token-based, from issue #17), so sessions and CSRF cookies are disabled
- * and unauthenticated requests receive a JSON {@code 401} rather than a login redirect. Actuator
- * health is public; everything else requires authentication. Security headers (a strict CSP for a
- * JSON API, frame-deny, referrer policy, HSTS) are applied to every response. CORS is driven by
- * {@link QnopProperties} so the SPA origin is configurable per environment.
+ * <p>The API is stateless: bearer access tokens are validated by the resource-server filter using
+ * {@link DelegatingJwtDecoder} (local HMAC + revocation, issue #17), and unauthenticated requests
+ * receive a JSON {@code 401} rather than a login redirect. The login endpoint and actuator health
+ * are public; refresh/logout are public but ride on the HttpOnly refresh cookie, so they are
+ * CSRF-protected via a double-submit cookie token (the rest of the API is token-based and exempt).
+ * Everything else requires authentication. Security headers (a strict CSP for a JSON API,
+ * frame-deny, referrer policy, HSTS) are applied to every response. CORS is driven by {@link
+ * QnopProperties} so the SPA origin is configurable per environment.
  */
 @Configuration
 @EnableWebSecurity
@@ -53,13 +60,26 @@ public class SecurityConfiguration {
 
   private static final long HSTS_MAX_AGE_SECONDS = 31_536_000L; // one year
 
+  /** Cookie-bearing, state-changing auth endpoints that require a double-submit CSRF token. */
+  private static final RequestMatcher AUTH_CSRF_MATCHER =
+      request ->
+          "POST".equalsIgnoreCase(request.getMethod())
+              && ("/api/v1/auth/refresh".equals(request.getRequestURI())
+                  || "/api/v1/auth/logout".equals(request.getRequestURI()));
+
   @Bean
   SecurityFilterChain securityFilterChain(
       HttpSecurity http,
       AuthenticationEntryPoint authenticationEntryPoint,
-      CorsConfigurationSource corsConfigurationSource)
+      CorsConfigurationSource corsConfigurationSource,
+      DelegatingJwtDecoder jwtDecoder)
       throws Exception {
-    http.csrf(csrf -> csrf.disable())
+    http.csrf(
+            csrf ->
+                csrf.csrfTokenRepository(CookieCsrfTokenRepository.withHttpOnlyFalse())
+                    .csrfTokenRequestHandler(new CsrfTokenRequestAttributeHandler())
+                    .requireCsrfProtectionMatcher(AUTH_CSRF_MATCHER))
+        .addFilterAfter(new CsrfCookieFilter(), CsrfFilter.class)
         .cors(cors -> cors.configurationSource(corsConfigurationSource))
         .sessionManagement(
             session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
@@ -67,10 +87,14 @@ public class SecurityConfiguration {
             auth ->
                 auth.requestMatchers("/actuator/health", "/actuator/health/**")
                     .permitAll()
+                    .requestMatchers(
+                        "/api/v1/auth/login", "/api/v1/auth/refresh", "/api/v1/auth/logout")
+                    .permitAll()
                     .requestMatchers("/api/v1/admin/**")
                     .hasRole("SUPERADMIN")
                     .anyRequest()
                     .authenticated())
+        .oauth2ResourceServer(oauth2 -> oauth2.jwt(jwt -> jwt.decoder(jwtDecoder)))
         .httpBasic(httpBasic -> httpBasic.disable())
         .formLogin(formLogin -> formLogin.disable())
         .exceptionHandling(ex -> ex.authenticationEntryPoint(authenticationEntryPoint))

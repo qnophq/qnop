@@ -37,6 +37,7 @@ Important architecture decisions are recorded here as ADRs (see [ADR-0001](0001-
 | [0023](0023-identity-and-access-model.md) | Identity & access model (schema level) | Accepted |
 | [0024](0024-branding-asset-storage.md) | Branding-asset storage location (Postgres bytea) | Accepted |
 | [0025](0025-application-settings-architecture.md) | Application settings — registry-authoritative, snapshot-backed runtime | Accepted |
+| [0026](0026-jwt-session-and-revocation.md) | JWT access tokens, rotating refresh tokens, and revocation | Accepted |
 
 ## Template
 

@@ -32,6 +32,13 @@ dependencies {
     implementation(libs.spring.boot.starter.validation)
     implementation(libs.spring.security.crypto)
 
+    // JWT & session core (issue #17): Nimbus encode/decode for self-issued HS256
+    // access tokens, and Caffeine for the in-memory revocation (jti) denylist.
+    // Framework-light (no spring-security-web); the servlet resource-server
+    // filter is wired in qnop-app.
+    implementation(libs.spring.security.oauth2.jose)
+    implementation(libs.caffeine)
+
     testImplementation(platform(libs.junit.bom))
     testImplementation(libs.junit.jupiter)
     testRuntimeOnly(libs.junit.platform.launcher)

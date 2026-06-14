@@ -59,6 +59,14 @@ spring-boot-starter-security = { module = "org.springframework.boot:spring-boot-
 spring-boot-starter-validation = { module = "org.springframework.boot:spring-boot-starter-validation" }
 spring-security-crypto = { module = "org.springframework.security:spring-security-crypto" }
 
+# JWT & session core (issue #17) — versions managed by the Spring Boot BOM.
+# Nimbus JWT encode/decode for self-issued HS256 access tokens.
+spring-security-oauth2-jose = { module = "org.springframework.security:spring-security-oauth2-jose" }
+# Servlet resource-server filter that validates the bearer JWT on each request.
+spring-boot-starter-oauth2-resource-server = { module = "org.springframework.boot:spring-boot-starter-oauth2-resource-server" }
+# In-memory cache for the JWT revocation (jti) denylist.
+caffeine = { module = "com.github.ben-manes.caffeine:caffeine" }
+
 # Test
 spring-boot-starter-test = { module = "org.springframework.boot:spring-boot-starter-test" }
 # Spring Boot 4 split the web test slices into per-stack modules; @WebMvcTest now
