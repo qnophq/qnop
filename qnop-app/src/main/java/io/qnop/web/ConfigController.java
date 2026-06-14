@@ -1,0 +1,73 @@
+/*
+ * Copyright (c) 2026-present devtank42 GmbH
+ *
+ * This file is part of qnop (Qualified Notes on Papers).
+ *
+ * qnop is free software: you can redistribute it and/or modify it under the
+ * terms of the GNU Affero General Public License as published by the Free
+ * Software Foundation, either version 3 of the License, or (at your option)
+ * any later version.
+ *
+ * qnop is distributed in the hope that it will be useful, but WITHOUT ANY
+ * WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS
+ * FOR A PARTICULAR PURPOSE. See the GNU Affero General Public License for more
+ * details.
+ *
+ * You should have received a copy of the GNU Affero General Public License
+ * along with qnop. If not, see <https://www.gnu.org/licenses/>.
+ *
+ * SPDX-License-Identifier: AGPL-3.0-only
+ */
+package io.qnop.web;
+
+import io.qnop.api.v1.ServerConfigApi;
+import io.qnop.api.v1.model.Edition;
+import io.qnop.api.v1.model.ServerConfigAuth;
+import io.qnop.api.v1.model.ServerConfigGeneral;
+import io.qnop.api.v1.model.ServerConfigResponse;
+import io.qnop.api.v1.model.ServerConfigUpload;
+import io.qnop.api.v1.model.SupportedFormat;
+import java.util.List;
+import java.util.Optional;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.RestController;
+
+/**
+ * Public server configuration endpoint ({@code GET /api/v1/config}), implementing the generated
+ * {@link ServerConfigApi} contract (ADR-0015, ADR-0021).
+ *
+ * <p><strong>Placeholder values (issue #9).</strong> This endpoint proves the OpenAPI-first
+ * toolchain end-to-end: a hand-written {@code @RestController} implements a generated interface and
+ * returns a generated DTO. The values are static for now; later issues wire the real sources —
+ * {@code edition} from the {@code EditionResolver} SPI (ADR-0012), {@code general}/{@code upload}
+ * from application settings (#16), and {@code auth.oidcProviders} from the OIDC registry (#21).
+ */
+@RestController
+public class ConfigController implements ServerConfigApi {
+
+  /** Static Community fallback until the upload limit is operator-configurable (#16). */
+  private static final int DEFAULT_MAX_DOCUMENT_SIZE_MB = 50;
+
+  /** Reported when no build manifest is available (e.g. when running from exploded classes). */
+  private static final String UNKNOWN_VERSION = "unknown";
+
+  @Override
+  public ResponseEntity<ServerConfigResponse> getServerConfig() {
+    ServerConfigResponse body =
+        new ServerConfigResponse()
+            .version(resolveVersion())
+            .edition(Edition.COMMUNITY)
+            .general(new ServerConfigGeneral().siteName("qnop").defaultTimezone("UTC"))
+            .auth(new ServerConfigAuth().oidcProviders(List.of()).selfRegistrationEnabled(false))
+            .upload(new ServerConfigUpload().maxDocumentSizeMb(DEFAULT_MAX_DOCUMENT_SIZE_MB))
+            .supportedFormats(
+                List.of(SupportedFormat.PDF, SupportedFormat.DOCX, SupportedFormat.MD));
+    return ResponseEntity.ok(body);
+  }
+
+  /** Reads the server version from the JAR manifest, falling back to {@code "unknown"}. */
+  private static String resolveVersion() {
+    return Optional.ofNullable(ConfigController.class.getPackage().getImplementationVersion())
+        .orElse(UNKNOWN_VERSION);
+  }
+}

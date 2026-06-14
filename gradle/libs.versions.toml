@@ -12,6 +12,15 @@ spotless = "8.6.0"
 # versions of the Spring stack, JPA/Hibernate, the PostgreSQL driver, Liquibase
 # and Testcontainers — so those artifacts are declared below WITHOUT versions.
 springBoot = "4.1.0"
+# OpenAPI-first contract tooling (ADR-0021): the openapi-generator Gradle plugin
+# produces pure DTOs into qnop-api-model and Spring MVC interfaces into
+# qnop-api-endpoint from a single spec. Jackson annotations stay on 2.x
+# (com.fasterxml.jackson) — the generated models only carry annotations.
+openapiGenerator = "7.22.0"
+jacksonAnnotations = "2.21"
+swaggerAnnotations = "2.2.50"
+jakartaValidation = "3.1.1"
+jakartaAnnotation = "3.0.0"
 
 # --- Pinned for later phases (NOT yet applied) -------------------------
 awsSdk = "2.31.6"            # software.amazon.awssdk:s3 — vendor-neutral S3 client
@@ -32,8 +41,20 @@ spring-boot-starter-data-jpa = { module = "org.springframework.boot:spring-boot-
 liquibase-core = { module = "org.liquibase:liquibase-core" }
 postgresql = { module = "org.postgresql:postgresql" }
 
+# OpenAPI contract (ADR-0021). qnop-api-model needs only the annotation libraries
+# the generated POJOs reference (Jackson 2.x annotations + Jakarta Bean
+# Validation); it stays Spring-free. swagger-annotations + jakarta-annotation are
+# consumed by the generated Spring interfaces in qnop-api-endpoint.
+jackson-annotations = { module = "com.fasterxml.jackson.core:jackson-annotations", version.ref = "jacksonAnnotations" }
+swagger-annotations = { module = "io.swagger.core.v3:swagger-annotations", version.ref = "swaggerAnnotations" }
+jakarta-validation-api = { module = "jakarta.validation:jakarta.validation-api", version.ref = "jakartaValidation" }
+jakarta-annotation-api = { module = "jakarta.annotation:jakarta.annotation-api", version.ref = "jakartaAnnotation" }
+
 # Test
 spring-boot-starter-test = { module = "org.springframework.boot:spring-boot-starter-test" }
+# Spring Boot 4 split the web test slices into per-stack modules; @WebMvcTest now
+# lives in spring-boot-webmvc-test (package org.springframework.boot.webmvc.test).
+spring-boot-webmvc-test = { module = "org.springframework.boot:spring-boot-webmvc-test" }
 spring-boot-testcontainers = { module = "org.springframework.boot:spring-boot-testcontainers" }
 # Testcontainers 2.x artifact ids carry the `testcontainers-` prefix; versions
 # are managed transitively by the Spring Boot BOM (testcontainers-bom).
@@ -43,3 +64,4 @@ testcontainers-junit-jupiter = { module = "org.testcontainers:testcontainers-jun
 [plugins]
 spotless = { id = "com.diffplug.spotless", version.ref = "spotless" }
 spring-boot = { id = "org.springframework.boot", version.ref = "springBoot" }
+openapi-generator = { id = "org.openapi.generator", version.ref = "openapiGenerator" }
