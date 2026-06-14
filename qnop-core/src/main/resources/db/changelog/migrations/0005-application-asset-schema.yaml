@@ -1,0 +1,67 @@
+# SPDX-License-Identifier: AGPL-3.0-only
+#
+# Application-asset / branding schema (issue #15): application_asset.
+# Ported from plugwerk (migration 0035); see ADR-0024 for why branding bytes
+# live in Postgres bytea rather than object storage. Postgres-only CHECK
+# constraints live here in Liquibase, NOT in JPA annotations (ADR-0020). JPA
+# runs ddl-auto=none, so the entity column mapping must match exactly. The slot
+# column stores the snake_case BrandingSlot.dbValue (via BrandingSlotConverter).
+databaseChangeLog:
+  - changeSet:
+      id: 0005-application-asset
+      author: qnop
+      comment: Branding-asset storage; one row per slot, current-asset (not history).
+      changes:
+        - createTable:
+            tableName: application_asset
+            columns:
+              - column:
+                  name: id
+                  type: UUID
+                  constraints: { primaryKey: true, nullable: false }
+              - column:
+                  name: slot
+                  type: VARCHAR(32)
+                  constraints: { nullable: false }
+              - column:
+                  name: content_type
+                  type: VARCHAR(64)
+                  constraints: { nullable: false }
+              - column:
+                  name: content
+                  type: BYTEA
+                  constraints: { nullable: false }
+              - column:
+                  name: sha256
+                  type: VARCHAR(64)
+                  constraints: { nullable: false }
+              - column:
+                  name: size_bytes
+                  type: BIGINT
+                  constraints: { nullable: false }
+              - column:
+                  name: uploaded_at
+                  type: TIMESTAMP WITH TIME ZONE
+                  constraints: { nullable: false }
+              - column: { name: uploaded_by, type: UUID }
+        - addUniqueConstraint:
+            tableName: application_asset
+            columnNames: slot
+            constraintName: ux_application_asset_slot
+        # No ON DELETE action (no cascade, issue #15): a user who uploaded a
+        # branding asset cannot be deleted until the asset row is reassigned or
+        # removed. Contrast oidc_identity, whose user FK cascades.
+        - addForeignKeyConstraint:
+            baseTableName: application_asset
+            baseColumnNames: uploaded_by
+            referencedTableName: qnop_user
+            referencedColumnNames: id
+            constraintName: fk_application_asset_user
+        - sql:
+            comment: Postgres-only CHECK constraints on the slot + content_type domains.
+            splitStatements: true
+            sql: |
+              ALTER TABLE application_asset ADD CONSTRAINT ck_application_asset_slot
+                CHECK (slot IN ('logo_light', 'logo_dark', 'logomark'));
+              ALTER TABLE application_asset ADD CONSTRAINT ck_application_asset_content_type
+                CHECK (content_type IN ('image/svg+xml', 'image/png', 'image/webp'));
