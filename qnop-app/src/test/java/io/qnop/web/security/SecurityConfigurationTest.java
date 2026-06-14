@@ -32,7 +32,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.boot.test.web.server.LocalServerPort;
 
 /**
- * Verifies the security filter chain (ADR-0021): the context starts with the chain, actuator health
+ * Verifies the security filter chain (ADR-0022): the context starts with the chain, actuator health
  * is public, unauthenticated requests to protected paths get a 401, and the security headers are
  * present. Drives the live server over HTTP (like {@code QnopApplicationContextTest}) to stay free
  * of a servlet test-client dependency. Requires Docker (Testcontainers).

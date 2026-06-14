@@ -31,7 +31,7 @@ import org.testcontainers.junit.jupiter.Testcontainers;
 /**
  * Base for full-context integration tests: boots the application against a real PostgreSQL
  * (Testcontainers, ADR-0020) and supplies strong {@code QNOP_AUTH_*} secrets so the security
- * foundation's fail-fast validation (ADR-0021) is satisfied. Requires Docker.
+ * foundation's fail-fast validation (ADR-0022) is satisfied. Requires Docker.
  */
 @SpringBootTest(
     classes = QnopApplication.class,

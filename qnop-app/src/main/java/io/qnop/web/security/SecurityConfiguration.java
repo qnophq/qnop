@@ -38,7 +38,7 @@ import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 
 /**
- * The servlet security filter chain for the Community server (issue #10, ADR-0021).
+ * The servlet security filter chain for the Community server (issue #10, ADR-0022).
  *
  * <p>The API is stateless (token-based, from issue #17), so sessions and CSRF cookies are disabled
  * and unauthenticated requests receive a JSON {@code 401} rather than a login redirect. Actuator

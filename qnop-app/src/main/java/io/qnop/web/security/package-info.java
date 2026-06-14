@@ -20,7 +20,7 @@
  */
 
 /**
- * Servlet security wiring for the qnop Community server (issue #10, ADR-0021).
+ * Servlet security wiring for the qnop Community server (issue #10, ADR-0022).
  *
  * <p>Holds the {@code SecurityFilterChain}: stateless session policy, CORS, security headers/CSP, a
  * JSON 401 entry point, and the public/authenticated request matrix. The framework-light crypto

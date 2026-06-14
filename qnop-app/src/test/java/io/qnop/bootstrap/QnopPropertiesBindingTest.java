@@ -31,7 +31,7 @@ import org.springframework.boot.validation.autoconfigure.ValidationAutoConfigura
 import org.springframework.context.annotation.Configuration;
 
 /**
- * Verifies the fail-fast contract (ADR-0021): a context bound to placeholder secrets refuses to
+ * Verifies the fail-fast contract (ADR-0022): a context bound to placeholder secrets refuses to
  * start, while strong secrets bind cleanly. Runs without a database — only the properties binding
  * and validation are exercised.
  */

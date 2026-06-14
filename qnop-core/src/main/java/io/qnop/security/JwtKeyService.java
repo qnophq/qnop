@@ -28,7 +28,7 @@ import org.springframework.stereotype.Service;
 
 /**
  * Derives domain-separated HMAC-SHA256 keys from the configured {@code qnop.auth.jwt-secret} using
- * HKDF (ADR-0021). Each {@code purpose} yields an independent key, so compromising — or rotating —
+ * HKDF (ADR-0022). Each {@code purpose} yields an independent key, so compromising — or rotating —
  * one purpose's key does not affect the others. Actual token issuance and verification land in
  * issue #17; this service is the shared key-derivation foundation.
  */
