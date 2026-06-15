@@ -22,11 +22,14 @@ package io.qnop.web;
 
 import io.qnop.api.v1.endpoint.ServerConfigApi;
 import io.qnop.api.v1.model.Edition;
+import io.qnop.api.v1.model.OidcProviderLoginInfo;
 import io.qnop.api.v1.model.ServerConfigAuth;
 import io.qnop.api.v1.model.ServerConfigGeneral;
 import io.qnop.api.v1.model.ServerConfigResponse;
 import io.qnop.api.v1.model.ServerConfigUpload;
 import io.qnop.api.v1.model.SupportedFormat;
+import io.qnop.service.oidc.OidcProviderService;
+import io.qnop.service.oidc.OidcProviderView;
 import java.util.List;
 import java.util.Optional;
 import org.springframework.http.ResponseEntity;
@@ -51,6 +54,12 @@ public class ConfigController implements ServerConfigApi {
   /** Reported when no build manifest is available (e.g. when running from exploded classes). */
   private static final String UNKNOWN_VERSION = "unknown";
 
+  private final OidcProviderService oidcProviders;
+
+  public ConfigController(OidcProviderService oidcProviders) {
+    this.oidcProviders = oidcProviders;
+  }
+
   @Override
   public ResponseEntity<ServerConfigResponse> getServerConfig() {
     ServerConfigResponse body =
@@ -58,11 +67,27 @@ public class ConfigController implements ServerConfigApi {
             .version(resolveVersion())
             .edition(Edition.COMMUNITY)
             .general(new ServerConfigGeneral().siteName("qnop").defaultTimezone("UTC"))
-            .auth(new ServerConfigAuth().oidcProviders(List.of()).selfRegistrationEnabled(false))
+            .auth(
+                new ServerConfigAuth()
+                    .oidcProviders(enabledOidcProviders())
+                    .selfRegistrationEnabled(false))
             .upload(new ServerConfigUpload().maxDocumentSizeMb(DEFAULT_MAX_DOCUMENT_SIZE_MB))
             .supportedFormats(
                 List.of(SupportedFormat.PDF, SupportedFormat.DOCX, SupportedFormat.MD));
     return ResponseEntity.ok(body);
+  }
+
+  /** The enabled providers as login buttons for the SPA (issue #21). */
+  private List<OidcProviderLoginInfo> enabledOidcProviders() {
+    return oidcProviders.findAll().stream()
+        .filter(OidcProviderView::enabled)
+        .map(
+            v ->
+                new OidcProviderLoginInfo()
+                    .id(v.id().toString())
+                    .name(v.name())
+                    .loginUrl("/oauth2/authorization/" + v.id()))
+        .toList();
   }
 
   /** Reads the server version from the JAR manifest, falling back to {@code "unknown"}. */
