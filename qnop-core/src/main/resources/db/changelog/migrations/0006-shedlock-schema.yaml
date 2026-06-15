@@ -1,0 +1,32 @@
+# SPDX-License-Identifier: AGPL-3.0-only
+#
+# ShedLock coordination table (issue #52, ADR-0029). Backs the distributed lock
+# that makes the @Scheduled cleanup sweeps run at most once per tick across
+# instances. Column shape is mandated by ShedLock's JdbcTemplateLockProvider —
+# name (PK), lock_until, locked_at, locked_by — and uses plain TIMESTAMP because
+# the provider is configured with usingDbTime() (DB clock is authoritative).
+databaseChangeLog:
+  - changeSet:
+      id: 0006-shedlock
+      author: qnop
+      comment: ShedLock distributed-lock table for scheduled jobs.
+      changes:
+        - createTable:
+            tableName: shedlock
+            columns:
+              - column:
+                  name: name
+                  type: VARCHAR(64)
+                  constraints: { primaryKey: true, nullable: false }
+              - column:
+                  name: lock_until
+                  type: TIMESTAMP
+                  constraints: { nullable: false }
+              - column:
+                  name: locked_at
+                  type: TIMESTAMP
+                  constraints: { nullable: false }
+              - column:
+                  name: locked_by
+                  type: VARCHAR(255)
+                  constraints: { nullable: false }

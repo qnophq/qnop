@@ -25,6 +25,9 @@ jakartaAnnotation = "3.0.0"
 # so it carries an explicit version; caffeine IS BOM-managed (declared below
 # without a version). bucket4j_jdk17-core targets JDK 17+ (we run JDK 21).
 bucket4j = "8.18.0"
+# Distributed scheduler locks (issue #52, ADR-0029). ShedLock 7.x is the line
+# tested against Spring 7.0 / Spring Boot 4.x and requires JVM 17+ (we run 21).
+shedlock = "7.0.0"
 # Mail subsystem (issue #19): logic-less Mustache for admin-editable templates,
 # safe to render untrusted template bodies. SMTP via spring-boot-starter-mail
 # (version managed by the Spring Boot BOM).
@@ -83,6 +86,11 @@ caffeine = { module = "com.github.ben-manes.caffeine:caffeine" }
 # Boot BOM, so it carries an explicit version. The Caffeine cache above backs the
 # per-key bucket store.
 bucket4j-core = { module = "com.bucket4j:bucket4j_jdk17-core", version.ref = "bucket4j" }
+# Distributed scheduler locks (issue #52, ADR-0029). shedlock-spring carries the
+# @SchedulerLock annotation (used in qnop-core service sweeps); the JDBC provider
+# backs the lock on the existing Postgres (no Redis, ADR-0013) and is wired in qnop-app.
+shedlock-spring = { module = "net.javacrumbs.shedlock:shedlock-spring", version.ref = "shedlock" }
+shedlock-provider-jdbc-template = { module = "net.javacrumbs.shedlock:shedlock-provider-jdbc-template", version.ref = "shedlock" }
 # Mail subsystem (issue #19) — JavaMail + logic-less Mustache template rendering.
 spring-boot-starter-mail = { module = "org.springframework.boot:spring-boot-starter-mail" }
 jmustache = { module = "com.samskivert:jmustache", version.ref = "jmustache" }
