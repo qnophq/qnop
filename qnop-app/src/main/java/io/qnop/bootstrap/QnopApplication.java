@@ -27,6 +27,7 @@ import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.boot.persistence.autoconfigure.EntityScan;
 import org.springframework.data.jpa.repository.config.EnableJpaRepositories;
+import org.springframework.scheduling.annotation.EnableScheduling;
 
 /**
  * Spring Boot entry point for the qnop Community server.
@@ -40,6 +41,7 @@ import org.springframework.data.jpa.repository.config.EnableJpaRepositories;
 @EnableConfigurationProperties({QnopProperties.class, RateLimitProperties.class})
 @EntityScan("io.qnop.entity")
 @EnableJpaRepositories("io.qnop.repository")
+@EnableScheduling
 public class QnopApplication {
 
   public static void main(String[] args) {
