@@ -66,8 +66,8 @@ class BrandingControllerIT extends AbstractIntegrationTest {
   @BeforeEach
   void setUp() throws Exception {
     mockMvc = MockMvcBuilders.webAppContextSetup(context).apply(springSecurity()).build();
-    userId =
-        users.saveAndFlush(User.internal("Admin", "admin@example.com", "admin", "hash")).getId();
+    String tag = "branding-" + UUID.randomUUID();
+    userId = users.saveAndFlush(User.internal("Admin", tag + "@example.com", tag, "hash")).getId();
     BufferedImage image = new BufferedImage(16, 16, BufferedImage.TYPE_INT_ARGB);
     ByteArrayOutputStream out = new ByteArrayOutputStream();
     ImageIO.write(image, "png", out);
