@@ -35,6 +35,9 @@ tags:
       rotation, logout, and password change (issue #17). Access tokens are
       short-lived JWTs sent as `Authorization: Bearer`; the rotating refresh
       token lives in an HttpOnly, SameSite=Strict cookie scoped to `/api/v1/auth`.
+  - name: UserSettings
+    description: |
+      The authenticated user's own per-user settings (issue #22).
 paths:
   /config:
     get:
@@ -512,6 +515,78 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
+  /users/me/settings:
+    get:
+      tags:
+        - UserSettings
+      summary: Get the current user's settings
+      description: |
+        Returns the authenticated user's settings with their values, types and
+        descriptions (registry defaults where unset). Requires a user (JWT)
+        principal; API-key principals are rejected.
+      operationId: getCurrentUserSettings
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: The current user's settings
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserSettingsResponse'
+        '401':
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Principal is not a user (e.g. an API key)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+    patch:
+      tags:
+        - UserSettings
+      summary: Update the current user's settings
+      description: |
+        Applies a partial set of changes (`key` to value) for the authenticated
+        user and returns the full, updated settings.
+      operationId: updateCurrentUserSettings
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UserSettingsUpdateRequest'
+      responses:
+        '200':
+          description: Updated user settings
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserSettingsResponse'
+        '400':
+          description: Unknown key or type-invalid value
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Principal is not a user (e.g. an API key)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
 components:
   securitySchemes:
     bearerAuth:
@@ -870,6 +945,46 @@ components:
       required:
         - subject
         - bodyPlain
+    UserSettingItem:
+      type: object
+      description: One user setting with its current value.
+      properties:
+        key:
+          type: string
+          description: Stable setting key (e.g. `theme`).
+        value:
+          type: string
+          description: Current value (registry default where the user has not set one).
+        type:
+          $ref: '#/components/schemas/SettingValueType'
+        description:
+          type: string
+          description: Human-readable description of the setting.
+      required:
+        - key
+        - type
+        - description
+    UserSettingsResponse:
+      type: object
+      description: The authenticated user's settings.
+      properties:
+        settings:
+          type: array
+          items:
+            $ref: '#/components/schemas/UserSettingItem'
+      required:
+        - settings
+    UserSettingsUpdateRequest:
+      type: object
+      description: Partial map of user setting key to new value.
+      properties:
+        values:
+          type: object
+          additionalProperties:
+            type: string
+          description: Map of setting key to new value.
+      required:
+        - values
     ErrorResponse:
       type: object
       description: |
