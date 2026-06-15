@@ -74,7 +74,10 @@ public class BrandingService {
     enforceDimensions(contentType, content);
 
     String sha256 = sha256Hex(content);
+    // Flush the delete before the insert: a single flush would order the INSERT before the DELETE
+    // (Hibernate's action ordering) and transiently violate the (slot) unique constraint.
     repository.deleteBySlot(resolved);
+    repository.flush();
     repository.saveAndFlush(
         ApplicationAsset.create(
             resolved, contentType, content, sha256, content.length, uploadedBy));
