@@ -33,6 +33,7 @@ import java.time.Duration;
 import java.time.Instant;
 import java.util.Base64;
 import java.util.HexFormat;
+import net.javacrumbs.shedlock.spring.annotation.SchedulerLock;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -90,6 +91,7 @@ public class PasswordResetTokenService {
   }
 
   @Scheduled(cron = "0 35 3 * * *")
+  @SchedulerLock(name = "passwordResetTokenSweep", lockAtMostFor = "PT5M")
   @Transactional
   public void sweep() {
     tokens.deleteByExpiresAtBefore(Instant.now());

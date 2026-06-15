@@ -26,3 +26,6 @@ databaseChangeLog:
   - include:
       file: migrations/0005-application-asset-schema.yaml
       relativeToChangelogFile: true
+  - include:
+      file: migrations/0006-shedlock-schema.yaml
+      relativeToChangelogFile: true

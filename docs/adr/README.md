@@ -40,6 +40,7 @@ Important architecture decisions are recorded here as ADRs (see [ADR-0001](0001-
 | [0026](0026-jwt-session-and-revocation.md) | JWT access tokens, rotating refresh tokens, and revocation | Accepted |
 | [0027](0027-auth-rate-limiting.md) | Auth rate limiting & trusted-proxy IP resolution | Accepted |
 | [0028](0028-branding-upload-and-svg-sanitization.md) | Branding upload pipeline & SVG sanitization | Accepted |
+| [0029](0029-distributed-scheduler-locks.md) | Distributed scheduler locks for @Scheduled jobs (ShedLock) | Accepted |
 
 ## Template
 

@@ -38,6 +38,12 @@ dependencies {
     // implementation dependency and does not reach this module's compile classpath.
     implementation(libs.bucket4j.core)
     implementation(libs.caffeine)
+    // Distributed scheduler locks (io.qnop.bootstrap.SchedulingConfiguration, issue #52 /
+    // ADR-0029): @EnableSchedulerLock + the Postgres JdbcTemplateLockProvider that backs the
+    // @SchedulerLock'd cleanup sweeps. shedlock-spring is declared here too (qnop-core's is an
+    // implementation dep and does not reach this compile classpath).
+    implementation(libs.shedlock.spring)
+    implementation(libs.shedlock.provider.jdbc.template)
     // The bootstrap registers the sibling data packages explicitly via
     // @EntityScan / @EnableJpaRepositories (issue #11), so this module takes a
     // direct JPA dependency for those compile-time symbols (Hibernate itself
