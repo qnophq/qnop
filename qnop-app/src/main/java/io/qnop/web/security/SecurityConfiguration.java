@@ -30,6 +30,7 @@ import java.util.List;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.core.annotation.Order;
+import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
@@ -129,6 +130,8 @@ public class SecurityConfiguration {
                         "/api/v1/auth/verify-email",
                         "/api/v1/auth/forgot-password",
                         "/api/v1/auth/reset-password")
+                    .permitAll()
+                    .requestMatchers(HttpMethod.GET, "/api/v1/branding/**")
                     .permitAll()
                     .requestMatchers("/api/v1/admin/**")
                     .hasRole("SUPERADMIN")
