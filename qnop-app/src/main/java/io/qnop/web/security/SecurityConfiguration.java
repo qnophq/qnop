@@ -29,12 +29,18 @@ import io.qnop.web.security.ratelimit.RegisterRateLimitFilter;
 import java.util.List;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.core.annotation.Order;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.config.http.SessionCreationPolicy;
+import org.springframework.security.oauth2.client.InMemoryOAuth2AuthorizedClientService;
+import org.springframework.security.oauth2.client.OAuth2AuthorizedClientService;
+import org.springframework.security.oauth2.client.registration.ClientRegistrationRepository;
+import org.springframework.security.oauth2.client.web.AuthenticatedPrincipalOAuth2AuthorizedClientRepository;
+import org.springframework.security.oauth2.client.web.OAuth2AuthorizedClientRepository;
 import org.springframework.security.web.AuthenticationEntryPoint;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.access.intercept.AuthorizationFilter;
@@ -74,6 +80,7 @@ public class SecurityConfiguration {
                   || "/api/v1/auth/logout".equals(request.getRequestURI()));
 
   @Bean
+  @Order(2)
   SecurityFilterChain securityFilterChain(
       HttpSecurity http,
       AuthenticationEntryPoint authenticationEntryPoint,
@@ -148,6 +155,49 @@ public class SecurityConfiguration {
                         hsts ->
                             hsts.includeSubDomains(true).maxAgeInSeconds(HSTS_MAX_AGE_SECONDS)));
     return http.build();
+  }
+
+  /**
+   * Dedicated chain for the OIDC/OAuth2 browser login handshake (issue #21). It is scoped to the
+   * authorization-start and callback URLs only, so the main API chain above stays STATELESS. A
+   * session may be created here (IF_REQUIRED) to hold the in-flight authorization request between
+   * the redirect to the IdP and the callback — this avoids storing (and deserializing) the
+   * authorization request in a cookie. On success, {@link OidcLoginSuccessHandler} sets the qnop
+   * refresh cookie and redirects to the SPA; the session is irrelevant to the token-based API.
+   */
+  @Bean
+  @Order(1)
+  SecurityFilterChain oidcLoginSecurityChain(
+      HttpSecurity http,
+      ClientRegistrationRepository clientRegistrationRepository,
+      OidcLoginSuccessHandler oidcLoginSuccessHandler,
+      CorsConfigurationSource corsConfigurationSource)
+      throws Exception {
+    http.securityMatcher("/oauth2/authorization/**", "/login/oauth2/code/**")
+        .authorizeHttpRequests(auth -> auth.anyRequest().authenticated())
+        .oauth2Login(
+            oauth2 ->
+                oauth2
+                    .clientRegistrationRepository(clientRegistrationRepository)
+                    .successHandler(oidcLoginSuccessHandler))
+        .cors(cors -> cors.configurationSource(corsConfigurationSource))
+        .csrf(csrf -> csrf.disable())
+        .sessionManagement(
+            session -> session.sessionCreationPolicy(SessionCreationPolicy.IF_REQUIRED));
+    return http.build();
+  }
+
+  /** Persists the OAuth2 access token (app-wide, in memory) so the success handler can read it. */
+  @Bean
+  OAuth2AuthorizedClientService oauth2AuthorizedClientService(
+      ClientRegistrationRepository clientRegistrationRepository) {
+    return new InMemoryOAuth2AuthorizedClientService(clientRegistrationRepository);
+  }
+
+  @Bean
+  OAuth2AuthorizedClientRepository oauth2AuthorizedClientRepository(
+      OAuth2AuthorizedClientService authorizedClientService) {
+    return new AuthenticatedPrincipalOAuth2AuthorizedClientRepository(authorizedClientService);
   }
 
   /** Returns a bare JSON {@code 401} instead of redirecting to a login form (this is an API). */

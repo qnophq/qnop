@@ -27,6 +27,7 @@ import java.util.List;
 import java.util.UUID;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.security.oauth2.client.registration.ClientRegistration;
 import org.springframework.security.oauth2.client.registration.ClientRegistrations;
 import org.springframework.stereotype.Service;
@@ -52,10 +53,15 @@ public class OidcProviderService {
 
   private final OidcProviderRepository providers;
   private final OidcSsrfPolicy ssrfPolicy;
+  private final ApplicationEventPublisher events;
 
-  public OidcProviderService(OidcProviderRepository providers, OidcSsrfPolicy ssrfPolicy) {
+  public OidcProviderService(
+      OidcProviderRepository providers,
+      OidcSsrfPolicy ssrfPolicy,
+      ApplicationEventPublisher events) {
     this.providers = providers;
     this.ssrfPolicy = ssrfPolicy;
+    this.events = events;
   }
 
   @Transactional(readOnly = true)
@@ -133,7 +139,9 @@ public class OidcProviderService {
     provider.setUserNameAttribute(trimToNull(userNameAttribute));
     provider.setEmailAttribute(trimToNull(emailAttribute));
     provider.setDisplayNameAttribute(trimToNull(displayNameAttribute));
-    return toView(providers.save(provider));
+    OidcProviderView view = toView(providers.save(provider));
+    events.publishEvent(new OidcProvidersChangedEvent());
+    return view;
   }
 
   /**
@@ -185,7 +193,9 @@ public class OidcProviderService {
     if (patch.displayNameAttribute() != null) {
       provider.setDisplayNameAttribute(trimToNull(patch.displayNameAttribute()));
     }
-    return toView(provider);
+    OidcProviderView view = toView(provider);
+    events.publishEvent(new OidcProvidersChangedEvent());
+    return view;
   }
 
   public void delete(UUID id) {
@@ -193,6 +203,7 @@ public class OidcProviderService {
       throw new OidcProviderNotFoundException(id);
     }
     providers.deleteById(id);
+    events.publishEvent(new OidcProvidersChangedEvent());
   }
 
   private OidcProvider require(UUID id) {

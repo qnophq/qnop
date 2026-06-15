@@ -27,6 +27,11 @@ dependencies {
     // Resource-server filter that validates the bearer JWT on each request, plus
     // the JWT (Nimbus) types used by the web-layer decoder/cookie glue (issue #17).
     implementation(libs.spring.boot.starter.oauth2.resource.server)
+    // OIDC/OAuth2 browser login chain (io.qnop.web.security, issue #21): the
+    // oauth2Login DSL + authorized-client types. (qnop-core also uses the client
+    // library, but that is an implementation dep and does not reach this compile
+    // classpath.)
+    implementation(libs.spring.boot.starter.oauth2.client)
     // Auth-endpoint rate limiting (io.qnop.web.security.ratelimit, issue #18 / ADR-0027):
     // Bucket4j token buckets in a Caffeine cache. Caffeine is BOM-managed (also used by the
     // #17 revocation denylist in qnop-core); declared here too because that is an

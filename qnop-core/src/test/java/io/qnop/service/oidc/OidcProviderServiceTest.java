@@ -36,18 +36,20 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.context.ApplicationEventPublisher;
 
 @ExtendWith(MockitoExtension.class)
 class OidcProviderServiceTest {
 
   @Mock private OidcProviderRepository providers;
+  @Mock private ApplicationEventPublisher events;
 
   private OidcProviderService service;
 
   @BeforeEach
   void setUp() {
     // Use the real SSRF policy so its rules are exercised through the service.
-    service = new OidcProviderService(providers, new OidcSsrfPolicy(false));
+    service = new OidcProviderService(providers, new OidcSsrfPolicy(false), events);
   }
 
   @Test

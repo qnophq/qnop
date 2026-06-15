@@ -87,6 +87,22 @@ public class UserService {
     return user;
   }
 
+  /** Records a successful-login timestamp (issue #21 OIDC login, and local login). */
+  @Transactional
+  public User bumpLastLogin(UUID id, Instant at) {
+    User user = users.findById(id).orElseThrow(() -> new UserNotFoundException(id));
+    user.setLastLoginAt(at);
+    return user;
+  }
+
+  /** Provisions an enabled external (OIDC) user — no local credentials (issue #21). */
+  @Transactional
+  public User provisionExternal(String displayName, String email) {
+    User user = User.external(displayName, normalizeEmail(email));
+    user.setEnabled(true);
+    return users.save(user);
+  }
+
   /**
    * Applies a reset/new password: re-hashes, clears any forced-change flag, and stamps {@code
    * password_invalidated_before} so previously issued access tokens are rejected (issue #17).

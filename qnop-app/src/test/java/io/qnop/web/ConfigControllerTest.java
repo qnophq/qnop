@@ -20,15 +20,20 @@
  */
 package io.qnop.web;
 
+import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import io.qnop.service.oidc.OidcProviderService;
+import java.util.List;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
 import org.springframework.test.context.ContextConfiguration;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
 /**
@@ -46,6 +51,14 @@ class ConfigControllerTest {
 
   @Autowired private MockMvc mockMvc;
 
+  @MockitoBean private OidcProviderService oidcProviders;
+
+  @BeforeEach
+  void setUp() {
+    // No providers configured: auth.oidcProviders should serialize as an empty list.
+    when(oidcProviders.findAll()).thenReturn(List.of());
+  }
+
   @Test
   @DisplayName("GET /api/v1/config returns the public Community configuration")
   void getConfig_returnsCommunityConfig() throws Exception {
@@ -56,6 +69,8 @@ class ConfigControllerTest {
         .andExpect(jsonPath("$.version").exists())
         .andExpect(jsonPath("$.general.siteName").value("qnop"))
         .andExpect(jsonPath("$.auth.selfRegistrationEnabled").value(false))
+        .andExpect(jsonPath("$.auth.oidcProviders").isArray())
+        .andExpect(jsonPath("$.auth.oidcProviders").isEmpty())
         .andExpect(jsonPath("$.upload.maxDocumentSizeMb").value(50))
         .andExpect(jsonPath("$.supportedFormats[0]").value("PDF"));
   }
