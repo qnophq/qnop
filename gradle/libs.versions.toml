@@ -67,6 +67,10 @@ spring-boot-starter-security = { module = "org.springframework.boot:spring-boot-
 spring-boot-starter-validation = { module = "org.springframework.boot:spring-boot-starter-validation" }
 spring-security-crypto = { module = "org.springframework.security:spring-security-crypto" }
 
+# OIDC/OAuth2 client (issue #21) — DB-configured providers + discovery
+# (ClientRegistrations.fromIssuerLocation). Versions via the Spring Boot BOM.
+spring-boot-starter-oauth2-client = { module = "org.springframework.boot:spring-boot-starter-oauth2-client" }
+
 # JWT & session core (issue #17) — versions managed by the Spring Boot BOM.
 # Nimbus JWT encode/decode for self-issued HS256 access tokens.
 spring-security-oauth2-jose = { module = "org.springframework.security:spring-security-oauth2-jose" }
