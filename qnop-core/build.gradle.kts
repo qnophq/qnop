@@ -39,6 +39,10 @@ dependencies {
     implementation(libs.spring.security.oauth2.jose)
     implementation(libs.caffeine)
 
+    // OIDC/OAuth2 provider admin (issue #21): ClientRegistrations.fromIssuerLocation
+    // for endpoint discovery. The browser login flow is wired in qnop-app (PR B).
+    implementation(libs.spring.boot.starter.oauth2.client)
+
     // Mail subsystem (issue #19): runtime SMTP (JavaMailSender) + logic-less
     // Mustache rendering of DB-stored, admin-editable templates.
     implementation(libs.spring.boot.starter.mail)

@@ -150,6 +150,221 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
+  /admin/oidc-providers:
+    get:
+      tags:
+        - AdminOidcProviders
+      summary: List OIDC/OAuth2 providers
+      operationId: listOidcProviders
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: All configured providers (client secrets never included)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OidcProviderListResponse'
+        '401':
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Caller is not a superadmin
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+    post:
+      tags:
+        - AdminOidcProviders
+      summary: Create an OIDC/OAuth2 provider
+      description: Creates a disabled provider; the operator enables it after verifying the config.
+      operationId: createOidcProvider
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/OidcProviderCreateRequest'
+      responses:
+        '201':
+          description: The created provider
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OidcProviderDto'
+        '400':
+          description: Invalid input or a blocked/invalid URI
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Caller is not a superadmin
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /admin/oidc-providers/discover:
+    post:
+      tags:
+        - AdminOidcProviders
+      summary: Discover endpoints for an OIDC issuer
+      description: |
+        Probes an issuer URI's `.well-known/openid-configuration` and returns the
+        discovered endpoints. The issuer URI passes the SSRF guard first. Returns
+        a body with `success=false` (not a 5xx) when the issuer is not discoverable.
+      operationId: discoverOidcEndpoints
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/OidcDiscoveryRequest'
+      responses:
+        '200':
+          description: Discovery outcome
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OidcDiscoveryResponse'
+        '401':
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Caller is not a superadmin
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /admin/oidc-providers/{providerId}:
+    get:
+      tags:
+        - AdminOidcProviders
+      summary: Get an OIDC/OAuth2 provider
+      operationId: getOidcProvider
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/OidcProviderIdParam'
+      responses:
+        '200':
+          description: The provider
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OidcProviderDto'
+        '404':
+          description: Unknown provider
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Caller is not a superadmin
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+    patch:
+      tags:
+        - AdminOidcProviders
+      summary: Update an OIDC/OAuth2 provider
+      description: Partial update; only provided fields change. A blank client secret keeps the stored one.
+      operationId: updateOidcProvider
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/OidcProviderIdParam'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/OidcProviderUpdateRequest'
+      responses:
+        '200':
+          description: The updated provider
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OidcProviderDto'
+        '400':
+          description: Invalid input or a blocked/invalid URI
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Unknown provider
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Caller is not a superadmin
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+    delete:
+      tags:
+        - AdminOidcProviders
+      summary: Delete an OIDC/OAuth2 provider
+      operationId: deleteOidcProvider
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/OidcProviderIdParam'
+      responses:
+        '204':
+          description: Provider deleted
+        '404':
+          description: Unknown provider
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Caller is not a superadmin
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
   /admin/email/test:
     post:
       tags:
@@ -720,6 +935,14 @@ components:
         itself is introduced in a later issue; the scheme is declared here so the
         contract is complete from the first endpoint.
   parameters:
+    OidcProviderIdParam:
+      name: providerId
+      in: path
+      required: true
+      description: The OIDC provider's id.
+      schema:
+        type: string
+        format: uuid
     MailTemplateKeyParam:
       name: key
       in: path
@@ -1172,6 +1395,171 @@ components:
       required:
         - token
         - newPassword
+    OidcProviderTypeDto:
+      type: string
+      description: Kind of external identity provider.
+      enum:
+        - OIDC
+        - GITHUB
+        - GOOGLE
+        - FACEBOOK
+        - OAUTH2
+    OidcProviderDto:
+      type: object
+      description: A configured identity provider. The client secret is never returned.
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        providerType:
+          $ref: '#/components/schemas/OidcProviderTypeDto'
+        enabled:
+          type: boolean
+        clientId:
+          type: string
+        hasClientSecret:
+          type: boolean
+          description: Whether a client secret is stored (the value itself is never exposed).
+        issuerUri:
+          type: string
+        scope:
+          type: string
+        authorizationUri:
+          type: string
+        tokenUri:
+          type: string
+        userInfoUri:
+          type: string
+        jwkSetUri:
+          type: string
+        userNameAttribute:
+          type: string
+        emailAttribute:
+          type: string
+        displayNameAttribute:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+      required:
+        - id
+        - name
+        - providerType
+        - enabled
+        - clientId
+        - hasClientSecret
+        - scope
+        - createdAt
+    OidcProviderListResponse:
+      type: object
+      properties:
+        providers:
+          type: array
+          items:
+            $ref: '#/components/schemas/OidcProviderDto'
+      required:
+        - providers
+    OidcProviderCreateRequest:
+      type: object
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 100
+        providerType:
+          $ref: '#/components/schemas/OidcProviderTypeDto'
+        clientId:
+          type: string
+          minLength: 1
+          maxLength: 255
+        clientSecret:
+          type: string
+          maxLength: 1024
+        issuerUri:
+          type: string
+        scope:
+          type: string
+        authorizationUri:
+          type: string
+        tokenUri:
+          type: string
+        userInfoUri:
+          type: string
+        jwkSetUri:
+          type: string
+        userNameAttribute:
+          type: string
+        emailAttribute:
+          type: string
+        displayNameAttribute:
+          type: string
+      required:
+        - name
+        - providerType
+        - clientId
+        - clientSecret
+    OidcProviderUpdateRequest:
+      type: object
+      description: Partial update; only provided fields change. A blank clientSecret keeps the stored one.
+      properties:
+        enabled:
+          type: boolean
+        name:
+          type: string
+          maxLength: 100
+        clientId:
+          type: string
+          maxLength: 255
+        clientSecret:
+          type: string
+          maxLength: 1024
+        issuerUri:
+          type: string
+        scope:
+          type: string
+        authorizationUri:
+          type: string
+        tokenUri:
+          type: string
+        userInfoUri:
+          type: string
+        jwkSetUri:
+          type: string
+        userNameAttribute:
+          type: string
+        emailAttribute:
+          type: string
+        displayNameAttribute:
+          type: string
+    OidcDiscoveryRequest:
+      type: object
+      properties:
+        issuerUri:
+          type: string
+      required:
+        - issuerUri
+    OidcDiscoveryResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+        authorizationUri:
+          type: string
+        tokenUri:
+          type: string
+        userInfoUri:
+          type: string
+        jwkSetUri:
+          type: string
+        error:
+          type: string
+      required:
+        - success
     ErrorResponse:
       type: object
       description: |
