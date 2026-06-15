@@ -28,6 +28,7 @@ import java.time.Duration;
 import java.time.Instant;
 import java.util.Base64;
 import java.util.UUID;
+import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -110,6 +111,17 @@ public class RefreshTokenService {
   @Transactional
   public void revokeAllForUser(UUID userId) {
     repository.revokeAllForUser(userId, LOGOUT, Instant.now());
+  }
+
+  /**
+   * Daily off-peak purge of refresh-token rows whose absolute expiry has passed, so the table does
+   * not grow unbounded (issue #43). Rotated/revoked rows are also removed once they expire — their
+   * security purpose (reuse detection) is moot after expiry.
+   */
+  @Scheduled(cron = "0 40 3 * * *")
+  @Transactional
+  public void sweepExpired() {
+    repository.deleteExpiredBefore(Instant.now());
   }
 
   private Minted issueInFamily(UUID userId, UUID familyId) {
