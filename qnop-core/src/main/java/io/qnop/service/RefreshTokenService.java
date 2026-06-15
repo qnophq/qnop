@@ -28,6 +28,7 @@ import java.time.Duration;
 import java.time.Instant;
 import java.util.Base64;
 import java.util.UUID;
+import net.javacrumbs.shedlock.spring.annotation.SchedulerLock;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -119,6 +120,7 @@ public class RefreshTokenService {
    * security purpose (reuse detection) is moot after expiry.
    */
   @Scheduled(cron = "0 40 3 * * *")
+  @SchedulerLock(name = "refreshTokenSweep", lockAtMostFor = "PT5M")
   @Transactional
   public void sweepExpired() {
     repository.deleteExpiredBefore(Instant.now());

@@ -48,6 +48,11 @@ dependencies {
     implementation(libs.spring.boot.starter.mail)
     implementation(libs.jmustache)
 
+    // Distributed scheduler locks (issue #52, ADR-0029): the @SchedulerLock
+    // annotation on the @Scheduled cleanup sweeps. The Postgres-backed LockProvider
+    // that makes the lock real is wired in qnop-app.
+    implementation(libs.shedlock.spring)
+
     testImplementation(platform(libs.junit.bom))
     testImplementation(libs.junit.jupiter)
     testRuntimeOnly(libs.junit.platform.launcher)

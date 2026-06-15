@@ -31,6 +31,7 @@ import java.time.Duration;
 import java.time.Instant;
 import java.util.Base64;
 import java.util.HexFormat;
+import net.javacrumbs.shedlock.spring.annotation.SchedulerLock;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -88,6 +89,7 @@ public class EmailVerificationTokenService {
 
   /** Daily off-peak purge of expired rows so the table does not grow unbounded. */
   @Scheduled(cron = "0 30 3 * * *")
+  @SchedulerLock(name = "emailVerificationTokenSweep", lockAtMostFor = "PT5M")
   @Transactional
   public void sweep() {
     tokens.deleteByExpiresAtBefore(Instant.now());
