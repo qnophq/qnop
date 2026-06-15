@@ -20,6 +20,9 @@
  */
 package io.qnop.service;
 
+import io.qnop.entity.SettingValueType;
+import java.util.List;
+
 /**
  * Validates a raw setting value string against its key's declared type (issue #16). Shared, plain,
  * DB-free logic (ADR-0004). Throws {@link SettingValidationException} on violation.
@@ -29,36 +32,47 @@ public final class ValueValidator {
   private ValueValidator() {}
 
   public static void validate(ApplicationSettingKey key, String value) {
+    validate(key.getType(), key.getEnumOptions(), value, key.getKey());
+  }
+
+  public static void validate(UserSettingKey key, String value) {
+    validate(key.getType(), key.getEnumOptions(), value, key.getKey());
+  }
+
+  /** Core, key-agnostic validation shared by the application- and user-setting registries. */
+  public static void validate(
+      SettingValueType type, List<String> enumOptions, String value, String keyForError) {
     if (value == null) {
-      throw new SettingValidationException(key.getKey(), "value must not be null");
+      throw new SettingValidationException(keyForError, "value must not be null");
     }
-    switch (key.getType()) {
-      case INTEGER -> requireInteger(key, value);
-      case BOOLEAN -> requireBoolean(key, value);
-      case ENUM -> requireEnumOption(key, value);
+    switch (type) {
+      case INTEGER -> requireInteger(keyForError, value);
+      case BOOLEAN -> requireBoolean(keyForError, value);
+      case ENUM -> requireEnumOption(keyForError, enumOptions, value);
       case STRING, PASSWORD -> {
         // any string is acceptable
       }
     }
   }
 
-  private static void requireInteger(ApplicationSettingKey key, String value) {
+  private static void requireInteger(String keyForError, String value) {
     try {
       Integer.parseInt(value.trim());
     } catch (NumberFormatException e) {
-      throw new SettingValidationException(key.getKey(), "must be an integer");
+      throw new SettingValidationException(keyForError, "must be an integer");
     }
   }
 
-  private static void requireBoolean(ApplicationSettingKey key, String value) {
+  private static void requireBoolean(String keyForError, String value) {
     if (!"true".equals(value) && !"false".equals(value)) {
-      throw new SettingValidationException(key.getKey(), "must be 'true' or 'false'");
+      throw new SettingValidationException(keyForError, "must be 'true' or 'false'");
     }
   }
 
-  private static void requireEnumOption(ApplicationSettingKey key, String value) {
-    if (!key.getEnumOptions().contains(value)) {
-      throw new SettingValidationException(key.getKey(), "must be one of " + key.getEnumOptions());
+  private static void requireEnumOption(
+      String keyForError, List<String> enumOptions, String value) {
+    if (!enumOptions.contains(value)) {
+      throw new SettingValidationException(keyForError, "must be one of " + enumOptions);
     }
   }
 }
