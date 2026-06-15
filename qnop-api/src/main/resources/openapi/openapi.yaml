@@ -386,6 +386,127 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
+  /auth/register:
+    post:
+      tags:
+        - AuthRegistration
+      summary: Register a local account
+      description: |
+        Self-registration of a local user. Public; gated by the
+        `auth.self_registration_enabled` setting. Anti-enumeration: the response is
+        **uniform** whether or not the username/email already exists (no account is
+        created or re-mailed for a duplicate); when registration is disabled the
+        endpoint reports a **disguised 404** so its availability is not revealed.
+      operationId: register
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RegisterRequest'
+      responses:
+        '200':
+          description: Uniform registration acknowledgement
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RegisterResponse'
+        '400':
+          description: Invalid input
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Registration is not available
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '429':
+          description: Too many registration attempts
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /auth/verify-email:
+    get:
+      tags:
+        - AuthRegistration
+      summary: Verify a registered email address
+      description: Consumes a single-use verification token and activates the account. Public.
+      operationId: verifyEmail
+      security: []
+      parameters:
+        - name: token
+          in: query
+          required: true
+          description: The raw verification token from the emailed link.
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Verification result
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/VerifyEmailResponse'
+        '400':
+          description: Unknown, expired, or already-used token
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /auth/forgot-password:
+    post:
+      tags:
+        - AuthPasswordReset
+      summary: Request a password-reset email
+      description: |
+        Starts the self-service reset flow. Public. Always returns **204** with
+        constant-time behaviour regardless of whether the address maps to a local
+        account, so it cannot be used to enumerate users.
+      operationId: forgotPassword
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ForgotPasswordRequest'
+      responses:
+        '204':
+          description: Request accepted (no content; outcome intentionally not disclosed)
+        '429':
+          description: Too many reset requests
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /auth/reset-password:
+    post:
+      tags:
+        - AuthPasswordReset
+      summary: Complete a password reset
+      description: Consumes a single-use reset token and sets the new password. Public.
+      operationId: resetPassword
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ResetPasswordRequest'
+      responses:
+        '204':
+          description: Password updated
+        '400':
+          description: Unknown/expired/used token or invalid password
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
   /auth/login:
     post:
       tags:
@@ -985,6 +1106,72 @@ components:
           description: Map of setting key to new value.
       required:
         - values
+    RegisterRequest:
+      type: object
+      description: Self-registration details for a new local account.
+      properties:
+        username:
+          type: string
+          minLength: 3
+          maxLength: 64
+        email:
+          type: string
+          format: email
+          maxLength: 320
+        password:
+          type: string
+          minLength: 8
+          maxLength: 200
+        displayName:
+          type: string
+          maxLength: 255
+      required:
+        - username
+        - email
+        - password
+    RegisterResponse:
+      type: object
+      description: Uniform, non-revealing acknowledgement of a registration request.
+      properties:
+        verificationRequired:
+          type: boolean
+          description: Whether the user must verify their email before logging in.
+        message:
+          type: string
+      required:
+        - verificationRequired
+        - message
+    VerifyEmailResponse:
+      type: object
+      properties:
+        verified:
+          type: boolean
+        message:
+          type: string
+      required:
+        - verified
+        - message
+    ForgotPasswordRequest:
+      type: object
+      properties:
+        email:
+          type: string
+          format: email
+          maxLength: 320
+      required:
+        - email
+    ResetPasswordRequest:
+      type: object
+      properties:
+        token:
+          type: string
+        newPassword:
+          type: string
+          minLength: 8
+          maxLength: 200
+      required:
+        - token
+        - newPassword
     ErrorResponse:
       type: object
       description: |

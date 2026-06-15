@@ -45,7 +45,12 @@ import org.springframework.boot.context.properties.bind.DefaultValue;
  */
 @ConfigurationProperties(prefix = "qnop.auth.rate-limit")
 public record RateLimitProperties(
-    List<String> trustedProxyCidrs, Limit login, Limit refresh, Limit changePassword) {
+    List<String> trustedProxyCidrs,
+    Limit login,
+    Limit refresh,
+    Limit changePassword,
+    Limit register,
+    Limit forgotPassword) {
 
   // A whole scope absent from config arrives as null here; substitute its per-scope default. The
   // Limit components themselves carry @DefaultValue, so a partially-specified scope keeps the
@@ -55,6 +60,8 @@ public record RateLimitProperties(
     login = login != null ? login : new Limit(10, 60);
     refresh = refresh != null ? refresh : new Limit(30, 60);
     changePassword = changePassword != null ? changePassword : new Limit(5, 300);
+    register = register != null ? register : new Limit(5, 3600);
+    forgotPassword = forgotPassword != null ? forgotPassword : new Limit(5, 3600);
   }
 
   /**

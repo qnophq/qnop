@@ -22,8 +22,10 @@ package io.qnop.web.security;
 
 import io.qnop.security.QnopProperties;
 import io.qnop.web.security.ratelimit.ChangePasswordRateLimitFilter;
+import io.qnop.web.security.ratelimit.ForgotPasswordRateLimitFilter;
 import io.qnop.web.security.ratelimit.LoginRateLimitFilter;
 import io.qnop.web.security.ratelimit.RefreshRateLimitFilter;
+import io.qnop.web.security.ratelimit.RegisterRateLimitFilter;
 import java.util.List;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -79,7 +81,10 @@ public class SecurityConfiguration {
       DelegatingJwtDecoder jwtDecoder,
       LoginRateLimitFilter loginRateLimitFilter,
       RefreshRateLimitFilter refreshRateLimitFilter,
-      ChangePasswordRateLimitFilter changePasswordRateLimitFilter)
+      ChangePasswordRateLimitFilter changePasswordRateLimitFilter,
+      RegisterRateLimitFilter registerRateLimitFilter,
+      ForgotPasswordRateLimitFilter forgotPasswordRateLimitFilter,
+      PasswordChangeRequiredFilter passwordChangeRequiredFilter)
       throws Exception {
     http.csrf(
             csrf ->
@@ -96,6 +101,12 @@ public class SecurityConfiguration {
         .addFilterBefore(loginRateLimitFilter, CsrfFilter.class)
         .addFilterBefore(refreshRateLimitFilter, CsrfFilter.class)
         .addFilterBefore(changePasswordRateLimitFilter, AuthorizationFilter.class)
+        // IP-keyed limiters for the public self-service endpoints (issue #20).
+        .addFilterBefore(registerRateLimitFilter, CsrfFilter.class)
+        .addFilterBefore(forgotPasswordRateLimitFilter, CsrfFilter.class)
+        // Force a password change before any non-auth resource (issue #20); needs the
+        // authenticated subject, so it runs after the authorization filter.
+        .addFilterAfter(passwordChangeRequiredFilter, AuthorizationFilter.class)
         .cors(cors -> cors.configurationSource(corsConfigurationSource))
         .sessionManagement(
             session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
@@ -105,6 +116,12 @@ public class SecurityConfiguration {
                     .permitAll()
                     .requestMatchers(
                         "/api/v1/auth/login", "/api/v1/auth/refresh", "/api/v1/auth/logout")
+                    .permitAll()
+                    .requestMatchers(
+                        "/api/v1/auth/register",
+                        "/api/v1/auth/verify-email",
+                        "/api/v1/auth/forgot-password",
+                        "/api/v1/auth/reset-password")
                     .permitAll()
                     .requestMatchers("/api/v1/admin/**")
                     .hasRole("SUPERADMIN")
