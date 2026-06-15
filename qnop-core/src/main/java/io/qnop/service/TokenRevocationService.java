@@ -32,6 +32,7 @@ import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.time.Instant;
 import java.util.UUID;
+import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -111,6 +112,17 @@ public class TokenRevocationService {
               user.setPasswordInvalidatedBefore(Instant.now());
               userRepository.save(user);
             });
+  }
+
+  /**
+   * Daily off-peak purge of denylist entries whose underlying token would have expired anyway, so
+   * {@code revoked_token} does not grow unbounded (issue #43). An expired token is rejected by JWS
+   * {@code exp} validation regardless, so dropping its denylist row is safe.
+   */
+  @Scheduled(cron = "0 45 3 * * *")
+  @Transactional
+  public void sweepExpired() {
+    revokedTokenRepository.deleteExpiredBefore(Instant.now());
   }
 
   private static String hashJti(String jti) {
