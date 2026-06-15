@@ -27,6 +27,8 @@ import java.time.Instant;
 import java.util.Locale;
 import java.util.Optional;
 import java.util.UUID;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -127,6 +129,70 @@ public class UserService {
     admin.setEnabled(true);
     admin.setPasswordChangeRequired(passwordChangeRequired);
     return users.save(admin);
+  }
+
+  // --- Admin user management (issue #20, PR 2) ---------------------------------
+
+  /** A page of users as web-safe views (admin listing). */
+  @Transactional(readOnly = true)
+  public Page<UserView> list(Pageable pageable) {
+    return users.findAll(pageable).map(this::toView);
+  }
+
+  /** One user as a web-safe view, or throws {@link UserNotFoundException}. */
+  @Transactional(readOnly = true)
+  public UserView getView(UUID id) {
+    return users.findById(id).map(this::toView).orElseThrow(() -> new UserNotFoundException(id));
+  }
+
+  /** Admin-creates an enabled internal user (optionally a superadmin). */
+  @Transactional
+  public UserView createByAdmin(
+      String username, String email, String password, String displayName, boolean superadmin) {
+    String name = displayName == null || displayName.isBlank() ? username : displayName;
+    User user =
+        User.internal(name, normalizeEmail(email), username, passwordEncoder.encode(password));
+    user.setEnabled(true);
+    user.setSuperadmin(superadmin);
+    return toView(users.save(user));
+  }
+
+  /** Partially updates an internal user (enabled / display name / superadmin). */
+  @Transactional
+  public UserView updateByAdmin(UUID id, Boolean enabled, String displayName, Boolean superadmin) {
+    User user = users.findById(id).orElseThrow(() -> new UserNotFoundException(id));
+    if (enabled != null) {
+      user.setEnabled(enabled);
+    }
+    if (displayName != null && !displayName.isBlank()) {
+      user.setDisplayName(displayName);
+    }
+    if (superadmin != null) {
+      user.setSuperadmin(superadmin);
+    }
+    return toView(user);
+  }
+
+  /** Deletes a user; throws {@link UserNotFoundException} if absent. */
+  @Transactional
+  public void delete(UUID id) {
+    if (!users.existsById(id)) {
+      throw new UserNotFoundException(id);
+    }
+    users.deleteById(id);
+  }
+
+  private UserView toView(User user) {
+    return new UserView(
+        user.getId(),
+        user.getUsername(),
+        user.getEmail(),
+        user.getDisplayName(),
+        user.isEnabled(),
+        user.isSuperadmin(),
+        user.getSource().name(),
+        user.getCreatedAt(),
+        user.getLastLoginAt());
   }
 
   private String normalizeEmail(String email) {

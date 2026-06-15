@@ -150,6 +150,241 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
+  /admin/users:
+    get:
+      tags:
+        - AdminUsers
+      summary: List users
+      description: Paged list of all users. Superadmin only.
+      operationId: listUsers
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: page
+          in: query
+          required: false
+          schema:
+            type: integer
+            format: int32
+            default: 0
+            minimum: 0
+        - name: size
+          in: query
+          required: false
+          schema:
+            type: integer
+            format: int32
+            default: 20
+            minimum: 1
+            maximum: 200
+      responses:
+        '200':
+          description: A page of users
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AdminUserListResponse'
+        '401':
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Caller is not a superadmin
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+    post:
+      tags:
+        - AdminUsers
+      summary: Create a user
+      operationId: createUser
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AdminCreateUserRequest'
+      responses:
+        '201':
+          description: The created user
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AdminUser'
+        '400':
+          description: Invalid input or duplicate username/email
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Caller is not a superadmin
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /admin/users/{userId}:
+    get:
+      tags:
+        - AdminUsers
+      summary: Get a user
+      operationId: getUser
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/UserIdParam'
+      responses:
+        '200':
+          description: The user
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AdminUser'
+        '404':
+          description: Unknown user
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Caller is not a superadmin
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+    patch:
+      tags:
+        - AdminUsers
+      summary: Update a user
+      description: Partially updates a user (enable/disable, display name, superadmin flag).
+      operationId: updateUser
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/UserIdParam'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AdminUpdateUserRequest'
+      responses:
+        '200':
+          description: The updated user
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AdminUser'
+        '404':
+          description: Unknown user
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Caller is not a superadmin
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+    delete:
+      tags:
+        - AdminUsers
+      summary: Delete a user
+      operationId: deleteUser
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/UserIdParam'
+      responses:
+        '204':
+          description: User deleted
+        '404':
+          description: Unknown user
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Caller is not a superadmin
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /admin/users/{userId}/reset-password:
+    post:
+      tags:
+        - AdminUsers
+      summary: Admin-trigger a password reset for a user
+      description: |
+        Issues a single-use reset token and emails the link. Rejects resetting the
+        caller's own account (400) and external/OIDC users (400). When SMTP delivery
+        fails, the reset URL is returned in the body so the operator can hand it over.
+      operationId: adminResetUserPassword
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/UserIdParam'
+      responses:
+        '200':
+          description: Reset triggered
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AdminPasswordResetResponse'
+        '400':
+          description: Self-reset or external-user reset not allowed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Unknown user
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Caller is not a superadmin
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
   /admin/email/test:
     post:
       tags:
@@ -720,6 +955,14 @@ components:
         itself is introduced in a later issue; the scheme is declared here so the
         contract is complete from the first endpoint.
   parameters:
+    UserIdParam:
+      name: userId
+      in: path
+      required: true
+      description: The target user's id.
+      schema:
+        type: string
+        format: uuid
     MailTemplateKeyParam:
       name: key
       in: path
@@ -1172,6 +1415,118 @@ components:
       required:
         - token
         - newPassword
+    AdminUser:
+      type: object
+      description: A user as seen by the admin API.
+      properties:
+        id:
+          type: string
+          format: uuid
+        username:
+          type: string
+        email:
+          type: string
+        displayName:
+          type: string
+        enabled:
+          type: boolean
+        superadmin:
+          type: boolean
+        source:
+          type: string
+          enum:
+            - INTERNAL
+            - EXTERNAL
+        createdAt:
+          type: string
+          format: date-time
+        lastLoginAt:
+          type: string
+          format: date-time
+      required:
+        - id
+        - username
+        - email
+        - displayName
+        - enabled
+        - superadmin
+        - source
+        - createdAt
+    AdminUserListResponse:
+      type: object
+      properties:
+        users:
+          type: array
+          items:
+            $ref: '#/components/schemas/AdminUser'
+        page:
+          type: integer
+          format: int32
+        size:
+          type: integer
+          format: int32
+        total:
+          type: integer
+          format: int64
+      required:
+        - users
+        - page
+        - size
+        - total
+    AdminCreateUserRequest:
+      type: object
+      properties:
+        username:
+          type: string
+          minLength: 3
+          maxLength: 64
+        email:
+          type: string
+          format: email
+          maxLength: 320
+        password:
+          type: string
+          minLength: 8
+          maxLength: 200
+        displayName:
+          type: string
+          maxLength: 255
+        superadmin:
+          type: boolean
+          default: false
+      required:
+        - username
+        - email
+        - password
+    AdminUpdateUserRequest:
+      type: object
+      description: Partial update; only the provided fields are changed.
+      properties:
+        enabled:
+          type: boolean
+        displayName:
+          type: string
+          maxLength: 255
+        superadmin:
+          type: boolean
+    AdminPasswordResetResponse:
+      type: object
+      description: Outcome of an admin-triggered reset.
+      properties:
+        tokenIssued:
+          type: boolean
+        emailSent:
+          type: boolean
+        expiresAt:
+          type: string
+          format: date-time
+        resetUrl:
+          type: string
+          description: The reset link; present only when SMTP delivery failed (operator fallback).
+      required:
+        - tokenIssued
+        - emailSent
+        - expiresAt
     ErrorResponse:
       type: object
       description: |
