@@ -26,6 +26,7 @@ import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
+import jakarta.persistence.Version;
 import java.time.Instant;
 import java.util.Objects;
 import java.util.UUID;
@@ -65,6 +66,16 @@ public class ApplicationSetting {
 
   @Column(name = "updated_by")
   private UUID updatedBy;
+
+  /**
+   * Optimistic-locking guard (issue #47). Hibernate increments it on every update and rejects a
+   * write whose in-memory version is stale, so two concurrent admin edits of the same setting can't
+   * silently lose one another. The backing column ({@code version BIGINT NOT NULL DEFAULT 0}) is
+   * defined in Liquibase on the {@code application_setting} table (migration 0002).
+   */
+  @Version
+  @Column(name = "version", nullable = false)
+  private long version;
 
   protected ApplicationSetting() {
     // for JPA
@@ -114,6 +125,11 @@ public class ApplicationSetting {
 
   public void setUpdatedBy(UUID updatedBy) {
     this.updatedBy = updatedBy;
+  }
+
+  /** The optimistic-locking version; managed by Hibernate (no setter). */
+  public long getVersion() {
+    return version;
   }
 
   @Override

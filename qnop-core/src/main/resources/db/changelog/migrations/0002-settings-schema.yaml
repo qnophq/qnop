@@ -30,6 +30,13 @@ databaseChangeLog:
                   constraints: { nullable: false }
               # Nullable audit reference; kept as a raw UUID column (no @ManyToOne).
               - column: { name: updated_by, type: UUID }
+              # Optimistic-locking guard (issue #47): Hibernate @Version. Seed inserts below
+              # rely on the DEFAULT 0.
+              - column:
+                  name: version
+                  type: BIGINT
+                  defaultValueNumeric: 0
+                  constraints: { nullable: false }
         - addForeignKeyConstraint:
             baseTableName: application_setting
             baseColumnNames: updated_by
