@@ -20,6 +20,7 @@
  */
 package io.qnop.web.security.ratelimit;
 
+import io.qnop.web.ApiErrorWriter;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
@@ -27,7 +28,6 @@ import jakarta.servlet.http.HttpServletResponse;
 import java.io.IOException;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
-import org.springframework.http.MediaType;
 import org.springframework.web.filter.OncePerRequestFilter;
 
 /**
@@ -76,17 +76,8 @@ abstract class AbstractRateLimitFilter extends OncePerRequestFilter {
 
   private void writeTooManyRequests(HttpServletResponse response, long retryAfterSeconds)
       throws IOException {
-    response.setStatus(HttpStatus.TOO_MANY_REQUESTS.value());
     response.setHeader(HttpHeaders.RETRY_AFTER, Long.toString(retryAfterSeconds));
-    response.setContentType(MediaType.APPLICATION_JSON_VALUE);
-    response
-        .getWriter()
-        .write(
-            "{\"error\":\"too_many_requests\",\"message\":\""
-                + message
-                + "\",\"retryAfterSeconds\":"
-                + retryAfterSeconds
-                + "}");
+    ApiErrorWriter.write(response, HttpStatus.TOO_MANY_REQUESTS, "RATE_LIMITED", message);
   }
 
   /** Whether this filter applies to the request (method + path match). */

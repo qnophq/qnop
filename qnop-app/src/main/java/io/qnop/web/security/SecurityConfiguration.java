@@ -21,6 +21,7 @@
 package io.qnop.web.security;
 
 import io.qnop.security.QnopProperties;
+import io.qnop.web.ApiErrorWriter;
 import io.qnop.web.security.ratelimit.ChangePasswordRateLimitFilter;
 import io.qnop.web.security.ratelimit.ForgotPasswordRateLimitFilter;
 import io.qnop.web.security.ratelimit.LoginRateLimitFilter;
@@ -32,7 +33,6 @@ import org.springframework.context.annotation.Configuration;
 import org.springframework.core.annotation.Order;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
-import org.springframework.http.MediaType;
 import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
@@ -44,6 +44,7 @@ import org.springframework.security.oauth2.client.web.AuthenticatedPrincipalOAut
 import org.springframework.security.oauth2.client.web.OAuth2AuthorizedClientRepository;
 import org.springframework.security.web.AuthenticationEntryPoint;
 import org.springframework.security.web.SecurityFilterChain;
+import org.springframework.security.web.access.AccessDeniedHandler;
 import org.springframework.security.web.access.intercept.AuthorizationFilter;
 import org.springframework.security.web.csrf.CookieCsrfTokenRepository;
 import org.springframework.security.web.csrf.CsrfFilter;
@@ -85,6 +86,7 @@ public class SecurityConfiguration {
   SecurityFilterChain securityFilterChain(
       HttpSecurity http,
       AuthenticationEntryPoint authenticationEntryPoint,
+      AccessDeniedHandler accessDeniedHandler,
       CorsConfigurationSource corsConfigurationSource,
       DelegatingJwtDecoder jwtDecoder,
       LoginRateLimitFilter loginRateLimitFilter,
@@ -140,7 +142,10 @@ public class SecurityConfiguration {
         .oauth2ResourceServer(oauth2 -> oauth2.jwt(jwt -> jwt.decoder(jwtDecoder)))
         .httpBasic(httpBasic -> httpBasic.disable())
         .formLogin(formLogin -> formLogin.disable())
-        .exceptionHandling(ex -> ex.authenticationEntryPoint(authenticationEntryPoint))
+        .exceptionHandling(
+            ex ->
+                ex.authenticationEntryPoint(authenticationEntryPoint)
+                    .accessDeniedHandler(accessDeniedHandler))
         .headers(
             headers ->
                 headers
@@ -203,14 +208,26 @@ public class SecurityConfiguration {
     return new AuthenticatedPrincipalOAuth2AuthorizedClientRepository(authorizedClientService);
   }
 
-  /** Returns a bare JSON {@code 401} instead of redirecting to a login form (this is an API). */
+  /** Writes the uniform {@code ErrorResponse} 401 instead of a login redirect (issue #45). */
   @Bean
   AuthenticationEntryPoint authenticationEntryPoint() {
-    return (request, response, authException) -> {
-      response.setStatus(HttpStatus.UNAUTHORIZED.value());
-      response.setContentType(MediaType.APPLICATION_JSON_VALUE);
-      response.getWriter().write("{\"error\":\"unauthorized\"}");
-    };
+    return (request, response, authException) ->
+        ApiErrorWriter.write(
+            response,
+            HttpStatus.UNAUTHORIZED,
+            "UNAUTHENTICATED",
+            "Authentication is required to access this resource.");
+  }
+
+  /** Writes the uniform {@code ErrorResponse} 403 for authorization failures (issue #45). */
+  @Bean
+  AccessDeniedHandler accessDeniedHandler() {
+    return (request, response, accessDeniedException) ->
+        ApiErrorWriter.write(
+            response,
+            HttpStatus.FORBIDDEN,
+            "FORBIDDEN",
+            "You do not have permission to access this resource.");
   }
 
   @Bean

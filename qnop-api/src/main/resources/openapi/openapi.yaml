@@ -757,6 +757,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
   /auth/refresh:
     post:
       tags:
@@ -950,6 +952,31 @@ components:
       description: The template storage key (e.g. `auth.password_reset`).
       schema:
         type: string
+  responses:
+    Unauthorized:
+      description: Authentication is required (uniform error envelope, issue #45).
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+    Forbidden:
+      description: The caller lacks permission for this resource (issue #45).
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+    TooManyRequests:
+      description: Rate limit exceeded; retry after the Retry-After header (issue #45).
+      headers:
+        Retry-After:
+          description: Seconds to wait before retrying.
+          schema:
+            type: integer
+            format: int32
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
   schemas:
     Edition:
       type: string
