@@ -22,12 +22,15 @@ package io.qnop.web.security.ratelimit;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import java.util.List;
 import org.junit.jupiter.api.Test;
 
 /** Unit tests for the shared Bucket4j limiter — no Spring context, no Docker. */
 class BucketRateLimitServiceTest {
 
-  private final BucketRateLimitService service = new BucketRateLimitService();
+  private final BucketRateLimitService service =
+      new BucketRateLimitService(
+          new RateLimitProperties(List.of(), null, null, null, null, null, 100_000L));
 
   @Test
   void allowsUpToCapacityThenRejects() {

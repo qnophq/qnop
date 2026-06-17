@@ -42,6 +42,9 @@ import org.springframework.boot.context.properties.bind.DefaultValue;
  * @param refresh IP-keyed limit for {@code POST /api/v1/auth/refresh} (default 30 / 60s)
  * @param changePassword subject-keyed limit for {@code POST /api/v1/auth/change-password} (default
  *     5 / 300s)
+ * @param maxBuckets upper bound on the number of live token buckets held in memory (default
+ *     100&nbsp;000). Bounds memory under a high-cardinality key space — e.g. a spoofable client IP
+ *     when no trusted proxy is configured (issue #49).
  */
 @ConfigurationProperties(prefix = "qnop.auth.rate-limit")
 public record RateLimitProperties(
@@ -50,7 +53,8 @@ public record RateLimitProperties(
     Limit refresh,
     Limit changePassword,
     Limit register,
-    Limit forgotPassword) {
+    Limit forgotPassword,
+    @DefaultValue("100000") long maxBuckets) {
 
   // A whole scope absent from config arrives as null here; substitute its per-scope default. The
   // Limit components themselves carry @DefaultValue, so a partially-specified scope keeps the
