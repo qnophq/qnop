@@ -80,6 +80,9 @@ class ArchitectureRulesTest {
             // The published REST contract is used by the service (mapping) and web layers.
             .whereLayer("Api")
             .mayOnlyBeAccessedByLayers("Service", "Web")
+            // Some access checks here are legitimately empty (e.g. Web is accessed by no
+            // layer), so keep the allowance on the layered rule; the purity rules below no
+            // longer need it now that their packages are populated (issue #50, L-8).
             .allowEmptyShould(true);
 
     rule.check(QNOP_CLASSES);
@@ -104,6 +107,8 @@ class ArchitectureRulesTest {
                 "io.qnop.repository..",
                 "io.qnop.service..",
                 "io.qnop.web..")
+            // qnop-spi is still package-info only in Community; keep the empty-should
+            // allowance here until the first published SPI interface lands.
             .allowEmptyShould(true);
 
     rule.check(QNOP_CLASSES);
@@ -129,8 +134,7 @@ class ArchitectureRulesTest {
                 "io.qnop.entity..",
                 "io.qnop.repository..",
                 "io.qnop.service..",
-                "io.qnop.web..")
-            .allowEmptyShould(true);
+                "io.qnop.web..");
 
     rule.check(QNOP_CLASSES);
   }
@@ -151,8 +155,7 @@ class ArchitectureRulesTest {
                 "io.qnop.service..",
                 "io.qnop.repository..",
                 "io.qnop.entity..",
-                "io.qnop.api..")
-            .allowEmptyShould(true);
+                "io.qnop.api..");
 
     rule.check(QNOP_CLASSES);
   }

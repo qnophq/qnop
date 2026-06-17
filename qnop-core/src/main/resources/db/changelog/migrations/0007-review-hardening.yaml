@@ -1,0 +1,29 @@
+# SPDX-License-Identifier: AGPL-3.0-only
+#
+# Phase-1 review follow-ups (issue #50): tighten two existing tables. These are
+# Postgres-only invariants (partial-unique index, CHECK) and live in Liquibase,
+# not JPA annotations (ADR-0020).
+databaseChangeLog:
+  - changeSet:
+      id: 0007-refresh-token-rotated-to-unique
+      author: qnop
+      comment: A refresh token is rotated into at most one successor (issue #50, L-9).
+      changes:
+        - sql:
+            comment: |
+              Partial-unique index so rotated_to_id links predecessor→successor 1:1;
+              NULLs (un-rotated tokens) stay unconstrained.
+            sql: |
+              CREATE UNIQUE INDEX ux_refresh_token_rotated_to
+                ON refresh_token (rotated_to_id) WHERE rotated_to_id IS NOT NULL;
+
+  - changeSet:
+      id: 0007-mail-template-locale-lowercase
+      author: qnop
+      comment: Store mail_template.locale lowercase so (template_key, locale) cannot collide on case (issue #50, L-9).
+      changes:
+        - sql:
+            comment: Enforce a lowercase locale; the seeded rows are already 'en'.
+            sql: |
+              ALTER TABLE mail_template ADD CONSTRAINT ck_mail_template_locale_lowercase
+                CHECK (locale = lower(locale));
