@@ -71,5 +71,6 @@ class RateLimitIT extends AbstractIntegrationTest {
 
     assertThat(throttled.statusCode()).isEqualTo(429);
     assertThat(throttled.headers().firstValue("Retry-After")).isPresent();
+    assertThat(throttled.body()).contains("\"code\":\"RATE_LIMITED\"");
   }
 }
