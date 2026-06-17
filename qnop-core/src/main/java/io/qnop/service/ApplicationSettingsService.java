@@ -35,9 +35,10 @@ import java.util.Set;
 import java.util.UUID;
 import org.springframework.security.crypto.encrypt.TextEncryptor;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.support.TransactionSynchronization;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
+import org.springframework.transaction.support.TransactionTemplate;
 
 /**
  * Runtime access to the global application settings (issue #16). Reads are served lock-free from an
@@ -53,10 +54,14 @@ import org.springframework.transaction.support.TransactionSynchronizationManager
 @Service
 public class ApplicationSettingsService {
 
+  /** Attempts for an optimistic-locking write before giving up (issue #47). */
+  private static final int MAX_WRITE_ATTEMPTS = 3;
+
   private final ApplicationSettingRepository repository;
   private final TextEncryptor textEncryptor;
   private final ConfigurationKeyRedactor redactor;
   private final List<SettingsChangeListener> listeners;
+  private final TransactionTemplate transactionTemplate;
 
   private final java.util.concurrent.atomic.AtomicReference<Map<ApplicationSettingKey, String>>
       snapshot = new java.util.concurrent.atomic.AtomicReference<>(Map.of());
@@ -65,11 +70,13 @@ public class ApplicationSettingsService {
       ApplicationSettingRepository repository,
       TextEncryptor textEncryptor,
       ConfigurationKeyRedactor redactor,
-      List<SettingsChangeListener> listeners) {
+      List<SettingsChangeListener> listeners,
+      PlatformTransactionManager transactionManager) {
     this.repository = repository;
     this.textEncryptor = textEncryptor;
     this.redactor = redactor;
     this.listeners = listeners;
+    this.transactionTemplate = new TransactionTemplate(transactionManager);
   }
 
   @PostConstruct
@@ -126,13 +133,23 @@ public class ApplicationSettingsService {
    * Applies a partial set of changes ({@code key -> raw value}). Unknown keys and type-invalid
    * values are rejected with {@link SettingValidationException}; a {@link
    * ConfigurationKeyRedactor#MASK} value for a sensitive key means "unchanged". The snapshot
-   * refresh and listener notifications run after the surrounding transaction commits.
+   * refresh and listener notifications run after the write transaction commits.
+   *
+   * <p>Each attempt runs in its own transaction; an optimistic-locking conflict (a concurrent edit
+   * of the same setting, guarded by {@link ApplicationSetting}'s {@code @Version}) retries the
+   * whole apply up to {@value #MAX_WRITE_ATTEMPTS} times so the losing writer re-reads the current
+   * row rather than clobbering it (issue #47). A {@link SettingValidationException} is not retried.
    *
    * @param changes raw key/value pairs to apply
    * @param actor the editing user's id, or {@code null} when unattributed (wired in issue #17)
    */
-  @Transactional
   public void update(Map<String, String> changes, UUID actor) {
+    OptimisticRetry.execute(
+        MAX_WRITE_ATTEMPTS,
+        () -> transactionTemplate.executeWithoutResult(status -> applyChanges(changes, actor)));
+  }
+
+  private void applyChanges(Map<String, String> changes, UUID actor) {
     Set<ApplicationSettingKey> changed = EnumSet.noneOf(ApplicationSettingKey.class);
     for (Map.Entry<String, String> entry : changes.entrySet()) {
       ApplicationSettingKey key =
