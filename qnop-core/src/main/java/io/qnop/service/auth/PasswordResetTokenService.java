@@ -85,8 +85,12 @@ public class PasswordResetTokenService {
     if (token.getExpiresAt().isBefore(Instant.now())) {
       throw new InvalidPasswordResetTokenException("Reset token has expired");
     }
-    token.setConsumedAt(Instant.now());
-    return token.getUser();
+    User user = token.getUser(); // resolve before the atomic update clears the persistence context
+    // Atomic single-use guard (issue #61): only one concurrent caller flips consumed_at from null.
+    if (tokens.markConsumed(token.getId(), Instant.now()) == 0) {
+      throw new InvalidPasswordResetTokenException("Reset token already used");
+    }
+    return user;
   }
 
   @Scheduled(cron = "0 35 3 * * *")

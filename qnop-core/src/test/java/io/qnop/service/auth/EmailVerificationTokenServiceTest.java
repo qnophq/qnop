@@ -82,11 +82,24 @@ class EmailVerificationTokenServiceTest {
     EmailVerificationToken token =
         new EmailVerificationToken(user, "h", Instant.now().plusSeconds(60));
     when(tokens.findByTokenHash(any())).thenReturn(Optional.of(token));
+    when(tokens.markConsumed(any(), any())).thenReturn(1);
 
     User result = service.consume("raw-token");
 
     assertThat(result).isSameAs(user);
-    assertThat(token.getConsumedAt()).isNotNull();
+    verify(tokens).markConsumed(any(), any(Instant.class));
+  }
+
+  @Test
+  @DisplayName("consume rejects a token consumed concurrently (atomic guard, issue #61)")
+  void consumeLosesRace() {
+    EmailVerificationToken token =
+        new EmailVerificationToken(user, "h", Instant.now().plusSeconds(60));
+    when(tokens.findByTokenHash(any())).thenReturn(Optional.of(token));
+    when(tokens.markConsumed(any(), any())).thenReturn(0); // another request already won
+
+    assertThatThrownBy(() -> service.consume("raw-token"))
+        .isInstanceOf(InvalidVerificationTokenException.class);
   }
 
   @Test
