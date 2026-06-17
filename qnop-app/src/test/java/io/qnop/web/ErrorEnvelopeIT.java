@@ -23,7 +23,7 @@ package io.qnop.web;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.jwt;
 import static org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -84,15 +84,9 @@ class ErrorEnvelopeIT extends AbstractIntegrationTest {
 
   @Test
   void bodyValidationReturns400Envelope() throws Exception {
+    // {} omits the required usernameOrEmail/password, tripping @Valid bean validation.
     mockMvc
-        .perform(
-            patch("/api/v1/admin/settings")
-                .with(
-                    jwt()
-                        .jwt(j -> j.subject(UUID.randomUUID().toString()))
-                        .authorities(new SimpleGrantedAuthority("ROLE_SUPERADMIN")))
-                .contentType(MediaType.APPLICATION_JSON)
-                .content("{}"))
+        .perform(post("/api/v1/auth/login").contentType(MediaType.APPLICATION_JSON).content("{}"))
         .andExpect(status().isBadRequest())
         .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_JSON))
         .andExpect(jsonPath("$.code").value("VALIDATION_ERROR"))
