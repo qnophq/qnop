@@ -94,7 +94,7 @@ public class ApplicationAsset {
     ApplicationAsset asset = new ApplicationAsset();
     asset.slot = slot;
     asset.contentType = contentType;
-    asset.content = content;
+    asset.content = content == null ? null : content.clone();
     asset.sha256 = sha256;
     asset.sizeBytes = sizeBytes;
     asset.uploadedBy = uploadedBy;
@@ -121,12 +121,16 @@ public class ApplicationAsset {
     this.contentType = contentType;
   }
 
+  /**
+   * Returns a defensive copy so the stored bytes (and their {@code sha256}/{@code size}) stay
+   * intact.
+   */
   public byte[] getContent() {
-    return content;
+    return content == null ? null : content.clone();
   }
 
   public void setContent(byte[] content) {
-    this.content = content;
+    this.content = content == null ? null : content.clone();
   }
 
   public String getSha256() {

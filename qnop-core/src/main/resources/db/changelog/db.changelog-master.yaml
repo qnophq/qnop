@@ -29,3 +29,6 @@ databaseChangeLog:
   - include:
       file: migrations/0006-shedlock-schema.yaml
       relativeToChangelogFile: true
+  - include:
+      file: migrations/0007-review-hardening.yaml
+      relativeToChangelogFile: true

@@ -58,7 +58,7 @@ public class RefreshTokenService {
   private final RefreshTokenRepository repository;
   private final RefreshTokenHasher hasher;
   private final QnopProperties properties;
-  private final SecureRandom secureRandom = new SecureRandom();
+  private static final SecureRandom SECURE_RANDOM = new SecureRandom();
 
   public RefreshTokenService(
       RefreshTokenRepository repository, RefreshTokenHasher hasher, QnopProperties properties) {
@@ -136,7 +136,7 @@ public class RefreshTokenService {
 
   private String generatePlaintext() {
     byte[] bytes = new byte[TOKEN_BYTES];
-    secureRandom.nextBytes(bytes);
+    SECURE_RANDOM.nextBytes(bytes);
     return Base64.getUrlEncoder().withoutPadding().encodeToString(bytes);
   }
 

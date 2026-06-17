@@ -45,11 +45,18 @@ public class EncryptedStringConverter implements AttributeConverter<String, Stri
 
   @Override
   public String convertToDatabaseColumn(String attribute) {
-    return attribute == null ? null : encryptor.encrypt(attribute);
+    // Keep null and empty distinct and unencrypted; only real secrets are encrypted.
+    if (attribute == null || attribute.isEmpty()) {
+      return attribute;
+    }
+    return encryptor.encrypt(attribute);
   }
 
   @Override
   public String convertToEntityAttribute(String dbData) {
-    return dbData == null ? null : encryptor.decrypt(dbData);
+    if (dbData == null || dbData.isEmpty()) {
+      return dbData;
+    }
+    return encryptor.decrypt(dbData);
   }
 }

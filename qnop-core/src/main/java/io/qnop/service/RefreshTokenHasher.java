@@ -52,12 +52,7 @@ public class RefreshTokenHasher {
       Mac mac = Mac.getInstance(HMAC_ALGORITHM);
       mac.init(key);
       byte[] digest = mac.doFinal(plaintext.getBytes(StandardCharsets.UTF_8));
-      StringBuilder hex = new StringBuilder(digest.length * 2);
-      for (byte b : digest) {
-        hex.append(Character.forDigit((b >> 4) & 0xF, 16));
-        hex.append(Character.forDigit(b & 0xF, 16));
-      }
-      return hex.toString();
+      return java.util.HexFormat.of().formatHex(digest);
     } catch (NoSuchAlgorithmException | InvalidKeyException e) {
       throw new IllegalStateException("Unable to compute refresh-token lookup hash", e);
     }
