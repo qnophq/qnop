@@ -29,7 +29,9 @@ import java.util.HexFormat;
 import java.util.Optional;
 import java.util.UUID;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionTemplate;
 
 /**
  * Validates and stores operator branding assets, and reads them back for public serving (issue
@@ -41,18 +43,25 @@ import org.springframework.transaction.annotation.Transactional;
 public class BrandingService {
 
   private final ApplicationAssetRepository repository;
+  private final TransactionTemplate transactionTemplate;
 
-  public BrandingService(ApplicationAssetRepository repository) {
+  public BrandingService(
+      ApplicationAssetRepository repository, PlatformTransactionManager transactionManager) {
     this.repository = repository;
+    this.transactionTemplate = new TransactionTemplate(transactionManager);
   }
 
   /**
    * Validates the uploaded bytes and replaces the asset in {@code slot}.
    *
+   * <p>The CPU-bound validation pipeline — content-type sniffing, SVG sanitization (XML parsing)
+   * and pixel-dimension decoding ({@code ImageIO}) — runs <em>outside</em> any transaction so it
+   * does not hold a database connection while parsing potentially adversarial input (issue #48).
+   * Only the delete-then-insert is transactional.
+   *
    * @throws BrandingValidationException if the type is unsupported, the payload too large, the
    *     image unreadable/oversized, or the SVG unsafe
    */
-  @Transactional
   public StoredAsset store(String slot, byte[] bytes, UUID uploadedBy) {
     BrandingSlot resolved = resolve(slot);
     String contentType = sniffContentType(bytes);
@@ -74,14 +83,19 @@ public class BrandingService {
     enforceDimensions(contentType, content);
 
     String sha256 = sha256Hex(content);
-    // Flush the delete before the insert: a single flush would order the INSERT before the DELETE
-    // (Hibernate's action ordering) and transiently violate the (slot) unique constraint.
-    repository.deleteBySlot(resolved);
-    repository.flush();
-    repository.saveAndFlush(
-        ApplicationAsset.create(
-            resolved, contentType, content, sha256, content.length, uploadedBy));
-    return new StoredAsset(contentType, sha256, content.length);
+    byte[] stored = content;
+    return transactionTemplate.execute(
+        status -> {
+          // Flush the delete before the insert: a single flush would order the INSERT before the
+          // DELETE (Hibernate's action ordering) and transiently violate the (slot) unique
+          // constraint.
+          repository.deleteBySlot(resolved);
+          repository.flush();
+          repository.saveAndFlush(
+              ApplicationAsset.create(
+                  resolved, contentType, stored, sha256, stored.length, uploadedBy));
+          return new StoredAsset(contentType, sha256, stored.length);
+        });
   }
 
   /** The current asset for a slot, for public serving. */

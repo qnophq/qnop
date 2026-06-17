@@ -61,6 +61,13 @@ import org.w3c.dom.NodeList;
  */
 public final class SvgSanitizer {
 
+  /**
+   * Maximum element nesting depth. A legitimate logo is shallow; a pathologically deep tree is a
+   * denial-of-service vector (stack exhaustion in the recursive walk), so it is rejected outright
+   * (issue #48).
+   */
+  private static final int MAX_NESTING_DEPTH = 100;
+
   private static final Set<String> ALLOWED_ELEMENTS =
       Set.of(
           "svg",
@@ -101,7 +108,7 @@ public final class SvgSanitizer {
       if (root == null || !"svg".equals(localName(root))) {
         throw new IllegalArgumentException("not an <svg> document");
       }
-      sanitizeElement(root);
+      sanitizeElement(root, 0);
       return serialize(document);
     } catch (IllegalArgumentException e) {
       throw e;
@@ -126,7 +133,11 @@ public final class SvgSanitizer {
     return builder.parse(new ByteArrayInputStream(svg));
   }
 
-  private static void sanitizeElement(Element element) {
+  private static void sanitizeElement(Element element, int depth) {
+    if (depth > MAX_NESTING_DEPTH) {
+      throw new IllegalArgumentException(
+          "SVG nesting exceeds the maximum depth of " + MAX_NESTING_DEPTH);
+    }
     NamedNodeMap attributes = element.getAttributes();
     List<Attr> toRemove = new ArrayList<>();
     for (int i = 0; i < attributes.getLength(); i++) {
@@ -157,7 +168,7 @@ public final class SvgSanitizer {
     }
     for (Element child : childElements) {
       if (ALLOWED_ELEMENTS.contains(localName(child))) {
-        sanitizeElement(child);
+        sanitizeElement(child, depth + 1);
       } else {
         element.removeChild(child); // drops <script>, <foreignObject>, <style>, <image>, …
       }

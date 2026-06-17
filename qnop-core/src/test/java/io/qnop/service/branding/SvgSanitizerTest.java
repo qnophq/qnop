@@ -85,4 +85,29 @@ class SvgSanitizerTest {
         () ->
             SvgSanitizer.sanitize("<html><body>x</body></html>".getBytes(StandardCharsets.UTF_8)));
   }
+
+  @Test
+  void rejectsPathologicallyDeepNesting() {
+    // A logo is shallow; a very deep tree is a stack-exhaustion DoS vector (issue #48).
+    int depth = 500;
+    String svg =
+        "<svg xmlns=\"http://www.w3.org/2000/svg\">"
+            + "<g>".repeat(depth)
+            + "</g>".repeat(depth)
+            + "</svg>";
+
+    assertThrows(IllegalArgumentException.class, () -> sanitize(svg));
+  }
+
+  @Test
+  void acceptsModeratelyNestedGroups() {
+    int depth = 20;
+    String svg =
+        "<svg xmlns=\"http://www.w3.org/2000/svg\">"
+            + "<g>".repeat(depth)
+            + "</g>".repeat(depth)
+            + "</svg>";
+
+    assertTrue(sanitize(svg).contains("<g"), svg);
+  }
 }
