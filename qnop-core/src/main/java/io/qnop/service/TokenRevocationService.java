@@ -32,6 +32,7 @@ import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.time.Instant;
 import java.util.UUID;
+import net.javacrumbs.shedlock.spring.annotation.SchedulerLock;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -120,6 +121,7 @@ public class TokenRevocationService {
    * {@code exp} validation regardless, so dropping its denylist row is safe.
    */
   @Scheduled(cron = "0 45 3 * * *")
+  @SchedulerLock(name = "revokedTokenSweep", lockAtMostFor = "PT5M")
   @Transactional
   public void sweepExpired() {
     revokedTokenRepository.deleteExpiredBefore(Instant.now());
