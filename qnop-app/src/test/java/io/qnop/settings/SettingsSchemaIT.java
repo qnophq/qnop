@@ -144,4 +144,16 @@ class SettingsSchemaIT extends AbstractIntegrationTest {
     ApplicationSetting reloaded = applicationSettings.findById("custom.audited").orElseThrow();
     assertThat(reloaded.getUpdatedBy()).isNull();
   }
+
+  @Test
+  void indexesTheUpdatedByForeignKey() {
+    // The FK column must be indexed so deletes of a qnop_user (ON DELETE SET NULL) and joins on
+    // updated_by do not sequentially scan application_setting (issue #46).
+    Integer count =
+        jdbc.queryForObject(
+            "SELECT count(*) FROM pg_indexes WHERE tablename = 'application_setting'"
+                + " AND indexname = 'ix_application_setting_updated_by'",
+            Integer.class);
+    assertThat(count).isEqualTo(1);
+  }
 }
