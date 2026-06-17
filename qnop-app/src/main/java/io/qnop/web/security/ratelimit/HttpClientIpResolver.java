@@ -22,6 +22,8 @@ package io.qnop.web.security.ratelimit;
 
 import jakarta.servlet.http.HttpServletRequest;
 import java.util.List;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.security.web.util.matcher.IpAddressMatcher;
 import org.springframework.stereotype.Component;
 
@@ -53,6 +55,8 @@ public class HttpClientIpResolver {
 
   private static final String X_FORWARDED_FOR = "X-Forwarded-For";
 
+  private static final Logger log = LoggerFactory.getLogger(HttpClientIpResolver.class);
+
   private final List<IpAddressMatcher> trustedProxyMatchers;
 
   public HttpClientIpResolver(RateLimitProperties properties) {
@@ -61,6 +65,14 @@ public class HttpClientIpResolver {
             .map(String::trim)
             .map(IpAddressMatcher::new)
             .toList();
+    if (trustedProxyMatchers.isEmpty()) {
+      log.warn(
+          "Rate limiting is active but qnop.auth.rate-limit.trusted-proxy-cidrs is empty:"
+              + " X-Forwarded-For is ignored and the connection IP is used. This is the secure"
+              + " default for a direct deployment. If qnop runs behind a reverse proxy, set it to"
+              + " the proxy's egress CIDRs, or every client shares one per-IP bucket and the limit"
+              + " is effectively bypassable.");
+    }
   }
 
   /** Returns the best-trusted client IP for the request. */

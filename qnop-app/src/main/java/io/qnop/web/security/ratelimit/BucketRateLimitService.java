@@ -43,15 +43,18 @@ public class BucketRateLimitService {
   /** Upper bound on how long an idle bucket lingers, independent of the caller's window. */
   private static final long MAX_BUCKET_TTL_SECONDS = 3_600;
 
-  private static final long MAX_BUCKETS = 100_000;
+  private final java.util.concurrent.ConcurrentMap<String, Bucket> buckets;
 
-  private final Caffeine<Object, Object> cacheBuilder =
-      Caffeine.newBuilder()
-          .expireAfterAccess(MAX_BUCKET_TTL_SECONDS, TimeUnit.SECONDS)
-          .maximumSize(MAX_BUCKETS);
-
-  private final java.util.concurrent.ConcurrentMap<String, Bucket> buckets =
-      cacheBuilder.<String, Bucket>build().asMap();
+  public BucketRateLimitService(RateLimitProperties properties) {
+    // Size-cap the bucket store so a high-cardinality key space (e.g. a spoofable client IP when
+    // no trusted proxy is configured) cannot grow it without bound (issue #49).
+    this.buckets =
+        Caffeine.newBuilder()
+            .expireAfterAccess(MAX_BUCKET_TTL_SECONDS, TimeUnit.SECONDS)
+            .maximumSize(properties.maxBuckets())
+            .<String, Bucket>build()
+            .asMap();
+  }
 
   /**
    * Attempts to consume one token from the bucket identified by {@code scope + key}.
