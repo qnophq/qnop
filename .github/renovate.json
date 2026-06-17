@@ -1,6 +1,8 @@
 {
   "$schema": "https://docs.renovatebot.com/renovate-schema.json",
   "extends": ["github>qnophq/.github"],
+  "comment:schedule": "Override the org preset's 'before 6am every weekday' window. This is a self-hosted single-repo instance whose cadence is already set by the weekday cron in .github/workflows/renovate.yml; the in-config window only fights GitHub's best-effort cron delay (the 04:00 UTC run actually fires ~09:00 UTC, outside the window), so every update sat in 'Awaiting Schedule' and no PR was ever opened. See issue #64.",
+  "schedule": ["at any time"],
   "packageRules": [
     {
       "description": "Spring Boot starters, BOM, security, and dependency-management plugin",
