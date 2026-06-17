@@ -22,9 +22,13 @@ package io.qnop.repository;
 
 import io.qnop.entity.User;
 import io.qnop.entity.UserSource;
+import java.time.Instant;
 import java.util.Optional;
 import java.util.UUID;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 
 /** Data access for {@link User}. */
 public interface UserRepository extends JpaRepository<User, UUID> {
@@ -36,4 +40,32 @@ public interface UserRepository extends JpaRepository<User, UUID> {
   Optional<User> findByUsernameAndSource(String username, UserSource source);
 
   boolean existsByEmailIgnoreCaseAndSource(String email, UserSource source);
+
+  /**
+   * Atomically stamps the last-login timestamp (issue #61) without a read-modify-write, so a login
+   * never clobbers a concurrent security write. Best-effort: it does not bump {@code version}, so a
+   * concurrent full-entity edit may overwrite the timestamp — harmless for a login marker.
+   */
+  @Modifying(clearAutomatically = true)
+  @Query("UPDATE User u SET u.lastLoginAt = :at WHERE u.id = :id")
+  int touchLastLogin(@Param("id") UUID id, @Param("at") Instant at);
+
+  /**
+   * Atomically bumps {@code password_invalidated_before} (token revocation) and increments {@code
+   * version} (issue #61). The version bump makes any concurrently-loaded stale entity's later
+   * full-entity save fail optimistically rather than reverting the revocation.
+   */
+  @Modifying(clearAutomatically = true)
+  @Query(
+      "UPDATE User u SET u.passwordInvalidatedBefore = :at, u.version = u.version + 1"
+          + " WHERE u.id = :id")
+  int bumpPasswordInvalidatedBefore(@Param("id") UUID id, @Param("at") Instant at);
+
+  /**
+   * Atomically replaces the password hash and increments {@code version} (issue #61), so a password
+   * change cannot be lost to, or clobber, a concurrent edit.
+   */
+  @Modifying(clearAutomatically = true)
+  @Query("UPDATE User u SET u.passwordHash = :hash, u.version = u.version + 1 WHERE u.id = :id")
+  int updatePasswordHash(@Param("id") UUID id, @Param("hash") String hash);
 }

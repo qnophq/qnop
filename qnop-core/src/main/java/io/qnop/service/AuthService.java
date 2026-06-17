@@ -94,8 +94,10 @@ public class AuthService {
     if (!passwordEncoder.matches(currentPassword, user.getPasswordHash())) {
       return ChangePasswordOutcome.WRONG_PASSWORD;
     }
-    user.setPasswordHash(passwordEncoder.encode(newPassword));
-    userRepository.save(user);
+    // Atomic, version-bumping updates (issue #61): the loaded `user` is read for verification only
+    // and never dirty-saved, so the hash change and the revocation below can't clobber each other
+    // or a concurrent edit.
+    userRepository.updatePasswordHash(userId, passwordEncoder.encode(newPassword));
     tokenRevocationService.revokeAllForUser(userId);
     refreshTokenService.revokeAllForUser(userId);
     return ChangePasswordOutcome.SUCCESS;

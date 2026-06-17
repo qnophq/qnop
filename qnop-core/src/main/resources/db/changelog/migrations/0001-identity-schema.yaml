@@ -56,6 +56,12 @@ databaseChangeLog:
                   name: updated_at
                   type: TIMESTAMP WITH TIME ZONE
                   constraints: { nullable: false }
+              # Optimistic-locking guard (issue #61): Hibernate @Version.
+              - column:
+                  name: version
+                  type: BIGINT
+                  defaultValueNumeric: 0
+                  constraints: { nullable: false }
         - sql:
             comment: Postgres-only CHECK + partial-unique constraints (not expressible in JPA).
             splitStatements: true

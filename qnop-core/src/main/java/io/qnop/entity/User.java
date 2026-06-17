@@ -26,6 +26,7 @@ import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
+import jakarta.persistence.Version;
 import java.time.Instant;
 import java.util.Objects;
 import java.util.UUID;
@@ -89,6 +90,20 @@ public class User {
   @UpdateTimestamp
   @Column(name = "updated_at", nullable = false)
   private Instant updatedAt;
+
+  /**
+   * Optimistic-locking guard (issue #61). Concurrent full-entity edits of the same user (e.g. an
+   * admin enable/disable racing a password reset) are rejected instead of silently losing one
+   * another. The security-critical single-field writes — {@code password_invalidated_before} and
+   * {@code password_hash} — go through atomic, version-bumping {@code UPDATE}s in {@link
+   * io.qnop.repository.UserRepository} so a token revocation can never be clobbered by a stale
+   * write; {@code last_login_at} is updated atomically too (best-effort, no version bump). The
+   * backing column ({@code version BIGINT NOT NULL DEFAULT 0}) is defined in Liquibase on {@code
+   * qnop_user} (migration 0001).
+   */
+  @Version
+  @Column(name = "version", nullable = false)
+  private long version;
 
   protected User() {
     // for JPA
@@ -205,6 +220,11 @@ public class User {
 
   public Instant getUpdatedAt() {
     return updatedAt;
+  }
+
+  /** The optimistic-locking version; managed by Hibernate (no setter). */
+  public long getVersion() {
+    return version;
   }
 
   @Override
