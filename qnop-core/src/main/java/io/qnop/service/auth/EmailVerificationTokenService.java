@@ -83,8 +83,12 @@ public class EmailVerificationTokenService {
     if (token.getExpiresAt().isBefore(Instant.now())) {
       throw new InvalidVerificationTokenException("Verification token has expired");
     }
-    token.setConsumedAt(Instant.now());
-    return token.getUser();
+    User user = token.getUser(); // resolve before the atomic update clears the persistence context
+    // Atomic single-use guard (issue #61): only one concurrent caller flips consumed_at from null.
+    if (tokens.markConsumed(token.getId(), Instant.now()) == 0) {
+      throw new InvalidVerificationTokenException("Verification token already used");
+    }
+    return user;
   }
 
   /** Daily off-peak purge of expired rows so the table does not grow unbounded. */

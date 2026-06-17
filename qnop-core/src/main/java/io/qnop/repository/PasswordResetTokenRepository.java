@@ -26,6 +26,7 @@ import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
@@ -41,6 +42,16 @@ public interface PasswordResetTokenRepository extends JpaRepository<PasswordRese
    */
   @Query("SELECT t FROM PasswordResetToken t WHERE t.user.id = :userId AND t.consumedAt IS NULL")
   List<PasswordResetToken> findUnconsumedTokensForUser(@Param("userId") UUID userId);
+
+  /**
+   * Atomically consumes a token (issue #61): sets {@code consumed_at} only if it is still null.
+   * Returns 1 if this call won the race, 0 if already consumed — so a reset token cannot be
+   * replayed under concurrency.
+   */
+  @Modifying(clearAutomatically = true)
+  @Query(
+      "UPDATE PasswordResetToken t SET t.consumedAt = :at WHERE t.id = :id AND t.consumedAt IS NULL")
+  int markConsumed(@Param("id") UUID id, @Param("at") Instant at);
 
   /** Scheduled-sweep target: rows whose {@code expires_at} has passed. */
   long deleteByExpiresAtBefore(Instant cutoff);
