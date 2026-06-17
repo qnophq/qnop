@@ -32,9 +32,16 @@ jobs:
     uses: qnophq/.github/.github/workflows/renovate.yml@94c4381a80ff3297b4017be99f49bb9193f778d1 # main
     # Permissions belong on the calling job, not on the reusable workflow.
     # The reusable workflow inherits these for the duration of the call.
+    # (Renovate now authenticates as a GitHub App, so these GITHUB_TOKEN
+    # scopes are no longer what opens PRs — see ADR-0017 amendment — but
+    # they stay accurate for any GITHUB_TOKEN-based steps.)
     permissions:
       contents: write       # branch + push
       pull-requests: write  # open + label PRs
       issues: write         # update Dependency Dashboard issue
+    # Pass this repo's RENOVATE_APP_ID + RENOVATE_APP_PRIVATE_KEY secrets to
+    # the reusable workflow, which mints the App installation token Renovate
+    # runs as (ADR-0017 amendment, issue #67).
+    secrets: inherit
     with:
       logLevel: ${{ inputs.logLevel || 'info' }}
