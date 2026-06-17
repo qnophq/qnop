@@ -37,6 +37,14 @@ databaseChangeLog:
             referencedColumnNames: id
             constraintName: fk_application_setting_updated_by
             onDelete: SET NULL
+        # Index the FK column: Postgres does not auto-index FKs, so without this a
+        # delete of a qnop_user (ON DELETE SET NULL) and any join on updated_by
+        # would sequentially scan application_setting (issue #46).
+        - createIndex:
+            tableName: application_setting
+            indexName: ix_application_setting_updated_by
+            columns:
+              - column: { name: updated_by }
         - sql:
             comment: Postgres-only CHECK on the value-type enum (not expressible in JPA).
             sql: |
