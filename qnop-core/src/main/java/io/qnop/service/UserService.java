@@ -87,12 +87,15 @@ public class UserService {
     return user;
   }
 
-  /** Records a successful-login timestamp (issue #21 OIDC login, and local login). */
+  /**
+   * Records a successful-login timestamp (issue #21 OIDC login, and local login). The write is an
+   * atomic {@code UPDATE} (issue #61) so it can never clobber a concurrent security write; the row
+   * is then re-read to return the fresh entity.
+   */
   @Transactional
   public User bumpLastLogin(UUID id, Instant at) {
-    User user = users.findById(id).orElseThrow(() -> new UserNotFoundException(id));
-    user.setLastLoginAt(at);
-    return user;
+    users.touchLastLogin(id, at);
+    return users.findById(id).orElseThrow(() -> new UserNotFoundException(id));
   }
 
   /** Provisions an enabled external (OIDC) user — no local credentials (issue #21). */

@@ -23,6 +23,7 @@ package io.qnop.service;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
@@ -172,24 +173,19 @@ class TokenRevocationServiceTest {
   }
 
   @Test
-  @DisplayName("revokeAllForUser bumps passwordInvalidatedBefore and persists the user")
+  @DisplayName("revokeAllForUser atomically bumps passwordInvalidatedBefore")
   void revokeAllForUserBumpsTimestamp() {
-    User user = org.mockito.Mockito.mock(User.class);
-    when(users.findById(userId)).thenReturn(Optional.of(user));
-
     service.revokeAllForUser(userId);
 
-    verify(user).setPasswordInvalidatedBefore(any(Instant.class));
-    verify(users).save(user);
+    verify(users).bumpPasswordInvalidatedBefore(eq(userId), any(Instant.class));
   }
 
   @Test
-  @DisplayName("revokeAllForUser is a no-op when the user does not exist")
-  void revokeAllForUserNoopWhenUserMissing() {
-    when(users.findById(userId)).thenReturn(Optional.empty());
-
+  @DisplayName("revokeAllForUser uses an atomic update, not a read-modify-write (issue #61)")
+  void revokeAllForUserDoesNotReadModifyWrite() {
     service.revokeAllForUser(userId);
 
+    verify(users, never()).findById(any());
     verify(users, never()).save(any());
   }
 

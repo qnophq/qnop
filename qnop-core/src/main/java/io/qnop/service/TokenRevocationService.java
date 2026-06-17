@@ -106,13 +106,10 @@ public class TokenRevocationService {
    */
   @Transactional
   public void revokeAllForUser(UUID userId) {
-    userRepository
-        .findById(userId)
-        .ifPresent(
-            user -> {
-              user.setPasswordInvalidatedBefore(Instant.now());
-              userRepository.save(user);
-            });
+    // Atomic, version-bumping UPDATE (issue #61): the revocation is always applied and cannot be
+    // reverted by a concurrent stale full-entity save of the same user. A no-op if the user is
+    // gone.
+    userRepository.bumpPasswordInvalidatedBefore(userId, Instant.now());
   }
 
   /**
