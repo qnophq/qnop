@@ -86,7 +86,16 @@ class ErrorEnvelopeIT extends AbstractIntegrationTest {
   void bodyValidationReturns400Envelope() throws Exception {
     // {} omits the required usernameOrEmail/password, tripping @Valid bean validation.
     mockMvc
-        .perform(post("/api/v1/auth/login").contentType(MediaType.APPLICATION_JSON).content("{}"))
+        .perform(
+            post("/api/v1/auth/login")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{}")
+                .with(
+                    request -> {
+                      // Distinct client IP so this does not drain RateLimitIT's login bucket.
+                      request.setRemoteAddr("203.0.113.45");
+                      return request;
+                    }))
         .andExpect(status().isBadRequest())
         .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_JSON))
         .andExpect(jsonPath("$.code").value("VALIDATION_ERROR"))
