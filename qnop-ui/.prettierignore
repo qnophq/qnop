@@ -1,0 +1,8 @@
+# Generated files — not source, must not be reformatted by Prettier.
+# The package manager owns the lockfile's format; running it through
+# `prettier --check` breaks CI whenever the lockfile is regenerated
+# (e.g. on every Renovate dependency update). See issue #80.
+pnpm-lock.yaml
+
+# Build output
+dist
