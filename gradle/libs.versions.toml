@@ -17,7 +17,7 @@ springBoot = "4.1.0"
 # qnop-api-endpoint from a single spec. Jackson annotations stay on 2.x
 # (com.fasterxml.jackson) — the generated models only carry annotations.
 openapiGenerator = "7.23.0"
-jacksonAnnotations = "2.21"
+jacksonAnnotations = "2.22"
 swaggerAnnotations = "2.2.51"
 jakartaValidation = "3.1.1"
 jakartaAnnotation = "3.0.0"
