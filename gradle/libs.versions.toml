@@ -3,8 +3,8 @@
 
 [versions]
 # --- Applied -----------------------------------------------------------
-junit = "5.12.2"
-archunit = "1.4.1"
+junit = "5.14.4"
+archunit = "1.4.2"
 # NOTE: keep `spotless` in sync with build-logic/build.gradle.kts (precompiled
 # script plugins cannot read this catalog at plugin-resolution time).
 spotless = "8.6.0"
