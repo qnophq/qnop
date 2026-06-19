@@ -27,7 +27,7 @@ jakartaAnnotation = "3.0.0"
 bucket4j = "8.19.0"
 # Distributed scheduler locks (issue #52, ADR-0029). ShedLock 7.x is the line
 # tested against Spring 7.0 / Spring Boot 4.x and requires JVM 17+ (we run 21).
-shedlock = "7.0.0"
+shedlock = "7.7.0"
 # Mail subsystem (issue #19): logic-less Mustache for admin-editable templates,
 # safe to render untrusted template bodies. SMTP via spring-boot-starter-mail
 # (version managed by the Spring Boot BOM).
