@@ -15,7 +15,7 @@ importers:
         specifier: 11.14.1
         version: 11.14.1(@emotion/react@11.14.0(@types/react@19.2.17)(react@19.2.7))(@types/react@19.2.17)(react@19.2.7)
       '@fontsource/inter':
-        specifier: ^5.2.8
+        specifier: 5.2.8
         version: 5.2.8
       '@mui/material':
         specifier: 9.1.1
@@ -31,7 +31,7 @@ importers:
         specifier: 10.0.1
         version: 10.0.1(eslint@10.5.0)
       '@types/node':
-        specifier: ^24.12.3
+        specifier: 24.13.2
         version: 24.13.2
       '@types/react':
         specifier: 19.2.17
@@ -52,7 +52,7 @@ importers:
         specifier: 0.5.2
         version: 0.5.2(eslint@10.5.0)
       globals:
-        specifier: ^17.6.0
+        specifier: 17.6.0
         version: 17.6.0
       prettier:
         specifier: 3.8.4
