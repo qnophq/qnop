@@ -12,5 +12,5 @@ repositories {
 dependencies {
     // Plugin marker so `qnop.java-conventions` can apply Spotless via `id(...)`.
     // Keep version in sync with gradle/libs.versions.toml -> [versions].spotless
-    implementation("com.diffplug.spotless:spotless-plugin-gradle:8.6.0")
+    implementation("com.diffplug.spotless:spotless-plugin-gradle:8.7.0")
 }
