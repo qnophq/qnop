@@ -7,7 +7,7 @@ junit = "5.14.4"
 archunit = "1.4.2"
 # NOTE: keep `spotless` in sync with build-logic/build.gradle.kts (precompiled
 # script plugins cannot read this catalog at plugin-resolution time).
-spotless = "8.6.0"
+spotless = "8.7.0"
 # Spring Boot plugin + BOM. The BOM (spring-boot-dependencies) manages the
 # versions of the Spring stack, JPA/Hibernate, the PostgreSQL driver, Liquibase
 # and Testcontainers — so those artifacts are declared below WITHOUT versions.
