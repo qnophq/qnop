@@ -24,7 +24,7 @@ jakartaAnnotation = "3.0.0"
 # Auth rate limiting (issue #18, ADR-0027). bucket4j is not in the Spring Boot BOM,
 # so it carries an explicit version; caffeine IS BOM-managed (declared below
 # without a version). bucket4j_jdk17-core targets JDK 17+ (we run JDK 21).
-bucket4j = "8.18.0"
+bucket4j = "8.19.0"
 # Distributed scheduler locks (issue #52, ADR-0029). ShedLock 7.x is the line
 # tested against Spring 7.0 / Spring Boot 4.x and requires JVM 17+ (we run 21).
 shedlock = "7.0.0"
