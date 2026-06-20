@@ -7,11 +7,36 @@
 // Hosts the architecture-conformance tests. This module carries the Spring Boot
 // plugin and is the bootable server (Phase 1, ADR-0020).
 
+import org.springframework.boot.gradle.tasks.run.BootRun
+
 plugins {
     id("qnop.java-conventions")
     // Version comes from the root `plugins {}` block (declared there `apply false`
     // to keep a single shared plugin classloader — see the root build script).
     id("org.springframework.boot")
+}
+
+// Local-dev convenience (issue #110): load the repo-root `.env` into bootRun's
+// forked JVM so `./gradlew :qnop-app:bootRun` starts without `set -a; source .env`
+// first — matching how docker-compose already consumes the same file. Spring does
+// not read `.env` itself. Shell-exported variables win (we only fill keys absent
+// from the process environment), a missing `.env` is a no-op, and this never
+// affects tests or CI (they supply real environment / Testcontainers secrets).
+tasks.named<BootRun>("bootRun") {
+    val dotenv = rootProject.layout.projectDirectory.file(".env").asFile
+    if (dotenv.exists()) {
+        dotenv.readLines().forEach { rawLine ->
+            val line = rawLine.trim().removePrefix("export ").trim()
+            if (line.isEmpty() || line.startsWith("#")) return@forEach
+            val separator = line.indexOf('=')
+            if (separator <= 0) return@forEach
+            val key = line.substring(0, separator).trim()
+            val value = line.substring(separator + 1).trim().trim('"', '\'')
+            if (System.getenv(key) == null) {
+                environment(key, value)
+            }
+        }
+    }
 }
 
 dependencies {
