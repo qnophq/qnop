@@ -23,13 +23,34 @@ import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 import CssBaseline from '@mui/material/CssBaseline';
 import { ThemeProvider } from '@mui/material/styles';
+import { QueryClientProvider } from '@tanstack/react-query';
+import { RouterProvider } from 'react-router-dom';
 import '@fontsource/inter/400.css';
 import '@fontsource/inter/500.css';
 import '@fontsource/inter/600.css';
 import '@fontsource/inter/700.css';
 import './index.css';
-import { theme } from './theme/theme';
-import { App } from './App';
+import { queryClient } from './api/queryClient';
+import { AuthHydrationBoundary } from './components/auth/AuthHydrationBoundary';
+import { router } from './router';
+import { buildTheme } from './theme/theme';
+import { useUiStore } from './stores/uiStore';
+
+function Root() {
+  const themeMode = useUiStore((s) => s.themeMode);
+  const theme = buildTheme(themeMode);
+
+  return (
+    <QueryClientProvider client={queryClient}>
+      <ThemeProvider theme={theme}>
+        <CssBaseline />
+        <AuthHydrationBoundary>
+          <RouterProvider router={router} />
+        </AuthHydrationBoundary>
+      </ThemeProvider>
+    </QueryClientProvider>
+  );
+}
 
 const rootElement = document.getElementById('root');
 if (!rootElement) {
@@ -38,9 +59,6 @@ if (!rootElement) {
 
 createRoot(rootElement).render(
   <StrictMode>
-    <ThemeProvider theme={theme}>
-      <CssBaseline />
-      <App />
-    </ThemeProvider>
+    <Root />
   </StrictMode>,
 );

@@ -10,7 +10,14 @@ lerna-debug.log*
 node_modules
 dist
 dist-ssr
+coverage
 *.local
+
+# Generated API client (typescript-axios) — produced by `pnpm generate:api`
+# from ../qnop-api/.../openapi.yaml on dev/build; never committed.
+src/api/generated
+# openapi-generator-cli runtime cache
+.openapi-generator-cli
 
 # Editor directories and files
 .vscode/*

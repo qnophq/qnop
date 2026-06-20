@@ -19,30 +19,41 @@
  * SPDX-License-Identifier: AGPL-3.0-only
  */
 
-import { createTheme } from '@mui/material/styles';
+import { createTheme, type Theme } from '@mui/material/styles';
+import type { PaletteMode } from '@mui/material';
+import { tokens } from './tokens';
 
 /**
- * Deliberate, restrained palette for an enterprise review tool: a deep indigo
- * primary against neutral paper surfaces, with a burnt accent reserved for
- * semantic emphasis (open annotations, required action). Not the MUI default.
+ * Builds the MUI theme for the given mode. This is the minimal foundation
+ * theme (#100): brand primary + light/dark surfaces and a few sensible
+ * defaults. The full devtank42 system (Sklow font, the complete type scale,
+ * component overrides) is layered on in #101.
  */
-export const theme = createTheme({
-  palette: {
-    mode: 'light',
-    primary: { main: '#34386b' },
-    secondary: { main: '#c2410c' },
-    background: { default: '#f3f4f8', paper: '#ffffff' },
-    text: { primary: '#1c1d29', secondary: '#5b5d72' },
-  },
-  typography: {
-    fontFamily: '"Inter", system-ui, -apple-system, "Segoe UI", sans-serif',
-    h1: {
-      fontSize: 'clamp(2rem, 1.4rem + 2.5vw, 3.25rem)',
-      fontWeight: 700,
-      letterSpacing: '-0.025em',
+export function buildTheme(mode: PaletteMode): Theme {
+  const isDark = mode === 'dark';
+  return createTheme({
+    palette: {
+      mode,
+      primary: { main: tokens.color.blue, dark: tokens.color.bluePress },
+      secondary: { main: tokens.color.navy },
+      success: { main: tokens.color.success },
+      warning: { main: tokens.color.warning },
+      error: { main: tokens.color.danger },
+      background: {
+        default: isDark ? tokens.color.navy : tokens.color.offWhite,
+        paper: isDark ? tokens.color.navy700 : tokens.color.white,
+      },
+      text: {
+        primary: isDark ? tokens.color.white : tokens.color.navy,
+        secondary: isDark ? '#B9C6D4' : tokens.color.gray600,
+      },
     },
-    h6: { fontWeight: 600, letterSpacing: '-0.01em' },
-    button: { textTransform: 'none', fontWeight: 600 },
-  },
-  shape: { borderRadius: 10 },
-});
+    typography: {
+      fontFamily: '"Inter", system-ui, -apple-system, "Segoe UI", sans-serif',
+      h1: { fontWeight: 700, letterSpacing: '-0.025em' },
+      h6: { fontWeight: 600, letterSpacing: '-0.01em' },
+      button: { textTransform: 'none', fontWeight: 600 },
+    },
+    shape: { borderRadius: tokens.radius.md },
+  });
+}

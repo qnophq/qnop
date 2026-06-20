@@ -1,0 +1,28 @@
+{
+  "$schema": "node_modules/@openapitools/openapi-generator-cli/schema/openapitools.schema.json",
+  "spaces": 2,
+  "generator-cli": {
+    "version": "7.12.0",
+    "generators": {
+      "qnop-api": {
+        "generatorName": "typescript-axios",
+        "inputSpec": "../qnop-api/src/main/resources/openapi/openapi.yaml",
+        "output": "src/api/generated",
+        "additionalProperties": {
+          "supportsES6": true,
+          "withSeparateModelsAndApi": true,
+          "modelPackage": "model",
+          "apiPackage": "api",
+          "npmName": "qnop-api-client",
+          "typescriptThreePlus": true,
+          "withNodeImports": false,
+          "useSingleRequestParameter": false
+        },
+        "globalProperty": {
+          "modelDocs": false,
+          "apiDocs": false
+        }
+      }
+    }
+  }
+}

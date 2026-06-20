@@ -29,7 +29,7 @@ jobs:
       - run: ./gradlew build --stacktrace
 
   qnop-ui:
-    name: Frontend (lint + format + build)
+    name: Frontend (lint + format + test + build)
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -45,9 +45,19 @@ jobs:
           node-version: '24'
           cache: pnpm
           cache-dependency-path: qnop-ui/pnpm-lock.yaml
+      # The typescript-axios client is generated from the backend openapi.yaml
+      # by openapi-generator-cli, which runs the generator JAR — hence a JDK.
+      - uses: actions/setup-java@ad2b38190b15e4d6bdf0c97fb4fca8412226d287 # v5
+        with:
+          distribution: temurin
+          java-version: '21'
       - run: pnpm install --frozen-lockfile
+      # Generate the API client up front so lint/test/build see it (build also
+      # regenerates it via its own script; this keeps test:run self-sufficient).
+      - run: pnpm generate:api
       - run: pnpm format:check
       - run: pnpm lint
+      - run: pnpm test:run
       - run: pnpm build
 
   license-headers:
