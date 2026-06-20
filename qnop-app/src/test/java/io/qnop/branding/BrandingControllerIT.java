@@ -83,7 +83,7 @@ class BrandingControllerIT extends AbstractIntegrationTest {
   private JwtRequestPostProcessor superadmin() {
     return jwt()
         .jwt(j -> j.subject(userId.toString()))
-        .authorities(new SimpleGrantedAuthority("ROLE_SUPERADMIN"));
+        .authorities(new SimpleGrantedAuthority("ROLE_ADMIN"));
   }
 
   private MockMultipartFile logo() {

@@ -21,6 +21,7 @@
 package io.qnop.service.auth;
 
 import io.qnop.entity.User;
+import io.qnop.entity.UserRole;
 import io.qnop.service.ApplicationSettingKey;
 import io.qnop.service.ApplicationSettingsService;
 import io.qnop.service.UserService;
@@ -65,9 +66,26 @@ public class RegistrationService {
     if (userService.internalUserExists(username, email)) {
       return;
     }
-    User user = userService.createSelfRegistered(username, email, password, displayName);
+    User user =
+        userService.createSelfRegistered(username, email, password, displayName, defaultRole());
     String rawToken = verificationTokens.issue(user).rawToken();
     sendVerificationEmail(user, rawToken);
+  }
+
+  /**
+   * The configured global role for self-registered accounts. Defensively falls back to {@link
+   * UserRole#MEMBER} for any unknown value and never lets self-registration mint an {@code ADMIN}.
+   */
+  private UserRole defaultRole() {
+    String configured =
+        settings.getString(ApplicationSettingKey.AUTH_SELF_REGISTRATION_DEFAULT_ROLE);
+    UserRole role;
+    try {
+      role = UserRole.valueOf(configured);
+    } catch (IllegalArgumentException | NullPointerException e) {
+      role = UserRole.MEMBER;
+    }
+    return role == UserRole.ADMIN ? UserRole.MEMBER : role;
   }
 
   /** Consumes a verification token and activates the account. Throws on an invalid token. */

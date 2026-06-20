@@ -34,8 +34,7 @@ import org.hibernate.annotations.UpdateTimestamp;
 
 /**
  * A global, typed application setting keyed by {@code setting_key} (the natural primary key). The
- * runtime settings service (issue #16) reads and writes these; superadmins edit them via the admin
- * API.
+ * runtime settings service (issue #16) reads and writes these; admins edit them via the admin API.
  *
  * <p>There is intentionally no {@code created_at} (matches the reference model). {@code updatedBy}
  * is a nullable raw UUID reference to the editing {@link User}; the Postgres {@code ON DELETE SET

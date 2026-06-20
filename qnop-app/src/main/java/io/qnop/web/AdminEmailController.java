@@ -49,11 +49,11 @@ import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.server.ResponseStatusException;
 
 /**
- * Superadmin mail administration endpoints ({@code /api/v1/admin/email/**}), implementing the
- * generated {@link AdminEmailApi} contract (issue #19). Authorization is enforced by the security
- * chain ({@code /api/v1/admin/**} requires {@code SUPERADMIN}, issue #17); these handlers assume an
- * authenticated superadmin. Template render failures map to 400 and unknown keys to 404; a failed
- * SMTP delivery is reported in the body (never a 5xx) because {@link MailService} never throws.
+ * Admin mail administration endpoints ({@code /api/v1/admin/email/**}), implementing the generated
+ * {@link AdminEmailApi} contract (issue #19). Authorization is enforced by the security chain
+ * ({@code /api/v1/admin/**} requires {@code ADMIN}, issue #98); these handlers assume an
+ * authenticated admin. Template render failures map to 400 and unknown keys to 404; a failed SMTP
+ * delivery is reported in the body (never a 5xx) because {@link MailService} never throws.
  */
 @RestController
 public class AdminEmailController implements AdminEmailApi {
@@ -147,7 +147,7 @@ public class AdminEmailController implements AdminEmailApi {
     return variables == null ? Map.of() : new HashMap<>(variables);
   }
 
-  /** The authenticated superadmin's id (the JWT subject), or null if not parseable. */
+  /** The authenticated admin's id (the JWT subject), or null if not parseable. */
   private UUID currentActor() {
     Authentication auth = SecurityContextHolder.getContext().getAuthentication();
     if (auth == null) {

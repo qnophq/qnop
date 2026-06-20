@@ -136,10 +136,15 @@ public class SecurityConfiguration {
                     .requestMatchers(HttpMethod.GET, "/api/v1/branding/**")
                     .permitAll()
                     .requestMatchers("/api/v1/admin/**")
-                    .hasRole("SUPERADMIN")
+                    .hasRole("ADMIN")
                     .anyRequest()
                     .authenticated())
-        .oauth2ResourceServer(oauth2 -> oauth2.jwt(jwt -> jwt.decoder(jwtDecoder)))
+        .oauth2ResourceServer(
+            oauth2 ->
+                oauth2.jwt(
+                    jwt ->
+                        jwt.decoder(jwtDecoder)
+                            .jwtAuthenticationConverter(new RoleJwtAuthenticationConverter())))
         .httpBasic(httpBasic -> httpBasic.disable())
         .formLogin(formLogin -> formLogin.disable())
         .exceptionHandling(

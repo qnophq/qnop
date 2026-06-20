@@ -41,10 +41,12 @@ databaseChangeLog:
                   type: BOOLEAN
                   defaultValueBoolean: false
                   constraints: { nullable: false }
+              # Global system role (issue #98): exactly one per user. ADMIN replaces the
+              # former is_superadmin flag; allowed values pinned by a CHECK below.
               - column:
-                  name: is_superadmin
-                  type: BOOLEAN
-                  defaultValueBoolean: false
+                  name: role
+                  type: VARCHAR(16)
+                  defaultValue: "MEMBER"
                   constraints: { nullable: false }
               - column: { name: password_invalidated_before, type: TIMESTAMP WITH TIME ZONE }
               - column: { name: last_login_at, type: TIMESTAMP WITH TIME ZONE }
@@ -73,6 +75,8 @@ databaseChangeLog:
                   (source = 'INTERNAL' AND username IS NOT NULL AND password_hash IS NOT NULL)
                   OR (source = 'EXTERNAL' AND username IS NULL AND password_hash IS NULL)
                 );
+              ALTER TABLE qnop_user ADD CONSTRAINT ck_qnop_user_role
+                CHECK (role IN ('ADMIN', 'MEMBER', 'AUDITOR'));
               CREATE UNIQUE INDEX ux_qnop_user_email_internal
                 ON qnop_user (LOWER(email)) WHERE source = 'INTERNAL';
               CREATE UNIQUE INDEX ux_qnop_user_username_internal

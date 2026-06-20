@@ -8,7 +8,7 @@ databaseChangeLog:
   - changeSet:
       id: 0002-settings-application-setting
       author: qnop
-      comment: Global, typed key/value application settings edited by superadmins (issue #16).
+      comment: Global, typed key/value application settings edited by admins (issue #16).
       changes:
         - createTable:
             tableName: application_setting
@@ -195,9 +195,9 @@ databaseChangeLog:
             tableName: application_setting
             columns:
               - column: { name: setting_key, value: "auth.self_registration_default_role" }
-              - column: { name: setting_value, value: "USER" }
-              - column: { name: setting_desc, value: "Role assigned to self-registered users." }
-              - column: { name: value_type, value: "STRING" }
+              - column: { name: setting_value, value: "MEMBER" }
+              - column: { name: setting_desc, value: "Global role assigned to self-registered users (ADMIN is intentionally not selectable)." }
+              - column: { name: value_type, value: "ENUM" }
         - insert:
             tableName: application_setting
             columns:

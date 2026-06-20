@@ -47,9 +47,9 @@ import org.springframework.web.server.ResponseStatusException;
  * Superadmin management of DB-configured OIDC/OAuth2 providers ({@code
  * /api/v1/admin/oidc-providers/**}), implementing the generated {@link AdminOidcProvidersApi}
  * (issue #21, PR A). Authorization is enforced by the security chain ({@code /api/v1/admin/**}
- * requires {@code SUPERADMIN}). The {@code OidcProvider} entity never reaches this layer — the
- * service returns {@link OidcProviderView}s (with the client secret elided), which are mapped here
- * to API DTOs (ADR-0004). SSRF/validation failures surface as 400, unknown providers as 404.
+ * requires {@code ADMIN}). The {@code OidcProvider} entity never reaches this layer — the service
+ * returns {@link OidcProviderView}s (with the client secret elided), which are mapped here to API
+ * DTOs (ADR-0004). SSRF/validation failures surface as 400, unknown providers as 404.
  */
 @RestController
 public class OidcProviderController implements AdminOidcProvidersApi {

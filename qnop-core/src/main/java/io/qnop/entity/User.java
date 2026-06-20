@@ -74,8 +74,9 @@ public class User {
   @Column(name = "password_change_required", nullable = false)
   private boolean passwordChangeRequired = false;
 
-  @Column(name = "is_superadmin", nullable = false)
-  private boolean superadmin = false;
+  @Enumerated(EnumType.STRING)
+  @Column(name = "role", nullable = false, length = 16)
+  private UserRole role = UserRole.MEMBER;
 
   @Column(name = "password_invalidated_before")
   private Instant passwordInvalidatedBefore;
@@ -190,12 +191,12 @@ public class User {
     this.passwordChangeRequired = passwordChangeRequired;
   }
 
-  public boolean isSuperadmin() {
-    return superadmin;
+  public UserRole getRole() {
+    return role;
   }
 
-  public void setSuperadmin(boolean superadmin) {
-    this.superadmin = superadmin;
+  public void setRole(UserRole role) {
+    this.role = role;
   }
 
   public Instant getPasswordInvalidatedBefore() {
