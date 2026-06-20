@@ -28,6 +28,8 @@ import io.qnop.api.v1.model.ServerConfigGeneral;
 import io.qnop.api.v1.model.ServerConfigResponse;
 import io.qnop.api.v1.model.ServerConfigUpload;
 import io.qnop.api.v1.model.SupportedFormat;
+import io.qnop.service.ApplicationSettingKey;
+import io.qnop.service.ApplicationSettingsService;
 import io.qnop.service.oidc.OidcProviderService;
 import io.qnop.service.oidc.OidcProviderView;
 import java.util.List;
@@ -39,11 +41,11 @@ import org.springframework.web.bind.annotation.RestController;
  * Public server configuration endpoint ({@code GET /api/v1/config}), implementing the generated
  * {@link ServerConfigApi} contract (ADR-0015, ADR-0021).
  *
- * <p><strong>Placeholder values (issue #9).</strong> This endpoint proves the OpenAPI-first
+ * <p><strong>Partly placeholder (issue #9/#99).</strong> This endpoint proves the OpenAPI-first
  * toolchain end-to-end: a hand-written {@code @RestController} implements a generated interface and
- * returns a generated DTO. The values are static for now; later issues wire the real sources —
- * {@code edition} from the {@code EditionResolver} SPI (ADR-0012), {@code general}/{@code upload}
- * from application settings (#16), and {@code auth.oidcProviders} from the OIDC registry (#21).
+ * returns a generated DTO. {@code auth.oidcProviders} comes from the OIDC registry (#21) and {@code
+ * auth.selfRegistrationEnabled} from application settings (#99); {@code edition} ({@code
+ * EditionResolver} SPI, ADR-0012) and {@code general}/{@code upload} (#16) are still static.
  */
 @RestController
 public class ConfigController implements ServerConfigApi {
@@ -55,9 +57,11 @@ public class ConfigController implements ServerConfigApi {
   private static final String UNKNOWN_VERSION = "unknown";
 
   private final OidcProviderService oidcProviders;
+  private final ApplicationSettingsService settings;
 
-  public ConfigController(OidcProviderService oidcProviders) {
+  public ConfigController(OidcProviderService oidcProviders, ApplicationSettingsService settings) {
     this.oidcProviders = oidcProviders;
+    this.settings = settings;
   }
 
   @Override
@@ -70,7 +74,8 @@ public class ConfigController implements ServerConfigApi {
             .auth(
                 new ServerConfigAuth()
                     .oidcProviders(enabledOidcProviders())
-                    .selfRegistrationEnabled(false))
+                    .selfRegistrationEnabled(
+                        settings.getBoolean(ApplicationSettingKey.AUTH_SELF_REGISTRATION_ENABLED)))
             .upload(new ServerConfigUpload().maxDocumentSizeMb(DEFAULT_MAX_DOCUMENT_SIZE_MB))
             .supportedFormats(
                 List.of(SupportedFormat.PDF, SupportedFormat.DOCX, SupportedFormat.MD));

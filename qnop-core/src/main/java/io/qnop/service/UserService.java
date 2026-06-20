@@ -81,6 +81,29 @@ public class UserService {
     return users.findById(id);
   }
 
+  /**
+   * The current user's profile for {@code GET /users/me}. Returns a Spring-free, entity-free view
+   * (role and source as their enum names) so the web layer never touches a JPA entity (ADR-0004).
+   */
+  @Transactional(readOnly = true)
+  public UserProfileView getProfile(UUID id) {
+    return users
+        .findById(id)
+        .map(
+            u ->
+                new UserProfileView(
+                    u.getId(),
+                    u.getDisplayName(),
+                    u.getEmail(),
+                    u.getRole().name(),
+                    u.getSource().name()))
+        .orElseThrow(() -> new UserNotFoundException(id));
+  }
+
+  /** A read-only projection of a user's profile (no entity types cross the service boundary). */
+  public record UserProfileView(
+      UUID id, String displayName, String email, String role, String source) {}
+
   /** Activates a user after successful email verification. */
   @Transactional
   public User enable(UUID id) {

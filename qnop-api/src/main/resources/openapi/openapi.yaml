@@ -38,6 +38,10 @@ tags:
   - name: UserSettings
     description: |
       The authenticated user's own per-user settings (issue #22).
+  - name: Users
+    description: |
+      The authenticated user's own profile — identity, global role and account
+      source — used by the SPA to render the shell and gate role-based UI (#99).
 paths:
   /config:
     get:
@@ -853,6 +857,30 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
+  /users/me:
+    get:
+      tags:
+        - Users
+      summary: Get the current user's profile
+      description: |
+        Returns the authenticated user's identity, global role and account source.
+        The SPA calls this right after login to render the shell and gate
+        role-based UI. Requires a user (JWT) principal; non-user principals are
+        rejected with 403.
+      operationId: getCurrentUser
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: The current user's profile
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CurrentUserResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
   /users/me/settings:
     get:
       tags:
@@ -1356,6 +1384,48 @@ components:
           description: Map of setting key to new value.
       required:
         - values
+    UserRole:
+      type: string
+      description: |
+        A user's global system role — exactly one per user (issue #98). `ADMIN`
+        administers the system; `MEMBER` is the standard user; `AUDITOR` has
+        organisation-wide read access to the audit trail and compliance.
+      enum:
+        - ADMIN
+        - MEMBER
+        - AUDITOR
+    UserSource:
+      type: string
+      description: |
+        How the account authenticates: `INTERNAL` (local username + password) or
+        `EXTERNAL` (provisioned from an OIDC/OAuth2 provider).
+      enum:
+        - INTERNAL
+        - EXTERNAL
+    CurrentUserResponse:
+      type: object
+      description: The authenticated user's own profile.
+      properties:
+        id:
+          type: string
+          format: uuid
+          description: The user's stable id.
+        displayName:
+          type: string
+          description: Human-readable name shown in the UI.
+        email:
+          type: string
+          description: The user's email address.
+        role:
+          $ref: '#/components/schemas/UserRole'
+        source:
+          $ref: '#/components/schemas/UserSource'
+      required:
+        - id
+        - displayName
+        - email
+        - role
+        - source
     RegisterRequest:
       type: object
       description: Self-registration details for a new local account.
