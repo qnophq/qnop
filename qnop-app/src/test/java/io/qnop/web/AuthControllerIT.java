@@ -191,6 +191,25 @@ class AuthControllerIT extends AbstractIntegrationTest {
         .andExpect(status().isForbidden());
   }
 
+  @Test
+  void currentUserReturnsProfileForRealToken() throws Exception {
+    createUser("ivan", UserRole.AUDITOR);
+    String accessToken = loginAccessToken("ivan");
+
+    mockMvc
+        .perform(get("/api/v1/users/me").header("Authorization", "Bearer " + accessToken))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.displayName").value("ivan"))
+        .andExpect(jsonPath("$.email").value("ivan@example.com"))
+        .andExpect(jsonPath("$.role").value("AUDITOR"))
+        .andExpect(jsonPath("$.source").value("INTERNAL"));
+  }
+
+  @Test
+  void currentUserUnauthorizedForAnonymous() throws Exception {
+    mockMvc.perform(get("/api/v1/users/me")).andExpect(status().isUnauthorized());
+  }
+
   private User createUser(String username) {
     return createUser(username, UserRole.MEMBER);
   }

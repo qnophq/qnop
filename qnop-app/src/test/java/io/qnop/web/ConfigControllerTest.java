@@ -25,6 +25,8 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import io.qnop.service.ApplicationSettingKey;
+import io.qnop.service.ApplicationSettingsService;
 import io.qnop.service.oidc.OidcProviderService;
 import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
@@ -52,11 +54,14 @@ class ConfigControllerTest {
   @Autowired private MockMvc mockMvc;
 
   @MockitoBean private OidcProviderService oidcProviders;
+  @MockitoBean private ApplicationSettingsService settings;
 
   @BeforeEach
   void setUp() {
     // No providers configured: auth.oidcProviders should serialize as an empty list.
     when(oidcProviders.findAll()).thenReturn(List.of());
+    when(settings.getBoolean(ApplicationSettingKey.AUTH_SELF_REGISTRATION_ENABLED))
+        .thenReturn(false);
   }
 
   @Test
@@ -73,6 +78,18 @@ class ConfigControllerTest {
         .andExpect(jsonPath("$.auth.oidcProviders").isEmpty())
         .andExpect(jsonPath("$.upload.maxDocumentSizeMb").value(50))
         .andExpect(jsonPath("$.supportedFormats[0]").value("PDF"));
+  }
+
+  @Test
+  @DisplayName("selfRegistrationEnabled reflects the application setting")
+  void getConfig_reflectsSelfRegistrationSetting() throws Exception {
+    when(settings.getBoolean(ApplicationSettingKey.AUTH_SELF_REGISTRATION_ENABLED))
+        .thenReturn(true);
+
+    mockMvc
+        .perform(get("/api/v1/config"))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.auth.selfRegistrationEnabled").value(true));
   }
 
   @Test
