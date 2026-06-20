@@ -6,7 +6,8 @@ import tseslint from 'typescript-eslint';
 import { defineConfig, globalIgnores } from 'eslint/config';
 
 export default defineConfig([
-  globalIgnores(['dist']),
+  // dist: build output. src/api/generated: typescript-axios output (not source).
+  globalIgnores(['dist', 'src/api/generated']),
   {
     files: ['**/*.{ts,tsx}'],
     extends: [
@@ -17,6 +18,32 @@ export default defineConfig([
     ],
     languageOptions: {
       globals: globals.browser,
+    },
+    rules: {
+      '@typescript-eslint/no-unused-vars': [
+        'error',
+        {
+          argsIgnorePattern: '^_',
+          varsIgnorePattern: '^_',
+          caughtErrorsIgnorePattern: '^_',
+          ignoreRestSiblings: true,
+        },
+      ],
+    },
+  },
+  {
+    // These modules legitimately export non-components alongside components
+    // (router config, Zustand stores, theme helpers, tests), so the
+    // Fast-Refresh-only rule does not apply.
+    files: [
+      'src/main.tsx',
+      'src/router/**/*.{ts,tsx}',
+      'src/stores/**/*.{ts,tsx}',
+      'src/theme/**/*.{ts,tsx}',
+      '**/*.test.{ts,tsx}',
+    ],
+    rules: {
+      'react-refresh/only-export-components': 'off',
     },
   },
 ]);

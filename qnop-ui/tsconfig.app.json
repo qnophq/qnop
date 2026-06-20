@@ -2,9 +2,11 @@
   "compilerOptions": {
     "tsBuildInfoFile": "./node_modules/.tmp/tsconfig.app.tsbuildinfo",
     "target": "es2023",
-    "lib": ["ES2023", "DOM"],
+    "lib": ["ES2023", "DOM", "DOM.Iterable"],
     "module": "esnext",
-    "types": ["vite/client"],
+    // `node` is needed only so tsc resolves the generated client's
+    // `import { URL } from 'url'`; at runtime a Vite alias maps it to a shim.
+    "types": ["vite/client", "node"],
     "skipLibCheck": true,
 
     /* Bundler mode */
@@ -15,10 +17,14 @@
     "noEmit": true,
     "jsx": "react-jsx",
 
-    /* Linting */
-    "noUnusedLocals": true,
-    "noUnusedParameters": true,
-    "erasableSyntaxOnly": true,
+    /* Path alias (mirrors the Vite resolve.alias) */
+    "paths": {
+      "@/*": ["./src/*"]
+    },
+
+    /* Linting — unused-symbol detection is delegated to ESLint
+       (@typescript-eslint/no-unused-vars), which ignores the generated client;
+       tsc must tolerate the generator's unused cookie params. */
     "noFallthroughCasesInSwitch": true
   },
   "include": ["src"]

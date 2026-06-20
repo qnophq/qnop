@@ -6,3 +6,6 @@ pnpm-lock.yaml
 
 # Build output
 dist
+
+# Generated API client (typescript-axios) — not source.
+src/api/generated

@@ -1,0 +1,6 @@
+# pnpm 11 reads settings from here (the package.json `pnpm` field is no longer
+# read). Allow the OpenAPI generator's install script to run so `generate:api`
+# can fetch and invoke the generator JAR; without this pnpm blocks the build
+# script and the generator's preflight `pnpm install` fails.
+allowBuilds:
+  '@openapitools/openapi-generator-cli': true
