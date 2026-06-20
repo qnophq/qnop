@@ -30,6 +30,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import io.qnop.entity.User;
+import io.qnop.entity.UserRole;
 import io.qnop.service.ApplicationSettingKey;
 import io.qnop.service.ApplicationSettingsService;
 import io.qnop.service.UserService;
@@ -71,17 +72,21 @@ class RegistrationServiceTest {
 
     service.register("jane", "jane@example.com", "password1", "Jane");
 
-    verify(userService, never()).createSelfRegistered(any(), any(), any(), any());
+    verify(userService, never()).createSelfRegistered(any(), any(), any(), any(), any());
     verify(verificationTokens, never()).issue(any());
     verify(mailService, never()).sendMailFromTemplate(any(), any(), anyMap(), any());
   }
 
   @Test
-  @DisplayName("a new account is created, a token issued, and a verification email sent")
+  @DisplayName(
+      "a new account is created with the configured default role, token issued, email sent")
   void newAccountIsRegistered() {
     User user = User.internal("Jane", "jane@example.com", "jane", "hash");
     when(userService.internalUserExists("jane", "jane@example.com")).thenReturn(false);
-    when(userService.createSelfRegistered("jane", "jane@example.com", "password1", "Jane"))
+    when(settings.getString(ApplicationSettingKey.AUTH_SELF_REGISTRATION_DEFAULT_ROLE))
+        .thenReturn("AUDITOR");
+    when(userService.createSelfRegistered(
+            "jane", "jane@example.com", "password1", "Jane", UserRole.AUDITOR))
         .thenReturn(user);
     when(verificationTokens.issue(user))
         .thenReturn(
@@ -89,6 +94,8 @@ class RegistrationServiceTest {
 
     service.register("jane", "jane@example.com", "password1", "Jane");
 
+    verify(userService)
+        .createSelfRegistered("jane", "jane@example.com", "password1", "Jane", UserRole.AUDITOR);
     verify(verificationTokens).issue(user);
     verify(mailService)
         .sendMailFromTemplate(
@@ -96,6 +103,26 @@ class RegistrationServiceTest {
             eq("jane@example.com"),
             anyMap(),
             isNull());
+  }
+
+  @Test
+  @DisplayName("self-registration never mints an ADMIN, even if the setting says so")
+  void adminDefaultRoleIsDowngradedToMember() {
+    User user = User.internal("Jane", "jane@example.com", "jane", "hash");
+    when(userService.internalUserExists("jane", "jane@example.com")).thenReturn(false);
+    when(settings.getString(ApplicationSettingKey.AUTH_SELF_REGISTRATION_DEFAULT_ROLE))
+        .thenReturn("ADMIN");
+    when(userService.createSelfRegistered(
+            "jane", "jane@example.com", "password1", "Jane", UserRole.MEMBER))
+        .thenReturn(user);
+    when(verificationTokens.issue(user))
+        .thenReturn(
+            new EmailVerificationTokenService.IssuedToken("RAW", Instant.now().plusSeconds(60)));
+
+    service.register("jane", "jane@example.com", "password1", "Jane");
+
+    verify(userService)
+        .createSelfRegistered("jane", "jane@example.com", "password1", "Jane", UserRole.MEMBER);
   }
 
   @Test

@@ -20,6 +20,8 @@
  */
 package io.qnop.service;
 
+import io.qnop.entity.User;
+import io.qnop.entity.UserRole;
 import io.qnop.security.QnopProperties;
 import java.time.Instant;
 import java.util.UUID;
@@ -33,22 +35,37 @@ import org.springframework.stereotype.Service;
 /**
  * Issues short-lived HS256 access tokens (issue #17). The subject is the {@code qnop_user.id} UUID;
  * every token carries a unique {@code jti} so it can be individually revoked (see {@code
- * TokenRevocationService}). TTL and issuer come from {@code qnop.auth} (default 15m / {@code
- * qnop}).
+ * TokenRevocationService}) and the user's global {@link UserRole} as a {@value #ROLE_CLAIM} claim,
+ * which the resource-server filter maps to a {@code ROLE_*} authority (issue #98). The role is
+ * resolved at mint time — on both login and refresh — so a role change takes effect on the next
+ * token. TTL and issuer come from {@code qnop.auth} (default 15m / {@code qnop}).
  */
 @Service
 public class JwtTokenService {
 
+  /**
+   * Claim carrying the user's global role; mapped to {@code ROLE_<value>} by the resource server.
+   */
+  public static final String ROLE_CLAIM = "role";
+
   private final JwtEncoder jwtEncoder;
   private final QnopProperties properties;
+  private final UserService userService;
 
-  public JwtTokenService(JwtEncoder jwtEncoder, QnopProperties properties) {
+  public JwtTokenService(
+      JwtEncoder jwtEncoder, QnopProperties properties, UserService userService) {
     this.jwtEncoder = jwtEncoder;
     this.properties = properties;
+    this.userService = userService;
   }
 
-  /** Mints a signed access token for the given user id. */
+  /** Mints a signed access token for the given user id, embedding the user's current role. */
   public String issueAccessToken(UUID userId) {
+    UserRole role =
+        userService
+            .findById(userId)
+            .map(User::getRole)
+            .orElseThrow(() -> new UserNotFoundException(userId));
     QnopProperties.Auth auth = properties.auth();
     Instant now = Instant.now();
     JwtClaimsSet claims =
@@ -58,6 +75,7 @@ public class JwtTokenService {
             .issuedAt(now)
             .expiresAt(now.plus(auth.accessTokenTtl()))
             .subject(userId.toString())
+            .claim(ROLE_CLAIM, role.name())
             .build();
     JwsHeader header = JwsHeader.with(MacAlgorithm.HS256).build();
     return jwtEncoder.encode(JwtEncoderParameters.from(header, claims)).getTokenValue();

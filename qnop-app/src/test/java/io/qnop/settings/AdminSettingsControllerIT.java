@@ -43,8 +43,8 @@ import org.springframework.web.context.WebApplicationContext;
 
 /**
  * Verifies the admin settings endpoints (issue #16, ADR-0025) end-to-end through the real security
- * filter chain: the {@code /api/v1/admin/**} namespace requires {@code SUPERADMIN}, the GET returns
- * the (redacted) settings, and PATCH validates and applies updates.
+ * filter chain: the {@code /api/v1/admin/**} namespace requires {@code ADMIN}, the GET returns the
+ * (redacted) settings, and PATCH validates and applies updates.
  *
  * <p>MockMvc is built explicitly with {@code springSecurity()} so {@code @WithMockUser} is honored
  * by the filter chain (Spring Boot 4's {@code @AutoConfigureMockMvc} does not apply it on its own
@@ -68,8 +68,8 @@ class AdminSettingsControllerIT extends AbstractIntegrationTest {
   }
 
   @Test
-  @WithMockUser(roles = "SUPERADMIN")
-  void getReturnsSettingsForSuperadmin() throws Exception {
+  @WithMockUser(roles = "ADMIN")
+  void getReturnsSettingsForAdmin() throws Exception {
     mockMvc
         .perform(get("/api/v1/admin/settings"))
         .andExpect(status().isOk())
@@ -78,8 +78,8 @@ class AdminSettingsControllerIT extends AbstractIntegrationTest {
   }
 
   @Test
-  @WithMockUser(roles = "USER")
-  void getForbiddenForNonSuperadmin() throws Exception {
+  @WithMockUser(roles = "MEMBER")
+  void getForbiddenForNonAdmin() throws Exception {
     mockMvc.perform(get("/api/v1/admin/settings")).andExpect(status().isForbidden());
   }
 
@@ -89,7 +89,7 @@ class AdminSettingsControllerIT extends AbstractIntegrationTest {
   }
 
   @Test
-  @WithMockUser(roles = "SUPERADMIN")
+  @WithMockUser(roles = "ADMIN")
   void patchUpdatesSetting() throws Exception {
     mockMvc
         .perform(
@@ -102,7 +102,7 @@ class AdminSettingsControllerIT extends AbstractIntegrationTest {
   }
 
   @Test
-  @WithMockUser(roles = "SUPERADMIN")
+  @WithMockUser(roles = "ADMIN")
   void patchRejectsTypeInvalidValue() throws Exception {
     mockMvc
         .perform(

@@ -21,12 +21,18 @@
 package io.qnop.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
 import com.nimbusds.jose.jwk.source.ImmutableSecret;
+import io.qnop.entity.User;
+import io.qnop.entity.UserRole;
 import io.qnop.security.JwtKeyService;
 import io.qnop.security.QnopProperties;
 import java.time.Duration;
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 import javax.crypto.SecretKey;
 import org.junit.jupiter.api.DisplayName;
@@ -39,9 +45,10 @@ import org.springframework.security.oauth2.jwt.NimbusJwtDecoder;
 import org.springframework.security.oauth2.jwt.NimbusJwtEncoder;
 
 /**
- * Unit test for {@link JwtTokenService} (issue #44): a minted access token must be a valid HS256
- * JWT whose claims match the {@code qnop.auth} configuration. Tokens are decoded with a decoder
- * built from the same HKDF-derived signing key, mirroring {@code JwtConfiguration}.
+ * Unit test for {@link JwtTokenService} (issues #44/#98): a minted access token must be a valid
+ * HS256 JWT whose claims match the {@code qnop.auth} configuration and carry the user's current
+ * global role. Tokens are decoded with a decoder built from the same HKDF-derived signing key,
+ * mirroring {@code JwtConfiguration}.
  */
 class JwtTokenServiceTest {
 
@@ -52,12 +59,21 @@ class JwtTokenServiceTest {
   private final JwtEncoder encoder = new NimbusJwtEncoder(new ImmutableSecret<>(signingKey));
   private final JwtDecoder decoder =
       NimbusJwtDecoder.withSecretKey(signingKey).macAlgorithm(MacAlgorithm.HS256).build();
-  private final JwtTokenService service = new JwtTokenService(encoder, properties());
+  private final UserService userService = mock(UserService.class);
+  private final JwtTokenService service = new JwtTokenService(encoder, properties(), userService);
+
+  private UUID givenUserWithRole(UserRole role) {
+    UUID userId = UUID.randomUUID();
+    User user = User.internal("Test User", "test@example.com", "test", "hash");
+    user.setRole(role);
+    when(userService.findById(userId)).thenReturn(Optional.of(user));
+    return userId;
+  }
 
   @Test
   @DisplayName("issued token is a valid HS256 JWT carrying the expected claims")
   void issuesDecodableHs256TokenWithExpectedClaims() {
-    UUID userId = UUID.randomUUID();
+    UUID userId = givenUserWithRole(UserRole.MEMBER);
 
     Jwt jwt = decoder.decode(service.issueAccessToken(userId));
 
@@ -75,9 +91,29 @@ class JwtTokenServiceTest {
   }
 
   @Test
+  @DisplayName("token carries the user's global role as the 'role' claim")
+  void embedsUserRoleClaim() {
+    UUID userId = givenUserWithRole(UserRole.ADMIN);
+
+    Jwt jwt = decoder.decode(service.issueAccessToken(userId));
+
+    assertThat(jwt.getClaimAsString(JwtTokenService.ROLE_CLAIM)).isEqualTo("ADMIN");
+  }
+
+  @Test
+  @DisplayName("minting fails for an unknown user")
+  void rejectsUnknownUser() {
+    UUID userId = UUID.randomUUID();
+    when(userService.findById(userId)).thenReturn(Optional.empty());
+
+    assertThatThrownBy(() -> service.issueAccessToken(userId))
+        .isInstanceOf(UserNotFoundException.class);
+  }
+
+  @Test
   @DisplayName("each token gets a distinct jti so it can be revoked individually")
   void mintsUniqueJtiPerToken() {
-    UUID userId = UUID.randomUUID();
+    UUID userId = givenUserWithRole(UserRole.MEMBER);
 
     Jwt first = decoder.decode(service.issueAccessToken(userId));
     Jwt second = decoder.decode(service.issueAccessToken(userId));

@@ -33,8 +33,8 @@ import org.springframework.boot.ApplicationRunner;
 import org.springframework.stereotype.Component;
 
 /**
- * Bootstraps the initial superadmin on first startup (issue #20). If no internal user named {@value
- * #ADMIN_USERNAME} exists, this runner creates one ({@code is_superadmin = true}, {@code
+ * Bootstraps the initial admin on first startup (issue #20). If no internal user named {@value
+ * #ADMIN_USERNAME} exists, this runner creates one ({@code role = ADMIN}, {@code
  * password_change_required = true}) and surfaces a one-time credential.
  *
  * <p>The password comes from {@code QNOP_ADMIN_PASSWORD} when set (CI/smoke tests — then no forced
@@ -70,14 +70,14 @@ public class AdminInitializationRunner implements ApplicationRunner {
     String initialPassword = fixedPassword != null ? fixedPassword : generatePassword();
     boolean passwordChangeRequired = fixedPassword == null;
 
-    userService.createSuperadmin(
+    userService.createAdmin(
         ADMIN_USERNAME,
         "Administrator",
         ADMIN_DEFAULT_EMAIL,
         initialPassword,
         passwordChangeRequired);
 
-    log.info("Bootstrapped initial superadmin '{}' (first startup).", ADMIN_USERNAME);
+    log.info("Bootstrapped initial admin '{}' (first startup).", ADMIN_USERNAME);
     if (passwordChangeRequired) {
       surfaceGeneratedPassword(initialPassword);
     }
@@ -85,7 +85,7 @@ public class AdminInitializationRunner implements ApplicationRunner {
 
   private void surfaceGeneratedPassword(String password) {
     System.err.printf(
-        "%n=== qnop initial superadmin ===%nusername: %s%npassword: %s%n"
+        "%n=== qnop initial admin ===%nusername: %s%npassword: %s%n"
             + "Change it on first login. Also written to %s (0600).%n================================%n",
         ADMIN_USERNAME, password, PASSWORD_FILE);
     try {

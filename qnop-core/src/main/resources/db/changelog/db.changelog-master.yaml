@@ -32,3 +32,6 @@ databaseChangeLog:
   - include:
       file: migrations/0007-review-hardening.yaml
       relativeToChangelogFile: true
+  - include:
+      file: migrations/0008-user-roles.yaml
+      relativeToChangelogFile: true

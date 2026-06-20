@@ -40,8 +40,8 @@ import org.springframework.web.multipart.MultipartFile;
 
 /**
  * Branding asset endpoints (issue #23). Admin upload/delete live under {@code
- * /api/v1/admin/branding/**} (superadmin, enforced centrally in the security filter chain); the
- * read path {@code GET /api/v1/branding/{slot}} is public (login page, OG metadata).
+ * /api/v1/admin/branding/**} (admin, enforced centrally in the security filter chain); the read
+ * path {@code GET /api/v1/branding/{slot}} is public (login page, OG metadata).
  *
  * <p>These are deliberately hand-written controllers rather than generated from the OpenAPI JSON
  * contract: they carry multipart uploads and binary responses with ETag/304 caching, which sit

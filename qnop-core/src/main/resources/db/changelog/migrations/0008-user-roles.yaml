@@ -1,0 +1,43 @@
+# SPDX-License-Identifier: AGPL-3.0-only
+#
+# Global role model (issue #98, epic #97): replace the binary is_superadmin flag
+# on qnop_user with a single role enum (ADMIN/MEMBER/AUDITOR), and re-point the
+# self-registration default-role setting to the new enum. Postgres-only CHECK
+# lives here in Liquibase, NOT in JPA (ADR-0020); JPA runs ddl-auto=none, so the
+# entity mapping must match these definitions exactly.
+databaseChangeLog:
+  - changeSet:
+      id: 0008-qnop-user-role
+      author: qnop
+      comment: Replace qnop_user.is_superadmin with a global role enum.
+      changes:
+        - addColumn:
+            tableName: qnop_user
+            columns:
+              - column:
+                  name: role
+                  type: VARCHAR(16)
+                  defaultValue: "MEMBER"
+                  constraints: { nullable: false }
+        - sql:
+            comment: Backfill superadmins to ADMIN, pin the enum, then drop the old flag.
+            splitStatements: true
+            sql: |
+              UPDATE qnop_user SET role = 'ADMIN' WHERE is_superadmin = true;
+              ALTER TABLE qnop_user ADD CONSTRAINT ck_qnop_user_role
+                CHECK (role IN ('ADMIN', 'MEMBER', 'AUDITOR'));
+        - dropColumn:
+            tableName: qnop_user
+            columnName: is_superadmin
+
+  - changeSet:
+      id: 0008-self-registration-default-role
+      author: qnop
+      comment: Re-point the self-registration default role from the legacy USER value to the new enum.
+      changes:
+        - update:
+            tableName: application_setting
+            columns:
+              - column: { name: setting_value, value: "MEMBER" }
+              - column: { name: value_type, value: "ENUM" }
+            where: setting_key = 'auth.self_registration_default_role'

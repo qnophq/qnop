@@ -29,6 +29,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import io.qnop.bootstrap.AbstractIntegrationTest;
 import io.qnop.entity.User;
+import io.qnop.entity.UserRole;
 import io.qnop.repository.UserRepository;
 import io.qnop.web.security.RefreshTokenCookieFactory;
 import jakarta.servlet.http.Cookie;
@@ -167,10 +168,39 @@ class AuthControllerIT extends AbstractIntegrationTest {
     assertThat(user.getId()).isNotNull();
   }
 
+  @Test
+  void adminTokenReachesAdminEndpoints() throws Exception {
+    // Proves the issue-98 blocker fix end-to-end: a real login mints a token whose role claim is
+    // mapped to ROLE_ADMIN by RoleJwtAuthenticationConverter, so /admin/** is reachable. A
+    // @WithMockUser test cannot prove this — it injects the authority and bypasses the converter.
+    createUser("grace", UserRole.ADMIN);
+    String accessToken = loginAccessToken("grace");
+
+    mockMvc
+        .perform(get("/api/v1/admin/settings").header("Authorization", "Bearer " + accessToken))
+        .andExpect(status().isOk());
+  }
+
+  @Test
+  void memberTokenIsForbiddenFromAdminEndpoints() throws Exception {
+    createUser("heidi", UserRole.MEMBER);
+    String accessToken = loginAccessToken("heidi");
+
+    mockMvc
+        .perform(get("/api/v1/admin/settings").header("Authorization", "Bearer " + accessToken))
+        .andExpect(status().isForbidden());
+  }
+
   private User createUser(String username) {
-    return userRepository.saveAndFlush(
+    return createUser(username, UserRole.MEMBER);
+  }
+
+  private User createUser(String username, UserRole role) {
+    User user =
         User.internal(
-            username, username + "@example.com", username, passwordEncoder.encode(PASSWORD)));
+            username, username + "@example.com", username, passwordEncoder.encode(PASSWORD));
+    user.setRole(role);
+    return userRepository.saveAndFlush(user);
   }
 
   private MockHttpServletRequestBuilder loginRequest(String usernameOrEmail, String password) {

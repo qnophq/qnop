@@ -35,7 +35,7 @@ import java.util.stream.Collectors;
  * <p>This registry is the single source of truth for the global settings; the {@code
  * application_setting} table (issue #13) is its persisted projection. The key set here must stay in
  * sync with the Liquibase seed. Per-user settings have their own registry (issues #22/#24); this
- * enum covers only the global, superadmin-managed ones.
+ * enum covers only the global, admin-managed ones.
  */
 public enum ApplicationSettingKey {
   GENERAL_APPLICATION_NAME(
@@ -87,9 +87,10 @@ public enum ApplicationSettingKey {
       "Whether visitors may register their own local accounts."),
   AUTH_SELF_REGISTRATION_DEFAULT_ROLE(
       "auth.self_registration_default_role",
-      SettingValueType.STRING,
-      "USER",
-      "Role assigned to self-registered users."),
+      SettingValueType.ENUM,
+      "MEMBER",
+      "Global role assigned to self-registered users (ADMIN is intentionally not selectable).",
+      List.of("MEMBER", "AUDITOR")),
   AUTH_PASSWORD_RESET_ENABLED(
       "auth.password_reset_enabled",
       SettingValueType.BOOLEAN,

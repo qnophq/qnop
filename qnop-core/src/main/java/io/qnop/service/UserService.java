@@ -21,6 +21,7 @@
 package io.qnop.service;
 
 import io.qnop.entity.User;
+import io.qnop.entity.UserRole;
 import io.qnop.entity.UserSource;
 import io.qnop.repository.UserRepository;
 import java.time.Instant;
@@ -35,9 +36,9 @@ import org.springframework.transaction.annotation.Transactional;
  * Lifecycle operations for local ({@link UserSource#INTERNAL}) users (issue #20):
  * self-registration, email-verification activation, and password reset. Passwords are BCrypt-hashed
  * (issue #10); emails are normalized (trimmed, lower-cased) to match the case-insensitive
- * uniqueness index (issue #11). qnop has no role model — authorization is the {@code is_superadmin}
- * flag — so a self-registered user is a plain internal account, created disabled until its email is
- * verified.
+ * uniqueness index (issue #11). Every user carries exactly one global {@link UserRole} (issue #98);
+ * a self-registered user is a plain internal account with the configured default role, created
+ * disabled until its email is verified.
  */
 @Service
 public class UserService {
@@ -50,13 +51,14 @@ public class UserService {
     this.passwordEncoder = passwordEncoder;
   }
 
-  /** Creates a disabled internal user pending email verification. */
+  /** Creates a disabled internal user with the given role, pending email verification. */
   @Transactional
   public User createSelfRegistered(
-      String username, String email, String rawPassword, String displayName) {
+      String username, String email, String rawPassword, String displayName, UserRole role) {
     String name = displayName == null || displayName.isBlank() ? username : displayName;
     User user =
         User.internal(name, normalizeEmail(email), username, passwordEncoder.encode(rawPassword));
+    user.setRole(role);
     user.setEnabled(false);
     return users.save(user);
   }
@@ -131,9 +133,9 @@ public class UserService {
     return users.findByUsernameAndSource(username, UserSource.INTERNAL).isPresent();
   }
 
-  /** Creates an enabled internal superadmin (used by the first-start bootstrap, issue #20). */
+  /** Creates an enabled internal {@link UserRole#ADMIN} (used by the first-start bootstrap). */
   @Transactional
-  public User createSuperadmin(
+  public User createAdmin(
       String username,
       String displayName,
       String email,
@@ -142,7 +144,7 @@ public class UserService {
     User admin =
         User.internal(
             displayName, normalizeEmail(email), username, passwordEncoder.encode(rawPassword));
-    admin.setSuperadmin(true);
+    admin.setRole(UserRole.ADMIN);
     admin.setEnabled(true);
     admin.setPasswordChangeRequired(passwordChangeRequired);
     return users.save(admin);

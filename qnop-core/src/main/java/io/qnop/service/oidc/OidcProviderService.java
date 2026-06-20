@@ -34,7 +34,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * Superadmin management of DB-configured OIDC/OAuth2 providers (issue #21, PR A): CRUD plus
+ * Admin management of DB-configured OIDC/OAuth2 providers (issue #21, PR A): CRUD plus
  * issuer-discovery. Client secrets are encrypted at rest by the entity converter (issue #11) and
  * never returned (the {@link OidcProviderView} exposes only {@code hasClientSecret}). Every
  * operator-supplied URI passes the {@link OidcSsrfPolicy} before storage or fetch. The browser
