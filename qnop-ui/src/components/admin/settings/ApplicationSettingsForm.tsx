@@ -49,11 +49,17 @@ const GROUP_LABELS: Record<string, string> = {
 };
 
 /**
- * Allowed values for ENUM settings. The API does not publish the option list, so
- * known enum keys are enumerated here; an unknown ENUM key falls back to a plain
- * text field rather than rendering an empty dropdown.
+ * Curated dropdown options keyed by setting key. The API does not publish option
+ * lists, so known choices are enumerated here. This covers both ENUM settings
+ * and STRING settings with a known, closed value set (e.g. the default language).
+ * An ENUM key without an entry falls back to a plain text field rather than
+ * rendering an empty dropdown.
  */
-const ENUM_OPTIONS: Record<string, { value: string; label: string }[]> = {
+const SELECT_OPTIONS: Record<string, { value: string; label: string }[]> = {
+  'general.default_language': [
+    { value: 'en', label: 'English' },
+    { value: 'de', label: 'Deutsch' },
+  ],
   'tracking.provider': [
     { value: 'none', label: 'None' },
     { value: 'matomo', label: 'Matomo' },
@@ -243,8 +249,10 @@ function SettingField({ setting, value, onChange }: SettingFieldProps) {
     );
   }
 
-  const enumOptions = setting.type === 'ENUM' ? ENUM_OPTIONS[setting.key] : undefined;
-  if (enumOptions) {
+  // A curated option list turns the field into a dropdown, for ENUM settings and
+  // for STRING settings with a known, closed value set (e.g. the default language).
+  const options = SELECT_OPTIONS[setting.key];
+  if (options) {
     return (
       <TextField
         select
@@ -254,7 +262,7 @@ function SettingField({ setting, value, onChange }: SettingFieldProps) {
         helperText={setting.description}
         sx={{ maxWidth: 480 }}
       >
-        {enumOptions.map((option) => (
+        {options.map((option) => (
           <MenuItem key={option.value} value={option.value}>
             {option.label}
           </MenuItem>
