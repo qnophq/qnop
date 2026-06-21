@@ -21,10 +21,13 @@
 package io.qnop.repository;
 
 import io.qnop.entity.User;
+import io.qnop.entity.UserRole;
 import io.qnop.entity.UserSource;
 import java.time.Instant;
 import java.util.Optional;
 import java.util.UUID;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
@@ -38,6 +41,21 @@ public interface UserRepository extends JpaRepository<User, UUID> {
 
   /** Finds an internal user by exact username. */
   Optional<User> findByUsernameAndSource(String username, UserSource source);
+
+  /**
+   * Paginated admin search (issue #104): an optional case-insensitive match on display name, email
+   * or username and an optional role filter. {@code q} must be passed pre-lowercased and {@code
+   * LIKE}-wrapped (e.g. {@code %alice%}); a {@code null} {@code q}/{@code role} disables that
+   * filter.
+   */
+  @Query(
+      "SELECT u FROM User u WHERE (:role IS NULL OR u.role = :role)"
+          + " AND (:q IS NULL OR LOWER(u.displayName) LIKE :q OR LOWER(u.email) LIKE :q"
+          + " OR (u.username IS NOT NULL AND LOWER(u.username) LIKE :q))")
+  Page<User> search(@Param("q") String q, @Param("role") UserRole role, Pageable pageable);
+
+  /** Number of enabled users with the given role — guards the last-admin invariant (issue #104). */
+  long countByRoleAndEnabledTrue(UserRole role);
 
   boolean existsByEmailIgnoreCaseAndSource(String email, UserSource source);
 

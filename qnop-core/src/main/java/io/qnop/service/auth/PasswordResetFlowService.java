@@ -75,6 +75,17 @@ public class PasswordResetFlowService {
     userService.applyPasswordReset(user.getId(), newPassword);
   }
 
+  /**
+   * Admin action (issue #104): issues a reset token for a known internal account and emails the
+   * set-your-password link. Unlike {@link #requestReset}, this is not gated by the self-service
+   * feature flag or anti-enumeration — the admin already knows the account exists and is acting on
+   * it deliberately (e.g. (re)sending an invitation or unblocking a locked-out user).
+   */
+  @Transactional
+  public void sendSetupLink(User user) {
+    sendResetEmail(user);
+  }
+
   private void sendResetEmail(User user) {
     String rawToken = resetTokens.issue(user).rawToken();
     String actionUrl =

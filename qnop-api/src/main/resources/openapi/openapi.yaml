@@ -42,6 +42,13 @@ tags:
     description: |
       The authenticated user's own profile — identity, global role and account
       source — used by the SPA to render the shell and gate role-based UI (#99).
+  - name: AdminUsers
+    description: |
+      Admin-only user management (issue #104): list/search with pagination,
+      create (set an initial password or send an invitation), edit display name,
+      global role and enabled state, and trigger a password-setup/reset link.
+      A self-lockout guard prevents an admin from disabling or demoting their own
+      account or the last remaining admin.
 paths:
   /config:
     get:
@@ -605,6 +612,212 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
+  /admin/users:
+    get:
+      tags:
+        - AdminUsers
+      summary: List and search users
+      description: |
+        Returns a page of users (internal and external), most-recent first.
+        Optional `q` matches display name, email or username (case-insensitive);
+        optional `role` filters by global role.
+      operationId: listUsers
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: q
+          in: query
+          required: false
+          description: Case-insensitive search over display name, email and username.
+          schema:
+            type: string
+            maxLength: 200
+        - name: role
+          in: query
+          required: false
+          description: Filter by global role.
+          schema:
+            $ref: '#/components/schemas/UserRole'
+        - name: page
+          in: query
+          required: false
+          description: Zero-based page index.
+          schema:
+            type: integer
+            format: int32
+            minimum: 0
+            default: 0
+        - name: size
+          in: query
+          required: false
+          description: Page size.
+          schema:
+            type: integer
+            format: int32
+            minimum: 1
+            maximum: 100
+            default: 20
+      responses:
+        '200':
+          description: A page of users
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AdminUserListResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+    post:
+      tags:
+        - AdminUsers
+      summary: Create or invite a user
+      description: |
+        Creates an internal account. If `initialPassword` is provided the account
+        is enabled immediately and must change its password on first login. If it
+        is omitted, the account is created without a password and an invitation
+        link (set-your-password) is emailed to the address.
+      operationId: createUser
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AdminUserCreateRequest'
+      responses:
+        '201':
+          description: The created user
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AdminUserDetail'
+        '400':
+          description: Invalid input
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '409':
+          description: A user with that username or email already exists
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+  /admin/users/{userId}:
+    get:
+      tags:
+        - AdminUsers
+      summary: Get a user
+      operationId: getUser
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/UserIdParam'
+      responses:
+        '200':
+          description: The user
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AdminUserDetail'
+        '404':
+          description: Unknown user
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+    patch:
+      tags:
+        - AdminUsers
+      summary: Update a user
+      description: |
+        Partial update of display name, global role and enabled state. The
+        self-lockout guard rejects (409) an attempt to disable or demote your own
+        account or the last remaining admin.
+      operationId: updateUser
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/UserIdParam'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AdminUserUpdateRequest'
+      responses:
+        '200':
+          description: The updated user
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AdminUserDetail'
+        '400':
+          description: Invalid input
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Unknown user
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '409':
+          description: Self-lockout or last-admin guard violated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+  /admin/users/{userId}/password-reset:
+    post:
+      tags:
+        - AdminUsers
+      summary: Send a password-setup/reset link
+      description: |
+        Issues a password-reset token for the user and emails the set-your-password
+        link. Works for any internal account (e.g. to (re)send an invitation or to
+        help a locked-out user). External (OIDC) accounts have no local password and
+        are rejected with 409.
+      operationId: sendUserPasswordReset
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/UserIdParam'
+      responses:
+        '202':
+          description: The reset email has been queued
+        '404':
+          description: Unknown user
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '409':
+          description: The account has no local password (external/OIDC)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
   /auth/register:
     post:
       tags:
@@ -980,6 +1193,14 @@ components:
       description: The template storage key (e.g. `auth.password_reset`).
       schema:
         type: string
+    UserIdParam:
+      name: userId
+      in: path
+      required: true
+      description: The user's id.
+      schema:
+        type: string
+        format: uuid
   responses:
     Unauthorized:
       description: Authentication is required (uniform error envelope, issue #45).
@@ -1426,6 +1647,119 @@ components:
         - email
         - role
         - source
+    AdminUserSummary:
+      type: object
+      description: A user as shown in the admin user list.
+      properties:
+        id:
+          type: string
+          format: uuid
+        displayName:
+          type: string
+        email:
+          type: string
+        username:
+          type: string
+          nullable: true
+          description: The local username; null for external (OIDC) accounts.
+        role:
+          $ref: '#/components/schemas/UserRole'
+        source:
+          $ref: '#/components/schemas/UserSource'
+        enabled:
+          type: boolean
+        lastLoginAt:
+          type: string
+          format: date-time
+          nullable: true
+        createdAt:
+          type: string
+          format: date-time
+      required:
+        - id
+        - displayName
+        - email
+        - role
+        - source
+        - enabled
+        - createdAt
+    AdminUserDetail:
+      allOf:
+        - $ref: '#/components/schemas/AdminUserSummary'
+      description: Full detail for a single user (currently the same fields as the summary).
+    AdminUserListResponse:
+      type: object
+      description: A page of users for the admin list.
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/AdminUserSummary'
+        total:
+          type: integer
+          format: int64
+          description: Total number of users matching the query.
+        page:
+          type: integer
+          format: int32
+          description: Zero-based page index.
+        size:
+          type: integer
+          format: int32
+          description: Page size.
+      required:
+        - items
+        - total
+        - page
+        - size
+    AdminUserCreateRequest:
+      type: object
+      description: |
+        Create an internal user. Provide `initialPassword` to enable the account
+        immediately (with a forced change on first login), or omit it to send an
+        invitation link instead.
+      properties:
+        displayName:
+          type: string
+          minLength: 1
+          maxLength: 200
+        username:
+          type: string
+          minLength: 3
+          maxLength: 64
+        email:
+          type: string
+          format: email
+          maxLength: 320
+        role:
+          $ref: '#/components/schemas/UserRole'
+        initialPassword:
+          type: string
+          minLength: 8
+          maxLength: 200
+          nullable: true
+          description: Optional. When omitted, an invitation email is sent instead.
+      required:
+        - displayName
+        - username
+        - email
+        - role
+    AdminUserUpdateRequest:
+      type: object
+      description: Partial update; only provided fields change.
+      properties:
+        displayName:
+          type: string
+          minLength: 1
+          maxLength: 200
+          nullable: true
+        role:
+          allOf:
+            - $ref: '#/components/schemas/UserRole'
+          nullable: true
+        enabled:
+          type: boolean
+          nullable: true
     RegisterRequest:
       type: object
       description: Self-registration details for a new local account.
