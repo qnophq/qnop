@@ -1,0 +1,78 @@
+/*
+ * Copyright (c) 2026-present devtank42 GmbH
+ *
+ * This file is part of qnop (Qualified Notes on Papers).
+ *
+ * qnop is free software: you can redistribute it and/or modify it under the
+ * terms of the GNU Affero General Public License as published by the Free
+ * Software Foundation, either version 3 of the License, or (at your option)
+ * any later version.
+ *
+ * qnop is distributed in the hope that it will be useful, but WITHOUT ANY
+ * WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS
+ * FOR A PARTICULAR PURPOSE. See the GNU Affero General Public License for more
+ * details.
+ *
+ * You should have received a copy of the GNU Affero General Public License
+ * along with qnop. If not, see <https://www.gnu.org/licenses/>.
+ *
+ * SPDX-License-Identifier: AGPL-3.0-only
+ */
+
+import { describe, expect, it } from 'vitest';
+import { crumbsFor, visibleNavGroups } from './navConfig';
+
+function ids(role: 'ADMIN' | 'MEMBER' | 'AUDITOR' | null): string[] {
+  return visibleNavGroups(role).flatMap((g) => g.items.map((i) => i.id));
+}
+
+describe('visibleNavGroups', () => {
+  it('shows only dashboard + reviews for a MEMBER', () => {
+    expect(ids('MEMBER')).toEqual(['dashboard', 'reviews']);
+  });
+
+  it('adds compliance for an AUDITOR but no admin items', () => {
+    const items = ids('AUDITOR');
+    expect(items).toContain('compliance');
+    expect(items).not.toContain('users');
+    expect(items).not.toContain('settings');
+  });
+
+  it('shows everything for an ADMIN', () => {
+    expect(ids('ADMIN')).toEqual([
+      'dashboard',
+      'reviews',
+      'compliance',
+      'users',
+      'teams',
+      'settings',
+    ]);
+  });
+
+  it('drops the now-empty admin group for a MEMBER', () => {
+    const groups = visibleNavGroups('MEMBER');
+    expect(groups.some((g) => g.label === 'Verwaltung')).toBe(false);
+  });
+
+  it('shows only the always-visible items when role is null', () => {
+    expect(ids(null)).toEqual(['dashboard', 'reviews']);
+  });
+});
+
+describe('crumbsFor', () => {
+  it('returns a single Dashboard crumb at root', () => {
+    expect(crumbsFor('/')).toEqual([{ label: 'Dashboard' }]);
+  });
+
+  it('builds Dashboard > group > item for an admin path', () => {
+    expect(crumbsFor('/admin/users')).toEqual([
+      { label: 'Dashboard', to: '/' },
+      { label: 'Verwaltung' },
+      { label: 'Benutzer' },
+    ]);
+  });
+
+  it('builds Dashboard > item for a top-level path', () => {
+    expect(crumbsFor('/reviews')).toEqual([{ label: 'Dashboard', to: '/' }, { label: 'Reviews' }]);
+  });
+});

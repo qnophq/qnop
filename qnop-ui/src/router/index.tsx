@@ -20,32 +20,91 @@
  */
 
 import { createBrowserRouter } from 'react-router-dom';
-import { AppShell } from '../AppShell';
+import { FileText, Settings, ShieldCheck, User, Users } from 'lucide-react';
+import { AppShell } from '../components/shell/AppShell';
+import { AdminRoute } from '../components/auth/AdminRoute';
 import { ProtectedRoute } from '../components/auth/ProtectedRoute';
+import { RoleRoute } from '../components/auth/RoleRoute';
+import { ComingSoonPage } from '../pages/ComingSoonPage';
 import { HomePage } from '../pages/HomePage';
 import { LoginPage } from '../pages/LoginPage';
 import { ForbiddenPage } from '../pages/errors/ForbiddenPage';
 import { NotFoundPage } from '../pages/errors/NotFoundPage';
 
 /**
- * Central route table (#100). Public routes (login, errors) sit outside the
- * shell; everything under the shell is gated by {@link ProtectedRoute}. Admin
- * sections (gated by AdminRoute) and lazy-loaded feature areas are added with
- * their screens in #102+.
+ * Central route table. Public routes (login, errors) sit outside the shell;
+ * everything under the shell requires authentication. Surfaces whose screens
+ * arrive in later issues render the in-brand placeholder, guarded by the same
+ * roles the sidebar uses (#102). Real pages replace these in #104+ / Phase B.
  */
 export const router = createBrowserRouter([
   { path: '/login', element: <LoginPage /> },
   { path: '/403', element: <ForbiddenPage /> },
   {
     path: '/',
-    element: <AppShell />,
+    element: (
+      <ProtectedRoute>
+        <AppShell />
+      </ProtectedRoute>
+    ),
     children: [
+      { index: true, element: <HomePage /> },
       {
-        index: true,
+        path: 'reviews',
         element: (
-          <ProtectedRoute>
-            <HomePage />
-          </ProtectedRoute>
+          <ComingSoonPage
+            title="Reviews"
+            description="Dokumente hochladen, prüfen und freigeben — die Review-Oberfläche entsteht im PDF-Durchstich."
+            icon={FileText}
+          />
+        ),
+      },
+      {
+        path: 'compliance',
+        element: (
+          <RoleRoute allow={['ADMIN', 'AUDITOR']}>
+            <ComingSoonPage
+              title="Compliance"
+              description="Audit-Trail und Compliance-Auswertungen über alle Reviews."
+              icon={ShieldCheck}
+            />
+          </RoleRoute>
+        ),
+      },
+      {
+        path: 'admin/users',
+        element: (
+          <AdminRoute>
+            <ComingSoonPage
+              title="Benutzer"
+              description="Konten, Rollen und Zugriff verwalten."
+              icon={User}
+            />
+          </AdminRoute>
+        ),
+      },
+      {
+        path: 'admin/teams',
+        element: (
+          <AdminRoute>
+            <ComingSoonPage
+              title="Teams"
+              description="Prüfer in Teams gruppieren und Reviews an die richtigen Personen leiten."
+              icon={Users}
+            />
+          </AdminRoute>
+        ),
+      },
+      {
+        path: 'admin/settings',
+        element: (
+          <AdminRoute>
+            <ComingSoonPage
+              title="Einstellungen"
+              description="Arbeitsbereich, Sicherheitsrichtlinie, OIDC, Branding und Mail."
+              icon={Settings}
+            />
+          </AdminRoute>
         ),
       },
       { path: '*', element: <NotFoundPage /> },

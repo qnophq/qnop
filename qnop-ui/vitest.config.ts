@@ -33,6 +33,7 @@ export default defineConfig({
         'src/api/refresh.ts',
         'src/api/hooks/**/*.ts',
         'src/components/auth/**/*.tsx',
+        'src/components/shell/navConfig.tsx',
         'src/theme/**/*.ts',
       ],
       thresholds: {
