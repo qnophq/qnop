@@ -93,10 +93,10 @@ export function UsersPage() {
   const onResetPassword = async (user: AdminUserSummary) => {
     try {
       await sendReset.mutateAsync(user.id);
-      setToast({ message: `Passwort-Link an ${user.email} gesendet.`, severity: 'success' });
+      setToast({ message: `Password link sent to ${user.email}.`, severity: 'success' });
     } catch (err) {
       setToast({
-        message: apiErrorMessage(err, 'Der Link konnte nicht gesendet werden.'),
+        message: apiErrorMessage(err, 'The link could not be sent.'),
         severity: 'error',
       });
     }
@@ -111,14 +111,14 @@ export function UsersPage() {
       >
         <Box>
           <Typography variant="h1" sx={{ fontSize: 28 }}>
-            Benutzer
+            Users
           </Typography>
           <Typography color="text.secondary" sx={{ mt: 0.5 }}>
-            Konten, Rollen und Zugriff verwalten.
+            Manage accounts, roles and access.
           </Typography>
         </Box>
         <Button variant="contained" startIcon={<UserPlus size={18} />} onClick={openCreate}>
-          Benutzer anlegen
+          Add user
         </Button>
       </Stack>
 
@@ -126,7 +126,7 @@ export function UsersPage() {
         <TextField
           value={search}
           onChange={(e) => setSearch(e.target.value)}
-          placeholder="Nach Name, E-Mail oder Benutzername suchen"
+          placeholder="Search by name, email or username"
           size="small"
           sx={{ flex: 1, maxWidth: 420 }}
           slotProps={{
@@ -139,7 +139,7 @@ export function UsersPage() {
               endAdornment: search ? (
                 <InputAdornment position="end">
                   <IconButton
-                    aria-label="Suche zurücksetzen"
+                    aria-label="Clear search"
                     size="small"
                     edge="end"
                     onClick={() => setSearch('')}
@@ -153,7 +153,7 @@ export function UsersPage() {
         />
         <TextField
           select
-          label="Rolle"
+          label="Role"
           value={roleFilter}
           onChange={(e) => {
             setRoleFilter(e.target.value as UserRole | '');
@@ -162,9 +162,9 @@ export function UsersPage() {
           size="small"
           sx={{ minWidth: 160 }}
         >
-          <MenuItem value="">Alle Rollen</MenuItem>
+          <MenuItem value="">All roles</MenuItem>
           <MenuItem value="ADMIN">Admin</MenuItem>
-          <MenuItem value="MEMBER">Mitglied</MenuItem>
+          <MenuItem value="MEMBER">Member</MenuItem>
           <MenuItem value="AUDITOR">Auditor</MenuItem>
         </TextField>
       </Stack>
@@ -173,7 +173,7 @@ export function UsersPage() {
         <Box sx={{ height: 3 }}>{isFetching && <LinearProgress />}</Box>
         {isError ? (
           <Alert severity="error" sx={{ m: 2 }}>
-            Die Benutzerliste konnte nicht geladen werden.
+            The user list could not be loaded.
           </Alert>
         ) : (
           <>
@@ -185,13 +185,13 @@ export function UsersPage() {
               rowsPerPage={PAGE_SIZE}
               rowsPerPageOptions={[PAGE_SIZE]}
               onPageChange={(_, next) => setPage(next)}
-              labelDisplayedRows={({ from, to, count }) => `${from}–${to} von ${count}`}
+              labelDisplayedRows={({ from, to, count }) => `${from}–${to} of ${count}`}
             />
           </>
         )}
         {isLoading && (
           <Typography color="text.secondary" sx={{ p: 2, fontSize: 14 }}>
-            Lädt …
+            Loading…
           </Typography>
         )}
       </Paper>

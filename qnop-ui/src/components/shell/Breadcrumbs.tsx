@@ -33,7 +33,7 @@ export function Breadcrumbs() {
   return (
     <MuiBreadcrumbs
       separator={<ChevronRight size={13} />}
-      aria-label="Brotkrumen"
+      aria-label="Breadcrumb"
       sx={{ fontSize: 13, '& .MuiBreadcrumbs-separator': { mx: 0.5, color: 'text.disabled' } }}
     >
       {crumbs.map((c, i) => {

@@ -63,7 +63,7 @@ function ToneBadge({ tone, label }: { tone: Tone; label: string }) {
 const ROLE_TONE: Record<UserRole, Tone> = { ADMIN: 'blue', AUDITOR: 'amber', MEMBER: 'neutral' };
 const ROLE_LABEL: Record<UserRole, string> = {
   ADMIN: 'Admin',
-  MEMBER: 'Mitglied',
+  MEMBER: 'Member',
   AUDITOR: 'Auditor',
 };
 
@@ -75,8 +75,8 @@ export function UserRoleBadge({ role }: { role: UserRole }) {
 /** Account state: active (green) or disabled (red). */
 export function UserStatusBadge({ enabled }: { enabled: boolean }) {
   return enabled ? (
-    <ToneBadge tone="green" label="Aktiv" />
+    <ToneBadge tone="green" label="Active" />
   ) : (
-    <ToneBadge tone="red" label="Deaktiviert" />
+    <ToneBadge tone="red" label="Disabled" />
   );
 }

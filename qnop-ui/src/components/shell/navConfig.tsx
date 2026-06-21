@@ -61,7 +61,7 @@ export const NAV_GROUPS: NavGroup[] = [
     ],
   },
   {
-    label: 'Verwaltung',
+    label: 'Administration',
     items: [
       {
         id: 'compliance',
@@ -70,11 +70,11 @@ export const NAV_GROUPS: NavGroup[] = [
         icon: ShieldCheck,
         roles: ['ADMIN', 'AUDITOR'],
       },
-      { id: 'users', label: 'Benutzer', path: '/admin/users', icon: User, roles: ['ADMIN'] },
+      { id: 'users', label: 'Users', path: '/admin/users', icon: User, roles: ['ADMIN'] },
       { id: 'teams', label: 'Teams', path: '/admin/teams', icon: Users, roles: ['ADMIN'] },
       {
         id: 'settings',
-        label: 'Einstellungen',
+        label: 'Settings',
         path: '/admin/settings',
         icon: Settings,
         roles: ['ADMIN'],

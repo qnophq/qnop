@@ -58,7 +58,7 @@ export function ComingSoonPage({ title, description, icon: Icon }: ComingSoonPag
           {title}
         </Typography>
         <Typography color="text.secondary">{description}</Typography>
-        <Chip label="In Vorbereitung" color="primary" variant="outlined" size="small" />
+        <Chip label="Coming soon" color="primary" variant="outlined" size="small" />
       </Stack>
     </Box>
   );

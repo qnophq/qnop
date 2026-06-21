@@ -23,7 +23,7 @@ import { useState } from 'react';
 import IconButton from '@mui/material/IconButton';
 import InputAdornment from '@mui/material/InputAdornment';
 import TextField from '@mui/material/TextField';
-import { Eye, EyeOff } from 'lucide-react';
+import { Eye, EyeOff, Lock } from 'lucide-react';
 
 interface PasswordFieldProps {
   label: string;
@@ -54,13 +54,18 @@ export function PasswordField({
       fullWidth
       slotProps={{
         input: {
+          startAdornment: (
+            <InputAdornment position="start">
+              <Lock size={17} />
+            </InputAdornment>
+          ),
           endAdornment: (
             <InputAdornment position="end">
               <IconButton
                 onClick={() => setShow((s) => !s)}
                 edge="end"
                 size="small"
-                aria-label={show ? 'Passwort verbergen' : 'Passwort anzeigen'}
+                aria-label={show ? 'Hide password' : 'Show password'}
                 tabIndex={-1}
               >
                 {show ? <EyeOff size={18} /> : <Eye size={18} />}

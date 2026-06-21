@@ -51,13 +51,8 @@ export function TopBar({ isMobile, onToggleSidebar }: TopBarProps) {
       sx={{ borderBottom: 1, borderColor: 'divider', bgcolor: 'background.paper' }}
     >
       <Toolbar sx={{ gap: 1.5, minHeight: { xs: 56, sm: 56 } }}>
-        <Tooltip title={isMobile ? 'Menü' : 'Menü ein-/ausklappen'}>
-          <IconButton
-            onClick={onToggleSidebar}
-            size="small"
-            edge="start"
-            aria-label="Menü umschalten"
-          >
+        <Tooltip title={isMobile ? 'Menu' : 'Toggle menu'}>
+          <IconButton onClick={onToggleSidebar} size="small" edge="start" aria-label="Toggle menu">
             {isMobile ? <MenuIcon size={18} /> : <PanelLeft size={18} />}
           </IconButton>
         </Tooltip>
@@ -86,26 +81,24 @@ export function TopBar({ isMobile, onToggleSidebar }: TopBarProps) {
         >
           <Search size={15} />
           <InputBase
-            placeholder="Suchen…"
+            placeholder="Search…"
             sx={{ fontSize: 13, flex: 1 }}
-            inputProps={{ 'aria-label': 'Suchen' }}
+            inputProps={{ 'aria-label': 'Search' }}
           />
         </Box>
 
-        <Tooltip title={themeMode === 'dark' ? 'Heller Modus' : 'Dunkler Modus'}>
+        <Tooltip title={themeMode === 'dark' ? 'Light mode' : 'Dark mode'}>
           <IconButton
             onClick={toggleTheme}
             size="small"
-            aria-label={
-              themeMode === 'dark' ? 'Hellen Modus aktivieren' : 'Dunklen Modus aktivieren'
-            }
+            aria-label={themeMode === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
           >
             {themeMode === 'dark' ? <Sun size={18} /> : <Moon size={18} />}
           </IconButton>
         </Tooltip>
 
-        <Tooltip title="Benachrichtigungen">
-          <IconButton size="small" aria-label="Benachrichtigungen">
+        <Tooltip title="Notifications">
+          <IconButton size="small" aria-label="Notifications">
             <Badge color="primary" variant="dot">
               <Bell size={18} />
             </Badge>
@@ -119,7 +112,7 @@ export function TopBar({ isMobile, onToggleSidebar }: TopBarProps) {
           onClick={() => navigate('/reviews')}
           sx={{ display: { xs: 'none', sm: 'inline-flex' } }}
         >
-          Neuer Review
+          New review
         </Button>
       </Toolbar>
     </AppBar>

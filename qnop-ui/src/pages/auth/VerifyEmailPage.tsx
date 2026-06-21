@@ -48,30 +48,30 @@ export function VerifyEmailPage() {
   }, [token]);
 
   return (
-    <AuthLayout title="E-Mail bestätigen">
+    <AuthLayout title="Verify email">
       {status === 'verifying' && (
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, color: 'text.secondary' }}>
           <CircularProgress size={20} />
-          Adresse wird bestätigt…
+          Confirming your address…
         </Box>
       )}
       {status === 'success' && (
         <>
           <Alert severity="success" sx={{ mb: 2 }}>
-            Deine E-Mail-Adresse ist bestätigt. Du kannst dich jetzt anmelden.
+            Your email address is confirmed. You can sign in now.
           </Alert>
           <Link component={RouterLink} to="/login" underline="hover">
-            Zur Anmeldung
+            To sign in
           </Link>
         </>
       )}
       {status === 'error' && (
         <>
           <Alert severity="error" sx={{ mb: 2 }}>
-            Der Bestätigungslink ist ungültig oder abgelaufen.
+            The confirmation link is invalid or expired.
           </Alert>
           <Link component={RouterLink} to="/login" underline="hover">
-            Zur Anmeldung
+            To sign in
           </Link>
         </>
       )}

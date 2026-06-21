@@ -51,7 +51,7 @@ describe('visibleNavGroups', () => {
 
   it('drops the now-empty admin group for a MEMBER', () => {
     const groups = visibleNavGroups('MEMBER');
-    expect(groups.some((g) => g.label === 'Verwaltung')).toBe(false);
+    expect(groups.some((g) => g.label === 'Administration')).toBe(false);
   });
 
   it('shows only the always-visible items when role is null', () => {
@@ -65,7 +65,7 @@ describe('crumbsFor', () => {
   });
 
   it('builds group > item for an admin path (no Dashboard prefix)', () => {
-    expect(crumbsFor('/admin/users')).toEqual([{ label: 'Verwaltung' }, { label: 'Benutzer' }]);
+    expect(crumbsFor('/admin/users')).toEqual([{ label: 'Administration' }, { label: 'Users' }]);
   });
 
   it('builds just the item for a top-level path', () => {

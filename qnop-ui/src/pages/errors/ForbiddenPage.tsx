@@ -25,8 +25,8 @@ export function ForbiddenPage() {
   return (
     <ErrorState
       code="403"
-      title="Kein Zugriff"
-      message="Für diesen Bereich fehlen dir die Berechtigungen."
+      title="No access"
+      message="You don't have permission to view this area."
     />
   );
 }

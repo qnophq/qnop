@@ -54,30 +54,30 @@ export function ResetPasswordPage() {
       await resetPassword(token, password);
       setDone(true);
     } catch (err) {
-      setError(apiErrorMessage(err, 'Zurücksetzen fehlgeschlagen. Fordere einen neuen Link an.'));
+      setError(apiErrorMessage(err, 'Reset failed. Please request a new link.'));
     } finally {
       setSubmitting(false);
     }
   };
 
   return (
-    <AuthLayout title="Neues Passwort wählen">
+    <AuthLayout title="Choose a new password">
       {done ? (
         <>
           <Alert severity="success" sx={{ mb: 2 }}>
-            Dein Passwort wurde geändert. Du kannst dich jetzt anmelden.
+            Your password has been changed. You can sign in now.
           </Alert>
           <Link component={RouterLink} to="/login" underline="hover">
-            Zur Anmeldung
+            To sign in
           </Link>
         </>
       ) : !token ? (
         <>
           <Alert severity="error" sx={{ mb: 2 }}>
-            Der Link ist ungültig oder unvollständig. Bitte fordere einen neuen an.
+            This link is invalid or incomplete. Please request a new one.
           </Alert>
           <Link component={RouterLink} to="/forgot-password" underline="hover">
-            Neuen Link anfordern
+            Request a new link
           </Link>
         </>
       ) : (
@@ -85,7 +85,7 @@ export function ResetPasswordPage() {
           <Stack spacing={2}>
             <Box>
               <PasswordField
-                label="Neues Passwort"
+                label="New password"
                 value={password}
                 onChange={setPassword}
                 autoComplete="new-password"
@@ -94,13 +94,13 @@ export function ResetPasswordPage() {
               <PasswordStrengthMeter password={password} />
             </Box>
             <PasswordField
-              label="Passwort bestätigen"
+              label="Confirm password"
               value={confirm}
               onChange={setConfirm}
               autoComplete="new-password"
               required
             />
-            {mismatch && <Alert severity="warning">Die Passwörter stimmen nicht überein.</Alert>}
+            {mismatch && <Alert severity="warning">The passwords don&apos;t match.</Alert>}
             {error && <Alert severity="error">{error}</Alert>}
             <Button
               type="submit"
@@ -109,7 +109,7 @@ export function ResetPasswordPage() {
               disabled={submitting || !canSubmit}
               fullWidth
             >
-              Passwort speichern
+              Save password
             </Button>
           </Stack>
         </Box>

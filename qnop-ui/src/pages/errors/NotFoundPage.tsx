@@ -23,10 +23,6 @@ import { ErrorState } from './ErrorState';
 
 export function NotFoundPage() {
   return (
-    <ErrorState
-      code="404"
-      title="Seite nicht gefunden"
-      message="Die angeforderte Seite existiert nicht."
-    />
+    <ErrorState code="404" title="Page not found" message="The page you requested doesn't exist." />
   );
 }
