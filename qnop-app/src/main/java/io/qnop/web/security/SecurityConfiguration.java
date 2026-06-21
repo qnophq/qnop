@@ -135,6 +135,11 @@ public class SecurityConfiguration {
                     .permitAll()
                     .requestMatchers(HttpMethod.GET, "/api/v1/branding/**")
                     .permitAll()
+                    // The SPA needs the public server config before authentication
+                    // (enabled OIDC providers, self-registration, edition). OpenAPI
+                    // declares GET /config as security: [] — honour that here.
+                    .requestMatchers(HttpMethod.GET, "/api/v1/config")
+                    .permitAll()
                     .requestMatchers("/api/v1/admin/**")
                     .hasRole("ADMIN")
                     .anyRequest()

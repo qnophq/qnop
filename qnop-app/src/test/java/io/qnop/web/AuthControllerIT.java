@@ -144,9 +144,10 @@ class AuthControllerIT extends AbstractIntegrationTest {
     User user = createUser("frank");
     String accessToken = loginAccessToken("frank");
 
-    // The access token works before the change.
+    // The access token works before the change. Probe a genuinely protected
+    // endpoint (/users/me): /config is public, so it would not prove anything.
     mockMvc
-        .perform(get("/api/v1/config").header("Authorization", "Bearer " + accessToken))
+        .perform(get("/api/v1/users/me").header("Authorization", "Bearer " + accessToken))
         .andExpect(status().isOk());
 
     String body =
@@ -162,7 +163,7 @@ class AuthControllerIT extends AbstractIntegrationTest {
 
     // The previously issued access token is now rejected (passwordInvalidatedBefore bumped).
     mockMvc
-        .perform(get("/api/v1/config").header("Authorization", "Bearer " + accessToken))
+        .perform(get("/api/v1/users/me").header("Authorization", "Bearer " + accessToken))
         .andExpect(status().isUnauthorized());
 
     assertThat(user.getId()).isNotNull();
@@ -208,6 +209,17 @@ class AuthControllerIT extends AbstractIntegrationTest {
   @Test
   void currentUserUnauthorizedForAnonymous() throws Exception {
     mockMvc.perform(get("/api/v1/users/me")).andExpect(status().isUnauthorized());
+  }
+
+  @Test
+  void configIsPublicForAnonymous() throws Exception {
+    // OpenAPI declares GET /config as security: [] — the SPA reads it before login
+    // (OIDC providers, self-registration). The slice test cannot prove this because
+    // it does not load the security chain; this exercises the real filter.
+    mockMvc
+        .perform(get("/api/v1/config"))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.edition").value("COMMUNITY"));
   }
 
   private User createUser(String username) {
