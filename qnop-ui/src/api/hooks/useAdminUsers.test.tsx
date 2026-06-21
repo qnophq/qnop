@@ -28,6 +28,7 @@ import {
   adminUserKeys,
   useAdminUsers,
   useCreateUser,
+  useDeleteUser,
   useSendUserPasswordReset,
   useUpdateUser,
 } from './useAdminUsers';
@@ -40,6 +41,7 @@ vi.mock('../config', () => ({
     listUsers: vi.fn(),
     createUser: vi.fn(),
     updateUser: vi.fn(),
+    deleteUser: vi.fn(),
     sendUserPasswordReset: vi.fn(),
   },
 }));
@@ -67,7 +69,15 @@ describe('useAdminUsers', () => {
     >);
 
     const { result } = renderHook(
-      () => useAdminUsers({ q: 'ali', role: 'MEMBER', page: 0, size: 20 }),
+      () =>
+        useAdminUsers({
+          q: 'ali',
+          role: 'MEMBER',
+          enabled: false,
+          sort: 'createdAt,desc',
+          page: 0,
+          size: 20,
+        }),
       { wrapper },
     );
 
@@ -75,6 +85,8 @@ describe('useAdminUsers', () => {
     expect(adminUsersApi.listUsers).toHaveBeenCalledWith({
       q: 'ali',
       role: 'MEMBER',
+      enabled: false,
+      sort: 'createdAt,desc',
       page: 0,
       size: 20,
     });
@@ -92,6 +104,8 @@ describe('useAdminUsers', () => {
     expect(adminUsersApi.listUsers).toHaveBeenCalledWith({
       q: undefined,
       role: undefined,
+      enabled: undefined,
+      sort: undefined,
       page: 0,
       size: 20,
     });
@@ -139,15 +153,30 @@ describe('useUpdateUser', () => {
   });
 });
 
-describe('useSendUserPasswordReset', () => {
-  it('sends a reset for the given id', async () => {
-    vi.mocked(adminUsersApi.sendUserPasswordReset).mockResolvedValue({
+describe('useDeleteUser', () => {
+  it('deletes the given id', async () => {
+    vi.mocked(adminUsersApi.deleteUser).mockResolvedValue({
       data: undefined,
+    } as Awaited<ReturnType<typeof adminUsersApi.deleteUser>>);
+
+    const { result } = renderHook(() => useDeleteUser(), { wrapper });
+    await result.current.mutateAsync('u5');
+
+    expect(adminUsersApi.deleteUser).toHaveBeenCalledWith({ userId: 'u5' });
+  });
+});
+
+describe('useSendUserPasswordReset', () => {
+  it('sends a reset for the given id and returns the outcome', async () => {
+    vi.mocked(adminUsersApi.sendUserPasswordReset).mockResolvedValue({
+      data: { emailSent: false, resetUrl: 'https://app/reset?token=x' },
     } as Awaited<ReturnType<typeof adminUsersApi.sendUserPasswordReset>>);
 
     const { result } = renderHook(() => useSendUserPasswordReset(), { wrapper });
-    await result.current.mutateAsync('u9');
+    const outcome = await result.current.mutateAsync('u9');
 
     expect(adminUsersApi.sendUserPasswordReset).toHaveBeenCalledWith({ userId: 'u9' });
+    expect(outcome.emailSent).toBe(false);
+    expect(outcome.resetUrl).toBe('https://app/reset?token=x');
   });
 });

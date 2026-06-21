@@ -21,6 +21,7 @@
 
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import type {
+  AdminPasswordResetResponse,
   AdminUserCreateRequest,
   AdminUserListResponse,
   AdminUserUpdateRequest,
@@ -32,6 +33,8 @@ import { adminUsersApi } from '../config';
 export interface AdminUserListParams {
   q?: string;
   role?: UserRole;
+  enabled?: boolean;
+  sort?: string;
   page: number;
   size: number;
 }
@@ -43,7 +46,8 @@ export const adminUserKeys = {
 
 /**
  * A page of users for the admin list. Keeps the previous page visible while the
- * next one loads, so pagination and search do not flash an empty table.
+ * next one loads, so pagination, search, filtering and sorting do not flash an
+ * empty table.
  */
 export function useAdminUsers(params: AdminUserListParams) {
   return useQuery<AdminUserListResponse>({
@@ -52,6 +56,8 @@ export function useAdminUsers(params: AdminUserListParams) {
       const response = await adminUsersApi.listUsers({
         q: params.q || undefined,
         role: params.role,
+        enabled: params.enabled,
+        sort: params.sort,
         page: params.page,
         size: params.size,
       });
@@ -88,11 +94,27 @@ export function useUpdateUser() {
   });
 }
 
-/** Sends a password-setup/reset link to the given user. */
-export function useSendUserPasswordReset() {
+/** Deletes a user, then refreshes the list. */
+export function useDeleteUser() {
+  const queryClient = useQueryClient();
   return useMutation({
     mutationFn: async (id: string) => {
-      await adminUsersApi.sendUserPasswordReset({ userId: id });
+      await adminUsersApi.deleteUser({ userId: id });
+    },
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: adminUserKeys.all }),
+  });
+}
+
+/**
+ * Admin password reset: revokes the user's sessions and emails a reset link.
+ * Returns the outcome ({@code emailSent}, and a fallback {@code resetUrl} when
+ * email could not be sent).
+ */
+export function useSendUserPasswordReset() {
+  return useMutation<AdminPasswordResetResponse, unknown, string>({
+    mutationFn: async (id: string) => {
+      const response = await adminUsersApi.sendUserPasswordReset({ userId: id });
+      return response.data;
     },
   });
 }
