@@ -32,7 +32,13 @@ export default defineConfig({
         'src/utils/**/*.ts',
         'src/api/refresh.ts',
         'src/api/hooks/**/*.ts',
-        'src/components/auth/**/*.tsx',
+        // Auth guards are logic (unit-tested); the presentational auth
+        // components (AuthLayout, OidcButtons, PasswordField, the strength
+        // meter) are verified visually, not by markup assertions.
+        'src/components/auth/ProtectedRoute.tsx',
+        'src/components/auth/AdminRoute.tsx',
+        'src/components/auth/RoleRoute.tsx',
+        'src/components/auth/AuthHydrationBoundary.tsx',
         'src/components/shell/navConfig.tsx',
         'src/theme/**/*.ts',
       ],

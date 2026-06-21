@@ -79,12 +79,29 @@ describe('authStore', () => {
 
   it('fetchMe clears auth on a 401', async () => {
     useAuthStore.setState({ accessToken: 'tok' });
-    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(jsonResponse({}, false)));
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: false, status: 401 } as Response));
 
     await useAuthStore.getState().fetchMe();
 
     expect(useAuthStore.getState().isAuthenticated).toBe(false);
     expect(useAuthStore.getState().accessToken).toBeNull();
+  });
+
+  it('fetchMe flags a forced password change on a 403 and keeps the token', async () => {
+    useAuthStore.setState({ accessToken: 'tok' });
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: false, status: 403 } as Response));
+
+    await useAuthStore.getState().fetchMe();
+
+    const state = useAuthStore.getState();
+    expect(state.passwordChangeRequired).toBe(true);
+    expect(state.isAuthenticated).toBe(false);
+    expect(state.accessToken).toBe('tok');
+  });
+
+  it('login throws RATE_LIMITED on a 429', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: false, status: 429 } as Response));
+    await expect(useAuthStore.getState().login('x', 'y')).rejects.toThrow('RATE_LIMITED');
   });
 
   it('hydrate authenticates when refresh yields a token', async () => {

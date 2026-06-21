@@ -27,7 +27,12 @@ import { ProtectedRoute } from '../components/auth/ProtectedRoute';
 import { RoleRoute } from '../components/auth/RoleRoute';
 import { ComingSoonPage } from '../pages/ComingSoonPage';
 import { HomePage } from '../pages/HomePage';
-import { LoginPage } from '../pages/LoginPage';
+import { ChangePasswordPage } from '../pages/auth/ChangePasswordPage';
+import { ForgotPasswordPage } from '../pages/auth/ForgotPasswordPage';
+import { LoginPage } from '../pages/auth/LoginPage';
+import { RegisterPage } from '../pages/auth/RegisterPage';
+import { ResetPasswordPage } from '../pages/auth/ResetPasswordPage';
+import { VerifyEmailPage } from '../pages/auth/VerifyEmailPage';
 import { ForbiddenPage } from '../pages/errors/ForbiddenPage';
 import { NotFoundPage } from '../pages/errors/NotFoundPage';
 
@@ -39,6 +44,11 @@ import { NotFoundPage } from '../pages/errors/NotFoundPage';
  */
 export const router = createBrowserRouter([
   { path: '/login', element: <LoginPage /> },
+  { path: '/register', element: <RegisterPage /> },
+  { path: '/forgot-password', element: <ForgotPasswordPage /> },
+  { path: '/reset-password', element: <ResetPasswordPage /> },
+  { path: '/verify-email', element: <VerifyEmailPage /> },
+  { path: '/change-password', element: <ChangePasswordPage /> },
   { path: '/403', element: <ForbiddenPage /> },
   {
     path: '/',
