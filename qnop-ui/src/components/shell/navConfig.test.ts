@@ -46,6 +46,9 @@ describe('visibleNavGroups', () => {
       'users',
       'teams',
       'settings',
+      'oidc-providers',
+      'mail-templates',
+      'branding',
     ]);
   });
 

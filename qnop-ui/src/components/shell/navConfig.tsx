@@ -21,7 +21,10 @@
 
 import {
   FileText,
+  KeyRound,
   LayoutDashboard,
+  Mail,
+  Palette,
   Settings,
   ShieldCheck,
   User,
@@ -77,6 +80,27 @@ export const NAV_GROUPS: NavGroup[] = [
         label: 'Settings',
         path: '/admin/settings',
         icon: Settings,
+        roles: ['ADMIN'],
+      },
+      {
+        id: 'oidc-providers',
+        label: 'OIDC providers',
+        path: '/admin/oidc-providers',
+        icon: KeyRound,
+        roles: ['ADMIN'],
+      },
+      {
+        id: 'mail-templates',
+        label: 'Mail templates',
+        path: '/admin/mail-templates',
+        icon: Mail,
+        roles: ['ADMIN'],
+      },
+      {
+        id: 'branding',
+        label: 'Branding',
+        path: '/admin/branding',
+        icon: Palette,
         roles: ['ADMIN'],
       },
     ],

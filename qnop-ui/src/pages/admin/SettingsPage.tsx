@@ -19,48 +19,17 @@
  * SPDX-License-Identifier: AGPL-3.0-only
  */
 
-import { useState, type ReactNode } from 'react';
 import Box from '@mui/material/Box';
 import Stack from '@mui/material/Stack';
-import Tab from '@mui/material/Tab';
-import Tabs from '@mui/material/Tabs';
 import Typography from '@mui/material/Typography';
 import { ApplicationSettingsForm } from '../../components/admin/settings/ApplicationSettingsForm';
 
-interface SettingsTab {
-  readonly id: string;
-  readonly label: string;
-  readonly content: ReactNode;
-}
-
-/** Placeholder for the settings sections that land in the follow-up PRs of #106. */
-function ComingSoon({ what }: { what: string }) {
-  return (
-    <Typography color="text.secondary" sx={{ fontSize: 14 }}>
-      {what} arrives in a follow-up of #106.
-    </Typography>
-  );
-}
-
-const TABS: readonly SettingsTab[] = [
-  { id: 'application', label: 'Application', content: <ApplicationSettingsForm /> },
-  {
-    id: 'oidc',
-    label: 'OIDC providers',
-    content: <ComingSoon what="Single sign-on provider management" />,
-  },
-  { id: 'mail', label: 'Mail templates', content: <ComingSoon what="The mail template editor" /> },
-  { id: 'branding', label: 'Branding', content: <ComingSoon what="Logo and branding uploads" /> },
-];
-
 /**
- * Admin settings screen (issue #106): a tabbed shell over the application
- * settings, OIDC providers, mail templates and branding. This change wires the
- * shell and the Application tab; the remaining tabs follow in separate PRs.
+ * Admin application settings screen (issue #106): general, upload, tracking,
+ * SMTP and authentication settings. OIDC providers, mail templates and branding
+ * are separate Administration menu items, each with its own screen.
  */
 export function SettingsPage() {
-  const [active, setActive] = useState(0);
-
   return (
     <Stack spacing={3}>
       <Box>
@@ -68,34 +37,10 @@ export function SettingsPage() {
           Settings
         </Typography>
         <Typography color="text.secondary" sx={{ mt: 0.5 }}>
-          Workspace, security policy, single sign-on, branding and mail.
+          Workspace, uploads, usage tracking, email and authentication.
         </Typography>
       </Box>
-
-      <Box sx={{ borderBottom: 1, borderColor: 'divider' }}>
-        <Tabs
-          value={active}
-          onChange={(_, next) => setActive(next)}
-          variant="scrollable"
-          scrollButtons="auto"
-          aria-label="Settings sections"
-        >
-          {TABS.map((tab) => (
-            <Tab key={tab.id} label={tab.label} id={`settings-tab-${tab.id}`} />
-          ))}
-        </Tabs>
-      </Box>
-
-      {TABS.map((tab, index) => (
-        <Box
-          key={tab.id}
-          role="tabpanel"
-          hidden={active !== index}
-          aria-labelledby={`settings-tab-${tab.id}`}
-        >
-          {active === index && tab.content}
-        </Box>
-      ))}
+      <ApplicationSettingsForm />
     </Stack>
   );
 }

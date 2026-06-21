@@ -20,7 +20,7 @@
  */
 
 import { createBrowserRouter } from 'react-router-dom';
-import { FileText, ShieldCheck } from 'lucide-react';
+import { FileText, KeyRound, Mail, Palette, ShieldCheck } from 'lucide-react';
 import { AppShell } from '../components/shell/AppShell';
 import { AdminRoute } from '../components/auth/AdminRoute';
 import { ProtectedRoute } from '../components/auth/ProtectedRoute';
@@ -114,6 +114,42 @@ export const router = createBrowserRouter([
         element: (
           <AdminRoute>
             <SettingsPage />
+          </AdminRoute>
+        ),
+      },
+      {
+        path: 'admin/oidc-providers',
+        element: (
+          <AdminRoute>
+            <ComingSoonPage
+              title="OIDC providers"
+              description="Configure single sign-on identity providers — list, add, discover and enable."
+              icon={KeyRound}
+            />
+          </AdminRoute>
+        ),
+      },
+      {
+        path: 'admin/mail-templates',
+        element: (
+          <AdminRoute>
+            <ComingSoonPage
+              title="Mail templates"
+              description="Edit, preview and test the transactional email templates."
+              icon={Mail}
+            />
+          </AdminRoute>
+        ),
+      },
+      {
+        path: 'admin/branding',
+        element: (
+          <AdminRoute>
+            <ComingSoonPage
+              title="Branding"
+              description="Upload the light/dark logos and logomark shown across the app."
+              icon={Palette}
+            />
           </AdminRoute>
         ),
       },
