@@ -20,53 +20,57 @@
  */
 
 import Box from '@mui/material/Box';
-import Button from '@mui/material/Button';
 import Card from '@mui/material/Card';
 import CardContent from '@mui/material/CardContent';
-import Chip from '@mui/material/Chip';
 import Stack from '@mui/material/Stack';
 import Typography from '@mui/material/Typography';
+import { Inbox } from 'lucide-react';
 import { useAuthStore } from '../stores/authStore';
-import { ThemeShowcase } from '../components/ThemeShowcase';
 
 /**
- * Placeholder authenticated landing page (#100). It confirms the wiring works —
- * the profile shown here comes from GET /users/me via the auth store — and, for
- * #101, hosts a small theme showcase so the devtank42 design system can be seen
- * and visually verified in both light and dark. The real dashboard arrives with
- * the app shell and review surfaces (#102+); the showcase goes with it.
+ * Dashboard placeholder (#102). Shows the signed-in user (from GET /users/me)
+ * and frames the review workspace to come. The real command-centre dashboard
+ * from the prototype lands in the PDF vertical slice (Phase B).
  */
 export function HomePage() {
   const displayName = useAuthStore((s) => s.displayName);
-  const email = useAuthStore((s) => s.email);
-  const role = useAuthStore((s) => s.role);
 
   return (
     <Stack spacing={3}>
       <Box>
         <Typography variant="h1">Willkommen{displayName ? `, ${displayName}` : ''}.</Typography>
         <Typography color="text.secondary" sx={{ mt: 1 }}>
-          {email} · Rolle: {role}
+          Dein Review-Arbeitsbereich entsteht hier in den nächsten Schritten.
         </Typography>
       </Box>
 
       <Card>
         <CardContent>
-          <Typography variant="h6" gutterBottom>
-            Review-Arbeitsbereich
-          </Typography>
-          <Typography color="text.secondary" sx={{ mb: 2 }}>
-            Das Dashboard und der Review-Arbeitsbereich entstehen in den nächsten Schritten.
-          </Typography>
-          <Stack direction="row" sx={{ flexWrap: 'wrap', gap: 1 }}>
-            <Button variant="contained">Neuer Review</Button>
-            <Button variant="outlined">Vergleichen</Button>
-            <Chip label="In Prüfung" color="primary" size="small" variant="outlined" />
+          <Stack direction="row" spacing={2} sx={{ alignItems: 'center' }}>
+            <Box
+              sx={{
+                width: 44,
+                height: 44,
+                borderRadius: 1.75,
+                bgcolor: 'primary.light',
+                color: 'primary.main',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                flexShrink: 0,
+              }}
+            >
+              <Inbox size={22} />
+            </Box>
+            <Box>
+              <Typography variant="h6">Noch keine Reviews</Typography>
+              <Typography color="text.secondary">
+                Sobald der Dokumenten-Upload steht, erscheinen deine Reviews hier.
+              </Typography>
+            </Box>
           </Stack>
         </CardContent>
       </Card>
-
-      <ThemeShowcase />
     </Stack>
   );
 }
