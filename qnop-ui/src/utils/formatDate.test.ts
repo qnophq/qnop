@@ -20,7 +20,7 @@
  */
 
 import { describe, expect, it } from 'vitest';
-import { formatDateTime } from './formatDate';
+import { formatDateTime, formatRelative } from './formatDate';
 
 describe('formatDateTime', () => {
   it('returns an em dash for null, undefined or an invalid date', () => {
@@ -33,5 +33,28 @@ describe('formatDateTime', () => {
     const formatted = formatDateTime('2026-06-21T12:34:00Z');
     expect(formatted).not.toBe('—');
     expect(formatted).toMatch(/2026/);
+  });
+});
+
+describe('formatRelative', () => {
+  it('returns an em dash for null, undefined or an invalid date', () => {
+    expect(formatRelative(null)).toBe('—');
+    expect(formatRelative(undefined)).toBe('—');
+    expect(formatRelative('not-a-date')).toBe('—');
+  });
+
+  it('reports a very recent timestamp as "just now"', () => {
+    expect(formatRelative(new Date(Date.now() - 5_000).toISOString())).toBe('just now');
+  });
+
+  it('reports a few hours ago relatively', () => {
+    const threeHoursAgo = new Date(Date.now() - 3 * 60 * 60_000).toISOString();
+    expect(formatRelative(threeHoursAgo)).toMatch(/hour/);
+  });
+
+  it('falls back to an absolute date beyond 30 days', () => {
+    const longAgo = new Date(Date.now() - 200 * 24 * 60 * 60_000).toISOString();
+    expect(formatRelative(longAgo)).not.toBe('—');
+    expect(formatRelative(longAgo)).not.toMatch(/ago|just now/);
   });
 });

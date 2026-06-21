@@ -27,50 +27,92 @@ import ListItemText from '@mui/material/ListItemText';
 import Menu from '@mui/material/Menu';
 import MenuItem from '@mui/material/MenuItem';
 import Stack from '@mui/material/Stack';
+import Switch from '@mui/material/Switch';
 import Table from '@mui/material/Table';
 import TableBody from '@mui/material/TableBody';
 import TableCell from '@mui/material/TableCell';
 import TableHead from '@mui/material/TableHead';
 import TableRow from '@mui/material/TableRow';
+import TableSortLabel from '@mui/material/TableSortLabel';
+import Tooltip from '@mui/material/Tooltip';
 import Typography from '@mui/material/Typography';
-import { KeyRound, MoreVertical, SquarePen } from 'lucide-react';
+import { KeyRound, MoreVertical, SquarePen, Trash2 } from 'lucide-react';
 import type { AdminUserSummary } from '../../../api/generated';
 import { UserAvatar } from '../../shell/UserAvatar';
-import { formatDateTime } from '../../../utils/formatDate';
+import { formatDateTime, formatRelative } from '../../../utils/formatDate';
+import { ToneBadge } from '../ToneBadge';
 import { UserRoleBadge, UserStatusBadge } from './UserBadges';
 
 interface UsersTableProps {
   users: AdminUserSummary[];
+  currentUserId: string | null;
+  /** Active sort as `field,direction`. */
+  sort: string;
+  onSort: (field: string) => void;
   onEdit: (user: AdminUserSummary) => void;
   onResetPassword: (user: AdminUserSummary) => void;
+  onToggleEnabled: (user: AdminUserSummary) => void;
+  onDelete: (user: AdminUserSummary) => void;
 }
 
-export function UsersTable({ users, onEdit, onResetPassword }: UsersTableProps) {
+const COLUMNS: { key: string; label: string; sortable?: boolean }[] = [
+  { key: 'displayName', label: 'User', sortable: true },
+  { key: 'role', label: 'Role', sortable: true },
+  { key: 'status', label: 'Status' },
+  { key: 'createdAt', label: 'Created', sortable: true },
+  { key: 'lastLoginAt', label: 'Last login', sortable: true },
+  { key: 'actions', label: '' },
+];
+
+export function UsersTable({
+  users,
+  currentUserId,
+  sort,
+  onSort,
+  onEdit,
+  onResetPassword,
+  onToggleEnabled,
+  onDelete,
+}: UsersTableProps) {
   const [anchorEl, setAnchorEl] = useState<HTMLElement | null>(null);
   const [active, setActive] = useState<AdminUserSummary | null>(null);
+
+  const [sortField, sortDir] = sort.split(',');
+  const direction = sortDir === 'desc' ? 'desc' : 'asc';
 
   const openMenu = (event: MouseEvent<HTMLElement>, user: AdminUserSummary) => {
     setAnchorEl(event.currentTarget);
     setActive(user);
   };
   const closeMenu = () => setAnchorEl(null);
+  const isSelf = (user: AdminUserSummary) => user.id === currentUserId;
 
   return (
     <>
       <Table size="medium" sx={{ '& td, & th': { borderColor: 'divider' } }}>
         <TableHead>
           <TableRow>
-            <TableCell>User</TableCell>
-            <TableCell>Role</TableCell>
-            <TableCell>Status</TableCell>
-            <TableCell>Last login</TableCell>
-            <TableCell align="right">Actions</TableCell>
+            {COLUMNS.map((col) => (
+              <TableCell key={col.key} align={col.key === 'actions' ? 'right' : 'left'}>
+                {col.sortable ? (
+                  <TableSortLabel
+                    active={sortField === col.key}
+                    direction={sortField === col.key ? direction : 'asc'}
+                    onClick={() => onSort(col.key)}
+                  >
+                    {col.label}
+                  </TableSortLabel>
+                ) : (
+                  col.label
+                )}
+              </TableCell>
+            ))}
           </TableRow>
         </TableHead>
         <TableBody>
           {users.length === 0 && (
             <TableRow>
-              <TableCell colSpan={5}>
+              <TableCell colSpan={COLUMNS.length}>
                 <Typography color="text.secondary" sx={{ py: 4, textAlign: 'center' }}>
                   No users found.
                 </Typography>
@@ -83,17 +125,26 @@ export function UsersTable({ users, onEdit, onResetPassword }: UsersTableProps) 
                 <Stack direction="row" spacing={1.5} sx={{ alignItems: 'center' }}>
                   <UserAvatar name={user.displayName} size={36} />
                   <Box sx={{ minWidth: 0 }}>
-                    <Typography sx={{ fontWeight: 600, lineHeight: 1.3 }} noWrap>
-                      {user.displayName}
+                    <Stack
+                      direction="row"
+                      spacing={0.75}
+                      sx={{ alignItems: 'center', flexWrap: 'wrap' }}
+                    >
+                      <Typography sx={{ fontWeight: 600, lineHeight: 1.3 }} noWrap>
+                        {user.displayName}
+                      </Typography>
                       {user.source === 'EXTERNAL' && (
                         <Typography
                           component="span"
-                          sx={{ ml: 1, fontSize: 11, color: 'text.secondary', fontWeight: 500 }}
+                          sx={{ fontSize: 11, color: 'text.secondary', fontWeight: 500 }}
                         >
-                          OIDC
+                          ({user.providerName ?? 'OIDC'})
                         </Typography>
                       )}
-                    </Typography>
+                      {user.passwordChangeRequired && (
+                        <ToneBadge tone="amber" label="Password change" />
+                      )}
+                    </Stack>
                     <Typography sx={{ fontSize: 13, color: 'text.secondary' }} noWrap>
                       {user.email}
                     </Typography>
@@ -104,11 +155,31 @@ export function UsersTable({ users, onEdit, onResetPassword }: UsersTableProps) 
                 <UserRoleBadge role={user.role} />
               </TableCell>
               <TableCell>
-                <UserStatusBadge enabled={user.enabled} />
+                <Stack direction="row" spacing={1} sx={{ alignItems: 'center' }}>
+                  <Tooltip
+                    title={isSelf(user) ? 'You cannot disable your own account' : 'Toggle access'}
+                  >
+                    <span>
+                      <Switch
+                        size="small"
+                        checked={user.enabled}
+                        disabled={isSelf(user)}
+                        onChange={() => onToggleEnabled(user)}
+                        slotProps={{ input: { 'aria-label': `Toggle ${user.displayName}` } }}
+                      />
+                    </span>
+                  </Tooltip>
+                  <UserStatusBadge enabled={user.enabled} />
+                </Stack>
               </TableCell>
               <TableCell>
                 <Typography sx={{ fontSize: 13, color: 'text.secondary' }}>
-                  {formatDateTime(user.lastLoginAt)}
+                  {formatDateTime(user.createdAt)}
+                </Typography>
+              </TableCell>
+              <TableCell>
+                <Typography sx={{ fontSize: 13, color: 'text.secondary' }}>
+                  {formatRelative(user.lastLoginAt)}
                 </Typography>
               </TableCell>
               <TableCell align="right">
@@ -147,7 +218,19 @@ export function UsersTable({ users, onEdit, onResetPassword }: UsersTableProps) 
           <ListItemIcon>
             <KeyRound size={16} />
           </ListItemIcon>
-          <ListItemText>Send password link</ListItemText>
+          <ListItemText>Reset password</ListItemText>
+        </MenuItem>
+        <MenuItem
+          disabled={active ? isSelf(active) : false}
+          onClick={() => {
+            closeMenu();
+            if (active) onDelete(active);
+          }}
+        >
+          <ListItemIcon>
+            <Trash2 size={16} />
+          </ListItemIcon>
+          <ListItemText>Delete</ListItemText>
         </MenuItem>
       </Menu>
     </>

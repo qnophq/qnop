@@ -35,12 +35,22 @@ import TextField from '@mui/material/TextField';
 import Typography from '@mui/material/Typography';
 import { Search, UserPlus, X } from 'lucide-react';
 import type { AdminUserSummary, UserRole } from '../../api/generated';
-import { useAdminUsers, useSendUserPasswordReset } from '../../api/hooks/useAdminUsers';
+import {
+  useAdminUsers,
+  useDeleteUser,
+  useSendUserPasswordReset,
+  useUpdateUser,
+} from '../../api/hooks/useAdminUsers';
 import { UserFormDialog } from '../../components/admin/users/UserFormDialog';
 import { UsersTable } from '../../components/admin/users/UsersTable';
-import { apiErrorMessage } from '../../utils/apiError';
+import { ResetLinkDialog } from '../../components/admin/users/ResetLinkDialog';
+import { ConfirmDialog } from '../../components/admin/ConfirmDialog';
+import { useAuthStore } from '../../stores/authStore';
+import { apiErrorCode, apiErrorMessage } from '../../utils/apiError';
 
-const PAGE_SIZE = 20;
+const PAGE_SIZE_OPTIONS = [10, 20, 50, 100];
+const DEFAULT_PAGE_SIZE = 20;
+const DEFAULT_SORT = 'displayName,asc';
 
 type DialogState =
   | { open: false }
@@ -48,19 +58,33 @@ type DialogState =
   | { open: true; mode: 'edit'; user: AdminUserSummary };
 
 type Toast = { message: string; severity: 'success' | 'error' } | null;
+type StatusFilter = '' | 'active' | 'disabled';
 
-/** Admin user management: search, filter, paginate, create/invite, edit and reset (#104). */
+const CONFLICT_MESSAGES: Record<string, string> = {
+  LAST_ADMIN: 'At least one enabled admin must remain.',
+  SELF_LOCKOUT: "You can't disable or change the role of your own account.",
+  SELF_DELETE: "You can't delete your own account.",
+};
+
+/** Admin user management: search/filter/sort, paginate, create, edit, delete and reset (#104/#124). */
 export function UsersPage() {
+  const currentUserId = useAuthStore((s) => s.userId);
+  const updateUser = useUpdateUser();
+  const deleteUser = useDeleteUser();
+  const sendReset = useSendUserPasswordReset();
+
   const [search, setSearch] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
   const [roleFilter, setRoleFilter] = useState<UserRole | ''>('');
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>('');
+  const [sort, setSort] = useState(DEFAULT_SORT);
   const [page, setPage] = useState(0);
+  const [pageSize, setPageSize] = useState(DEFAULT_PAGE_SIZE);
   const [dialog, setDialog] = useState<DialogState>({ open: false });
-  // Bumped on every open so the dialog remounts with fresh state (see UserFormDialog).
   const [openSeq, setOpenSeq] = useState(0);
+  const [deleteTarget, setDeleteTarget] = useState<AdminUserSummary | null>(null);
+  const [resetLink, setResetLink] = useState<{ displayName: string; url: string } | null>(null);
   const [toast, setToast] = useState<Toast>(null);
-
-  const sendReset = useSendUserPasswordReset();
 
   const openCreate = () => {
     setDialog({ open: true, mode: 'create' });
@@ -83,22 +107,66 @@ export function UsersPage() {
   const { data, isLoading, isFetching, isError } = useAdminUsers({
     q: debouncedSearch || undefined,
     role: roleFilter || undefined,
+    enabled: statusFilter === '' ? undefined : statusFilter === 'active',
+    sort,
     page,
-    size: PAGE_SIZE,
+    size: pageSize,
   });
 
   const users = data?.items ?? [];
   const total = data?.total ?? 0;
 
-  const onResetPassword = async (user: AdminUserSummary) => {
+  const onSort = (field: string) => {
+    const [currentField, currentDir] = sort.split(',');
+    const nextDir = currentField === field && currentDir === 'asc' ? 'desc' : 'asc';
+    setSort(`${field},${nextDir}`);
+    setPage(0);
+  };
+
+  const onToggleEnabled = async (user: AdminUserSummary) => {
     try {
-      await sendReset.mutateAsync(user.id);
-      setToast({ message: `Password link sent to ${user.email}.`, severity: 'success' });
+      await updateUser.mutateAsync({ id: user.id, request: { enabled: !user.enabled } });
     } catch (err) {
       setToast({
-        message: apiErrorMessage(err, 'The link could not be sent.'),
+        message: conflictOr(err, `Could not update ${user.displayName}.`),
         severity: 'error',
       });
+    }
+  };
+
+  const onResetPassword = async (user: AdminUserSummary) => {
+    try {
+      const outcome = await sendReset.mutateAsync(user.id);
+      if (outcome.emailSent) {
+        setToast({
+          message: `Password reset emailed to ${user.email}. Sessions revoked.`,
+          severity: 'success',
+        });
+      } else if (outcome.resetUrl) {
+        setResetLink({ displayName: user.displayName, url: outcome.resetUrl });
+      } else {
+        setToast({
+          message: `Reset triggered for ${user.displayName}, but no link was returned.`,
+          severity: 'error',
+        });
+      }
+    } catch (err) {
+      setToast({
+        message: conflictOr(err, 'The reset could not be triggered.'),
+        severity: 'error',
+      });
+    }
+  };
+
+  const confirmDelete = async () => {
+    if (!deleteTarget) return;
+    try {
+      await deleteUser.mutateAsync(deleteTarget.id);
+      setToast({ message: `User “${deleteTarget.displayName}” deleted.`, severity: 'success' });
+    } catch (err) {
+      setToast({ message: conflictOr(err, 'Could not delete the user.'), severity: 'error' });
+    } finally {
+      setDeleteTarget(null);
     }
   };
 
@@ -122,13 +190,13 @@ export function UsersPage() {
         </Button>
       </Stack>
 
-      <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1.5}>
+      <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1.5} sx={{ flexWrap: 'wrap' }}>
         <TextField
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           placeholder="Search by name, email or username"
           size="small"
-          sx={{ flex: 1, maxWidth: 420 }}
+          sx={{ flex: 1, minWidth: 240, maxWidth: 420 }}
           slotProps={{
             input: {
               startAdornment: (
@@ -160,12 +228,27 @@ export function UsersPage() {
             setPage(0);
           }}
           size="small"
-          sx={{ minWidth: 160 }}
+          sx={{ minWidth: 150 }}
         >
           <MenuItem value="">All roles</MenuItem>
           <MenuItem value="ADMIN">Admin</MenuItem>
           <MenuItem value="MEMBER">Member</MenuItem>
           <MenuItem value="AUDITOR">Auditor</MenuItem>
+        </TextField>
+        <TextField
+          select
+          label="Status"
+          value={statusFilter}
+          onChange={(e) => {
+            setStatusFilter(e.target.value as StatusFilter);
+            setPage(0);
+          }}
+          size="small"
+          sx={{ minWidth: 150 }}
+        >
+          <MenuItem value="">All statuses</MenuItem>
+          <MenuItem value="active">Active</MenuItem>
+          <MenuItem value="disabled">Disabled</MenuItem>
         </TextField>
       </Stack>
 
@@ -177,14 +260,28 @@ export function UsersPage() {
           </Alert>
         ) : (
           <>
-            <UsersTable users={users} onEdit={openEdit} onResetPassword={onResetPassword} />
+            <UsersTable
+              users={users}
+              currentUserId={currentUserId}
+              sort={sort}
+              onSort={onSort}
+              onEdit={openEdit}
+              onResetPassword={onResetPassword}
+              onToggleEnabled={onToggleEnabled}
+              onDelete={setDeleteTarget}
+            />
             <TablePagination
               component="div"
               count={total}
               page={page}
-              rowsPerPage={PAGE_SIZE}
-              rowsPerPageOptions={[PAGE_SIZE]}
+              rowsPerPage={pageSize}
+              rowsPerPageOptions={PAGE_SIZE_OPTIONS}
               onPageChange={(_, next) => setPage(next)}
+              onRowsPerPageChange={(e) => {
+                setPageSize(parseInt(e.target.value, 10));
+                setPage(0);
+              }}
+              labelRowsPerPage="Users per page"
               labelDisplayedRows={({ from, to, count }) => `${from}–${to} of ${count}`}
             />
           </>
@@ -204,6 +301,23 @@ export function UsersPage() {
         onClose={() => setDialog({ open: false })}
       />
 
+      <ConfirmDialog
+        open={deleteTarget !== null}
+        title="Delete user"
+        message={`Permanently delete “${deleteTarget?.displayName}”? Their sessions, settings and team memberships are removed. This cannot be undone.`}
+        confirmLabel="Delete"
+        destructive
+        onConfirm={confirmDelete}
+        onClose={() => setDeleteTarget(null)}
+      />
+
+      <ResetLinkDialog
+        open={resetLink !== null}
+        displayName={resetLink?.displayName ?? ''}
+        url={resetLink?.url ?? ''}
+        onClose={() => setResetLink(null)}
+      />
+
       <Snackbar
         open={toast !== null}
         autoHideDuration={5000}
@@ -218,4 +332,10 @@ export function UsersPage() {
       </Snackbar>
     </Stack>
   );
+}
+
+/** Maps a known 409 conflict code to a friendly message, else the generic fallback. */
+function conflictOr(err: unknown, fallback: string): string {
+  const code = apiErrorCode(err);
+  return (code && CONFLICT_MESSAGES[code]) ?? apiErrorMessage(err, fallback);
 }

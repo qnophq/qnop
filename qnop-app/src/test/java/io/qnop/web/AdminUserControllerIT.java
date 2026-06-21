@@ -21,7 +21,10 @@
 package io.qnop.web;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.hamcrest.Matchers.everyItem;
 import static org.hamcrest.Matchers.greaterThanOrEqualTo;
+import static org.hamcrest.Matchers.is;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -231,11 +234,83 @@ class AdminUserControllerIT extends AbstractIntegrationTest {
     User target = createUser("member", UserRole.MEMBER);
     String token = adminToken();
 
+    // No SMTP is configured in the IT, so the email is "skipped" and the fallback link is returned.
     mockMvc
         .perform(
             post("/api/v1/admin/users/{id}/password-reset", target.getId())
                 .header("Authorization", "Bearer " + token))
-        .andExpect(status().isAccepted());
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.emailSent").value(false))
+        .andExpect(jsonPath("$.resetUrl").isNotEmpty());
+  }
+
+  @Test
+  void adminDeletesUser() throws Exception {
+    createUser("root", UserRole.ADMIN);
+    User target = createUser("victim", UserRole.MEMBER);
+    String token = adminToken();
+
+    mockMvc
+        .perform(
+            delete("/api/v1/admin/users/{id}", target.getId())
+                .header("Authorization", "Bearer " + token))
+        .andExpect(status().isNoContent());
+
+    mockMvc
+        .perform(
+            get("/api/v1/admin/users/{id}", target.getId())
+                .header("Authorization", "Bearer " + token))
+        .andExpect(status().isNotFound());
+  }
+
+  @Test
+  void adminCannotDeleteOwnAccount() throws Exception {
+    User admin = createUser("root", UserRole.ADMIN);
+    String token = adminToken();
+
+    mockMvc
+        .perform(
+            delete("/api/v1/admin/users/{id}", admin.getId())
+                .header("Authorization", "Bearer " + token))
+        .andExpect(status().isConflict())
+        .andExpect(jsonPath("$.code").value("SELF_DELETE"));
+  }
+
+  @Test
+  void filtersByEnabledStatus() throws Exception {
+    createUser("root", UserRole.ADMIN);
+    User disabled = createUser("inactive", UserRole.MEMBER);
+    disabled.setEnabled(false);
+    userRepository.saveAndFlush(disabled);
+    String token = adminToken();
+
+    mockMvc
+        .perform(
+            get("/api/v1/admin/users")
+                .param("enabled", "false")
+                .header("Authorization", "Bearer " + token))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.items[*].username", everyItem(is("inactive"))))
+        .andExpect(jsonPath("$.items[*].enabled", everyItem(is(false))));
+  }
+
+  @Test
+  void sortsByDisplayNameDescending() throws Exception {
+    createUser("root", UserRole.ADMIN);
+    createUser("sortuser-a", UserRole.MEMBER);
+    createUser("sortuser-b", UserRole.MEMBER);
+    String token = adminToken();
+
+    mockMvc
+        .perform(
+            get("/api/v1/admin/users")
+                .param("q", "sortuser")
+                .param("sort", "displayName,desc")
+                .header("Authorization", "Bearer " + token))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.total").value(2))
+        .andExpect(jsonPath("$.items[0].username").value("sortuser-b"))
+        .andExpect(jsonPath("$.items[1].username").value("sortuser-a"));
   }
 
   private String adminToken() throws Exception {
