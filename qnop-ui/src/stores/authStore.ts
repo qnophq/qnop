@@ -36,6 +36,12 @@ interface AuthState {
   isAuthenticated: boolean;
   /** True while the initial refresh-on-load is in flight; gates the first render. */
   isHydrating: boolean;
+  /**
+   * True when the backend has a valid session but forces a password change
+   * before any non-auth resource (the PasswordChangeRequiredFilter returns 403
+   * on /users/me). The token is kept so the user can reach /change-password.
+   */
+  passwordChangeRequired: boolean;
 
   setAccessToken: (token: string | null) => void;
   login: (usernameOrEmail: string, password: string) => Promise<void>;
@@ -58,6 +64,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   ...EMPTY_PROFILE,
   isAuthenticated: false,
   isHydrating: true,
+  passwordChangeRequired: false,
 
   setAccessToken: (token) => set({ accessToken: token }),
 
@@ -69,7 +76,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       body: JSON.stringify({ usernameOrEmail, password }),
     });
     if (!response.ok) {
-      throw new Error('INVALID_CREDENTIALS');
+      throw new Error(response.status === 429 ? 'RATE_LIMITED' : 'INVALID_CREDENTIALS');
     }
     const body = (await response.json()) as { accessToken: string };
     set({ accessToken: body.accessToken });
@@ -82,19 +89,26 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       credentials: 'include',
       headers: token ? { Authorization: `Bearer ${token}` } : {},
     });
-    if (!response.ok) {
-      get().clearAuth();
+    if (response.ok) {
+      const me = (await response.json()) as CurrentUserResponse;
+      set({
+        userId: me.id,
+        displayName: me.displayName,
+        email: me.email,
+        role: me.role,
+        source: me.source,
+        isAuthenticated: true,
+        passwordChangeRequired: false,
+      });
       return;
     }
-    const me = (await response.json()) as CurrentUserResponse;
-    set({
-      userId: me.id,
-      displayName: me.displayName,
-      email: me.email,
-      role: me.role,
-      source: me.source,
-      isAuthenticated: true,
-    });
+    // A 403 here means a valid session that must change its password first; keep
+    // the token so /change-password is reachable. Any other failure clears auth.
+    if (response.status === 403 && token) {
+      set({ ...EMPTY_PROFILE, isAuthenticated: false, passwordChangeRequired: true });
+      return;
+    }
+    get().clearAuth();
   },
 
   hydrate: async () => {
@@ -128,7 +142,13 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     get().clearAuth();
   },
 
-  clearAuth: () => set({ accessToken: null, ...EMPTY_PROFILE, isAuthenticated: false }),
+  clearAuth: () =>
+    set({
+      accessToken: null,
+      ...EMPTY_PROFILE,
+      isAuthenticated: false,
+      passwordChangeRequired: false,
+    }),
 }));
 
 /** Whether the current user has the global ADMIN role. */

@@ -26,7 +26,7 @@ import ListItemIcon from '@mui/material/ListItemIcon';
 import Menu from '@mui/material/Menu';
 import MenuItem from '@mui/material/MenuItem';
 import Typography from '@mui/material/Typography';
-import { LogOut } from 'lucide-react';
+import { KeyRound, LogOut } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useAuthStore } from '../../stores/authStore';
 import { UserAvatar } from './UserAvatar';
@@ -89,6 +89,17 @@ export function UserFooter({ collapsed }: UserFooterProps) {
         anchorOrigin={{ vertical: 'top', horizontal: 'left' }}
         transformOrigin={{ vertical: 'bottom', horizontal: 'left' }}
       >
+        <MenuItem
+          onClick={() => {
+            setAnchor(null);
+            navigate('/change-password');
+          }}
+        >
+          <ListItemIcon>
+            <KeyRound size={16} />
+          </ListItemIcon>
+          Passwort ändern
+        </MenuItem>
         <MenuItem onClick={onLogout}>
           <ListItemIcon>
             <LogOut size={16} />
