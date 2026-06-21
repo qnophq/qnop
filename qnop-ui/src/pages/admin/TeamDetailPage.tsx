@@ -37,14 +37,7 @@ import TableCell from '@mui/material/TableCell';
 import TableHead from '@mui/material/TableHead';
 import TableRow from '@mui/material/TableRow';
 import Typography from '@mui/material/Typography';
-import {
-  ArrowLeft,
-  ArrowLeftRight,
-  MoreVertical,
-  SquarePen,
-  UserMinus,
-  UserPlus,
-} from 'lucide-react';
+import { ArrowLeftRight, MoreVertical, SquarePen, UserMinus, UserPlus } from 'lucide-react';
 import { Link as RouterLink, useParams } from 'react-router-dom';
 import type { AdminTeamMember } from '../../api/generated';
 import { useRemoveTeamMember, useSetTeamMemberRole, useTeam } from '../../api/hooks/useTeams';
@@ -108,14 +101,6 @@ export function TeamDetailPage() {
   return (
     <Stack spacing={3}>
       <Box>
-        <Link
-          component={RouterLink}
-          to="/admin/teams"
-          underline="hover"
-          sx={{ display: 'inline-flex', alignItems: 'center', gap: 0.5, fontSize: 13, mb: 1 }}
-        >
-          <ArrowLeft size={15} /> Teams
-        </Link>
         <Stack
           direction={{ xs: 'column', sm: 'row' }}
           spacing={2}

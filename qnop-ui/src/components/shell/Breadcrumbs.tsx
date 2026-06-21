@@ -38,7 +38,9 @@ export function Breadcrumbs() {
     >
       {crumbs.map((c, i) => {
         const isLast = i === crumbs.length - 1;
-        if (c.to && !isLast) {
+        // A crumb with a `to` is always a link — even when it is the last crumb,
+        // as on a detail page where the trailing "Teams" links back to the list.
+        if (c.to) {
           return (
             <Link
               key={i}
