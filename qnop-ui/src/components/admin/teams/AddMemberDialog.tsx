@@ -34,7 +34,6 @@ import TextField from '@mui/material/TextField';
 import type { AdminUserSummary, TeamRole } from '../../../api/generated';
 import { useAdminUsers } from '../../../api/hooks/useAdminUsers';
 import { useAddTeamMember } from '../../../api/hooks/useTeams';
-import { apiErrorCode, apiErrorMessage } from '../../../utils/apiError';
 
 interface AddMemberDialogProps {
   open: boolean;
@@ -43,7 +42,11 @@ interface AddMemberDialogProps {
   onClose: () => void;
 }
 
-/** Picks a user (via the admin user search) and adds them to the team with a role. */
+/**
+ * Picks one or more users (via the admin user search) and adds them to the team
+ * with the chosen role. Adds run in parallel; on a partial failure the dialog
+ * stays open with only the users that could not be added still selected.
+ */
 export function AddMemberDialog({
   open,
   teamId,
@@ -53,9 +56,10 @@ export function AddMemberDialog({
   const addMember = useAddTeamMember();
   const [search, setSearch] = useState('');
   const [debounced, setDebounced] = useState('');
-  const [selected, setSelected] = useState<AdminUserSummary | null>(null);
+  const [selected, setSelected] = useState<AdminUserSummary[]>([]);
   const [teamRole, setTeamRole] = useState<TeamRole>('MEMBER');
   const [error, setError] = useState<string | null>(null);
+  const [submitting, setSubmitting] = useState(false);
 
   useEffect(() => {
     const handle = setTimeout(() => setDebounced(search), 300);
@@ -68,27 +72,33 @@ export function AddMemberDialog({
 
   const onSubmit = async (event: FormEvent) => {
     event.preventDefault();
-    if (!selected) return;
+    if (selected.length === 0) return;
     setError(null);
-    try {
-      await addMember.mutateAsync({ teamId, userId: selected.id, teamRole });
+    setSubmitting(true);
+    const results = await Promise.allSettled(
+      selected.map((user) => addMember.mutateAsync({ teamId, userId: user.id, teamRole })),
+    );
+    setSubmitting(false);
+
+    const failed = selected.filter((_, i) => results[i].status === 'rejected');
+    if (failed.length === 0) {
       onClose();
-    } catch (err) {
-      const message =
-        apiErrorCode(err) === 'ALREADY_MEMBER'
-          ? 'This user is already a member of the team.'
-          : apiErrorMessage(err, 'Could not add the member. Please try again.');
-      setError(message);
+      return;
     }
+    // Keep only the users that could not be added so the admin can retry them.
+    setSelected(failed);
+    setError(`Could not add: ${failed.map((u) => u.displayName).join(', ')}.`);
   };
 
   return (
     <Dialog open={open} onClose={onClose} fullWidth maxWidth="sm">
       <Box component="form" onSubmit={onSubmit} noValidate>
-        <DialogTitle>Add member</DialogTitle>
+        <DialogTitle>Add members</DialogTitle>
         <DialogContent>
           <Stack spacing={2.5} sx={{ mt: 1 }}>
             <Autocomplete
+              multiple
+              disableCloseOnSelect
               options={options}
               loading={isFetching}
               value={selected}
@@ -99,7 +109,7 @@ export function AddMemberDialog({
               filterOptions={(x) => x}
               noOptionsText="No matching users"
               renderInput={(params) => (
-                <TextField {...params} label="User" placeholder="Search by name or email" />
+                <TextField {...params} label="Users" placeholder="Search by name or email" />
               )}
             />
             <TextField
@@ -108,6 +118,7 @@ export function AddMemberDialog({
               value={teamRole}
               onChange={(e) => setTeamRole(e.target.value as TeamRole)}
               fullWidth
+              helperText="Applied to everyone added in this batch."
             >
               <MenuItem value="MEMBER">Member</MenuItem>
               <MenuItem value="LEAD">Lead</MenuItem>
@@ -119,8 +130,8 @@ export function AddMemberDialog({
           <Button onClick={onClose} color="inherit">
             Cancel
           </Button>
-          <Button type="submit" variant="contained" disabled={addMember.isPending || !selected}>
-            Add
+          <Button type="submit" variant="contained" disabled={submitting || selected.length === 0}>
+            {selected.length > 1 ? `Add ${selected.length}` : 'Add'}
           </Button>
         </DialogActions>
       </Box>
