@@ -19,18 +19,21 @@
  * SPDX-License-Identifier: AGPL-3.0-only
  */
 
-import { useState, type FormEvent } from 'react';
+import { useState, type FormEvent, type ReactNode } from 'react';
 import Alert from '@mui/material/Alert';
 import Box from '@mui/material/Box';
 import Button from '@mui/material/Button';
 import Checkbox from '@mui/material/Checkbox';
 import FormControlLabel from '@mui/material/FormControlLabel';
+import InputAdornment from '@mui/material/InputAdornment';
 import Link from '@mui/material/Link';
 import Stack from '@mui/material/Stack';
 import TextField from '@mui/material/TextField';
 import Typography from '@mui/material/Typography';
+import { AtSign, Mail, User } from 'lucide-react';
 import { Link as RouterLink, Navigate } from 'react-router-dom';
 import { AuthLayout } from '../../components/auth/AuthLayout';
+import { AuthModeSwitch } from '../../components/auth/AuthModeSwitch';
 import { OidcButtons } from '../../components/auth/OidcButtons';
 import { PasswordField } from '../../components/auth/PasswordField';
 import { PasswordStrengthMeter } from '../../components/auth/PasswordStrengthMeter';
@@ -38,6 +41,10 @@ import { register } from '../../api/auth';
 import { useConfig } from '../../api/hooks/useConfig';
 import { apiErrorMessage } from '../../utils/apiError';
 import { passwordStrength } from '../../utils/passwordStrength';
+
+const startIcon = (icon: ReactNode) => ({
+  input: { startAdornment: <InputAdornment position="start">{icon}</InputAdornment> },
+});
 
 /** Registration screen, available only when self-registration is enabled. */
 export function RegisterPage() {
@@ -63,9 +70,7 @@ export function RegisterPage() {
       await register({ displayName, username, email, password });
       setDone(true);
     } catch (err) {
-      setError(
-        apiErrorMessage(err, 'Registrierung fehlgeschlagen. Bitte später erneut versuchen.'),
-      );
+      setError(apiErrorMessage(err, 'Registration failed. Please try again later.'));
     } finally {
       setSubmitting(false);
     }
@@ -73,13 +78,13 @@ export function RegisterPage() {
 
   if (done) {
     return (
-      <AuthLayout title="Fast geschafft">
+      <AuthLayout title="Almost there">
         <Alert severity="success" sx={{ mb: 2 }}>
-          Wenn die Angaben gültig sind, haben wir dir eine Bestätigungs-E-Mail geschickt. Bitte
-          bestätige deine Adresse, um die Anmeldung abzuschließen.
+          If the details are valid, we&apos;ve sent you a confirmation email. Please confirm your
+          address to finish signing up.
         </Alert>
         <Link component={RouterLink} to="/login" underline="hover">
-          Zur Anmeldung
+          To sign in
         </Link>
       </AuthLayout>
     );
@@ -88,37 +93,44 @@ export function RegisterPage() {
   const canSubmit = terms && passwordStrength(password).acceptable;
 
   return (
-    <AuthLayout title="Konto erstellen" subtitle="In zwei Minuten startklar.">
+    <AuthLayout
+      title="Create account"
+      subtitle="Ready in two minutes."
+      headerSlot={<AuthModeSwitch active="register" />}
+    >
       <Box component="form" onSubmit={onSubmit} noValidate>
         <Stack spacing={2}>
           <TextField
-            label="Vollständiger Name"
+            label="Full name"
             value={displayName}
             onChange={(e) => setDisplayName(e.target.value)}
             autoComplete="name"
             fullWidth
             required
+            slotProps={startIcon(<User size={17} />)}
           />
           <TextField
-            label="Benutzername"
+            label="Username"
             value={username}
             onChange={(e) => setUsername(e.target.value)}
             autoComplete="username"
             fullWidth
             required
+            slotProps={startIcon(<AtSign size={17} />)}
           />
           <TextField
-            label="Arbeits-E-Mail"
+            label="Work email"
             type="email"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
             autoComplete="email"
             fullWidth
             required
+            slotProps={startIcon(<Mail size={17} />)}
           />
           <Box>
             <PasswordField
-              label="Passwort"
+              label="Password"
               value={password}
               onChange={setPassword}
               autoComplete="new-password"
@@ -133,7 +145,7 @@ export function RegisterPage() {
             }
             label={
               <Typography sx={{ fontSize: 12.5, color: 'text.secondary' }}>
-                Ich akzeptiere die Nutzungsbedingungen und die Datenschutzerklärung (DSGVO).
+                I accept the terms of service and the privacy policy (GDPR).
               </Typography>
             }
           />
@@ -147,19 +159,12 @@ export function RegisterPage() {
             disabled={submitting || !canSubmit}
             fullWidth
           >
-            Konto erstellen
+            Create account
           </Button>
         </Stack>
       </Box>
 
       <OidcButtons />
-
-      <Typography sx={{ mt: 3, textAlign: 'center', fontSize: 13, color: 'text.secondary' }}>
-        Bereits ein Konto?{' '}
-        <Link component={RouterLink} to="/login" underline="hover" sx={{ fontWeight: 500 }}>
-          Anmelden
-        </Link>
-      </Typography>
     </AuthLayout>
   );
 }

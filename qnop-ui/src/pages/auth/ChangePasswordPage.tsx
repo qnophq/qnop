@@ -69,9 +69,7 @@ export function ChangePasswordPage() {
       clearAuth();
       setDone(true);
     } catch (err) {
-      setError(
-        apiErrorMessage(err, 'Das aktuelle Passwort ist falsch oder die Anfrage schlug fehl.'),
-      );
+      setError(apiErrorMessage(err, 'The current password is wrong or the request failed.'));
     } finally {
       setSubmitting(false);
     }
@@ -79,23 +77,23 @@ export function ChangePasswordPage() {
 
   return (
     <AuthLayout
-      title="Passwort ändern"
-      subtitle={forced ? 'Bitte vergib ein neues Passwort, um fortzufahren.' : undefined}
+      title="Change password"
+      subtitle={forced ? 'Please set a new password to continue.' : undefined}
     >
       {done ? (
         <>
           <Alert severity="success" sx={{ mb: 2 }}>
-            Dein Passwort wurde geändert. Bitte melde dich mit dem neuen Passwort an.
+            Your password has been changed. Please sign in with the new password.
           </Alert>
           <Link component={RouterLink} to="/login" underline="hover">
-            Zur Anmeldung
+            To sign in
           </Link>
         </>
       ) : (
         <Box component="form" onSubmit={onSubmit} noValidate>
           <Stack spacing={2}>
             <PasswordField
-              label="Aktuelles Passwort"
+              label="Current password"
               value={current}
               onChange={setCurrent}
               autoComplete="current-password"
@@ -103,7 +101,7 @@ export function ChangePasswordPage() {
             />
             <Box>
               <PasswordField
-                label="Neues Passwort"
+                label="New password"
                 value={password}
                 onChange={setPassword}
                 autoComplete="new-password"
@@ -112,13 +110,13 @@ export function ChangePasswordPage() {
               <PasswordStrengthMeter password={password} />
             </Box>
             <PasswordField
-              label="Neues Passwort bestätigen"
+              label="Confirm new password"
               value={confirm}
               onChange={setConfirm}
               autoComplete="new-password"
               required
             />
-            {mismatch && <Alert severity="warning">Die Passwörter stimmen nicht überein.</Alert>}
+            {mismatch && <Alert severity="warning">The passwords don&apos;t match.</Alert>}
             {error && <Alert severity="error">{error}</Alert>}
             <Button
               type="submit"
@@ -127,12 +125,12 @@ export function ChangePasswordPage() {
               disabled={submitting || !canSubmit}
               fullWidth
             >
-              Passwort ändern
+              Change password
             </Button>
             {!forced && (
               <Typography sx={{ fontSize: 13 }}>
                 <Link component={RouterLink} to="/" underline="hover">
-                  Abbrechen
+                  Cancel
                 </Link>
               </Typography>
             )}

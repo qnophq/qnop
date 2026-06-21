@@ -35,15 +35,17 @@ const TRUST = [
 interface AuthLayoutProps {
   title: string;
   subtitle?: string;
+  /** Optional slot rendered above the title (e.g. the sign-in/register switch). */
+  headerSlot?: ReactNode;
   children: ReactNode;
 }
 
 /**
  * Two-column shell for the public auth screens (#103): a sovereign-themed brand
  * panel on the left (hidden below `md`) and the form card on the right, matching
- * the design prototype's "Dokumenten-Review, souverän" treatment.
+ * the design prototype's "Sovereign document review" treatment.
  */
-export function AuthLayout({ title, subtitle, children }: AuthLayoutProps) {
+export function AuthLayout({ title, subtitle, headerSlot, children }: AuthLayoutProps) {
   return (
     <Box
       sx={{
@@ -131,22 +133,32 @@ export function AuthLayout({ title, subtitle, children }: AuthLayoutProps) {
         <Box sx={{ position: 'relative', zIndex: 1, mt: 'auto', maxWidth: 460 }}>
           <Typography
             sx={{
-              fontSize: 12,
-              letterSpacing: '0.1em',
+              fontSize: 12.5,
+              letterSpacing: '0.12em',
               textTransform: 'uppercase',
               color: '#61B5F6',
-              fontWeight: 500,
-              mb: 2,
+              fontWeight: 600,
+              mb: 2.5,
             }}
           >
-            Dokumenten-Review, souverän
+            Sovereign document review
           </Typography>
-          <Typography variant="h2" sx={{ color: '#fff', mb: 2 }}>
-            Prüfen, freigeben, vertrauen — alles an einem Ort.
+          <Typography
+            component="h2"
+            sx={{
+              color: '#fff',
+              fontWeight: 700,
+              fontSize: { md: 34, lg: 41 },
+              lineHeight: 1.1,
+              letterSpacing: '-0.025em',
+              mb: 2.5,
+            }}
+          >
+            Review, approve, trust — all in one place.
           </Typography>
-          <Typography sx={{ color: '#B9C6D4', lineHeight: 1.6, maxWidth: 420 }}>
-            Verträge gemeinsam prüfen, Versionen vergleichen und Reviews koordinieren. Ihre Daten
-            bleiben dabei vollständig auf Ihrer Infrastruktur.
+          <Typography sx={{ color: '#B9C6D4', fontSize: 16, lineHeight: 1.65, maxWidth: 430 }}>
+            Review contracts together, compare versions and coordinate reviews — while your data
+            stays entirely on your own infrastructure.
           </Typography>
           <Stack direction="row" sx={{ flexWrap: 'wrap', gap: 1.25, mt: 4 }}>
             {TRUST.map(({ icon: Icon, label }) => (
@@ -173,7 +185,7 @@ export function AuthLayout({ title, subtitle, children }: AuthLayoutProps) {
         </Box>
 
         <Typography sx={{ position: 'relative', zIndex: 1, mt: 5, fontSize: 12, color: '#7A8BA0' }}>
-          © 2026 devtank42 GmbH · Alle Daten verbleiben in der EU
+          © 2026 devtank42 GmbH · All data stays in the EU
         </Typography>
       </Box>
 
@@ -188,11 +200,21 @@ export function AuthLayout({ title, subtitle, children }: AuthLayoutProps) {
         }}
       >
         <Box sx={{ width: '100%', maxWidth: 408 }}>
-          <Typography variant="h4" component="h1" sx={{ mb: subtitle ? 0.5 : 3 }}>
+          {headerSlot}
+          <Typography
+            component="h1"
+            sx={{
+              fontWeight: 700,
+              fontSize: 26,
+              letterSpacing: '-0.02em',
+              lineHeight: 1.15,
+              mb: subtitle ? 0.75 : 3,
+            }}
+          >
             {title}
           </Typography>
           {subtitle && (
-            <Typography color="text.secondary" sx={{ mb: 3 }}>
+            <Typography color="text.secondary" sx={{ fontSize: 14.5, mb: 3 }}>
               {subtitle}
             </Typography>
           )}

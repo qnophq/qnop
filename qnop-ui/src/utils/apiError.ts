@@ -21,7 +21,7 @@
 
 import { isAxiosError } from 'axios';
 
-const RATE_LIMITED = 'Zu viele Versuche. Bitte versuche es später erneut.';
+const RATE_LIMITED = 'Too many attempts. Please try again later.';
 
 /**
  * Maps an API/network error to a concise, user-facing German message. Rate
@@ -32,7 +32,7 @@ export function apiErrorMessage(error: unknown, fallback: string): string {
   if (isAxiosError(error)) {
     const status = error.response?.status;
     if (status === 429) return RATE_LIMITED;
-    if (status === 400) return 'Die Anfrage ist ungültig oder der Link ist abgelaufen.';
+    if (status === 400) return 'The request is invalid or the link has expired.';
   }
   if (error instanceof Error && error.message === 'RATE_LIMITED') {
     return RATE_LIMITED;

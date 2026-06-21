@@ -60,11 +60,11 @@ export function UsersTable({ users, onEdit, onResetPassword }: UsersTableProps) 
       <Table size="medium" sx={{ '& td, & th': { borderColor: 'divider' } }}>
         <TableHead>
           <TableRow>
-            <TableCell>Benutzer</TableCell>
-            <TableCell>Rolle</TableCell>
+            <TableCell>User</TableCell>
+            <TableCell>Role</TableCell>
             <TableCell>Status</TableCell>
-            <TableCell>Letzter Login</TableCell>
-            <TableCell align="right">Aktionen</TableCell>
+            <TableCell>Last login</TableCell>
+            <TableCell align="right">Actions</TableCell>
           </TableRow>
         </TableHead>
         <TableBody>
@@ -72,7 +72,7 @@ export function UsersTable({ users, onEdit, onResetPassword }: UsersTableProps) 
             <TableRow>
               <TableCell colSpan={5}>
                 <Typography color="text.secondary" sx={{ py: 4, textAlign: 'center' }}>
-                  Keine Benutzer gefunden.
+                  No users found.
                 </Typography>
               </TableCell>
             </TableRow>
@@ -114,7 +114,7 @@ export function UsersTable({ users, onEdit, onResetPassword }: UsersTableProps) 
               <TableCell align="right">
                 <IconButton
                   size="small"
-                  aria-label={`Aktionen für ${user.displayName}`}
+                  aria-label={`Actions for ${user.displayName}`}
                   onClick={(e) => openMenu(e, user)}
                 >
                   <MoreVertical size={18} />
@@ -135,7 +135,7 @@ export function UsersTable({ users, onEdit, onResetPassword }: UsersTableProps) 
           <ListItemIcon>
             <SquarePen size={16} />
           </ListItemIcon>
-          <ListItemText>Bearbeiten</ListItemText>
+          <ListItemText>Edit</ListItemText>
         </MenuItem>
         <MenuItem
           disabled={active?.source === 'EXTERNAL'}
@@ -147,7 +147,7 @@ export function UsersTable({ users, onEdit, onResetPassword }: UsersTableProps) 
           <ListItemIcon>
             <KeyRound size={16} />
           </ListItemIcon>
-          <ListItemText>Passwort-Link senden</ListItemText>
+          <ListItemText>Send password link</ListItemText>
         </MenuItem>
       </Menu>
     </>

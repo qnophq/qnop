@@ -33,7 +33,7 @@ import { UserAvatar } from './UserAvatar';
 
 const ROLE_LABEL: Record<string, string> = {
   ADMIN: 'Administrator',
-  MEMBER: 'Mitglied',
+  MEMBER: 'Member',
   AUDITOR: 'Auditor',
 };
 
@@ -59,7 +59,7 @@ export function UserFooter({ collapsed }: UserFooterProps) {
     <Box sx={{ borderTop: 1, borderColor: 'divider', p: collapsed ? 1 : 1.5 }}>
       <ButtonBase
         onClick={(e: MouseEvent<HTMLElement>) => setAnchor(e.currentTarget)}
-        aria-label="Benutzermenü"
+        aria-label="User menu"
         sx={{
           width: '100%',
           gap: 1.25,
@@ -73,7 +73,7 @@ export function UserFooter({ collapsed }: UserFooterProps) {
         {!collapsed && (
           <Box sx={{ minWidth: 0, textAlign: 'left', flex: 1 }}>
             <Typography noWrap sx={{ fontSize: 13, fontWeight: 500, lineHeight: 1.2 }}>
-              {displayName ?? 'Unbekannt'}
+              {displayName ?? 'Unknown'}
             </Typography>
             <Typography noWrap sx={{ fontSize: 11, color: 'text.disabled' }}>
               {role ? ROLE_LABEL[role] : ''}
@@ -98,13 +98,13 @@ export function UserFooter({ collapsed }: UserFooterProps) {
           <ListItemIcon>
             <KeyRound size={16} />
           </ListItemIcon>
-          Passwort ändern
+          Change password
         </MenuItem>
         <MenuItem onClick={onLogout}>
           <ListItemIcon>
             <LogOut size={16} />
           </ListItemIcon>
-          Abmelden
+          Sign out
         </MenuItem>
       </Menu>
     </Box>

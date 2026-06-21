@@ -41,7 +41,7 @@ export function OidcButtons() {
 
   return (
     <>
-      <Divider sx={{ my: 2.5, color: 'text.disabled', fontSize: 12 }}>oder</Divider>
+      <Divider sx={{ my: 2.5, color: 'text.disabled', fontSize: 12 }}>or</Divider>
       <Stack spacing={1.25}>
         {providers.map((p) => (
           <Button
@@ -55,7 +55,7 @@ export function OidcButtons() {
             }}
             sx={{ borderColor: 'divider', color: 'text.primary', justifyContent: 'center' }}
           >
-            Mit {p.name} anmelden
+            Sign in with {p.name}
           </Button>
         ))}
       </Stack>

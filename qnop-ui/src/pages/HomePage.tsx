@@ -38,9 +38,9 @@ export function HomePage() {
   return (
     <Stack spacing={3}>
       <Box>
-        <Typography variant="h1">Willkommen{displayName ? `, ${displayName}` : ''}.</Typography>
+        <Typography variant="h1">Welcome{displayName ? `, ${displayName}` : ''}.</Typography>
         <Typography color="text.secondary" sx={{ mt: 1 }}>
-          Dein Review-Arbeitsbereich entsteht hier in den nächsten Schritten.
+          Your review workspace will take shape here over the next steps.
         </Typography>
       </Box>
 
@@ -63,9 +63,9 @@ export function HomePage() {
               <Inbox size={22} />
             </Box>
             <Box>
-              <Typography variant="h6">Noch keine Reviews</Typography>
+              <Typography variant="h6">No reviews yet</Typography>
               <Typography color="text.secondary">
-                Sobald der Dokumenten-Upload steht, erscheinen deine Reviews hier.
+                Once document upload is ready, your reviews will appear here.
               </Typography>
             </Box>
           </Stack>

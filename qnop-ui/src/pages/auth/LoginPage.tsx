@@ -23,12 +23,14 @@ import { useState, type FormEvent } from 'react';
 import Alert from '@mui/material/Alert';
 import Box from '@mui/material/Box';
 import Button from '@mui/material/Button';
+import InputAdornment from '@mui/material/InputAdornment';
 import Link from '@mui/material/Link';
 import Stack from '@mui/material/Stack';
 import TextField from '@mui/material/TextField';
-import Typography from '@mui/material/Typography';
+import { AtSign } from 'lucide-react';
 import { Link as RouterLink, useNavigate, useSearchParams } from 'react-router-dom';
 import { AuthLayout } from '../../components/auth/AuthLayout';
+import { AuthModeSwitch } from '../../components/auth/AuthModeSwitch';
 import { OidcButtons } from '../../components/auth/OidcButtons';
 import { PasswordField } from '../../components/auth/PasswordField';
 import { useConfig } from '../../api/hooks/useConfig';
@@ -47,6 +49,8 @@ export function LoginPage() {
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
+  const canRegister = !!config?.auth?.selfRegistrationEnabled;
+
   const onSubmit = async (event: FormEvent) => {
     event.preventDefault();
     setError(null);
@@ -59,27 +63,40 @@ export function LoginPage() {
       }
       navigate(safeRedirectPath(params.get('from')), { replace: true });
     } catch (err) {
-      setError(apiErrorMessage(err, 'Anmeldung fehlgeschlagen. Bitte Zugangsdaten prüfen.'));
+      setError(apiErrorMessage(err, 'Sign-in failed. Please check your credentials.'));
     } finally {
       setSubmitting(false);
     }
   };
 
   return (
-    <AuthLayout title="Willkommen zurück" subtitle="Melde dich an, um deine Reviews fortzusetzen.">
+    <AuthLayout
+      title="Welcome back"
+      subtitle="Sign in to continue with your reviews."
+      headerSlot={canRegister ? <AuthModeSwitch active="login" /> : undefined}
+    >
       <Box component="form" onSubmit={onSubmit} noValidate>
         <Stack spacing={2}>
           <TextField
-            label="E-Mail oder Benutzername"
+            label="Email or username"
             value={usernameOrEmail}
             onChange={(e) => setUsernameOrEmail(e.target.value)}
             autoComplete="username"
             fullWidth
             required
+            slotProps={{
+              input: {
+                startAdornment: (
+                  <InputAdornment position="start">
+                    <AtSign size={17} />
+                  </InputAdornment>
+                ),
+              },
+            }}
           />
           <Box>
             <PasswordField
-              label="Passwort"
+              label="Password"
               value={password}
               onChange={setPassword}
               autoComplete="current-password"
@@ -92,7 +109,7 @@ export function LoginPage() {
                 underline="hover"
                 sx={{ fontSize: 13 }}
               >
-                Passwort vergessen?
+                Forgot password?
               </Link>
             </Box>
           </Box>
@@ -100,21 +117,12 @@ export function LoginPage() {
           {error && <Alert severity="error">{error}</Alert>}
 
           <Button type="submit" variant="contained" size="large" disabled={submitting} fullWidth>
-            Anmelden
+            Sign in
           </Button>
         </Stack>
       </Box>
 
       <OidcButtons />
-
-      {config?.auth?.selfRegistrationEnabled && (
-        <Typography sx={{ mt: 3, textAlign: 'center', fontSize: 13, color: 'text.secondary' }}>
-          Noch kein Konto?{' '}
-          <Link component={RouterLink} to="/register" underline="hover" sx={{ fontWeight: 500 }}>
-            Konto erstellen
-          </Link>
-        </Typography>
-      )}
     </AuthLayout>
   );
 }

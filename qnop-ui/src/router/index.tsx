@@ -65,7 +65,7 @@ export const router = createBrowserRouter([
         element: (
           <ComingSoonPage
             title="Reviews"
-            description="Dokumente hochladen, prüfen und freigeben — die Review-Oberfläche entsteht im PDF-Durchstich."
+            description="Upload, review and approve documents — the review surface arrives in the PDF vertical slice."
             icon={FileText}
           />
         ),
@@ -76,7 +76,7 @@ export const router = createBrowserRouter([
           <RoleRoute allow={['ADMIN', 'AUDITOR']}>
             <ComingSoonPage
               title="Compliance"
-              description="Audit-Trail und Compliance-Auswertungen über alle Reviews."
+              description="Audit trail and compliance reporting across all reviews."
               icon={ShieldCheck}
             />
           </RoleRoute>
@@ -96,7 +96,7 @@ export const router = createBrowserRouter([
           <AdminRoute>
             <ComingSoonPage
               title="Teams"
-              description="Prüfer in Teams gruppieren und Reviews an die richtigen Personen leiten."
+              description="Group reviewers into teams and route reviews to the right people."
               icon={Users}
             />
           </AdminRoute>
@@ -107,8 +107,8 @@ export const router = createBrowserRouter([
         element: (
           <AdminRoute>
             <ComingSoonPage
-              title="Einstellungen"
-              description="Arbeitsbereich, Sicherheitsrichtlinie, OIDC, Branding und Mail."
+              title="Settings"
+              description="Workspace, security policy, OIDC, branding and mail."
               icon={Settings}
             />
           </AdminRoute>

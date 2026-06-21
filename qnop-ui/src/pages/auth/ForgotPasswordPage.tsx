@@ -23,9 +23,11 @@ import { useState, type FormEvent } from 'react';
 import Alert from '@mui/material/Alert';
 import Box from '@mui/material/Box';
 import Button from '@mui/material/Button';
+import InputAdornment from '@mui/material/InputAdornment';
 import Link from '@mui/material/Link';
 import Stack from '@mui/material/Stack';
 import TextField from '@mui/material/TextField';
+import { Mail } from 'lucide-react';
 import { Link as RouterLink } from 'react-router-dom';
 import { AuthLayout } from '../../components/auth/AuthLayout';
 import { forgotPassword } from '../../api/auth';
@@ -46,25 +48,21 @@ export function ForgotPasswordPage() {
       await forgotPassword(email);
       setDone(true);
     } catch (err) {
-      setError(apiErrorMessage(err, 'Anfrage fehlgeschlagen. Bitte später erneut versuchen.'));
+      setError(apiErrorMessage(err, 'Request failed. Please try again later.'));
     } finally {
       setSubmitting(false);
     }
   };
 
   return (
-    <AuthLayout
-      title="Passwort zurücksetzen"
-      subtitle="Wir senden dir einen Link zum Zurücksetzen deines Passworts."
-    >
+    <AuthLayout title="Reset password" subtitle="We'll send you a link to reset your password.">
       {done ? (
         <>
           <Alert severity="success" sx={{ mb: 2 }}>
-            Wenn ein Konto mit dieser Adresse existiert, ist eine E-Mail mit einem Reset-Link
-            unterwegs.
+            If an account exists for this address, a reset link is on its way.
           </Alert>
           <Link component={RouterLink} to="/login" underline="hover">
-            Zurück zur Anmeldung
+            Back to sign in
           </Link>
         </>
       ) : (
@@ -72,13 +70,22 @@ export function ForgotPasswordPage() {
           <Box component="form" onSubmit={onSubmit} noValidate>
             <Stack spacing={2}>
               <TextField
-                label="Arbeits-E-Mail"
+                label="Work email"
                 type="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 autoComplete="email"
                 fullWidth
                 required
+                slotProps={{
+                  input: {
+                    startAdornment: (
+                      <InputAdornment position="start">
+                        <Mail size={17} />
+                      </InputAdornment>
+                    ),
+                  },
+                }}
               />
               {error && <Alert severity="error">{error}</Alert>}
               <Button
@@ -88,13 +95,13 @@ export function ForgotPasswordPage() {
                 disabled={submitting}
                 fullWidth
               >
-                Link senden
+                Send link
               </Button>
             </Stack>
           </Box>
           <Box sx={{ mt: 3 }}>
             <Link component={RouterLink} to="/login" underline="hover" sx={{ fontSize: 13 }}>
-              Zurück zur Anmeldung
+              Back to sign in
             </Link>
           </Box>
         </>

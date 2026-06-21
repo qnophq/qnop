@@ -27,7 +27,7 @@ export interface PasswordStrength {
   acceptable: boolean;
 }
 
-const LABELS = ['', 'Schwach', 'Mittel', 'Gut', 'Stark'] as const;
+const LABELS = ['', 'Weak', 'Fair', 'Good', 'Strong'] as const;
 
 /**
  * A lightweight password-strength estimate for the register/reset meters

@@ -49,16 +49,16 @@ interface UserFormDialogProps {
 }
 
 const ROLES: { value: UserRole; label: string }[] = [
-  { value: 'MEMBER', label: 'Mitglied' },
+  { value: 'MEMBER', label: 'Member' },
   { value: 'AUDITOR', label: 'Auditor' },
   { value: 'ADMIN', label: 'Admin' },
 ];
 
-const CONFLICT_DE: Record<string, string> = {
-  EMAIL_TAKEN: 'Diese E-Mail-Adresse ist bereits vergeben.',
-  USERNAME_TAKEN: 'Dieser Benutzername ist bereits vergeben.',
-  SELF_LOCKOUT: 'Du kannst dein eigenes Konto nicht deaktivieren oder herabstufen.',
-  LAST_ADMIN: 'Es muss mindestens ein aktiver Admin verbleiben.',
+const CONFLICT_MESSAGES: Record<string, string> = {
+  EMAIL_TAKEN: 'An account with this email already exists.',
+  USERNAME_TAKEN: 'This username is already taken.',
+  SELF_LOCKOUT: "You can't disable or change the role of your own account.",
+  LAST_ADMIN: 'At least one enabled admin must remain.',
 };
 
 /**
@@ -111,8 +111,8 @@ export function UserFormDialog({ open, mode, user, onClose }: UserFormDialogProp
     } catch (err) {
       const code = apiErrorCode(err);
       setError(
-        (code && CONFLICT_DE[code]) ??
-          apiErrorMessage(err, 'Speichern fehlgeschlagen. Bitte erneut versuchen.'),
+        (code && CONFLICT_MESSAGES[code]) ??
+          apiErrorMessage(err, 'Saving failed. Please try again.'),
       );
     }
   };
@@ -122,11 +122,11 @@ export function UserFormDialog({ open, mode, user, onClose }: UserFormDialogProp
   return (
     <Dialog open={open} onClose={onClose} fullWidth maxWidth="sm">
       <Box component="form" onSubmit={onSubmit} noValidate>
-        <DialogTitle>{isEdit ? 'Benutzer bearbeiten' : 'Benutzer anlegen'}</DialogTitle>
+        <DialogTitle>{isEdit ? 'Edit user' : 'Add user'}</DialogTitle>
         <DialogContent>
           <Stack spacing={2.5} sx={{ mt: 1 }}>
             <TextField
-              label="Vollständiger Name"
+              label="Full name"
               value={displayName}
               onChange={(e) => setDisplayName(e.target.value)}
               autoComplete="name"
@@ -137,16 +137,16 @@ export function UserFormDialog({ open, mode, user, onClose }: UserFormDialogProp
             {!isEdit && (
               <>
                 <TextField
-                  label="Benutzername"
+                  label="Username"
                   value={username}
                   onChange={(e) => setUsername(e.target.value)}
                   autoComplete="off"
                   fullWidth
                   required
-                  helperText="Mindestens 3 Zeichen, eindeutig."
+                  helperText="At least 3 characters, unique."
                 />
                 <TextField
-                  label="E-Mail"
+                  label="Email"
                   type="email"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
@@ -158,7 +158,7 @@ export function UserFormDialog({ open, mode, user, onClose }: UserFormDialogProp
             )}
 
             <TextField
-              label="Rolle"
+              label="Role"
               select
               value={role}
               onChange={(e) => setRole(e.target.value as UserRole)}
@@ -176,7 +176,7 @@ export function UserFormDialog({ open, mode, user, onClose }: UserFormDialogProp
                 control={
                   <Switch checked={enabled} onChange={(e) => setEnabled(e.target.checked)} />
                 }
-                label={enabled ? 'Konto aktiv' : 'Konto deaktiviert'}
+                label={enabled ? 'Account active' : 'Account disabled'}
               />
             )}
 
@@ -189,18 +189,18 @@ export function UserFormDialog({ open, mode, user, onClose }: UserFormDialogProp
                   <FormControlLabel
                     value="invite"
                     control={<Radio size="small" />}
-                    label="Einladung per E-Mail senden (Benutzer setzt eigenes Passwort)"
+                    label="Send an email invitation (the user sets their own password)"
                   />
                   <FormControlLabel
                     value="password"
                     control={<Radio size="small" />}
-                    label="Passwort jetzt setzen (Änderung beim ersten Login erforderlich)"
+                    label="Set a password now (must be changed on first login)"
                   />
                 </RadioGroup>
                 {method === 'password' && (
                   <Box sx={{ mt: 1 }}>
                     <PasswordField
-                      label="Initialpasswort"
+                      label="Initial password"
                       value={password}
                       onChange={setPassword}
                       autoComplete="new-password"
@@ -217,10 +217,10 @@ export function UserFormDialog({ open, mode, user, onClose }: UserFormDialogProp
         </DialogContent>
         <DialogActions sx={{ px: 3, pb: 2.5 }}>
           <Button onClick={onClose} color="inherit">
-            Abbrechen
+            Cancel
           </Button>
           <Button type="submit" variant="contained" disabled={submitting || !canSubmit}>
-            {isEdit ? 'Speichern' : 'Anlegen'}
+            {isEdit ? 'Save' : 'Create'}
           </Button>
         </DialogActions>
       </Box>

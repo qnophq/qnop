@@ -33,15 +33,15 @@ function axiosWithBody(status: number, data: unknown): AxiosError {
 
 describe('apiErrorMessage', () => {
   it('maps a 429 to a rate-limit message', () => {
-    expect(apiErrorMessage(axiosWithStatus(429), 'fallback')).toMatch(/Versuche/i);
+    expect(apiErrorMessage(axiosWithStatus(429), 'fallback')).toMatch(/attempts/i);
   });
 
   it('maps a 400 to an invalid/expired message', () => {
-    expect(apiErrorMessage(axiosWithStatus(400), 'fallback')).toMatch(/ungültig|abgelaufen/i);
+    expect(apiErrorMessage(axiosWithStatus(400), 'fallback')).toMatch(/invalid|expired/i);
   });
 
   it('maps the RATE_LIMITED sentinel error to the rate-limit message', () => {
-    expect(apiErrorMessage(new Error('RATE_LIMITED'), 'fallback')).toMatch(/Versuche/i);
+    expect(apiErrorMessage(new Error('RATE_LIMITED'), 'fallback')).toMatch(/attempts/i);
   });
 
   it('falls back for unknown errors', () => {
