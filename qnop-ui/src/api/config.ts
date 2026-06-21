@@ -21,6 +21,7 @@
 
 import axios, { AxiosError, type InternalAxiosRequestConfig } from 'axios';
 import {
+  AdminSettingsApi,
   AdminTeamsApi,
   AdminUsersApi,
   AuthApi,
@@ -86,3 +87,4 @@ export const authRegistrationApi = new AuthRegistrationApi(undefined, undefined,
 export const authPasswordResetApi = new AuthPasswordResetApi(undefined, undefined, axiosInstance);
 export const adminUsersApi = new AdminUsersApi(undefined, undefined, axiosInstance);
 export const adminTeamsApi = new AdminTeamsApi(undefined, undefined, axiosInstance);
+export const adminSettingsApi = new AdminSettingsApi(undefined, undefined, axiosInstance);

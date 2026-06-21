@@ -20,13 +20,14 @@
  */
 
 import { createBrowserRouter } from 'react-router-dom';
-import { FileText, Settings, ShieldCheck } from 'lucide-react';
+import { FileText, KeyRound, Mail, Palette, ShieldCheck } from 'lucide-react';
 import { AppShell } from '../components/shell/AppShell';
 import { AdminRoute } from '../components/auth/AdminRoute';
 import { ProtectedRoute } from '../components/auth/ProtectedRoute';
 import { RoleRoute } from '../components/auth/RoleRoute';
 import { ComingSoonPage } from '../pages/ComingSoonPage';
 import { HomePage } from '../pages/HomePage';
+import { SettingsPage } from '../pages/admin/SettingsPage';
 import { UsersPage } from '../pages/admin/UsersPage';
 import { TeamsPage } from '../pages/admin/TeamsPage';
 import { TeamDetailPage } from '../pages/admin/TeamDetailPage';
@@ -112,10 +113,42 @@ export const router = createBrowserRouter([
         path: 'admin/settings',
         element: (
           <AdminRoute>
+            <SettingsPage />
+          </AdminRoute>
+        ),
+      },
+      {
+        path: 'admin/oidc-providers',
+        element: (
+          <AdminRoute>
             <ComingSoonPage
-              title="Settings"
-              description="Workspace, security policy, OIDC, branding and mail."
-              icon={Settings}
+              title="OIDC providers"
+              description="Configure single sign-on identity providers — list, add, discover and enable."
+              icon={KeyRound}
+            />
+          </AdminRoute>
+        ),
+      },
+      {
+        path: 'admin/mail-templates',
+        element: (
+          <AdminRoute>
+            <ComingSoonPage
+              title="Mail templates"
+              description="Edit, preview and test the transactional email templates."
+              icon={Mail}
+            />
+          </AdminRoute>
+        ),
+      },
+      {
+        path: 'admin/branding',
+        element: (
+          <AdminRoute>
+            <ComingSoonPage
+              title="Branding"
+              description="Upload the light/dark logos and logomark shown across the app."
+              icon={Palette}
             />
           </AdminRoute>
         ),
