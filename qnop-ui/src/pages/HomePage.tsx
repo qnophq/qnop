@@ -19,14 +19,22 @@
  * SPDX-License-Identifier: AGPL-3.0-only
  */
 
+import Box from '@mui/material/Box';
+import Button from '@mui/material/Button';
+import Card from '@mui/material/Card';
+import CardContent from '@mui/material/CardContent';
+import Chip from '@mui/material/Chip';
 import Stack from '@mui/material/Stack';
 import Typography from '@mui/material/Typography';
 import { useAuthStore } from '../stores/authStore';
+import { ThemeShowcase } from '../components/ThemeShowcase';
 
 /**
  * Placeholder authenticated landing page (#100). It confirms the wiring works —
- * the profile shown here comes from GET /users/me via the auth store. The real
- * dashboard arrives with the app shell and review surfaces (#102+).
+ * the profile shown here comes from GET /users/me via the auth store — and, for
+ * #101, hosts a small theme showcase so the devtank42 design system can be seen
+ * and visually verified in both light and dark. The real dashboard arrives with
+ * the app shell and review surfaces (#102+); the showcase goes with it.
  */
 export function HomePage() {
   const displayName = useAuthStore((s) => s.displayName);
@@ -34,16 +42,31 @@ export function HomePage() {
   const role = useAuthStore((s) => s.role);
 
   return (
-    <Stack spacing={1}>
-      <Typography variant="h1" sx={{ fontSize: '1.75rem' }}>
-        Willkommen{displayName ? `, ${displayName}` : ''}.
-      </Typography>
-      <Typography color="text.secondary">
-        {email} · Rolle: {role}
-      </Typography>
-      <Typography color="text.secondary" sx={{ mt: 2 }}>
-        Das Dashboard und der Review-Arbeitsbereich entstehen in den nächsten Schritten.
-      </Typography>
+    <Stack spacing={3}>
+      <Box>
+        <Typography variant="h1">Willkommen{displayName ? `, ${displayName}` : ''}.</Typography>
+        <Typography color="text.secondary" sx={{ mt: 1 }}>
+          {email} · Rolle: {role}
+        </Typography>
+      </Box>
+
+      <Card>
+        <CardContent>
+          <Typography variant="h6" gutterBottom>
+            Review-Arbeitsbereich
+          </Typography>
+          <Typography color="text.secondary" sx={{ mb: 2 }}>
+            Das Dashboard und der Review-Arbeitsbereich entstehen in den nächsten Schritten.
+          </Typography>
+          <Stack direction="row" sx={{ flexWrap: 'wrap', gap: 1 }}>
+            <Button variant="contained">Neuer Review</Button>
+            <Button variant="outlined">Vergleichen</Button>
+            <Chip label="In Prüfung" color="primary" size="small" variant="outlined" />
+          </Stack>
+        </CardContent>
+      </Card>
+
+      <ThemeShowcase />
     </Stack>
   );
 }
