@@ -18,31 +18,22 @@
  *
  * SPDX-License-Identifier: AGPL-3.0-only
  */
+package io.qnop.service;
 
-import type { UserRole } from '../../../api/generated';
-import { ToneBadge, type BadgeTone } from '../ToneBadge';
+/**
+ * A conflicting team request (issue #105): a duplicate team name or adding a user who is already a
+ * member. Carries a stable {@code code} for the uniform error envelope; mapped to HTTP 409.
+ */
+public class TeamConflictException extends RuntimeException {
 
-const ROLE_TONE: Record<UserRole, BadgeTone> = {
-  ADMIN: 'blue',
-  AUDITOR: 'amber',
-  MEMBER: 'neutral',
-};
-const ROLE_LABEL: Record<UserRole, string> = {
-  ADMIN: 'Admin',
-  MEMBER: 'Member',
-  AUDITOR: 'Auditor',
-};
+  private final String code;
 
-/** The user's global role as a coloured pill. */
-export function UserRoleBadge({ role }: { role: UserRole }) {
-  return <ToneBadge tone={ROLE_TONE[role]} label={ROLE_LABEL[role]} />;
-}
+  public TeamConflictException(String code, String message) {
+    super(message);
+    this.code = code;
+  }
 
-/** Account state: active (green) or disabled (red). */
-export function UserStatusBadge({ enabled }: { enabled: boolean }) {
-  return enabled ? (
-    <ToneBadge tone="green" label="Active" />
-  ) : (
-    <ToneBadge tone="red" label="Disabled" />
-  );
+  public String getCode() {
+    return code;
+  }
 }

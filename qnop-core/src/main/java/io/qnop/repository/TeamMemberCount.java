@@ -18,31 +18,9 @@
  *
  * SPDX-License-Identifier: AGPL-3.0-only
  */
+package io.qnop.repository;
 
-import type { UserRole } from '../../../api/generated';
-import { ToneBadge, type BadgeTone } from '../ToneBadge';
+import java.util.UUID;
 
-const ROLE_TONE: Record<UserRole, BadgeTone> = {
-  ADMIN: 'blue',
-  AUDITOR: 'amber',
-  MEMBER: 'neutral',
-};
-const ROLE_LABEL: Record<UserRole, string> = {
-  ADMIN: 'Admin',
-  MEMBER: 'Member',
-  AUDITOR: 'Auditor',
-};
-
-/** The user's global role as a coloured pill. */
-export function UserRoleBadge({ role }: { role: UserRole }) {
-  return <ToneBadge tone={ROLE_TONE[role]} label={ROLE_LABEL[role]} />;
-}
-
-/** Account state: active (green) or disabled (red). */
-export function UserStatusBadge({ enabled }: { enabled: boolean }) {
-  return enabled ? (
-    <ToneBadge tone="green" label="Active" />
-  ) : (
-    <ToneBadge tone="red" label="Disabled" />
-  );
-}
+/** Member count per team, for the team list (avoids an N+1 over the page). Issue #105. */
+public record TeamMemberCount(UUID teamId, long count) {}

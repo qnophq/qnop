@@ -117,13 +117,17 @@ export function crumbsFor(pathname: string): Crumb[] {
     return [{ label: 'Dashboard' }];
   }
   for (const group of NAV_GROUPS) {
-    const item = group.items.find((i) => i.path === pathname);
+    // Exact match, or a detail page nested under an item (e.g. /admin/teams/:id):
+    // both resolve to the item's section context (the id segment is not shown).
+    const item = group.items.find(
+      (i) => i.path === pathname || (i.path !== '/' && pathname.startsWith(`${i.path}/`)),
+    );
     if (item) {
       const trail: Crumb[] = [];
       if (group.label) {
         trail.push({ label: group.label });
       }
-      trail.push({ label: item.label });
+      trail.push({ label: item.label, to: item.path === pathname ? undefined : item.path });
       return trail;
     }
   }

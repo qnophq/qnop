@@ -18,31 +18,16 @@
  *
  * SPDX-License-Identifier: AGPL-3.0-only
  */
+package io.qnop.entity;
 
-import type { UserRole } from '../../../api/generated';
-import { ToneBadge, type BadgeTone } from '../ToneBadge';
-
-const ROLE_TONE: Record<UserRole, BadgeTone> = {
-  ADMIN: 'blue',
-  AUDITOR: 'amber',
-  MEMBER: 'neutral',
-};
-const ROLE_LABEL: Record<UserRole, string> = {
-  ADMIN: 'Admin',
-  MEMBER: 'Member',
-  AUDITOR: 'Auditor',
-};
-
-/** The user's global role as a coloured pill. */
-export function UserRoleBadge({ role }: { role: UserRole }) {
-  return <ToneBadge tone={ROLE_TONE[role]} label={ROLE_LABEL[role]} />;
-}
-
-/** Account state: active (green) or disabled (red). */
-export function UserStatusBadge({ enabled }: { enabled: boolean }) {
-  return enabled ? (
-    <ToneBadge tone="green" label="Active" />
-  ) : (
-    <ToneBadge tone="red" label="Disabled" />
-  );
+/**
+ * A user's role <em>within a team</em> (issue #105) — distinct from the global {@link UserRole} and
+ * from per-review roles. Carried on {@link TeamMembership}. The allowed set is pinned by a Postgres
+ * {@code CHECK} constraint in Liquibase, not here (ADR-0020).
+ */
+public enum TeamRole {
+  /** Manages the team and its membership; the team's point of contact. */
+  LEAD,
+  /** A regular team member. The default when adding someone to a team. */
+  MEMBER
 }

@@ -19,30 +19,13 @@
  * SPDX-License-Identifier: AGPL-3.0-only
  */
 
-import type { UserRole } from '../../../api/generated';
+import type { TeamRole } from '../../../api/generated';
 import { ToneBadge, type BadgeTone } from '../ToneBadge';
 
-const ROLE_TONE: Record<UserRole, BadgeTone> = {
-  ADMIN: 'blue',
-  AUDITOR: 'amber',
-  MEMBER: 'neutral',
-};
-const ROLE_LABEL: Record<UserRole, string> = {
-  ADMIN: 'Admin',
-  MEMBER: 'Member',
-  AUDITOR: 'Auditor',
-};
+const TONE: Record<TeamRole, BadgeTone> = { LEAD: 'blue', MEMBER: 'neutral' };
+const LABEL: Record<TeamRole, string> = { LEAD: 'Lead', MEMBER: 'Member' };
 
-/** The user's global role as a coloured pill. */
-export function UserRoleBadge({ role }: { role: UserRole }) {
-  return <ToneBadge tone={ROLE_TONE[role]} label={ROLE_LABEL[role]} />;
-}
-
-/** Account state: active (green) or disabled (red). */
-export function UserStatusBadge({ enabled }: { enabled: boolean }) {
-  return enabled ? (
-    <ToneBadge tone="green" label="Active" />
-  ) : (
-    <ToneBadge tone="red" label="Disabled" />
-  );
+/** A team member's per-team role as a coloured pill. */
+export function TeamRoleBadge({ role }: { role: TeamRole }) {
+  return <ToneBadge tone={TONE[role]} label={LABEL[role]} />;
 }

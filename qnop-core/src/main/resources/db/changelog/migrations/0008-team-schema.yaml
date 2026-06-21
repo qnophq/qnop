@@ -1,0 +1,107 @@
+# SPDX-License-Identifier: AGPL-3.0-only
+#
+# Team schema (issue #105): team + team_membership. Postgres-only CHECK and the
+# case-insensitive name uniqueness live here in Liquibase, NOT in JPA annotations
+# (ADR-0020). JPA runs ddl-auto=none, so the entity mapping must match exactly.
+databaseChangeLog:
+  - changeSet:
+      id: 0008-team
+      author: qnop
+      comment: Teams group reviewers; memberships carry the per-team role.
+      changes:
+        - createTable:
+            tableName: team
+            columns:
+              - column:
+                  name: id
+                  type: UUID
+                  constraints: { primaryKey: true, nullable: false }
+              - column:
+                  name: name
+                  type: VARCHAR(120)
+                  constraints: { nullable: false }
+              - column: { name: description, type: VARCHAR(1000) }
+              - column:
+                  name: enabled
+                  type: BOOLEAN
+                  defaultValueBoolean: true
+                  constraints: { nullable: false }
+              - column:
+                  name: created_at
+                  type: TIMESTAMP WITH TIME ZONE
+                  constraints: { nullable: false }
+              - column:
+                  name: updated_at
+                  type: TIMESTAMP WITH TIME ZONE
+                  constraints: { nullable: false }
+              - column:
+                  name: version
+                  type: BIGINT
+                  defaultValueNumeric: 0
+                  constraints: { nullable: false }
+        - sql:
+            comment: Case-insensitive team-name uniqueness (functional index, not expressible in JPA).
+            sql: |
+              CREATE UNIQUE INDEX ux_team_name_lower ON team (LOWER(name));
+
+  - changeSet:
+      id: 0008-team-membership
+      author: qnop
+      comment: n:m membership of users in teams with a per-team role (LEAD/MEMBER).
+      changes:
+        - createTable:
+            tableName: team_membership
+            columns:
+              - column:
+                  name: id
+                  type: UUID
+                  constraints: { primaryKey: true, nullable: false }
+              - column:
+                  name: team_id
+                  type: UUID
+                  constraints: { nullable: false }
+              - column:
+                  name: user_id
+                  type: UUID
+                  constraints: { nullable: false }
+              - column:
+                  name: team_role
+                  type: VARCHAR(16)
+                  constraints: { nullable: false }
+              - column:
+                  name: joined_at
+                  type: TIMESTAMP WITH TIME ZONE
+                  constraints: { nullable: false }
+              - column:
+                  name: version
+                  type: BIGINT
+                  defaultValueNumeric: 0
+                  constraints: { nullable: false }
+        - addForeignKeyConstraint:
+            constraintName: fk_team_membership_team
+            baseTableName: team_membership
+            baseColumnNames: team_id
+            referencedTableName: team
+            referencedColumnNames: id
+            onDelete: CASCADE
+        - addForeignKeyConstraint:
+            constraintName: fk_team_membership_user
+            baseTableName: team_membership
+            baseColumnNames: user_id
+            referencedTableName: qnop_user
+            referencedColumnNames: id
+            onDelete: CASCADE
+        - addUniqueConstraint:
+            constraintName: ux_team_membership_team_user
+            tableName: team_membership
+            columnNames: team_id, user_id
+        - createIndex:
+            indexName: ix_team_membership_user
+            tableName: team_membership
+            columns:
+              - column: { name: user_id }
+        - sql:
+            comment: Postgres-only CHECK on the team-role enum.
+            sql: |
+              ALTER TABLE team_membership ADD CONSTRAINT ck_team_membership_role
+                CHECK (team_role IN ('LEAD', 'MEMBER'));

@@ -18,31 +18,22 @@
  *
  * SPDX-License-Identifier: AGPL-3.0-only
  */
+package io.qnop.service;
 
-import type { UserRole } from '../../../api/generated';
-import { ToneBadge, type BadgeTone } from '../ToneBadge';
+import java.util.UUID;
 
-const ROLE_TONE: Record<UserRole, BadgeTone> = {
-  ADMIN: 'blue',
-  AUDITOR: 'amber',
-  MEMBER: 'neutral',
-};
-const ROLE_LABEL: Record<UserRole, string> = {
-  ADMIN: 'Admin',
-  MEMBER: 'Member',
-  AUDITOR: 'Auditor',
-};
+/** Thrown when a team (or team membership) lookup finds no matching row (issue #105). */
+public class TeamNotFoundException extends RuntimeException {
 
-/** The user's global role as a coloured pill. */
-export function UserRoleBadge({ role }: { role: UserRole }) {
-  return <ToneBadge tone={ROLE_TONE[role]} label={ROLE_LABEL[role]} />;
-}
+  public TeamNotFoundException(String message) {
+    super(message);
+  }
 
-/** Account state: active (green) or disabled (red). */
-export function UserStatusBadge({ enabled }: { enabled: boolean }) {
-  return enabled ? (
-    <ToneBadge tone="green" label="Active" />
-  ) : (
-    <ToneBadge tone="red" label="Disabled" />
-  );
+  public static TeamNotFoundException team(UUID id) {
+    return new TeamNotFoundException("Team not found: " + id);
+  }
+
+  public static TeamNotFoundException membership(UUID teamId, UUID userId) {
+    return new TeamNotFoundException("User " + userId + " is not a member of team " + teamId);
+  }
 }
