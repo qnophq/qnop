@@ -20,13 +20,14 @@
  */
 
 import { createBrowserRouter } from 'react-router-dom';
-import { FileText, KeyRound, Mail, Palette, ShieldCheck } from 'lucide-react';
+import { FileText, Mail, Palette, ShieldCheck } from 'lucide-react';
 import { AppShell } from '../components/shell/AppShell';
 import { AdminRoute } from '../components/auth/AdminRoute';
 import { ProtectedRoute } from '../components/auth/ProtectedRoute';
 import { RoleRoute } from '../components/auth/RoleRoute';
 import { ComingSoonPage } from '../pages/ComingSoonPage';
 import { HomePage } from '../pages/HomePage';
+import { OidcProvidersPage } from '../pages/admin/OidcProvidersPage';
 import { SettingsPage } from '../pages/admin/SettingsPage';
 import { UsersPage } from '../pages/admin/UsersPage';
 import { TeamsPage } from '../pages/admin/TeamsPage';
@@ -121,11 +122,7 @@ export const router = createBrowserRouter([
         path: 'admin/oidc-providers',
         element: (
           <AdminRoute>
-            <ComingSoonPage
-              title="OIDC providers"
-              description="Configure single sign-on identity providers — list, add, discover and enable."
-              icon={KeyRound}
-            />
+            <OidcProvidersPage />
           </AdminRoute>
         ),
       },
