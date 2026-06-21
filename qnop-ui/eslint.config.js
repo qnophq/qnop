@@ -6,8 +6,8 @@ import tseslint from 'typescript-eslint';
 import { defineConfig, globalIgnores } from 'eslint/config';
 
 export default defineConfig([
-  // dist: build output. src/api/generated: typescript-axios output (not source).
-  globalIgnores(['dist', 'src/api/generated']),
+  // dist: build output. coverage: vitest report. src/api/generated: typescript-axios output.
+  globalIgnores(['dist', 'coverage', 'src/api/generated']),
   {
     files: ['**/*.{ts,tsx}'],
     extends: [

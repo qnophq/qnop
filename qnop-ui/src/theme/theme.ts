@@ -19,41 +19,198 @@
  * SPDX-License-Identifier: AGPL-3.0-only
  */
 
-import { createTheme, type Theme } from '@mui/material/styles';
-import type { PaletteMode } from '@mui/material';
-import { tokens } from './tokens';
+import { createTheme, type Theme, type ThemeOptions } from '@mui/material/styles';
+import type { PaletteMode, Shadows } from '@mui/material';
+import { surfaces, tokens } from './tokens';
 
 /**
- * Builds the MUI theme for the given mode. This is the minimal foundation
- * theme (#100): brand primary + light/dark surfaces and a few sensible
- * defaults. The full devtank42 system (Sklow font, the complete type scale,
- * component overrides) is layered on in #101.
+ * Brand tokens that have no native MUI slot, exposed on the theme as `theme.qnop`
+ * so components and `sx` can read them type-safely (badge tones, the raised
+ * surface colour, motion easings, the focus ring). Surfaced via module
+ * augmentation below.
+ */
+export interface QnopTokens {
+  mode: PaletteMode;
+  /** Slightly raised surface (rows, inputs) — the prototype `--app-surface-2`. */
+  surface2: string;
+  badge: typeof tokens.badge;
+  avatarPalette: typeof tokens.avatarPalette;
+  motion: typeof tokens.motion;
+  focusRing: string;
+  brand: typeof tokens.brand;
+}
+
+declare module '@mui/material/styles' {
+  interface Theme {
+    qnop: QnopTokens;
+  }
+  interface ThemeOptions {
+    qnop?: QnopTokens;
+  }
+}
+
+/** Flat, crisp elevation scale — the brand reads as bordered surfaces, not shadow stacks. */
+function buildShadows(): Shadows {
+  const { xs, sm, md, lg } = tokens.shadow;
+  const scale = Array.from({ length: 25 }, (_, i) => {
+    if (i === 0) return 'none';
+    if (i <= 2) return xs;
+    if (i <= 4) return sm;
+    if (i <= 12) return md;
+    return lg;
+  });
+  return scale as unknown as Shadows;
+}
+
+/**
+ * Builds the devtank42 MUI theme for the given mode (#101). All values come from
+ * {@link tokens}; light and dark use the matching surface set. The same shape is
+ * returned for both modes, so `main.tsx` simply rebuilds on a theme toggle.
  */
 export function buildTheme(mode: PaletteMode): Theme {
-  const isDark = mode === 'dark';
-  return createTheme({
+  const s = surfaces[mode];
+
+  const qnop: QnopTokens = {
+    mode,
+    surface2: s.surface2,
+    badge: tokens.badge,
+    avatarPalette: tokens.avatarPalette,
+    motion: tokens.motion,
+    focusRing: tokens.shadow.focusRing,
+    brand: tokens.brand,
+  };
+
+  const options: ThemeOptions = {
+    qnop,
     palette: {
       mode,
-      primary: { main: tokens.color.blue, dark: tokens.color.bluePress },
-      secondary: { main: tokens.color.navy },
-      success: { main: tokens.color.success },
-      warning: { main: tokens.color.warning },
-      error: { main: tokens.color.danger },
-      background: {
-        default: isDark ? tokens.color.navy : tokens.color.offWhite,
-        paper: isDark ? tokens.color.navy700 : tokens.color.white,
+      primary: {
+        main: tokens.brand.blue,
+        dark: tokens.brand.bluePress,
+        light: tokens.brand.blue50,
+        contrastText: '#FFFFFF',
       },
-      text: {
-        primary: isDark ? tokens.color.white : tokens.color.navy,
-        secondary: isDark ? '#B9C6D4' : tokens.color.gray600,
-      },
-    },
-    typography: {
-      fontFamily: '"Inter", system-ui, -apple-system, "Segoe UI", sans-serif',
-      h1: { fontWeight: 700, letterSpacing: '-0.025em' },
-      h6: { fontWeight: 600, letterSpacing: '-0.01em' },
-      button: { textTransform: 'none', fontWeight: 600 },
+      secondary: { main: tokens.brand.navy, contrastText: '#FFFFFF' },
+      success: { main: tokens.semantic.success, contrastText: '#FFFFFF' },
+      warning: { main: tokens.semantic.warning, contrastText: '#3E2E00' },
+      error: { main: tokens.semantic.danger, contrastText: '#FFFFFF' },
+      background: { default: s.bg, paper: s.surface },
+      text: { primary: s.fg, secondary: s.fg2, disabled: s.fg3 },
+      divider: s.border,
     },
     shape: { borderRadius: tokens.radius.md },
-  });
+    shadows: buildShadows(),
+    typography: {
+      fontFamily: tokens.font.sans,
+      fontSize: 14,
+      h1: {
+        fontFamily: tokens.font.display,
+        fontWeight: 700,
+        fontSize: '2rem',
+        letterSpacing: '-0.025em',
+        lineHeight: 1.1,
+      },
+      h2: {
+        fontFamily: tokens.font.display,
+        fontWeight: 700,
+        fontSize: '1.625rem',
+        letterSpacing: '-0.02em',
+        lineHeight: 1.15,
+      },
+      h3: {
+        fontFamily: tokens.font.display,
+        fontWeight: 600,
+        fontSize: '1.375rem',
+        letterSpacing: '-0.02em',
+        lineHeight: 1.2,
+      },
+      h4: {
+        fontFamily: tokens.font.display,
+        fontWeight: 600,
+        fontSize: '1.125rem',
+        letterSpacing: '-0.01em',
+      },
+      h5: {
+        fontFamily: tokens.font.display,
+        fontWeight: 600,
+        fontSize: '1rem',
+        letterSpacing: '-0.01em',
+      },
+      h6: {
+        fontFamily: tokens.font.display,
+        fontWeight: 600,
+        fontSize: '0.9375rem',
+        letterSpacing: '-0.01em',
+      },
+      body1: { fontSize: '0.9375rem', letterSpacing: '-0.005em' },
+      body2: { fontSize: '0.8125rem', letterSpacing: '-0.005em' },
+      button: { textTransform: 'none', fontWeight: 500, letterSpacing: '-0.005em' },
+      caption: { fontSize: '0.6875rem' },
+    },
+    components: {
+      MuiCssBaseline: {
+        styleOverrides: {
+          a: { color: tokens.brand.blue, textDecoration: 'none' },
+          '::selection': { background: tokens.brand.blue, color: '#FFFFFF' },
+          '*::-webkit-scrollbar': { width: 10, height: 10 },
+          '*::-webkit-scrollbar-thumb': {
+            background: s.borderStrong,
+            borderRadius: tokens.radius.pill,
+            border: '2px solid transparent',
+            backgroundClip: 'content-box',
+          },
+        },
+      },
+      MuiButton: {
+        defaultProps: { disableElevation: true },
+        styleOverrides: {
+          root: {
+            borderRadius: tokens.radius.sm + 2,
+            fontWeight: 500,
+            '&:active': { transform: 'translateY(1px)' },
+          },
+          sizeSmall: { height: 28, paddingInline: 10, fontSize: '0.75rem' },
+          sizeMedium: { height: 34, paddingInline: 14 },
+          sizeLarge: { height: 40, paddingInline: 18, fontSize: '0.875rem' },
+        },
+      },
+      MuiPaper: {
+        defaultProps: { elevation: 0 },
+        styleOverrides: { root: { backgroundImage: 'none' } },
+      },
+      MuiCard: {
+        defaultProps: { elevation: 0 },
+        styleOverrides: {
+          root: { borderRadius: tokens.radius.lg, border: `1px solid ${s.border}` },
+        },
+      },
+      MuiChip: {
+        styleOverrides: {
+          root: { borderRadius: tokens.radius.sm, fontWeight: 500 },
+        },
+      },
+      MuiOutlinedInput: {
+        styleOverrides: {
+          root: {
+            borderRadius: tokens.radius.sm + 2,
+            '&.Mui-focused .MuiOutlinedInput-notchedOutline': {
+              borderColor: tokens.brand.blue,
+              boxShadow: tokens.shadow.focusRing,
+            },
+          },
+        },
+      },
+      MuiTooltip: {
+        styleOverrides: {
+          tooltip: {
+            background: tokens.brand.navy,
+            fontSize: '0.75rem',
+            borderRadius: tokens.radius.sm,
+          },
+        },
+      },
+    },
+  };
+
+  return createTheme(options);
 }
