@@ -107,7 +107,11 @@ export interface Crumb {
   to?: string;
 }
 
-/** Resolves the breadcrumb trail for a pathname from the nav config. */
+/**
+ * Resolves the breadcrumb trail for a pathname from the nav config. The trail
+ * is just the section context: the (optional) group label plus the current
+ * item. "Dashboard" is the root itself, never a prefix on other pages.
+ */
 export function crumbsFor(pathname: string): Crumb[] {
   if (pathname === '/') {
     return [{ label: 'Dashboard' }];
@@ -115,7 +119,7 @@ export function crumbsFor(pathname: string): Crumb[] {
   for (const group of NAV_GROUPS) {
     const item = group.items.find((i) => i.path === pathname);
     if (item) {
-      const trail: Crumb[] = [{ label: 'Dashboard', to: '/' }];
+      const trail: Crumb[] = [];
       if (group.label) {
         trail.push({ label: group.label });
       }
@@ -123,7 +127,7 @@ export function crumbsFor(pathname: string): Crumb[] {
       return trail;
     }
   }
-  // Unknown path: Dashboard + a humanised last segment.
+  // Unknown path: a single humanised last segment.
   const last = pathname.split('/').filter(Boolean).pop() ?? '';
-  return [{ label: 'Dashboard', to: '/' }, { label: last.charAt(0).toUpperCase() + last.slice(1) }];
+  return [{ label: last.charAt(0).toUpperCase() + last.slice(1) }];
 }

@@ -64,15 +64,11 @@ describe('crumbsFor', () => {
     expect(crumbsFor('/')).toEqual([{ label: 'Dashboard' }]);
   });
 
-  it('builds Dashboard > group > item for an admin path', () => {
-    expect(crumbsFor('/admin/users')).toEqual([
-      { label: 'Dashboard', to: '/' },
-      { label: 'Verwaltung' },
-      { label: 'Benutzer' },
-    ]);
+  it('builds group > item for an admin path (no Dashboard prefix)', () => {
+    expect(crumbsFor('/admin/users')).toEqual([{ label: 'Verwaltung' }, { label: 'Benutzer' }]);
   });
 
-  it('builds Dashboard > item for a top-level path', () => {
-    expect(crumbsFor('/reviews')).toEqual([{ label: 'Dashboard', to: '/' }, { label: 'Reviews' }]);
+  it('builds just the item for a top-level path', () => {
+    expect(crumbsFor('/reviews')).toEqual([{ label: 'Reviews' }]);
   });
 });
