@@ -49,6 +49,11 @@ tags:
       global role and enabled state, and trigger a password-setup/reset link.
       A self-lockout guard prevents an admin from disabling or demoting their own
       account or the last remaining admin.
+  - name: AdminTeams
+    description: |
+      Admin-only team management (issue #105): list/search teams with pagination,
+      create / edit / delete teams, and manage memberships with a per-team role
+      (LEAD / MEMBER). Teams group reviewers for the review workflow.
 paths:
   /config:
     get:
@@ -818,6 +823,284 @@ paths:
           $ref: '#/components/responses/Unauthorized'
         '403':
           $ref: '#/components/responses/Forbidden'
+  /admin/teams:
+    get:
+      tags:
+        - AdminTeams
+      summary: List and search teams
+      description: Returns a page of teams ordered by name, with a member count each.
+      operationId: listTeams
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: q
+          in: query
+          required: false
+          description: Case-insensitive search over team name and description.
+          schema:
+            type: string
+            maxLength: 200
+        - name: page
+          in: query
+          required: false
+          schema:
+            type: integer
+            format: int32
+            minimum: 0
+            default: 0
+        - name: size
+          in: query
+          required: false
+          schema:
+            type: integer
+            format: int32
+            minimum: 1
+            maximum: 100
+            default: 20
+      responses:
+        '200':
+          description: A page of teams
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AdminTeamListResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+    post:
+      tags:
+        - AdminTeams
+      summary: Create a team
+      operationId: createTeam
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AdminTeamCreateRequest'
+      responses:
+        '201':
+          description: The created team
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AdminTeamSummary'
+        '400':
+          description: Invalid input
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '409':
+          description: A team with that name already exists
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+  /admin/teams/{teamId}:
+    get:
+      tags:
+        - AdminTeams
+      summary: Get a team with its members
+      operationId: getTeam
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/TeamIdParam'
+      responses:
+        '200':
+          description: The team and its members
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AdminTeamDetail'
+        '404':
+          description: Unknown team
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+    patch:
+      tags:
+        - AdminTeams
+      summary: Update a team
+      description: Partial update of name, description and enabled state.
+      operationId: updateTeam
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/TeamIdParam'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AdminTeamUpdateRequest'
+      responses:
+        '200':
+          description: The updated team
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AdminTeamSummary'
+        '400':
+          description: Invalid input
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Unknown team
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '409':
+          description: A team with that name already exists
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+    delete:
+      tags:
+        - AdminTeams
+      summary: Delete a team
+      description: Deletes the team and, by cascade, its memberships.
+      operationId: deleteTeam
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/TeamIdParam'
+      responses:
+        '204':
+          description: Team deleted
+        '404':
+          description: Unknown team
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+  /admin/teams/{teamId}/members:
+    post:
+      tags:
+        - AdminTeams
+      summary: Add a member to a team
+      operationId: addTeamMember
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/TeamIdParam'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AdminTeamMemberRequest'
+      responses:
+        '201':
+          description: The added member
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AdminTeamMember'
+        '400':
+          description: Invalid input
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Unknown team or user
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '409':
+          description: The user is already a member of the team
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+  /admin/teams/{teamId}/members/{userId}:
+    patch:
+      tags:
+        - AdminTeams
+      summary: Set a member's team role
+      operationId: setTeamMemberRole
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/TeamIdParam'
+        - $ref: '#/components/parameters/UserIdParam'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AdminTeamMemberRoleUpdateRequest'
+      responses:
+        '200':
+          description: The updated member
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AdminTeamMember'
+        '404':
+          description: The team has no such member
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+    delete:
+      tags:
+        - AdminTeams
+      summary: Remove a member from a team
+      operationId: removeTeamMember
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/TeamIdParam'
+        - $ref: '#/components/parameters/UserIdParam'
+      responses:
+        '204':
+          description: Member removed
+        '404':
+          description: The team has no such member
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
   /auth/register:
     post:
       tags:
@@ -1198,6 +1481,14 @@ components:
       in: path
       required: true
       description: The user's id.
+      schema:
+        type: string
+        format: uuid
+    TeamIdParam:
+      name: teamId
+      in: path
+      required: true
+      description: The team's id.
       schema:
         type: string
         format: uuid
@@ -1760,6 +2051,167 @@ components:
         enabled:
           type: boolean
           nullable: true
+    TeamRole:
+      type: string
+      description: |
+        A user's role within a team (issue #105) — distinct from the global
+        UserRole. `LEAD` manages the team; `MEMBER` is a regular member.
+      enum:
+        - LEAD
+        - MEMBER
+    AdminTeamMember:
+      type: object
+      description: A team member joined with their user identity.
+      properties:
+        userId:
+          type: string
+          format: uuid
+        displayName:
+          type: string
+        email:
+          type: string
+        teamRole:
+          $ref: '#/components/schemas/TeamRole'
+        joinedAt:
+          type: string
+          format: date-time
+      required:
+        - userId
+        - displayName
+        - email
+        - teamRole
+        - joinedAt
+    AdminTeamSummary:
+      type: object
+      description: A team as shown in the admin team list.
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        description:
+          type: string
+          nullable: true
+        enabled:
+          type: boolean
+        memberCount:
+          type: integer
+          format: int64
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+      required:
+        - id
+        - name
+        - enabled
+        - memberCount
+        - createdAt
+        - updatedAt
+    AdminTeamDetail:
+      type: object
+      description: Full team detail including its members.
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        description:
+          type: string
+          nullable: true
+        enabled:
+          type: boolean
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+        members:
+          type: array
+          items:
+            $ref: '#/components/schemas/AdminTeamMember'
+      required:
+        - id
+        - name
+        - enabled
+        - createdAt
+        - updatedAt
+        - members
+    AdminTeamListResponse:
+      type: object
+      description: A page of teams for the admin list.
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/AdminTeamSummary'
+        total:
+          type: integer
+          format: int64
+        page:
+          type: integer
+          format: int32
+        size:
+          type: integer
+          format: int32
+      required:
+        - items
+        - total
+        - page
+        - size
+    AdminTeamCreateRequest:
+      type: object
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 120
+        description:
+          type: string
+          maxLength: 1000
+          nullable: true
+      required:
+        - name
+    AdminTeamUpdateRequest:
+      type: object
+      description: Partial update; only provided fields change.
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 120
+          nullable: true
+        description:
+          type: string
+          maxLength: 1000
+          nullable: true
+        enabled:
+          type: boolean
+          nullable: true
+    AdminTeamMemberRequest:
+      type: object
+      description: Add a user to a team with a team role.
+      properties:
+        userId:
+          type: string
+          format: uuid
+        teamRole:
+          $ref: '#/components/schemas/TeamRole'
+      required:
+        - userId
+        - teamRole
+    AdminTeamMemberRoleUpdateRequest:
+      type: object
+      properties:
+        teamRole:
+          $ref: '#/components/schemas/TeamRole'
+      required:
+        - teamRole
     RegisterRequest:
       type: object
       description: Self-registration details for a new local account.
