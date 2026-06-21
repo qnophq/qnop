@@ -28,18 +28,30 @@
  */
 
 const brand = {
+  // Bright signature blue — the recognisable brand accent. It only reaches
+  // 3.3:1 on white, so it is used for non-text accents (focus ring, brand mark,
+  // tints), NOT for white-on-blue surfaces or blue body text.
   blue: '#1292EE',
   blueHover: '#0F80D6',
+  // Accessible action blue (white text 5.2:1, as text on white 5.2:1) — the
+  // interactive primary. Stays in the brand ramp so recognition holds (a11y #101).
   bluePress: '#0B6FBC',
+  blueDeep: '#085B9C',
   blue50: '#E7F4FE',
   navy: '#012142',
   navy700: '#02305E',
 } as const;
 
 const semantic = {
+  // Bright tones for non-text indicators (status dots, badge accents).
   success: '#16B77B',
   warning: '#F5B83D',
   danger: '#E5484D',
+  // Darkened tones for filled buttons that carry white text (WCAG AA ≥ 4.5:1):
+  // white on successStrong = 5.1:1, on dangerStrong = 5.3:1. Warning keeps dark
+  // text on the bright amber (7.4:1), so it needs no strong variant.
+  successStrong: '#087E53',
+  dangerStrong: '#CD2B31',
 } as const;
 
 /** Per-mode surfaces, foregrounds and borders (prototype `--app-*` layer). */
@@ -49,7 +61,9 @@ const light = {
   surface2: '#F6F8FB',
   fg: '#012142',
   fg2: '#3B4958',
-  fg3: '#778797',
+  // Darkened from the prototype's #778797 (3.7:1, sub-AA) to clear 4.5:1 for
+  // small metadata text: 5.4:1 on white, 5.0:1 on the page background.
+  fg3: '#5E6C7B',
   border: '#E6EBF1',
   borderStrong: '#CBD4DF',
 } as const;
@@ -65,9 +79,19 @@ const dark = {
   borderStrong: 'rgba(255,255,255,0.14)',
 } as const;
 
-/** Pill/badge tones (background, text, border) — `fgDark` overrides text in dark mode. */
+/**
+ * Pill/badge tones — `fg` is the light-mode text, `fgDark` the dark-mode text.
+ * Backgrounds are translucent brand colours so a single value composites
+ * correctly over the light card AND the dark surface (the blue tone was
+ * previously a solid light fill, which broke to 1.5:1 in dark mode).
+ */
 const badge = {
-  blue: { bg: '#E7F4FE', fg: '#085B9C', border: 'rgba(18,144,239,0.18)', fgDark: '#9BCEFA' },
+  blue: {
+    bg: 'rgba(18,144,239,0.12)',
+    fg: '#085B9C',
+    border: 'rgba(18,144,239,0.20)',
+    fgDark: '#9BCEFA',
+  },
   green: {
     bg: 'rgba(22,183,123,0.10)',
     fg: '#087E53',

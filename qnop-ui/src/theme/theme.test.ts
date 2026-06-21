@@ -27,7 +27,8 @@ describe('buildTheme', () => {
   it('builds a light theme from the devtank42 light surfaces', () => {
     const theme = buildTheme('light');
     expect(theme.palette.mode).toBe('light');
-    expect(theme.palette.primary.main).toBe(tokens.brand.blue);
+    // Interactive primary is the accessible action blue, not the bright accent.
+    expect(theme.palette.primary.main).toBe(tokens.brand.bluePress);
     expect(theme.palette.background.default).toBe(tokens.light.bg);
     expect(theme.palette.background.paper).toBe(tokens.light.surface);
     expect(theme.palette.text.primary).toBe(tokens.light.fg);
@@ -42,11 +43,17 @@ describe('buildTheme', () => {
     expect(theme.palette.text.primary).toBe(tokens.dark.fg);
   });
 
-  it('maps the semantic colours', () => {
+  it('maps the semantic colours (AA-strong tones for white-on-colour buttons)', () => {
     const theme = buildTheme('light');
-    expect(theme.palette.success.main).toBe(tokens.semantic.success);
+    expect(theme.palette.success.main).toBe(tokens.semantic.successStrong);
     expect(theme.palette.warning.main).toBe(tokens.semantic.warning);
-    expect(theme.palette.error.main).toBe(tokens.semantic.danger);
+    expect(theme.palette.error.main).toBe(tokens.semantic.dangerStrong);
+  });
+
+  it('keeps the bright brand blue available as an accent for recognition', () => {
+    const theme = buildTheme('light');
+    expect(theme.qnop.brand.blue).toBe('#1292EE');
+    expect(theme.palette.primary.main).not.toBe(theme.qnop.brand.blue);
   });
 
   it('uses the squircle radius and the Outfit display face', () => {

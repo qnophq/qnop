@@ -84,16 +84,21 @@ export function buildTheme(mode: PaletteMode): Theme {
     qnop,
     palette: {
       mode,
+      // Interactive primary uses the accessible action blue (white text 5.2:1);
+      // the brighter brand blue lives on in the focus ring and brand accents
+      // (theme.qnop.brand.blue), so recognition holds while buttons/links pass
+      // WCAG AA. success/error likewise use the darkened "strong" tones for
+      // white-on-colour buttons; the bright tones remain for status indicators.
       primary: {
-        main: tokens.brand.blue,
-        dark: tokens.brand.bluePress,
+        main: tokens.brand.bluePress,
+        dark: tokens.brand.blueDeep,
         light: tokens.brand.blue50,
         contrastText: '#FFFFFF',
       },
       secondary: { main: tokens.brand.navy, contrastText: '#FFFFFF' },
-      success: { main: tokens.semantic.success, contrastText: '#FFFFFF' },
+      success: { main: tokens.semantic.successStrong, contrastText: '#FFFFFF' },
       warning: { main: tokens.semantic.warning, contrastText: '#3E2E00' },
-      error: { main: tokens.semantic.danger, contrastText: '#FFFFFF' },
+      error: { main: tokens.semantic.dangerStrong, contrastText: '#FFFFFF' },
       background: { default: s.bg, paper: s.surface },
       text: { primary: s.fg, secondary: s.fg2, disabled: s.fg3 },
       divider: s.border,
