@@ -31,10 +31,13 @@ import static org.mockito.Mockito.when;
 
 import io.qnop.entity.User;
 import io.qnop.entity.UserRole;
+import io.qnop.repository.OidcIdentityRepository;
 import io.qnop.repository.UserRepository;
 import io.qnop.service.AdminUserService.AdminUserPage;
 import io.qnop.service.AdminUserService.AdminUserView;
+import io.qnop.service.AdminUserService.PasswordResetOutcome;
 import io.qnop.service.auth.PasswordResetFlowService;
+import io.qnop.service.auth.PasswordResetFlowService.SetupLinkOutcome;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -45,14 +48,19 @@ import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.security.crypto.password.PasswordEncoder;
 
-/** Unit tests for {@link AdminUserService} (issue #104): create/invite, edit guards, reset. */
+/**
+ * Unit tests for {@link AdminUserService} (issues #104/#124): create/invite, edit, delete, reset.
+ */
 class AdminUserServiceTest {
 
   private final UserRepository users = mock(UserRepository.class);
+  private final OidcIdentityRepository oidcIdentities = mock(OidcIdentityRepository.class);
   private final PasswordEncoder passwordEncoder = mock(PasswordEncoder.class);
   private final PasswordResetFlowService passwordResetFlow = mock(PasswordResetFlowService.class);
+  private final RefreshTokenService refreshTokens = mock(RefreshTokenService.class);
   private final AdminUserService service =
-      new AdminUserService(users, passwordEncoder, passwordResetFlow);
+      new AdminUserService(
+          users, oidcIdentities, passwordEncoder, passwordResetFlow, refreshTokens);
 
   private void noClash() {
     when(users.existsByEmailIgnoreCaseAndSource(any(), any())).thenReturn(false);
@@ -162,6 +170,45 @@ class AdminUserServiceTest {
   }
 
   @Test
+  @DisplayName("delete rejects self and the last admin, and removes any other user")
+  void delete() {
+    UUID selfId = UUID.randomUUID();
+    User self = User.internal("Self", "self@example.com", "self", "h");
+    self.setRole(UserRole.ADMIN);
+    when(users.findById(selfId)).thenReturn(Optional.of(self));
+    assertThatThrownBy(() -> service.delete(selfId, selfId))
+        .isInstanceOf(AdminUserConflictException.class)
+        .extracting("code")
+        .isEqualTo("SELF_DELETE");
+
+    UUID adminId = UUID.randomUUID();
+    User onlyAdmin = User.internal("Admin", "admin@example.com", "admin", "h");
+    onlyAdmin.setRole(UserRole.ADMIN);
+    when(users.findById(adminId)).thenReturn(Optional.of(onlyAdmin));
+    when(users.countByRoleAndEnabledTrue(UserRole.ADMIN)).thenReturn(1L);
+    assertThatThrownBy(() -> service.delete(adminId, UUID.randomUUID()))
+        .isInstanceOf(AdminUserConflictException.class)
+        .extracting("code")
+        .isEqualTo("LAST_ADMIN");
+
+    UUID memberId = UUID.randomUUID();
+    User member = User.internal("Member", "member@example.com", "member", "h");
+    member.setRole(UserRole.MEMBER);
+    when(users.findById(memberId)).thenReturn(Optional.of(member));
+    service.delete(memberId, UUID.randomUUID());
+    verify(users).delete(member);
+  }
+
+  @Test
+  @DisplayName("delete throws for an unknown user")
+  void deleteRejectsUnknown() {
+    UUID id = UUID.randomUUID();
+    when(users.findById(id)).thenReturn(Optional.empty());
+    assertThatThrownBy(() -> service.delete(id, UUID.randomUUID()))
+        .isInstanceOf(UserNotFoundException.class);
+  }
+
+  @Test
   @DisplayName("get throws for an unknown user")
   void getRejectsUnknown() {
     UUID id = UUID.randomUUID();
@@ -170,7 +217,7 @@ class AdminUserServiceTest {
   }
 
   @Test
-  @DisplayName("password reset is rejected for an external account and sent for an internal one")
+  @DisplayName("password reset rejects external accounts; for internal it revokes sessions + sends")
   void sendPasswordReset() {
     UUID externalId = UUID.randomUUID();
     when(users.findById(externalId))
@@ -183,22 +230,46 @@ class AdminUserServiceTest {
     UUID internalId = UUID.randomUUID();
     User internal = User.internal("Int", "int@example.com", "int", "h");
     when(users.findById(internalId)).thenReturn(Optional.of(internal));
-    service.sendPasswordReset(internalId);
+    when(passwordResetFlow.sendSetupLink(internal))
+        .thenReturn(new SetupLinkOutcome(true, "https://app/reset?token=x"));
+
+    PasswordResetOutcome outcome = service.sendPasswordReset(internalId);
+
+    assertThat(outcome.emailSent()).isTrue();
+    assertThat(outcome.resetUrl()).isNull(); // hidden when the email went out
     verify(passwordResetFlow).sendSetupLink(internal);
+    verify(refreshTokens).revokeAllForUser(internalId);
+    verify(users).bumpPasswordInvalidatedBefore(eq(internalId), any());
   }
 
   @Test
-  @DisplayName("list lowercases and wraps the query and maps the page")
+  @DisplayName("password reset returns the fallback url when the email could not be sent")
+  void sendPasswordResetFallbackUrl() {
+    UUID id = UUID.randomUUID();
+    User internal = User.internal("Int", "int@example.com", "int", "h");
+    when(users.findById(id)).thenReturn(Optional.of(internal));
+    when(passwordResetFlow.sendSetupLink(internal))
+        .thenReturn(new SetupLinkOutcome(false, "https://app/reset?token=y"));
+
+    PasswordResetOutcome outcome = service.sendPasswordReset(id);
+
+    assertThat(outcome.emailSent()).isFalse();
+    assertThat(outcome.resetUrl()).isEqualTo("https://app/reset?token=y");
+  }
+
+  @Test
+  @DisplayName("list lowercases/wraps the query, passes the enabled filter, and maps the page")
   void listMapsPage() {
     User user = User.internal("Alice", "alice@example.com", "alice", "h");
     user.setRole(UserRole.MEMBER);
-    when(users.search(eq("%ali%"), eq(UserRole.MEMBER), any()))
+    when(users.search(eq("%ali%"), eq(UserRole.MEMBER), eq(true), any()))
         .thenReturn(new PageImpl<>(List.of(user), PageRequest.of(0, 20), 1));
 
-    AdminUserPage page = service.list(" Ali ", "MEMBER", 0, 20);
+    AdminUserPage page = service.list(" Ali ", "MEMBER", true, "displayName,asc", 0, 20);
 
     assertThat(page.items()).hasSize(1);
     assertThat(page.total()).isEqualTo(1);
     assertThat(page.items().get(0).email()).isEqualTo("alice@example.com");
+    assertThat(page.items().get(0).providerName()).isNull(); // internal user
   }
 }

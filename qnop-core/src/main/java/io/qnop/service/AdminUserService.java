@@ -23,12 +23,17 @@ package io.qnop.service;
 import io.qnop.entity.User;
 import io.qnop.entity.UserRole;
 import io.qnop.entity.UserSource;
+import io.qnop.repository.OidcIdentityRepository;
+import io.qnop.repository.UserProviderName;
 import io.qnop.repository.UserRepository;
 import io.qnop.service.auth.PasswordResetFlowService;
+import io.qnop.service.auth.PasswordResetFlowService.SetupLinkOutcome;
 import java.time.Instant;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.UUID;
+import java.util.stream.Collectors;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
@@ -37,50 +42,69 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * Admin user management (issue #104): paginated search, create-or-invite, edit and password-setup
- * links. Keeps the {@code User} entity inside the service layer — every result crosses the boundary
- * as an entity-free {@link AdminUserView} (role and source as their enum names), so the web layer
- * never touches a JPA entity (ADR-0004).
+ * Admin user management (issues #104/#124): paginated search/filter/sort, create-or-invite, edit,
+ * delete and admin password reset. Keeps the {@code User} entity inside the service layer — every
+ * result crosses the boundary as an entity-free {@link AdminUserView} (role and source as their
+ * enum names), so the web layer never touches a JPA entity (ADR-0004).
  *
- * <p>Two guards protect against admin lockout: an admin can neither disable nor demote their own
- * account, and the last enabled admin can never be disabled or demoted — both surface as {@link
- * AdminUserConflictException} (HTTP 409). Creating with an {@code initialPassword} yields an
- * enabled account that must change its password on first login; omitting it provisions the account
- * behind a random, unusable placeholder hash (the {@code INTERNAL ⇒ credentials} DB invariant) and
- * emails an invitation link the user follows to set their own password.
+ * <p>Lockout guards (all {@link AdminUserConflictException} / HTTP 409): an admin can neither
+ * disable, demote nor delete their own account, and the last enabled admin can never be disabled,
+ * demoted or deleted. Creating with an {@code initialPassword} yields an enabled account that must
+ * change its password on first login; omitting it provisions the account behind a random, unusable
+ * placeholder hash (the {@code INTERNAL ⇒ credentials} DB invariant) and emails an invitation link.
  */
 @Service
 public class AdminUserService {
 
+  /** Whitelist of API sort fields → entity properties (guards the ORDER BY against injection). */
+  private static final Map<String, String> SORTABLE =
+      Map.of(
+          "displayname", "displayName",
+          "email", "email",
+          "username", "username",
+          "role", "role",
+          "createdat", "createdAt",
+          "lastloginat", "lastLoginAt");
+
   private final UserRepository users;
+  private final OidcIdentityRepository oidcIdentities;
   private final PasswordEncoder passwordEncoder;
   private final PasswordResetFlowService passwordResetFlow;
+  private final RefreshTokenService refreshTokens;
 
   public AdminUserService(
       UserRepository users,
+      OidcIdentityRepository oidcIdentities,
       PasswordEncoder passwordEncoder,
-      PasswordResetFlowService passwordResetFlow) {
+      PasswordResetFlowService passwordResetFlow,
+      RefreshTokenService refreshTokens) {
     this.users = users;
+    this.oidcIdentities = oidcIdentities;
     this.passwordEncoder = passwordEncoder;
     this.passwordResetFlow = passwordResetFlow;
+    this.refreshTokens = refreshTokens;
   }
 
-  /** A paginated, optionally filtered slice of users for the admin list. */
+  /** A paginated, optionally filtered/sorted slice of users for the admin list. */
   @Transactional(readOnly = true)
-  public AdminUserPage list(String query, String roleName, int page, int size) {
+  public AdminUserPage list(
+      String query, String roleName, Boolean enabled, String sort, int page, int size) {
     String like =
         blankToNull(query) == null ? null : "%" + query.trim().toLowerCase(Locale.ROOT) + "%";
     UserRole role = parseRoleOrNull(roleName);
     Page<User> result =
-        users.search(
-            like, role, PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "createdAt")));
-    List<AdminUserView> items = result.getContent().stream().map(AdminUserService::toView).toList();
+        users.search(like, role, enabled, PageRequest.of(page, size, parseSort(sort)));
+
+    Map<UUID, String> providerNames = providerNamesFor(result.getContent());
+    List<AdminUserView> items =
+        result.getContent().stream().map(u -> toView(u, providerNameOf(u, providerNames))).toList();
     return new AdminUserPage(items, result.getTotalElements(), page, size);
   }
 
   @Transactional(readOnly = true)
   public AdminUserView get(UUID id) {
-    return toView(users.findById(id).orElseThrow(() -> new UserNotFoundException(id)));
+    User user = users.findById(id).orElseThrow(() -> new UserNotFoundException(id));
+    return toView(user, providerNameOf(user, providerNamesFor(List.of(user))));
   }
 
   /**
@@ -114,7 +138,7 @@ public class AdminUserService {
     if (invite) {
       passwordResetFlow.sendSetupLink(saved);
     }
-    return toView(saved);
+    return toView(saved, null);
   }
 
   /**
@@ -149,25 +173,69 @@ public class AdminUserService {
     }
     user.setRole(newRole);
     user.setEnabled(newEnabled);
-    return toView(user);
+    return toView(user, null);
   }
 
   /**
-   * Issues a password-setup/reset token for an internal account and emails the link. External
-   * (OIDC) accounts have no local password and are rejected (409).
+   * Permanently deletes a user; the database cascades their tokens, settings, OIDC identity and
+   * team memberships. Rejects (409) deleting your own account or the last enabled admin.
    */
   @Transactional
-  public void sendPasswordReset(UUID id) {
+  public void delete(UUID id, UUID actingUserId) {
+    User user = users.findById(id).orElseThrow(() -> new UserNotFoundException(id));
+    if (id.equals(actingUserId)) {
+      throw new AdminUserConflictException("SELF_DELETE", "You cannot delete your own account.");
+    }
+    if (user.getRole() == UserRole.ADMIN
+        && user.isEnabled()
+        && users.countByRoleAndEnabledTrue(UserRole.ADMIN) <= 1) {
+      throw new AdminUserConflictException("LAST_ADMIN", "At least one enabled admin must remain.");
+    }
+    users.delete(user);
+  }
+
+  /**
+   * Admin password reset for an internal account: revokes the user's active sessions immediately,
+   * issues a single-use reset token and emails the set-your-password link. External (OIDC) accounts
+   * have no local password and are rejected (409). The reset URL is returned only as a fallback
+   * when the email could not be sent.
+   */
+  @Transactional
+  public PasswordResetOutcome sendPasswordReset(UUID id) {
     User user = users.findById(id).orElseThrow(() -> new UserNotFoundException(id));
     if (user.getSource() != UserSource.INTERNAL) {
       throw new AdminUserConflictException(
           "NO_LOCAL_PASSWORD",
           "This account signs in via an identity provider; it has no password.");
     }
-    passwordResetFlow.sendSetupLink(user);
+    SetupLinkOutcome outcome = passwordResetFlow.sendSetupLink(user);
+    // Revoke active sessions now (the modifying writes clear the persistence context, so do this
+    // after the link has been issued from the still-managed entity).
+    users.bumpPasswordInvalidatedBefore(id, Instant.now());
+    refreshTokens.revokeAllForUser(id);
+    return new PasswordResetOutcome(
+        outcome.emailSent(), outcome.emailSent() ? null : outcome.resetUrl());
   }
 
-  private static AdminUserView toView(User u) {
+  /** The provider name for a user, or null for internal accounts (avoids a null-key map lookup). */
+  private static String providerNameOf(User user, Map<UUID, String> providerNames) {
+    return user.getSource() == UserSource.EXTERNAL ? providerNames.get(user.getId()) : null;
+  }
+
+  /** The provider name per external user id in the given page (empty for all-internal pages). */
+  private Map<UUID, String> providerNamesFor(List<User> page) {
+    List<UUID> externalIds =
+        page.stream().filter(u -> u.getSource() == UserSource.EXTERNAL).map(User::getId).toList();
+    if (externalIds.isEmpty()) {
+      return Map.of();
+    }
+    return oidcIdentities.findProviderNamesByUserIds(externalIds).stream()
+        .collect(
+            Collectors.toMap(
+                UserProviderName::userId, UserProviderName::providerName, (a, b) -> a));
+  }
+
+  private static AdminUserView toView(User u, String providerName) {
     return new AdminUserView(
         u.getId(),
         u.getDisplayName(),
@@ -176,6 +244,8 @@ public class AdminUserService {
         u.getRole().name(),
         u.getSource().name(),
         u.isEnabled(),
+        u.isPasswordChangeRequired(),
+        providerName,
         u.getLastLoginAt(),
         u.getCreatedAt());
   }
@@ -193,6 +263,19 @@ public class AdminUserService {
       return null;
     }
     return UserRole.valueOf(roleName.trim().toUpperCase(Locale.ROOT));
+  }
+
+  /**
+   * Parses a {@code field,direction} string against the whitelist; defaults to display name asc.
+   */
+  private static Sort parseSort(String sort) {
+    String[] parts = (blankToNull(sort) == null ? "displayName,asc" : sort).split(",");
+    String field = SORTABLE.getOrDefault(parts[0].trim().toLowerCase(Locale.ROOT), "displayName");
+    Sort.Direction direction =
+        parts.length > 1 && parts[1].trim().equalsIgnoreCase("desc")
+            ? Sort.Direction.DESC
+            : Sort.Direction.ASC;
+    return Sort.by(direction, field);
   }
 
   private static String normalizeEmail(String email) {
@@ -219,9 +302,14 @@ public class AdminUserService {
       String role,
       String source,
       boolean enabled,
+      boolean passwordChangeRequired,
+      String providerName,
       Instant lastLoginAt,
       Instant createdAt) {}
 
   /** One page of {@link AdminUserView}s plus the total count for the admin list. */
   public record AdminUserPage(List<AdminUserView> items, long total, int page, int size) {}
+
+  /** Outcome of an admin password reset: whether email was sent, and a fallback link if not. */
+  public record PasswordResetOutcome(boolean emailSent, String resetUrl) {}
 }

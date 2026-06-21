@@ -21,9 +21,13 @@
 package io.qnop.repository;
 
 import io.qnop.entity.OidcIdentity;
+import java.util.Collection;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 
 /** Data access for {@link OidcIdentity}. */
 public interface OidcIdentityRepository extends JpaRepository<OidcIdentity, UUID> {
@@ -32,4 +36,14 @@ public interface OidcIdentityRepository extends JpaRepository<OidcIdentity, UUID
   Optional<OidcIdentity> findByOidcProviderIdAndSubject(UUID oidcProviderId, String subject);
 
   Optional<OidcIdentity> findByUserId(UUID userId);
+
+  /**
+   * The OIDC provider names for a set of users, to label external accounts in the admin list
+   * without an N+1 (issue #124).
+   */
+  @Query(
+      "SELECT new io.qnop.repository.UserProviderName(i.userId, p.name) "
+          + "FROM OidcIdentity i JOIN OidcProvider p ON p.id = i.oidcProviderId "
+          + "WHERE i.userId IN :userIds")
+  List<UserProviderName> findProviderNamesByUserIds(@Param("userIds") Collection<UUID> userIds);
 }

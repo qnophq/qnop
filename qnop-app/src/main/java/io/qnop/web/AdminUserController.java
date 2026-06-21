@@ -21,6 +21,7 @@
 package io.qnop.web;
 
 import io.qnop.api.v1.endpoint.AdminUsersApi;
+import io.qnop.api.v1.model.AdminPasswordResetResponse;
 import io.qnop.api.v1.model.AdminUserCreateRequest;
 import io.qnop.api.v1.model.AdminUserDetail;
 import io.qnop.api.v1.model.AdminUserListResponse;
@@ -33,6 +34,7 @@ import io.qnop.service.AdminUserConflictException;
 import io.qnop.service.AdminUserService;
 import io.qnop.service.AdminUserService.AdminUserPage;
 import io.qnop.service.AdminUserService.AdminUserView;
+import io.qnop.service.AdminUserService.PasswordResetOutcome;
 import io.qnop.service.UserNotFoundException;
 import java.time.Instant;
 import java.time.OffsetDateTime;
@@ -62,8 +64,9 @@ public class AdminUserController implements AdminUsersApi {
 
   @Override
   public ResponseEntity<AdminUserListResponse> listUsers(
-      String q, UserRole role, Integer page, Integer size) {
-    AdminUserPage result = adminUsers.list(q, role == null ? null : role.name(), page, size);
+      String q, UserRole role, Boolean enabled, String sort, Integer page, Integer size) {
+    AdminUserPage result =
+        adminUsers.list(q, role == null ? null : role.name(), enabled, sort, page, size);
     return ResponseEntity.ok(
         new AdminUserListResponse()
             .items(result.items().stream().map(AdminUserController::toSummary).toList())
@@ -102,9 +105,18 @@ public class AdminUserController implements AdminUsersApi {
   }
 
   @Override
-  public ResponseEntity<Void> sendUserPasswordReset(UUID userId) {
-    adminUsers.sendPasswordReset(userId);
-    return ResponseEntity.accepted().build();
+  public ResponseEntity<Void> deleteUser(UUID userId) {
+    adminUsers.delete(userId, CurrentUser.requireUserId());
+    return ResponseEntity.noContent().build();
+  }
+
+  @Override
+  public ResponseEntity<AdminPasswordResetResponse> sendUserPasswordReset(UUID userId) {
+    PasswordResetOutcome outcome = adminUsers.sendPasswordReset(userId);
+    return ResponseEntity.ok(
+        new AdminPasswordResetResponse()
+            .emailSent(outcome.emailSent())
+            .resetUrl(outcome.resetUrl()));
   }
 
   @ExceptionHandler(UserNotFoundException.class)
@@ -136,6 +148,8 @@ public class AdminUserController implements AdminUsersApi {
         .role(UserRole.fromValue(v.role()))
         .source(UserSource.fromValue(v.source()))
         .enabled(v.enabled())
+        .passwordChangeRequired(v.passwordChangeRequired())
+        .providerName(v.providerName())
         .lastLoginAt(toOffset(v.lastLoginAt()))
         .createdAt(toOffset(v.createdAt()));
   }
@@ -149,6 +163,8 @@ public class AdminUserController implements AdminUsersApi {
         .role(UserRole.fromValue(v.role()))
         .source(UserSource.fromValue(v.source()))
         .enabled(v.enabled())
+        .passwordChangeRequired(v.passwordChangeRequired())
+        .providerName(v.providerName())
         .lastLoginAt(toOffset(v.lastLoginAt()))
         .createdAt(toOffset(v.createdAt()));
   }

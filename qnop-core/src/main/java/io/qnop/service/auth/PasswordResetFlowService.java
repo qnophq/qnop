@@ -25,6 +25,7 @@ import io.qnop.service.ApplicationSettingKey;
 import io.qnop.service.ApplicationSettingsService;
 import io.qnop.service.UserService;
 import io.qnop.service.mail.MailService;
+import io.qnop.service.mail.MailService.SendResult;
 import io.qnop.service.mail.MailTemplateKey;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
@@ -76,29 +77,35 @@ public class PasswordResetFlowService {
   }
 
   /**
-   * Admin action (issue #104): issues a reset token for a known internal account and emails the
-   * set-your-password link. Unlike {@link #requestReset}, this is not gated by the self-service
+   * Admin action (issues #104/#124): issues a reset token for a known internal account and emails
+   * the set-your-password link, returning whether the email was sent and the link itself (for an
+   * out-of-band fallback). Unlike {@link #requestReset}, this is not gated by the self-service
    * feature flag or anti-enumeration — the admin already knows the account exists and is acting on
    * it deliberately (e.g. (re)sending an invitation or unblocking a locked-out user).
    */
   @Transactional
-  public void sendSetupLink(User user) {
-    sendResetEmail(user);
+  public SetupLinkOutcome sendSetupLink(User user) {
+    return sendResetEmail(user);
   }
 
-  private void sendResetEmail(User user) {
+  private SetupLinkOutcome sendResetEmail(User user) {
     String rawToken = resetTokens.issue(user).rawToken();
     String actionUrl =
         baseUrl() + "/reset-password?token=" + URLEncoder.encode(rawToken, StandardCharsets.UTF_8);
-    mailService.sendMailFromTemplate(
-        MailTemplateKey.PASSWORD_RESET,
-        user.getEmail(),
-        Map.of(
-            "siteName", siteName(),
-            "recipientName", user.getDisplayName(),
-            "actionUrl", actionUrl),
-        null);
+    SendResult result =
+        mailService.sendMailFromTemplate(
+            MailTemplateKey.PASSWORD_RESET,
+            user.getEmail(),
+            Map.of(
+                "siteName", siteName(),
+                "recipientName", user.getDisplayName(),
+                "actionUrl", actionUrl),
+            null);
+    return new SetupLinkOutcome(result instanceof SendResult.Sent, actionUrl);
   }
+
+  /** Result of issuing a reset/setup link: whether the email was sent, and the link itself. */
+  public record SetupLinkOutcome(boolean emailSent, String resetUrl) {}
 
   private String siteName() {
     return settings.getString(ApplicationSettingKey.GENERAL_APPLICATION_NAME);
