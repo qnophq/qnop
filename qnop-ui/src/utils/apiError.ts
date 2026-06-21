@@ -39,3 +39,16 @@ export function apiErrorMessage(error: unknown, fallback: string): string {
   }
   return fallback;
 }
+
+/**
+ * The stable `code` from the uniform API error envelope (e.g. `EMAIL_TAKEN`,
+ * `SELF_LOCKOUT`), or undefined when the error carries none. Callers map known
+ * codes to localized messages instead of surfacing the server's English text.
+ */
+export function apiErrorCode(error: unknown): string | undefined {
+  if (isAxiosError(error)) {
+    const code = (error.response?.data as { code?: unknown } | undefined)?.code;
+    if (typeof code === 'string') return code;
+  }
+  return undefined;
+}

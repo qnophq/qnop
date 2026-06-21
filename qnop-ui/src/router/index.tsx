@@ -20,13 +20,14 @@
  */
 
 import { createBrowserRouter } from 'react-router-dom';
-import { FileText, Settings, ShieldCheck, User, Users } from 'lucide-react';
+import { FileText, Settings, ShieldCheck, Users } from 'lucide-react';
 import { AppShell } from '../components/shell/AppShell';
 import { AdminRoute } from '../components/auth/AdminRoute';
 import { ProtectedRoute } from '../components/auth/ProtectedRoute';
 import { RoleRoute } from '../components/auth/RoleRoute';
 import { ComingSoonPage } from '../pages/ComingSoonPage';
 import { HomePage } from '../pages/HomePage';
+import { UsersPage } from '../pages/admin/UsersPage';
 import { ChangePasswordPage } from '../pages/auth/ChangePasswordPage';
 import { ForgotPasswordPage } from '../pages/auth/ForgotPasswordPage';
 import { LoginPage } from '../pages/auth/LoginPage';
@@ -85,11 +86,7 @@ export const router = createBrowserRouter([
         path: 'admin/users',
         element: (
           <AdminRoute>
-            <ComingSoonPage
-              title="Benutzer"
-              description="Konten, Rollen und Zugriff verwalten."
-              icon={User}
-            />
+            <UsersPage />
           </AdminRoute>
         ),
       },
