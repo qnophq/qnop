@@ -20,7 +20,7 @@
  */
 
 import { createBrowserRouter } from 'react-router-dom';
-import { FileText, Settings, ShieldCheck, Users } from 'lucide-react';
+import { FileText, Settings, ShieldCheck } from 'lucide-react';
 import { AppShell } from '../components/shell/AppShell';
 import { AdminRoute } from '../components/auth/AdminRoute';
 import { ProtectedRoute } from '../components/auth/ProtectedRoute';
@@ -28,6 +28,8 @@ import { RoleRoute } from '../components/auth/RoleRoute';
 import { ComingSoonPage } from '../pages/ComingSoonPage';
 import { HomePage } from '../pages/HomePage';
 import { UsersPage } from '../pages/admin/UsersPage';
+import { TeamsPage } from '../pages/admin/TeamsPage';
+import { TeamDetailPage } from '../pages/admin/TeamDetailPage';
 import { ChangePasswordPage } from '../pages/auth/ChangePasswordPage';
 import { ForgotPasswordPage } from '../pages/auth/ForgotPasswordPage';
 import { LoginPage } from '../pages/auth/LoginPage';
@@ -94,11 +96,15 @@ export const router = createBrowserRouter([
         path: 'admin/teams',
         element: (
           <AdminRoute>
-            <ComingSoonPage
-              title="Teams"
-              description="Group reviewers into teams and route reviews to the right people."
-              icon={Users}
-            />
+            <TeamsPage />
+          </AdminRoute>
+        ),
+      },
+      {
+        path: 'admin/teams/:id',
+        element: (
+          <AdminRoute>
+            <TeamDetailPage />
           </AdminRoute>
         ),
       },

@@ -71,4 +71,11 @@ describe('crumbsFor', () => {
   it('builds just the item for a top-level path', () => {
     expect(crumbsFor('/reviews')).toEqual([{ label: 'Reviews' }]);
   });
+
+  it('maps a nested detail path to its section, linking back to the list', () => {
+    expect(crumbsFor('/admin/teams/abc-123')).toEqual([
+      { label: 'Administration' },
+      { label: 'Teams', to: '/admin/teams' },
+    ]);
+  });
 });
