@@ -25,16 +25,16 @@
     "@fontsource/outfit": "5.2.8",
     "@mui/material": "9.1.1",
     "@tanstack/react-query": "5.101.0",
-    "axios": "1.17.0",
-    "lucide-react": "1.18.0",
+    "axios": "1.18.0",
+    "lucide-react": "1.21.0",
     "react": "19.2.7",
     "react-dom": "19.2.7",
-    "react-router-dom": "7.17.0",
+    "react-router-dom": "7.18.0",
     "zustand": "5.0.14"
   },
   "devDependencies": {
     "@eslint/js": "10.0.1",
-    "@openapitools/openapi-generator-cli": "2.38.0",
+    "@openapitools/openapi-generator-cli": "2.39.0",
     "@testing-library/jest-dom": "6.9.1",
     "@testing-library/react": "16.3.2",
     "@testing-library/user-event": "14.6.1",
@@ -42,7 +42,7 @@
     "@types/react": "19.2.17",
     "@types/react-dom": "19.2.3",
     "@vitejs/plugin-react": "6.0.2",
-    "@vitest/coverage-v8": "4.1.8",
+    "@vitest/coverage-v8": "4.1.9",
     "eslint": "10.5.0",
     "eslint-plugin-react-hooks": "7.1.1",
     "eslint-plugin-react-refresh": "0.5.3",
@@ -52,6 +52,6 @@
     "typescript": "6.0.3",
     "typescript-eslint": "8.61.1",
     "vite": "8.0.16",
-    "vitest": "4.1.8"
+    "vitest": "4.1.9"
   }
 }
