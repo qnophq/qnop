@@ -69,7 +69,12 @@ export function ChangePasswordPage() {
       clearAuth();
       setDone(true);
     } catch (err) {
-      setError(apiErrorMessage(err, 'The current password is wrong or the request failed.'));
+      setError(
+        apiErrorMessage(
+          err,
+          'The current password is wrong, or the new password does not meet the requirements.',
+        ),
+      );
     } finally {
       setSubmitting(false);
     }

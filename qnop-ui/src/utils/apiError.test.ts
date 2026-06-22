@@ -36,8 +36,13 @@ describe('apiErrorMessage', () => {
     expect(apiErrorMessage(axiosWithStatus(429), 'fallback')).toMatch(/attempts/i);
   });
 
-  it('maps a 400 to an invalid/expired message', () => {
+  it('maps a 400 without a validation code to an invalid/expired message', () => {
     expect(apiErrorMessage(axiosWithStatus(400), 'fallback')).toMatch(/invalid|expired/i);
+  });
+
+  it('maps a 400 VALIDATION_ERROR to the caller fallback, not the link-expired text', () => {
+    const error = axiosWithBody(400, { code: 'VALIDATION_ERROR' });
+    expect(apiErrorMessage(error, 'fallback')).toBe('fallback');
   });
 
   it('maps the RATE_LIMITED sentinel error to the rate-limit message', () => {

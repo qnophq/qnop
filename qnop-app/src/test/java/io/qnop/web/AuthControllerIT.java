@@ -31,6 +31,7 @@ import io.qnop.bootstrap.AbstractIntegrationTest;
 import io.qnop.entity.User;
 import io.qnop.entity.UserRole;
 import io.qnop.repository.UserRepository;
+import io.qnop.service.JwtTokenService;
 import io.qnop.web.security.RefreshTokenCookieFactory;
 import jakarta.servlet.http.Cookie;
 import java.util.regex.Matcher;
@@ -63,6 +64,7 @@ class AuthControllerIT extends AbstractIntegrationTest {
   @Autowired MockMvc mockMvc;
   @Autowired UserRepository userRepository;
   @Autowired PasswordEncoder passwordEncoder;
+  @Autowired JwtTokenService jwtTokenService;
 
   @Test
   void loginIssuesAccessTokenAndRefreshCookie() throws Exception {
@@ -167,6 +169,45 @@ class AuthControllerIT extends AbstractIntegrationTest {
         .andExpect(status().isUnauthorized());
 
     assertThat(user.getId()).isNotNull();
+  }
+
+  @Test
+  void changePasswordAcceptsTheEightCharacterPolicyMinimum() throws Exception {
+    // Regression: the change-password minimum must stay at 8 — matching the other
+    // password fields and the UI strength meter. A 12-char minimum here rejected
+    // passwords the UI had accepted, surfacing as a misleading 400 on first login.
+    // Mint the token directly so the shared, IP-scoped login rate-limit bucket
+    // (drained by the other tests) cannot make this assertion flaky.
+    String accessToken = jwtTokenService.issueAccessToken(createUser("judy").getId());
+
+    String body =
+        "{\"currentPassword\":\"%s\",\"newPassword\":\"%s\"}".formatted(PASSWORD, "pass8wrd");
+    mockMvc
+        .perform(
+            post("/api/v1/auth/change-password")
+                .header("Authorization", "Bearer " + accessToken)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(body))
+        .andExpect(status().isNoContent());
+  }
+
+  @Test
+  void changePasswordRejectsTooShortPasswordWithValidationEnvelope() throws Exception {
+    // A password below the minimum trips bean validation, which the global handler
+    // maps to a 400 carrying code VALIDATION_ERROR (the UI keys its message off this).
+    // Mint the token directly to avoid the shared login rate-limit bucket.
+    String accessToken = jwtTokenService.issueAccessToken(createUser("mallory").getId());
+
+    String body =
+        "{\"currentPassword\":\"%s\",\"newPassword\":\"%s\"}".formatted(PASSWORD, "short7x");
+    mockMvc
+        .perform(
+            post("/api/v1/auth/change-password")
+                .header("Authorization", "Bearer " + accessToken)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(body))
+        .andExpect(status().isBadRequest())
+        .andExpect(jsonPath("$.code").value("VALIDATION_ERROR"));
   }
 
   @Test
