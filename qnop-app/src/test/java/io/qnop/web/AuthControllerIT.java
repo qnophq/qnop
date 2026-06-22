@@ -172,6 +172,31 @@ class AuthControllerIT extends AbstractIntegrationTest {
   }
 
   @Test
+  void changePasswordClearsTheForcedChangeRequirement() throws Exception {
+    // Regression: a user created with "must change password on first login" was sent
+    // back to the change-password screen after every login because the change never
+    // cleared password_change_required. A successful change must clear the flag.
+    User user = createUser("nina");
+    user.setPasswordChangeRequired(true);
+    userRepository.saveAndFlush(user);
+    String accessToken = jwtTokenService.issueAccessToken(user.getId());
+
+    String body =
+        "{\"currentPassword\":\"%s\",\"newPassword\":\"%s\"}"
+            .formatted(PASSWORD, "a-brand-new-strong-password");
+    mockMvc
+        .perform(
+            post("/api/v1/auth/change-password")
+                .header("Authorization", "Bearer " + accessToken)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(body))
+        .andExpect(status().isNoContent());
+
+    assertThat(userRepository.findById(user.getId()).orElseThrow().isPasswordChangeRequired())
+        .isFalse();
+  }
+
+  @Test
   void changePasswordAcceptsTheEightCharacterPolicyMinimum() throws Exception {
     // Regression: the change-password minimum must stay at 8 — matching the other
     // password fields and the UI strength meter. A 12-char minimum here rejected

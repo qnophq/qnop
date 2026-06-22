@@ -78,8 +78,9 @@ public class AuthService {
   }
 
   /**
-   * Re-verifies the current password, stores the new hash, and invalidates every existing session
-   * (access tokens via {@code passwordInvalidatedBefore}; refresh families revoked).
+   * Re-verifies the current password, stores the new hash, clears any forced-change requirement
+   * ({@code password_change_required}), and invalidates every existing session (access tokens via
+   * {@code passwordInvalidatedBefore}; refresh families revoked).
    */
   @Transactional
   public ChangePasswordOutcome changePassword(
