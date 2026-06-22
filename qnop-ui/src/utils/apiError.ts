@@ -24,15 +24,21 @@ import { isAxiosError } from 'axios';
 const RATE_LIMITED = 'Too many attempts. Please try again later.';
 
 /**
- * Maps an API/network error to a concise, user-facing German message. Rate
- * limits (429) and bad requests (400) get specific text; everything else falls
- * back to the caller's default. Never surfaces server internals.
+ * Maps an API/network error to a concise, user-facing message. Rate limits (429)
+ * get specific text. A 400 is split by its error code: a body-validation failure
+ * (`VALIDATION_ERROR`, e.g. the password policy) surfaces the caller's
+ * context-specific fallback, while any other 400 — a consumed or expired
+ * token/link in the reset flow — gets the link-expired text. Everything else
+ * falls back to the caller's default. Never surfaces server internals.
  */
 export function apiErrorMessage(error: unknown, fallback: string): string {
   if (isAxiosError(error)) {
     const status = error.response?.status;
     if (status === 429) return RATE_LIMITED;
-    if (status === 400) return 'The request is invalid or the link has expired.';
+    if (status === 400) {
+      if (apiErrorCode(error) === 'VALIDATION_ERROR') return fallback;
+      return 'The request is invalid or the link has expired.';
+    }
   }
   if (error instanceof Error && error.message === 'RATE_LIMITED') {
     return RATE_LIMITED;

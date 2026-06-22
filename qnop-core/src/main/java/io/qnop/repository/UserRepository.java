@@ -85,10 +85,14 @@ public interface UserRepository extends JpaRepository<User, UUID> {
   int bumpPasswordInvalidatedBefore(@Param("id") UUID id, @Param("at") Instant at);
 
   /**
-   * Atomically replaces the password hash and increments {@code version} (issue #61), so a password
-   * change cannot be lost to, or clobber, a concurrent edit.
+   * Atomically replaces the password hash, clears {@code password_change_required}, and increments
+   * {@code version} (issue #61). A self-service password change always satisfies any forced-change
+   * requirement, and the version bump means the change cannot be lost to, or clobber, a concurrent
+   * edit.
    */
   @Modifying(clearAutomatically = true)
-  @Query("UPDATE User u SET u.passwordHash = :hash, u.version = u.version + 1 WHERE u.id = :id")
+  @Query(
+      "UPDATE User u SET u.passwordHash = :hash, u.passwordChangeRequired = false,"
+          + " u.version = u.version + 1 WHERE u.id = :id")
   int updatePasswordHash(@Param("id") UUID id, @Param("hash") String hash);
 }

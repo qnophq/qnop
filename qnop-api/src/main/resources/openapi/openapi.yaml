@@ -1768,7 +1768,8 @@ components:
         newPassword:
           type: string
           format: password
-          minLength: 12
+          minLength: 8
+          maxLength: 200
           description: The replacement password. Must meet the minimum-length policy.
       required:
         - currentPassword
