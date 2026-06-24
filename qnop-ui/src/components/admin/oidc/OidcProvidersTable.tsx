@@ -20,6 +20,7 @@
  */
 
 import { useState, type MouseEvent } from 'react';
+import Chip from '@mui/material/Chip';
 import IconButton from '@mui/material/IconButton';
 import ListItemIcon from '@mui/material/ListItemIcon';
 import ListItemText from '@mui/material/ListItemText';
@@ -47,7 +48,7 @@ interface OidcProvidersTableProps {
   onDelete: (provider: OidcProviderDto) => void;
 }
 
-const COLUMNS = ['Provider', 'Type', 'Client ID', 'Status', 'Created', ''];
+const COLUMNS = ['Provider', 'Type', 'Issuer', 'Client ID', 'Status', 'Created', ''];
 
 export function OidcProvidersTable({
   providers,
@@ -95,8 +96,24 @@ export function OidcProvidersTable({
                 <Typography sx={{ fontWeight: 600 }}>{provider.name}</Typography>
               </TableCell>
               <TableCell>
-                <Typography sx={{ fontSize: 13, color: 'text.secondary' }}>
-                  {providerTypeLabel(provider.providerType)}
+                <Chip
+                  label={providerTypeLabel(provider.providerType)}
+                  size="small"
+                  variant="outlined"
+                />
+              </TableCell>
+              <TableCell>
+                <Typography
+                  sx={{
+                    fontSize: 13,
+                    color: 'text.secondary',
+                    fontFamily: 'monospace',
+                    maxWidth: 220,
+                  }}
+                  noWrap
+                  title={provider.issuerUri ?? undefined}
+                >
+                  {provider.issuerUri ?? '—'}
                 </Typography>
               </TableCell>
               <TableCell>

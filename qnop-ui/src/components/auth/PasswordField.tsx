@@ -31,6 +31,8 @@ interface PasswordFieldProps {
   onChange: (value: string) => void;
   autoComplete?: string;
   required?: boolean;
+  error?: boolean;
+  helperText?: string;
 }
 
 /** A password input with a show/hide toggle, used across the auth screens. */
@@ -40,6 +42,8 @@ export function PasswordField({
   onChange,
   autoComplete,
   required,
+  error,
+  helperText,
 }: PasswordFieldProps) {
   const [show, setShow] = useState(false);
 
@@ -51,6 +55,8 @@ export function PasswordField({
       onChange={(e) => onChange(e.target.value)}
       autoComplete={autoComplete}
       required={required}
+      error={error}
+      helperText={helperText}
       fullWidth
       slotProps={{
         input: {
