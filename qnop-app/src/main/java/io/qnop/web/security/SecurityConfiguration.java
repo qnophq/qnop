@@ -189,6 +189,7 @@ public class SecurityConfiguration {
       HttpSecurity http,
       ClientRegistrationRepository clientRegistrationRepository,
       OidcLoginSuccessHandler oidcLoginSuccessHandler,
+      PromptAwareOAuth2AuthorizationRequestResolver promptAwareResolver,
       CorsConfigurationSource corsConfigurationSource)
       throws Exception {
     http.securityMatcher("/oauth2/authorization/**", "/login/oauth2/code/**")
@@ -197,6 +198,8 @@ public class SecurityConfiguration {
             oauth2 ->
                 oauth2
                     .clientRegistrationRepository(clientRegistrationRepository)
+                    .authorizationEndpoint(
+                        endpoint -> endpoint.authorizationRequestResolver(promptAwareResolver))
                     .successHandler(oidcLoginSuccessHandler))
         .cors(cors -> cors.configurationSource(corsConfigurationSource))
         .csrf(csrf -> csrf.disable())

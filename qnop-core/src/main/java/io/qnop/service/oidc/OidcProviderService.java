@@ -74,6 +74,32 @@ public class OidcProviderService {
     return toView(require(id));
   }
 
+  /**
+   * The enabled providers as public login-page button projections (issue #21), each carrying the
+   * derived brand icon and account-switch affordances ({@link OidcLoginInfoFactory}).
+   */
+  @Transactional(readOnly = true)
+  public List<OidcProviderLoginView> enabledLoginViews() {
+    return providers.findAll().stream()
+        .filter(OidcProvider::isEnabled)
+        .map(OidcLoginInfoFactory::loginView)
+        .toList();
+  }
+
+  /**
+   * Whether the provider honours an OIDC {@code prompt} hint, used by {@link
+   * io.qnop.web.security.PromptAwareOAuth2AuthorizationRequestResolver} for the account-switch
+   * affordance. True for every type except GitHub, which silently ignores {@code prompt}; an
+   * unknown id is {@code false} so the resolver leaves the request untouched.
+   */
+  @Transactional(readOnly = true)
+  public boolean honoursPrompt(UUID id) {
+    return providers
+        .findById(id)
+        .map(p -> p.getProviderType() != OidcProviderType.GITHUB)
+        .orElse(false);
+  }
+
   /** Probes an issuer for OIDC discovery support without persisting anything. */
   @Transactional(readOnly = true)
   public OidcDiscoveryOutcome discoverEndpoints(String issuerUri) {

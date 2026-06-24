@@ -22,6 +22,7 @@ package io.qnop.web;
 
 import io.qnop.api.v1.endpoint.ServerConfigApi;
 import io.qnop.api.v1.model.Edition;
+import io.qnop.api.v1.model.OidcIconKind;
 import io.qnop.api.v1.model.OidcProviderLoginInfo;
 import io.qnop.api.v1.model.ServerConfigAuth;
 import io.qnop.api.v1.model.ServerConfigGeneral;
@@ -31,7 +32,6 @@ import io.qnop.api.v1.model.SupportedFormat;
 import io.qnop.service.ApplicationSettingKey;
 import io.qnop.service.ApplicationSettingsService;
 import io.qnop.service.oidc.OidcProviderService;
-import io.qnop.service.oidc.OidcProviderView;
 import java.util.List;
 import java.util.Optional;
 import org.springframework.http.ResponseEntity;
@@ -82,16 +82,18 @@ public class ConfigController implements ServerConfigApi {
     return ResponseEntity.ok(body);
   }
 
-  /** The enabled providers as login buttons for the SPA (issue #21). */
+  /** The enabled providers as login buttons for the SPA (issue #21), with icon + account-switch. */
   private List<OidcProviderLoginInfo> enabledOidcProviders() {
-    return oidcProviders.findAll().stream()
-        .filter(OidcProviderView::enabled)
+    return oidcProviders.enabledLoginViews().stream()
         .map(
             v ->
                 new OidcProviderLoginInfo()
-                    .id(v.id().toString())
+                    .id(v.id())
                     .name(v.name())
-                    .loginUrl("/oauth2/authorization/" + v.id()))
+                    .loginUrl(v.loginUrl())
+                    .iconKind(OidcIconKind.fromValue(v.iconKind()))
+                    .accountPickerLoginUrl(v.accountPickerLoginUrl())
+                    .accountSwitchHintUrl(v.accountSwitchHintUrl()))
         .toList();
   }
 
