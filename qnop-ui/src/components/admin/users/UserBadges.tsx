@@ -19,7 +19,7 @@
  * SPDX-License-Identifier: AGPL-3.0-only
  */
 
-import type { UserRole } from '../../../api/generated';
+import type { UserRole, UserSource } from '../../../api/generated';
 import { ToneBadge, type BadgeTone } from '../ToneBadge';
 
 const ROLE_TONE: Record<UserRole, BadgeTone> = {
@@ -44,5 +44,24 @@ export function UserStatusBadge({ enabled }: { enabled: boolean }) {
     <ToneBadge tone="green" label="Active" />
   ) : (
     <ToneBadge tone="red" label="Disabled" />
+  );
+}
+
+/**
+ * Where the account comes from: a local (INTERNAL) login or an external OIDC
+ * provider. External accounts show the provider's name (e.g. "Keycloak") so the
+ * operator sees *which* IdP at a glance; local accounts read "Local".
+ */
+export function UserSourceBadge({
+  source,
+  providerName,
+}: {
+  source: UserSource;
+  providerName?: string;
+}) {
+  return source === 'EXTERNAL' ? (
+    <ToneBadge tone="blue" label={providerName?.trim() || 'External'} />
+  ) : (
+    <ToneBadge tone="neutral" label="Local" />
   );
 }

@@ -41,7 +41,7 @@ import type { AdminUserSummary } from '../../../api/generated';
 import { UserAvatar } from '../../shell/UserAvatar';
 import { formatDateTime, formatRelative } from '../../../utils/formatDate';
 import { ToneBadge } from '../ToneBadge';
-import { UserRoleBadge, UserStatusBadge } from './UserBadges';
+import { UserRoleBadge, UserSourceBadge, UserStatusBadge } from './UserBadges';
 
 interface UsersTableProps {
   users: AdminUserSummary[];
@@ -58,6 +58,7 @@ interface UsersTableProps {
 const COLUMNS: { key: string; label: string; sortable?: boolean }[] = [
   { key: 'displayName', label: 'User', sortable: true },
   { key: 'role', label: 'Role', sortable: true },
+  { key: 'source', label: 'Source' },
   { key: 'status', label: 'Status' },
   { key: 'createdAt', label: 'Created', sortable: true },
   { key: 'lastLoginAt', label: 'Last login', sortable: true },
@@ -133,14 +134,6 @@ export function UsersTable({
                       <Typography sx={{ fontWeight: 600, lineHeight: 1.3 }} noWrap>
                         {user.displayName}
                       </Typography>
-                      {user.source === 'EXTERNAL' && (
-                        <Typography
-                          component="span"
-                          sx={{ fontSize: 11, color: 'text.secondary', fontWeight: 500 }}
-                        >
-                          ({user.providerName ?? 'OIDC'})
-                        </Typography>
-                      )}
                       {user.passwordChangeRequired && (
                         <ToneBadge tone="amber" label="Password change" />
                       )}
@@ -153,6 +146,9 @@ export function UsersTable({
               </TableCell>
               <TableCell>
                 <UserRoleBadge role={user.role} />
+              </TableCell>
+              <TableCell>
+                <UserSourceBadge source={user.source} providerName={user.providerName} />
               </TableCell>
               <TableCell>
                 <Stack direction="row" spacing={1} sx={{ alignItems: 'center' }}>
