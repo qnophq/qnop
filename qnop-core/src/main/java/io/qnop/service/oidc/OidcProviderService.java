@@ -111,10 +111,18 @@ public class OidcProviderService {
       ssrfPolicy.requirePublicHttpUri(trimmed, "issuerUri", true);
     } catch (IllegalArgumentException e) {
       log.warn("OIDC discovery rejected for issuerUri={}: {}", trimmed, e.getMessage());
-      return OidcDiscoveryOutcome.failure(DISCOVERY_FAILED);
+      return OidcDiscoveryOutcome.failure(e.getMessage());
     }
     try {
-      ClientRegistration registration = ClientRegistrations.fromIssuerLocation(trimmed).build();
+      // fromIssuerLocation fetches the discovery document and pre-fills the endpoints; build()
+      // still validates a registrationId + clientId, which a pure endpoint probe does not have.
+      // Supply throwaway placeholders so the build succeeds without the operator's real
+      // credentials.
+      ClientRegistration registration =
+          ClientRegistrations.fromIssuerLocation(trimmed)
+              .registrationId("discovery")
+              .clientId("discovery")
+              .build();
       ClientRegistration.ProviderDetails details = registration.getProviderDetails();
       return new OidcDiscoveryOutcome(
           true,
@@ -125,8 +133,21 @@ public class OidcProviderService {
           null);
     } catch (RuntimeException e) {
       log.debug("OIDC discovery failed for issuerUri={}: {}", trimmed, e.getMessage());
-      return OidcDiscoveryOutcome.failure(DISCOVERY_FAILED);
+      return OidcDiscoveryOutcome.failure(discoveryFailureMessage(e));
     }
+  }
+
+  /**
+   * A discovery-failure message that keeps the actionable hint and appends the underlying cause.
+   * Discovery is an admin-only probe against an operator-supplied issuer, so the cause (a Spring
+   * {@code ClientRegistrations} message, e.g. an unreachable issuer or a malformed document) aids
+   * diagnosis without leaking qnop internals.
+   */
+  private static String discoveryFailureMessage(Throwable cause) {
+    String detail = cause.getMessage();
+    return detail == null || detail.isBlank()
+        ? DISCOVERY_FAILED
+        : DISCOVERY_FAILED + " (" + detail + ")";
   }
 
   /** Creates a disabled provider (the operator enables it after verifying the configuration). */
