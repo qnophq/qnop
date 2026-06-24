@@ -132,6 +132,10 @@ export function OidcProviderFormDialog({
   const isOidc = providerType === 'OIDC';
   const isGeneric = providerType === 'OAUTH2';
   const showIssuer = supportsDiscovery(providerType);
+  // Endpoints & attribute mapping are only shown for the generic types. For the
+  // well-known vendors (GitHub/Google/Facebook) qnop already knows them, so the
+  // whole section is hidden.
+  const showEndpoints = isOidc || isGeneric;
   const clientIdChanged = Boolean(editing && clientId.trim() !== provider.clientId);
   const submitting = createProvider.isPending || updateProvider.isPending;
 
@@ -149,17 +153,19 @@ export function OidcProviderFormDialog({
     if (isOidc && effectiveScope.trim() && !effectiveScope.trim().split(/\s+/).includes('openid')) {
       e.scope = 'OIDC scopes must include "openid".';
     }
-    const endpoints = [
-      ['authorizationUri', authorizationUri],
-      ['tokenUri', tokenUri],
-      ['userInfoUri', userInfoUri],
-      ['jwkSetUri', jwkSetUri],
-    ] as const;
-    for (const [field, value] of endpoints) {
-      if (isGeneric && field !== 'jwkSetUri' && !value.trim()) {
-        e[field] = 'Required for a generic OAuth2 provider.';
-      } else if (value.trim() && !isHttpUrl(value.trim())) {
-        e[field] = 'Enter a valid http(s) URL.';
+    if (showEndpoints) {
+      const endpoints = [
+        ['authorizationUri', authorizationUri],
+        ['tokenUri', tokenUri],
+        ['userInfoUri', userInfoUri],
+        ['jwkSetUri', jwkSetUri],
+      ] as const;
+      for (const [field, value] of endpoints) {
+        if (isGeneric && field !== 'jwkSetUri' && !value.trim()) {
+          e[field] = 'Required for a generic OAuth2 provider.';
+        } else if (value.trim() && !isHttpUrl(value.trim())) {
+          e[field] = 'Enter a valid http(s) URL.';
+        }
       }
     }
     return e;
@@ -169,6 +175,7 @@ export function OidcProviderFormDialog({
     clientSecret,
     isEdit,
     showIssuer,
+    showEndpoints,
     isOidc,
     isGeneric,
     issuerUri,
@@ -212,13 +219,19 @@ export function OidcProviderFormDialog({
       clientId: clientId.trim(),
       issuerUri: optional(issuerUri),
       scope: optional(effectiveScope),
-      authorizationUri: optional(authorizationUri),
-      tokenUri: optional(tokenUri),
-      userInfoUri: optional(userInfoUri),
-      jwkSetUri: optional(jwkSetUri),
-      userNameAttribute: optional(userNameAttribute),
-      emailAttribute: optional(emailAttribute),
-      displayNameAttribute: optional(displayNameAttribute),
+      // Endpoints & attribute mapping only apply to the generic types; for the
+      // well-known vendors qnop fills them in, so they are neither shown nor sent.
+      ...(showEndpoints
+        ? {
+            authorizationUri: optional(authorizationUri),
+            tokenUri: optional(tokenUri),
+            userInfoUri: optional(userInfoUri),
+            jwkSetUri: optional(jwkSetUri),
+            userNameAttribute: optional(userNameAttribute),
+            emailAttribute: optional(emailAttribute),
+            displayNameAttribute: optional(displayNameAttribute),
+          }
+        : {}),
     };
     try {
       if (isEdit && provider) {
@@ -358,83 +371,85 @@ export function OidcProviderFormDialog({
                 }
               />
 
-              <Accordion
-                disableGutters
-                elevation={0}
-                defaultExpanded={isGeneric}
-                sx={{ '&:before': { display: 'none' } }}
-              >
-                <AccordionSummary expandIcon={<ChevronDown size={18} />} sx={{ px: 0 }}>
-                  <Typography sx={{ fontSize: 14, fontWeight: 600 }}>
-                    Endpoints &amp; attribute mapping{isGeneric ? ' (required)' : ' (advanced)'}
-                  </Typography>
-                </AccordionSummary>
-                <AccordionDetails sx={{ px: 0 }}>
-                  <Stack spacing={2}>
-                    <Typography color="text.secondary" sx={{ fontSize: 13 }}>
-                      {isGeneric
-                        ? 'Required for a generic OAuth2 provider — qnop cannot discover these.'
-                        : 'Optional. Leave blank for GitHub/Google/Facebook (qnop knows their endpoints).'}
+              {showEndpoints && (
+                <Accordion
+                  disableGutters
+                  elevation={0}
+                  defaultExpanded={isGeneric}
+                  sx={{ '&:before': { display: 'none' } }}
+                >
+                  <AccordionSummary expandIcon={<ChevronDown size={18} />} sx={{ px: 0 }}>
+                    <Typography sx={{ fontSize: 14, fontWeight: 600 }}>
+                      Endpoints &amp; attribute mapping{isGeneric ? ' (required)' : ' (advanced)'}
                     </Typography>
-                    <TextField
-                      label="Authorization URL"
-                      value={authorizationUri}
-                      onChange={(e) => setAuthorizationUri(e.target.value)}
-                      fullWidth
-                      required={isGeneric}
-                      error={Boolean(fieldError('authorizationUri'))}
-                      helperText={fieldError('authorizationUri')}
-                    />
-                    <TextField
-                      label="Token URL"
-                      value={tokenUri}
-                      onChange={(e) => setTokenUri(e.target.value)}
-                      fullWidth
-                      required={isGeneric}
-                      error={Boolean(fieldError('tokenUri'))}
-                      helperText={fieldError('tokenUri')}
-                    />
-                    <TextField
-                      label="User info URL"
-                      value={userInfoUri}
-                      onChange={(e) => setUserInfoUri(e.target.value)}
-                      fullWidth
-                      required={isGeneric}
-                      error={Boolean(fieldError('userInfoUri'))}
-                      helperText={fieldError('userInfoUri')}
-                    />
-                    <TextField
-                      label="JWK set URL"
-                      value={jwkSetUri}
-                      onChange={(e) => setJwkSetUri(e.target.value)}
-                      fullWidth
-                      error={Boolean(fieldError('jwkSetUri'))}
-                      helperText={fieldError('jwkSetUri')}
-                    />
-                    <TextField
-                      label="Username attribute"
-                      value={userNameAttribute}
-                      onChange={(e) => setUserNameAttribute(e.target.value)}
-                      fullWidth
-                      placeholder="sub"
-                    />
-                    <TextField
-                      label="Email attribute"
-                      value={emailAttribute}
-                      onChange={(e) => setEmailAttribute(e.target.value)}
-                      fullWidth
-                      placeholder="email"
-                    />
-                    <TextField
-                      label="Display-name attribute"
-                      value={displayNameAttribute}
-                      onChange={(e) => setDisplayNameAttribute(e.target.value)}
-                      fullWidth
-                      placeholder="name"
-                    />
-                  </Stack>
-                </AccordionDetails>
-              </Accordion>
+                  </AccordionSummary>
+                  <AccordionDetails sx={{ px: 0 }}>
+                    <Stack spacing={2}>
+                      <Typography color="text.secondary" sx={{ fontSize: 13 }}>
+                        {isGeneric
+                          ? 'Required for a generic OAuth2 provider — qnop cannot discover these.'
+                          : 'Optional — usually filled in by Discover from the issuer; override only if needed.'}
+                      </Typography>
+                      <TextField
+                        label="Authorization URL"
+                        value={authorizationUri}
+                        onChange={(e) => setAuthorizationUri(e.target.value)}
+                        fullWidth
+                        required={isGeneric}
+                        error={Boolean(fieldError('authorizationUri'))}
+                        helperText={fieldError('authorizationUri')}
+                      />
+                      <TextField
+                        label="Token URL"
+                        value={tokenUri}
+                        onChange={(e) => setTokenUri(e.target.value)}
+                        fullWidth
+                        required={isGeneric}
+                        error={Boolean(fieldError('tokenUri'))}
+                        helperText={fieldError('tokenUri')}
+                      />
+                      <TextField
+                        label="User info URL"
+                        value={userInfoUri}
+                        onChange={(e) => setUserInfoUri(e.target.value)}
+                        fullWidth
+                        required={isGeneric}
+                        error={Boolean(fieldError('userInfoUri'))}
+                        helperText={fieldError('userInfoUri')}
+                      />
+                      <TextField
+                        label="JWK set URL"
+                        value={jwkSetUri}
+                        onChange={(e) => setJwkSetUri(e.target.value)}
+                        fullWidth
+                        error={Boolean(fieldError('jwkSetUri'))}
+                        helperText={fieldError('jwkSetUri')}
+                      />
+                      <TextField
+                        label="Username attribute"
+                        value={userNameAttribute}
+                        onChange={(e) => setUserNameAttribute(e.target.value)}
+                        fullWidth
+                        placeholder="sub"
+                      />
+                      <TextField
+                        label="Email attribute"
+                        value={emailAttribute}
+                        onChange={(e) => setEmailAttribute(e.target.value)}
+                        fullWidth
+                        placeholder="email"
+                      />
+                      <TextField
+                        label="Display-name attribute"
+                        value={displayNameAttribute}
+                        onChange={(e) => setDisplayNameAttribute(e.target.value)}
+                        fullWidth
+                        placeholder="name"
+                      />
+                    </Stack>
+                  </AccordionDetails>
+                </Accordion>
+              )}
 
               {isEdit && provider && (
                 <ProviderCallbackInstructions
