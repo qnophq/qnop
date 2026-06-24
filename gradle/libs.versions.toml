@@ -18,7 +18,7 @@ springBoot = "4.1.0"
 # (com.fasterxml.jackson) — the generated models only carry annotations.
 openapiGenerator = "7.23.0"
 jacksonAnnotations = "2.22"
-swaggerAnnotations = "2.2.51"
+swaggerAnnotations = "2.2.52"
 jakartaValidation = "3.1.1"
 jakartaAnnotation = "3.0.0"
 # Auth rate limiting (issue #18, ADR-0027). bucket4j is not in the Spring Boot BOM,
