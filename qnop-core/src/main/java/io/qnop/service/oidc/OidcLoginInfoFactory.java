@@ -71,13 +71,15 @@ public final class OidcLoginInfoFactory {
 
   /**
    * The "use a different account" URL, or {@code null} when the provider cannot honour a {@code
-   * prompt}. {@code select_account} pops the picker (OIDC/Google/Facebook); {@code login} forces a
-   * fresh upstream auth (generic OAuth2); GitHub has neither.
+   * prompt}. Google and Facebook honour {@code select_account} (a real account picker). Generic
+   * OIDC/OAuth2 providers (e.g. Keycloak) frequently ignore {@code select_account} and silently
+   * re-use the session, so they get the universally-supported {@code login} (force re-auth), which
+   * still lets the user sign in as a different account. GitHub honours neither.
    */
   static String accountPickerLoginUrl(OidcProviderType type, String loginUrl) {
     return switch (type) {
-      case OIDC, GOOGLE, FACEBOOK -> loginUrl + "?prompt=select_account";
-      case OAUTH2 -> loginUrl + "?prompt=login";
+      case GOOGLE, FACEBOOK -> loginUrl + "?prompt=select_account";
+      case OIDC, OAUTH2 -> loginUrl + "?prompt=login";
       case GITHUB -> null;
     };
   }

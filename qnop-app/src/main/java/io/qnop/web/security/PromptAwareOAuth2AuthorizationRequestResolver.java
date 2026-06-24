@@ -40,10 +40,10 @@ import org.springframework.stereotype.Component;
  * /oauth2/authorization/{id}?prompt=…}; this resolver validates that {@code prompt} strictly and
  * forwards it as {@code additionalParameters["prompt"]}.
  *
- * <p><strong>Allow-list:</strong> only {@code select_account} (OIDC/Google/Facebook) and {@code
- * login} (generic OAuth2) reach the upstream — anything else (consent, none, arbitrary or repeated
- * values) is dropped silently. This is the only defence against a caller injecting upstream
- * parameters via the query string.
+ * <p><strong>Allow-list:</strong> only {@code select_account} (Google/Facebook) and {@code login}
+ * (generic OIDC/OAuth2, broadly supported) reach the upstream — anything else (consent, none,
+ * arbitrary or repeated values) is dropped silently. This is the only defence against a caller
+ * injecting upstream parameters via the query string.
  *
  * <p><strong>GitHub carve-out:</strong> GitHub ignores {@code prompt}; for a GitHub provider the
  * request passes through unchanged (the SPA mirrors this by rendering a sign-out hint instead of a

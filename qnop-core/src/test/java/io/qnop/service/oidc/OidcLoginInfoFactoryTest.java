@@ -46,10 +46,8 @@ class OidcLoginInfoFactoryTest {
   }
 
   @Test
-  @DisplayName("OIDC-style providers get a select_account account picker")
-  void accountPicker_selectAccountForIdpStyleProviders() {
-    assertThat(OidcLoginInfoFactory.accountPickerLoginUrl(OidcProviderType.OIDC, LOGIN_URL))
-        .isEqualTo(LOGIN_URL + "?prompt=select_account");
+  @DisplayName("Google and Facebook get a select_account account picker")
+  void accountPicker_selectAccountForNamedVendors() {
     assertThat(OidcLoginInfoFactory.accountPickerLoginUrl(OidcProviderType.GOOGLE, LOGIN_URL))
         .isEqualTo(LOGIN_URL + "?prompt=select_account");
     assertThat(OidcLoginInfoFactory.accountPickerLoginUrl(OidcProviderType.FACEBOOK, LOGIN_URL))
@@ -57,8 +55,10 @@ class OidcLoginInfoFactoryTest {
   }
 
   @Test
-  @DisplayName("generic OAuth2 gets a login (re-auth) prompt instead of a picker")
-  void accountPicker_loginPromptForGenericOauth2() {
+  @DisplayName("generic OIDC/OAuth2 get the broadly-supported login (re-auth) prompt")
+  void accountPicker_loginPromptForGenericProviders() {
+    assertThat(OidcLoginInfoFactory.accountPickerLoginUrl(OidcProviderType.OIDC, LOGIN_URL))
+        .isEqualTo(LOGIN_URL + "?prompt=login");
     assertThat(OidcLoginInfoFactory.accountPickerLoginUrl(OidcProviderType.OAUTH2, LOGIN_URL))
         .isEqualTo(LOGIN_URL + "?prompt=login");
   }
