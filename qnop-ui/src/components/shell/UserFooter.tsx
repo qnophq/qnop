@@ -45,6 +45,7 @@ interface UserFooterProps {
 export function UserFooter({ collapsed }: UserFooterProps) {
   const displayName = useAuthStore((s) => s.displayName);
   const role = useAuthStore((s) => s.role);
+  const source = useAuthStore((s) => s.source);
   const logout = useAuthStore((s) => s.logout);
   const navigate = useNavigate();
   const [anchor, setAnchor] = useState<HTMLElement | null>(null);
@@ -89,17 +90,20 @@ export function UserFooter({ collapsed }: UserFooterProps) {
         anchorOrigin={{ vertical: 'top', horizontal: 'left' }}
         transformOrigin={{ vertical: 'bottom', horizontal: 'left' }}
       >
-        <MenuItem
-          onClick={() => {
-            setAnchor(null);
-            navigate('/change-password');
-          }}
-        >
-          <ListItemIcon>
-            <KeyRound size={16} />
-          </ListItemIcon>
-          Change password
-        </MenuItem>
+        {/* External (OIDC) accounts have no local password — only local users can change it. */}
+        {source !== 'EXTERNAL' && (
+          <MenuItem
+            onClick={() => {
+              setAnchor(null);
+              navigate('/change-password');
+            }}
+          >
+            <ListItemIcon>
+              <KeyRound size={16} />
+            </ListItemIcon>
+            Change password
+          </MenuItem>
+        )}
         <MenuItem onClick={onLogout}>
           <ListItemIcon>
             <LogOut size={16} />

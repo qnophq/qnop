@@ -43,6 +43,7 @@ import { passwordStrength } from '../../utils/passwordStrength';
 export function ChangePasswordPage() {
   const accessToken = useAuthStore((s) => s.accessToken);
   const forced = useAuthStore((s) => s.passwordChangeRequired);
+  const source = useAuthStore((s) => s.source);
   const clearAuth = useAuthStore((s) => s.clearAuth);
   const [current, setCurrent] = useState('');
   const [password, setPassword] = useState('');
@@ -54,6 +55,13 @@ export function ChangePasswordPage() {
   // Reachable only with a session token (full auth or a forced-change session).
   if (!accessToken && !done) {
     return <Navigate to="/login" replace />;
+  }
+
+  // External (OIDC) accounts have no local password to change; bounce a direct
+  // hit to the home page. A forced-change session keeps source null (its
+  // /users/me is 403-gated), so this never blocks the local first-login flow.
+  if (source === 'EXTERNAL' && !done) {
+    return <Navigate to="/" replace />;
   }
 
   const mismatch = confirm.length > 0 && confirm !== password;
