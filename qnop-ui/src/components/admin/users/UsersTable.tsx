@@ -36,7 +36,7 @@ import TableRow from '@mui/material/TableRow';
 import TableSortLabel from '@mui/material/TableSortLabel';
 import Tooltip from '@mui/material/Tooltip';
 import Typography from '@mui/material/Typography';
-import { KeyRound, MoreVertical, SquarePen, Trash2 } from 'lucide-react';
+import { KeyRound, KeySquare, MoreVertical, SquarePen, Trash2 } from 'lucide-react';
 import type { AdminUserSummary } from '../../../api/generated';
 import { UserAvatar } from '../../shell/UserAvatar';
 import { formatDateTime, formatRelative } from '../../../utils/formatDate';
@@ -51,6 +51,7 @@ interface UsersTableProps {
   onSort: (field: string) => void;
   onEdit: (user: AdminUserSummary) => void;
   onResetPassword: (user: AdminUserSummary) => void;
+  onGeneratePassword: (user: AdminUserSummary) => void;
   onToggleEnabled: (user: AdminUserSummary) => void;
   onDelete: (user: AdminUserSummary) => void;
 }
@@ -72,6 +73,7 @@ export function UsersTable({
   onSort,
   onEdit,
   onResetPassword,
+  onGeneratePassword,
   onToggleEnabled,
   onDelete,
 }: UsersTableProps) {
@@ -214,7 +216,19 @@ export function UsersTable({
           <ListItemIcon>
             <KeyRound size={16} />
           </ListItemIcon>
-          <ListItemText>Reset password</ListItemText>
+          <ListItemText>Email reset link</ListItemText>
+        </MenuItem>
+        <MenuItem
+          disabled={active?.source === 'EXTERNAL'}
+          onClick={() => {
+            closeMenu();
+            if (active) onGeneratePassword(active);
+          }}
+        >
+          <ListItemIcon>
+            <KeySquare size={16} />
+          </ListItemIcon>
+          <ListItemText>Generate password</ListItemText>
         </MenuItem>
         <MenuItem
           disabled={active ? isSelf(active) : false}

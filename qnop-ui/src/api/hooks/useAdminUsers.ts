@@ -21,6 +21,7 @@
 
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import type {
+  AdminGeneratedPasswordResponse,
   AdminPasswordResetResponse,
   AdminUserCreateRequest,
   AdminUserListResponse,
@@ -116,5 +117,22 @@ export function useSendUserPasswordReset() {
       const response = await adminUsersApi.sendUserPasswordReset({ userId: id });
       return response.data;
     },
+  });
+}
+
+/**
+ * Admin password generation: assigns a fresh random password, flags it for a
+ * forced change on next login, and revokes the user's sessions. The plaintext
+ * {@code password} is returned exactly once — it can never be retrieved again.
+ * Invalidates the list so the "password change" badge reflects the new state.
+ */
+export function useGenerateUserPassword() {
+  const queryClient = useQueryClient();
+  return useMutation<AdminGeneratedPasswordResponse, unknown, string>({
+    mutationFn: async (id: string) => {
+      const response = await adminUsersApi.generateUserPassword({ userId: id });
+      return response.data;
+    },
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: adminUserKeys.all }),
   });
 }

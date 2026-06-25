@@ -38,12 +38,14 @@ import type { AdminUserSummary, UserRole } from '../../api/generated';
 import {
   useAdminUsers,
   useDeleteUser,
+  useGenerateUserPassword,
   useSendUserPasswordReset,
   useUpdateUser,
 } from '../../api/hooks/useAdminUsers';
 import { UserFormDialog } from '../../components/admin/users/UserFormDialog';
 import { UsersTable } from '../../components/admin/users/UsersTable';
 import { ResetLinkDialog } from '../../components/admin/users/ResetLinkDialog';
+import { GeneratedPasswordDialog } from '../../components/admin/users/GeneratedPasswordDialog';
 import { ConfirmDialog } from '../../components/admin/ConfirmDialog';
 import { useAuthStore } from '../../stores/authStore';
 import { apiErrorCode, apiErrorMessage } from '../../utils/apiError';
@@ -72,6 +74,7 @@ export function UsersPage() {
   const updateUser = useUpdateUser();
   const deleteUser = useDeleteUser();
   const sendReset = useSendUserPasswordReset();
+  const generatePassword = useGenerateUserPassword();
 
   const [search, setSearch] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
@@ -84,6 +87,10 @@ export function UsersPage() {
   const [openSeq, setOpenSeq] = useState(0);
   const [deleteTarget, setDeleteTarget] = useState<AdminUserSummary | null>(null);
   const [resetLink, setResetLink] = useState<{ displayName: string; url: string } | null>(null);
+  const [generatedPassword, setGeneratedPassword] = useState<{
+    displayName: string;
+    password: string;
+  } | null>(null);
   const [toast, setToast] = useState<Toast>(null);
 
   const openCreate = () => {
@@ -153,6 +160,18 @@ export function UsersPage() {
     } catch (err) {
       setToast({
         message: conflictOr(err, 'The reset could not be triggered.'),
+        severity: 'error',
+      });
+    }
+  };
+
+  const onGeneratePassword = async (user: AdminUserSummary) => {
+    try {
+      const outcome = await generatePassword.mutateAsync(user.id);
+      setGeneratedPassword({ displayName: user.displayName, password: outcome.password });
+    } catch (err) {
+      setToast({
+        message: conflictOr(err, 'A password could not be generated.'),
         severity: 'error',
       });
     }
@@ -267,6 +286,7 @@ export function UsersPage() {
               onSort={onSort}
               onEdit={openEdit}
               onResetPassword={onResetPassword}
+              onGeneratePassword={onGeneratePassword}
               onToggleEnabled={onToggleEnabled}
               onDelete={setDeleteTarget}
             />
@@ -316,6 +336,13 @@ export function UsersPage() {
         displayName={resetLink?.displayName ?? ''}
         url={resetLink?.url ?? ''}
         onClose={() => setResetLink(null)}
+      />
+
+      <GeneratedPasswordDialog
+        open={generatedPassword !== null}
+        displayName={generatedPassword?.displayName ?? ''}
+        password={generatedPassword?.password ?? ''}
+        onClose={() => setGeneratedPassword(null)}
       />
 
       <Snackbar

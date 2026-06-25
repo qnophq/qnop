@@ -229,6 +229,38 @@ class AdminUserControllerIT extends AbstractIntegrationTest {
   }
 
   @Test
+  void adminGeneratesPasswordForUser() throws Exception {
+    createUser("root", UserRole.ADMIN);
+    User target = createUser("member", UserRole.MEMBER);
+    String token = adminToken();
+
+    mockMvc
+        .perform(
+            post("/api/v1/admin/users/{id}/password", target.getId())
+                .header("Authorization", "Bearer " + token))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.password").isNotEmpty());
+
+    // The account must change the generated password on first login.
+    assertThat(userRepository.findById(target.getId()).orElseThrow().isPasswordChangeRequired())
+        .isTrue();
+  }
+
+  @Test
+  void generatePasswordRejectsExternalAccount() throws Exception {
+    createUser("root", UserRole.ADMIN);
+    User external = userRepository.saveAndFlush(User.external("Ext", "ext@example.com"));
+    String token = adminToken();
+
+    mockMvc
+        .perform(
+            post("/api/v1/admin/users/{id}/password", external.getId())
+                .header("Authorization", "Bearer " + token))
+        .andExpect(status().isConflict())
+        .andExpect(jsonPath("$.code").value("NO_LOCAL_PASSWORD"));
+  }
+
+  @Test
   void sendsPasswordReset() throws Exception {
     createUser("root", UserRole.ADMIN);
     User target = createUser("member", UserRole.MEMBER);
