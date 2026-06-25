@@ -23,11 +23,12 @@ import { useState, type FormEvent } from 'react';
 import Alert from '@mui/material/Alert';
 import Box from '@mui/material/Box';
 import Button from '@mui/material/Button';
+import CircularProgress from '@mui/material/CircularProgress';
 import InputAdornment from '@mui/material/InputAdornment';
 import Link from '@mui/material/Link';
 import Stack from '@mui/material/Stack';
 import TextField from '@mui/material/TextField';
-import { AtSign } from 'lucide-react';
+import { ArrowRight, AtSign } from 'lucide-react';
 import { Link as RouterLink, useNavigate, useSearchParams } from 'react-router-dom';
 import { AuthLayout } from '../../components/auth/AuthLayout';
 import { AuthModeSwitch } from '../../components/auth/AuthModeSwitch';
@@ -133,7 +134,16 @@ export function LoginPage() {
             </Box>
           </Box>
 
-          <Button type="submit" variant="contained" size="large" disabled={submitting} fullWidth>
+          <Button
+            type="submit"
+            variant="contained"
+            size="large"
+            disabled={submitting}
+            fullWidth
+            endIcon={
+              submitting ? <CircularProgress size={16} color="inherit" /> : <ArrowRight size={16} />
+            }
+          >
             Sign in
           </Button>
         </Stack>
