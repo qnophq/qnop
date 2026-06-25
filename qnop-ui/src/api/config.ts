@@ -21,6 +21,7 @@
 
 import axios, { AxiosError, type InternalAxiosRequestConfig } from 'axios';
 import {
+  AdminEmailApi,
   AdminOidcProvidersApi,
   AdminSettingsApi,
   AdminTeamsApi,
@@ -90,3 +91,4 @@ export const adminUsersApi = new AdminUsersApi(undefined, undefined, axiosInstan
 export const adminTeamsApi = new AdminTeamsApi(undefined, undefined, axiosInstance);
 export const adminSettingsApi = new AdminSettingsApi(undefined, undefined, axiosInstance);
 export const adminOidcProvidersApi = new AdminOidcProvidersApi(undefined, undefined, axiosInstance);
+export const adminEmailApi = new AdminEmailApi(undefined, undefined, axiosInstance);
