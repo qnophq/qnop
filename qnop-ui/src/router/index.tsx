@@ -20,13 +20,14 @@
  */
 
 import { createBrowserRouter } from 'react-router-dom';
-import { FileText, Mail, Palette, ShieldCheck } from 'lucide-react';
+import { FileText, Palette, ShieldCheck } from 'lucide-react';
 import { AppShell } from '../components/shell/AppShell';
 import { AdminRoute } from '../components/auth/AdminRoute';
 import { ProtectedRoute } from '../components/auth/ProtectedRoute';
 import { RoleRoute } from '../components/auth/RoleRoute';
 import { ComingSoonPage } from '../pages/ComingSoonPage';
 import { HomePage } from '../pages/HomePage';
+import { MailTemplatesPage } from '../pages/admin/MailTemplatesPage';
 import { OidcProvidersPage } from '../pages/admin/OidcProvidersPage';
 import { SettingsPage } from '../pages/admin/SettingsPage';
 import { UsersPage } from '../pages/admin/UsersPage';
@@ -130,11 +131,7 @@ export const router = createBrowserRouter([
         path: 'admin/mail-templates',
         element: (
           <AdminRoute>
-            <ComingSoonPage
-              title="Mail templates"
-              description="Edit, preview and test the transactional email templates."
-              icon={Mail}
-            />
+            <MailTemplatesPage />
           </AdminRoute>
         ),
       },
