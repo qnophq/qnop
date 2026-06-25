@@ -21,6 +21,7 @@
 package io.qnop.web;
 
 import io.qnop.api.v1.endpoint.AdminUsersApi;
+import io.qnop.api.v1.model.AdminGeneratedPasswordResponse;
 import io.qnop.api.v1.model.AdminPasswordResetResponse;
 import io.qnop.api.v1.model.AdminUserCreateRequest;
 import io.qnop.api.v1.model.AdminUserDetail;
@@ -34,6 +35,7 @@ import io.qnop.service.AdminUserConflictException;
 import io.qnop.service.AdminUserService;
 import io.qnop.service.AdminUserService.AdminUserPage;
 import io.qnop.service.AdminUserService.AdminUserView;
+import io.qnop.service.AdminUserService.GeneratedPasswordOutcome;
 import io.qnop.service.AdminUserService.PasswordResetOutcome;
 import io.qnop.service.UserNotFoundException;
 import java.time.Instant;
@@ -117,6 +119,12 @@ public class AdminUserController implements AdminUsersApi {
         new AdminPasswordResetResponse()
             .emailSent(outcome.emailSent())
             .resetUrl(outcome.resetUrl()));
+  }
+
+  @Override
+  public ResponseEntity<AdminGeneratedPasswordResponse> generateUserPassword(UUID userId) {
+    GeneratedPasswordOutcome outcome = adminUsers.generatePassword(userId);
+    return ResponseEntity.ok(new AdminGeneratedPasswordResponse().password(outcome.password()));
   }
 
   @ExceptionHandler(UserNotFoundException.class)

@@ -35,6 +35,7 @@ import io.qnop.repository.OidcIdentityRepository;
 import io.qnop.repository.UserRepository;
 import io.qnop.service.AdminUserService.AdminUserPage;
 import io.qnop.service.AdminUserService.AdminUserView;
+import io.qnop.service.AdminUserService.GeneratedPasswordOutcome;
 import io.qnop.service.AdminUserService.PasswordResetOutcome;
 import io.qnop.service.auth.PasswordResetFlowService;
 import io.qnop.service.auth.PasswordResetFlowService.SetupLinkOutcome;
@@ -198,6 +199,45 @@ class AdminUserServiceTest {
 
     verify(refreshTokens, never()).revokeAllForUser(any());
     verify(users, never()).bumpPasswordInvalidatedBefore(any(), any());
+  }
+
+  @Test
+  @DisplayName("generate sets a strong password, requires change, and revokes sessions")
+  void generatePasswordForInternalUser() {
+    UUID id = UUID.randomUUID();
+    User member = User.internal("Member", "m@example.com", "m", "old-hash");
+    member.setRole(UserRole.MEMBER);
+    when(users.findById(id)).thenReturn(Optional.of(member));
+
+    GeneratedPasswordOutcome outcome = service.generatePassword(id);
+
+    assertThat(outcome.password()).hasSize(16);
+    assertThat(member.isPasswordChangeRequired()).isTrue();
+    verify(passwordEncoder).encode(outcome.password());
+    verify(users).bumpPasswordInvalidatedBefore(eq(id), any());
+    verify(refreshTokens).revokeAllForUser(id);
+  }
+
+  @Test
+  @DisplayName("generate rejects an external (OIDC) account without touching sessions")
+  void generatePasswordRejectsExternal() {
+    UUID id = UUID.randomUUID();
+    User external = User.external("Ext", "ext@example.com");
+    when(users.findById(id)).thenReturn(Optional.of(external));
+
+    assertThatThrownBy(() -> service.generatePassword(id))
+        .isInstanceOf(AdminUserConflictException.class)
+        .extracting("code")
+        .isEqualTo("NO_LOCAL_PASSWORD");
+    verify(refreshTokens, never()).revokeAllForUser(any());
+  }
+
+  @Test
+  @DisplayName("the generated-password outcome never leaks the plaintext via toString")
+  void generatedPasswordOutcomeTostringMasked() {
+    assertThat(new GeneratedPasswordOutcome("s3cret-value").toString())
+        .doesNotContain("s3cret-value")
+        .contains("***");
   }
 
   @Test

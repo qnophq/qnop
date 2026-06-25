@@ -876,6 +876,47 @@ paths:
           $ref: '#/components/responses/Unauthorized'
         '403':
           $ref: '#/components/responses/Forbidden'
+  /admin/users/{userId}/password:
+    post:
+      tags:
+        - AdminUsers
+      summary: Generate a new password for a user (admin)
+      description: |
+        Sets a freshly generated strong password on the user, marks it for change
+        on first login, and revokes the user's active sessions immediately. The
+        generated password is returned **once** for the admin to hand over — it is
+        never stored in clear text and cannot be retrieved again. External (OIDC)
+        accounts have no local password and are rejected with 409. An admin may
+        target their own account; doing so ends their sessions (the response still
+        carries the new password to sign back in with).
+      operationId: generateUserPassword
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/UserIdParam'
+      responses:
+        '200':
+          description: The password was generated and set
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AdminGeneratedPasswordResponse'
+        '404':
+          description: Unknown user
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '409':
+          description: The account has no local password (external/OIDC)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
   /admin/teams:
     get:
       tags:
@@ -2083,6 +2124,17 @@ components:
             sent so the operator can deliver it out of band.
       required:
         - emailSent
+    AdminGeneratedPasswordResponse:
+      type: object
+      description: |
+        A freshly generated password, returned exactly once. It is never stored in
+        clear text and cannot be retrieved again — the admin must hand it over now.
+      properties:
+        password:
+          type: string
+          description: The generated plaintext password, shown a single time.
+      required:
+        - password
     AdminUserListResponse:
       type: object
       description: A page of users for the admin list.

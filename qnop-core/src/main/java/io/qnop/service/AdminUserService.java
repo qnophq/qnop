@@ -26,6 +26,7 @@ import io.qnop.entity.UserSource;
 import io.qnop.repository.OidcIdentityRepository;
 import io.qnop.repository.UserProviderName;
 import io.qnop.repository.UserRepository;
+import io.qnop.security.PasswordGenerator;
 import io.qnop.service.auth.PasswordResetFlowService;
 import io.qnop.service.auth.PasswordResetFlowService.SetupLinkOutcome;
 import java.time.Instant;
@@ -226,6 +227,41 @@ public class AdminUserService {
     refreshTokens.revokeAllForUser(id);
     return new PasswordResetOutcome(
         outcome.emailSent(), outcome.emailSent() ? null : outcome.resetUrl());
+  }
+
+  /**
+   * Generates a strong password for an internal account, sets it (requiring a change on first
+   * login), and revokes the user's active sessions immediately — the new password is the only way
+   * back in. Returns the plaintext exactly once; it is never stored in clear text. External (OIDC)
+   * accounts have no local password and are rejected (409). An admin may target their own account,
+   * which signs them out (they sign back in with the new password).
+   */
+  @Transactional
+  public GeneratedPasswordOutcome generatePassword(UUID id) {
+    User user = users.findById(id).orElseThrow(() -> new UserNotFoundException(id));
+    if (user.getSource() != UserSource.INTERNAL) {
+      throw new AdminUserConflictException(
+          "NO_LOCAL_PASSWORD",
+          "This account signs in via an identity provider; it has no password.");
+    }
+    String password = PasswordGenerator.generate();
+    user.setPasswordHash(passwordEncoder.encode(password));
+    user.setPasswordChangeRequired(true);
+    // flush() persists the hash + flag before bumpPasswordInvalidatedBefore clears the context.
+    users.flush();
+    users.bumpPasswordInvalidatedBefore(id, Instant.now());
+    refreshTokens.revokeAllForUser(id);
+    return new GeneratedPasswordOutcome(password);
+  }
+
+  /**
+   * A freshly generated password, surfaced once; {@code toString} is masked to keep it out of logs.
+   */
+  public record GeneratedPasswordOutcome(String password) {
+    @Override
+    public String toString() {
+      return "GeneratedPasswordOutcome[password=***]";
+    }
   }
 
   /** The provider name for a user, or null for internal accounts (avoids a null-key map lookup). */
