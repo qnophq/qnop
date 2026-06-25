@@ -170,6 +170,37 @@ class AdminUserServiceTest {
   }
 
   @Test
+  @DisplayName("disabling a user revokes their active sessions")
+  void updateDisablingRevokesSessions() {
+    UUID id = UUID.randomUUID();
+    User member = User.internal("Member", "m@example.com", "m", "h");
+    member.setRole(UserRole.MEMBER);
+    member.setEnabled(true);
+    when(users.findById(id)).thenReturn(Optional.of(member));
+
+    service.update(id, null, null, false, UUID.randomUUID());
+
+    assertThat(member.isEnabled()).isFalse();
+    verify(users).bumpPasswordInvalidatedBefore(eq(id), any());
+    verify(refreshTokens).revokeAllForUser(id);
+  }
+
+  @Test
+  @DisplayName("a non-disabling update leaves the user's sessions untouched")
+  void updateWithoutDisablingKeepsSessions() {
+    UUID id = UUID.randomUUID();
+    User member = User.internal("Old", "m@example.com", "m", "h");
+    member.setRole(UserRole.MEMBER);
+    member.setEnabled(true);
+    when(users.findById(id)).thenReturn(Optional.of(member));
+
+    service.update(id, "New", null, null, UUID.randomUUID());
+
+    verify(refreshTokens, never()).revokeAllForUser(any());
+    verify(users, never()).bumpPasswordInvalidatedBefore(any(), any());
+  }
+
+  @Test
   @DisplayName("delete rejects self and the last admin, and removes any other user")
   void delete() {
     UUID selfId = UUID.randomUUID();

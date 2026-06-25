@@ -173,6 +173,17 @@ public class AdminUserService {
     }
     user.setRole(newRole);
     user.setEnabled(newEnabled);
+
+    // Disabling must end access immediately (mirrors the admin password reset): invalidate live
+    // access tokens and revoke refresh families, so a disabled user cannot keep using or refreshing
+    // a session. flush() persists the enabled change before bumpPasswordInvalidatedBefore clears
+    // the
+    // persistence context.
+    if (disabling) {
+      users.flush();
+      users.bumpPasswordInvalidatedBefore(id, Instant.now());
+      refreshTokens.revokeAllForUser(id);
+    }
     return toView(user, null);
   }
 
