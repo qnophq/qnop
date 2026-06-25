@@ -38,6 +38,17 @@ import { useAuthStore } from '../../stores/authStore';
 import { apiErrorMessage } from '../../utils/apiError';
 import { safeRedirectPath } from '../../utils/safeRedirectPath';
 
+/**
+ * OIDC redirect-failure codes set by the backend success handler (`/login?error=…`) mapped to
+ * user-facing copy. Unknown codes fall back to the generic message.
+ */
+const OIDC_LOGIN_ERRORS: Record<string, string> = {
+  account_disabled: 'Your account is disabled. Please contact an administrator.',
+  email_missing:
+    'The identity provider did not share an email address, which qnop requires for an account.',
+  oidc: 'Sign-in via the identity provider failed. Please try again or contact an administrator.',
+};
+
 /** Login screen: local credentials, OIDC providers, links to register / reset. */
 export function LoginPage() {
   const login = useAuthStore((s) => s.login);
@@ -46,7 +57,10 @@ export function LoginPage() {
   const { data: config } = useConfig();
   const [usernameOrEmail, setUsernameOrEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(() => {
+    const code = params.get('error');
+    return code ? (OIDC_LOGIN_ERRORS[code] ?? OIDC_LOGIN_ERRORS.oidc) : null;
+  });
   const [submitting, setSubmitting] = useState(false);
 
   const canRegister = !!config?.auth?.selfRegistrationEnabled;
@@ -75,6 +89,11 @@ export function LoginPage() {
       subtitle="Sign in to continue with your reviews."
       headerSlot={canRegister ? <AuthModeSwitch active="login" /> : undefined}
     >
+      {error && (
+        <Alert severity="error" sx={{ mb: 2 }} onClose={() => setError(null)}>
+          {error}
+        </Alert>
+      )}
       <Box component="form" onSubmit={onSubmit} noValidate>
         <Stack spacing={2}>
           <TextField
@@ -113,8 +132,6 @@ export function LoginPage() {
               </Link>
             </Box>
           </Box>
-
-          {error && <Alert severity="error">{error}</Alert>}
 
           <Button type="submit" variant="contained" size="large" disabled={submitting} fullWidth>
             Sign in

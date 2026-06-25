@@ -23,6 +23,8 @@ package io.qnop.web.security;
 import io.qnop.security.QnopProperties;
 import io.qnop.service.RefreshTokenService;
 import io.qnop.service.RefreshTokenService.IssuedRefreshToken;
+import io.qnop.service.oidc.OidcAccountDisabledException;
+import io.qnop.service.oidc.OidcEmailMissingException;
 import io.qnop.service.oidc.OidcLoginService;
 import io.qnop.service.oidc.OidcLoginService.LoginResult;
 import jakarta.servlet.http.HttpServletRequest;
@@ -84,8 +86,22 @@ public class OidcLoginSuccessHandler implements AuthenticationSuccessHandler {
       response.sendRedirect(frontendBase());
     } catch (RuntimeException e) {
       log.warn("OIDC login could not be completed: {}", e.getMessage());
-      response.sendRedirect(frontendBase() + "/login?error=oidc");
+      response.sendRedirect(frontendBase() + "/login?error=" + errorCode(e));
     }
+  }
+
+  /**
+   * Maps a login failure to a stable, non-sensitive code the SPA turns into a localized message.
+   * Only the category crosses the redirect URL — never the raw exception text.
+   */
+  private static String errorCode(RuntimeException e) {
+    if (e instanceof OidcAccountDisabledException) {
+      return "account_disabled";
+    }
+    if (e instanceof OidcEmailMissingException) {
+      return "email_missing";
+    }
+    return "oidc";
   }
 
   private String providerAccessToken(OAuth2AuthenticationToken token) {
