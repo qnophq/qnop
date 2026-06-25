@@ -43,3 +43,49 @@ export function passwordStrength(password: string): PasswordStrength {
   const score = (password.length === 0 ? 0 : raw) as PasswordStrength['score'];
   return { score, label: LABELS[score], acceptable: password.length >= 8 };
 }
+
+// Readable character classes for self-service generation — ambiguous glyphs
+// (0/O, 1/l/I) are dropped so a copied password is hard to mistype.
+const LOWER = 'abcdefghijkmnpqrstuvwxyz';
+const UPPER = 'ABCDEFGHJKLMNPQRSTUVWXYZ';
+const DIGITS = '23456789';
+const SYMBOLS = '!@#$%^&*-_=+';
+const ALL = LOWER + UPPER + DIGITS + SYMBOLS;
+
+/** Default length for a generated password — comfortably above the 8-char policy. */
+export const GENERATED_PASSWORD_LENGTH = 20;
+
+/**
+ * Returns an unbiased index in {@code [0, maxExclusive)} using the Web Crypto API
+ * with rejection sampling (no {@code Math.random}, no modulo bias).
+ */
+function randomIndex(maxExclusive: number): number {
+  const limit = Math.floor(0x1_0000_0000 / maxExclusive) * maxExclusive;
+  const buffer = new Uint32Array(1);
+  let value: number;
+  do {
+    crypto.getRandomValues(buffer);
+    value = buffer[0];
+  } while (value >= limit);
+  return value % maxExclusive;
+}
+
+const pick = (chars: string): string => chars[randomIndex(chars.length)];
+
+/**
+ * Generates a strong random password for the self-service change screen (#116).
+ * Guarantees at least one lowercase, uppercase, digit and symbol — so it always
+ * clears the policy and reads as "Strong" — then fills and shuffles the rest with
+ * cryptographically secure randomness.
+ */
+export function generateStrongPassword(length: number = GENERATED_PASSWORD_LENGTH): string {
+  const required = [pick(LOWER), pick(UPPER), pick(DIGITS), pick(SYMBOLS)];
+  const rest = Array.from({ length: Math.max(0, length - required.length) }, () => pick(ALL));
+  const chars = [...required, ...rest];
+  // Fisher–Yates shuffle so the guaranteed characters are not always up front.
+  for (let i = chars.length - 1; i > 0; i--) {
+    const j = randomIndex(i + 1);
+    [chars[i], chars[j]] = [chars[j], chars[i]];
+  }
+  return chars.join('');
+}

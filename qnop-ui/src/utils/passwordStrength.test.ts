@@ -20,7 +20,11 @@
  */
 
 import { describe, expect, it } from 'vitest';
-import { passwordStrength } from './passwordStrength';
+import {
+  GENERATED_PASSWORD_LENGTH,
+  generateStrongPassword,
+  passwordStrength,
+} from './passwordStrength';
 
 describe('passwordStrength', () => {
   it('scores an empty password as 0 and not acceptable', () => {
@@ -43,5 +47,36 @@ describe('passwordStrength', () => {
     expect(r.score).toBe(4);
     expect(r.label).toBe('Strong');
     expect(r.acceptable).toBe(true);
+  });
+});
+
+describe('generateStrongPassword', () => {
+  it('uses the default length and honours a custom length', () => {
+    expect(generateStrongPassword()).toHaveLength(GENERATED_PASSWORD_LENGTH);
+    expect(generateStrongPassword(32)).toHaveLength(32);
+  });
+
+  it('always produces a password the strength meter rates as strong', () => {
+    for (let i = 0; i < 200; i++) {
+      const r = passwordStrength(generateStrongPassword());
+      expect(r.acceptable).toBe(true);
+      expect(r.score).toBe(4);
+    }
+  });
+
+  it('contains every required character class and no ambiguous glyphs', () => {
+    for (let i = 0; i < 200; i++) {
+      const pw = generateStrongPassword();
+      expect(pw).toMatch(/[a-z]/);
+      expect(pw).toMatch(/[A-Z]/);
+      expect(pw).toMatch(/[0-9]/);
+      expect(pw).toMatch(/[^A-Za-z0-9]/);
+      expect(pw).not.toMatch(/[0O1lI]/);
+    }
+  });
+
+  it('returns a different password on each call', () => {
+    const seen = new Set(Array.from({ length: 500 }, () => generateStrongPassword()));
+    expect(seen.size).toBe(500);
   });
 });
