@@ -29,6 +29,7 @@ import static org.mockito.Mockito.when;
 
 import io.qnop.entity.OidcProvider;
 import io.qnop.repository.OidcProviderRepository;
+import io.qnop.service.oidc.OidcProviderService.OidcDiscoveryOutcome;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -111,5 +112,25 @@ class OidcProviderServiceTest {
     when(providers.existsById(id)).thenReturn(false);
 
     assertThatThrownBy(() -> service.delete(id)).isInstanceOf(OidcProviderNotFoundException.class);
+  }
+
+  @Test
+  @DisplayName("discovery rejects a blank issuer with a clear message")
+  void discoverBlankIssuer() {
+    OidcDiscoveryOutcome outcome = service.discoverEndpoints("   ");
+
+    assertThat(outcome.success()).isFalse();
+    assertThat(outcome.error()).contains("must not be blank");
+  }
+
+  @Test
+  @DisplayName("discovery surfaces the SSRF rejection reason instead of a generic message")
+  void discoverBlockedHostSurfacesReason() {
+    // The default policy blocks loopback; the reason must reach the caller (issue #106), not be
+    // swallowed behind a generic "discovery failed" text.
+    OidcDiscoveryOutcome outcome = service.discoverEndpoints("http://localhost:8081/realms/qnop");
+
+    assertThat(outcome.success()).isFalse();
+    assertThat(outcome.error()).contains("blocked");
   }
 }

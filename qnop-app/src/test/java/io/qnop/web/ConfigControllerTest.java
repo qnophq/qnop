@@ -27,6 +27,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import io.qnop.service.ApplicationSettingKey;
 import io.qnop.service.ApplicationSettingsService;
+import io.qnop.service.oidc.OidcProviderLoginView;
 import io.qnop.service.oidc.OidcProviderService;
 import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
@@ -59,7 +60,7 @@ class ConfigControllerTest {
   @BeforeEach
   void setUp() {
     // No providers configured: auth.oidcProviders should serialize as an empty list.
-    when(oidcProviders.findAll()).thenReturn(List.of());
+    when(oidcProviders.enabledLoginViews()).thenReturn(List.of());
     when(settings.getBoolean(ApplicationSettingKey.AUTH_SELF_REGISTRATION_ENABLED))
         .thenReturn(false);
   }
@@ -90,6 +91,43 @@ class ConfigControllerTest {
         .perform(get("/api/v1/config"))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.auth.selfRegistrationEnabled").value(true));
+  }
+
+  @Test
+  @DisplayName("enabled providers expose icon kind and account-switch affordances")
+  void getConfig_mapsOidcLoginInfoFields() throws Exception {
+    String googleLogin = "/oauth2/authorization/11111111-1111-1111-1111-111111111111";
+    String githubLogin = "/oauth2/authorization/22222222-2222-2222-2222-222222222222";
+    when(oidcProviders.enabledLoginViews())
+        .thenReturn(
+            List.of(
+                new OidcProviderLoginView(
+                    "11111111-1111-1111-1111-111111111111",
+                    "Google",
+                    googleLogin,
+                    "google",
+                    googleLogin + "?prompt=select_account",
+                    null),
+                new OidcProviderLoginView(
+                    "22222222-2222-2222-2222-222222222222",
+                    "GitHub",
+                    githubLogin,
+                    "github",
+                    null,
+                    "https://github.com/logout")));
+
+    mockMvc
+        .perform(get("/api/v1/config"))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.auth.oidcProviders[0].name").value("Google"))
+        .andExpect(jsonPath("$.auth.oidcProviders[0].iconKind").value("google"))
+        .andExpect(
+            jsonPath("$.auth.oidcProviders[0].accountPickerLoginUrl")
+                .value(googleLogin + "?prompt=select_account"))
+        .andExpect(jsonPath("$.auth.oidcProviders[1].iconKind").value("github"))
+        .andExpect(
+            jsonPath("$.auth.oidcProviders[1].accountSwitchHintUrl")
+                .value("https://github.com/logout"));
   }
 
   @Test

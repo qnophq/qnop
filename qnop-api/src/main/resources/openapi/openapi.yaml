@@ -1601,10 +1601,38 @@ components:
         loginUrl:
           type: string
           description: Relative URL the frontend redirects to in order to start login.
+        iconKind:
+          $ref: '#/components/schemas/OidcIconKind'
+        accountPickerLoginUrl:
+          type: string
+          nullable: true
+          description: |
+            Relative login URL that forces the upstream account picker / re-auth
+            screen (adds an allow-listed `prompt`). Null when the provider cannot
+            honour it (e.g. GitHub), in which case the SPA renders a sign-out hint.
+        accountSwitchHintUrl:
+          type: string
+          nullable: true
+          description: |
+            Absolute upstream sign-out URL the SPA links to as a fallback when the
+            provider has no `prompt`-based account picker (today only GitHub). Null
+            otherwise.
       required:
         - id
         - name
         - loginUrl
+        - iconKind
+    OidcIconKind:
+      type: string
+      description: |
+        Which brand glyph the SPA renders on a provider's login button. Decoupled
+        from `OidcProviderTypeDto` so the icon set can evolve independently.
+      enum:
+        - github
+        - google
+        - facebook
+        - oidc
+        - oauth2
     ServerConfigGeneral:
       type: object
       description: General, application-wide public configuration.

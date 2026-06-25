@@ -24,13 +24,14 @@ import Alert from '@mui/material/Alert';
 import Box from '@mui/material/Box';
 import Button from '@mui/material/Button';
 import Checkbox from '@mui/material/Checkbox';
+import CircularProgress from '@mui/material/CircularProgress';
 import FormControlLabel from '@mui/material/FormControlLabel';
 import InputAdornment from '@mui/material/InputAdornment';
 import Link from '@mui/material/Link';
 import Stack from '@mui/material/Stack';
 import TextField from '@mui/material/TextField';
 import Typography from '@mui/material/Typography';
-import { AtSign, Mail, User } from 'lucide-react';
+import { ArrowRight, AtSign, Mail, User } from 'lucide-react';
 import { Link as RouterLink, Navigate } from 'react-router-dom';
 import { AuthLayout } from '../../components/auth/AuthLayout';
 import { AuthModeSwitch } from '../../components/auth/AuthModeSwitch';
@@ -158,6 +159,9 @@ export function RegisterPage() {
             size="large"
             disabled={submitting || !canSubmit}
             fullWidth
+            endIcon={
+              submitting ? <CircularProgress size={16} color="inherit" /> : <ArrowRight size={16} />
+            }
           >
             Create account
           </Button>
