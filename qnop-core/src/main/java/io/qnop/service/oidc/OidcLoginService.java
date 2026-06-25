@@ -72,6 +72,11 @@ public class OidcLoginService {
       throw new IllegalStateException("OIDC login returned no subject for provider " + providerId);
     }
     User user = identityService.upsertOnLogin(provider, principal);
+    // An admin can disable an account; honour it on the OIDC path too, mirroring the local login.
+    if (!user.isEnabled()) {
+      throw new OidcAccountDisabledException(
+          "The account linked to this " + provider.getName() + " login is disabled.");
+    }
     return new LoginResult(user.getId(), principal.upstreamIdToken());
   }
 
