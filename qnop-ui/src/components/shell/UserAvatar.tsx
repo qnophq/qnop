@@ -19,12 +19,15 @@
  * SPDX-License-Identifier: AGPL-3.0-only
  */
 
+import { useState } from 'react';
 import Box from '@mui/material/Box';
 import { useTheme } from '@mui/material/styles';
 
 interface UserAvatarProps {
   name: string | null;
   size?: number;
+  /** Uploaded profile picture; falls back to the initials avatar when absent or it fails to load. */
+  imageUrl?: string | null;
 }
 
 function initials(name: string): string {
@@ -34,12 +37,27 @@ function initials(name: string): string {
   return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
 }
 
-/** Initials avatar with a deterministic colour from the brand avatar palette. */
-export function UserAvatar({ name, size = 28 }: UserAvatarProps) {
+/**
+ * Avatar: renders the uploaded profile picture when present, otherwise an initials
+ * avatar with a deterministic colour from the brand palette (issue #117). A broken
+ * or expired image URL falls back to the initials too.
+ */
+export function UserAvatar({ name, size = 28, imageUrl }: UserAvatarProps) {
   const theme = useTheme();
   const safe = name ?? '?';
   const palette = theme.qnop.avatarPalette;
   const idx = (safe.charCodeAt(0) + safe.charCodeAt(safe.length - 1)) % palette.length;
+
+  // Track load failure so a broken/expired image falls back to initials. Reset it during render
+  // when the URL changes (e.g. the cache-busting ?v= after an upload) — the React-recommended
+  // "adjust state during render" pattern, avoiding a setState-in-effect cascade.
+  const [failed, setFailed] = useState(false);
+  const [lastUrl, setLastUrl] = useState(imageUrl);
+  if (imageUrl !== lastUrl) {
+    setLastUrl(imageUrl);
+    setFailed(false);
+  }
+  const showImage = Boolean(imageUrl) && !failed;
 
   return (
     <Box
@@ -49,6 +67,7 @@ export function UserAvatar({ name, size = 28 }: UserAvatarProps) {
         height: size,
         borderRadius: '50%',
         flexShrink: 0,
+        overflow: 'hidden',
         bgcolor: palette[idx],
         color: '#fff',
         display: 'flex',
@@ -59,7 +78,17 @@ export function UserAvatar({ name, size = 28 }: UserAvatarProps) {
         lineHeight: 1,
       }}
     >
-      {initials(safe)}
+      {showImage ? (
+        <Box
+          component="img"
+          src={imageUrl ?? undefined}
+          alt=""
+          onError={() => setFailed(true)}
+          sx={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
+        />
+      ) : (
+        initials(safe)
+      )}
     </Box>
   );
 }

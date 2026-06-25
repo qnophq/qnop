@@ -26,7 +26,7 @@ import ListItemIcon from '@mui/material/ListItemIcon';
 import Menu from '@mui/material/Menu';
 import MenuItem from '@mui/material/MenuItem';
 import Typography from '@mui/material/Typography';
-import { KeyRound, LogOut } from 'lucide-react';
+import { KeyRound, LogOut, UserRound } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useAuthStore } from '../../stores/authStore';
 import { UserAvatar } from './UserAvatar';
@@ -41,11 +41,12 @@ interface UserFooterProps {
   collapsed: boolean;
 }
 
-/** Sidebar footer: the signed-in user with a menu (profile placeholder, logout). */
+/** Sidebar footer: the signed-in user with a menu (profile, change password, logout). */
 export function UserFooter({ collapsed }: UserFooterProps) {
   const displayName = useAuthStore((s) => s.displayName);
   const role = useAuthStore((s) => s.role);
   const source = useAuthStore((s) => s.source);
+  const avatarUrl = useAuthStore((s) => s.avatarUrl);
   const logout = useAuthStore((s) => s.logout);
   const navigate = useNavigate();
   const [anchor, setAnchor] = useState<HTMLElement | null>(null);
@@ -70,7 +71,7 @@ export function UserFooter({ collapsed }: UserFooterProps) {
           '&:hover': { bgcolor: 'action.hover' },
         }}
       >
-        <UserAvatar name={displayName} size={28} />
+        <UserAvatar name={displayName} size={28} imageUrl={avatarUrl} />
         {!collapsed && (
           <Box sx={{ minWidth: 0, textAlign: 'left', flex: 1 }}>
             <Typography noWrap sx={{ fontSize: 13, fontWeight: 500, lineHeight: 1.2 }}>
@@ -90,6 +91,17 @@ export function UserFooter({ collapsed }: UserFooterProps) {
         anchorOrigin={{ vertical: 'top', horizontal: 'left' }}
         transformOrigin={{ vertical: 'bottom', horizontal: 'left' }}
       >
+        <MenuItem
+          onClick={() => {
+            setAnchor(null);
+            navigate('/profile');
+          }}
+        >
+          <ListItemIcon>
+            <UserRound size={16} />
+          </ListItemIcon>
+          Profile
+        </MenuItem>
         {/* External (OIDC) accounts have no local password — only local users can change it. */}
         {source !== 'EXTERNAL' && (
           <MenuItem
