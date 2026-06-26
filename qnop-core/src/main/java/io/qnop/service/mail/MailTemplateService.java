@@ -22,7 +22,9 @@ package io.qnop.service.mail;
 
 import com.samskivert.mustache.Mustache;
 import io.qnop.entity.MailTemplate;
+import io.qnop.entity.User;
 import io.qnop.repository.MailTemplateRepository;
+import io.qnop.repository.UserRepository;
 import io.qnop.service.ApplicationSettingKey;
 import io.qnop.service.ApplicationSettingsService;
 import java.time.Instant;
@@ -55,6 +57,7 @@ public class MailTemplateService {
       "This is an automated message — please don't reply.";
 
   private final MailTemplateRepository repository;
+  private final UserRepository userRepository;
   private final ApplicationSettingsService settings;
   private final EmailLayoutBuilder layoutBuilder;
   private final Mustache.Compiler plainCompiler = Mustache.compiler().escapeHTML(false);
@@ -62,9 +65,11 @@ public class MailTemplateService {
 
   public MailTemplateService(
       MailTemplateRepository repository,
+      UserRepository userRepository,
       ApplicationSettingsService settings,
       EmailLayoutBuilder layoutBuilder) {
     this.repository = repository;
+    this.userRepository = userRepository;
     this.settings = settings;
     this.layoutBuilder = layoutBuilder;
   }
@@ -149,7 +154,13 @@ public class MailTemplateService {
   /** A preview render plus the effective variables it was rendered with. */
   public record MailPreview(RenderedMail rendered, Map<String, String> sampleVars) {}
 
-  /** The effective view per known template at the configured default locale. */
+  /**
+   * The effective view per known template at the configured default locale. One {@code findById}
+   * resolves each customised template's editor name; the catalog is a closed three-key set, so a
+   * batch lookup would only matter if it grew significantly. Runs in one read-only transaction so
+   * the per-template lookups share a session.
+   */
+  @Transactional(readOnly = true)
   public List<MailTemplateView> listAll() {
     String locale = defaultLocale();
     return java.util.Arrays.stream(MailTemplateKey.values())
@@ -228,6 +239,7 @@ public class MailTemplateService {
   }
 
   /** The effective view for one template at the configured default locale. */
+  @Transactional(readOnly = true)
   public MailTemplateView getEffective(MailTemplateKey key) {
     return getEffective(key, defaultLocale());
   }
@@ -279,7 +291,27 @@ public class MailTemplateService {
         key.defaultBodyPlain(),
         defaultBodyHtml(key),
         updatedAt,
-        updatedBy);
+        updatedBy,
+        resolveUserName(updatedBy));
+  }
+
+  /**
+   * Resolves the editing admin's display name for the attribution line. Returns null for built-in
+   * defaults ({@code updatedBy == null}), a non-UUID value, or a since-deleted user — the UI then
+   * shows the relative time without a name.
+   */
+  private String resolveUserName(String updatedBy) {
+    if (updatedBy == null) {
+      return null;
+    }
+    try {
+      return userRepository
+          .findById(UUID.fromString(updatedBy))
+          .map(User::getDisplayName)
+          .orElse(null);
+    } catch (IllegalArgumentException e) {
+      return null;
+    }
   }
 
   /** Rejects a submitted body that references a placeholder outside the key's closed set. */

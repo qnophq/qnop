@@ -30,7 +30,8 @@ import java.util.List;
  *
  * <p>Carries the editor metadata (issue #141): a {@code friendlyName}, the closed {@code
  * placeholders} set the template accepts, and the built-in {@code default*} content for
- * compare/reset in the UI.
+ * compare/reset in the UI. {@code updatedByName} is the resolved display name of {@code updatedBy}
+ * (null for built-in defaults or a since-deleted user), so the list can attribute an override.
  */
 public record MailTemplateView(
     String key,
@@ -45,7 +46,8 @@ public record MailTemplateView(
     String defaultBodyPlain,
     String defaultBodyHtml,
     Instant updatedAt,
-    String updatedBy) {
+    String updatedBy,
+    String updatedByName) {
 
   /** Where the effective content came from. */
   public enum Source {

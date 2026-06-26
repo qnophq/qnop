@@ -1986,6 +1986,11 @@ components:
         updatedBy:
           type: string
           description: Id of the admin who last saved the override; absent for built-in defaults.
+        updatedByName:
+          type: string
+          description: >-
+            Display name of the admin who last saved the override; absent for
+            built-in defaults or a since-deleted user.
       required:
         - key
         - friendlyName

@@ -184,6 +184,7 @@ public class AdminEmailController implements AdminEmailApi {
         .defaultBodyPlain(view.defaultBodyPlain())
         .defaultBodyHtml(view.defaultBodyHtml())
         .updatedAt(view.updatedAt() == null ? null : view.updatedAt().atOffset(ZoneOffset.UTC))
-        .updatedBy(view.updatedBy());
+        .updatedBy(view.updatedBy())
+        .updatedByName(view.updatedByName());
   }
 }
