@@ -24,6 +24,8 @@ import Box from '@mui/material/Box';
 import Stack from '@mui/material/Stack';
 import Typography from '@mui/material/Typography';
 import { Fingerprint, Server, ShieldCheck } from 'lucide-react';
+import { useConfig } from '../../api/hooks/useConfig';
+import { BrandLogo } from '../branding/BrandLogo';
 import { tokens } from '../../theme/tokens';
 
 const TRUST = [
@@ -46,6 +48,8 @@ interface AuthLayoutProps {
  * the design prototype's "Sovereign document review" treatment.
  */
 export function AuthLayout({ title, subtitle, headerSlot, children }: AuthLayoutProps) {
+  // The auth hero is always dark, so use the dark-surface (light) logo variant (issue #154).
+  const logoUrl = useConfig().data?.branding?.logoDark.url;
   return (
     <Box
       sx={{
@@ -93,41 +97,48 @@ export function AuthLayout({ title, subtitle, headerSlot, children }: AuthLayout
           }}
         />
 
-        <Box
-          sx={{ position: 'relative', zIndex: 1, display: 'flex', alignItems: 'center', gap: 1.25 }}
-        >
-          <Box
-            sx={{
-              width: 38,
-              height: 38,
-              borderRadius: 1.5,
-              bgcolor: 'rgba(255,255,255,0.12)',
-              border: '1px solid rgba(255,255,255,0.18)',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-            }}
-          >
-            <ShieldCheck size={22} />
-          </Box>
-          <Box>
-            <Typography
-              sx={{ fontWeight: 700, fontSize: 17, letterSpacing: '-0.02em', lineHeight: 1 }}
-            >
-              qnop
-            </Typography>
-            <Typography
-              sx={{
-                fontSize: 10.5,
-                letterSpacing: '0.1em',
-                textTransform: 'uppercase',
-                color: '#9BCEFA',
-                mt: 0.4,
-              }}
-            >
-              Quality Notes · Sovereign
-            </Typography>
-          </Box>
+        <Box sx={{ position: 'relative', zIndex: 1 }}>
+          <BrandLogo
+            url={logoUrl}
+            alt="qnop"
+            sx={{ height: 38, maxWidth: 220 }}
+            fallback={
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.25 }}>
+                <Box
+                  sx={{
+                    width: 38,
+                    height: 38,
+                    borderRadius: 1.5,
+                    bgcolor: 'rgba(255,255,255,0.12)',
+                    border: '1px solid rgba(255,255,255,0.18)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                  }}
+                >
+                  <ShieldCheck size={22} />
+                </Box>
+                <Box>
+                  <Typography
+                    sx={{ fontWeight: 700, fontSize: 17, letterSpacing: '-0.02em', lineHeight: 1 }}
+                  >
+                    qnop
+                  </Typography>
+                  <Typography
+                    sx={{
+                      fontSize: 10.5,
+                      letterSpacing: '0.1em',
+                      textTransform: 'uppercase',
+                      color: '#9BCEFA',
+                      mt: 0.4,
+                    }}
+                  >
+                    Quality Notes · Sovereign
+                  </Typography>
+                </Box>
+              </Box>
+            }
+          />
         </Box>
 
         <Box sx={{ position: 'relative', zIndex: 1, mt: 'auto', maxWidth: 460 }}>

@@ -27,10 +27,15 @@ export const configKeys = {
   all: ['config'] as const,
 };
 
+/** Short staleness window so branding changes propagate across sessions (issue #154). */
+const CONFIG_STALE_MS = 5 * 60_000;
+
 /**
  * Public server configuration (edition, branding, OIDC providers, self-
- * registration flag, upload limits, supported formats). Fetched once and cached
- * for the session; it rarely changes within a session.
+ * registration flag, upload limits, supported formats). Cached with a short
+ * staleness window and refetched on window focus, so an updated branding asset
+ * (issue #154) propagates to other sessions without a manual reload; the admin
+ * upload also invalidates this query for same-session immediacy.
  */
 export function useConfig() {
   return useQuery<ServerConfigResponse>({
@@ -39,6 +44,7 @@ export function useConfig() {
       const response = await serverConfigApi.getServerConfig();
       return response.data;
     },
-    staleTime: Infinity,
+    staleTime: CONFIG_STALE_MS,
+    refetchOnWindowFocus: true,
   });
 }
