@@ -25,9 +25,13 @@ import io.qnop.entity.MailTemplate;
 import io.qnop.repository.MailTemplateRepository;
 import io.qnop.service.ApplicationSettingKey;
 import io.qnop.service.ApplicationSettingsService;
+import java.time.Instant;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
+import java.util.SortedSet;
 import java.util.UUID;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -47,6 +51,8 @@ import org.springframework.transaction.annotation.Transactional;
 public class MailTemplateService {
 
   private static final String FALLBACK_LOCALE = "en";
+  private static final String AUTOMATED_FOOTER =
+      "This is an automated message — please don't reply.";
 
   private final MailTemplateRepository repository;
   private final ApplicationSettingsService settings;
@@ -98,13 +104,50 @@ public class MailTemplateService {
         content,
         actionUrl == null ? null : actionUrl.toString(),
         key.ctaLabel(),
-        "This is an automated message — please don't reply.");
+        AUTOMATED_FOOTER);
   }
 
-  /** Renders {@code key} with the provided variables, or representative sample data if none. */
-  public RenderedMail preview(MailTemplateKey key, String locale, Map<String, Object> vars) {
-    return render(key, vars == null || vars.isEmpty() ? sampleVars() : vars, locale);
+  /** The catalog default HTML body as a template (placeholders intact), for compare/reset. */
+  private String defaultBodyHtml(MailTemplateKey key) {
+    return layoutBuilder.wrap(
+        "{{siteName}}",
+        key.preheader(),
+        key.defaultBodyHtmlContent(),
+        "{{actionUrl}}",
+        key.ctaLabel(),
+        AUTOMATED_FOOTER);
   }
+
+  /**
+   * Renders {@code key} for the editor preview (issue #141). Per-key demo values are overlaid with
+   * any caller-supplied overrides (overrides for unknown placeholders are ignored); the effective
+   * variable set is returned so the editor can prefill its sample-variable inputs. Rejects an
+   * effective template that references a placeholder outside the key's closed set.
+   */
+  public MailPreview preview(MailTemplateKey key, String locale, Map<String, Object> overrides) {
+    Map<String, String> sampleVars = effectiveSampleVars(key, overrides);
+    validateEffectivePlaceholders(key, locale);
+    RenderedMail rendered = render(key, new HashMap<>(sampleVars), locale);
+    return new MailPreview(rendered, sampleVars);
+  }
+
+  /** The per-key demo values overlaid with caller overrides scoped to the key's placeholder set. */
+  private Map<String, String> effectiveSampleVars(
+      MailTemplateKey key, Map<String, Object> overrides) {
+    Map<String, String> vars = key.sampleVars();
+    if (overrides != null) {
+      for (String placeholder : key.placeholders()) {
+        Object override = overrides.get(placeholder);
+        if (override != null) {
+          vars.put(placeholder, override.toString());
+        }
+      }
+    }
+    return vars;
+  }
+
+  /** A preview render plus the effective variables it was rendered with. */
+  public record MailPreview(RenderedMail rendered, Map<String, String> sampleVars) {}
 
   /** The effective view per known template at the configured default locale. */
   public List<MailTemplateView> listAll() {
@@ -117,11 +160,21 @@ public class MailTemplateService {
   /** The effective view for one template at {@code locale} (exact row, else catalog default). */
   public MailTemplateView getEffective(MailTemplateKey key, String locale) {
     return findRow(key, locale)
-        .map(row -> toView(row, MailTemplateView.Source.DATABASE))
+        .map(
+            row ->
+                buildView(
+                    key,
+                    row.getLocale(),
+                    row.getSubject(),
+                    row.getBodyPlain(),
+                    row.getBodyHtml(),
+                    MailTemplateView.Source.DATABASE,
+                    row.getUpdatedAt(),
+                    row.getUpdatedBy()))
         .orElseGet(
             () ->
-                new MailTemplateView(
-                    key.key(),
+                buildView(
+                    key,
                     locale,
                     key.defaultSubject(),
                     key.defaultBodyPlain(),
@@ -140,6 +193,7 @@ public class MailTemplateService {
       String bodyPlain,
       String bodyHtml,
       UUID actor) {
+    validatePlaceholders(key, subject, bodyPlain, bodyHtml);
     MailTemplate row =
         findRow(key, locale)
             .orElseGet(() -> new MailTemplate(key.key(), locale, subject, bodyPlain));
@@ -147,7 +201,16 @@ public class MailTemplateService {
     row.setBodyPlain(bodyPlain);
     row.setBodyHtml(bodyHtml);
     row.setUpdatedBy(actor == null ? null : actor.toString());
-    return toView(repository.save(row), MailTemplateView.Source.DATABASE);
+    MailTemplate saved = repository.save(row);
+    return buildView(
+        key,
+        saved.getLocale(),
+        saved.getSubject(),
+        saved.getBodyPlain(),
+        saved.getBodyHtml(),
+        MailTemplateView.Source.DATABASE,
+        saved.getUpdatedAt(),
+        saved.getUpdatedBy());
   }
 
   /**
@@ -191,23 +254,59 @@ public class MailTemplateService {
     return configured == null || configured.isBlank() ? FALLBACK_LOCALE : configured;
   }
 
-  private Map<String, Object> sampleVars() {
-    return Map.of(
-        "siteName", "qnop",
-        "recipientName", "Jane Doe",
-        "actionUrl", "https://qnop.example/action?token=SAMPLE",
-        "expiresAtHuman", "in 30 minutes");
+  /**
+   * Assembles a view, attaching the key's editor metadata (friendly name, placeholders, defaults).
+   */
+  private MailTemplateView buildView(
+      MailTemplateKey key,
+      String locale,
+      String subject,
+      String bodyPlain,
+      String bodyHtml,
+      MailTemplateView.Source source,
+      Instant updatedAt,
+      String updatedBy) {
+    return new MailTemplateView(
+        key.key(),
+        key.friendlyName(),
+        locale,
+        subject,
+        bodyPlain,
+        bodyHtml,
+        source,
+        key.placeholders(),
+        key.defaultSubject(),
+        key.defaultBodyPlain(),
+        defaultBodyHtml(key),
+        updatedAt,
+        updatedBy);
   }
 
-  private MailTemplateView toView(MailTemplate row, MailTemplateView.Source source) {
-    return new MailTemplateView(
-        row.getTemplateKey(),
-        row.getLocale(),
-        row.getSubject(),
-        row.getBodyPlain(),
-        row.getBodyHtml(),
-        source,
-        row.getUpdatedAt(),
-        row.getUpdatedBy());
+  /** Rejects a submitted body that references a placeholder outside the key's closed set. */
+  private void validatePlaceholders(
+      MailTemplateKey key, String subject, String bodyPlain, String bodyHtml) {
+    SortedSet<String> unknown =
+        MailPlaceholderValidator.unknownPlaceholders(
+            Set.copyOf(key.placeholders()), subject, bodyPlain, bodyHtml);
+    if (!unknown.isEmpty()) {
+      throw new MailTemplateValidationException(unknown, key.placeholders());
+    }
+  }
+
+  /** Validates the effective (stored or default) template content before a preview render. */
+  private void validateEffectivePlaceholders(MailTemplateKey key, String locale) {
+    Optional<MailTemplate> row = resolve(key, locale);
+    String subject = row.map(MailTemplate::getSubject).orElseGet(key::defaultSubject);
+    String plain = row.map(MailTemplate::getBodyPlain).orElseGet(key::defaultBodyPlain);
+    String htmlSource =
+        row.map(MailTemplate::getBodyHtml)
+            .filter(h -> !h.isBlank())
+            .orElseGet(key::defaultBodyHtmlContent);
+    SortedSet<String> unknown =
+        MailPlaceholderValidator.unknownPlaceholders(
+            Set.copyOf(key.placeholders()), subject, plain, htmlSource);
+    if (!unknown.isEmpty()) {
+      throw new MailTemplateValidationException(unknown, key.placeholders());
+    }
   }
 }

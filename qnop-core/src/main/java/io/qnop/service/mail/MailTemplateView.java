@@ -21,19 +21,29 @@
 package io.qnop.service.mail;
 
 import java.time.Instant;
+import java.util.List;
 
 /**
  * A web-safe view of one template's effective content for the admin API: either a stored per-locale
  * row ({@code source = DATABASE}) or the built-in catalog fallback ({@code source = DEFAULT}). No
  * JPA entity leaks to the web layer (ADR-0004).
+ *
+ * <p>Carries the editor metadata (issue #141): a {@code friendlyName}, the closed {@code
+ * placeholders} set the template accepts, and the built-in {@code default*} content for
+ * compare/reset in the UI.
  */
 public record MailTemplateView(
     String key,
+    String friendlyName,
     String locale,
     String subject,
     String bodyPlain,
     String bodyHtml,
     Source source,
+    List<String> placeholders,
+    String defaultSubject,
+    String defaultBodyPlain,
+    String defaultBodyHtml,
     Instant updatedAt,
     String updatedBy) {
 

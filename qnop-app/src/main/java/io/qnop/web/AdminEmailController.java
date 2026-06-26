@@ -34,6 +34,8 @@ import io.qnop.service.mail.MailService;
 import io.qnop.service.mail.MailService.SendResult;
 import io.qnop.service.mail.MailTemplateKey;
 import io.qnop.service.mail.MailTemplateService;
+import io.qnop.service.mail.MailTemplateService.MailPreview;
+import io.qnop.service.mail.MailTemplateValidationException;
 import io.qnop.service.mail.MailTemplateView;
 import io.qnop.service.mail.RenderedMail;
 import java.time.ZoneOffset;
@@ -96,15 +98,20 @@ public class AdminEmailController implements AdminEmailApi {
   @Override
   public ResponseEntity<MailTemplateResponse> updateMailTemplate(
       String key, UpdateMailTemplateRequest request) {
-    MailTemplateView saved =
-        templates.update(
-            resolveKey(key),
-            request.getLocale(),
-            request.getSubject(),
-            request.getBodyPlain(),
-            request.getBodyHtml(),
-            currentActor());
-    return ResponseEntity.ok(toResponse(saved));
+    MailTemplateKey templateKey = resolveKey(key);
+    try {
+      MailTemplateView saved =
+          templates.update(
+              templateKey,
+              request.getLocale(),
+              request.getSubject(),
+              request.getBodyPlain(),
+              request.getBodyHtml(),
+              currentActor());
+      return ResponseEntity.ok(toResponse(saved));
+    } catch (MailTemplateValidationException e) {
+      throw new ResponseStatusException(HttpStatus.BAD_REQUEST, e.getMessage());
+    }
   }
 
   @Override
@@ -117,19 +124,22 @@ public class AdminEmailController implements AdminEmailApi {
   public ResponseEntity<MailTemplatePreviewResponse> previewMailTemplate(
       String key, PreviewMailTemplateRequest request) {
     MailTemplateKey templateKey = resolveKey(key);
-    RenderedMail rendered;
+    MailPreview preview;
     try {
-      rendered =
-          templates.preview(templateKey, request.getLocale(), toVars(request.getVariables()));
+      preview = templates.preview(templateKey, request.getLocale(), toVars(request.getVariables()));
+    } catch (MailTemplateValidationException e) {
+      throw new ResponseStatusException(HttpStatus.BAD_REQUEST, e.getMessage());
     } catch (RuntimeException e) {
       throw new ResponseStatusException(
           HttpStatus.BAD_REQUEST, "Template render failed: " + e.getMessage());
     }
+    RenderedMail rendered = preview.rendered();
     return ResponseEntity.ok(
         new MailTemplatePreviewResponse()
             .subject(rendered.subject())
             .bodyPlain(rendered.bodyPlain())
-            .bodyHtml(rendered.bodyHtml()));
+            .bodyHtml(rendered.bodyHtml())
+            .sampleVars(preview.sampleVars()));
   }
 
   private MailTemplateKey resolveKey(String key) {
@@ -163,11 +173,16 @@ public class AdminEmailController implements AdminEmailApi {
   private MailTemplateResponse toResponse(MailTemplateView view) {
     return new MailTemplateResponse()
         .key(view.key())
+        .friendlyName(view.friendlyName())
         .locale(view.locale())
         .subject(view.subject())
         .bodyPlain(view.bodyPlain())
         .bodyHtml(view.bodyHtml())
         .source(MailTemplateSource.valueOf(view.source().name()))
+        .placeholders(view.placeholders())
+        .defaultSubject(view.defaultSubject())
+        .defaultBodyPlain(view.defaultBodyPlain())
+        .defaultBodyHtml(view.defaultBodyHtml())
         .updatedAt(view.updatedAt() == null ? null : view.updatedAt().atOffset(ZoneOffset.UTC))
         .updatedBy(view.updatedBy());
   }
