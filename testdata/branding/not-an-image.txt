@@ -1,0 +1,3 @@
+This is plain text, not an image. The branding upload pipeline must reject it
+with 415 Unsupported Media Type — the content type is sniffed from the bytes,
+not trusted from the request, so renaming a file does not get it past the gate.
