@@ -7,6 +7,7 @@
 
 plugins {
     `java-library`
+    jacoco
     id("com.diffplug.spotless")
 }
 
@@ -57,5 +58,15 @@ tasks.withType<Test>().configureEach {
         exceptionFormat = org.gradle.api.tasks.testing.logging.TestExceptionFormat.FULL
         showStackTraces = true
         showCauses = true
+    }
+}
+
+// Coverage is measured (report-only, no verification gate so it never breaks CI):
+// run `./gradlew test jacocoTestReport` and open build/reports/jacoco/test/html.
+// Drives the integration-test suite toward maximum coverage (issue #163).
+tasks.withType<JacocoReport>().configureEach {
+    reports {
+        xml.required.set(true)
+        html.required.set(true)
     }
 }
