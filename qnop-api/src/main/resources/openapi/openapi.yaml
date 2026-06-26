@@ -2055,6 +2055,12 @@ components:
           $ref: '#/components/schemas/UserRole'
         source:
           $ref: '#/components/schemas/UserSource'
+        avatarUrl:
+          type: string
+          nullable: true
+          description: |
+            URL of the user's profile picture (with a cache-busting `?v=` token),
+            or null when none is set — the UI then renders the initials avatar.
       required:
         - id
         - displayName
@@ -2096,6 +2102,12 @@ components:
         createdAt:
           type: string
           format: date-time
+        avatarUrl:
+          type: string
+          nullable: true
+          description: |
+            URL of the user's profile picture (with a cache-busting `?v=` token),
+            or null when none is set — the UI then renders the initials avatar.
       required:
         - id
         - displayName

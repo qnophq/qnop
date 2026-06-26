@@ -38,9 +38,11 @@ import io.qnop.service.AdminUserService.AdminUserView;
 import io.qnop.service.AdminUserService.GeneratedPasswordOutcome;
 import io.qnop.service.AdminUserService.PasswordResetOutcome;
 import io.qnop.service.UserNotFoundException;
+import io.qnop.service.avatar.AvatarService;
 import java.time.Instant;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
+import java.util.Map;
 import java.util.UUID;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -59,9 +61,11 @@ import org.springframework.web.bind.annotation.RestController;
 public class AdminUserController implements AdminUsersApi {
 
   private final AdminUserService adminUsers;
+  private final AvatarService avatars;
 
-  public AdminUserController(AdminUserService adminUsers) {
+  public AdminUserController(AdminUserService adminUsers, AvatarService avatars) {
     this.adminUsers = adminUsers;
+    this.avatars = avatars;
   }
 
   @Override
@@ -69,9 +73,15 @@ public class AdminUserController implements AdminUsersApi {
       String q, UserRole role, Boolean enabled, String sort, Integer page, Integer size) {
     AdminUserPage result =
         adminUsers.list(q, role == null ? null : role.name(), enabled, sort, page, size);
+    // One batched lookup for the whole page so building avatar URLs never streams image bytes.
+    Map<UUID, Instant> avatarTimestamps =
+        avatars.updatedAt(result.items().stream().map(AdminUserView::id).toList());
     return ResponseEntity.ok(
         new AdminUserListResponse()
-            .items(result.items().stream().map(AdminUserController::toSummary).toList())
+            .items(
+                result.items().stream()
+                    .map(v -> toSummary(v, avatarTimestamps.get(v.id())))
+                    .toList())
             .total(result.total())
             .page(result.page())
             .size(result.size()));
@@ -86,12 +96,14 @@ public class AdminUserController implements AdminUsersApi {
             request.getEmail(),
             request.getRole().name(),
             request.getInitialPassword());
-    return ResponseEntity.status(HttpStatus.CREATED).body(toDetail(created));
+    return ResponseEntity.status(HttpStatus.CREATED)
+        .body(toDetail(created, avatarUpdatedAt(created)));
   }
 
   @Override
   public ResponseEntity<AdminUserDetail> getUser(UUID userId) {
-    return ResponseEntity.ok(toDetail(adminUsers.get(userId)));
+    AdminUserView view = adminUsers.get(userId);
+    return ResponseEntity.ok(toDetail(view, avatarUpdatedAt(view)));
   }
 
   @Override
@@ -103,7 +115,7 @@ public class AdminUserController implements AdminUsersApi {
             request.getRole() == null ? null : request.getRole().name(),
             request.getEnabled(),
             CurrentUser.requireUserId());
-    return ResponseEntity.ok(toDetail(updated));
+    return ResponseEntity.ok(toDetail(updated, avatarUpdatedAt(updated)));
   }
 
   @Override
@@ -147,7 +159,11 @@ public class AdminUserController implements AdminUsersApi {
                 .timestamp(OffsetDateTime.now(ZoneOffset.UTC)));
   }
 
-  private static AdminUserSummary toSummary(AdminUserView v) {
+  private Instant avatarUpdatedAt(AdminUserView v) {
+    return avatars.updatedAt(v.id()).orElse(null);
+  }
+
+  private static AdminUserSummary toSummary(AdminUserView v, Instant avatarUpdatedAt) {
     return new AdminUserSummary()
         .id(v.id())
         .displayName(v.displayName())
@@ -159,10 +175,11 @@ public class AdminUserController implements AdminUsersApi {
         .passwordChangeRequired(v.passwordChangeRequired())
         .providerName(v.providerName())
         .lastLoginAt(toOffset(v.lastLoginAt()))
-        .createdAt(toOffset(v.createdAt()));
+        .createdAt(toOffset(v.createdAt()))
+        .avatarUrl(AvatarUrls.forUser(v.id(), avatarUpdatedAt));
   }
 
-  private static AdminUserDetail toDetail(AdminUserView v) {
+  private static AdminUserDetail toDetail(AdminUserView v, Instant avatarUpdatedAt) {
     return new AdminUserDetail()
         .id(v.id())
         .displayName(v.displayName())
@@ -174,7 +191,8 @@ public class AdminUserController implements AdminUsersApi {
         .passwordChangeRequired(v.passwordChangeRequired())
         .providerName(v.providerName())
         .lastLoginAt(toOffset(v.lastLoginAt()))
-        .createdAt(toOffset(v.createdAt()));
+        .createdAt(toOffset(v.createdAt()))
+        .avatarUrl(AvatarUrls.forUser(v.id(), avatarUpdatedAt));
   }
 
   private static OffsetDateTime toOffset(Instant instant) {

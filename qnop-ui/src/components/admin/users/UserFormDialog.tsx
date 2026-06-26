@@ -38,8 +38,10 @@ import type { AdminUserSummary, UserRole } from '../../../api/generated';
 import { PasswordField } from '../../auth/PasswordField';
 import { PasswordStrengthMeter } from '../../auth/PasswordStrengthMeter';
 import { useCreateUser, useUpdateUser } from '../../../api/hooks/useAdminUsers';
+import { useRemoveUserAvatar, useUploadUserAvatar } from '../../../api/hooks/useAvatar';
 import { apiErrorCode, apiErrorMessage } from '../../../utils/apiError';
 import { passwordStrength } from '../../../utils/passwordStrength';
+import { AvatarUploader } from '../../profile/AvatarUploader';
 
 interface UserFormDialogProps {
   open: boolean;
@@ -71,9 +73,14 @@ const CONFLICT_MESSAGES: Record<string, string> = {
 export function UserFormDialog({ open, mode, user, onClose }: UserFormDialogProps) {
   const createUser = useCreateUser();
   const updateUser = useUpdateUser();
+  const uploadAvatar = useUploadUserAvatar();
+  const removeAvatar = useRemoveUserAvatar();
 
   const editing = mode === 'edit' && user;
   const [displayName, setDisplayName] = useState(editing ? user.displayName : '');
+  const [avatarUrl, setAvatarUrl] = useState<string | null>(
+    editing ? (user.avatarUrl ?? null) : null,
+  );
   const [username, setUsername] = useState(editing ? (user.username ?? '') : '');
   const [email, setEmail] = useState(editing ? user.email : '');
   const [role, setRole] = useState<UserRole>(editing ? user.role : 'MEMBER');
@@ -83,6 +90,29 @@ export function UserFormDialog({ open, mode, user, onClose }: UserFormDialogProp
   const [error, setError] = useState<string | null>(null);
 
   const submitting = createUser.isPending || updateUser.isPending;
+  const avatarBusy = uploadAvatar.isPending || removeAvatar.isPending;
+
+  const onAvatarSelect = async (blob: Blob) => {
+    if (!user) return;
+    setError(null);
+    try {
+      const result = await uploadAvatar.mutateAsync({ userId: user.id, file: blob });
+      setAvatarUrl(result.avatarUrl ?? null);
+    } catch (err) {
+      setError(apiErrorMessage(err, 'The picture could not be uploaded.'));
+    }
+  };
+
+  const onAvatarRemove = async () => {
+    if (!user) return;
+    setError(null);
+    try {
+      await removeAvatar.mutateAsync(user.id);
+      setAvatarUrl(null);
+    } catch (err) {
+      setError(apiErrorMessage(err, 'The picture could not be removed.'));
+    }
+  };
   const passwordOk = method === 'invite' || passwordStrength(password).acceptable;
   const canSubmit =
     mode === 'edit'
@@ -125,6 +155,16 @@ export function UserFormDialog({ open, mode, user, onClose }: UserFormDialogProp
         <DialogTitle>{isEdit ? 'Edit user' : 'Add user'}</DialogTitle>
         <DialogContent>
           <Stack spacing={2.5} sx={{ mt: 1 }}>
+            {isEdit && user && (
+              <AvatarUploader
+                name={displayName || user.displayName}
+                imageUrl={avatarUrl}
+                busy={avatarBusy}
+                onSelect={onAvatarSelect}
+                onRemove={onAvatarRemove}
+              />
+            )}
+
             <TextField
               label="Full name"
               value={displayName}

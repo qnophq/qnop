@@ -26,6 +26,8 @@ import io.qnop.api.v1.model.UserRole;
 import io.qnop.api.v1.model.UserSource;
 import io.qnop.service.UserService;
 import io.qnop.service.UserService.UserProfileView;
+import io.qnop.service.avatar.AvatarService;
+import java.util.UUID;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -39,20 +41,24 @@ import org.springframework.web.bind.annotation.RestController;
 public class CurrentUserController implements UsersApi {
 
   private final UserService users;
+  private final AvatarService avatars;
 
-  public CurrentUserController(UserService users) {
+  public CurrentUserController(UserService users, AvatarService avatars) {
     this.users = users;
+    this.avatars = avatars;
   }
 
   @Override
   public ResponseEntity<CurrentUserResponse> getCurrentUser() {
-    UserProfileView profile = users.getProfile(CurrentUser.requireUserId());
+    UUID userId = CurrentUser.requireUserId();
+    UserProfileView profile = users.getProfile(userId);
     return ResponseEntity.ok(
         new CurrentUserResponse()
             .id(profile.id())
             .displayName(profile.displayName())
             .email(profile.email())
             .role(UserRole.fromValue(profile.role()))
-            .source(UserSource.fromValue(profile.source())));
+            .source(UserSource.fromValue(profile.source()))
+            .avatarUrl(AvatarUrls.forUser(userId, avatars.updatedAt(userId).orElse(null))));
   }
 }

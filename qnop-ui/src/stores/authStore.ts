@@ -33,6 +33,8 @@ interface AuthState {
   email: string | null;
   role: UserRole | null;
   source: UserSource | null;
+  /** URL of the current user's profile picture, or null for the initials avatar. */
+  avatarUrl: string | null;
   isAuthenticated: boolean;
   /** True while the initial refresh-on-load is in flight; gates the first render. */
   isHydrating: boolean;
@@ -44,6 +46,8 @@ interface AuthState {
   passwordChangeRequired: boolean;
 
   setAccessToken: (token: string | null) => void;
+  /** Updates just the avatar URL after a self-service upload/remove, so the shell reflects it. */
+  setAvatarUrl: (url: string | null) => void;
   login: (usernameOrEmail: string, password: string) => Promise<void>;
   fetchMe: () => Promise<void>;
   hydrate: () => Promise<void>;
@@ -57,6 +61,7 @@ const EMPTY_PROFILE = {
   email: null,
   role: null,
   source: null,
+  avatarUrl: null,
 } as const;
 
 export const useAuthStore = create<AuthState>((set, get) => ({
@@ -67,6 +72,8 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   passwordChangeRequired: false,
 
   setAccessToken: (token) => set({ accessToken: token }),
+
+  setAvatarUrl: (url) => set({ avatarUrl: url }),
 
   login: async (usernameOrEmail, password) => {
     const response = await fetch(`${API_BASE}/auth/login`, {
@@ -97,6 +104,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         email: me.email,
         role: me.role,
         source: me.source,
+        avatarUrl: me.avatarUrl ?? null,
         isAuthenticated: true,
         passwordChangeRequired: false,
       });
