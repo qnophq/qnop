@@ -63,7 +63,7 @@ services:
   # password, client secret, and user passwords are weak ON PURPOSE — bind to
   # 127.0.0.1 only and never expose this stack beyond localhost.
   keycloak:
-    image: quay.io/keycloak/keycloak:26.6
+    image: quay.io/keycloak/keycloak:26.6@sha256:9b0330756022422149aa6502eb2def8cd47c6e1b000c7c65cdb13e7c0133e992
     profiles: ['keycloak']
     command: ['start-dev', '--import-realm']
     environment:
