@@ -34,8 +34,8 @@ class ValueValidatorTest {
         () -> ValueValidator.validate(ApplicationSettingKey.GENERAL_APPLICATION_NAME, "anything"));
     assertDoesNotThrow(
         () -> ValueValidator.validate(ApplicationSettingKey.UPLOAD_MAX_FILE_SIZE_MB, "42"));
-    assertDoesNotThrow(
-        () -> ValueValidator.validate(ApplicationSettingKey.SMTP_TLS_ENABLED, "false"));
+    assertDoesNotThrow(() -> ValueValidator.validate(ApplicationSettingKey.SMTP_ENABLED, "false"));
+    assertDoesNotThrow(() -> ValueValidator.validate(ApplicationSettingKey.SMTP_ENCRYPTION, "tls"));
     assertDoesNotThrow(
         () -> ValueValidator.validate(ApplicationSettingKey.TRACKING_PROVIDER, "matomo"));
     assertDoesNotThrow(() -> ValueValidator.validate(ApplicationSettingKey.SMTP_PASSWORD, "p@ss"));
@@ -52,7 +52,7 @@ class ValueValidatorTest {
   void rejectsNonBoolean() {
     assertThrows(
         SettingValidationException.class,
-        () -> ValueValidator.validate(ApplicationSettingKey.SMTP_TLS_ENABLED, "yes"));
+        () -> ValueValidator.validate(ApplicationSettingKey.SMTP_ENABLED, "yes"));
   }
 
   @Test
@@ -60,6 +60,9 @@ class ValueValidatorTest {
     assertThrows(
         SettingValidationException.class,
         () -> ValueValidator.validate(ApplicationSettingKey.TRACKING_PROVIDER, "google-analytics"));
+    assertThrows(
+        SettingValidationException.class,
+        () -> ValueValidator.validate(ApplicationSettingKey.SMTP_ENCRYPTION, "ssl"));
   }
 
   @Test
@@ -67,5 +70,46 @@ class ValueValidatorTest {
     assertThrows(
         SettingValidationException.class,
         () -> ValueValidator.validate(ApplicationSettingKey.GENERAL_BASE_URL, null));
+  }
+
+  @Test
+  void enforcesIntegerRange() {
+    assertDoesNotThrow(() -> ValueValidator.validate(ApplicationSettingKey.SMTP_PORT, "587"));
+    assertDoesNotThrow(() -> ValueValidator.validate(ApplicationSettingKey.SMTP_PORT, "65535"));
+    assertThrows(
+        SettingValidationException.class,
+        () -> ValueValidator.validate(ApplicationSettingKey.SMTP_PORT, "0"));
+    assertThrows(
+        SettingValidationException.class,
+        () -> ValueValidator.validate(ApplicationSettingKey.SMTP_PORT, "70000"));
+    assertThrows(
+        SettingValidationException.class,
+        () -> ValueValidator.validate(ApplicationSettingKey.UPLOAD_MAX_FILE_SIZE_MB, "0"));
+  }
+
+  @Test
+  void enforcesEmailFormatButAllowsBlank() {
+    assertDoesNotThrow(
+        () -> ValueValidator.validate(ApplicationSettingKey.SMTP_FROM, "no-reply@example.com"));
+    assertDoesNotThrow(() -> ValueValidator.validate(ApplicationSettingKey.SMTP_FROM, ""));
+    assertThrows(
+        SettingValidationException.class,
+        () -> ValueValidator.validate(ApplicationSettingKey.SMTP_FROM, "not-an-email"));
+  }
+
+  @Test
+  void enforcesHttpUrlFormatButAllowsBlank() {
+    assertDoesNotThrow(
+        () ->
+            ValueValidator.validate(
+                ApplicationSettingKey.GENERAL_BASE_URL, "https://qnop.example"));
+    assertDoesNotThrow(() -> ValueValidator.validate(ApplicationSettingKey.GENERAL_BASE_URL, ""));
+    assertThrows(
+        SettingValidationException.class,
+        () -> ValueValidator.validate(ApplicationSettingKey.GENERAL_BASE_URL, "not a url"));
+    assertThrows(
+        SettingValidationException.class,
+        () ->
+            ValueValidator.validate(ApplicationSettingKey.GENERAL_BASE_URL, "ftp://qnop.example"));
   }
 }

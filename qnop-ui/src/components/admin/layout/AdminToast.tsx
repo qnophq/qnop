@@ -18,29 +18,25 @@
  *
  * SPDX-License-Identifier: AGPL-3.0-only
  */
-package io.qnop.service;
 
-/**
- * Raised when a settings update references an unknown key or carries a value that violates the
- * key's {@link io.qnop.entity.SettingValueType}. Mapped to HTTP 400 at the web layer.
- */
-public class SettingValidationException extends RuntimeException {
+import Alert from '@mui/material/Alert';
+import Snackbar from '@mui/material/Snackbar';
+import type { ToastState } from './useToast';
 
-  private final String settingKey;
-  private final String reason;
-
-  public SettingValidationException(String settingKey, String reason) {
-    super("Invalid setting '" + settingKey + "': " + reason);
-    this.settingKey = settingKey;
-    this.reason = reason;
-  }
-
-  public String getSettingKey() {
-    return settingKey;
-  }
-
-  /** The bare, field-level reason (without the key prefix), for per-field error reporting. */
-  public String getReason() {
-    return reason;
-  }
+/** Renders the toast produced by {@link useToast} — bottom-centre, filled, auto-hiding. */
+export function AdminToast({ toast, onClose }: { toast: ToastState | null; onClose: () => void }) {
+  return (
+    <Snackbar
+      open={toast !== null}
+      autoHideDuration={4000}
+      onClose={onClose}
+      anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
+    >
+      {toast ? (
+        <Alert severity={toast.severity} onClose={onClose} variant="filled">
+          {toast.message}
+        </Alert>
+      ) : undefined}
+    </Snackbar>
+  );
 }

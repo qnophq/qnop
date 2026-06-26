@@ -69,6 +69,11 @@ public enum ApplicationSettingKey {
       "none",
       "Usage-tracking provider.",
       List.of("none", "matomo", "plausible", "umami")),
+  SMTP_ENABLED(
+      "smtp.enabled",
+      SettingValueType.BOOLEAN,
+      "false",
+      "Master switch for outgoing mail; when off, message sends are skipped."),
   SMTP_HOST("smtp.host", SettingValueType.STRING, "", "SMTP server host."),
   SMTP_PORT("smtp.port", SettingValueType.INTEGER, "587", "SMTP server port."),
   SMTP_USERNAME("smtp.username", SettingValueType.STRING, "", "SMTP authentication username."),
@@ -77,9 +82,18 @@ public enum ApplicationSettingKey {
       SettingValueType.PASSWORD,
       "",
       "SMTP authentication password (stored encrypted, redacted in API)."),
+  SMTP_ENCRYPTION(
+      "smtp.encryption",
+      SettingValueType.ENUM,
+      "starttls",
+      "SMTP transport encryption: none, starttls (port 587), or tls (implicit SSL, port 465).",
+      List.of("none", "starttls", "tls")),
   SMTP_FROM("smtp.from", SettingValueType.STRING, "", "Default From address for outgoing mail."),
-  SMTP_TLS_ENABLED(
-      "smtp.tls_enabled", SettingValueType.BOOLEAN, "true", "Whether to use STARTTLS for SMTP."),
+  SMTP_FROM_NAME(
+      "smtp.from_name",
+      SettingValueType.STRING,
+      "qnop",
+      "Display name used in the From header of outgoing mail."),
   AUTH_SELF_REGISTRATION_ENABLED(
       "auth.self_registration_enabled",
       SettingValueType.BOOLEAN,
@@ -106,6 +120,19 @@ public enum ApplicationSettingKey {
       Arrays.stream(values())
           .collect(
               Collectors.toUnmodifiableMap(ApplicationSettingKey::getKey, Function.identity()));
+
+  /**
+   * Beyond-type value constraints per key (admin validation). Kept here rather than threaded
+   * through the constructor so the enum constants stay readable; {@link ValueValidator} enforces
+   * them.
+   */
+  private static final Map<ApplicationSettingKey, SettingConstraints> CONSTRAINTS =
+      Map.of(
+          UPLOAD_MAX_FILE_SIZE_MB, SettingConstraints.range(1, 1024),
+          AUTH_PASSWORD_RESET_TOKEN_TTL_MINUTES, SettingConstraints.range(1, 1440),
+          SMTP_PORT, SettingConstraints.range(1, 65535),
+          SMTP_FROM, SettingConstraints.format(SettingConstraints.ValueFormat.EMAIL),
+          GENERAL_BASE_URL, SettingConstraints.format(SettingConstraints.ValueFormat.URL));
 
   private final String key;
   private final SettingValueType type;
@@ -153,6 +180,14 @@ public enum ApplicationSettingKey {
 
   public List<String> getEnumOptions() {
     return enumOptions;
+  }
+
+  /**
+   * Value constraints beyond the declared type (range/format); {@link SettingConstraints#NONE} if
+   * none.
+   */
+  public SettingConstraints getConstraints() {
+    return CONSTRAINTS.getOrDefault(this, SettingConstraints.NONE);
   }
 
   /** A sensitive value is encrypted at rest and redacted in API responses. */

@@ -29,6 +29,7 @@ import { ComingSoonPage } from '../pages/ComingSoonPage';
 import { HomePage } from '../pages/HomePage';
 import { BrandingPage } from '../pages/admin/BrandingPage';
 import { ProfilePage } from '../pages/ProfilePage';
+import { EmailServerPage } from '../pages/admin/EmailServerPage';
 import { MailTemplatesPage } from '../pages/admin/MailTemplatesPage';
 import { OidcProvidersPage } from '../pages/admin/OidcProvidersPage';
 import { SettingsPage } from '../pages/admin/SettingsPage';
@@ -127,6 +128,14 @@ export const router = createBrowserRouter([
         element: (
           <AdminRoute>
             <OidcProvidersPage />
+          </AdminRoute>
+        ),
+      },
+      {
+        path: 'admin/email',
+        element: (
+          <AdminRoute>
+            <EmailServerPage />
           </AdminRoute>
         ),
       },

@@ -33,7 +33,7 @@ import Switch from '@mui/material/Switch';
 import TextField from '@mui/material/TextField';
 import type { AdminTeamSummary } from '../../../api/generated';
 import { useCreateTeam, useUpdateTeam } from '../../../api/hooks/useTeams';
-import { apiErrorCode, apiErrorMessage } from '../../../utils/apiError';
+import { apiErrorCode, apiErrorMessage, apiFieldErrors } from '../../../utils/apiError';
 
 interface TeamFormDialogProps {
   open: boolean;
@@ -56,14 +56,35 @@ export function TeamFormDialog({ open, mode, team, onClose }: TeamFormDialogProp
   const [description, setDescription] = useState(editing ? (team.description ?? '') : '');
   const [enabled, setEnabled] = useState(editing ? team.enabled : true);
   const [error, setError] = useState<string | null>(null);
+  const [submitAttempted, setSubmitAttempted] = useState(false);
+  const [serverErrors, setServerErrors] = useState<Record<string, string>>({});
 
   const submitting = createTeam.isPending || updateTeam.isPending;
-  const canSubmit = name.trim().length > 0;
   const isEdit = mode === 'edit';
+
+  const clientErrors: Record<string, string> = {};
+  if (name.trim().length === 0) {
+    clientErrors.name = 'A team name is required.';
+  }
+
+  const fieldError = (field: string): string | undefined =>
+    serverErrors[field] ?? (submitAttempted ? clientErrors[field] : undefined);
+
+  const clearServer = (field: string) =>
+    setServerErrors((prev) => {
+      if (!(field in prev)) return prev;
+      const rest = { ...prev };
+      delete rest[field];
+      return rest;
+    });
 
   const onSubmit = async (event: FormEvent) => {
     event.preventDefault();
     setError(null);
+    if (Object.keys(clientErrors).length > 0) {
+      setSubmitAttempted(true);
+      return;
+    }
     try {
       if (isEdit && team) {
         await updateTeam.mutateAsync({ id: team.id, request: { name, description, enabled } });
@@ -72,11 +93,16 @@ export function TeamFormDialog({ open, mode, team, onClose }: TeamFormDialogProp
       }
       onClose();
     } catch (err) {
-      const message =
-        apiErrorCode(err) === 'NAME_TAKEN'
-          ? 'A team with that name already exists.'
-          : apiErrorMessage(err, 'Saving failed. Please try again.');
-      setError(message);
+      if (apiErrorCode(err) === 'NAME_TAKEN') {
+        setServerErrors({ name: 'A team with that name already exists.' });
+      } else {
+        const serverFieldErrors = apiFieldErrors(err);
+        if (Object.keys(serverFieldErrors).length > 0) {
+          setServerErrors(serverFieldErrors);
+        } else {
+          setError(apiErrorMessage(err, 'Saving failed. Please try again.'));
+        }
+      }
     }
   };
 
@@ -89,9 +115,14 @@ export function TeamFormDialog({ open, mode, team, onClose }: TeamFormDialogProp
             <TextField
               label="Name"
               value={name}
-              onChange={(e) => setName(e.target.value)}
+              onChange={(e) => {
+                setName(e.target.value);
+                clearServer('name');
+              }}
               fullWidth
               required
+              error={Boolean(fieldError('name'))}
+              helperText={fieldError('name')}
             />
             <TextField
               label="Description"
@@ -116,7 +147,7 @@ export function TeamFormDialog({ open, mode, team, onClose }: TeamFormDialogProp
           <Button onClick={onClose} color="inherit">
             Cancel
           </Button>
-          <Button type="submit" variant="contained" disabled={submitting || !canSubmit}>
+          <Button type="submit" variant="contained" disabled={submitting}>
             {isEdit ? 'Save' : 'Create'}
           </Button>
         </DialogActions>

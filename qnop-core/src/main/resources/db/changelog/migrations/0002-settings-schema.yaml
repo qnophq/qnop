@@ -145,6 +145,13 @@ databaseChangeLog:
         - insert:
             tableName: application_setting
             columns:
+              - column: { name: setting_key, value: "smtp.enabled" }
+              - column: { name: setting_value, value: "false" }
+              - column: { name: setting_desc, value: "Master switch for outgoing mail; when off, message sends are skipped." }
+              - column: { name: value_type, value: "BOOLEAN" }
+        - insert:
+            tableName: application_setting
+            columns:
               - column: { name: setting_key, value: "smtp.host" }
               - column: { name: setting_value, value: "" }
               - column: { name: setting_desc, value: "SMTP server host." }
@@ -173,6 +180,13 @@ databaseChangeLog:
         - insert:
             tableName: application_setting
             columns:
+              - column: { name: setting_key, value: "smtp.encryption" }
+              - column: { name: setting_value, value: "starttls" }
+              - column: { name: setting_desc, value: "SMTP transport encryption: none, starttls (port 587), or tls (implicit SSL, port 465)." }
+              - column: { name: value_type, value: "ENUM" }
+        - insert:
+            tableName: application_setting
+            columns:
               - column: { name: setting_key, value: "smtp.from" }
               - column: { name: setting_value, value: "" }
               - column: { name: setting_desc, value: "Default From address for outgoing mail." }
@@ -180,10 +194,10 @@ databaseChangeLog:
         - insert:
             tableName: application_setting
             columns:
-              - column: { name: setting_key, value: "smtp.tls_enabled" }
-              - column: { name: setting_value, value: "true" }
-              - column: { name: setting_desc, value: "Whether to use STARTTLS for SMTP." }
-              - column: { name: value_type, value: "BOOLEAN" }
+              - column: { name: setting_key, value: "smtp.from_name" }
+              - column: { name: setting_value, value: "qnop" }
+              - column: { name: setting_desc, value: "Display name used in the From header of outgoing mail." }
+              - column: { name: value_type, value: "STRING" }
         - insert:
             tableName: application_setting
             columns:

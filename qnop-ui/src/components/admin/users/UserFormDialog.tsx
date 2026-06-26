@@ -39,7 +39,8 @@ import { PasswordField } from '../../auth/PasswordField';
 import { PasswordStrengthMeter } from '../../auth/PasswordStrengthMeter';
 import { useCreateUser, useUpdateUser } from '../../../api/hooks/useAdminUsers';
 import { useRemoveUserAvatar, useUploadUserAvatar } from '../../../api/hooks/useAvatar';
-import { apiErrorCode, apiErrorMessage } from '../../../utils/apiError';
+import { apiErrorCode, apiErrorMessage, apiFieldErrors } from '../../../utils/apiError';
+import { isEmail } from '../../../utils/validation';
 import { passwordStrength } from '../../../utils/passwordStrength';
 import { AvatarUploader } from '../../profile/AvatarUploader';
 
@@ -88,6 +89,8 @@ export function UserFormDialog({ open, mode, user, onClose }: UserFormDialogProp
   const [method, setMethod] = useState<'invite' | 'password'>('invite');
   const [password, setPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
+  const [submitAttempted, setSubmitAttempted] = useState(false);
+  const [serverErrors, setServerErrors] = useState<Record<string, string>>({});
 
   const submitting = createUser.isPending || updateUser.isPending;
   const avatarBusy = uploadAvatar.isPending || removeAvatar.isPending;
@@ -113,18 +116,45 @@ export function UserFormDialog({ open, mode, user, onClose }: UserFormDialogProp
       setError(apiErrorMessage(err, 'The picture could not be removed.'));
     }
   };
-  const passwordOk = method === 'invite' || passwordStrength(password).acceptable;
-  const canSubmit =
-    mode === 'edit'
-      ? displayName.trim().length > 0
-      : displayName.trim().length > 0 &&
-        username.trim().length >= 3 &&
-        email.trim().length > 0 &&
-        passwordOk;
+  const isEdit = mode === 'edit';
+
+  // Per-field client errors; shown once a save is attempted (the OIDC dialog pattern).
+  const clientErrors: Record<string, string> = {};
+  if (displayName.trim().length === 0) {
+    clientErrors.displayName = 'A full name is required.';
+  }
+  if (!isEdit) {
+    if (username.trim().length < 3) {
+      clientErrors.username = 'Enter at least 3 characters.';
+    }
+    if (email.trim().length === 0) {
+      clientErrors.email = 'An email address is required.';
+    } else if (!isEmail(email)) {
+      clientErrors.email = 'Enter a valid email address.';
+    }
+    if (method === 'password' && !passwordStrength(password).acceptable) {
+      clientErrors.password = 'Choose a stronger password (at least 8 characters).';
+    }
+  }
+
+  const fieldError = (field: string): string | undefined =>
+    serverErrors[field] ?? (submitAttempted ? clientErrors[field] : undefined);
+
+  const clearServer = (field: string) =>
+    setServerErrors((prev) => {
+      if (!(field in prev)) return prev;
+      const rest = { ...prev };
+      delete rest[field];
+      return rest;
+    });
 
   const onSubmit = async (event: FormEvent) => {
     event.preventDefault();
     setError(null);
+    if (Object.keys(clientErrors).length > 0) {
+      setSubmitAttempted(true);
+      return;
+    }
     try {
       if (mode === 'edit' && user) {
         await updateUser.mutateAsync({ id: user.id, request: { displayName, role, enabled } });
@@ -140,14 +170,23 @@ export function UserFormDialog({ open, mode, user, onClose }: UserFormDialogProp
       onClose();
     } catch (err) {
       const code = apiErrorCode(err);
-      setError(
-        (code && CONFLICT_MESSAGES[code]) ??
-          apiErrorMessage(err, 'Saving failed. Please try again.'),
-      );
+      if (code === 'EMAIL_TAKEN') {
+        setServerErrors({ email: CONFLICT_MESSAGES.EMAIL_TAKEN });
+      } else if (code === 'USERNAME_TAKEN') {
+        setServerErrors({ username: CONFLICT_MESSAGES.USERNAME_TAKEN });
+      } else {
+        const serverFieldErrors = apiFieldErrors(err);
+        if (Object.keys(serverFieldErrors).length > 0) {
+          setServerErrors(serverFieldErrors);
+        } else {
+          setError(
+            (code && CONFLICT_MESSAGES[code]) ??
+              apiErrorMessage(err, 'Saving failed. Please try again.'),
+          );
+        }
+      }
     }
   };
-
-  const isEdit = mode === 'edit';
 
   return (
     <Dialog open={open} onClose={onClose} fullWidth maxWidth="sm">
@@ -168,10 +207,15 @@ export function UserFormDialog({ open, mode, user, onClose }: UserFormDialogProp
             <TextField
               label="Full name"
               value={displayName}
-              onChange={(e) => setDisplayName(e.target.value)}
+              onChange={(e) => {
+                setDisplayName(e.target.value);
+                clearServer('displayName');
+              }}
               autoComplete="name"
               fullWidth
               required
+              error={Boolean(fieldError('displayName'))}
+              helperText={fieldError('displayName')}
             />
 
             {!isEdit && (
@@ -179,20 +223,29 @@ export function UserFormDialog({ open, mode, user, onClose }: UserFormDialogProp
                 <TextField
                   label="Username"
                   value={username}
-                  onChange={(e) => setUsername(e.target.value)}
+                  onChange={(e) => {
+                    setUsername(e.target.value);
+                    clearServer('username');
+                  }}
                   autoComplete="off"
                   fullWidth
                   required
-                  helperText="At least 3 characters, unique."
+                  error={Boolean(fieldError('username'))}
+                  helperText={fieldError('username') ?? 'At least 3 characters, unique.'}
                 />
                 <TextField
                   label="Email"
                   type="email"
                   value={email}
-                  onChange={(e) => setEmail(e.target.value)}
+                  onChange={(e) => {
+                    setEmail(e.target.value);
+                    clearServer('email');
+                  }}
                   autoComplete="off"
                   fullWidth
                   required
+                  error={Boolean(fieldError('email'))}
+                  helperText={fieldError('email')}
                 />
               </>
             )}
@@ -242,9 +295,14 @@ export function UserFormDialog({ open, mode, user, onClose }: UserFormDialogProp
                     <PasswordField
                       label="Initial password"
                       value={password}
-                      onChange={setPassword}
+                      onChange={(next) => {
+                        setPassword(next);
+                        clearServer('password');
+                      }}
                       autoComplete="new-password"
                       required
+                      error={Boolean(fieldError('password'))}
+                      helperText={fieldError('password')}
                     />
                     <PasswordStrengthMeter password={password} />
                   </Box>
@@ -259,7 +317,7 @@ export function UserFormDialog({ open, mode, user, onClose }: UserFormDialogProp
           <Button onClick={onClose} color="inherit">
             Cancel
           </Button>
-          <Button type="submit" variant="contained" disabled={submitting || !canSubmit}>
+          <Button type="submit" variant="contained" disabled={submitting}>
             {isEdit ? 'Save' : 'Create'}
           </Button>
         </DialogActions>

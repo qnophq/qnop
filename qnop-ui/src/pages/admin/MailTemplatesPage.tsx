@@ -28,54 +28,42 @@ import List from '@mui/material/List';
 import ListItemButton from '@mui/material/ListItemButton';
 import ListItemText from '@mui/material/ListItemText';
 import Paper from '@mui/material/Paper';
-import Snackbar from '@mui/material/Snackbar';
 import Stack from '@mui/material/Stack';
 import Typography from '@mui/material/Typography';
 import { MailCheck } from 'lucide-react';
 import { useMailTemplates } from '../../api/hooks/useMailTemplates';
 import { MailTemplateEditor } from '../../components/admin/mail/MailTemplateEditor';
 import { SendTestEmailDialog } from '../../components/admin/mail/SendTestEmailDialog';
+import { PageHeader } from '../../components/admin/layout/PageHeader';
+import { AdminToast } from '../../components/admin/layout/AdminToast';
+import { useToast } from '../../components/admin/layout/useToast';
 import { ToneBadge } from '../../components/admin/ToneBadge';
-
-type Toast = { message: string; severity: 'success' | 'error' } | null;
 
 /** Admin mail-template editor: edit, preview, reset, and send a test email (#106). */
 export function MailTemplatesPage() {
   const { data, isLoading, isFetching, isError } = useMailTemplates();
   const [selectedKey, setSelectedKey] = useState<string | null>(null);
   const [testOpen, setTestOpen] = useState(false);
-  const [toast, setToast] = useState<Toast>(null);
+  const { toast, notify, clear } = useToast();
 
   const templates = data?.templates ?? [];
   const selected = templates.find((t) => t.key === selectedKey) ?? templates[0];
 
-  const notify = (message: string, severity: 'success' | 'error') =>
-    setToast({ message, severity });
-
   return (
     <Stack spacing={3}>
-      <Stack
-        direction={{ xs: 'column', sm: 'row' }}
-        spacing={2}
-        sx={{ justifyContent: 'space-between', alignItems: { sm: 'center' } }}
-      >
-        <Box>
-          <Typography variant="h1" sx={{ fontSize: 28 }}>
-            Mail templates
-          </Typography>
-          <Typography color="text.secondary" sx={{ mt: 0.5 }}>
-            Edit, preview and reset transactional emails. Customised templates override the
-            defaults.
-          </Typography>
-        </Box>
-        <Button
-          variant="outlined"
-          startIcon={<MailCheck size={18} />}
-          onClick={() => setTestOpen(true)}
-        >
-          Send test email
-        </Button>
-      </Stack>
+      <PageHeader
+        title="Mail templates"
+        description="Edit, preview and reset transactional emails. Customised templates override the defaults."
+        action={
+          <Button
+            variant="outlined"
+            startIcon={<MailCheck size={18} />}
+            onClick={() => setTestOpen(true)}
+          >
+            Send test email
+          </Button>
+        }
+      />
 
       {isError ? (
         <Alert severity="error">The mail templates could not be loaded.</Alert>
@@ -123,18 +111,7 @@ export function MailTemplatesPage() {
 
       <SendTestEmailDialog open={testOpen} onClose={() => setTestOpen(false)} />
 
-      <Snackbar
-        open={toast !== null}
-        autoHideDuration={5000}
-        onClose={() => setToast(null)}
-        anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
-      >
-        {toast ? (
-          <Alert severity={toast.severity} onClose={() => setToast(null)} variant="filled">
-            {toast.message}
-          </Alert>
-        ) : undefined}
-      </Snackbar>
+      <AdminToast toast={toast} onClose={clear} />
     </Stack>
   );
 }

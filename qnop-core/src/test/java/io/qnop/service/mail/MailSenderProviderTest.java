@@ -27,6 +27,7 @@ import static org.mockito.Mockito.when;
 import io.qnop.service.ApplicationSettingKey;
 import io.qnop.service.ApplicationSettingsService;
 import java.util.EnumSet;
+import java.util.Properties;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -49,18 +50,39 @@ class MailSenderProviderTest {
   }
 
   private void configureSmtp() {
+    configureSmtp("starttls");
+  }
+
+  private void configureSmtp(String encryption) {
+    lenient().when(settings.getBoolean(ApplicationSettingKey.SMTP_ENABLED)).thenReturn(true);
     lenient()
         .when(settings.getString(ApplicationSettingKey.SMTP_HOST))
         .thenReturn("smtp.example.com");
     lenient().when(settings.getInteger(ApplicationSettingKey.SMTP_PORT)).thenReturn(587);
     lenient().when(settings.getString(ApplicationSettingKey.SMTP_USERNAME)).thenReturn("user");
     lenient().when(settings.getString(ApplicationSettingKey.SMTP_PASSWORD)).thenReturn("secret");
-    lenient().when(settings.getBoolean(ApplicationSettingKey.SMTP_TLS_ENABLED)).thenReturn(true);
+    lenient()
+        .when(settings.getString(ApplicationSettingKey.SMTP_ENCRYPTION))
+        .thenReturn(encryption);
+  }
+
+  private static Properties propsOf(JavaMailSender sender) {
+    return ((JavaMailSenderImpl) sender).getJavaMailProperties();
+  }
+
+  @Test
+  @DisplayName("current() is null and isEnabled() false when the master switch is off")
+  void disabledWhenMasterSwitchOff() {
+    when(settings.getBoolean(ApplicationSettingKey.SMTP_ENABLED)).thenReturn(false);
+
+    assertThat(provider.isEnabled()).isFalse();
+    assertThat(provider.current()).isNull();
   }
 
   @Test
   @DisplayName("current() is null and isEnabled() false when the host is blank")
   void disabledWhenHostBlank() {
+    when(settings.getBoolean(ApplicationSettingKey.SMTP_ENABLED)).thenReturn(true);
     when(settings.getString(ApplicationSettingKey.SMTP_HOST)).thenReturn("");
 
     assertThat(provider.isEnabled()).isFalse();
@@ -78,6 +100,52 @@ class MailSenderProviderTest {
     assertThat(((JavaMailSenderImpl) first).getHost()).isEqualTo("smtp.example.com");
     assertThat(((JavaMailSenderImpl) first).getPort()).isEqualTo(587);
     assertThat(provider.current()).isSameAs(first); // cached
+  }
+
+  @Test
+  @DisplayName("encryption=starttls requires STARTTLS (no implicit SSL, no silent downgrade)")
+  void encryptionStartTls() {
+    configureSmtp("starttls");
+
+    Properties props = propsOf(provider.current());
+
+    assertThat(props.getProperty("mail.smtp.starttls.enable")).isEqualTo("true");
+    assertThat(props.getProperty("mail.smtp.starttls.required")).isEqualTo("true");
+    assertThat(props.getProperty("mail.smtp.ssl.enable")).isNull();
+  }
+
+  @Test
+  @DisplayName("encryption=tls enables implicit SSL (port 465) and no STARTTLS")
+  void encryptionImplicitTls() {
+    configureSmtp("tls");
+
+    Properties props = propsOf(provider.current());
+
+    assertThat(props.getProperty("mail.smtp.ssl.enable")).isEqualTo("true");
+    assertThat(props.getProperty("mail.smtp.starttls.enable")).isNull();
+  }
+
+  @Test
+  @DisplayName("encryption=none leaves the connection plaintext")
+  void encryptionNone() {
+    configureSmtp("none");
+
+    Properties props = propsOf(provider.current());
+
+    assertThat(props.getProperty("mail.smtp.ssl.enable")).isNull();
+    assertThat(props.getProperty("mail.smtp.starttls.enable")).isNull();
+  }
+
+  @Test
+  @DisplayName("an unrecognized encryption value falls back to required STARTTLS")
+  void encryptionUnknownFallsBackToStartTls() {
+    configureSmtp("ssl"); // not a valid enum option; only reachable via out-of-band DB edits
+
+    Properties props = propsOf(provider.current());
+
+    assertThat(props.getProperty("mail.smtp.starttls.enable")).isEqualTo("true");
+    assertThat(props.getProperty("mail.smtp.starttls.required")).isEqualTo("true");
+    assertThat(props.getProperty("mail.smtp.ssl.enable")).isNull();
   }
 
   @Test

@@ -25,9 +25,10 @@ import io.qnop.api.v1.model.AdminSetting;
 import io.qnop.api.v1.model.AdminSettingsResponse;
 import io.qnop.api.v1.model.AdminSettingsUpdateRequest;
 import io.qnop.api.v1.model.ErrorResponse;
+import io.qnop.api.v1.model.FieldError;
 import io.qnop.api.v1.model.SettingValueType;
 import io.qnop.service.ApplicationSettingsService;
-import io.qnop.service.SettingValidationException;
+import io.qnop.service.SettingsValidationException;
 import java.time.OffsetDateTime;
 import java.util.List;
 import org.springframework.http.ResponseEntity;
@@ -74,18 +75,28 @@ public class AdminSettingsController implements AdminSettingsApi {
                         .value(descriptor.value())
                         .type(SettingValueType.fromValue(descriptor.type()))
                         .description(descriptor.description())
-                        .sensitive(descriptor.sensitive()))
+                        .sensitive(descriptor.sensitive())
+                        .allowedValues(descriptor.allowedValues()))
             .toList();
     return new AdminSettingsResponse().settings(items);
   }
 
-  @ExceptionHandler(SettingValidationException.class)
-  public ResponseEntity<ErrorResponse> onInvalidSetting(SettingValidationException ex) {
+  @ExceptionHandler(SettingsValidationException.class)
+  public ResponseEntity<ErrorResponse> onInvalidSettings(SettingsValidationException ex) {
+    List<FieldError> fieldErrors =
+        ex.getFieldErrors().stream()
+            .map(error -> new FieldError().field(error.field()).message(error.message()))
+            .toList();
+    String message =
+        fieldErrors.size() == 1
+            ? "1 setting is invalid."
+            : fieldErrors.size() + " settings are invalid.";
     return ResponseEntity.badRequest()
         .body(
             new ErrorResponse()
-                .code("INVALID_SETTING")
-                .message(ex.getMessage())
+                .code("VALIDATION_ERROR")
+                .message(message)
+                .fieldErrors(fieldErrors)
                 .timestamp(OffsetDateTime.now()));
   }
 }

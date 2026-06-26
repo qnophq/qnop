@@ -20,27 +20,24 @@
  */
 package io.qnop.service;
 
+import java.util.List;
+
 /**
- * Raised when a settings update references an unknown key or carries a value that violates the
- * key's {@link io.qnop.entity.SettingValueType}. Mapped to HTTP 400 at the web layer.
+ * Raised when a settings update carries one or more invalid values. Unlike {@link
+ * SettingValidationException} (a single offending key), this aggregates <em>every</em> field-level
+ * violation so the admin UI can mark all bad fields at once. Mapped to HTTP 400 with a {@code
+ * fieldErrors} array at the web layer; thrown before any write, so the update is all-or-nothing.
  */
-public class SettingValidationException extends RuntimeException {
+public class SettingsValidationException extends RuntimeException {
 
-  private final String settingKey;
-  private final String reason;
+  private final transient List<SettingFieldError> fieldErrors;
 
-  public SettingValidationException(String settingKey, String reason) {
-    super("Invalid setting '" + settingKey + "': " + reason);
-    this.settingKey = settingKey;
-    this.reason = reason;
+  public SettingsValidationException(List<SettingFieldError> fieldErrors) {
+    super("Settings validation failed for " + fieldErrors.size() + " field(s)");
+    this.fieldErrors = List.copyOf(fieldErrors);
   }
 
-  public String getSettingKey() {
-    return settingKey;
-  }
-
-  /** The bare, field-level reason (without the key prefix), for per-field error reporting. */
-  public String getReason() {
-    return reason;
+  public List<SettingFieldError> getFieldErrors() {
+    return fieldErrors;
   }
 }

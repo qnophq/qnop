@@ -24,6 +24,7 @@ import {
   KeyRound,
   LayoutDashboard,
   Mail,
+  MailPlus,
   Palette,
   Settings,
   ShieldCheck,
@@ -87,6 +88,13 @@ export const NAV_GROUPS: NavGroup[] = [
         label: 'OIDC providers',
         path: '/admin/oidc-providers',
         icon: KeyRound,
+        roles: ['ADMIN'],
+      },
+      {
+        id: 'email',
+        label: 'Email / SMTP',
+        path: '/admin/email',
+        icon: MailPlus,
         roles: ['ADMIN'],
       },
       {

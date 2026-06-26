@@ -19,27 +19,22 @@
  * SPDX-License-Identifier: AGPL-3.0-only
  */
 
-import Box from '@mui/material/Box';
 import Stack from '@mui/material/Stack';
-import Typography from '@mui/material/Typography';
 import { ApplicationSettingsForm } from '../../components/admin/settings/ApplicationSettingsForm';
+import { PageHeader } from '../../components/admin/layout/PageHeader';
 
 /**
- * Admin application settings screen (issue #106): general, upload, tracking,
- * SMTP and authentication settings. OIDC providers, mail templates and branding
- * are separate Administration menu items, each with its own screen.
+ * Admin application settings screen (issue #106): general, upload, tracking and
+ * authentication settings. Email/SMTP, OIDC providers, mail templates and
+ * branding are separate Administration menu items, each with its own screen.
  */
 export function SettingsPage() {
   return (
     <Stack spacing={3}>
-      <Box>
-        <Typography variant="h1" sx={{ fontSize: 28 }}>
-          Settings
-        </Typography>
-        <Typography color="text.secondary" sx={{ mt: 0.5 }}>
-          Workspace, uploads, usage tracking, email and authentication.
-        </Typography>
-      </Box>
+      <PageHeader
+        title="Settings"
+        description="Workspace, uploads, usage tracking and authentication."
+      />
       <ApplicationSettingsForm />
     </Stack>
   );

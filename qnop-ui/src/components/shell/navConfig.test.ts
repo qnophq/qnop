@@ -47,6 +47,7 @@ describe('visibleNavGroups', () => {
       'teams',
       'settings',
       'oidc-providers',
+      'email',
       'mail-templates',
       'branding',
     ]);
@@ -73,6 +74,13 @@ describe('crumbsFor', () => {
 
   it('builds just the item for a top-level path', () => {
     expect(crumbsFor('/reviews')).toEqual([{ label: 'Reviews' }]);
+  });
+
+  it('resolves the Email / SMTP admin path', () => {
+    expect(crumbsFor('/admin/email')).toEqual([
+      { label: 'Administration' },
+      { label: 'Email / SMTP' },
+    ]);
   });
 
   it('maps a nested detail path to its section, linking back to the list', () => {

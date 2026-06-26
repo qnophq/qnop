@@ -21,8 +21,10 @@
 package io.qnop.web;
 
 import io.qnop.api.v1.model.ErrorResponse;
+import io.qnop.api.v1.model.FieldError;
 import jakarta.validation.ConstraintViolationException;
 import java.time.OffsetDateTime;
+import java.util.List;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.MethodArgumentNotValidException;
@@ -41,12 +43,18 @@ public class ApiExceptionHandler {
 
   @ExceptionHandler(MethodArgumentNotValidException.class)
   public ResponseEntity<ErrorResponse> onBodyValidation(MethodArgumentNotValidException ex) {
-    String message =
+    List<FieldError> fieldErrors =
         ex.getBindingResult().getFieldErrors().stream()
-            .findFirst()
-            .map(error -> error.getField() + " " + error.getDefaultMessage())
-            .orElse("request body validation failed");
-    return badRequest(message);
+            .map(
+                error ->
+                    new FieldError()
+                        .field(error.getField())
+                        .message(
+                            error.getDefaultMessage() != null
+                                ? error.getDefaultMessage()
+                                : "is invalid"))
+            .toList();
+    return validationError(fieldErrors);
   }
 
   @ExceptionHandler(HandlerMethodValidationException.class)
@@ -65,6 +73,22 @@ public class ApiExceptionHandler {
             new ErrorResponse()
                 .code("VALIDATION_ERROR")
                 .message(message)
+                .timestamp(OffsetDateTime.now()));
+  }
+
+  private static ResponseEntity<ErrorResponse> validationError(List<FieldError> fieldErrors) {
+    String message =
+        fieldErrors.isEmpty()
+            ? "request body validation failed"
+            : fieldErrors.size() == 1
+                ? "1 field is invalid."
+                : fieldErrors.size() + " fields are invalid.";
+    return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+        .body(
+            new ErrorResponse()
+                .code("VALIDATION_ERROR")
+                .message(message)
+                .fieldErrors(fieldErrors)
                 .timestamp(OffsetDateTime.now()));
   }
 }

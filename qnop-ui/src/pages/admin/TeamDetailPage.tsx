@@ -45,6 +45,7 @@ import { AddMemberDialog } from '../../components/admin/teams/AddMemberDialog';
 import { TeamFormDialog } from '../../components/admin/teams/TeamFormDialog';
 import { TeamRoleBadge } from '../../components/admin/teams/TeamRoleBadge';
 import { ConfirmDialog } from '../../components/admin/ConfirmDialog';
+import { PageHeader } from '../../components/admin/layout/PageHeader';
 import { UserAvatar } from '../../components/shell/UserAvatar';
 import { UserStatusBadge } from '../../components/admin/users/UserBadges';
 import { formatDateTime } from '../../utils/formatDate';
@@ -100,25 +101,11 @@ export function TeamDetailPage() {
 
   return (
     <Stack spacing={3}>
-      <Box>
-        <Stack
-          direction={{ xs: 'column', sm: 'row' }}
-          spacing={2}
-          sx={{ justifyContent: 'space-between', alignItems: { sm: 'center' } }}
-        >
-          <Box>
-            <Stack direction="row" spacing={1.5} sx={{ alignItems: 'center' }}>
-              <Typography variant="h1" sx={{ fontSize: 26 }}>
-                {team.name}
-              </Typography>
-              <UserStatusBadge enabled={team.enabled} />
-            </Stack>
-            {team.description && (
-              <Typography color="text.secondary" sx={{ mt: 0.5 }}>
-                {team.description}
-              </Typography>
-            )}
-          </Box>
+      <PageHeader
+        title={team.name}
+        titleAdornment={<UserStatusBadge enabled={team.enabled} />}
+        description={team.description || undefined}
+        action={
           <Stack direction="row" spacing={1.5}>
             <Button color="inherit" startIcon={<SquarePen size={16} />} onClick={openEdit}>
               Edit
@@ -127,8 +114,8 @@ export function TeamDetailPage() {
               Add member
             </Button>
           </Stack>
-        </Stack>
-      </Box>
+        }
+      />
 
       <Paper variant="outlined" sx={{ overflow: 'hidden' }}>
         <Table size="medium" sx={{ '& td, & th': { borderColor: 'divider' } }}>

@@ -47,6 +47,7 @@ import {
   useUpdateOidcProvider,
 } from '../../../api/hooks/useOidcProviders';
 import { apiErrorMessage } from '../../../utils/apiError';
+import { isHttpUrl } from '../../../utils/validation';
 import { ProviderCallbackInstructions } from './ProviderCallbackInstructions';
 import { PROVIDER_TYPES, supportsDiscovery } from './oidcProviderTypes';
 
@@ -67,16 +68,6 @@ interface OidcProviderFormDialogProps {
 function optional(value: string): string | undefined {
   const trimmed = value.trim();
   return trimmed.length > 0 ? trimmed : undefined;
-}
-
-/** Whether a non-empty value parses as an absolute http(s) URL. */
-function isHttpUrl(value: string): boolean {
-  try {
-    const url = new URL(value);
-    return url.protocol === 'http:' || url.protocol === 'https:';
-  } catch {
-    return false;
-  }
 }
 
 /**

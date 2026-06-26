@@ -21,7 +21,7 @@
 
 import { AxiosError, type AxiosResponse } from 'axios';
 import { describe, expect, it } from 'vitest';
-import { apiErrorCode, apiErrorMessage } from './apiError';
+import { apiErrorCode, apiErrorMessage, apiFieldErrors } from './apiError';
 
 function axiosWithStatus(status: number): AxiosError {
   return new AxiosError('x', 'ERR', undefined, undefined, { status } as AxiosResponse);
@@ -64,5 +64,27 @@ describe('apiErrorCode', () => {
     expect(apiErrorCode(axiosWithBody(409, { message: 'x' }))).toBeUndefined();
     expect(apiErrorCode(axiosWithStatus(500))).toBeUndefined();
     expect(apiErrorCode(new Error('boom'))).toBeUndefined();
+  });
+});
+
+describe('apiFieldErrors', () => {
+  it('maps the fieldErrors array to a field→message record', () => {
+    const error = axiosWithBody(400, {
+      code: 'VALIDATION_ERROR',
+      message: '2 settings are invalid.',
+      fieldErrors: [
+        { field: 'smtp.port', message: 'must be at most 65535' },
+        { field: 'smtp.from', message: 'must be a valid email address' },
+      ],
+    });
+    expect(apiFieldErrors(error)).toEqual({
+      'smtp.port': 'must be at most 65535',
+      'smtp.from': 'must be a valid email address',
+    });
+  });
+
+  it('returns an empty object when there are no field errors', () => {
+    expect(apiFieldErrors(axiosWithBody(400, { code: 'VALIDATION_ERROR' }))).toEqual({});
+    expect(apiFieldErrors(new Error('boom'))).toEqual({});
   });
 });

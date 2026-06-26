@@ -1821,6 +1821,13 @@ components:
         sensitive:
           type: boolean
           description: Whether the value is a secret (masked here, encrypted at rest).
+        allowedValues:
+          type: array
+          items:
+            type: string
+          description: >-
+            For `ENUM`-typed settings, the permitted values, in display order; the
+            admin UI renders these as a dropdown. Empty for all other types.
       required:
         - key
         - type
@@ -2698,7 +2705,29 @@ components:
           type: string
           format: date-time
           description: Server timestamp (RFC 3339) when the error was produced.
+        fieldErrors:
+          type: array
+          description: >-
+            Per-field validation failures, present when `code` is
+            `VALIDATION_ERROR`. Lets the client flag each offending field
+            individually; absent or empty for non-validation errors.
+          items:
+            $ref: '#/components/schemas/FieldError'
       required:
         - code
         - message
         - timestamp
+    FieldError:
+      type: object
+      description: One field-level validation failure within an `ErrorResponse`.
+      properties:
+        field:
+          type: string
+          description: The offending field or setting key (e.g. `smtp.port`).
+        message:
+          type: string
+          description: >-
+            Human-readable, non-sensitive reason (e.g. `must be at most 65535`).
+      required:
+        - field
+        - message
