@@ -19,158 +19,201 @@
  * SPDX-License-Identifier: AGPL-3.0-only
  */
 
-import { useCallback, useState } from 'react';
-import Cropper, { type Area, type MediaSize } from 'react-easy-crop';
+import { useEffect, useRef, useState, type SyntheticEvent } from 'react';
+import ReactCrop, { centerCrop, makeAspectCrop, type Crop, type PixelCrop } from 'react-image-crop';
+import 'react-image-crop/dist/ReactCrop.css';
 import Box from '@mui/material/Box';
 import Button from '@mui/material/Button';
 import Dialog from '@mui/material/Dialog';
 import DialogActions from '@mui/material/DialogActions';
 import DialogContent from '@mui/material/DialogContent';
 import DialogTitle from '@mui/material/DialogTitle';
-import Slider from '@mui/material/Slider';
 import Stack from '@mui/material/Stack';
-import ToggleButton from '@mui/material/ToggleButton';
-import ToggleButtonGroup from '@mui/material/ToggleButtonGroup';
 import Typography from '@mui/material/Typography';
-import { ZoomIn } from 'lucide-react';
-import { getCroppedImageBlob } from '../../../utils/cropImage';
-
-export type AspectValue = number | 'original';
-export interface AspectPreset {
-  label: string;
-  value: AspectValue;
-}
+import { useTheme } from '@mui/material/styles';
+import { Crop as CropIcon } from 'lucide-react';
 
 interface BrandingCropDialogProps {
   open: boolean;
   imageSrc: string;
   label: string;
-  presets: AspectPreset[];
-  defaultAspect: AspectValue;
-  /** Output bounds (the crop is scaled to fit, preserving its aspect). */
+  /** Preview the result on the slot's surface (dark for the dark-mode logo). */
+  dark?: boolean;
+  /** Locked aspect (e.g. 1 for the square logomark); omit for a free-form crop (wordmark logos). */
+  aspect?: number;
+  /** Output bounds — the crop is scaled to fit, so the saved PNG stays well under 512 KiB. */
   maxWidth: number;
   maxHeight: number;
+  /** One-line guidance shown above the cropper. */
+  recommended: string;
   busy?: boolean;
   onCancel: () => void;
   onCropped: (blob: Blob) => void;
 }
 
-const MIN_ZOOM = 1;
-const MAX_ZOOM = 3;
-
 /**
- * Crops a raster branding logo to a chosen aspect before upload (issue #106). Unlike the square
- * avatar cropper, the aspect is configurable per slot — a logomark is square, while wordmark logos
- * keep their own proportions ("Original") or a banner ratio. Exports a transparent PNG bounded to
- * the slot's output size so it stays well under the 512 KiB cap.
+ * Crops a raster branding logo before upload (issue #106). Unlike the square avatar cropper, this
+ * uses a handle-based selection (drag a box around exactly the part you want) with a live readout of
+ * the resulting pixel size and a preview of the cropped result on the slot's surface — so it is
+ * obvious which size is being cut. The logomark locks to a square; wordmark logos crop freely.
+ * The preview canvas is also the exported PNG, so what you see is exactly what is saved.
  */
 export function BrandingCropDialog({
   open,
   imageSrc,
   label,
-  presets,
-  defaultAspect,
+  dark,
+  aspect,
   maxWidth,
   maxHeight,
+  recommended,
   busy,
   onCancel,
   onCropped,
 }: BrandingCropDialogProps) {
-  const [crop, setCrop] = useState({ x: 0, y: 0 });
-  const [zoom, setZoom] = useState(1);
-  const [area, setArea] = useState<Area | null>(null);
-  const [selected, setSelected] = useState<AspectValue>(defaultAspect);
-  const [originalAspect, setOriginalAspect] = useState<number | null>(null);
+  const theme = useTheme();
+  const imgRef = useRef<HTMLImageElement | null>(null);
+  const previewRef = useRef<HTMLCanvasElement | null>(null);
+  const [crop, setCrop] = useState<Crop>();
+  const [completed, setCompleted] = useState<PixelCrop>();
+  const [output, setOutput] = useState<{ width: number; height: number } | null>(null);
   const [exporting, setExporting] = useState(false);
 
-  const aspect = selected === 'original' ? (originalAspect ?? 1) : selected;
   const disabled = busy || exporting;
 
-  const onCropComplete = useCallback((_: Area, areaPixels: Area) => setArea(areaPixels), []);
-  const onMediaLoaded = useCallback(
-    (media: MediaSize) => setOriginalAspect(media.naturalWidth / media.naturalHeight),
-    [],
-  );
+  const onImageLoad = (event: SyntheticEvent<HTMLImageElement>) => {
+    const { width, height } = event.currentTarget;
+    const initial: Crop = aspect
+      ? centerCrop(makeAspectCrop({ unit: '%', width: 80 }, aspect, width, height), width, height)
+      : { unit: '%', x: 5, y: 5, width: 90, height: 90 };
+    setCrop(initial);
+  };
 
-  const apply = async () => {
-    if (!area) return;
+  // Draw the selection onto the preview canvas at the final (bounded) output size. This canvas is
+  // both the on-screen preview and the exported PNG, so they can never disagree.
+  useEffect(() => {
+    const image = imgRef.current;
+    const canvas = previewRef.current;
+    if (!completed || !image || !canvas || completed.width === 0 || completed.height === 0) return;
+    const scaleX = image.naturalWidth / image.width;
+    const scaleY = image.naturalHeight / image.height;
+    const cropW = completed.width * scaleX;
+    const cropH = completed.height * scaleY;
+    const scale = Math.min(1, maxWidth / cropW, maxHeight / cropH);
+    const outW = Math.max(1, Math.round(cropW * scale));
+    const outH = Math.max(1, Math.round(cropH * scale));
+    canvas.width = outW;
+    canvas.height = outH;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+    ctx.clearRect(0, 0, outW, outH);
+    ctx.imageSmoothingQuality = 'high';
+    ctx.drawImage(
+      image,
+      completed.x * scaleX,
+      completed.y * scaleY,
+      cropW,
+      cropH,
+      0,
+      0,
+      outW,
+      outH,
+    );
+    setOutput({ width: outW, height: outH });
+  }, [completed, maxWidth, maxHeight]);
+
+  const apply = () => {
+    const canvas = previewRef.current;
+    if (!canvas || !output) return;
     setExporting(true);
-    try {
-      onCropped(
-        await getCroppedImageBlob(imageSrc, area, { maxWidth, maxHeight, type: 'image/png' }),
-      );
-    } finally {
+    canvas.toBlob((blob) => {
       setExporting(false);
-    }
+      if (blob) onCropped(blob);
+    }, 'image/png');
   };
 
   return (
     <Dialog open={open} onClose={disabled ? undefined : onCancel} maxWidth="sm" fullWidth>
       <DialogTitle>Crop {label.toLowerCase()}</DialogTitle>
       <DialogContent>
-        {presets.length > 1 && (
-          <ToggleButtonGroup
-            size="small"
-            exclusive
-            value={selected}
-            onChange={(_, value) => value != null && setSelected(value as AspectValue)}
-            sx={{ mb: 2, flexWrap: 'wrap' }}
-            aria-label="Crop aspect ratio"
-          >
-            {presets.map((p) => (
-              <ToggleButton key={String(p.value)} value={p.value} sx={{ textTransform: 'none' }}>
-                {p.label}
-              </ToggleButton>
-            ))}
-          </ToggleButtonGroup>
-        )}
+        <Typography sx={{ fontSize: 13, color: 'text.secondary', mb: 1.5 }}>
+          {aspect
+            ? 'Drag the square handles over your mark. '
+            : 'Drag a box around exactly the part you want. '}
+          {recommended}
+        </Typography>
 
         <Box
           sx={{
-            position: 'relative',
-            width: '100%',
-            height: 300,
+            display: 'flex',
+            justifyContent: 'center',
             bgcolor: 'common.black',
             borderRadius: 2,
-            overflow: 'hidden',
+            p: 1,
+            '& .ReactCrop__image': { maxHeight: 320 },
           }}
         >
-          <Cropper
-            image={imageSrc}
+          <ReactCrop
             crop={crop}
-            zoom={zoom}
             aspect={aspect}
-            cropShape="rect"
-            showGrid
-            restrictPosition={false}
-            onCropChange={setCrop}
-            onZoomChange={setZoom}
-            onCropComplete={onCropComplete}
-            onMediaLoaded={onMediaLoaded}
-          />
+            keepSelection
+            minWidth={24}
+            minHeight={24}
+            onChange={(_, percentCrop) => setCrop(percentCrop)}
+            onComplete={(pixelCrop) => setCompleted(pixelCrop)}
+          >
+            <img
+              ref={imgRef}
+              src={imageSrc}
+              alt=""
+              onLoad={onImageLoad}
+              style={{ maxHeight: 320, maxWidth: '100%', display: 'block' }}
+            />
+          </ReactCrop>
         </Box>
 
-        <Stack direction="row" spacing={1.5} sx={{ alignItems: 'center', mt: 2 }}>
-          <ZoomIn size={18} />
-          <Slider
-            min={MIN_ZOOM}
-            max={MAX_ZOOM}
-            step={0.01}
-            value={zoom}
-            onChange={(_, value) => setZoom(value as number)}
-            aria-label="Zoom"
-            disabled={disabled}
-          />
+        <Stack direction="row" spacing={2} sx={{ mt: 2, alignItems: 'center' }}>
+          <Box
+            sx={{
+              width: 132,
+              height: 72,
+              flexShrink: 0,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              borderRadius: 1.5,
+              border: 1,
+              borderColor: 'divider',
+              bgcolor: dark ? theme.qnop.brand.navy : theme.qnop.surface2,
+              overflow: 'hidden',
+              p: 0.75,
+            }}
+          >
+            <canvas
+              ref={previewRef}
+              style={{ maxWidth: '100%', maxHeight: '100%', display: output ? 'block' : 'none' }}
+            />
+          </Box>
+          <Box>
+            <Typography sx={{ fontSize: 12, color: 'text.secondary' }}>
+              Saved size (transparent PNG)
+            </Typography>
+            <Typography sx={{ fontWeight: 600, fontSize: 15 }}>
+              {output ? `${output.width} × ${output.height} px` : '—'}
+            </Typography>
+          </Box>
         </Stack>
-        <Typography sx={{ fontSize: 12, color: 'text.secondary', mt: 0.5 }}>
-          Drag to reposition, zoom to crop, and pick a ratio. Exported as a transparent PNG.
-        </Typography>
       </DialogContent>
       <DialogActions sx={{ px: 3, pb: 2.5 }}>
         <Button onClick={onCancel} color="inherit" disabled={disabled}>
           Cancel
         </Button>
-        <Button onClick={apply} variant="contained" disabled={disabled || !area}>
+        <Button
+          onClick={apply}
+          variant="contained"
+          startIcon={<CropIcon size={16} />}
+          disabled={disabled || !output}
+        >
           Use selection
         </Button>
       </DialogActions>

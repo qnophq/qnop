@@ -33,7 +33,7 @@ import { useDeleteBrandingAsset, useUploadBrandingAsset } from '../../../api/hoo
 import { apiErrorMessage } from '../../../utils/apiError';
 import { ConfirmDialog } from '../ConfirmDialog';
 import { ToneBadge } from '../ToneBadge';
-import { BrandingCropDialog, type AspectPreset, type AspectValue } from './BrandingCropDialog';
+import { BrandingCropDialog } from './BrandingCropDialog';
 
 interface BrandingSlotCardProps {
   slot: BrandingSlot;
@@ -51,34 +51,30 @@ interface BrandingSlotCardProps {
 const ALLOWED = BRANDING_ACCEPT.split(',');
 const SVG_TYPE = 'image/svg+xml';
 
-/** Per-slot crop framing: a logomark is square; wordmark logos keep their own ratio or a banner. */
-const WORDMARK_PRESETS: AspectPreset[] = [
-  { label: 'Original', value: 'original' },
-  { label: '3 : 1', value: 3 },
-  { label: '16 : 9', value: 16 / 9 },
-  { label: 'Square', value: 1 },
-];
+/**
+ * Per-slot crop framing: the logomark locks to a square; wordmark logos crop freely. The output is
+ * bounded so the saved PNG stays well under the 512 KiB cap, and the recommendation is surfaced in
+ * the cropper so the operator knows the target size.
+ */
 const SLOT_CROP: Record<
   BrandingSlot,
-  { presets: AspectPreset[]; defaultAspect: AspectValue; maxWidth: number; maxHeight: number }
+  { aspect?: number; maxWidth: number; maxHeight: number; recommended: string }
 > = {
   'logo-light': {
-    presets: WORDMARK_PRESETS,
-    defaultAspect: 'original',
     maxWidth: 1024,
     maxHeight: 384,
+    recommended: 'Wordmark logos are wide — saved at up to 1024 × 384 px.',
   },
   'logo-dark': {
-    presets: WORDMARK_PRESETS,
-    defaultAspect: 'original',
     maxWidth: 1024,
     maxHeight: 384,
+    recommended: 'Wordmark logos are wide — saved at up to 1024 × 384 px.',
   },
   logomark: {
-    presets: [{ label: 'Square', value: 1 }],
-    defaultAspect: 1,
+    aspect: 1,
     maxWidth: 512,
     maxHeight: 512,
+    recommended: 'The logomark is square — saved at up to 512 × 512 px.',
   },
 };
 
@@ -117,10 +113,10 @@ export function BrandingSlotCard({
   const busy = upload.isPending || remove.isPending;
   const cropConfig = SLOT_CROP[slot];
 
-  const doUpload = async (file: Blob, filename: string) => {
+  const doUpload = async (file: Blob, filename: string, successMessage?: string) => {
     try {
       await upload.mutateAsync({ slot, file, filename });
-      onNotify(`${label} updated.`, 'success');
+      onNotify(successMessage ?? `${label} updated.`, 'success');
     } catch (err) {
       onNotify(apiErrorMessage(err, 'The upload failed.'), 'error');
     }
@@ -136,8 +132,12 @@ export function BrandingSlotCard({
       return;
     }
     if (file.type === SVG_TYPE) {
-      // SVG is vector — rasterizing it to crop would lose quality, so upload it as-is.
-      void doUpload(file, file.name || 'logo.svg');
+      // SVG is vector — rasterizing it to crop would lose quality, so upload it as-is and say so.
+      void doUpload(
+        file,
+        file.name || 'logo.svg',
+        `${label} updated — SVG is vector and used as-is (no cropping).`,
+      );
       return;
     }
     setCropSrc(URL.createObjectURL(file));
@@ -299,10 +299,11 @@ export function BrandingSlotCard({
           open
           imageSrc={cropSrc}
           label={label}
-          presets={cropConfig.presets}
-          defaultAspect={cropConfig.defaultAspect}
+          dark={dark}
+          aspect={cropConfig.aspect}
           maxWidth={cropConfig.maxWidth}
           maxHeight={cropConfig.maxHeight}
+          recommended={cropConfig.recommended}
           busy={busy}
           onCancel={closeCrop}
           onCropped={onCropped}
