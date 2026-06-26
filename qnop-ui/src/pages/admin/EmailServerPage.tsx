@@ -178,7 +178,7 @@ export function EmailServerPage() {
 
   return (
     <Box component="form" onSubmit={onSubmit} noValidate>
-      <Stack spacing={3} sx={{ maxWidth: 760 }}>
+      <Stack spacing={3}>
         <PageHeader
           title="Email / SMTP"
           description="Configure the outgoing-mail server: connection, sender identity, and delivery. Changes apply without a restart."
@@ -189,7 +189,7 @@ export function EmailServerPage() {
           title="Connection"
           description="Where and how qnop reaches your SMTP server."
         >
-          <Stack spacing={2.5}>
+          <Stack spacing={2.5} sx={{ maxWidth: 480 }}>
             <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2}>
               <Box sx={{ flex: 1 }}>{textField(SMTP_KEYS.host)}</Box>
               <Box sx={{ width: { sm: 150 } }}>{textField(SMTP_KEYS.port, { type: 'number' })}</Box>
@@ -250,7 +250,7 @@ export function EmailServerPage() {
           title="Identity"
           description="How outgoing messages present their sender."
         >
-          <Stack spacing={2.5}>
+          <Stack spacing={2.5} sx={{ maxWidth: 480 }}>
             {textField(SMTP_KEYS.from, { type: 'email', autoComplete: 'off' })}
             {textField(SMTP_KEYS.fromName)}
           </Stack>
@@ -262,7 +262,7 @@ export function EmailServerPage() {
           description="Turn outgoing mail on and verify it with a test message."
           action={<ToneBadge tone={status.tone} label={status.label} />}
         >
-          <Stack spacing={2.5}>
+          <Stack spacing={2.5} sx={{ maxWidth: 480 }}>
             {byKey[SMTP_KEYS.enabled] && (
               <FormControlLabel
                 control={
