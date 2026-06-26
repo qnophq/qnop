@@ -20,6 +20,12 @@ spring:
     open-in-view: false
   liquibase:
     change-log: classpath:/db/changelog/db.changelog-master.yaml
+  servlet:
+    multipart:
+      # Headroom over the 1 MiB avatar cap (AvatarLimits) so the service-level
+      # size check returns a clean 413 before the container rejects the request.
+      max-file-size: 2MB
+      max-request-size: 4MB
 
 management:
   endpoints:

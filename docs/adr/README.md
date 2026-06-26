@@ -42,6 +42,7 @@ Important architecture decisions are recorded here as ADRs (see [ADR-0001](0001-
 | [0028](0028-branding-upload-and-svg-sanitization.md) | Branding upload pipeline & SVG sanitization | Accepted |
 | [0029](0029-distributed-scheduler-locks.md) | Distributed scheduler locks for @Scheduled jobs (ShedLock) | Accepted |
 | [0030](0030-concurrency-control-strategy.md) | Concurrency control for entity writes (optimistic locking + atomic updates) | Accepted |
+| [0031](0031-profile-avatar-storage.md) | Profile-avatar storage in Postgres bytea behind an AvatarStorage port | Accepted |
 
 ## Template
 

@@ -35,3 +35,6 @@ databaseChangeLog:
   - include:
       file: migrations/0008-team-schema.yaml
       relativeToChangelogFile: true
+  - include:
+      file: migrations/0009-user-avatar-schema.yaml
+      relativeToChangelogFile: true

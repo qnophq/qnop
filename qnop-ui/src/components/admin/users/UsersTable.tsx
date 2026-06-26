@@ -126,7 +126,7 @@ export function UsersTable({
             <TableRow key={user.id} hover>
               <TableCell>
                 <Stack direction="row" spacing={1.5} sx={{ alignItems: 'center' }}>
-                  <UserAvatar name={user.displayName} size={36} />
+                  <UserAvatar name={user.displayName} size={36} imageUrl={user.avatarUrl} />
                   <Box sx={{ minWidth: 0 }}>
                     <Stack
                       direction="row"

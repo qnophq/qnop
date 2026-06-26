@@ -28,6 +28,7 @@ import { RoleRoute } from '../components/auth/RoleRoute';
 import { ComingSoonPage } from '../pages/ComingSoonPage';
 import { HomePage } from '../pages/HomePage';
 import { BrandingPage } from '../pages/admin/BrandingPage';
+import { ProfilePage } from '../pages/ProfilePage';
 import { MailTemplatesPage } from '../pages/admin/MailTemplatesPage';
 import { OidcProvidersPage } from '../pages/admin/OidcProvidersPage';
 import { SettingsPage } from '../pages/admin/SettingsPage';
@@ -66,6 +67,7 @@ export const router = createBrowserRouter([
     ),
     children: [
       { index: true, element: <HomePage /> },
+      { path: 'profile', element: <ProfilePage /> },
       {
         path: 'reviews',
         element: (

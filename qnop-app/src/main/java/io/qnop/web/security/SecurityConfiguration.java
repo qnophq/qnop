@@ -135,6 +135,11 @@ public class SecurityConfiguration {
                     .permitAll()
                     .requestMatchers(HttpMethod.GET, "/api/v1/branding/**")
                     .permitAll()
+                    // Avatars are served to <img> elements, which cannot carry a bearer token;
+                    // the read path is public (low-sensitivity display pictures, ADR-0031). Upload
+                    // and delete stay authenticated/admin via the matchers below.
+                    .requestMatchers(HttpMethod.GET, "/api/v1/users/*/avatar")
+                    .permitAll()
                     // The SPA needs the public server config before authentication
                     // (enabled OIDC providers, self-registration, edition). OpenAPI
                     // declares GET /config as security: [] — honour that here.
