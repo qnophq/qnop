@@ -33,7 +33,7 @@ import Stack from '@mui/material/Stack';
 import Switch from '@mui/material/Switch';
 import TextField from '@mui/material/TextField';
 import Typography from '@mui/material/Typography';
-import { ArrowLeft, Eye, RotateCcw, Variable } from 'lucide-react';
+import { Eye, RotateCcw, Variable } from 'lucide-react';
 import { Link as RouterLink, useParams } from 'react-router-dom';
 import type { MailTemplateResponse } from '../../api/generated';
 import {
@@ -203,36 +203,26 @@ function EditForm({
   return (
     <Box component="form" onSubmit={onSave} noValidate>
       <Stack spacing={3}>
-        <Box>
-          <Link
-            component={RouterLink}
-            to="/admin/mail-templates"
-            underline="hover"
-            sx={{ display: 'inline-flex', alignItems: 'center', gap: 0.5, fontSize: 14, mb: 1.5 }}
-          >
-            <ArrowLeft size={16} /> All templates
-          </Link>
-          <PageHeader
-            title={template.friendlyName}
-            titleAdornment={
-              <ToneBadge
-                tone={isCustomised ? 'blue' : 'neutral'}
-                label={isCustomised ? 'Custom' : 'Default'}
-              />
-            }
-            description={
-              <Box component="span" sx={{ fontFamily: 'monospace', fontSize: 13 }}>
-                {template.key} · {template.locale}
-                {isCustomised && (
-                  <Box component="span" sx={{ fontFamily: 'body1.fontFamily', ml: 1 }}>
-                    — edited {formatRelative(template.updatedAt)}
-                    {template.updatedByName ? ` by ${template.updatedByName}` : ''}
-                  </Box>
-                )}
-              </Box>
-            }
-          />
-        </Box>
+        <PageHeader
+          title={template.friendlyName}
+          titleAdornment={
+            <ToneBadge
+              tone={isCustomised ? 'blue' : 'neutral'}
+              label={isCustomised ? 'Custom' : 'Default'}
+            />
+          }
+          description={
+            <Box component="span" sx={{ fontFamily: 'monospace', fontSize: 13 }}>
+              {template.key} · {template.locale}
+              {isCustomised && (
+                <Box component="span" sx={{ fontFamily: 'body1.fontFamily', ml: 1 }}>
+                  — edited {formatRelative(template.updatedAt)}
+                  {template.updatedByName ? ` by ${template.updatedByName}` : ''}
+                </Box>
+              )}
+            </Box>
+          }
+        />
 
         <Box
           sx={{
