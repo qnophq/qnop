@@ -69,17 +69,23 @@ VALUES
    'a0000000-0000-0000-0000-000000000003', 'MEMBER', TIMESTAMPTZ '2026-01-02 09:04:00+00', 0);
 
 -- ---------------------------------------------------------------------------
--- OIDC providers: one enabled, one disabled. The encrypted secret is a dummy
--- placeholder — the seeded suite exercises the admin CRUD/list paths, which
--- never decrypt it (they expose only `hasClientSecret`).
+-- OIDC providers: one enabled (with secret), one disabled (no secret).
+--
+-- client_secret_encrypted is read through EncryptedStringConverter, which
+-- decrypts on entity load — so the value MUST be a real ciphertext produced by
+-- Encryptors.delux with the integration-test key/salt (AbstractIntegrationTest).
+-- The literal below is the encryption of "seed-dummy-secret"; the disabled
+-- provider stores NULL to exercise the no-secret path (hasClientSecret=false).
 -- ---------------------------------------------------------------------------
 INSERT INTO oidc_provider
   (id, name, provider_type, enabled, client_id, client_secret_encrypted, issuer_uri,
    scope, created_at, updated_at)
 VALUES
   ('d0000000-0000-0000-0000-000000000001', 'Seeded Google', 'GOOGLE', true,
-   'seed-client-google', 'seed-dummy-secret', 'https://accounts.google.example',
+   'seed-client-google',
+   'd87d2739523ce0d827fb5b56b26019ed803139c074194c98394602a53ece3dd3d5288dcf0ef4535907065ec9e65a9381e1',
+   'https://accounts.google.example',
    'openid email profile', TIMESTAMPTZ '2026-01-03 08:00:00+00', TIMESTAMPTZ '2026-01-03 08:00:00+00'),
   ('d0000000-0000-0000-0000-000000000002', 'Seeded OIDC (disabled)', 'OIDC', false,
-   'seed-client-oidc', 'seed-dummy-secret', 'https://idp.example',
+   'seed-client-oidc', NULL, 'https://idp.example',
    'openid email', TIMESTAMPTZ '2026-01-03 08:05:00+00', TIMESTAMPTZ '2026-01-03 08:05:00+00');
