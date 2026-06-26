@@ -24,27 +24,33 @@ import io.qnop.bootstrap.AbstractIntegrationTest;
 import io.qnop.service.JwtTokenService;
 import java.util.UUID;
 import javax.sql.DataSource;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.core.io.FileSystemResource;
-import org.springframework.jdbc.datasource.DataSourceUtils;
-import org.springframework.jdbc.datasource.init.ScriptUtils;
+import org.springframework.jdbc.datasource.init.DatabasePopulatorUtils;
+import org.springframework.jdbc.datasource.init.ResourceDatabasePopulator;
 import org.springframework.test.web.servlet.MockMvc;
-import org.springframework.transaction.annotation.Transactional;
 
 /**
  * Base for integration tests that run against the shared dummy dataset (issue #163). Each test
- * loads {@code testdata/db/seed.sql} in {@link BeforeEach} on the transaction-bound connection;
- * because the class is {@link Transactional}, every seeded row (and every change a request makes)
- * is rolled back after the test — so the JVM-shared Testcontainers database is never polluted.
+ * cleans and reloads {@code testdata/db/seed.sql} in {@link BeforeEach} and wipes it again in
+ * {@link AfterEach}, so every seeded test sees exactly the dummy dataset and the JVM-shared
+ * Testcontainers database is left empty for non-seeded IT classes.
+ *
+ * <p>The seed is loaded through {@link DatabasePopulatorUtils} on an autocommit pool connection
+ * rather than relying on {@code @Transactional} rollback: the Boot-default {@code
+ * JpaTransactionManager} has no {@code DataSource} set, so a test transaction never binds a
+ * connection to the {@code DataSource} — a script run via {@code DataSourceUtils} would therefore
+ * commit on a separate connection and never roll back. Explicit clean+seed is deterministic
+ * regardless of the transaction manager's wiring.
  *
  * <p>Authentication is fast: {@link #token(UUID)} mints a real access token for a seeded user via
  * {@link JwtTokenService} (correct role claim, no login round-trip or rate limit). The seeded ids
  * and the shared password are exposed as constants.
  */
 @AutoConfigureMockMvc
-@Transactional
 public abstract class SeededIntegrationTest extends AbstractIntegrationTest {
 
   /** The plaintext behind every seeded user's bcrypt hash (for the real-login flows). */
@@ -73,9 +79,20 @@ public abstract class SeededIntegrationTest extends AbstractIntegrationTest {
 
   @BeforeEach
   void loadSeed() {
-    ScriptUtils.executeSqlScript(
-        DataSourceUtils.getConnection(dataSource),
-        new FileSystemResource(TestData.path("db/seed.sql")));
+    runScript("db/clean.sql");
+    runScript("db/seed.sql");
+  }
+
+  @AfterEach
+  void wipeSeed() {
+    runScript("db/clean.sql");
+  }
+
+  /** Runs a SQL script from {@code testdata/} on a managed (autocommit) pool connection. */
+  private void runScript(String relativePath) {
+    DatabasePopulatorUtils.execute(
+        new ResourceDatabasePopulator(new FileSystemResource(TestData.path(relativePath))),
+        dataSource);
   }
 
   /** A bearer access token for a seeded user (carries the user's real role claim). */
