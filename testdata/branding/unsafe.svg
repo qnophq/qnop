@@ -1,6 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" viewBox="0 0 64 64" onload="alert('xss')">
-  <!-- Intentionally hostile: a <script>, an inline event handler, and a javascript: link.
-       Used to assert the branding upload pipeline sanitizes SVG before storing/serving. -->
+  <!-- Intentionally hostile fixture: a forbidden script element, an inline event handler, and an
+       external-scheme link. The branding pipeline must drop all three before storing/serving. -->
   <script>alert('xss')</script>
   <rect width="64" height="64" fill="#012142"/>
   <a xlink:href="javascript:alert('nav')"><rect x="8" y="8" width="16" height="16" fill="#1292EE"/></a>
