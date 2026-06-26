@@ -39,6 +39,7 @@ import io.qnop.service.AdminUserService.GeneratedPasswordOutcome;
 import io.qnop.service.AdminUserService.PasswordResetOutcome;
 import io.qnop.service.auth.PasswordResetFlowService;
 import io.qnop.service.auth.PasswordResetFlowService.SetupLinkOutcome;
+import io.qnop.service.mail.MailTemplateKey;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -86,7 +87,7 @@ class AdminUserServiceTest {
     verify(users).save(saved.capture());
     assertThat(saved.getValue().isPasswordChangeRequired()).isTrue();
     assertThat(saved.getValue().getPasswordHash()).isEqualTo("hashed");
-    verify(passwordResetFlow, never()).sendSetupLink(any());
+    verify(passwordResetFlow, never()).sendSetupLink(any(), any());
   }
 
   @Test
@@ -100,7 +101,7 @@ class AdminUserServiceTest {
     verify(users).save(saved.capture());
     assertThat(saved.getValue().getPasswordHash()).isEqualTo("hashed");
     assertThat(saved.getValue().isEnabled()).isTrue();
-    verify(passwordResetFlow).sendSetupLink(saved.getValue());
+    verify(passwordResetFlow).sendSetupLink(saved.getValue(), MailTemplateKey.PASSWORD_RESET);
   }
 
   @Test
@@ -301,14 +302,14 @@ class AdminUserServiceTest {
     UUID internalId = UUID.randomUUID();
     User internal = User.internal("Int", "int@example.com", "int", "h");
     when(users.findById(internalId)).thenReturn(Optional.of(internal));
-    when(passwordResetFlow.sendSetupLink(internal))
+    when(passwordResetFlow.sendSetupLink(internal, MailTemplateKey.ADMIN_PASSWORD_RESET))
         .thenReturn(new SetupLinkOutcome(true, "https://app/reset?token=x"));
 
     PasswordResetOutcome outcome = service.sendPasswordReset(internalId);
 
     assertThat(outcome.emailSent()).isTrue();
     assertThat(outcome.resetUrl()).isNull(); // hidden when the email went out
-    verify(passwordResetFlow).sendSetupLink(internal);
+    verify(passwordResetFlow).sendSetupLink(internal, MailTemplateKey.ADMIN_PASSWORD_RESET);
     verify(refreshTokens).revokeAllForUser(internalId);
     verify(users).bumpPasswordInvalidatedBefore(eq(internalId), any());
   }
@@ -319,7 +320,7 @@ class AdminUserServiceTest {
     UUID id = UUID.randomUUID();
     User internal = User.internal("Int", "int@example.com", "int", "h");
     when(users.findById(id)).thenReturn(Optional.of(internal));
-    when(passwordResetFlow.sendSetupLink(internal))
+    when(passwordResetFlow.sendSetupLink(internal, MailTemplateKey.ADMIN_PASSWORD_RESET))
         .thenReturn(new SetupLinkOutcome(false, "https://app/reset?token=y"));
 
     PasswordResetOutcome outcome = service.sendPasswordReset(id);

@@ -27,8 +27,10 @@ import io.qnop.service.ApplicationSettingsService;
 import io.qnop.service.UserService;
 import io.qnop.service.mail.MailService;
 import io.qnop.service.mail.MailTemplateKey;
+import io.qnop.service.mail.RelativeTimePhrase;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
+import java.time.Instant;
 import java.util.Map;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -68,8 +70,8 @@ public class RegistrationService {
     }
     User user =
         userService.createSelfRegistered(username, email, password, displayName, defaultRole());
-    String rawToken = verificationTokens.issue(user).rawToken();
-    sendVerificationEmail(user, rawToken);
+    var issued = verificationTokens.issue(user);
+    sendVerificationEmail(user, issued.rawToken(), issued.expiresAt());
   }
 
   /**
@@ -95,7 +97,7 @@ public class RegistrationService {
     userService.enable(user.getId());
   }
 
-  private void sendVerificationEmail(User user, String rawToken) {
+  private void sendVerificationEmail(User user, String rawToken, Instant expiresAt) {
     String actionUrl =
         baseUrl() + "/verify-email?token=" + URLEncoder.encode(rawToken, StandardCharsets.UTF_8);
     mailService.sendMailFromTemplate(
@@ -104,7 +106,8 @@ public class RegistrationService {
         Map.of(
             "siteName", siteName(),
             "recipientName", user.getDisplayName(),
-            "actionUrl", actionUrl),
+            "actionUrl", actionUrl,
+            "expiresAtHuman", RelativeTimePhrase.until(expiresAt)),
         null);
   }
 
