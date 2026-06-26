@@ -24,9 +24,9 @@ Path svg = TestData.path("branding/logomark.svg");
 ```
 testdata/
 └── branding/                 # branding upload fixtures (issue #106)
-    ├── logo-light.png        # valid 96×96 RGBA PNG (navy)
-    ├── logo-dark.png         # valid 120×64 RGBA PNG (blue) — used to test "replace"
-    ├── logomark.svg          # valid, clean SVG
+    ├── logo-light.png        # valid 320×96 RGBA PNG — "TEST LOGO" wordmark (navy text)
+    ├── logo-dark.png         # valid 320×96 RGBA PNG — "TEST LOGO" wordmark (white text), for "replace"
+    ├── logomark.svg          # valid, clean SVG — "T" mark
     ├── unsafe.svg            # hostile SVG (script + onload + javascript: link) for sanitization
     └── not-an-image.txt      # plain text — must be rejected as an unsupported type (415)
 ```
