@@ -50,9 +50,9 @@ describe('useUploadBrandingAsset', () => {
     const file = new File(['x'], 'logo.png', { type: 'image/png' });
 
     const { result } = renderHook(() => useUploadBrandingAsset(), { wrapper });
-    await result.current.mutateAsync({ slot: 'logo-light', file });
+    await result.current.mutateAsync({ slot: 'logo-light', file, filename: 'logo.png' });
 
-    expect(uploadBrandingAsset).toHaveBeenCalledWith('logo-light', file);
+    expect(uploadBrandingAsset).toHaveBeenCalledWith('logo-light', file, 'logo.png');
   });
 });
 

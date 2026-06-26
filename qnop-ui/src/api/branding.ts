@@ -50,10 +50,18 @@ export function brandingAssetUrl(slot: BrandingSlot, version?: number): string {
   return version ? `${url}?v=${version}` : url;
 }
 
-/** Uploads (replacing any existing) the asset for a slot. */
-export async function uploadBrandingAsset(slot: BrandingSlot, file: File): Promise<StoredAsset> {
+/**
+ * Uploads (replacing any existing) the asset for a slot. Accepts any Blob — a File for a
+ * direct SVG upload, or the cropped PNG Blob the cropper produces — with a cosmetic filename
+ * (the backend sniffs the real type from the bytes, not the name).
+ */
+export async function uploadBrandingAsset(
+  slot: BrandingSlot,
+  file: Blob,
+  filename = 'asset',
+): Promise<StoredAsset> {
   const form = new FormData();
-  form.append('file', file);
+  form.append('file', file, filename);
   const response = await axiosInstance.post<StoredAsset>(`/admin/branding/${slot}`, form);
   return response.data;
 }

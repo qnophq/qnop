@@ -78,8 +78,9 @@ export function BrandingPage() {
           Branding
         </Typography>
         <Typography color="text.secondary" sx={{ mt: 0.5 }}>
-          Replace the default logos shown across the app. PNG, WebP or SVG, up to 512 KiB. Each slot
-          falls back to the qnop default until you upload your own.
+          Replace the default logos shown across the app — drag an image in or browse. Raster
+          uploads open a cropper to cut the exact framing; SVG uploads as-is. PNG, WebP or SVG, up
+          to 512 KiB; each slot falls back to the qnop default until you upload your own.
         </Typography>
       </Box>
 

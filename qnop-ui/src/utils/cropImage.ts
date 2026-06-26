@@ -63,6 +63,55 @@ function canvasToBlob(canvas: HTMLCanvasElement): Promise<Blob> {
   });
 }
 
+export interface CropOutput {
+  /** Bounds the output (the crop is scaled down to fit, preserving its aspect). */
+  maxWidth: number;
+  maxHeight: number;
+  /** Output type. PNG (default) preserves transparency — important for logos. */
+  type?: 'image/png' | 'image/webp';
+}
+
+function encode(canvas: HTMLCanvasElement, type: string, quality?: number): Promise<Blob> {
+  return new Promise((resolve, reject) => {
+    canvas.toBlob(
+      (blob) => (blob ? resolve(blob) : reject(new Error('The image could not be processed.'))),
+      type,
+      quality,
+    );
+  });
+}
+
+/**
+ * Crops {@link area} out of the source image at its selected aspect, scaled to fit within
+ * {@link CropOutput.maxWidth}×{@link CropOutput.maxHeight} (preserving the crop's proportions), and
+ * returns a blob. Used for branding logos, which keep their own aspect ratio (unlike the square
+ * avatar) and need a transparent PNG by default.
+ */
+export async function getCroppedImageBlob(
+  imageSrc: string,
+  area: PixelArea,
+  output: CropOutput,
+): Promise<Blob> {
+  const image = await loadImage(imageSrc);
+  const scale = Math.min(1, output.maxWidth / area.width, output.maxHeight / area.height);
+  const width = Math.max(1, Math.round(area.width * scale));
+  const height = Math.max(1, Math.round(area.height * scale));
+  const canvas = document.createElement('canvas');
+  canvas.width = width;
+  canvas.height = height;
+  const ctx = canvas.getContext('2d');
+  if (!ctx) {
+    throw new Error('Image editing is not supported in this browser.');
+  }
+  ctx.imageSmoothingQuality = 'high';
+  ctx.drawImage(image, area.x, area.y, area.width, area.height, 0, 0, width, height);
+  return encode(
+    canvas,
+    output.type ?? 'image/png',
+    output.type === 'image/webp' ? 0.92 : undefined,
+  );
+}
+
 /** Crops {@link area} out of the source image and returns a square {@link AVATAR_OUTPUT_SIZE} blob. */
 export async function getCroppedAvatarBlob(imageSrc: string, area: PixelArea): Promise<Blob> {
   const image = await loadImage(imageSrc);

@@ -31,8 +31,8 @@ import { configKeys } from './useConfig';
 export function useUploadBrandingAsset() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (vars: { slot: BrandingSlot; file: File }) =>
-      uploadBrandingAsset(vars.slot, vars.file),
+    mutationFn: (vars: { slot: BrandingSlot; file: Blob; filename?: string }) =>
+      uploadBrandingAsset(vars.slot, vars.file, vars.filename),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: configKeys.all }),
   });
 }
