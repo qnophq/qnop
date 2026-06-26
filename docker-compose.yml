@@ -89,6 +89,32 @@ services:
       retries: 30
       start_period: 30s
 
+  # Mailpit — a local SMTP sink for testing outgoing mail (#146). It accepts every
+  # message on :1025 instead of delivering it and serves a web inbox on :8025
+  # (messages are in-memory and cleared on restart — fine for a test sink).
+  # NOT started by default; enable via the `mail` profile:
+  #   docker compose --profile mail up -d
+  #
+  # Point the qnop SMTP settings (Administration → Email / SMTP) at it:
+  #   Host: localhost   Port: 1025   Encryption: None   (no username/password)
+  #   From: noreply@qnop.local   Enable outgoing mail: ON
+  # Then use "Send test" there and read the message at http://localhost:8025.
+  # Bound to loopback only — this dev sink must never be reachable off-host.
+  mailpit:
+    image: axllent/mailpit:latest@sha256:37a38e48e9338cd7e89dfeb487f37b02ebfcd9cb23111bed2d345e79d37d6dd6
+    profiles: ['mail']
+    environment:
+      # Allow unauthenticated/plaintext SMTP from the local app — dev only.
+      MP_SMTP_AUTH_ALLOW_INSECURE: 'true'
+    ports:
+      - '127.0.0.1:${QNOP_MAILPIT_SMTP_PORT:-1025}:1025' # SMTP intake
+      - '127.0.0.1:${QNOP_MAILPIT_UI_PORT:-8025}:8025' # web inbox
+    healthcheck:
+      test: ['CMD', '/mailpit', 'readyz']
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
 volumes:
   qnop_pgdata:
   qnop_miniodata:
