@@ -27,9 +27,12 @@ import ListItemIcon from '@mui/material/ListItemIcon';
 import ListItemText from '@mui/material/ListItemText';
 import Tooltip from '@mui/material/Tooltip';
 import Typography from '@mui/material/Typography';
+import { useTheme, type SxProps, type Theme } from '@mui/material/styles';
 import { ShieldCheck } from 'lucide-react';
 import { NavLink } from 'react-router-dom';
+import { useConfig } from '../../api/hooks/useConfig';
 import { useAuthStore } from '../../stores/authStore';
+import { BrandLogo } from '../branding/BrandLogo';
 import { visibleNavGroups } from './navConfig';
 import { UserFooter } from './UserFooter';
 
@@ -47,10 +50,29 @@ interface SidebarContentProps {
 export function SidebarContent({ collapsed, onNavigate }: SidebarContentProps) {
   const role = useAuthStore((s) => s.role);
   const groups = visibleNavGroups(role);
+  const theme = useTheme();
+  const branding = useConfig().data?.branding;
+  const logomarkUrl = branding?.logomark.url;
+  // Pick the logo variant for the sidebar surface: dark theme → light logo, and vice versa.
+  const fullLogoUrl =
+    theme.palette.mode === 'dark' ? branding?.logoDark.url : branding?.logoLight.url;
+
+  // The brand-mark box, shared by the collapsed rail and the expanded fallback.
+  const markBoxSx: SxProps<Theme> = {
+    width: 30,
+    height: 30,
+    borderRadius: 1.75,
+    bgcolor: 'primary.main',
+    color: 'primary.contrastText',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    flexShrink: 0,
+  };
 
   return (
     <Box sx={{ height: '100%', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
-      {/* Brand */}
+      {/* Brand — driven by config.branding (issue #154), falling back to the wordmark */}
       <Box
         sx={{
           display: 'flex',
@@ -63,41 +85,47 @@ export function SidebarContent({ collapsed, onNavigate }: SidebarContentProps) {
           borderColor: 'divider',
         }}
       >
-        <Box
-          sx={{
-            width: 30,
-            height: 30,
-            borderRadius: 1.75,
-            bgcolor: 'primary.main',
-            color: 'primary.contrastText',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            flexShrink: 0,
-          }}
-        >
-          <ShieldCheck size={18} />
-        </Box>
-        {!collapsed && (
-          <Box sx={{ minWidth: 0 }}>
-            <Typography
-              sx={{ fontWeight: 700, fontSize: 15, letterSpacing: '-0.015em', lineHeight: 1 }}
-            >
-              qnop
-            </Typography>
-            <Typography
-              sx={{
-                fontSize: 10.5,
-                letterSpacing: '0.08em',
-                textTransform: 'uppercase',
-                color: 'text.disabled',
-                mt: 0.4,
-                fontWeight: 500,
-              }}
-            >
-              Quality Notes · Sovereign
-            </Typography>
+        {collapsed ? (
+          <Box sx={markBoxSx}>
+            <BrandLogo
+              url={logomarkUrl}
+              alt="qnop"
+              fallback={<ShieldCheck size={18} />}
+              sx={{ width: 20, height: 20 }}
+            />
           </Box>
+        ) : (
+          <BrandLogo
+            url={fullLogoUrl}
+            alt="qnop"
+            sx={{ height: 30, maxWidth: 180 }}
+            fallback={
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.25 }}>
+                <Box sx={markBoxSx}>
+                  <ShieldCheck size={18} />
+                </Box>
+                <Box sx={{ minWidth: 0 }}>
+                  <Typography
+                    sx={{ fontWeight: 700, fontSize: 15, letterSpacing: '-0.015em', lineHeight: 1 }}
+                  >
+                    qnop
+                  </Typography>
+                  <Typography
+                    sx={{
+                      fontSize: 10.5,
+                      letterSpacing: '0.08em',
+                      textTransform: 'uppercase',
+                      color: 'text.disabled',
+                      mt: 0.4,
+                      fontWeight: 500,
+                    }}
+                  >
+                    Quality Notes · Sovereign
+                  </Typography>
+                </Box>
+              </Box>
+            }
+          />
         )}
       </Box>
 
