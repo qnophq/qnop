@@ -30,6 +30,7 @@
     "react": "19.2.7",
     "react-dom": "19.2.7",
     "react-easy-crop": "^6.0.2",
+    "react-image-crop": "^11.1.2",
     "react-router-dom": "7.18.0",
     "zustand": "5.0.14"
   },

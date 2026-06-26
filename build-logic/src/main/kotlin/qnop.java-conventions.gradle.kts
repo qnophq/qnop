@@ -45,6 +45,10 @@ spotless {
 
 tasks.withType<Test>().configureEach {
     useJUnitPlatform()
+    // Expose the repo-level shared fixtures directory so integration tests can load
+    // files (e.g. branding assets) without brittle relative paths; see testdata/README.md
+    // and io.qnop.testsupport.TestData.
+    systemProperty("qnop.testdata.dir", rootDir.resolve("testdata").absolutePath)
     // Surface full exception traces for failures. The integration tests are
     // CI-only (Testcontainers needs Docker), so a truncated stack in the CI log
     // would otherwise leave failures undebuggable.

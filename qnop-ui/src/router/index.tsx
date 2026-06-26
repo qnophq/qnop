@@ -20,13 +20,14 @@
  */
 
 import { createBrowserRouter } from 'react-router-dom';
-import { FileText, Palette, ShieldCheck } from 'lucide-react';
+import { FileText, ShieldCheck } from 'lucide-react';
 import { AppShell } from '../components/shell/AppShell';
 import { AdminRoute } from '../components/auth/AdminRoute';
 import { ProtectedRoute } from '../components/auth/ProtectedRoute';
 import { RoleRoute } from '../components/auth/RoleRoute';
 import { ComingSoonPage } from '../pages/ComingSoonPage';
 import { HomePage } from '../pages/HomePage';
+import { BrandingPage } from '../pages/admin/BrandingPage';
 import { ProfilePage } from '../pages/ProfilePage';
 import { MailTemplatesPage } from '../pages/admin/MailTemplatesPage';
 import { OidcProvidersPage } from '../pages/admin/OidcProvidersPage';
@@ -141,11 +142,7 @@ export const router = createBrowserRouter([
         path: 'admin/branding',
         element: (
           <AdminRoute>
-            <ComingSoonPage
-              title="Branding"
-              description="Upload the light/dark logos and logomark shown across the app."
-              icon={Palette}
-            />
+            <BrandingPage />
           </AdminRoute>
         ),
       },

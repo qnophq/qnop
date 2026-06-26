@@ -25,15 +25,22 @@ import io.qnop.api.v1.model.Edition;
 import io.qnop.api.v1.model.OidcIconKind;
 import io.qnop.api.v1.model.OidcProviderLoginInfo;
 import io.qnop.api.v1.model.ServerConfigAuth;
+import io.qnop.api.v1.model.ServerConfigBranding;
+import io.qnop.api.v1.model.ServerConfigBrandingSlot;
 import io.qnop.api.v1.model.ServerConfigGeneral;
 import io.qnop.api.v1.model.ServerConfigResponse;
 import io.qnop.api.v1.model.ServerConfigUpload;
 import io.qnop.api.v1.model.SupportedFormat;
 import io.qnop.service.ApplicationSettingKey;
 import io.qnop.service.ApplicationSettingsService;
+import io.qnop.service.branding.BrandingService;
+import io.qnop.service.branding.BrandingService.SlotStatus;
 import io.qnop.service.oidc.OidcProviderService;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -58,10 +65,15 @@ public class ConfigController implements ServerConfigApi {
 
   private final OidcProviderService oidcProviders;
   private final ApplicationSettingsService settings;
+  private final BrandingService branding;
 
-  public ConfigController(OidcProviderService oidcProviders, ApplicationSettingsService settings) {
+  public ConfigController(
+      OidcProviderService oidcProviders,
+      ApplicationSettingsService settings,
+      BrandingService branding) {
     this.oidcProviders = oidcProviders;
     this.settings = settings;
+    this.branding = branding;
   }
 
   @Override
@@ -78,8 +90,26 @@ public class ConfigController implements ServerConfigApi {
                         settings.getBoolean(ApplicationSettingKey.AUTH_SELF_REGISTRATION_ENABLED)))
             .upload(new ServerConfigUpload().maxDocumentSizeMb(DEFAULT_MAX_DOCUMENT_SIZE_MB))
             .supportedFormats(
-                List.of(SupportedFormat.PDF, SupportedFormat.DOCX, SupportedFormat.MD));
+                List.of(SupportedFormat.PDF, SupportedFormat.DOCX, SupportedFormat.MD))
+            .branding(buildBranding());
     return ResponseEntity.ok(body);
+  }
+
+  /** Effective branding (custom vs default) per slot, so the SPA can render and badge each logo. */
+  private ServerConfigBranding buildBranding() {
+    Map<String, SlotStatus> bySlot =
+        branding.statusAll().stream()
+            .collect(Collectors.toMap(SlotStatus::slot, Function.identity()));
+    return new ServerConfigBranding()
+        .logoLight(toBrandingSlot(bySlot.get("logo-light")))
+        .logoDark(toBrandingSlot(bySlot.get("logo-dark")))
+        .logomark(toBrandingSlot(bySlot.get("logomark")));
+  }
+
+  private static ServerConfigBrandingSlot toBrandingSlot(SlotStatus status) {
+    return new ServerConfigBrandingSlot()
+        .source(ServerConfigBrandingSlot.SourceEnum.fromValue(status.source().name()))
+        .url("/api/v1/branding/" + status.slot() + "?v=" + status.version());
   }
 
   /** The enabled providers as login buttons for the SPA (issue #21), with icon + account-switch. */

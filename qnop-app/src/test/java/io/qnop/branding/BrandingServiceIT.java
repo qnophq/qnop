@@ -107,11 +107,31 @@ class BrandingServiceIT extends AbstractIntegrationTest {
   }
 
   @Test
-  void deleteRemovesAsset() throws Exception {
+  void deleteFallsBackToFactoryDefault() throws Exception {
     branding.store("logo-light", png(16, 16), null);
+    assertThat(branding.get("logo-light").orElseThrow().contentType()).isEqualTo("image/png");
 
     branding.delete("logo-light");
 
-    assertThat(branding.get("logo-light")).isEmpty();
+    // The slot is not gone — it now serves the bundled factory default (SVG), never 404.
+    assertThat(branding.get("logo-light").orElseThrow().contentType()).isEqualTo("image/svg+xml");
+  }
+
+  @Test
+  void reportsDefaultThenCustomSource() throws Exception {
+    assertThat(sourceOf("logomark")).isEqualTo(BrandingService.BrandingSource.DEFAULT);
+    assertThat(branding.get("logomark").orElseThrow().contentType()).isEqualTo("image/svg+xml");
+
+    branding.store("logomark", png(16, 16), null);
+
+    assertThat(sourceOf("logomark")).isEqualTo(BrandingService.BrandingSource.CUSTOM);
+  }
+
+  private BrandingService.BrandingSource sourceOf(String slot) {
+    return branding.statusAll().stream()
+        .filter(s -> s.slot().equals(slot))
+        .findFirst()
+        .orElseThrow()
+        .source();
   }
 }

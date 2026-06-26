@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" fill="none" role="img" aria-label="qnop">
+  <!-- Temporary qnop placeholder logomark. Replace with the real brand asset. -->
+  <rect width="64" height="64" rx="16" fill="#012142"/>
+  <text x="31" y="45" text-anchor="middle" font-family="'Segoe UI', system-ui, -apple-system, Roboto, Helvetica, Arial, sans-serif" font-size="36" font-weight="700" fill="#FFFFFF">q</text>
+  <circle cx="44" cy="43" r="4.5" fill="#1292EE"/>
+</svg>

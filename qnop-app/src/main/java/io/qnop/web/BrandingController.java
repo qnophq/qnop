@@ -36,6 +36,7 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.multipart.MaxUploadSizeExceededException;
 import org.springframework.web.multipart.MultipartFile;
 
 /**
@@ -83,6 +84,9 @@ public class BrandingController {
     return ResponseEntity.ok()
         .eTag(etag)
         .cacheControl(CacheControl.noCache())
+        // The bytes are an operator-influenced binary on a public path; stop the browser
+        // from MIME-sniffing them into something executable.
+        .header("X-Content-Type-Options", "nosniff")
         .contentType(MediaType.parseMediaType(asset.contentType()))
         .body(asset.content());
   }
@@ -94,6 +98,17 @@ public class BrandingController {
             new ErrorResponse()
                 .code(ex.getCode())
                 .message(ex.getMessage())
+                .timestamp(OffsetDateTime.now()));
+  }
+
+  /** A multipart payload above the container limit maps to a uniform 413, not a generic 500. */
+  @ExceptionHandler(MaxUploadSizeExceededException.class)
+  public ResponseEntity<ErrorResponse> onTooLarge(MaxUploadSizeExceededException ex) {
+    return ResponseEntity.status(413)
+        .body(
+            new ErrorResponse()
+                .code("PAYLOAD_TOO_LARGE")
+                .message("The file is too large (max 512 KiB).")
                 .timestamp(OffsetDateTime.now()));
   }
 }
