@@ -26,6 +26,7 @@ import { ThemeProvider } from '@mui/material/styles';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import type { AdminSetting } from '../../api/generated';
 import { buildTheme } from '../../theme/theme';
+import { useAuthStore } from '../../stores/authStore';
 import { EmailServerPage } from './EmailServerPage';
 
 const { updateMutate, testMutate } = vi.hoisted(() => ({
@@ -95,6 +96,7 @@ vi.mock('../../api/hooks/useMailTemplates', () => ({
 beforeEach(() => {
   updateMutate.mockReset().mockResolvedValue({ settings: SETTINGS });
   testMutate.mockReset().mockResolvedValue({ status: 'SENT', detail: 'Sent.' });
+  useAuthStore.setState({ email: 'admin@example.com' });
 });
 
 function wrapper({ children }: { children: ReactNode }) {
@@ -177,5 +179,42 @@ describe('EmailServerPage', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Send test' }));
 
     await waitFor(() => expect(testMutate).toHaveBeenCalledWith('qa@example.com'));
+  });
+
+  it('defaults the recipient to the signed-in admin email', () => {
+    renderPage();
+
+    expect((screen.getByLabelText('Recipient') as HTMLInputElement).value).toBe(
+      'admin@example.com',
+    );
+  });
+
+  it('surfaces a skipped send as an info status alert', async () => {
+    testMutate.mockResolvedValue({ status: 'SKIPPED', detail: 'SMTP is not configured.' });
+    renderPage();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Send test' }));
+
+    const alert = await screen.findByRole('status');
+    expect(alert.textContent).toContain('SMTP is not configured.');
+    expect(alert.className).toContain('MuiAlert-colorInfo');
+  });
+
+  it('surfaces a failed send as an error alert', async () => {
+    testMutate.mockResolvedValue({ status: 'FAILED', detail: 'Connection refused.' });
+    renderPage();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Send test' }));
+
+    const alert = await screen.findByText('Connection refused.');
+    expect(alert.closest('.MuiAlert-colorError')).toBeTruthy();
+  });
+
+  it('disables the test-send when no recipient is set', () => {
+    useAuthStore.setState({ email: null });
+    renderPage();
+
+    expect((screen.getByLabelText('Recipient') as HTMLInputElement).value).toBe('');
+    expect(screen.getByRole('button', { name: 'Send test' })).toBeDisabled();
   });
 });

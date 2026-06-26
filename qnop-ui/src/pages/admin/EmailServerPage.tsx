@@ -35,6 +35,7 @@ import { AtSign, SendHorizonal, Server, Zap } from 'lucide-react';
 import type { AdminSetting, SendTestEmailResponse } from '../../api/generated';
 import { useSettings, useUpdateSettings } from '../../api/hooks/useSettings';
 import { useSendTestEmail } from '../../api/hooks/useMailTemplates';
+import { useAuthStore } from '../../stores/authStore';
 import { PasswordField } from '../../components/auth/PasswordField';
 import { PageHeader } from '../../components/admin/layout/PageHeader';
 import { SectionCard } from '../../components/admin/layout/SectionCard';
@@ -52,9 +53,9 @@ import {
 import { apiErrorMessage, apiFieldErrors } from '../../utils/apiError';
 import { isEmail, isPort } from '../../utils/validation';
 
-const TEST_SEVERITY: Record<SendTestEmailResponse['status'], 'success' | 'warning' | 'error'> = {
+const TEST_SEVERITY: Record<SendTestEmailResponse['status'], 'success' | 'info' | 'error'> = {
   SENT: 'success',
-  SKIPPED: 'warning',
+  SKIPPED: 'info',
   FAILED: 'error',
 };
 
@@ -98,7 +99,9 @@ export function EmailServerPage() {
   const [submitAttempted, setSubmitAttempted] = useState(false);
   const [serverErrors, setServerErrors] = useState<Record<string, string>>({});
   const { toast, notify, clear } = useToast();
-  const [testRecipient, setTestRecipient] = useState('');
+  // Default the test recipient to the signed-in admin (issue #146); still editable.
+  const adminEmail = useAuthStore((s) => s.email);
+  const [testRecipient, setTestRecipient] = useState(adminEmail ?? '');
   const [testResult, setTestResult] = useState<SendTestEmailResponse | null>(null);
   const [testError, setTestError] = useState<string | null>(null);
 
@@ -375,7 +378,7 @@ export function EmailServerPage() {
                 </Typography>
               )}
               {testResult && (
-                <Alert severity={TEST_SEVERITY[testResult.status]} sx={{ mt: 1.5 }}>
+                <Alert severity={TEST_SEVERITY[testResult.status]} role="status" sx={{ mt: 1.5 }}>
                   {testResult.detail}
                 </Alert>
               )}
