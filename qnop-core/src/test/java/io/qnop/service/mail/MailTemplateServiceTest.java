@@ -139,14 +139,87 @@ class MailTemplateServiceTest {
   }
 
   @Test
-  @DisplayName("preview uses representative sample data when no variables are supplied")
+  @DisplayName("preview uses per-key demo data and returns the effective sampleVars")
   void previewUsesSampleVars() {
     when(repository.findByTemplateKeyAndLocale(any(), any())).thenReturn(Optional.empty());
 
-    RenderedMail mail = service.preview(MailTemplateKey.REGISTRATION_VERIFICATION, "en", Map.of());
+    MailTemplateService.MailPreview preview =
+        service.preview(MailTemplateKey.REGISTRATION_VERIFICATION, "en", Map.of());
 
-    assertThat(mail.subject()).isEqualTo("Verify your qnop account");
-    assertThat(mail.bodyPlain()).contains("Jane Doe");
+    assertThat(preview.rendered().subject()).isEqualTo("Verify your qnop account");
+    assertThat(preview.rendered().bodyPlain()).contains("Jane Doe");
+    assertThat(preview.sampleVars())
+        .containsEntry("recipientName", "Jane Doe")
+        .containsEntry("expiresAtHuman", "in 30 minutes")
+        .containsOnlyKeys("siteName", "recipientName", "actionUrl", "expiresAtHuman");
+  }
+
+  @Test
+  @DisplayName("preview overlays caller overrides and ignores unknown override keys")
+  void previewOverlaysOverrides() {
+    when(repository.findByTemplateKeyAndLocale(any(), any())).thenReturn(Optional.empty());
+
+    MailTemplateService.MailPreview preview =
+        service.preview(
+            MailTemplateKey.PASSWORD_RESET,
+            "en",
+            Map.of("recipientName", "Alice", "bogus", "ignored"));
+
+    assertThat(preview.rendered().bodyPlain()).contains("Alice");
+    assertThat(preview.sampleVars())
+        .containsEntry("recipientName", "Alice")
+        .doesNotContainKey("bogus");
+  }
+
+  @Test
+  @DisplayName("getEffective carries friendlyName, sorted placeholders and the catalog defaults")
+  void getEffectivePopulatesEditorMetadata() {
+    when(repository.findByTemplateKeyAndLocale(any(), any())).thenReturn(Optional.empty());
+
+    MailTemplateView view = service.getEffective(MailTemplateKey.PASSWORD_RESET, "en");
+
+    assertThat(view.friendlyName()).isEqualTo("Password reset");
+    assertThat(view.placeholders())
+        .containsExactly("actionUrl", "expiresAtHuman", "recipientName", "siteName");
+    assertThat(view.defaultSubject()).isEqualTo("Reset your {{siteName}} password");
+    assertThat(view.defaultBodyPlain()).contains("{{recipientName}}", "{{actionUrl}}");
+    assertThat(view.defaultBodyHtml()).contains("<!DOCTYPE html>", "{{actionUrl}}");
+  }
+
+  @Test
+  @DisplayName("updating a body with an unknown placeholder is rejected")
+  void updateRejectsUnknownPlaceholder() {
+    assertThatThrownBy(
+            () ->
+                service.update(
+                    MailTemplateKey.PASSWORD_RESET,
+                    "en",
+                    "Hi {{recipientName}}",
+                    "Reset via {{actionUrl}} for {{unknownThing}}",
+                    null,
+                    null))
+        .isInstanceOf(MailTemplateValidationException.class)
+        .hasMessageContaining("{{unknownThing}}");
+  }
+
+  @Test
+  @DisplayName("updating a body that uses only known placeholders is accepted")
+  void updateAcceptsKnownPlaceholders() {
+    MailTemplate row = new MailTemplate("auth.password_reset", "en", "s", "p");
+    when(repository.findByTemplateKeyAndLocale("auth.password_reset", "en"))
+        .thenReturn(Optional.of(row));
+    when(repository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+    MailTemplateView saved =
+        service.update(
+            MailTemplateKey.PASSWORD_RESET,
+            "en",
+            "Reset for {{recipientName}}",
+            "Open {{actionUrl}} — expires {{expiresAtHuman}}",
+            "<p>{{siteName}}</p>",
+            null);
+
+    assertThat(saved.source()).isEqualTo(MailTemplateView.Source.DATABASE);
   }
 
   @Test

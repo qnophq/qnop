@@ -1937,11 +1937,14 @@ components:
         - DEFAULT
     MailTemplateResponse:
       type: object
-      description: The effective content of one mail template.
+      description: The effective content of one mail template, plus editor metadata.
       properties:
         key:
           type: string
           description: Stable template storage key (e.g. `auth.password_reset`).
+        friendlyName:
+          type: string
+          description: Human-readable label for the template (e.g. `Password reset`).
         locale:
           type: string
         subject:
@@ -1953,6 +1956,22 @@ components:
           description: Optional HTML alternative; absent when the template is plain-text only.
         source:
           $ref: '#/components/schemas/MailTemplateSource'
+        placeholders:
+          type: array
+          items:
+            type: string
+          description: >-
+            The sorted, closed set of `{{placeholder}}` names this template
+            accepts. The editor offers these as chips and rejects any other.
+        defaultSubject:
+          type: string
+          description: The built-in catalog subject (for compare/reset in the editor).
+        defaultBodyPlain:
+          type: string
+          description: The built-in catalog plain-text body.
+        defaultBodyHtml:
+          type: string
+          description: The built-in catalog HTML body (branded chrome); absent if none.
         updatedAt:
           type: string
           format: date-time
@@ -1962,10 +1981,14 @@ components:
           description: Id of the admin who last saved the override; absent for built-in defaults.
       required:
         - key
+        - friendlyName
         - locale
         - subject
         - bodyPlain
         - source
+        - placeholders
+        - defaultSubject
+        - defaultBodyPlain
     MailTemplateListResponse:
       type: object
       properties:
@@ -2013,9 +2036,18 @@ components:
           type: string
         bodyHtml:
           type: string
+        sampleVars:
+          type: object
+          additionalProperties:
+            type: string
+          description: >-
+            The effective variables used for this render — per-key demo values
+            overlaid with any caller-supplied overrides — so the editor can
+            prefill its sample-variable inputs.
       required:
         - subject
         - bodyPlain
+        - sampleVars
     UserSettingItem:
       type: object
       description: One user setting with its current value.
