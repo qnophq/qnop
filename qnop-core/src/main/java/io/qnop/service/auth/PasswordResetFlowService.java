@@ -27,6 +27,7 @@ import io.qnop.service.UserService;
 import io.qnop.service.mail.MailService;
 import io.qnop.service.mail.MailService.SendResult;
 import io.qnop.service.mail.MailTemplateKey;
+import io.qnop.service.mail.RelativeTimePhrase;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
 import java.util.Map;
@@ -66,7 +67,10 @@ public class PasswordResetFlowService {
     if (!settings.getBoolean(ApplicationSettingKey.AUTH_PASSWORD_RESET_ENABLED)) {
       return;
     }
-    userService.findInternalByEmail(email).filter(User::isEnabled).ifPresent(this::sendResetEmail);
+    userService
+        .findInternalByEmail(email)
+        .filter(User::isEnabled)
+        .ifPresent(user -> sendResetEmail(user, MailTemplateKey.PASSWORD_RESET));
   }
 
   /** Consumes a reset token and applies the new password. Throws on an invalid token. */
@@ -82,24 +86,30 @@ public class PasswordResetFlowService {
    * out-of-band fallback). Unlike {@link #requestReset}, this is not gated by the self-service
    * feature flag or anti-enumeration — the admin already knows the account exists and is acting on
    * it deliberately (e.g. (re)sending an invitation or unblocking a locked-out user).
+   *
+   * @param template the template to send — {@code PASSWORD_RESET} for an invitation/re-send, {@code
+   *     ADMIN_PASSWORD_RESET} for an admin-initiated reset (issue #140).
    */
   @Transactional
-  public SetupLinkOutcome sendSetupLink(User user) {
-    return sendResetEmail(user);
+  public SetupLinkOutcome sendSetupLink(User user, MailTemplateKey template) {
+    return sendResetEmail(user, template);
   }
 
-  private SetupLinkOutcome sendResetEmail(User user) {
-    String rawToken = resetTokens.issue(user).rawToken();
+  private SetupLinkOutcome sendResetEmail(User user, MailTemplateKey template) {
+    var issued = resetTokens.issue(user);
     String actionUrl =
-        baseUrl() + "/reset-password?token=" + URLEncoder.encode(rawToken, StandardCharsets.UTF_8);
+        baseUrl()
+            + "/reset-password?token="
+            + URLEncoder.encode(issued.rawToken(), StandardCharsets.UTF_8);
     SendResult result =
         mailService.sendMailFromTemplate(
-            MailTemplateKey.PASSWORD_RESET,
+            template,
             user.getEmail(),
             Map.of(
                 "siteName", siteName(),
                 "recipientName", user.getDisplayName(),
-                "actionUrl", actionUrl),
+                "actionUrl", actionUrl,
+                "expiresAtHuman", RelativeTimePhrase.until(issued.expiresAt())),
             null);
     return new SetupLinkOutcome(result instanceof SendResult.Sent, actionUrl);
   }

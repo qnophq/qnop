@@ -50,30 +50,55 @@ public class MailTemplateService {
 
   private final MailTemplateRepository repository;
   private final ApplicationSettingsService settings;
+  private final EmailLayoutBuilder layoutBuilder;
   private final Mustache.Compiler plainCompiler = Mustache.compiler().escapeHTML(false);
   private final Mustache.Compiler htmlCompiler = Mustache.compiler().escapeHTML(true);
 
   public MailTemplateService(
-      MailTemplateRepository repository, ApplicationSettingsService settings) {
+      MailTemplateRepository repository,
+      ApplicationSettingsService settings,
+      EmailLayoutBuilder layoutBuilder) {
     this.repository = repository;
     this.settings = settings;
+    this.layoutBuilder = layoutBuilder;
   }
 
   /**
    * Renders the template for {@code locale} (with fallback) using {@code vars}. Throws {@link
    * com.samskivert.mustache.MustacheException} if a referenced variable is missing.
+   *
+   * <p>When a stored row carries an HTML override it is used verbatim; otherwise the catalog
+   * default's content fragment is rendered and wrapped in the shared branded chrome ({@link
+   * EmailLayoutBuilder}), so every email — default or reset-to-default — looks consistent.
    */
   public RenderedMail render(MailTemplateKey key, Map<String, Object> vars, String locale) {
     Optional<MailTemplate> row = resolve(key, locale);
     String subject = row.map(MailTemplate::getSubject).orElseGet(key::defaultSubject);
     String plain = row.map(MailTemplate::getBodyPlain).orElseGet(key::defaultBodyPlain);
-    String html = row.map(MailTemplate::getBodyHtml).orElse(null);
+    String storedHtml = row.map(MailTemplate::getBodyHtml).filter(h -> !h.isBlank()).orElse(null);
 
     String renderedSubject = plainCompiler.compile(subject).execute(vars);
     String renderedPlain = plainCompiler.compile(plain).execute(vars);
     String renderedHtml =
-        html != null && !html.isBlank() ? htmlCompiler.compile(html).execute(vars) : null;
+        storedHtml != null
+            ? htmlCompiler.compile(storedHtml).execute(vars)
+            : buildBrandedHtml(key, vars);
     return new RenderedMail(renderedSubject, renderedPlain, renderedHtml);
+  }
+
+  /** Renders the catalog default content fragment and wraps it in the branded chrome. */
+  private String buildBrandedHtml(MailTemplateKey key, Map<String, Object> vars) {
+    String content = htmlCompiler.compile(key.defaultBodyHtmlContent()).execute(vars);
+    String preheader = plainCompiler.compile(key.preheader()).execute(vars);
+    Object brand = vars.get("siteName");
+    Object actionUrl = vars.get("actionUrl");
+    return layoutBuilder.wrap(
+        brand == null ? null : brand.toString(),
+        preheader,
+        content,
+        actionUrl == null ? null : actionUrl.toString(),
+        key.ctaLabel(),
+        "This is an automated message — please don't reply.");
   }
 
   /** Renders {@code key} with the provided variables, or representative sample data if none. */
@@ -170,7 +195,8 @@ public class MailTemplateService {
     return Map.of(
         "siteName", "qnop",
         "recipientName", "Jane Doe",
-        "actionUrl", "https://qnop.example/action?token=SAMPLE");
+        "actionUrl", "https://qnop.example/action?token=SAMPLE",
+        "expiresAtHuman", "in 30 minutes");
   }
 
   private MailTemplateView toView(MailTemplate row, MailTemplateView.Source source) {

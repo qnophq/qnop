@@ -7,8 +7,11 @@
 # body_plain is always required (accessibility / spam-filter friendliness),
 # body_html is the optional alternative the mail layer sends as
 # multipart/alternative. Seeds ship usable English defaults out of the box;
-# Mustache placeholders ({{username}}, {{verificationLink}}/{{resetLink}},
-# {{expiresAtHuman}}, {{siteName}}) are rendered by MailTemplateService (#19).
+# Mustache placeholders ({{recipientName}}, {{actionUrl}}, {{expiresAtHuman}},
+# {{siteName}}) are rendered by MailTemplateService (#19) and must match exactly
+# the variables the send flows supply (issue #140). The seeds carry plain text
+# only; the branded HTML is built by EmailLayoutBuilder from the catalog content
+# fragment, so there is a single source of email chrome (issue #140).
 databaseChangeLog:
   - changeSet:
       id: 0003-create-mail-template
@@ -73,30 +76,13 @@ databaseChangeLog:
               - column:
                   name: body_plain
                   value: |
-                    Hi {{username}},
+                    Hi {{recipientName}},
 
-                    Please verify your email address to finish setting up your
-                    {{siteName}} account. This link expires {{expiresAtHuman}}.
+                    Confirm your email address to activate your {{siteName}} account:
 
-                    {{verificationLink}}
+                    {{actionUrl}}
 
-                    If you did not create an account, you can safely ignore this message.
-              - column:
-                  name: body_html
-                  value: |
-                    <!DOCTYPE html>
-                    <html>
-                      <body>
-                        <p>Hi {{username}},</p>
-                        <p>Please verify your email address to finish setting up your
-                          {{siteName}} account. This link expires {{expiresAtHuman}}.</p>
-                        <p><a href="{{verificationLink}}">Verify my email</a></p>
-                        <p>If the button does not work, paste this URL into your browser:<br>
-                          <a href="{{verificationLink}}">{{verificationLink}}</a></p>
-                        <p style="color:#666;font-size:0.9em;">If you did not create an account,
-                          you can safely ignore this message.</p>
-                      </body>
-                    </html>
+                    This link expires {{expiresAtHuman}}. If you did not create this account, you can safely ignore this message.
       rollback:
         - delete:
             tableName: mail_template
@@ -117,34 +103,13 @@ databaseChangeLog:
               - column:
                   name: body_plain
                   value: |
-                    Hi {{username}},
+                    Hi {{recipientName}},
 
-                    We received a request to reset the password on your {{siteName}}
-                    account. Click the link below to choose a new one — it is valid
-                    {{expiresAtHuman}}.
+                    We received a request to reset your {{siteName}} password. Choose a new one here:
 
-                    {{resetLink}}
+                    {{actionUrl}}
 
-                    If you did not request a password reset, you can safely ignore this
-                    message — your existing password remains active.
-              - column:
-                  name: body_html
-                  value: |
-                    <!DOCTYPE html>
-                    <html>
-                      <body>
-                        <p>Hi {{username}},</p>
-                        <p>We received a request to reset the password on your {{siteName}}
-                          account. Click the button below to choose a new one — it is valid
-                          {{expiresAtHuman}}.</p>
-                        <p><a href="{{resetLink}}">Reset my password</a></p>
-                        <p>If the button does not work, paste this URL into your browser:<br>
-                          <a href="{{resetLink}}">{{resetLink}}</a></p>
-                        <p style="color:#666;font-size:0.9em;">If you did not request a password
-                          reset, you can safely ignore this message — your existing password
-                          remains active.</p>
-                      </body>
-                    </html>
+                    This link expires {{expiresAtHuman}}. If you did not request this, you can safely ignore this message; your password stays unchanged.
       rollback:
         - delete:
             tableName: mail_template
@@ -161,36 +126,17 @@ databaseChangeLog:
               - column: { name: id, valueComputed: gen_random_uuid() }
               - column: { name: template_key, value: auth.admin_password_reset }
               - column: { name: locale, value: en }
-              - column: { name: subject, value: "An administrator reset your {{siteName}} password" }
+              - column: { name: subject, value: "Your {{siteName}} password was reset by an administrator" }
               - column:
                   name: body_plain
                   value: |
-                    Hi {{username}},
+                    Hi {{recipientName}},
 
-                    An administrator has initiated a password reset on your {{siteName}}
-                    account. Click the link below to choose a new password — it is valid
-                    {{expiresAtHuman}}.
+                    An administrator reset your {{siteName}} password. Set a new one to sign back in:
 
-                    {{resetLink}}
+                    {{actionUrl}}
 
-                    If you have questions about this change, contact your administrator.
-              - column:
-                  name: body_html
-                  value: |
-                    <!DOCTYPE html>
-                    <html>
-                      <body>
-                        <p>Hi {{username}},</p>
-                        <p>An administrator has initiated a password reset on your {{siteName}}
-                          account. Click the button below to choose a new password — it is valid
-                          {{expiresAtHuman}}.</p>
-                        <p><a href="{{resetLink}}">Choose new password</a></p>
-                        <p>If the button does not work, paste this URL into your browser:<br>
-                          <a href="{{resetLink}}">{{resetLink}}</a></p>
-                        <p style="color:#666;font-size:0.9em;">If you have questions about this
-                          change, contact your administrator.</p>
-                      </body>
-                    </html>
+                    This link expires {{expiresAtHuman}}.
       rollback:
         - delete:
             tableName: mail_template

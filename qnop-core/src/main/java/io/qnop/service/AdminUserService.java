@@ -29,6 +29,7 @@ import io.qnop.repository.UserRepository;
 import io.qnop.security.PasswordGenerator;
 import io.qnop.service.auth.PasswordResetFlowService;
 import io.qnop.service.auth.PasswordResetFlowService.SetupLinkOutcome;
+import io.qnop.service.mail.MailTemplateKey;
 import java.time.Instant;
 import java.util.List;
 import java.util.Locale;
@@ -137,7 +138,7 @@ public class AdminUserService {
     User saved = users.save(user);
 
     if (invite) {
-      passwordResetFlow.sendSetupLink(saved);
+      passwordResetFlow.sendSetupLink(saved, MailTemplateKey.PASSWORD_RESET);
     }
     return toView(saved, null);
   }
@@ -220,7 +221,8 @@ public class AdminUserService {
           "NO_LOCAL_PASSWORD",
           "This account signs in via an identity provider; it has no password.");
     }
-    SetupLinkOutcome outcome = passwordResetFlow.sendSetupLink(user);
+    SetupLinkOutcome outcome =
+        passwordResetFlow.sendSetupLink(user, MailTemplateKey.ADMIN_PASSWORD_RESET);
     // Revoke active sessions now (the modifying writes clear the persistence context, so do this
     // after the link has been issued from the still-managed entity).
     users.bumpPasswordInvalidatedBefore(id, Instant.now());

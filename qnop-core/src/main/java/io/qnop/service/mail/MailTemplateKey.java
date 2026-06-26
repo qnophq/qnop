@@ -32,9 +32,11 @@ import java.util.Optional;
  * the enum is the authoritative <em>registry</em> of which templates exist, the entity is one
  * stored per-locale override.
  *
- * <p>Bodies are logic-less Mustache; variables (e.g. {@code {{siteName}}}, {@code {{actionUrl}}})
- * are supplied at render time. HTML defaults are intentionally absent here — the seeded rows carry
- * the rich responsive HTML; when neither exists the message is sent plain-text only.
+ * <p>Bodies are logic-less Mustache; variables ({@code {{siteName}}}, {@code {{recipientName}}},
+ * {@code {{actionUrl}}}, {@code {{expiresAtHuman}}}) are supplied at render time and must match the
+ * variables the live send flows pass (issue #140). Each key carries a plain-text body and an inner
+ * HTML content fragment; {@link EmailLayoutBuilder} wraps the fragment in the shared branded chrome
+ * unless a stored row overrides the HTML.
  */
 public enum MailTemplateKey {
   REGISTRATION_VERIFICATION(
@@ -43,43 +45,81 @@ public enum MailTemplateKey {
       """
       Hi {{recipientName}},
 
-      Please confirm your email address to activate your {{siteName}} account:
+      Confirm your email address to activate your {{siteName}} account:
 
       {{actionUrl}}
 
-      If you did not create this account, you can safely ignore this message.
-      """),
+      This link expires {{expiresAtHuman}}. If you did not create this account, you can safely ignore this message.
+      """,
+      """
+      <h1 style="margin:0 0 14px;color:#18191f;font-size:22px;font-weight:700;letter-spacing:-0.01em;line-height:1.3;">Confirm your email</h1>
+      <p style="margin:0 0 14px;">Hi {{recipientName}},</p>
+      <p style="margin:0 0 14px;">Confirm this address to activate your <strong style="color:#18191f;">{{siteName}}</strong> account.</p>
+      <p style="margin:0;color:#9a9ea8;font-size:13px;">This link expires {{expiresAtHuman}}. If you didn't create this account, you can ignore this email.</p>
+      """,
+      "Verify email address",
+      "Confirm your email to activate your {{siteName}} account."),
   PASSWORD_RESET(
       "auth.password_reset",
       "Reset your {{siteName}} password",
       """
       Hi {{recipientName}},
 
-      We received a request to reset your {{siteName}} password. Use the link below to choose a new one:
+      We received a request to reset your {{siteName}} password. Choose a new one here:
 
       {{actionUrl}}
 
-      If you did not request this, you can safely ignore this message; your password stays unchanged.
-      """),
+      This link expires {{expiresAtHuman}}. If you did not request this, you can safely ignore this message; your password stays unchanged.
+      """,
+      """
+      <h1 style="margin:0 0 14px;color:#18191f;font-size:22px;font-weight:700;letter-spacing:-0.01em;line-height:1.3;">Reset your password</h1>
+      <p style="margin:0 0 14px;">Hi {{recipientName}},</p>
+      <p style="margin:0 0 14px;">We received a request to reset your <strong style="color:#18191f;">{{siteName}}</strong> password. Choose a new one below.</p>
+      <p style="margin:0;color:#9a9ea8;font-size:13px;">This link expires {{expiresAtHuman}}. If you didn't request this, ignore this email — your password stays unchanged.</p>
+      """,
+      "Choose a new password",
+      "Reset your {{siteName}} password."),
   ADMIN_PASSWORD_RESET(
       "auth.admin_password_reset",
       "Your {{siteName}} password was reset by an administrator",
       """
       Hi {{recipientName}},
 
-      An administrator has reset your {{siteName}} password. Use the link below to set a new one:
+      An administrator reset your {{siteName}} password. Set a new one to sign back in:
 
       {{actionUrl}}
-      """);
+
+      This link expires {{expiresAtHuman}}.
+      """,
+      """
+      <h1 style="margin:0 0 14px;color:#18191f;font-size:22px;font-weight:700;letter-spacing:-0.01em;line-height:1.3;">Set a new password</h1>
+      <p style="margin:0 0 14px;">Hi {{recipientName}},</p>
+      <p style="margin:0 0 14px;">An administrator reset your <strong style="color:#18191f;">{{siteName}}</strong> password. Set a new one to sign back in.</p>
+      <p style="margin:0;color:#9a9ea8;font-size:13px;">This link expires {{expiresAtHuman}}.</p>
+      """,
+      "Set a new password",
+      "An administrator reset your {{siteName}} password.");
 
   private final String key;
   private final String defaultSubject;
   private final String defaultBodyPlain;
+  private final String defaultBodyHtmlContent;
+  private final String ctaLabel;
+  private final String preheader;
 
-  MailTemplateKey(String key, String defaultSubject, String defaultBodyPlain) {
+  MailTemplateKey(
+      String key,
+      String defaultSubject,
+      String defaultBodyPlain,
+      String defaultBodyHtmlContent,
+      String ctaLabel,
+      String preheader) {
     this.key = key;
     this.defaultSubject = defaultSubject;
     this.defaultBodyPlain = defaultBodyPlain;
+    this.defaultBodyHtmlContent = defaultBodyHtmlContent;
+    this.ctaLabel = ctaLabel;
+    this.preheader = preheader;
   }
 
   /** The stable storage key (matches the {@code template_key} column). */
@@ -93,6 +133,25 @@ public enum MailTemplateKey {
 
   public String defaultBodyPlain() {
     return defaultBodyPlain;
+  }
+
+  /**
+   * The inner HTML content fragment (heading + body), wrapped in the shared branded chrome by
+   * {@link EmailLayoutBuilder} when no stored HTML override exists. Logic-less Mustache,
+   * HTML-escaped.
+   */
+  public String defaultBodyHtmlContent() {
+    return defaultBodyHtmlContent;
+  }
+
+  /** The call-to-action button label for this template. */
+  public String ctaLabel() {
+    return ctaLabel;
+  }
+
+  /** The hidden inbox-preview line (Mustache). */
+  public String preheader() {
+    return preheader;
   }
 
   /** Resolves a storage key back to its catalog entry, if known. */

@@ -45,11 +45,19 @@ class MailTemplateServiceTest {
   @Mock private MailTemplateRepository repository;
   @Mock private ApplicationSettingsService settings;
 
+  /** Exactly the variable set the live send flows supply (issue #140). */
+  private static final Map<String, Object> FLOW_VARS =
+      Map.of(
+          "siteName", "qnop",
+          "recipientName", "Jane",
+          "actionUrl", "https://qnop.example/reset?token=abc",
+          "expiresAtHuman", "in 30 minutes");
+
   private MailTemplateService service;
 
   @BeforeEach
   void setUp() {
-    service = new MailTemplateService(repository, settings);
+    service = new MailTemplateService(repository, settings, new EmailLayoutBuilder());
     lenient()
         .when(settings.getString(ApplicationSettingKey.GENERAL_DEFAULT_LANGUAGE))
         .thenReturn("en");
@@ -76,19 +84,34 @@ class MailTemplateServiceTest {
   }
 
   @Test
-  @DisplayName("falls back to the catalog defaults when no row exists for any locale")
+  @DisplayName("falls back to the catalog defaults and builds branded HTML when no row exists")
   void fallsBackToCatalogDefaults() {
     when(repository.findByTemplateKeyAndLocale(any(), any())).thenReturn(Optional.empty());
 
-    RenderedMail mail =
-        service.render(
-            MailTemplateKey.PASSWORD_RESET,
-            Map.of("siteName", "qnop", "recipientName", "Jane", "actionUrl", "https://x"),
-            "de");
+    RenderedMail mail = service.render(MailTemplateKey.PASSWORD_RESET, FLOW_VARS, "de");
 
     assertThat(mail.subject()).isEqualTo("Reset your qnop password");
-    assertThat(mail.bodyPlain()).contains("Jane");
-    assertThat(mail.bodyHtml()).isNull();
+    assertThat(mail.bodyPlain()).contains("Jane").contains("in 30 minutes");
+    // The catalog default has no stored HTML — the branded chrome is built from the fragment.
+    assertThat(mail.bodyHtml())
+        .isNotNull()
+        .contains("<!DOCTYPE html>")
+        .contains("Reset your password")
+        .contains("Choose a new password") // the CTA label
+        .contains("https://qnop.example/reset?token=abc"); // the action URL in the CTA
+  }
+
+  @Test
+  @DisplayName("every catalog template renders against exactly the variables its flow supplies")
+  void everyTemplateRendersAgainstFlowVars() {
+    when(repository.findByTemplateKeyAndLocale(any(), any())).thenReturn(Optional.empty());
+
+    for (MailTemplateKey key : MailTemplateKey.values()) {
+      RenderedMail mail = service.render(key, FLOW_VARS, "en");
+      assertThat(mail.subject()).as("subject of %s", key).isNotBlank();
+      assertThat(mail.bodyPlain()).as("plain of %s", key).isNotBlank();
+      assertThat(mail.bodyHtml()).as("html of %s", key).isNotNull().contains("qnop");
+    }
   }
 
   @Test

@@ -48,11 +48,13 @@ class MailTemplateSchemaIT extends AbstractIntegrationTest {
         .hasValueSatisfying(
             t -> {
               assertThat(t.getSubject()).contains("{{siteName}}");
-              assertThat(t.getBodyPlain()).contains("{{username}}", "{{verificationLink}}");
-              assertThat(t.getBodyHtml()).isNotBlank();
+              // Unified vocabulary that the send flows actually supply (issue #140).
+              assertThat(t.getBodyPlain()).contains("{{recipientName}}", "{{actionUrl}}");
+              // Seeds carry plain text only; the branded HTML is built by EmailLayoutBuilder.
+              assertThat(t.getBodyHtml()).isNull();
             });
     assertThat(templates.findByTemplateKeyAndLocale("auth.password_reset", "en"))
-        .hasValueSatisfying(t -> assertThat(t.getBodyPlain()).contains("{{resetLink}}"));
+        .hasValueSatisfying(t -> assertThat(t.getBodyPlain()).contains("{{actionUrl}}"));
     assertThat(templates.findByTemplateKeyAndLocale("auth.admin_password_reset", "en")).isPresent();
   }
 
