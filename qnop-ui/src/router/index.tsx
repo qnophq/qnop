@@ -19,6 +19,7 @@
  * SPDX-License-Identifier: AGPL-3.0-only
  */
 
+import { lazy, Suspense } from 'react';
 import { createBrowserRouter } from 'react-router-dom';
 import { FileText, ShieldCheck } from 'lucide-react';
 import { AppShell } from '../components/shell/AppShell';
@@ -30,7 +31,7 @@ import { HomePage } from '../pages/HomePage';
 import { BrandingPage } from '../pages/admin/BrandingPage';
 import { ProfilePage } from '../pages/ProfilePage';
 import { EmailServerPage } from '../pages/admin/EmailServerPage';
-import { MailTemplatesPage } from '../pages/admin/MailTemplatesPage';
+import { MailTemplatesListPage } from '../pages/admin/MailTemplatesListPage';
 import { OidcProvidersPage } from '../pages/admin/OidcProvidersPage';
 import { SettingsPage } from '../pages/admin/SettingsPage';
 import { UsersPage } from '../pages/admin/UsersPage';
@@ -44,6 +45,11 @@ import { ResetPasswordPage } from '../pages/auth/ResetPasswordPage';
 import { VerifyEmailPage } from '../pages/auth/VerifyEmailPage';
 import { ForbiddenPage } from '../pages/errors/ForbiddenPage';
 import { NotFoundPage } from '../pages/errors/NotFoundPage';
+
+// The template editor pulls in CodeMirror; load it lazily so the rest of the app stays light.
+const MailTemplateEditPage = lazy(() =>
+  import('../pages/admin/MailTemplateEditPage').then((m) => ({ default: m.MailTemplateEditPage })),
+);
 
 /**
  * Central route table. Public routes (login, errors) sit outside the shell;
@@ -143,7 +149,21 @@ export const router = createBrowserRouter([
         path: 'admin/mail-templates',
         element: (
           <AdminRoute>
-            <MailTemplatesPage />
+            <MailTemplatesListPage />
+          </AdminRoute>
+        ),
+      },
+      {
+        path: 'admin/mail-templates/:key',
+        element: (
+          <AdminRoute>
+            <Suspense
+              fallback={
+                <div style={{ padding: '8px 4px', fontSize: 14, color: '#5E6C7B' }}>Loading…</div>
+              }
+            >
+              <MailTemplateEditPage />
+            </Suspense>
           </AdminRoute>
         ),
       },

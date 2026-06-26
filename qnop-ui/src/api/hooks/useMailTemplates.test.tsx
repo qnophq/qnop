@@ -26,6 +26,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import type { MailTemplateListResponse } from '../generated';
 import {
   mailTemplateKeys,
+  useMailTemplate,
   useMailTemplates,
   usePreviewMailTemplate,
   useResetMailTemplate,
@@ -39,6 +40,7 @@ const EMPTY: MailTemplateListResponse = { templates: [] };
 vi.mock('../config', () => ({
   adminEmailApi: {
     listMailTemplates: vi.fn(),
+    getMailTemplate: vi.fn(),
     updateMailTemplate: vi.fn(),
     resetMailTemplate: vi.fn(),
     previewMailTemplate: vi.fn(),
@@ -72,6 +74,20 @@ describe('useMailTemplates', () => {
     await waitFor(() => expect(result.current.isSuccess).toBe(true));
     expect(adminEmailApi.listMailTemplates).toHaveBeenCalled();
     expect(result.current.data?.templates).toEqual([]);
+  });
+});
+
+describe('useMailTemplate', () => {
+  it('fetches one template by key', async () => {
+    vi.mocked(adminEmailApi.getMailTemplate).mockResolvedValue({
+      data: { key: 'auth.password_reset' },
+    } as Awaited<ReturnType<typeof adminEmailApi.getMailTemplate>>);
+
+    const { result } = renderHook(() => useMailTemplate('auth.password_reset'), { wrapper });
+
+    await waitFor(() => expect(result.current.isSuccess).toBe(true));
+    expect(adminEmailApi.getMailTemplate).toHaveBeenCalledWith({ key: 'auth.password_reset' });
+    expect(result.current.data?.key).toBe('auth.password_reset');
   });
 });
 

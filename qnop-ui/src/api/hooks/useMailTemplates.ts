@@ -23,6 +23,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import type {
   MailTemplateListResponse,
   MailTemplatePreviewResponse,
+  MailTemplateResponse,
   SendTestEmailResponse,
   UpdateMailTemplateRequest,
 } from '../generated';
@@ -30,6 +31,7 @@ import { adminEmailApi } from '../config';
 
 export const mailTemplateKeys = {
   all: ['admin', 'mail-templates'] as const,
+  detail: (key: string) => ['admin', 'mail-templates', key] as const,
 };
 
 /** All mail templates with their current (override or built-in) content. */
@@ -40,6 +42,19 @@ export function useMailTemplates() {
       const response = await adminEmailApi.listMailTemplates();
       return response.data;
     },
+  });
+}
+
+/** One template's effective content + editor metadata (issue #144), for the edit page. */
+export function useMailTemplate(key: string) {
+  return useQuery<MailTemplateResponse>({
+    queryKey: mailTemplateKeys.detail(key),
+    queryFn: async () => {
+      const response = await adminEmailApi.getMailTemplate({ key });
+      return response.data;
+    },
+    enabled: key.length > 0,
+    refetchOnWindowFocus: false,
   });
 }
 
@@ -54,7 +69,10 @@ export function useUpdateMailTemplate() {
       });
       return response.data;
     },
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: mailTemplateKeys.all }),
+    onSuccess: (_data, vars) => {
+      queryClient.invalidateQueries({ queryKey: mailTemplateKeys.all });
+      queryClient.invalidateQueries({ queryKey: mailTemplateKeys.detail(vars.key) });
+    },
   });
 }
 
@@ -65,7 +83,10 @@ export function useResetMailTemplate() {
     mutationFn: async (key: string) => {
       await adminEmailApi.resetMailTemplate({ key });
     },
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: mailTemplateKeys.all }),
+    onSuccess: (_data, key) => {
+      queryClient.invalidateQueries({ queryKey: mailTemplateKeys.all });
+      queryClient.invalidateQueries({ queryKey: mailTemplateKeys.detail(key) });
+    },
   });
 }
 

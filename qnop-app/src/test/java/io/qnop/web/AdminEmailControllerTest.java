@@ -75,6 +75,7 @@ class AdminEmailControllerTest {
         "Hi {{recipientName}}, {{actionUrl}}",
         "<!DOCTYPE html>…{{actionUrl}}…",
         null,
+        null,
         null);
   }
 

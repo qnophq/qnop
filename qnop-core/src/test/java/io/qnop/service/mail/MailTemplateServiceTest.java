@@ -27,11 +27,14 @@ import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.when;
 
 import io.qnop.entity.MailTemplate;
+import io.qnop.entity.User;
 import io.qnop.repository.MailTemplateRepository;
+import io.qnop.repository.UserRepository;
 import io.qnop.service.ApplicationSettingKey;
 import io.qnop.service.ApplicationSettingsService;
 import java.util.Map;
 import java.util.Optional;
+import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -43,6 +46,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 class MailTemplateServiceTest {
 
   @Mock private MailTemplateRepository repository;
+  @Mock private UserRepository userRepository;
   @Mock private ApplicationSettingsService settings;
 
   /** Exactly the variable set the live send flows supply (issue #140). */
@@ -57,7 +61,8 @@ class MailTemplateServiceTest {
 
   @BeforeEach
   void setUp() {
-    service = new MailTemplateService(repository, settings, new EmailLayoutBuilder());
+    service =
+        new MailTemplateService(repository, userRepository, settings, new EmailLayoutBuilder());
     lenient()
         .when(settings.getString(ApplicationSettingKey.GENERAL_DEFAULT_LANGUAGE))
         .thenReturn("en");
@@ -231,5 +236,68 @@ class MailTemplateServiceTest {
 
     assertThat(view.source()).isEqualTo(MailTemplateView.Source.DEFAULT);
     assertThat(view.subject()).isEqualTo(MailTemplateKey.PASSWORD_RESET.defaultSubject());
+  }
+
+  @Test
+  @DisplayName("resolves the editing admin's display name for attribution")
+  void resolvesUpdatedByName() {
+    UUID actor = UUID.randomUUID();
+    User editor = User.internal("Ada Admin", "ada@qnop.example", "ada", "hash");
+    when(userRepository.findById(actor)).thenReturn(Optional.of(editor));
+    when(repository.findByTemplateKeyAndLocale("auth.password_reset", "en"))
+        .thenReturn(Optional.empty());
+    when(repository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+    MailTemplateView saved =
+        service.update(
+            MailTemplateKey.PASSWORD_RESET,
+            "en",
+            "Reset for {{recipientName}}",
+            "Open {{actionUrl}}",
+            null,
+            actor);
+
+    assertThat(saved.updatedBy()).isEqualTo(actor.toString());
+    assertThat(saved.updatedByName()).isEqualTo("Ada Admin");
+  }
+
+  @Test
+  @DisplayName("a built-in default has no updatedBy name")
+  void defaultHasNoUpdatedByName() {
+    when(repository.findByTemplateKeyAndLocale(any(), any())).thenReturn(Optional.empty());
+
+    MailTemplateView view = service.getEffective(MailTemplateKey.PASSWORD_RESET, "en");
+
+    assertThat(view.updatedBy()).isNull();
+    assertThat(view.updatedByName()).isNull();
+  }
+
+  @Test
+  @DisplayName("a since-deleted editor degrades to no name")
+  void deletedEditorHasNoName() {
+    MailTemplate row = new MailTemplate("auth.password_reset", "en", "s", "p");
+    String actor = UUID.randomUUID().toString();
+    row.setUpdatedBy(actor);
+    when(repository.findByTemplateKeyAndLocale("auth.password_reset", "en"))
+        .thenReturn(Optional.of(row));
+    when(userRepository.findById(UUID.fromString(actor))).thenReturn(Optional.empty());
+
+    MailTemplateView view = service.getEffective(MailTemplateKey.PASSWORD_RESET, "en");
+
+    assertThat(view.updatedBy()).isEqualTo(actor);
+    assertThat(view.updatedByName()).isNull();
+  }
+
+  @Test
+  @DisplayName("a malformed stored updatedBy degrades to no name instead of throwing")
+  void malformedUpdatedByDegradesToNull() {
+    MailTemplate row = new MailTemplate("auth.password_reset", "en", "s", "p");
+    row.setUpdatedBy("not-a-uuid");
+    when(repository.findByTemplateKeyAndLocale("auth.password_reset", "en"))
+        .thenReturn(Optional.of(row));
+
+    MailTemplateView view = service.getEffective(MailTemplateKey.PASSWORD_RESET, "en");
+
+    assertThat(view.updatedByName()).isNull();
   }
 }
