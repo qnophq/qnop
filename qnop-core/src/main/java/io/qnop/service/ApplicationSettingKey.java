@@ -69,6 +69,11 @@ public enum ApplicationSettingKey {
       "none",
       "Usage-tracking provider.",
       List.of("none", "matomo", "plausible", "umami")),
+  SMTP_ENABLED(
+      "smtp.enabled",
+      SettingValueType.BOOLEAN,
+      "false",
+      "Master switch for outgoing mail; when off, message sends are skipped."),
   SMTP_HOST("smtp.host", SettingValueType.STRING, "", "SMTP server host."),
   SMTP_PORT("smtp.port", SettingValueType.INTEGER, "587", "SMTP server port."),
   SMTP_USERNAME("smtp.username", SettingValueType.STRING, "", "SMTP authentication username."),
@@ -77,9 +82,18 @@ public enum ApplicationSettingKey {
       SettingValueType.PASSWORD,
       "",
       "SMTP authentication password (stored encrypted, redacted in API)."),
+  SMTP_ENCRYPTION(
+      "smtp.encryption",
+      SettingValueType.ENUM,
+      "starttls",
+      "SMTP transport encryption: none, starttls (port 587), or tls (implicit SSL, port 465).",
+      List.of("none", "starttls", "tls")),
   SMTP_FROM("smtp.from", SettingValueType.STRING, "", "Default From address for outgoing mail."),
-  SMTP_TLS_ENABLED(
-      "smtp.tls_enabled", SettingValueType.BOOLEAN, "true", "Whether to use STARTTLS for SMTP."),
+  SMTP_FROM_NAME(
+      "smtp.from_name",
+      SettingValueType.STRING,
+      "qnop",
+      "Display name used in the From header of outgoing mail."),
   AUTH_SELF_REGISTRATION_ENABLED(
       "auth.self_registration_enabled",
       SettingValueType.BOOLEAN,

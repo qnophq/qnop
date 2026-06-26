@@ -122,7 +122,8 @@ public class ApplicationSettingsService {
               redactor.redact(key, current.get(key)),
               key.getType().name(),
               key.getDescription(),
-              key.isSensitive()));
+              key.isSensitive(),
+              key.getEnumOptions()));
     }
     return descriptors;
   }
@@ -210,9 +211,18 @@ public class ApplicationSettingsService {
     return value;
   }
 
-  /** A self-contained, web-safe view of one setting — no entity types reach the web layer. */
+  /**
+   * A self-contained, web-safe view of one setting — no entity types reach the web layer. {@code
+   * allowedValues} lists the permitted options for {@code ENUM}-typed settings (empty otherwise) so
+   * the admin UI can render a dropdown straight from the contract.
+   */
   public record SettingDescriptor(
-      String key, String value, String type, String description, boolean sensitive) {}
+      String key,
+      String value,
+      String type,
+      String description,
+      boolean sensitive,
+      List<String> allowedValues) {}
 
   // retained for symmetry with values()/keys() callers
   static List<ApplicationSettingKey> allKeys() {

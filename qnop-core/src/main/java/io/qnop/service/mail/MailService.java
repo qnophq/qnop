@@ -60,7 +60,12 @@ public class MailService {
       MimeMessageHelper helper = new MimeMessageHelper(message, multipart, "UTF-8");
       String from = senderProvider.from();
       if (from != null && !from.isBlank()) {
-        helper.setFrom(from);
+        String fromName = senderProvider.fromName();
+        if (fromName != null && !fromName.isBlank()) {
+          helper.setFrom(from, fromName);
+        } else {
+          helper.setFrom(from);
+        }
       }
       helper.setTo(to);
       helper.setSubject(subject);

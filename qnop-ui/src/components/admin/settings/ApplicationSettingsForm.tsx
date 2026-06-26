@@ -38,22 +38,26 @@ import { useSettings, useUpdateSettings } from '../../../api/hooks/useSettings';
 import { apiErrorMessage } from '../../../utils/apiError';
 
 /** Group prefixes in display order; unknown groups are appended alphabetically. */
-const GROUP_ORDER = ['general', 'upload', 'tracking', 'smtp', 'auth'] as const;
+const GROUP_ORDER = ['general', 'upload', 'tracking', 'auth'] as const;
 
 const GROUP_LABELS: Record<string, string> = {
   general: 'General',
   upload: 'Uploads',
   tracking: 'Usage tracking',
-  smtp: 'Email (SMTP)',
   auth: 'Authentication',
 };
 
 /**
- * Curated dropdown options keyed by setting key. The API does not publish option
- * lists, so known choices are enumerated here. This covers both ENUM settings
- * and STRING settings with a known, closed value set (e.g. the default language).
- * An ENUM key without an entry falls back to a plain text field rather than
- * rendering an empty dropdown.
+ * Groups intentionally omitted here because they have a dedicated, richer
+ * surface. SMTP lives on the Email / SMTP page (issue #142).
+ */
+const HIDDEN_GROUPS = new Set<string>(['smtp']);
+
+/**
+ * Curated dropdown labels keyed by setting key. ENUM option *sets* now come from
+ * the API contract (`allowedValues`); this map only supplies nicer labels and
+ * covers STRING settings with a known, closed value set (e.g. the default
+ * language) that are not modelled as ENUM server-side.
  */
 const SELECT_OPTIONS: Record<string, { value: string; label: string }[]> = {
   'general.default_language': [
@@ -71,6 +75,27 @@ const SELECT_OPTIONS: Record<string, { value: string; label: string }[]> = {
     { value: 'AUDITOR', label: 'Auditor' },
   ],
 };
+
+/** Humanises a raw enum value for display, e.g. `starttls` → "Starttls". */
+function humaniseOption(value: string): string {
+  return value.charAt(0).toUpperCase() + value.slice(1);
+}
+
+/**
+ * The dropdown options for a setting, if it should render as a select: a curated
+ * label list when one exists, otherwise the API's `allowedValues` for ENUMs.
+ * Returns `undefined` for free-text fields.
+ */
+function optionsFor(setting: AdminSetting): { value: string; label: string }[] | undefined {
+  const curated = SELECT_OPTIONS[setting.key];
+  if (curated) {
+    return curated;
+  }
+  if (setting.type === 'ENUM' && setting.allowedValues && setting.allowedValues.length > 0) {
+    return setting.allowedValues.map((value) => ({ value, label: humaniseOption(value) }));
+  }
+  return undefined;
+}
 
 type Toast = { message: string; severity: 'success' | 'error' } | null;
 
@@ -99,7 +124,10 @@ export function ApplicationSettingsForm() {
   const { data, isLoading, isError } = useSettings();
   const updateSettings = useUpdateSettings();
 
-  const settings = useMemo(() => data?.settings ?? [], [data]);
+  const settings = useMemo(
+    () => (data?.settings ?? []).filter((setting) => !HIDDEN_GROUPS.has(groupOf(setting.key))),
+    [data],
+  );
   // Server values are derived (not state); only the user's edits are held as an
   // overlay, so there is no setState-in-effect to re-seed the form. Clearing the
   // overlay after a save re-bases the form on the freshly stored values.
@@ -249,9 +277,10 @@ function SettingField({ setting, value, onChange }: SettingFieldProps) {
     );
   }
 
-  // A curated option list turns the field into a dropdown, for ENUM settings and
-  // for STRING settings with a known, closed value set (e.g. the default language).
-  const options = SELECT_OPTIONS[setting.key];
+  // A dropdown is used for ENUM settings (options from the API contract's
+  // allowedValues) and for STRING settings with a known, closed value set
+  // (curated, e.g. the default language).
+  const options = optionsFor(setting);
   if (options) {
     return (
       <TextField

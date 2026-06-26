@@ -77,6 +77,22 @@ class MailServiceTest {
   }
 
   @Test
+  @DisplayName("uses smtp.from_name as the From display name")
+  void usesFromNameAsDisplayName() throws Exception {
+    when(senderProvider.current()).thenReturn(sender);
+    when(senderProvider.from()).thenReturn("from@qnop.example");
+    when(senderProvider.fromName()).thenReturn("qnop Mailer");
+    MimeMessage mime = new MimeMessage((Session) null);
+    when(sender.createMimeMessage()).thenReturn(mime);
+
+    SendResult result = service.sendMail("to@example.com", "Subject", "Body", null);
+
+    assertThat(result).isInstanceOf(SendResult.Sent.class);
+    assertThat(mime.getFrom()).hasSize(1);
+    assertThat(mime.getFrom()[0].toString()).contains("qnop Mailer").contains("from@qnop.example");
+  }
+
+  @Test
   @DisplayName("returns Failed (never throws) when delivery fails")
   void failedOnDeliveryError() {
     when(senderProvider.current()).thenReturn(sender);

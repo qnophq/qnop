@@ -74,7 +74,8 @@ public class AdminSettingsController implements AdminSettingsApi {
                         .value(descriptor.value())
                         .type(SettingValueType.fromValue(descriptor.type()))
                         .description(descriptor.description())
-                        .sensitive(descriptor.sensitive()))
+                        .sensitive(descriptor.sensitive())
+                        .allowedValues(descriptor.allowedValues()))
             .toList();
     return new AdminSettingsResponse().settings(items);
   }

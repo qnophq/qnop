@@ -60,7 +60,7 @@ class SettingsServiceIT extends AbstractIntegrationTest {
     assertThat(settings.getString(ApplicationSettingKey.GENERAL_APPLICATION_NAME))
         .isEqualTo("qnop");
     assertThat(settings.getInteger(ApplicationSettingKey.UPLOAD_MAX_FILE_SIZE_MB)).isEqualTo(25);
-    assertThat(settings.getBoolean(ApplicationSettingKey.SMTP_TLS_ENABLED)).isTrue();
+    assertThat(settings.getString(ApplicationSettingKey.SMTP_ENCRYPTION)).isEqualTo("starttls");
   }
 
   @Test

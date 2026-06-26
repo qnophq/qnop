@@ -1821,6 +1821,13 @@ components:
         sensitive:
           type: boolean
           description: Whether the value is a secret (masked here, encrypted at rest).
+        allowedValues:
+          type: array
+          items:
+            type: string
+          description: >-
+            For `ENUM`-typed settings, the permitted values, in display order; the
+            admin UI renders these as a dropdown. Empty for all other types.
       required:
         - key
         - type
