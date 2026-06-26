@@ -28,7 +28,6 @@ import InputAdornment from '@mui/material/InputAdornment';
 import LinearProgress from '@mui/material/LinearProgress';
 import MenuItem from '@mui/material/MenuItem';
 import Paper from '@mui/material/Paper';
-import Snackbar from '@mui/material/Snackbar';
 import Stack from '@mui/material/Stack';
 import TablePagination from '@mui/material/TablePagination';
 import TextField from '@mui/material/TextField';
@@ -47,6 +46,9 @@ import { UsersTable } from '../../components/admin/users/UsersTable';
 import { ResetLinkDialog } from '../../components/admin/users/ResetLinkDialog';
 import { GeneratedPasswordDialog } from '../../components/admin/users/GeneratedPasswordDialog';
 import { ConfirmDialog } from '../../components/admin/ConfirmDialog';
+import { PageHeader } from '../../components/admin/layout/PageHeader';
+import { AdminToast } from '../../components/admin/layout/AdminToast';
+import { useToast } from '../../components/admin/layout/useToast';
 import { useAuthStore } from '../../stores/authStore';
 import { apiErrorCode, apiErrorMessage } from '../../utils/apiError';
 
@@ -59,7 +61,6 @@ type DialogState =
   | { open: true; mode: 'create' }
   | { open: true; mode: 'edit'; user: AdminUserSummary };
 
-type Toast = { message: string; severity: 'success' | 'error' } | null;
 type StatusFilter = '' | 'active' | 'disabled';
 
 const CONFLICT_MESSAGES: Record<string, string> = {
@@ -91,7 +92,7 @@ export function UsersPage() {
     displayName: string;
     password: string;
   } | null>(null);
-  const [toast, setToast] = useState<Toast>(null);
+  const { toast, notify, clear } = useToast();
 
   const openCreate = () => {
     setDialog({ open: true, mode: 'create' });
@@ -134,10 +135,7 @@ export function UsersPage() {
     try {
       await updateUser.mutateAsync({ id: user.id, request: { enabled: !user.enabled } });
     } catch (err) {
-      setToast({
-        message: conflictOr(err, `Could not update ${user.displayName}.`),
-        severity: 'error',
-      });
+      notify(conflictOr(err, `Could not update ${user.displayName}.`), 'error');
     }
   };
 
@@ -145,23 +143,14 @@ export function UsersPage() {
     try {
       const outcome = await sendReset.mutateAsync(user.id);
       if (outcome.emailSent) {
-        setToast({
-          message: `Password reset emailed to ${user.email}. Sessions revoked.`,
-          severity: 'success',
-        });
+        notify(`Password reset emailed to ${user.email}. Sessions revoked.`);
       } else if (outcome.resetUrl) {
         setResetLink({ displayName: user.displayName, url: outcome.resetUrl });
       } else {
-        setToast({
-          message: `Reset triggered for ${user.displayName}, but no link was returned.`,
-          severity: 'error',
-        });
+        notify(`Reset triggered for ${user.displayName}, but no link was returned.`, 'error');
       }
     } catch (err) {
-      setToast({
-        message: conflictOr(err, 'The reset could not be triggered.'),
-        severity: 'error',
-      });
+      notify(conflictOr(err, 'The reset could not be triggered.'), 'error');
     }
   };
 
@@ -170,10 +159,7 @@ export function UsersPage() {
       const outcome = await generatePassword.mutateAsync(user.id);
       setGeneratedPassword({ displayName: user.displayName, password: outcome.password });
     } catch (err) {
-      setToast({
-        message: conflictOr(err, 'A password could not be generated.'),
-        severity: 'error',
-      });
+      notify(conflictOr(err, 'A password could not be generated.'), 'error');
     }
   };
 
@@ -181,9 +167,9 @@ export function UsersPage() {
     if (!deleteTarget) return;
     try {
       await deleteUser.mutateAsync(deleteTarget.id);
-      setToast({ message: `User “${deleteTarget.displayName}” deleted.`, severity: 'success' });
+      notify(`User “${deleteTarget.displayName}” deleted.`);
     } catch (err) {
-      setToast({ message: conflictOr(err, 'Could not delete the user.'), severity: 'error' });
+      notify(conflictOr(err, 'Could not delete the user.'), 'error');
     } finally {
       setDeleteTarget(null);
     }
@@ -191,23 +177,15 @@ export function UsersPage() {
 
   return (
     <Stack spacing={3}>
-      <Stack
-        direction={{ xs: 'column', sm: 'row' }}
-        spacing={2}
-        sx={{ justifyContent: 'space-between', alignItems: { sm: 'center' } }}
-      >
-        <Box>
-          <Typography variant="h1" sx={{ fontSize: 28 }}>
-            Users
-          </Typography>
-          <Typography color="text.secondary" sx={{ mt: 0.5 }}>
-            Manage accounts, roles and access.
-          </Typography>
-        </Box>
-        <Button variant="contained" startIcon={<UserPlus size={18} />} onClick={openCreate}>
-          Add user
-        </Button>
-      </Stack>
+      <PageHeader
+        title="Users"
+        description="Manage accounts, roles and access."
+        action={
+          <Button variant="contained" startIcon={<UserPlus size={18} />} onClick={openCreate}>
+            Add user
+          </Button>
+        }
+      />
 
       <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1.5} sx={{ flexWrap: 'wrap' }}>
         <TextField
@@ -345,18 +323,7 @@ export function UsersPage() {
         onClose={() => setGeneratedPassword(null)}
       />
 
-      <Snackbar
-        open={toast !== null}
-        autoHideDuration={5000}
-        onClose={() => setToast(null)}
-        anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
-      >
-        {toast ? (
-          <Alert severity={toast.severity} onClose={() => setToast(null)} variant="filled">
-            {toast.message}
-          </Alert>
-        ) : undefined}
-      </Snackbar>
+      <AdminToast toast={toast} onClose={clear} />
     </Stack>
   );
 }

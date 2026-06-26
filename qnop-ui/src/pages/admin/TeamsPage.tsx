@@ -31,7 +31,6 @@ import ListItemText from '@mui/material/ListItemText';
 import Menu from '@mui/material/Menu';
 import MenuItem from '@mui/material/MenuItem';
 import Paper from '@mui/material/Paper';
-import Snackbar from '@mui/material/Snackbar';
 import Stack from '@mui/material/Stack';
 import Table from '@mui/material/Table';
 import TableBody from '@mui/material/TableBody';
@@ -47,6 +46,9 @@ import type { AdminTeamSummary } from '../../api/generated';
 import { useDeleteTeam, useTeams } from '../../api/hooks/useTeams';
 import { TeamFormDialog } from '../../components/admin/teams/TeamFormDialog';
 import { ConfirmDialog } from '../../components/admin/ConfirmDialog';
+import { PageHeader } from '../../components/admin/layout/PageHeader';
+import { AdminToast } from '../../components/admin/layout/AdminToast';
+import { useToast } from '../../components/admin/layout/useToast';
 import { UserStatusBadge } from '../../components/admin/users/UserBadges';
 import { apiErrorMessage } from '../../utils/apiError';
 
@@ -56,8 +58,6 @@ type DialogState =
   | { open: false }
   | { open: true; mode: 'create' }
   | { open: true; mode: 'edit'; team: AdminTeamSummary };
-
-type Toast = { message: string; severity: 'success' | 'error' } | null;
 
 /** Admin team management: search, paginate, create / edit / delete, open a team (#105). */
 export function TeamsPage() {
@@ -71,7 +71,7 @@ export function TeamsPage() {
   const [anchorEl, setAnchorEl] = useState<HTMLElement | null>(null);
   const [active, setActive] = useState<AdminTeamSummary | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<AdminTeamSummary | null>(null);
-  const [toast, setToast] = useState<Toast>(null);
+  const { toast, notify, clear } = useToast();
 
   useEffect(() => {
     const handle = setTimeout(() => {
@@ -107,9 +107,9 @@ export function TeamsPage() {
     if (!deleteTarget) return;
     try {
       await deleteTeam.mutateAsync(deleteTarget.id);
-      setToast({ message: `Team “${deleteTarget.name}” deleted.`, severity: 'success' });
+      notify(`Team “${deleteTarget.name}” deleted.`);
     } catch (err) {
-      setToast({ message: apiErrorMessage(err, 'Could not delete the team.'), severity: 'error' });
+      notify(apiErrorMessage(err, 'Could not delete the team.'), 'error');
     } finally {
       setDeleteTarget(null);
     }
@@ -117,23 +117,15 @@ export function TeamsPage() {
 
   return (
     <Stack spacing={3}>
-      <Stack
-        direction={{ xs: 'column', sm: 'row' }}
-        spacing={2}
-        sx={{ justifyContent: 'space-between', alignItems: { sm: 'center' } }}
-      >
-        <Box>
-          <Typography variant="h1" sx={{ fontSize: 28 }}>
-            Teams
-          </Typography>
-          <Typography color="text.secondary" sx={{ mt: 0.5 }}>
-            Group reviewers and manage their team roles.
-          </Typography>
-        </Box>
-        <Button variant="contained" startIcon={<UsersRound size={18} />} onClick={openCreate}>
-          Create team
-        </Button>
-      </Stack>
+      <PageHeader
+        title="Teams"
+        description="Group reviewers and manage their team roles."
+        action={
+          <Button variant="contained" startIcon={<UsersRound size={18} />} onClick={openCreate}>
+            Create team
+          </Button>
+        }
+      />
 
       <TextField
         value={search}
@@ -283,18 +275,7 @@ export function TeamsPage() {
         onClose={() => setDeleteTarget(null)}
       />
 
-      <Snackbar
-        open={toast !== null}
-        autoHideDuration={5000}
-        onClose={() => setToast(null)}
-        anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
-      >
-        {toast ? (
-          <Alert severity={toast.severity} onClose={() => setToast(null)} variant="filled">
-            {toast.message}
-          </Alert>
-        ) : undefined}
-      </Snackbar>
+      <AdminToast toast={toast} onClose={clear} />
     </Stack>
   );
 }

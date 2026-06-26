@@ -27,7 +27,6 @@ import Divider from '@mui/material/Divider';
 import FormControlLabel from '@mui/material/FormControlLabel';
 import LinearProgress from '@mui/material/LinearProgress';
 import MenuItem from '@mui/material/MenuItem';
-import Snackbar from '@mui/material/Snackbar';
 import Stack from '@mui/material/Stack';
 import Switch from '@mui/material/Switch';
 import TextField, { type TextFieldProps } from '@mui/material/TextField';
@@ -37,7 +36,10 @@ import type { AdminSetting, SendTestEmailResponse } from '../../api/generated';
 import { useSettings, useUpdateSettings } from '../../api/hooks/useSettings';
 import { useSendTestEmail } from '../../api/hooks/useMailTemplates';
 import { PasswordField } from '../../components/auth/PasswordField';
-import { SectionCard } from '../../components/admin/mail/smtp/SectionCard';
+import { PageHeader } from '../../components/admin/layout/PageHeader';
+import { SectionCard } from '../../components/admin/layout/SectionCard';
+import { AdminToast } from '../../components/admin/layout/AdminToast';
+import { useToast } from '../../components/admin/layout/useToast';
 import { ToneBadge } from '../../components/admin/ToneBadge';
 import {
   ENCRYPTION_FALLBACK,
@@ -48,8 +50,6 @@ import {
   computeSmtpStatus,
 } from '../../components/admin/mail/smtp/smtpConfig';
 import { apiErrorMessage } from '../../utils/apiError';
-
-type Toast = { message: string; severity: 'success' | 'error' } | null;
 
 const TEST_SEVERITY: Record<SendTestEmailResponse['status'], 'success' | 'warning' | 'error'> = {
   SENT: 'success',
@@ -94,7 +94,7 @@ export function EmailServerPage() {
 
   const [edits, setEdits] = useState<Record<string, string>>({});
   const [error, setError] = useState<string | null>(null);
-  const [toast, setToast] = useState<Toast>(null);
+  const { toast, notify, clear } = useToast();
   const [testRecipient, setTestRecipient] = useState('');
   const [testResult, setTestResult] = useState<SendTestEmailResponse | null>(null);
   const [testError, setTestError] = useState<string | null>(null);
@@ -129,7 +129,7 @@ export function EmailServerPage() {
     try {
       await updateSettings.mutateAsync(patch);
       setEdits({});
-      setToast({ message: 'SMTP settings saved.', severity: 'success' });
+      notify('SMTP settings saved.');
     } catch (err) {
       setError(apiErrorMessage(err, 'The SMTP settings could not be saved.'));
     }
@@ -179,15 +179,10 @@ export function EmailServerPage() {
   return (
     <Box component="form" onSubmit={onSubmit} noValidate>
       <Stack spacing={3} sx={{ maxWidth: 760 }}>
-        <Box>
-          <Typography variant="h1" sx={{ fontSize: 28 }}>
-            Email / SMTP
-          </Typography>
-          <Typography color="text.secondary" sx={{ mt: 0.5 }}>
-            Configure the outgoing-mail server: connection, sender identity, and delivery. Changes
-            apply without a restart.
-          </Typography>
-        </Box>
+        <PageHeader
+          title="Email / SMTP"
+          description="Configure the outgoing-mail server: connection, sender identity, and delivery. Changes apply without a restart."
+        />
 
         <SectionCard
           icon={Server}
@@ -369,18 +364,7 @@ export function EmailServerPage() {
         </Stack>
       </Stack>
 
-      <Snackbar
-        open={toast !== null}
-        autoHideDuration={4000}
-        onClose={() => setToast(null)}
-        anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
-      >
-        {toast ? (
-          <Alert severity={toast.severity} onClose={() => setToast(null)} variant="filled">
-            {toast.message}
-          </Alert>
-        ) : undefined}
-      </Snackbar>
+      <AdminToast toast={toast} onClose={clear} />
     </Box>
   );
 }

@@ -19,23 +19,24 @@
  * SPDX-License-Identifier: AGPL-3.0-only
  */
 
-import Stack from '@mui/material/Stack';
-import { ApplicationSettingsForm } from '../../components/admin/settings/ApplicationSettingsForm';
-import { PageHeader } from '../../components/admin/layout/PageHeader';
+import Alert from '@mui/material/Alert';
+import Snackbar from '@mui/material/Snackbar';
+import type { ToastState } from './useToast';
 
-/**
- * Admin application settings screen (issue #106): general, upload, tracking and
- * authentication settings. Email/SMTP, OIDC providers, mail templates and
- * branding are separate Administration menu items, each with its own screen.
- */
-export function SettingsPage() {
+/** Renders the toast produced by {@link useToast} — bottom-centre, filled, auto-hiding. */
+export function AdminToast({ toast, onClose }: { toast: ToastState | null; onClose: () => void }) {
   return (
-    <Stack spacing={3}>
-      <PageHeader
-        title="Settings"
-        description="Workspace, uploads, usage tracking and authentication."
-      />
-      <ApplicationSettingsForm />
-    </Stack>
+    <Snackbar
+      open={toast !== null}
+      autoHideDuration={4000}
+      onClose={onClose}
+      anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
+    >
+      {toast ? (
+        <Alert severity={toast.severity} onClose={onClose} variant="filled">
+          {toast.message}
+        </Alert>
+      ) : undefined}
+    </Snackbar>
   );
 }

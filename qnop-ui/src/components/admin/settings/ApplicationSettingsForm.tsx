@@ -27,14 +27,16 @@ import Divider from '@mui/material/Divider';
 import FormControlLabel from '@mui/material/FormControlLabel';
 import LinearProgress from '@mui/material/LinearProgress';
 import MenuItem from '@mui/material/MenuItem';
-import Paper from '@mui/material/Paper';
-import Snackbar from '@mui/material/Snackbar';
 import Stack from '@mui/material/Stack';
 import Switch from '@mui/material/Switch';
 import TextField from '@mui/material/TextField';
 import Typography from '@mui/material/Typography';
+import { BarChart3, Lock, SlidersHorizontal, Upload, type LucideIcon } from 'lucide-react';
 import type { AdminSetting } from '../../../api/generated';
 import { useSettings, useUpdateSettings } from '../../../api/hooks/useSettings';
+import { SectionCard } from '../layout/SectionCard';
+import { AdminToast } from '../layout/AdminToast';
+import { useToast } from '../layout/useToast';
 import { apiErrorMessage } from '../../../utils/apiError';
 
 /** Group prefixes in display order; unknown groups are appended alphabetically. */
@@ -45,6 +47,21 @@ const GROUP_LABELS: Record<string, string> = {
   upload: 'Uploads',
   tracking: 'Usage tracking',
   auth: 'Authentication',
+};
+
+/** Brand-tint section icon per group, matching the Email / SMTP page's language. */
+const GROUP_ICONS: Record<string, LucideIcon> = {
+  general: SlidersHorizontal,
+  upload: Upload,
+  tracking: BarChart3,
+  auth: Lock,
+};
+
+const GROUP_DESCRIPTIONS: Record<string, string> = {
+  general: 'Workspace identity, base URL and default language.',
+  upload: 'Constraints applied to document uploads.',
+  tracking: 'Anonymous, privacy-friendly usage analytics.',
+  auth: 'Self-registration and password-reset behaviour.',
 };
 
 /**
@@ -97,8 +114,6 @@ function optionsFor(setting: AdminSetting): { value: string; label: string }[] |
   return undefined;
 }
 
-type Toast = { message: string; severity: 'success' | 'error' } | null;
-
 /** The baseline value used for dirty-tracking: secrets always start blank. */
 function baseline(setting: AdminSetting): string {
   return setting.sensitive ? '' : (setting.value ?? '');
@@ -140,7 +155,7 @@ export function ApplicationSettingsForm() {
   }, [settings]);
   const [edits, setEdits] = useState<Record<string, string>>({});
   const [error, setError] = useState<string | null>(null);
-  const [toast, setToast] = useState<Toast>(null);
+  const { toast, notify, clear } = useToast();
 
   const valueOf = (key: string): string => edits[key] ?? baselines[key] ?? '';
   const changed = useMemo(
@@ -170,7 +185,7 @@ export function ApplicationSettingsForm() {
     try {
       await updateSettings.mutateAsync(patch);
       setEdits({});
-      setToast({ message: 'Settings saved.', severity: 'success' });
+      notify('Settings saved.');
     } catch (err) {
       setError(apiErrorMessage(err, 'The settings could not be saved.'));
     }
@@ -191,10 +206,12 @@ export function ApplicationSettingsForm() {
     <Box component="form" onSubmit={onSubmit} noValidate>
       <Stack spacing={3}>
         {groups.map(({ group, items }) => (
-          <Paper key={group} variant="outlined" sx={{ p: { xs: 2, sm: 3 } }}>
-            <Typography variant="h2" sx={{ fontSize: 18, mb: 2 }}>
-              {GROUP_LABELS[group] ?? fieldLabel(group)}
-            </Typography>
+          <SectionCard
+            key={group}
+            icon={GROUP_ICONS[group]}
+            title={GROUP_LABELS[group] ?? fieldLabel(group)}
+            description={GROUP_DESCRIPTIONS[group]}
+          >
             <Stack spacing={2.5}>
               {items.map((setting) => (
                 <SettingField
@@ -205,19 +222,27 @@ export function ApplicationSettingsForm() {
                 />
               ))}
             </Stack>
-          </Paper>
+          </SectionCard>
         ))}
 
         {error && <Alert severity="error">{error}</Alert>}
 
         <Divider />
-        <Stack direction="row" spacing={2} sx={{ alignItems: 'center' }}>
+        <Stack direction="row" spacing={1.5} sx={{ alignItems: 'center' }}>
           <Button
             type="submit"
             variant="contained"
             disabled={changed.length === 0 || updateSettings.isPending}
           >
             {updateSettings.isPending ? 'Saving…' : 'Save changes'}
+          </Button>
+          <Button
+            type="button"
+            color="inherit"
+            disabled={changed.length === 0 || updateSettings.isPending}
+            onClick={() => setEdits({})}
+          >
+            Discard
           </Button>
           <Typography color="text.secondary" sx={{ fontSize: 14 }}>
             {changed.length === 0
@@ -229,18 +254,7 @@ export function ApplicationSettingsForm() {
         </Stack>
       </Stack>
 
-      <Snackbar
-        open={toast !== null}
-        autoHideDuration={4000}
-        onClose={() => setToast(null)}
-        anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
-      >
-        {toast ? (
-          <Alert severity={toast.severity} onClose={() => setToast(null)} variant="filled">
-            {toast.message}
-          </Alert>
-        ) : undefined}
-      </Snackbar>
+      <AdminToast toast={toast} onClose={clear} />
     </Box>
   );
 }

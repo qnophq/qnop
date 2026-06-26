@@ -19,19 +19,16 @@
  * SPDX-License-Identifier: AGPL-3.0-only
  */
 
-import { useState } from 'react';
 import Alert from '@mui/material/Alert';
-import Box from '@mui/material/Box';
 import Skeleton from '@mui/material/Skeleton';
-import Snackbar from '@mui/material/Snackbar';
 import Stack from '@mui/material/Stack';
-import Typography from '@mui/material/Typography';
 import type { ServerConfigBrandingSlot } from '../../api/generated';
 import { useConfig } from '../../api/hooks/useConfig';
 import { BrandingSlotCard } from '../../components/admin/branding/BrandingSlotCard';
+import { PageHeader } from '../../components/admin/layout/PageHeader';
+import { AdminToast } from '../../components/admin/layout/AdminToast';
+import { useToast } from '../../components/admin/layout/useToast';
 import type { BrandingSlot } from '../../api/branding';
-
-type Toast = { message: string; severity: 'success' | 'error' } | null;
 
 interface SlotDef {
   slot: BrandingSlot;
@@ -44,9 +41,7 @@ interface SlotDef {
 /** Admin branding: upload/replace/remove the light & dark logos and the logomark (#106). */
 export function BrandingPage() {
   const { data: config, isLoading, isError } = useConfig();
-  const [toast, setToast] = useState<Toast>(null);
-  const notify = (message: string, severity: 'success' | 'error') =>
-    setToast({ message, severity });
+  const { toast, notify, clear } = useToast();
 
   const branding = config?.branding;
   const slots: SlotDef[] = [
@@ -73,16 +68,10 @@ export function BrandingPage() {
 
   return (
     <Stack spacing={3}>
-      <Box>
-        <Typography variant="h1" sx={{ fontSize: 28 }}>
-          Branding
-        </Typography>
-        <Typography color="text.secondary" sx={{ mt: 0.5 }}>
-          Replace the default logos shown across the app — drag an image in or browse. Raster
-          uploads open a cropper to cut the exact framing; SVG uploads as-is. PNG, WebP or SVG, up
-          to 512 KiB; each slot falls back to the qnop default until you upload your own.
-        </Typography>
-      </Box>
+      <PageHeader
+        title="Branding"
+        description="Replace the default logos shown across the app — drag an image in or browse. Raster uploads open a cropper to cut the exact framing; SVG uploads as-is. PNG, WebP or SVG, up to 512 KiB; each slot falls back to the qnop default until you upload your own."
+      />
 
       {isError ? (
         <Alert severity="error">The branding configuration could not be loaded.</Alert>
@@ -112,18 +101,7 @@ export function BrandingPage() {
         </Stack>
       )}
 
-      <Snackbar
-        open={toast !== null}
-        autoHideDuration={5000}
-        onClose={() => setToast(null)}
-        anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
-      >
-        {toast ? (
-          <Alert severity={toast.severity} onClose={() => setToast(null)} variant="filled">
-            {toast.message}
-          </Alert>
-        ) : undefined}
-      </Snackbar>
+      <AdminToast toast={toast} onClose={clear} />
     </Stack>
   );
 }

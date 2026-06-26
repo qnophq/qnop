@@ -25,7 +25,6 @@ import Box from '@mui/material/Box';
 import Button from '@mui/material/Button';
 import LinearProgress from '@mui/material/LinearProgress';
 import Paper from '@mui/material/Paper';
-import Snackbar from '@mui/material/Snackbar';
 import Stack from '@mui/material/Stack';
 import Typography from '@mui/material/Typography';
 import { Plus } from 'lucide-react';
@@ -36,6 +35,9 @@ import {
   useUpdateOidcProvider,
 } from '../../api/hooks/useOidcProviders';
 import { ConfirmDialog } from '../../components/admin/ConfirmDialog';
+import { PageHeader } from '../../components/admin/layout/PageHeader';
+import { AdminToast } from '../../components/admin/layout/AdminToast';
+import { useToast } from '../../components/admin/layout/useToast';
 import { OidcProviderFormDialog } from '../../components/admin/oidc/OidcProviderFormDialog';
 import { OidcProvidersTable } from '../../components/admin/oidc/OidcProvidersTable';
 import { apiErrorMessage } from '../../utils/apiError';
@@ -44,8 +46,6 @@ type DialogState =
   | { open: false }
   | { open: true; mode: 'create' }
   | { open: true; mode: 'edit'; provider: OidcProviderDto };
-
-type Toast = { message: string; severity: 'success' | 'error' } | null;
 
 /** Admin OIDC/OAuth2 provider management: list, add, edit, enable and delete (#106). */
 export function OidcProvidersPage() {
@@ -56,7 +56,7 @@ export function OidcProvidersPage() {
   const [dialog, setDialog] = useState<DialogState>({ open: false });
   const [openSeq, setOpenSeq] = useState(0);
   const [toDelete, setToDelete] = useState<OidcProviderDto | null>(null);
-  const [toast, setToast] = useState<Toast>(null);
+  const { toast, notify, clear } = useToast();
 
   const providers = data?.providers ?? [];
 
@@ -75,15 +75,9 @@ export function OidcProvidersPage() {
         id: provider.id,
         request: { enabled: !provider.enabled },
       });
-      setToast({
-        message: `${provider.name} ${provider.enabled ? 'disabled' : 'enabled'}.`,
-        severity: 'success',
-      });
+      notify(`${provider.name} ${provider.enabled ? 'disabled' : 'enabled'}.`);
     } catch (err) {
-      setToast({
-        message: apiErrorMessage(err, 'The change could not be saved.'),
-        severity: 'error',
-      });
+      notify(apiErrorMessage(err, 'The change could not be saved.'), 'error');
     }
   };
 
@@ -91,12 +85,9 @@ export function OidcProvidersPage() {
     if (!toDelete) return;
     try {
       await deleteProvider.mutateAsync(toDelete.id);
-      setToast({ message: `${toDelete.name} deleted.`, severity: 'success' });
+      notify(`${toDelete.name} deleted.`);
     } catch (err) {
-      setToast({
-        message: apiErrorMessage(err, 'The provider could not be deleted.'),
-        severity: 'error',
-      });
+      notify(apiErrorMessage(err, 'The provider could not be deleted.'), 'error');
     } finally {
       setToDelete(null);
     }
@@ -104,23 +95,15 @@ export function OidcProvidersPage() {
 
   return (
     <Stack spacing={3}>
-      <Stack
-        direction={{ xs: 'column', sm: 'row' }}
-        spacing={2}
-        sx={{ justifyContent: 'space-between', alignItems: { sm: 'center' } }}
-      >
-        <Box>
-          <Typography variant="h1" sx={{ fontSize: 28 }}>
-            OIDC providers
-          </Typography>
-          <Typography color="text.secondary" sx={{ mt: 0.5 }}>
-            Configure single sign-on identity providers. New providers start disabled.
-          </Typography>
-        </Box>
-        <Button variant="contained" startIcon={<Plus size={18} />} onClick={openCreate}>
-          Add provider
-        </Button>
-      </Stack>
+      <PageHeader
+        title="OIDC providers"
+        description="Configure single sign-on identity providers. New providers start disabled."
+        action={
+          <Button variant="contained" startIcon={<Plus size={18} />} onClick={openCreate}>
+            Add provider
+          </Button>
+        }
+      />
 
       <Paper variant="outlined" sx={{ overflow: 'hidden' }}>
         <Box sx={{ height: 3 }}>{isFetching && <LinearProgress />}</Box>
@@ -161,18 +144,7 @@ export function OidcProvidersPage() {
         onClose={() => setToDelete(null)}
       />
 
-      <Snackbar
-        open={toast !== null}
-        autoHideDuration={5000}
-        onClose={() => setToast(null)}
-        anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
-      >
-        {toast ? (
-          <Alert severity={toast.severity} onClose={() => setToast(null)} variant="filled">
-            {toast.message}
-          </Alert>
-        ) : undefined}
-      </Snackbar>
+      <AdminToast toast={toast} onClose={clear} />
     </Stack>
   );
 }
