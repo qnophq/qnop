@@ -22,6 +22,7 @@ package io.qnop.web;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -100,7 +101,8 @@ class AdminEmailControllerTest {
         new MailPreview(
             new RenderedMail("Reset qnop", "Hi Jane Doe", "<p>Hi</p>"),
             Map.of("siteName", "qnop", "recipientName", "Jane Doe"));
-    when(templates.preview(eq(MailTemplateKey.PASSWORD_RESET), any(), any())).thenReturn(preview);
+    when(templates.preview(eq(MailTemplateKey.PASSWORD_RESET), any(), any(), any()))
+        .thenReturn(preview);
 
     mockMvc
         .perform(
@@ -110,6 +112,36 @@ class AdminEmailControllerTest {
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.subject").value("Reset qnop"))
         .andExpect(jsonPath("$.sampleVars.recipientName").value("Jane Doe"));
+
+    // No draft fields → preview the stored/default version.
+    verify(templates).preview(eq(MailTemplateKey.PASSWORD_RESET), any(), any(), eq(null));
+  }
+
+  @Test
+  void previewRendersSubmittedDraft() throws Exception {
+    MailPreview preview =
+        new MailPreview(
+            new RenderedMail("Draft subject", "Draft body", "<p>Draft</p>"),
+            Map.of("siteName", "qnop"));
+    when(templates.preview(eq(MailTemplateKey.PASSWORD_RESET), any(), any(), any()))
+        .thenReturn(preview);
+
+    mockMvc
+        .perform(
+            post("/api/v1/admin/email/templates/auth.password_reset/preview")
+                .contentType("application/json")
+                .content(
+                    "{\"subject\":\"New {{siteName}}\",\"bodyPlain\":\"Body\",\"bodyHtml\":\"<p>x</p>\"}"))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.subject").value("Draft subject"));
+
+    // The unsaved editor content is forwarded as a draft to render in place of the stored version.
+    verify(templates)
+        .preview(
+            eq(MailTemplateKey.PASSWORD_RESET),
+            any(),
+            any(),
+            eq(new MailTemplateService.MailTemplateDraft("New {{siteName}}", "Body", "<p>x</p>")));
   }
 
   @Test

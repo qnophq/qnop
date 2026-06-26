@@ -29,10 +29,9 @@ import type { MailTemplateResponse } from '../../api/generated';
 import { buildTheme } from '../../theme/theme';
 import { MailTemplateEditPage } from './MailTemplateEditPage';
 
-const { updateMutate, resetMutate, previewMutate } = vi.hoisted(() => ({
+const { updateMutate, resetMutate } = vi.hoisted(() => ({
   updateMutate: vi.fn(),
   resetMutate: vi.fn(),
-  previewMutate: vi.fn(),
 }));
 
 const TEMPLATE: MailTemplateResponse = {
@@ -54,7 +53,10 @@ vi.mock('../../api/hooks/useMailTemplates', () => ({
   useMailTemplate: () => ({ data: TEMPLATE, isLoading: false, isError: false, isFetching: false }),
   useUpdateMailTemplate: () => ({ mutateAsync: updateMutate, isPending: false }),
   useResetMailTemplate: () => ({ mutateAsync: resetMutate, isPending: false }),
-  usePreviewMailTemplate: () => ({ mutateAsync: previewMutate, isPending: false }),
+}));
+
+vi.mock('../../api/hooks/useMailTemplatePreview', () => ({
+  useMailTemplatePreview: () => ({ status: 'idle', data: null, error: null, refresh: vi.fn() }),
 }));
 
 vi.mock('react-router-dom', async (importOriginal) => ({
@@ -88,7 +90,6 @@ vi.mock('../../components/admin/mail/mustache/MustacheCodeEditor', () => ({
 beforeEach(() => {
   updateMutate.mockReset().mockResolvedValue(TEMPLATE);
   resetMutate.mockReset().mockResolvedValue(undefined);
-  previewMutate.mockReset().mockResolvedValue({ subject: 's', bodyPlain: 'p', sampleVars: {} });
 });
 
 function wrapper({ children }: { children: ReactNode }) {
@@ -151,5 +152,11 @@ describe('MailTemplateEditPage', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Reset' }));
 
     await waitFor(() => expect(resetMutate).toHaveBeenCalledWith('auth.password_reset'));
+  });
+
+  it('renders the live preview pane beside the editor', () => {
+    renderPage();
+
+    expect(screen.getByText('Live preview')).toBeTruthy();
   });
 });

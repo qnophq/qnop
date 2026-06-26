@@ -38,10 +38,10 @@ import { Link as RouterLink, useParams } from 'react-router-dom';
 import type { MailTemplateResponse } from '../../api/generated';
 import {
   useMailTemplate,
-  usePreviewMailTemplate,
   useResetMailTemplate,
   useUpdateMailTemplate,
 } from '../../api/hooks/useMailTemplates';
+import { useMailTemplatePreview } from '../../api/hooks/useMailTemplatePreview';
 import { PageHeader } from '../../components/admin/layout/PageHeader';
 import { SectionCard } from '../../components/admin/layout/SectionCard';
 import { AdminToast } from '../../components/admin/layout/AdminToast';
@@ -49,7 +49,7 @@ import { useToast } from '../../components/admin/layout/useToast';
 import { ToneBadge } from '../../components/admin/ToneBadge';
 import { ConfirmDialog } from '../../components/admin/ConfirmDialog';
 import { CompareWithDefault } from '../../components/admin/mail/CompareWithDefault';
-import { MailTemplatePreviewDialog } from '../../components/admin/mail/MailTemplatePreviewDialog';
+import { MailTemplatePreviewPane } from '../../components/admin/mail/preview/MailTemplatePreviewPane';
 import {
   MustacheCodeEditor,
   type MustacheEditorHandle,
@@ -117,7 +117,6 @@ function EditForm({
 }) {
   const updateTemplate = useUpdateMailTemplate();
   const resetTemplate = useResetMailTemplate();
-  const previewTemplate = usePreviewMailTemplate();
   const { toast, notify, clear } = useToast();
 
   const [subject, setSubject] = useState(template.subject);
@@ -126,10 +125,7 @@ function EditForm({
   const [showHtml, setShowHtml] = useState(template.bodyHtml != null);
   const [submitAttempted, setSubmitAttempted] = useState(false);
   const [confirmReset, setConfirmReset] = useState(false);
-  const [previewOpen, setPreviewOpen] = useState(false);
-  const [previewData, setPreviewData] = useState<Awaited<
-    ReturnType<typeof previewTemplate.mutateAsync>
-  > | null>(null);
+  const [sampleOverrides, setSampleOverrides] = useState<Record<string, string>>({});
 
   const lastFocused = useRef<FocusTarget>('subject');
   const subjectRef = useRef<HTMLInputElement>(null);
@@ -144,6 +140,18 @@ function EditForm({
     subject !== template.subject ||
     bodyPlain !== template.bodyPlain ||
     (showHtml ? bodyHtml : null) !== (template.bodyHtml ?? null);
+
+  // Live preview of the unsaved draft (issue #145), debounced and rendered beside the editor.
+  const htmlEnabled = showHtml && bodyHtml.trim() !== '';
+  const preview = useMailTemplatePreview({
+    key: template.key,
+    locale: template.locale,
+    subject,
+    bodyPlain,
+    bodyHtml: htmlEnabled ? bodyHtml : undefined,
+    variables: sampleOverrides,
+  });
+  const sampleValues = { ...(preview.data?.sampleVars ?? {}), ...sampleOverrides };
 
   const insertPlaceholder = (name: string) => {
     if (lastFocused.current === 'bodyHtml' && showHtml) {
@@ -192,18 +200,9 @@ function EditForm({
     }
   };
 
-  const onPreview = async () => {
-    try {
-      setPreviewData(await previewTemplate.mutateAsync({ key: template.key }));
-      setPreviewOpen(true);
-    } catch (err) {
-      notify(apiErrorMessage(err, 'The preview could not be rendered.'), 'error');
-    }
-  };
-
   return (
     <Box component="form" onSubmit={onSave} noValidate>
-      <Stack spacing={3} sx={{ maxWidth: 860 }}>
+      <Stack spacing={3}>
         <Box>
           <Link
             component={RouterLink}
@@ -232,145 +231,163 @@ function EditForm({
                 )}
               </Box>
             }
-            action={
-              <Button
-                variant="outlined"
-                startIcon={<Eye size={18} />}
-                onClick={onPreview}
-                disabled={previewTemplate.isPending}
-              >
-                Preview
-              </Button>
-            }
           />
         </Box>
 
-        <SectionCard
-          icon={Variable}
-          title="Available variables"
-          description="Click a chip to insert it at the caret of the last field you edited."
+        <Box
+          sx={{
+            display: 'grid',
+            gridTemplateColumns: { xs: '1fr', lg: 'minmax(0, 1fr) minmax(0, 1fr)' },
+            gap: 3,
+            alignItems: 'start',
+          }}
         >
-          {template.placeholders.length === 0 ? (
-            <Typography color="text.secondary" sx={{ fontSize: 14, fontStyle: 'italic' }}>
-              This template takes no variables.
-            </Typography>
-          ) : (
-            <Stack direction="row" spacing={0.75} useFlexGap sx={{ flexWrap: 'wrap' }}>
-              {template.placeholders.map((name) => (
-                <Chip
-                  key={name}
-                  label={`{{${name}}}`}
-                  size="small"
-                  variant="outlined"
-                  onClick={() => insertPlaceholder(name)}
-                  sx={{ fontFamily: 'monospace', fontSize: 12.5 }}
-                />
-              ))}
-            </Stack>
-          )}
-        </SectionCard>
-
-        <SectionCard icon={Eye} title="Content" description="Subject and body for this email.">
-          <Stack spacing={2.5}>
-            <Box>
-              <TextField
-                label="Subject"
-                value={subject}
-                onChange={(e) => setSubject(e.target.value)}
-                onFocus={() => (lastFocused.current = 'subject')}
-                inputRef={subjectRef}
-                fullWidth
-                required
-                error={Boolean(subjectError)}
-                helperText={subjectError || 'Mustache syntax, e.g. {{siteName}}.'}
-                slotProps={{ input: { sx: { fontFamily: 'monospace' } } }}
-              />
-              <CompareWithDefault label="default subject" value={template.defaultSubject} />
-            </Box>
-
-            <Box>
-              <Typography sx={{ fontSize: 13.5, fontWeight: 500, mb: 0.5 }}>
-                Plain-text body{' '}
-                <Box component="span" sx={{ color: 'error.main' }}>
-                  *
-                </Box>
-              </Typography>
-              <MustacheCodeEditor
-                ref={plainRef}
-                value={bodyPlain}
-                onChange={setBodyPlain}
-                onFocus={() => (lastFocused.current = 'bodyPlain')}
-                placeholders={template.placeholders}
-                minHeight="220px"
-              />
-              {plainError && (
-                <Typography color="error" sx={{ fontSize: 12.5, mt: 0.5, ml: 1.5 }}>
-                  {plainError}
-                </Typography>
-              )}
-              <CompareWithDefault
-                label="default plain-text body"
-                value={template.defaultBodyPlain}
-              />
-            </Box>
-
-            <Box>
-              <FormControlLabel
-                control={
-                  <Switch checked={showHtml} onChange={(e) => toggleHtml(e.target.checked)} />
-                }
-                label="Add HTML alternative"
-                sx={{ m: 0, gap: 1 }}
-              />
-              <Collapse in={showHtml} unmountOnExit>
-                <Box sx={{ mt: 1.5 }}>
-                  <MustacheCodeEditor
-                    ref={htmlRef}
-                    value={bodyHtml}
-                    onChange={setBodyHtml}
-                    onFocus={() => (lastFocused.current = 'bodyHtml')}
-                    placeholders={template.placeholders}
-                    language="html"
-                    minHeight="300px"
-                  />
-                  {template.defaultBodyHtml && (
-                    <CompareWithDefault
-                      label="default HTML body"
-                      value={template.defaultBodyHtml}
-                    />
-                  )}
-                </Box>
-              </Collapse>
-            </Box>
-          </Stack>
-        </SectionCard>
-
-        <Divider />
-        <Stack
-          direction={{ xs: 'column', sm: 'row' }}
-          spacing={1.5}
-          sx={{ alignItems: { sm: 'center' }, justifyContent: 'space-between' }}
-        >
-          <Button
-            type="button"
-            color="error"
-            startIcon={<RotateCcw size={18} />}
-            disabled={!isCustomised || resetTemplate.isPending}
-            onClick={() => setConfirmReset(true)}
-          >
-            Reset to default
-          </Button>
-          <Stack direction="row" spacing={1.5} sx={{ alignItems: 'center' }}>
-            {updateTemplate.isPending && <LinearProgress sx={{ width: 100 }} />}
-            <Button
-              type="submit"
-              variant="contained"
-              disabled={!dirty || updateTemplate.isPending || refreshing}
+          <Stack spacing={3}>
+            <SectionCard
+              icon={Variable}
+              title="Available variables"
+              description="Click a chip to insert it at the caret of the last field you edited."
             >
-              {updateTemplate.isPending ? 'Saving…' : 'Save changes'}
-            </Button>
+              {template.placeholders.length === 0 ? (
+                <Typography color="text.secondary" sx={{ fontSize: 14, fontStyle: 'italic' }}>
+                  This template takes no variables.
+                </Typography>
+              ) : (
+                <Stack direction="row" spacing={0.75} useFlexGap sx={{ flexWrap: 'wrap' }}>
+                  {template.placeholders.map((name) => (
+                    <Chip
+                      key={name}
+                      label={`{{${name}}}`}
+                      size="small"
+                      variant="outlined"
+                      onClick={() => insertPlaceholder(name)}
+                      sx={{ fontFamily: 'monospace', fontSize: 12.5 }}
+                    />
+                  ))}
+                </Stack>
+              )}
+            </SectionCard>
+
+            <SectionCard icon={Eye} title="Content" description="Subject and body for this email.">
+              <Stack spacing={2.5}>
+                <Box>
+                  <TextField
+                    label="Subject"
+                    value={subject}
+                    onChange={(e) => setSubject(e.target.value)}
+                    onFocus={() => (lastFocused.current = 'subject')}
+                    inputRef={subjectRef}
+                    fullWidth
+                    required
+                    error={Boolean(subjectError)}
+                    helperText={subjectError || 'Mustache syntax, e.g. {{siteName}}.'}
+                    slotProps={{ input: { sx: { fontFamily: 'monospace' } } }}
+                  />
+                  <CompareWithDefault label="default subject" value={template.defaultSubject} />
+                </Box>
+
+                <Box>
+                  <Typography sx={{ fontSize: 13.5, fontWeight: 500, mb: 0.5 }}>
+                    Plain-text body{' '}
+                    <Box component="span" sx={{ color: 'error.main' }}>
+                      *
+                    </Box>
+                  </Typography>
+                  <MustacheCodeEditor
+                    ref={plainRef}
+                    value={bodyPlain}
+                    onChange={setBodyPlain}
+                    onFocus={() => (lastFocused.current = 'bodyPlain')}
+                    placeholders={template.placeholders}
+                    minHeight="220px"
+                  />
+                  {plainError && (
+                    <Typography color="error" sx={{ fontSize: 12.5, mt: 0.5, ml: 1.5 }}>
+                      {plainError}
+                    </Typography>
+                  )}
+                  <CompareWithDefault
+                    label="default plain-text body"
+                    value={template.defaultBodyPlain}
+                  />
+                </Box>
+
+                <Box>
+                  <FormControlLabel
+                    control={
+                      <Switch checked={showHtml} onChange={(e) => toggleHtml(e.target.checked)} />
+                    }
+                    label="Add HTML alternative"
+                    sx={{ m: 0, gap: 1 }}
+                  />
+                  <Collapse in={showHtml} unmountOnExit>
+                    <Box sx={{ mt: 1.5 }}>
+                      <MustacheCodeEditor
+                        ref={htmlRef}
+                        value={bodyHtml}
+                        onChange={setBodyHtml}
+                        onFocus={() => (lastFocused.current = 'bodyHtml')}
+                        placeholders={template.placeholders}
+                        language="html"
+                        minHeight="300px"
+                      />
+                      {template.defaultBodyHtml && (
+                        <CompareWithDefault
+                          label="default HTML body"
+                          value={template.defaultBodyHtml}
+                        />
+                      )}
+                    </Box>
+                  </Collapse>
+                </Box>
+              </Stack>
+            </SectionCard>
+
+            <Box>
+              <Divider sx={{ mb: 2 }} />
+              <Stack
+                direction={{ xs: 'column', sm: 'row' }}
+                spacing={1.5}
+                sx={{ alignItems: { sm: 'center' }, justifyContent: 'space-between' }}
+              >
+                <Button
+                  type="button"
+                  color="error"
+                  startIcon={<RotateCcw size={18} />}
+                  disabled={!isCustomised || resetTemplate.isPending}
+                  onClick={() => setConfirmReset(true)}
+                >
+                  Reset to default
+                </Button>
+                <Stack direction="row" spacing={1.5} sx={{ alignItems: 'center' }}>
+                  {updateTemplate.isPending && <LinearProgress sx={{ width: 100 }} />}
+                  <Button
+                    type="submit"
+                    variant="contained"
+                    disabled={!dirty || updateTemplate.isPending || refreshing}
+                  >
+                    {updateTemplate.isPending ? 'Saving…' : 'Save changes'}
+                  </Button>
+                </Stack>
+              </Stack>
+            </Box>
           </Stack>
-        </Stack>
+
+          <Box sx={{ position: { lg: 'sticky' }, top: { lg: 24 } }}>
+            <MailTemplatePreviewPane
+              status={preview.status}
+              preview={preview.data}
+              error={preview.error}
+              onRefresh={preview.refresh}
+              htmlEnabled={htmlEnabled}
+              placeholders={template.placeholders}
+              sampleValues={sampleValues}
+              onSampleChange={(name, value) =>
+                setSampleOverrides((prev) => ({ ...prev, [name]: value }))
+              }
+            />
+          </Box>
+        </Box>
       </Stack>
 
       <ConfirmDialog
@@ -381,13 +398,6 @@ function EditForm({
         destructive
         onConfirm={onReset}
         onClose={() => setConfirmReset(false)}
-      />
-
-      <MailTemplatePreviewDialog
-        open={previewOpen}
-        loading={previewTemplate.isPending}
-        preview={previewData}
-        onClose={() => setPreviewOpen(false)}
       />
 
       <AdminToast toast={toast} onClose={clear} />

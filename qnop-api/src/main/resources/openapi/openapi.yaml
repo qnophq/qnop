@@ -2034,6 +2034,23 @@ components:
         locale:
           type: string
           description: Locale to render; falls back to the default language when omitted.
+        subject:
+          type: string
+          description: >-
+            Draft subject to render instead of the stored version, for a live
+            preview while editing. When both subject and bodyPlain are supplied
+            the draft is rendered; otherwise the stored override or built-in
+            default is used.
+        bodyPlain:
+          type: string
+          description: >-
+            Draft plain-text body to render instead of the stored version.
+            Honoured only together with a draft subject.
+        bodyHtml:
+          type: string
+          description: >-
+            Optional draft HTML alternative. When omitted or blank the branded
+            default chrome is rendered around the plain content.
         variables:
           type: object
           additionalProperties:

@@ -126,7 +126,9 @@ public class AdminEmailController implements AdminEmailApi {
     MailTemplateKey templateKey = resolveKey(key);
     MailPreview preview;
     try {
-      preview = templates.preview(templateKey, request.getLocale(), toVars(request.getVariables()));
+      preview =
+          templates.preview(
+              templateKey, request.getLocale(), toVars(request.getVariables()), toDraft(request));
     } catch (MailTemplateValidationException e) {
       throw new ResponseStatusException(HttpStatus.BAD_REQUEST, e.getMessage());
     } catch (RuntimeException e) {
@@ -155,6 +157,19 @@ public class AdminEmailController implements AdminEmailApi {
 
   private Map<String, Object> toVars(Map<String, String> variables) {
     return variables == null ? Map.of() : new HashMap<>(variables);
+  }
+
+  /**
+   * Builds the unsaved draft to render, or null to preview the stored version. A draft is honoured
+   * only when the editor supplies both a subject and a plain body (the live preview's
+   * enabled-gate).
+   */
+  private MailTemplateService.MailTemplateDraft toDraft(PreviewMailTemplateRequest request) {
+    if (request.getSubject() == null || request.getBodyPlain() == null) {
+      return null;
+    }
+    return new MailTemplateService.MailTemplateDraft(
+        request.getSubject(), request.getBodyPlain(), request.getBodyHtml());
   }
 
   /** The authenticated admin's id (the JWT subject), or null if not parseable. */
