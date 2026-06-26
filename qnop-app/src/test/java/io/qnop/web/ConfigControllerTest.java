@@ -27,6 +27,9 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import io.qnop.service.ApplicationSettingKey;
 import io.qnop.service.ApplicationSettingsService;
+import io.qnop.service.branding.BrandingService;
+import io.qnop.service.branding.BrandingService.BrandingSource;
+import io.qnop.service.branding.BrandingService.SlotStatus;
 import io.qnop.service.oidc.OidcProviderLoginView;
 import io.qnop.service.oidc.OidcProviderService;
 import java.util.List;
@@ -56,6 +59,7 @@ class ConfigControllerTest {
 
   @MockitoBean private OidcProviderService oidcProviders;
   @MockitoBean private ApplicationSettingsService settings;
+  @MockitoBean private BrandingService branding;
 
   @BeforeEach
   void setUp() {
@@ -63,6 +67,13 @@ class ConfigControllerTest {
     when(oidcProviders.enabledLoginViews()).thenReturn(List.of());
     when(settings.getBoolean(ApplicationSettingKey.AUTH_SELF_REGISTRATION_ENABLED))
         .thenReturn(false);
+    // All slots on the factory default until something is uploaded.
+    when(branding.statusAll())
+        .thenReturn(
+            List.of(
+                new SlotStatus("logo-light", BrandingSource.DEFAULT, "sha-light"),
+                new SlotStatus("logo-dark", BrandingSource.DEFAULT, "sha-dark"),
+                new SlotStatus("logomark", BrandingSource.DEFAULT, "sha-mark")));
   }
 
   @Test
@@ -78,7 +89,11 @@ class ConfigControllerTest {
         .andExpect(jsonPath("$.auth.oidcProviders").isArray())
         .andExpect(jsonPath("$.auth.oidcProviders").isEmpty())
         .andExpect(jsonPath("$.upload.maxDocumentSizeMb").value(50))
-        .andExpect(jsonPath("$.supportedFormats[0]").value("PDF"));
+        .andExpect(jsonPath("$.supportedFormats[0]").value("PDF"))
+        .andExpect(jsonPath("$.branding.logoLight.source").value("DEFAULT"))
+        .andExpect(
+            jsonPath("$.branding.logoLight.url").value("/api/v1/branding/logo-light?v=sha-light"))
+        .andExpect(jsonPath("$.branding.logomark.source").value("DEFAULT"));
   }
 
   @Test

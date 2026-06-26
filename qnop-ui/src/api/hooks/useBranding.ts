@@ -19,20 +19,29 @@
  * SPDX-License-Identifier: AGPL-3.0-only
  */
 
-import { useMutation } from '@tanstack/react-query';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { deleteBrandingAsset, uploadBrandingAsset, type BrandingSlot } from '../branding';
+import { configKeys } from './useConfig';
 
-/** Uploads a branding asset for a slot. */
+/**
+ * Uploads a branding asset for a slot, then invalidates the server config so the page re-reads the
+ * slot's effective source (custom vs default) and its cache-busting URL — the single source of truth
+ * for the preview, rather than guessing from an image load.
+ */
 export function useUploadBrandingAsset() {
+  const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (vars: { slot: BrandingSlot; file: File }) =>
       uploadBrandingAsset(vars.slot, vars.file),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: configKeys.all }),
   });
 }
 
-/** Deletes the branding asset for a slot. */
+/** Deletes the branding asset for a slot (falling back to the default), then refreshes the config. */
 export function useDeleteBrandingAsset() {
+  const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (slot: BrandingSlot) => deleteBrandingAsset(slot),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: configKeys.all }),
   });
 }

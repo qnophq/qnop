@@ -23,9 +23,15 @@ package io.qnop.service.branding;
 import io.qnop.entity.ApplicationAsset;
 import io.qnop.entity.BrandingSlot;
 import io.qnop.repository.ApplicationAssetRepository;
+import java.io.IOException;
+import java.io.InputStream;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
+import java.util.Arrays;
+import java.util.EnumMap;
 import java.util.HexFormat;
+import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 import org.springframework.stereotype.Service;
@@ -45,10 +51,47 @@ public class BrandingService {
   private final ApplicationAssetRepository repository;
   private final TransactionTemplate transactionTemplate;
 
+  /**
+   * Bundled factory logos served when a slot has no operator upload (issue #106 follow-up). Loaded
+   * once from the classpath; serving a default means {@code GET /branding/{slot}} always returns an
+   * image (the login page and shell need a logo before anything is uploaded), and the UI can mark a
+   * slot as default vs custom via {@link #statusAll()}.
+   */
+  private final Map<BrandingSlot, BrandingAsset> defaults;
+
   public BrandingService(
       ApplicationAssetRepository repository, PlatformTransactionManager transactionManager) {
     this.repository = repository;
     this.transactionTemplate = new TransactionTemplate(transactionManager);
+    this.defaults = loadDefaults();
+  }
+
+  /** Where each slot's effective asset comes from. */
+  public enum BrandingSource {
+    CUSTOM,
+    DEFAULT
+  }
+
+  /**
+   * Web-safe status of one slot: its kebab url value, its source, and a cache-bust version (sha).
+   */
+  public record SlotStatus(String slot, BrandingSource source, String version) {}
+
+  private static Map<BrandingSlot, BrandingAsset> loadDefaults() {
+    Map<BrandingSlot, BrandingAsset> map = new EnumMap<>(BrandingSlot.class);
+    for (BrandingSlot slot : BrandingSlot.values()) {
+      String path = "/branding/defaults/" + slot.urlValue() + ".svg";
+      try (InputStream in = BrandingService.class.getResourceAsStream(path)) {
+        if (in == null) {
+          throw new IllegalStateException("Missing default branding asset on classpath: " + path);
+        }
+        byte[] bytes = in.readAllBytes();
+        map.put(slot, new BrandingAsset(bytes, BrandingLimits.SVG, sha256Hex(bytes)));
+      } catch (IOException e) {
+        throw new IllegalStateException("Could not read default branding asset: " + path, e);
+      }
+    }
+    return map;
   }
 
   /**
@@ -98,14 +141,39 @@ public class BrandingService {
         });
   }
 
-  /** The current asset for a slot, for public serving. */
+  /**
+   * The effective asset for a slot, for public serving: the operator upload when present, otherwise
+   * the bundled factory default. Present for every known slot; an unknown slot still throws 404.
+   */
   @Transactional(readOnly = true)
   public Optional<BrandingAsset> get(String slot) {
+    BrandingSlot resolved = resolve(slot);
     return repository
-        .findBySlot(resolve(slot))
+        .findBySlot(resolved)
         .map(
             asset ->
-                new BrandingAsset(asset.getContent(), asset.getContentType(), asset.getSha256()));
+                new BrandingAsset(asset.getContent(), asset.getContentType(), asset.getSha256()))
+        .or(() -> Optional.of(defaults.get(resolved)));
+  }
+
+  /**
+   * Per-slot source (custom upload vs factory default) and a cache-bust version (the asset's
+   * SHA-256), for the public config so the SPA can render and badge each slot without guessing from
+   * an image load.
+   */
+  @Transactional(readOnly = true)
+  public List<SlotStatus> statusAll() {
+    return Arrays.stream(BrandingSlot.values()).map(this::statusFor).toList();
+  }
+
+  private SlotStatus statusFor(BrandingSlot slot) {
+    return repository
+        .findBySlot(slot)
+        .map(asset -> new SlotStatus(slot.urlValue(), BrandingSource.CUSTOM, asset.getSha256()))
+        .orElseGet(
+            () ->
+                new SlotStatus(
+                    slot.urlValue(), BrandingSource.DEFAULT, defaults.get(slot).sha256()));
   }
 
   /** Removes the asset for a slot (idempotent). */

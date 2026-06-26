@@ -1750,6 +1750,8 @@ components:
           description: Document formats this server can ingest and review.
           items:
             $ref: '#/components/schemas/SupportedFormat'
+        branding:
+          $ref: '#/components/schemas/ServerConfigBranding'
       required:
         - version
         - edition
@@ -1757,6 +1759,41 @@ components:
         - auth
         - upload
         - supportedFormats
+    ServerConfigBranding:
+      type: object
+      description: |
+        Effective branding logos. Each slot carries the URL to render and whether it
+        is the operator's custom upload or the bundled factory default, so the UI can
+        show and mark it without inferring from an image load.
+      properties:
+        logoLight:
+          $ref: '#/components/schemas/ServerConfigBrandingSlot'
+        logoDark:
+          $ref: '#/components/schemas/ServerConfigBrandingSlot'
+        logomark:
+          $ref: '#/components/schemas/ServerConfigBrandingSlot'
+      required:
+        - logoLight
+        - logoDark
+        - logomark
+    ServerConfigBrandingSlot:
+      type: object
+      description: One branding slot's effective asset.
+      properties:
+        source:
+          type: string
+          description: Whether the effective asset is the custom upload or the factory default.
+          enum:
+            - CUSTOM
+            - DEFAULT
+        url:
+          type: string
+          description: |
+            Public URL of the effective asset, with a cache-busting `?v=` token (the
+            asset's SHA-256) so it reloads when the upload changes.
+      required:
+        - source
+        - url
     SettingValueType:
       type: string
       description: The declared type of an application setting value.

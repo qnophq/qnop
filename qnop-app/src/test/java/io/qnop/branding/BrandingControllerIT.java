@@ -125,15 +125,33 @@ class BrandingControllerIT extends AbstractIntegrationTest {
   }
 
   @Test
-  void deleteRemovesAsset() throws Exception {
+  void deleteFallsBackToFactoryDefault() throws Exception {
     mockMvc
         .perform(multipart("/api/v1/admin/branding/logomark").file(logo()).with(superadmin()))
         .andExpect(status().isOk());
 
     mockMvc
+        .perform(get("/api/v1/branding/logomark"))
+        .andExpect(status().isOk())
+        .andExpect(header().string("Content-Type", "image/png"));
+
+    mockMvc
         .perform(delete("/api/v1/admin/branding/logomark").with(superadmin()))
         .andExpect(status().isNoContent());
 
-    mockMvc.perform(get("/api/v1/branding/logomark")).andExpect(status().isNotFound());
+    // After delete the slot serves the bundled factory default (SVG), not a 404.
+    mockMvc
+        .perform(get("/api/v1/branding/logomark"))
+        .andExpect(status().isOk())
+        .andExpect(header().string("Content-Type", "image/svg+xml"));
+  }
+
+  @Test
+  void emptySlotServesFactoryDefault() throws Exception {
+    mockMvc
+        .perform(get("/api/v1/branding/logo-light"))
+        .andExpect(status().isOk())
+        .andExpect(header().string("Content-Type", "image/svg+xml"))
+        .andExpect(header().exists("ETag"));
   }
 }

@@ -22,18 +22,54 @@
 import { useState } from 'react';
 import Alert from '@mui/material/Alert';
 import Box from '@mui/material/Box';
+import Skeleton from '@mui/material/Skeleton';
 import Snackbar from '@mui/material/Snackbar';
 import Stack from '@mui/material/Stack';
 import Typography from '@mui/material/Typography';
+import type { ServerConfigBrandingSlot } from '../../api/generated';
+import { useConfig } from '../../api/hooks/useConfig';
 import { BrandingSlotCard } from '../../components/admin/branding/BrandingSlotCard';
+import type { BrandingSlot } from '../../api/branding';
 
 type Toast = { message: string; severity: 'success' | 'error' } | null;
 
+interface SlotDef {
+  slot: BrandingSlot;
+  label: string;
+  description: string;
+  dark?: boolean;
+  asset?: ServerConfigBrandingSlot;
+}
+
 /** Admin branding: upload/replace/remove the light & dark logos and the logomark (#106). */
 export function BrandingPage() {
+  const { data: config, isLoading, isError } = useConfig();
   const [toast, setToast] = useState<Toast>(null);
   const notify = (message: string, severity: 'success' | 'error') =>
     setToast({ message, severity });
+
+  const branding = config?.branding;
+  const slots: SlotDef[] = [
+    {
+      slot: 'logo-light',
+      label: 'Logo (light)',
+      description: 'Shown on light backgrounds.',
+      asset: branding?.logoLight,
+    },
+    {
+      slot: 'logo-dark',
+      label: 'Logo (dark)',
+      description: 'Shown on dark backgrounds.',
+      dark: true,
+      asset: branding?.logoDark,
+    },
+    {
+      slot: 'logomark',
+      label: 'Logomark',
+      description: 'Compact mark / favicon.',
+      asset: branding?.logomark,
+    },
+  ];
 
   return (
     <Stack spacing={3}>
@@ -42,31 +78,38 @@ export function BrandingPage() {
           Branding
         </Typography>
         <Typography color="text.secondary" sx={{ mt: 0.5 }}>
-          Upload the logos shown across the app. PNG, WebP or SVG, up to 512 KiB.
+          Replace the default logos shown across the app. PNG, WebP or SVG, up to 512 KiB. Each slot
+          falls back to the qnop default until you upload your own.
         </Typography>
       </Box>
 
-      <Stack direction={{ xs: 'column', md: 'row' }} spacing={2} sx={{ alignItems: 'stretch' }}>
-        <BrandingSlotCard
-          slot="logo-light"
-          label="Logo (light)"
-          description="Shown on light backgrounds."
-          onNotify={notify}
-        />
-        <BrandingSlotCard
-          slot="logo-dark"
-          label="Logo (dark)"
-          description="Shown on dark backgrounds."
-          dark
-          onNotify={notify}
-        />
-        <BrandingSlotCard
-          slot="logomark"
-          label="Logomark"
-          description="Compact mark / favicon."
-          onNotify={notify}
-        />
-      </Stack>
+      {isError ? (
+        <Alert severity="error">The branding configuration could not be loaded.</Alert>
+      ) : (
+        <Stack direction={{ xs: 'column', md: 'row' }} spacing={2} sx={{ alignItems: 'stretch' }}>
+          {slots.map((s) =>
+            isLoading || !s.asset ? (
+              <Skeleton
+                key={s.slot}
+                variant="rounded"
+                height={232}
+                sx={{ flex: 1, minWidth: 240 }}
+              />
+            ) : (
+              <BrandingSlotCard
+                key={s.slot}
+                slot={s.slot}
+                label={s.label}
+                description={s.description}
+                dark={s.dark}
+                source={s.asset.source}
+                url={s.asset.url}
+                onNotify={notify}
+              />
+            ),
+          )}
+        </Stack>
+      )}
 
       <Snackbar
         open={toast !== null}

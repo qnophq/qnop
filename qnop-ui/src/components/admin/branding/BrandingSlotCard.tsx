@@ -23,23 +23,25 @@ import { useRef, useState, type ChangeEvent } from 'react';
 import Box from '@mui/material/Box';
 import Button from '@mui/material/Button';
 import Paper from '@mui/material/Paper';
+import Skeleton from '@mui/material/Skeleton';
 import Stack from '@mui/material/Stack';
 import Typography from '@mui/material/Typography';
+import { useTheme } from '@mui/material/styles';
 import { ImageOff, Trash2, Upload } from 'lucide-react';
-import {
-  BRANDING_ACCEPT,
-  BRANDING_MAX_SIZE_BYTES,
-  brandingAssetUrl,
-  type BrandingSlot,
-} from '../../../api/branding';
+import { BRANDING_ACCEPT, BRANDING_MAX_SIZE_BYTES, type BrandingSlot } from '../../../api/branding';
 import { useDeleteBrandingAsset, useUploadBrandingAsset } from '../../../api/hooks/useBranding';
 import { apiErrorMessage } from '../../../utils/apiError';
 import { ConfirmDialog } from '../ConfirmDialog';
+import { ToneBadge } from '../ToneBadge';
 
 interface BrandingSlotCardProps {
   slot: BrandingSlot;
   label: string;
   description: string;
+  /** Where the effective asset comes from — drives the badge and the Replace/Remove affordances. */
+  source: 'CUSTOM' | 'DEFAULT';
+  /** Effective asset URL (custom upload or factory default), with a cache-busting `?v=` token. */
+  url: string;
   /** Render the preview on a dark surface (for the dark-mode logo). */
   dark?: boolean;
   onNotify: (message: string, severity: 'success' | 'error') => void;
@@ -47,22 +49,36 @@ interface BrandingSlotCardProps {
 
 const ALLOWED = BRANDING_ACCEPT.split(',');
 
-/** One branding slot: live preview, upload (with client-side validation), and delete. */
+/**
+ * One branding slot: a live preview of the effective logo (custom upload or factory default),
+ * clearly badged as one or the other, with upload/replace and — only for a custom upload — remove.
+ * The source and URL come from the server config (the single source of truth), so the card never
+ * guesses "has asset" from an image load.
+ */
 export function BrandingSlotCard({
   slot,
   label,
   description,
+  source,
+  url,
   dark,
   onNotify,
 }: BrandingSlotCardProps) {
+  const theme = useTheme();
   const upload = useUploadBrandingAsset();
   const remove = useDeleteBrandingAsset();
   const inputRef = useRef<HTMLInputElement>(null);
-
-  // Bumped after every change to bust the browser cache for the preview <img>.
-  const [version, setVersion] = useState(1);
-  const [hasAsset, setHasAsset] = useState<boolean | null>(null);
   const [confirmDelete, setConfirmDelete] = useState(false);
+
+  // Show a skeleton until the current URL's image loads; an error shows a fallback rather than an
+  // endless skeleton. Comparing against the URL resets both whenever the effective asset changes.
+  const [loadedUrl, setLoadedUrl] = useState<string | null>(null);
+  const [failedUrl, setFailedUrl] = useState<string | null>(null);
+  const loaded = loadedUrl === url;
+  const failed = failedUrl === url;
+
+  const isCustom = source === 'CUSTOM';
+  const busy = upload.isPending || remove.isPending;
 
   const onPick = async (event: ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -78,8 +94,6 @@ export function BrandingSlotCard({
     }
     try {
       await upload.mutateAsync({ slot, file });
-      setHasAsset(true);
-      setVersion((v) => v + 1);
       onNotify(`${label} updated.`, 'success');
     } catch (err) {
       onNotify(apiErrorMessage(err, 'The upload failed.'), 'error');
@@ -90,28 +104,31 @@ export function BrandingSlotCard({
     setConfirmDelete(false);
     try {
       await remove.mutateAsync(slot);
-      setHasAsset(false);
-      setVersion((v) => v + 1);
-      onNotify(`${label} removed.`, 'success');
+      onNotify(`${label} reset to default.`, 'success');
     } catch (err) {
       onNotify(apiErrorMessage(err, 'The asset could not be removed.'), 'error');
     }
   };
 
-  const busy = upload.isPending || remove.isPending;
-
   return (
-    <Paper variant="outlined" sx={{ p: 2.5, flex: 1, minWidth: 240 }}>
-      <Stack spacing={2}>
-        <Box>
-          <Typography sx={{ fontWeight: 600 }}>{label}</Typography>
-          <Typography color="text.secondary" sx={{ fontSize: 13 }}>
-            {description}
-          </Typography>
-        </Box>
+    <Paper
+      variant="outlined"
+      sx={{ p: 2.5, flex: 1, minWidth: 240, display: 'flex', flexDirection: 'column' }}
+    >
+      <Stack spacing={2} sx={{ flex: 1 }}>
+        <Stack direction="row" spacing={1} sx={{ justifyContent: 'space-between' }}>
+          <Box sx={{ minWidth: 0 }}>
+            <Typography sx={{ fontWeight: 600 }}>{label}</Typography>
+            <Typography color="text.secondary" sx={{ fontSize: 13 }}>
+              {description}
+            </Typography>
+          </Box>
+          <ToneBadge tone={isCustom ? 'blue' : 'neutral'} label={isCustom ? 'Custom' : 'Default'} />
+        </Stack>
 
         <Box
           sx={{
+            position: 'relative',
             height: 120,
             display: 'flex',
             alignItems: 'center',
@@ -119,43 +136,45 @@ export function BrandingSlotCard({
             borderRadius: 1.5,
             border: 1,
             borderColor: 'divider',
-            bgcolor: dark ? 'grey.900' : 'background.default',
+            bgcolor: dark ? theme.qnop.brand.navy : theme.qnop.surface2,
             overflow: 'hidden',
             p: 1.5,
           }}
         >
+          {!loaded && !failed && <Skeleton variant="rounded" width="55%" height={26} />}
+          {failed && (
+            <Stack spacing={0.5} sx={{ alignItems: 'center', color: 'text.disabled' }}>
+              <ImageOff size={22} />
+              <Typography sx={{ fontSize: 12 }}>Preview unavailable</Typography>
+            </Stack>
+          )}
           <Box
             component="img"
-            src={brandingAssetUrl(slot, version)}
+            key={url}
+            src={url}
             alt={`${label} preview`}
-            onLoad={() => setHasAsset(true)}
-            onError={() => setHasAsset(false)}
+            onLoad={() => setLoadedUrl(url)}
+            onError={() => setFailedUrl(url)}
             sx={{
               maxHeight: '100%',
               maxWidth: '100%',
               objectFit: 'contain',
-              display: hasAsset ? 'block' : 'none',
+              display: loaded && !failed ? 'block' : 'none',
             }}
           />
-          {hasAsset === false && (
-            <Stack spacing={0.5} sx={{ alignItems: 'center', color: 'text.disabled' }}>
-              <ImageOff size={22} />
-              <Typography sx={{ fontSize: 12 }}>No image</Typography>
-            </Stack>
-          )}
         </Box>
 
-        <Stack direction="row" spacing={1}>
+        <Stack direction="row" spacing={1} sx={{ mt: 'auto' }}>
           <Button
             size="small"
-            variant="outlined"
+            variant={isCustom ? 'outlined' : 'contained'}
             startIcon={<Upload size={15} />}
             onClick={() => inputRef.current?.click()}
             disabled={busy}
           >
-            {hasAsset ? 'Replace' : 'Upload'}
+            {isCustom ? 'Replace' : 'Upload'}
           </Button>
-          {hasAsset && (
+          {isCustom && (
             <Button
               size="small"
               color="error"
@@ -166,14 +185,21 @@ export function BrandingSlotCard({
               Remove
             </Button>
           )}
-          <input ref={inputRef} type="file" accept={BRANDING_ACCEPT} hidden onChange={onPick} />
+          <input
+            ref={inputRef}
+            type="file"
+            accept={BRANDING_ACCEPT}
+            hidden
+            aria-label={`Upload ${label}`}
+            onChange={onPick}
+          />
         </Stack>
       </Stack>
 
       <ConfirmDialog
         open={confirmDelete}
-        title="Remove asset"
-        message={`Remove the ${label.toLowerCase()}? The app falls back to its default.`}
+        title="Remove logo"
+        message={`Remove the custom ${label.toLowerCase()}? The app falls back to the default ${label.toLowerCase()}.`}
         confirmLabel="Remove"
         destructive
         onConfirm={onDelete}
