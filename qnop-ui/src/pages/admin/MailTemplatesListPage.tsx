@@ -19,12 +19,19 @@
  * SPDX-License-Identifier: AGPL-3.0-only
  */
 
-import { useState } from 'react';
+import { useState, type KeyboardEvent } from 'react';
 import Alert from '@mui/material/Alert';
 import Box from '@mui/material/Box';
 import Button from '@mui/material/Button';
-import ButtonBase from '@mui/material/ButtonBase';
+import LinearProgress from '@mui/material/LinearProgress';
+import Paper from '@mui/material/Paper';
 import Stack from '@mui/material/Stack';
+import Table from '@mui/material/Table';
+import TableBody from '@mui/material/TableBody';
+import TableCell from '@mui/material/TableCell';
+import TableHead from '@mui/material/TableHead';
+import TableRow from '@mui/material/TableRow';
+import Tooltip from '@mui/material/Tooltip';
 import Typography from '@mui/material/Typography';
 import { ChevronRight, MailCheck } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
@@ -34,118 +41,116 @@ import { PageHeader } from '../../components/admin/layout/PageHeader';
 import { ToneBadge } from '../../components/admin/ToneBadge';
 import { SendTestEmailDialog } from '../../components/admin/mail/SendTestEmailDialog';
 import { formatRelative } from '../../utils/formatDate';
+import { localeDisplayName, localeShortCode } from '../../utils/locale';
 
-/** The attribution line for a template row: who customised it and when, or the factory marker. */
-function attribution(template: MailTemplateResponse): { text: string; customised: boolean } {
-  if (template.source !== 'DATABASE') {
-    return { text: 'Factory default', customised: false };
-  }
-  const when = formatRelative(template.updatedAt);
-  return {
-    text: template.updatedByName ? `Edited ${when} by ${template.updatedByName}` : `Edited ${when}`,
-    customised: true,
-  };
-}
+const COLUMNS = ['Template', 'Subject', 'Language', 'Source', 'Last edited', ''];
 
-/** A navigable template row: friendly name, key, subject preview, attribution and source badge. */
+/** A compact, navigable template row: name + key, subject, language, source and edit attribution. */
 function TemplateRow({ template, onOpen }: { template: MailTemplateResponse; onOpen: () => void }) {
-  const attr = attribution(template);
+  const customised = template.source === 'DATABASE';
+  const onKeyDown = (event: KeyboardEvent<HTMLTableRowElement>) => {
+    if (event.key === 'Enter' || event.key === ' ') {
+      event.preventDefault();
+      onOpen();
+    }
+  };
+
   return (
-    <ButtonBase
+    <TableRow
+      hover
+      tabIndex={0}
       onClick={onOpen}
-      focusRipple
+      onKeyDown={onKeyDown}
+      aria-label={`Edit the ${template.friendlyName} template`}
       sx={{
-        display: 'block',
-        textAlign: 'left',
-        width: '100%',
-        borderRadius: 2,
-        border: '1px solid',
-        borderColor: 'divider',
-        bgcolor: 'background.paper',
-        p: { xs: 2, sm: 2.5 },
-        transition: (t) => t.transitions.create(['border-color', 'box-shadow']),
-        '&:hover': {
-          borderColor: (t) => t.qnop.brand.blue,
-          boxShadow: (t) => t.qnop.badge.blue.border,
+        cursor: 'pointer',
+        '& td': { borderColor: 'divider' },
+        '&:hover .row-chevron': { opacity: 1, transform: 'translateX(2px)' },
+        '&:focus-visible': {
+          outline: (t) => `2px solid ${t.qnop.brand.blue}`,
+          outlineOffset: '-2px',
         },
-        '&:hover .row-chevron': { transform: 'translateX(2px)', opacity: 1 },
-        '&.Mui-focusVisible': { boxShadow: (t) => t.qnop.focusRing },
       }}
     >
-      <Box
-        sx={{
-          display: 'grid',
-          gridTemplateColumns: 'minmax(0, 1fr) auto',
-          gap: 2,
-          alignItems: 'center',
-        }}
-      >
-        <Box sx={{ minWidth: 0 }}>
-          <Stack direction="row" spacing={1} sx={{ alignItems: 'center', mb: 0.25 }}>
-            <Typography sx={{ fontSize: 16, fontWeight: 600 }} noWrap>
-              {template.friendlyName}
-            </Typography>
-            <ToneBadge
-              tone={attr.customised ? 'blue' : 'neutral'}
-              label={attr.customised ? 'Custom' : 'Default'}
-            />
-          </Stack>
-          <Typography
-            sx={{ fontSize: 12.5, fontFamily: 'monospace', color: 'text.secondary' }}
-            noWrap
-          >
-            {template.key}
-          </Typography>
-          <Typography color="text.secondary" sx={{ fontSize: 14, mt: 0.5 }} noWrap>
-            {template.subject}
-          </Typography>
-          <Typography
-            sx={{
-              fontSize: 12.5,
-              mt: 0.5,
-              color: attr.customised ? 'text.primary' : 'text.disabled',
-              fontStyle: attr.customised ? 'normal' : 'italic',
-              fontWeight: attr.customised ? 500 : 400,
-            }}
-          >
-            {attr.text}
-          </Typography>
-        </Box>
+      <TableCell sx={{ minWidth: 200 }}>
+        <Typography sx={{ fontSize: 14, fontWeight: 600 }}>{template.friendlyName}</Typography>
+        <Typography sx={{ fontSize: 12, fontFamily: 'monospace', color: 'text.secondary' }} noWrap>
+          {template.key}
+        </Typography>
+      </TableCell>
+
+      <TableCell sx={{ maxWidth: 280 }}>
+        <Typography sx={{ fontSize: 13, color: 'text.secondary' }} noWrap title={template.subject}>
+          {template.subject}
+        </Typography>
+      </TableCell>
+
+      <TableCell>
+        <Tooltip title={localeDisplayName(template.locale)}>
+          <Box component="span" sx={{ display: 'inline-flex' }}>
+            <ToneBadge tone="neutral" label={localeShortCode(template.locale)} />
+          </Box>
+        </Tooltip>
+      </TableCell>
+
+      <TableCell>
+        <ToneBadge
+          tone={customised ? 'blue' : 'neutral'}
+          label={customised ? 'Custom' : 'Default'}
+        />
+      </TableCell>
+
+      <TableCell sx={{ whiteSpace: 'nowrap' }}>
+        {customised ? (
+          <>
+            <Typography sx={{ fontSize: 13 }}>{formatRelative(template.updatedAt)}</Typography>
+            {template.updatedByName && (
+              <Typography sx={{ fontSize: 12, color: 'text.secondary' }}>
+                by {template.updatedByName}
+              </Typography>
+            )}
+          </>
+        ) : (
+          <Typography sx={{ fontSize: 13, color: 'text.disabled' }}>—</Typography>
+        )}
+      </TableCell>
+
+      <TableCell align="right" sx={{ width: 44 }}>
         <Box
           className="row-chevron"
           sx={{
-            display: 'grid',
-            placeItems: 'center',
+            display: 'inline-flex',
             color: 'text.secondary',
-            opacity: 0.6,
+            opacity: 0.5,
             transition: (t) => t.transitions.create(['transform', 'opacity']),
           }}
           aria-hidden
         >
-          <ChevronRight size={20} />
+          <ChevronRight size={18} />
         </Box>
-      </Box>
-    </ButtonBase>
+      </TableCell>
+    </TableRow>
   );
 }
 
 /**
- * Mail-templates list (issue #144): one navigable row per template in the closed registry — no
- * "add" CTA. Customised templates carry an "Edited … by …" attribution; built-ins read "Factory
- * default". Opening a row routes to its editor.
+ * Mail-templates list (issue #144): a compact, navigable table over the closed registry — no
+ * "add" CTA. Templates are managed per language (today only the configured default locale exists);
+ * the Language column anticipates the per-locale variants i18n will add. Customised templates carry
+ * an edit attribution, built-ins read as factory defaults. Opening a row routes to its editor.
  */
 export function MailTemplatesListPage() {
-  const { data, isLoading, isError } = useMailTemplates();
+  const { data, isLoading, isFetching, isError } = useMailTemplates();
   const navigate = useNavigate();
   const [testOpen, setTestOpen] = useState(false);
 
   const templates = data?.templates ?? [];
 
   return (
-    <Stack spacing={3} sx={{ maxWidth: 860 }}>
+    <Stack spacing={3}>
       <PageHeader
         title="Mail templates"
-        description="Edit the transactional emails qnop sends. Customised templates override the built-in defaults."
+        description="Edit the transactional emails qnop sends, per language. Customised templates override the built-in defaults."
         action={
           <Button
             variant="outlined"
@@ -157,27 +162,55 @@ export function MailTemplatesListPage() {
         }
       />
 
-      {isError ? (
-        <Alert severity="error">The mail templates could not be loaded.</Alert>
-      ) : isLoading ? (
-        <Typography color="text.secondary" sx={{ p: 1, fontSize: 14 }}>
-          Loading…
-        </Typography>
-      ) : templates.length === 0 ? (
-        <Typography color="text.secondary" sx={{ p: 1, fontSize: 14 }}>
-          No mail templates.
-        </Typography>
-      ) : (
-        <Stack spacing={1.5}>
-          {templates.map((template) => (
-            <TemplateRow
-              key={template.key}
-              template={template}
-              onOpen={() => navigate(`/admin/mail-templates/${encodeURIComponent(template.key)}`)}
-            />
-          ))}
-        </Stack>
-      )}
+      <Paper variant="outlined" sx={{ overflow: 'hidden' }}>
+        <Box sx={{ height: 3 }}>{isFetching && <LinearProgress />}</Box>
+        {isError ? (
+          <Alert severity="error" sx={{ m: 2 }}>
+            The mail templates could not be loaded.
+          </Alert>
+        ) : (
+          <Table size="small" sx={{ '& th': { borderColor: 'divider' } }}>
+            <TableHead>
+              <TableRow>
+                {COLUMNS.map((col, index) => (
+                  <TableCell
+                    key={col || 'chevron'}
+                    align={index === COLUMNS.length - 1 ? 'right' : 'left'}
+                    sx={{ fontSize: 12, color: 'text.secondary', fontWeight: 600 }}
+                  >
+                    {col}
+                  </TableCell>
+                ))}
+              </TableRow>
+            </TableHead>
+            <TableBody>
+              {!isLoading && templates.length === 0 && (
+                <TableRow>
+                  <TableCell colSpan={COLUMNS.length}>
+                    <Typography color="text.secondary" sx={{ py: 4, textAlign: 'center' }}>
+                      No mail templates.
+                    </Typography>
+                  </TableCell>
+                </TableRow>
+              )}
+              {templates.map((template) => (
+                <TemplateRow
+                  key={template.key}
+                  template={template}
+                  onOpen={() =>
+                    navigate(`/admin/mail-templates/${encodeURIComponent(template.key)}`)
+                  }
+                />
+              ))}
+            </TableBody>
+          </Table>
+        )}
+        {isLoading && (
+          <Typography color="text.secondary" sx={{ p: 2, fontSize: 14 }}>
+            Loading…
+          </Typography>
+        )}
+      </Paper>
 
       <SendTestEmailDialog open={testOpen} onClose={() => setTestOpen(false)} />
     </Stack>

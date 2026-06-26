@@ -58,7 +58,12 @@ const TEMPLATES: MailTemplateResponse[] = [
 ];
 
 vi.mock('../../api/hooks/useMailTemplates', () => ({
-  useMailTemplates: () => ({ data: { templates: TEMPLATES }, isLoading: false, isError: false }),
+  useMailTemplates: () => ({
+    data: { templates: TEMPLATES },
+    isLoading: false,
+    isFetching: false,
+    isError: false,
+  }),
   useSendTestEmail: () => ({ mutateAsync: vi.fn(), isPending: false }),
 }));
 
@@ -88,11 +93,18 @@ describe('MailTemplatesListPage', () => {
     expect(screen.getByText('Account verification')).toBeTruthy();
   });
 
-  it('attributes a customised template and marks a built-in as a factory default', () => {
+  it('shows the template language as a locale badge', () => {
     render(<MailTemplatesListPage />, { wrapper });
 
-    expect(screen.getByText('Edited just now by Ada Admin')).toBeTruthy();
-    expect(screen.getByText('Factory default')).toBeTruthy();
+    expect(screen.getByText('Language')).toBeTruthy();
+    expect(screen.getAllByText('EN')).toHaveLength(2);
+  });
+
+  it('attributes a customised template and marks a built-in as a default', () => {
+    render(<MailTemplatesListPage />, { wrapper });
+
+    expect(screen.getByText('just now')).toBeTruthy();
+    expect(screen.getByText('by Ada Admin')).toBeTruthy();
     expect(screen.getByText('Custom')).toBeTruthy();
     expect(screen.getByText('Default')).toBeTruthy();
   });
@@ -103,5 +115,15 @@ describe('MailTemplatesListPage', () => {
     fireEvent.click(screen.getByText('Password reset'));
 
     expect(navigateMock).toHaveBeenCalledWith('/admin/mail-templates/auth.password_reset');
+  });
+
+  it('navigates to the editor when a focused row is activated with the keyboard', () => {
+    render(<MailTemplatesListPage />, { wrapper });
+
+    fireEvent.keyDown(screen.getByText('Account verification').closest('tr')!, { key: 'Enter' });
+
+    expect(navigateMock).toHaveBeenCalledWith(
+      '/admin/mail-templates/auth.registration_verification',
+    );
   });
 });
