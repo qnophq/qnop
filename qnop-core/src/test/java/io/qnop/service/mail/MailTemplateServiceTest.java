@@ -177,6 +177,46 @@ class MailTemplateServiceTest {
   }
 
   @Test
+  @DisplayName("preview renders the editor draft content instead of the stored version")
+  void previewRendersDraft() {
+    MailTemplateService.MailPreview preview =
+        service.preview(
+            MailTemplateKey.PASSWORD_RESET,
+            "en",
+            Map.of(),
+            new MailTemplateService.MailTemplateDraft(
+                "Draft subject for {{siteName}}", "Draft body, hi {{recipientName}}", null));
+
+    assertThat(preview.rendered().subject()).isEqualTo("Draft subject for qnop");
+    assertThat(preview.rendered().bodyPlain()).isEqualTo("Draft body, hi Jane Doe");
+  }
+
+  @Test
+  @DisplayName("preview renders a draft HTML alternative, escaping variables")
+  void previewRendersDraftHtml() {
+    MailTemplateService.MailPreview preview =
+        service.preview(
+            MailTemplateKey.PASSWORD_RESET,
+            "en",
+            Map.of(),
+            new MailTemplateService.MailTemplateDraft(
+                "Subject", "Plain", "<p>Hello {{recipientName}}</p>"));
+
+    assertThat(preview.rendered().bodyHtml()).contains("<p>Hello Jane Doe</p>");
+  }
+
+  @Test
+  @DisplayName("preview rejects a draft that references a placeholder outside the closed set")
+  void previewRejectsUnknownDraftPlaceholder() {
+    MailTemplateService.MailTemplateDraft draft =
+        new MailTemplateService.MailTemplateDraft("Subject", "Body {{unknownVar}}", null);
+
+    assertThatThrownBy(() -> service.preview(MailTemplateKey.PASSWORD_RESET, "en", Map.of(), draft))
+        .isInstanceOf(MailTemplateValidationException.class)
+        .hasMessageContaining("unknownVar");
+  }
+
+  @Test
   @DisplayName("getEffective carries friendlyName, sorted placeholders and the catalog defaults")
   void getEffectivePopulatesEditorMetadata() {
     when(repository.findByTemplateKeyAndLocale(any(), any())).thenReturn(Optional.empty());

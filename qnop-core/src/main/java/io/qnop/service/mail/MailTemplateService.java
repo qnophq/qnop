@@ -87,12 +87,21 @@ public class MailTemplateService {
     String subject = row.map(MailTemplate::getSubject).orElseGet(key::defaultSubject);
     String plain = row.map(MailTemplate::getBodyPlain).orElseGet(key::defaultBodyPlain);
     String storedHtml = row.map(MailTemplate::getBodyHtml).filter(h -> !h.isBlank()).orElse(null);
+    return renderContent(key, subject, plain, storedHtml, vars);
+  }
 
+  /**
+   * Renders explicit {@code subject}/{@code plain}/{@code html} content with {@code vars}. A blank
+   * or absent HTML source falls back to the catalog default fragment wrapped in the branded chrome,
+   * so a draft preview without an HTML alternative still shows a representative HTML email.
+   */
+  private RenderedMail renderContent(
+      MailTemplateKey key, String subject, String plain, String html, Map<String, Object> vars) {
     String renderedSubject = plainCompiler.compile(subject).execute(vars);
     String renderedPlain = plainCompiler.compile(plain).execute(vars);
     String renderedHtml =
-        storedHtml != null
-            ? htmlCompiler.compile(storedHtml).execute(vars)
+        html != null && !html.isBlank()
+            ? htmlCompiler.compile(html).execute(vars)
             : buildBrandedHtml(key, vars);
     return new RenderedMail(renderedSubject, renderedPlain, renderedHtml);
   }
@@ -123,18 +132,37 @@ public class MailTemplateService {
         AUTOMATED_FOOTER);
   }
 
-  /**
-   * Renders {@code key} for the editor preview (issue #141). Per-key demo values are overlaid with
-   * any caller-supplied overrides (overrides for unknown placeholders are ignored); the effective
-   * variable set is returned so the editor can prefill its sample-variable inputs. Rejects an
-   * effective template that references a placeholder outside the key's closed set.
-   */
+  /** Previews the stored or catalog-default version of {@code key} (issue #141). */
   public MailPreview preview(MailTemplateKey key, String locale, Map<String, Object> overrides) {
+    return preview(key, locale, overrides, null);
+  }
+
+  /**
+   * Renders {@code key} for the editor preview (issue #141/#145). Per-key demo values are overlaid
+   * with any caller-supplied overrides (overrides for unknown placeholders are ignored); the
+   * effective variable set is returned so the editor can prefill its sample-variable inputs. When
+   * {@code draft} is supplied its unsaved content is rendered for a live preview; otherwise the
+   * stored override or catalog default is used. Rejects content that references a placeholder
+   * outside the key's closed set.
+   */
+  public MailPreview preview(
+      MailTemplateKey key, String locale, Map<String, Object> overrides, MailTemplateDraft draft) {
     Map<String, String> sampleVars = effectiveSampleVars(key, overrides);
-    validateEffectivePlaceholders(key, locale);
-    RenderedMail rendered = render(key, new HashMap<>(sampleVars), locale);
+    RenderedMail rendered;
+    if (draft == null) {
+      validateEffectivePlaceholders(key, locale);
+      rendered = render(key, new HashMap<>(sampleVars), locale);
+    } else {
+      validatePlaceholders(key, draft.subject(), draft.bodyPlain(), draft.bodyHtml());
+      rendered =
+          renderContent(
+              key, draft.subject(), draft.bodyPlain(), draft.bodyHtml(), new HashMap<>(sampleVars));
+    }
     return new MailPreview(rendered, sampleVars);
   }
+
+  /** Unsaved editor content rendered in place of the stored version for a live preview (#145). */
+  public record MailTemplateDraft(String subject, String bodyPlain, String bodyHtml) {}
 
   /** The per-key demo values overlaid with caller overrides scoped to the key's placeholder set. */
   private Map<String, String> effectiveSampleVars(

@@ -22,7 +22,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import type {
   MailTemplateListResponse,
-  MailTemplatePreviewResponse,
   MailTemplateResponse,
   SendTestEmailResponse,
   UpdateMailTemplateRequest,
@@ -86,22 +85,6 @@ export function useResetMailTemplate() {
     onSuccess: (_data, key) => {
       queryClient.invalidateQueries({ queryKey: mailTemplateKeys.all });
       queryClient.invalidateQueries({ queryKey: mailTemplateKeys.detail(key) });
-    },
-  });
-}
-
-/** Renders a template (with sample data) without sending it. */
-export function usePreviewMailTemplate() {
-  return useMutation({
-    mutationFn: async (vars: {
-      key: string;
-      locale?: string;
-    }): Promise<MailTemplatePreviewResponse> => {
-      const response = await adminEmailApi.previewMailTemplate({
-        key: vars.key,
-        previewMailTemplateRequest: { locale: vars.locale },
-      });
-      return response.data;
     },
   });
 }

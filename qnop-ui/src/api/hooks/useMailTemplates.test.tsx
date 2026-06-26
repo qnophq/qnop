@@ -28,7 +28,6 @@ import {
   mailTemplateKeys,
   useMailTemplate,
   useMailTemplates,
-  usePreviewMailTemplate,
   useResetMailTemplate,
   useSendTestEmail,
   useUpdateMailTemplate,
@@ -120,23 +119,6 @@ describe('useResetMailTemplate', () => {
     await result.current.mutateAsync('auth.password_reset');
 
     expect(adminEmailApi.resetMailTemplate).toHaveBeenCalledWith({ key: 'auth.password_reset' });
-  });
-});
-
-describe('usePreviewMailTemplate', () => {
-  it('wraps the key and locale', async () => {
-    vi.mocked(adminEmailApi.previewMailTemplate).mockResolvedValue({
-      data: { subject: 'S', bodyPlain: 'B' },
-    } as Awaited<ReturnType<typeof adminEmailApi.previewMailTemplate>>);
-
-    const { result } = renderHook(() => usePreviewMailTemplate(), { wrapper });
-    const out = await result.current.mutateAsync({ key: 'k', locale: 'de' });
-
-    expect(adminEmailApi.previewMailTemplate).toHaveBeenCalledWith({
-      key: 'k',
-      previewMailTemplateRequest: { locale: 'de' },
-    });
-    expect(out.subject).toBe('S');
   });
 });
 
