@@ -158,6 +158,16 @@ describe('EmailServerPage', () => {
     );
   });
 
+  it('flags an out-of-range port and blocks the save', () => {
+    renderPage();
+
+    fireEvent.change(screen.getByLabelText('Port'), { target: { value: '70000' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Save changes' }));
+
+    expect(screen.getByText('Enter a port between 1 and 65535.')).toBeTruthy();
+    expect(updateMutate).not.toHaveBeenCalled();
+  });
+
   it('sends a test message to the entered recipient', async () => {
     renderPage();
 

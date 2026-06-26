@@ -20,6 +20,7 @@
  */
 
 import { isAxiosError } from 'axios';
+import type { ErrorResponse } from '../api/generated';
 
 const RATE_LIMITED = 'Too many attempts. Please try again later.';
 
@@ -57,4 +58,25 @@ export function apiErrorCode(error: unknown): string | undefined {
     if (typeof code === 'string') return code;
   }
   return undefined;
+}
+
+/**
+ * Per-field validation failures from the API's `ErrorResponse.fieldErrors`,
+ * keyed by field name (e.g. `smtp.port` → "must be at most 65535"). Returns an
+ * empty object when the error carries none, so a form can mark each offending
+ * field from a single server response.
+ */
+export function apiFieldErrors(error: unknown): Record<string, string> {
+  const map: Record<string, string> = {};
+  if (isAxiosError(error)) {
+    const fieldErrors = (error.response?.data as ErrorResponse | undefined)?.fieldErrors;
+    if (Array.isArray(fieldErrors)) {
+      for (const entry of fieldErrors) {
+        if (typeof entry?.field === 'string' && typeof entry?.message === 'string') {
+          map[entry.field] = entry.message;
+        }
+      }
+    }
+  }
+  return map;
 }

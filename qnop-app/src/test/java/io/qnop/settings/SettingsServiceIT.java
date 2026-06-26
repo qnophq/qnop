@@ -27,7 +27,8 @@ import io.qnop.bootstrap.AbstractIntegrationTest;
 import io.qnop.service.ApplicationSettingKey;
 import io.qnop.service.ApplicationSettingsService;
 import io.qnop.service.ConfigurationKeyRedactor;
-import io.qnop.service.SettingValidationException;
+import io.qnop.service.SettingFieldError;
+import io.qnop.service.SettingsValidationException;
 import java.util.Map;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
@@ -96,13 +97,25 @@ class SettingsServiceIT extends AbstractIntegrationTest {
   @Test
   void rejectsUnknownKey() {
     assertThatThrownBy(() -> settings.update(Map.of("nope.key", "x"), null))
-        .isInstanceOf(SettingValidationException.class);
+        .isInstanceOf(SettingsValidationException.class);
   }
 
   @Test
   void rejectsTypeInvalidValue() {
     assertThatThrownBy(() -> settings.update(Map.of("upload.max_file_size_mb", "abc"), null))
-        .isInstanceOf(SettingValidationException.class);
+        .isInstanceOf(SettingsValidationException.class);
+  }
+
+  @Test
+  void aggregatesEveryInvalidField() {
+    assertThatThrownBy(
+            () -> settings.update(Map.of("smtp.port", "70000", "smtp.from", "not-an-email"), null))
+        .isInstanceOfSatisfying(
+            SettingsValidationException.class,
+            ex ->
+                assertThat(ex.getFieldErrors())
+                    .extracting(SettingFieldError::field)
+                    .containsExactlyInAnyOrder("smtp.port", "smtp.from"));
   }
 
   private String redactedValue(String key) {

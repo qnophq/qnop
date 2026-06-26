@@ -21,26 +21,8 @@
 package io.qnop.service;
 
 /**
- * Raised when a settings update references an unknown key or carries a value that violates the
- * key's {@link io.qnop.entity.SettingValueType}. Mapped to HTTP 400 at the web layer.
+ * One field-level validation failure: the offending {@code field} (a setting key) and a
+ * human-readable {@code message}. Aggregated by {@link SettingsValidationException} so the admin UI
+ * can flag every bad field in a single response.
  */
-public class SettingValidationException extends RuntimeException {
-
-  private final String settingKey;
-  private final String reason;
-
-  public SettingValidationException(String settingKey, String reason) {
-    super("Invalid setting '" + settingKey + "': " + reason);
-    this.settingKey = settingKey;
-    this.reason = reason;
-  }
-
-  public String getSettingKey() {
-    return settingKey;
-  }
-
-  /** The bare, field-level reason (without the key prefix), for per-field error reporting. */
-  public String getReason() {
-    return reason;
-  }
-}
+public record SettingFieldError(String field, String message) {}

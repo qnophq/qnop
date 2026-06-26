@@ -29,8 +29,10 @@ import java.util.Collections;
 import java.util.EnumMap;
 import java.util.EnumSet;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 import org.springframework.security.crypto.encrypt.TextEncryptor;
@@ -131,43 +133,75 @@ public class ApplicationSettingsService {
   // --- writes ----------------------------------------------------------------
 
   /**
-   * Applies a partial set of changes ({@code key -> raw value}). Unknown keys and type-invalid
-   * values are rejected with {@link SettingValidationException}; a {@link
-   * ConfigurationKeyRedactor#MASK} value for a sensitive key means "unchanged". The snapshot
-   * refresh and listener notifications run after the write transaction commits.
+   * Applies a partial set of changes ({@code key -> raw value}). Every value is validated first,
+   * outside the write transaction; unknown keys and invalid values are collected and rejected
+   * together via {@link SettingsValidationException} so the caller can flag every bad field at
+   * once, before anything is written. A {@link ConfigurationKeyRedactor#MASK} value for a sensitive
+   * key means "unchanged". The snapshot refresh and listener notifications run after the write
+   * commits.
    *
-   * <p>Each attempt runs in its own transaction; an optimistic-locking conflict (a concurrent edit
-   * of the same setting, guarded by {@link ApplicationSetting}'s {@code @Version}) retries the
-   * whole apply up to {@value #MAX_WRITE_ATTEMPTS} times so the losing writer re-reads the current
-   * row rather than clobbering it (issue #47). A {@link SettingValidationException} is not retried.
+   * <p>The write of the validated changes runs in its own transaction; an optimistic-locking
+   * conflict (a concurrent edit of the same setting, guarded by {@link ApplicationSetting}'s
+   * {@code @Version}) retries the whole write up to {@value #MAX_WRITE_ATTEMPTS} times so the
+   * losing writer re-reads the current row rather than clobbering it (issue #47).
    *
    * @param changes raw key/value pairs to apply
    * @param actor the editing user's id, or {@code null} when unattributed (wired in issue #17)
    */
   public void update(Map<String, String> changes, UUID actor) {
+    Map<ApplicationSettingKey, String> resolved = resolveAndValidate(changes);
+    if (resolved.isEmpty()) {
+      return;
+    }
     OptimisticRetry.execute(
         MAX_WRITE_ATTEMPTS,
-        () -> transactionTemplate.executeWithoutResult(status -> applyChanges(changes, actor)));
+        () -> transactionTemplate.executeWithoutResult(status -> writeResolved(resolved, actor)));
   }
 
-  private void applyChanges(Map<String, String> changes, UUID actor) {
-    Set<ApplicationSettingKey> changed = EnumSet.noneOf(ApplicationSettingKey.class);
+  /**
+   * Resolves each change to a known key and validates its value, collecting <em>all</em>
+   * field-level violations before failing so the admin UI can flag every bad field at once. Mask
+   * sentinels for sensitive keys are dropped (left unchanged). Throws {@link
+   * SettingsValidationException} if anything is invalid. Pure, DB-free work — runs outside the
+   * write transaction and is never retried.
+   */
+  private Map<ApplicationSettingKey, String> resolveAndValidate(Map<String, String> changes) {
+    Map<ApplicationSettingKey, String> resolved = new LinkedHashMap<>();
+    List<SettingFieldError> errors = new ArrayList<>();
     for (Map.Entry<String, String> entry : changes.entrySet()) {
-      ApplicationSettingKey key =
-          ApplicationSettingKey.fromKey(entry.getKey())
-              .orElseThrow(
-                  () -> new SettingValidationException(entry.getKey(), "unknown setting key"));
+      Optional<ApplicationSettingKey> match = ApplicationSettingKey.fromKey(entry.getKey());
+      if (match.isEmpty()) {
+        errors.add(new SettingFieldError(entry.getKey(), "unknown setting key"));
+        continue;
+      }
+      ApplicationSettingKey key = match.get();
       String value = entry.getValue();
       if (key.isSensitive() && redactor.isMask(value)) {
         continue; // sentinel: leave the stored secret untouched
       }
-      ValueValidator.validate(key, value);
+      try {
+        ValueValidator.validate(key, value);
+      } catch (SettingValidationException e) {
+        errors.add(new SettingFieldError(key.getKey(), e.getReason()));
+        continue;
+      }
+      resolved.put(key, value);
+    }
+    if (!errors.isEmpty()) {
+      throw new SettingsValidationException(errors);
+    }
+    return resolved;
+  }
 
+  private void writeResolved(Map<ApplicationSettingKey, String> resolved, UUID actor) {
+    Set<ApplicationSettingKey> changed = EnumSet.noneOf(ApplicationSettingKey.class);
+    for (Map.Entry<ApplicationSettingKey, String> entry : resolved.entrySet()) {
+      ApplicationSettingKey key = entry.getKey();
       ApplicationSetting row =
           repository
               .findById(key.getKey())
               .orElseGet(() -> new ApplicationSetting(key.getKey(), null, key.getType()));
-      row.setSettingValue(encryptIfSecret(key, value));
+      row.setSettingValue(encryptIfSecret(key, entry.getValue()));
       row.setValueType(key.getType());
       row.setUpdatedBy(actor);
       repository.save(row);

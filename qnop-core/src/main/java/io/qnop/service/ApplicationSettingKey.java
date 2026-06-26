@@ -121,6 +121,19 @@ public enum ApplicationSettingKey {
           .collect(
               Collectors.toUnmodifiableMap(ApplicationSettingKey::getKey, Function.identity()));
 
+  /**
+   * Beyond-type value constraints per key (admin validation). Kept here rather than threaded
+   * through the constructor so the enum constants stay readable; {@link ValueValidator} enforces
+   * them.
+   */
+  private static final Map<ApplicationSettingKey, SettingConstraints> CONSTRAINTS =
+      Map.of(
+          UPLOAD_MAX_FILE_SIZE_MB, SettingConstraints.range(1, 1024),
+          AUTH_PASSWORD_RESET_TOKEN_TTL_MINUTES, SettingConstraints.range(1, 1440),
+          SMTP_PORT, SettingConstraints.range(1, 65535),
+          SMTP_FROM, SettingConstraints.format(SettingConstraints.ValueFormat.EMAIL),
+          GENERAL_BASE_URL, SettingConstraints.format(SettingConstraints.ValueFormat.URL));
+
   private final String key;
   private final SettingValueType type;
   private final String defaultValue;
@@ -167,6 +180,14 @@ public enum ApplicationSettingKey {
 
   public List<String> getEnumOptions() {
     return enumOptions;
+  }
+
+  /**
+   * Value constraints beyond the declared type (range/format); {@link SettingConstraints#NONE} if
+   * none.
+   */
+  public SettingConstraints getConstraints() {
+    return CONSTRAINTS.getOrDefault(this, SettingConstraints.NONE);
   }
 
   /** A sensitive value is encrypted at rest and redacted in API responses. */

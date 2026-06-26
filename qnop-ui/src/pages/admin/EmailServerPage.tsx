@@ -49,7 +49,8 @@ import {
   SMTP_KEYS,
   computeSmtpStatus,
 } from '../../components/admin/mail/smtp/smtpConfig';
-import { apiErrorMessage } from '../../utils/apiError';
+import { apiErrorMessage, apiFieldErrors } from '../../utils/apiError';
+import { isEmail, isPort } from '../../utils/validation';
 
 const TEST_SEVERITY: Record<SendTestEmailResponse['status'], 'success' | 'warning' | 'error'> = {
   SENT: 'success',
@@ -94,6 +95,8 @@ export function EmailServerPage() {
 
   const [edits, setEdits] = useState<Record<string, string>>({});
   const [error, setError] = useState<string | null>(null);
+  const [submitAttempted, setSubmitAttempted] = useState(false);
+  const [serverErrors, setServerErrors] = useState<Record<string, string>>({});
   const { toast, notify, clear } = useToast();
   const [testRecipient, setTestRecipient] = useState('');
   const [testResult, setTestResult] = useState<SendTestEmailResponse | null>(null);
@@ -105,6 +108,12 @@ export function EmailServerPage() {
     // A prior test ran against the saved state; editing makes that result stale.
     setTestResult(null);
     setTestError(null);
+    setServerErrors((prev) => {
+      if (!(key in prev)) return prev;
+      const rest = { ...prev };
+      delete rest[key];
+      return rest;
+    });
   };
 
   const changed = useMemo(
@@ -122,22 +131,64 @@ export function EmailServerPage() {
       ? allowedEncryption
       : [...ENCRYPTION_FALLBACK];
 
+  // Client-side field errors mirroring the server's SMTP constraints.
+  const clientErrors = useMemo(() => {
+    const valueAt = (key: string) => edits[key] ?? baselines[key] ?? '';
+    const map: Record<string, string> = {};
+    if (enabled && valueAt(SMTP_KEYS.host).trim() === '') {
+      map[SMTP_KEYS.host] = 'A host is required to send mail.';
+    }
+    const port = valueAt(SMTP_KEYS.port);
+    if (port.trim() !== '' && !isPort(port)) {
+      map[SMTP_KEYS.port] = 'Enter a port between 1 and 65535.';
+    }
+    const from = valueAt(SMTP_KEYS.from);
+    if (from.trim() !== '' && !isEmail(from)) {
+      map[SMTP_KEYS.from] = 'Enter a valid email address.';
+    }
+    return map;
+  }, [edits, baselines, enabled]);
+
+  const fieldError = (key: string): string | undefined =>
+    serverErrors[key] ?? (submitAttempted ? clientErrors[key] : undefined);
+
+  const discard = () => {
+    setEdits({});
+    setServerErrors({});
+    setSubmitAttempted(false);
+  };
+
   const onSubmit = async (event: FormEvent) => {
     event.preventDefault();
     setError(null);
+    if (Object.keys(clientErrors).length > 0) {
+      setSubmitAttempted(true);
+      return;
+    }
     const patch = Object.fromEntries(changed.map((key) => [key, edits[key]]));
     try {
       await updateSettings.mutateAsync(patch);
       setEdits({});
+      setServerErrors({});
+      setSubmitAttempted(false);
       notify('SMTP settings saved.');
     } catch (err) {
-      setError(apiErrorMessage(err, 'The SMTP settings could not be saved.'));
+      const serverFieldErrors = apiFieldErrors(err);
+      if (Object.keys(serverFieldErrors).length > 0) {
+        setServerErrors(serverFieldErrors);
+      } else {
+        setError(apiErrorMessage(err, 'The SMTP settings could not be saved.'));
+      }
     }
   };
 
   const onSendTest = async () => {
     setTestError(null);
     setTestResult(null);
+    if (!isEmail(testRecipient)) {
+      setTestError('Enter a valid recipient email address.');
+      return;
+    }
     try {
       setTestResult(await sendTest.mutateAsync(testRecipient.trim()));
     } catch (err) {
@@ -149,13 +200,15 @@ export function EmailServerPage() {
   const textField = (key: string, extra?: Partial<TextFieldProps>) => {
     const setting = byKey[key];
     if (!setting) return null;
+    const err = fieldError(key);
     return (
       <TextField
         label={SMTP_FIELD[key]?.label ?? key}
         value={valueOf(key)}
         onChange={(e) => setValue(key, e.target.value)}
         placeholder={SMTP_FIELD[key]?.placeholder}
-        helperText={setting.description}
+        error={Boolean(err)}
+        helperText={err ?? setting.description}
         fullWidth
         {...extra}
       />
@@ -350,7 +403,7 @@ export function EmailServerPage() {
             type="button"
             color="inherit"
             disabled={!hasChanges || updateSettings.isPending}
-            onClick={() => setEdits({})}
+            onClick={discard}
           >
             Discard
           </Button>

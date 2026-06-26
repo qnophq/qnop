@@ -21,7 +21,9 @@
 package io.qnop.service;
 
 import io.qnop.entity.SettingValueType;
+import java.net.URI;
 import java.util.List;
+import java.util.regex.Pattern;
 
 /**
  * Validates a raw setting value string against its key's declared type (issue #16). Shared, plain,
@@ -31,8 +33,11 @@ public final class ValueValidator {
 
   private ValueValidator() {}
 
+  private static final Pattern EMAIL_PATTERN = Pattern.compile("^[^@\\s]+@[^@\\s]+\\.[^@\\s]+$");
+
   public static void validate(ApplicationSettingKey key, String value) {
     validate(key.getType(), key.getEnumOptions(), value, key.getKey());
+    validateConstraints(key.getConstraints(), value, key.getKey());
   }
 
   public static void validate(UserSettingKey key, String value) {
@@ -73,6 +78,49 @@ public final class ValueValidator {
       String keyForError, List<String> enumOptions, String value) {
     if (!enumOptions.contains(value)) {
       throw new SettingValidationException(keyForError, "must be one of " + enumOptions);
+    }
+  }
+
+  /**
+   * Enforces beyond-type constraints after the type check has passed: an inclusive integer range
+   * (the value already parses as an int) and/or a string format (skipped when blank, so empty
+   * defaults stay valid).
+   */
+  private static void validateConstraints(
+      SettingConstraints constraints, String value, String keyForError) {
+    if (constraints.min() != null || constraints.max() != null) {
+      int parsed = Integer.parseInt(value.trim());
+      if (constraints.min() != null && parsed < constraints.min()) {
+        throw new SettingValidationException(keyForError, "must be at least " + constraints.min());
+      }
+      if (constraints.max() != null && parsed > constraints.max()) {
+        throw new SettingValidationException(keyForError, "must be at most " + constraints.max());
+      }
+    }
+    if (constraints.format() != null && !value.isBlank()) {
+      switch (constraints.format()) {
+        case EMAIL -> requireEmail(keyForError, value);
+        case URL -> requireHttpUrl(keyForError, value);
+      }
+    }
+  }
+
+  private static void requireEmail(String keyForError, String value) {
+    if (!EMAIL_PATTERN.matcher(value.trim()).matches()) {
+      throw new SettingValidationException(keyForError, "must be a valid email address");
+    }
+  }
+
+  private static void requireHttpUrl(String keyForError, String value) {
+    try {
+      URI uri = URI.create(value.trim());
+      String scheme = uri.getScheme();
+      boolean http = scheme != null && (scheme.equals("http") || scheme.equals("https"));
+      if (!http || uri.getHost() == null) {
+        throw new SettingValidationException(keyForError, "must be a valid http(s) URL");
+      }
+    } catch (IllegalArgumentException e) {
+      throw new SettingValidationException(keyForError, "must be a valid http(s) URL");
     }
   }
 }

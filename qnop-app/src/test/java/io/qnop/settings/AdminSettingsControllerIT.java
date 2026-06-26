@@ -109,6 +109,21 @@ class AdminSettingsControllerIT extends AbstractIntegrationTest {
             patch("/api/v1/admin/settings")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("{\"values\":{\"upload.max_file_size_mb\":\"abc\"}}"))
-        .andExpect(status().isBadRequest());
+        .andExpect(status().isBadRequest())
+        .andExpect(jsonPath("$.code").value("VALIDATION_ERROR"))
+        .andExpect(jsonPath("$.fieldErrors[0].field").value("upload.max_file_size_mb"))
+        .andExpect(jsonPath("$.fieldErrors[0].message").isNotEmpty());
+  }
+
+  @Test
+  @WithMockUser(roles = "ADMIN")
+  void patchReportsEveryInvalidFieldAtOnce() throws Exception {
+    mockMvc
+        .perform(
+            patch("/api/v1/admin/settings")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"values\":{\"smtp.port\":\"70000\",\"smtp.from\":\"nope\"}}"))
+        .andExpect(status().isBadRequest())
+        .andExpect(jsonPath("$.fieldErrors.length()").value(2));
   }
 }
