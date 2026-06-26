@@ -1,18 +1,6 @@
-<?xml version="1.0" encoding="UTF-8"?>
-<svg id="Layer_2" fill="#012042" data-name="Layer 2" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 404.15 404.15">
-  <defs></defs>
-  <g id="Layer_1-2" data-name="Layer 1">
-    <g>
-      <polygon class="cls-1" points="111.17 228.03 111.17 229.04 110.29 228.03 111.17 228.03"></polygon>
-      <g>
-        <path class="cls-1" d="M404.15,73.33v257.54c0,40.48-32.85,73.23-73.33,73.23h-4.02l-57.5-65.32v-203.97H89.98l-52.14-59.26v-2.22C37.84,32.8,70.64,0,111.12,0h219.7c40.48,0,73.33,32.8,73.33,73.33Z"></path>
-        <g>
-          <path class="cls-1" d="M89.98,134.81H0v95.02h173.48l-83.5-95.02ZM110.29,228.03h.88v1.02l-.88-1.02Z"></path>
-          <polygon class="cls-1" points="111.17 228.03 111.17 229.04 110.29 228.03 111.17 228.03"></polygon>
-          <polygon class="cls-1" points="268.92 338.31 268.92 404.15 173.9 404.15 173.9 230.25 268.92 338.31"></polygon>
-        </g>
-        <rect class="cls-1" y="302.28" width="101.82" height="101.87"></rect>
-      </g>
-    </g>
-  </g>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" fill="none" role="img" aria-label="qnop">
+  <!-- Temporary qnop placeholder logomark. Replace with the real brand asset. -->
+  <rect width="64" height="64" rx="16" fill="#012142"/>
+  <text x="31" y="45" text-anchor="middle" font-family="'Segoe UI', system-ui, -apple-system, Roboto, Helvetica, Arial, sans-serif" font-size="36" font-weight="700" fill="#FFFFFF">q</text>
+  <circle cx="44" cy="43" r="4.5" fill="#1292EE"/>
 </svg>
