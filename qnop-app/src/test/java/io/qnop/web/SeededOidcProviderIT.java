@@ -68,11 +68,11 @@ class SeededOidcProviderIT extends SeededIntegrationTest {
             asAdmin(post(PROVIDERS))
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(
-                    "{\"name\":\"New IdP\",\"providerType\":\"OIDC\","
+                    "{\"name\":\"New IdP\",\"providerType\":\"GITHUB\","
                         + "\"clientId\":\"new-client\",\"clientSecret\":\"new-secret\"}"))
         .andExpect(status().isCreated())
         .andExpect(jsonPath("$.name").value("New IdP"))
-        .andExpect(jsonPath("$.providerType").value("OIDC"))
+        .andExpect(jsonPath("$.providerType").value("GITHUB"))
         .andExpect(jsonPath("$.hasClientSecret").value(true))
         .andExpect(jsonPath("$.clientSecret").doesNotExist());
   }
