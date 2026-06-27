@@ -85,7 +85,12 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     if (!response.ok) {
       throw new Error(response.status === 429 ? 'RATE_LIMITED' : 'INVALID_CREDENTIALS');
     }
-    const body = (await response.json()) as { accessToken: string };
+    const body = (await response.json()) as { accessToken?: string };
+    if (typeof body.accessToken !== 'string') {
+      // A 200 without a usable token (format change, WAF/proxy page) must not leave the store
+      // in a half-authenticated state with an undefined token — fail loudly instead.
+      throw new Error('Unexpected login response');
+    }
     set({ accessToken: body.accessToken });
     await get().fetchMe();
   },
