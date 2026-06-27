@@ -144,12 +144,6 @@ public class UserService {
     return user;
   }
 
-  /** Whether the given user must change their password before using the API (issue #17/#20). */
-  @Transactional(readOnly = true)
-  public boolean passwordChangeRequired(UUID id) {
-    return users.findById(id).map(User::isPasswordChangeRequired).orElse(false);
-  }
-
   /** Whether an internal user with the given username exists (bootstrap idempotency). */
   @Transactional(readOnly = true)
   public boolean internalUsernameExists(String username) {

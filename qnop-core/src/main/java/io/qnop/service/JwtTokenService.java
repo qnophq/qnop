@@ -38,7 +38,12 @@ import org.springframework.stereotype.Service;
  * TokenRevocationService}) and the user's global {@link UserRole} as a {@value #ROLE_CLAIM} claim,
  * which the resource-server filter maps to a {@code ROLE_*} authority (issue #98). The role is
  * resolved at mint time — on both login and refresh — so a role change takes effect on the next
- * token. TTL and issuer come from {@code qnop.auth} (default 15m / {@code qnop}).
+ * token. The token also carries the user's {@value #PCR_CLAIM} (password-change-required) flag so
+ * the {@code PasswordChangeRequiredFilter} can gate every request from the token alone, with no
+ * per-request DB lookup (issue #167). Every transition that flips the flag (admin reset, generated
+ * password, self-service change) also revokes the user's live tokens, so a fresh mint always
+ * reflects the current flag — no stale-claim window. TTL and issuer come from {@code qnop.auth}
+ * (default 15m / {@code qnop}).
  */
 @Service
 public class JwtTokenService {
@@ -47,6 +52,12 @@ public class JwtTokenService {
    * Claim carrying the user's global role; mapped to {@code ROLE_<value>} by the resource server.
    */
   public static final String ROLE_CLAIM = "role";
+
+  /**
+   * Boolean claim: the user must change their password before any non-auth resource is reachable.
+   * Read by {@code PasswordChangeRequiredFilter} instead of a per-request DB lookup (issue #167).
+   */
+  public static final String PCR_CLAIM = "pcr";
 
   private final JwtEncoder jwtEncoder;
   private final QnopProperties properties;
@@ -59,13 +70,12 @@ public class JwtTokenService {
     this.userService = userService;
   }
 
-  /** Mints a signed access token for the given user id, embedding the user's current role. */
+  /**
+   * Mints a signed access token for the given user id, embedding the user's current role and
+   * password-change-required flag.
+   */
   public String issueAccessToken(UUID userId) {
-    UserRole role =
-        userService
-            .findById(userId)
-            .map(User::getRole)
-            .orElseThrow(() -> new UserNotFoundException(userId));
+    User user = userService.findById(userId).orElseThrow(() -> new UserNotFoundException(userId));
     QnopProperties.Auth auth = properties.auth();
     Instant now = Instant.now();
     JwtClaimsSet claims =
@@ -75,7 +85,8 @@ public class JwtTokenService {
             .issuedAt(now)
             .expiresAt(now.plus(auth.accessTokenTtl()))
             .subject(userId.toString())
-            .claim(ROLE_CLAIM, role.name())
+            .claim(ROLE_CLAIM, user.getRole().name())
+            .claim(PCR_CLAIM, user.isPasswordChangeRequired())
             .build();
     JwsHeader header = JwsHeader.with(MacAlgorithm.HS256).build();
     return jwtEncoder.encode(JwtEncoderParameters.from(header, claims)).getTokenValue();
