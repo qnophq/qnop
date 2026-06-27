@@ -42,10 +42,12 @@ import org.hibernate.annotations.UuidGenerator;
  * inbound {@code ?token=…} query parameter. {@code consumedAt} flips when the link is used; the row
  * is kept for audit until a scheduled sweep removes expired rows.
  *
- * <p>Unlike the other token entities, {@code user} is an <strong>EAGER {@code @ManyToOne}</strong>:
- * the verify-email consumers read the linked user outside the service transaction (to flip {@code
- * enabled} / send to {@code email}), and LAZY would raise {@code LazyInitializationException}. The
- * FK to {@code qnop_user} cascades on delete (Liquibase, ADR-0020).
+ * <p>{@code user} is a <strong>LAZY {@code @ManyToOne}</strong>: every access happens inside the
+ * active service transaction ({@code consume()} resolves {@code getUser()} before the atomic
+ * update, while the issue/sweep paths never read the user), so LAZY avoids the forced join on every
+ * token lookup and on the daily expiry sweep. The FK to {@code qnop_user} cascades on delete
+ * (Liquibase, ADR-0020). A caller needing the user outside a transaction should use an explicit
+ * JOIN FETCH query.
  */
 @Entity
 @Table(name = "email_verification_token")
@@ -56,7 +58,7 @@ public class EmailVerificationToken {
   @Column(name = "id", nullable = false, updatable = false)
   private UUID id;
 
-  @ManyToOne(fetch = FetchType.EAGER, optional = false)
+  @ManyToOne(fetch = FetchType.LAZY, optional = false)
   @JoinColumn(name = "user_id", nullable = false, updatable = false)
   private User user;
 
