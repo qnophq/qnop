@@ -196,6 +196,7 @@ export function UsersPage() {
           sx={{ flex: 1, minWidth: 240, maxWidth: 420 }}
           slotProps={{
             input: {
+              'aria-label': 'Search users',
               startAdornment: (
                 <InputAdornment position="start">
                   <Search size={16} />
