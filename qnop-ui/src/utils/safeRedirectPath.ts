@@ -20,13 +20,41 @@
  */
 
 /**
- * Normalizes a post-login redirect target to a safe, same-origin relative path.
- * Rejects absolute URLs and protocol-relative (`//host`) values to prevent open
- * redirects, falling back to the app root.
+ * Normalizes a post-login redirect target to a safe, same-origin relative path,
+ * falling back to the app root for anything else.
+ *
+ * Canonicalising with {@link URL} against the app origin is what makes this robust:
+ * it collapses backslashes and protocol-relative forms (`//host`, `/\host`) and
+ * surfaces the true target origin regardless of percent-encoding, so encoded open
+ * redirects like `/%2F%2Fevil.example.com` (which a literal `//` check would miss)
+ * are rejected too.
  */
 export function safeRedirectPath(target: string | null | undefined, fallback = '/'): string {
-  if (!target || !target.startsWith('/') || target.startsWith('//')) {
+  if (!target || !target.startsWith('/')) {
     return fallback;
   }
-  return target;
+  let resolved: URL;
+  try {
+    resolved = new URL(target, window.location.origin);
+  } catch {
+    return fallback;
+  }
+  if (resolved.origin !== window.location.origin) {
+    return fallback;
+  }
+  // Guard against a path that only becomes protocol-relative once decoded (e.g.
+  // `/%2F%2Fevil` → `//evil`), which a downstream decode could turn off-origin.
+  const decodedPath = safeDecode(resolved.pathname);
+  if (decodedPath === null || decodedPath.startsWith('//') || decodedPath.startsWith('/\\')) {
+    return fallback;
+  }
+  return `${resolved.pathname}${resolved.search}${resolved.hash}`;
+}
+
+function safeDecode(value: string): string | null {
+  try {
+    return decodeURIComponent(value);
+  } catch {
+    return null;
+  }
 }

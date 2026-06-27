@@ -38,6 +38,17 @@ describe('safeRedirectPath', () => {
     expect(safeRedirectPath('//evil.example')).toBe('/');
   });
 
+  it('rejects percent-encoded and backslash open-redirect variants', () => {
+    expect(safeRedirectPath('/%2F%2Fevil.example.com')).toBe('/');
+    expect(safeRedirectPath('/%5C%5Cevil.example.com')).toBe('/');
+    expect(safeRedirectPath('/\\evil.example.com')).toBe('/');
+    expect(safeRedirectPath('/\\/evil.example.com')).toBe('/');
+  });
+
+  it('preserves query and hash on a same-origin path', () => {
+    expect(safeRedirectPath('/reviews/42?tab=open#c1')).toBe('/reviews/42?tab=open#c1');
+  });
+
   it('honours a custom fallback', () => {
     expect(safeRedirectPath(null, '/home')).toBe('/home');
   });
