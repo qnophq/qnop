@@ -149,6 +149,17 @@ class AvatarServiceTest {
   }
 
   @Test
+  void storeFailsWithContextWhenReadBackIsEmpty() throws IOException {
+    // A concurrent remove/replace between the put and the cross-transaction read-back can leave
+    // no row; the failure must carry context instead of a bare NoSuchElementException.
+    when(storage.findUpdatedAt(userId)).thenReturn(Optional.empty());
+    assertThatThrownBy(() -> service.store(userId, png(48, 48), actor))
+        .isInstanceOf(IllegalStateException.class)
+        .hasMessageContaining(userId.toString());
+    verify(storage).put(any());
+  }
+
+  @Test
   void getRemoveAndUpdatedAtDelegateToStorage() {
     service.remove(userId);
     verify(storage).remove(userId);
