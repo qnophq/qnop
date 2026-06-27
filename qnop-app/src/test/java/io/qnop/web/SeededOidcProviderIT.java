@@ -86,7 +86,8 @@ class SeededOidcProviderIT extends SeededIntegrationTest {
                 .content(
                     "{\"name\":\"Seeded Google\",\"providerType\":\"OIDC\","
                         + "\"clientId\":\"dup\",\"clientSecret\":\"dup-secret\"}"))
-        .andExpect(status().isBadRequest());
+        .andExpect(status().isConflict())
+        .andExpect(jsonPath("$.code").value("NAME_TAKEN"));
   }
 
   @Test

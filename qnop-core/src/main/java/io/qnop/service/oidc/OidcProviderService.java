@@ -165,6 +165,10 @@ public class OidcProviderService {
       String userNameAttribute,
       String emailAttribute,
       String displayNameAttribute) {
+    if (providers.findByName(name).isPresent()) {
+      throw new OidcProviderConflictException(
+          "NAME_TAKEN", "A provider with that name already exists.");
+    }
     OidcProviderType type = OidcProviderType.valueOf(providerType);
     if (type == OidcProviderType.OAUTH2) {
       ssrfPolicy.requirePublicHttpUri(authorizationUri, "authorizationUri", true);
