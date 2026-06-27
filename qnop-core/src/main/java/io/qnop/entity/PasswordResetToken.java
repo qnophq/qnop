@@ -43,9 +43,10 @@ import org.hibernate.annotations.UuidGenerator;
  * the token is exchanged for a new password; the row is kept for audit until a scheduled sweep
  * removes it.
  *
- * <p>{@code user} is an EAGER {@code @ManyToOne} for the same reason as {@link
- * EmailVerificationToken} (the reset-password consumer reads the user outside the service
- * transaction). The FK to {@code qnop_user} cascades on delete (Liquibase, ADR-0020).
+ * <p>{@code user} is a LAZY {@code @ManyToOne} for the same reason as {@link
+ * EmailVerificationToken}: {@code consume()} resolves the user inside the active transaction and
+ * the issue/sweep paths never read it, so LAZY avoids a forced join on every lookup and on the
+ * sweep. The FK to {@code qnop_user} cascades on delete (Liquibase, ADR-0020).
  */
 @Entity
 @Table(name = "password_reset_token")
@@ -56,7 +57,7 @@ public class PasswordResetToken {
   @Column(name = "id", nullable = false, updatable = false)
   private UUID id;
 
-  @ManyToOne(fetch = FetchType.EAGER, optional = false)
+  @ManyToOne(fetch = FetchType.LAZY, optional = false)
   @JoinColumn(name = "user_id", nullable = false, updatable = false)
   private User user;
 
