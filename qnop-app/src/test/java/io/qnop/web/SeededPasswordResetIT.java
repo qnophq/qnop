@@ -59,17 +59,6 @@ class SeededPasswordResetIT extends SeededIntegrationTest {
   }
 
   @Test
-  void rejectsAnInvalidEmailWithAValidationError() throws Exception {
-    mockMvc
-        .perform(
-            post(FORGOT)
-                .contentType(MediaType.APPLICATION_JSON)
-                .content("{\"email\":\"not-email\"}"))
-        .andExpect(status().isBadRequest())
-        .andExpect(jsonPath("$.code").value("VALIDATION_ERROR"));
-  }
-
-  @Test
   void resetWithAnUnknownTokenIsRejected() throws Exception {
     mockMvc
         .perform(

@@ -20,6 +20,7 @@
  */
 package io.qnop.web;
 
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.cookie;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -39,7 +40,7 @@ class SeededRefreshIT extends SeededIntegrationTest {
     Cookie first = refreshCookie(login("admin", SEED_PASSWORD));
 
     mockMvc
-        .perform(post(REFRESH).cookie(first))
+        .perform(post(REFRESH).with(csrf()).cookie(first))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.accessToken").isNotEmpty())
         .andExpect(jsonPath("$.tokenType").value("Bearer"))
@@ -51,24 +52,25 @@ class SeededRefreshIT extends SeededIntegrationTest {
     Cookie first = refreshCookie(login("admin", SEED_PASSWORD));
 
     // Rotate once: `first` becomes ROTATED and a successor cookie is issued.
-    Cookie second = refreshCookie(mockMvc.perform(post(REFRESH).cookie(first)).andReturn());
+    Cookie second =
+        refreshCookie(mockMvc.perform(post(REFRESH).with(csrf()).cookie(first)).andReturn());
 
     // Replaying the rotated `first` is reuse → 401 and the family is revoked.
-    mockMvc.perform(post(REFRESH).cookie(first)).andExpect(status().isUnauthorized());
+    mockMvc.perform(post(REFRESH).with(csrf()).cookie(first)).andExpect(status().isUnauthorized());
 
     // The previously-valid successor is now revoked too.
-    mockMvc.perform(post(REFRESH).cookie(second)).andExpect(status().isUnauthorized());
+    mockMvc.perform(post(REFRESH).with(csrf()).cookie(second)).andExpect(status().isUnauthorized());
   }
 
   @Test
   void rejectsARefreshWithoutACookie() throws Exception {
-    mockMvc.perform(post(REFRESH)).andExpect(status().isUnauthorized());
+    mockMvc.perform(post(REFRESH).with(csrf())).andExpect(status().isUnauthorized());
   }
 
   @Test
   void rejectsAnUnknownRefreshToken() throws Exception {
     mockMvc
-        .perform(post(REFRESH).cookie(new Cookie(REFRESH_COOKIE, "not-a-real-token")))
+        .perform(post(REFRESH).with(csrf()).cookie(new Cookie(REFRESH_COOKIE, "not-a-real-token")))
         .andExpect(status().isUnauthorized());
   }
 }

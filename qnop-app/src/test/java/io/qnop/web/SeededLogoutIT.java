@@ -20,6 +20,7 @@
  */
 package io.qnop.web;
 
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -37,14 +38,16 @@ class SeededLogoutIT extends SeededIntegrationTest {
   void logsOutAndInvalidatesTheRefreshToken() throws Exception {
     Cookie refresh = refreshCookie(login("admin", SEED_PASSWORD));
 
-    mockMvc.perform(post(LOGOUT).cookie(refresh)).andExpect(status().isNoContent());
+    mockMvc.perform(post(LOGOUT).with(csrf()).cookie(refresh)).andExpect(status().isNoContent());
 
     // The refresh token is no longer usable after logout.
-    mockMvc.perform(post(REFRESH).cookie(refresh)).andExpect(status().isUnauthorized());
+    mockMvc
+        .perform(post(REFRESH).with(csrf()).cookie(refresh))
+        .andExpect(status().isUnauthorized());
   }
 
   @Test
   void logoutWithoutACookieIsIdempotent() throws Exception {
-    mockMvc.perform(post(LOGOUT)).andExpect(status().isNoContent());
+    mockMvc.perform(post(LOGOUT).with(csrf())).andExpect(status().isNoContent());
   }
 }

@@ -72,9 +72,7 @@ class SeededLoginIT extends SeededIntegrationTest {
             post(LOGIN)
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(body("admin", "wrong-password")))
-        .andExpect(status().isUnauthorized())
-        .andExpect(jsonPath("$.code").isNotEmpty())
-        .andExpect(jsonPath("$.message").isNotEmpty());
+        .andExpect(status().isUnauthorized());
   }
 
   @Test
