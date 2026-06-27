@@ -60,6 +60,25 @@ jobs:
       - run: pnpm test:run
       - run: pnpm build
 
+  smoke:
+    name: Smoke (docker-compose deploy + testdata)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
+      # Build the backend image and bring up PostgreSQL + the server, then run
+      # the smoke script: wait for /actuator/health, seed testdata/db/seed.sql
+      # into the running database, and exercise the base API over HTTP (#207).
+      - name: Build and start the test-deployment stack
+        run: docker compose -f docker-compose.smoke.yml up -d --build
+      - name: Run smoke tests
+        run: bash scripts/smoke-test.sh
+      - name: Dump container logs on failure
+        if: failure()
+        run: docker compose -f docker-compose.smoke.yml logs --no-color
+      - name: Tear down
+        if: always()
+        run: docker compose -f docker-compose.smoke.yml down -v
+
   license-headers:
     name: License headers (SPDX)
     runs-on: ubuntu-latest
