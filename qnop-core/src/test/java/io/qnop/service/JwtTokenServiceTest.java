@@ -63,9 +63,14 @@ class JwtTokenServiceTest {
   private final JwtTokenService service = new JwtTokenService(encoder, properties(), userService);
 
   private UUID givenUserWithRole(UserRole role) {
+    return givenUser(role, false);
+  }
+
+  private UUID givenUser(UserRole role, boolean passwordChangeRequired) {
     UUID userId = UUID.randomUUID();
     User user = User.internal("Test User", "test@example.com", "test", "hash");
     user.setRole(role);
+    user.setPasswordChangeRequired(passwordChangeRequired);
     when(userService.findById(userId)).thenReturn(Optional.of(user));
     return userId;
   }
@@ -88,6 +93,8 @@ class JwtTokenServiceTest {
     assertThat(jwt.getIssuedAt()).isNotNull();
     assertThat(jwt.getExpiresAt()).isNotNull();
     assertThat(Duration.between(jwt.getIssuedAt(), jwt.getExpiresAt())).isEqualTo(TTL);
+    // pcr defaults to false for an ordinary account.
+    assertThat(jwt.getClaimAsBoolean(JwtTokenService.PCR_CLAIM)).isFalse();
   }
 
   @Test
@@ -98,6 +105,16 @@ class JwtTokenServiceTest {
     Jwt jwt = decoder.decode(service.issueAccessToken(userId));
 
     assertThat(jwt.getClaimAsString(JwtTokenService.ROLE_CLAIM)).isEqualTo("ADMIN");
+  }
+
+  @Test
+  @DisplayName("token carries the user's password-change-required flag as the 'pcr' claim")
+  void embedsPasswordChangeRequiredClaim() {
+    UUID userId = givenUser(UserRole.MEMBER, true);
+
+    Jwt jwt = decoder.decode(service.issueAccessToken(userId));
+
+    assertThat(jwt.getClaimAsBoolean(JwtTokenService.PCR_CLAIM)).isTrue();
   }
 
   @Test

@@ -23,9 +23,8 @@ package io.qnop.web.security;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.when;
 
-import io.qnop.service.UserService;
+import io.qnop.service.JwtTokenService;
 import jakarta.servlet.FilterChain;
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
@@ -45,22 +44,18 @@ import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken;
 
 /**
- * Unit tests for {@link PasswordChangeRequiredFilter}. Verifies the gate blocks protected paths for
- * a user that must change their password and — the focus of issue #165 — that the 403 body is the
- * uniform {@code ErrorResponse} envelope ({@code code}/{@code message}/{@code timestamp}) written
- * by {@link io.qnop.web.ApiErrorWriter}, not the legacy ad-hoc {@code error} field.
+ * Unit tests for {@link PasswordChangeRequiredFilter}. The gate is driven solely by the {@code pcr}
+ * claim on the verified access token (issue #167) — no DB lookup — and the 403 is the uniform
+ * {@code ErrorResponse} envelope (issue #165/#45).
  */
 @ExtendWith(MockitoExtension.class)
 class PasswordChangeRequiredFilterTest {
 
   private static final UUID USER_ID = UUID.fromString("11111111-1111-1111-1111-111111111111");
 
-  @Mock private UserService userService;
   @Mock private FilterChain filterChain;
 
-  private PasswordChangeRequiredFilter newFilter() {
-    return new PasswordChangeRequiredFilter(userService);
-  }
+  private final PasswordChangeRequiredFilter filter = new PasswordChangeRequiredFilter();
 
   @AfterEach
   void clearContext() {
@@ -68,15 +63,13 @@ class PasswordChangeRequiredFilterTest {
   }
 
   @Test
-  @DisplayName(
-      "blocks a protected path with the uniform ErrorResponse envelope when a change is required")
-  void blocksWithUniformEnvelope() throws Exception {
-    authenticateAs(USER_ID);
-    when(userService.passwordChangeRequired(USER_ID)).thenReturn(true);
+  @DisplayName("blocks a protected path with the uniform ErrorResponse envelope when pcr=true")
+  void blocksWhenPcrClaimTrue() throws Exception {
+    authenticateWithPcr(true);
     MockHttpServletRequest request = new MockHttpServletRequest("GET", "/api/v1/users/me");
     MockHttpServletResponse response = new MockHttpServletResponse();
 
-    newFilter().doFilter(request, response, filterChain);
+    filter.doFilter(request, response, filterChain);
 
     assertThat(response.getStatus()).isEqualTo(HttpStatus.FORBIDDEN.value());
     assertThat(response.getContentType()).startsWith(MediaType.APPLICATION_JSON_VALUE);
@@ -91,38 +84,57 @@ class PasswordChangeRequiredFilterTest {
 
   @Test
   @DisplayName("never blocks an /api/v1/auth/ path so the user can change the password")
-  void allowsAuthPaths() throws Exception {
-    authenticateAs(USER_ID);
+  void allowsAuthPathsEvenWhenPcrTrue() throws Exception {
+    authenticateWithPcr(true);
     MockHttpServletRequest request =
         new MockHttpServletRequest("POST", "/api/v1/auth/change-password");
     MockHttpServletResponse response = new MockHttpServletResponse();
 
-    newFilter().doFilter(request, response, filterChain);
+    filter.doFilter(request, response, filterChain);
 
     verify(filterChain).doFilter(request, response);
     assertThat(response.getStatus()).isEqualTo(HttpStatus.OK.value());
   }
 
   @Test
-  @DisplayName("lets the request through when no password change is required")
-  void allowsWhenNoChangeRequired() throws Exception {
-    authenticateAs(USER_ID);
-    when(userService.passwordChangeRequired(USER_ID)).thenReturn(false);
+  @DisplayName("lets the request through when pcr=false")
+  void allowsWhenPcrFalse() throws Exception {
+    authenticateWithPcr(false);
     MockHttpServletRequest request = new MockHttpServletRequest("GET", "/api/v1/users/me");
     MockHttpServletResponse response = new MockHttpServletResponse();
 
-    newFilter().doFilter(request, response, filterChain);
+    filter.doFilter(request, response, filterChain);
 
     verify(filterChain).doFilter(request, response);
   }
 
-  private static void authenticateAs(UUID subject) {
+  @Test
+  @DisplayName("lets the request through when the pcr claim is absent (legacy token)")
+  void allowsWhenPcrClaimAbsent() throws Exception {
     Jwt jwt =
         Jwt.withTokenValue("token")
             .header("alg", "none")
-            .subject(subject.toString())
+            .subject(USER_ID.toString())
             .issuedAt(Instant.EPOCH)
             .expiresAt(Instant.EPOCH.plusSeconds(900))
+            .build();
+    SecurityContextHolder.getContext().setAuthentication(new JwtAuthenticationToken(jwt));
+    MockHttpServletRequest request = new MockHttpServletRequest("GET", "/api/v1/users/me");
+    MockHttpServletResponse response = new MockHttpServletResponse();
+
+    filter.doFilter(request, response, filterChain);
+
+    verify(filterChain).doFilter(request, response);
+  }
+
+  private static void authenticateWithPcr(boolean pcr) {
+    Jwt jwt =
+        Jwt.withTokenValue("token")
+            .header("alg", "none")
+            .subject(USER_ID.toString())
+            .issuedAt(Instant.EPOCH)
+            .expiresAt(Instant.EPOCH.plusSeconds(900))
+            .claim(JwtTokenService.PCR_CLAIM, pcr)
             .build();
     SecurityContextHolder.getContext().setAuthentication(new JwtAuthenticationToken(jwt));
   }
