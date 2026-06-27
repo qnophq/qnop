@@ -19,7 +19,7 @@
  * SPDX-License-Identifier: AGPL-3.0-only
  */
 
-import { useRef, useState, type DragEvent } from 'react';
+import { useEffect, useRef, useState, type DragEvent } from 'react';
 import Alert from '@mui/material/Alert';
 import Box from '@mui/material/Box';
 import Button from '@mui/material/Button';
@@ -92,6 +92,13 @@ export function AvatarUploader({ name, imageUrl, busy, onSelect, onRemove }: Ava
     if (cropSrc) URL.revokeObjectURL(cropSrc);
     setCropSrc(null);
   };
+
+  // Release the crop-preview object URL if the component unmounts while the
+  // cropper is still open (e.g. navigating away), where closeCrop never runs.
+  useEffect(() => {
+    if (!cropSrc) return;
+    return () => URL.revokeObjectURL(cropSrc);
+  }, [cropSrc]);
 
   const onCropped = (blob: Blob) => {
     onSelect(blob);
