@@ -54,6 +54,20 @@ tags:
       Admin-only team management (issue #105): list/search teams with pagination,
       create / edit / delete teams, and manage memberships with a per-team role
       (LEAD / MEMBER). Teams group reviewers for the review workflow.
+  - name: AdminOidcProviders
+    description: |
+      Superadmin-only management of DB-configured OIDC/OAuth2 login providers,
+      including issuer-endpoint discovery (issue #21).
+  - name: AdminEmail
+    description: |
+      Superadmin-only mail configuration — SMTP connection test, mail-template
+      overrides and preview (issue #19).
+  - name: AuthRegistration
+    description: |
+      Public self-registration and email-verification endpoints (issue #20).
+  - name: AuthPasswordReset
+    description: |
+      Public self-service password-reset request and confirmation flow (issue #20).
 paths:
   /config:
     get:
