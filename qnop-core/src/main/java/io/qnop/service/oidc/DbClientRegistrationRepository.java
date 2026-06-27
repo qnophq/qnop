@@ -56,11 +56,14 @@ public class DbClientRegistrationRepository
   private static final Logger log = LoggerFactory.getLogger(DbClientRegistrationRepository.class);
 
   private final io.qnop.repository.OidcProviderRepository providers;
+  private final OidcSsrfPolicy ssrfPolicy;
   private final AtomicReference<Map<String, ClientRegistration>> cache =
       new AtomicReference<>(Map.of());
 
-  public DbClientRegistrationRepository(io.qnop.repository.OidcProviderRepository providers) {
+  public DbClientRegistrationRepository(
+      io.qnop.repository.OidcProviderRepository providers, OidcSsrfPolicy ssrfPolicy) {
     this.providers = providers;
+    this.ssrfPolicy = ssrfPolicy;
   }
 
   @PostConstruct
@@ -107,6 +110,11 @@ public class DbClientRegistrationRepository
   }
 
   private ClientRegistration buildRegistration(OidcProvider provider, String registrationId) {
+    // Re-validate the stored URIs against the SSRF policy at use time, not only when the operator
+    // saved them (issue #168): discovery (fromIssuerLocation) and the OAuth2 endpoints below issue
+    // outbound requests, so a row whose URI is internal — e.g. via a policy change or a direct DB
+    // edit — must be blocked here too. A violation throws, and refresh() logs and skips the row.
+    validateOutboundUris(provider);
     ClientRegistration.Builder builder =
         switch (provider.getProviderType()) {
           case OIDC ->
@@ -143,6 +151,26 @@ public class DbClientRegistrationRepository
         .redirectUri(REDIRECT_URI)
         .scope(scopes(provider))
         .build();
+  }
+
+  /**
+   * Re-applies the {@link OidcSsrfPolicy} to the URIs this provider will fetch, mirroring the
+   * write-time validation in {@code OidcProviderService}. The hosted providers (Google/GitHub/
+   * Facebook) use hard-coded public endpoints and need no check.
+   */
+  private void validateOutboundUris(OidcProvider provider) {
+    switch (provider.getProviderType()) {
+      case OIDC -> ssrfPolicy.requirePublicHttpUri(provider.getIssuerUri(), "issuerUri", true);
+      case OAUTH2 -> {
+        ssrfPolicy.requirePublicHttpUri(provider.getAuthorizationUri(), "authorizationUri", true);
+        ssrfPolicy.requirePublicHttpUri(provider.getTokenUri(), "tokenUri", true);
+        ssrfPolicy.requirePublicHttpUri(provider.getUserInfoUri(), "userInfoUri", true);
+        ssrfPolicy.requirePublicHttpUri(provider.getJwkSetUri(), "jwkSetUri", false);
+      }
+      default -> {
+        // GOOGLE/GITHUB/FACEBOOK: hard-coded public endpoints, nothing operator-supplied to fetch.
+      }
+    }
   }
 
   private static List<String> scopes(OidcProvider provider) {
