@@ -44,6 +44,11 @@ services:
       QNOP_AUTH_ENCRYPTION_KEY: integration-test-encryption-key-0123456789
       QNOP_AUTH_ENCRYPTION_SALT: 0123456789abcdef0123456789abcdef
       QNOP_CORS_ALLOWED_ORIGINS: http://localhost:5173
+      # Post-OIDC-login redirect base (issue #178): a dedicated, CORS-independent
+      # setting. The smoke simulates an SPA on a separate origin, and smoke-oidc.sh
+      # asserts the redirect targets it; without this the default is blank, which
+      # redirects to the API root (http://localhost:8080/) and fails the check.
+      QNOP_AUTH_OIDC_FRONTEND_BASE_URL: http://localhost:5173
       # The Keycloak issuer is a private/container host; the SSRF guard blocks
       # discovery against it unless explicitly allowed (test deployment only).
       QNOP_AUTH_OIDC_ALLOW_PRIVATE_DISCOVERY_URIS: 'true'
