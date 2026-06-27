@@ -1,0 +1,46 @@
+# SPDX-License-Identifier: AGPL-3.0-only
+#
+# Test-deployment stack for the CI smoke tests (issue #207): a standalone
+# PostgreSQL plus the qnop server built from the repo Dockerfile. This is NOT a
+# production or local-dev stack — the QNOP_AUTH_* values below are throwaway test
+# secrets that intentionally match the encryption key/salt used to produce
+# testdata/db/seed.sql, so the seeded rows (e.g. the OIDC client secret) stay
+# decryptable. MinIO is omitted: object storage is not consumed yet.
+#
+# Usage:  docker compose -f docker-compose.smoke.yml up -d --build
+#         bash scripts/smoke-test.sh
+#         docker compose -f docker-compose.smoke.yml down -v
+
+services:
+  postgres:
+    image: postgres:18@sha256:1a5b3e745bbd82d6deb146505e504da3c2f248cac15e431951b148fbe4f8613a
+    environment:
+      POSTGRES_USER: qnop
+      POSTGRES_PASSWORD: qnop
+      POSTGRES_DB: qnop
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U qnop -d qnop']
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      QNOP_DB_HOST: postgres
+      QNOP_DB_PORT: '5432'
+      QNOP_DB_NAME: qnop
+      QNOP_DB_USERNAME: qnop
+      QNOP_DB_PASSWORD: qnop
+      # Test-only secrets — must match testdata/db/seed.sql's encryption inputs.
+      QNOP_AUTH_JWT_SECRET: integration-test-jwt-secret-0123456789
+      QNOP_AUTH_ENCRYPTION_KEY: integration-test-encryption-key-0123456789
+      QNOP_AUTH_ENCRYPTION_SALT: 0123456789abcdef0123456789abcdef
+      QNOP_CORS_ALLOWED_ORIGINS: http://localhost:5173
+    ports:
+      - '8080:8080'

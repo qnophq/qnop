@@ -1,0 +1,12 @@
+# Keep the build context small and deterministic: no VCS metadata, no build
+# outputs, no Gradle/IDE caches, and no frontend (the image is the backend jar).
+.git
+.gradle
+**/build
+**/node_modules
+qnop-ui
+.github
+.idea
+.vscode
+*.iml
+.env
