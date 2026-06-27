@@ -1,14 +1,16 @@
 # SPDX-License-Identifier: AGPL-3.0-only
 #
-# Test-deployment stack for the CI smoke tests (issue #207): a standalone
-# PostgreSQL plus the qnop server built from the repo Dockerfile. This is NOT a
-# production or local-dev stack — the QNOP_AUTH_* values below are throwaway test
-# secrets that intentionally match the encryption key/salt used to produce
-# testdata/db/seed.sql, so the seeded rows (e.g. the OIDC client secret) stay
-# decryptable. MinIO is omitted: object storage is not consumed yet.
+# Test-deployment stack for the CI smoke tests (issues #207, #225): a standalone
+# PostgreSQL, the qnop server built from the repo Dockerfile, and a Keycloak
+# identity provider for the OIDC login smoke test. This is NOT a production or
+# local-dev stack — the QNOP_AUTH_* values below are throwaway test secrets that
+# intentionally match the encryption key/salt used to produce testdata/db/seed.sql,
+# so the seeded rows (e.g. the OIDC client secret) stay decryptable. MinIO is
+# omitted: object storage is not consumed yet.
 #
 # Usage:  docker compose -f docker-compose.smoke.yml up -d --build
 #         bash scripts/smoke-test.sh
+#         docker compose -f docker-compose.smoke.yml run --rm smoke-oidc
 #         docker compose -f docker-compose.smoke.yml down -v
 
 services:
@@ -42,5 +44,59 @@ services:
       QNOP_AUTH_ENCRYPTION_KEY: integration-test-encryption-key-0123456789
       QNOP_AUTH_ENCRYPTION_SALT: 0123456789abcdef0123456789abcdef
       QNOP_CORS_ALLOWED_ORIGINS: http://localhost:5173
+      # The Keycloak issuer is a private/container host; the SSRF guard blocks
+      # discovery against it unless explicitly allowed (test deployment only).
+      QNOP_AUTH_OIDC_ALLOW_PRIVATE_DISCOVERY_URIS: 'true'
+      # The smoke deployment serves plain HTTP, so the refresh cookie must not be
+      # Secure-only (otherwise it could not be replayed over http in a test).
+      QNOP_AUTH_COOKIE_SECURE: 'false'
     ports:
       - '8080:8080'
+
+  # Local OIDC provider for the login smoke test (issue #225). Imports the same
+  # realm shipped for local dev (realm `qnop`, confidential client `qnop-local`,
+  # users alice/bob). No host port is published — the app reaches it on the
+  # compose network as http://keycloak:8080 and the smoke-oidc sidecar shares the
+  # app's network namespace, so both use that single issuer hostname.
+  keycloak:
+    image: quay.io/keycloak/keycloak:26.6@sha256:9b0330756022422149aa6502eb2def8cd47c6e1b000c7c65cdb13e7c0133e992
+    command: ['start-dev', '--import-realm']
+    environment:
+      KC_BOOTSTRAP_ADMIN_USERNAME: admin
+      KC_BOOTSTRAP_ADMIN_PASSWORD: admin
+      KC_HEALTH_ENABLED: 'true'
+    volumes:
+      - ./docker/keycloak:/opt/keycloak/data/import:ro
+    healthcheck:
+      test:
+        [
+          'CMD-SHELL',
+          "exec 3<>/dev/tcp/localhost/9000 && echo -e 'GET /health/ready HTTP/1.1\\r\\nHost: localhost\\r\\n\\r\\n' >&3 && head -1 <&3 | grep -q '200'",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 30
+      start_period: 30s
+
+  # OIDC login smoke runner (issue #225). Runs on demand:
+  #   docker compose -f docker-compose.smoke.yml run --rm smoke-oidc
+  # It shares the app's network namespace so `localhost:8080` is the app (an
+  # already-whitelisted redirect host in the realm) and `keycloak:8080` resolves
+  # the same way the app sees it — keeping the OIDC issuer consistent across the
+  # back-channel (app↔Keycloak) and front-channel (curl↔Keycloak) without editing
+  # the dev realm. Requires the database to have been seeded first (smoke-test.sh).
+  smoke-oidc:
+    # Tag-only (no digest): a throwaway test runner; Renovate pins the digest.
+    image: alpine:3.20
+    profiles: ['oidc']
+    network_mode: 'service:app'
+    depends_on:
+      app:
+        condition: service_started
+      keycloak:
+        condition: service_healthy
+    volumes:
+      - .:/work:ro
+    working_dir: /work
+    entrypoint:
+      ['sh', '-c', 'apk add --no-cache bash curl jq >/dev/null && exec bash scripts/smoke-oidc.sh']

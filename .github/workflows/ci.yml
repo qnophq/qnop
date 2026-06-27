@@ -72,6 +72,11 @@ jobs:
         run: docker compose -f docker-compose.smoke.yml up -d --build
       - name: Run smoke tests
         run: bash scripts/smoke-test.sh
+      # OIDC login smoke test (#225): a sidecar that shares the app's network
+      # namespace drives the full authorization-code flow against the bundled
+      # Keycloak. Runs after the basic smoke (which seeds the database).
+      - name: Run OIDC login smoke test
+        run: docker compose -f docker-compose.smoke.yml run --rm smoke-oidc
       - name: Dump container logs on failure
         if: failure()
         run: docker compose -f docker-compose.smoke.yml logs --no-color
