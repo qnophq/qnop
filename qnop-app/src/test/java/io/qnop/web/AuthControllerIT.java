@@ -172,6 +172,23 @@ class AuthControllerIT extends AbstractIntegrationTest {
   }
 
   @Test
+  void changePasswordRejectsExternalAccountsWith409() throws Exception {
+    User external = userRepository.saveAndFlush(User.external("Oscar", "oscar@oidc.example.com"));
+    String accessToken = jwtTokenService.issueAccessToken(external.getId());
+
+    mockMvc
+        .perform(
+            post("/api/v1/auth/change-password")
+                .header("Authorization", "Bearer " + accessToken)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(
+                    "{\"currentPassword\":\"irrelevant\","
+                        + "\"newPassword\":\"a-brand-new-strong-password\"}"))
+        .andExpect(status().isConflict())
+        .andExpect(jsonPath("$.code").value("EXTERNAL_ACCOUNT"));
+  }
+
+  @Test
   void changePasswordClearsTheForcedChangeRequirement() throws Exception {
     // Regression: a user created with "must change password on first login" was sent
     // back to the change-password screen after every login because the change never

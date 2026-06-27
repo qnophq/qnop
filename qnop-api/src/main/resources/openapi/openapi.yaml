@@ -1447,6 +1447,14 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
+        '409':
+          description: |
+            The account authenticates via an external provider (OIDC) and has no local
+            password to change (code `EXTERNAL_ACCOUNT`).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
   /users/me:
     get:
       tags:

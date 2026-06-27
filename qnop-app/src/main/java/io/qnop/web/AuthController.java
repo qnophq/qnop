@@ -22,6 +22,7 @@ package io.qnop.web;
 
 import io.qnop.api.v1.endpoint.AuthApi;
 import io.qnop.api.v1.model.ChangePasswordRequest;
+import io.qnop.api.v1.model.ErrorResponse;
 import io.qnop.api.v1.model.LoginRequest;
 import io.qnop.api.v1.model.TokenResponse;
 import io.qnop.security.QnopProperties;
@@ -33,6 +34,8 @@ import io.qnop.service.RefreshTokenService.IssuedRefreshToken;
 import io.qnop.service.RefreshTokenService.RotationResult;
 import io.qnop.service.TokenRevocationService;
 import io.qnop.web.security.RefreshTokenCookieFactory;
+import java.time.OffsetDateTime;
+import java.time.ZoneOffset;
 import java.util.UUID;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
@@ -41,6 +44,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.oauth2.jwt.Jwt;
+import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.server.ResponseStatusException;
 
@@ -121,14 +125,31 @@ public class AuthController implements AuthApi {
         authService.changePassword(userId, request.getCurrentPassword(), request.getNewPassword());
     return switch (outcome) {
       case SUCCESS -> ResponseEntity.noContent().build();
-      case NOT_LOCAL ->
-          throw new ResponseStatusException(
-              HttpStatus.BAD_REQUEST, "Password change is not available for this account");
+      case NOT_LOCAL -> throw new ExternalAccountException();
       case WRONG_PASSWORD, USER_NOT_FOUND ->
           throw new ResponseStatusException(
               HttpStatus.UNAUTHORIZED, "Current password is incorrect");
     };
   }
+
+  /**
+   * A local password change was attempted on an account that authenticates via an external provider
+   * (OIDC). Mapped to 409 with code {@code EXTERNAL_ACCOUNT}, consistent with the admin endpoints'
+   * rejection of OIDC accounts (issue #185).
+   */
+  @ExceptionHandler(ExternalAccountException.class)
+  public ResponseEntity<ErrorResponse> onExternalAccount(ExternalAccountException ex) {
+    return ResponseEntity.status(HttpStatus.CONFLICT)
+        .body(
+            new ErrorResponse()
+                .code("EXTERNAL_ACCOUNT")
+                .message(
+                    "Password change is not available for an account that authenticates via an"
+                        + " external provider.")
+                .timestamp(OffsetDateTime.now(ZoneOffset.UTC)));
+  }
+
+  private static final class ExternalAccountException extends RuntimeException {}
 
   private ResponseEntity<TokenResponse> issueSession(UUID userId) {
     return issueSession(userId, refreshTokenService.issue(userId));
