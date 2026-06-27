@@ -73,7 +73,8 @@ class SeededChangePasswordIT extends SeededIntegrationTest {
                 .header("Authorization", "Bearer " + token(EXTERNAL_ID))
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(body(SEED_PASSWORD, NEW_PASSWORD)))
-        .andExpect(status().isBadRequest());
+        .andExpect(status().isConflict())
+        .andExpect(jsonPath("$.code").value("EXTERNAL_ACCOUNT"));
   }
 
   @Test
