@@ -38,10 +38,10 @@ import org.hibernate.annotations.UuidGenerator;
  *
  * <p>The bytes live in Postgres ({@code bytea}) rather than object storage so a database backup is
  * a complete restore; see ADR-0024 (and plugwerk's ADR-0037 as prior art). The {@code slot} and
- * {@code content_type} domains, the {@code (slot)} uniqueness, and the no-cascade {@code
- * uploaded_by → qnop_user} foreign key are enforced in Liquibase (migration {@code 0005}), not in
- * JPA annotations (ADR-0020); JPA runs {@code ddl-auto=none}. Identifiers are UUIDv7, generated
- * application-side by Hibernate.
+ * {@code content_type} domains, the {@code (slot)} uniqueness, and the {@code ON DELETE SET NULL}
+ * {@code uploaded_by → qnop_user} foreign key are enforced in Liquibase (migration {@code 0005}),
+ * not in JPA annotations (ADR-0020); JPA runs {@code ddl-auto=none}. Identifiers are UUIDv7,
+ * generated application-side by Hibernate.
  */
 @Entity
 @Table(name = "application_asset")
@@ -74,7 +74,8 @@ public class ApplicationAsset {
   private Instant uploadedAt;
 
   /**
-   * The user who uploaded the asset, if known. Nullable; the FK does not cascade on user delete.
+   * The user who uploaded the asset, if known. Nullable, audit-only; the FK is {@code ON DELETE SET
+   * NULL}, so deleting the uploader nulls this rather than blocking the delete (issue #180).
    */
   @Column(name = "uploaded_by")
   private UUID uploadedBy;

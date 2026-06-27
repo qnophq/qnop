@@ -48,15 +48,17 @@ databaseChangeLog:
             tableName: application_asset
             columnNames: slot
             constraintName: ux_application_asset_slot
-        # No ON DELETE action (no cascade, issue #15): a user who uploaded a
-        # branding asset cannot be deleted until the asset row is reassigned or
-        # removed. Contrast oidc_identity, whose user FK cascades.
+        # uploaded_by is a nullable, audit-only reference. ON DELETE SET NULL so
+        # deleting an uploader nulls the attribution rather than blocking the delete
+        # (issue #180) — consistent with application_setting.updated_by. No FK index:
+        # the table holds at most one row per branding slot, so a scan is trivial.
         - addForeignKeyConstraint:
             baseTableName: application_asset
             baseColumnNames: uploaded_by
             referencedTableName: qnop_user
             referencedColumnNames: id
             constraintName: fk_application_asset_user
+            onDelete: SET NULL
         - sql:
             comment: Postgres-only CHECK constraints on the slot + content_type domains.
             splitStatements: true
