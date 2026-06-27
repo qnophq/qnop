@@ -60,7 +60,8 @@ class RefreshTokenServiceTest {
                 Duration.ofMinutes(15),
                 Duration.ofDays(7),
                 "qnop",
-                Boolean.TRUE),
+                Boolean.TRUE,
+                null),
             new QnopProperties.Cors(null));
     RefreshTokenHasher hasher = new RefreshTokenHasher(new JwtKeyService(properties));
     service = new RefreshTokenService(repository, hasher, properties);

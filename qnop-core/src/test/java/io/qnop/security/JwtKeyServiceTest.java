@@ -42,6 +42,7 @@ class JwtKeyServiceTest {
                 null,
                 null,
                 null,
+                null,
                 null),
             new QnopProperties.Cors(List.of()));
     return new JwtKeyService(properties);

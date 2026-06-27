@@ -30,7 +30,6 @@ import io.qnop.service.oidc.OidcLoginService.LoginResult;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import java.io.IOException;
-import java.util.List;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpHeaders;
@@ -83,7 +82,7 @@ public class OidcLoginSuccessHandler implements AuthenticationSuccessHandler {
       response.addHeader(
           HttpHeaders.SET_COOKIE,
           cookieFactory.build(refresh.plaintext(), refresh.maxAge()).toString());
-      response.sendRedirect(frontendBase());
+      response.sendRedirect(frontendBase() + "/");
     } catch (RuntimeException e) {
       log.warn("OIDC login could not be completed: {}", e.getMessage());
       response.sendRedirect(frontendBase() + "/login?error=" + errorCode(e));
@@ -113,12 +112,12 @@ public class OidcLoginSuccessHandler implements AuthenticationSuccessHandler {
         : client.getAccessToken().getTokenValue();
   }
 
+  /**
+   * The post-OIDC-login redirect base (issue #178): a dedicated, CORS-independent setting. Blank
+   * means same-origin relative redirects (SPA served from the API origin); a configured value is an
+   * absolute, trailing-slash-trimmed {@code https://…} base for a separately-hosted SPA.
+   */
   private String frontendBase() {
-    List<String> origins = properties.cors().allowedOrigins();
-    if (origins == null || origins.isEmpty()) {
-      return "";
-    }
-    String base = origins.get(0);
-    return base.endsWith("/") ? base.substring(0, base.length() - 1) : base;
+    return properties.auth().oidc().frontendBaseUrl();
   }
 }
