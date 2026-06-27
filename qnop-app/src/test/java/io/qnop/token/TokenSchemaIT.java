@@ -42,6 +42,7 @@ import java.util.UUID;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
@@ -61,7 +62,20 @@ class TokenSchemaIT extends AbstractIntegrationTest {
   @Autowired EmailVerificationTokenRepository emailTokens;
   @Autowired PasswordResetTokenRepository passwordResetTokens;
   @Autowired UserRepository users;
+  @Autowired JdbcTemplate jdbc;
   @PersistenceContext EntityManager entityManager;
+
+  @Test
+  void indexesFamilyIdForActiveTokens() {
+    // revokeFamily() filters on family_id WHERE revoked_at IS NULL; that hot path must be
+    // backed by a partial index, not a sequential scan (issue #182).
+    Integer count =
+        jdbc.queryForObject(
+            "SELECT count(*) FROM pg_indexes WHERE tablename = 'refresh_token'"
+                + " AND indexname = 'ix_refresh_token_active_family'",
+            Integer.class);
+    assertThat(count).isEqualTo(1);
+  }
 
   private User newUser() {
     return users.saveAndFlush(

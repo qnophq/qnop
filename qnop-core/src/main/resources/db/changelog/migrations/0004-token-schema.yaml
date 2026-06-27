@@ -66,10 +66,14 @@ databaseChangeLog:
             columns:
               - column: { name: expires_at }
         - sql:
-            comment: Partial index for active (unrevoked) tokens — the revoke-by-user/family hot path.
+            comment: |
+              Partial indexes over active (unrevoked) tokens for the two revoke hot paths:
+              revoke-by-user and revoke-by-family (reuse-detection / logout, issue #182).
             sql: |
               CREATE INDEX ix_refresh_token_active
                 ON refresh_token (user_id) WHERE revoked_at IS NULL;
+              CREATE INDEX ix_refresh_token_active_family
+                ON refresh_token (family_id) WHERE revoked_at IS NULL;
 
   - changeSet:
       id: 0004-token-revoked-token
