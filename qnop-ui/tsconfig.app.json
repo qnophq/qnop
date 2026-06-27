@@ -8,6 +8,7 @@
     // `import { URL } from 'url'`; at runtime a Vite alias maps it to a shim.
     "types": ["vite/client", "node"],
     "skipLibCheck": true,
+    "strict": true,
 
     /* Bundler mode */
     "moduleResolution": "bundler",
