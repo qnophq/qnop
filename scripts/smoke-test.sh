@@ -12,6 +12,7 @@ set -euo pipefail
 
 BASE_URL="${SMOKE_BASE_URL:-http://localhost:8080}"
 COMPOSE_FILE="${SMOKE_COMPOSE_FILE:-docker-compose.smoke.yml}"
+CLEAN_FILE="testdata/db/clean.sql"
 SEED_FILE="testdata/db/seed.sql"
 SEED_USER="admin"
 SEED_PASS="Test-Pass-1234!"
@@ -38,8 +39,13 @@ for i in $(seq 1 "$HEALTH_RETRIES"); do
   sleep "$HEALTH_DELAY"
 done
 
-# 2) Seed the running database with the shared fixtures (schema is migrated by now).
-log "seeding ${SEED_FILE}"
+# 2) Seed the running database with the shared fixtures (schema is migrated by
+#    now). Clean first: on first boot the app bootstraps an initial 'admin' user,
+#    which would collide with the seeded admin — so wipe the app tables, then load
+#    the deterministic dataset (same clean+seed contract as the IT suite, #163).
+log "cleaning + seeding ${SEED_FILE}"
+docker compose -f "$COMPOSE_FILE" exec -T postgres \
+  psql -v ON_ERROR_STOP=1 -U qnop -d qnop <"$CLEAN_FILE" >/dev/null
 docker compose -f "$COMPOSE_FILE" exec -T postgres \
   psql -v ON_ERROR_STOP=1 -U qnop -d qnop <"$SEED_FILE" >/dev/null
 log "seeded"
