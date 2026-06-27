@@ -130,6 +130,7 @@ class JwtTokenServiceTest {
             TTL,
             Duration.ofDays(7),
             ISSUER,
+            null,
             null),
         new QnopProperties.Cors(List.of()));
   }

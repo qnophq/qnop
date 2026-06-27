@@ -204,6 +204,7 @@ class TokenRevocationServiceTest {
             Duration.ofMinutes(15),
             Duration.ofDays(7),
             "qnop-test",
+            null,
             null),
         new QnopProperties.Cors(List.of()));
   }

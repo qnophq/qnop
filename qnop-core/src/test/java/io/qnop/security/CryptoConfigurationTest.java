@@ -44,6 +44,7 @@ class CryptoConfigurationTest {
             null,
             null,
             null,
+            null,
             null),
         new QnopProperties.Cors(List.of()));
   }

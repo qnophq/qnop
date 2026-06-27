@@ -56,6 +56,7 @@ public record QnopProperties(@Valid Auth auth, @Valid Cors cors) {
    * @param issuer the {@code iss} claim of self-issued tokens (default {@code qnop})
    * @param cookieSecure whether the refresh cookie carries {@code Secure} (default true; set false
    *     only for local HTTP dev — browsers drop {@code Secure} cookies on plain HTTP)
+   * @param oidc OIDC/OAuth2 login settings (post-login redirect base, issue #178)
    */
   public record Auth(
       @ValidSecret String jwtSecret,
@@ -69,13 +70,38 @@ public record QnopProperties(@Valid Auth auth, @Valid Cors cors) {
       Duration accessTokenTtl,
       Duration refreshTokenTtl,
       String issuer,
-      Boolean cookieSecure) {
+      Boolean cookieSecure,
+      @Valid Oidc oidc) {
 
     public Auth {
       accessTokenTtl = accessTokenTtl != null ? accessTokenTtl : Duration.ofMinutes(15);
       refreshTokenTtl = refreshTokenTtl != null ? refreshTokenTtl : Duration.ofDays(7);
       issuer = (issuer == null || issuer.isBlank()) ? "qnop" : issuer;
       cookieSecure = cookieSecure == null ? Boolean.TRUE : cookieSecure;
+      oidc = oidc != null ? oidc : new Oidc(null);
+    }
+  }
+
+  /**
+   * OIDC/OAuth2 login settings (issue #178).
+   *
+   * @param frontendBaseUrl absolute base URL the browser is redirected to after an OIDC login (e.g.
+   *     {@code https://app.example.com}). Deliberately separate from the CORS origin list, which
+   *     governs API access only. Blank (the default) means same-origin relative redirects — correct
+   *     when the SPA is served from the API origin. A non-blank value must be an http(s) URL; a
+   *     trailing slash is trimmed.
+   */
+  public record Oidc(
+      @Pattern(
+              regexp = "^(https?://.+)?$",
+              message = "qnop.auth.oidc.frontend-base-url must be blank or an http(s) URL")
+          String frontendBaseUrl) {
+
+    public Oidc {
+      frontendBaseUrl = frontendBaseUrl == null ? "" : frontendBaseUrl.trim();
+      if (frontendBaseUrl.endsWith("/")) {
+        frontendBaseUrl = frontendBaseUrl.substring(0, frontendBaseUrl.length() - 1);
+      }
     }
   }
 

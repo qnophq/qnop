@@ -52,5 +52,9 @@ qnop:
     # NEVER enable in production.
     oidc:
       allow-private-discovery-uris: ${QNOP_AUTH_OIDC_ALLOW_PRIVATE_DISCOVERY_URIS:false}
+      # Post-OIDC-login redirect base (issue #178). Blank → same-origin relative redirects
+      # (SPA served from the API origin). Set to the SPA's absolute origin when hosted
+      # separately. Independent of CORS allowed-origins.
+      frontend-base-url: ${QNOP_AUTH_OIDC_FRONTEND_BASE_URL:}
   cors:
     allowed-origins: ${QNOP_CORS_ALLOWED_ORIGINS:http://localhost:5173}
