@@ -44,8 +44,8 @@ Rationale:
   object store on the (cacheable) read path.
 
 The Postgres-only invariants — the `slot` and `content_type` CHECK domains, the
-`(slot)` uniqueness, and the no-cascade `uploaded_by → qnop_user` foreign key —
-live in Liquibase, not JPA annotations (ADR-0020). The `slot` column stores the
+`(slot)` uniqueness, and the `ON DELETE SET NULL` `uploaded_by → qnop_user` foreign
+key (issue #180) — live in Liquibase, not JPA annotations (ADR-0020). The `slot` column stores the
 snake_case `BrandingSlot.dbValue` via an `AttributeConverter`, keeping the
 persisted values aligned with the CHECK domain and with the URL form used in
 issue #23.
@@ -57,9 +57,10 @@ issue #23.
 - Large/numerous binary assets must **not** follow this pattern — review
   documents stay in object storage. This decision is scoped to small, bounded,
   config-like branding assets.
-- `uploaded_by` does not cascade: a user who uploaded a branding asset cannot be
-  deleted until the asset row is reassigned or removed. Acceptable because
-  branding rows are few and admin-managed.
+- `uploaded_by` is audit-only and uses `ON DELETE SET NULL` (issue #180,
+  consistent with `application_setting.updated_by`): deleting an uploader nulls the
+  attribution rather than blocking the delete. (The original no-cascade choice made
+  uploaders undeletable — a 500 on user delete — which this corrects.)
 - SVG sanitization, size caps, SHA-256/size computation, and the upload/read
   endpoints are deferred to the branding service work (issue #23); #15 is schema
   + entity + repository only.

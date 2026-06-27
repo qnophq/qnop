@@ -29,6 +29,8 @@ import io.qnop.entity.BrandingSlot;
 import io.qnop.entity.User;
 import io.qnop.repository.ApplicationAssetRepository;
 import io.qnop.repository.UserRepository;
+import jakarta.persistence.EntityManager;
+import jakarta.persistence.PersistenceContext;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -39,9 +41,9 @@ import org.springframework.transaction.annotation.Transactional;
 /**
  * Verifies the application-asset / branding schema (issue #15) against a real PostgreSQL
  * (ADR-0020): UUIDv7 generation, the {@code bytea} round-trip, the snake_case slot mapping, the
- * Postgres-only CHECK and {@code (slot)} unique constraints that JPA cannot express, and the
- * no-cascade {@code uploaded_by} foreign key. Each test runs in a rolled-back transaction for
- * isolation. Extends {@link AbstractIntegrationTest}, which boots the full context against
+ * Postgres-only CHECK and {@code (slot)} unique constraints that JPA cannot express, and the {@code
+ * ON DELETE SET NULL} {@code uploaded_by} foreign key. Each test runs in a rolled-back transaction
+ * for isolation. Extends {@link AbstractIntegrationTest}, which boots the full context against
  * Testcontainers. Requires Docker.
  */
 @Transactional
@@ -52,6 +54,7 @@ class ApplicationAssetSchemaIT extends AbstractIntegrationTest {
   @Autowired ApplicationAssetRepository assets;
   @Autowired UserRepository users;
   @Autowired JdbcTemplate jdbc;
+  @PersistenceContext EntityManager entityManager;
 
   private static ApplicationAsset asset(BrandingSlot slot, UUID uploadedBy) {
     return ApplicationAsset.create(slot, "image/png", PNG, "deadbeef", PNG.length, uploadedBy);
@@ -141,15 +144,16 @@ class ApplicationAssetSchemaIT extends AbstractIntegrationTest {
   }
 
   @Test
-  void blocksUserDeletionWhileAssetReferencesThem() {
+  void nullsUploadedByWhenUploaderIsDeleted() {
     User uploader = users.saveAndFlush(User.external("Uploader", "uploader@example.com"));
-    assets.saveAndFlush(asset(BrandingSlot.LOGO_DARK, uploader.getId()));
+    UUID assetId = assets.saveAndFlush(asset(BrandingSlot.LOGO_DARK, uploader.getId())).getId();
 
-    assertThatThrownBy(
-            () -> {
-              users.deleteById(uploader.getId());
-              users.flush(); // force the DELETE so the no-cascade FK rejects it
-            })
-        .isInstanceOf(DataIntegrityViolationException.class);
+    // ON DELETE SET NULL (issue #180): deleting the uploader must succeed and null the attribution,
+    // not block the delete with a FK violation.
+    users.deleteById(uploader.getId());
+    users.flush();
+    entityManager.clear(); // the SET NULL happens in the DB, outside Hibernate's L1 cache
+
+    assertThat(assets.findById(assetId).orElseThrow().getUploadedBy()).isNull();
   }
 }
