@@ -23,6 +23,7 @@ package io.qnop.web;
 import io.qnop.api.v1.model.ErrorResponse;
 import io.qnop.api.v1.model.FieldError;
 import jakarta.validation.ConstraintViolationException;
+import jakarta.validation.Path;
 import java.time.OffsetDateTime;
 import java.util.List;
 import org.springframework.http.HttpStatus;
@@ -64,7 +65,34 @@ public class ApiExceptionHandler {
 
   @ExceptionHandler(ConstraintViolationException.class)
   public ResponseEntity<ErrorResponse> onConstraintViolation(ConstraintViolationException ex) {
-    return badRequest(ex.getMessage());
+    // Never echo ex.getMessage(): it embeds the internal property path (e.g.
+    // "createUser.arg0.email"), leaking method and parameter names. Surface only the constraint's
+    // interpolated message keyed by the leaf node (the public field/parameter name).
+    List<FieldError> fieldErrors =
+        ex.getConstraintViolations().stream()
+            .map(
+                violation ->
+                    new FieldError()
+                        .field(leafNode(violation.getPropertyPath()))
+                        .message(
+                            violation.getMessage() != null ? violation.getMessage() : "is invalid"))
+            .toList();
+    return fieldErrors.isEmpty()
+        ? badRequest("request parameter validation failed")
+        : validationError(fieldErrors);
+  }
+
+  /**
+   * The last node of a constraint property path — the public field/parameter name, not the path.
+   */
+  private static String leafNode(Path propertyPath) {
+    String leaf = "";
+    for (Path.Node node : propertyPath) {
+      if (node.getName() != null) {
+        leaf = node.getName();
+      }
+    }
+    return leaf;
   }
 
   private static ResponseEntity<ErrorResponse> badRequest(String message) {
