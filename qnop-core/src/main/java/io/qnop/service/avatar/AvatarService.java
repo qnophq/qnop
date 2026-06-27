@@ -91,7 +91,15 @@ public class AvatarService {
             dimensions == null ? null : dimensions[0],
             dimensions == null ? null : dimensions[1],
             actor));
-    return storage.findUpdatedAt(userId).orElseThrow();
+    // The read-back runs in a separate transaction from the put above, so a concurrent
+    // remove/replace could in theory leave no row. Fail with context rather than a bare,
+    // undiagnosable NoSuchElementException.
+    return storage
+        .findUpdatedAt(userId)
+        .orElseThrow(
+            () ->
+                new IllegalStateException(
+                    "avatar was stored but could not be re-read for user " + userId));
   }
 
   /** The user's avatar bytes for serving, or empty when none is set. */
