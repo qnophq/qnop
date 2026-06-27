@@ -96,8 +96,9 @@ public class AdminUserController implements AdminUsersApi {
             request.getEmail(),
             request.getRole().name(),
             request.getInitialPassword());
-    return ResponseEntity.status(HttpStatus.CREATED)
-        .body(toDetail(created, avatarUpdatedAt(created)));
+    // A brand-new user has no avatar yet, so pass null directly and skip the
+    // guaranteed-empty avatar lookup (issue #179).
+    return ResponseEntity.status(HttpStatus.CREATED).body(toDetail(created, null));
   }
 
   @Override
