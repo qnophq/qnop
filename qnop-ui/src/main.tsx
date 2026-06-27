@@ -19,7 +19,7 @@
  * SPDX-License-Identifier: AGPL-3.0-only
  */
 
-import { StrictMode } from 'react';
+import { StrictMode, useMemo } from 'react';
 import { createRoot } from 'react-dom/client';
 import CssBaseline from '@mui/material/CssBaseline';
 import { ThemeProvider } from '@mui/material/styles';
@@ -42,7 +42,9 @@ import { useUiStore } from './stores/uiStore';
 
 function Root() {
   const themeMode = useUiStore((s) => s.themeMode);
-  const theme = buildTheme(themeMode);
+  // Rebuild the MUI theme only when the mode changes, not on every Root re-render — a fresh theme
+  // identity would otherwise cascade a re-render through every themed component (issue #170).
+  const theme = useMemo(() => buildTheme(themeMode), [themeMode]);
 
   return (
     <QueryClientProvider client={queryClient}>
