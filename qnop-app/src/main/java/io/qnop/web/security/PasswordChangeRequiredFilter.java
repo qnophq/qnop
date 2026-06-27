@@ -21,6 +21,7 @@
 package io.qnop.web.security;
 
 import io.qnop.service.UserService;
+import io.qnop.web.ApiErrorWriter;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
@@ -28,7 +29,6 @@ import jakarta.servlet.http.HttpServletResponse;
 import java.io.IOException;
 import java.util.UUID;
 import org.springframework.http.HttpStatus;
-import org.springframework.http.MediaType;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken;
@@ -61,13 +61,11 @@ public class PasswordChangeRequiredFilter extends OncePerRequestFilter {
     if (authentication instanceof JwtAuthenticationToken jwt
         && !request.getRequestURI().startsWith(AUTH_PREFIX)
         && requiresPasswordChange(jwt.getName())) {
-      response.setStatus(HttpStatus.FORBIDDEN.value());
-      response.setContentType(MediaType.APPLICATION_JSON_VALUE);
-      response
-          .getWriter()
-          .write(
-              "{\"error\":\"PASSWORD_CHANGE_REQUIRED\",\"message\":\"You must change your password"
-                  + " before accessing this resource.\"}");
+      ApiErrorWriter.write(
+          response,
+          HttpStatus.FORBIDDEN,
+          "PASSWORD_CHANGE_REQUIRED",
+          "You must change your password before accessing this resource.");
       return;
     }
     filterChain.doFilter(request, response);
