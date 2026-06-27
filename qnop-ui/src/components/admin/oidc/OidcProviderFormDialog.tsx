@@ -183,13 +183,20 @@ export function OidcProviderFormDialog({
     submitAttempted ? errors[field] : undefined;
 
   const runDiscover = async () => {
-    await discover.mutateAsync(issuerUri.trim()).then((result) => {
+    setError(null);
+    try {
+      const result = await discover.mutateAsync(issuerUri.trim());
       if (!result.success) return;
       if (result.authorizationUri) setAuthorizationUri(result.authorizationUri);
       if (result.tokenUri) setTokenUri(result.tokenUri);
       if (result.userInfoUri) setUserInfoUri(result.userInfoUri);
       if (result.jwkSetUri) setJwkSetUri(result.jwkSetUri);
-    });
+    } catch (err) {
+      // mutateAsync rethrows on TCP failure / 5xx / rate limit (unlike the
+      // endpoint's 200 + success:false). Surface it instead of leaving an
+      // unhandled rejection.
+      setError(apiErrorMessage(err, 'Could not reach the issuer to discover its endpoints.'));
+    }
   };
 
   // Editing the issuer invalidates a previous discovery result so the banner
