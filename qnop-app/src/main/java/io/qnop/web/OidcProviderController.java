@@ -21,6 +21,7 @@
 package io.qnop.web;
 
 import io.qnop.api.v1.endpoint.AdminOidcProvidersApi;
+import io.qnop.api.v1.model.ErrorResponse;
 import io.qnop.api.v1.model.OidcDiscoveryRequest;
 import io.qnop.api.v1.model.OidcDiscoveryResponse;
 import io.qnop.api.v1.model.OidcProviderCreateRequest;
@@ -28,6 +29,7 @@ import io.qnop.api.v1.model.OidcProviderDto;
 import io.qnop.api.v1.model.OidcProviderListResponse;
 import io.qnop.api.v1.model.OidcProviderTypeDto;
 import io.qnop.api.v1.model.OidcProviderUpdateRequest;
+import io.qnop.service.oidc.OidcProviderConflictException;
 import io.qnop.service.oidc.OidcProviderNotFoundException;
 import io.qnop.service.oidc.OidcProviderService;
 import io.qnop.service.oidc.OidcProviderService.OidcDiscoveryOutcome;
@@ -37,9 +39,9 @@ import java.time.Instant;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
 import java.util.UUID;
-import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.server.ResponseStatusException;
 
@@ -88,11 +90,19 @@ public class OidcProviderController implements AdminOidcProvidersApi {
               request.getDisplayNameAttribute());
     } catch (IllegalArgumentException e) {
       throw new ResponseStatusException(HttpStatus.BAD_REQUEST, e.getMessage());
-    } catch (DataIntegrityViolationException e) {
-      throw new ResponseStatusException(
-          HttpStatus.BAD_REQUEST, "A provider with that name already exists");
     }
     return ResponseEntity.status(HttpStatus.CREATED).body(toDto(created));
+  }
+
+  /** Duplicate provider name → 409, consistent with the teams/users conflict responses (#184). */
+  @ExceptionHandler(OidcProviderConflictException.class)
+  public ResponseEntity<ErrorResponse> onConflict(OidcProviderConflictException ex) {
+    return ResponseEntity.status(HttpStatus.CONFLICT)
+        .body(
+            new ErrorResponse()
+                .code(ex.getCode())
+                .message(ex.getMessage())
+                .timestamp(OffsetDateTime.now(ZoneOffset.UTC)));
   }
 
   @Override
