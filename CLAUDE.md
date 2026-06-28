@@ -52,8 +52,11 @@ Frontend (`cd qnop-ui`):
 
 ```bash
 pnpm install
-pnpm dev            # vite dev server
-pnpm build          # tsc -b && vite build
+pnpm generate:api   # openapi-generator-cli — regenerate the typed API client (needs a JDK)
+pnpm dev            # generate:api + vite dev server
+pnpm build          # generate:api + tsc -b + vite build
+pnpm typecheck      # generate:api + tsc -b --noEmit
+pnpm test           # vitest (watch); pnpm test:run for a one-shot run
 pnpm lint           # eslint
 pnpm format         # prettier --write
 pnpm format:check
