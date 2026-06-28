@@ -24,9 +24,11 @@ Read `docs/ARCHITECTURE.md` and `docs/adr/` first — they hold the binding deci
 
 Commits are signed off (`git commit -s`, DCO). See `CONTRIBUTING.md`.
 
-## Current state — Phase 1 (in progress)
+## Current state — Phase 1 (identity & administration shipped)
 
-The Spring Boot server now **boots** with PostgreSQL + Liquibase + JPA wired (ADR-0020, issue #8); the domain is still empty. Still pending (do not assume they exist): the domain core + workflow state machine, the SPI interfaces + Community defaults, `/api/edition`, S3/object-storage wiring, the frontend↔backend integration, and the identity/auth subsystem (epic #7: users, OIDC, settings, mail, branding). Backend modules hold only `package-info` placeholders plus the `io.qnop.bootstrap` entry point. `docker-compose.yml` provides local Postgres for `bootRun`; the test suite spins up its own Postgres via **Testcontainers** (Docker required). MinIO is prepared but not yet consumed.
+The Spring Boot server **boots and runs** (PostgreSQL + Liquibase + JPA, ADR-0020) with the full identity & administration layer of epic #7 in place — `io.qnop.entity` (JPA model), `io.qnop.repository` (Spring Data), `io.qnop.service` (business services) and the framework-light `io.qnop.security` (crypto/key-derivation, ADR-0022) are all populated. **Shipped:** local login with JWT access + rotating refresh tokens and revocation (ADR-0026), OIDC/OAuth2 providers, self-registration, email verification and password reset, auth rate limiting (ADR-0027), users & teams, application settings (ADR-0025), mail templates, branding upload with SVG sanitization (ADR-0028; assets stored as Postgres `bytea`, ADR-0024), profile avatars (ADR-0031), ShedLock distributed scheduling (ADR-0029) and optimistic concurrency control (ADR-0030). The REST contract is OpenAPI-first (ADR-0021) and the `qnop-ui` SPA (login, profile, admin surfaces) consumes it; `/config` exposes the running edition.
+
+**Genuinely still pending (do not assume they exist):** the document-review domain core — the review workflow state machine, annotation anchoring/re-anchoring, and the ingest pipeline; the `qnop-spi` extension-point interfaces + Community defaults (still only a `package-info` placeholder); and S3/object-storage (`StorageProvider`) wiring for binary documents — MinIO is provisioned in `docker-compose.yml` but **not yet consumed**. `docker-compose.yml` provides local Postgres (+ MinIO) for `bootRun`; the test suite spins up its own Postgres via **Testcontainers** (Docker required).
 
 ## Stack
 
@@ -74,9 +76,10 @@ qnop-app    @RestControllers + Spring Boot bootstrap (runnable) ──▶ qnop-a
    │ calls
    ▼
 qnop-core   io.qnop.service ▸ io.qnop.repository ▸ io.qnop.entity ──▶ qnop-spi  (published plugin contract)
+            io.qnop.security  (framework-light crypto / key derivation, ADR-0022)
 ```
 
-- Layering rule (ArchUnit): `web → service → repository → entity`; controllers never touch repositories directly, and entities never leak to the web layer (the service maps them to `qnop-api` DTOs).
+- Layering rule (ArchUnit): `web → service → repository → entity`; controllers never touch repositories directly, and entities never leak to the web layer (the service maps them to `qnop-api` DTOs). `io.qnop.security` (crypto/key-derivation, ADR-0022) is a framework-light layer the service and web layers may use.
 - JPA entities are the model — **no** separate pure-domain model, **no** domain↔entity mapper. Only entity⇄DTO mapping, in the service layer.
 - **Guardrail:** keep the complex logic (re-anchoring, workflow state machine) as plain DB-free testable code in `io.qnop.service`, not inside `@Transactional` methods needing a live `EntityManager`.
 - **Two published, versioned, Spring-free contracts** (ArchUnit-guarded as pure): `qnop-spi` = plugin boundary; `qnop-api` = public REST contract. See ADR-0003/0015.
