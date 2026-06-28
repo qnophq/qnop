@@ -29,13 +29,15 @@ qnop-core
                       anchoring · entity⇄DTO mapping · SPI defaults           (published plugin
   io.qnop.repository  Spring Data repositories                                contract)
   io.qnop.entity      JPA entities — the model
+  io.qnop.security    crypto + validated-config primitives — the Security
+                      layer, reachable only from Service and Web (ADR-0022)
 ```
 
 | Module | Spring? | Responsibility |
 |--------|---------|----------------|
 | `qnop-spi` | no | Published plugin contract: extension-point interfaces + DTOs. Consumed by the enterprise repo. |
 | `qnop-api` | no | Published REST contract: request/response DTOs + OpenAPI. Split into `qnop-api-model` (Spring-free DTOs) + `qnop-api-endpoint` (generated Spring MVC interfaces) per [ADR-0021](adr/0021-openapi-first-contract-tooling.md). Consumed externally and by `qnop-core`/`qnop-app`. |
-| `qnop-core` | yes | `io.qnop.entity` (JPA entities = the model), `io.qnop.repository` (Spring Data), `io.qnop.service` (business logic, workflow state machine, anchoring, entity⇄DTO mapping, SPI default beans). |
+| `qnop-core` | yes | `io.qnop.entity` (JPA entities = the model), `io.qnop.repository` (Spring Data), `io.qnop.service` (business logic, workflow state machine, anchoring, entity⇄DTO mapping, SPI default beans), `io.qnop.security` (crypto + validated-config primitives — the ArchUnit *Security* layer, reachable only from Service and Web, per [ADR-0022](adr/0022-security-crypto-foundation.md)). |
 | `qnop-app` | yes | `io.qnop.web` (`@RestController`s implementing `qnop-api`) + `io.qnop.bootstrap` (Spring Boot main/config). The runnable Community module; hosts the ArchUnit test. |
 
 ### Published artifacts
