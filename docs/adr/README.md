@@ -46,6 +46,7 @@ Important architecture decisions are recorded here as ADRs (see [ADR-0001](0001-
 | [0032](0032-document-representation-and-rendering-pipeline.md) | Document representation & rendering pipeline | Accepted |
 | [0033](0033-durable-async-job-execution-on-postgres.md) | Durable async job execution on Postgres | Accepted |
 | [0034](0034-inter-version-diff.md) | Inter-version diff | Accepted |
+| [0035](0035-esignature-approval-enterprise-feature.md) | E-signature approval as a post-finalization enterprise feature | Accepted |
 
 ## Template
 
