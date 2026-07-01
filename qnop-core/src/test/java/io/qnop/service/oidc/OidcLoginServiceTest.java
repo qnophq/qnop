@@ -102,4 +102,37 @@ class OidcLoginServiceTest {
     assertThat(result.userId()).isEqualTo(userId);
     assertThat(result.upstreamIdToken()).isEqualTo("idtok");
   }
+
+  @Test
+  @DisplayName("rejects a registrationId that does not resolve to a provider id")
+  void rejectsUnparseableRegistrationId() {
+    when(authentication.getAuthorizedClientRegistrationId()).thenReturn("not-a-uuid");
+
+    assertThatThrownBy(() -> service.completeLogin(authentication, "tok"))
+        .isInstanceOf(IllegalStateException.class);
+  }
+
+  @Test
+  @DisplayName("rejects a login for an unknown provider id")
+  void rejectsUnknownProvider() {
+    UUID providerId = UUID.randomUUID();
+    when(authentication.getAuthorizedClientRegistrationId()).thenReturn(providerId.toString());
+    when(providers.findById(providerId)).thenReturn(Optional.empty());
+
+    assertThatThrownBy(() -> service.completeLogin(authentication, "tok"))
+        .isInstanceOf(IllegalStateException.class);
+  }
+
+  @Test
+  @DisplayName("rejects a replayed callback for a disabled provider before provisioning")
+  void rejectsDisabledProvider() {
+    UUID providerId = UUID.randomUUID();
+    OidcProvider provider = mock(OidcProvider.class);
+    when(provider.isEnabled()).thenReturn(false);
+    when(authentication.getAuthorizedClientRegistrationId()).thenReturn(providerId.toString());
+    when(providers.findById(providerId)).thenReturn(Optional.of(provider));
+
+    assertThatThrownBy(() -> service.completeLogin(authentication, "tok"))
+        .isInstanceOf(IllegalStateException.class);
+  }
 }
