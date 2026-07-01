@@ -9,16 +9,16 @@ importers:
   .:
     dependencies:
       '@codemirror/autocomplete':
-        specifier: ^6.20.3
+        specifier: 6.20.3
         version: 6.20.3
       '@codemirror/lang-html':
-        specifier: ^6.4.11
+        specifier: 6.4.11
         version: 6.4.11
       '@codemirror/state':
-        specifier: ^6.7.0
+        specifier: 6.7.0
         version: 6.7.0
       '@codemirror/view':
-        specifier: ^6.43.3
+        specifier: 6.43.3
         version: 6.43.3
       '@emotion/react':
         specifier: 11.14.0
