@@ -59,6 +59,11 @@ openApiGenerate {
             "hideGenerationTimestamp" to "true",
         ),
     )
+    // Keep `format: uri` string fields typed as String, not java.net.URI (issue #187):
+    // the annotation documents the contract for tooling (Swagger, the generated TS
+    // client) and adds a maxLength bound, without changing the server-side field type
+    // — the service layer's SSRF guard already enforces URI validity semantically.
+    typeMappings.set(mapOf("URI" to "String"))
     // MODELS ONLY — no apis, no supporting files. The `java` generator emits
     // plain POJOs (Jackson + Jakarta Bean Validation, java.time dates), so this
     // artifact stays Spring-free.
