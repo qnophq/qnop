@@ -1,0 +1,72 @@
+# SPDX-License-Identifier: AGPL-3.0-only
+#
+# Durable async job queue (issue #242, ADR-0033). A generic, Postgres-backed work
+# queue: enqueue is transactional with the triggering write (outbox); a poll-loop
+# claims due PENDING rows with FOR UPDATE SKIP LOCKED, retries with capped
+# exponential backoff, and a reaper reclaims jobs left RUNNING by a crash. The
+# `payload` is jsonb (the first jsonb column in the schema). JPA runs
+# ddl-auto=none, so the entity mapping must match these definitions exactly.
+databaseChangeLog:
+  - changeSet:
+      id: 0010-job-queue
+      author: qnop
+      comment: Durable async job queue (ADR-0033) — generic Postgres-backed work items.
+      changes:
+        - createTable:
+            tableName: job
+            columns:
+              - column:
+                  name: id
+                  type: UUID
+                  constraints: { primaryKey: true, nullable: false }
+              - column:
+                  name: type
+                  type: VARCHAR(64)
+                  constraints: { nullable: false }
+              - column:
+                  name: payload
+                  type: JSONB
+                  constraints: { nullable: false }
+              - column:
+                  name: status
+                  type: VARCHAR(16)
+                  constraints: { nullable: false }
+              - column:
+                  name: attempts
+                  type: INTEGER
+                  defaultValueNumeric: 0
+                  constraints: { nullable: false }
+              - column:
+                  name: max_attempts
+                  type: INTEGER
+                  defaultValueNumeric: 5
+                  constraints: { nullable: false }
+              - column:
+                  name: run_after
+                  type: TIMESTAMP WITH TIME ZONE
+                  constraints: { nullable: false }
+              - column: { name: last_error, type: TEXT }
+              - column:
+                  name: created_at
+                  type: TIMESTAMP WITH TIME ZONE
+                  constraints: { nullable: false }
+              - column:
+                  name: updated_at
+                  type: TIMESTAMP WITH TIME ZONE
+                  constraints: { nullable: false }
+              - column:
+                  name: version
+                  type: BIGINT
+                  defaultValueNumeric: 0
+                  constraints: { nullable: false }
+        - sql:
+            comment: |
+              Status is a closed set. Two partial indexes serve the hot paths: the
+              poller claiming due PENDING jobs, and the reaper reclaiming stale RUNNING ones.
+            sql: |
+              ALTER TABLE job ADD CONSTRAINT ck_job_status
+                CHECK (status IN ('PENDING', 'RUNNING', 'DONE', 'FAILED'));
+              CREATE INDEX ix_job_pending_run_after
+                ON job (run_after) WHERE status = 'PENDING';
+              CREATE INDEX ix_job_running_updated_at
+                ON job (updated_at) WHERE status = 'RUNNING';
