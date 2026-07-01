@@ -42,6 +42,18 @@ spotless {
         trimTrailingWhitespace()
         endWithNewline()
     }
+    kotlinGradle {
+        // ADR-0007 + ADR-0019: Kotlin-DSL build scripts also carry the SPDX header,
+        // now auto-inserted/checked by `spotlessApply`/`build` instead of only the CI
+        // grep (issue #196). Kotlin uses a short `//` header (not the Java block), so a
+        // dedicated header file. The delimiter ends the header region at the first line
+        // that is neither the copyright nor the SPDX line, so descriptive `//` comments
+        // (and a blank line) below the header are preserved rather than stripped.
+        licenseHeaderFile(
+            rootProject.file("license-header-kts.txt"),
+            "(?!// (?:Copyright|SPDX-License-Identifier)).*",
+        )
+    }
 }
 
 tasks.withType<Test>().configureEach {
