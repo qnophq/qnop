@@ -1,0 +1,437 @@
+# SPDX-License-Identifier: AGPL-3.0-only
+#
+# Document-review domain schema (issue #244, ADR-0011/0009/0032). The document IS
+# the review: it owns an immutable version chain, its reviewer set, the
+# version-independent annotations (with a per-version placement each) and comment
+# threads, and an append-only audit trail.
+#
+# Conventions (ADR-0020): Liquibase owns the schema (JPA ddl-auto=none, so entity
+# mappings must match exactly); Postgres-only CHECK/partial-index constraints live
+# in raw `sql:` blocks. FK delete policy: structural parents (document, annotation,
+# document_version) CASCADE; user references RESTRICT (a user with review history is
+# disabled, not hard-deleted); participant principals CASCADE. The `workflow_state`
+# column has NO CHECK on purpose — the Community edition ships five states but the
+# column stays open for an enterprise-extended state machine (#246, ADR-0035).
+databaseChangeLog:
+  - changeSet:
+      id: 0011-document
+      author: qnop
+      comment: Review aggregate root — owner, title, and the extensible workflow state.
+      changes:
+        - createTable:
+            tableName: document
+            columns:
+              - column:
+                  name: id
+                  type: UUID
+                  constraints: { primaryKey: true, nullable: false }
+              - column:
+                  name: owner_id
+                  type: UUID
+                  constraints: { nullable: false }
+              - column:
+                  name: title
+                  type: VARCHAR(500)
+                  constraints: { nullable: false }
+              - column:
+                  name: workflow_state
+                  type: VARCHAR(32)
+                  constraints: { nullable: false }
+              - column:
+                  name: created_at
+                  type: TIMESTAMP WITH TIME ZONE
+                  constraints: { nullable: false }
+              - column:
+                  name: updated_at
+                  type: TIMESTAMP WITH TIME ZONE
+                  constraints: { nullable: false }
+              - column:
+                  name: version
+                  type: BIGINT
+                  defaultValueNumeric: 0
+                  constraints: { nullable: false }
+        - addForeignKeyConstraint:
+            constraintName: fk_document_owner
+            baseTableName: document
+            baseColumnNames: owner_id
+            referencedTableName: qnop_user
+            referencedColumnNames: id
+            onDelete: RESTRICT
+        - createIndex:
+            indexName: ix_document_owner
+            tableName: document
+            columns:
+              - column: { name: owner_id }
+        - createIndex:
+            indexName: ix_document_workflow_state
+            tableName: document
+            columns:
+              - column: { name: workflow_state }
+
+  - changeSet:
+      id: 0011-document-version
+      author: qnop
+      comment: Immutable version chain; rendered_document (jsonb) is attached later by ingest (#245).
+      changes:
+        - createTable:
+            tableName: document_version
+            columns:
+              - column:
+                  name: id
+                  type: UUID
+                  constraints: { primaryKey: true, nullable: false }
+              - column:
+                  name: document_id
+                  type: UUID
+                  constraints: { nullable: false }
+              - column:
+                  name: version_number
+                  type: INTEGER
+                  constraints: { nullable: false }
+              - column:
+                  name: storage_key
+                  type: VARCHAR(512)
+                  constraints: { nullable: false }
+              - column:
+                  name: content_hash
+                  type: VARCHAR(128)
+                  constraints: { nullable: false }
+              - column:
+                  name: content_type
+                  type: VARCHAR(128)
+                  constraints: { nullable: false }
+              - column:
+                  name: size_bytes
+                  type: BIGINT
+                  constraints: { nullable: false }
+              - column: { name: rendered_document, type: JSONB }
+              - column:
+                  name: created_by
+                  type: UUID
+                  constraints: { nullable: false }
+              - column:
+                  name: created_at
+                  type: TIMESTAMP WITH TIME ZONE
+                  constraints: { nullable: false }
+              - column:
+                  name: version
+                  type: BIGINT
+                  defaultValueNumeric: 0
+                  constraints: { nullable: false }
+        - addForeignKeyConstraint:
+            constraintName: fk_document_version_document
+            baseTableName: document_version
+            baseColumnNames: document_id
+            referencedTableName: document
+            referencedColumnNames: id
+            onDelete: CASCADE
+        - addForeignKeyConstraint:
+            constraintName: fk_document_version_created_by
+            baseTableName: document_version
+            baseColumnNames: created_by
+            referencedTableName: qnop_user
+            referencedColumnNames: id
+            onDelete: RESTRICT
+        - addUniqueConstraint:
+            constraintName: ux_document_version_number
+            tableName: document_version
+            columnNames: document_id, version_number
+
+  - changeSet:
+      id: 0011-review-participant
+      author: qnop
+      comment: Reviewer set — each principal is a user XOR a team (owner is Document.owner_id).
+      changes:
+        - createTable:
+            tableName: review_participant
+            columns:
+              - column:
+                  name: id
+                  type: UUID
+                  constraints: { primaryKey: true, nullable: false }
+              - column:
+                  name: document_id
+                  type: UUID
+                  constraints: { nullable: false }
+              - column: { name: user_id, type: UUID }
+              - column: { name: team_id, type: UUID }
+              - column:
+                  name: role
+                  type: VARCHAR(16)
+                  constraints: { nullable: false }
+              - column:
+                  name: created_at
+                  type: TIMESTAMP WITH TIME ZONE
+                  constraints: { nullable: false }
+        - addForeignKeyConstraint:
+            constraintName: fk_review_participant_document
+            baseTableName: review_participant
+            baseColumnNames: document_id
+            referencedTableName: document
+            referencedColumnNames: id
+            onDelete: CASCADE
+        - addForeignKeyConstraint:
+            constraintName: fk_review_participant_user
+            baseTableName: review_participant
+            baseColumnNames: user_id
+            referencedTableName: qnop_user
+            referencedColumnNames: id
+            onDelete: CASCADE
+        - addForeignKeyConstraint:
+            constraintName: fk_review_participant_team
+            baseTableName: review_participant
+            baseColumnNames: team_id
+            referencedTableName: team
+            referencedColumnNames: id
+            onDelete: CASCADE
+        - createIndex:
+            indexName: ix_review_participant_user
+            tableName: review_participant
+            columns:
+              - column: { name: user_id }
+        - createIndex:
+            indexName: ix_review_participant_team
+            tableName: review_participant
+            columns:
+              - column: { name: team_id }
+        - sql:
+            comment: |
+              Principal is exactly one of user/team (XOR) and the role is a closed set.
+              Partial unique indexes stop the same user/team being added to a document twice.
+            splitStatements: true
+            sql: |
+              ALTER TABLE review_participant ADD CONSTRAINT ck_review_participant_principal
+                CHECK (num_nonnulls(user_id, team_id) = 1);
+              ALTER TABLE review_participant ADD CONSTRAINT ck_review_participant_role
+                CHECK (role IN ('OWNER', 'REVIEWER'));
+              CREATE UNIQUE INDEX ux_review_participant_user
+                ON review_participant (document_id, user_id) WHERE user_id IS NOT NULL;
+              CREATE UNIQUE INDEX ux_review_participant_team
+                ON review_participant (document_id, team_id) WHERE team_id IS NOT NULL;
+
+  - changeSet:
+      id: 0011-annotation
+      author: qnop
+      comment: Version-independent annotation raised against a document; status is a closed set.
+      changes:
+        - createTable:
+            tableName: annotation
+            columns:
+              - column:
+                  name: id
+                  type: UUID
+                  constraints: { primaryKey: true, nullable: false }
+              - column:
+                  name: document_id
+                  type: UUID
+                  constraints: { nullable: false }
+              - column:
+                  name: author_id
+                  type: UUID
+                  constraints: { nullable: false }
+              - column:
+                  name: status
+                  type: VARCHAR(16)
+                  constraints: { nullable: false }
+              - column:
+                  name: created_at
+                  type: TIMESTAMP WITH TIME ZONE
+                  constraints: { nullable: false }
+              - column:
+                  name: updated_at
+                  type: TIMESTAMP WITH TIME ZONE
+                  constraints: { nullable: false }
+              - column:
+                  name: version
+                  type: BIGINT
+                  defaultValueNumeric: 0
+                  constraints: { nullable: false }
+        - addForeignKeyConstraint:
+            constraintName: fk_annotation_document
+            baseTableName: annotation
+            baseColumnNames: document_id
+            referencedTableName: document
+            referencedColumnNames: id
+            onDelete: CASCADE
+        - addForeignKeyConstraint:
+            constraintName: fk_annotation_author
+            baseTableName: annotation
+            baseColumnNames: author_id
+            referencedTableName: qnop_user
+            referencedColumnNames: id
+            onDelete: RESTRICT
+        - createIndex:
+            indexName: ix_annotation_document
+            tableName: annotation
+            columns:
+              - column: { name: document_id }
+        - sql:
+            comment: Closed set of annotation outcomes (not expressible in JPA).
+            sql: |
+              ALTER TABLE annotation ADD CONSTRAINT ck_annotation_status
+                CHECK (status IN ('OPEN', 'ACCEPTED', 'REJECTED'));
+
+  - changeSet:
+      id: 0011-comment
+      author: qnop
+      comment: Append-only discussion thread on an annotation.
+      changes:
+        - createTable:
+            tableName: comment
+            columns:
+              - column:
+                  name: id
+                  type: UUID
+                  constraints: { primaryKey: true, nullable: false }
+              - column:
+                  name: annotation_id
+                  type: UUID
+                  constraints: { nullable: false }
+              - column:
+                  name: author_id
+                  type: UUID
+                  constraints: { nullable: false }
+              - column:
+                  name: body
+                  type: TEXT
+                  constraints: { nullable: false }
+              - column:
+                  name: created_at
+                  type: TIMESTAMP WITH TIME ZONE
+                  constraints: { nullable: false }
+        - addForeignKeyConstraint:
+            constraintName: fk_comment_annotation
+            baseTableName: comment
+            baseColumnNames: annotation_id
+            referencedTableName: annotation
+            referencedColumnNames: id
+            onDelete: CASCADE
+        - addForeignKeyConstraint:
+            constraintName: fk_comment_author
+            baseTableName: comment
+            baseColumnNames: author_id
+            referencedTableName: qnop_user
+            referencedColumnNames: id
+            onDelete: RESTRICT
+        - createIndex:
+            indexName: ix_comment_annotation
+            tableName: comment
+            columns:
+              - column: { name: annotation_id }
+
+  - changeSet:
+      id: 0011-annotation-placement
+      author: qnop
+      comment: Per-version placement of an annotation; anchor (jsonb) + re-anchoring lifecycle.
+      changes:
+        - createTable:
+            tableName: annotation_placement
+            columns:
+              - column:
+                  name: id
+                  type: UUID
+                  constraints: { primaryKey: true, nullable: false }
+              - column:
+                  name: annotation_id
+                  type: UUID
+                  constraints: { nullable: false }
+              - column:
+                  name: document_version_id
+                  type: UUID
+                  constraints: { nullable: false }
+              - column:
+                  name: anchor
+                  type: JSONB
+                  constraints: { nullable: false }
+              - column:
+                  name: status
+                  type: VARCHAR(16)
+                  constraints: { nullable: false }
+              - column:
+                  name: created_at
+                  type: TIMESTAMP WITH TIME ZONE
+                  constraints: { nullable: false }
+              - column:
+                  name: updated_at
+                  type: TIMESTAMP WITH TIME ZONE
+                  constraints: { nullable: false }
+              - column:
+                  name: version
+                  type: BIGINT
+                  defaultValueNumeric: 0
+                  constraints: { nullable: false }
+        - addForeignKeyConstraint:
+            constraintName: fk_annotation_placement_annotation
+            baseTableName: annotation_placement
+            baseColumnNames: annotation_id
+            referencedTableName: annotation
+            referencedColumnNames: id
+            onDelete: CASCADE
+        - addForeignKeyConstraint:
+            constraintName: fk_annotation_placement_version
+            baseTableName: annotation_placement
+            baseColumnNames: document_version_id
+            referencedTableName: document_version
+            referencedColumnNames: id
+            onDelete: CASCADE
+        - addUniqueConstraint:
+            constraintName: ux_annotation_placement_anno_version
+            tableName: annotation_placement
+            columnNames: annotation_id, document_version_id
+        - createIndex:
+            indexName: ix_annotation_placement_version
+            tableName: annotation_placement
+            columns:
+              - column: { name: document_version_id }
+        - sql:
+            comment: Closed set of re-anchoring outcomes (not expressible in JPA).
+            sql: |
+              ALTER TABLE annotation_placement ADD CONSTRAINT ck_annotation_placement_status
+                CHECK (status IN ('PENDING', 'PLACED', 'MOVED', 'ORPHANED', 'FAILED'));
+
+  - changeSet:
+      id: 0011-audit-event
+      author: qnop
+      comment: Append-only per-document audit trail; open event_type, optional actor + jsonb detail.
+      changes:
+        - createTable:
+            tableName: audit_event
+            columns:
+              - column:
+                  name: id
+                  type: UUID
+                  constraints: { primaryKey: true, nullable: false }
+              - column:
+                  name: document_id
+                  type: UUID
+                  constraints: { nullable: false }
+              - column:
+                  name: event_type
+                  type: VARCHAR(64)
+                  constraints: { nullable: false }
+              - column: { name: actor_id, type: UUID }
+              - column: { name: detail, type: JSONB }
+              - column:
+                  name: created_at
+                  type: TIMESTAMP WITH TIME ZONE
+                  constraints: { nullable: false }
+        - addForeignKeyConstraint:
+            constraintName: fk_audit_event_document
+            baseTableName: audit_event
+            baseColumnNames: document_id
+            referencedTableName: document
+            referencedColumnNames: id
+            onDelete: CASCADE
+        - addForeignKeyConstraint:
+            constraintName: fk_audit_event_actor
+            baseTableName: audit_event
+            baseColumnNames: actor_id
+            referencedTableName: qnop_user
+            referencedColumnNames: id
+            onDelete: RESTRICT
+        - createIndex:
+            indexName: ix_audit_event_document
+            tableName: audit_event
+            columns:
+              - column: { name: document_id }
+              - column: { name: created_at }
