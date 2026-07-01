@@ -15,6 +15,23 @@
 plugins {
     alias(libs.plugins.spring.boot) apply false
     alias(libs.plugins.openapi.generator) apply false
+    // OWASP Dependency-Check (issue #195): applied at the root so
+    // `dependencyCheckAggregate` scans every module against the NVD. It is NOT wired
+    // into `check`/`build`, so the local gate is unaffected; the CI `backend-audit`
+    // job invokes it only when an NVD API key secret is present (otherwise the NVD
+    // feed is heavily rate-limited).
+    alias(libs.plugins.dependency.check)
+}
+
+dependencyCheck {
+    // Fail on a high/critical advisory (CVSS >= 7.0) in any module's runtime deps.
+    failBuildOnCVSS = 7.0f
+    formats = listOf("HTML", "SARIF")
+    // NVD API key from the NVD_API_KEY env var (CI secret) or a -PnvdApiKey property;
+    // kept off the command line so it does not leak into build logs.
+    (findProperty("nvdApiKey") as String? ?: System.getenv("NVD_API_KEY"))
+        ?.takeIf { it.isNotBlank() }
+        ?.let { nvd.apiKey = it }
 }
 
 tasks.register("buildAll") {
