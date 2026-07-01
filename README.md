@@ -6,7 +6,7 @@ Reviewers — individual users or whole teams — mark up lines and regions of a
 
 The focus is on **textual documents first — PDF, Word (DOCX), and Markdown**. Support for further formats (for example images) may follow once the text review workflow is solid, and such formats are a likely **Enterprise** feature rather than part of the Community scope.
 
-> **Status: Phase 0 — project skeleton.** The structure, build, conventions and local infrastructure are in place; the domain core and the running server arrive in Phase 1. See [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) and the roadmap there.
+> **Status: Phase 1 — identity & administration layer shipped.** The server boots (PostgreSQL + Liquibase + JPA) with the full identity/auth subsystem — local login with JWT access + rotating refresh tokens, revocation, OIDC/OAuth2 providers, self-registration, email verification and password reset, rate limiting — plus users & teams, application settings, mail templates, branding upload (with SVG sanitization) and profile avatars. The document-review domain (ingest, annotation anchoring, the review workflow state machine) is Phase 2. See [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) and the roadmap there.
 
 ## Editions
 
