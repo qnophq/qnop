@@ -8,6 +8,10 @@ archunit = "1.4.2"
 # NOTE: keep `spotless` in sync with build-logic/build.gradle.kts (precompiled
 # script plugins cannot read this catalog at plugin-resolution time).
 spotless = "8.7.0"
+# OWASP Dependency-Check — backend per-PR CVE gate (issue #195). Applied at the
+# root; the CI job runs dependencyCheckAggregate only when an NVD API key secret
+# is present.
+dependencyCheck = "12.1.0"
 # Spring Boot plugin + BOM. The BOM (spring-boot-dependencies) manages the
 # versions of the Spring stack, JPA/Hibernate, the PostgreSQL driver, Liquibase
 # and Testcontainers — so those artifacts are declared below WITHOUT versions.
@@ -111,3 +115,4 @@ testcontainers-junit-jupiter = { module = "org.testcontainers:testcontainers-jun
 spotless = { id = "com.diffplug.spotless", version.ref = "spotless" }
 spring-boot = { id = "org.springframework.boot", version.ref = "springBoot" }
 openapi-generator = { id = "org.openapi.generator", version.ref = "openapiGenerator" }
+dependency-check = { id = "org.owasp.dependencycheck", version.ref = "dependencyCheck" }
