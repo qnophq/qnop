@@ -214,6 +214,33 @@ class AuthControllerIT extends AbstractIntegrationTest {
   }
 
   @Test
+  void passwordChangeRequiredBlocksProtectedPathsButAllowsChangePassword() throws Exception {
+    // A valid JWT whose user still must change their password (pcr claim = true).
+    User user = createUser("olivia");
+    user.setPasswordChangeRequired(true);
+    userRepository.saveAndFlush(user);
+    String accessToken = jwtTokenService.issueAccessToken(user.getId());
+
+    // Protected endpoint: blocked with 403 and the PASSWORD_CHANGE_REQUIRED code.
+    mockMvc
+        .perform(get("/api/v1/users/me").header("Authorization", "Bearer " + accessToken))
+        .andExpect(status().isForbidden())
+        .andExpect(jsonPath("$.code").value("PASSWORD_CHANGE_REQUIRED"));
+
+    // Allow-listed path (/api/v1/auth/**): the change-password endpoint stays reachable.
+    String body =
+        "{\"currentPassword\":\"%s\",\"newPassword\":\"%s\"}"
+            .formatted(PASSWORD, "a-brand-new-strong-password");
+    mockMvc
+        .perform(
+            post("/api/v1/auth/change-password")
+                .header("Authorization", "Bearer " + accessToken)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(body))
+        .andExpect(status().isNoContent());
+  }
+
+  @Test
   void changePasswordAcceptsTheEightCharacterPolicyMinimum() throws Exception {
     // Regression: the change-password minimum must stay at 8 — matching the other
     // password fields and the UI strength meter. A 12-char minimum here rejected
