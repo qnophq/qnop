@@ -55,5 +55,10 @@ public abstract class AbstractIntegrationTest {
     registry.add("qnop.auth.encryption-key", () -> "integration-test-encryption-key-0123456789");
     registry.add("qnop.auth.encryption-salt", () -> "0123456789abcdef0123456789abcdef");
     registry.add("qnop.cors.allowed-origins", () -> "http://localhost:5173");
+    // Effectively disable the background job poller/reaper in tests (interval == initial delay ==
+    // 1h): tests drive the queue via direct poll()/reap() calls, so a stray scheduled tick must not
+    // race them (ADR-0033).
+    registry.add("qnop.jobs.poll-interval-ms", () -> "3600000");
+    registry.add("qnop.jobs.reaper-interval-ms", () -> "3600000");
   }
 }
