@@ -3,7 +3,7 @@
   "extends": ["github>qnophq/.github"],
   "schedule": ["at any time"],
   "prHourlyLimit": 10,
-  "//": "Hold updates until packages clear pnpm 11's supply-chain minimum release age (~24h), plus margin, so deps PRs never fail `pnpm install --frozen-lockfile` for being too fresh. See ADR-0017 / issue #264.",
+  "description": "Hold updates until packages clear pnpm 11's supply-chain minimum release age (~24h), plus margin, so deps PRs never fail `pnpm install --frozen-lockfile` for being too fresh. See ADR-0017 / issue #264.",
   "minimumReleaseAge": "3 days",
   "packageRules": [
     {
