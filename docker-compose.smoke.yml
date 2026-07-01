@@ -15,7 +15,7 @@
 
 services:
   postgres:
-    image: postgres:18@sha256:1a5b3e745bbd82d6deb146505e504da3c2f248cac15e431951b148fbe4f8613a
+    image: postgres:18@sha256:4aabea78cf39b90e834caf3af7d602a18565f6fe2508705c8d01aa63245c2e20
     environment:
       POSTGRES_USER: qnop
       POSTGRES_PASSWORD: qnop
@@ -64,7 +64,7 @@ services:
   # compose network as http://keycloak:8080 and the smoke-oidc sidecar shares the
   # app's network namespace, so both use that single issuer hostname.
   keycloak:
-    image: quay.io/keycloak/keycloak:26.6@sha256:9b0330756022422149aa6502eb2def8cd47c6e1b000c7c65cdb13e7c0133e992
+    image: quay.io/keycloak/keycloak:26.6@sha256:20e96e40e673ffa474ac4da56c91cb0adba28b8571bd274ce255e6120265c1f4
     command: ['start-dev', '--import-realm']
     environment:
       KC_BOOTSTRAP_ADMIN_USERNAME: admin
@@ -92,7 +92,7 @@ services:
   # the dev realm. Requires the database to have been seeded first (smoke-test.sh).
   smoke-oidc:
     # Tag-only (no digest): a throwaway test runner; Renovate pins the digest.
-    image: alpine:3.20
+    image: alpine:3.24@sha256:28bd5fe8b56d1bd048e5babf5b10710ebe0bae67db86916198a6eec434943f8b
     profiles: ['oidc']
     network_mode: 'service:app'
     depends_on:
