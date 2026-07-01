@@ -5,6 +5,15 @@
   "prHourlyLimit": 10,
   "packageRules": [
     {
+      "description": "OpenAPI Generator — the Gradle plugin (Java DTOs + Spring interfaces) and the npm CLI (TypeScript client) run against the same openapi.yaml, so they must move in lockstep to avoid template/serialization drift",
+      "matchPackageNames": [
+        "/^org\\.openapi\\.generator/",
+        "/^@openapitools/"
+      ],
+      "groupName": "OpenAPI Generator",
+      "groupSlug": "openapi-generator"
+    },
+    {
       "description": "Spring Boot starters, BOM, security, and dependency-management plugin",
       "matchManagers": ["gradle", "gradle-wrapper"],
       "matchPackageNames": [
