@@ -2661,16 +2661,26 @@ components:
           maxLength: 1024
         issuerUri:
           type: string
+          format: uri
+          maxLength: 512
         scope:
           type: string
         authorizationUri:
           type: string
+          format: uri
+          maxLength: 512
         tokenUri:
           type: string
+          format: uri
+          maxLength: 512
         userInfoUri:
           type: string
+          format: uri
+          maxLength: 512
         jwkSetUri:
           type: string
+          format: uri
+          maxLength: 512
         userNameAttribute:
           type: string
         emailAttribute:
@@ -2699,16 +2709,26 @@ components:
           maxLength: 1024
         issuerUri:
           type: string
+          format: uri
+          maxLength: 512
         scope:
           type: string
         authorizationUri:
           type: string
+          format: uri
+          maxLength: 512
         tokenUri:
           type: string
+          format: uri
+          maxLength: 512
         userInfoUri:
           type: string
+          format: uri
+          maxLength: 512
         jwkSetUri:
           type: string
+          format: uri
+          maxLength: 512
         userNameAttribute:
           type: string
         emailAttribute:
@@ -2720,6 +2740,8 @@ components:
       properties:
         issuerUri:
           type: string
+          format: uri
+          maxLength: 512
       required:
         - issuerUri
     OidcDiscoveryResponse:
