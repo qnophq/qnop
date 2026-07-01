@@ -33,7 +33,11 @@ cp .env.example .env && docker compose up -d
 # Backend — compile + format check + architecture & context tests
 ./gradlew build
 
-# Run the server (uses the docker-compose Postgres)
+# Run the server (uses the docker-compose Postgres).
+# Unlike `docker compose`, Gradle's bootRun does NOT auto-load .env, and the server
+# fails fast unless QNOP_AUTH_JWT_SECRET / QNOP_AUTH_ENCRYPTION_KEY / QNOP_AUTH_ENCRYPTION_SALT
+# hold real values (>= 32 chars). Replace the CHANGE_ME placeholders in .env, then export it:
+set -a; source .env; set +a
 ./gradlew :qnop-app:bootRun
 
 # Frontend
