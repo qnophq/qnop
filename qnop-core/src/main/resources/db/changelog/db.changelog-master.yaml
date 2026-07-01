@@ -41,3 +41,6 @@ databaseChangeLog:
   - include:
       file: migrations/0010-job-queue-schema.yaml
       relativeToChangelogFile: true
+  - include:
+      file: migrations/0011-document-review-schema.yaml
+      relativeToChangelogFile: true
