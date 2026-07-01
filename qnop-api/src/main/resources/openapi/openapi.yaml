@@ -2202,6 +2202,7 @@ components:
           format: uuid
         displayName:
           type: string
+          maxLength: 255
         email:
           type: string
         username:
@@ -2308,7 +2309,7 @@ components:
         displayName:
           type: string
           minLength: 1
-          maxLength: 200
+          maxLength: 255
         username:
           type: string
           minLength: 3
@@ -2337,7 +2338,7 @@ components:
         displayName:
           type: string
           minLength: 1
-          maxLength: 200
+          maxLength: 255
           nullable: true
         role:
           allOf:
