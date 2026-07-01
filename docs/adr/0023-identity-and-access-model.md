@@ -38,8 +38,10 @@ authenticated and externally provisioned (OIDC) users.
   `UUID` columns rather than `@ManyToOne` associations.
 - **UUIDv7 primary keys, generated application-side** via Hibernate
   `@UuidGenerator(style = VERSION_7)` (Hibernate ORM 7). Time-ordered UUIDs keep
-  B-tree index locality without a DB round-trip; the local image is Postgres 17,
-  which has no native `uuidv7()`.
+  B-tree index locality without a DB round-trip, and the id is known before
+  insert. Retained even though the infra image is now Postgres 18 (issue #199),
+  whose native `uuidv7()` would tie generation to the DB version and only yield
+  the id after the write.
 - **Client secrets are encrypted at rest** via a JPA `AttributeConverter`
   (`EncryptedStringConverter`) backed by the `TextEncryptor` from the
   security/crypto foundation (`io.qnop.security.CryptoConfiguration`, ADR-0022).
@@ -67,8 +69,10 @@ authenticated and externally provisioned (OIDC) users.
 - **A pure-domain model with an entity mapper** — rejected per ADR-0004 (JPA
   entities are the model).
 - **UUIDv4 keys** — rejected: random keys hurt index locality at scale.
-- **Native `uuidv7()` DB default** — unavailable on Postgres 17 (18+ only);
-  app-side generation also keeps the id known before insert.
+- **Native `uuidv7()` DB default** — available on the infra image (Postgres 18)
+  but not chosen: it would couple key generation to the DB version and only
+  expose the id after the write, whereas app-side generation keeps the id known
+  before insert and independent of the Postgres version.
 - **Encrypting secrets in a service layer instead of a converter** — deferred
   until an `oidc_provider` service exists; the converter makes encryption
   transparent and testable from the schema layer today.

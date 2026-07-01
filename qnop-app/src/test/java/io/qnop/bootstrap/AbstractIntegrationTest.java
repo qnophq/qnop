@@ -41,8 +41,9 @@ import org.testcontainers.containers.PostgreSQLContainer;
     webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 public abstract class AbstractIntegrationTest {
 
+  // postgres:18 to match docker-compose(.smoke).yml — the ADR-0020 test/infra parity (issue #199).
   @ServiceConnection
-  static final PostgreSQLContainer<?> postgres = new PostgreSQLContainer<>("postgres:17");
+  static final PostgreSQLContainer<?> postgres = new PostgreSQLContainer<>("postgres:18");
 
   static {
     postgres.start();
