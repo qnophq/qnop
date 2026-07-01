@@ -31,7 +31,6 @@ import io.qnop.entity.AuditEvent;
 import io.qnop.entity.Comment;
 import io.qnop.entity.Document;
 import io.qnop.entity.DocumentVersion;
-import io.qnop.entity.ParticipantRole;
 import io.qnop.entity.ReviewParticipant;
 import io.qnop.entity.Team;
 import io.qnop.entity.User;
@@ -95,10 +94,8 @@ class DocumentReviewSchemaIT extends AbstractIntegrationTest {
     DocumentVersion v1 = versions.saveAndFlush(newVersion(doc.getId(), 1, owner.getId()));
     versions.saveAndFlush(newVersion(doc.getId(), 2, owner.getId()));
 
-    participants.saveAndFlush(
-        ReviewParticipant.forUser(doc.getId(), author.getId(), ParticipantRole.REVIEWER));
-    participants.saveAndFlush(
-        ReviewParticipant.forTeam(doc.getId(), team.getId(), ParticipantRole.REVIEWER));
+    participants.saveAndFlush(ReviewParticipant.forUser(doc.getId(), author.getId()));
+    participants.saveAndFlush(ReviewParticipant.forTeam(doc.getId(), team.getId()));
 
     Annotation ann = annotations.saveAndFlush(new Annotation(doc.getId(), author.getId()));
     comments.saveAndFlush(new Comment(ann.getId(), author.getId(), "First remark"));
@@ -165,8 +162,7 @@ class DocumentReviewSchemaIT extends AbstractIntegrationTest {
     Team team = newTeam();
     Document doc = documents.saveAndFlush(new Document(owner.getId(), "Doc"));
     DocumentVersion v = versions.saveAndFlush(newVersion(doc.getId(), 1, owner.getId()));
-    participants.saveAndFlush(
-        ReviewParticipant.forTeam(doc.getId(), team.getId(), ParticipantRole.REVIEWER));
+    participants.saveAndFlush(ReviewParticipant.forTeam(doc.getId(), team.getId()));
     Annotation ann = annotations.saveAndFlush(new Annotation(doc.getId(), owner.getId()));
     comments.saveAndFlush(new Comment(ann.getId(), owner.getId(), "c"));
     placements.saveAndFlush(new AnnotationPlacement(ann.getId(), v.getId(), "{\"p\":1}"));
@@ -213,8 +209,8 @@ class DocumentReviewSchemaIT extends AbstractIntegrationTest {
     assertThatThrownBy(
             () ->
                 jdbc.update(
-                    "INSERT INTO review_participant (id, document_id, user_id, team_id, role,"
-                        + " created_at) VALUES (?::uuid, ?::uuid, ?::uuid, ?::uuid, 'REVIEWER', now())",
+                    "INSERT INTO review_participant (id, document_id, user_id, team_id,"
+                        + " created_at) VALUES (?::uuid, ?::uuid, ?::uuid, ?::uuid, now())",
                     UUID.randomUUID().toString(),
                     doc.getId().toString(),
                     userId.toString(),
@@ -230,8 +226,8 @@ class DocumentReviewSchemaIT extends AbstractIntegrationTest {
     assertThatThrownBy(
             () ->
                 jdbc.update(
-                    "INSERT INTO review_participant (id, document_id, user_id, team_id, role,"
-                        + " created_at) VALUES (?::uuid, ?::uuid, NULL, NULL, 'REVIEWER', now())",
+                    "INSERT INTO review_participant (id, document_id, user_id, team_id,"
+                        + " created_at) VALUES (?::uuid, ?::uuid, NULL, NULL, now())",
                     UUID.randomUUID().toString(),
                     doc.getId().toString()))
         .isInstanceOf(DataIntegrityViolationException.class);

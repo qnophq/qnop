@@ -22,8 +22,6 @@ package io.qnop.entity;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
-import jakarta.persistence.EnumType;
-import jakarta.persistence.Enumerated;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
 import java.time.Instant;
@@ -36,8 +34,12 @@ import org.hibernate.annotations.UuidGenerator;
  * A reviewer on a {@link Document} (issue #244, ADR-0011). The principal is <em>either</em> a user
  * <em>or</em> a team — never both, never neither — held as two nullable FKs with a Postgres {@code
  * CHECK} (user_id XOR team_id) in Liquibase (ADR-0020). A team principal means every member of that
- * team reviews. The canonical document owner is {@code Document.ownerId}, not a participant row
- * (see {@link ParticipantRole}). Use {@link #forUser} / {@link #forTeam} to construct.
+ * team reviews.
+ *
+ * <p>There is no role field: a participant <em>is</em> a reviewer. The canonical document owner is
+ * modelled structurally as {@code Document.ownerId}, not as a participant row, so no owner/reviewer
+ * distinction is needed here (reviewer sub-roles, if ever required, are an additive change). Use
+ * {@link #forUser} / {@link #forTeam} to construct.
  */
 @Entity
 @Table(name = "review_participant")
@@ -57,10 +59,6 @@ public class ReviewParticipant {
   @Column(name = "team_id", updatable = false)
   private UUID teamId;
 
-  @Enumerated(EnumType.STRING)
-  @Column(name = "role", nullable = false, length = 16)
-  private ParticipantRole role;
-
   @CreationTimestamp
   @Column(name = "created_at", nullable = false, updatable = false)
   private Instant createdAt;
@@ -69,21 +67,20 @@ public class ReviewParticipant {
     // for JPA
   }
 
-  private ReviewParticipant(UUID documentId, UUID userId, UUID teamId, ParticipantRole role) {
+  private ReviewParticipant(UUID documentId, UUID userId, UUID teamId) {
     this.documentId = documentId;
     this.userId = userId;
     this.teamId = teamId;
-    this.role = role;
   }
 
   /** A single user reviews the document. */
-  public static ReviewParticipant forUser(UUID documentId, UUID userId, ParticipantRole role) {
-    return new ReviewParticipant(documentId, userId, null, role);
+  public static ReviewParticipant forUser(UUID documentId, UUID userId) {
+    return new ReviewParticipant(documentId, userId, null);
   }
 
   /** A whole team reviews the document. */
-  public static ReviewParticipant forTeam(UUID documentId, UUID teamId, ParticipantRole role) {
-    return new ReviewParticipant(documentId, null, teamId, role);
+  public static ReviewParticipant forTeam(UUID documentId, UUID teamId) {
+    return new ReviewParticipant(documentId, null, teamId);
   }
 
   public UUID getId() {
@@ -100,10 +97,6 @@ public class ReviewParticipant {
 
   public UUID getTeamId() {
     return teamId;
-  }
-
-  public ParticipantRole getRole() {
-    return role;
   }
 
   public Instant getCreatedAt() {

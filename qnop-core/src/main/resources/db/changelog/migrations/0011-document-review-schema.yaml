@@ -156,10 +156,6 @@ databaseChangeLog:
               - column: { name: user_id, type: UUID }
               - column: { name: team_id, type: UUID }
               - column:
-                  name: role
-                  type: VARCHAR(16)
-                  constraints: { nullable: false }
-              - column:
                   name: created_at
                   type: TIMESTAMP WITH TIME ZONE
                   constraints: { nullable: false }
@@ -196,14 +192,12 @@ databaseChangeLog:
               - column: { name: team_id }
         - sql:
             comment: |
-              Principal is exactly one of user/team (XOR) and the role is a closed set.
-              Partial unique indexes stop the same user/team being added to a document twice.
+              Principal is exactly one of user/team (XOR). Partial unique indexes stop the
+              same user/team being added to a document twice.
             splitStatements: true
             sql: |
               ALTER TABLE review_participant ADD CONSTRAINT ck_review_participant_principal
                 CHECK (num_nonnulls(user_id, team_id) = 1);
-              ALTER TABLE review_participant ADD CONSTRAINT ck_review_participant_role
-                CHECK (role IN ('OWNER', 'REVIEWER'));
               CREATE UNIQUE INDEX ux_review_participant_user
                 ON review_participant (document_id, user_id) WHERE user_id IS NOT NULL;
               CREATE UNIQUE INDEX ux_review_participant_team
