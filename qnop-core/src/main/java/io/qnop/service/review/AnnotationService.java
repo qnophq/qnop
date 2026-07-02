@@ -140,10 +140,15 @@ public class AnnotationService {
 
   /**
    * All of a document's annotations; each with its placement on {@code versionNumber} when given.
+   * {@code placementStatus} (requires {@code versionNumber}) narrows to placements in that state —
+   * e.g. ORPHANED to surface what re-anchoring could not relocate (issue #248).
    */
   @Transactional(readOnly = true)
   public List<AnnotationView> list(
-      UUID documentId, Integer versionNumber, UUID actor, boolean admin) {
+      UUID documentId, Integer versionNumber, String placementStatus, UUID actor, boolean admin) {
+    if (placementStatus != null && versionNumber == null) {
+      throw DocumentValidationException.invalidRequest("placementStatus requires version");
+    }
     documentAccess.getDocument(documentId, actor, admin); // visibility → 404 if not a participant
     UUID versionId =
         versionNumber == null
@@ -163,6 +168,7 @@ public class AnnotationService {
                           .orElse(null);
               return view(annotation, placement, threadSize(annotation.getId()));
             })
+        .filter(view -> placementStatus == null || placementStatus.equals(view.placementStatus()))
         .toList();
   }
 
