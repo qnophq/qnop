@@ -68,6 +68,14 @@ tags:
   - name: AuthPasswordReset
     description: |
       Public self-service password-reset request and confirmation flow (issue #20).
+  - name: ReviewWorkflow
+    description: |
+      The review workflow of a document (issue #246, ADR-0011): reading the
+      current state with its reachable transitions, and requesting a transition
+      through the single state-machine choke-point. State-changing calls are
+      owner-only. The state is an open string: the Community edition ships
+      `DRAFT`, `IN_REVIEW`, `CHANGES_REQUESTED`, `FINALIZED` and `CANCELLED`,
+      but an enterprise-extended state machine may add further states.
 paths:
   /config:
     get:
@@ -1571,6 +1579,90 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
+  /documents/{documentId}/workflow:
+    parameters:
+      - name: documentId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+    get:
+      tags: [ReviewWorkflow]
+      summary: Current workflow state of a document
+      description: |
+        The document's persisted workflow state and the transitions that are
+        structurally reachable from it (guards are not pre-evaluated — the
+        authoritative check happens on the transition request itself). The
+        transition list is empty for terminal states and for states this
+        edition's state machine does not manage.
+      operationId: getDocumentWorkflow
+      responses:
+        '200':
+          description: The current workflow status.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WorkflowStatus'
+        '401':
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Unknown document
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+    post:
+      tags: [ReviewWorkflow]
+      summary: Request a workflow transition (owner-only)
+      description: |
+        Moves the review to `targetState` through the state-machine choke-point
+        (ADR-0011). Rejected with `409` when the edge is not in the transition
+        table, when a guard vetoes it — finalization requires zero OPEN
+        annotations and zero PENDING placements (re-anchoring complete) — or
+        when the current or target state is not managed by this edition.
+      operationId: transitionDocumentWorkflow
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/WorkflowTransitionRequest'
+      responses:
+        '200':
+          description: Transition applied; the new workflow status.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WorkflowStatus'
+        '401':
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: The caller is not the document owner
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Unknown document
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '409':
+          description: Illegal transition or a guard vetoed it (e.g. the FINALIZED invariant)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
 components:
   securitySchemes:
     bearerAuth:
@@ -1640,6 +1732,43 @@ components:
           schema:
             $ref: '#/components/schemas/ErrorResponse'
   schemas:
+    WorkflowStatus:
+      type: object
+      description: |
+        The workflow view of a document (issue #246, ADR-0011). `state` is an
+        open string — the Community edition ships `DRAFT`, `IN_REVIEW`,
+        `CHANGES_REQUESTED`, `FINALIZED` and `CANCELLED`, but an
+        enterprise-extended state machine may add further states, so clients
+        must tolerate unknown values.
+      required:
+        - state
+        - allowedTransitions
+      properties:
+        state:
+          type: string
+          description: The current workflow state (Community values or an enterprise extension).
+          example: IN_REVIEW
+        allowedTransitions:
+          type: array
+          description: |
+            Target states structurally reachable from `state` (transition table
+            only; guards are evaluated on the transition request). Empty for
+            terminal states and for states this edition does not manage.
+          items:
+            type: string
+          example: [CHANGES_REQUESTED, FINALIZED, CANCELLED]
+    WorkflowTransitionRequest:
+      type: object
+      description: A request to move the review to `targetState` (issue #246, ADR-0011).
+      required:
+        - targetState
+      properties:
+        targetState:
+          type: string
+          minLength: 1
+          maxLength: 32
+          description: The requested target workflow state.
+          example: FINALIZED
     Edition:
       type: string
       description: |
