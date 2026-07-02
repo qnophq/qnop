@@ -190,7 +190,8 @@ public class AnnotationService {
   public CommentView addComment(UUID annotationId, UUID author, boolean admin, String body) {
     Annotation annotation = requireAnnotation(annotationId);
     documentAccess.getDocument(annotation.getDocumentId(), author, admin);
-    return commentView(comments.save(new Comment(annotationId, author, body)));
+    // saveAndFlush so @CreationTimestamp is populated on the returned comment before the view.
+    return commentView(comments.saveAndFlush(new Comment(annotationId, author, body)));
   }
 
   /** An annotation's comment thread, oldest first; visible participants only. */
