@@ -47,4 +47,12 @@ public final class CurrentUser {
       throw new AccessDeniedException("principal is not a user");
     }
   }
+
+  /** Whether the caller carries the global {@code ROLE_ADMIN} authority (issue #245). */
+  public static boolean isAdmin() {
+    Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+    return authentication != null
+        && authentication.getAuthorities().stream()
+            .anyMatch(granted -> "ROLE_ADMIN".equals(granted.getAuthority()));
+  }
 }

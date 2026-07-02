@@ -76,6 +76,12 @@ tags:
       owner-only. The state is an open string: the Community edition ships
       `DRAFT`, `IN_REVIEW`, `CHANGES_REQUESTED`, `FINALIZED` and `CANCELLED`,
       but an enterprise-extended state machine may add further states.
+  - name: Documents
+    description: |
+      Document metadata, versions, and the canonical rendered representation of
+      the review core (issue #245, ADR-0032). Visible only to the owner, the
+      review participants, and admins. The multipart upload and the
+      original-binary download are deliberately outside this contract (ADR-0028).
 paths:
   /config:
     get:
@@ -1663,6 +1669,89 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
+  /documents/{documentId}:
+    get:
+      tags:
+        - Documents
+      summary: Get document metadata
+      operationId: getDocument
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/DocumentIdParam'
+      responses:
+        '200':
+          description: The document
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DocumentResponse'
+        '404':
+          description: Unknown document, or the caller is not a participant
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /documents/{documentId}/versions:
+    get:
+      tags:
+        - Documents
+      summary: List a document's versions
+      operationId: listDocumentVersions
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/DocumentIdParam'
+      responses:
+        '200':
+          description: All versions, oldest first
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DocumentVersionListResponse'
+        '404':
+          description: Unknown document, or the caller is not a participant
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /documents/{documentId}/versions/{versionNumber}/rendered:
+    get:
+      tags:
+        - Documents
+      summary: Get the canonical rendered representation of a version
+      description: |
+        The server-extracted, format-agnostic representation (ADR-0032): one
+        surface per page with intrinsic size and the ordered text spans, each
+        carrying its character-offset range and a bounding box normalized to
+        0..1 of the surface. Available once the async extraction has completed.
+      operationId: getRenderedDocument
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/DocumentIdParam'
+        - $ref: '#/components/parameters/VersionNumberParam'
+      responses:
+        '200':
+          description: The rendered representation
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RenderedDocumentResponse'
+        '404':
+          description: Unknown document/version, or the caller is not a participant
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '409':
+          description: >-
+            Extraction has not completed (`EXTRACTION_PENDING`) or failed
+            permanently (`EXTRACTION_FAILED`).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
 components:
   securitySchemes:
     bearerAuth:
@@ -1675,6 +1764,22 @@ components:
         itself is introduced in a later issue; the scheme is declared here so the
         contract is complete from the first endpoint.
   parameters:
+    DocumentIdParam:
+      name: documentId
+      in: path
+      required: true
+      description: The document's id.
+      schema:
+        type: string
+        format: uuid
+    VersionNumberParam:
+      name: versionNumber
+      in: path
+      required: true
+      description: The 1-based version number within the document.
+      schema:
+        type: integer
+        minimum: 1
     OidcProviderIdParam:
       name: providerId
       in: path
@@ -2933,3 +3038,175 @@ components:
       required:
         - field
         - message
+    DocumentResponse:
+      type: object
+      description: A review document's metadata.
+      properties:
+        id:
+          type: string
+          format: uuid
+        title:
+          type: string
+          maxLength: 500
+        ownerId:
+          type: string
+          format: uuid
+        workflowState:
+          type: string
+          description: The review workflow state (state machine lands with #246).
+        latestVersionNumber:
+          type: integer
+          description: The highest existing version number; 0 when none exist.
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+      required:
+        - id
+        - title
+        - ownerId
+        - workflowState
+        - latestVersionNumber
+        - createdAt
+        - updatedAt
+    DocumentVersionListResponse:
+      type: object
+      properties:
+        versions:
+          type: array
+          items:
+            $ref: '#/components/schemas/DocumentVersionSummary'
+      required:
+        - versions
+    DocumentVersionSummary:
+      type: object
+      description: One immutable version of a document.
+      properties:
+        versionNumber:
+          type: integer
+        contentType:
+          type: string
+        sizeBytes:
+          type: integer
+          format: int64
+        contentHash:
+          type: string
+          description: SHA-256 of the original binary (hex); also the download ETag.
+        extractionStatus:
+          $ref: '#/components/schemas/ExtractionStatus'
+        createdBy:
+          type: string
+          format: uuid
+        createdAt:
+          type: string
+          format: date-time
+      required:
+        - versionNumber
+        - contentType
+        - sizeBytes
+        - contentHash
+        - extractionStatus
+        - createdBy
+        - createdAt
+    ExtractionStatus:
+      type: string
+      description: >-
+        Lifecycle of a version's canonical representation: PENDING until the
+        async extraction job runs, then READY or FAILED (ADR-0032/0033).
+      enum:
+        - PENDING
+        - READY
+        - FAILED
+    RenderedDocumentResponse:
+      type: object
+      description: >-
+        The canonical, server-extracted representation of one document version
+        (ADR-0032). Property names mirror the stored representation exactly.
+      properties:
+        surfaces:
+          type: array
+          description: The ordered renderable planes (one per PDF page).
+          items:
+            $ref: '#/components/schemas/RenderedSurface'
+      required:
+        - surfaces
+    RenderedSurface:
+      type: object
+      description: >-
+        One renderable plane. width/height are the intrinsic size in source
+        units (PDF points); all boxes are fractions of them.
+      properties:
+        index:
+          type: integer
+          description: Zero-based surface index within the document.
+        width:
+          type: number
+          format: double
+        height:
+          type: number
+          format: double
+        textSpans:
+          type: array
+          description: Ordered text runs; empty when the surface has no text layer.
+          items:
+            $ref: '#/components/schemas/RenderedTextSpan'
+      required:
+        - index
+        - width
+        - height
+        - textSpans
+    RenderedTextSpan:
+      type: object
+      description: >-
+        One extracted text run with its character-offset range within the
+        surface's canonical text (spans joined by a single newline) and its
+        normalized glyph bounding box.
+      properties:
+        text:
+          type: string
+        startOffset:
+          type: integer
+          description: Inclusive start within the surface's canonical text.
+        endOffset:
+          type: integer
+          description: Exclusive end (startOffset + text length).
+        box:
+          $ref: '#/components/schemas/NormalizedBox'
+      required:
+        - text
+        - startOffset
+        - endOffset
+        - box
+    NormalizedBox:
+      type: object
+      description: >-
+        An axis-aligned rectangle normalized to 0..1 of its surface; x/y is the
+        top-left corner, origin at the surface's top-left.
+      properties:
+        x:
+          type: number
+          format: double
+          minimum: 0
+          maximum: 1
+        y:
+          type: number
+          format: double
+          minimum: 0
+          maximum: 1
+        width:
+          type: number
+          format: double
+          minimum: 0
+          maximum: 1
+        height:
+          type: number
+          format: double
+          minimum: 0
+          maximum: 1
+      required:
+        - x
+        - y
+        - width
+        - height

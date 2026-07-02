@@ -21,6 +21,7 @@
 package io.qnop.web;
 
 import io.qnop.api.v1.model.ErrorResponse;
+import io.qnop.service.avatar.AvatarLimits;
 import io.qnop.service.avatar.AvatarService;
 import io.qnop.service.avatar.AvatarStorage.AvatarContent;
 import io.qnop.service.avatar.AvatarValidationException;
@@ -65,6 +66,7 @@ public class AvatarController {
   public ResponseEntity<AvatarUploadResponse> uploadMine(@RequestParam("file") MultipartFile file)
       throws IOException {
     UUID me = CurrentUser.requireUserId();
+    requireWithinCap(file);
     Instant updatedAt = avatars.store(me, file.getBytes(), me);
     return ResponseEntity.ok(new AvatarUploadResponse(AvatarUrls.forUser(me, updatedAt)));
   }
@@ -80,8 +82,22 @@ public class AvatarController {
       consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
   public ResponseEntity<AvatarUploadResponse> uploadForUser(
       @PathVariable UUID userId, @RequestParam("file") MultipartFile file) throws IOException {
+    requireWithinCap(file);
     Instant updatedAt = avatars.store(userId, file.getBytes(), CurrentUser.requireUserId());
     return ResponseEntity.ok(new AvatarUploadResponse(AvatarUrls.forUser(userId, updatedAt)));
+  }
+
+  /**
+   * Rejects an oversized upload before {@code getBytes()} materializes it on the heap. The
+   * container's multipart ceiling moved above the avatar cap when document uploads landed (issue
+   * #245), so this size precheck restores the cheap early 413 (the service still enforces the cap
+   * on the actual bytes).
+   */
+  private static void requireWithinCap(MultipartFile file) {
+    if (file.getSize() > AvatarLimits.MAX_SIZE_BYTES) {
+      throw AvatarValidationException.tooLarge(
+          "avatar exceeds " + AvatarLimits.MAX_SIZE_BYTES + " bytes");
+    }
   }
 
   @DeleteMapping("/admin/users/{userId}/avatar")

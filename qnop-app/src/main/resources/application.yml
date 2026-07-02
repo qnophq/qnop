@@ -22,10 +22,14 @@ spring:
     change-log: classpath:/db/changelog/db.changelog-master.yaml
   servlet:
     multipart:
-      # Headroom over the 1 MiB avatar cap (AvatarLimits) so the service-level
-      # size check returns a clean 413 before the container rejects the request.
-      max-file-size: 2MB
-      max-request-size: 4MB
+      # Headroom over the largest service-level cap — the document upload setting
+      # (upload.max_file_size_mb, default 25 MB; issue #245) — so the size checks in
+      # AvatarService/BrandingService/DocumentIngestService return a clean 413 before
+      # the container rejects the request. Operators raising the document setting past
+      # this ceiling must raise QNOP_UPLOAD_MULTIPART_LIMIT_MB with it. Multipart
+      # uploads stream to a temp file, not the heap, so a generous ceiling is safe.
+      max-file-size: ${QNOP_UPLOAD_MULTIPART_LIMIT_MB:55}MB
+      max-request-size: ${QNOP_UPLOAD_MULTIPART_LIMIT_MB:55}MB
 
 management:
   endpoints:

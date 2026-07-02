@@ -58,6 +58,12 @@ dependencies {
     // path-style, so MinIO / S3 / GCS is a deploy-time config switch.
     implementation(libs.aws.sdk.s3)
 
+    // PDF extraction (issue #245, ADR-0032): PDFBox turns uploads into RenderedDocuments;
+    // Jackson 3 (tools.jackson, BOM-managed — the same stack Boot 4's MVC uses) serializes
+    // them into the jsonb column, so stored payloads and HTTP responses share one mapper line.
+    implementation(libs.pdfbox)
+    implementation(libs.jackson3.databind)
+
     testImplementation(platform(libs.junit.bom))
     testImplementation(libs.junit.jupiter)
     testRuntimeOnly(libs.junit.platform.launcher)

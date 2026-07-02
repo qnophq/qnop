@@ -100,5 +100,8 @@ dependencies {
     // StorageProvider SPI types directly (qnop-core hides qnop-spi behind `implementation`).
     testImplementation(libs.testcontainers.minio)
     testImplementation(project(":qnop-spi"))
+    // The document-ingest ITs (issue #245) generate their PDF fixtures with PDFBox
+    // instead of committing binary blobs.
+    testImplementation(libs.pdfbox)
     testRuntimeOnly(libs.junit.platform.launcher)
 }

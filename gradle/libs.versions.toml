@@ -68,6 +68,12 @@ postgresql = { module = "org.postgresql:postgresql" }
 # Validation); it stays Spring-free. swagger-annotations + jakarta-annotation are
 # consumed by the generated Spring interfaces in qnop-api-endpoint.
 jackson-annotations = { module = "com.fasterxml.jackson.core:jackson-annotations", version.ref = "jacksonAnnotations" }
+# Jackson 3 (tools.jackson) — the JSON stack Spring Boot 4 uses at runtime; version
+# from the Boot BOM. The annotations above deliberately stay on the shared
+# com.fasterxml 2.x line, which Jackson 3 reads unchanged.
+jackson3-databind = { module = "tools.jackson.core:jackson-databind" }
+# PDF text extraction with glyph positions (ADR-0032, issue #245).
+pdfbox = { module = "org.apache.pdfbox:pdfbox", version.ref = "pdfbox" }
 swagger-annotations = { module = "io.swagger.core.v3:swagger-annotations", version.ref = "swaggerAnnotations" }
 jakarta-validation-api = { module = "jakarta.validation:jakarta.validation-api", version.ref = "jakartaValidation" }
 jakarta-annotation-api = { module = "jakarta.annotation:jakarta.annotation-api", version.ref = "jakartaAnnotation" }

@@ -105,6 +105,15 @@ databaseChangeLog:
                   type: BIGINT
                   constraints: { nullable: false }
               - column: { name: rendered_document, type: JSONB }
+              # Extraction lifecycle (issue #245, ADR-0032/0033): the async job flips
+              # PENDING -> READY (rendered_document attached) or FAILED (unprocessable
+              # content). A dedicated column - not derived from rendered_document IS
+              # NULL - so clients can tell "still extracting" from "failed" (#251).
+              - column:
+                  name: extraction_status
+                  type: VARCHAR(16)
+                  defaultValue: PENDING
+                  constraints: { nullable: false }
               - column:
                   name: created_by
                   type: UUID
