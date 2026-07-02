@@ -82,6 +82,13 @@ tags:
       the review core (issue #245, ADR-0032). Visible only to the owner, the
       review participants, and admins. The multipart upload and the
       original-binary download are deliberately outside this contract (ADR-0028).
+  - name: Annotations
+    description: |
+      Annotations, their comment threads, and per-version placements (issue #247,
+      ADR-0009/0011). A participant creates an anchored annotation on a version;
+      the document owner or the annotation's author accepts or rejects it, feeding
+      the review workflow. Visible only to the document's participants and admins —
+      a non-participant sees 404, as for documents (anti-enumeration).
 paths:
   /config:
     get:
@@ -1752,6 +1759,196 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
+  /documents/{documentId}/annotations:
+    parameters:
+      - $ref: '#/components/parameters/DocumentIdParam'
+    get:
+      tags: [Annotations]
+      summary: List a document's annotations
+      description: |
+        Every annotation on the document. When `version` is given, each item also
+        carries its placement (anchor + status) on that version, or nulls when it
+        has none there.
+      operationId: listAnnotations
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: version
+          in: query
+          required: false
+          description: A 1-based version number to resolve each annotation's placement against.
+          schema:
+            type: integer
+            minimum: 1
+      responses:
+        '200':
+          description: The annotations
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AnnotationListResponse'
+        '404':
+          description: Unknown document, or the caller is not a participant
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+    post:
+      tags: [Annotations]
+      summary: Create an annotation on a version
+      description: |
+        Anchors a new annotation to a region (and, on a text surface, the quoted
+        text) of the given version. The placement on that version is `PLACED`
+        immediately — a human drew it; re-anchoring onto later versions is async
+        (#248). An optional `comment` seeds the discussion thread.
+      operationId: createAnnotation
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AnnotationCreateRequest'
+      responses:
+        '201':
+          description: The created annotation
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AnnotationView'
+        '400':
+          description: Validation failed (e.g. the region anchor is missing or out of 0..1)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Unknown document/version, or the caller is not a participant
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /annotations/{annotationId}:
+    parameters:
+      - $ref: '#/components/parameters/AnnotationIdParam'
+    get:
+      tags: [Annotations]
+      summary: Get an annotation
+      operationId: getAnnotation
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: The annotation
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AnnotationView'
+        '404':
+          description: Unknown annotation, or the caller is not a participant
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /annotations/{annotationId}/decision:
+    parameters:
+      - $ref: '#/components/parameters/AnnotationIdParam'
+    post:
+      tags: [Annotations]
+      summary: Accept or reject an annotation (owner or author)
+      description: |
+        Applies the `OPEN → ACCEPTED | REJECTED` decision (ADR-0011). Allowed for
+        the document owner or the annotation's author. Accepting drives the review
+        workflow (`IN_REVIEW → CHANGES_REQUESTED`) through the state-machine
+        choke-point. Rejected with `409` if the annotation is already decided.
+      operationId: decideAnnotation
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AnnotationDecisionRequest'
+      responses:
+        '200':
+          description: The updated annotation
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AnnotationView'
+        '403':
+          description: The caller is neither the document owner nor the annotation's author
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Unknown annotation
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '409':
+          description: The annotation has already been decided
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /annotations/{annotationId}/comments:
+    parameters:
+      - $ref: '#/components/parameters/AnnotationIdParam'
+    get:
+      tags: [Annotations]
+      summary: List an annotation's comment thread
+      operationId: listComments
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: The thread, oldest first
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CommentListResponse'
+        '404':
+          description: Unknown annotation, or the caller is not a participant
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+    post:
+      tags: [Annotations]
+      summary: Add a comment to an annotation
+      operationId: addComment
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CommentCreateRequest'
+      responses:
+        '201':
+          description: The created comment
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CommentView'
+        '400':
+          description: Validation failed (e.g. an empty body)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Unknown annotation, or the caller is not a participant
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
 components:
   securitySchemes:
     bearerAuth:
@@ -1808,6 +2005,14 @@ components:
       in: path
       required: true
       description: The team's id.
+      schema:
+        type: string
+        format: uuid
+    AnnotationIdParam:
+      name: annotationId
+      in: path
+      required: true
+      description: The annotation's id.
       schema:
         type: string
         format: uuid
@@ -3210,3 +3415,208 @@ components:
         - y
         - width
         - height
+    RegionAnchor:
+      type: object
+      description: |
+        The universal geometric layer of an anchor (ADR-0009): a normalized
+        rectangle on one surface. Always present — for an image it is the only
+        layer.
+      required:
+        - surfaceIndex
+        - box
+      properties:
+        surfaceIndex:
+          type: integer
+          minimum: 0
+          description: Zero-based surface (page) index.
+        box:
+          $ref: '#/components/schemas/NormalizedBox'
+    TextQuoteAnchor:
+      type: object
+      description: |
+        The text-quote layer (ADR-0009), present when the surface has a text
+        layer: the exact quoted text plus a little surrounding context, robust to
+        reflow across versions.
+      required:
+        - quote
+      properties:
+        quote:
+          type: string
+          minLength: 1
+          description: The exact quoted text.
+        prefix:
+          type: string
+          description: A short slice of text immediately before the quote.
+        suffix:
+          type: string
+          description: A short slice of text immediately after the quote.
+    TextPositionAnchor:
+      type: object
+      description: |
+        The text-position layer (ADR-0009): character offsets into the surface's
+        canonical text. Fast but brittle — a tiebreaker only.
+      required:
+        - start
+        - end
+      properties:
+        start:
+          type: integer
+          minimum: 0
+          description: Inclusive start offset.
+        end:
+          type: integer
+          minimum: 0
+          description: Exclusive end offset.
+    Anchor:
+      type: object
+      description: |
+        A multi-layer annotation anchor (ADR-0009). `region` is always present;
+        `textQuote` and `textPosition` are added when the surface has a text layer.
+      required:
+        - region
+      properties:
+        region:
+          $ref: '#/components/schemas/RegionAnchor'
+        textQuote:
+          $ref: '#/components/schemas/TextQuoteAnchor'
+        textPosition:
+          $ref: '#/components/schemas/TextPositionAnchor'
+    AnnotationStatus:
+      type: string
+      description: The owner-decided lifecycle of an annotation (ADR-0011).
+      enum:
+        - OPEN
+        - ACCEPTED
+        - REJECTED
+    PlacementStatus:
+      type: string
+      description: |
+        Where an annotation sits on a specific version (ADR-0009): PLACED when a
+        human drew it or re-anchoring resolved it uniquely; MOVED when re-anchored
+        with a change to review; ORPHANED when no confident match exists; PENDING
+        while the async re-anchoring job runs; FAILED on an internal error.
+      enum:
+        - PENDING
+        - PLACED
+        - MOVED
+        - ORPHANED
+        - FAILED
+    AnnotationCreateRequest:
+      type: object
+      description: Create an annotation anchored to a region of a version.
+      required:
+        - versionNumber
+        - anchor
+      properties:
+        versionNumber:
+          type: integer
+          minimum: 1
+          description: The 1-based version the annotation is drawn on.
+        anchor:
+          $ref: '#/components/schemas/Anchor'
+        comment:
+          type: string
+          minLength: 1
+          maxLength: 20000
+          description: An optional first comment seeding the discussion thread.
+    AnnotationView:
+      type: object
+      description: |
+        An annotation with, when a version was requested, its placement on that
+        version and the size of its comment thread.
+      required:
+        - id
+        - documentId
+        - authorId
+        - status
+        - commentCount
+        - createdAt
+        - updatedAt
+      properties:
+        id:
+          type: string
+          format: uuid
+        documentId:
+          type: string
+          format: uuid
+        authorId:
+          type: string
+          format: uuid
+        status:
+          $ref: '#/components/schemas/AnnotationStatus'
+        anchor:
+          $ref: '#/components/schemas/Anchor'
+        placementStatus:
+          $ref: '#/components/schemas/PlacementStatus'
+        commentCount:
+          type: integer
+          description: Number of comments in the thread.
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+    AnnotationListResponse:
+      type: object
+      required:
+        - annotations
+      properties:
+        annotations:
+          type: array
+          items:
+            $ref: '#/components/schemas/AnnotationView'
+    AnnotationDecision:
+      type: string
+      description: An owner/author decision on an annotation (ADR-0011).
+      enum:
+        - ACCEPTED
+        - REJECTED
+    AnnotationDecisionRequest:
+      type: object
+      required:
+        - decision
+      properties:
+        decision:
+          $ref: '#/components/schemas/AnnotationDecision'
+    CommentCreateRequest:
+      type: object
+      required:
+        - body
+      properties:
+        body:
+          type: string
+          minLength: 1
+          maxLength: 20000
+    CommentView:
+      type: object
+      required:
+        - id
+        - annotationId
+        - authorId
+        - body
+        - createdAt
+      properties:
+        id:
+          type: string
+          format: uuid
+        annotationId:
+          type: string
+          format: uuid
+        authorId:
+          type: string
+          format: uuid
+        body:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+    CommentListResponse:
+      type: object
+      required:
+        - comments
+      properties:
+        comments:
+          type: array
+          items:
+            $ref: '#/components/schemas/CommentView'
