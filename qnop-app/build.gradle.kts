@@ -96,5 +96,9 @@ dependencies {
     testImplementation(libs.spring.boot.testcontainers)
     testImplementation(libs.testcontainers.postgresql)
     testImplementation(libs.testcontainers.junit.jupiter)
+    // Object-storage integration tests run against a real MinIO (issue #243) and use the
+    // StorageProvider SPI types directly (qnop-core hides qnop-spi behind `implementation`).
+    testImplementation(libs.testcontainers.minio)
+    testImplementation(project(":qnop-spi"))
     testRuntimeOnly(libs.junit.platform.launcher)
 }
