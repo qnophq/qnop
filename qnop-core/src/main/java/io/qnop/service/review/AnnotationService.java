@@ -116,7 +116,9 @@ public class AnnotationService {
             .orElseThrow(
                 () -> DocumentValidationException.notFound("no such version: " + versionNumber));
 
-    Annotation annotation = annotations.save(new Annotation(documentId, author));
+    // saveAndFlush so the @CreationTimestamp / @UpdateTimestamp are populated on the returned
+    // entity (they are only set when the INSERT is flushed) before the view is built.
+    Annotation annotation = annotations.saveAndFlush(new Annotation(documentId, author));
     AnnotationPlacement placement =
         new AnnotationPlacement(annotation.getId(), version.getId(), anchorJson);
     placement.markPlaced(anchorJson);
