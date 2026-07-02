@@ -22,27 +22,59 @@ package io.qnop.web;
 
 import io.qnop.api.v1.model.ErrorResponse;
 import io.qnop.service.document.DocumentValidationException;
+import io.qnop.service.review.AnnotationDecisionForbiddenException;
+import io.qnop.service.review.AnnotationNotFoundException;
+import io.qnop.service.review.DocumentNotFoundException;
+import io.qnop.service.review.NotDocumentOwnerException;
+import io.qnop.service.review.WorkflowTransitionException;
 import java.time.OffsetDateTime;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 
 /**
- * Maps {@link DocumentValidationException} onto the uniform {@code ErrorResponse} envelope (issue
- * #245/#45). A controller advice — rather than per-controller handlers — because the document
- * pipeline spans three controllers (metadata/rendered, multipart upload, binary download) that all
- * raise the same exception.
+ * Maps the review-domain exceptions onto the uniform {@code ErrorResponse} envelope (issues
+ * #245/#246/#247, #45). A controller advice — rather than per-controller handlers — because the
+ * document/review pipeline spans several controllers (metadata/rendered, upload, download,
+ * workflow, annotations) that raise the same exceptions.
  */
 @RestControllerAdvice
 public class DocumentExceptionHandler {
 
   @ExceptionHandler(DocumentValidationException.class)
   public ResponseEntity<ErrorResponse> onDocumentError(DocumentValidationException ex) {
-    return ResponseEntity.status(ex.getStatus())
-        .body(
-            new ErrorResponse()
-                .code(ex.getCode())
-                .message(ex.getMessage())
-                .timestamp(OffsetDateTime.now()));
+    return error(ex.getStatus(), ex.getCode(), ex.getMessage());
+  }
+
+  @ExceptionHandler(DocumentNotFoundException.class)
+  public ResponseEntity<ErrorResponse> onDocumentNotFound(DocumentNotFoundException ex) {
+    return error(HttpStatus.NOT_FOUND.value(), "DOCUMENT_NOT_FOUND", ex.getMessage());
+  }
+
+  @ExceptionHandler(AnnotationNotFoundException.class)
+  public ResponseEntity<ErrorResponse> onAnnotationNotFound(AnnotationNotFoundException ex) {
+    return error(HttpStatus.NOT_FOUND.value(), "ANNOTATION_NOT_FOUND", ex.getMessage());
+  }
+
+  @ExceptionHandler(NotDocumentOwnerException.class)
+  public ResponseEntity<ErrorResponse> onNotOwner(NotDocumentOwnerException ex) {
+    return error(HttpStatus.FORBIDDEN.value(), "NOT_DOCUMENT_OWNER", ex.getMessage());
+  }
+
+  @ExceptionHandler(AnnotationDecisionForbiddenException.class)
+  public ResponseEntity<ErrorResponse> onDecisionForbidden(
+      AnnotationDecisionForbiddenException ex) {
+    return error(HttpStatus.FORBIDDEN.value(), "ANNOTATION_DECISION_FORBIDDEN", ex.getMessage());
+  }
+
+  @ExceptionHandler(WorkflowTransitionException.class)
+  public ResponseEntity<ErrorResponse> onTransitionRefused(WorkflowTransitionException ex) {
+    return error(HttpStatus.CONFLICT.value(), ex.getCode(), ex.getMessage());
+  }
+
+  private static ResponseEntity<ErrorResponse> error(int status, String code, String message) {
+    return ResponseEntity.status(status)
+        .body(new ErrorResponse().code(code).message(message).timestamp(OffsetDateTime.now()));
   }
 }

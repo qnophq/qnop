@@ -18,19 +18,15 @@
  *
  * SPDX-License-Identifier: AGPL-3.0-only
  */
-package io.qnop.repository;
+package io.qnop.service.review;
 
-import io.qnop.entity.Comment;
-import java.util.List;
-import java.util.UUID;
-import org.springframework.data.jpa.repository.JpaRepository;
+/**
+ * The acting user may not decide this annotation (issue #247, ADR-0011): accept/reject is limited
+ * to the document owner or the annotation's author. Mapped to HTTP 403.
+ */
+public class AnnotationDecisionForbiddenException extends RuntimeException {
 
-/** Data access for annotation comment threads (issue #244, ADR-0011). */
-public interface CommentRepository extends JpaRepository<Comment, UUID> {
-
-  /** The discussion thread of an annotation, oldest message first. */
-  List<Comment> findByAnnotationIdOrderByCreatedAtAsc(UUID annotationId);
-
-  /** The size of an annotation's thread (issue #247). */
-  long countByAnnotationId(UUID annotationId);
+  public AnnotationDecisionForbiddenException() {
+    super("Only the document owner or the annotation's author may decide this annotation");
+  }
 }

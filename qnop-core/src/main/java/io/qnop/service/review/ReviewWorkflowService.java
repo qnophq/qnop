@@ -102,10 +102,10 @@ public class ReviewWorkflowService {
   }
 
   /**
-   * Applies the owner's decision on an annotation — the {@code OPEN → ACCEPTED | REJECTED}
-   * sub-machine (ADR-0011). Accepting while the document is {@code IN_REVIEW} drives the workflow
-   * to {@code CHANGES_REQUESTED} through the same choke-point (with its own audit event). The REST
-   * surface for this lands with the annotations API (#247); the domain rule lives here.
+   * Applies a decision on an annotation — the {@code OPEN → ACCEPTED | REJECTED} sub-machine
+   * (ADR-0011), permitted for the document owner or the annotation's author (issue #247). Accepting
+   * while the document is {@code IN_REVIEW} drives the workflow to {@code CHANGES_REQUESTED}
+   * through the same choke-point (with its own audit event).
    */
   @Transactional
   public Annotation decideAnnotation(UUID annotationId, AnnotationStatus decision, UUID actorId) {
@@ -117,7 +117,9 @@ public class ReviewWorkflowService {
             .findById(annotationId)
             .orElseThrow(() -> new AnnotationNotFoundException(annotationId));
     Document document = load(annotation.getDocumentId());
-    requireOwner(document, actorId);
+    if (!document.getOwnerId().equals(actorId) && !annotation.getAuthorId().equals(actorId)) {
+      throw new AnnotationDecisionForbiddenException();
+    }
     if (!ReviewWorkflowMachine.canDecide(annotation.getStatus())) {
       throw new WorkflowTransitionException(
           WorkflowTransitionException.ANNOTATION_ALREADY_DECIDED,

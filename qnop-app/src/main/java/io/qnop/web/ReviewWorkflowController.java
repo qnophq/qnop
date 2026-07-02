@@ -21,27 +21,19 @@
 package io.qnop.web;
 
 import io.qnop.api.v1.endpoint.ReviewWorkflowApi;
-import io.qnop.api.v1.model.ErrorResponse;
 import io.qnop.api.v1.model.WorkflowStatus;
 import io.qnop.api.v1.model.WorkflowTransitionRequest;
 import io.qnop.entity.WorkflowState;
-import io.qnop.service.review.DocumentNotFoundException;
-import io.qnop.service.review.NotDocumentOwnerException;
 import io.qnop.service.review.ReviewWorkflowService;
-import io.qnop.service.review.WorkflowTransitionException;
-import java.time.OffsetDateTime;
-import java.time.ZoneOffset;
 import java.util.UUID;
-import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestController;
 
 /**
  * Workflow transition endpoints (issue #246, ADR-0011): reading a document's workflow status and
  * requesting a transition through the state-machine choke-point. State changes are owner-only; the
  * service enforces that and the domain guards — this controller only maps to the published
- * contract.
+ * contract. Domain exceptions are mapped globally by {@link DocumentExceptionHandler}.
  */
 @RestController
 public class ReviewWorkflowController implements ReviewWorkflowApi {
@@ -69,30 +61,5 @@ public class ReviewWorkflowController implements ReviewWorkflowApi {
     return new WorkflowStatus()
         .state(status.state())
         .allowedTransitions(status.allowedTransitions().stream().map(WorkflowState::name).toList());
-  }
-
-  @ExceptionHandler(DocumentNotFoundException.class)
-  ResponseEntity<ErrorResponse> documentNotFound(DocumentNotFoundException ex) {
-    return error(HttpStatus.NOT_FOUND, "DOCUMENT_NOT_FOUND", ex.getMessage());
-  }
-
-  @ExceptionHandler(NotDocumentOwnerException.class)
-  ResponseEntity<ErrorResponse> notOwner(NotDocumentOwnerException ex) {
-    return error(HttpStatus.FORBIDDEN, "NOT_DOCUMENT_OWNER", ex.getMessage());
-  }
-
-  @ExceptionHandler(WorkflowTransitionException.class)
-  ResponseEntity<ErrorResponse> transitionRefused(WorkflowTransitionException ex) {
-    return error(HttpStatus.CONFLICT, ex.getCode(), ex.getMessage());
-  }
-
-  private static ResponseEntity<ErrorResponse> error(
-      HttpStatus status, String code, String message) {
-    return ResponseEntity.status(status)
-        .body(
-            new ErrorResponse()
-                .code(code)
-                .message(message)
-                .timestamp(OffsetDateTime.now(ZoneOffset.UTC)));
   }
 }
