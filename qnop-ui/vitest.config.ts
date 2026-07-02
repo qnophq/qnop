@@ -40,6 +40,10 @@ export default defineConfig({
         'src/components/auth/RoleRoute.tsx',
         'src/components/auth/AuthHydrationBoundary.tsx',
         'src/components/shell/navConfig.tsx',
+        // The viewer's pure anchor-building logic (#250); the presentational
+        // viewer/panel components are covered by component tests, and the
+        // pdf.js wiring (usePdfDocument, SurfacePage canvas) by E2E later.
+        'src/components/reviews/viewer/anchoring.ts',
         'src/theme/**/*.ts',
       ],
       thresholds: {

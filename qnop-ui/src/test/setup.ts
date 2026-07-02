@@ -49,3 +49,19 @@ if (!window.ResizeObserver) {
     disconnect() {}
   };
 }
+
+// jsdom does not implement IntersectionObserver; the document viewer uses it
+// to render pages lazily. The stub never fires, so canvases stay blank in tests.
+if (!window.IntersectionObserver) {
+  window.IntersectionObserver = class {
+    root = null;
+    rootMargin = '';
+    thresholds = [];
+    observe() {}
+    unobserve() {}
+    disconnect() {}
+    takeRecords() {
+      return [];
+    }
+  } as unknown as typeof IntersectionObserver;
+}

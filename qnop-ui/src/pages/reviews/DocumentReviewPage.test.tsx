@@ -1,0 +1,198 @@
+/*
+ * Copyright (c) 2026-present devtank42 GmbH
+ *
+ * This file is part of qnop (Qualified Notes on Papers).
+ *
+ * qnop is free software: you can redistribute it and/or modify it under the
+ * terms of the GNU Affero General Public License as published by the Free
+ * Software Foundation, either version 3 of the License, or (at your option)
+ * any later version.
+ *
+ * qnop is distributed in the hope that it will be useful, but WITHOUT ANY
+ * WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS
+ * FOR A PARTICULAR PURPOSE. See the GNU Affero General Public License for more
+ * details.
+ *
+ * You should have received a copy of the GNU Affero General Public License
+ * along with qnop. If not, see <https://www.gnu.org/licenses/>.
+ *
+ * SPDX-License-Identifier: AGPL-3.0-only
+ */
+
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { render, screen } from '@testing-library/react';
+import { MemoryRouter, Route, Routes } from 'react-router-dom';
+import { ThemeProvider } from '@mui/material/styles';
+import type { AnnotationView, RenderedSurface } from '../../api/generated';
+import { AnnotationStatus, ExtractionStatus, PlacementStatus } from '../../api/generated';
+import { buildTheme } from '../../theme/theme';
+import { DocumentReviewPage } from './DocumentReviewPage';
+import {
+  useDocument,
+  useDocumentVersions,
+  useOriginalPdf,
+  useRenderedDocument,
+} from '../../api/hooks/useDocuments';
+import { useAnnotations, useCreateAnnotation } from '../../api/hooks/useAnnotations';
+import { usePdfDocument } from '../../components/reviews/viewer/usePdfDocument';
+
+vi.mock('../../api/hooks/useDocuments', () => ({
+  useDocument: vi.fn(),
+  useDocumentVersions: vi.fn(),
+  useRenderedDocument: vi.fn(),
+  useOriginalPdf: vi.fn(),
+}));
+vi.mock('../../api/hooks/useAnnotations', () => ({
+  useAnnotations: vi.fn(),
+  useCreateAnnotation: vi.fn(),
+}));
+vi.mock('../../api/hooks/useComments', () => ({
+  useComments: vi.fn().mockReturnValue({ isPending: true, isError: false, data: undefined }),
+  useAddComment: vi.fn().mockReturnValue({ mutate: vi.fn(), isPending: false }),
+}));
+vi.mock('../../components/reviews/viewer/usePdfDocument', () => ({
+  usePdfDocument: vi.fn(),
+}));
+// The viewer needs a real pdf.js document and layout; the page test only
+// verifies the orchestration around it.
+vi.mock('../../components/reviews/viewer/DocumentViewer', () => ({
+  DocumentViewer: ({ annotations }: { annotations: AnnotationView[] }) => (
+    <div data-testid="document-viewer" data-annotation-count={annotations.length} />
+  ),
+}));
+
+const SURFACES: RenderedSurface[] = [
+  {
+    index: 0,
+    width: 612,
+    height: 792,
+    textSpans: [
+      {
+        text: 'Hello',
+        startOffset: 0,
+        endOffset: 5,
+        box: { x: 0.1, y: 0.1, width: 0.3, height: 0.02 },
+      },
+    ],
+  },
+];
+
+const ANNOTATIONS: AnnotationView[] = [
+  {
+    id: 'a1',
+    documentId: 'doc-1',
+    authorId: 'u1',
+    status: AnnotationStatus.Open,
+    placementStatus: PlacementStatus.Moved,
+    anchor: {
+      region: { surfaceIndex: 0, box: { x: 0.1, y: 0.1, width: 0.2, height: 0.05 } },
+      textQuote: { quote: 'Hello' },
+    },
+    commentCount: 0,
+    createdAt: '2026-07-01T10:00:00Z',
+    updatedAt: '2026-07-01T10:00:00Z',
+  },
+];
+
+type Queryish = { data?: unknown; isPending?: boolean; isError?: boolean };
+const asQuery = <T,>(value: Queryish) =>
+  ({ isPending: false, isError: false, ...value }) as unknown as T;
+
+function seedHappyPath(extractionStatus: ExtractionStatus = ExtractionStatus.Ready) {
+  vi.mocked(useDocument).mockReturnValue(
+    asQuery({
+      data: {
+        id: 'doc-1',
+        title: 'Supply Contract',
+        ownerId: 'u1',
+        workflowState: 'IN_REVIEW',
+        latestVersionNumber: 2,
+        createdAt: '2026-07-01T10:00:00Z',
+        updatedAt: '2026-07-01T10:00:00Z',
+      },
+    }),
+  );
+  vi.mocked(useDocumentVersions).mockReturnValue(
+    asQuery({
+      data: {
+        versions: [
+          { versionNumber: 1, extractionStatus: ExtractionStatus.Ready },
+          { versionNumber: 2, extractionStatus },
+        ],
+      },
+    }),
+  );
+  vi.mocked(useRenderedDocument).mockReturnValue(
+    asQuery({
+      data: extractionStatus === ExtractionStatus.Ready ? { surfaces: SURFACES } : undefined,
+    }),
+  );
+  vi.mocked(useOriginalPdf).mockReturnValue(asQuery({ data: new ArrayBuffer(4) }));
+  vi.mocked(usePdfDocument).mockReturnValue({
+    pdf: { numPages: 1 } as unknown as NonNullable<ReturnType<typeof usePdfDocument>['pdf']>,
+    error: null,
+  });
+  vi.mocked(useAnnotations).mockReturnValue(asQuery({ data: { annotations: ANNOTATIONS } }));
+  vi.mocked(useCreateAnnotation).mockReturnValue({
+    mutate: vi.fn(),
+    isPending: false,
+  } as unknown as ReturnType<typeof useCreateAnnotation>);
+}
+
+function renderPage() {
+  render(
+    <ThemeProvider theme={buildTheme('light')}>
+      <MemoryRouter initialEntries={['/reviews/doc-1']}>
+        <Routes>
+          <Route path="/reviews/:documentId" element={<DocumentReviewPage />} />
+        </Routes>
+      </MemoryRouter>
+    </ThemeProvider>,
+  );
+}
+
+beforeEach(() => {
+  vi.clearAllMocks();
+});
+
+describe('DocumentReviewPage', () => {
+  it('renders title, workflow badge, version info, viewer and annotations', () => {
+    seedHappyPath();
+    renderPage();
+
+    expect(screen.getByRole('heading', { level: 1, name: 'Supply Contract' })).toBeInTheDocument();
+    expect(screen.getByText('In review')).toBeInTheDocument();
+    expect(screen.getByText('Version 2 of 2')).toBeInTheDocument();
+    expect(screen.getByTestId('document-viewer')).toHaveAttribute('data-annotation-count', '1');
+    expect(screen.getByText('Annotations (1)')).toBeInTheDocument();
+    expect(screen.getByText('“Hello”')).toBeInTheDocument();
+    expect(screen.getByText('Moved')).toBeInTheDocument();
+  });
+
+  it('announces a still-processing version and keeps annotating disabled', () => {
+    seedHappyPath(ExtractionStatus.Pending);
+    renderPage();
+
+    expect(screen.getByText(/The document is being processed/)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Draw region' })).toBeDisabled();
+  });
+
+  it('shows the anti-enumeration error state', () => {
+    vi.mocked(useDocument).mockReturnValue(asQuery({ isError: true }));
+    vi.mocked(useDocumentVersions).mockReturnValue(asQuery({}));
+    vi.mocked(useRenderedDocument).mockReturnValue(asQuery({}));
+    vi.mocked(useOriginalPdf).mockReturnValue(asQuery({}));
+    vi.mocked(usePdfDocument).mockReturnValue({ pdf: null, error: null });
+    vi.mocked(useAnnotations).mockReturnValue(asQuery({}));
+    vi.mocked(useCreateAnnotation).mockReturnValue({
+      mutate: vi.fn(),
+      isPending: false,
+    } as unknown as ReturnType<typeof useCreateAnnotation>);
+
+    renderPage();
+
+    expect(
+      screen.getByText('This document does not exist, or you are not a participant of its review.'),
+    ).toBeInTheDocument();
+  });
+});
