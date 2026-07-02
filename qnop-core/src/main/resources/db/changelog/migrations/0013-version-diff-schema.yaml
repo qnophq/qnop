@@ -1,0 +1,66 @@
+# SPDX-License-Identifier: AGPL-3.0-only
+#
+# Permanent inter-version diff cache (issue #249, ADR-0034). Document versions
+# are immutable, so a computed diff between any two versions is stable forever:
+# computed lazily on first request, cached here indefinitely, never invalidated.
+# The payload is the serialized list of located changes (jsonb). Rows die with
+# their versions (FK CASCADE). JPA runs ddl-auto=none, so the entity mapping
+# (io.qnop.entity.VersionDiff) must match these definitions exactly.
+databaseChangeLog:
+  - changeSet:
+      id: 0013-version-diff
+      author: qnop
+      comment: Permanent inter-version diff cache (ADR-0034) — keyed by the version pair.
+      changes:
+        - createTable:
+            tableName: version_diff
+            columns:
+              - column:
+                  name: id
+                  type: UUID
+                  constraints: { primaryKey: true, nullable: false }
+              - column:
+                  name: document_id
+                  type: UUID
+                  constraints: { nullable: false }
+              - column:
+                  name: from_version_id
+                  type: UUID
+                  constraints: { nullable: false }
+              - column:
+                  name: to_version_id
+                  type: UUID
+                  constraints: { nullable: false }
+              - column:
+                  name: payload
+                  type: JSONB
+                  constraints: { nullable: false }
+              - column:
+                  name: created_at
+                  type: TIMESTAMP WITH TIME ZONE
+                  constraints: { nullable: false }
+        - addForeignKeyConstraint:
+            baseTableName: version_diff
+            baseColumnNames: document_id
+            referencedTableName: document
+            referencedColumnNames: id
+            constraintName: fk_version_diff_document
+            onDelete: CASCADE
+        - addForeignKeyConstraint:
+            baseTableName: version_diff
+            baseColumnNames: from_version_id
+            referencedTableName: document_version
+            referencedColumnNames: id
+            constraintName: fk_version_diff_from_version
+            onDelete: CASCADE
+        - addForeignKeyConstraint:
+            baseTableName: version_diff
+            baseColumnNames: to_version_id
+            referencedTableName: document_version
+            referencedColumnNames: id
+            constraintName: fk_version_diff_to_version
+            onDelete: CASCADE
+        - addUniqueConstraint:
+            tableName: version_diff
+            columnNames: from_version_id, to_version_id
+            constraintName: ux_version_diff_pair

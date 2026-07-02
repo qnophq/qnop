@@ -21,11 +21,17 @@
 package io.qnop.web;
 
 import io.qnop.api.v1.endpoint.DocumentsApi;
+import io.qnop.api.v1.model.DiffChange;
+import io.qnop.api.v1.model.DiffChangeType;
+import io.qnop.api.v1.model.DiffLocation;
 import io.qnop.api.v1.model.DocumentResponse;
 import io.qnop.api.v1.model.DocumentVersionListResponse;
 import io.qnop.api.v1.model.DocumentVersionSummary;
 import io.qnop.api.v1.model.ExtractionStatus;
+import io.qnop.api.v1.model.NormalizedBox;
 import io.qnop.api.v1.model.RenderedDocumentResponse;
+import io.qnop.api.v1.model.VersionDiffResponse;
+import io.qnop.service.diff.VersionDiffService;
 import io.qnop.service.document.DocumentAccessService;
 import io.qnop.service.document.DocumentAccessService.DocumentVersionView;
 import io.qnop.service.document.DocumentAccessService.DocumentView;
@@ -35,19 +41,54 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.RestController;
 
 /**
- * Document metadata, versions, and the canonical rendered representation (issue #245, ADR-0032),
- * implementing the generated {@link DocumentsApi} contract. Authorization (owner / participant /
- * admin, otherwise 404) lives in {@link DocumentAccessService}; this layer only maps views to the
- * published models. The multipart upload and the original-binary download are plain controllers
- * (ADR-0028): {@code DocumentUploadController} / {@code DocumentContentController}.
+ * Document metadata, versions, the canonical rendered representation (issue #245, ADR-0032), and
+ * the inter-version diff (issue #249, ADR-0034), implementing the generated {@link DocumentsApi}
+ * contract. Authorization (owner / participant / admin, otherwise 404) lives in the services; this
+ * layer only maps views to the published models. The multipart upload and the original-binary
+ * download are plain controllers (ADR-0028): {@code DocumentUploadController} / {@code
+ * DocumentContentController}.
  */
 @RestController
 public class DocumentsController implements DocumentsApi {
 
   private final DocumentAccessService documents;
+  private final VersionDiffService diffs;
 
-  public DocumentsController(DocumentAccessService documents) {
+  public DocumentsController(DocumentAccessService documents, VersionDiffService diffs) {
     this.documents = documents;
+    this.diffs = diffs;
+  }
+
+  @Override
+  public ResponseEntity<VersionDiffResponse> getVersionDiff(
+      UUID documentId, Integer from, Integer to) {
+    VersionDiffService.DiffView view =
+        diffs.diff(documentId, from, to, CurrentUser.requireUserId(), CurrentUser.isAdmin());
+    return ResponseEntity.ok(
+        new VersionDiffResponse()
+            .fromVersion(view.fromVersion())
+            .toVersion(view.toVersion())
+            .changes(view.changes().stream().map(DocumentsController::toDto).toList()));
+  }
+
+  private static DiffChange toDto(VersionDiffService.ChangeView change) {
+    return new DiffChange()
+        .type(DiffChangeType.fromValue(change.type()))
+        .fromText(change.fromText())
+        .fromLocations(change.fromLocations().stream().map(DocumentsController::toDto).toList())
+        .toText(change.toText())
+        .toLocations(change.toLocations().stream().map(DocumentsController::toDto).toList());
+  }
+
+  private static DiffLocation toDto(VersionDiffService.LocationView location) {
+    return new DiffLocation()
+        .surfaceIndex(location.surfaceIndex())
+        .box(
+            new NormalizedBox()
+                .x(location.x())
+                .y(location.y())
+                .width(location.width())
+                .height(location.height()));
   }
 
   @Override

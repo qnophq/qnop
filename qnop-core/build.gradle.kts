@@ -64,6 +64,10 @@ dependencies {
     implementation(libs.pdfbox)
     implementation(libs.jackson3.databind)
 
+    // Inter-version diff (issue #249, ADR-0034): Myers diff at word granularity
+    // over the two versions' extracted text layers.
+    implementation(libs.java.diff.utils)
+
     testImplementation(platform(libs.junit.bom))
     testImplementation(libs.junit.jupiter)
     testRuntimeOnly(libs.junit.platform.launcher)

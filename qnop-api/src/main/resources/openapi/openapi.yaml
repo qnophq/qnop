@@ -1949,6 +1949,65 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
+  /documents/{documentId}/diff:
+    get:
+      tags:
+        - Documents
+      summary: What changed between two versions
+      description: |
+        A word-granularity text diff over the two versions' extracted text layers
+        (ADR-0034), with every change mapped back to the normalized boxes of the
+        text runs it covers — so the change can be highlighted on the rendered
+        original. Any pair is diffable (not only adjacent versions). Versions are
+        immutable, so the result is computed on first request and served from a
+        permanent cache afterwards. A version without a text layer (an image)
+        contributes no changes; the client falls back to side-by-side.
+      operationId: getVersionDiff
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/DocumentIdParam'
+        - name: from
+          in: query
+          required: true
+          description: The 1-based number of the older (baseline) version.
+          schema:
+            type: integer
+            minimum: 1
+        - name: to
+          in: query
+          required: true
+          description: The 1-based number of the newer version to compare against.
+          schema:
+            type: integer
+            minimum: 1
+      responses:
+        '200':
+          description: The located changes from `from` to `to`.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/VersionDiffResponse'
+        '400':
+          description: Invalid version pair (e.g. `from` equals `to`)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Unknown document/version, or the caller is not a participant
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '409':
+          description: >-
+            Extraction has not completed for one of the versions
+            (`EXTRACTION_PENDING`) or failed permanently (`EXTRACTION_FAILED`).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
 components:
   securitySchemes:
     bearerAuth:
@@ -3620,3 +3679,73 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/CommentView'
+    DiffChangeType:
+      type: string
+      description: The kind of a change, in the `from → to` direction (ADR-0034).
+      enum:
+        - INSERTED
+        - DELETED
+        - CHANGED
+    DiffLocation:
+      type: object
+      description: One highlighted rectangle of a change — a text run's box on a surface.
+      required:
+        - surfaceIndex
+        - box
+      properties:
+        surfaceIndex:
+          type: integer
+          minimum: 0
+          description: Zero-based surface (page) index.
+        box:
+          $ref: '#/components/schemas/NormalizedBox'
+    DiffChange:
+      type: object
+      description: |
+        One contiguous change. `fromText`/`fromLocations` describe the affected
+        content of the baseline version (empty for INSERTED); `toText`/
+        `toLocations` the newer version's (empty for DELETED).
+      required:
+        - type
+        - fromText
+        - fromLocations
+        - toText
+        - toLocations
+      properties:
+        type:
+          $ref: '#/components/schemas/DiffChangeType'
+        fromText:
+          type: string
+          description: The affected text in the baseline version ('' for INSERTED).
+        fromLocations:
+          type: array
+          description: Boxes of the affected text runs in the baseline version.
+          items:
+            $ref: '#/components/schemas/DiffLocation'
+        toText:
+          type: string
+          description: The affected text in the newer version ('' for DELETED).
+        toLocations:
+          type: array
+          description: Boxes of the affected text runs in the newer version.
+          items:
+            $ref: '#/components/schemas/DiffLocation'
+    VersionDiffResponse:
+      type: object
+      description: The located changes between two immutable versions (ADR-0034).
+      required:
+        - fromVersion
+        - toVersion
+        - changes
+      properties:
+        fromVersion:
+          type: integer
+          description: The 1-based baseline version number.
+        toVersion:
+          type: integer
+          description: The 1-based newer version number.
+        changes:
+          type: array
+          description: All changes in document order; empty when the texts are identical.
+          items:
+            $ref: '#/components/schemas/DiffChange'
