@@ -30,8 +30,10 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import com.jayway.jsonpath.JsonPath;
 import io.qnop.bootstrap.AbstractIntegrationTest;
+import io.qnop.entity.ReviewParticipant;
 import io.qnop.entity.User;
 import io.qnop.repository.DocumentRepository;
+import io.qnop.repository.ReviewParticipantRepository;
 import io.qnop.repository.UserRepository;
 import io.qnop.service.job.JobQueuePoller;
 import java.io.ByteArrayOutputStream;
@@ -68,6 +70,7 @@ class DocumentIngestIT extends AbstractIntegrationTest {
   @Autowired MockMvc mockMvc;
   @Autowired UserRepository users;
   @Autowired DocumentRepository documents;
+  @Autowired ReviewParticipantRepository participants;
   @Autowired PasswordEncoder passwordEncoder;
   @Autowired JobQueuePoller poller;
 
@@ -140,11 +143,13 @@ class DocumentIngestIT extends AbstractIntegrationTest {
   }
 
   @Test
-  @DisplayName("re-upload by the owner appends version 2; non-owners get 403")
+  @DisplayName("re-upload is owner-only: owner appends v2, stranger gets 404, participant 403")
   void addVersionIsOwnerOnly() throws Exception {
     UUID owner = createUser();
-    UUID other = createUser();
+    UUID participant = createUser();
+    UUID stranger = createUser();
     UUID documentId = uploadDocument(owner, pdf("v1"));
+    participants.save(ReviewParticipant.forUser(documentId, participant));
 
     mockMvc
         .perform(
@@ -154,12 +159,22 @@ class DocumentIngestIT extends AbstractIntegrationTest {
         .andExpect(status().isCreated())
         .andExpect(jsonPath("$.versionNumber").value(2));
 
+    // Anti-enumeration: a stranger cannot learn the document exists.
     mockMvc
         .perform(
             multipart("/api/v1/documents/{id}/versions", documentId)
                 .file(pdfFile(pdf("v3")))
-                .with(asUser(other)))
-        .andExpect(status().isNotFound()); // invisible to a non-participant: 404, not 403
+                .with(asUser(stranger)))
+        .andExpect(status().isNotFound());
+
+    // A participant sees the document but re-upload stays owner-only.
+    mockMvc
+        .perform(
+            multipart("/api/v1/documents/{id}/versions", documentId)
+                .file(pdfFile(pdf("v3")))
+                .with(asUser(participant)))
+        .andExpect(status().isForbidden())
+        .andExpect(jsonPath("$.code").value("NOT_OWNER"));
   }
 
   @Test

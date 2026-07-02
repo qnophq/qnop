@@ -177,6 +177,16 @@ public class DocumentAccessService {
     return document;
   }
 
+  /**
+   * Whether {@code actor} may see {@code documentId} at all (owner, participant — direct or via
+   * team — or admin). Used by the ingest path to distinguish an invisible document (404) from a
+   * visible one where the action is owner-only (403).
+   */
+  @Transactional(readOnly = true)
+  public boolean isVisible(UUID documentId, UUID actor, boolean admin) {
+    return documents.findById(documentId).map(d -> canAccess(d, actor, admin)).orElse(false);
+  }
+
   private boolean canAccess(Document document, UUID actor, boolean admin) {
     if (admin || document.getOwnerId().equals(actor)) {
       return true;

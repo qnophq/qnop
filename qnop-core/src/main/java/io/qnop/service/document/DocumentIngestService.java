@@ -64,6 +64,7 @@ public class DocumentIngestService {
   private final StorageService storage;
   private final JobService jobs;
   private final ApplicationSettingsService settings;
+  private final DocumentAccessService access;
   private final TransactionTemplate transactionTemplate;
 
   public DocumentIngestService(
@@ -72,12 +73,14 @@ public class DocumentIngestService {
       StorageService storage,
       JobService jobs,
       ApplicationSettingsService settings,
+      DocumentAccessService access,
       PlatformTransactionManager transactionManager) {
     this.documents = documents;
     this.versions = versions;
     this.storage = storage;
     this.jobs = jobs;
     this.settings = settings;
+    this.access = access;
     this.transactionTemplate = new TransactionTemplate(transactionManager);
   }
 
@@ -109,6 +112,11 @@ public class DocumentIngestService {
             .orElseThrow(
                 () -> DocumentValidationException.notFound("no such document: " + documentId));
     if (!document.getOwnerId().equals(actor)) {
+      // Anti-enumeration: a caller who cannot even see the document gets the same 404 as for an
+      // unknown id; only a visible non-owner (participant/admin) learns the action is owner-only.
+      if (!access.isVisible(documentId, actor, false)) {
+        throw DocumentValidationException.notFound("no such document: " + documentId);
+      }
       throw DocumentValidationException.notOwner("only the owner may upload a new version");
     }
     validatePdf(content);
