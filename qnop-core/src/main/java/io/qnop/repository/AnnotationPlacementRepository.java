@@ -26,9 +26,23 @@ import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 
 /** Data access for per-version annotation placements (issue #244, ADR-0009). */
 public interface AnnotationPlacementRepository extends JpaRepository<AnnotationPlacement, UUID> {
+
+  /**
+   * Placements in a given status across <em>all</em> versions of a document — the document-wide
+   * FINALIZED gate (issue #246, ADR-0011): finalization requires zero {@code PENDING} placements
+   * anywhere, i.e. re-anchoring has completed for every version.
+   */
+  @Query(
+      "SELECT count(p) FROM AnnotationPlacement p, DocumentVersion v"
+          + " WHERE p.documentVersionId = v.id AND v.documentId = :documentId"
+          + " AND p.status = :status")
+  long countByDocumentIdAndStatus(
+      @Param("documentId") UUID documentId, @Param("status") PlacementStatus status);
 
   /** Every version placement of one annotation. */
   List<AnnotationPlacement> findByAnnotationId(UUID annotationId);
