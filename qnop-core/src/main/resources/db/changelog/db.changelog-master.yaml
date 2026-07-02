@@ -47,3 +47,6 @@ databaseChangeLog:
   - include:
       file: migrations/0012-storage-object-schema.yaml
       relativeToChangelogFile: true
+  - include:
+      file: migrations/0013-version-diff-schema.yaml
+      relativeToChangelogFile: true

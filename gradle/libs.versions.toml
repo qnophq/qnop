@@ -40,6 +40,10 @@ jmustache = "1.16"
 # endpointOverride + path-style so MinIO (On-Prem) and S3/GCS (SaaS) are a
 # deploy-time config switch. Not in the Spring Boot BOM → explicit version.
 awsSdk = "2.31.6"
+# Inter-version diff (issue #249, ADR-0034): actively-maintained Myers diff over
+# token lists (word granularity), Apache-2.0. Chosen over the unmaintained
+# java port of diff-match-patch. Not in the Spring Boot BOM → explicit version.
+javaDiffUtils = "4.15"
 
 # --- Pinned for later phases (NOT yet applied) -------------------------
 pdfbox = "3.0.5"            # PDF text extraction with glyph positions
@@ -111,6 +115,10 @@ jmustache = { module = "com.samskivert:jmustache", version.ref = "jmustache" }
 # Object storage (issue #243, ADR-0005): AWS SDK v2 S3 client — the vendor-neutral
 # StorageProvider default (io.qnop.service.storage). Not BOM-managed → explicit version.
 aws-sdk-s3 = { module = "software.amazon.awssdk:s3", version.ref = "awsSdk" }
+
+# Inter-version diff (issue #249, ADR-0034): Myers diff at word granularity over the
+# extracted text layers. Not BOM-managed → explicit version.
+java-diff-utils = { module = "io.github.java-diff-utils:java-diff-utils", version.ref = "javaDiffUtils" }
 
 # Test
 spring-boot-starter-test = { module = "org.springframework.boot:spring-boot-starter-test" }
