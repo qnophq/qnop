@@ -1,0 +1,66 @@
+# SPDX-License-Identifier: AGPL-3.0-only
+#
+# Object-storage staging registry (issue #243, ADR-0005 / ADR-0036). Every blob
+# upload records a row here: PENDING until the domain row that references its
+# object_key (e.g. document_version.storage_key) is committed, then COMMITTED.
+# The orphan reaper deletes PENDING rows (and their objects) older than the grace
+# period, closing the upload-then-commit window. Keys are content-addressed
+# (sha-256), so object_key is unique and identical content deduplicates. JPA runs
+# ddl-auto=none, so the entity mapping (io.qnop.entity.StorageObject) must match
+# these definitions exactly.
+databaseChangeLog:
+  - changeSet:
+      id: 0012-storage-object
+      author: qnop
+      comment: Object-storage staging registry + orphan-reaper index (ADR-0005/0036).
+      changes:
+        - createTable:
+            tableName: storage_object
+            columns:
+              - column:
+                  name: id
+                  type: UUID
+                  constraints: { primaryKey: true, nullable: false }
+              - column:
+                  name: object_key
+                  type: VARCHAR(512)
+                  constraints: { nullable: false }
+              - column:
+                  name: content_hash
+                  type: VARCHAR(128)
+                  constraints: { nullable: false }
+              - column:
+                  name: content_type
+                  type: VARCHAR(128)
+                  constraints: { nullable: false }
+              - column:
+                  name: size_bytes
+                  type: BIGINT
+                  constraints: { nullable: false }
+              - column:
+                  name: status
+                  type: VARCHAR(16)
+                  constraints: { nullable: false }
+              - column:
+                  name: created_at
+                  type: TIMESTAMP WITH TIME ZONE
+                  constraints: { nullable: false }
+              - column: { name: committed_at, type: TIMESTAMP WITH TIME ZONE }
+              - column:
+                  name: version
+                  type: BIGINT
+                  defaultValueNumeric: 0
+                  constraints: { nullable: false }
+        - addUniqueConstraint:
+            tableName: storage_object
+            columnNames: object_key
+            constraintName: ux_storage_object_key
+        - sql:
+            comment: |
+              Status is a closed set. A partial index serves the orphan reaper's
+              hot path: scanning old PENDING rows.
+            sql: |
+              ALTER TABLE storage_object ADD CONSTRAINT ck_storage_object_status
+                CHECK (status IN ('PENDING', 'COMMITTED'));
+              CREATE INDEX ix_storage_object_pending_created_at
+                ON storage_object (created_at) WHERE status = 'PENDING';

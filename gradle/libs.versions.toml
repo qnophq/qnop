@@ -36,9 +36,12 @@ shedlock = "7.7.0"
 # safe to render untrusted template bodies. SMTP via spring-boot-starter-mail
 # (version managed by the Spring Boot BOM).
 jmustache = "1.16"
+# Object storage (issue #243, ADR-0005): the AWS SDK v2 S3 client, used with
+# endpointOverride + path-style so MinIO (On-Prem) and S3/GCS (SaaS) are a
+# deploy-time config switch. Not in the Spring Boot BOM → explicit version.
+awsSdk = "2.31.6"
 
 # --- Pinned for later phases (NOT yet applied) -------------------------
-awsSdk = "2.31.6"            # software.amazon.awssdk:s3 — vendor-neutral S3 client
 pdfbox = "3.0.5"            # PDF text extraction with glyph positions
 poi = "5.4.1"              # .docx structural extraction (XWPF)
 
@@ -99,6 +102,10 @@ shedlock-provider-jdbc-template = { module = "net.javacrumbs.shedlock:shedlock-p
 spring-boot-starter-mail = { module = "org.springframework.boot:spring-boot-starter-mail" }
 jmustache = { module = "com.samskivert:jmustache", version.ref = "jmustache" }
 
+# Object storage (issue #243, ADR-0005): AWS SDK v2 S3 client — the vendor-neutral
+# StorageProvider default (io.qnop.service.storage). Not BOM-managed → explicit version.
+aws-sdk-s3 = { module = "software.amazon.awssdk:s3", version.ref = "awsSdk" }
+
 # Test
 spring-boot-starter-test = { module = "org.springframework.boot:spring-boot-starter-test" }
 # Spring Boot 4 split the web test slices into per-stack modules; @WebMvcTest now
@@ -110,6 +117,9 @@ spring-boot-testcontainers = { module = "org.springframework.boot:spring-boot-te
 # are managed transitively by the Spring Boot BOM (testcontainers-bom).
 testcontainers-postgresql = { module = "org.testcontainers:testcontainers-postgresql" }
 testcontainers-junit-jupiter = { module = "org.testcontainers:testcontainers-junit-jupiter" }
+# MinIO container for the object-storage integration tests (issue #243). BOM-managed;
+# Testcontainers 2.x artifact ids carry the `testcontainers-` prefix.
+testcontainers-minio = { module = "org.testcontainers:testcontainers-minio" }
 
 [plugins]
 spotless = { id = "com.diffplug.spotless", version.ref = "spotless" }

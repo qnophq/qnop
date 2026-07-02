@@ -28,7 +28,7 @@ Commits are signed off (`git commit -s`, DCO). See `CONTRIBUTING.md`.
 
 The Spring Boot server **boots and runs** (PostgreSQL + Liquibase + JPA, ADR-0020) with the full identity & administration layer of epic #7 in place — `io.qnop.entity` (JPA model), `io.qnop.repository` (Spring Data), `io.qnop.service` (business services) and the framework-light `io.qnop.security` (crypto/key-derivation, ADR-0022) are all populated. **Shipped:** local login with JWT access + rotating refresh tokens and revocation (ADR-0026), OIDC/OAuth2 providers, self-registration, email verification and password reset, auth rate limiting (ADR-0027), users & teams, application settings (ADR-0025), mail templates, branding upload with SVG sanitization (ADR-0028; assets stored as Postgres `bytea`, ADR-0024), profile avatars (ADR-0031), ShedLock distributed scheduling (ADR-0029) and optimistic concurrency control (ADR-0030). The REST contract is OpenAPI-first (ADR-0021) and the `qnop-ui` SPA (login, profile, admin surfaces) consumes it; `/config` exposes the running edition.
 
-**Genuinely still pending (do not assume they exist):** the document-review domain core — the review workflow state machine, annotation anchoring/re-anchoring, and the ingest pipeline; the `qnop-spi` extension-point interfaces + Community defaults (still only a `package-info` placeholder); and S3/object-storage (`StorageProvider`) wiring for binary documents — MinIO is provisioned in `docker-compose.yml` but **not yet consumed**. `docker-compose.yml` provides local Postgres (+ MinIO) for `bootRun`; the test suite spins up its own Postgres via **Testcontainers** (Docker required).
+**Genuinely still pending (do not assume they exist):** the document-review domain core — the review workflow state machine, annotation anchoring/re-anchoring, and the ingest pipeline. The `qnop-spi` extension-point boundary now carries its first published contract, the `StorageProvider` SPI, with the S3/MinIO Community default in `io.qnop.service.storage` (issue #243, ADR-0005/0036) — so MinIO **is now consumed** (object bytes for `document_version.storage_key`), with an upload-then-commit staging registry (`storage_object`) and orphan reaper. `docker-compose.yml` provides local Postgres (+ MinIO) for `bootRun`; the test suite spins up its own Postgres **and MinIO** via **Testcontainers** (Docker required).
 
 ## Stack
 
@@ -67,7 +67,7 @@ pnpm format:check
 Local infra:
 
 ```bash
-cp .env.example .env && docker compose up -d   # Postgres + MinIO (not yet consumed by the app)
+cp .env.example .env && docker compose up -d   # Postgres + MinIO (object storage, ADR-0005)
 ```
 
 ## Architecture (essentials)

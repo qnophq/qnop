@@ -53,6 +53,11 @@ dependencies {
     // that makes the lock real is wired in qnop-app.
     implementation(libs.shedlock.spring)
 
+    // Object storage (issue #243, ADR-0005): the AWS SDK v2 S3 client backs the
+    // StorageProvider default (io.qnop.service.storage) via endpointOverride +
+    // path-style, so MinIO / S3 / GCS is a deploy-time config switch.
+    implementation(libs.aws.sdk.s3)
+
     testImplementation(platform(libs.junit.bom))
     testImplementation(libs.junit.jupiter)
     testRuntimeOnly(libs.junit.platform.launcher)

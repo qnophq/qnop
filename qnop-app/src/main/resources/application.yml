@@ -58,3 +58,18 @@ qnop:
       frontend-base-url: ${QNOP_AUTH_OIDC_FRONTEND_BASE_URL:}
   cors:
     allowed-origins: ${QNOP_CORS_ALLOWED_ORIGINS:http://localhost:5173}
+  # Object storage for binary documents (issue #243, ADR-0005). Defaults target the
+  # docker-compose MinIO; leave `endpoint` blank to target real AWS S3 (SaaS). The
+  # access/secret keys are storage credentials, not crypto secrets, so short local
+  # MinIO values are fine. `auto-create-bucket` is on for local dev / an empty MinIO;
+  # real S3 buckets are pre-provisioned, so set it false in production.
+  s3:
+    endpoint: ${QNOP_S3_ENDPOINT:}
+    region: ${QNOP_S3_REGION:us-east-1}
+    bucket: ${QNOP_S3_BUCKET:qnop-documents}
+    access-key: ${QNOP_S3_ACCESS_KEY:qnop}
+    secret-key: ${QNOP_S3_SECRET_KEY:qnop_secret}
+    path-style-access: ${QNOP_S3_PATH_STYLE_ACCESS:true}
+    auto-create-bucket: ${QNOP_S3_AUTO_CREATE_BUCKET:false}
+    reaper-grace-period: ${QNOP_S3_REAPER_GRACE_PERIOD:PT1H}
+    reaper-cron: ${QNOP_S3_REAPER_CRON:0 30 3 * * *}
