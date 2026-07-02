@@ -20,8 +20,6 @@
  */
 package io.qnop.service.document;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import io.qnop.api.v1.model.RenderedDocumentResponse;
 import io.qnop.entity.Document;
 import io.qnop.entity.DocumentVersion;
@@ -40,6 +38,9 @@ import java.util.List;
 import java.util.UUID;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import tools.jackson.core.JacksonException;
+import tools.jackson.databind.ObjectMapper;
+import tools.jackson.databind.json.JsonMapper;
 
 /**
  * Authorized read access to documents, their versions, the rendered representation, and the
@@ -54,7 +55,8 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 public class DocumentAccessService {
 
-  private static final ObjectMapper MAPPER = new ObjectMapper();
+  // Jackson 3 (tools.jackson), matching the stack Boot 4's MVC serializes responses with.
+  private static final ObjectMapper MAPPER = JsonMapper.builder().build();
 
   private final DocumentRepository documents;
   private final DocumentVersionRepository versions;
@@ -133,7 +135,7 @@ public class DocumentAccessService {
     }
     try {
       return MAPPER.readValue(version.getRenderedDocument(), RenderedDocumentResponse.class);
-    } catch (JsonProcessingException e) {
+    } catch (JacksonException e) {
       throw new IllegalStateException(
           "stored rendered document does not match the API contract for version " + version.getId(),
           e);

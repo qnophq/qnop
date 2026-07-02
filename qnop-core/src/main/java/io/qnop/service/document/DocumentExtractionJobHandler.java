@@ -20,9 +20,6 @@
  */
 package io.qnop.service.document;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import io.qnop.entity.DocumentVersion;
 import io.qnop.entity.ExtractionStatus;
 import io.qnop.repository.DocumentVersionRepository;
@@ -32,13 +29,16 @@ import io.qnop.spi.extract.DocumentExtractor;
 import io.qnop.spi.extract.ExtractionException;
 import io.qnop.spi.extract.RenderedDocument;
 import io.qnop.spi.storage.StorageContent;
-import java.io.IOException;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
+import tools.jackson.core.JacksonException;
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.ObjectMapper;
+import tools.jackson.databind.json.JsonMapper;
 
 /**
  * Runs the async extraction of a {@code DocumentVersion} (issue #245, ADR-0032/0033): loads the
@@ -58,7 +58,10 @@ import org.springframework.stereotype.Component;
 public class DocumentExtractionJobHandler implements JobHandler {
 
   private static final Logger log = LoggerFactory.getLogger(DocumentExtractionJobHandler.class);
-  private static final ObjectMapper MAPPER = new ObjectMapper();
+
+  // Jackson 3 (tools.jackson) — the same stack Boot 4's MVC uses, so the stored jsonb and the
+  // HTTP serialization of the published model never diverge in mapper behaviour.
+  private static final ObjectMapper MAPPER = JsonMapper.builder().build();
 
   private final DocumentVersionRepository versions;
   private final StorageService storage;
@@ -118,10 +121,10 @@ public class DocumentExtractionJobHandler implements JobHandler {
       log.warn("Extraction of version {} failed permanently: {}", versionId, e.getMessage());
       version.markExtractionFailed();
       versions.save(version);
-    } catch (JsonProcessingException e) {
+    } catch (JacksonException e) {
+      // Serializing our own SPI records can only fail on a code bug; add context and let the
+      // queue's retry/FAILED policy surface it.
       throw new IllegalStateException("Failed to serialize rendered document", e);
-    } catch (IOException e) {
-      throw new IllegalStateException("Failed to read stored object", e); // retryable I/O
     }
   }
 
@@ -129,7 +132,7 @@ public class DocumentExtractionJobHandler implements JobHandler {
     try {
       JsonNode node = MAPPER.readTree(payload);
       return UUID.fromString(node.get("versionId").asText());
-    } catch (JsonProcessingException | NullPointerException | IllegalArgumentException e) {
+    } catch (JacksonException | NullPointerException | IllegalArgumentException e) {
       // A malformed payload can only come from a code bug; retrying cannot fix it, but failing
       // loudly (job FAILED after max attempts) surfaces it instead of silently dropping work.
       throw new IllegalArgumentException("Malformed extraction payload: " + payload, e);

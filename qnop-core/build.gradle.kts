@@ -59,9 +59,10 @@ dependencies {
     implementation(libs.aws.sdk.s3)
 
     // PDF extraction (issue #245, ADR-0032): PDFBox turns uploads into RenderedDocuments;
-    // jackson-databind (BOM-managed) serializes them into the jsonb column.
+    // Jackson 3 (tools.jackson, BOM-managed — the same stack Boot 4's MVC uses) serializes
+    // them into the jsonb column, so stored payloads and HTTP responses share one mapper line.
     implementation(libs.pdfbox)
-    implementation(libs.jackson.databind)
+    implementation(libs.jackson3.databind)
 
     testImplementation(platform(libs.junit.bom))
     testImplementation(libs.junit.jupiter)
