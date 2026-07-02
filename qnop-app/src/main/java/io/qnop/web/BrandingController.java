@@ -21,6 +21,7 @@
 package io.qnop.web;
 
 import io.qnop.api.v1.model.ErrorResponse;
+import io.qnop.service.branding.BrandingLimits;
 import io.qnop.service.branding.BrandingService;
 import io.qnop.service.branding.BrandingValidationException;
 import java.io.IOException;
@@ -62,6 +63,13 @@ public class BrandingController {
   @PostMapping(value = "/admin/branding/{slot}", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
   public ResponseEntity<BrandingService.StoredAsset> upload(
       @PathVariable String slot, @RequestParam("file") MultipartFile file) throws IOException {
+    // Reject before getBytes() materializes the upload on the heap: the container's multipart
+    // ceiling moved above the branding cap when document uploads landed (issue #245); the
+    // service still enforces the cap on the actual bytes.
+    if (file.getSize() > BrandingLimits.MAX_SIZE_BYTES) {
+      throw BrandingValidationException.tooLarge(
+          "asset exceeds " + BrandingLimits.MAX_SIZE_BYTES + " bytes");
+    }
     return ResponseEntity.ok(branding.store(slot, file.getBytes(), CurrentUser.requireUserId()));
   }
 

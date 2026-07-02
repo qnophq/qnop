@@ -1,0 +1,26 @@
+# SPDX-License-Identifier: AGPL-3.0-only
+#
+# Extraction status for document versions (issue #245, ADR-0032/0033): the async
+# extraction job flips PENDING -> READY (rendered_document attached) or FAILED
+# (unprocessable content). A dedicated column - rather than deriving from
+# rendered_document IS NULL - lets clients distinguish "still extracting" from
+# "extraction failed" (the upload wizard, #251, needs exactly that). Added as a
+# new changeset because 0011 is merged and immutable.
+databaseChangeLog:
+  - changeSet:
+      id: 0013-document-version-extraction-status
+      author: qnop
+      comment: PENDING/READY/FAILED extraction state per document version.
+      changes:
+        - addColumn:
+            tableName: document_version
+            columns:
+              - column:
+                  name: extraction_status
+                  type: VARCHAR(16)
+                  defaultValue: PENDING
+                  constraints: { nullable: false }
+      rollback:
+        - dropColumn:
+            tableName: document_version
+            columnName: extraction_status

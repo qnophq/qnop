@@ -22,6 +22,8 @@ package io.qnop.entity;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
 import jakarta.persistence.Version;
@@ -77,6 +79,11 @@ public class DocumentVersion {
   @Column(name = "rendered_document")
   private String renderedDocument;
 
+  /** Extraction lifecycle (issue #245): PENDING until the async job flips it to READY/FAILED. */
+  @Enumerated(EnumType.STRING)
+  @Column(name = "extraction_status", nullable = false, length = 16)
+  private ExtractionStatus extractionStatus = ExtractionStatus.PENDING;
+
   @Column(name = "created_by", nullable = false, updatable = false)
   private UUID createdBy;
 
@@ -109,9 +116,23 @@ public class DocumentVersion {
     this.createdBy = createdBy;
   }
 
-  /** Attaches the normalized rendering produced by the extraction job (#245); jsonb payload. */
+  /**
+   * Attaches the normalized rendering produced by the extraction job (#245); jsonb payload. Marks
+   * the extraction {@link ExtractionStatus#READY}.
+   */
   public void attachRenderedDocument(String renderedDocumentJson) {
     this.renderedDocument = renderedDocumentJson;
+    this.extractionStatus = ExtractionStatus.READY;
+  }
+
+  /** Marks the extraction permanently failed (unprocessable content, issue #245). */
+  public void markExtractionFailed() {
+    this.renderedDocument = null;
+    this.extractionStatus = ExtractionStatus.FAILED;
+  }
+
+  public ExtractionStatus getExtractionStatus() {
+    return extractionStatus;
   }
 
   public UUID getId() {
