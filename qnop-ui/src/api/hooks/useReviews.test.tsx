@@ -40,6 +40,7 @@ import {
   useUploadVersion,
   useWorkflow,
 } from './useReviews';
+import { documentKeys } from './useDocuments';
 import { axiosInstance, documentsApi, principalsApi, reviewWorkflowApi } from '../config';
 
 vi.mock('../config', () => ({
@@ -196,5 +197,32 @@ describe('uploads', () => {
     await result.current.mutateAsync({ file });
 
     expect(vi.mocked(axiosInstance.post).mock.calls[0][0]).toBe(`/documents/${DOC_ID}/versions`);
+  });
+
+  // Regression for issue #300: the review page derives the effective version from
+  // detail.latestVersionNumber; a stale value right after the upload made the page
+  // watch the OLD version (polling off) and stick on "Processing document…". The
+  // upload response is authoritative, so the cache must be bumped synchronously.
+  it('bumps the cached latestVersionNumber from the upload response', async () => {
+    vi.mocked(axiosInstance.post).mockResolvedValue({
+      data: { documentId: DOC_ID, versionNumber: 2, extractionStatus: 'PENDING' },
+    });
+    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    queryClient.setQueryData(documentKeys.detail(DOC_ID), {
+      id: DOC_ID,
+      title: 'Contract',
+      latestVersionNumber: 1,
+    });
+    const clientWrapper = ({ children }: { children: ReactNode }) => (
+      <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
+    );
+
+    const { result } = renderHook(() => useUploadVersion(DOC_ID), { wrapper: clientWrapper });
+    await result.current.mutateAsync({ file: new File(['%PDF'], 'v2.pdf') });
+
+    expect(
+      (queryClient.getQueryData(documentKeys.detail(DOC_ID)) as { latestVersionNumber: number })
+        .latestVersionNumber,
+    ).toBe(2);
   });
 });

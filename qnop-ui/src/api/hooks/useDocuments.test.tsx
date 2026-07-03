@@ -20,8 +20,8 @@
  */
 
 import type { ReactNode } from 'react';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { renderHook, waitFor } from '@testing-library/react';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { act, renderHook, waitFor } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import type { RenderedDocumentResponse } from '../generated';
 import { ExtractionStatus } from '../generated';
@@ -89,6 +89,101 @@ describe('useDocumentVersions', () => {
     await waitFor(() => expect(result.current.isSuccess).toBe(true));
     expect(documentsApi.listDocumentVersions).toHaveBeenCalledWith({ documentId: DOC_ID });
     expect(result.current.data?.versions).toHaveLength(1);
+  });
+
+  // Regression for issue #300: right after a new-version upload the cached list may
+  // not contain the watched version yet. Polling must run BOTH while the version is
+  // missing from the list AND while it is PENDING — otherwise the viewer sticks on
+  // "Processing document…" until a manual reload.
+  describe('extraction polling (issue #300)', () => {
+    const v1Ready = { versionNumber: 1, extractionStatus: ExtractionStatus.Ready };
+    const v2Pending = { versionNumber: 2, extractionStatus: ExtractionStatus.Pending };
+    const v2Ready = { versionNumber: 2, extractionStatus: ExtractionStatus.Ready };
+
+    afterEach(() => {
+      vi.useRealTimers();
+    });
+
+    it('polls while the watched version is missing, then while PENDING, and stops on READY', async () => {
+      vi.useFakeTimers();
+      const responses = [
+        { versions: [v1Ready] }, // stale list — v2 uploaded but not refetched yet
+        { versions: [v1Ready, v2Pending] }, // v2 appears, extraction running
+        { versions: [v1Ready, v2Ready] }, // extraction finished
+      ];
+      let call = 0;
+      vi.mocked(documentsApi.listDocumentVersions).mockImplementation(
+        async () =>
+          ({ data: responses[Math.min(call++, responses.length - 1)] }) as Awaited<
+            ReturnType<typeof documentsApi.listDocumentVersions>
+          >,
+      );
+
+      const { result } = renderHook(() => useDocumentVersions(DOC_ID, 2), { wrapper });
+
+      // Initial fetch resolves with the stale list (v2 missing).
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(0);
+      });
+      expect(documentsApi.listDocumentVersions).toHaveBeenCalledTimes(1);
+
+      // The watched version is absent → the list is stale → a poll tick must fire.
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(2600);
+      });
+      expect(documentsApi.listDocumentVersions).toHaveBeenCalledTimes(2);
+
+      // v2 is PENDING → keep polling until READY.
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(2600);
+      });
+      expect(documentsApi.listDocumentVersions).toHaveBeenCalledTimes(3);
+      expect(result.current.data?.versions).toContainEqual(v2Ready);
+
+      // READY → polling stops.
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(6000);
+      });
+      expect(documentsApi.listDocumentVersions).toHaveBeenCalledTimes(3);
+    });
+
+    it('does not poll without a watched version', async () => {
+      vi.useFakeTimers();
+      vi.mocked(documentsApi.listDocumentVersions).mockResolvedValue({
+        data: { versions: [v1Ready] },
+      } as Awaited<ReturnType<typeof documentsApi.listDocumentVersions>>);
+
+      renderHook(() => useDocumentVersions(DOC_ID, undefined), { wrapper });
+
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(0);
+      });
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(6000);
+      });
+      expect(documentsApi.listDocumentVersions).toHaveBeenCalledTimes(1);
+    });
+
+    it('does not poll forever for an out-of-range version (stale/tampered URL)', async () => {
+      vi.useFakeTimers();
+      // Only v1 exists; a URL asking for v999 must not keep the list polling —
+      // that version is more than one above the max and can never appear.
+      vi.mocked(documentsApi.listDocumentVersions).mockResolvedValue({
+        data: { versions: [v1Ready] },
+      } as Awaited<ReturnType<typeof documentsApi.listDocumentVersions>>);
+
+      renderHook(() => useDocumentVersions(DOC_ID, 999), { wrapper });
+
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(0);
+      });
+      expect(documentsApi.listDocumentVersions).toHaveBeenCalledTimes(1);
+
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(6000);
+      });
+      expect(documentsApi.listDocumentVersions).toHaveBeenCalledTimes(1);
+    });
   });
 });
 
