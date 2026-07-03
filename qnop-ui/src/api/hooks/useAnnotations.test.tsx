@@ -24,13 +24,19 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { renderHook, waitFor } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import type { AnnotationListResponse } from '../generated';
-import { annotationKeys, useAnnotations, useCreateAnnotation } from './useAnnotations';
+import {
+  annotationKeys,
+  useAnnotations,
+  useCreateAnnotation,
+  useDecideAnnotation,
+} from './useAnnotations';
 import { annotationsApi } from '../config';
 
 vi.mock('../config', () => ({
   annotationsApi: {
     listAnnotations: vi.fn(),
     createAnnotation: vi.fn(),
+    decideAnnotation: vi.fn(),
   },
 }));
 
@@ -89,6 +95,22 @@ describe('useCreateAnnotation', () => {
     expect(annotationsApi.createAnnotation).toHaveBeenCalledWith({
       documentId: DOC_ID,
       annotationCreateRequest: request,
+    });
+  });
+});
+
+describe('useDecideAnnotation', () => {
+  it('posts the decision', async () => {
+    vi.mocked(annotationsApi.decideAnnotation).mockResolvedValue({ data: { id: 'a1' } } as Awaited<
+      ReturnType<typeof annotationsApi.decideAnnotation>
+    >);
+
+    const { result } = renderHook(() => useDecideAnnotation(), { wrapper });
+    await result.current.mutateAsync({ annotationId: 'a1', decision: 'ACCEPTED' });
+
+    expect(annotationsApi.decideAnnotation).toHaveBeenCalledWith({
+      annotationId: 'a1',
+      annotationDecisionRequest: { decision: 'ACCEPTED' },
     });
   });
 });

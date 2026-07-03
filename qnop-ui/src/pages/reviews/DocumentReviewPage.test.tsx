@@ -45,6 +45,7 @@ vi.mock('../../api/hooks/useDocuments', () => ({
 vi.mock('../../api/hooks/useAnnotations', () => ({
   useAnnotations: vi.fn(),
   useCreateAnnotation: vi.fn(),
+  useDecideAnnotation: vi.fn().mockReturnValue({ mutate: vi.fn(), isPending: false }),
 }));
 vi.mock('../../api/hooks/useComments', () => ({
   useComments: vi.fn().mockReturnValue({ isPending: true, isError: false, data: undefined }),
@@ -52,6 +53,13 @@ vi.mock('../../api/hooks/useComments', () => ({
 }));
 vi.mock('../../components/reviews/viewer/usePdfDocument', () => ({
   usePdfDocument: vi.fn(),
+}));
+// The hub head talks to its own hooks (participants, workflow, config) and has
+// dedicated tests; the page test only checks it receives the right identity.
+vi.mock('../../components/reviews/hub/ReviewHubHead', () => ({
+  ReviewHubHead: ({ isOwner }: { isOwner: boolean }) => (
+    <div data-testid="review-hub-head" data-is-owner={String(isOwner)} />
+  ),
 }));
 // The viewer needs a real pdf.js document and layout; the page test only
 // verifies the orchestration around it. The stub exposes a button that

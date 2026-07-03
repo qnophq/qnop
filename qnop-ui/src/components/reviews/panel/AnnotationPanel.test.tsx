@@ -19,12 +19,13 @@
  * SPDX-License-Identifier: AGPL-3.0-only
  */
 
-import { describe, expect, it, vi } from 'vitest';
-import { fireEvent, render, screen, within } from '@testing-library/react';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { cleanup, fireEvent, render, screen, within } from '@testing-library/react';
 import { ThemeProvider } from '@mui/material/styles';
 import type { AnnotationView } from '../../../api/generated';
 import { AnnotationStatus, PlacementStatus } from '../../../api/generated';
 import { buildTheme } from '../../../theme/theme';
+import { useAuthStore } from '../../../stores/authStore';
 import { AnnotationPanel } from './AnnotationPanel';
 
 vi.mock('./CommentThread', () => ({
@@ -36,6 +37,16 @@ vi.mock('./CommentThread', () => ({
 vi.mock('../../../api/hooks/useComments', () => ({
   useComments: vi.fn().mockReturnValue({ isPending: false, isError: false, data: undefined }),
 }));
+
+const { decideMutate } = vi.hoisted(() => ({ decideMutate: vi.fn() }));
+vi.mock('../../../api/hooks/useAnnotations', () => ({
+  useDecideAnnotation: () => ({ mutate: decideMutate, isPending: false }),
+}));
+
+beforeEach(() => {
+  decideMutate.mockClear();
+  useAuthStore.setState({ userId: null });
+});
 
 const annotation = (id: string, overrides: Partial<AnnotationView> = {}): AnnotationView => ({
   id,
@@ -63,6 +74,7 @@ function renderPanel(props: Partial<Parameters<typeof AnnotationPanel>[0]> = {})
     onCreate: vi.fn(),
     onCancelPending: vi.fn(),
     canAnnotate: true,
+    ownerId: 'owner-1',
     notify: vi.fn(),
   };
   const merged = { ...defaults, ...props };
@@ -158,6 +170,44 @@ describe('AnnotationPanel', () => {
 
     fireEvent.click(composer.getByRole('button', { name: 'Cancel' }));
     expect(props.onCancelPending).toHaveBeenCalled();
+  });
+
+  it('offers Accept/Reject to the owner on an open active annotation', () => {
+    useAuthStore.setState({ userId: 'owner-1' });
+    renderPanel({ annotations: [annotation('a1')], activeAnnotationId: 'a1' });
+
+    fireEvent.click(within(screen.getByTestId('decision-bar')).getByText('Accept'));
+
+    expect(decideMutate).toHaveBeenCalledWith(
+      { annotationId: 'a1', decision: 'ACCEPTED' },
+      expect.anything(),
+    );
+  });
+
+  it('offers the decision to the author as well', () => {
+    useAuthStore.setState({ userId: 'u1' });
+    renderPanel({ annotations: [annotation('a1')], activeAnnotationId: 'a1' });
+
+    fireEvent.click(within(screen.getByTestId('decision-bar')).getByText('Reject'));
+
+    expect(decideMutate).toHaveBeenCalledWith(
+      { annotationId: 'a1', decision: 'REJECTED' },
+      expect.anything(),
+    );
+  });
+
+  it('hides the decision bar from uninvolved participants and on decided annotations', () => {
+    useAuthStore.setState({ userId: 'stranger' });
+    renderPanel({ annotations: [annotation('a1')], activeAnnotationId: 'a1' });
+    expect(screen.queryByTestId('decision-bar')).not.toBeInTheDocument();
+    cleanup();
+
+    useAuthStore.setState({ userId: 'owner-1' });
+    renderPanel({
+      annotations: [annotation('a2', { status: AnnotationStatus.Accepted })],
+      activeAnnotationId: 'a2',
+    });
+    expect(screen.queryByTestId('decision-bar')).not.toBeInTheDocument();
   });
 
   it('creates via the submit shortcut and shows the hint', () => {

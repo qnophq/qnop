@@ -42,10 +42,10 @@ import {
 import { AdminToast } from '../../components/admin/layout/AdminToast';
 import { PageHeader } from '../../components/admin/layout/PageHeader';
 import { useToast } from '../../components/admin/layout/useToast';
-import type { BadgeTone } from '../../components/admin/ToneBadge';
-import { ToneBadge } from '../../components/admin/ToneBadge';
+import { ReviewHubHead } from '../../components/reviews/hub/ReviewHubHead';
 import { AnnotationPanel } from '../../components/reviews/panel/AnnotationPanel';
 import { PANEL_MIN_WIDTH, PanelResizer } from '../../components/reviews/PanelResizer';
+import { WorkflowBadge } from '../../components/reviews/WorkflowBadge';
 import type {
   ScreenPosition,
   TextSelectionOffsets,
@@ -56,25 +56,9 @@ import { DocumentViewer } from '../../components/reviews/viewer/DocumentViewer';
 import { usePdfDocument } from '../../components/reviews/viewer/usePdfDocument';
 import type { ViewerTool } from '../../components/reviews/viewer/ViewerToolbar';
 import { ViewerToolbar } from '../../components/reviews/viewer/ViewerToolbar';
+import { useAuthStore } from '../../stores/authStore';
 
 const PANEL_WIDTH_KEY = 'qnop-review-panel-width';
-
-/** Community workflow states with a badge tone; unknown (enterprise) states render neutral. */
-const WORKFLOW_TONES: Record<string, BadgeTone> = {
-  DRAFT: 'neutral',
-  IN_REVIEW: 'blue',
-  CHANGES_REQUESTED: 'amber',
-  FINALIZED: 'green',
-  CANCELLED: 'red',
-};
-
-function workflowBadge(state: string) {
-  const label = state
-    .toLowerCase()
-    .replaceAll('_', ' ')
-    .replace(/^./, (c) => c.toUpperCase());
-  return <ToneBadge tone={WORKFLOW_TONES[state] ?? 'neutral'} label={label} />;
-}
 
 /**
  * The review surface of one document (#250): pdf.js renders the original for
@@ -87,6 +71,7 @@ export function DocumentReviewPage() {
   const { documentId = '' } = useParams();
   const [searchParams, setSearchParams] = useSearchParams();
   const { toast, notify, clear } = useToast();
+  const userId = useAuthStore((s) => s.userId);
 
   const documentQuery = useDocument(documentId);
   const latestVersion = documentQuery.data?.latestVersionNumber ?? 0;
@@ -225,7 +210,20 @@ export function DocumentReviewPage() {
     >
       {/* No description line: the version lives in the toolbar dropdown, and
           every saved pixel goes to the document and its annotations. */}
-      <PageHeader title={document.title} titleAdornment={workflowBadge(document.workflowState)} />
+      <PageHeader
+        title={document.title}
+        titleAdornment={<WorkflowBadge state={document.workflowState} />}
+        action={
+          <ReviewHubHead
+            documentId={documentId}
+            isOwner={document.ownerId === userId}
+            ownUserId={userId}
+            annotations={annotations}
+            notify={notify}
+            onVersionUploaded={handleVersionChange}
+          />
+        }
+      />
       {versionNumber === undefined ? (
         <Alert severity="info">This review has no uploaded document version yet.</Alert>
       ) : (
@@ -330,6 +328,7 @@ export function DocumentReviewPage() {
               onCreate={handleCreate}
               onCancelPending={() => setPending(null)}
               canAnnotate={canAnnotate}
+              ownerId={document.ownerId}
               notify={notify}
             />
           </Box>

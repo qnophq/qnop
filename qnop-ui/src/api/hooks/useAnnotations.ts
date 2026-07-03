@@ -20,7 +20,11 @@
  */
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import type { AnnotationCreateRequest, AnnotationListResponse } from '../generated';
+import type {
+  AnnotationCreateRequest,
+  AnnotationDecision,
+  AnnotationListResponse,
+} from '../generated';
 import { annotationsApi } from '../config';
 
 export const annotationKeys = {
@@ -57,5 +61,27 @@ export function useCreateAnnotation(documentId: string) {
       return response.data;
     },
     onSuccess: () => queryClient.invalidateQueries({ queryKey: annotationKeys.all }),
+  });
+}
+
+/**
+ * Decides an annotation (owner or author): OPEN -> ACCEPTED | REJECTED. The
+ * first acceptance moves the workflow to CHANGES_REQUESTED (ADR-0011), so the
+ * reviews/workflow caches are invalidated alongside the annotation lists.
+ */
+export function useDecideAnnotation() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (vars: { annotationId: string; decision: AnnotationDecision }) => {
+      const response = await annotationsApi.decideAnnotation({
+        annotationId: vars.annotationId,
+        annotationDecisionRequest: { decision: vars.decision },
+      });
+      return response.data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: annotationKeys.all });
+      queryClient.invalidateQueries({ queryKey: ['reviews'] });
+    },
   });
 }

@@ -31,6 +31,8 @@ import {
   AuthPasswordResetApi,
   AuthRegistrationApi,
   DocumentsApi,
+  PrincipalsApi,
+  ReviewWorkflowApi,
   ServerConfigApi,
   UsersApi,
 } from './generated';
@@ -96,3 +98,5 @@ export const adminOidcProvidersApi = new AdminOidcProvidersApi(undefined, undefi
 export const adminEmailApi = new AdminEmailApi(undefined, undefined, axiosInstance);
 export const documentsApi = new DocumentsApi(undefined, undefined, axiosInstance);
 export const annotationsApi = new AnnotationsApi(undefined, undefined, axiosInstance);
+export const principalsApi = new PrincipalsApi(undefined, undefined, axiosInstance);
+export const reviewWorkflowApi = new ReviewWorkflowApi(undefined, undefined, axiosInstance);
