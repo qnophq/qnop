@@ -20,12 +20,15 @@
  */
 package io.qnop.service.review;
 
+import static java.util.stream.Collectors.toMap;
+
 import io.qnop.entity.Annotation;
 import io.qnop.entity.AnnotationPlacement;
 import io.qnop.entity.AnnotationStatus;
 import io.qnop.entity.AuditEvent;
 import io.qnop.entity.Comment;
 import io.qnop.entity.DocumentVersion;
+import io.qnop.repository.AnnotationCommentCount;
 import io.qnop.repository.AnnotationPlacementRepository;
 import io.qnop.repository.AnnotationRepository;
 import io.qnop.repository.AuditEventRepository;
@@ -35,6 +38,7 @@ import io.qnop.service.document.DocumentAccessService;
 import io.qnop.service.document.DocumentValidationException;
 import java.time.Instant;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -158,17 +162,21 @@ public class AnnotationService {
                 .findByDocumentIdAndVersionNumber(documentId, versionNumber)
                 .map(DocumentVersion::getId)
                 .orElse(null);
-    return annotations.findByDocumentId(documentId).stream()
+    List<Annotation> documentAnnotations = annotations.findByDocumentId(documentId);
+    // Batch the placements and comment counts (issue #313): one query each instead of 2N.
+    Map<UUID, AnnotationPlacement> placementByAnnotation =
+        versionId == null
+            ? Map.of()
+            : placements.findByDocumentVersionId(versionId).stream()
+                .collect(toMap(AnnotationPlacement::getAnnotationId, placement -> placement));
+    Map<UUID, Integer> threadSizeByAnnotation = threadSizes(documentAnnotations);
+    return documentAnnotations.stream()
         .map(
-            annotation -> {
-              AnnotationPlacement placement =
-                  versionId == null
-                      ? null
-                      : placements
-                          .findByAnnotationIdAndDocumentVersionId(annotation.getId(), versionId)
-                          .orElse(null);
-              return view(annotation, placement, threadSize(annotation.getId()));
-            })
+            annotation ->
+                view(
+                    annotation,
+                    placementByAnnotation.get(annotation.getId()),
+                    threadSizeByAnnotation.getOrDefault(annotation.getId(), 0)))
         .filter(view -> placementStatus == null || placementStatus.equals(view.placementStatus()))
         .toList();
   }
@@ -219,6 +227,16 @@ public class AnnotationService {
 
   private int threadSize(UUID annotationId) {
     return (int) comments.countByAnnotationId(annotationId);
+  }
+
+  /** Thread sizes for a batch of annotations in a single aggregation (issue #313). */
+  private Map<UUID, Integer> threadSizes(List<Annotation> forAnnotations) {
+    if (forAnnotations.isEmpty()) {
+      return Map.of();
+    }
+    List<UUID> ids = forAnnotations.stream().map(Annotation::getId).toList();
+    return comments.countByAnnotationIdIn(ids).stream()
+        .collect(toMap(AnnotationCommentCount::annotationId, count -> (int) count.count()));
   }
 
   private static AnnotationView view(
