@@ -25,10 +25,12 @@ import CircularProgress from '@mui/material/CircularProgress';
 import IconButton from '@mui/material/IconButton';
 import Stack from '@mui/material/Stack';
 import TextField from '@mui/material/TextField';
+import Tooltip from '@mui/material/Tooltip';
 import Typography from '@mui/material/Typography';
 import { useTheme } from '@mui/material/styles';
 import { SendHorizontal } from 'lucide-react';
 import { useAddComment, useComments } from '../../../api/hooks/useComments';
+import { isSubmitShortcut, submitShortcutLabel } from '../../../utils/platform';
 import { useAuthStore } from '../../../stores/authStore';
 import type { Notify } from '../../admin/layout/useToast';
 import { UserAvatar } from '../../shell/UserAvatar';
@@ -155,21 +157,30 @@ export function CommentThread({ annotationId, notify }: CommentThreadProps) {
             placeholder="Add a comment"
             value={draft}
             onChange={(event) => setDraft(event.target.value)}
+            onKeyDown={(event) => {
+              if (isSubmitShortcut(event)) {
+                event.preventDefault();
+                submit();
+              }
+            }}
             slotProps={{
               htmlInput: { maxLength: 20000, 'aria-label': 'Add a comment' },
               input: {
                 sx: { borderRadius: 1, bgcolor: 'background.paper' },
                 endAdornment: (
-                  <IconButton
-                    size="small"
-                    aria-label="Comment"
-                    color="primary"
-                    onClick={submit}
-                    disabled={!draft.trim() || addComment.isPending}
-                    sx={{ alignSelf: 'flex-end' }}
-                  >
-                    <SendHorizontal size={16} />
-                  </IconButton>
+                  <Tooltip title={`Send (${submitShortcutLabel()})`}>
+                    <span style={{ alignSelf: 'flex-end' }}>
+                      <IconButton
+                        size="small"
+                        aria-label="Comment"
+                        color="primary"
+                        onClick={submit}
+                        disabled={!draft.trim() || addComment.isPending}
+                      >
+                        <SendHorizontal size={16} />
+                      </IconButton>
+                    </span>
+                  </Tooltip>
                 ),
               },
             }}

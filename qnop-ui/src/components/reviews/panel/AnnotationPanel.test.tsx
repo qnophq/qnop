@@ -159,4 +159,26 @@ describe('AnnotationPanel', () => {
     fireEvent.click(composer.getByRole('button', { name: 'Cancel' }));
     expect(props.onCancelPending).toHaveBeenCalled();
   });
+
+  it('creates via the submit shortcut and shows the hint', () => {
+    const props = renderPanel({
+      pendingAnchor: {
+        region: { surfaceIndex: 0, box: { x: 0.1, y: 0.1, width: 0.2, height: 0.1 } },
+      },
+    });
+
+    const composer = within(screen.getByTestId('annotation-composer'));
+    expect(composer.getByText('to create')).toBeInTheDocument();
+
+    const field = composer.getByLabelText('Annotation comment');
+    fireEvent.change(field, { target: { value: 'Shortcut comment' } });
+    fireEvent.keyDown(field, { key: 'Enter', metaKey: true });
+    expect(props.onCreate).toHaveBeenCalledWith('Shortcut comment');
+
+    // Plain Enter stays a newline, Alt+Enter submits too.
+    fireEvent.keyDown(field, { key: 'Enter' });
+    expect(props.onCreate).toHaveBeenCalledTimes(1);
+    fireEvent.keyDown(field, { key: 'Enter', altKey: true });
+    expect(props.onCreate).toHaveBeenCalledTimes(2);
+  });
 });
