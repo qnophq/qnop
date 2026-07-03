@@ -51,6 +51,15 @@ const MailTemplateEditPage = lazy(() =>
   import('../pages/admin/MailTemplateEditPage').then((m) => ({ default: m.MailTemplateEditPage })),
 );
 
+// The review surface pulls in pdf.js; load it lazily so the rest of the app stays light (#250).
+const DocumentReviewPage = lazy(() =>
+  import('../pages/reviews/DocumentReviewPage').then((m) => ({ default: m.DocumentReviewPage })),
+);
+
+const lazyFallback = (
+  <div style={{ padding: '8px 4px', fontSize: 14, color: '#5E6C7B' }}>Loading…</div>
+);
+
 /**
  * Central route table. Public routes (login, errors) sit outside the shell;
  * everything under the shell requires authentication. Surfaces whose screens
@@ -83,6 +92,14 @@ export const router = createBrowserRouter([
             description="Upload, review and approve documents — the review surface arrives in the PDF vertical slice."
             icon={FileText}
           />
+        ),
+      },
+      {
+        path: 'reviews/:documentId',
+        element: (
+          <Suspense fallback={lazyFallback}>
+            <DocumentReviewPage />
+          </Suspense>
         ),
       },
       {
@@ -157,11 +174,7 @@ export const router = createBrowserRouter([
         path: 'admin/mail-templates/:key',
         element: (
           <AdminRoute>
-            <Suspense
-              fallback={
-                <div style={{ padding: '8px 4px', fontSize: 14, color: '#5E6C7B' }}>Loading…</div>
-              }
-            >
+            <Suspense fallback={lazyFallback}>
               <MailTemplateEditPage />
             </Suspense>
           </AdminRoute>

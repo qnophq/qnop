@@ -26,9 +26,11 @@ import {
   AdminSettingsApi,
   AdminTeamsApi,
   AdminUsersApi,
+  AnnotationsApi,
   AuthApi,
   AuthPasswordResetApi,
   AuthRegistrationApi,
+  DocumentsApi,
   ServerConfigApi,
   UsersApi,
 } from './generated';
@@ -92,3 +94,5 @@ export const adminTeamsApi = new AdminTeamsApi(undefined, undefined, axiosInstan
 export const adminSettingsApi = new AdminSettingsApi(undefined, undefined, axiosInstance);
 export const adminOidcProvidersApi = new AdminOidcProvidersApi(undefined, undefined, axiosInstance);
 export const adminEmailApi = new AdminEmailApi(undefined, undefined, axiosInstance);
+export const documentsApi = new DocumentsApi(undefined, undefined, axiosInstance);
+export const annotationsApi = new AnnotationsApi(undefined, undefined, axiosInstance);

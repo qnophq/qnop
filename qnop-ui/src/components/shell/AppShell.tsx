@@ -25,7 +25,7 @@ import Container from '@mui/material/Container';
 import Drawer from '@mui/material/Drawer';
 import useMediaQuery from '@mui/material/useMediaQuery';
 import { useTheme } from '@mui/material/styles';
-import { Outlet } from 'react-router-dom';
+import { Outlet, useMatch } from 'react-router-dom';
 import { SidebarContent } from './SidebarContent';
 import { TopBar } from './TopBar';
 
@@ -42,6 +42,9 @@ const COLLAPSE_KEY = 'qnop-nav-collapsed';
 export function AppShell() {
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('md'));
+  // The document review workspace (#250) spans the full width; every other
+  // surface keeps the centred reading container.
+  const fullBleed = Boolean(useMatch('/reviews/:documentId'));
   const [collapsed, setCollapsed] = useState<boolean>(() => {
     try {
       return localStorage.getItem(COLLAPSE_KEY) === '1';
@@ -106,8 +109,25 @@ export function AppShell() {
       {/* Main column */}
       <Box sx={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column' }}>
         <TopBar isMobile={isMobile} onToggleSidebar={toggleSidebar} />
-        <Box component="main" sx={{ flex: 1, overflow: 'auto', bgcolor: 'background.default' }}>
-          <Container maxWidth="lg" sx={{ py: { xs: 3, md: 4 } }}>
+        <Box
+          component="main"
+          sx={{
+            flex: 1,
+            // The review workspace manages its own scrolling (document pane and
+            // annotation panel scroll independently) — the shell must not add a
+            // second scrollbar around it. On xs the workspace stacks and the
+            // page scroll returns.
+            overflow: fullBleed ? { xs: 'auto', md: 'hidden' } : 'auto',
+            bgcolor: 'background.default',
+          }}
+        >
+          <Container
+            maxWidth={fullBleed ? false : 'lg'}
+            sx={{
+              py: fullBleed ? 2 : { xs: 3, md: 4 },
+              height: fullBleed ? { md: '100%' } : undefined,
+            }}
+          >
             <Outlet />
           </Container>
         </Box>
