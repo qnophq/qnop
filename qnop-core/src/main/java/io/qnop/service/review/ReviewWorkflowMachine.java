@@ -73,8 +73,11 @@ public class ReviewWorkflowMachine {
    * @param openAnnotations annotations on the document still in {@code OPEN}
    * @param pendingPlacements annotation placements on any version still {@code PENDING}
    *     (re-anchoring not yet complete, ADR-0009/0033)
+   * @param hasReadyVersion whether at least one version has a completed (READY) extraction — a
+   *     review with no reviewable representation cannot be finalized (issue #323)
    */
-  public record TransitionContext(long openAnnotations, long pendingPlacements) {}
+  public record TransitionContext(
+      long openAnnotations, long pendingPlacements, boolean hasReadyVersion) {}
 
   /** Outcome of a {@link #transition} request. */
   public sealed interface TransitionResult {
@@ -108,6 +111,11 @@ public class ReviewWorkflowMachine {
           "cannot finalize: "
               + context.pendingPlacements()
               + " pending placement(s) — re-anchoring has not completed");
+    }
+    if (!context.hasReadyVersion()) {
+      // A review whose only version(s) failed extraction has nothing reviewable to finalize
+      // (issue #323); PENDING versions are already covered by the pending-placement guard.
+      return Optional.of("cannot finalize: no version has a completed (READY) extraction");
     }
     return Optional.empty();
   }

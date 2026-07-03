@@ -24,12 +24,14 @@ import io.qnop.entity.Annotation;
 import io.qnop.entity.AnnotationStatus;
 import io.qnop.entity.AuditEvent;
 import io.qnop.entity.Document;
+import io.qnop.entity.ExtractionStatus;
 import io.qnop.entity.PlacementStatus;
 import io.qnop.entity.WorkflowState;
 import io.qnop.repository.AnnotationPlacementRepository;
 import io.qnop.repository.AnnotationRepository;
 import io.qnop.repository.AuditEventRepository;
 import io.qnop.repository.DocumentRepository;
+import io.qnop.repository.DocumentVersionRepository;
 import io.qnop.service.document.DocumentAccessService;
 import io.qnop.service.review.ReviewWorkflowMachine.TransitionContext;
 import io.qnop.service.review.ReviewWorkflowMachine.TransitionResult;
@@ -57,6 +59,7 @@ public class ReviewWorkflowService {
   private final ReviewWorkflowMachine machine = new ReviewWorkflowMachine();
 
   private final DocumentRepository documents;
+  private final DocumentVersionRepository versions;
   private final AnnotationRepository annotations;
   private final AnnotationPlacementRepository placements;
   private final AuditEventRepository auditEvents;
@@ -64,11 +67,13 @@ public class ReviewWorkflowService {
 
   public ReviewWorkflowService(
       DocumentRepository documents,
+      DocumentVersionRepository versions,
       AnnotationRepository annotations,
       AnnotationPlacementRepository placements,
       AuditEventRepository auditEvents,
       DocumentAccessService documentAccess) {
     this.documents = documents;
+    this.versions = versions;
     this.annotations = annotations;
     this.placements = placements;
     this.auditEvents = auditEvents;
@@ -162,7 +167,9 @@ public class ReviewWorkflowService {
     TransitionContext context =
         new TransitionContext(
             annotations.countByDocumentIdAndStatus(document.getId(), AnnotationStatus.OPEN),
-            placements.countByDocumentIdAndStatus(document.getId(), PlacementStatus.PENDING));
+            placements.countByDocumentIdAndStatus(document.getId(), PlacementStatus.PENDING),
+            versions.existsByDocumentIdAndExtractionStatus(
+                document.getId(), ExtractionStatus.READY));
     switch (machine.transition(from, target, context)) {
       case TransitionResult.Allowed allowed -> document.setWorkflowState(allowed.target());
       case TransitionResult.Denied denied ->
