@@ -153,7 +153,7 @@ describe('AnnotationPanel', () => {
     fireEvent.change(composer.getByLabelText('Annotation comment'), {
       target: { value: 'Wrong figure' },
     });
-    fireEvent.click(composer.getByRole('button', { name: 'Create annotation' }));
+    fireEvent.click(composer.getByRole('button', { name: /Create annotation/ }));
     expect(props.onCreate).toHaveBeenCalledWith('Wrong figure');
 
     fireEvent.click(composer.getByRole('button', { name: 'Cancel' }));
@@ -168,7 +168,7 @@ describe('AnnotationPanel', () => {
     });
 
     const composer = within(screen.getByTestId('annotation-composer'));
-    expect(composer.getByText('to create')).toBeInTheDocument();
+    expect(composer.getByRole('button', { name: /Create annotation \(.+\)/ })).toBeInTheDocument();
 
     const field = composer.getByLabelText('Annotation comment');
     fireEvent.change(field, { target: { value: 'Shortcut comment' } });

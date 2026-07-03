@@ -43,28 +43,6 @@ import { CommentThread } from './CommentThread';
 
 type StatusFilter = 'all' | 'open' | 'decided';
 
-/** A keyboard-key chip for inline shortcut hints. */
-function Kbd({ children }: { children: ReactNode }) {
-  return (
-    <Box
-      component="kbd"
-      sx={(theme) => ({
-        px: 0.5,
-        py: 0.1,
-        borderRadius: '4px',
-        border: `1px solid ${theme.palette.divider}`,
-        bgcolor: theme.qnop.surface2,
-        fontFamily: '"JetBrains Mono", monospace',
-        fontSize: 11,
-        lineHeight: 1.4,
-        color: theme.palette.text.secondary,
-      })}
-    >
-      {children}
-    </Box>
-  );
-}
-
 const FILTERS: { value: StatusFilter; label: string }[] = [
   { value: 'all', label: 'All' },
   { value: 'open', label: 'Open' },
@@ -132,24 +110,17 @@ function Composer({
           }}
           slotProps={{ htmlInput: { maxLength: 20000, 'aria-label': 'Annotation comment' } }}
         />
-        <Stack direction="row" spacing={1} sx={{ alignItems: 'center' }}>
-          <Typography
-            variant="caption"
-            color="text.secondary"
-            sx={{ mr: 'auto', display: 'inline-flex', alignItems: 'center', gap: 0.5 }}
-          >
-            <Kbd>{submitShortcutLabel()}</Kbd> to create
-          </Typography>
-          <Button size="small" onClick={onCancel} disabled={creating}>
-            Cancel
-          </Button>
+        <Stack direction="row" spacing={1} sx={{ justifyContent: 'flex-end' }}>
           <Button
             size="small"
             variant="contained"
             onClick={() => onCreate(comment)}
             disabled={creating}
           >
-            Create annotation
+            Create annotation ({submitShortcutLabel()})
+          </Button>
+          <Button size="small" onClick={onCancel} disabled={creating}>
+            Cancel
           </Button>
         </Stack>
       </Stack>
