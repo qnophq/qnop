@@ -100,4 +100,24 @@ describe('TextSpanLayer', () => {
 
     expect(onTextSelected).not.toHaveBeenCalled();
   });
+
+  it('mirrors the live selection as marker bands and clears them on collapse', () => {
+    renderLayer();
+
+    const first = screen.getByText('Hello world').firstChild!;
+    const range = document.createRange();
+    range.setStart(first, 0);
+    range.setEnd(first, 5);
+    const selection = window.getSelection()!;
+    selection.removeAllRanges();
+    selection.addRange(range);
+    fireEvent(document, new Event('selectionchange'));
+
+    expect(screen.getByTestId('live-selection-0')).toBeInTheDocument();
+
+    selection.removeAllRanges();
+    fireEvent(document, new Event('selectionchange'));
+
+    expect(screen.queryByTestId('live-selection-0')).not.toBeInTheDocument();
+  });
 });

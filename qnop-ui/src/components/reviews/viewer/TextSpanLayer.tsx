@@ -19,12 +19,12 @@
  * SPDX-License-Identifier: AGPL-3.0-only
  */
 
-import { useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import type { PointerEvent } from 'react';
 import Box from '@mui/material/Box';
 import type { RenderedTextSpan } from '../../../api/generated';
 import type { ScreenPosition, TextSelectionOffsets } from './anchoring';
-import { markerLineBox, surfaceLinePitch } from './anchoring';
+import { boxesForRange, markerLineBox, surfaceLinePitch } from './anchoring';
 import { SELECTION_MARKER_BG } from './markerColors';
 
 /**
@@ -69,16 +69,42 @@ function measureGlyphRun(text: string, fontSize: number): number | null {
   return width > 0 ? width : null;
 }
 
+/** The current DOM selection as canonical-text offsets within this layer, or null. */
+function resolveSelectionOffsets(root: HTMLElement): { start: number; end: number } | null {
+  const selection = window.getSelection();
+  if (!selection || selection.rangeCount === 0 || selection.isCollapsed) return null;
+  const range = selection.getRangeAt(0);
+  const startElement = spanElementFor(range.startContainer);
+  const endElement = spanElementFor(range.endContainer);
+  // Both ends must sit on this surface's spans; cross-surface selections are ignored.
+  if (!startElement || !endElement || !root.contains(startElement) || !root.contains(endElement)) {
+    return null;
+  }
+  const start =
+    Number(startElement.dataset.spanStart) +
+    (range.startContainer.nodeType === Node.TEXT_NODE ? range.startOffset : 0);
+  const end =
+    Number(endElement.dataset.spanStart) +
+    (range.endContainer.nodeType === Node.TEXT_NODE
+      ? range.endOffset
+      : Number(endElement.dataset.spanLength));
+  return end > start ? { start, end } : null;
+}
+
 /**
  * An invisible, selectable text layer built from the server-extracted spans
  * (ADR-0032 — the client is not the authority on where text is; it only makes
  * the server's text selectable). Like pdf.js's own text layer, each span is
  * absolutely positioned at its normalized box and its glyph run is stretched
  * horizontally (scaleX from a canvas measurement) to cover the box, so the
- * browser's selection rectangles trace the printed text. The glyphs themselves
- * stay transparent — also while selected — and the selection paints as a
- * translucent marker; the offsets attached to each span are the canonical-text
- * offsets the anchor model needs (ADR-0009).
+ * browser's selection hit-testing traces the printed text.
+ *
+ * The native selection paint is fully suppressed (a translucent ::selection
+ * over the canvas would tint the printed glyphs); instead the layer follows
+ * `selectionchange` and draws its own marker bands with multiply blending —
+ * the page's text keeps its original colour, exactly like the pending preview
+ * and persisted highlights. The offsets attached to each span are the
+ * canonical-text offsets the anchor model needs (ADR-0009).
  */
 export function TextSpanLayer({
   spans,
@@ -89,37 +115,36 @@ export function TextSpanLayer({
   onTextSelected,
 }: TextSpanLayerProps) {
   const rootRef = useRef<HTMLDivElement>(null);
+  const [liveRange, setLiveRange] = useState<{ start: number; end: number } | null>(null);
+
+  // Follow the native selection while it is being dragged and mirror it as
+  // marker bands; a collapsed or foreign selection clears the bands.
+  useEffect(() => {
+    if (!enabled) return undefined;
+    const handleSelectionChange = () => {
+      const root = rootRef.current;
+      setLiveRange(root ? resolveSelectionOffsets(root) : null);
+    };
+    document.addEventListener('selectionchange', handleSelectionChange);
+    return () => document.removeEventListener('selectionchange', handleSelectionChange);
+  }, [enabled]);
 
   const handlePointerUp = (event: PointerEvent<HTMLDivElement>) => {
-    const selection = window.getSelection();
     const root = rootRef.current;
-    if (!selection || selection.rangeCount === 0 || selection.isCollapsed || !root) return;
-    const range = selection.getRangeAt(0);
-    const startElement = spanElementFor(range.startContainer);
-    const endElement = spanElementFor(range.endContainer);
-    // Both ends must sit on this surface's spans; cross-surface selections are ignored.
-    if (
-      !startElement ||
-      !endElement ||
-      !root.contains(startElement) ||
-      !root.contains(endElement)
-    ) {
-      return;
-    }
-    const start =
-      Number(startElement.dataset.spanStart) +
-      (range.startContainer.nodeType === Node.TEXT_NODE ? range.startOffset : 0);
-    const end =
-      Number(endElement.dataset.spanStart) +
-      (range.endContainer.nodeType === Node.TEXT_NODE
-        ? range.endOffset
-        : Number(endElement.dataset.spanLength));
-    if (end <= start) return;
-    selection.removeAllRanges();
-    onTextSelected({ surfaceIndex, start, end }, { left: event.clientX, top: event.clientY });
+    if (!root) return;
+    const offsets = resolveSelectionOffsets(root);
+    if (!offsets) return;
+    window.getSelection()?.removeAllRanges();
+    setLiveRange(null);
+    onTextSelected({ surfaceIndex, ...offsets }, { left: event.clientX, top: event.clientY });
   };
 
   const pitch = surfaceLinePitch(spans);
+  // Guarded by `enabled` so a stale range never paints on a disabled layer.
+  const liveBoxes =
+    enabled && liveRange
+      ? boxesForRange(spans, liveRange.start, liveRange.end).map((box) => markerLineBox(box, pitch))
+      : [];
 
   return (
     <Box
@@ -133,16 +158,34 @@ export function TextSpanLayer({
         cursor: enabled ? 'text' : 'default',
         pointerEvents: enabled ? 'auto' : 'none',
         userSelect: enabled ? 'text' : 'none',
-        // The transparent-marker feel: the selection paints a translucent
-        // highlight while the layer's approximated glyphs stay invisible —
-        // without the color override the browser would repaint the selected
-        // glyphs (in the layer's font, not the page's) as visible text.
+        // Suppress the native selection paint entirely: a translucent
+        // ::selection sits ABOVE the canvas and would tint the printed glyphs
+        // (no blend modes on pseudo-selections). The visible marking comes
+        // from the layer's own multiply-blended bands below; the color
+        // override keeps the browser from repainting the invisible glyphs.
         '& span::selection': {
-          backgroundColor: SELECTION_MARKER_BG,
+          backgroundColor: 'transparent',
           color: 'transparent',
         },
       }}
     >
+      {liveBoxes.map((box, index) => (
+        <div
+          key={index}
+          data-testid={index === 0 ? `live-selection-${surfaceIndex}` : undefined}
+          style={{
+            position: 'absolute',
+            left: `${box.x * 100}%`,
+            top: `${box.y * 100}%`,
+            width: `${box.width * 100}%`,
+            height: `${box.height * 100}%`,
+            backgroundColor: SELECTION_MARKER_BG,
+            mixBlendMode: 'multiply',
+            borderRadius: '1px',
+            pointerEvents: 'none',
+          }}
+        />
+      ))}
       {spans.map((span) => {
         const fontSize = Math.max(span.box.height * pageHeight * 0.85, 6);
         const measured = span.text.length > 0 ? measureGlyphRun(span.text, fontSize) : null;
