@@ -172,6 +172,32 @@ describe('AnnotationPanel', () => {
     expect(props.onCancelPending).toHaveBeenCalled();
   });
 
+  it('requires a non-blank comment before an annotation can be created', () => {
+    const props = renderPanel({
+      pendingAnchor: {
+        region: { surfaceIndex: 0, box: { x: 0.1, y: 0.1, width: 0.2, height: 0.1 } },
+      },
+    });
+
+    const composer = within(screen.getByTestId('annotation-composer'));
+    const field = composer.getByLabelText('Annotation comment');
+    const create = composer.getByRole('button', { name: /Create annotation/ });
+
+    // Empty and whitespace-only comments keep creating disabled (issue #301) —
+    // the button as well as the submit shortcut.
+    expect(create).toBeDisabled();
+    fireEvent.keyDown(field, { key: 'Enter', metaKey: true });
+    fireEvent.change(field, { target: { value: '   ' } });
+    expect(create).toBeDisabled();
+    fireEvent.keyDown(field, { key: 'Enter', metaKey: true });
+    expect(props.onCreate).not.toHaveBeenCalled();
+
+    fireEvent.change(field, { target: { value: 'Needs a source' } });
+    expect(create).toBeEnabled();
+    fireEvent.click(create);
+    expect(props.onCreate).toHaveBeenCalledWith('Needs a source');
+  });
+
   it('offers Accept/Reject to the owner on an open active annotation', () => {
     useAuthStore.setState({ userId: 'owner-1' });
     renderPanel({ annotations: [annotation('a1')], activeAnnotationId: 'a1' });

@@ -165,9 +165,12 @@ export function DocumentReviewPage() {
   };
 
   const handleCreate = (comment: string) => {
-    if (!pending || versionNumber === undefined) return;
+    // The first comment is mandatory (issue #301) — the composer only submits
+    // non-blank text; this guard keeps the invariant at the API boundary too.
+    const trimmed = comment.trim();
+    if (!pending || versionNumber === undefined || trimmed.length === 0) return;
     createAnnotation.mutate(
-      { versionNumber, anchor: pending.anchor, comment: comment.trim() || undefined },
+      { versionNumber, anchor: pending.anchor, comment: trimmed },
       {
         onSuccess: (created) => {
           setPending(null);
