@@ -45,6 +45,7 @@ vi.mock('../../api/hooks/useDocuments', () => ({
 vi.mock('../../api/hooks/useAnnotations', () => ({
   useAnnotations: vi.fn(),
   useCreateAnnotation: vi.fn(),
+  useDecideAnnotation: vi.fn().mockReturnValue({ mutate: vi.fn(), isPending: false }),
 }));
 vi.mock('../../api/hooks/useComments', () => ({
   useComments: vi.fn().mockReturnValue({ isPending: true, isError: false, data: undefined }),

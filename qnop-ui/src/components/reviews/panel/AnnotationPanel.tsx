@@ -31,9 +31,12 @@ import Stack from '@mui/material/Stack';
 import TextField from '@mui/material/TextField';
 import Typography from '@mui/material/Typography';
 import { useTheme } from '@mui/material/styles';
-import { ChevronRight, Link2, NotebookPen, Unlink } from 'lucide-react';
+import { Check, ChevronRight, Link2, NotebookPen, Unlink, X } from 'lucide-react';
 import type { Anchor, AnnotationView } from '../../../api/generated';
-import { AnnotationStatus } from '../../../api/generated';
+import { AnnotationDecision, AnnotationStatus } from '../../../api/generated';
+import { useDecideAnnotation } from '../../../api/hooks/useAnnotations';
+import { useAuthStore } from '../../../stores/authStore';
+import { apiErrorCode } from '../../../utils/apiError';
 import { isSubmitShortcut, submitShortcutLabel } from '../../../utils/platform';
 import type { Notify } from '../../admin/layout/useToast';
 import { SectionCard } from '../../admin/layout/SectionCard';
@@ -42,6 +45,11 @@ import { AnnotationListItem } from './AnnotationListItem';
 import { CommentThread } from './CommentThread';
 
 type StatusFilter = 'all' | 'open' | 'decided';
+
+/** Known decision conflicts (409) — mapped to friendly text, never server prose. */
+const DECISION_CONFLICTS: Record<string, string> = {
+  ANNOTATION_ALREADY_DECIDED: 'This annotation was already decided.',
+};
 
 const FILTERS: { value: StatusFilter; label: string }[] = [
   { value: 'all', label: 'All' },
@@ -61,7 +69,48 @@ interface AnnotationPanelProps {
   onCreate: (comment: string) => void;
   onCancelPending: () => void;
   canAnnotate: boolean;
+  /** The document owner — owner or author may decide an annotation (ADR-0011). */
+  ownerId: string | null;
   notify: Notify;
+}
+
+/** Accept/Reject for an open annotation, shown to the owner or the author. */
+function DecisionBar({
+  disabled,
+  onDecide,
+}: {
+  disabled: boolean;
+  onDecide: (decision: AnnotationDecision) => void;
+}) {
+  return (
+    <Stack
+      direction="row"
+      spacing={1}
+      data-testid="decision-bar"
+      sx={{ alignItems: 'center', pl: 2, py: 1 }}
+    >
+      <Button
+        size="small"
+        variant="contained"
+        color="success"
+        startIcon={<Check size={14} />}
+        disabled={disabled}
+        onClick={() => onDecide(AnnotationDecision.Accepted)}
+      >
+        Accept
+      </Button>
+      <Button
+        size="small"
+        variant="outlined"
+        color="inherit"
+        startIcon={<X size={14} />}
+        disabled={disabled}
+        onClick={() => onDecide(AnnotationDecision.Rejected)}
+      >
+        Reject
+      </Button>
+    </Stack>
+  );
 }
 
 /** The composer for a freshly drawn anchor: optional first comment, then create. */
@@ -240,9 +289,36 @@ export function AnnotationPanel({
   onCreate,
   onCancelPending,
   canAnnotate,
+  ownerId,
   notify,
 }: AnnotationPanelProps) {
   const [filter, setFilter] = useState<StatusFilter>('all');
+  const userId = useAuthStore((state) => state.userId);
+  const decide = useDecideAnnotation();
+
+  const mayDecide = (annotation: AnnotationView) =>
+    annotation.status === AnnotationStatus.Open &&
+    userId !== null &&
+    (ownerId === userId || annotation.authorId === userId);
+
+  const handleDecide = (annotation: AnnotationView, decision: AnnotationDecision) => {
+    decide.mutate(
+      { annotationId: annotation.id, decision },
+      {
+        onSuccess: () =>
+          notify(
+            decision === AnnotationDecision.Accepted
+              ? 'Annotation accepted.'
+              : 'Annotation rejected.',
+          ),
+        onError: (error) =>
+          notify(
+            DECISION_CONFLICTS[apiErrorCode(error) ?? ''] ?? 'The decision could not be saved.',
+            'error',
+          ),
+      },
+    );
+  };
 
   const matchesFilter = (annotation: AnnotationView) =>
     filter === 'all' ||
@@ -267,6 +343,12 @@ export function AnnotationPanel({
           onHover={onHover}
         />
         <Collapse in={active} unmountOnExit>
+          {mayDecide(annotation) && (
+            <DecisionBar
+              disabled={decide.isPending}
+              onDecide={(decision) => handleDecide(annotation, decision)}
+            />
+          )}
           <CommentThread annotationId={annotation.id} notify={notify} />
         </Collapse>
       </Stack>

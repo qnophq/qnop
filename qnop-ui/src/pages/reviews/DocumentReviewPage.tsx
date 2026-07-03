@@ -328,6 +328,7 @@ export function DocumentReviewPage() {
               onCreate={handleCreate}
               onCancelPending={() => setPending(null)}
               canAnnotate={canAnnotate}
+              ownerId={document.ownerId}
               notify={notify}
             />
           </Box>
