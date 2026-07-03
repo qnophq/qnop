@@ -64,8 +64,14 @@ function positionSx(box: NormalizedBox) {
  * keyframe set serves every status colour.
  */
 const markPulse = keyframes`
-  0%, 100% { background-color: color-mix(in srgb, var(--hl) 55%, transparent); }
-  50% { background-color: color-mix(in srgb, var(--hl) 95%, transparent); }
+  0%, 100% {
+    background-color: color-mix(in srgb, var(--hl) 60%, transparent);
+    filter: none;
+  }
+  50% {
+    background-color: var(--hl);
+    filter: brightness(0.88) saturate(1.35);
+  }
 `;
 
 /**
@@ -172,17 +178,16 @@ export function HighlightLayer({
                     // earlier feedback), while hovering its PANEL CARD stages
                     // the full spotlight: a deep colour pulse plus a glow ring
                     // so the linked passage is unmissable.
-                    bgcolor: alpha(style.color, hot ? 0.85 : active ? 0.6 : 0.3),
+                    bgcolor: alpha(style.color, hot ? 0.9 : active ? 0.6 : 0.3),
                     mixBlendMode: 'multiply',
                     borderRadius: marker ? '1px' : '2px',
                     '&:hover': { bgcolor: alpha(style.color, 0.5) },
                     '&:focus-visible': { outline: 'none', boxShadow: theme.qnop.focusRing },
                     ...(primary && !marker && active && { boxShadow: theme.qnop.focusRing }),
+                    // Spotlight without any ring: the linked mark pulses to
+                    // the full, brightness-deepened colour instead.
                     ...(hot && {
                       animation: `${markPulse} 0.9s ease-in-out infinite`,
-                      // One spotlight treatment for both kinds: white-gap ring
-                      // plus glow (prototype hl-hot).
-                      boxShadow: `0 0 0 2px ${theme.palette.background.paper}, 0 0 0 4px ${style.color}, 0 4px 14px -2px ${alpha(style.color, 0.8)}`,
                       zIndex: 1,
                     }),
                     '@media (prefers-reduced-motion: reduce)': {
