@@ -42,27 +42,26 @@ const annotation = (id: string, surfaceIndex: number | null, y = 0.2): Annotatio
 const SURFACES: RenderedSurface[] = [{ index: 0, width: 600, height: 800, textSpans: [] }];
 
 describe('spotlightForAnchor', () => {
-  it('pads the anchor region and stays inside the page', () => {
+  it('hugs the painted geometry exactly — no margin exposing undimmed page', () => {
     const spotlight = spotlightForAnchor(
       { region: { surfaceIndex: 0, box: { x: 0.1, y: 0.2, width: 0.3, height: 0.02 } } },
       SURFACES,
     );
 
     expect(spotlight.surfaceIndex).toBe(0);
-    expect(spotlight.box.x).toBeCloseTo(0.085, 5);
-    expect(spotlight.box.y).toBeCloseTo(0.19, 5);
-    expect(spotlight.box.width).toBeCloseTo(0.33, 5);
-    expect(spotlight.box.height).toBeCloseTo(0.04, 5);
+    expect(spotlight.box.x).toBeCloseTo(0.1, 10);
+    expect(spotlight.box.y).toBeCloseTo(0.2, 10);
+    expect(spotlight.box.width).toBeCloseTo(0.3, 10);
+    expect(spotlight.box.height).toBeCloseTo(0.02, 10);
   });
 
   it('clamps at the page edges', () => {
     const spotlight = spotlightForAnchor(
-      { region: { surfaceIndex: 0, box: { x: 0, y: 0, width: 1, height: 0.05 } } },
+      { region: { surfaceIndex: 0, box: { x: -0.05, y: 0, width: 1.2, height: 0.05 } } },
       SURFACES,
     );
 
     expect(spotlight.box.x).toBe(0);
-    expect(spotlight.box.y).toBe(0);
     expect(spotlight.box.x + spotlight.box.width).toBeLessThanOrEqual(1);
   });
 });

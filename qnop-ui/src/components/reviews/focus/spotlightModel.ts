@@ -38,17 +38,18 @@ import {
  * same stored anchor boxes the highlights paint with (ADR-0032).
  */
 
-/** Breathing room around the mark, normalized to the page (x wider — reading direction). */
-const SPOTLIGHT_PAD_X = 0.015;
-const SPOTLIGHT_PAD_Y = 0.01;
-
-/** The sharp region of the scrim: one page and the padded box on it. */
+/** The sharp region of the scrim: one page and the box on it. */
 export interface Spotlight {
   surfaceIndex: number;
   box: NormalizedBox;
 }
 
-/** The padded, clamped spotlight rect of an anchor on its surface. */
+/**
+ * The clamped spotlight rect of an anchor on its surface — the union of
+ * exactly the boxes the highlight layer paints (the pitch-grown marker bands,
+ * or the region box). No extra padding: any margin would expose undimmed page
+ * pixels around the mark, reading as a white frame against the veil.
+ */
 export function spotlightForAnchor(
   anchor: Anchor,
   surfaces: RenderedSurface[] | undefined,
@@ -57,15 +58,7 @@ export function spotlightForAnchor(
   const spans = surfaces?.find((surface) => surface.index === surfaceIndex)?.textSpans ?? [];
   const { boxes } = highlightBoxesForAnchor(anchor, spans);
   const union = unionBoxes(boxes) ?? anchor.region.box;
-  return {
-    surfaceIndex,
-    box: clampBox({
-      x: union.x - SPOTLIGHT_PAD_X,
-      y: union.y - SPOTLIGHT_PAD_Y,
-      width: union.width + 2 * SPOTLIGHT_PAD_X,
-      height: union.height + 2 * SPOTLIGHT_PAD_Y,
-    }),
-  };
+  return { surfaceIndex, box: clampBox(union) };
 }
 
 /** The spotlight of an annotation, or null when it has no placement here. */
