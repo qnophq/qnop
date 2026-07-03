@@ -180,9 +180,9 @@ export function HighlightLayer({
                     ...(primary && !marker && active && { boxShadow: theme.qnop.focusRing }),
                     ...(hot && {
                       animation: `${markPulse} 0.9s ease-in-out infinite`,
-                      boxShadow: marker
-                        ? `0 3px 16px -2px ${alpha(style.color, 0.9)}`
-                        : `0 0 0 2px ${theme.palette.background.paper}, 0 0 0 4px ${style.color}, 0 4px 14px -2px ${alpha(style.color, 0.8)}`,
+                      // One spotlight treatment for both kinds: white-gap ring
+                      // plus glow (prototype hl-hot).
+                      boxShadow: `0 0 0 2px ${theme.palette.background.paper}, 0 0 0 4px ${style.color}, 0 4px 14px -2px ${alpha(style.color, 0.8)}`,
                       zIndex: 1,
                     }),
                     '@media (prefers-reduced-motion: reduce)': {
