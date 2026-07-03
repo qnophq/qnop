@@ -28,6 +28,7 @@ import Typography from '@mui/material/Typography';
 import { useTheme } from '@mui/material/styles';
 import { MessageSquare } from 'lucide-react';
 import type { AnnotationView } from '../../../api/generated';
+import type { ScreenPosition } from './anchoring';
 import { AnnotationStatus } from '../../../api/generated';
 import { useComments } from '../../../api/hooks/useComments';
 import { useAuthStore } from '../../../stores/authStore';
@@ -51,9 +52,13 @@ const TIME_FORMAT = new Intl.DateTimeFormat(undefined, {
   timeStyle: 'short',
 });
 
+/** Vertical offset so the card sits just below the pointer, not under it. */
+const POINTER_OFFSET_PX = 14;
+
 interface AnnotationHoverCardProps {
   annotation: AnnotationView;
-  anchorEl: HTMLElement;
+  /** The current pointer position — read once when the card becomes visible. */
+  getAnchorPosition: () => ScreenPosition | null;
 }
 
 /**
@@ -63,7 +68,7 @@ interface AnnotationHoverCardProps {
  * Hovering also warms the comments cache, so opening the thread afterwards is
  * instant. Pointer events pass through — the card never traps the mouse.
  */
-export function AnnotationHoverCard({ annotation, anchorEl }: AnnotationHoverCardProps) {
+export function AnnotationHoverCard({ annotation, getAnchorPosition }: AnnotationHoverCardProps) {
   const theme = useTheme();
   const userId = useAuthStore((state) => state.userId);
   const displayName = useAuthStore((state) => state.displayName);
@@ -71,16 +76,19 @@ export function AnnotationHoverCard({ annotation, anchorEl }: AnnotationHoverCar
   const commentsQuery = useComments(annotation.id, annotation.commentCount > 0);
 
   // Hide instantly when the hovered mark changes (adjust-state-during-render
-  // pattern), then re-show after the hover-intent delay.
-  const [visible, setVisible] = useState(false);
+  // pattern), then re-show after the hover-intent delay — frozen at wherever
+  // the pointer settled, so the card does not chase the mouse.
+  const [position, setPosition] = useState<ScreenPosition | null>(null);
   const [lastId, setLastId] = useState(annotation.id);
   if (annotation.id !== lastId) {
     setLastId(annotation.id);
-    setVisible(false);
+    setPosition(null);
   }
   useEffect(() => {
-    const timer = setTimeout(() => setVisible(true), SHOW_DELAY_MS);
+    const timer = setTimeout(() => setPosition(getAnchorPosition()), SHOW_DELAY_MS);
     return () => clearTimeout(timer);
+    // getAnchorPosition is a stable ref reader from the viewer.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [annotation.id]);
 
   const firstComment = commentsQuery.data?.comments[0];
@@ -94,9 +102,11 @@ export function AnnotationHoverCard({ annotation, anchorEl }: AnnotationHoverCar
 
   return (
     <Popover
-      open={visible}
-      anchorEl={anchorEl}
-      anchorOrigin={{ vertical: 'bottom', horizontal: 'left' }}
+      open={Boolean(position)}
+      anchorReference="anchorPosition"
+      anchorPosition={
+        position ? { left: position.left, top: position.top + POINTER_OFFSET_PX } : undefined
+      }
       transformOrigin={{ vertical: 'top', horizontal: 'left' }}
       disableAutoFocus
       disableEnforceFocus

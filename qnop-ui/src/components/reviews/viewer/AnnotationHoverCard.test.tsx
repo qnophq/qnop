@@ -50,11 +50,9 @@ const annotation = (overrides: Partial<AnnotationView> = {}): AnnotationView => 
 });
 
 function renderCard(view: AnnotationView) {
-  const anchorEl = document.createElement('div');
-  document.body.appendChild(anchorEl);
   render(
     <ThemeProvider theme={buildTheme('light')}>
-      <AnnotationHoverCard annotation={view} anchorEl={anchorEl} />
+      <AnnotationHoverCard annotation={view} getAnchorPosition={() => ({ left: 120, top: 240 })} />
     </ThemeProvider>,
   );
 }

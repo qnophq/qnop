@@ -92,8 +92,10 @@ export function DocumentViewer({
   const pageRefs = useRef<(HTMLDivElement | null)[]>([]);
   const [containerWidth, setContainerWidth] = useState(0);
   // Preview card for marks only: hovering a PANEL card links the mark but must
-  // not stack a second card over the document.
+  // not stack a second card over the document. The pointer position is kept in
+  // a ref (no re-renders) and read once when the card shows.
   const [previewId, setPreviewId] = useState<string | null>(null);
+  const pointerRef = useRef<ScreenPosition | null>(null);
 
   const handleMarkHover = (annotationId: string | null) => {
     setPreviewId(annotationId);
@@ -175,6 +177,9 @@ export function DocumentViewer({
       ref={containerRef}
       component="section"
       aria-label="Document pages"
+      onMouseMove={(event) => {
+        pointerRef.current = { left: event.clientX, top: event.clientY };
+      }}
       sx={{
         overflow: 'auto',
         height: '100%',
@@ -219,11 +224,8 @@ export function DocumentViewer({
       )}
       {(() => {
         const preview = previewId ? annotations.find((a) => a.id === previewId) : undefined;
-        const anchor = previewId
-          ? document.getElementById(`annotation-highlight-${previewId}`)
-          : null;
-        return preview && anchor ? (
-          <AnnotationHoverCard annotation={preview} anchorEl={anchor} />
+        return preview ? (
+          <AnnotationHoverCard annotation={preview} getAnchorPosition={() => pointerRef.current} />
         ) : null;
       })()}
     </Box>
