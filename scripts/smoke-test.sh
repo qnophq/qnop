@@ -188,15 +188,33 @@ code="$(acode GET "/api/v1/documents/${doc_id}/annotations?version=1")"
 log "GET .../annotations?version=1 -> 200"
 
 # 17) Auth session rotation: the refresh cookie mints a fresh access token, and
-#     after logout it is revoked (rotation + revocation, ADR-0026).
-refresh_json="$(curl -sf -b "$COOKIES" -c "$COOKIES" -X POST "${BASE_URL}/api/v1/auth/refresh")"
+#     after logout it is revoked (rotation + revocation, ADR-0026). /auth/refresh
+#     and /auth/logout are CSRF-protected by a double-submit cookie token (#175):
+#     the server sets a (non-HttpOnly) XSRF-TOKEN cookie that must be echoed back
+#     as the X-XSRF-TOKEN header, so we read it from the jar for each call.
+xsrf() { awk '$6=="XSRF-TOKEN"{v=$7} END{print v}' "$COOKIES"; }
+[ -n "$(xsrf)" ] || fail "login did not set the XSRF-TOKEN cookie"
+
+refresh_json="$(
+  curl -sf -b "$COOKIES" -c "$COOKIES" -H "X-XSRF-TOKEN: $(xsrf)" \
+    -X POST "${BASE_URL}/api/v1/auth/refresh"
+)"
 new_token="$(echo "$refresh_json" | jq -r '.accessToken')"
 [ -n "$new_token" ] && [ "$new_token" != "null" ] || fail "refresh did not return an access token"
 log "POST /api/v1/auth/refresh -> rotated access token"
 
-code="$(curl -s -o /dev/null -w '%{http_code}' -b "$COOKIES" -X POST "${BASE_URL}/api/v1/auth/logout")"
+code="$(
+  curl -s -o /dev/null -w '%{http_code}' -b "$COOKIES" -c "$COOKIES" \
+    -H "X-XSRF-TOKEN: $(xsrf)" -X POST "${BASE_URL}/api/v1/auth/logout"
+)"
 [ "$code" = "204" ] || fail "POST /api/v1/auth/logout -> HTTP $code (expected 204)"
-code="$(curl -s -o /dev/null -w '%{http_code}' -b "$COOKIES" -X POST "${BASE_URL}/api/v1/auth/refresh")"
+
+# Replay the (revoked) family — CSRF still satisfied, so this reaches the auth
+# check and must be rejected as unauthorized rather than blocked earlier.
+code="$(
+  curl -s -o /dev/null -w '%{http_code}' -b "$COOKIES" \
+    -H "X-XSRF-TOKEN: $(xsrf)" -X POST "${BASE_URL}/api/v1/auth/refresh"
+)"
 [ "$code" = "401" ] || fail "refresh after logout -> HTTP $code (expected 401 — token revoked)"
 log "logout revokes the refresh family (replay -> 401)"
 
