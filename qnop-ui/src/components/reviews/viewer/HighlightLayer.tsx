@@ -155,14 +155,12 @@ export function HighlightLayer({
                     transition: 'background-color 120ms ease',
                     // Highlighter look for both kinds: a borderless fill that
                     // multiplies over the page pixels, so printed glyphs stay
-                    // crisp underneath.
-                    bgcolor: alpha(
-                      style.color,
-                      marker ? (active ? 0.65 : 0.45) : active ? 0.5 : 0.35,
-                    ),
+                    // crisp underneath. Text bands and region boxes share the
+                    // same intensity in every state.
+                    bgcolor: alpha(style.color, active ? 0.65 : 0.45),
                     mixBlendMode: 'multiply',
                     borderRadius: marker ? '1px' : '2px',
-                    '&:hover': { bgcolor: alpha(style.color, marker ? 0.6 : 0.45) },
+                    '&:hover': { bgcolor: alpha(style.color, 0.6) },
                     '&:focus-visible': { outline: 'none', boxShadow: theme.qnop.focusRing },
                     ...(active && primary && !marker && { boxShadow: theme.qnop.focusRing }),
                   }}
