@@ -37,3 +37,10 @@ These are **data-critical**: losing a re-anchoring job would leave annotations s
 - **Spring `@Async` + thread pool.** Rejected: in-memory; a crash/restart mid-job loses the work and strands annotations `PENDING` permanently — unacceptable for re-anchoring.
 - **Redis / RabbitMQ / Kafka queue.** Rejected for now: pulls a broker into the On-Prem story early, against ADR-0013; Postgres-backed queues are well-proven at this scale (`FOR UPDATE SKIP LOCKED`).
 - **Spring Batch / Quartz.** Rejected: heavier than needed; we want a small, explicit, idempotent job table, not a scheduling framework.
+
+## Amendment (2026-07-04, issue #314)
+
+One refinement to the execution model; it refines, not reverses, the decision above.
+
+- **The job runner no longer holds a transaction across the handler.** The original `runOne` was `@Transactional`, so *handler effects and the `DONE` write committed atomically*. That was tidy but made the extraction handler pin a pooled DB connection for the entire S3 fetch + PDF parse (seconds); under concurrent uploads that exhausts the pool. `runOne` is now **non-transactional**: the handler runs with **no ambient transaction**, does its slow I/O connection-free, and owns the transaction around *its own* writes (the extraction handler's `READY`/`FAILED` writes moved into a small `DocumentExtractionWriter` bean so the `@Transactional` boundary is a real proxy call; the re-anchoring handler's `handle` is now itself `@Transactional`). `DONE` is then marked in a separate short transaction.
+- **The outbox guarantee is unchanged, and safety now rests entirely on idempotency.** The extraction→re-anchor enqueue still shares the `READY` write's transaction (outbox intact). What changes is that handler-effects and `DONE` are no longer one atomic unit — a crash in the gap re-runs the job, and the pre-existing, already-mandatory **idempotency** contract (a replay observing the terminal state is a no-op) covers that window. This trades a strong-but-costly atomicity for a brief connection hold, keeping the durability the data-criticality demands.

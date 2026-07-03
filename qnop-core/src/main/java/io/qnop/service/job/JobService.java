@@ -42,6 +42,14 @@ import org.springframework.transaction.annotation.Transactional;
  * (not self-invoked) so a handler failure rolls back its own effects without losing the failure
  * bookkeep, and so {@link #reapStale} can recover jobs stranded {@code RUNNING} by a crash.
  * Handlers are dispatched by {@code Job.type} and must be idempotent.
+ *
+ * <p><strong>Handler transactions (issue #314).</strong> {@link #runOne} deliberately runs the
+ * handler <em>without</em> an ambient transaction, so a handler doing slow I/O (an S3 fetch, a PDF
+ * parse) never pins a pooled DB connection for its whole duration. Each handler owns the
+ * transaction around its own writes, and the terminal {@code DONE} write is a separate short
+ * transaction. Handler-effects and {@code DONE} are therefore no longer one atomic unit — the
+ * mandatory idempotency (a re-run after a crash between the two is a no-op) is what keeps this
+ * safe.
  */
 @Service
 public class JobService {
@@ -82,11 +90,13 @@ public class JobService {
   }
 
   /**
-   * Runs one claimed job: dispatches its handler and marks it {@code DONE}. Handler effects and the
-   * {@code DONE} write are one transaction; a throwing handler rolls both back, and the caller
-   * records the failure separately. The {@code RUNNING} guard makes a re-run a no-op (idempotency).
+   * Runs one claimed job: dispatches its handler, then marks it {@code DONE}. Intentionally
+   * <em>not</em> {@code @Transactional} (issue #314) — the handler must be free to do slow I/O
+   * without holding a DB connection, so it owns the transaction around its own writes and this
+   * method marks {@code DONE} in a separate short transaction (via the repository). A throwing
+   * handler propagates to the caller, which records the failure; the {@code RUNNING} guard plus
+   * handler idempotency make a re-run a no-op.
    */
-  @Transactional
   public void runOne(UUID id) {
     Job job = repository.findById(id).orElse(null);
     if (job == null || job.getStatus() != JobStatus.RUNNING) {
