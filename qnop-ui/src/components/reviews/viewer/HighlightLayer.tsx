@@ -150,7 +150,6 @@ export function HighlightLayer({
                   }
                   aria-hidden={primary ? undefined : true}
                   data-testid={primary ? `highlight-${annotation.id}` : undefined}
-                  title={quote ? `“${quote.slice(0, 120)}”` : 'Region annotation'}
                   onClick={() => onSelect(annotation.id)}
                   onMouseEnter={() => onHover?.(annotation.id)}
                   onMouseLeave={() => onHover?.(null)}

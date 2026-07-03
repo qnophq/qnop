@@ -31,6 +31,7 @@ import type {
   RenderedSurface,
 } from '../../../api/generated';
 import type { ScreenPosition, TextSelectionOffsets } from './anchoring';
+import { AnnotationHoverCard } from './AnnotationHoverCard';
 import { SurfacePage } from './SurfacePage';
 import type { ViewerTool } from './ViewerToolbar';
 
@@ -90,6 +91,14 @@ export function DocumentViewer({
   const containerRef = useRef<HTMLDivElement>(null);
   const pageRefs = useRef<(HTMLDivElement | null)[]>([]);
   const [containerWidth, setContainerWidth] = useState(0);
+  // Preview card for marks only: hovering a PANEL card links the mark but must
+  // not stack a second card over the document.
+  const [previewId, setPreviewId] = useState<string | null>(null);
+
+  const handleMarkHover = (annotationId: string | null) => {
+    setPreviewId(annotationId);
+    onHoverAnnotation?.(annotationId);
+  };
 
   useEffect(() => {
     const element = containerRef.current;
@@ -192,8 +201,11 @@ export function DocumentViewer({
                   annotations={annotations}
                   activeAnnotationId={activeAnnotationId}
                   hoverAnnotationId={hoverAnnotationId}
-                  onSelectAnnotation={onSelectAnnotation}
-                  onHoverAnnotation={onHoverAnnotation}
+                  onSelectAnnotation={(id) => {
+                    setPreviewId(null);
+                    onSelectAnnotation(id);
+                  }}
+                  onHoverAnnotation={handleMarkHover}
                   tool={tool}
                   canAnnotate={canAnnotate}
                   pendingAnchor={pendingAnchor}
@@ -205,6 +217,15 @@ export function DocumentViewer({
           })}
         </Stack>
       )}
+      {(() => {
+        const preview = previewId ? annotations.find((a) => a.id === previewId) : undefined;
+        const anchor = previewId
+          ? document.getElementById(`annotation-highlight-${previewId}`)
+          : null;
+        return preview && anchor ? (
+          <AnnotationHoverCard annotation={preview} anchorEl={anchor} />
+        ) : null;
+      })()}
     </Box>
   );
 }
