@@ -23,11 +23,29 @@ package io.qnop.repository;
 import io.qnop.entity.Document;
 import java.util.List;
 import java.util.UUID;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 
 /** Data access for review aggregate roots (issue #244, ADR-0011). */
 public interface DocumentRepository extends JpaRepository<Document, UUID> {
 
   /** Documents owned by the given user. */
   List<Document> findByOwnerId(UUID ownerId);
+
+  /**
+   * The documents visible to a user for the reviews overview (issue #292): owned, joined as a
+   * direct participant, or joined through membership in a participating team. {@code q} must be
+   * passed pre-lowercased and {@code LIKE}-wrapped; {@code null} disables the title filter.
+   */
+  @Query(
+      "SELECT d FROM Document d WHERE (:q IS NULL OR LOWER(d.title) LIKE :q)"
+          + " AND (d.ownerId = :actor"
+          + " OR EXISTS (SELECT 1 FROM ReviewParticipant p"
+          + "   WHERE p.documentId = d.id AND p.userId = :actor)"
+          + " OR EXISTS (SELECT 1 FROM ReviewParticipant pt, TeamMembership m"
+          + "   WHERE pt.documentId = d.id AND pt.teamId = m.teamId AND m.userId = :actor))")
+  Page<Document> findVisibleTo(@Param("actor") UUID actor, @Param("q") String q, Pageable pageable);
 }

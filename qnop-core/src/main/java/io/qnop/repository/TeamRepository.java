@@ -21,6 +21,7 @@
 package io.qnop.repository;
 
 import io.qnop.entity.Team;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 import org.springframework.data.domain.Page;
@@ -46,4 +47,13 @@ public interface TeamRepository extends JpaRepository<Team, UUID> {
       "SELECT t FROM Team t WHERE :q IS NULL OR LOWER(t.name) LIKE :q"
           + " OR (t.description IS NOT NULL AND LOWER(t.description) LIKE :q)")
   Page<Team> search(@Param("q") String q, Pageable pageable);
+
+  /**
+   * Principal-directory search (issue #292): enabled teams by name. {@code q} pre-lowercased and
+   * {@code LIKE}-wrapped; {@code null} disables the filter. Limit via {@code Pageable}.
+   */
+  @Query(
+      "SELECT t FROM Team t WHERE t.enabled = TRUE AND (:q IS NULL OR LOWER(t.name) LIKE :q)"
+          + " ORDER BY LOWER(t.name)")
+  List<Team> searchEnabledPrincipals(@Param("q") String q, Pageable pageable);
 }

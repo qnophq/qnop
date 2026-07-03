@@ -24,6 +24,7 @@ import io.qnop.entity.User;
 import io.qnop.entity.UserRole;
 import io.qnop.entity.UserSource;
 import java.time.Instant;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 import org.springframework.data.domain.Page;
@@ -95,4 +96,17 @@ public interface UserRepository extends JpaRepository<User, UUID> {
       "UPDATE User u SET u.passwordHash = :hash, u.passwordChangeRequired = false,"
           + " u.version = u.version + 1 WHERE u.id = :id")
   int updatePasswordHash(@Param("id") UUID id, @Param("hash") String hash);
+
+  /**
+   * Principal-directory search (issue #292): enabled users by display name or username.
+   * Deliberately does NOT match on email — the directory must not confirm email addresses. {@code
+   * q} pre-lowercased and {@code LIKE}-wrapped; {@code null} disables the filter. Limit via {@code
+   * Pageable}.
+   */
+  @Query(
+      "SELECT u FROM User u WHERE u.enabled = TRUE AND (:q IS NULL"
+          + " OR LOWER(u.displayName) LIKE :q"
+          + " OR (u.username IS NOT NULL AND LOWER(u.username) LIKE :q))"
+          + " ORDER BY LOWER(u.displayName)")
+  List<User> searchEnabledPrincipals(@Param("q") String q, Pageable pageable);
 }

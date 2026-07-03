@@ -62,6 +62,10 @@ public class DocumentValidationException extends RuntimeException {
     return new DocumentValidationException(413, "PAYLOAD_TOO_LARGE", detail);
   }
 
+  public static DocumentValidationException duplicateParticipant(String detail) {
+    return new DocumentValidationException(409, "DUPLICATE_PARTICIPANT", detail);
+  }
+
   public static DocumentValidationException invalidRequest(String detail) {
     return new DocumentValidationException(400, "VALIDATION_ERROR", detail);
   }

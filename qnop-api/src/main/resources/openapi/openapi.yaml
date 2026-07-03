@@ -82,6 +82,15 @@ tags:
       the review core (issue #245, ADR-0032). Visible only to the owner, the
       review participants, and admins. The multipart upload and the
       original-binary download are deliberately outside this contract (ADR-0028).
+      The root listing and the participant management (issue #292, ADR-0011)
+      power the reviews overview: a participant is a reviewer — a user or a
+      whole team — while the owner stays structural on the document.
+  - name: Principals
+    description: |
+      A lightweight directory of assignable principals — enabled users and
+      teams — for picking review participants (issue #292). Available to every
+      authenticated user by deliberate Community decision; it exposes display
+      names only (no emails, no roles).
   - name: Annotations
     description: |
       Annotations, their comment threads, and per-version placements (issue #247,
@@ -1676,6 +1685,207 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
+  /documents:
+    get:
+      tags:
+        - Documents
+      summary: List the caller's documents
+      description: |
+        Every document the caller owns or participates in — directly or through
+        a team membership. Deliberately personal: admins see their own list
+        here too and use the direct document endpoints for oversight.
+      operationId: listDocuments
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: q
+          in: query
+          required: false
+          description: Case-insensitive search over the title.
+          schema:
+            type: string
+            maxLength: 200
+        - name: sort
+          in: query
+          required: false
+          description: |
+            Sort as `field,direction`. Allowed fields: updatedAt, createdAt,
+            title; direction asc|desc.
+          schema:
+            type: string
+            default: updatedAt,desc
+        - name: page
+          in: query
+          required: false
+          description: Zero-based page index.
+          schema:
+            type: integer
+            format: int32
+            minimum: 0
+            default: 0
+        - name: size
+          in: query
+          required: false
+          description: Page size.
+          schema:
+            type: integer
+            format: int32
+            minimum: 1
+            maximum: 100
+            default: 20
+      responses:
+        '200':
+          description: A page of the caller's documents, with review progress.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DocumentListResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+  /documents/{documentId}/participants:
+    get:
+      tags:
+        - Documents
+      summary: List review participants
+      description: |
+        The document's reviewers — users or teams (ADR-0011). The owner is
+        structural on the document and never appears here.
+      operationId: listParticipants
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/DocumentIdParam'
+      responses:
+        '200':
+          description: The participants, oldest first.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ParticipantListResponse'
+        '404':
+          description: Unknown document, or the caller is not a participant
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+    post:
+      tags:
+        - Documents
+      summary: Add a review participant
+      description: |
+        Owner-only. Exactly one of `userId` or `teamId` — a participant is a
+        user XOR a team. Adding the owner, a disabled principal, or an unknown
+        principal is rejected with 400; adding a principal twice with 409.
+      operationId: addParticipant
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/DocumentIdParam'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ParticipantCreateRequest'
+      responses:
+        '201':
+          description: The participant was added.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ParticipantView'
+        '400':
+          description: Not exactly one principal, unknown or disabled principal, or the owner
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: The caller is a participant but not the owner
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Unknown document, or the caller is not a participant
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '409':
+          description: The principal is already a participant
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+  /documents/{documentId}/participants/{participantId}:
+    delete:
+      tags:
+        - Documents
+      summary: Remove a review participant
+      description: Owner-only.
+      operationId: removeParticipant
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/DocumentIdParam'
+        - $ref: '#/components/parameters/ParticipantIdParam'
+      responses:
+        '204':
+          description: The participant was removed.
+        '403':
+          description: The caller is a participant but not the owner
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Unknown document or participant, or the caller is not a participant
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+  /principals:
+    get:
+      tags:
+        - Principals
+      summary: Search assignable principals
+      operationId: searchPrincipals
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: q
+          in: query
+          required: false
+          description: Case-insensitive search over user display names/usernames and team names.
+          schema:
+            type: string
+            maxLength: 200
+        - name: size
+          in: query
+          required: false
+          description: Maximum number of principals to return.
+          schema:
+            type: integer
+            format: int32
+            minimum: 1
+            maximum: 50
+            default: 20
+      responses:
+        '200':
+          description: Matching enabled users and teams, sorted by display name.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PrincipalListResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
   /documents/{documentId}:
     get:
       tags:
@@ -2081,6 +2291,14 @@ components:
       in: path
       required: true
       description: The annotation's id.
+      schema:
+        type: string
+        format: uuid
+    ParticipantIdParam:
+      name: participantId
+      in: path
+      required: true
+      description: The participant row's id.
       schema:
         type: string
         format: uuid
@@ -3311,6 +3529,153 @@ components:
       required:
         - field
         - message
+    DocumentSummary:
+      type: object
+      description: One document in the caller's reviews overview (issue #292).
+      properties:
+        id:
+          type: string
+          format: uuid
+        title:
+          type: string
+          maxLength: 500
+        ownerId:
+          type: string
+          format: uuid
+        workflowState:
+          type: string
+          description: The review workflow state (open string set, ADR-0011).
+        latestVersionNumber:
+          type: integer
+          description: The highest existing version number; 0 when none exist.
+        annotationCount:
+          type: integer
+          format: int32
+          description: All annotations on the document, regardless of status.
+        openAnnotationCount:
+          type: integer
+          format: int32
+          description: Annotations still in status OPEN.
+        participants:
+          type: array
+          description: The reviewers (users or teams), oldest first.
+          items:
+            $ref: '#/components/schemas/ParticipantView'
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+      required:
+        - id
+        - title
+        - ownerId
+        - workflowState
+        - latestVersionNumber
+        - annotationCount
+        - openAnnotationCount
+        - participants
+        - createdAt
+        - updatedAt
+    DocumentListResponse:
+      type: object
+      description: A page of the caller's documents.
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/DocumentSummary'
+        total:
+          type: integer
+          format: int64
+          description: Total number of documents matching the query.
+        page:
+          type: integer
+          format: int32
+          description: Zero-based page index.
+        size:
+          type: integer
+          format: int32
+          description: Page size.
+      required:
+        - items
+        - total
+        - page
+        - size
+    ParticipantKind:
+      type: string
+      description: What kind of principal a participant is.
+      enum:
+        - USER
+        - TEAM
+    ParticipantView:
+      type: object
+      description: A review participant — a user or a team acting as reviewer (ADR-0011).
+      properties:
+        id:
+          type: string
+          format: uuid
+          description: The participant row's id (used for removal).
+        kind:
+          $ref: '#/components/schemas/ParticipantKind'
+        principalId:
+          type: string
+          format: uuid
+          description: The user's or team's id.
+        displayName:
+          type: string
+          description: The user's display name or the team's name.
+      required:
+        - id
+        - kind
+        - principalId
+        - displayName
+    ParticipantListResponse:
+      type: object
+      description: The document's review participants.
+      properties:
+        participants:
+          type: array
+          items:
+            $ref: '#/components/schemas/ParticipantView'
+      required:
+        - participants
+    ParticipantCreateRequest:
+      type: object
+      description: Add a reviewer — exactly one of `userId` or `teamId`.
+      properties:
+        userId:
+          type: string
+          format: uuid
+        teamId:
+          type: string
+          format: uuid
+    PrincipalView:
+      type: object
+      description: An assignable principal — an enabled user or team.
+      properties:
+        id:
+          type: string
+          format: uuid
+        kind:
+          $ref: '#/components/schemas/ParticipantKind'
+        displayName:
+          type: string
+      required:
+        - id
+        - kind
+        - displayName
+    PrincipalListResponse:
+      type: object
+      description: Principals matching a directory search.
+      properties:
+        principals:
+          type: array
+          items:
+            $ref: '#/components/schemas/PrincipalView'
+      required:
+        - principals
     DocumentResponse:
       type: object
       description: A review document's metadata.

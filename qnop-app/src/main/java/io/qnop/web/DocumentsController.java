@@ -24,17 +24,25 @@ import io.qnop.api.v1.endpoint.DocumentsApi;
 import io.qnop.api.v1.model.DiffChange;
 import io.qnop.api.v1.model.DiffChangeType;
 import io.qnop.api.v1.model.DiffLocation;
+import io.qnop.api.v1.model.DocumentListResponse;
 import io.qnop.api.v1.model.DocumentResponse;
+import io.qnop.api.v1.model.DocumentSummary;
 import io.qnop.api.v1.model.DocumentVersionListResponse;
 import io.qnop.api.v1.model.DocumentVersionSummary;
 import io.qnop.api.v1.model.ExtractionStatus;
 import io.qnop.api.v1.model.NormalizedBox;
+import io.qnop.api.v1.model.ParticipantCreateRequest;
+import io.qnop.api.v1.model.ParticipantKind;
+import io.qnop.api.v1.model.ParticipantListResponse;
+import io.qnop.api.v1.model.ParticipantView;
 import io.qnop.api.v1.model.RenderedDocumentResponse;
 import io.qnop.api.v1.model.VersionDiffResponse;
 import io.qnop.service.diff.VersionDiffService;
 import io.qnop.service.document.DocumentAccessService;
 import io.qnop.service.document.DocumentAccessService.DocumentVersionView;
 import io.qnop.service.document.DocumentAccessService.DocumentView;
+import io.qnop.service.document.DocumentOverviewService;
+import io.qnop.service.document.ReviewParticipantService;
 import java.time.ZoneOffset;
 import java.util.UUID;
 import org.springframework.http.ResponseEntity;
@@ -53,10 +61,90 @@ public class DocumentsController implements DocumentsApi {
 
   private final DocumentAccessService documents;
   private final VersionDiffService diffs;
+  private final DocumentOverviewService overview;
+  private final ReviewParticipantService participants;
 
-  public DocumentsController(DocumentAccessService documents, VersionDiffService diffs) {
+  public DocumentsController(
+      DocumentAccessService documents,
+      VersionDiffService diffs,
+      DocumentOverviewService overview,
+      ReviewParticipantService participants) {
     this.documents = documents;
     this.diffs = diffs;
+    this.overview = overview;
+    this.participants = participants;
+  }
+
+  @Override
+  public ResponseEntity<DocumentListResponse> listDocuments(
+      String q, String sort, Integer page, Integer size) {
+    DocumentOverviewService.DocumentPage result =
+        overview.listVisible(
+            CurrentUser.requireUserId(),
+            q,
+            sort,
+            page == null ? 0 : page,
+            size == null ? 20 : size);
+    return ResponseEntity.ok(
+        new DocumentListResponse()
+            .items(result.items().stream().map(DocumentsController::toSummary).toList())
+            .total(result.total())
+            .page(result.page())
+            .size(result.size()));
+  }
+
+  @Override
+  public ResponseEntity<ParticipantListResponse> listParticipants(UUID documentId) {
+    return ResponseEntity.ok(
+        new ParticipantListResponse()
+            .participants(
+                participants
+                    .list(documentId, CurrentUser.requireUserId(), CurrentUser.isAdmin())
+                    .stream()
+                    .map(DocumentsController::toParticipant)
+                    .toList()));
+  }
+
+  @Override
+  public ResponseEntity<ParticipantView> addParticipant(
+      UUID documentId, ParticipantCreateRequest request) {
+    ReviewParticipantService.ParticipantView added =
+        participants.add(
+            documentId,
+            CurrentUser.requireUserId(),
+            CurrentUser.isAdmin(),
+            request.getUserId(),
+            request.getTeamId());
+    return ResponseEntity.status(201).body(toParticipant(added));
+  }
+
+  @Override
+  public ResponseEntity<Void> removeParticipant(UUID documentId, UUID participantId) {
+    participants.remove(
+        documentId, participantId, CurrentUser.requireUserId(), CurrentUser.isAdmin());
+    return ResponseEntity.noContent().build();
+  }
+
+  private static DocumentSummary toSummary(DocumentOverviewService.DocumentSummaryView view) {
+    return new DocumentSummary()
+        .id(view.id())
+        .title(view.title())
+        .ownerId(view.ownerId())
+        .workflowState(view.workflowState())
+        .latestVersionNumber(view.latestVersionNumber())
+        .annotationCount(view.annotationCount())
+        .openAnnotationCount(view.openAnnotationCount())
+        .participants(view.participants().stream().map(DocumentsController::toParticipant).toList())
+        .createdAt(view.createdAt().atOffset(ZoneOffset.UTC))
+        .updatedAt(view.updatedAt().atOffset(ZoneOffset.UTC));
+  }
+
+  private static ParticipantView toParticipant(ReviewParticipantService.ParticipantView view) {
+    return new ParticipantView()
+        .id(view.id())
+        .kind(view.team() ? ParticipantKind.TEAM : ParticipantKind.USER)
+        .principalId(view.principalId())
+        .displayName(view.displayName());
   }
 
   @Override

@@ -21,10 +21,13 @@
 package io.qnop.repository;
 
 import io.qnop.entity.DocumentVersion;
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 
 /** Data access for the immutable version chain of a document (issue #244, ADR-0011). */
 public interface DocumentVersionRepository extends JpaRepository<DocumentVersion, UUID> {
@@ -37,4 +40,11 @@ public interface DocumentVersionRepository extends JpaRepository<DocumentVersion
 
   /** The latest (highest-numbered) version of a document, if any. */
   Optional<DocumentVersion> findTopByDocumentIdOrderByVersionNumberDesc(UUID documentId);
+
+  /** Batched highest version numbers for the reviews overview (issue #292). */
+  @Query(
+      "SELECT new io.qnop.repository.DocumentMaxVersion(v.documentId, MAX(v.versionNumber))"
+          + " FROM DocumentVersion v WHERE v.documentId IN :documentIds GROUP BY v.documentId")
+  List<DocumentMaxVersion> findMaxVersionsByDocumentIds(
+      @Param("documentIds") Collection<UUID> documentIds);
 }
