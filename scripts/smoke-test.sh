@@ -191,12 +191,23 @@ log "GET .../annotations?version=1 -> 200"
 #     after logout it is revoked (rotation + revocation, ADR-0026). /auth/refresh
 #     and /auth/logout are CSRF-protected by a double-submit cookie token (#175):
 #     the server sets a (non-HttpOnly) XSRF-TOKEN cookie that must be echoed back
-#     as the X-XSRF-TOKEN header, so we read it from the jar for each call.
-xsrf() { awk '$6=="XSRF-TOKEN"{v=$7} END{print v}' "$COOKIES"; }
-[ -n "$(xsrf)" ] || fail "login did not set the XSRF-TOKEN cookie"
+#     as the X-XSRF-TOKEN header. Prime it from a response's Set-Cookie header
+#     (into the jar via -c), with a jar fallback, so the cookie and header match.
+csrf_hdrs="$(
+  curl -sf -D - -o /dev/null -b "$COOKIES" -c "$COOKIES" \
+    -H "Authorization: Bearer ${TOKEN}" "${BASE_URL}/api/v1/users/me"
+)"
+XSRF="$(printf '%s' "$csrf_hdrs" | tr -d '\r' |
+  sed -n 's/^[Ss]et-[Cc]ookie: *XSRF-TOKEN=\([^;]*\).*/\1/p' | tail -1)"
+[ -n "$XSRF" ] || XSRF="$(awk '$6=="XSRF-TOKEN"{v=$7} END{print v}' "$COOKIES")"
+if [ -z "$XSRF" ]; then
+  echo "[smoke] cookie jar contents:" >&2
+  cat "$COOKIES" >&2
+  fail "no XSRF-TOKEN cookie was issued (double-submit CSRF token, #175)"
+fi
 
 refresh_json="$(
-  curl -sf -b "$COOKIES" -c "$COOKIES" -H "X-XSRF-TOKEN: $(xsrf)" \
+  curl -sf -b "$COOKIES" -c "$COOKIES" -H "X-XSRF-TOKEN: ${XSRF}" \
     -X POST "${BASE_URL}/api/v1/auth/refresh"
 )"
 new_token="$(echo "$refresh_json" | jq -r '.accessToken')"
@@ -205,7 +216,7 @@ log "POST /api/v1/auth/refresh -> rotated access token"
 
 code="$(
   curl -s -o /dev/null -w '%{http_code}' -b "$COOKIES" -c "$COOKIES" \
-    -H "X-XSRF-TOKEN: $(xsrf)" -X POST "${BASE_URL}/api/v1/auth/logout"
+    -H "X-XSRF-TOKEN: ${XSRF}" -X POST "${BASE_URL}/api/v1/auth/logout"
 )"
 [ "$code" = "204" ] || fail "POST /api/v1/auth/logout -> HTTP $code (expected 204)"
 
@@ -213,7 +224,7 @@ code="$(
 # check and must be rejected as unauthorized rather than blocked earlier.
 code="$(
   curl -s -o /dev/null -w '%{http_code}' -b "$COOKIES" \
-    -H "X-XSRF-TOKEN: $(xsrf)" -X POST "${BASE_URL}/api/v1/auth/refresh"
+    -H "X-XSRF-TOKEN: ${XSRF}" -X POST "${BASE_URL}/api/v1/auth/refresh"
 )"
 [ "$code" = "401" ] || fail "refresh after logout -> HTTP $code (expected 401 — token revoked)"
 log "logout revokes the refresh family (replay -> 401)"
