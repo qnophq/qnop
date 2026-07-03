@@ -93,7 +93,7 @@ describe('CommentThread', () => {
 
     renderThread();
 
-    expect(screen.getByText('No comments yet.')).toBeInTheDocument();
+    expect(screen.getByText(/No comments yet/)).toBeInTheDocument();
   });
 
   it('submits a trimmed comment and blocks empty drafts', () => {

@@ -22,7 +22,7 @@
 import { Fragment } from 'react';
 import type { KeyboardEvent } from 'react';
 import Box from '@mui/material/Box';
-import { alpha, useTheme } from '@mui/material/styles';
+import { alpha, keyframes, useTheme } from '@mui/material/styles';
 import type {
   Anchor,
   AnnotationView,
@@ -57,6 +57,16 @@ function positionSx(box: NormalizedBox) {
     height: `${box.height * 100}%`,
   } as const;
 }
+
+/**
+ * The card↔mark link cue (prototype `hlHotPulse`): the hovered mark breathes
+ * between its rest and hot intensity. Driven by a CSS variable so one
+ * keyframe set serves every status colour.
+ */
+const markPulse = keyframes`
+  0%, 100% { background-color: color-mix(in srgb, var(--hl) 48%, transparent); }
+  50% { background-color: color-mix(in srgb, var(--hl) 78%, transparent); }
+`;
 
 /**
  * The highlight overlay of one surface. Geometry comes from the stored anchors
@@ -151,11 +161,11 @@ export function HighlightLayer({
                   }
                   sx={{
                     ...positionSx(box),
+                    '--hl': style.color,
                     pointerEvents: 'auto',
                     cursor: 'pointer',
                     opacity: style.opacity,
                     transition: 'background-color 120ms ease, box-shadow 120ms ease',
-                    '@media (prefers-reduced-motion: reduce)': { transition: 'none' },
                     // Highlighter look for both kinds: a borderless fill that
                     // multiplies over the page pixels, so printed glyphs stay
                     // crisp underneath. Text bands and region boxes share the
@@ -169,6 +179,11 @@ export function HighlightLayer({
                     ...(primary &&
                       !marker &&
                       (active || hot) && { boxShadow: theme.qnop.focusRing }),
+                    ...(hot && { animation: `${markPulse} 1.1s ease-in-out infinite` }),
+                    '@media (prefers-reduced-motion: reduce)': {
+                      transition: 'none',
+                      animation: 'none',
+                    },
                   }}
                 />
               );

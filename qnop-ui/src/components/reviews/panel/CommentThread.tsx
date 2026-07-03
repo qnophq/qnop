@@ -20,14 +20,22 @@
  */
 
 import { useState } from 'react';
-import Button from '@mui/material/Button';
+import Box from '@mui/material/Box';
 import CircularProgress from '@mui/material/CircularProgress';
+import IconButton from '@mui/material/IconButton';
 import Stack from '@mui/material/Stack';
 import TextField from '@mui/material/TextField';
 import Typography from '@mui/material/Typography';
+import { useTheme } from '@mui/material/styles';
+import { SendHorizontal } from 'lucide-react';
 import { useAddComment, useComments } from '../../../api/hooks/useComments';
 import { useAuthStore } from '../../../stores/authStore';
 import type { Notify } from '../../admin/layout/useToast';
+import { UserAvatar } from '../../shell/UserAvatar';
+
+const AVATAR_SIZE = 26;
+/** Centre of the avatar column — where the thread line runs. */
+const LINE_LEFT = AVATAR_SIZE / 2 - 1;
 
 interface CommentThreadProps {
   annotationId: string;
@@ -40,13 +48,18 @@ const TIME_FORMAT = new Intl.DateTimeFormat(undefined, {
 });
 
 /**
- * The annotation's discussion: a flat thread, oldest first (ADR-0011 — the
- * annotation owns the thread; accept/reject decisions live on the annotation,
- * not on comments). Participant names are not part of the annotation API yet,
- * so authorship is shown relative to the signed-in user.
+ * The annotation's discussion as a social-style thread (ADR-0011 — the
+ * annotation owns the thread): every comment is an avatar on a shared
+ * timeline rail with a speech bubble, the composer continues the same rail —
+ * the annotation card above is the root post. Participant names are not part
+ * of the annotation API yet, so authorship is shown relative to the signed-in
+ * user.
  */
 export function CommentThread({ annotationId, notify }: CommentThreadProps) {
+  const theme = useTheme();
   const userId = useAuthStore((state) => state.userId);
+  const displayName = useAuthStore((state) => state.displayName);
+  const avatarUrl = useAuthStore((state) => state.avatarUrl);
   const commentsQuery = useComments(annotationId);
   const addComment = useAddComment(annotationId);
   const [draft, setDraft] = useState('');
@@ -60,58 +73,109 @@ export function CommentThread({ annotationId, notify }: CommentThreadProps) {
     });
   };
 
+  const comments = commentsQuery.data?.comments ?? [];
+
   return (
-    <Stack spacing={1.5} sx={{ pt: 1 }}>
-      {commentsQuery.isPending && (
-        <Stack sx={{ alignItems: 'center', py: 1 }}>
-          <CircularProgress size={18} />
-        </Stack>
-      )}
-      {commentsQuery.isError && (
-        <Typography variant="body2" color="error">
-          Could not load the comments.
-        </Typography>
-      )}
-      {commentsQuery.data?.comments.map((comment) => (
-        <Stack key={comment.id} spacing={0.25}>
-          <Stack direction="row" spacing={1} sx={{ alignItems: 'baseline' }}>
-            <Typography variant="body2" sx={{ fontWeight: 600 }}>
-              {comment.authorId === userId ? 'You' : 'Participant'}
-            </Typography>
-            <Typography variant="caption" color="text.secondary">
-              {TIME_FORMAT.format(new Date(comment.createdAt))}
-            </Typography>
+    <Box sx={{ position: 'relative', mt: 0.5, ml: 1.5, pl: 0 }}>
+      {/* The timeline rail connecting the annotation card to its thread. */}
+      <Box
+        aria-hidden
+        sx={{
+          position: 'absolute',
+          left: LINE_LEFT,
+          top: -6,
+          bottom: 18,
+          width: 2,
+          borderRadius: 1,
+          bgcolor: theme.palette.divider,
+        }}
+      />
+      <Stack spacing={1.25} sx={{ pt: 1 }}>
+        {commentsQuery.isPending && (
+          <Stack sx={{ alignItems: 'center', py: 1 }}>
+            <CircularProgress size={18} aria-label="Loading comments" />
           </Stack>
-          <Typography variant="body2" sx={{ whiteSpace: 'pre-wrap', overflowWrap: 'anywhere' }}>
-            {comment.body}
+        )}
+        {commentsQuery.isError && (
+          <Typography variant="body2" color="error" sx={{ pl: 4.5 }}>
+            Could not load the comments.
           </Typography>
+        )}
+        {comments.map((comment) => {
+          const own = comment.authorId === userId;
+          const name = own ? (displayName ?? 'You') : 'Participant';
+          return (
+            <Stack key={comment.id} direction="row" spacing={1} sx={{ alignItems: 'flex-start' }}>
+              <Box sx={{ position: 'relative', zIndex: 1, pt: 0.25 }}>
+                <UserAvatar name={name} size={AVATAR_SIZE} imageUrl={own ? avatarUrl : null} />
+              </Box>
+              <Box
+                sx={{
+                  flex: 1,
+                  minWidth: 0,
+                  bgcolor: theme.qnop.surface2,
+                  borderRadius: '4px 12px 12px 12px',
+                  px: 1.25,
+                  py: 0.75,
+                }}
+              >
+                <Stack direction="row" spacing={1} sx={{ alignItems: 'baseline' }}>
+                  <Typography variant="body2" sx={{ fontWeight: 600 }}>
+                    {own ? 'You' : name}
+                  </Typography>
+                  <Typography variant="caption" color="text.secondary">
+                    {TIME_FORMAT.format(new Date(comment.createdAt))}
+                  </Typography>
+                </Stack>
+                <Typography
+                  variant="body2"
+                  sx={{ whiteSpace: 'pre-wrap', overflowWrap: 'anywhere', mt: 0.25 }}
+                >
+                  {comment.body}
+                </Typography>
+              </Box>
+            </Stack>
+          );
+        })}
+        {!commentsQuery.isPending && !commentsQuery.isError && comments.length === 0 && (
+          <Typography variant="body2" color="text.secondary" sx={{ pl: 4.5 }}>
+            No comments yet. Start the discussion.
+          </Typography>
+        )}
+        {/* Composer continues the thread rail with the signed-in user's avatar. */}
+        <Stack direction="row" spacing={1} sx={{ alignItems: 'flex-start' }}>
+          <Box sx={{ position: 'relative', zIndex: 1, pt: 0.5 }}>
+            <UserAvatar name={displayName ?? 'You'} size={AVATAR_SIZE} imageUrl={avatarUrl} />
+          </Box>
+          <TextField
+            multiline
+            minRows={1}
+            size="small"
+            fullWidth
+            placeholder="Add a comment"
+            value={draft}
+            onChange={(event) => setDraft(event.target.value)}
+            slotProps={{
+              htmlInput: { maxLength: 20000, 'aria-label': 'Add a comment' },
+              input: {
+                sx: { borderRadius: 3, bgcolor: 'background.paper' },
+                endAdornment: (
+                  <IconButton
+                    size="small"
+                    aria-label="Comment"
+                    color="primary"
+                    onClick={submit}
+                    disabled={!draft.trim() || addComment.isPending}
+                    sx={{ alignSelf: 'flex-end' }}
+                  >
+                    <SendHorizontal size={16} />
+                  </IconButton>
+                ),
+              },
+            }}
+          />
         </Stack>
-      ))}
-      {commentsQuery.data?.comments.length === 0 && (
-        <Typography variant="body2" color="text.secondary">
-          No comments yet.
-        </Typography>
-      )}
-      <Stack spacing={1}>
-        <TextField
-          multiline
-          minRows={2}
-          size="small"
-          placeholder="Add a comment"
-          value={draft}
-          onChange={(event) => setDraft(event.target.value)}
-          slotProps={{ htmlInput: { maxLength: 20000, 'aria-label': 'Add a comment' } }}
-        />
-        <Button
-          variant="contained"
-          size="small"
-          onClick={submit}
-          disabled={!draft.trim() || addComment.isPending}
-          sx={{ alignSelf: 'flex-end' }}
-        >
-          Comment
-        </Button>
       </Stack>
-    </Stack>
+    </Box>
   );
 }

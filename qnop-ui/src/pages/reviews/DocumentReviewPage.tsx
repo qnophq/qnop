@@ -197,9 +197,9 @@ export function DocumentReviewPage() {
       spacing={2.5}
       sx={{
         // The review surface is a fixed workspace (prototype layout): the page
-        // header stays put while document and panel scroll independently.
-        // 100dvh minus the shell top bar and the container paddings.
-        height: { md: 'calc(100dvh - 112px)' },
+        // header stays put while document and panel scroll independently. The
+        // shell hands this route the full container height (AppShell fullBleed).
+        height: { md: '100%' },
         minHeight: { md: 480 },
       }}
     >

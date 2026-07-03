@@ -23,7 +23,7 @@ import Box from '@mui/material/Box';
 import ButtonBase from '@mui/material/ButtonBase';
 import Stack from '@mui/material/Stack';
 import Typography from '@mui/material/Typography';
-import { alpha, useTheme } from '@mui/material/styles';
+import { alpha, keyframes, useTheme } from '@mui/material/styles';
 import { MessageSquare } from 'lucide-react';
 import type { AnnotationView } from '../../../api/generated';
 import { AnnotationStatus } from '../../../api/generated';
@@ -31,6 +31,12 @@ import type { BadgeTone } from '../../admin/ToneBadge';
 import { ToneBadge } from '../../admin/ToneBadge';
 import { highlightColorFor } from '../viewer/markerColors';
 import { PlacementStatusChip } from './PlacementStatusChip';
+
+/** Gentle glow on the status rail while the card is linked to its hovered mark. */
+const railGlow = keyframes`
+  0%, 100% { box-shadow: 0 0 0 0 transparent; }
+  50% { box-shadow: 0 0 10px 2px var(--rail-glow); }
+`;
 
 const STATUS_CUES: Record<AnnotationStatus, { tone: BadgeTone; label: string }> = {
   [AnnotationStatus.Open]: { tone: 'blue', label: 'Open' },
@@ -98,13 +104,30 @@ export function AnnotationListItem({
           'border-color 120ms ease, background-color 120ms ease, transform 160ms ease, box-shadow 160ms ease',
         '@media (prefers-reduced-motion: reduce)': { transition: 'none' },
         ...(linked && {
-          transform: 'translateX(-2px)',
-          boxShadow: `0 6px 18px -8px ${alpha(railColor, 0.7)}`,
+          transform: 'translateX(-3px)',
+          boxShadow: `0 8px 22px -10px ${alpha(railColor, 0.8)}`,
         }),
         '&:hover': { borderColor: railColor },
         '&:focus-visible': { boxShadow: theme.qnop.focusRing },
       }}
     >
+      {/* Link arrow pointing at the document while the pair is hot (prototype). */}
+      {linked && (
+        <Box
+          aria-hidden
+          sx={{
+            position: 'absolute',
+            left: -7,
+            top: '50%',
+            transform: 'translateY(-50%)',
+            width: 0,
+            height: 0,
+            borderTop: '6px solid transparent',
+            borderBottom: '6px solid transparent',
+            borderRight: `7px solid ${railColor}`,
+          }}
+        />
+      )}
       {/* Status rail — the same colour the mark paints with on the page. */}
       <Box
         aria-hidden
@@ -118,6 +141,9 @@ export function AnnotationListItem({
           bgcolor: railColor,
           opacity: linked || active ? 1 : 0.55,
           transition: 'opacity 120ms ease',
+          '--rail-glow': alpha(railColor, 0.55),
+          ...(linked && { animation: `${railGlow} 1.1s ease-in-out infinite` }),
+          '@media (prefers-reduced-motion: reduce)': { animation: 'none', transition: 'none' },
         }}
       />
       <Stack spacing={0.75}>
