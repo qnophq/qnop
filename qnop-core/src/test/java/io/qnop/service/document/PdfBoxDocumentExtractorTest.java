@@ -126,6 +126,29 @@ class PdfBoxDocumentExtractorTest {
   }
 
   @Test
+  @DisplayName("spans carry glyph-true, non-decreasing per-character right edges (#290)")
+  void spansCarryCharAdvances() throws Exception {
+    byte[] pdf = pdf("Wim mi Wim"); // proportional font: W wide, i narrow
+
+    Surface surface = extractor.extract(new ByteArrayInputStream(pdf)).surfaces().get(0);
+    TextSpan span = surface.textSpans().get(0);
+
+    assertThat(span.charAdvances()).isNotNull().hasSize(span.text().length());
+    double previous = span.box().x();
+    for (double edge : span.charAdvances()) {
+      assertThat(edge).isGreaterThanOrEqualTo(previous).isBetween(0.0, 1.0);
+      previous = edge;
+    }
+    // The last edge is the right end of the box (same coordinate space).
+    assertThat(span.charAdvances().get(span.text().length() - 1))
+        .isCloseTo(span.box().x() + span.box().width(), org.assertj.core.data.Offset.offset(1e-6));
+    // Glyph-true means non-uniform: the wide 'W' (char 0) is wider than the narrow 'i' (char 1).
+    double wWidth = span.charAdvances().get(0) - span.box().x();
+    double iWidth = span.charAdvances().get(1) - span.charAdvances().get(0);
+    assertThat(wWidth).isGreaterThan(iWidth * 2);
+  }
+
+  @Test
   @DisplayName("vertically overlapping runs stay character-intact as separate spans (#296)")
   void overlappingRunsAreNotInterleaved() throws Exception {
     // A small kicker line with a large headline right below: the 36 pt glyphs extend upward

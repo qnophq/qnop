@@ -3812,6 +3812,20 @@ components:
           description: Exclusive end (startOffset + text length).
         box:
           $ref: '#/components/schemas/NormalizedBox'
+        charAdvances:
+          type: array
+          items:
+            type: number
+            format: double
+          description: >-
+            Glyph-true sub-line geometry (issue #290): the normalized x of
+            each character's right edge on the surface, in the same coordinate
+            space as `box`. Character i spans from `i == 0 ? box.x :
+            charAdvances[i-1]` to `charAdvances[i]`. Values are non-decreasing
+            and the array length equals the text length. Absent for
+            representations extracted before this field existed or when
+            per-character geometry cannot be attributed — clients then
+            distribute the characters uniformly across the box.
       required:
         - text
         - startOffset
