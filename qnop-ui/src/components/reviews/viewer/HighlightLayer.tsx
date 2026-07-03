@@ -176,9 +176,9 @@ export function HighlightLayer({
                     borderRadius: marker ? '1px' : '2px',
                     '&:hover': { bgcolor: alpha(style.color, 0.6) },
                     '&:focus-visible': { outline: 'none', boxShadow: theme.qnop.focusRing },
-                    ...(primary &&
-                      !marker &&
-                      (active || hot) && { boxShadow: theme.qnop.focusRing }),
+                    // Hovering a region only pulses the fill — no ring; the
+                    // ring stays an active/keyboard-focus cue.
+                    ...(primary && !marker && active && { boxShadow: theme.qnop.focusRing }),
                     ...(hot && { animation: `${markPulse} 1.1s ease-in-out infinite` }),
                     '@media (prefers-reduced-motion: reduce)': {
                       transition: 'none',
