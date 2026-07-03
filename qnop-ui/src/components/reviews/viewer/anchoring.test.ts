@@ -23,12 +23,14 @@ import { describe, expect, it } from 'vitest';
 import type { AnnotationView, RenderedTextSpan } from '../../../api/generated';
 import { AnnotationStatus } from '../../../api/generated';
 import {
+  MARKER_OVERSHOOT,
   QUOTE_CONTEXT_CHARS,
   boxesForRange,
   buildRegionAnchor,
   buildTextAnchor,
   clampBox,
   compareAnnotationsByPosition,
+  highlightBoxesForAnchor,
   surfaceText,
   unionBoxes,
 } from './anchoring';
@@ -164,6 +166,35 @@ describe('buildRegionAnchor', () => {
   it('rejects degenerate rectangles from stray clicks', () => {
     expect(buildRegionAnchor(0, { x: 0.5, y: 0.5, width: 0.001, height: 0.2 })).toBeNull();
     expect(buildRegionAnchor(0, { x: 0.5, y: 0.5, width: 0.2, height: 0 })).toBeNull();
+  });
+});
+
+describe('highlightBoxesForAnchor', () => {
+  it('paints a text anchor as one overshot marker box per line', () => {
+    const anchor = buildTextAnchor(0, SPANS, 6, 18)!;
+    const geometry = highlightBoxesForAnchor(anchor, SPANS);
+
+    expect(geometry.kind).toBe('marker');
+    expect(geometry.boxes).toHaveLength(2);
+    // First line box vertically expanded by the overshoot, centred on the glyphs.
+    expect(geometry.boxes[0].y).toBeCloseTo(0.1 - (0.02 * (MARKER_OVERSHOOT - 1)) / 2);
+    expect(geometry.boxes[0].height).toBeCloseTo(0.02 * MARKER_OVERSHOOT);
+  });
+
+  it('falls back to the stored region box for region-only anchors', () => {
+    const anchor = buildRegionAnchor(0, { x: 0.2, y: 0.3, width: 0.1, height: 0.1 })!;
+    const geometry = highlightBoxesForAnchor(anchor, SPANS);
+
+    expect(geometry.kind).toBe('box');
+    expect(geometry.boxes).toEqual([anchor.region.box]);
+  });
+
+  it('falls back to the region box when the surface has no spans or the offsets miss', () => {
+    const anchor = buildTextAnchor(0, SPANS, 6, 18)!;
+    expect(highlightBoxesForAnchor(anchor, []).kind).toBe('box');
+
+    const stale = { ...anchor, textPosition: { start: 500, end: 600 } };
+    expect(highlightBoxesForAnchor(stale, SPANS).kind).toBe('box');
   });
 });
 

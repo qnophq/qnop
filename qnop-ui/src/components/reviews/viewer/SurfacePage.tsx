@@ -22,7 +22,12 @@
 import { useEffect, useRef, useState } from 'react';
 import Paper from '@mui/material/Paper';
 import type { PDFDocumentProxy, RenderTask } from 'pdfjs-dist';
-import type { AnnotationView, NormalizedBox, RenderedSurface } from '../../../api/generated';
+import type {
+  Anchor,
+  AnnotationView,
+  NormalizedBox,
+  RenderedSurface,
+} from '../../../api/generated';
 import type { TextSelectionOffsets } from './anchoring';
 import { HighlightLayer } from './HighlightLayer';
 import { RegionSelectLayer } from './RegionSelectLayer';
@@ -47,7 +52,7 @@ interface SurfacePageProps {
   tool: ViewerTool;
   /** False disables both selection layers (extraction pending, or read-only). */
   canAnnotate: boolean;
-  pendingAnchorBox: NormalizedBox | null;
+  pendingAnchor: Anchor | null;
   onTextSelected: (selection: TextSelectionOffsets) => void;
   onRegionSelected: (surfaceIndex: number, box: NormalizedBox) => void;
 }
@@ -69,7 +74,7 @@ export function SurfacePage({
   onSelectAnnotation,
   tool,
   canAnnotate,
-  pendingAnchorBox,
+  pendingAnchor,
   onTextSelected,
   onRegionSelected,
 }: SurfacePageProps) {
@@ -151,9 +156,10 @@ export function SurfacePage({
           <HighlightLayer
             annotations={annotations}
             surfaceIndex={surface.index}
+            spans={surface.textSpans}
             activeAnnotationId={activeAnnotationId}
             onSelect={onSelectAnnotation}
-            pendingBox={pendingAnchorBox}
+            pendingAnchor={pendingAnchor}
           />
           <RegionSelectLayer
             surfaceIndex={surface.index}

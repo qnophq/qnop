@@ -113,9 +113,7 @@ export function DocumentViewer({
                 onSelectAnnotation={onSelectAnnotation}
                 tool={tool}
                 canAnnotate={canAnnotate}
-                pendingAnchorBox={
-                  pendingAnchor?.region.surfaceIndex === pageIndex ? pendingAnchor.region.box : null
-                }
+                pendingAnchor={pendingAnchor}
                 onTextSelected={onTextSelected}
                 onRegionSelected={onRegionSelected}
               />

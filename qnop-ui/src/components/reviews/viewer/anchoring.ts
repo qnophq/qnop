@@ -39,6 +39,15 @@ export const QUOTE_CONTEXT_CHARS = 32;
 /** Smallest normalized edge a drawn region may have — guards against stray clicks. */
 export const MIN_REGION_EDGE = 0.004;
 
+/**
+ * How much taller a text marker paints than the extracted glyph box, centred
+ * on the printed line. PDF viewers (macOS Preview, Acrobat) and Word overshoot
+ * the glyphs the same way — ascenders/descenders stay covered and adjacent
+ * lines merge into one continuous marker. Used by both the live selection
+ * (TextSpanLayer) and persisted text highlights (HighlightLayer).
+ */
+export const MARKER_OVERSHOOT = 1.3;
+
 /** A text selection expressed in canonical-text offsets of one surface. */
 export interface TextSelectionOffsets {
   surfaceIndex: number;
@@ -160,6 +169,41 @@ export function buildRegionAnchor(surfaceIndex: number, box: NormalizedBox): Anc
   const rect: NormalizedBox = { x: x1, y: y1, width: x2 - x1, height: y2 - y1 };
   if (rect.width < MIN_REGION_EDGE || rect.height < MIN_REGION_EDGE) return null;
   return { region: { surfaceIndex, box: rect } };
+}
+
+/** How an anchor paints on its surface: line-wise text marker, or a plain box. */
+export interface HighlightGeometry {
+  kind: 'marker' | 'box';
+  boxes: NormalizedBox[];
+}
+
+function expandMarkerLine(box: NormalizedBox): NormalizedBox {
+  return clampBox({
+    x: box.x,
+    y: box.y - (box.height * (MARKER_OVERSHOOT - 1)) / 2,
+    width: box.width,
+    height: box.height * MARKER_OVERSHOOT,
+  });
+}
+
+/**
+ * The highlight geometry of an anchor on its surface: a text anchor paints as
+ * per-line marker boxes (recomputed from the stored text-position offsets
+ * against the surface's spans, each with {@link MARKER_OVERSHOOT}); a
+ * region-only anchor — or a text anchor whose offsets no longer hit any span —
+ * falls back to the stored region bounding box.
+ */
+export function highlightBoxesForAnchor(
+  anchor: Anchor,
+  spans: RenderedTextSpan[],
+): HighlightGeometry {
+  if (anchor.textPosition && spans.length > 0) {
+    const lines = boxesForRange(spans, anchor.textPosition.start, anchor.textPosition.end);
+    if (lines.length > 0) {
+      return { kind: 'marker', boxes: lines.map(expandMarkerLine) };
+    }
+  }
+  return { kind: 'box', boxes: [anchor.region.box] };
 }
 
 /**

@@ -24,26 +24,11 @@ import Box from '@mui/material/Box';
 import { useTheme } from '@mui/material/styles';
 import type { RenderedTextSpan } from '../../../api/generated';
 import type { TextSelectionOffsets } from './anchoring';
-
-/**
- * Text-marker selection colours: translucent so the page's own glyphs stay
- * readable underneath (the PDF pixels are white in both themes). Light mode is
- * the classic highlighter yellow; dark mode uses the softer brand amber so the
- * marker matches the muted dark UI.
- */
-const SELECTION_BG_LIGHT = 'rgba(255, 224, 0, 0.45)';
-const SELECTION_BG_DARK = 'rgba(245, 184, 61, 0.5)';
+import { MARKER_OVERSHOOT } from './anchoring';
+import { selectionMarkerColor } from './markerColors';
 
 /** The font the invisible glyphs are measured and rendered with. */
 const LAYER_FONT_FAMILY = 'sans-serif';
-
-/**
- * How much taller the selection marker paints than the extracted glyph box,
- * centred on the printed line. PDF viewers (macOS Preview, Acrobat) and Word
- * overshoot the glyphs the same way — ascenders/descenders stay covered and
- * multi-line selections merge into one continuous marker.
- */
-const MARKER_OVERSHOOT = 1.3;
 
 interface TextSpanLayerProps {
   spans: RenderedTextSpan[];
@@ -128,8 +113,7 @@ export function TextSpanLayer({
     onTextSelected({ surfaceIndex, start, end });
   };
 
-  const selectionBackground =
-    theme.palette.mode === 'dark' ? SELECTION_BG_DARK : SELECTION_BG_LIGHT;
+  const selectionBackground = selectionMarkerColor(theme.palette.mode);
 
   return (
     <Box

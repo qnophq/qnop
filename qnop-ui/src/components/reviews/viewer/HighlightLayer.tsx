@@ -19,42 +19,68 @@
  * SPDX-License-Identifier: AGPL-3.0-only
  */
 
+import { Fragment } from 'react';
 import type { KeyboardEvent } from 'react';
 import Box from '@mui/material/Box';
 import { alpha, useTheme } from '@mui/material/styles';
-import type { AnnotationView, NormalizedBox } from '../../../api/generated';
+import type {
+  Anchor,
+  AnnotationView,
+  NormalizedBox,
+  RenderedTextSpan,
+} from '../../../api/generated';
 import { AnnotationStatus, PlacementStatus } from '../../../api/generated';
+import { highlightBoxesForAnchor } from './anchoring';
+import { selectionMarkerColor } from './markerColors';
 
 interface HighlightLayerProps {
   /** All annotations of the document — the layer picks the ones on this surface. */
   annotations: AnnotationView[];
   surfaceIndex: number;
+  /** The surface's extracted text spans — text anchors repaint as per-line markers. */
+  spans: RenderedTextSpan[];
   activeAnnotationId: string | null;
   onSelect: (annotationId: string) => void;
-  /** Preview rectangle of a not-yet-created annotation. */
-  pendingBox?: NormalizedBox | null;
+  /** The drawn-but-not-yet-created anchor; painted as a preview. */
+  pendingAnchor?: Anchor | null;
+}
+
+function positionSx(box: NormalizedBox) {
+  return {
+    position: 'absolute',
+    left: `${box.x * 100}%`,
+    top: `${box.y * 100}%`,
+    width: `${box.width * 100}%`,
+    height: `${box.height * 100}%`,
+  } as const;
 }
 
 /**
- * The highlight overlay of one surface. Every rectangle is drawn from the
- * stored normalized box of the annotation's placement on the current version
- * (ADR-0032) — the client never computes highlight geometry itself. Colour
- * carries the cue: decided annotations turn green/grey, a placement the
- * re-anchoring engine changed turns amber and dashed, a still-pending
- * placement renders dimmed (ADR-0009).
+ * The highlight overlay of one surface. Geometry comes from the stored anchors
+ * (ADR-0032 — the client never computes highlight geometry from its own
+ * rendering): a text anchor paints as per-line marker bands, like a
+ * highlighter pen; a region anchor stays a bordered box. Colour carries the
+ * cue: decided annotations turn green/grey, a placement the re-anchoring
+ * engine changed turns amber, a still-pending placement renders dimmed
+ * (ADR-0009).
  */
 export function HighlightLayer({
   annotations,
   surfaceIndex,
+  spans,
   activeAnnotationId,
   onSelect,
-  pendingBox,
+  pendingAnchor,
 }: HighlightLayerProps) {
   const theme = useTheme();
 
   const visible = annotations.filter(
     (annotation) => annotation.anchor?.region.surfaceIndex === surfaceIndex,
   );
+  const pending =
+    pendingAnchor && pendingAnchor.region.surfaceIndex === surfaceIndex
+      ? highlightBoxesForAnchor(pendingAnchor, spans)
+      : null;
 
   const styleFor = (annotation: AnnotationView) => {
     const brand = theme.qnop.brand.blue;
@@ -84,57 +110,88 @@ export function HighlightLayer({
   return (
     <Box sx={{ position: 'absolute', inset: 0, pointerEvents: 'none' }}>
       {visible.map((annotation) => {
-        const box = annotation.anchor!.region.box;
+        const anchor = annotation.anchor!;
+        const { kind, boxes } = highlightBoxesForAnchor(anchor, spans);
         const style = styleFor(annotation);
         const active = annotation.id === activeAnnotationId;
-        const quote = annotation.anchor?.textQuote?.quote;
+        const quote = anchor.textQuote?.quote;
         return (
-          <Box
-            key={annotation.id}
-            id={`annotation-highlight-${annotation.id}`}
-            role="button"
-            tabIndex={0}
-            aria-pressed={active}
-            aria-label={quote ? `Annotation: ${quote.slice(0, 60)}` : 'Region annotation'}
-            data-testid={`highlight-${annotation.id}`}
-            onClick={() => onSelect(annotation.id)}
-            onKeyDown={(event) => handleKeyDown(event, annotation.id)}
-            sx={{
-              position: 'absolute',
-              left: `${box.x * 100}%`,
-              top: `${box.y * 100}%`,
-              width: `${box.width * 100}%`,
-              height: `${box.height * 100}%`,
-              pointerEvents: 'auto',
-              cursor: 'pointer',
-              bgcolor: alpha(style.color, active ? 0.28 : 0.16),
-              border: `1.5px ${style.borderStyle} ${style.color}`,
-              borderRadius: '2px',
-              opacity: style.opacity,
-              transition: 'background-color 120ms ease',
-              '&:hover': { bgcolor: alpha(style.color, 0.26) },
-              '&:focus-visible': { outline: 'none', boxShadow: theme.qnop.focusRing },
-              ...(active && { boxShadow: theme.qnop.focusRing }),
-            }}
-          />
+          <Fragment key={annotation.id}>
+            {boxes.map((box, index) => {
+              const primary = index === 0;
+              const marker = kind === 'marker';
+              return (
+                <Box
+                  key={index}
+                  id={primary ? `annotation-highlight-${annotation.id}` : undefined}
+                  role={primary ? 'button' : undefined}
+                  tabIndex={primary ? 0 : undefined}
+                  aria-pressed={primary ? active : undefined}
+                  aria-label={
+                    primary
+                      ? quote
+                        ? `Annotation: ${quote.slice(0, 60)}`
+                        : 'Region annotation'
+                      : undefined
+                  }
+                  aria-hidden={primary ? undefined : true}
+                  data-testid={primary ? `highlight-${annotation.id}` : undefined}
+                  onClick={() => onSelect(annotation.id)}
+                  onKeyDown={
+                    primary
+                      ? (event: KeyboardEvent) => handleKeyDown(event, annotation.id)
+                      : undefined
+                  }
+                  sx={{
+                    ...positionSx(box),
+                    pointerEvents: 'auto',
+                    cursor: 'pointer',
+                    opacity: style.opacity,
+                    transition: 'background-color 120ms ease',
+                    // Marker = highlighter look: fill only, multiplied over the
+                    // page pixels so the printed glyphs stay crisp underneath.
+                    // Box = the bordered region rectangle.
+                    bgcolor: alpha(
+                      style.color,
+                      marker ? (active ? 0.45 : 0.3) : active ? 0.28 : 0.16,
+                    ),
+                    mixBlendMode: marker ? 'multiply' : 'normal',
+                    border: marker ? 'none' : `1.5px ${style.borderStyle} ${style.color}`,
+                    borderRadius: marker ? '1px' : '2px',
+                    '&:hover': { bgcolor: alpha(style.color, marker ? 0.45 : 0.26) },
+                    '&:focus-visible': { outline: 'none', boxShadow: theme.qnop.focusRing },
+                    ...(active && primary && !marker && { boxShadow: theme.qnop.focusRing }),
+                  }}
+                />
+              );
+            })}
+          </Fragment>
         );
       })}
-      {pendingBox && (
-        <Box
-          data-testid="pending-highlight"
-          sx={{
-            position: 'absolute',
-            left: `${pendingBox.x * 100}%`,
-            top: `${pendingBox.y * 100}%`,
-            width: `${pendingBox.width * 100}%`,
-            height: `${pendingBox.height * 100}%`,
-            border: `2px dashed ${theme.qnop.brand.blue}`,
-            bgcolor: alpha(theme.qnop.brand.blue, 0.08),
-            borderRadius: '2px',
-            pointerEvents: 'none',
-          }}
-        />
-      )}
+      {pending &&
+        pending.boxes.map((box, index) => (
+          <Box
+            key={index}
+            data-testid={index === 0 ? 'pending-highlight' : undefined}
+            sx={{
+              ...positionSx(box),
+              pointerEvents: 'none',
+              ...(pending.kind === 'marker'
+                ? {
+                    // Identical to the live selection, so releasing the mouse
+                    // does not visually change the mark.
+                    bgcolor: selectionMarkerColor(theme.palette.mode),
+                    mixBlendMode: 'multiply',
+                    borderRadius: '1px',
+                  }
+                : {
+                    border: `2px dashed ${theme.qnop.brand.blue}`,
+                    bgcolor: alpha(theme.qnop.brand.blue, 0.08),
+                    borderRadius: '2px',
+                  }),
+            }}
+          />
+        ))}
     </Box>
   );
 }
