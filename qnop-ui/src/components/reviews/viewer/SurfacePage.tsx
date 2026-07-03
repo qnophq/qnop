@@ -126,7 +126,6 @@ export function SurfacePage({
   }, [pdf, pageIndex, surface, width, visible]);
 
   const aspect = surface ? surface.width / surface.height : (fallbackAspect ?? Math.SQRT1_2);
-  const pageHeight = width / aspect;
 
   return (
     <Paper
@@ -157,8 +156,6 @@ export function SurfacePage({
           <TextSpanLayer
             spans={surface.textSpans}
             surfaceIndex={surface.index}
-            pageWidth={width}
-            pageHeight={pageHeight}
             enabled={canAnnotate && tool === 'text' && surface.textSpans.length > 0}
             onTextSelected={onTextSelected}
           />

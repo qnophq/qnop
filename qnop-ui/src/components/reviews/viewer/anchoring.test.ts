@@ -30,6 +30,9 @@ import {
   boxesForRange,
   buildRegionAnchor,
   buildTextAnchor,
+  caretOffsetAtPoint,
+  charLeftEdge,
+  charRightEdge,
   clampBox,
   compareAnnotationsByPosition,
   highlightBoxesForAnchor,
@@ -37,6 +40,7 @@ import {
   surfaceLinePitch,
   surfaceText,
   unionBoxes,
+  wordRangeAt,
 } from './anchoring';
 
 /** Two lines: "Hello world" (0..11) + '\n' (11) + "Second line" (12..23). */
@@ -54,6 +58,82 @@ const SPANS: RenderedTextSpan[] = [
     box: { x: 0.1, y: 0.15, width: 0.4, height: 0.02 },
   },
 ];
+
+/** "abc" with glyph-true edges: a=0.10..0.14, b=0.14..0.30, c=0.30..0.40. */
+const ADVANCED_SPAN: RenderedTextSpan = {
+  text: 'abc',
+  startOffset: 0,
+  endOffset: 3,
+  box: { x: 0.1, y: 0.1, width: 0.3, height: 0.02 },
+  charAdvances: [0.14, 0.3, 0.4],
+};
+
+describe('charLeftEdge / charRightEdge', () => {
+  it('reads glyph-true edges from charAdvances', () => {
+    expect(charLeftEdge(ADVANCED_SPAN, 0)).toBeCloseTo(0.1);
+    expect(charRightEdge(ADVANCED_SPAN, 0)).toBeCloseTo(0.14);
+    expect(charLeftEdge(ADVANCED_SPAN, 1)).toBeCloseTo(0.14);
+    expect(charRightEdge(ADVANCED_SPAN, 2)).toBeCloseTo(0.4);
+  });
+
+  it('falls back to the uniform grid without advances', () => {
+    const span = SPANS[0]; // width 0.5 over 11 chars
+    expect(charLeftEdge(span, 0)).toBeCloseTo(0.1);
+    expect(charRightEdge(span, 0)).toBeCloseTo(0.1 + 0.5 / 11);
+    expect(charRightEdge(span, 10)).toBeCloseTo(0.6);
+  });
+});
+
+describe('caretOffsetAtPoint', () => {
+  it('snaps to the nearest glyph-true boundary', () => {
+    // 0.145 is just right of b's left edge (0.14) — uniform would say char 0.
+    expect(caretOffsetAtPoint([ADVANCED_SPAN], 0.145, 0.11, null)).toBe(1);
+    expect(caretOffsetAtPoint([ADVANCED_SPAN], 0.29, 0.11, null)).toBe(2);
+  });
+
+  it('clamps outside-x points to the line start and visible end', () => {
+    expect(caretOffsetAtPoint([ADVANCED_SPAN], 0.01, 0.11, null)).toBe(0);
+    expect(caretOffsetAtPoint([ADVANCED_SPAN], 0.9, 0.11, null)).toBe(3);
+  });
+
+  it('picks the vertically nearest line for a point between lines', () => {
+    // y = 0.148 sits between the two SPANS lines, nearer to the second band.
+    const offset = caretOffsetAtPoint(SPANS, 0.1, 0.16, surfaceLinePitch(SPANS));
+    expect(offset).toBe(12);
+  });
+
+  it('returns null when the surface has no text', () => {
+    expect(caretOffsetAtPoint([], 0.5, 0.5, null)).toBeNull();
+  });
+});
+
+describe('wordRangeAt', () => {
+  it('expands to the word around the caret', () => {
+    expect(wordRangeAt(SPANS, 8)).toEqual({ start: 6, end: 11 });
+    expect(wordRangeAt(SPANS, 0)).toEqual({ start: 0, end: 5 });
+  });
+
+  it('takes the word left of a caret sitting on the following space', () => {
+    expect(wordRangeAt(SPANS, 5)).toEqual({ start: 0, end: 5 });
+  });
+
+  it('never crosses the canonical newline between lines', () => {
+    expect(wordRangeAt(SPANS, 12)).toEqual({ start: 12, end: 18 });
+  });
+
+  it('returns null on empty text', () => {
+    expect(wordRangeAt([], 0)).toBeNull();
+  });
+});
+
+describe('boxesForRange with charAdvances', () => {
+  it('cuts partial lines at the true glyph edges', () => {
+    const boxes = boxesForRange([ADVANCED_SPAN], 1, 2); // just "b"
+    expect(boxes).toHaveLength(1);
+    expect(boxes[0].x).toBeCloseTo(0.14);
+    expect(boxes[0].width).toBeCloseTo(0.16);
+  });
+});
 
 describe('surfaceText', () => {
   it('joins spans with single newlines, matching the server offsets', () => {
