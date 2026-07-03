@@ -79,6 +79,14 @@ public class Document {
   @Column(name = "updated_at", nullable = false)
   private Instant updatedAt;
 
+  /**
+   * Optional, informational completion deadline (issue #295). Nullable and free of any
+   * workflow-guard semantics: an overdue review is highlighted in the UI, never auto-cancelled or
+   * blocked. Community scope.
+   */
+  @Column(name = "due_at")
+  private Instant dueAt;
+
   @Version
   @Column(name = "version", nullable = false)
   private long version;
@@ -130,6 +138,16 @@ public class Document {
 
   public Instant getUpdatedAt() {
     return updatedAt;
+  }
+
+  /** The optional completion deadline, or {@code null} when none is set (issue #295). */
+  public Instant getDueAt() {
+    return dueAt;
+  }
+
+  /** Sets or clears ({@code null}) the optional completion deadline (issue #295). */
+  public void setDueAt(Instant dueAt) {
+    this.dueAt = dueAt;
   }
 
   @Override

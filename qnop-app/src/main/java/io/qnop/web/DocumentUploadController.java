@@ -24,6 +24,8 @@ import io.qnop.service.document.DocumentIngestService;
 import io.qnop.service.document.DocumentIngestService.UploadResult;
 import io.qnop.service.document.DocumentValidationException;
 import java.io.IOException;
+import java.time.Instant;
+import java.time.format.DateTimeParseException;
 import java.util.UUID;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
@@ -55,8 +57,11 @@ public class DocumentUploadController {
 
   @PostMapping(consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
   public ResponseEntity<DocumentUploadResponse> createDocument(
-      @RequestParam("title") String title, @RequestParam("file") MultipartFile file) {
-    UploadResult result = ingest.createDocument(CurrentUser.requireUserId(), title, bytesOf(file));
+      @RequestParam("title") String title,
+      @RequestParam("file") MultipartFile file,
+      @RequestParam(value = "dueAt", required = false) String dueAt) {
+    UploadResult result =
+        ingest.createDocument(CurrentUser.requireUserId(), title, bytesOf(file), parseDueAt(dueAt));
     return ResponseEntity.status(HttpStatus.CREATED).body(DocumentUploadResponse.of(result));
   }
 
@@ -65,6 +70,18 @@ public class DocumentUploadController {
       @PathVariable UUID documentId, @RequestParam("file") MultipartFile file) {
     UploadResult result = ingest.addVersion(CurrentUser.requireUserId(), documentId, bytesOf(file));
     return ResponseEntity.status(HttpStatus.CREATED).body(DocumentUploadResponse.of(result));
+  }
+
+  /** Parses the optional ISO-8601 instant form field; blank/absent means no deadline (#295). */
+  private static Instant parseDueAt(String dueAt) {
+    if (dueAt == null || dueAt.isBlank()) {
+      return null;
+    }
+    try {
+      return Instant.parse(dueAt);
+    } catch (DateTimeParseException e) {
+      throw DocumentValidationException.invalidRequest("dueAt must be an ISO-8601 instant");
+    }
   }
 
   private static byte[] bytesOf(MultipartFile file) {

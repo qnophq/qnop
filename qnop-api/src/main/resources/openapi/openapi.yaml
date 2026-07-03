@@ -1909,6 +1909,47 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
+    patch:
+      tags:
+        - Documents
+      summary: Update document metadata
+      description: |
+        Owner-only. Currently patches the optional review due date (issue #295):
+        a supplied `dueAt` sets it, an explicit `null` clears it. Any value —
+        including the past — is accepted on edit so the owner can correct a
+        deadline after the fact.
+      operationId: updateDocument
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/DocumentIdParam'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DocumentUpdateRequest'
+      responses:
+        '200':
+          description: The updated document
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DocumentResponse'
+        '403':
+          description: The caller is a participant but not the owner
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Unknown document, or the caller is not a participant
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
   /documents/{documentId}/versions:
     get:
       tags:
@@ -3567,6 +3608,14 @@ components:
         updatedAt:
           type: string
           format: date-time
+        dueAt:
+          type: string
+          format: date-time
+          nullable: true
+          description: >-
+            Optional, informational completion deadline (issue #295). Absent or
+            null when none is set. No workflow-guard semantics — an overdue open
+            review is only visually flagged.
       required:
         - id
         - title
@@ -3701,6 +3750,14 @@ components:
         updatedAt:
           type: string
           format: date-time
+        dueAt:
+          type: string
+          format: date-time
+          nullable: true
+          description: >-
+            Optional, informational completion deadline (issue #295). Absent or
+            null when none is set. No workflow-guard semantics — an overdue open
+            review is only visually flagged.
       required:
         - id
         - title
@@ -3709,6 +3766,20 @@ components:
         - latestVersionNumber
         - createdAt
         - updatedAt
+    DocumentUpdateRequest:
+      type: object
+      description: >-
+        Owner-only patch of a document's mutable metadata (issue #295). Every
+        supplied field replaces the stored value; an explicit `null` clears it.
+      properties:
+        dueAt:
+          type: string
+          format: date-time
+          nullable: true
+          description: >-
+            The completion deadline to set, or `null` to clear it. When creating
+            it must be in the future; on edit any value (including the past) is
+            accepted so an owner can correct it after the fact.
     DocumentVersionListResponse:
       type: object
       properties:
