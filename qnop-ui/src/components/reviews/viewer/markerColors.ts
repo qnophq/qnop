@@ -40,7 +40,7 @@ export const MARKER_YELLOW_BORDER = '#D9AD00';
  * readable): identical everywhere a mark is being drawn, so releasing the
  * mouse and creating the annotation never changes the mark's colour.
  */
-export const SELECTION_MARKER_BG = 'rgba(255, 224, 0, 0.45)';
+export const SELECTION_MARKER_BG = 'rgba(255, 224, 0, 0.3)';
 
 /**
  * The colour a mark paints with on the page — shared with the panel so an

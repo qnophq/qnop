@@ -64,8 +64,8 @@ function positionSx(box: NormalizedBox) {
  * keyframe set serves every status colour.
  */
 const markPulse = keyframes`
-  0%, 100% { background-color: color-mix(in srgb, var(--hl) 48%, transparent); }
-  50% { background-color: color-mix(in srgb, var(--hl) 78%, transparent); }
+  0%, 100% { background-color: color-mix(in srgb, var(--hl) 55%, transparent); }
+  50% { background-color: color-mix(in srgb, var(--hl) 95%, transparent); }
 `;
 
 /**
@@ -167,18 +167,24 @@ export function HighlightLayer({
                     transition: 'background-color 120ms ease, box-shadow 120ms ease',
                     // Highlighter look for both kinds: a borderless fill that
                     // multiplies over the page pixels, so printed glyphs stay
-                    // crisp underneath. Text bands and region boxes share the
-                    // same intensity in every state; a hover on either side of
-                    // the card↔mark link paints the mark "hot".
-                    bgcolor: alpha(style.color, active || hot ? 0.65 : 0.45),
+                    // crisp underneath. At rest the marker is a pale wash;
+                    // hovering the mark itself deepens it gently (no ring —
+                    // earlier feedback), while hovering its PANEL CARD stages
+                    // the full spotlight: a deep colour pulse plus a glow ring
+                    // so the linked passage is unmissable.
+                    bgcolor: alpha(style.color, hot ? 0.85 : active ? 0.6 : 0.3),
                     mixBlendMode: 'multiply',
                     borderRadius: marker ? '1px' : '2px',
-                    '&:hover': { bgcolor: alpha(style.color, 0.6) },
+                    '&:hover': { bgcolor: alpha(style.color, 0.5) },
                     '&:focus-visible': { outline: 'none', boxShadow: theme.qnop.focusRing },
-                    // Hovering a region only pulses the fill — no ring; the
-                    // ring stays an active/keyboard-focus cue.
                     ...(primary && !marker && active && { boxShadow: theme.qnop.focusRing }),
-                    ...(hot && { animation: `${markPulse} 1.1s ease-in-out infinite` }),
+                    ...(hot && {
+                      animation: `${markPulse} 0.9s ease-in-out infinite`,
+                      boxShadow: marker
+                        ? `0 3px 16px -2px ${alpha(style.color, 0.9)}`
+                        : `0 0 0 2px ${theme.palette.background.paper}, 0 0 0 4px ${style.color}, 0 4px 14px -2px ${alpha(style.color, 0.8)}`,
+                      zIndex: 1,
+                    }),
                     '@media (prefers-reduced-motion: reduce)': {
                       transition: 'none',
                       animation: 'none',

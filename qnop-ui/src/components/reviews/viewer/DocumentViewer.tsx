@@ -171,6 +171,9 @@ export function DocumentViewer({
 
   const pageWidth = Math.max(0, (containerWidth - 2 * PAGE_GUTTER_PX) * zoom);
   const pageCount = surfaces?.length ?? pdf.numPages;
+  // Only a PANEL-card hover stages the mark's spotlight treatment; hovering
+  // the mark directly keeps the gentle CSS :hover (earlier feedback: no ring).
+  const linkHoverId = hoverAnnotationId === previewId ? null : (hoverAnnotationId ?? null);
 
   return (
     <Box
@@ -205,7 +208,7 @@ export function DocumentViewer({
                   width={pageWidth}
                   annotations={annotations}
                   activeAnnotationId={activeAnnotationId}
-                  hoverAnnotationId={hoverAnnotationId}
+                  hoverAnnotationId={linkHoverId}
                   onSelectAnnotation={(id) => {
                     setPreviewId(null);
                     onSelectAnnotation(id);
