@@ -149,7 +149,7 @@ export function CommentThread({ annotationId, notify }: CommentThreadProps) {
           </Box>
           <TextField
             multiline
-            minRows={1}
+            minRows={3}
             size="small"
             fullWidth
             placeholder="Add a comment"

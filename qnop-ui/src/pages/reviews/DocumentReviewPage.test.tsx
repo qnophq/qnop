@@ -187,6 +187,8 @@ describe('DocumentReviewPage', () => {
     expect(screen.getByTestId('document-viewer')).toHaveAttribute('data-annotation-count', '1');
     expect(screen.getByText('Annotations (1)')).toBeInTheDocument();
     expect(screen.getByText('“Hello”')).toBeInTheDocument();
+    // Placement cues are expanded-state details.
+    fireEvent.click(screen.getByTestId('annotation-item-a1'));
     expect(screen.getByText('Moved')).toBeInTheDocument();
   });
 

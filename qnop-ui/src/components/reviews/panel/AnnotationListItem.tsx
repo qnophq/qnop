@@ -22,13 +22,19 @@
 import Box from '@mui/material/Box';
 import ButtonBase from '@mui/material/ButtonBase';
 import Stack from '@mui/material/Stack';
+import Tooltip from '@mui/material/Tooltip';
 import Typography from '@mui/material/Typography';
 import { alpha, keyframes, useTheme } from '@mui/material/styles';
-import { MessageSquare } from 'lucide-react';
+import type { Theme } from '@mui/material/styles';
+import { CircleCheck, CircleDot, CircleX, MessageSquare } from 'lucide-react';
+import type { LucideIcon } from 'lucide-react';
 import type { AnnotationView } from '../../../api/generated';
 import { AnnotationStatus } from '../../../api/generated';
+import { useComments } from '../../../api/hooks/useComments';
+import { useAuthStore } from '../../../stores/authStore';
 import type { BadgeTone } from '../../admin/ToneBadge';
 import { ToneBadge } from '../../admin/ToneBadge';
+import { UserAvatar } from '../../shell/UserAvatar';
 import { highlightColorFor } from '../viewer/markerColors';
 import { PlacementStatusChip } from './PlacementStatusChip';
 
@@ -38,11 +44,71 @@ const railGlow = keyframes`
   50% { box-shadow: 0 0 10px 2px var(--rail-glow); }
 `;
 
-const STATUS_CUES: Record<AnnotationStatus, { tone: BadgeTone; label: string }> = {
-  [AnnotationStatus.Open]: { tone: 'blue', label: 'Open' },
-  [AnnotationStatus.Accepted]: { tone: 'green', label: 'Accepted' },
-  [AnnotationStatus.Rejected]: { tone: 'neutral', label: 'Rejected' },
+const STATUS_CUES: Record<
+  AnnotationStatus,
+  { tone: BadgeTone; label: string; icon: LucideIcon; color: (theme: Theme) => string }
+> = {
+  [AnnotationStatus.Open]: {
+    tone: 'blue',
+    label: 'Open',
+    icon: CircleDot,
+    color: (theme) => theme.qnop.brand.blue,
+  },
+  [AnnotationStatus.Accepted]: {
+    tone: 'green',
+    label: 'Accepted',
+    icon: CircleCheck,
+    color: (theme) => theme.palette.success.main,
+  },
+  [AnnotationStatus.Rejected]: {
+    tone: 'neutral',
+    label: 'Rejected',
+    icon: CircleX,
+    color: (theme) => theme.palette.text.disabled,
+  },
 };
+
+/** Up to this many participant avatars stack in the collapsed row. */
+const MAX_AVATARS = 3;
+
+/** Overlapping avatar stack of everyone involved in the discussion. */
+function ParticipantAvatars({ ids }: { ids: string[] }) {
+  const userId = useAuthStore((state) => state.userId);
+  const displayName = useAuthStore((state) => state.displayName);
+  const avatarUrl = useAuthStore((state) => state.avatarUrl);
+  const shown = ids.slice(0, MAX_AVATARS);
+  return (
+    <Stack direction="row" sx={{ alignItems: 'center', flexShrink: 0 }}>
+      {shown.map((id, index) => {
+        const own = id === userId;
+        return (
+          <Box
+            key={id}
+            sx={{
+              borderRadius: '50%',
+              border: '2px solid',
+              borderColor: 'background.paper',
+              ml: index === 0 ? 0 : -0.75,
+              display: 'flex',
+              zIndex: shown.length - index,
+            }}
+          >
+            <UserAvatar
+              name={own ? (displayName ?? 'You') : 'Participant'}
+              size={20}
+              imageUrl={own ? avatarUrl : null}
+            />
+          </Box>
+        );
+      })}
+      {ids.length > MAX_AVATARS && (
+        <Typography variant="caption" color="text.secondary" sx={{ ml: 0.5 }}>
+          +{ids.length - MAX_AVATARS}
+        </Typography>
+      )}
+    </Stack>
+  );
+}
 
 interface AnnotationListItemProps {
   annotation: AnnotationView;
@@ -54,11 +120,13 @@ interface AnnotationListItemProps {
 }
 
 /**
- * One annotation in the panel: its lifecycle status (owner's decision,
- * ADR-0011), the placement cue for the viewed version (ADR-0009), and the mark
- * itself — the quoted text, or the page for a pure region annotation. The left
- * rail carries the same colour the mark paints with on the page, and hovering
- * either side of the card↔mark pair lights up the other (prototype linking).
+ * One annotation in the panel. Collapsed it is a single dense row — status
+ * icon, the quoted passage, thread size, page and the participants' avatar
+ * stack — so a long review stays scannable. The active (clicked) annotation
+ * grows into the detailed card with badges, placement cue and full quote; the
+ * comment timeline follows below. The left rail always carries the colour the
+ * mark paints with on the page, and hovering either side of the card↔mark
+ * pair lights up the other.
  */
 export function AnnotationListItem({
   annotation,
@@ -71,9 +139,20 @@ export function AnnotationListItem({
   const quote = annotation.anchor?.textQuote?.quote;
   const region = annotation.anchor?.region;
   const statusCue = STATUS_CUES[annotation.status];
+  const StatusIcon = statusCue.icon;
   const railColor = annotation.anchor
     ? highlightColorFor(annotation, theme.palette)
     : theme.palette.divider;
+
+  // Participants: the annotation author plus every commenter already known to
+  // the cache (enabled: false never fetches — rows stay cheap; the stack
+  // enriches once a thread has been opened or hover-prefetched).
+  const cachedComments = useComments(annotation.id, false).data?.comments ?? [];
+  const participantIds = [
+    ...new Set([annotation.authorId, ...cachedComments.map((comment) => comment.authorId)]),
+  ];
+
+  const fallbackLabel = region ? 'Region annotation' : 'No placement on this version';
 
   return (
     <ButtonBase
@@ -98,8 +177,8 @@ export function AnnotationListItem({
             ? alpha(railColor, 0.08)
             : 'transparent',
         pl: 2,
-        pr: 1.5,
-        py: 1.25,
+        pr: 1.25,
+        py: active ? 1.25 : 0.75,
         transition:
           'border-color 120ms ease, background-color 120ms ease, transform 160ms ease, box-shadow 160ms ease',
         '@media (prefers-reduced-motion: reduce)': { transition: 'none' },
@@ -146,44 +225,86 @@ export function AnnotationListItem({
           '@media (prefers-reduced-motion: reduce)': { animation: 'none', transition: 'none' },
         }}
       />
-      <Stack spacing={0.75}>
-        <Stack direction="row" spacing={1} sx={{ alignItems: 'center', flexWrap: 'wrap' }}>
-          <ToneBadge tone={statusCue.tone} label={statusCue.label} />
-          <PlacementStatusChip status={annotation.placementStatus} />
-          <Stack
-            direction="row"
-            spacing={1}
-            sx={{ alignItems: 'center', ml: 'auto', color: 'text.secondary' }}
-          >
-            {region && <Typography variant="caption">Page {region.surfaceIndex + 1}</Typography>}
-            <Stack direction="row" spacing={0.5} sx={{ alignItems: 'center' }}>
-              <MessageSquare size={13} aria-hidden />
-              <Typography variant="caption" aria-label={`${annotation.commentCount} comments`}>
-                {annotation.commentCount}
-              </Typography>
+      {active ? (
+        <Stack spacing={0.75}>
+          <Stack direction="row" spacing={1} sx={{ alignItems: 'center', flexWrap: 'wrap' }}>
+            <ToneBadge tone={statusCue.tone} label={statusCue.label} />
+            <PlacementStatusChip status={annotation.placementStatus} />
+            <Stack
+              direction="row"
+              spacing={1}
+              sx={{ alignItems: 'center', ml: 'auto', color: 'text.secondary' }}
+            >
+              {region && <Typography variant="caption">Page {region.surfaceIndex + 1}</Typography>}
+              <Stack direction="row" spacing={0.5} sx={{ alignItems: 'center' }}>
+                <MessageSquare size={13} aria-hidden />
+                <Typography variant="caption" aria-label={`${annotation.commentCount} comments`}>
+                  {annotation.commentCount}
+                </Typography>
+              </Stack>
             </Stack>
           </Stack>
+          {quote ? (
+            <Typography
+              variant="body2"
+              sx={{
+                fontStyle: 'italic',
+                color: 'text.secondary',
+                display: '-webkit-box',
+                WebkitLineClamp: 4,
+                WebkitBoxOrient: 'vertical',
+                overflow: 'hidden',
+              }}
+            >
+              “{quote}”
+            </Typography>
+          ) : (
+            <Typography variant="body2" color="text.secondary">
+              {fallbackLabel}
+            </Typography>
+          )}
         </Stack>
-        {quote ? (
+      ) : (
+        <Stack direction="row" spacing={1} sx={{ alignItems: 'center', minWidth: 0 }}>
+          <Tooltip title={statusCue.label}>
+            <Box sx={{ display: 'flex', color: statusCue.color(theme), flexShrink: 0 }}>
+              <StatusIcon size={15} aria-label={statusCue.label} />
+            </Box>
+          </Tooltip>
           <Typography
             variant="body2"
+            noWrap
             sx={{
-              fontStyle: 'italic',
+              flex: 1,
+              minWidth: 0,
               color: 'text.secondary',
-              display: '-webkit-box',
-              WebkitLineClamp: 2,
-              WebkitBoxOrient: 'vertical',
-              overflow: 'hidden',
+              fontStyle: quote ? 'italic' : 'normal',
             }}
           >
-            “{quote}”
+            {quote ? `“${quote}”` : fallbackLabel}
           </Typography>
-        ) : (
-          <Typography variant="body2" color="text.secondary">
-            {region ? 'Region annotation' : 'No placement on this version'}
-          </Typography>
-        )}
-      </Stack>
+          <Stack
+            direction="row"
+            spacing={0.5}
+            sx={{ alignItems: 'center', color: 'text.secondary', flexShrink: 0 }}
+          >
+            <MessageSquare size={13} aria-hidden />
+            <Typography variant="caption" aria-label={`${annotation.commentCount} comments`}>
+              {annotation.commentCount}
+            </Typography>
+          </Stack>
+          {region && (
+            <Typography
+              variant="caption"
+              color="text.secondary"
+              sx={{ flexShrink: 0, fontVariantNumeric: 'tabular-nums' }}
+            >
+              p. {region.surfaceIndex + 1}
+            </Typography>
+          )}
+          <ParticipantAvatars ids={participantIds} />
+        </Stack>
+      )}
     </ButtonBase>
   );
 }

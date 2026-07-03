@@ -33,6 +33,10 @@ vi.mock('./CommentThread', () => ({
   ),
 }));
 
+vi.mock('../../../api/hooks/useComments', () => ({
+  useComments: vi.fn().mockReturnValue({ isPending: false, isError: false, data: undefined }),
+}));
+
 const annotation = (id: string, overrides: Partial<AnnotationView> = {}): AnnotationView => ({
   id,
   documentId: 'd1',
@@ -87,14 +91,17 @@ describe('AnnotationPanel', () => {
           placementStatus: PlacementStatus.Orphaned,
         }),
       ],
+      // The unplaced annotation is expanded: placement cues are
+      // expanded-state details; collapsed rows stay a single dense line.
+      activeAnnotationId: 'orphaned-1',
     });
 
     expect(screen.getByText('Annotations (2)')).toBeInTheDocument();
     expect(screen.getByText('Not placed on this version')).toBeInTheDocument();
-    expect(screen.getByText('Orphaned')).toBeInTheDocument();
     expect(screen.getByText('“quoted text”')).toBeInTheDocument();
-    // The placed annotation shows its page; the unplaced one has none.
-    expect(screen.getByText('Page 1')).toBeInTheDocument();
+    // The collapsed placed row shows the page as a compact caption.
+    expect(screen.getByText('p. 1')).toBeInTheDocument();
+    expect(screen.getByText('Orphaned')).toBeInTheDocument();
   });
 
   it('toggles the active annotation and reveals its thread', () => {
