@@ -23,7 +23,6 @@ package io.qnop.web;
 import io.qnop.api.v1.endpoint.ReviewWorkflowApi;
 import io.qnop.api.v1.model.WorkflowStatus;
 import io.qnop.api.v1.model.WorkflowTransitionRequest;
-import io.qnop.entity.WorkflowState;
 import io.qnop.service.review.ReviewWorkflowService;
 import java.util.UUID;
 import org.springframework.http.ResponseEntity;
@@ -46,7 +45,8 @@ public class ReviewWorkflowController implements ReviewWorkflowApi {
 
   @Override
   public ResponseEntity<WorkflowStatus> getDocumentWorkflow(UUID documentId) {
-    return ResponseEntity.ok(toDto(workflow.status(documentId)));
+    UUID actor = CurrentUser.requireUserId();
+    return ResponseEntity.ok(toDto(workflow.status(documentId, actor, CurrentUser.isAdmin())));
   }
 
   @Override
@@ -60,6 +60,6 @@ public class ReviewWorkflowController implements ReviewWorkflowApi {
   private static WorkflowStatus toDto(ReviewWorkflowService.WorkflowStatus status) {
     return new WorkflowStatus()
         .state(status.state())
-        .allowedTransitions(status.allowedTransitions().stream().map(WorkflowState::name).toList());
+        .allowedTransitions(status.allowedTransitions());
   }
 }

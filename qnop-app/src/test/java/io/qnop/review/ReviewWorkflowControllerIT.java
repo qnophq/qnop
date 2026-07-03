@@ -32,12 +32,14 @@ import io.qnop.entity.AnnotationStatus;
 import io.qnop.entity.AuditEvent;
 import io.qnop.entity.Document;
 import io.qnop.entity.DocumentVersion;
+import io.qnop.entity.ReviewParticipant;
 import io.qnop.entity.WorkflowState;
 import io.qnop.repository.AnnotationPlacementRepository;
 import io.qnop.repository.AnnotationRepository;
 import io.qnop.repository.AuditEventRepository;
 import io.qnop.repository.DocumentRepository;
 import io.qnop.repository.DocumentVersionRepository;
+import io.qnop.repository.ReviewParticipantRepository;
 import io.qnop.service.review.ReviewWorkflowService;
 import io.qnop.testsupport.SeededIntegrationTest;
 import java.util.UUID;
@@ -59,6 +61,7 @@ class ReviewWorkflowControllerIT extends SeededIntegrationTest {
   @Autowired AnnotationRepository annotations;
   @Autowired AnnotationPlacementRepository placements;
   @Autowired AuditEventRepository auditEvents;
+  @Autowired ReviewParticipantRepository participants;
   @Autowired ReviewWorkflowService workflow;
 
   private Document draftOwnedByMember() {
@@ -78,16 +81,54 @@ class ReviewWorkflowControllerIT extends SeededIntegrationTest {
   // --- GET ---------------------------------------------------------------------
 
   @Test
-  void getReturnsStateAndStructurallyAllowedTransitions() throws Exception {
+  void ownerReadsStateAndStructurallyAllowedTransitions() throws Exception {
     Document document = draftOwnedByMember();
+
+    mockMvc
+        .perform(
+            get(workflowPath(document.getId()))
+                .header("Authorization", "Bearer " + token(MEMBER_ID)))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.state").value("DRAFT"))
+        .andExpect(jsonPath("$.allowedTransitions.length()").value(2));
+  }
+
+  @Test
+  void participantMayReadTheWorkflow() throws Exception {
+    Document document = draftOwnedByMember();
+    participants.save(ReviewParticipant.forUser(document.getId(), MEMBER2_ID));
 
     mockMvc
         .perform(
             get(workflowPath(document.getId()))
                 .header("Authorization", "Bearer " + token(MEMBER2_ID)))
         .andExpect(status().isOk())
-        .andExpect(jsonPath("$.state").value("DRAFT"))
-        .andExpect(jsonPath("$.allowedTransitions.length()").value(2));
+        .andExpect(jsonPath("$.state").value("DRAFT"));
+  }
+
+  @Test
+  void adminMayReadTheWorkflow() throws Exception {
+    Document document = draftOwnedByMember();
+
+    mockMvc
+        .perform(
+            get(workflowPath(document.getId()))
+                .header("Authorization", "Bearer " + token(ADMIN_ID)))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.state").value("DRAFT"));
+  }
+
+  @Test
+  void nonParticipantGetIsRejectedWith404() throws Exception {
+    // A visible-to-nobody document must not leak its existence (issue #311): 404, not 403.
+    Document document = draftOwnedByMember();
+
+    mockMvc
+        .perform(
+            get(workflowPath(document.getId()))
+                .header("Authorization", "Bearer " + token(MEMBER2_ID)))
+        .andExpect(status().isNotFound())
+        .andExpect(jsonPath("$.code").value("DOCUMENT_NOT_FOUND"));
   }
 
   @Test

@@ -1619,6 +1619,8 @@ paths:
         transition list is empty for terminal states and for states this
         edition's state machine does not manage.
       operationId: getDocumentWorkflow
+      security:
+        - bearerAuth: []
       responses:
         '200':
           description: The current workflow status.
@@ -1648,6 +1650,8 @@ paths:
         annotations and zero PENDING placements (re-anchoring complete) — or
         when the current or target state is not managed by this edition.
       operationId: transitionDocumentWorkflow
+      security:
+        - bearerAuth: []
       requestBody:
         required: true
         content:
