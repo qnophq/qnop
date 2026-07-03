@@ -49,6 +49,8 @@ function renderToolbar(overrides: Partial<Parameters<typeof CompareToolbar>[0]> 
     syncScroll: true,
     onSyncScrollChange: vi.fn(),
     changeCount: 4,
+    zoom: 1,
+    onZoomChange: vi.fn(),
     ...overrides,
   };
   render(
@@ -92,5 +94,15 @@ describe('CompareToolbar', () => {
     const props = renderToolbar();
     fireEvent.click(screen.getByRole('switch', { name: 'Sync scroll' }));
     expect(props.onSyncScrollChange).toHaveBeenCalledWith(false);
+  });
+
+  it('steps the shared zoom and resets to fit width', () => {
+    const props = renderToolbar({ zoom: 1.5 });
+    fireEvent.click(screen.getByRole('button', { name: 'Zoom in' }));
+    expect(props.onZoomChange).toHaveBeenCalledWith(1.75);
+    fireEvent.click(screen.getByRole('button', { name: 'Zoom out' }));
+    expect(props.onZoomChange).toHaveBeenCalledWith(1.25);
+    fireEvent.click(screen.getByRole('button', { name: 'Reset zoom to fit width' }));
+    expect(props.onZoomChange).toHaveBeenCalledWith(1);
   });
 });

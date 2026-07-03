@@ -31,24 +31,15 @@ import ToggleButtonGroup from '@mui/material/ToggleButtonGroup';
 import Tooltip from '@mui/material/Tooltip';
 import Typography from '@mui/material/Typography';
 import { Link as RouterLink } from 'react-router-dom';
-import {
-  BoxSelect,
-  ChevronDown,
-  ChevronUp,
-  GitCompareArrows,
-  TextCursor,
-  ZoomIn,
-  ZoomOut,
-} from 'lucide-react';
+import { BoxSelect, ChevronDown, ChevronUp, GitCompareArrows, TextCursor } from 'lucide-react';
 import type { DocumentVersionSummary } from '../../../api/generated';
 import { ExtractionStatus } from '../../../api/generated';
 import { ToneBadge } from '../../admin/ToneBadge';
+import { ZoomControls } from './ZoomControls';
 
 export type ViewerTool = 'text' | 'region';
 
-export const MIN_ZOOM = 0.5;
-export const MAX_ZOOM = 3;
-const ZOOM_STEP = 0.25;
+export { MAX_ZOOM, MIN_ZOOM } from './ZoomControls';
 
 interface ViewerToolbarProps {
   versions: DocumentVersionSummary[];
@@ -192,44 +183,7 @@ export function ViewerToolbar({
 
         <Divider orientation="vertical" flexItem />
 
-        <IconButton
-          size="small"
-          aria-label="Zoom out"
-          disabled={zoom <= MIN_ZOOM}
-          onClick={() => onZoomChange(Math.max(MIN_ZOOM, zoom - ZOOM_STEP))}
-        >
-          <ZoomOut size={16} />
-        </IconButton>
-        <Tooltip title="Reset zoom to fit width">
-          <Typography
-            component="button"
-            variant="body2"
-            color="text.secondary"
-            aria-label="Reset zoom to fit width"
-            onClick={() => onZoomChange(1)}
-            sx={{
-              minWidth: 44,
-              textAlign: 'center',
-              fontVariantNumeric: 'tabular-nums',
-              background: 'none',
-              border: 'none',
-              cursor: 'pointer',
-              font: 'inherit',
-              borderRadius: 1,
-              '&:focus-visible': (theme) => ({ outline: 'none', boxShadow: theme.qnop.focusRing }),
-            }}
-          >
-            {Math.round(zoom * 100)}%
-          </Typography>
-        </Tooltip>
-        <IconButton
-          size="small"
-          aria-label="Zoom in"
-          disabled={zoom >= MAX_ZOOM}
-          onClick={() => onZoomChange(Math.min(MAX_ZOOM, zoom + ZOOM_STEP))}
-        >
-          <ZoomIn size={16} />
-        </IconButton>
+        <ZoomControls zoom={zoom} onZoomChange={onZoomChange} />
       </Stack>
     </Paper>
   );

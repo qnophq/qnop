@@ -91,6 +91,7 @@ export function VersionComparePage() {
 
   const [activeChange, setActiveChange] = useState<number | null>(null);
   const [syncScroll, setSyncScroll] = useState(true);
+  const [zoom, setZoom] = useState(1);
   // Callback refs held in state: the panes mount only after the data guards,
   // so the sync-scroll listeners must attach when the elements appear.
   const [fromScrollEl, setFromScrollEl] = useState<HTMLDivElement | null>(null);
@@ -174,6 +175,8 @@ export function VersionComparePage() {
             syncScroll={syncScroll}
             onSyncScrollChange={setSyncScroll}
             changeCount={changes ? changes.length : null}
+            zoom={zoom}
+            onZoomChange={setZoom}
           />
           {diffQuery.isError && (
             <Alert severity="error">
@@ -225,6 +228,7 @@ export function VersionComparePage() {
                   activeChangeIndex={activeChange}
                   onSelectChange={(index) => setActiveChange(index)}
                   scrollRef={side === 'from' ? setFromScrollEl : setToScrollEl}
+                  zoom={zoom}
                 />
               </Paper>
             ))}

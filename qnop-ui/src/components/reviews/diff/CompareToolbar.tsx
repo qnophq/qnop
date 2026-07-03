@@ -19,6 +19,7 @@
  * SPDX-License-Identifier: AGPL-3.0-only
  */
 
+import Divider from '@mui/material/Divider';
 import FormControlLabel from '@mui/material/FormControlLabel';
 import IconButton from '@mui/material/IconButton';
 import MenuItem from '@mui/material/MenuItem';
@@ -30,6 +31,7 @@ import Typography from '@mui/material/Typography';
 import { ArrowLeftRight, MoveRight } from 'lucide-react';
 import type { DocumentVersionSummary } from '../../../api/generated';
 import { ExtractionStatus } from '../../../api/generated';
+import { ZoomControls } from '../viewer/ZoomControls';
 
 interface CompareToolbarProps {
   versions: DocumentVersionSummary[];
@@ -40,6 +42,9 @@ interface CompareToolbarProps {
   onSyncScrollChange: (value: boolean) => void;
   /** Null while the diff is still loading. */
   changeCount: number | null;
+  /** Shared fit-width zoom of both panes (1 = fit width). */
+  zoom: number;
+  onZoomChange: (zoom: number) => void;
 }
 
 /**
@@ -55,6 +60,8 @@ export function CompareToolbar({
   syncScroll,
   onSyncScrollChange,
   changeCount,
+  zoom,
+  onZoomChange,
 }: CompareToolbarProps) {
   const pickerItems = (other: number) =>
     versions.map((version) => (
@@ -117,6 +124,10 @@ export function CompareToolbar({
             ? '1 change'
             : `${changeCount} changes`}
       </Typography>
+
+      <Divider orientation="vertical" flexItem />
+
+      <ZoomControls zoom={zoom} onZoomChange={onZoomChange} />
 
       <FormControlLabel
         control={

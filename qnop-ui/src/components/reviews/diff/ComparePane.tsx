@@ -19,8 +19,7 @@
  * SPDX-License-Identifier: AGPL-3.0-only
  */
 
-import { useEffect, useRef, useState } from 'react';
-import type { Ref } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import Box from '@mui/material/Box';
 import CircularProgress from '@mui/material/CircularProgress';
 import Paper from '@mui/material/Paper';
@@ -52,8 +51,10 @@ interface ComparePaneProps {
   changes: DiffChange[];
   activeChangeIndex: number | null;
   onSelectChange: (changeIndex: number) => void;
-  /** The scroll container ref (callback ref) — the page couples both panes (sync scroll). */
-  scrollRef: Ref<HTMLDivElement>;
+  /** Callback ref for the scroll container — the page couples both panes (sync scroll). */
+  scrollRef: (element: HTMLDivElement | null) => void;
+  /** Fit-width factor shared by both panes (1 = fit width, >1 overflows horizontally). */
+  zoom: number;
 }
 
 /**
@@ -76,25 +77,39 @@ export function ComparePane({
   activeChangeIndex,
   onSelectChange,
   scrollRef,
+  zoom,
 }: ComparePaneProps) {
   const theme = useTheme();
-  const stackRef = useRef<HTMLDivElement>(null);
-  const [stackWidth, setStackWidth] = useState(0);
+  const scrollElRef = useRef<HTMLDivElement | null>(null);
+  const [paneWidth, setPaneWidth] = useState(0);
   const [fallbackAspects, setFallbackAspects] = useState<Record<number, number>>({});
 
+  // One element, two consumers: the page's sync-scroll coupling (external
+  // callback ref) and the width observer below. The SCROLL CONTAINER is
+  // measured — the page stack grows with the zoom (max-content) and would
+  // feed its own width back into the page size.
+  const setScrollElement = useCallback(
+    (element: HTMLDivElement | null) => {
+      scrollElRef.current = element;
+      scrollRef(element);
+    },
+    [scrollRef],
+  );
+
   useEffect(() => {
-    const element = stackRef.current;
+    const element = scrollElRef.current;
     if (!element) return undefined;
+    // contentRect excludes the container's padding — the gutter is already out.
     const observer = new ResizeObserver((entries) => {
       const width = entries[0]?.contentRect.width;
-      if (width) setStackWidth(width);
+      if (width) setPaneWidth(width);
     });
     observer.observe(element);
-    setStackWidth(element.clientWidth);
+    setPaneWidth(Math.max(0, element.clientWidth - 2 * PAGE_GUTTER_PX));
     return () => observer.disconnect();
   }, []);
 
-  const pageWidth = Math.max(0, stackWidth - 2 * PAGE_GUTTER_PX);
+  const pageWidth = Math.max(0, paneWidth * zoom);
   const pageCount = surfaces?.length ?? pdf?.numPages ?? 0;
   const isTo = side === 'to';
   const badge = isTo ? theme.qnop.badge.blue : null;
@@ -155,11 +170,19 @@ export function ComparePane({
       </Stack>
 
       <Box
-        ref={scrollRef}
+        ref={setScrollElement}
         data-testid={`compare-scroll-${side}`}
-        sx={{ flex: 1, minHeight: 0, overflow: 'auto', bgcolor: theme.qnop.surface2 }}
+        sx={{
+          flex: 1,
+          minHeight: 0,
+          overflow: 'auto',
+          bgcolor: theme.qnop.surface2,
+          p: `${PAGE_GUTTER_PX}px`,
+        }}
       >
-        <Stack ref={stackRef} spacing={2} sx={{ p: `${PAGE_GUTTER_PX}px`, alignItems: 'center' }}>
+        {/* max-content + centred items: zoomed pages overflow horizontally
+            without the flexbox centring clip (same trick as the viewer). */}
+        <Stack spacing={2} sx={{ width: 'max-content', minWidth: '100%', alignItems: 'center' }}>
           {pdfError && (
             <Typography variant="body2" color="error" sx={{ py: 4 }}>
               The document could not be rendered. {pdfError}
