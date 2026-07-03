@@ -147,6 +147,10 @@ public class DocumentIngestService {
     UploadResult result =
         transactionTemplate.execute(
             status -> {
+              // Take the same pessimistic lock the workflow transition uses (issue #324): seeding a
+              // new version's PENDING placements must serialize with a concurrent finalize, so
+              // finalize can never observe a stale (pre-upload) pending-placement count.
+              documents.findByIdForUpdate(documentId);
               int next =
                   versions
                           .findTopByDocumentIdOrderByVersionNumberDesc(documentId)
