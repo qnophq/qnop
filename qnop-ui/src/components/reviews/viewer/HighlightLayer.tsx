@@ -182,8 +182,9 @@ export function HighlightLayer({
                     mixBlendMode: 'multiply',
                     borderRadius: marker ? '1px' : '2px',
                     '&:hover': { bgcolor: alpha(style.color, 0.5) },
+                    // No ring on selection either — the deeper fill carries the
+                    // active state; the ring stays keyboard-focus only.
                     '&:focus-visible': { outline: 'none', boxShadow: theme.qnop.focusRing },
-                    ...(primary && !marker && active && { boxShadow: theme.qnop.focusRing }),
                     // Spotlight without any ring: the linked mark pulses to
                     // the full, brightness-deepened colour instead.
                     ...(hot && {
