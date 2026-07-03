@@ -40,13 +40,20 @@ export const QUOTE_CONTEXT_CHARS = 32;
 export const MIN_REGION_EDGE = 0.004;
 
 /**
- * How much taller a text marker paints than the extracted glyph box, centred
- * on the printed line. PDF viewers (macOS Preview, Acrobat) and Word overshoot
- * the glyphs the same way — ascenders/descenders stay covered and adjacent
- * lines merge into one continuous marker. Used by both the live selection
- * (TextSpanLayer) and persisted text highlights (HighlightLayer).
+ * Text-marker line metrics. Word and native PDF viewers paint a highlight over
+ * the FULL line box (baseline to baseline), so consecutive lines merge into
+ * one continuous marker. The extracted span box is only the ascent (its bottom
+ * edge is the baseline — descenders hang below it), so the marker height is
+ * derived from the surface's measured line pitch, bounded to stay sane on
+ * unusual layouts, and the extra height is distributed asymmetrically: most of
+ * it below the box, covering the descenders.
  */
-export const MARKER_OVERSHOOT = 1.3;
+export const MARKER_MIN_FACTOR = 1.35;
+export const MARKER_MAX_FACTOR = 2.6;
+/** Marker height relative to the span box when the surface has no pitch info. */
+export const MARKER_FALLBACK_FACTOR = 1.45;
+/** Share of the extra marker height that goes above the box top. */
+const MARKER_EXTRA_TOP_SHARE = 0.25;
 
 /** A text selection expressed in canonical-text offsets of one surface. */
 export interface TextSelectionOffsets {
@@ -177,21 +184,50 @@ export interface HighlightGeometry {
   boxes: NormalizedBox[];
 }
 
-function expandMarkerLine(box: NormalizedBox): NormalizedBox {
+/**
+ * The surface's typical line pitch: the median gap between distinct line tops.
+ * The median is robust against paragraph gaps and headings. Null when the
+ * surface has fewer than two text lines.
+ */
+export function surfaceLinePitch(spans: RenderedTextSpan[]): number | null {
+  const tops = [...new Set(spans.map((span) => span.box.y))].sort((a, b) => a - b);
+  const deltas: number[] = [];
+  for (let i = 1; i < tops.length; i++) {
+    const delta = tops[i] - tops[i - 1];
+    if (delta > 1e-6) deltas.push(delta);
+  }
+  if (deltas.length === 0) return null;
+  deltas.sort((a, b) => a - b);
+  return deltas[Math.floor(deltas.length / 2)];
+}
+
+/**
+ * The marker band for one text line: the span box grown to the line pitch
+ * (Word-style full-line highlight), with most of the extra height below the
+ * box — the box bottom is the baseline, so that is where descenders hang.
+ */
+export function markerLineBox(box: NormalizedBox, pitch: number | null): NormalizedBox {
+  const factor =
+    pitch && box.height > 0
+      ? Math.min(Math.max(pitch / box.height, MARKER_MIN_FACTOR), MARKER_MAX_FACTOR)
+      : MARKER_FALLBACK_FACTOR;
+  const height = box.height * factor;
+  const extra = height - box.height;
   return clampBox({
     x: box.x,
-    y: box.y - (box.height * (MARKER_OVERSHOOT - 1)) / 2,
+    y: box.y - extra * MARKER_EXTRA_TOP_SHARE,
     width: box.width,
-    height: box.height * MARKER_OVERSHOOT,
+    height,
   });
 }
 
 /**
  * The highlight geometry of an anchor on its surface: a text anchor paints as
  * per-line marker boxes (recomputed from the stored text-position offsets
- * against the surface's spans, each with {@link MARKER_OVERSHOOT}); a
- * region-only anchor — or a text anchor whose offsets no longer hit any span —
- * falls back to the stored region bounding box.
+ * against the surface's spans, each grown to the line pitch via
+ * {@link markerLineBox}); a region-only anchor — or a text anchor whose
+ * offsets no longer hit any span — falls back to the stored region bounding
+ * box.
  */
 export function highlightBoxesForAnchor(
   anchor: Anchor,
@@ -200,7 +236,8 @@ export function highlightBoxesForAnchor(
   if (anchor.textPosition && spans.length > 0) {
     const lines = boxesForRange(spans, anchor.textPosition.start, anchor.textPosition.end);
     if (lines.length > 0) {
-      return { kind: 'marker', boxes: lines.map(expandMarkerLine) };
+      const pitch = surfaceLinePitch(spans);
+      return { kind: 'marker', boxes: lines.map((line) => markerLineBox(line, pitch)) };
     }
   }
   return { kind: 'box', boxes: [anchor.region.box] };

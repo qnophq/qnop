@@ -24,7 +24,7 @@ import Box from '@mui/material/Box';
 import { useTheme } from '@mui/material/styles';
 import type { RenderedTextSpan } from '../../../api/generated';
 import type { TextSelectionOffsets } from './anchoring';
-import { MARKER_OVERSHOOT } from './anchoring';
+import { markerLineBox, surfaceLinePitch } from './anchoring';
 import { selectionMarkerColor } from './markerColors';
 
 /** The font the invisible glyphs are measured and rendered with. */
@@ -114,6 +114,7 @@ export function TextSpanLayer({
   };
 
   const selectionBackground = selectionMarkerColor(theme.palette.mode);
+  const pitch = surfaceLinePitch(spans);
 
   return (
     <Box
@@ -141,10 +142,11 @@ export function TextSpanLayer({
         const fontSize = Math.max(span.box.height * pageHeight * 0.85, 6);
         const measured = span.text.length > 0 ? measureGlyphRun(span.text, fontSize) : null;
         const scaleX = measured ? (span.box.width * pageWidth) / measured : 1;
-        // The line box is taller than the glyph box and shifted up by half the
-        // overshoot, so the marker paints centred on the printed line.
-        const lineHeightPx = Math.max(span.box.height * pageHeight * MARKER_OVERSHOOT, 9);
-        const topFraction = span.box.y - (span.box.height * (MARKER_OVERSHOOT - 1)) / 2;
+        // The selection paints the line box: grown to the surface's line pitch
+        // and shifted like the persisted markers, so selecting and the created
+        // highlight cover the printed line identically (Word-style full line).
+        const line = markerLineBox(span.box, pitch);
+        const lineHeightPx = Math.max(line.height * pageHeight, 9);
         return (
           <span
             key={span.startOffset}
@@ -153,8 +155,8 @@ export function TextSpanLayer({
             style={{
               position: 'absolute',
               left: `${span.box.x * 100}%`,
-              top: `${topFraction * 100}%`,
-              height: `${span.box.height * MARKER_OVERSHOOT * 100}%`,
+              top: `${line.y * 100}%`,
+              height: `${line.height * 100}%`,
               color: 'transparent',
               whiteSpace: 'pre',
               fontFamily: LAYER_FONT_FAMILY,

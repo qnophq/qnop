@@ -114,10 +114,11 @@ describe('HighlightLayer', () => {
     );
     // Two lines → two marker bands: the primary (focusable) one plus one aria-hidden band.
     expect(rects).toHaveLength(2);
-    // First line: "world" trimmed proportionally, expanded by the 1.3 overshoot.
+    // First line: "world" trimmed proportionally, grown to the fixture pitch
+    // (0.05) with a quarter of the extra height above the box.
     const computed = getComputedStyle(primary);
-    expect(parseFloat(computed.top)).toBeCloseTo((0.1 - 0.02 * 0.15) * 100);
-    expect(parseFloat(computed.height)).toBeCloseTo(0.02 * 1.3 * 100);
+    expect(parseFloat(computed.top)).toBeCloseTo((0.1 - 0.03 * 0.25) * 100);
+    expect(parseFloat(computed.height)).toBeCloseTo(5);
     // Marker bands have no border — the highlighter look.
     expect(computed.borderStyle).toBe('none');
   });
@@ -200,9 +201,10 @@ describe('HighlightLayer', () => {
     );
 
     const pending = screen.getByTestId('pending-highlight');
-    // Line-wise: the preview follows the first line's box, not the union box.
+    // Line-wise: the preview follows the first line's pitch-tall marker band,
+    // not the union box.
     const computed = getComputedStyle(pending);
-    expect(parseFloat(computed.top)).toBeCloseTo((0.1 - 0.02 * 0.15) * 100);
-    expect(parseFloat(computed.height)).toBeCloseTo(0.02 * 1.3 * 100);
+    expect(parseFloat(computed.top)).toBeCloseTo((0.1 - 0.03 * 0.25) * 100);
+    expect(parseFloat(computed.height)).toBeCloseTo(5);
   });
 });

@@ -64,11 +64,11 @@ describe('TextSpanLayer', () => {
     const span = screen.getByText('Hello world');
     expect(span).toHaveAttribute('data-span-start', '0');
     expect(span).toHaveAttribute('data-span-length', '11');
-    // Box y=0.1/h=0.02 with 1.3 overshoot → top 9.7%, height 2.6%: the marker
-    // paints taller than the printed glyphs, centred on the line.
+    // Fixture pitch 0.05 on 0.02-tall boxes → the marker line paints the full
+    // pitch (5%), with a quarter of the extra height above the box top.
     expect(span).toHaveStyle({ left: '10%', color: 'rgba(0, 0, 0, 0)' });
-    expect(parseFloat(span.style.top)).toBeCloseTo(9.7);
-    expect(parseFloat(span.style.height)).toBeCloseTo(2.6);
+    expect(parseFloat(span.style.top)).toBeCloseTo(9.25);
+    expect(parseFloat(span.style.height)).toBeCloseTo(5);
   });
 
   it('reports a cross-span selection as canonical-text offsets', () => {

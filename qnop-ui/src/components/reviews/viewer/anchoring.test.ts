@@ -23,7 +23,9 @@ import { describe, expect, it } from 'vitest';
 import type { AnnotationView, RenderedTextSpan } from '../../../api/generated';
 import { AnnotationStatus } from '../../../api/generated';
 import {
-  MARKER_OVERSHOOT,
+  MARKER_FALLBACK_FACTOR,
+  MARKER_MAX_FACTOR,
+  MARKER_MIN_FACTOR,
   QUOTE_CONTEXT_CHARS,
   boxesForRange,
   buildRegionAnchor,
@@ -31,6 +33,8 @@ import {
   clampBox,
   compareAnnotationsByPosition,
   highlightBoxesForAnchor,
+  markerLineBox,
+  surfaceLinePitch,
   surfaceText,
   unionBoxes,
 } from './anchoring';
@@ -169,16 +173,46 @@ describe('buildRegionAnchor', () => {
   });
 });
 
+describe('surfaceLinePitch', () => {
+  it('returns the median gap between line tops', () => {
+    expect(surfaceLinePitch(SPANS)).toBeCloseTo(0.05);
+  });
+
+  it('returns null for a single line or no text', () => {
+    expect(surfaceLinePitch([SPANS[0]])).toBeNull();
+    expect(surfaceLinePitch([])).toBeNull();
+  });
+});
+
+describe('markerLineBox', () => {
+  it('grows the line to the pitch, biased below the box (descenders hang there)', () => {
+    const box = { x: 0.1, y: 0.1, width: 0.5, height: 0.02 };
+    const marker = markerLineBox(box, 0.03); // pitch/height = 1.5
+    expect(marker.height).toBeCloseTo(0.03);
+    expect(marker.y).toBeCloseTo(0.1 - 0.01 * 0.25);
+    // Bottom extends further than the top: baseline + descender coverage.
+    expect(box.y - marker.y).toBeLessThan(marker.y + marker.height - (box.y + box.height));
+  });
+
+  it('bounds the factor and falls back without pitch info', () => {
+    const box = { x: 0, y: 0.5, width: 0.5, height: 0.02 };
+    expect(markerLineBox(box, 0.001).height).toBeCloseTo(0.02 * MARKER_MIN_FACTOR);
+    expect(markerLineBox(box, 0.5).height).toBeCloseTo(0.02 * MARKER_MAX_FACTOR);
+    expect(markerLineBox(box, null).height).toBeCloseTo(0.02 * MARKER_FALLBACK_FACTOR);
+  });
+});
+
 describe('highlightBoxesForAnchor', () => {
-  it('paints a text anchor as one overshot marker box per line', () => {
+  it('paints a text anchor as one pitch-tall marker box per line', () => {
     const anchor = buildTextAnchor(0, SPANS, 6, 18)!;
     const geometry = highlightBoxesForAnchor(anchor, SPANS);
 
     expect(geometry.kind).toBe('marker');
     expect(geometry.boxes).toHaveLength(2);
-    // First line box vertically expanded by the overshoot, centred on the glyphs.
-    expect(geometry.boxes[0].y).toBeCloseTo(0.1 - (0.02 * (MARKER_OVERSHOOT - 1)) / 2);
-    expect(geometry.boxes[0].height).toBeCloseTo(0.02 * MARKER_OVERSHOOT);
+    // Fixture pitch 0.05 on 0.02-tall boxes → factor 2.5, a quarter of the
+    // extra height above the box.
+    expect(geometry.boxes[0].height).toBeCloseTo(0.05);
+    expect(geometry.boxes[0].y).toBeCloseTo(0.1 - 0.03 * 0.25);
   });
 
   it('falls back to the stored region box for region-only anchors', () => {
