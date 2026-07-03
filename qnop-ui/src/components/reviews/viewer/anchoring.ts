@@ -115,13 +115,30 @@ function visibleLength(text: string): number {
 }
 
 /**
- * The highlight boxes covering the canonical-text range [start, end).
- * Partially selected spans are trimmed proportionally by character count — an
- * approximation (glyph widths vary), acceptable because the authoritative
- * anchor is the text quote; the box only needs to visually cover the selection.
- * Each line is clamped to its visible text: trailing whitespace (e.g. lines
- * padded to a fixed width) never paints — matching Word/Acrobat, where a
- * highlight ends at the last printed character.
+ * The x of the right edge of the span's character `index` (0-based): glyph-true
+ * from the server's charAdvances (#290) when present, otherwise the uniform
+ * i/len approximation across the box.
+ */
+export function charRightEdge(span: RenderedTextSpan, index: number): number {
+  const advances = span.charAdvances;
+  if (advances && advances.length === span.text.length) {
+    return advances[Math.min(index, advances.length - 1)];
+  }
+  return span.box.x + (span.box.width * (index + 1)) / span.text.length;
+}
+
+/** The x of the left edge of the span's character `index` (0-based). */
+export function charLeftEdge(span: RenderedTextSpan, index: number): number {
+  return index <= 0 ? span.box.x : charRightEdge(span, index - 1);
+}
+
+/**
+ * The highlight boxes covering the canonical-text range [start, end). Partial
+ * lines are cut at the true glyph edges when the span carries charAdvances
+ * (#290); without them the cut falls back to the proportional character-count
+ * approximation. Each line is clamped to its visible text: trailing whitespace
+ * (e.g. lines padded to a fixed width) never paints — matching Word/Acrobat,
+ * where a highlight ends at the last printed character.
  */
 export function boxesForRange(
   spans: RenderedTextSpan[],
@@ -134,18 +151,86 @@ export function boxesForRange(
     const overlapStart = Math.max(start, span.startOffset);
     const overlapEnd = Math.min(end, span.endOffset, visibleEnd);
     if (overlapEnd <= overlapStart || span.text.length === 0) continue;
-    const fromFraction = (overlapStart - span.startOffset) / span.text.length;
-    const widthFraction = (overlapEnd - overlapStart) / span.text.length;
+    const fromX = charLeftEdge(span, overlapStart - span.startOffset);
+    const toX = charRightEdge(span, overlapEnd - 1 - span.startOffset);
     boxes.push(
       clampBox({
-        x: span.box.x + span.box.width * fromFraction,
+        x: fromX,
         y: span.box.y,
-        width: span.box.width * widthFraction,
+        width: toX - fromX,
         height: span.box.height,
       }),
     );
   }
   return boxes;
+}
+
+/**
+ * The canonical-text caret offset nearest to a point on the surface (both
+ * normalized 0..1). Hit-testing prefers the line whose marker band contains
+ * the y (the same band the selection paints), then the nearest band; within a
+ * line the caret snaps to the closest character boundary — glyph-true when
+ * charAdvances exist. Null when the surface has no text.
+ */
+export function caretOffsetAtPoint(
+  spans: RenderedTextSpan[],
+  x: number,
+  y: number,
+  pitch: number | null,
+): number | null {
+  let best: { offset: number; dy: number; dx: number } | null = null;
+  for (const span of spans) {
+    if (span.text.length === 0) continue;
+    const band = markerLineBox(span.box, pitch);
+    const dy = y < band.y ? band.y - y : y > band.y + band.height ? y - (band.y + band.height) : 0;
+    const right = span.box.x + span.box.width;
+    let dx = 0;
+    let offset: number;
+    if (x <= span.box.x) {
+      dx = span.box.x - x;
+      offset = span.startOffset;
+    } else if (x >= right) {
+      dx = x - right;
+      offset = span.startOffset + visibleLength(span.text);
+    } else {
+      // Nearest character boundary: boundary i sits at the left edge of char i.
+      offset = span.startOffset + span.text.length;
+      let bestDist = Math.abs(x - right);
+      for (let i = 0; i < span.text.length; i++) {
+        const boundary = charLeftEdge(span, i);
+        const dist = Math.abs(x - boundary);
+        if (dist < bestDist) {
+          bestDist = dist;
+          offset = span.startOffset + i;
+        }
+      }
+    }
+    if (!best || dy < best.dy || (dy === best.dy && dx < best.dx)) {
+      best = { offset, dy, dx };
+    }
+  }
+  return best ? best.offset : null;
+}
+
+/**
+ * The word range (canonical-text offsets) around a caret offset — the
+ * double-click selection. When the caret sits on whitespace (e.g. at a word
+ * end) the word to its left counts. Null on empty text or plain whitespace.
+ */
+export function wordRangeAt(
+  spans: RenderedTextSpan[],
+  offset: number,
+): { start: number; end: number } | null {
+  const text = surfaceText(spans);
+  if (text.length === 0) return null;
+  let at = Math.min(Math.max(offset, 0), text.length - 1);
+  if (/\s/.test(text[at]) && at > 0 && /\S/.test(text[at - 1])) at--;
+  if (/\s/.test(text[at])) return null;
+  let start = at;
+  let end = at + 1;
+  while (start > 0 && /\S/.test(text[start - 1])) start--;
+  while (end < text.length && /\S/.test(text[end])) end++;
+  return { start, end };
 }
 
 /**

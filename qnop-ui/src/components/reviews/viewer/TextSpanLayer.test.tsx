@@ -26,14 +26,21 @@ import type { RenderedTextSpan } from '../../../api/generated';
 import { buildTheme } from '../../../theme/theme';
 import { TextSpanLayer } from './TextSpanLayer';
 
+// "Hello world" with glyph-true edges: "Hello " narrow (0.02 each), "world"
+// wide (0.076 each) — deliberately far from the uniform grid (0.0454 each), so
+// any test passing below proves the advances are honoured.
+const ADVANCES = [0.12, 0.14, 0.16, 0.18, 0.2, 0.22, 0.296, 0.372, 0.448, 0.524, 0.6];
+
 const SPANS: RenderedTextSpan[] = [
   {
     text: 'Hello world',
     startOffset: 0,
     endOffset: 11,
     box: { x: 0.1, y: 0.1, width: 0.5, height: 0.02 },
+    charAdvances: ADVANCES,
   },
   {
+    // No charAdvances — exercises the uniform fallback (0.4/11 per char).
     text: 'Second line',
     startOffset: 12,
     endOffset: 23,
@@ -41,15 +48,33 @@ const SPANS: RenderedTextSpan[] = [
   },
 ];
 
-function renderLayer(onTextSelected = vi.fn()) {
+/** The layer maps pointer pixels through its bounding rect: pin it to 1000×1000. */
+function layerAt(): HTMLElement {
+  const layer = screen.getByTestId('text-layer-0');
+  Object.defineProperty(layer, 'getBoundingClientRect', {
+    value: () => ({
+      left: 0,
+      top: 0,
+      width: 1000,
+      height: 1000,
+      right: 1000,
+      bottom: 1000,
+      x: 0,
+      y: 0,
+      toJSON: () => ({}),
+    }),
+  });
+  return layer;
+}
+
+function renderLayer({ enabled = true } = {}) {
+  const onTextSelected = vi.fn();
   render(
     <ThemeProvider theme={buildTheme('light')}>
       <TextSpanLayer
         spans={SPANS}
         surfaceIndex={0}
-        pageWidth={800}
-        pageHeight={1035}
-        enabled
+        enabled={enabled}
         onTextSelected={onTextSelected}
       />
     </ThemeProvider>,
@@ -58,66 +83,92 @@ function renderLayer(onTextSelected = vi.fn()) {
 }
 
 describe('TextSpanLayer', () => {
-  it('positions each span centred on its box with marker overshoot and transparent glyphs', () => {
-    renderLayer();
-
-    const span = screen.getByText('Hello world');
-    expect(span).toHaveAttribute('data-span-start', '0');
-    expect(span).toHaveAttribute('data-span-length', '11');
-    // Fixture pitch 0.05 on 0.02-tall boxes → the marker line paints the full
-    // pitch (5%), with a quarter of the extra height above the box top.
-    expect(span).toHaveStyle({ left: '10%', color: 'rgba(0, 0, 0, 0)' });
-    expect(parseFloat(span.style.top)).toBeCloseTo(9.25);
-    expect(parseFloat(span.style.height)).toBeCloseTo(5);
-  });
-
-  it('reports a cross-span selection as canonical-text offsets', () => {
+  it('selects glyph-true via charAdvances — never the uniform grid', () => {
     const onTextSelected = renderLayer();
+    const layer = layerAt();
 
-    // Select "world" (6..11) through "Second" (12..18) via a real DOM range.
-    const first = screen.getByText('Hello world').firstChild!;
-    const second = screen.getByText('Second line').firstChild!;
-    const range = document.createRange();
-    range.setStart(first, 6);
-    range.setEnd(second, 6);
-    const selection = window.getSelection()!;
-    selection.removeAllRanges();
-    selection.addRange(range);
-
-    fireEvent.pointerUp(screen.getByTestId('text-layer-0'), { clientX: 120, clientY: 240 });
+    // Down just right of the boundary before "world" (advance edge 0.22);
+    // the uniform grid would place this pixel between characters 2 and 3.
+    fireEvent.pointerDown(layer, { button: 0, clientX: 225, clientY: 110 });
+    fireEvent.pointerMove(layer, { clientX: 600, clientY: 110 });
+    fireEvent.pointerUp(layer, { clientX: 600, clientY: 110 });
 
     expect(onTextSelected).toHaveBeenCalledWith(
-      { surfaceIndex: 0, start: 6, end: 18 },
-      { left: 120, top: 240 },
+      { surfaceIndex: 0, start: 6, end: 11 },
+      { left: 600, top: 110 },
     );
   });
 
-  it('ignores a collapsed selection', () => {
+  it('falls back to the uniform grid for spans without advances', () => {
     const onTextSelected = renderLayer();
-    window.getSelection()?.removeAllRanges();
+    const layer = layerAt();
 
-    fireEvent.pointerUp(screen.getByTestId('text-layer-0'));
+    // Span 2: uniform char width 0.4/11 ≈ 0.0364 → boundary 6 at x ≈ 0.318.
+    fireEvent.pointerDown(layer, { button: 0, clientX: 100, clientY: 160 });
+    fireEvent.pointerUp(layer, { clientX: 318, clientY: 160 });
+
+    expect(onTextSelected).toHaveBeenCalledWith(
+      { surfaceIndex: 0, start: 12, end: 18 },
+      { left: 318, top: 160 },
+    );
+  });
+
+  it('spans lines: dragging from the first into the second selects across', () => {
+    const onTextSelected = renderLayer();
+    const layer = layerAt();
+
+    fireEvent.pointerDown(layer, { button: 0, clientX: 225, clientY: 110 });
+    fireEvent.pointerUp(layer, { clientX: 318, clientY: 160 });
+
+    expect(onTextSelected).toHaveBeenCalledWith(
+      { surfaceIndex: 0, start: 6, end: 18 },
+      { left: 318, top: 160 },
+    );
+  });
+
+  it('mirrors the drag as live marker bands and clears them on release', () => {
+    renderLayer();
+    const layer = layerAt();
+
+    fireEvent.pointerDown(layer, { button: 0, clientX: 225, clientY: 110 });
+    fireEvent.pointerMove(layer, { clientX: 600, clientY: 110 });
+    expect(screen.getByTestId('live-selection-0')).toBeInTheDocument();
+
+    fireEvent.pointerUp(layer, { clientX: 600, clientY: 110 });
+    expect(screen.queryByTestId('live-selection-0')).not.toBeInTheDocument();
+  });
+
+  it('ignores a click without a drag', () => {
+    const onTextSelected = renderLayer();
+    const layer = layerAt();
+
+    fireEvent.pointerDown(layer, { button: 0, clientX: 225, clientY: 110 });
+    fireEvent.pointerUp(layer, { clientX: 225, clientY: 110 });
 
     expect(onTextSelected).not.toHaveBeenCalled();
   });
 
-  it('mirrors the live selection as marker bands and clears them on collapse', () => {
-    renderLayer();
+  it('selects the word under the pointer on double click', () => {
+    const onTextSelected = renderLayer();
+    const layer = layerAt();
 
-    const first = screen.getByText('Hello world').firstChild!;
-    const range = document.createRange();
-    range.setStart(first, 0);
-    range.setEnd(first, 5);
-    const selection = window.getSelection()!;
-    selection.removeAllRanges();
-    selection.addRange(range);
-    fireEvent(document, new Event('selectionchange'));
+    // x = 0.4 sits inside "world" (0.22..0.6) on the first line.
+    fireEvent.doubleClick(layer, { clientX: 400, clientY: 110 });
 
-    expect(screen.getByTestId('live-selection-0')).toBeInTheDocument();
+    expect(onTextSelected).toHaveBeenCalledWith(
+      { surfaceIndex: 0, start: 6, end: 11 },
+      { left: 400, top: 110 },
+    );
+  });
 
-    selection.removeAllRanges();
-    fireEvent(document, new Event('selectionchange'));
+  it('does nothing while disabled', () => {
+    const onTextSelected = renderLayer({ enabled: false });
+    const layer = layerAt();
 
-    expect(screen.queryByTestId('live-selection-0')).not.toBeInTheDocument();
+    fireEvent.pointerDown(layer, { button: 0, clientX: 225, clientY: 110 });
+    fireEvent.pointerUp(layer, { clientX: 600, clientY: 110 });
+    fireEvent.doubleClick(layer, { clientX: 400, clientY: 110 });
+
+    expect(onTextSelected).not.toHaveBeenCalled();
   });
 });

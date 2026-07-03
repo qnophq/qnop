@@ -106,10 +106,17 @@ public class PdfBoxDocumentExtractor implements DocumentExtractor {
   }
 
   /**
-   * One collected text run before canonical offsets exist: its text, normalized box, and the raw
-   * geometry (PDF points) plus collection sequence used to establish a deterministic reading order.
+   * One collected text run before canonical offsets exist: its text, normalized box, optional
+   * per-character right edges (issue #290), and the raw geometry (PDF points) plus collection
+   * sequence used to establish a deterministic reading order.
    */
-  private record RawRun(String text, NormalizedBox box, double baselineY, double minX, int seq) {}
+  private record RawRun(
+      String text,
+      NormalizedBox box,
+      List<Double> charAdvances,
+      double baselineY,
+      double minX,
+      int seq) {}
 
   /**
    * Collects one run per stripper-written string with a glyph bounding box normalized to the crop
@@ -139,7 +146,9 @@ public class PdfBoxDocumentExtractor implements DocumentExtractor {
       List<TextSpan> spans = new ArrayList<>(ordered.size());
       int offset = 0;
       for (RawRun run : ordered) {
-        spans.add(new TextSpan(run.text(), offset, offset + run.text().length(), run.box()));
+        spans.add(
+            new TextSpan(
+                run.text(), offset, offset + run.text().length(), run.box(), run.charAdvances()));
         offset += run.text().length() + 1; // +1 for the canonical '\n' joiner between runs
       }
       return spans;
@@ -161,7 +170,9 @@ public class PdfBoxDocumentExtractor implements DocumentExtractor {
         glyphs.append(position.getUnicode());
       }
       if (!glyphs.toString().equals(text)) {
-        addRun(text, positions);
+        // Stripper-inserted separators have no glyph of their own, so per-character
+        // geometry cannot be attributed — consumers fall back to uniform distribution.
+        addRun(text, positions, false);
         return;
       }
       List<TextPosition> current = new ArrayList<>();
@@ -182,7 +193,7 @@ public class PdfBoxDocumentExtractor implements DocumentExtractor {
       for (TextPosition position : positions) {
         text.append(position.getUnicode());
       }
-      addRun(text.toString(), positions);
+      addRun(text.toString(), positions, true);
     }
 
     private static boolean startsNewSegment(TextPosition previous, TextPosition next) {
@@ -194,7 +205,7 @@ public class PdfBoxDocumentExtractor implements DocumentExtractor {
       return jumpsBack || changesBaseline;
     }
 
-    private void addRun(String text, List<TextPosition> positions) {
+    private void addRun(String text, List<TextPosition> positions, boolean glyphsMatchText) {
       if (text.isBlank()) {
         return;
       }
@@ -214,7 +225,32 @@ public class PdfBoxDocumentExtractor implements DocumentExtractor {
               clamp(minTop / pageHeight),
               clamp((maxX - minX) / pageWidth),
               clamp((maxBottom - minTop) / pageHeight));
-      runs.add(new RawRun(text, box, maxBottom, minX, runs.size()));
+      List<Double> advances = glyphsMatchText ? charAdvances(positions) : null;
+      runs.add(new RawRun(text, box, advances, maxBottom, minX, runs.size()));
+    }
+
+    /**
+     * Glyph-true per-character right edges (issue #290), normalized to the crop box. A multi-char
+     * position (ligature) distributes its width evenly over its characters. Edges are forced
+     * non-decreasing (kerning can nudge a glyph left) so consumers can binary-search them.
+     */
+    private List<Double> charAdvances(List<TextPosition> positions) {
+      List<Double> edges = new ArrayList<>();
+      double previousEdge = 0.0d;
+      for (TextPosition position : positions) {
+        int glyphChars = position.getUnicode().length();
+        if (glyphChars == 0) {
+          continue;
+        }
+        double left = position.getXDirAdj();
+        double width = position.getWidthDirAdj();
+        for (int i = 1; i <= glyphChars; i++) {
+          double edge = clamp((left + width * i / glyphChars) / pageWidth);
+          previousEdge = Math.max(previousEdge, edge);
+          edges.add(previousEdge);
+        }
+      }
+      return edges;
     }
 
     private static double clamp(double value) {
