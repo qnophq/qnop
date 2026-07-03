@@ -58,6 +58,11 @@ const DocumentReviewPage = lazy(() =>
   import('../pages/reviews/DocumentReviewPage').then((m) => ({ default: m.DocumentReviewPage })),
 );
 
+// The version comparison shares pdf.js with the review surface (#252).
+const VersionComparePage = lazy(() =>
+  import('../pages/reviews/VersionComparePage').then((m) => ({ default: m.VersionComparePage })),
+);
+
 const lazyFallback = (
   <div style={{ padding: '8px 4px', fontSize: 14, color: '#5E6C7B' }}>Loading…</div>
 );
@@ -93,6 +98,14 @@ export const router = createBrowserRouter([
         element: (
           <Suspense fallback={lazyFallback}>
             <DocumentReviewPage />
+          </Suspense>
+        ),
+      },
+      {
+        path: 'reviews/:documentId/compare',
+        element: (
+          <Suspense fallback={lazyFallback}>
+            <VersionComparePage />
           </Suspense>
         ),
       },

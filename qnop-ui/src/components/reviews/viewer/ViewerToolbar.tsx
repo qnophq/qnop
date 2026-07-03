@@ -30,7 +30,16 @@ import ToggleButton from '@mui/material/ToggleButton';
 import ToggleButtonGroup from '@mui/material/ToggleButtonGroup';
 import Tooltip from '@mui/material/Tooltip';
 import Typography from '@mui/material/Typography';
-import { BoxSelect, ChevronDown, ChevronUp, TextCursor, ZoomIn, ZoomOut } from 'lucide-react';
+import { Link as RouterLink } from 'react-router-dom';
+import {
+  BoxSelect,
+  ChevronDown,
+  ChevronUp,
+  GitCompareArrows,
+  TextCursor,
+  ZoomIn,
+  ZoomOut,
+} from 'lucide-react';
 import type { DocumentVersionSummary } from '../../../api/generated';
 import { ExtractionStatus } from '../../../api/generated';
 import { ToneBadge } from '../../admin/ToneBadge';
@@ -56,6 +65,8 @@ interface ViewerToolbarProps {
   canAnnotate: boolean;
   zoom: number;
   onZoomChange: (zoom: number) => void;
+  /** Link to the version comparison (#252); undefined hides the button (fewer than two extracted versions). */
+  compareHref?: string;
 }
 
 /**
@@ -78,6 +89,7 @@ export function ViewerToolbar({
   canAnnotate,
   zoom,
   onZoomChange,
+  compareHref,
 }: ViewerToolbarProps) {
   return (
     <Paper
@@ -105,6 +117,18 @@ export function ViewerToolbar({
           </MenuItem>
         ))}
       </TextField>
+      {compareHref && (
+        <Tooltip title="Compare versions">
+          <IconButton
+            size="small"
+            aria-label="Compare versions"
+            component={RouterLink}
+            to={compareHref}
+          >
+            <GitCompareArrows size={16} />
+          </IconButton>
+        </Tooltip>
+      )}
 
       <Stack direction="row" spacing={0.25} sx={{ alignItems: 'center' }}>
         <IconButton
