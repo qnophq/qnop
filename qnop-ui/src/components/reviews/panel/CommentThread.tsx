@@ -114,7 +114,7 @@ export function CommentThread({ annotationId, notify }: CommentThreadProps) {
                   flex: 1,
                   minWidth: 0,
                   bgcolor: theme.qnop.surface2,
-                  borderRadius: '4px 12px 12px 12px',
+                  borderRadius: '3px 8px 8px 8px',
                   px: 1.25,
                   py: 0.75,
                 }}
@@ -158,7 +158,7 @@ export function CommentThread({ annotationId, notify }: CommentThreadProps) {
             slotProps={{
               htmlInput: { maxLength: 20000, 'aria-label': 'Add a comment' },
               input: {
-                sx: { borderRadius: 3, bgcolor: 'background.paper' },
+                sx: { borderRadius: 1, bgcolor: 'background.paper' },
                 endAdornment: (
                   <IconButton
                     size="small"

@@ -168,7 +168,7 @@ export function AnnotationListItem({
         width: '100%',
         textAlign: 'left',
         position: 'relative',
-        borderRadius: 1.5,
+        borderRadius: 0.75,
         border: '1px solid',
         borderColor: active ? theme.qnop.brand.blue : linked ? railColor : theme.palette.divider,
         bgcolor: active
