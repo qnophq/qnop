@@ -45,6 +45,7 @@ import { useToast } from '../../components/admin/layout/useToast';
 import type { BadgeTone } from '../../components/admin/ToneBadge';
 import { ToneBadge } from '../../components/admin/ToneBadge';
 import { AnnotationPanel } from '../../components/reviews/panel/AnnotationPanel';
+import { PANEL_MIN_WIDTH, PanelResizer } from '../../components/reviews/PanelResizer';
 import type {
   ScreenPosition,
   TextSelectionOffsets,
@@ -55,6 +56,8 @@ import { DocumentViewer } from '../../components/reviews/viewer/DocumentViewer';
 import { usePdfDocument } from '../../components/reviews/viewer/usePdfDocument';
 import type { ViewerTool } from '../../components/reviews/viewer/ViewerToolbar';
 import { ViewerToolbar } from '../../components/reviews/viewer/ViewerToolbar';
+
+const PANEL_WIDTH_KEY = 'qnop-review-panel-width';
 
 /** Community workflow states with a badge tone; unknown (enterprise) states render neutral. */
 const WORKFLOW_TONES: Record<string, BadgeTone> = {
@@ -115,6 +118,23 @@ export function DocumentReviewPage() {
   const [hoverAnnotationId, setHoverAnnotationId] = useState<string | null>(null);
   const [currentPage, setCurrentPage] = useState(0);
   const viewerRef = useRef<DocumentViewerHandle>(null);
+  const [panelWidth, setPanelWidth] = useState<number>(() => {
+    try {
+      const stored = Number(localStorage.getItem(PANEL_WIDTH_KEY));
+      return stored >= PANEL_MIN_WIDTH ? stored : PANEL_MIN_WIDTH;
+    } catch {
+      return PANEL_MIN_WIDTH;
+    }
+  });
+
+  const handlePanelWidthChange = (width: number) => {
+    setPanelWidth(width);
+    try {
+      localStorage.setItem(PANEL_WIDTH_KEY, String(width));
+    } catch {
+      // best-effort persistence
+    }
+  };
   // A drawn-but-not-created mark. While `menuPosition` is set, the "Create
   // annotation" popup is open at the pointer; choosing the item clears the
   // position and opens the composer in the panel. Dismissing the popup
@@ -217,8 +237,9 @@ export function DocumentReviewPage() {
       ) : (
         <Stack
           direction={{ xs: 'column', md: 'row' }}
-          spacing={2.5}
-          sx={{ alignItems: { xs: 'stretch', md: 'stretch' }, flex: 1, minHeight: 0 }}
+          // On md+ the resizer provides the gap between the panes.
+          spacing={{ xs: 2.5, md: 0 }}
+          sx={{ alignItems: 'stretch', flex: 1, minHeight: 0 }}
         >
           <Stack spacing={1.5} sx={{ flex: 1, minWidth: 0, minHeight: 0 }}>
             <ViewerToolbar
@@ -289,11 +310,16 @@ export function DocumentReviewPage() {
               </Box>
             )}
           </Stack>
+          <PanelResizer
+            width={panelWidth}
+            defaultWidth={PANEL_MIN_WIDTH}
+            onWidthChange={handlePanelWidthChange}
+          />
           <Box
             component="aside"
             aria-label="Annotations"
             sx={{
-              width: { xs: '100%', md: 360 },
+              width: { xs: '100%', md: panelWidth },
               flexShrink: 0,
               minHeight: 0,
               overflowY: { md: 'auto' },
