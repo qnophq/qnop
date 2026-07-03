@@ -79,13 +79,16 @@ export function AnnotationListItem({ annotation, active, onClick }: AnnotationLi
           <PlacementStatusChip status={annotation.placementStatus} />
           <Stack
             direction="row"
-            spacing={0.5}
+            spacing={1}
             sx={{ alignItems: 'center', ml: 'auto', color: 'text.secondary' }}
           >
-            <MessageSquare size={13} aria-hidden />
-            <Typography variant="caption" aria-label={`${annotation.commentCount} comments`}>
-              {annotation.commentCount}
-            </Typography>
+            {region && <Typography variant="caption">Page {region.surfaceIndex + 1}</Typography>}
+            <Stack direction="row" spacing={0.5} sx={{ alignItems: 'center' }}>
+              <MessageSquare size={13} aria-hidden />
+              <Typography variant="caption" aria-label={`${annotation.commentCount} comments`}>
+                {annotation.commentCount}
+              </Typography>
+            </Stack>
           </Stack>
         </Stack>
         {quote ? (
@@ -104,7 +107,7 @@ export function AnnotationListItem({ annotation, active, onClick }: AnnotationLi
           </Typography>
         ) : (
           <Typography variant="body2" color="text.secondary">
-            {region ? `Region on page ${region.surfaceIndex + 1}` : 'No placement on this version'}
+            {region ? 'Region annotation' : 'No placement on this version'}
           </Typography>
         )}
       </Stack>

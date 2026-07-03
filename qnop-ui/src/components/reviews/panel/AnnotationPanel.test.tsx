@@ -93,6 +93,8 @@ describe('AnnotationPanel', () => {
     expect(screen.getByText('Not placed on this version')).toBeInTheDocument();
     expect(screen.getByText('Orphaned')).toBeInTheDocument();
     expect(screen.getByText('“quoted text”')).toBeInTheDocument();
+    // The placed annotation shows its page; the unplaced one has none.
+    expect(screen.getByText('Page 1')).toBeInTheDocument();
   });
 
   it('toggles the active annotation and reveals its thread', () => {
