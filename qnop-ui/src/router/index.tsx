@@ -21,7 +21,7 @@
 
 import { lazy, Suspense } from 'react';
 import { createBrowserRouter } from 'react-router-dom';
-import { FileText, ShieldCheck } from 'lucide-react';
+import { ShieldCheck } from 'lucide-react';
 import { AppShell } from '../components/shell/AppShell';
 import { AdminRoute } from '../components/auth/AdminRoute';
 import { ProtectedRoute } from '../components/auth/ProtectedRoute';
@@ -45,6 +45,7 @@ import { ResetPasswordPage } from '../pages/auth/ResetPasswordPage';
 import { VerifyEmailPage } from '../pages/auth/VerifyEmailPage';
 import { ForbiddenPage } from '../pages/errors/ForbiddenPage';
 import { NotFoundPage } from '../pages/errors/NotFoundPage';
+import { ReviewsPage } from '../pages/reviews/ReviewsPage';
 
 // The template editor pulls in CodeMirror; load it lazily so the rest of the app stays light.
 const MailTemplateEditPage = lazy(() =>
@@ -84,16 +85,7 @@ export const router = createBrowserRouter([
     children: [
       { index: true, element: <HomePage /> },
       { path: 'profile', element: <ProfilePage /> },
-      {
-        path: 'reviews',
-        element: (
-          <ComingSoonPage
-            title="Reviews"
-            description="Upload, review and approve documents — the review surface arrives in the PDF vertical slice."
-            icon={FileText}
-          />
-        ),
-      },
+      { path: 'reviews', element: <ReviewsPage /> },
       {
         path: 'reviews/:documentId',
         element: (
