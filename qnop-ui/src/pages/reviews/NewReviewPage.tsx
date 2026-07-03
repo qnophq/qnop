@@ -73,6 +73,7 @@ export function NewReviewPage() {
   const [fileError, setFileError] = useState<string | null>(null);
   const [title, setTitle] = useState('');
   const [reviewers, setReviewers] = useState<PrincipalView[]>([]);
+  const [dueAt, setDueAt] = useState<string | null>(null);
   const [startImmediately, setStartImmediately] = useState(true);
   const [submit, setSubmit] = useState<SubmitState>(SUBMIT_IDLE);
 
@@ -107,6 +108,7 @@ export function NewReviewPage() {
       const created = await createReview.mutateAsync({
         title: title.trim(),
         file,
+        dueAt,
         onProgress: (fraction) => setSubmit((s) => ({ ...s, progress: fraction })),
       });
       documentId = created.documentId;
@@ -210,6 +212,8 @@ export function NewReviewPage() {
             file={file}
             title={title.trim()}
             reviewers={reviewers}
+            dueAt={dueAt}
+            onDueAtChange={setDueAt}
             startImmediately={startImmediately}
             onStartImmediatelyChange={setStartImmediately}
             phase={submit.phase}

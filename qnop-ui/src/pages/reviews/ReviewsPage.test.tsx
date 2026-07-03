@@ -236,4 +236,64 @@ describe('ReviewsPage', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Retry' }));
     expect(refetch).toHaveBeenCalled();
   });
+
+  it('flags an overdue open review and shows an upcoming deadline plainly', () => {
+    const DAY_MS = 24 * 60 * 60_000;
+    mockReviews({
+      data: {
+        items: [
+          summary({
+            id: 'doc-overdue',
+            title: 'Overdue review',
+            workflowState: 'IN_REVIEW',
+            dueAt: new Date(Date.now() - 2 * DAY_MS - 60_000).toISOString(),
+          }),
+          summary({
+            id: 'doc-upcoming',
+            title: 'Upcoming review',
+            workflowState: 'IN_REVIEW',
+            dueAt: new Date(Date.now() + 3 * DAY_MS + 60_000).toISOString(),
+          }),
+        ],
+        total: 2,
+        page: 0,
+        size: 100,
+      },
+    });
+    renderPage();
+
+    const overdue = screen.getByText('overdue by 2 days');
+    expect(overdue).toBeInTheDocument();
+    expect(overdue).toHaveAttribute('data-overdue', 'true');
+    expect(screen.getByText('due in 3 days')).toBeInTheDocument();
+  });
+
+  it('does not flag a passed deadline on a closed review', () => {
+    const DAY_MS = 24 * 60 * 60_000;
+    mockReviews({
+      data: {
+        items: [
+          summary({
+            id: 'doc-closed',
+            title: 'Closed review',
+            workflowState: 'FINALIZED',
+            dueAt: new Date(Date.now() - 5 * DAY_MS).toISOString(),
+          }),
+        ],
+        total: 1,
+        page: 0,
+        size: 100,
+      },
+    });
+    renderPage();
+
+    expect(screen.getByText('overdue by 5 days')).not.toHaveAttribute('data-overdue', 'true');
+  });
+
+  it('offers a due-date sort option', () => {
+    renderPage();
+
+    fireEvent.mouseDown(screen.getByRole('combobox', { name: 'Sort' }));
+    expect(screen.getByRole('option', { name: 'Due date' })).toBeInTheDocument();
+  });
 });

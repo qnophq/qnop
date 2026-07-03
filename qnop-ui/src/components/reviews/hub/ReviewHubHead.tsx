@@ -29,7 +29,7 @@ import Stack from '@mui/material/Stack';
 import Tooltip from '@mui/material/Tooltip';
 import Typography from '@mui/material/Typography';
 import { useTheme } from '@mui/material/styles';
-import { ChevronDown, Upload, UserPlus, Users } from 'lucide-react';
+import { CalendarClock, ChevronDown, Upload, UserPlus, Users } from 'lucide-react';
 import type { AnnotationView } from '../../../api/generated';
 import { AnnotationStatus, ParticipantKind } from '../../../api/generated';
 import { useConfig } from '../../../api/hooks/useConfig';
@@ -42,10 +42,12 @@ import {
 import { ConfirmDialog } from '../../admin/ConfirmDialog';
 import type { Notify } from '../../admin/layout/useToast';
 import { UserAvatar } from '../../shell/UserAvatar';
+import { DueDateLabel } from '../DueDateLabel';
 import { ProgressBar } from '../list/ReviewListParts';
 import { workflowLabel } from '../workflowMeta';
 import { validateDocumentFile } from '../wizard/wizardModel';
 import { apiErrorCode, apiErrorMessage } from '../../../utils/apiError';
+import { DueDateDialog } from './DueDateDialog';
 import { ParticipantsDialog } from './ParticipantsDialog';
 
 const FALLBACK_MAX_SIZE_MB = 50;
@@ -62,6 +64,10 @@ interface ReviewHubHeadProps {
   isOwner: boolean;
   ownUserId: string | null;
   annotations: AnnotationView[];
+  /** The review's optional due date (ISO instant) or null (issue #295). */
+  dueAt: string | null;
+  /** The workflow state, so an overdue deadline is only flagged while open. */
+  workflowState: string;
   notify: Notify;
   /** Called with the new version number after a successful re-upload. */
   onVersionUploaded: (versionNumber: number) => void;
@@ -78,12 +84,15 @@ export function ReviewHubHead({
   isOwner,
   ownUserId,
   annotations,
+  dueAt,
+  workflowState,
   notify,
   onVersionUploaded,
 }: ReviewHubHeadProps) {
   const theme = useTheme();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [participantsOpen, setParticipantsOpen] = useState(false);
+  const [dueDateOpen, setDueDateOpen] = useState(false);
   const [workflowMenuAnchor, setWorkflowMenuAnchor] = useState<HTMLElement | null>(null);
   const [confirmTarget, setConfirmTarget] = useState<string | null>(null);
 
@@ -137,6 +146,43 @@ export function ReviewHubHead({
   return (
     <Stack direction="row" spacing={1.5} sx={{ alignItems: 'center', flexWrap: 'wrap' }}>
       {total > 0 && <ProgressBar decided={decided} total={total} color={theme.qnop.brand.blue} />}
+
+      {isOwner ? (
+        <Tooltip title="Set review due date">
+          <ButtonBase
+            onClick={() => setDueDateOpen(true)}
+            data-testid="due-date-button"
+            aria-label="Set review due date"
+            sx={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: 0.75,
+              px: 1,
+              py: 0.5,
+              borderRadius: 99,
+              '&:hover': { bgcolor: theme.qnop.surface2 },
+              '&:focus-visible': { boxShadow: theme.qnop.focusRing },
+            }}
+          >
+            {dueAt ? (
+              <DueDateLabel dueAt={dueAt} workflowState={workflowState} />
+            ) : (
+              <>
+                <CalendarClock
+                  size={16}
+                  aria-hidden
+                  style={{ color: theme.palette.text.secondary }}
+                />
+                <Typography variant="caption" color="text.secondary">
+                  Set due date
+                </Typography>
+              </>
+            )}
+          </ButtonBase>
+        </Tooltip>
+      ) : (
+        dueAt && <DueDateLabel dueAt={dueAt} workflowState={workflowState} />
+      )}
 
       <Tooltip title={isOwner ? 'Manage participants' : 'View participants'}>
         <ButtonBase
@@ -268,6 +314,16 @@ export function ReviewHubHead({
         ownUserId={ownUserId}
         notify={notify}
       />
+
+      {isOwner && (
+        <DueDateDialog
+          documentId={documentId}
+          open={dueDateOpen}
+          onClose={() => setDueDateOpen(false)}
+          dueAt={dueAt}
+          notify={notify}
+        />
+      )}
 
       <ConfirmDialog
         open={confirmTarget !== null}

@@ -32,6 +32,7 @@ import { useTheme } from '@mui/material/styles';
 import { ChevronRight } from 'lucide-react';
 import type { DocumentSummary } from '../../../api/generated';
 import { formatRelative } from '../../../utils/formatDate';
+import { DueDateLabel } from '../DueDateLabel';
 import { WorkflowBadge } from '../WorkflowBadge';
 import { DocumentIcon, ProgressBar, ReviewerStack, RoleBadge } from './ReviewListParts';
 import { progressOf, roleOf } from './reviewListModel';
@@ -51,7 +52,7 @@ export function ReviewsTable({ reviews, userId, onOpen }: ReviewsTableProps) {
         <Table size="small" sx={{ minWidth: 720 }}>
           <TableHead>
             <TableRow sx={{ bgcolor: theme.qnop.surface2 }}>
-              {['Document', 'Role', 'Status', 'Progress', 'Reviewers', 'Updated', ''].map(
+              {['Document', 'Role', 'Status', 'Progress', 'Reviewers', 'Due', 'Updated', ''].map(
                 (header) => (
                   <TableCell
                     key={header}
@@ -115,6 +116,15 @@ export function ReviewsTable({ reviews, userId, onOpen }: ReviewsTableProps) {
                   </TableCell>
                   <TableCell>
                     <ReviewerStack participants={review.participants} />
+                  </TableCell>
+                  <TableCell sx={{ whiteSpace: 'nowrap' }}>
+                    {review.dueAt ? (
+                      <DueDateLabel dueAt={review.dueAt} workflowState={review.workflowState} />
+                    ) : (
+                      <Typography variant="caption" color="text.secondary">
+                        —
+                      </Typography>
+                    )}
                   </TableCell>
                   <TableCell sx={{ whiteSpace: 'nowrap' }}>
                     <Typography variant="caption" color="text.secondary">

@@ -20,7 +20,9 @@
  */
 
 import { describe, expect, it } from 'vitest';
-import { formatDateTime, formatRelative } from './formatDate';
+import { formatDateTime, formatDueDate, formatRelative, isPast } from './formatDate';
+
+const DAY_MS = 24 * 60 * 60_000;
 
 describe('formatDateTime', () => {
   it('returns an em dash for null, undefined or an invalid date', () => {
@@ -56,5 +58,47 @@ describe('formatRelative', () => {
     const longAgo = new Date(Date.now() - 200 * 24 * 60 * 60_000).toISOString();
     expect(formatRelative(longAgo)).not.toBe('—');
     expect(formatRelative(longAgo)).not.toMatch(/ago|just now/);
+  });
+});
+
+describe('isPast', () => {
+  it('is false for null, undefined or an invalid date', () => {
+    expect(isPast(null)).toBe(false);
+    expect(isPast(undefined)).toBe(false);
+    expect(isPast('not-a-date')).toBe(false);
+  });
+
+  it('is true for a past date and false for a future one', () => {
+    expect(isPast(new Date(Date.now() - DAY_MS).toISOString())).toBe(true);
+    expect(isPast(new Date(Date.now() + DAY_MS).toISOString())).toBe(false);
+  });
+});
+
+describe('formatDueDate', () => {
+  it('returns an em dash for null, undefined or an invalid date', () => {
+    expect(formatDueDate(null)).toBe('—');
+    expect(formatDueDate(undefined)).toBe('—');
+    expect(formatDueDate('not-a-date')).toBe('—');
+  });
+
+  it('phrases an upcoming deadline as "due in N days"', () => {
+    expect(formatDueDate(new Date(Date.now() + 3 * DAY_MS + 60_000).toISOString())).toBe(
+      'due in 3 days',
+    );
+  });
+
+  it('phrases a passed deadline as "overdue by N days"', () => {
+    expect(formatDueDate(new Date(Date.now() - 2 * DAY_MS - 60_000).toISOString())).toBe(
+      'overdue by 2 days',
+    );
+  });
+
+  it('reports the same day as "due today"', () => {
+    expect(formatDueDate(new Date(Date.now() + 60_000).toISOString())).toBe('due today');
+  });
+
+  it('falls back to an absolute date beyond 30 days', () => {
+    expect(formatDueDate(new Date(Date.now() + 200 * DAY_MS).toISOString())).toMatch(/^due /);
+    expect(formatDueDate(new Date(Date.now() - 200 * DAY_MS).toISOString())).toMatch(/^was due /);
   });
 });

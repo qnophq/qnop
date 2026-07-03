@@ -24,6 +24,8 @@ const DATE_TIME = new Intl.DateTimeFormat('en-GB', {
   timeStyle: 'short',
 });
 
+const DATE_ONLY = new Intl.DateTimeFormat('en-GB', { dateStyle: 'medium' });
+
 const RELATIVE = new Intl.RelativeTimeFormat('en', { numeric: 'auto' });
 
 const MINUTE_MS = 60_000;
@@ -52,4 +54,31 @@ export function formatRelative(iso: string | null | undefined): string {
   if (absMs < DAY_MS) return RELATIVE.format(Math.round(diffMs / HOUR_MS), 'hour');
   if (absMs < 30 * DAY_MS) return RELATIVE.format(Math.round(diffMs / DAY_MS), 'day');
   return DATE_TIME.format(date);
+}
+
+/** Whether an ISO timestamp is in the past relative to {@code now} (default: now). */
+export function isPast(iso: string | null | undefined, now: number = Date.now()): boolean {
+  if (!iso) return false;
+  const time = new Date(iso).getTime();
+  return !Number.isNaN(time) && time < now;
+}
+
+/**
+ * A due date phrased for a deadline: "due today", "due in 3 days", "overdue by
+ * 2 days", falling back to an absolute date beyond 30 days ("due 5 Jan 2027" /
+ * "was due 5 Jan 2020") and to an em dash when absent/invalid.
+ */
+export function formatDueDate(iso: string | null | undefined): string {
+  if (!iso) return '—';
+  const date = new Date(iso);
+  if (Number.isNaN(date.getTime())) return '—';
+  const diffMs = date.getTime() - Date.now();
+  if (Math.abs(diffMs) >= 30 * DAY_MS) {
+    return `${diffMs < 0 ? 'was due' : 'due'} ${DATE_ONLY.format(date)}`;
+  }
+  const days = Math.round(diffMs / DAY_MS);
+  if (days === 0) return 'due today';
+  if (days > 0) return `due in ${days} day${days === 1 ? '' : 's'}`;
+  const overdueDays = -days;
+  return `overdue by ${overdueDays} day${overdueDays === 1 ? '' : 's'}`;
 }

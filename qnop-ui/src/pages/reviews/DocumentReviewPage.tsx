@@ -219,6 +219,8 @@ export function DocumentReviewPage() {
             isOwner={document.ownerId === userId}
             ownUserId={userId}
             annotations={annotations}
+            dueAt={document.dueAt ?? null}
+            workflowState={document.workflowState}
             notify={notify}
             onVersionUploaded={handleVersionChange}
           />
