@@ -21,6 +21,7 @@
 package io.qnop.repository;
 
 import io.qnop.entity.DocumentVersion;
+import io.qnop.entity.ExtractionStatus;
 import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
@@ -37,6 +38,9 @@ public interface DocumentVersionRepository extends JpaRepository<DocumentVersion
 
   /** A specific numbered version of a document. */
   Optional<DocumentVersion> findByDocumentIdAndVersionNumber(UUID documentId, int versionNumber);
+
+  /** Whether any version of the document is in the given extraction state (issue #323). */
+  boolean existsByDocumentIdAndExtractionStatus(UUID documentId, ExtractionStatus extractionStatus);
 
   /** The latest (highest-numbered) version of a document, if any. */
   Optional<DocumentVersion> findTopByDocumentIdOrderByVersionNumberDesc(UUID documentId);

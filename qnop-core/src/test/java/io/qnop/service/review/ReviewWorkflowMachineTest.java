@@ -40,7 +40,7 @@ import org.junit.jupiter.params.provider.CsvSource;
  */
 class ReviewWorkflowMachineTest {
 
-  private static final TransitionContext CLEAN = new TransitionContext(0, 0);
+  private static final TransitionContext CLEAN = new TransitionContext(0, 0, true);
 
   private final ReviewWorkflowMachine machine = new ReviewWorkflowMachine();
 
@@ -115,7 +115,7 @@ class ReviewWorkflowMachineTest {
         machine.transition(
             WorkflowState.IN_REVIEW.name(),
             WorkflowState.FINALIZED,
-            new TransitionContext(open, pending));
+            new TransitionContext(open, pending, true));
 
     assertThat(result instanceof TransitionResult.Allowed).isEqualTo(allowed);
     if (!allowed) {
@@ -125,9 +125,22 @@ class ReviewWorkflowMachineTest {
   }
 
   @Test
+  @DisplayName("finalize is denied when no version has a completed extraction (issue #323)")
+  void finalizeRequiresAReadyVersion() {
+    TransitionResult result =
+        machine.transition(
+            WorkflowState.IN_REVIEW.name(),
+            WorkflowState.FINALIZED,
+            new TransitionContext(0, 0, false));
+
+    assertThat(result).isInstanceOf(TransitionResult.Denied.class);
+    assertThat(((TransitionResult.Denied) result).reason()).contains("READY");
+  }
+
+  @Test
   void guardDoesNotBlockNonFinalizeEdges() {
     // Open annotations must not prevent e.g. cancelling or requesting changes.
-    TransitionContext dirty = new TransitionContext(5, 5);
+    TransitionContext dirty = new TransitionContext(5, 5, true);
     assertThat(machine.transition("IN_REVIEW", WorkflowState.CHANGES_REQUESTED, dirty))
         .isInstanceOf(TransitionResult.Allowed.class);
     assertThat(machine.transition("IN_REVIEW", WorkflowState.CANCELLED, dirty))
