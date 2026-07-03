@@ -45,6 +45,7 @@ import { ResetPasswordPage } from '../pages/auth/ResetPasswordPage';
 import { VerifyEmailPage } from '../pages/auth/VerifyEmailPage';
 import { ForbiddenPage } from '../pages/errors/ForbiddenPage';
 import { NotFoundPage } from '../pages/errors/NotFoundPage';
+import { NewReviewPage } from '../pages/reviews/NewReviewPage';
 import { ReviewsPage } from '../pages/reviews/ReviewsPage';
 
 // The template editor pulls in CodeMirror; load it lazily so the rest of the app stays light.
@@ -86,6 +87,7 @@ export const router = createBrowserRouter([
       { index: true, element: <HomePage /> },
       { path: 'profile', element: <ProfilePage /> },
       { path: 'reviews', element: <ReviewsPage /> },
+      { path: 'reviews/new', element: <NewReviewPage /> },
       {
         path: 'reviews/:documentId',
         element: (

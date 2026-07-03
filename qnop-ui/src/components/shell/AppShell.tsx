@@ -43,8 +43,10 @@ export function AppShell() {
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('md'));
   // The document review workspace (#250) spans the full width; every other
-  // surface keeps the centred reading container.
-  const fullBleed = Boolean(useMatch('/reviews/:documentId'));
+  // surface keeps the centred reading container. /reviews/new also matches the
+  // dynamic segment but is a regular centred page (the wizard, #251).
+  const reviewMatch = useMatch('/reviews/:documentId');
+  const fullBleed = Boolean(reviewMatch && reviewMatch.params.documentId !== 'new');
   const [collapsed, setCollapsed] = useState<boolean>(() => {
     try {
       return localStorage.getItem(COLLAPSE_KEY) === '1';
