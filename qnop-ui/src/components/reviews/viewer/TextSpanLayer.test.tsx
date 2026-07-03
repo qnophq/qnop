@@ -58,13 +58,17 @@ function renderLayer(onTextSelected = vi.fn()) {
 }
 
 describe('TextSpanLayer', () => {
-  it('positions each span at its normalized box with transparent glyphs', () => {
+  it('positions each span centred on its box with marker overshoot and transparent glyphs', () => {
     renderLayer();
 
     const span = screen.getByText('Hello world');
     expect(span).toHaveAttribute('data-span-start', '0');
     expect(span).toHaveAttribute('data-span-length', '11');
-    expect(span).toHaveStyle({ left: '10%', top: '10%', color: 'rgba(0, 0, 0, 0)' });
+    // Box y=0.1/h=0.02 with 1.3 overshoot → top 9.7%, height 2.6%: the marker
+    // paints taller than the printed glyphs, centred on the line.
+    expect(span).toHaveStyle({ left: '10%', color: 'rgba(0, 0, 0, 0)' });
+    expect(parseFloat(span.style.top)).toBeCloseTo(9.7);
+    expect(parseFloat(span.style.height)).toBeCloseTo(2.6);
   });
 
   it('reports a cross-span selection as canonical-text offsets', () => {

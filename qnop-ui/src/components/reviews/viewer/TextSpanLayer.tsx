@@ -37,6 +37,14 @@ const SELECTION_BG_DARK = 'rgba(245, 184, 61, 0.5)';
 /** The font the invisible glyphs are measured and rendered with. */
 const LAYER_FONT_FAMILY = 'sans-serif';
 
+/**
+ * How much taller the selection marker paints than the extracted glyph box,
+ * centred on the printed line. PDF viewers (macOS Preview, Acrobat) and Word
+ * overshoot the glyphs the same way — ascenders/descenders stay covered and
+ * multi-line selections merge into one continuous marker.
+ */
+const MARKER_OVERSHOOT = 1.3;
+
 interface TextSpanLayerProps {
   spans: RenderedTextSpan[];
   surfaceIndex: number;
@@ -149,6 +157,10 @@ export function TextSpanLayer({
         const fontSize = Math.max(span.box.height * pageHeight * 0.85, 6);
         const measured = span.text.length > 0 ? measureGlyphRun(span.text, fontSize) : null;
         const scaleX = measured ? (span.box.width * pageWidth) / measured : 1;
+        // The line box is taller than the glyph box and shifted up by half the
+        // overshoot, so the marker paints centred on the printed line.
+        const lineHeightPx = Math.max(span.box.height * pageHeight * MARKER_OVERSHOOT, 9);
+        const topFraction = span.box.y - (span.box.height * (MARKER_OVERSHOOT - 1)) / 2;
         return (
           <span
             key={span.startOffset}
@@ -157,13 +169,13 @@ export function TextSpanLayer({
             style={{
               position: 'absolute',
               left: `${span.box.x * 100}%`,
-              top: `${span.box.y * 100}%`,
-              height: `${span.box.height * 100}%`,
+              top: `${topFraction * 100}%`,
+              height: `${span.box.height * MARKER_OVERSHOOT * 100}%`,
               color: 'transparent',
               whiteSpace: 'pre',
               fontFamily: LAYER_FONT_FAMILY,
               fontSize: `${fontSize}px`,
-              lineHeight: `${Math.max(span.box.height * pageHeight, 7)}px`,
+              lineHeight: `${lineHeightPx}px`,
               // Stretch the glyph run to the server box so the selection
               // rectangles trace the printed text (same trick as pdf.js).
               transform: `scaleX(${scaleX})`,
