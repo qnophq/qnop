@@ -27,6 +27,7 @@ import type { AnnotationView, RenderedSurface } from '../../api/generated';
 import { AnnotationStatus, ExtractionStatus, PlacementStatus } from '../../api/generated';
 import { buildTheme } from '../../theme/theme';
 import { DocumentReviewPage } from './DocumentReviewPage';
+import { resolveEffectiveVersion } from './resolveEffectiveVersion';
 import {
   useDocument,
   useDocumentVersions,
@@ -183,6 +184,36 @@ function renderPage() {
 
 beforeEach(() => {
   vi.clearAllMocks();
+});
+
+// Issue #300: the effective version must honor the URL as soon as ANY loaded
+// source (document detail or the version list) knows it — a stale
+// latestVersionNumber right after an upload must not push the page back onto
+// the old version (which would switch extraction polling off).
+describe('resolveEffectiveVersion', () => {
+  it('uses the requested version when the detail already knows it', () => {
+    expect(resolveEffectiveVersion(2, 2, [1, 2])).toBe(2);
+  });
+
+  it('uses the requested version when only the version list knows it (stale detail)', () => {
+    expect(resolveEffectiveVersion(2, 1, [1, 2])).toBe(2);
+  });
+
+  it('uses the requested version when only the detail knows it (stale list)', () => {
+    expect(resolveEffectiveVersion(2, 2, [1])).toBe(2);
+  });
+
+  it('falls back to the highest known version when the requested one is unknown', () => {
+    expect(resolveEffectiveVersion(9, 2, [1, 2])).toBe(2);
+  });
+
+  it('falls back to the latest without a requested version', () => {
+    expect(resolveEffectiveVersion(NaN, 3, [1, 2, 3])).toBe(3);
+  });
+
+  it('is undefined while nothing is known yet', () => {
+    expect(resolveEffectiveVersion(2, 0, [])).toBeUndefined();
+  });
 });
 
 describe('DocumentReviewPage', () => {

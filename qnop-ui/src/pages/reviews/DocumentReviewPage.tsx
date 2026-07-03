@@ -57,6 +57,7 @@ import { usePdfDocument } from '../../components/reviews/viewer/usePdfDocument';
 import type { ViewerTool } from '../../components/reviews/viewer/ViewerToolbar';
 import { ViewerToolbar } from '../../components/reviews/viewer/ViewerToolbar';
 import { useAuthStore } from '../../stores/authStore';
+import { resolveEffectiveVersion } from './resolveEffectiveVersion';
 
 const PANEL_WIDTH_KEY = 'qnop-review-panel-width';
 
@@ -76,14 +77,19 @@ export function DocumentReviewPage() {
   const documentQuery = useDocument(documentId);
   const latestVersion = documentQuery.data?.latestVersionNumber ?? 0;
   const requestedVersion = Number(searchParams.get('version'));
-  const versionNumber =
-    requestedVersion >= 1 && requestedVersion <= latestVersion
-      ? requestedVersion
-      : latestVersion >= 1
-        ? latestVersion
-        : undefined;
 
-  const versionsQuery = useDocumentVersions(documentId, versionNumber);
+  // Watch the URL's version even when the cached list does not know it yet —
+  // right after an upload the list is briefly stale, and useDocumentVersions
+  // polls until the watched version appears and its extraction settles (#300).
+  const versionsQuery = useDocumentVersions(
+    documentId,
+    requestedVersion >= 1 ? requestedVersion : latestVersion >= 1 ? latestVersion : undefined,
+  );
+  const versionNumber = resolveEffectiveVersion(
+    requestedVersion,
+    latestVersion,
+    versionsQuery.data?.versions.map((version) => version.versionNumber) ?? [],
+  );
   const versionSummary = versionsQuery.data?.versions.find(
     (version) => version.versionNumber === versionNumber,
   );

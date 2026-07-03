@@ -22,6 +22,7 @@
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import type {
   DocumentListResponse,
+  DocumentResponse,
   ParticipantCreateRequest,
   ParticipantListResponse,
   PrincipalListResponse,
@@ -225,7 +226,20 @@ export function useUploadVersion(documentId: string) {
       );
       return response.data;
     },
-    onSuccess: () => {
+    onSuccess: (result) => {
+      // The upload response is authoritative about the new version number. Bump the
+      // cached document detail synchronously so the review page immediately resolves
+      // and watches the new version (its extraction polling then runs) instead of
+      // falling back to the stale latestVersionNumber until the refetch below lands
+      // (issue #300). The versions list itself converges via invalidation + polling.
+      queryClient.setQueryData<DocumentResponse>(documentKeys.detail(documentId), (detail) =>
+        detail
+          ? {
+              ...detail,
+              latestVersionNumber: Math.max(detail.latestVersionNumber, result.versionNumber),
+            }
+          : detail,
+      );
       queryClient.invalidateQueries({ queryKey: documentKeys.all });
       queryClient.invalidateQueries({ queryKey: reviewKeys.all });
     },

@@ -53,9 +53,12 @@ export function useDocument(documentId: string) {
 }
 
 /**
- * The document's version list, oldest first. While the given version's server-side
- * extraction (ADR-0032) is still PENDING the list is re-polled, so the viewer
- * flips to annotatable as soon as the rendered representation is READY.
+ * The document's version list, oldest first. The list is re-polled while the
+ * watched version's server-side extraction (ADR-0032) is still PENDING — and
+ * also while the watched version is missing from the cached list entirely
+ * (right after a new-version upload the list may still be stale, issue #300) —
+ * so the viewer flips to annotatable as soon as the rendered representation is
+ * READY, without a manual reload or a window-focus refetch.
  */
 export function useDocumentVersions(documentId: string, watchVersion?: number) {
   return useQuery<DocumentVersionListResponse>({
@@ -66,8 +69,18 @@ export function useDocumentVersions(documentId: string, watchVersion?: number) {
     },
     refetchInterval: (query) => {
       if (!watchVersion) return false;
-      const watched = query.state.data?.versions.find((v) => v.versionNumber === watchVersion);
-      return watched?.extractionStatus === ExtractionStatus.Pending ? EXTRACTION_POLL_MS : false;
+      const versions = query.state.data?.versions;
+      const watched = versions?.find((v) => v.versionNumber === watchVersion);
+      if (!watched) {
+        // A watched version the cached list does not know yet means the list is
+        // stale — poll until it appears. Bound this to the plausibly-next
+        // version (one above the current max): an out-of-range version (a stale
+        // or tampered `?version=` URL) never arrives, so it must not poll
+        // forever.
+        const maxKnown = versions?.reduce((max, v) => Math.max(max, v.versionNumber), 0) ?? 0;
+        return watchVersion <= maxKnown + 1 ? EXTRACTION_POLL_MS : false;
+      }
+      return watched.extractionStatus === ExtractionStatus.Pending ? EXTRACTION_POLL_MS : false;
     },
   });
 }
