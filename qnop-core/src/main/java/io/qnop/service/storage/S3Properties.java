@@ -43,6 +43,10 @@ import org.springframework.validation.annotation.Validated;
  *     dev / tests against an empty MinIO — real S3 buckets are pre-provisioned)
  * @param reaperGracePeriod how long an uploaded-but-uncommitted object is kept before the orphan
  *     reaper deletes it (default 1h)
+ * @param apiCallTimeout hard ceiling on a whole S3 call including retries (default 60s); bounds a
+ *     hung extraction/serving job so it cannot pin a worker indefinitely (issue #314)
+ * @param apiCallAttemptTimeout ceiling on a single HTTP attempt before the SDK retries it (default
+ *     20s)
  */
 @ConfigurationProperties(prefix = "qnop.s3")
 @Validated
@@ -54,7 +58,9 @@ public record S3Properties(
     @NotBlank String secretKey,
     Boolean pathStyleAccess,
     Boolean autoCreateBucket,
-    Duration reaperGracePeriod) {
+    Duration reaperGracePeriod,
+    Duration apiCallTimeout,
+    Duration apiCallAttemptTimeout) {
 
   public S3Properties {
     endpoint = (endpoint == null || endpoint.isBlank()) ? null : endpoint.trim();
@@ -62,5 +68,8 @@ public record S3Properties(
     pathStyleAccess = pathStyleAccess == null ? Boolean.TRUE : pathStyleAccess;
     autoCreateBucket = autoCreateBucket == null ? Boolean.FALSE : autoCreateBucket;
     reaperGracePeriod = reaperGracePeriod == null ? Duration.ofHours(1) : reaperGracePeriod;
+    apiCallTimeout = apiCallTimeout == null ? Duration.ofSeconds(60) : apiCallTimeout;
+    apiCallAttemptTimeout =
+        apiCallAttemptTimeout == null ? Duration.ofSeconds(20) : apiCallAttemptTimeout;
   }
 }

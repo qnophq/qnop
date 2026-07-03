@@ -20,15 +20,10 @@
  */
 package io.qnop.service.document;
 
-import io.qnop.entity.AnnotationPlacement;
 import io.qnop.entity.DocumentVersion;
 import io.qnop.entity.ExtractionStatus;
-import io.qnop.entity.PlacementStatus;
-import io.qnop.repository.AnnotationPlacementRepository;
 import io.qnop.repository.DocumentVersionRepository;
 import io.qnop.service.job.JobHandler;
-import io.qnop.service.job.JobService;
-import io.qnop.service.review.ReanchorJobHandler;
 import io.qnop.service.storage.StorageService;
 import io.qnop.spi.extract.DocumentExtractor;
 import io.qnop.spi.extract.ExtractionException;
@@ -39,7 +34,6 @@ import java.util.Optional;
 import java.util.UUID;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.stereotype.Component;
 import tools.jackson.core.JacksonException;
 import tools.jackson.databind.JsonNode;
@@ -51,6 +45,12 @@ import tools.jackson.databind.json.JsonMapper;
  * original from object storage, finds the {@link DocumentExtractor} for its content type, and
  * attaches the resulting {@link RenderedDocument} as jsonb — flipping the version's extraction
  * status to READY, or FAILED when the content itself is unprocessable.
+ *
+ * <p><strong>Transaction shape (issue #314).</strong> The slow work — the S3 fetch and PDF parsing
+ * — runs here with <em>no</em> DB transaction held (the job runner no longer wraps the handler, see
+ * ADR-0033). Only the resulting DB writes are transactional, and they live in {@link
+ * DocumentExtractionWriter} so the {@code @Transactional} boundary is a real proxy call. A network
+ * hang or a 50 MB parse therefore no longer pins a pooled connection.
  *
  * <p><strong>Failure policy:</strong> {@link ExtractionException} (corrupt/encrypted content) and a
  * missing extractor are <em>permanent</em> — the handler marks the version FAILED and completes, so
@@ -72,22 +72,17 @@ public class DocumentExtractionJobHandler implements JobHandler {
   private final DocumentVersionRepository versions;
   private final StorageService storage;
   private final List<DocumentExtractor> extractors;
-  private final AnnotationPlacementRepository placements;
-  // ObjectProvider breaks the constructor cycle: JobService injects every JobHandler, and this
-  // handler needs JobService back to enqueue the follow-up re-anchoring job (issue #248).
-  private final ObjectProvider<JobService> jobs;
+  private final DocumentExtractionWriter writer;
 
   public DocumentExtractionJobHandler(
       DocumentVersionRepository versions,
       StorageService storage,
       List<DocumentExtractor> extractors,
-      AnnotationPlacementRepository placements,
-      ObjectProvider<JobService> jobs) {
+      DocumentExtractionWriter writer) {
     this.versions = versions;
     this.storage = storage;
     this.extractors = extractors;
-    this.placements = placements;
-    this.jobs = jobs;
+    this.writer = writer;
   }
 
   @Override
@@ -116,12 +111,13 @@ public class DocumentExtractionJobHandler implements JobHandler {
           "No DocumentExtractor supports {} — marking version {} FAILED.",
           version.getContentType(),
           versionId);
-      version.markExtractionFailed();
-      versions.save(version);
-      failPendingPlacements(version);
+      writer.failPermanently(versionId);
       return;
     }
 
+    // The fetch + parse run with no DB transaction held (issue #314); only the write phase below
+    // opens a short transaction.
+    String renderedJson;
     try (StorageContent content =
         storage
             .get(version.getStorageKey())
@@ -130,47 +126,17 @@ public class DocumentExtractionJobHandler implements JobHandler {
                     new IllegalStateException( // retryable: the object should exist post-commit
                         "stored object missing for version " + versionId))) {
       RenderedDocument rendered = extractor.get().extract(content.stream());
-      version.attachRenderedDocument(MAPPER.writeValueAsString(rendered));
-      versions.save(version);
-      enqueueReanchoringIfPending(version);
+      renderedJson = MAPPER.writeValueAsString(rendered);
     } catch (ExtractionException e) {
       log.warn("Extraction of version {} failed permanently: {}", versionId, e.getMessage());
-      version.markExtractionFailed();
-      versions.save(version);
-      failPendingPlacements(version);
+      writer.failPermanently(versionId);
+      return;
     } catch (JacksonException e) {
       // Serializing our own SPI records can only fail on a code bug; add context and let the
       // queue's retry/FAILED policy surface it.
       throw new IllegalStateException("Failed to serialize rendered document", e);
     }
-  }
-
-  /**
-   * Chains the re-anchoring job (issue #248) once the text layer is READY — in the same transaction
-   * as the READY write (outbox, ADR-0033). Skipped when the version has no pending placements (v1
-   * uploads, documents without open annotations).
-   */
-  private void enqueueReanchoringIfPending(DocumentVersion version) {
-    if (!placements
-        .findByDocumentVersionIdAndStatus(version.getId(), PlacementStatus.PENDING)
-        .isEmpty()) {
-      jobs.getObject()
-          .enqueue(
-              ReanchorJobHandler.TYPE, DocumentIngestService.extractionPayload(version.getId()));
-    }
-  }
-
-  /**
-   * A version whose extraction failed permanently can never be re-anchored against: its pending
-   * placements become FAILED (deterministic on replay — they are only ever PENDING before this).
-   */
-  private void failPendingPlacements(DocumentVersion version) {
-    List<AnnotationPlacement> pending =
-        placements.findByDocumentVersionIdAndStatus(version.getId(), PlacementStatus.PENDING);
-    for (AnnotationPlacement placement : pending) {
-      placement.markFailed();
-      placements.save(placement);
-    }
+    writer.attachRenderedAndChain(versionId, renderedJson);
   }
 
   private static UUID parseVersionId(String payload) {

@@ -34,6 +34,7 @@ import java.util.UUID;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
+import org.springframework.transaction.annotation.Transactional;
 import tools.jackson.core.JacksonException;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
@@ -73,7 +74,11 @@ public class ReanchorJobHandler implements JobHandler {
     return TYPE;
   }
 
+  // Its own transaction now that the job runner is non-transactional (issue #314): the
+  // per-placement
+  // writes still commit all-or-nothing, and it holds no external I/O so the connection is brief.
   @Override
+  @Transactional
   public void handle(String payload) {
     UUID versionId = parseVersionId(payload);
     Optional<DocumentVersion> found = versions.findById(versionId);

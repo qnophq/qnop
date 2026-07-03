@@ -28,10 +28,14 @@ import io.qnop.spi.extract.Surface;
 import io.qnop.spi.extract.TextSpan;
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.OutputStream;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
 import org.apache.pdfbox.Loader;
+import org.apache.pdfbox.io.RandomAccessReadBufferedFile;
 import org.apache.pdfbox.pdmodel.PDDocument;
 import org.apache.pdfbox.pdmodel.common.PDRectangle;
 import org.apache.pdfbox.text.PDFTextStripper;
@@ -65,14 +69,11 @@ public class PdfBoxDocumentExtractor implements DocumentExtractor {
 
   @Override
   public RenderedDocument extract(InputStream content) throws ExtractionException {
-    final byte[] bytes;
-    try {
-      bytes = content.readAllBytes();
-    } catch (IOException e) {
-      // Failing to read the caller-supplied stream is an I/O problem, not bad content: retryable.
-      throw new IllegalStateException("Failed to read PDF content", e);
-    }
-    try (PDDocument document = Loader.loadPDF(bytes)) {
+    // Spool to a temp file and let PDFBox page from disk (issue #314): loadPDF(byte[]) after
+    // readAllBytes held a 50 MB+ PDF fully in the heap; RandomAccessReadBufferedFile reads on
+    // demand, bounding memory to PDFBox's own buffers.
+    Path spooled = spoolToTempFile(content);
+    try (PDDocument document = Loader.loadPDF(new RandomAccessReadBufferedFile(spooled.toFile()))) {
       if (document.isEncrypted()) {
         throw new ExtractionException("Encrypted PDFs are not supported");
       }
@@ -87,6 +88,34 @@ public class PdfBoxDocumentExtractor implements DocumentExtractor {
     } catch (IOException e) {
       // PDFBox signals unparseable/corrupt input as IOException: the content is bad — permanent.
       throw new ExtractionException("Unreadable PDF: " + e.getMessage(), e);
+    } finally {
+      try {
+        Files.deleteIfExists(spooled);
+      } catch (IOException e) {
+        // Best-effort cleanup; the OS temp dir is swept eventually and a leak is not actionable.
+      }
+    }
+  }
+
+  private static Path spoolToTempFile(InputStream content) {
+    Path spooled;
+    try {
+      spooled = Files.createTempFile("qnop-pdf-", ".pdf");
+    } catch (IOException e) {
+      // A local-disk failure is an environment problem, not bad content: retryable.
+      throw new IllegalStateException("Failed to allocate a temp file for PDF extraction", e);
+    }
+    try (OutputStream out = Files.newOutputStream(spooled)) {
+      content.transferTo(out);
+      return spooled;
+    } catch (IOException e) {
+      try {
+        Files.deleteIfExists(spooled);
+      } catch (IOException suppressed) {
+        e.addSuppressed(suppressed);
+      }
+      // Failing to read the caller-supplied stream is an I/O problem, not bad content: retryable.
+      throw new IllegalStateException("Failed to buffer PDF content", e);
     }
   }
 

@@ -72,8 +72,10 @@ class DocumentExtractionJobHandlerTest {
   }
 
   private DocumentExtractionJobHandler handler(DocumentExtractor... extractors) {
-    return new DocumentExtractionJobHandler(
-        versions, storage, List.of(extractors), placements, jobs);
+    // The write phase lives in DocumentExtractionWriter (issue #314); in this unit test it runs
+    // directly (no Spring proxy), over the same mocked repositories.
+    DocumentExtractionWriter writer = new DocumentExtractionWriter(versions, placements, jobs);
+    return new DocumentExtractionJobHandler(versions, storage, List.of(extractors), writer);
   }
 
   private static String payload(UUID versionId) {
