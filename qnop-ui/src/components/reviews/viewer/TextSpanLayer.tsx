@@ -21,11 +21,10 @@
 
 import { useRef } from 'react';
 import Box from '@mui/material/Box';
-import { useTheme } from '@mui/material/styles';
 import type { RenderedTextSpan } from '../../../api/generated';
 import type { TextSelectionOffsets } from './anchoring';
 import { markerLineBox, surfaceLinePitch } from './anchoring';
-import { selectionMarkerColor } from './markerColors';
+import { SELECTION_MARKER_BG } from './markerColors';
 
 /**
  * The font the invisible glyphs are measured and rendered with. Monospace is
@@ -88,7 +87,6 @@ export function TextSpanLayer({
   enabled,
   onTextSelected,
 }: TextSpanLayerProps) {
-  const theme = useTheme();
   const rootRef = useRef<HTMLDivElement>(null);
 
   const handlePointerUp = () => {
@@ -120,7 +118,6 @@ export function TextSpanLayer({
     onTextSelected({ surfaceIndex, start, end });
   };
 
-  const selectionBackground = selectionMarkerColor(theme.palette.mode);
   const pitch = surfaceLinePitch(spans);
 
   return (
@@ -140,7 +137,7 @@ export function TextSpanLayer({
         // without the color override the browser would repaint the selected
         // glyphs (in the layer's font, not the page's) as visible text.
         '& span::selection': {
-          backgroundColor: selectionBackground,
+          backgroundColor: SELECTION_MARKER_BG,
           color: 'transparent',
         },
       }}

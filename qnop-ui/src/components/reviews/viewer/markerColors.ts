@@ -19,18 +19,19 @@
  * SPDX-License-Identifier: AGPL-3.0-only
  */
 
-import type { PaletteMode } from '@mui/material/styles';
+/**
+ * Text-marker colours. The classic highlighter yellow is used in BOTH themes —
+ * markers paint on the page itself, and the PDF pixels are white regardless of
+ * the UI theme. Keeping the base yellow also leaves amber unambiguous as the
+ * MOVED placement cue (ADR-0009).
+ */
+
+/** Solid highlighter yellow — the base of open text markers. */
+export const MARKER_YELLOW = '#FFE000';
 
 /**
- * Text-marker colours shared by the live selection (TextSpanLayer) and the
- * pending-anchor preview (HighlightLayer), so drawing a mark and its preview
- * look identical. Translucent so the page's own glyphs stay readable — the
- * PDF pixels are white in both themes. Light mode is the classic highlighter
- * yellow; dark mode uses the softer brand amber to match the muted dark UI.
+ * The live-selection / pending-preview fill (translucent so the glyphs stay
+ * readable): identical everywhere a mark is being drawn, so releasing the
+ * mouse and creating the annotation never changes the mark's colour.
  */
-const SELECTION_BG_LIGHT = 'rgba(255, 224, 0, 0.45)';
-const SELECTION_BG_DARK = 'rgba(245, 184, 61, 0.5)';
-
-export function selectionMarkerColor(mode: PaletteMode): string {
-  return mode === 'dark' ? SELECTION_BG_DARK : SELECTION_BG_LIGHT;
-}
+export const SELECTION_MARKER_BG = 'rgba(255, 224, 0, 0.45)';

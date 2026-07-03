@@ -31,7 +31,7 @@ import type {
 } from '../../../api/generated';
 import { AnnotationStatus, PlacementStatus } from '../../../api/generated';
 import { highlightBoxesForAnchor } from './anchoring';
-import { selectionMarkerColor } from './markerColors';
+import { MARKER_YELLOW, SELECTION_MARKER_BG } from './markerColors';
 
 interface HighlightLayerProps {
   /** All annotations of the document — the layer picks the ones on this surface. */
@@ -82,8 +82,14 @@ export function HighlightLayer({
       ? highlightBoxesForAnchor(pendingAnchor, spans)
       : null;
 
-  const styleFor = (annotation: AnnotationView) => {
-    const brand = theme.qnop.brand.blue;
+  /**
+   * The mark's colour: open text markers paint highlighter yellow (like the
+   * selection they were drawn from); open region boxes stay brand blue. Cue
+   * colours override the base — decided annotations turn green/grey, a MOVED
+   * placement turns amber, a still-pending placement renders dimmed.
+   */
+  const styleFor = (annotation: AnnotationView, marker: boolean) => {
+    const base = marker ? MARKER_YELLOW : theme.qnop.brand.blue;
     if (annotation.status === AnnotationStatus.Accepted) {
       return { color: theme.palette.success.main, borderStyle: 'solid', opacity: 1 };
     }
@@ -94,9 +100,9 @@ export function HighlightLayer({
       case PlacementStatus.Moved:
         return { color: theme.palette.warning.main, borderStyle: 'dashed', opacity: 1 };
       case PlacementStatus.Pending:
-        return { color: brand, borderStyle: 'dotted', opacity: 0.6 };
+        return { color: base, borderStyle: 'dotted', opacity: 0.6 };
       default:
-        return { color: brand, borderStyle: 'solid', opacity: 1 };
+        return { color: base, borderStyle: 'solid', opacity: 1 };
     }
   };
 
@@ -112,7 +118,7 @@ export function HighlightLayer({
       {visible.map((annotation) => {
         const anchor = annotation.anchor!;
         const { kind, boxes } = highlightBoxesForAnchor(anchor, spans);
-        const style = styleFor(annotation);
+        const style = styleFor(annotation, kind === 'marker');
         const active = annotation.id === activeAnnotationId;
         const quote = anchor.textQuote?.quote;
         return (
@@ -153,12 +159,12 @@ export function HighlightLayer({
                     // Box = the bordered region rectangle.
                     bgcolor: alpha(
                       style.color,
-                      marker ? (active ? 0.45 : 0.3) : active ? 0.28 : 0.16,
+                      marker ? (active ? 0.65 : 0.45) : active ? 0.28 : 0.16,
                     ),
                     mixBlendMode: marker ? 'multiply' : 'normal',
                     border: marker ? 'none' : `1.5px ${style.borderStyle} ${style.color}`,
                     borderRadius: marker ? '1px' : '2px',
-                    '&:hover': { bgcolor: alpha(style.color, marker ? 0.45 : 0.26) },
+                    '&:hover': { bgcolor: alpha(style.color, marker ? 0.6 : 0.26) },
                     '&:focus-visible': { outline: 'none', boxShadow: theme.qnop.focusRing },
                     ...(active && primary && !marker && { boxShadow: theme.qnop.focusRing }),
                   }}
@@ -180,7 +186,7 @@ export function HighlightLayer({
                 ? {
                     // Identical to the live selection, so releasing the mouse
                     // does not visually change the mark.
-                    bgcolor: selectionMarkerColor(theme.palette.mode),
+                    bgcolor: SELECTION_MARKER_BG,
                     mixBlendMode: 'multiply',
                     borderRadius: '1px',
                   }
