@@ -93,7 +93,8 @@ public class DocumentAccessService {
         document.getWorkflowState(),
         latest,
         document.getCreatedAt(),
-        document.getUpdatedAt());
+        document.getUpdatedAt(),
+        document.getDueAt());
   }
 
   /** All versions of a visible document, oldest first. */
@@ -220,7 +221,8 @@ public class DocumentAccessService {
       String workflowState,
       int latestVersionNumber,
       Instant createdAt,
-      Instant updatedAt) {}
+      Instant updatedAt,
+      Instant dueAt) {}
 
   /** Entity-free version metadata for the web layer. */
   public record DocumentVersionView(

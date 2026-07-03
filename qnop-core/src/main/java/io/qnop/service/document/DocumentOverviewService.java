@@ -114,7 +114,8 @@ public class DocumentOverviewService {
                           .map(ParticipantView::of)
                           .toList(),
                       document.getCreatedAt(),
-                      document.getUpdatedAt());
+                      document.getUpdatedAt(),
+                      document.getDueAt());
                 })
             .toList();
     return new DocumentPage(items, result.getTotalElements(), page, size);
@@ -148,7 +149,8 @@ public class DocumentOverviewService {
       int openAnnotationCount,
       List<ParticipantView> participants,
       Instant createdAt,
-      Instant updatedAt) {}
+      Instant updatedAt,
+      Instant dueAt) {}
 
   /** A page of the caller's documents. */
   public record DocumentPage(List<DocumentSummaryView> items, long total, int page, int size) {}

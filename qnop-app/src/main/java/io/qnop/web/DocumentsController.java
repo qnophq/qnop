@@ -27,6 +27,7 @@ import io.qnop.api.v1.model.DiffLocation;
 import io.qnop.api.v1.model.DocumentListResponse;
 import io.qnop.api.v1.model.DocumentResponse;
 import io.qnop.api.v1.model.DocumentSummary;
+import io.qnop.api.v1.model.DocumentUpdateRequest;
 import io.qnop.api.v1.model.DocumentVersionListResponse;
 import io.qnop.api.v1.model.DocumentVersionSummary;
 import io.qnop.api.v1.model.ExtractionStatus;
@@ -42,7 +43,10 @@ import io.qnop.service.document.DocumentAccessService;
 import io.qnop.service.document.DocumentAccessService.DocumentVersionView;
 import io.qnop.service.document.DocumentAccessService.DocumentView;
 import io.qnop.service.document.DocumentOverviewService;
+import io.qnop.service.document.DocumentUpdateService;
 import io.qnop.service.document.ReviewParticipantService;
+import java.time.Instant;
+import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
 import java.util.UUID;
 import org.springframework.http.ResponseEntity;
@@ -63,16 +67,19 @@ public class DocumentsController implements DocumentsApi {
   private final VersionDiffService diffs;
   private final DocumentOverviewService overview;
   private final ReviewParticipantService participants;
+  private final DocumentUpdateService updates;
 
   public DocumentsController(
       DocumentAccessService documents,
       VersionDiffService diffs,
       DocumentOverviewService overview,
-      ReviewParticipantService participants) {
+      ReviewParticipantService participants,
+      DocumentUpdateService updates) {
     this.documents = documents;
     this.diffs = diffs;
     this.overview = overview;
     this.participants = participants;
+    this.updates = updates;
   }
 
   @Override
@@ -136,7 +143,18 @@ public class DocumentsController implements DocumentsApi {
         .openAnnotationCount(view.openAnnotationCount())
         .participants(view.participants().stream().map(DocumentsController::toParticipant).toList())
         .createdAt(view.createdAt().atOffset(ZoneOffset.UTC))
-        .updatedAt(view.updatedAt().atOffset(ZoneOffset.UTC));
+        .updatedAt(view.updatedAt().atOffset(ZoneOffset.UTC))
+        .dueAt(atUtc(view.dueAt()));
+  }
+
+  /** Nullable {@link Instant} → {@link OffsetDateTime} at UTC for the wire model (#295). */
+  private static OffsetDateTime atUtc(Instant instant) {
+    return instant == null ? null : instant.atOffset(ZoneOffset.UTC);
+  }
+
+  /** Nullable wire {@link OffsetDateTime} → domain {@link Instant} (#295). */
+  private static Instant toInstant(OffsetDateTime dateTime) {
+    return dateTime == null ? null : dateTime.toInstant();
   }
 
   private static ParticipantView toParticipant(ReviewParticipantService.ParticipantView view) {
@@ -183,15 +201,31 @@ public class DocumentsController implements DocumentsApi {
   public ResponseEntity<DocumentResponse> getDocument(UUID documentId) {
     DocumentView view =
         documents.getDocument(documentId, CurrentUser.requireUserId(), CurrentUser.isAdmin());
-    return ResponseEntity.ok(
-        new DocumentResponse()
-            .id(view.id())
-            .title(view.title())
-            .ownerId(view.ownerId())
-            .workflowState(view.workflowState())
-            .latestVersionNumber(view.latestVersionNumber())
-            .createdAt(view.createdAt().atOffset(ZoneOffset.UTC))
-            .updatedAt(view.updatedAt().atOffset(ZoneOffset.UTC)));
+    return ResponseEntity.ok(toResponse(view));
+  }
+
+  @Override
+  public ResponseEntity<DocumentResponse> updateDocument(
+      UUID documentId, DocumentUpdateRequest request) {
+    DocumentView view =
+        updates.updateDueDate(
+            documentId,
+            CurrentUser.requireUserId(),
+            CurrentUser.isAdmin(),
+            toInstant(request.getDueAt()));
+    return ResponseEntity.ok(toResponse(view));
+  }
+
+  private static DocumentResponse toResponse(DocumentView view) {
+    return new DocumentResponse()
+        .id(view.id())
+        .title(view.title())
+        .ownerId(view.ownerId())
+        .workflowState(view.workflowState())
+        .latestVersionNumber(view.latestVersionNumber())
+        .createdAt(view.createdAt().atOffset(ZoneOffset.UTC))
+        .updatedAt(view.updatedAt().atOffset(ZoneOffset.UTC))
+        .dueAt(atUtc(view.dueAt()));
   }
 
   @Override

@@ -167,11 +167,13 @@ export function useCreateReview() {
     mutationFn: async (input: {
       title: string;
       file: File;
+      dueAt?: string | null;
       onProgress?: (fraction: number) => void;
     }) => {
       const form = new FormData();
       form.append('title', input.title);
       form.append('file', input.file);
+      if (input.dueAt) form.append('dueAt', input.dueAt);
       const response = await axiosInstance.post<UploadResult>('/documents', form, {
         onUploadProgress: (event) => {
           if (event.total) input.onProgress?.(event.loaded / event.total);
@@ -180,6 +182,28 @@ export function useCreateReview() {
       return response.data;
     },
     onSuccess: () => queryClient.invalidateQueries({ queryKey: reviewKeys.all }),
+  });
+}
+
+/**
+ * Sets or clears the optional review due date (owner-only, issue #295). A `null`
+ * clears it — the PATCH body's `dueAt` is the desired state, so omitting the
+ * field tells the server to clear the deadline.
+ */
+export function useUpdateDueDate(documentId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (dueAt: string | null) => {
+      const response = await documentsApi.updateDocument({
+        documentId,
+        documentUpdateRequest: { dueAt: dueAt ?? undefined },
+      });
+      return response.data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: documentKeys.detail(documentId) });
+      queryClient.invalidateQueries({ queryKey: reviewKeys.all });
+    },
   });
 }
 

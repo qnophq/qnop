@@ -27,6 +27,7 @@ import Typography from '@mui/material/Typography';
 import { useTheme } from '@mui/material/styles';
 import { FileText, Play, Users } from 'lucide-react';
 import type { PrincipalView } from '../../../api/generated';
+import { DueDatePicker } from '../DueDatePicker';
 import { formatFileSize } from './wizardModel';
 
 export type SubmitPhase = 'idle' | 'uploading' | 'finalizing';
@@ -35,6 +36,8 @@ interface SummaryStepProps {
   file: File;
   title: string;
   reviewers: PrincipalView[];
+  dueAt: string | null;
+  onDueAtChange: (value: string | null) => void;
   startImmediately: boolean;
   onStartImmediatelyChange: (value: boolean) => void;
   phase: SubmitPhase;
@@ -68,6 +71,8 @@ export function SummaryStep({
   file,
   title,
   reviewers,
+  dueAt,
+  onDueAtChange,
   startImmediately,
   onStartImmediatelyChange,
   phase,
@@ -103,6 +108,12 @@ export function SummaryStep({
             </Typography>
           </Stack>
         )}
+      </SummaryRow>
+
+      <SummaryRow label="Due date">
+        <Box sx={{ maxWidth: 280 }}>
+          <DueDatePicker value={dueAt} onChange={onDueAtChange} disabled={isSubmitting} />
+        </Box>
       </SummaryRow>
 
       <Stack

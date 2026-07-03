@@ -41,6 +41,7 @@ vi.mock('../../../api/config', () => ({
     listParticipants: vi.fn(),
     addParticipant: vi.fn(),
     removeParticipant: vi.fn(),
+    updateDocument: vi.fn(),
   },
   principalsApi: { searchPrincipals: vi.fn() },
   reviewWorkflowApi: {
@@ -93,13 +94,20 @@ function wrapper({ children }: { children: ReactNode }) {
 const notify = vi.fn();
 const onVersionUploaded = vi.fn();
 
-function renderHub({ isOwner = true, annotations = [] as AnnotationView[] } = {}) {
+function renderHub({
+  isOwner = true,
+  annotations = [] as AnnotationView[],
+  dueAt = null as string | null,
+  workflowState = 'IN_REVIEW',
+} = {}) {
   return render(
     <ReviewHubHead
       documentId={DOC_ID}
       isOwner={isOwner}
       ownUserId={ME}
       annotations={annotations}
+      dueAt={dueAt}
+      workflowState={workflowState}
       notify={notify}
       onVersionUploaded={onVersionUploaded}
     />,
@@ -231,5 +239,39 @@ describe('ReviewHubHead — new version upload', () => {
     await screen.findByTestId('participants-button');
     expect(screen.queryByRole('button', { name: /New version/ })).not.toBeInTheDocument();
     expect(screen.queryByTestId('version-file-input')).not.toBeInTheDocument();
+  });
+});
+
+describe('ReviewHubHead — due date', () => {
+  const DAY_MS = 24 * 60 * 60_000;
+
+  it('lets the owner open the due-date editor from a "Set due date" affordance', () => {
+    renderHub({ dueAt: null });
+
+    fireEvent.click(screen.getByTestId('due-date-button'));
+
+    expect(screen.getByRole('heading', { name: 'Review due date' })).toBeInTheDocument();
+  });
+
+  it('flags an overdue open review in the owner affordance', () => {
+    renderHub({
+      dueAt: new Date(Date.now() - 2 * DAY_MS - 60_000).toISOString(),
+      workflowState: 'IN_REVIEW',
+    });
+
+    const label = screen.getByText('overdue by 2 days');
+    expect(label).toHaveAttribute('data-overdue', 'true');
+  });
+
+  it('shows the due date read-only for non-owners, without an editor button', async () => {
+    renderHub({
+      isOwner: false,
+      dueAt: new Date(Date.now() + 4 * DAY_MS + 60_000).toISOString(),
+      workflowState: 'IN_REVIEW',
+    });
+
+    await screen.findByTestId('participants-button');
+    expect(screen.getByText('due in 4 days')).toBeInTheDocument();
+    expect(screen.queryByTestId('due-date-button')).not.toBeInTheDocument();
   });
 });

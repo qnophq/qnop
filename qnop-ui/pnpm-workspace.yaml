@@ -4,3 +4,5 @@
 # script and the generator's preflight `pnpm install` fails.
 allowBuilds:
   '@openapitools/openapi-generator-cli': true
+  # core-js-pure's only "build" is a funding postinstall; it needs no compilation.
+  core-js-pure: false

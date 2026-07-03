@@ -46,7 +46,7 @@ import { useAuthStore } from '../../stores/authStore';
 
 type RoleFilter = 'all' | 'owner' | 'reviewer';
 type StatusFilter = 'all' | 'open' | 'closed';
-type SortBy = 'updated' | 'name';
+type SortBy = 'updated' | 'name' | 'due';
 type ViewMode = 'table' | 'cards';
 
 const VIEW_STORAGE_KEY = 'qnop-reviews-view';
@@ -80,6 +80,15 @@ function sortReviews(reviews: DocumentSummary[], sortBy: SortBy): DocumentSummar
   const sorted = [...reviews];
   if (sortBy === 'name') {
     sorted.sort((a, b) => a.title.localeCompare(b.title, undefined, { sensitivity: 'base' }));
+  } else if (sortBy === 'due') {
+    // Soonest deadline (and anything already overdue) first; reviews without a
+    // due date sort last so the ones with a clock take priority.
+    sorted.sort((a, b) => {
+      if (!a.dueAt && !b.dueAt) return 0;
+      if (!a.dueAt) return 1;
+      if (!b.dueAt) return -1;
+      return a.dueAt.localeCompare(b.dueAt);
+    });
   } else {
     sorted.sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
   }
@@ -269,6 +278,7 @@ export function ReviewsPage() {
             >
               <MenuItem value="updated">Recently updated</MenuItem>
               <MenuItem value="name">Name</MenuItem>
+              <MenuItem value="due">Due date</MenuItem>
             </TextField>
             <ToggleButtonGroup
               exclusive

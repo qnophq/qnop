@@ -45,6 +45,11 @@ databaseChangeLog:
                   name: updated_at
                   type: TIMESTAMP WITH TIME ZONE
                   constraints: { nullable: false }
+              # Optional, informational completion deadline (issue #295); nullable,
+              # no workflow-guard semantics — an overdue review is only flagged.
+              - column:
+                  name: due_at
+                  type: TIMESTAMP WITH TIME ZONE
               - column:
                   name: version
                   type: BIGINT

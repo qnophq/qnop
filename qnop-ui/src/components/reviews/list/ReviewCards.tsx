@@ -28,6 +28,7 @@ import { useTheme } from '@mui/material/styles';
 import { History, MessageSquare } from 'lucide-react';
 import type { DocumentSummary } from '../../../api/generated';
 import { formatRelative } from '../../../utils/formatDate';
+import { DueDateLabel } from '../DueDateLabel';
 import { WorkflowBadge } from '../WorkflowBadge';
 import { DocumentIcon, ProgressBar, ReviewerStack, RoleBadge } from './ReviewListParts';
 import { progressOf, roleOf } from './reviewListModel';
@@ -131,9 +132,16 @@ export function ReviewCards({ reviews, userId, onOpen }: ReviewCardsProps) {
                 <Typography variant="caption">{review.annotationCount}</Typography>
               </Stack>
             </Stack>
-            <Typography variant="caption" color="text.secondary">
-              {formatRelative(review.updatedAt)}
-            </Typography>
+            <Stack
+              direction="row"
+              spacing={1}
+              sx={{ alignItems: 'center', justifyContent: 'space-between' }}
+            >
+              <Typography variant="caption" color="text.secondary">
+                {formatRelative(review.updatedAt)}
+              </Typography>
+              <DueDateLabel dueAt={review.dueAt} workflowState={review.workflowState} />
+            </Stack>
           </ButtonBase>
         );
       })}

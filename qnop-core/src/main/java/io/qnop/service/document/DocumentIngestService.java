@@ -36,6 +36,7 @@ import io.qnop.service.storage.StagedObject;
 import io.qnop.service.storage.StorageService;
 import java.io.ByteArrayInputStream;
 import java.nio.charset.StandardCharsets;
+import java.time.Instant;
 import java.util.Comparator;
 import java.util.Map;
 import java.util.Optional;
@@ -99,16 +100,22 @@ public class DocumentIngestService {
     this.transactionTemplate = new TransactionTemplate(transactionManager);
   }
 
-  /** Creates a new document owned by {@code actor} with the upload as version 1. */
-  public UploadResult createDocument(UUID actor, String title, byte[] content) {
+  /**
+   * Creates a new document owned by {@code actor} with the upload as version 1. An optional {@code
+   * dueAt} completion deadline (issue #295) must be in the future when set at creation.
+   */
+  public UploadResult createDocument(UUID actor, String title, byte[] content, Instant dueAt) {
     String cleanTitle = requireTitle(title);
+    Instant validDueAt = requireFutureOrNull(dueAt);
     validatePdf(content);
 
     StagedObject staged = storage.stage(new ByteArrayInputStream(content), PDF_CONTENT_TYPE);
     UploadResult result =
         transactionTemplate.execute(
             status -> {
-              Document document = documents.save(new Document(actor, cleanTitle));
+              Document document = new Document(actor, cleanTitle);
+              document.setDueAt(validDueAt);
+              document = documents.save(document);
               DocumentVersion version = saveVersionAndEnqueue(document.getId(), 1, staged, actor);
               return new UploadResult(
                   document.getId(),
@@ -219,6 +226,13 @@ public class DocumentIngestService {
           "title exceeds " + MAX_TITLE_LENGTH + " characters");
     }
     return trimmed;
+  }
+
+  private static Instant requireFutureOrNull(Instant dueAt) {
+    if (dueAt != null && !dueAt.isAfter(Instant.now())) {
+      throw DocumentValidationException.invalidRequest("dueAt must be in the future");
+    }
+    return dueAt;
   }
 
   private void validatePdf(byte[] content) {
