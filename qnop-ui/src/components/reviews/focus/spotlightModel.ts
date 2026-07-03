@@ -96,3 +96,18 @@ export function walkPosition(annotations: AnnotationView[], activeId: string): W
     nextId: index < ordered.length - 1 ? ordered[index + 1].id : null,
   };
 }
+
+/**
+ * The veil-with-a-hole as ONE polygon (a rectangular notch reached through a
+ * seam at the hole's left edge). A single path with a constant vertex count
+ * makes the hole itself transitionable — walking prev/next GLIDES the
+ * spotlight to the next mark instead of jumping.
+ */
+export function holePolygon(hole: NormalizedBox): string {
+  const pct = (value: number) => `${(value * 100).toFixed(4)}%`;
+  const x1 = pct(hole.x);
+  const y1 = pct(hole.y);
+  const x2 = pct(hole.x + hole.width);
+  const y2 = pct(hole.y + hole.height);
+  return `polygon(0% 0%, 0% 100%, ${x1} 100%, ${x1} ${y1}, ${x2} ${y1}, ${x2} ${y2}, ${x1} ${y2}, ${x1} 100%, 100% 100%, 100% 0%)`;
+}

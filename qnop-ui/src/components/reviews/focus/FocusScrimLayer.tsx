@@ -21,6 +21,8 @@
 
 import Box from '@mui/material/Box';
 import type { NormalizedBox } from '../../../api/generated';
+import { tokens } from '../../../theme/tokens';
+import { holePolygon } from './spotlightModel';
 
 interface FocusScrimLayerProps {
   /** The sharp region when the spotlight targets THIS page; null dims it fully. */
@@ -30,55 +32,36 @@ interface FocusScrimLayerProps {
   surfaceIndex: number;
 }
 
-/** The dimmed segments around the spotlight (or one full cover without one). */
-function segments(spotlight: NormalizedBox | null): NormalizedBox[] {
-  if (!spotlight) return [{ x: 0, y: 0, width: 1, height: 1 }];
-  const { x, y, width, height } = spotlight;
-  return [
-    { x: 0, y: 0, width: 1, height: y }, // above
-    { x: 0, y: y + height, width: 1, height: Math.max(0, 1 - y - height) }, // below
-    { x: 0, y, width: x, height }, // left of the spotlight
-    { x: x + width, y, width: Math.max(0, 1 - x - width), height }, // right of it
-  ].filter((segment) => segment.width > 0 && segment.height > 0);
-}
-
 /**
  * The focus mode's per-page scrim (issue #291): the page dims under a soft
- * veil while the spotlit passage stays untouched — the scrim is four
- * rectangles AROUND the spotlight, never a filter over it, so the anchored
- * text keeps its full contrast (the marks themselves paint on the layer
- * above). A light backdrop blur adds atmosphere; `prefers-reduced-
- * transparency` falls back to the plain veil, and the fade respects
- * `prefers-reduced-motion`. Clicking the veil dismisses the overlay.
+ * veil while the spotlit passage stays untouched — the hole is cut with a
+ * clip-path, never a filter over the mark, so the anchored text keeps its
+ * full contrast (the marks themselves paint on the layer above). The clipped
+ * region is also transparent to pointer events, so the spotlit passage stays
+ * selectable while the veil catches dismiss clicks. Moving the spotlight
+ * (prev/next) morphs the clip smoothly — clip-path animates on the
+ * compositor; `prefers-reduced-motion` snaps instead, and
+ * `prefers-reduced-transparency` drops the blur.
  */
 export function FocusScrimLayer({ spotlight, onDismiss, surfaceIndex }: FocusScrimLayerProps) {
   return (
     <Box
       data-testid={`focus-scrim-${surfaceIndex}`}
-      sx={{ position: 'absolute', inset: 0, pointerEvents: 'none' }}
-    >
-      {segments(spotlight).map((segment, index) => (
-        <Box
-          key={index}
-          data-testid={spotlight ? `scrim-segment-${surfaceIndex}-${index}` : undefined}
-          onClick={onDismiss}
-          sx={{
-            position: 'absolute',
-            left: `${segment.x * 100}%`,
-            top: `${segment.y * 100}%`,
-            width: `${segment.width * 100}%`,
-            height: `${segment.height * 100}%`,
-            pointerEvents: 'auto',
-            cursor: 'pointer',
-            bgcolor: 'rgba(1, 32, 66, 0.32)',
-            backdropFilter: 'blur(1.5px)',
-            '@media (prefers-reduced-transparency: reduce)': { backdropFilter: 'none' },
-            animation: 'qnopScrimIn 200ms ease-out',
-            '@keyframes qnopScrimIn': { from: { opacity: 0 }, to: { opacity: 1 } },
-            '@media (prefers-reduced-motion: reduce)': { animation: 'none' },
-          }}
-        />
-      ))}
-    </Box>
+      onClick={onDismiss}
+      sx={{
+        position: 'absolute',
+        inset: 0,
+        pointerEvents: 'auto',
+        cursor: 'pointer',
+        bgcolor: 'rgba(1, 32, 66, 0.32)',
+        backdropFilter: 'blur(1.5px)',
+        '@media (prefers-reduced-transparency: reduce)': { backdropFilter: 'none' },
+        clipPath: spotlight ? holePolygon(spotlight) : undefined,
+        transition: `clip-path ${tokens.motion.durSlow}ms ${tokens.motion.easeInOut}`,
+        animation: 'qnopScrimIn 200ms ease-out',
+        '@keyframes qnopScrimIn': { from: { opacity: 0 }, to: { opacity: 1 } },
+        '@media (prefers-reduced-motion: reduce)': { animation: 'none', transition: 'none' },
+      }}
+    />
   );
 }
