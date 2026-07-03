@@ -1,12 +1,14 @@
 # SPDX-License-Identifier: AGPL-3.0-only
 #
-# Test-deployment stack for the CI smoke tests (issues #207, #225): a standalone
-# PostgreSQL, the qnop server built from the repo Dockerfile, and a Keycloak
-# identity provider for the OIDC login smoke test. This is NOT a production or
-# local-dev stack — the QNOP_AUTH_* values below are throwaway test secrets that
-# intentionally match the encryption key/salt used to produce testdata/db/seed.sql,
-# so the seeded rows (e.g. the OIDC client secret) stay decryptable. MinIO is
-# omitted: object storage is not consumed yet.
+# Test-deployment stack for the CI smoke tests (issues #207, #225, #308): a
+# standalone PostgreSQL, a MinIO object store, the qnop server built from the repo
+# Dockerfile, and a Keycloak identity provider for the OIDC login smoke test. This
+# is NOT a production or local-dev stack — the QNOP_AUTH_* values below are
+# throwaway test secrets that intentionally match the encryption key/salt used to
+# produce testdata/db/seed.sql, so the seeded rows (e.g. the OIDC client secret)
+# stay decryptable. MinIO backs the document-ingest smoke (#308): the server writes
+# uploads there, the scheduled extraction job reads them back, and the smoke asserts
+# the rendered representation and byte-identical original.
 #
 # Usage:  docker compose -f docker-compose.smoke.yml up -d --build
 #         bash scripts/smoke-test.sh
@@ -26,6 +28,21 @@ services:
       timeout: 5s
       retries: 20
 
+  # Object storage for binary documents (issue #243, ADR-0005). The app writes
+  # uploads here and the extraction job reads them back; `auto-create-bucket` on
+  # the app side provisions the bucket on first use, so no init job is needed.
+  minio:
+    image: minio/minio:latest@sha256:14cea493d9a34af32f524e538b8346cf79f3321eff8e708c1e2960462bd8936e
+    command: server /data
+    environment:
+      MINIO_ROOT_USER: qnop
+      MINIO_ROOT_PASSWORD: qnop_secret
+    healthcheck:
+      test: ['CMD', 'mc', 'ready', 'local']
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
   app:
     build:
       context: .
@@ -33,12 +50,23 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
+      minio:
+        condition: service_healthy
     environment:
       QNOP_DB_HOST: postgres
       QNOP_DB_PORT: '5432'
       QNOP_DB_NAME: qnop
       QNOP_DB_USERNAME: qnop
       QNOP_DB_PASSWORD: qnop
+      # Object storage (issue #308): point at the MinIO service and let the app
+      # create the bucket on first use — the deployed ingest → extraction → serve
+      # path runs against real S3-compatible storage in the smoke.
+      QNOP_S3_ENDPOINT: http://minio:9000
+      QNOP_S3_BUCKET: qnop-documents
+      QNOP_S3_ACCESS_KEY: qnop
+      QNOP_S3_SECRET_KEY: qnop_secret
+      QNOP_S3_PATH_STYLE_ACCESS: 'true'
+      QNOP_S3_AUTO_CREATE_BUCKET: 'true'
       # Test-only secrets — must match testdata/db/seed.sql's encryption inputs.
       QNOP_AUTH_JWT_SECRET: integration-test-jwt-secret-0123456789
       QNOP_AUTH_ENCRYPTION_KEY: integration-test-encryption-key-0123456789

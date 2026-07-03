@@ -23,13 +23,21 @@ Path svg = TestData.path("branding/logomark.svg");
 
 ```
 testdata/
-└── branding/                 # branding upload fixtures (issue #106)
-    ├── logo-light.png        # valid 320×96 RGBA PNG — "TEST LOGO" wordmark (navy text)
-    ├── logo-dark.png         # valid 320×96 RGBA PNG — "TEST LOGO" wordmark (white text), for "replace"
-    ├── logomark.svg          # valid, clean SVG — "T" mark
-    ├── unsafe.svg            # hostile SVG (script + onload + javascript: link) for sanitization
-    └── not-an-image.txt      # plain text — must be rejected as an unsupported type (415)
+├── branding/                 # branding upload fixtures (issue #106)
+│   ├── logo-light.png        # valid 320×96 RGBA PNG — "TEST LOGO" wordmark (navy text)
+│   ├── logo-dark.png         # valid 320×96 RGBA PNG — "TEST LOGO" wordmark (white text), for "replace"
+│   ├── logomark.svg          # valid, clean SVG — "T" mark
+│   ├── unsafe.svg            # hostile SVG (script + onload + javascript: link) for sanitization
+│   └── not-an-image.txt      # plain text — must be rejected as an unsupported type (415)
+├── db/                       # deterministic SQL fixtures (issue #163)
+│   ├── clean.sql             # wipes the seeded tables to a known-empty slate
+│   └── seed.sql              # the shared seeded dataset (users, team, OIDC provider)
+└── documents/                # review document payloads (issue #308)
+    └── sample.pdf            # minimal valid single-page PDF, text "QNOP SMOKE TEST"
 ```
 
-Add new fixture families as sibling directories (e.g. `db/` seed scripts,
-`documents/` review payloads) as the suites that need them land.
+The `documents/sample.pdf` fixture backs the ingest smoke test: it is uploaded,
+the extraction job renders it, and the smoke asserts the extracted text — so it
+must stay a real, PDFBox-parsable PDF with extractable text.
+
+Add new fixture families as sibling directories as the suites that need them land.
