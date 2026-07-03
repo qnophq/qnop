@@ -126,6 +126,28 @@ class PdfBoxDocumentExtractorTest {
   }
 
   @Test
+  @DisplayName("a PDF beyond the page limit is rejected before extraction (DoS guard, issue #322)")
+  void overSizedPageCountIsRejected() throws Exception {
+    byte[] tooManyPages = blankPdf(PdfBoxDocumentExtractor.MAX_PAGES + 1);
+
+    assertThatThrownBy(() -> extractor.extract(new ByteArrayInputStream(tooManyPages)))
+        .isInstanceOf(ExtractionException.class)
+        .hasMessageContaining(String.valueOf(PdfBoxDocumentExtractor.MAX_PAGES));
+  }
+
+  /** A PDF with {@code pages} empty pages (no content streams — cheap to build past the cap). */
+  private static byte[] blankPdf(int pages) throws IOException {
+    try (PDDocument document = new PDDocument()) {
+      for (int i = 0; i < pages; i++) {
+        document.addPage(new PDPage(PDRectangle.LETTER));
+      }
+      ByteArrayOutputStream out = new ByteArrayOutputStream();
+      document.save(out);
+      return out.toByteArray();
+    }
+  }
+
+  @Test
   @DisplayName("spans carry glyph-true, non-decreasing per-character right edges (#290)")
   void spansCarryCharAdvances() throws Exception {
     byte[] pdf = pdf("Wim mi Wim"); // proportional font: W wide, i narrow

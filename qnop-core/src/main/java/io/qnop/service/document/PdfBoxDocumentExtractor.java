@@ -58,6 +58,14 @@ public class PdfBoxDocumentExtractor implements DocumentExtractor {
 
   static final String PDF_CONTENT_TYPE = "application/pdf";
 
+  /**
+   * Upper bound on pages a single document may carry (issue #322). Per-page extraction is CPU- and
+   * heap-bound, so a crafted PDF with an enormous page count is a denial-of-service vector; a
+   * document beyond this cap is rejected as unprocessable rather than extracted. Generous for real
+   * legal/compliance documents while bounding the abuse case.
+   */
+  static final int MAX_PAGES = 2_000;
+
   @Override
   public boolean supports(String contentType) {
     return PDF_CONTENT_TYPE.equalsIgnoreCase(contentType);
@@ -76,8 +84,15 @@ public class PdfBoxDocumentExtractor implements DocumentExtractor {
       if (document.isEncrypted()) {
         throw new ExtractionException("Encrypted PDFs are not supported");
       }
-      List<Surface> surfaces = new ArrayList<>(document.getNumberOfPages());
-      for (int pageIndex = 0; pageIndex < document.getNumberOfPages(); pageIndex++) {
+      int pageCount = document.getNumberOfPages();
+      if (pageCount > MAX_PAGES) {
+        // Reject before the CPU/heap-bound per-page loop: a crafted huge page count is a DoS
+        // vector, not a document to review (issue #322).
+        throw new ExtractionException(
+            "PDF has " + pageCount + " pages, exceeding the " + MAX_PAGES + "-page limit");
+      }
+      List<Surface> surfaces = new ArrayList<>(pageCount);
+      for (int pageIndex = 0; pageIndex < pageCount; pageIndex++) {
         surfaces.add(extractSurface(document, pageIndex));
       }
       if (surfaces.isEmpty()) {
