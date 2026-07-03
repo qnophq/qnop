@@ -21,9 +21,12 @@
 package io.qnop.repository;
 
 import io.qnop.entity.Comment;
+import java.util.Collection;
 import java.util.List;
 import java.util.UUID;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 
 /** Data access for annotation comment threads (issue #244, ADR-0011). */
 public interface CommentRepository extends JpaRepository<Comment, UUID> {
@@ -33,4 +36,14 @@ public interface CommentRepository extends JpaRepository<Comment, UUID> {
 
   /** The size of an annotation's thread (issue #247). */
   long countByAnnotationId(UUID annotationId);
+
+  /**
+   * Thread sizes for a set of annotations in one aggregation (issue #313) — annotations with no
+   * comments are simply absent from the result, so the caller defaults them to 0.
+   */
+  @Query(
+      "SELECT new io.qnop.repository.AnnotationCommentCount(c.annotationId, COUNT(c))"
+          + " FROM Comment c WHERE c.annotationId IN :annotationIds GROUP BY c.annotationId")
+  List<AnnotationCommentCount> countByAnnotationIdIn(
+      @Param("annotationIds") Collection<UUID> annotationIds);
 }
