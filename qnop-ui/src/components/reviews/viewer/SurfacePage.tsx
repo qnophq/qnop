@@ -143,6 +143,7 @@ export function SurfacePage({
           <TextSpanLayer
             spans={surface.textSpans}
             surfaceIndex={surface.index}
+            pageWidth={width}
             pageHeight={pageHeight}
             enabled={canAnnotate && tool === 'text' && surface.textSpans.length > 0}
             onTextSelected={onTextSelected}

@@ -20,12 +20,28 @@
  */
 
 import { useRef } from 'react';
+import Box from '@mui/material/Box';
+import { useTheme } from '@mui/material/styles';
 import type { RenderedTextSpan } from '../../../api/generated';
 import type { TextSelectionOffsets } from './anchoring';
+
+/**
+ * Text-marker selection colours: translucent so the page's own glyphs stay
+ * readable underneath (the PDF pixels are white in both themes). Light mode is
+ * the classic highlighter yellow; dark mode uses the softer brand amber so the
+ * marker matches the muted dark UI.
+ */
+const SELECTION_BG_LIGHT = 'rgba(255, 224, 0, 0.45)';
+const SELECTION_BG_DARK = 'rgba(245, 184, 61, 0.5)';
+
+/** The font the invisible glyphs are measured and rendered with. */
+const LAYER_FONT_FAMILY = 'sans-serif';
 
 interface TextSpanLayerProps {
   spans: RenderedTextSpan[];
   surfaceIndex: number;
+  /** Current display width of the page in CSS pixels — scales glyph runs to their boxes. */
+  pageWidth: number;
   /** Current display height of the page in CSS pixels — sizes the invisible glyphs. */
   pageHeight: number;
   enabled: boolean;
@@ -39,20 +55,40 @@ function spanElementFor(node: Node | null): HTMLElement | null {
   return element?.closest<HTMLElement>('[data-span-start]') ?? null;
 }
 
+// One shared 2D context for glyph-run measurement (null in jsdom → scale 1).
+let sharedMeasureContext: CanvasRenderingContext2D | null | undefined;
+
+/** The width of a glyph run in the layer font, or null when measuring is unavailable. */
+function measureGlyphRun(text: string, fontSize: number): number | null {
+  if (sharedMeasureContext === undefined) {
+    sharedMeasureContext = document.createElement('canvas').getContext('2d');
+  }
+  if (!sharedMeasureContext) return null;
+  sharedMeasureContext.font = `${fontSize}px ${LAYER_FONT_FAMILY}`;
+  const width = sharedMeasureContext.measureText(text).width;
+  return width > 0 ? width : null;
+}
+
 /**
  * An invisible, selectable text layer built from the server-extracted spans
  * (ADR-0032 — the client is not the authority on where text is; it only makes
- * the server's text selectable). Each span is absolutely positioned at its
- * normalized box, like pdf.js's own text layer, but the offsets attached to
- * each span are the canonical-text offsets the anchor model needs (ADR-0009).
+ * the server's text selectable). Like pdf.js's own text layer, each span is
+ * absolutely positioned at its normalized box and its glyph run is stretched
+ * horizontally (scaleX from a canvas measurement) to cover the box, so the
+ * browser's selection rectangles trace the printed text. The glyphs themselves
+ * stay transparent — also while selected — and the selection paints as a
+ * translucent marker; the offsets attached to each span are the canonical-text
+ * offsets the anchor model needs (ADR-0009).
  */
 export function TextSpanLayer({
   spans,
   surfaceIndex,
+  pageWidth,
   pageHeight,
   enabled,
   onTextSelected,
 }: TextSpanLayerProps) {
+  const theme = useTheme();
   const rootRef = useRef<HTMLDivElement>(null);
 
   const handlePointerUp = () => {
@@ -84,43 +120,60 @@ export function TextSpanLayer({
     onTextSelected({ surfaceIndex, start, end });
   };
 
+  const selectionBackground =
+    theme.palette.mode === 'dark' ? SELECTION_BG_DARK : SELECTION_BG_LIGHT;
+
   return (
-    <div
+    <Box
       ref={rootRef}
       data-testid={`text-layer-${surfaceIndex}`}
       onPointerUp={handlePointerUp}
-      style={{
+      sx={{
         position: 'absolute',
         inset: 0,
         overflow: 'hidden',
         cursor: enabled ? 'text' : 'default',
         pointerEvents: enabled ? 'auto' : 'none',
         userSelect: enabled ? 'text' : 'none',
+        // The transparent-marker feel: the selection paints a translucent
+        // highlight while the layer's approximated glyphs stay invisible —
+        // without the color override the browser would repaint the selected
+        // glyphs (in the layer's font, not the page's) as visible text.
+        '& span::selection': {
+          backgroundColor: selectionBackground,
+          color: 'transparent',
+        },
       }}
     >
-      {spans.map((span) => (
-        <span
-          key={span.startOffset}
-          data-span-start={span.startOffset}
-          data-span-length={span.text.length}
-          style={{
-            position: 'absolute',
-            left: `${span.box.x * 100}%`,
-            top: `${span.box.y * 100}%`,
-            width: `${span.box.width * 100}%`,
-            height: `${span.box.height * 100}%`,
-            color: 'transparent',
-            whiteSpace: 'pre',
-            overflow: 'hidden',
-            // Approximate glyph metrics: selection needs plausible hit targets,
-            // not typographic fidelity — the anchor is built from offsets.
-            fontSize: `${Math.max(span.box.height * pageHeight * 0.85, 6)}px`,
-            lineHeight: `${Math.max(span.box.height * pageHeight, 7)}px`,
-          }}
-        >
-          {span.text}
-        </span>
-      ))}
-    </div>
+      {spans.map((span) => {
+        const fontSize = Math.max(span.box.height * pageHeight * 0.85, 6);
+        const measured = span.text.length > 0 ? measureGlyphRun(span.text, fontSize) : null;
+        const scaleX = measured ? (span.box.width * pageWidth) / measured : 1;
+        return (
+          <span
+            key={span.startOffset}
+            data-span-start={span.startOffset}
+            data-span-length={span.text.length}
+            style={{
+              position: 'absolute',
+              left: `${span.box.x * 100}%`,
+              top: `${span.box.y * 100}%`,
+              height: `${span.box.height * 100}%`,
+              color: 'transparent',
+              whiteSpace: 'pre',
+              fontFamily: LAYER_FONT_FAMILY,
+              fontSize: `${fontSize}px`,
+              lineHeight: `${Math.max(span.box.height * pageHeight, 7)}px`,
+              // Stretch the glyph run to the server box so the selection
+              // rectangles trace the printed text (same trick as pdf.js).
+              transform: `scaleX(${scaleX})`,
+              transformOrigin: '0 0',
+            }}
+          >
+            {span.text}
+          </span>
+        );
+      })}
+    </Box>
   );
 }

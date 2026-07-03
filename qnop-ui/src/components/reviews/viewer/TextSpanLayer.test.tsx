@@ -1,0 +1,96 @@
+/*
+ * Copyright (c) 2026-present devtank42 GmbH
+ *
+ * This file is part of qnop (Qualified Notes on Papers).
+ *
+ * qnop is free software: you can redistribute it and/or modify it under the
+ * terms of the GNU Affero General Public License as published by the Free
+ * Software Foundation, either version 3 of the License, or (at your option)
+ * any later version.
+ *
+ * qnop is distributed in the hope that it will be useful, but WITHOUT ANY
+ * WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS
+ * FOR A PARTICULAR PURPOSE. See the GNU Affero General Public License for more
+ * details.
+ *
+ * You should have received a copy of the GNU Affero General Public License
+ * along with qnop. If not, see <https://www.gnu.org/licenses/>.
+ *
+ * SPDX-License-Identifier: AGPL-3.0-only
+ */
+
+import { describe, expect, it, vi } from 'vitest';
+import { fireEvent, render, screen } from '@testing-library/react';
+import { ThemeProvider } from '@mui/material/styles';
+import type { RenderedTextSpan } from '../../../api/generated';
+import { buildTheme } from '../../../theme/theme';
+import { TextSpanLayer } from './TextSpanLayer';
+
+const SPANS: RenderedTextSpan[] = [
+  {
+    text: 'Hello world',
+    startOffset: 0,
+    endOffset: 11,
+    box: { x: 0.1, y: 0.1, width: 0.5, height: 0.02 },
+  },
+  {
+    text: 'Second line',
+    startOffset: 12,
+    endOffset: 23,
+    box: { x: 0.1, y: 0.15, width: 0.4, height: 0.02 },
+  },
+];
+
+function renderLayer(onTextSelected = vi.fn()) {
+  render(
+    <ThemeProvider theme={buildTheme('light')}>
+      <TextSpanLayer
+        spans={SPANS}
+        surfaceIndex={0}
+        pageWidth={800}
+        pageHeight={1035}
+        enabled
+        onTextSelected={onTextSelected}
+      />
+    </ThemeProvider>,
+  );
+  return onTextSelected;
+}
+
+describe('TextSpanLayer', () => {
+  it('positions each span at its normalized box with transparent glyphs', () => {
+    renderLayer();
+
+    const span = screen.getByText('Hello world');
+    expect(span).toHaveAttribute('data-span-start', '0');
+    expect(span).toHaveAttribute('data-span-length', '11');
+    expect(span).toHaveStyle({ left: '10%', top: '10%', color: 'rgba(0, 0, 0, 0)' });
+  });
+
+  it('reports a cross-span selection as canonical-text offsets', () => {
+    const onTextSelected = renderLayer();
+
+    // Select "world" (6..11) through "Second" (12..18) via a real DOM range.
+    const first = screen.getByText('Hello world').firstChild!;
+    const second = screen.getByText('Second line').firstChild!;
+    const range = document.createRange();
+    range.setStart(first, 6);
+    range.setEnd(second, 6);
+    const selection = window.getSelection()!;
+    selection.removeAllRanges();
+    selection.addRange(range);
+
+    fireEvent.pointerUp(screen.getByTestId('text-layer-0'));
+
+    expect(onTextSelected).toHaveBeenCalledWith({ surfaceIndex: 0, start: 6, end: 18 });
+  });
+
+  it('ignores a collapsed selection', () => {
+    const onTextSelected = renderLayer();
+    window.getSelection()?.removeAllRanges();
+
+    fireEvent.pointerUp(screen.getByTestId('text-layer-0'));
+
+    expect(onTextSelected).not.toHaveBeenCalled();
+  });
+});
