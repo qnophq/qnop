@@ -23,16 +23,23 @@ import { describe, expect, it } from 'vitest';
 import { renderHook } from '@testing-library/react';
 import { useSyncScroll } from './useSyncScroll';
 
-function scrollable(scrollHeight: number, clientHeight: number): HTMLDivElement {
+function scrollable(
+  scrollHeight: number,
+  clientHeight: number,
+  scrollWidth = 0,
+  clientWidth = 0,
+): HTMLDivElement {
   const element = document.createElement('div');
   Object.defineProperty(element, 'scrollHeight', { value: scrollHeight, configurable: true });
   Object.defineProperty(element, 'clientHeight', { value: clientHeight, configurable: true });
+  Object.defineProperty(element, 'scrollWidth', { value: scrollWidth, configurable: true });
+  Object.defineProperty(element, 'clientWidth', { value: clientWidth, configurable: true });
   return element;
 }
 
 function setup(enabled = true) {
-  const left = scrollable(2000, 500); // 1500 scrollable
-  const right = scrollable(3500, 500); // 3000 scrollable
+  const left = scrollable(2000, 500, 1400, 600); // 1500 / 800 scrollable
+  const right = scrollable(3500, 500, 1000, 600); // 3000 / 400 scrollable
   renderHook(({ on }) => useSyncScroll(left, right, on), {
     initialProps: { on: enabled },
   });
@@ -62,6 +69,27 @@ describe('useSyncScroll', () => {
     left.dispatchEvent(new Event('scroll'));
 
     expect(right.scrollTop).toBe(1500); // half of the right range
+  });
+
+  it('follows both axes of a diagonal scroll', () => {
+    const { left, right } = setup();
+
+    left.scrollTop = 750; // half of the vertical range
+    left.scrollLeft = 200; // a quarter of the horizontal range
+    left.dispatchEvent(new Event('scroll'));
+
+    expect(right.scrollTop).toBe(1500);
+    expect(right.scrollLeft).toBe(100); // a quarter of the right range
+  });
+
+  it('follows a purely horizontal scroll', () => {
+    const { left, right } = setup();
+
+    left.scrollLeft = 400; // half of the horizontal range
+    left.dispatchEvent(new Event('scroll'));
+
+    expect(right.scrollLeft).toBe(200);
+    expect(right.scrollTop).toBe(0);
   });
 
   it('does not bounce the programmatic follow back to the source', () => {

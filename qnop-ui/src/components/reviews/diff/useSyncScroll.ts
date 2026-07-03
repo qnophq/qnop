@@ -21,11 +21,19 @@
 
 import { useEffect } from 'react';
 
+/** The proportional position on the target range, or null when an axis cannot scroll. */
+function mapped(value: number, sourceMax: number, targetMax: number): number | null {
+  if (sourceMax <= 0 || targetMax <= 0) return null;
+  return (value / sourceMax) * targetMax;
+}
+
 /**
- * Couples the two compare panes' vertical scrolling proportionally (the
- * versions rarely share a pixel height — inserted pages shift everything).
- * An echo guard swallows the scroll event a programmatic follow triggers on
- * the other pane, so the panes never feed back into each other.
+ * Couples the two compare panes' scrolling proportionally on BOTH axes (the
+ * versions rarely share a pixel height, and zoomed pages overflow
+ * horizontally). A mute flag plus a sub-pixel delta check swallow the scroll
+ * events a programmatic follow triggers on the other pane — writing two
+ * scroll properties can fire more than one event, so a one-shot echo marker
+ * would bounce back.
  *
  * Takes the ELEMENTS (from callback refs held in state), not ref objects: the
  * panes mount after the data guards, so the listeners must (re)attach when
@@ -38,19 +46,28 @@ export function useSyncScroll(
 ) {
   useEffect(() => {
     if (!enabled || !left || !right) return undefined;
-    let echo: HTMLElement | null = null;
+    let muted = false;
     const follow = (source: HTMLElement, target: HTMLElement) => () => {
-      if (echo === source) {
-        echo = null;
-        return;
-      }
-      const sourceMax = source.scrollHeight - source.clientHeight;
-      const targetMax = target.scrollHeight - target.clientHeight;
-      if (sourceMax <= 0 || targetMax <= 0) return;
-      const next = (source.scrollTop / sourceMax) * targetMax;
-      if (Math.abs(next - target.scrollTop) < 1) return;
-      echo = target;
-      target.scrollTop = next;
+      if (muted) return;
+      const nextTop = mapped(
+        source.scrollTop,
+        source.scrollHeight - source.clientHeight,
+        target.scrollHeight - target.clientHeight,
+      );
+      const nextLeft = mapped(
+        source.scrollLeft,
+        source.scrollWidth - source.clientWidth,
+        target.scrollWidth - target.clientWidth,
+      );
+      const moveTop = nextTop !== null && Math.abs(nextTop - target.scrollTop) >= 1;
+      const moveLeft = nextLeft !== null && Math.abs(nextLeft - target.scrollLeft) >= 1;
+      if (!moveTop && !moveLeft) return;
+      muted = true;
+      if (moveTop) target.scrollTop = nextTop;
+      if (moveLeft) target.scrollLeft = nextLeft;
+      requestAnimationFrame(() => {
+        muted = false;
+      });
     };
     const onLeft = follow(left, right);
     const onRight = follow(right, left);
