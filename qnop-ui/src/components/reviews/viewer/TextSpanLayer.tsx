@@ -27,8 +27,15 @@ import type { TextSelectionOffsets } from './anchoring';
 import { markerLineBox, surfaceLinePitch } from './anchoring';
 import { selectionMarkerColor } from './markerColors';
 
-/** The font the invisible glyphs are measured and rendered with. */
-const LAYER_FONT_FAMILY = 'sans-serif';
+/**
+ * The font the invisible glyphs are measured and rendered with. Monospace is
+ * deliberate: with the run stretched to the span box (scaleX), every character
+ * then sits at i/len of the box — the same uniform-grid model boxesForRange
+ * uses for drawing. A proportional layer font would only match the box in
+ * total width, so dragging over the printed glyphs would hit neighbouring
+ * characters in the invisible run (selection offsets shifted by a few chars).
+ */
+const LAYER_FONT_FAMILY = 'monospace';
 
 interface TextSpanLayerProps {
   spans: RenderedTextSpan[];
