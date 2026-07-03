@@ -30,6 +30,7 @@ import io.qnop.repository.AnnotationPlacementRepository;
 import io.qnop.repository.AnnotationRepository;
 import io.qnop.repository.AuditEventRepository;
 import io.qnop.repository.DocumentRepository;
+import io.qnop.service.document.DocumentAccessService;
 import io.qnop.service.review.ReviewWorkflowMachine.TransitionContext;
 import io.qnop.service.review.ReviewWorkflowMachine.TransitionResult;
 import java.util.List;
@@ -59,25 +60,40 @@ public class ReviewWorkflowService {
   private final AnnotationRepository annotations;
   private final AnnotationPlacementRepository placements;
   private final AuditEventRepository auditEvents;
+  private final DocumentAccessService documentAccess;
 
   public ReviewWorkflowService(
       DocumentRepository documents,
       AnnotationRepository annotations,
       AnnotationPlacementRepository placements,
-      AuditEventRepository auditEvents) {
+      AuditEventRepository auditEvents,
+      DocumentAccessService documentAccess) {
     this.documents = documents;
     this.annotations = annotations;
     this.placements = placements;
     this.auditEvents = auditEvents;
+    this.documentAccess = documentAccess;
   }
 
-  /** The workflow view of a document: its raw state and the structurally reachable targets. */
-  public record WorkflowStatus(String state, List<WorkflowState> allowedTransitions) {}
+  /**
+   * The workflow view of a document: its raw state and the structurally reachable target states as
+   * their names (kept as strings so the web layer maps them without depending on the entity enum,
+   * ADR-0004, issue #315).
+   */
+  public record WorkflowStatus(String state, List<String> allowedTransitions) {}
 
-  /** The current workflow status of a document (any authenticated principal may read it). */
+  /**
+   * The current workflow status of a document, readable by anyone who may see the document — its
+   * owner, a review participant (directly or via team), or an admin (issue #311). A non-participant
+   * gets a 404 (never a 403) so document ids stay non-enumerable, matching {@link
+   * DocumentAccessService}.
+   */
   @Transactional(readOnly = true)
-  public WorkflowStatus status(UUID documentId) {
+  public WorkflowStatus status(UUID documentId, UUID actorId, boolean admin) {
     Document document = load(documentId);
+    if (!documentAccess.isVisible(documentId, actorId, admin)) {
+      throw new DocumentNotFoundException(documentId);
+    }
     return statusOf(document);
   }
 
@@ -163,7 +179,10 @@ public class ReviewWorkflowService {
 
   private WorkflowStatus statusOf(Document document) {
     return new WorkflowStatus(
-        document.getWorkflowState(), machine.allowedTransitions(document.getWorkflowState()));
+        document.getWorkflowState(),
+        machine.allowedTransitions(document.getWorkflowState()).stream()
+            .map(WorkflowState::name)
+            .toList());
   }
 
   private Document load(UUID documentId) {
