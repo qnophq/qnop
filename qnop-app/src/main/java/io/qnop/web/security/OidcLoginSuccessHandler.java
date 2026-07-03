@@ -46,6 +46,13 @@ import org.springframework.stereotype.Component;
  * SPA. The access token is delivered by the SPA's subsequent {@code /api/v1/auth/refresh} call, so
  * it never travels in a URL. The provider's access token (used only for the GitHub email fallback)
  * is read from the {@link OAuth2AuthorizedClientService}.
+ *
+ * <p>This handler runs <em>only after</em> Spring Security's {@code
+ * OAuth2LoginAuthenticationFilter} has already authenticated the callback — which includes
+ * validating the {@code state} parameter against the authorization request stored at initiation. A
+ * forged or absent {@code state} fails in that filter and never reaches here, so this handler mints
+ * a session only for a state-validated response (issue #321). The chain does not override that
+ * default validation.
  */
 @Component
 public class OidcLoginSuccessHandler implements AuthenticationSuccessHandler {
