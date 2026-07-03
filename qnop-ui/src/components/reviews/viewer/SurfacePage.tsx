@@ -28,7 +28,7 @@ import type {
   NormalizedBox,
   RenderedSurface,
 } from '../../../api/generated';
-import type { TextSelectionOffsets } from './anchoring';
+import type { ScreenPosition, TextSelectionOffsets } from './anchoring';
 import { HighlightLayer } from './HighlightLayer';
 import { RegionSelectLayer } from './RegionSelectLayer';
 import { TextSpanLayer } from './TextSpanLayer';
@@ -53,8 +53,8 @@ interface SurfacePageProps {
   /** False disables both selection layers (extraction pending, or read-only). */
   canAnnotate: boolean;
   pendingAnchor: Anchor | null;
-  onTextSelected: (selection: TextSelectionOffsets) => void;
-  onRegionSelected: (surfaceIndex: number, box: NormalizedBox) => void;
+  onTextSelected: (selection: TextSelectionOffsets, at: ScreenPosition) => void;
+  onRegionSelected: (surfaceIndex: number, box: NormalizedBox, at: ScreenPosition) => void;
 }
 
 /**

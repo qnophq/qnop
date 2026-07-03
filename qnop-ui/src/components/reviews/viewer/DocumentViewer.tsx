@@ -29,7 +29,7 @@ import type {
   NormalizedBox,
   RenderedSurface,
 } from '../../../api/generated';
-import type { TextSelectionOffsets } from './anchoring';
+import type { ScreenPosition, TextSelectionOffsets } from './anchoring';
 import { SurfacePage } from './SurfacePage';
 import type { ViewerTool } from './ViewerToolbar';
 
@@ -47,8 +47,8 @@ interface DocumentViewerProps {
   tool: ViewerTool;
   canAnnotate: boolean;
   pendingAnchor: Anchor | null;
-  onTextSelected: (selection: TextSelectionOffsets) => void;
-  onRegionSelected: (surfaceIndex: number, box: NormalizedBox) => void;
+  onTextSelected: (selection: TextSelectionOffsets, at: ScreenPosition) => void;
+  onRegionSelected: (surfaceIndex: number, box: NormalizedBox, at: ScreenPosition) => void;
 }
 
 /**

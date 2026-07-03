@@ -24,7 +24,12 @@ import { useParams, useSearchParams } from 'react-router-dom';
 import Alert from '@mui/material/Alert';
 import Box from '@mui/material/Box';
 import CircularProgress from '@mui/material/CircularProgress';
+import ListItemIcon from '@mui/material/ListItemIcon';
+import ListItemText from '@mui/material/ListItemText';
+import Menu from '@mui/material/Menu';
+import MenuItem from '@mui/material/MenuItem';
 import Stack from '@mui/material/Stack';
+import { NotebookPen } from 'lucide-react';
 import type { Anchor, NormalizedBox } from '../../api/generated';
 import { ExtractionStatus } from '../../api/generated';
 import { useAnnotations, useCreateAnnotation } from '../../api/hooks/useAnnotations';
@@ -40,7 +45,10 @@ import { useToast } from '../../components/admin/layout/useToast';
 import type { BadgeTone } from '../../components/admin/ToneBadge';
 import { ToneBadge } from '../../components/admin/ToneBadge';
 import { AnnotationPanel } from '../../components/reviews/panel/AnnotationPanel';
-import type { TextSelectionOffsets } from '../../components/reviews/viewer/anchoring';
+import type {
+  ScreenPosition,
+  TextSelectionOffsets,
+} from '../../components/reviews/viewer/anchoring';
 import { buildRegionAnchor, buildTextAnchor } from '../../components/reviews/viewer/anchoring';
 import { DocumentViewer } from '../../components/reviews/viewer/DocumentViewer';
 import { usePdfDocument } from '../../components/reviews/viewer/usePdfDocument';
@@ -102,7 +110,14 @@ export function DocumentReviewPage() {
   const [tool, setTool] = useState<ViewerTool>('text');
   const [zoom, setZoom] = useState(1);
   const [activeAnnotationId, setActiveAnnotationId] = useState<string | null>(null);
-  const [pendingAnchor, setPendingAnchor] = useState<Anchor | null>(null);
+  // A drawn-but-not-created mark. While `menuPosition` is set, the "Create
+  // annotation" popup is open at the pointer; choosing the item clears the
+  // position and opens the composer in the panel. Dismissing the popup
+  // discards the mark entirely.
+  const [pending, setPending] = useState<{
+    anchor: Anchor;
+    menuPosition: { left: number; top: number } | null;
+  } | null>(null);
 
   const surfaces = renderedQuery.data?.surfaces;
   const annotations = useMemo(
@@ -115,34 +130,36 @@ export function DocumentReviewPage() {
   const handleVersionChange = (version: number) => {
     setSearchParams({ version: String(version) });
     setActiveAnnotationId(null);
-    setPendingAnchor(null);
+    setPending(null);
   };
 
-  const handleTextSelected = ({ surfaceIndex, start, end }: TextSelectionOffsets) => {
+  const stagePending = (anchor: Anchor, at: ScreenPosition) => {
+    setPending({ anchor, menuPosition: at });
+    setActiveAnnotationId(null);
+  };
+
+  const handleTextSelected = (
+    { surfaceIndex, start, end }: TextSelectionOffsets,
+    at: ScreenPosition,
+  ) => {
     const surface = surfaces?.find((s) => s.index === surfaceIndex);
     if (!surface) return;
     const anchor = buildTextAnchor(surfaceIndex, surface.textSpans, start, end);
-    if (anchor) {
-      setPendingAnchor(anchor);
-      setActiveAnnotationId(null);
-    }
+    if (anchor) stagePending(anchor, at);
   };
 
-  const handleRegionSelected = (surfaceIndex: number, box: NormalizedBox) => {
+  const handleRegionSelected = (surfaceIndex: number, box: NormalizedBox, at: ScreenPosition) => {
     const anchor = buildRegionAnchor(surfaceIndex, box);
-    if (anchor) {
-      setPendingAnchor(anchor);
-      setActiveAnnotationId(null);
-    }
+    if (anchor) stagePending(anchor, at);
   };
 
   const handleCreate = (comment: string) => {
-    if (!pendingAnchor || versionNumber === undefined) return;
+    if (!pending || versionNumber === undefined) return;
     createAnnotation.mutate(
-      { versionNumber, anchor: pendingAnchor, comment: comment.trim() || undefined },
+      { versionNumber, anchor: pending.anchor, comment: comment.trim() || undefined },
       {
         onSuccess: (created) => {
-          setPendingAnchor(null);
+          setPending(null);
           setActiveAnnotationId(created.id);
           notify('Annotation created.');
         },
@@ -234,11 +251,11 @@ export function DocumentReviewPage() {
                   activeAnnotationId={activeAnnotationId}
                   onSelectAnnotation={(id) => {
                     setActiveAnnotationId(id);
-                    setPendingAnchor(null);
+                    setPending(null);
                   }}
                   tool={tool}
                   canAnnotate={canAnnotate}
-                  pendingAnchor={pendingAnchor}
+                  pendingAnchor={pending?.anchor ?? null}
                   onTextSelected={handleTextSelected}
                   onRegionSelected={handleRegionSelected}
                 />
@@ -259,16 +276,31 @@ export function DocumentReviewPage() {
               annotations={annotations}
               activeAnnotationId={activeAnnotationId}
               onSelect={setActiveAnnotationId}
-              pendingAnchor={pendingAnchor}
+              pendingAnchor={pending && !pending.menuPosition ? pending.anchor : null}
               creating={createAnnotation.isPending}
               onCreate={handleCreate}
-              onCancelPending={() => setPendingAnchor(null)}
+              onCancelPending={() => setPending(null)}
               canAnnotate={canAnnotate}
               notify={notify}
             />
           </Box>
         </Stack>
       )}
+      {/* The post-selection popup: only an explicit "Create annotation" opens
+          the composer; dismissing it (click-away, Escape) discards the mark. */}
+      <Menu
+        open={Boolean(pending?.menuPosition)}
+        onClose={() => setPending(null)}
+        anchorReference="anchorPosition"
+        anchorPosition={pending?.menuPosition ?? undefined}
+      >
+        <MenuItem onClick={() => setPending((state) => state && { ...state, menuPosition: null })}>
+          <ListItemIcon>
+            <NotebookPen size={16} />
+          </ListItemIcon>
+          <ListItemText>Create annotation</ListItemText>
+        </MenuItem>
+      </Menu>
       <AdminToast toast={toast} onClose={clear} />
     </Stack>
   );

@@ -20,7 +20,7 @@
  */
 
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { ThemeProvider } from '@mui/material/styles';
 import type { AnnotationView, RenderedSurface } from '../../api/generated';
@@ -54,10 +54,32 @@ vi.mock('../../components/reviews/viewer/usePdfDocument', () => ({
   usePdfDocument: vi.fn(),
 }));
 // The viewer needs a real pdf.js document and layout; the page test only
-// verifies the orchestration around it.
+// verifies the orchestration around it. The stub exposes a button that
+// simulates a completed text selection.
 vi.mock('../../components/reviews/viewer/DocumentViewer', () => ({
-  DocumentViewer: ({ annotations }: { annotations: AnnotationView[] }) => (
-    <div data-testid="document-viewer" data-annotation-count={annotations.length} />
+  DocumentViewer: ({
+    annotations,
+    pendingAnchor,
+    onTextSelected,
+  }: {
+    annotations: AnnotationView[];
+    pendingAnchor: unknown;
+    onTextSelected: (sel: unknown, at: unknown) => void;
+  }) => (
+    <div
+      data-testid="document-viewer"
+      data-annotation-count={annotations.length}
+      data-has-pending={String(Boolean(pendingAnchor))}
+    >
+      <button
+        data-testid="fake-text-select"
+        onClick={() =>
+          onTextSelected({ surfaceIndex: 0, start: 0, end: 5 }, { left: 120, top: 240 })
+        }
+      >
+        select
+      </button>
+    </div>
   ),
 }));
 
@@ -175,6 +197,35 @@ describe('DocumentReviewPage', () => {
 
     expect(screen.getByText(/The document is being processed/)).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Draw region' })).toBeDisabled();
+  });
+
+  it('opens the composer only after choosing "Create annotation" from the popup', () => {
+    seedHappyPath();
+    renderPage();
+
+    // Selection complete → popup at the pointer, mark previewed, no composer yet.
+    fireEvent.click(screen.getByTestId('fake-text-select'));
+    expect(screen.getByRole('menuitem', { name: /Create annotation/ })).toBeInTheDocument();
+    expect(screen.getByTestId('document-viewer')).toHaveAttribute('data-has-pending', 'true');
+    expect(screen.queryByTestId('annotation-composer')).not.toBeInTheDocument();
+
+    // Explicitly choosing the item opens the composer; the mark stays.
+    fireEvent.click(screen.getByRole('menuitem', { name: /Create annotation/ }));
+    expect(screen.getByTestId('annotation-composer')).toBeInTheDocument();
+    expect(screen.getByTestId('document-viewer')).toHaveAttribute('data-has-pending', 'true');
+  });
+
+  it('discards popup and mark when the popup is dismissed', () => {
+    seedHappyPath();
+    renderPage();
+
+    fireEvent.click(screen.getByTestId('fake-text-select'));
+    // Escape = click-away semantics: the menu closes and the mark is gone.
+    fireEvent.keyDown(screen.getByRole('menu'), { key: 'Escape' });
+
+    expect(screen.queryByRole('menuitem', { name: /Create annotation/ })).not.toBeInTheDocument();
+    expect(screen.getByTestId('document-viewer')).toHaveAttribute('data-has-pending', 'false');
+    expect(screen.queryByTestId('annotation-composer')).not.toBeInTheDocument();
   });
 
   it('shows the anti-enumeration error state', () => {

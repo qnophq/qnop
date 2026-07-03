@@ -64,6 +64,12 @@ export interface TextSelectionOffsets {
   end: number;
 }
 
+/** A viewport position (e.g. the pointer on release) for anchoring a popup. */
+export interface ScreenPosition {
+  left: number;
+  top: number;
+}
+
 /** The canonical text of a surface: span texts joined by single newlines (API contract). */
 export function surfaceText(spans: RenderedTextSpan[]): string {
   return spans.map((span) => span.text).join('\n');

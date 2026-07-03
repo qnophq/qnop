@@ -20,9 +20,10 @@
  */
 
 import { useRef } from 'react';
+import type { PointerEvent } from 'react';
 import Box from '@mui/material/Box';
 import type { RenderedTextSpan } from '../../../api/generated';
-import type { TextSelectionOffsets } from './anchoring';
+import type { ScreenPosition, TextSelectionOffsets } from './anchoring';
 import { markerLineBox, surfaceLinePitch } from './anchoring';
 import { SELECTION_MARKER_BG } from './markerColors';
 
@@ -44,7 +45,7 @@ interface TextSpanLayerProps {
   /** Current display height of the page in CSS pixels — sizes the invisible glyphs. */
   pageHeight: number;
   enabled: boolean;
-  onTextSelected: (selection: TextSelectionOffsets) => void;
+  onTextSelected: (selection: TextSelectionOffsets, at: ScreenPosition) => void;
 }
 
 /** Finds the enclosing span element carrying canonical-text offsets. */
@@ -89,7 +90,7 @@ export function TextSpanLayer({
 }: TextSpanLayerProps) {
   const rootRef = useRef<HTMLDivElement>(null);
 
-  const handlePointerUp = () => {
+  const handlePointerUp = (event: PointerEvent<HTMLDivElement>) => {
     const selection = window.getSelection();
     const root = rootRef.current;
     if (!selection || selection.rangeCount === 0 || selection.isCollapsed || !root) return;
@@ -115,7 +116,7 @@ export function TextSpanLayer({
         : Number(endElement.dataset.spanLength));
     if (end <= start) return;
     selection.removeAllRanges();
-    onTextSelected({ surfaceIndex, start, end });
+    onTextSelected({ surfaceIndex, start, end }, { left: event.clientX, top: event.clientY });
   };
 
   const pitch = surfaceLinePitch(spans);

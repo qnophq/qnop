@@ -84,9 +84,12 @@ describe('TextSpanLayer', () => {
     selection.removeAllRanges();
     selection.addRange(range);
 
-    fireEvent.pointerUp(screen.getByTestId('text-layer-0'));
+    fireEvent.pointerUp(screen.getByTestId('text-layer-0'), { clientX: 120, clientY: 240 });
 
-    expect(onTextSelected).toHaveBeenCalledWith({ surfaceIndex: 0, start: 6, end: 18 });
+    expect(onTextSelected).toHaveBeenCalledWith(
+      { surfaceIndex: 0, start: 6, end: 18 },
+      { left: 120, top: 240 },
+    );
   });
 
   it('ignores a collapsed selection', () => {

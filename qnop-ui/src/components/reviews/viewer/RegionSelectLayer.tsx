@@ -24,11 +24,12 @@ import type { PointerEvent } from 'react';
 import Box from '@mui/material/Box';
 import { alpha, useTheme } from '@mui/material/styles';
 import type { NormalizedBox } from '../../../api/generated';
+import type { ScreenPosition } from './anchoring';
 
 interface RegionSelectLayerProps {
   surfaceIndex: number;
   enabled: boolean;
-  onRegionSelected: (surfaceIndex: number, box: NormalizedBox) => void;
+  onRegionSelected: (surfaceIndex: number, box: NormalizedBox, at: ScreenPosition) => void;
 }
 
 interface DraftRect {
@@ -78,15 +79,14 @@ export function RegionSelectLayer({
     setDraft({ ...draft, x2: point.x, y2: point.y });
   };
 
-  const handlePointerUp = () => {
+  const handlePointerUp = (event: PointerEvent<HTMLDivElement>) => {
     if (!draft) return;
     setDraft(null);
-    onRegionSelected(surfaceIndex, {
-      x: draft.x1,
-      y: draft.y1,
-      width: draft.x2 - draft.x1,
-      height: draft.y2 - draft.y1,
-    });
+    onRegionSelected(
+      surfaceIndex,
+      { x: draft.x1, y: draft.y1, width: draft.x2 - draft.x1, height: draft.y2 - draft.y1 },
+      { left: event.clientX, top: event.clientY },
+    );
   };
 
   const preview: NormalizedBox | null = draft && {
