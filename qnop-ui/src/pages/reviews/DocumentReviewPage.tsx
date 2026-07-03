@@ -253,6 +253,13 @@ export function DocumentReviewPage() {
               canAnnotate={canAnnotate}
               zoom={zoom}
               onZoomChange={setZoom}
+              compareHref={
+                (versionsQuery.data?.versions.filter(
+                  (version) => version.extractionStatus === ExtractionStatus.Ready,
+                ).length ?? 0) >= 2
+                  ? `/reviews/${documentId}/compare`
+                  : undefined
+              }
             />
             {extractionStatus === ExtractionStatus.Pending && (
               <Alert severity="info">

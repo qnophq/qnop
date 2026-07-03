@@ -30,16 +30,16 @@ import ToggleButton from '@mui/material/ToggleButton';
 import ToggleButtonGroup from '@mui/material/ToggleButtonGroup';
 import Tooltip from '@mui/material/Tooltip';
 import Typography from '@mui/material/Typography';
-import { BoxSelect, ChevronDown, ChevronUp, TextCursor, ZoomIn, ZoomOut } from 'lucide-react';
+import { Link as RouterLink } from 'react-router-dom';
+import { BoxSelect, ChevronDown, ChevronUp, GitCompareArrows, TextCursor } from 'lucide-react';
 import type { DocumentVersionSummary } from '../../../api/generated';
 import { ExtractionStatus } from '../../../api/generated';
 import { ToneBadge } from '../../admin/ToneBadge';
+import { ZoomControls } from './ZoomControls';
 
 export type ViewerTool = 'text' | 'region';
 
-export const MIN_ZOOM = 0.5;
-export const MAX_ZOOM = 3;
-const ZOOM_STEP = 0.25;
+export { MAX_ZOOM, MIN_ZOOM } from './ZoomControls';
 
 interface ViewerToolbarProps {
   versions: DocumentVersionSummary[];
@@ -56,6 +56,8 @@ interface ViewerToolbarProps {
   canAnnotate: boolean;
   zoom: number;
   onZoomChange: (zoom: number) => void;
+  /** Link to the version comparison (#252); undefined hides the button (fewer than two extracted versions). */
+  compareHref?: string;
 }
 
 /**
@@ -78,6 +80,7 @@ export function ViewerToolbar({
   canAnnotate,
   zoom,
   onZoomChange,
+  compareHref,
 }: ViewerToolbarProps) {
   return (
     <Paper
@@ -105,6 +108,18 @@ export function ViewerToolbar({
           </MenuItem>
         ))}
       </TextField>
+      {compareHref && (
+        <Tooltip title="Compare versions">
+          <IconButton
+            size="small"
+            aria-label="Compare versions"
+            component={RouterLink}
+            to={compareHref}
+          >
+            <GitCompareArrows size={16} />
+          </IconButton>
+        </Tooltip>
+      )}
 
       <Stack direction="row" spacing={0.25} sx={{ alignItems: 'center' }}>
         <IconButton
@@ -168,44 +183,7 @@ export function ViewerToolbar({
 
         <Divider orientation="vertical" flexItem />
 
-        <IconButton
-          size="small"
-          aria-label="Zoom out"
-          disabled={zoom <= MIN_ZOOM}
-          onClick={() => onZoomChange(Math.max(MIN_ZOOM, zoom - ZOOM_STEP))}
-        >
-          <ZoomOut size={16} />
-        </IconButton>
-        <Tooltip title="Reset zoom to fit width">
-          <Typography
-            component="button"
-            variant="body2"
-            color="text.secondary"
-            aria-label="Reset zoom to fit width"
-            onClick={() => onZoomChange(1)}
-            sx={{
-              minWidth: 44,
-              textAlign: 'center',
-              fontVariantNumeric: 'tabular-nums',
-              background: 'none',
-              border: 'none',
-              cursor: 'pointer',
-              font: 'inherit',
-              borderRadius: 1,
-              '&:focus-visible': (theme) => ({ outline: 'none', boxShadow: theme.qnop.focusRing }),
-            }}
-          >
-            {Math.round(zoom * 100)}%
-          </Typography>
-        </Tooltip>
-        <IconButton
-          size="small"
-          aria-label="Zoom in"
-          disabled={zoom >= MAX_ZOOM}
-          onClick={() => onZoomChange(Math.min(MAX_ZOOM, zoom + ZOOM_STEP))}
-        >
-          <ZoomIn size={16} />
-        </IconButton>
+        <ZoomControls zoom={zoom} onZoomChange={onZoomChange} />
       </Stack>
     </Paper>
   );

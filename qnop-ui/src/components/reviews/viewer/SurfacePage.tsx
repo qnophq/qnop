@@ -19,9 +19,9 @@
  * SPDX-License-Identifier: AGPL-3.0-only
  */
 
-import { useEffect, useRef, useState } from 'react';
+import { useState } from 'react';
 import Paper from '@mui/material/Paper';
-import type { PDFDocumentProxy, RenderTask } from 'pdfjs-dist';
+import type { PDFDocumentProxy } from 'pdfjs-dist';
 import type {
   Anchor,
   AnnotationView,
@@ -30,6 +30,7 @@ import type {
 } from '../../../api/generated';
 import type { ScreenPosition, TextSelectionOffsets } from './anchoring';
 import { HighlightLayer } from './HighlightLayer';
+import { PageCanvas } from './PageCanvas';
 import { RegionSelectLayer } from './RegionSelectLayer';
 import { TextSpanLayer } from './TextSpanLayer';
 import type { ViewerTool } from './ViewerToolbar';
@@ -82,54 +83,12 @@ export function SurfacePage({
   onTextSelected,
   onRegionSelected,
 }: SurfacePageProps) {
-  const containerRef = useRef<HTMLDivElement>(null);
-  const canvasRef = useRef<HTMLCanvasElement>(null);
-  const [visible, setVisible] = useState(false);
   const [fallbackAspect, setFallbackAspect] = useState<number | null>(null);
-
-  // Render lazily: pages far outside the viewport keep an empty canvas.
-  useEffect(() => {
-    const element = containerRef.current;
-    if (!element) return undefined;
-    const observer = new IntersectionObserver(
-      (entries) => {
-        if (entries.some((entry) => entry.isIntersecting)) setVisible(true);
-      },
-      { rootMargin: '100% 0px' },
-    );
-    observer.observe(element);
-    return () => observer.disconnect();
-  }, []);
-
-  useEffect(() => {
-    if (!visible) return undefined;
-    let cancelled = false;
-    let renderTask: RenderTask | undefined;
-    void pdf.getPage(pageIndex + 1).then((page) => {
-      if (cancelled) return;
-      const base = page.getViewport({ scale: 1 });
-      if (!surface) setFallbackAspect(base.width / base.height);
-      const dpr = window.devicePixelRatio || 1;
-      const viewport = page.getViewport({ scale: (width / base.width) * dpr });
-      const canvas = canvasRef.current;
-      if (!canvas) return;
-      canvas.width = Math.floor(viewport.width);
-      canvas.height = Math.floor(viewport.height);
-      renderTask = page.render({ canvas, viewport });
-      // Re-renders cancel the previous pass; swallow the cancellation rejection.
-      renderTask.promise.catch(() => {});
-    });
-    return () => {
-      cancelled = true;
-      renderTask?.cancel();
-    };
-  }, [pdf, pageIndex, surface, width, visible]);
 
   const aspect = surface ? surface.width / surface.height : (fallbackAspect ?? Math.SQRT1_2);
 
   return (
     <Paper
-      ref={containerRef}
       elevation={0}
       square
       data-testid={`surface-page-${pageIndex}`}
@@ -146,10 +105,12 @@ export function SurfacePage({
         border: theme.palette.mode === 'dark' ? `1px solid ${theme.palette.divider}` : 'none',
       })}
     >
-      <canvas
-        ref={canvasRef}
-        aria-label={`Page ${pageIndex + 1}`}
-        style={{ position: 'absolute', inset: 0, width: '100%', height: '100%' }}
+      <PageCanvas
+        pdf={pdf}
+        pageIndex={pageIndex}
+        width={width}
+        ariaLabel={`Page ${pageIndex + 1}`}
+        onAspect={surface ? undefined : setFallbackAspect}
       />
       {surface && (
         <>
