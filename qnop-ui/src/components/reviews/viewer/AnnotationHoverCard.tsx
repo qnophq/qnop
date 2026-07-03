@@ -118,7 +118,7 @@ export function AnnotationHoverCard({ annotation, getAnchorPosition }: Annotatio
           sx: {
             mt: 0.75,
             width: 320,
-            borderRadius: 2.5,
+            borderRadius: 0.75,
             border: `1px solid ${theme.palette.divider}`,
             boxShadow: '0 12px 32px -8px rgba(1, 32, 66, 0.25)',
             overflow: 'hidden',
