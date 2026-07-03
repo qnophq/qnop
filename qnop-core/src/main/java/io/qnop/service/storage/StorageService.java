@@ -72,9 +72,15 @@ public class StorageService {
   }
 
   /**
-   * Buffers the content (to compute its hash and length), uploads it under a content-addressed key,
-   * and records a {@code PENDING} registry row. Idempotent for identical content: an already-known
-   * key is returned without re-uploading (dedup).
+   * Buffers the content (to compute its hash and length), records a {@code PENDING} registry row,
+   * and uploads it under a content-addressed key.
+   *
+   * <p><strong>Dedup is authoritative only for {@code COMMITTED} rows</strong> (issue #289): a
+   * {@code PENDING} row can be <em>poisoned</em> — it is persisted before {@code put}, so a failed
+   * upload leaves a row with no object behind it. On a {@code PENDING} hit (or a lost concurrent
+   * insert race), the object's real existence is checked and it is (re-)uploaded when missing;
+   * {@code put} is idempotent for a content-addressed key + identical bytes, so this self-heals a
+   * failed earlier upload without ever returning a key that points at nothing.
    */
   public StagedObject stage(InputStream content, String contentType) {
     Path buffer = bufferToTempFile(content);
@@ -83,25 +89,38 @@ public class StorageService {
       long size = sizeOf(buffer);
       String key = keyFor(hash);
 
-      if (repository.findByObjectKey(key).isPresent()) {
-        return new StagedObject(key, hash, size); // dedup: content already stored
+      Optional<StorageObject> existing = repository.findByObjectKey(key);
+      if (existing.map(o -> o.getStatus() == StorageObjectStatus.COMMITTED).orElse(false)) {
+        return new StagedObject(key, hash, size); // authoritative dedup: the object is durable
       }
       // Persist the PENDING row (in Spring Data's own transaction) BEFORE the upload, so a crash
       // between the two always leaves a row the reaper can reclaim. A concurrent stage of identical
-      // content may win the unique-key race first — treat that as dedup.
-      try {
-        repository.save(StorageObject.pending(key, hash, contentType, size));
-      } catch (DataIntegrityViolationException e) {
-        return new StagedObject(key, hash, size);
+      // content may win the unique-key race — its row is only PENDING (the object may be missing),
+      // so we still verify-and-(re)upload below rather than trusting it.
+      boolean rowPreexisted = existing.isPresent();
+      if (!rowPreexisted) {
+        try {
+          repository.save(StorageObject.pending(key, hash, contentType, size));
+        } catch (DataIntegrityViolationException e) {
+          rowPreexisted = true;
+        }
       }
-      try (InputStream in = Files.newInputStream(buffer)) {
-        provider.put(key, in, size, contentType);
-      } catch (IOException e) {
-        throw new StorageException("Failed to read buffered upload for " + key, e);
+      // A freshly inserted row always needs the upload; a pre-existing PENDING row (possibly
+      // poisoned, mid-flight, or a race winner's) needs it only when the object is actually absent.
+      if (!rowPreexisted || !provider.exists(key)) {
+        uploadBuffered(buffer, key, size, contentType);
       }
       return new StagedObject(key, hash, size);
     } finally {
       deleteQuietly(buffer);
+    }
+  }
+
+  private void uploadBuffered(Path buffer, String key, long size, String contentType) {
+    try (InputStream in = Files.newInputStream(buffer)) {
+      provider.put(key, in, size, contentType);
+    } catch (IOException e) {
+      throw new StorageException("Failed to read buffered upload for " + key, e);
     }
   }
 
