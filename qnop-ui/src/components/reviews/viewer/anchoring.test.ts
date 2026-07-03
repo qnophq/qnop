@@ -111,6 +111,25 @@ describe('boxesForRange', () => {
     expect(boxesForRange(SPANS, 0, 5)).toHaveLength(1);
     expect(boxesForRange(SPANS, 11, 12)).toHaveLength(0);
   });
+
+  it('never paints trailing whitespace of a padded line', () => {
+    // "Short text" + 10 padding spaces: 20 chars across a 0.5-wide box.
+    const padded: RenderedTextSpan[] = [
+      {
+        text: 'Short text          ',
+        startOffset: 0,
+        endOffset: 20,
+        box: { x: 0.1, y: 0.1, width: 0.5, height: 0.02 },
+      },
+    ];
+    const boxes = boxesForRange(padded, 0, 20);
+    expect(boxes).toHaveLength(1);
+    // Clamped to the 10 visible characters: half the padded box width.
+    expect(boxes[0].width).toBeCloseTo(0.5 * (10 / 20));
+
+    // A range entirely inside the padding paints nothing.
+    expect(boxesForRange(padded, 12, 20)).toHaveLength(0);
+  });
 });
 
 describe('buildTextAnchor', () => {
@@ -144,6 +163,14 @@ describe('buildTextAnchor', () => {
     expect(buildTextAnchor(0, SPANS, 5, 5)).toBeNull();
     expect(buildTextAnchor(0, SPANS, 11, 12)).toBeNull();
     expect(buildTextAnchor(0, [], 0, 5)).toBeNull();
+  });
+
+  it('trims whitespace at the selection ends (Word/Acrobat semantics)', () => {
+    // " world\nSecond " selected — the mark starts and ends on printed chars.
+    const anchor = buildTextAnchor(0, SPANS, 5, 19);
+    expect(anchor?.textQuote?.quote).toBe('world\nSecond');
+    expect(anchor?.textPosition).toEqual({ start: 6, end: 18 });
+    expect(anchor?.textQuote?.prefix).toBe('Hello ');
   });
 });
 

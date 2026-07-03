@@ -107,11 +107,21 @@ export function unionBoxes(boxes: NormalizedBox[]): NormalizedBox | null {
   return clampBox({ x: minX, y: minY, width: maxX - minX, height: maxY - minY });
 }
 
+/** The length of the text without its trailing whitespace. */
+function visibleLength(text: string): number {
+  let end = text.length;
+  while (end > 0 && /\s/.test(text[end - 1])) end--;
+  return end;
+}
+
 /**
  * The highlight boxes covering the canonical-text range [start, end).
  * Partially selected spans are trimmed proportionally by character count — an
  * approximation (glyph widths vary), acceptable because the authoritative
  * anchor is the text quote; the box only needs to visually cover the selection.
+ * Each line is clamped to its visible text: trailing whitespace (e.g. lines
+ * padded to a fixed width) never paints — matching Word/Acrobat, where a
+ * highlight ends at the last printed character.
  */
 export function boxesForRange(
   spans: RenderedTextSpan[],
@@ -120,8 +130,9 @@ export function boxesForRange(
 ): NormalizedBox[] {
   const boxes: NormalizedBox[] = [];
   for (const span of spans) {
+    const visibleEnd = span.startOffset + visibleLength(span.text);
     const overlapStart = Math.max(start, span.startOffset);
-    const overlapEnd = Math.min(end, span.endOffset);
+    const overlapEnd = Math.min(end, span.endOffset, visibleEnd);
     if (overlapEnd <= overlapStart || span.text.length === 0) continue;
     const fromFraction = (overlapStart - span.startOffset) / span.text.length;
     const widthFraction = (overlapEnd - overlapStart) / span.text.length;
@@ -139,8 +150,10 @@ export function boxesForRange(
 
 /**
  * Builds the multi-layer anchor (region + text-quote + text-position,
- * ADR-0009) for a text selection. Returns null when the range is empty,
- * whitespace-only, or covers no span.
+ * ADR-0009) for a text selection. Whitespace at either end of the range is
+ * trimmed away first (Word/Acrobat semantics: a mark starts and ends on a
+ * printed character — and the stored quote stays clean for re-anchoring).
+ * Returns null when the range is empty, whitespace-only, or covers no span.
  */
 export function buildTextAnchor(
   surfaceIndex: number,
@@ -149,11 +162,12 @@ export function buildTextAnchor(
   end: number,
 ): Anchor | null {
   const text = surfaceText(spans);
-  const from = Math.max(0, Math.min(start, end));
-  const to = Math.min(text.length, Math.max(start, end));
+  let from = Math.max(0, Math.min(start, end));
+  let to = Math.min(text.length, Math.max(start, end));
+  while (from < to && /\s/.test(text[from])) from++;
+  while (to > from && /\s/.test(text[to - 1])) to--;
   if (to <= from) return null;
   const quote = text.slice(from, to);
-  if (quote.trim().length === 0) return null;
   const box = unionBoxes(boxesForRange(spans, from, to));
   if (!box) return null;
   const prefix = text.slice(Math.max(0, from - QUOTE_CONTEXT_CHARS), from);
