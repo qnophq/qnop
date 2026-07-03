@@ -20,22 +20,23 @@
  */
 
 import { useEffect } from 'react';
-import type { RefObject } from 'react';
 
 /**
  * Couples the two compare panes' vertical scrolling proportionally (the
  * versions rarely share a pixel height — inserted pages shift everything).
  * An echo guard swallows the scroll event a programmatic follow triggers on
  * the other pane, so the panes never feed back into each other.
+ *
+ * Takes the ELEMENTS (from callback refs held in state), not ref objects: the
+ * panes mount after the data guards, so the listeners must (re)attach when
+ * the elements appear — a plain ref would leave the effect bound to null.
  */
 export function useSyncScroll(
-  leftRef: RefObject<HTMLDivElement | null>,
-  rightRef: RefObject<HTMLDivElement | null>,
+  left: HTMLDivElement | null,
+  right: HTMLDivElement | null,
   enabled: boolean,
 ) {
   useEffect(() => {
-    const left = leftRef.current;
-    const right = rightRef.current;
     if (!enabled || !left || !right) return undefined;
     let echo: HTMLElement | null = null;
     const follow = (source: HTMLElement, target: HTMLElement) => () => {
@@ -59,5 +60,5 @@ export function useSyncScroll(
       left.removeEventListener('scroll', onLeft);
       right.removeEventListener('scroll', onRight);
     };
-  }, [leftRef, rightRef, enabled]);
+  }, [left, right, enabled]);
 }

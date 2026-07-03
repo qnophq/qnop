@@ -20,7 +20,7 @@
  */
 
 import { useEffect, useRef, useState } from 'react';
-import type { RefObject } from 'react';
+import type { Ref } from 'react';
 import Box from '@mui/material/Box';
 import CircularProgress from '@mui/material/CircularProgress';
 import Paper from '@mui/material/Paper';
@@ -52,8 +52,8 @@ interface ComparePaneProps {
   changes: DiffChange[];
   activeChangeIndex: number | null;
   onSelectChange: (changeIndex: number) => void;
-  /** The scroll container ref — the page couples both panes (sync scroll). */
-  scrollRef: RefObject<HTMLDivElement | null>;
+  /** The scroll container ref (callback ref) — the page couples both panes (sync scroll). */
+  scrollRef: Ref<HTMLDivElement>;
 }
 
 /**

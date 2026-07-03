@@ -33,11 +33,26 @@ function scrollable(scrollHeight: number, clientHeight: number): HTMLDivElement 
 function setup(enabled = true) {
   const left = scrollable(2000, 500); // 1500 scrollable
   const right = scrollable(3500, 500); // 3000 scrollable
-  renderHook(({ on }) => useSyncScroll({ current: left }, { current: right }, on), {
+  renderHook(({ on }) => useSyncScroll(left, right, on), {
     initialProps: { on: enabled },
   });
   return { left, right };
 }
+
+it('attaches once the elements appear after a guarded first render', () => {
+  const left = scrollable(2000, 500);
+  const right = scrollable(3500, 500);
+  const { rerender } = renderHook(
+    ({ l, r }: { l: HTMLDivElement | null; r: HTMLDivElement | null }) => useSyncScroll(l, r, true),
+    { initialProps: { l: null as HTMLDivElement | null, r: null as HTMLDivElement | null } },
+  );
+  rerender({ l: left, r: right });
+
+  left.scrollTop = 750;
+  left.dispatchEvent(new Event('scroll'));
+
+  expect(right.scrollTop).toBe(1500);
+});
 
 describe('useSyncScroll', () => {
   it('follows a scroll proportionally on the other pane', () => {

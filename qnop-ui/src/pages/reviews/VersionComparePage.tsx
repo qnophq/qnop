@@ -19,7 +19,7 @@
  * SPDX-License-Identifier: AGPL-3.0-only
  */
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Link as RouterLink, useParams, useSearchParams } from 'react-router-dom';
 import Alert from '@mui/material/Alert';
 import Box from '@mui/material/Box';
@@ -91,9 +91,11 @@ export function VersionComparePage() {
 
   const [activeChange, setActiveChange] = useState<number | null>(null);
   const [syncScroll, setSyncScroll] = useState(true);
-  const fromScrollRef = useRef<HTMLDivElement>(null);
-  const toScrollRef = useRef<HTMLDivElement>(null);
-  useSyncScroll(fromScrollRef, toScrollRef, syncScroll);
+  // Callback refs held in state: the panes mount only after the data guards,
+  // so the sync-scroll listeners must attach when the elements appear.
+  const [fromScrollEl, setFromScrollEl] = useState<HTMLDivElement | null>(null);
+  const [toScrollEl, setToScrollEl] = useState<HTMLDivElement | null>(null);
+  useSyncScroll(fromScrollEl, toScrollEl, syncScroll);
 
   // Selecting a change (card or highlight) brings it into view on both sides.
   useEffect(() => {
@@ -222,7 +224,7 @@ export function VersionComparePage() {
                   changes={changes ?? []}
                   activeChangeIndex={activeChange}
                   onSelectChange={(index) => setActiveChange(index)}
-                  scrollRef={side === 'from' ? fromScrollRef : toScrollRef}
+                  scrollRef={side === 'from' ? setFromScrollEl : setToScrollEl}
                 />
               </Paper>
             ))}
