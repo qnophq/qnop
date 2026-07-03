@@ -28,6 +28,7 @@ import ListItemIcon from '@mui/material/ListItemIcon';
 import ListItemText from '@mui/material/ListItemText';
 import Menu from '@mui/material/Menu';
 import MenuItem from '@mui/material/MenuItem';
+import Popper from '@mui/material/Popper';
 import Stack from '@mui/material/Stack';
 import { NotebookPen } from 'lucide-react';
 import type { Anchor, NormalizedBox } from '../../api/generated';
@@ -45,6 +46,16 @@ import { useToast } from '../../components/admin/layout/useToast';
 import { ReviewHubHead } from '../../components/reviews/hub/ReviewHubHead';
 import { AnnotationPanel } from '../../components/reviews/panel/AnnotationPanel';
 import { PANEL_MIN_WIDTH, PanelResizer } from '../../components/reviews/PanelResizer';
+import { FocusAnnotationCard } from '../../components/reviews/focus/FocusAnnotationCard';
+import { FocusDrawer } from '../../components/reviews/focus/FocusDrawer';
+import {
+  spotlightForAnchor,
+  spotlightForAnnotation,
+  walkPosition,
+} from '../../components/reviews/focus/spotlightModel';
+import { useAnchorElement } from '../../components/reviews/focus/useAnchorElement';
+import { useViewMode } from '../../components/reviews/focus/useViewMode';
+import { Composer } from '../../components/reviews/panel/Composer';
 import { WorkflowBadge } from '../../components/reviews/WorkflowBadge';
 import type {
   ScreenPosition,
@@ -104,6 +115,8 @@ export function DocumentReviewPage() {
 
   const [tool, setTool] = useState<ViewerTool>('text');
   const [zoom, setZoom] = useState(1);
+  const [viewMode, setViewMode] = useViewMode();
+  const [listOpen, setListOpen] = useState(false);
   const [activeAnnotationId, setActiveAnnotationId] = useState<string | null>(null);
   // Card↔mark linking (prototype): hovering either side lights up the other.
   const [hoverAnnotationId, setHoverAnnotationId] = useState<string | null>(null);
@@ -143,6 +156,30 @@ export function DocumentReviewPage() {
   const canAnnotate = extractionReady && surfaces !== undefined;
   const textToolAvailable = (surfaces ?? []).some((surface) => surface.textSpans.length > 0);
   const pageCount = surfaces?.length ?? pdf?.numPages ?? 0;
+
+  // Focus mode (issue #291): the spotlight follows the active annotation, or
+  // the pending anchor while its composer is open. The card/composer anchor
+  // to the mark elements the highlight layer renders.
+  const focusMode = viewMode === 'focus';
+  const activeAnnotation = annotations.find((a) => a.id === activeAnnotationId);
+  const composingPending = Boolean(pending && !pending.menuPosition);
+  const focusSpotlight = !focusMode
+    ? null
+    : composingPending && pending
+      ? spotlightForAnchor(pending.anchor, surfaces)
+      : spotlightForAnnotation(activeAnnotation, surfaces);
+  const focusOverlayOpen = focusMode && (composingPending || Boolean(activeAnnotation));
+  const activeMarkEl = useAnchorElement(
+    focusMode && activeAnnotation?.anchor ? `annotation-highlight-${activeAnnotation.id}` : null,
+  );
+  const pendingMarkEl = useAnchorElement(
+    focusMode && composingPending ? 'pending-highlight' : null,
+  );
+
+  const closeFocusCard = () => {
+    setActiveAnnotationId(null);
+    activeMarkEl?.focus();
+  };
 
   const handleVersionChange = (version: number) => {
     setSearchParams({ version: String(version) });
@@ -266,6 +303,13 @@ export function DocumentReviewPage() {
                   ? `/reviews/${documentId}/compare`
                   : undefined
               }
+              viewMode={viewMode}
+              onViewModeChange={(mode) => {
+                setViewMode(mode);
+                setListOpen(false);
+              }}
+              annotationCount={annotations.length}
+              onOpenAnnotationList={() => setListOpen(true)}
             />
             {extractionStatus === ExtractionStatus.Pending && (
               <Alert severity="info">
@@ -316,41 +360,116 @@ export function DocumentReviewPage() {
                   pendingAnchor={pending?.anchor ?? null}
                   onTextSelected={handleTextSelected}
                   onRegionSelected={handleRegionSelected}
+                  focusScrim={
+                    focusOverlayOpen
+                      ? {
+                          spotlight: focusSpotlight,
+                          // The veil never discards a composer mid-typing — the
+                          // card's Cancel is the explicit way out.
+                          onDismiss: () => {
+                            if (!composingPending) closeFocusCard();
+                          },
+                        }
+                      : null
+                  }
                 />
               </Box>
             )}
           </Stack>
-          <PanelResizer
-            width={panelWidth}
-            defaultWidth={PANEL_MIN_WIDTH}
-            onWidthChange={handlePanelWidthChange}
-          />
-          <Box
-            component="aside"
-            aria-label="Annotations"
-            sx={{
-              width: { xs: '100%', md: panelWidth },
-              flexShrink: 0,
-              minHeight: 0,
-              overflowY: { md: 'auto' },
-            }}
-          >
-            <AnnotationPanel
-              annotations={annotations}
-              activeAnnotationId={activeAnnotationId}
-              hoverAnnotationId={hoverAnnotationId}
-              onSelect={setActiveAnnotationId}
-              onHover={setHoverAnnotationId}
-              pendingAnchor={pending && !pending.menuPosition ? pending.anchor : null}
-              creating={createAnnotation.isPending}
-              onCreate={handleCreate}
-              onCancelPending={() => setPending(null)}
-              canAnnotate={canAnnotate}
-              ownerId={document.ownerId}
-              notify={notify}
+          {!focusMode && (
+            <PanelResizer
+              width={panelWidth}
+              defaultWidth={PANEL_MIN_WIDTH}
+              onWidthChange={handlePanelWidthChange}
             />
-          </Box>
+          )}
+          {!focusMode && (
+            <Box
+              component="aside"
+              aria-label="Annotations"
+              sx={{
+                width: { xs: '100%', md: panelWidth },
+                flexShrink: 0,
+                minHeight: 0,
+                overflowY: { md: 'auto' },
+              }}
+            >
+              <AnnotationPanel
+                annotations={annotations}
+                activeAnnotationId={activeAnnotationId}
+                hoverAnnotationId={hoverAnnotationId}
+                onSelect={setActiveAnnotationId}
+                onHover={setHoverAnnotationId}
+                pendingAnchor={pending && !pending.menuPosition ? pending.anchor : null}
+                creating={createAnnotation.isPending}
+                onCreate={handleCreate}
+                onCancelPending={() => setPending(null)}
+                canAnnotate={canAnnotate}
+                ownerId={document.ownerId}
+                notify={notify}
+              />
+            </Box>
+          )}
         </Stack>
+      )}
+      {focusMode && (
+        <FocusDrawer open={listOpen} onClose={() => setListOpen(false)}>
+          <AnnotationPanel
+            annotations={annotations}
+            activeAnnotationId={activeAnnotationId}
+            hoverAnnotationId={hoverAnnotationId}
+            onSelect={(id) => {
+              setActiveAnnotationId(id);
+              // A placed annotation continues in the spotlight; unplaced ones
+              // keep their thread inside the drawer (no mark to spotlight).
+              if (id && annotations.find((a) => a.id === id)?.anchor) setListOpen(false);
+            }}
+            onHover={setHoverAnnotationId}
+            pendingAnchor={null}
+            creating={createAnnotation.isPending}
+            onCreate={handleCreate}
+            onCancelPending={() => setPending(null)}
+            canAnnotate={canAnnotate}
+            ownerId={document.ownerId}
+            notify={notify}
+          />
+        </FocusDrawer>
+      )}
+      {focusMode && activeAnnotation && !listOpen && (
+        <FocusAnnotationCard
+          annotation={activeAnnotation}
+          anchorEl={activeMarkEl}
+          position={walkPosition(annotations, activeAnnotation.id)}
+          onNavigate={setActiveAnnotationId}
+          onClose={closeFocusCard}
+          ownerId={document.ownerId}
+          userId={userId}
+          notify={notify}
+        />
+      )}
+      {focusMode && composingPending && pending && (
+        <Popper
+          open={Boolean(pendingMarkEl)}
+          anchorEl={pendingMarkEl}
+          placement="right-start"
+          sx={(theme) => ({
+            zIndex: theme.zIndex.modal,
+            width: 380,
+            maxWidth: 'calc(100vw - 32px)',
+          })}
+          modifiers={[
+            { name: 'offset', options: { offset: [0, 16] } },
+            { name: 'flip', options: { fallbackPlacements: ['left-start', 'bottom', 'top'] } },
+            { name: 'preventOverflow', options: { padding: 12 } },
+          ]}
+        >
+          <Composer
+            pendingAnchor={pending.anchor}
+            creating={createAnnotation.isPending}
+            onCreate={handleCreate}
+            onCancel={() => setPending(null)}
+          />
+        </Popper>
       )}
       {/* The post-selection popup: only an explicit "Create annotation" opens
           the composer; dismissing it (click-away, Escape) discards the mark. */}

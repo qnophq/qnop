@@ -206,6 +206,7 @@ export function HighlightLayer({
         pending.boxes.map((box, index) => (
           <Box
             key={index}
+            id={index === 0 ? 'pending-highlight' : undefined}
             data-testid={index === 0 ? 'pending-highlight' : undefined}
             sx={{
               ...positionSx(box),

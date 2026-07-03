@@ -31,10 +31,20 @@ import ToggleButtonGroup from '@mui/material/ToggleButtonGroup';
 import Tooltip from '@mui/material/Tooltip';
 import Typography from '@mui/material/Typography';
 import { Link as RouterLink } from 'react-router-dom';
-import { BoxSelect, ChevronDown, ChevronUp, GitCompareArrows, TextCursor } from 'lucide-react';
+import {
+  BoxSelect,
+  ChevronDown,
+  ChevronUp,
+  GitCompareArrows,
+  NotebookPen,
+  PanelRight,
+  Scan,
+  TextCursor,
+} from 'lucide-react';
 import type { DocumentVersionSummary } from '../../../api/generated';
 import { ExtractionStatus } from '../../../api/generated';
 import { ToneBadge } from '../../admin/ToneBadge';
+import type { ReviewViewMode } from '../focus/useViewMode';
 import { ZoomControls } from './ZoomControls';
 
 export type ViewerTool = 'text' | 'region';
@@ -58,6 +68,12 @@ interface ViewerToolbarProps {
   onZoomChange: (zoom: number) => void;
   /** Link to the version comparison (#252); undefined hides the button (fewer than two extracted versions). */
   compareHref?: string;
+  /** The review's presentation (issue #291): side panel, or full-width focus mode. */
+  viewMode: ReviewViewMode;
+  onViewModeChange: (mode: ReviewViewMode) => void;
+  /** Shown on the list button in focus mode — the drawer's entry point. */
+  annotationCount: number;
+  onOpenAnnotationList: () => void;
 }
 
 /**
@@ -81,6 +97,10 @@ export function ViewerToolbar({
   zoom,
   onZoomChange,
   compareHref,
+  viewMode,
+  onViewModeChange,
+  annotationCount,
+  onOpenAnnotationList,
 }: ViewerToolbarProps) {
   return (
     <Paper
@@ -184,6 +204,44 @@ export function ViewerToolbar({
         <Divider orientation="vertical" flexItem />
 
         <ZoomControls zoom={zoom} onZoomChange={onZoomChange} />
+
+        <Divider orientation="vertical" flexItem />
+
+        <ToggleButtonGroup
+          exclusive
+          size="small"
+          value={viewMode}
+          onChange={(_event, next: ReviewViewMode | null) => next && onViewModeChange(next)}
+          aria-label="View mode"
+        >
+          <ToggleButton value="panel" aria-label="Panel view">
+            <Tooltip title="Panel view — the annotation list stays beside the document">
+              <PanelRight size={16} />
+            </Tooltip>
+          </ToggleButton>
+          <ToggleButton value="focus" aria-label="Focus view">
+            <Tooltip title="Focus view — full document width, discussion on demand">
+              <Scan size={16} />
+            </Tooltip>
+          </ToggleButton>
+        </ToggleButtonGroup>
+
+        {viewMode === 'focus' && (
+          <Tooltip title="Show the annotation list">
+            <IconButton
+              size="small"
+              aria-label={`Show annotations (${annotationCount})`}
+              onClick={onOpenAnnotationList}
+            >
+              <Stack direction="row" spacing={0.5} sx={{ alignItems: 'center' }}>
+                <NotebookPen size={16} />
+                <Typography variant="caption" sx={{ fontVariantNumeric: 'tabular-nums' }}>
+                  {annotationCount}
+                </Typography>
+              </Stack>
+            </IconButton>
+          </Tooltip>
+        )}
       </Stack>
     </Paper>
   );

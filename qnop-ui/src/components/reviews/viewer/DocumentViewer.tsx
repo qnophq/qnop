@@ -61,6 +61,14 @@ interface DocumentViewerProps {
   pendingAnchor: Anchor | null;
   onTextSelected: (selection: TextSelectionOffsets, at: ScreenPosition) => void;
   onRegionSelected: (surfaceIndex: number, box: NormalizedBox, at: ScreenPosition) => void;
+  /**
+   * Focus-mode overlay state (issue #291): non-null dims every page;
+   * `spotlight` names the page and rect that stay sharp.
+   */
+  focusScrim?: {
+    spotlight: { surfaceIndex: number; box: NormalizedBox } | null;
+    onDismiss: () => void;
+  } | null;
 }
 
 /**
@@ -87,6 +95,7 @@ export function DocumentViewer({
   pendingAnchor,
   onTextSelected,
   onRegionSelected,
+  focusScrim,
 }: DocumentViewerProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const pageRefs = useRef<(HTMLDivElement | null)[]>([]);
@@ -147,12 +156,15 @@ export function DocumentViewer({
     };
   }, [onVisiblePageChange]);
 
-  // A panel click scrolls the (possibly off-screen) highlight into view.
+  // A panel click (or the focus card's prev/next walk, #291) scrolls the
+  // possibly off-screen highlight into view. scrollIntoView ignores the CSS
+  // scroll-behavior override, so reduced motion is honoured explicitly.
   useEffect(() => {
     if (!activeAnnotationId) return;
+    const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
     document
       .getElementById(`annotation-highlight-${activeAnnotationId}`)
-      ?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      ?.scrollIntoView({ behavior: reduced ? 'auto' : 'smooth', block: 'center' });
   }, [activeAnnotationId]);
 
   // Hovering a panel card brings its mark into view — but only when it is
@@ -165,7 +177,8 @@ export function DocumentViewer({
     const markRect = mark.getBoundingClientRect();
     const viewRect = container.getBoundingClientRect();
     if (markRect.top < viewRect.top + 24 || markRect.bottom > viewRect.bottom - 8) {
-      mark.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+      mark.scrollIntoView({ behavior: reduced ? 'auto' : 'smooth', block: 'center' });
     }
   }, [hoverAnnotationId]);
 
@@ -219,6 +232,15 @@ export function DocumentViewer({
                   pendingAnchor={pendingAnchor}
                   onTextSelected={onTextSelected}
                   onRegionSelected={onRegionSelected}
+                  focusScrim={
+                    focusScrim && {
+                      box:
+                        focusScrim.spotlight?.surfaceIndex === pageIndex
+                          ? focusScrim.spotlight.box
+                          : null,
+                      onDismiss: focusScrim.onDismiss,
+                    }
+                  }
                 />
               </div>
             );

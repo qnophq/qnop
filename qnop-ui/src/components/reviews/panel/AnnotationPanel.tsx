@@ -22,34 +22,26 @@
 import { useState } from 'react';
 import type { ReactNode } from 'react';
 import Box from '@mui/material/Box';
-import Button from '@mui/material/Button';
 import ButtonBase from '@mui/material/ButtonBase';
 import Chip from '@mui/material/Chip';
 import Collapse from '@mui/material/Collapse';
-import Paper from '@mui/material/Paper';
 import Stack from '@mui/material/Stack';
-import TextField from '@mui/material/TextField';
 import Typography from '@mui/material/Typography';
 import { useTheme } from '@mui/material/styles';
-import { Check, ChevronRight, Link2, NotebookPen, Unlink, X } from 'lucide-react';
+import { ChevronRight, Link2, NotebookPen, Unlink } from 'lucide-react';
 import type { Anchor, AnnotationView } from '../../../api/generated';
-import { AnnotationDecision, AnnotationStatus } from '../../../api/generated';
-import { useDecideAnnotation } from '../../../api/hooks/useAnnotations';
+import { AnnotationStatus } from '../../../api/generated';
 import { useAuthStore } from '../../../stores/authStore';
-import { apiErrorCode } from '../../../utils/apiError';
-import { isSubmitShortcut, submitShortcutLabel } from '../../../utils/platform';
 import type { Notify } from '../../admin/layout/useToast';
 import { SectionCard } from '../../admin/layout/SectionCard';
 import { compareAnnotationsByPosition } from '../viewer/anchoring';
 import { AnnotationListItem } from './AnnotationListItem';
 import { CommentThread } from './CommentThread';
+import { Composer } from './Composer';
+import { DecisionBar } from './DecisionBar';
+import { mayDecideAnnotation, useDecideWithFeedback } from './decisions';
 
 type StatusFilter = 'all' | 'open' | 'decided';
-
-/** Known decision conflicts (409) — mapped to friendly text, never server prose. */
-const DECISION_CONFLICTS: Record<string, string> = {
-  ANNOTATION_ALREADY_DECIDED: 'This annotation was already decided.',
-};
 
 const FILTERS: { value: StatusFilter; label: string }[] = [
   { value: 'all', label: 'All' },
@@ -72,115 +64,6 @@ interface AnnotationPanelProps {
   /** The document owner — owner or author may decide an annotation (ADR-0011). */
   ownerId: string | null;
   notify: Notify;
-}
-
-/** Accept/Reject for an open annotation, shown to the owner or the author. */
-function DecisionBar({
-  disabled,
-  onDecide,
-}: {
-  disabled: boolean;
-  onDecide: (decision: AnnotationDecision) => void;
-}) {
-  return (
-    <Stack
-      direction="row"
-      spacing={1}
-      data-testid="decision-bar"
-      sx={{ alignItems: 'center', pl: 2, py: 1 }}
-    >
-      <Button
-        size="small"
-        variant="contained"
-        color="success"
-        startIcon={<Check size={14} />}
-        disabled={disabled}
-        onClick={() => onDecide(AnnotationDecision.Accepted)}
-      >
-        Accept
-      </Button>
-      <Button
-        size="small"
-        variant="outlined"
-        color="inherit"
-        startIcon={<X size={14} />}
-        disabled={disabled}
-        onClick={() => onDecide(AnnotationDecision.Rejected)}
-      >
-        Reject
-      </Button>
-    </Stack>
-  );
-}
-
-/**
- * The composer for a freshly drawn anchor. The first comment is mandatory
- * (issue #301) — an annotation without text must not exist, so creating stays
- * disabled (button and submit shortcut) until the trimmed comment is non-empty.
- */
-function Composer({
-  pendingAnchor,
-  creating,
-  onCreate,
-  onCancel,
-}: {
-  pendingAnchor: Anchor;
-  creating: boolean;
-  onCreate: (comment: string) => void;
-  onCancel: () => void;
-}) {
-  const [comment, setComment] = useState('');
-  const canCreate = !creating && comment.trim().length > 0;
-  const quote = pendingAnchor.textQuote?.quote;
-  return (
-    <Paper variant="outlined" sx={{ p: 1.5 }} data-testid="annotation-composer">
-      <Stack spacing={1}>
-        <Typography variant="subtitle2">New annotation</Typography>
-        <Typography
-          variant="body2"
-          color="text.secondary"
-          sx={{
-            fontStyle: quote ? 'italic' : 'normal',
-            display: '-webkit-box',
-            WebkitLineClamp: 3,
-            WebkitBoxOrient: 'vertical',
-            overflow: 'hidden',
-          }}
-        >
-          {quote ? `“${quote}”` : `Region on page ${pendingAnchor.region.surfaceIndex + 1}`}
-        </Typography>
-        <TextField
-          multiline
-          minRows={5}
-          size="small"
-          required
-          placeholder="Add a comment"
-          value={comment}
-          onChange={(event) => setComment(event.target.value)}
-          onKeyDown={(event) => {
-            if (isSubmitShortcut(event)) {
-              event.preventDefault();
-              if (canCreate) onCreate(comment);
-            }
-          }}
-          slotProps={{ htmlInput: { maxLength: 20000, 'aria-label': 'Annotation comment' } }}
-        />
-        <Stack direction="row" spacing={1} sx={{ justifyContent: 'flex-end' }}>
-          <Button
-            size="small"
-            variant="contained"
-            onClick={() => onCreate(comment)}
-            disabled={!canCreate}
-          >
-            Create annotation ({submitShortcutLabel()})
-          </Button>
-          <Button size="small" onClick={onCancel} disabled={creating}>
-            Cancel
-          </Button>
-        </Stack>
-      </Stack>
-    </Paper>
-  );
 }
 
 /** A collapsible, counted group of annotation cards (prototype sidebar section). */
@@ -300,31 +183,7 @@ export function AnnotationPanel({
 }: AnnotationPanelProps) {
   const [filter, setFilter] = useState<StatusFilter>('all');
   const userId = useAuthStore((state) => state.userId);
-  const decide = useDecideAnnotation();
-
-  const mayDecide = (annotation: AnnotationView) =>
-    annotation.status === AnnotationStatus.Open &&
-    userId !== null &&
-    (ownerId === userId || annotation.authorId === userId);
-
-  const handleDecide = (annotation: AnnotationView, decision: AnnotationDecision) => {
-    decide.mutate(
-      { annotationId: annotation.id, decision },
-      {
-        onSuccess: () =>
-          notify(
-            decision === AnnotationDecision.Accepted
-              ? 'Annotation accepted.'
-              : 'Annotation rejected.',
-          ),
-        onError: (error) =>
-          notify(
-            DECISION_CONFLICTS[apiErrorCode(error) ?? ''] ?? 'The decision could not be saved.',
-            'error',
-          ),
-      },
-    );
-  };
+  const { decideWith, isPending: deciding } = useDecideWithFeedback(notify);
 
   const matchesFilter = (annotation: AnnotationView) =>
     filter === 'all' ||
@@ -349,10 +208,10 @@ export function AnnotationPanel({
           onHover={onHover}
         />
         <Collapse in={active} unmountOnExit>
-          {mayDecide(annotation) && (
+          {mayDecideAnnotation(annotation, userId, ownerId) && (
             <DecisionBar
-              disabled={decide.isPending}
-              onDecide={(decision) => handleDecide(annotation, decision)}
+              disabled={deciding}
+              onDecide={(decision) => decideWith(annotation, decision)}
             />
           )}
           <CommentThread annotationId={annotation.id} notify={notify} />

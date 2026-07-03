@@ -19,7 +19,7 @@
  * SPDX-License-Identifier: AGPL-3.0-only
  */
 
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { fireEvent, render, screen } from '@testing-library/react';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { ThemeProvider } from '@mui/material/styles';
@@ -285,5 +285,37 @@ describe('DocumentReviewPage', () => {
     expect(
       screen.getByText('This document does not exist, or you are not a participant of its review.'),
     ).toBeInTheDocument();
+  });
+});
+
+// Issue #291: the focus view replaces the fixed panel with the drawer + the
+// spotlight overlay; the mode toggle persists as a personal preference.
+describe('DocumentReviewPage focus mode', () => {
+  afterEach(() => {
+    localStorage.removeItem('qnop-review-view-mode');
+  });
+
+  it('hides the side panel, offers the list drawer and persists the choice', () => {
+    localStorage.setItem('qnop-review-view-mode', 'focus');
+    seedHappyPath();
+    renderPage();
+
+    // No fixed aside — the document takes the full width.
+    expect(screen.queryByRole('complementary', { name: 'Annotations' })).not.toBeInTheDocument();
+
+    // The toolbar's counter button opens the full panel in a drawer.
+    fireEvent.click(screen.getByRole('button', { name: /Show annotations/ }));
+    expect(screen.getByText(/Annotations \(/)).toBeInTheDocument();
+  });
+
+  it('switches back to panel mode via the toolbar toggle and stores it', () => {
+    localStorage.setItem('qnop-review-view-mode', 'focus');
+    seedHappyPath();
+    renderPage();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Panel view' }));
+
+    expect(screen.getByRole('complementary', { name: 'Annotations' })).toBeInTheDocument();
+    expect(localStorage.getItem('qnop-review-view-mode')).toBe('panel');
   });
 });
