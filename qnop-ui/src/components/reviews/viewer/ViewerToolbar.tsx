@@ -30,7 +30,7 @@ import ToggleButton from '@mui/material/ToggleButton';
 import ToggleButtonGroup from '@mui/material/ToggleButtonGroup';
 import Tooltip from '@mui/material/Tooltip';
 import Typography from '@mui/material/Typography';
-import { BoxSelect, TextCursor, ZoomIn, ZoomOut } from 'lucide-react';
+import { BoxSelect, ChevronDown, ChevronUp, TextCursor, ZoomIn, ZoomOut } from 'lucide-react';
 import type { DocumentVersionSummary } from '../../../api/generated';
 import { ExtractionStatus } from '../../../api/generated';
 import { ToneBadge } from '../../admin/ToneBadge';
@@ -46,6 +46,10 @@ interface ViewerToolbarProps {
   currentVersion: number;
   onVersionChange: (versionNumber: number) => void;
   extractionStatus?: ExtractionStatus;
+  /** Zero-based page from the viewer's scroll spy. */
+  currentPage: number;
+  pageCount: number;
+  onNavigateToPage: (pageIndex: number) => void;
   tool: ViewerTool;
   onToolChange: (tool: ViewerTool) => void;
   textToolAvailable: boolean;
@@ -55,15 +59,19 @@ interface ViewerToolbarProps {
 }
 
 /**
- * The viewer's control strip: version switcher, extraction cue, annotation
- * tool toggle (text quote vs. universal region, ADR-0009) and zoom. Sticky at
- * the top of the page column so the tools stay reachable while scrolling.
+ * The viewer's control strip: version switcher, page navigation (fed by the
+ * viewer's scroll spy), extraction cue, annotation tool toggle (text quote
+ * vs. universal region, ADR-0009) and zoom. Sits as its own row above the
+ * document pane, so the tools stay reachable while the pages scroll.
  */
 export function ViewerToolbar({
   versions,
   currentVersion,
   onVersionChange,
   extractionStatus,
+  currentPage,
+  pageCount,
+  onNavigateToPage,
   tool,
   onToolChange,
   textToolAvailable,
@@ -75,9 +83,6 @@ export function ViewerToolbar({
     <Paper
       variant="outlined"
       sx={{
-        position: 'sticky',
-        top: 0,
-        zIndex: 2,
         px: 1.5,
         py: 1,
         display: 'flex',
@@ -100,6 +105,33 @@ export function ViewerToolbar({
           </MenuItem>
         ))}
       </TextField>
+
+      <Stack direction="row" spacing={0.25} sx={{ alignItems: 'center' }}>
+        <IconButton
+          size="small"
+          aria-label="Previous page"
+          disabled={currentPage <= 0}
+          onClick={() => onNavigateToPage(currentPage - 1)}
+        >
+          <ChevronUp size={16} />
+        </IconButton>
+        <Typography
+          variant="body2"
+          color="text.secondary"
+          aria-live="polite"
+          sx={{ fontVariantNumeric: 'tabular-nums', px: 0.5, whiteSpace: 'nowrap' }}
+        >
+          Page {Math.min(currentPage + 1, pageCount)} / {pageCount}
+        </Typography>
+        <IconButton
+          size="small"
+          aria-label="Next page"
+          disabled={currentPage >= pageCount - 1}
+          onClick={() => onNavigateToPage(currentPage + 1)}
+        >
+          <ChevronDown size={16} />
+        </IconButton>
+      </Stack>
 
       {extractionStatus === ExtractionStatus.Pending && (
         <Stack direction="row" spacing={1} sx={{ alignItems: 'center' }}>
@@ -144,13 +176,28 @@ export function ViewerToolbar({
         >
           <ZoomOut size={16} />
         </IconButton>
-        <Typography
-          variant="body2"
-          color="text.secondary"
-          sx={{ minWidth: 44, textAlign: 'center', fontVariantNumeric: 'tabular-nums' }}
-        >
-          {Math.round(zoom * 100)}%
-        </Typography>
+        <Tooltip title="Reset zoom to fit width">
+          <Typography
+            component="button"
+            variant="body2"
+            color="text.secondary"
+            aria-label="Reset zoom to fit width"
+            onClick={() => onZoomChange(1)}
+            sx={{
+              minWidth: 44,
+              textAlign: 'center',
+              fontVariantNumeric: 'tabular-nums',
+              background: 'none',
+              border: 'none',
+              cursor: 'pointer',
+              font: 'inherit',
+              borderRadius: 1,
+              '&:focus-visible': (theme) => ({ outline: 'none', boxShadow: theme.qnop.focusRing }),
+            }}
+          >
+            {Math.round(zoom * 100)}%
+          </Typography>
+        </Tooltip>
         <IconButton
           size="small"
           aria-label="Zoom in"

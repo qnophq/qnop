@@ -105,6 +105,34 @@ describe('AnnotationPanel', () => {
     expect(props.onSelect).toHaveBeenCalledWith(null);
   });
 
+  it('filters annotations by status', () => {
+    renderPanel({
+      annotations: [
+        annotation('open-1'),
+        annotation('accepted-1', { status: AnnotationStatus.Accepted }),
+      ],
+    });
+
+    fireEvent.click(screen.getByRole('button', { name: 'Open' }));
+    expect(screen.getByTestId('annotation-item-open-1')).toBeInTheDocument();
+    expect(screen.queryByTestId('annotation-item-accepted-1')).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Decided' }));
+    expect(screen.queryByTestId('annotation-item-open-1')).not.toBeInTheDocument();
+    expect(screen.getByTestId('annotation-item-accepted-1')).toBeInTheDocument();
+  });
+
+  it('collapses a section on click', () => {
+    renderPanel({ annotations: [annotation('a1')] });
+
+    const header = screen.getByRole('button', { name: /On this version/ });
+    expect(header).toHaveAttribute('aria-expanded', 'true');
+    expect(screen.getByTestId('annotation-item-a1')).toBeVisible();
+
+    fireEvent.click(header);
+    expect(header).toHaveAttribute('aria-expanded', 'false');
+  });
+
   it('opens the composer for a pending anchor and creates with the comment', () => {
     const props = renderPanel({
       pendingAnchor: {

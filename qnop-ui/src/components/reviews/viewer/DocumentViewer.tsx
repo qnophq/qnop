@@ -19,7 +19,8 @@
  * SPDX-License-Identifier: AGPL-3.0-only
  */
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useImperativeHandle, useRef, useState } from 'react';
+import type { Ref } from 'react';
 import Box from '@mui/material/Box';
 import Stack from '@mui/material/Stack';
 import type { PDFDocumentProxy } from 'pdfjs-dist';
@@ -36,14 +37,24 @@ import type { ViewerTool } from './ViewerToolbar';
 /** Keep hairline page borders visible inside the scroll area. */
 const PAGE_GUTTER_PX = 2;
 
+/** Imperative surface for the toolbar's page navigation. */
+export interface DocumentViewerHandle {
+  scrollToPage: (pageIndex: number) => void;
+}
+
 interface DocumentViewerProps {
+  ref?: Ref<DocumentViewerHandle>;
   pdf: PDFDocumentProxy;
   /** Server surfaces; undefined while extraction is running (pixels only then). */
   surfaces?: RenderedSurface[];
   zoom: number;
   annotations: AnnotationView[];
   activeAnnotationId: string | null;
+  hoverAnnotationId?: string | null;
   onSelectAnnotation: (annotationId: string) => void;
+  onHoverAnnotation?: (annotationId: string | null) => void;
+  /** Reports the page currently crossing the upper third of the viewport. */
+  onVisiblePageChange?: (pageIndex: number) => void;
   tool: ViewerTool;
   canAnnotate: boolean;
   pendingAnchor: Anchor | null;
@@ -52,17 +63,24 @@ interface DocumentViewerProps {
 }
 
 /**
- * The scrollable page stack. Fit-width at zoom 1: the page width tracks the
- * container via ResizeObserver; larger zooms overflow horizontally inside the
- * viewer, never the app shell.
+ * The scrollable page stack — its own scroll pane inside the review
+ * workspace. Fit-width at zoom 1: the page width tracks the container via
+ * ResizeObserver; larger zooms overflow horizontally inside the viewer, never
+ * the app shell. A scroll spy reports the current page to the toolbar, and a
+ * hovered annotation (from the panel) is scrolled into view when off-screen —
+ * the prototype's card↔mark linking.
  */
 export function DocumentViewer({
+  ref,
   pdf,
   surfaces,
   zoom,
   annotations,
   activeAnnotationId,
+  hoverAnnotationId,
   onSelectAnnotation,
+  onHoverAnnotation,
+  onVisiblePageChange,
   tool,
   canAnnotate,
   pendingAnchor,
@@ -70,6 +88,7 @@ export function DocumentViewer({
   onRegionSelected,
 }: DocumentViewerProps) {
   const containerRef = useRef<HTMLDivElement>(null);
+  const pageRefs = useRef<(HTMLDivElement | null)[]>([]);
   const [containerWidth, setContainerWidth] = useState(0);
 
   useEffect(() => {
@@ -84,6 +103,39 @@ export function DocumentViewer({
     return () => observer.disconnect();
   }, []);
 
+  useImperativeHandle(ref, () => ({
+    scrollToPage: (pageIndex: number) => {
+      pageRefs.current[pageIndex]?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    },
+  }));
+
+  // Scroll spy: report the page whose top has crossed the upper third of the
+  // viewport. rAF-throttled — scroll fires far more often than the answer
+  // changes.
+  useEffect(() => {
+    const container = containerRef.current;
+    if (!container || !onVisiblePageChange) return undefined;
+    let frame = 0;
+    const report = () => {
+      frame = 0;
+      const probe = container.getBoundingClientRect().top + container.clientHeight / 3;
+      let current = 0;
+      pageRefs.current.forEach((page, index) => {
+        if (page && page.getBoundingClientRect().top <= probe) current = index;
+      });
+      onVisiblePageChange(current);
+    };
+    const handleScroll = () => {
+      if (!frame) frame = requestAnimationFrame(report);
+    };
+    container.addEventListener('scroll', handleScroll, { passive: true });
+    report();
+    return () => {
+      container.removeEventListener('scroll', handleScroll);
+      if (frame) cancelAnimationFrame(frame);
+    };
+  }, [onVisiblePageChange]);
+
   // A panel click scrolls the (possibly off-screen) highlight into view.
   useEffect(() => {
     if (!activeAnnotationId) return;
@@ -92,31 +144,63 @@ export function DocumentViewer({
       ?.scrollIntoView({ behavior: 'smooth', block: 'center' });
   }, [activeAnnotationId]);
 
+  // Hovering a panel card brings its mark into view — but only when it is
+  // off-screen, so hovering an already-visible mark never causes scroll jumps.
+  useEffect(() => {
+    const container = containerRef.current;
+    if (!hoverAnnotationId || !container) return;
+    const mark = document.getElementById(`annotation-highlight-${hoverAnnotationId}`);
+    if (!mark) return;
+    const markRect = mark.getBoundingClientRect();
+    const viewRect = container.getBoundingClientRect();
+    if (markRect.top < viewRect.top + 24 || markRect.bottom > viewRect.bottom - 8) {
+      mark.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }
+  }, [hoverAnnotationId]);
+
   const pageWidth = Math.max(0, (containerWidth - 2 * PAGE_GUTTER_PX) * zoom);
   const pageCount = surfaces?.length ?? pdf.numPages;
 
   return (
-    <Box ref={containerRef} sx={{ overflowX: 'auto', p: `${PAGE_GUTTER_PX}px` }}>
+    <Box
+      ref={containerRef}
+      component="section"
+      aria-label="Document pages"
+      sx={{
+        overflow: 'auto',
+        height: '100%',
+        p: `${PAGE_GUTTER_PX}px`,
+        '@media (prefers-reduced-motion: reduce)': { scrollBehavior: 'auto' },
+      }}
+    >
       {pageWidth > 0 && (
-        <Stack spacing={2} sx={{ width: 'max-content', minWidth: '100%', alignItems: 'center' }}>
+        <Stack spacing={2.5} sx={{ width: 'max-content', minWidth: '100%', alignItems: 'center' }}>
           {Array.from({ length: pageCount }, (_, pageIndex) => {
             const surface = surfaces?.find((s) => s.index === pageIndex);
             return (
-              <SurfacePage
+              <div
                 key={pageIndex}
-                pdf={pdf}
-                pageIndex={pageIndex}
-                surface={surface}
-                width={pageWidth}
-                annotations={annotations}
-                activeAnnotationId={activeAnnotationId}
-                onSelectAnnotation={onSelectAnnotation}
-                tool={tool}
-                canAnnotate={canAnnotate}
-                pendingAnchor={pendingAnchor}
-                onTextSelected={onTextSelected}
-                onRegionSelected={onRegionSelected}
-              />
+                ref={(el) => {
+                  pageRefs.current[pageIndex] = el;
+                }}
+              >
+                <SurfacePage
+                  pdf={pdf}
+                  pageIndex={pageIndex}
+                  surface={surface}
+                  width={pageWidth}
+                  annotations={annotations}
+                  activeAnnotationId={activeAnnotationId}
+                  hoverAnnotationId={hoverAnnotationId}
+                  onSelectAnnotation={onSelectAnnotation}
+                  onHoverAnnotation={onHoverAnnotation}
+                  tool={tool}
+                  canAnnotate={canAnnotate}
+                  pendingAnchor={pendingAnchor}
+                  onTextSelected={onTextSelected}
+                  onRegionSelected={onRegionSelected}
+                />
+              </div>
             );
           })}
         </Stack>

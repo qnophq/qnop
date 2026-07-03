@@ -48,7 +48,9 @@ interface SurfacePageProps {
   width: number;
   annotations: AnnotationView[];
   activeAnnotationId: string | null;
+  hoverAnnotationId?: string | null;
   onSelectAnnotation: (annotationId: string) => void;
+  onHoverAnnotation?: (annotationId: string | null) => void;
   tool: ViewerTool;
   /** False disables both selection layers (extraction pending, or read-only). */
   canAnnotate: boolean;
@@ -71,7 +73,9 @@ export function SurfacePage({
   width,
   annotations,
   activeAnnotationId,
+  hoverAnnotationId,
   onSelectAnnotation,
+  onHoverAnnotation,
   tool,
   canAnnotate,
   pendingAnchor,
@@ -127,16 +131,21 @@ export function SurfacePage({
   return (
     <Paper
       ref={containerRef}
-      variant="outlined"
+      elevation={0}
       square
       data-testid={`surface-page-${pageIndex}`}
-      sx={{
+      sx={(theme) => ({
         position: 'relative',
         width,
         aspectRatio: `${aspect}`,
         bgcolor: '#fff',
         overflow: 'hidden',
-      }}
+        borderRadius: '3px',
+        // "Document on a desk": a soft ambient shadow in light mode; dark mode
+        // keeps a hairline edge instead (shadows vanish on dark surfaces).
+        boxShadow: theme.palette.mode === 'light' ? '0 4px 24px rgba(1, 32, 66, 0.10)' : 'none',
+        border: theme.palette.mode === 'dark' ? `1px solid ${theme.palette.divider}` : 'none',
+      })}
     >
       <canvas
         ref={canvasRef}
@@ -158,7 +167,9 @@ export function SurfacePage({
             surfaceIndex={surface.index}
             spans={surface.textSpans}
             activeAnnotationId={activeAnnotationId}
+            hoverAnnotationId={hoverAnnotationId}
             onSelect={onSelectAnnotation}
+            onHover={onHoverAnnotation}
             pendingAnchor={pendingAnchor}
           />
           <RegionSelectLayer

@@ -31,7 +31,7 @@ import type {
 } from '../../../api/generated';
 import { AnnotationStatus, PlacementStatus } from '../../../api/generated';
 import { highlightBoxesForAnchor } from './anchoring';
-import { MARKER_YELLOW, SELECTION_MARKER_BG } from './markerColors';
+import { SELECTION_MARKER_BG, highlightColorFor } from './markerColors';
 
 interface HighlightLayerProps {
   /** All annotations of the document — the layer picks the ones on this surface. */
@@ -40,7 +40,10 @@ interface HighlightLayerProps {
   /** The surface's extracted text spans — text anchors repaint as per-line markers. */
   spans: RenderedTextSpan[];
   activeAnnotationId: string | null;
+  /** The annotation hovered anywhere (page or panel) — paints "hot" for linking. */
+  hoverAnnotationId?: string | null;
   onSelect: (annotationId: string) => void;
+  onHover?: (annotationId: string | null) => void;
   /** The drawn-but-not-yet-created anchor; painted as a preview. */
   pendingAnchor?: Anchor | null;
 }
@@ -69,7 +72,9 @@ export function HighlightLayer({
   surfaceIndex,
   spans,
   activeAnnotationId,
+  hoverAnnotationId,
   onSelect,
+  onHover,
   pendingAnchor,
 }: HighlightLayerProps) {
   const theme = useTheme();
@@ -88,22 +93,15 @@ export function HighlightLayer({
    * base — decided annotations turn green/grey, a MOVED placement turns
    * amber, a still-pending placement renders dimmed.
    */
-  const styleFor = (annotation: AnnotationView) => {
-    if (annotation.status === AnnotationStatus.Accepted) {
-      return { color: theme.palette.success.main, opacity: 1 };
-    }
-    if (annotation.status === AnnotationStatus.Rejected) {
-      return { color: theme.palette.text.disabled, opacity: 0.7 };
-    }
-    switch (annotation.placementStatus) {
-      case PlacementStatus.Moved:
-        return { color: theme.palette.warning.main, opacity: 1 };
-      case PlacementStatus.Pending:
-        return { color: MARKER_YELLOW, opacity: 0.6 };
-      default:
-        return { color: MARKER_YELLOW, opacity: 1 };
-    }
-  };
+  const styleFor = (annotation: AnnotationView) => ({
+    color: highlightColorFor(annotation, theme.palette),
+    opacity:
+      annotation.status === AnnotationStatus.Rejected
+        ? 0.7
+        : annotation.placementStatus === PlacementStatus.Pending
+          ? 0.6
+          : 1,
+  });
 
   const handleKeyDown = (event: KeyboardEvent, annotationId: string) => {
     if (event.key === 'Enter' || event.key === ' ') {
@@ -119,6 +117,7 @@ export function HighlightLayer({
         const { kind, boxes } = highlightBoxesForAnchor(anchor, spans);
         const style = styleFor(annotation);
         const active = annotation.id === activeAnnotationId;
+        const hot = annotation.id === hoverAnnotationId;
         const quote = anchor.textQuote?.quote;
         return (
           <Fragment key={annotation.id}>
@@ -141,7 +140,10 @@ export function HighlightLayer({
                   }
                   aria-hidden={primary ? undefined : true}
                   data-testid={primary ? `highlight-${annotation.id}` : undefined}
+                  title={quote ? `“${quote.slice(0, 120)}”` : 'Region annotation'}
                   onClick={() => onSelect(annotation.id)}
+                  onMouseEnter={() => onHover?.(annotation.id)}
+                  onMouseLeave={() => onHover?.(null)}
                   onKeyDown={
                     primary
                       ? (event: KeyboardEvent) => handleKeyDown(event, annotation.id)
@@ -152,17 +154,21 @@ export function HighlightLayer({
                     pointerEvents: 'auto',
                     cursor: 'pointer',
                     opacity: style.opacity,
-                    transition: 'background-color 120ms ease',
+                    transition: 'background-color 120ms ease, box-shadow 120ms ease',
+                    '@media (prefers-reduced-motion: reduce)': { transition: 'none' },
                     // Highlighter look for both kinds: a borderless fill that
                     // multiplies over the page pixels, so printed glyphs stay
                     // crisp underneath. Text bands and region boxes share the
-                    // same intensity in every state.
-                    bgcolor: alpha(style.color, active ? 0.65 : 0.45),
+                    // same intensity in every state; a hover on either side of
+                    // the card↔mark link paints the mark "hot".
+                    bgcolor: alpha(style.color, active || hot ? 0.65 : 0.45),
                     mixBlendMode: 'multiply',
                     borderRadius: marker ? '1px' : '2px',
                     '&:hover': { bgcolor: alpha(style.color, 0.6) },
                     '&:focus-visible': { outline: 'none', boxShadow: theme.qnop.focusRing },
-                    ...(active && primary && !marker && { boxShadow: theme.qnop.focusRing }),
+                    ...(primary &&
+                      !marker &&
+                      (active || hot) && { boxShadow: theme.qnop.focusRing }),
                   }}
                 />
               );

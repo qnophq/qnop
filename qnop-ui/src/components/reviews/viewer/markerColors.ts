@@ -19,6 +19,9 @@
  * SPDX-License-Identifier: AGPL-3.0-only
  */
 
+import type { AnnotationView } from '../../../api/generated';
+import { AnnotationStatus, PlacementStatus } from '../../../api/generated';
+
 /**
  * Text-marker colours. The classic highlighter yellow is used in BOTH themes —
  * markers paint on the page itself, and the PDF pixels are white regardless of
@@ -38,3 +41,22 @@ export const MARKER_YELLOW_BORDER = '#D9AD00';
  * mouse and creating the annotation never changes the mark's colour.
  */
 export const SELECTION_MARKER_BG = 'rgba(255, 224, 0, 0.45)';
+
+/**
+ * The colour a mark paints with on the page — shared with the panel so an
+ * annotation card's status rail matches its highlight. Open marks are
+ * highlighter yellow; cue colours override the base (ADR-0009).
+ */
+export function highlightColorFor(
+  annotation: AnnotationView,
+  palette: {
+    success: { main: string };
+    warning: { main: string };
+    text: { disabled: string };
+  },
+): string {
+  if (annotation.status === AnnotationStatus.Accepted) return palette.success.main;
+  if (annotation.status === AnnotationStatus.Rejected) return palette.text.disabled;
+  if (annotation.placementStatus === PlacementStatus.Moved) return palette.warning.main;
+  return MARKER_YELLOW;
+}

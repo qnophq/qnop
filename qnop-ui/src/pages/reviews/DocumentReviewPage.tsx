@@ -19,7 +19,7 @@
  * SPDX-License-Identifier: AGPL-3.0-only
  */
 
-import { useMemo, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import { useParams, useSearchParams } from 'react-router-dom';
 import Alert from '@mui/material/Alert';
 import Box from '@mui/material/Box';
@@ -50,6 +50,7 @@ import type {
   TextSelectionOffsets,
 } from '../../components/reviews/viewer/anchoring';
 import { buildRegionAnchor, buildTextAnchor } from '../../components/reviews/viewer/anchoring';
+import type { DocumentViewerHandle } from '../../components/reviews/viewer/DocumentViewer';
 import { DocumentViewer } from '../../components/reviews/viewer/DocumentViewer';
 import { usePdfDocument } from '../../components/reviews/viewer/usePdfDocument';
 import type { ViewerTool } from '../../components/reviews/viewer/ViewerToolbar';
@@ -110,6 +111,10 @@ export function DocumentReviewPage() {
   const [tool, setTool] = useState<ViewerTool>('text');
   const [zoom, setZoom] = useState(1);
   const [activeAnnotationId, setActiveAnnotationId] = useState<string | null>(null);
+  // Card↔mark linking (prototype): hovering either side lights up the other.
+  const [hoverAnnotationId, setHoverAnnotationId] = useState<string | null>(null);
+  const [currentPage, setCurrentPage] = useState(0);
+  const viewerRef = useRef<DocumentViewerHandle>(null);
   // A drawn-but-not-created mark. While `menuPosition` is set, the "Create
   // annotation" popup is open at the pointer; choosing the item clears the
   // position and opens the composer in the panel. Dismissing the popup
@@ -126,6 +131,7 @@ export function DocumentReviewPage() {
   );
   const canAnnotate = extractionReady && surfaces !== undefined;
   const textToolAvailable = (surfaces ?? []).some((surface) => surface.textSpans.length > 0);
+  const pageCount = surfaces?.length ?? pdf?.numPages ?? 0;
 
   const handleVersionChange = (version: number) => {
     setSearchParams({ version: String(version) });
@@ -187,7 +193,16 @@ export function DocumentReviewPage() {
   const document = documentQuery.data;
 
   return (
-    <Stack spacing={3}>
+    <Stack
+      spacing={2.5}
+      sx={{
+        // The review surface is a fixed workspace (prototype layout): the page
+        // header stays put while document and panel scroll independently.
+        // 100dvh minus the shell top bar and the container paddings.
+        height: { md: 'calc(100dvh - 112px)' },
+        minHeight: { md: 480 },
+      }}
+    >
       <PageHeader
         title={document.title}
         titleAdornment={workflowBadge(document.workflowState)}
@@ -202,80 +217,94 @@ export function DocumentReviewPage() {
       ) : (
         <Stack
           direction={{ xs: 'column', md: 'row' }}
-          spacing={3}
-          sx={{ alignItems: 'flex-start' }}
+          spacing={2.5}
+          sx={{ alignItems: { xs: 'stretch', md: 'stretch' }, flex: 1, minHeight: 0 }}
         >
-          <Box sx={{ flex: 1, minWidth: 0, alignSelf: 'stretch' }}>
-            <Stack spacing={2}>
-              <ViewerToolbar
-                versions={versionsQuery.data?.versions ?? []}
-                currentVersion={versionNumber}
-                onVersionChange={handleVersionChange}
-                extractionStatus={extractionStatus}
-                tool={tool}
-                onToolChange={setTool}
-                textToolAvailable={textToolAvailable}
-                canAnnotate={canAnnotate}
-                zoom={zoom}
-                onZoomChange={setZoom}
-              />
-              {extractionStatus === ExtractionStatus.Pending && (
-                <Alert severity="info">
-                  The document is being processed — annotating becomes available once the text layer
-                  is extracted.
-                </Alert>
-              )}
-              {extractionStatus === ExtractionStatus.Failed && (
-                <Alert severity="error">
-                  Extraction failed for this version, so it cannot be annotated. The original
-                  document is still shown below.
-                </Alert>
-              )}
-              {pdfError && (
-                <Alert severity="error">The PDF could not be displayed: {pdfError}</Alert>
-              )}
-              {pdfQuery.isError && (
-                <Alert severity="error">The original document could not be loaded.</Alert>
-              )}
-              {(pdfQuery.isPending || (!pdf && !pdfError && !pdfQuery.isError)) && (
-                <Stack sx={{ alignItems: 'center', py: 6 }}>
-                  <CircularProgress />
-                </Stack>
-              )}
-              {pdf && (
+          <Stack spacing={1.5} sx={{ flex: 1, minWidth: 0, minHeight: 0 }}>
+            <ViewerToolbar
+              versions={versionsQuery.data?.versions ?? []}
+              currentVersion={versionNumber}
+              onVersionChange={handleVersionChange}
+              extractionStatus={extractionStatus}
+              currentPage={currentPage}
+              pageCount={pageCount}
+              onNavigateToPage={(pageIndex) => viewerRef.current?.scrollToPage(pageIndex)}
+              tool={tool}
+              onToolChange={setTool}
+              textToolAvailable={textToolAvailable}
+              canAnnotate={canAnnotate}
+              zoom={zoom}
+              onZoomChange={setZoom}
+            />
+            {extractionStatus === ExtractionStatus.Pending && (
+              <Alert severity="info">
+                The document is being processed — annotating becomes available once the text layer
+                is extracted.
+              </Alert>
+            )}
+            {extractionStatus === ExtractionStatus.Failed && (
+              <Alert severity="error">
+                Extraction failed for this version, so it cannot be annotated. The original document
+                is still shown below.
+              </Alert>
+            )}
+            {pdfError && <Alert severity="error">The PDF could not be displayed: {pdfError}</Alert>}
+            {pdfQuery.isError && (
+              <Alert severity="error">The original document could not be loaded.</Alert>
+            )}
+            {(pdfQuery.isPending || (!pdf && !pdfError && !pdfQuery.isError)) && (
+              <Stack sx={{ alignItems: 'center', py: 6 }}>
+                <CircularProgress aria-label="Loading document" />
+              </Stack>
+            )}
+            {pdf && (
+              <Box
+                sx={{
+                  flex: 1,
+                  minHeight: { xs: 480, md: 0 },
+                  borderRadius: 1,
+                  bgcolor: (theme) => theme.qnop.surface2,
+                }}
+              >
                 <DocumentViewer
+                  ref={viewerRef}
                   pdf={pdf}
                   surfaces={surfaces}
                   zoom={zoom}
                   annotations={annotations}
                   activeAnnotationId={activeAnnotationId}
+                  hoverAnnotationId={hoverAnnotationId}
                   onSelectAnnotation={(id) => {
                     setActiveAnnotationId(id);
                     setPending(null);
                   }}
+                  onHoverAnnotation={setHoverAnnotationId}
+                  onVisiblePageChange={setCurrentPage}
                   tool={tool}
                   canAnnotate={canAnnotate}
                   pendingAnchor={pending?.anchor ?? null}
                   onTextSelected={handleTextSelected}
                   onRegionSelected={handleRegionSelected}
                 />
-              )}
-            </Stack>
-          </Box>
+              </Box>
+            )}
+          </Stack>
           <Box
+            component="aside"
+            aria-label="Annotations"
             sx={{
               width: { xs: '100%', md: 360 },
               flexShrink: 0,
-              position: { md: 'sticky' },
-              top: { md: 0 },
-              maxHeight: { md: 'calc(100dvh - 140px)' },
+              minHeight: 0,
               overflowY: { md: 'auto' },
             }}
           >
             <AnnotationPanel
               annotations={annotations}
               activeAnnotationId={activeAnnotationId}
+              hoverAnnotationId={hoverAnnotationId}
               onSelect={setActiveAnnotationId}
+              onHover={setHoverAnnotationId}
               pendingAnchor={pending && !pending.menuPosition ? pending.anchor : null}
               creating={createAnnotation.isPending}
               onCreate={handleCreate}

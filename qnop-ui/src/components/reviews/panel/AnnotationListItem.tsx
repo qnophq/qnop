@@ -19,6 +19,7 @@
  * SPDX-License-Identifier: AGPL-3.0-only
  */
 
+import Box from '@mui/material/Box';
 import ButtonBase from '@mui/material/ButtonBase';
 import Stack from '@mui/material/Stack';
 import Typography from '@mui/material/Typography';
@@ -28,6 +29,7 @@ import type { AnnotationView } from '../../../api/generated';
 import { AnnotationStatus } from '../../../api/generated';
 import type { BadgeTone } from '../../admin/ToneBadge';
 import { ToneBadge } from '../../admin/ToneBadge';
+import { highlightColorFor } from '../viewer/markerColors';
 import { PlacementStatusChip } from './PlacementStatusChip';
 
 const STATUS_CUES: Record<AnnotationStatus, { tone: BadgeTone; label: string }> = {
@@ -39,40 +41,85 @@ const STATUS_CUES: Record<AnnotationStatus, { tone: BadgeTone; label: string }> 
 interface AnnotationListItemProps {
   annotation: AnnotationView;
   active: boolean;
+  /** True while the mark on the page is hovered — mirrors the link visually. */
+  linked?: boolean;
   onClick: () => void;
+  onHover?: (annotationId: string | null) => void;
 }
 
 /**
  * One annotation in the panel: its lifecycle status (owner's decision,
  * ADR-0011), the placement cue for the viewed version (ADR-0009), and the mark
- * itself — the quoted text, or the page for a pure region annotation.
+ * itself — the quoted text, or the page for a pure region annotation. The left
+ * rail carries the same colour the mark paints with on the page, and hovering
+ * either side of the card↔mark pair lights up the other (prototype linking).
  */
-export function AnnotationListItem({ annotation, active, onClick }: AnnotationListItemProps) {
+export function AnnotationListItem({
+  annotation,
+  active,
+  linked = false,
+  onClick,
+  onHover,
+}: AnnotationListItemProps) {
   const theme = useTheme();
   const quote = annotation.anchor?.textQuote?.quote;
   const region = annotation.anchor?.region;
   const statusCue = STATUS_CUES[annotation.status];
+  const railColor = annotation.anchor
+    ? highlightColorFor(annotation, theme.palette)
+    : theme.palette.divider;
 
   return (
     <ButtonBase
       onClick={onClick}
+      onMouseEnter={() => onHover?.(annotation.id)}
+      onMouseLeave={() => onHover?.(null)}
+      onFocus={() => onHover?.(annotation.id)}
+      onBlur={() => onHover?.(null)}
       aria-expanded={active}
       data-testid={`annotation-item-${annotation.id}`}
       sx={{
         display: 'block',
         width: '100%',
         textAlign: 'left',
+        position: 'relative',
         borderRadius: 1.5,
         border: '1px solid',
-        borderColor: active ? theme.qnop.brand.blue : theme.palette.divider,
-        bgcolor: active ? alpha(theme.qnop.brand.blue, 0.06) : 'transparent',
-        px: 1.5,
+        borderColor: active ? theme.qnop.brand.blue : linked ? railColor : theme.palette.divider,
+        bgcolor: active
+          ? alpha(theme.qnop.brand.blue, 0.06)
+          : linked
+            ? alpha(railColor, 0.08)
+            : 'transparent',
+        pl: 2,
+        pr: 1.5,
         py: 1.25,
-        transition: 'border-color 120ms ease, background-color 120ms ease',
-        '&:hover': { borderColor: theme.qnop.brand.blue },
+        transition:
+          'border-color 120ms ease, background-color 120ms ease, transform 160ms ease, box-shadow 160ms ease',
+        '@media (prefers-reduced-motion: reduce)': { transition: 'none' },
+        ...(linked && {
+          transform: 'translateX(-2px)',
+          boxShadow: `0 6px 18px -8px ${alpha(railColor, 0.7)}`,
+        }),
+        '&:hover': { borderColor: railColor },
         '&:focus-visible': { boxShadow: theme.qnop.focusRing },
       }}
     >
+      {/* Status rail — the same colour the mark paints with on the page. */}
+      <Box
+        aria-hidden
+        sx={{
+          position: 'absolute',
+          left: 0,
+          top: 8,
+          bottom: 8,
+          width: 3,
+          borderRadius: '0 3px 3px 0',
+          bgcolor: railColor,
+          opacity: linked || active ? 1 : 0.55,
+          transition: 'opacity 120ms ease',
+        }}
+      />
       <Stack spacing={0.75}>
         <Stack direction="row" spacing={1} sx={{ alignItems: 'center', flexWrap: 'wrap' }}>
           <ToneBadge tone={statusCue.tone} label={statusCue.label} />
