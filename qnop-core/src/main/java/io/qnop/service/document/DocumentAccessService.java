@@ -24,11 +24,9 @@ import io.qnop.api.v1.model.RenderedDocumentResponse;
 import io.qnop.entity.Document;
 import io.qnop.entity.DocumentVersion;
 import io.qnop.entity.ExtractionStatus;
-import io.qnop.entity.ReviewParticipant;
 import io.qnop.repository.DocumentRepository;
 import io.qnop.repository.DocumentVersionRepository;
 import io.qnop.repository.ReviewParticipantRepository;
-import io.qnop.repository.TeamMembershipRepository;
 import io.qnop.service.storage.StorageService;
 import io.qnop.spi.storage.StorageContent;
 import java.io.IOException;
@@ -61,19 +59,16 @@ public class DocumentAccessService {
   private final DocumentRepository documents;
   private final DocumentVersionRepository versions;
   private final ReviewParticipantRepository participants;
-  private final TeamMembershipRepository teamMemberships;
   private final StorageService storage;
 
   public DocumentAccessService(
       DocumentRepository documents,
       DocumentVersionRepository versions,
       ReviewParticipantRepository participants,
-      TeamMembershipRepository teamMemberships,
       StorageService storage) {
     this.documents = documents;
     this.versions = versions;
     this.participants = participants;
-    this.teamMemberships = teamMemberships;
     this.storage = storage;
   }
 
@@ -191,19 +186,11 @@ public class DocumentAccessService {
   }
 
   private boolean canAccess(Document document, UUID actor, boolean admin) {
-    if (admin || document.getOwnerId().equals(actor)) {
-      return true;
-    }
-    for (ReviewParticipant participant : participants.findByDocumentId(document.getId())) {
-      if (actor.equals(participant.getUserId())) {
-        return true;
-      }
-      if (participant.getTeamId() != null
-          && teamMemberships.existsByTeamIdAndUserId(participant.getTeamId(), actor)) {
-        return true;
-      }
-    }
-    return false;
+    // Owner and admin short-circuit; reviewer access (direct or via team) is one query (issue
+    // #312).
+    return admin
+        || document.getOwnerId().equals(actor)
+        || participants.existsAccessibleParticipant(document.getId(), actor);
   }
 
   private DocumentVersion requireVersion(UUID documentId, int versionNumber) {

@@ -44,6 +44,18 @@ public interface ReviewParticipantRepository extends JpaRepository<ReviewPartici
 
   boolean existsByDocumentIdAndTeamId(UUID documentId, UUID teamId);
 
+  /**
+   * Whether {@code userId} may access {@code documentId} as a reviewer — either a direct
+   * participant or a member of a participating team — resolved in a single query (issue #312).
+   * Replaces the per-team {@code existsByTeamIdAndUserId} loop that made access checks 1+N.
+   */
+  @Query(
+      "SELECT COUNT(p) > 0 FROM ReviewParticipant p"
+          + " LEFT JOIN TeamMembership m ON m.teamId = p.teamId AND m.userId = :userId"
+          + " WHERE p.documentId = :documentId AND (p.userId = :userId OR m.id IS NOT NULL)")
+  boolean existsAccessibleParticipant(
+      @Param("documentId") UUID documentId, @Param("userId") UUID userId);
+
   String VIEW_SELECT =
       "SELECT new io.qnop.repository.ParticipantProjection(p.id, p.documentId, p.userId,"
           + " p.teamId, COALESCE(u.displayName, t.name), p.createdAt)"
