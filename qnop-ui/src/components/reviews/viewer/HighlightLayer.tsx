@@ -31,7 +31,7 @@ import type {
 } from '../../../api/generated';
 import { AnnotationStatus, PlacementStatus } from '../../../api/generated';
 import { highlightBoxesForAnchor } from './anchoring';
-import { MARKER_YELLOW, MARKER_YELLOW_BORDER, SELECTION_MARKER_BG } from './markerColors';
+import { MARKER_YELLOW, SELECTION_MARKER_BG } from './markerColors';
 
 interface HighlightLayerProps {
   /** All annotations of the document — the layer picks the ones on this surface. */
@@ -83,40 +83,25 @@ export function HighlightLayer({
       : null;
 
   /**
-   * The mark's colour: open marks paint highlighter yellow — text as bands,
-   * regions as a filled box whose darker-yellow outline keeps the shape
-   * readable. Cue colours override the base — decided annotations turn
-   * green/grey, a MOVED placement turns amber, a still-pending placement
-   * renders dimmed.
+   * The mark's colour: open marks paint highlighter yellow — text as per-line
+   * bands, regions as one borderless filled box. Cue colours override the
+   * base — decided annotations turn green/grey, a MOVED placement turns
+   * amber, a still-pending placement renders dimmed.
    */
   const styleFor = (annotation: AnnotationView) => {
     if (annotation.status === AnnotationStatus.Accepted) {
-      const color = theme.palette.success.main;
-      return { color, border: color, borderStyle: 'solid', opacity: 1 };
+      return { color: theme.palette.success.main, opacity: 1 };
     }
     if (annotation.status === AnnotationStatus.Rejected) {
-      const color = theme.palette.text.disabled;
-      return { color, border: color, borderStyle: 'solid', opacity: 0.7 };
+      return { color: theme.palette.text.disabled, opacity: 0.7 };
     }
     switch (annotation.placementStatus) {
-      case PlacementStatus.Moved: {
-        const color = theme.palette.warning.main;
-        return { color, border: color, borderStyle: 'dashed', opacity: 1 };
-      }
+      case PlacementStatus.Moved:
+        return { color: theme.palette.warning.main, opacity: 1 };
       case PlacementStatus.Pending:
-        return {
-          color: MARKER_YELLOW,
-          border: MARKER_YELLOW_BORDER,
-          borderStyle: 'dotted',
-          opacity: 0.6,
-        };
+        return { color: MARKER_YELLOW, opacity: 0.6 };
       default:
-        return {
-          color: MARKER_YELLOW,
-          border: MARKER_YELLOW_BORDER,
-          borderStyle: 'solid',
-          opacity: 1,
-        };
+        return { color: MARKER_YELLOW, opacity: 1 };
     }
   };
 
@@ -168,16 +153,14 @@ export function HighlightLayer({
                     cursor: 'pointer',
                     opacity: style.opacity,
                     transition: 'background-color 120ms ease',
-                    // Highlighter look for both kinds: the fill multiplies over
-                    // the page pixels so printed glyphs stay crisp underneath.
-                    // A region keeps its outline so the drawn shape stays
-                    // readable; text bands are fill-only.
+                    // Highlighter look for both kinds: a borderless fill that
+                    // multiplies over the page pixels, so printed glyphs stay
+                    // crisp underneath.
                     bgcolor: alpha(
                       style.color,
                       marker ? (active ? 0.65 : 0.45) : active ? 0.5 : 0.35,
                     ),
                     mixBlendMode: 'multiply',
-                    border: marker ? 'none' : `1.5px ${style.borderStyle} ${style.border}`,
                     borderRadius: marker ? '1px' : '2px',
                     '&:hover': { bgcolor: alpha(style.color, marker ? 0.6 : 0.45) },
                     '&:focus-visible': { outline: 'none', boxShadow: theme.qnop.focusRing },
@@ -206,7 +189,6 @@ export function HighlightLayer({
                     borderRadius: '1px',
                   }
                 : {
-                    border: `2px dashed ${MARKER_YELLOW_BORDER}`,
                     bgcolor: SELECTION_MARKER_BG,
                     mixBlendMode: 'multiply',
                     borderRadius: '2px',

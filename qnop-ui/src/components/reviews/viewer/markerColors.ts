@@ -29,7 +29,7 @@
 /** Solid highlighter yellow — the base of open marks (text and region). */
 export const MARKER_YELLOW = '#FFE000';
 
-/** Darker yellow for region-box outlines — pure yellow lacks edge contrast on white. */
+/** Darker yellow for the rubber-band outline while a region is being drawn. */
 export const MARKER_YELLOW_BORDER = '#D9AD00';
 
 /**
