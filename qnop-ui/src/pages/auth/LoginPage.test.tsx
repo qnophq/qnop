@@ -190,7 +190,9 @@ describe('LoginPage', () => {
     fillCredentials();
     submit();
 
-    expect(await screen.findByText('Too many attempts. Please try again later.')).toBeInTheDocument();
+    expect(
+      await screen.findByText('Too many attempts. Please try again later.'),
+    ).toBeInTheDocument();
   });
 
   it('disables the submit button while the login is in flight', async () => {
