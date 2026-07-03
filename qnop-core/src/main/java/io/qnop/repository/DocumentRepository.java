@@ -21,16 +21,29 @@
 package io.qnop.repository;
 
 import io.qnop.entity.Document;
+import jakarta.persistence.LockModeType;
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
 /** Data access for review aggregate roots (issue #244, ADR-0011). */
 public interface DocumentRepository extends JpaRepository<Document, UUID> {
+
+  /**
+   * Loads a document under a {@code PESSIMISTIC_WRITE} row lock (issue #324): serializes the
+   * operations that must observe a consistent pending-placement / READY-version picture against the
+   * workflow transition — the finalize guard and a concurrent new-version upload — so a transition
+   * cannot commit on a stale count. Must be called inside a transaction.
+   */
+  @Lock(LockModeType.PESSIMISTIC_WRITE)
+  @Query("SELECT d FROM Document d WHERE d.id = :id")
+  Optional<Document> findByIdForUpdate(@Param("id") UUID id);
 
   /** Documents owned by the given user. */
   List<Document> findByOwnerId(UUID ownerId);
