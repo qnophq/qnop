@@ -26,8 +26,11 @@
  * MOVED placement cue (ADR-0009).
  */
 
-/** Solid highlighter yellow — the base of open text markers. */
+/** Solid highlighter yellow — the base of open marks (text and region). */
 export const MARKER_YELLOW = '#FFE000';
+
+/** Darker yellow for region-box outlines — pure yellow lacks edge contrast on white. */
+export const MARKER_YELLOW_BORDER = '#D9AD00';
 
 /**
  * The live-selection / pending-preview fill (translucent so the glyphs stay

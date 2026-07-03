@@ -22,9 +22,9 @@
 import { useRef, useState } from 'react';
 import type { PointerEvent } from 'react';
 import Box from '@mui/material/Box';
-import { alpha, useTheme } from '@mui/material/styles';
 import type { NormalizedBox } from '../../../api/generated';
 import type { ScreenPosition } from './anchoring';
+import { MARKER_YELLOW_BORDER, SELECTION_MARKER_BG } from './markerColors';
 
 interface RegionSelectLayerProps {
   surfaceIndex: number;
@@ -54,7 +54,6 @@ export function RegionSelectLayer({
   enabled,
   onRegionSelected,
 }: RegionSelectLayerProps) {
-  const theme = useTheme();
   const rootRef = useRef<HTMLDivElement>(null);
   const [draft, setDraft] = useState<DraftRect | null>(null);
 
@@ -119,8 +118,9 @@ export function RegionSelectLayer({
             top: `${preview.y * 100}%`,
             width: `${preview.width * 100}%`,
             height: `${preview.height * 100}%`,
-            border: `2px dashed ${theme.qnop.brand.blue}`,
-            bgcolor: alpha(theme.qnop.brand.blue, 0.08),
+            border: `2px dashed ${MARKER_YELLOW_BORDER}`,
+            bgcolor: SELECTION_MARKER_BG,
+            mixBlendMode: 'multiply',
             pointerEvents: 'none',
           }}
         />
