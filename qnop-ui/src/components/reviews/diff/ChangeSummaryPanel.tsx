@@ -19,7 +19,6 @@
  * SPDX-License-Identifier: AGPL-3.0-only
  */
 
-import Box from '@mui/material/Box';
 import ButtonBase from '@mui/material/ButtonBase';
 import Stack from '@mui/material/Stack';
 import Typography from '@mui/material/Typography';
@@ -28,7 +27,7 @@ import { ArrowRight } from 'lucide-react';
 import type { DiffChange } from '../../../api/generated';
 import { DiffChangeType } from '../../../api/generated';
 import { tokens } from '../../../theme/tokens';
-import { CHANGE_KIND, changePageNumber, diffStats, excerpt } from './diffModel';
+import { CHANGE_KIND, changePageNumber, excerpt } from './diffModel';
 
 interface ChangeSummaryPanelProps {
   changes: DiffChange[];
@@ -40,9 +39,10 @@ interface ChangeSummaryPanelProps {
 /**
  * The comparison's right-hand summary (design prototype `diff.jsx`): one card
  * per change — type label in the diff colour language, the affected text, the
- * page — plus the statistics block. Clicking a card selects the change and
- * scrolls both panes to its location; the active card carries the deeper
- * left rail, mirroring the highlight's deeper wash.
+ * page. Clicking a card selects the change and scrolls both panes to its
+ * location; the active card carries the deeper left rail, mirroring the
+ * highlight's deeper wash. The aggregate statistics live in the control strip
+ * above the panes (CompareToolbar).
  */
 export function ChangeSummaryPanel({
   changes,
@@ -51,7 +51,6 @@ export function ChangeSummaryPanel({
 }: ChangeSummaryPanelProps) {
   const theme = useTheme();
   const dark = theme.palette.mode === 'dark';
-  const stats = diffStats(changes);
 
   const railColor = (type: DiffChangeType) =>
     type === DiffChangeType.Inserted
@@ -166,65 +165,6 @@ export function ChangeSummaryPanel({
           </ButtonBase>
         );
       })}
-
-      {changes.length > 0 && (
-        <Box
-          sx={{
-            mt: 1,
-            p: 1.5,
-            borderRadius: 2,
-            bgcolor: theme.qnop.surface2,
-            border: `1px solid ${theme.palette.divider}`,
-          }}
-        >
-          <Typography
-            variant="overline"
-            sx={{ color: 'text.secondary', lineHeight: 2, letterSpacing: '0.08em' }}
-          >
-            Statistics
-          </Typography>
-          <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 1.25 }}>
-            {[
-              {
-                label: 'Words +',
-                value: `+${stats.addedWords}`,
-                color: dark ? tokens.badge.green.fgDark : tokens.semantic.successStrong,
-              },
-              {
-                label: 'Words −',
-                value: `−${stats.removedWords}`,
-                color: dark ? tokens.badge.red.fgDark : tokens.semantic.dangerStrong,
-              },
-              {
-                label: 'Changes',
-                value: `${changes.length}`,
-                color: theme.palette.text.primary,
-              },
-              {
-                label: stats.pages.length === 1 ? 'Page' : 'Pages',
-                value: stats.pages.join(', ') || '—',
-                color: theme.palette.text.primary,
-              },
-            ].map((stat) => (
-              <Box key={stat.label}>
-                <Typography sx={{ fontSize: 10.5, color: 'text.secondary' }}>
-                  {stat.label}
-                </Typography>
-                <Typography
-                  sx={{
-                    fontFamily: tokens.font.mono,
-                    fontSize: 13,
-                    fontWeight: 600,
-                    color: stat.color,
-                  }}
-                >
-                  {stat.value}
-                </Typography>
-              </Box>
-            ))}
-          </Box>
-        </Box>
-      )}
     </Stack>
   );
 }

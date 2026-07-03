@@ -84,17 +84,8 @@ describe('ChangeSummaryPanel', () => {
     expect(screen.getByTestId('change-card-1')).toHaveAttribute('aria-pressed', 'true');
   });
 
-  it('shows the word statistics per direction', () => {
-    renderPanel();
-    // +2 (thirty days) / −5 (fourteen days + the prepayment clause)
-    expect(screen.getByText('+2')).toBeInTheDocument();
-    expect(screen.getByText('−5')).toBeInTheDocument();
-    expect(screen.getByText('1, 3')).toBeInTheDocument();
-  });
-
-  it('states identical content for an empty diff and hides the statistics', () => {
+  it('states identical content for an empty diff', () => {
     renderPanel([]);
     expect(screen.getByText(/identical text content/)).toBeInTheDocument();
-    expect(screen.queryByText('Statistics')).not.toBeInTheDocument();
   });
 });

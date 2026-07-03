@@ -19,19 +19,24 @@
  * SPDX-License-Identifier: AGPL-3.0-only
  */
 
+import Box from '@mui/material/Box';
 import Divider from '@mui/material/Divider';
 import FormControlLabel from '@mui/material/FormControlLabel';
 import IconButton from '@mui/material/IconButton';
 import MenuItem from '@mui/material/MenuItem';
 import Paper from '@mui/material/Paper';
+import Stack from '@mui/material/Stack';
 import Switch from '@mui/material/Switch';
 import TextField from '@mui/material/TextField';
 import Tooltip from '@mui/material/Tooltip';
 import Typography from '@mui/material/Typography';
+import { useTheme } from '@mui/material/styles';
 import { ArrowLeftRight, MoveRight } from 'lucide-react';
-import type { DocumentVersionSummary } from '../../../api/generated';
+import type { DiffChange, DocumentVersionSummary } from '../../../api/generated';
 import { ExtractionStatus } from '../../../api/generated';
+import { tokens } from '../../../theme/tokens';
 import { ZoomControls } from '../viewer/ZoomControls';
+import { diffStats } from './diffModel';
 
 interface CompareToolbarProps {
   versions: DocumentVersionSummary[];
@@ -40,17 +45,42 @@ interface CompareToolbarProps {
   onChangePair: (from: number, to: number) => void;
   syncScroll: boolean;
   onSyncScrollChange: (value: boolean) => void;
-  /** Null while the diff is still loading. */
-  changeCount: number | null;
+  /** The diff's changes; null while the comparison is still loading. */
+  changes: DiffChange[] | null;
   /** Shared fit-width zoom of both panes (1 = fit width). */
   zoom: number;
   onZoomChange: (zoom: number) => void;
 }
 
+/** One compact statistic in the control strip: a tiny label over a mono value. */
+function Stat({ label, value, color }: { label: string; value: string; color?: string }) {
+  return (
+    <Box sx={{ textAlign: 'left' }}>
+      <Typography sx={{ fontSize: 10, lineHeight: 1.3, color: 'text.secondary' }}>
+        {label}
+      </Typography>
+      <Typography
+        sx={{
+          fontFamily: tokens.font.mono,
+          fontSize: 12.5,
+          fontWeight: 600,
+          lineHeight: 1.2,
+          fontVariantNumeric: 'tabular-nums',
+          color: color ?? 'text.primary',
+          whiteSpace: 'nowrap',
+        }}
+      >
+        {value}
+      </Typography>
+    </Box>
+  );
+}
+
 /**
  * The comparison's control strip: the baseline/compare version pickers (only
  * extracted versions are selectable, the two sides never collapse onto the
- * same version), a swap button, the change count, and the sync-scroll toggle.
+ * same version), a swap button, the diff statistics (±words, changes, pages),
+ * the shared zoom and the sync-scroll toggle.
  */
 export function CompareToolbar({
   versions,
@@ -59,10 +89,21 @@ export function CompareToolbar({
   onChangePair,
   syncScroll,
   onSyncScrollChange,
-  changeCount,
+  changes,
   zoom,
   onZoomChange,
 }: CompareToolbarProps) {
+  const theme = useTheme();
+  const dark = theme.palette.mode === 'dark';
+  const stats = changes ? diffStats(changes) : null;
+  const pagesValue =
+    stats === null
+      ? ''
+      : stats.pages.length === 0
+        ? '—'
+        : stats.pages.length > 3
+          ? `${stats.pages.length} pages`
+          : stats.pages.join(', ');
   const pickerItems = (other: number) =>
     versions.map((version) => (
       <MenuItem
@@ -112,18 +153,32 @@ export function CompareToolbar({
         </IconButton>
       </Tooltip>
 
-      <Typography
-        variant="body2"
-        color="text.secondary"
-        aria-live="polite"
-        sx={{ ml: 'auto', fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap' }}
-      >
-        {changeCount === null
-          ? 'Comparing…'
-          : changeCount === 1
-            ? '1 change'
-            : `${changeCount} changes`}
-      </Typography>
+      {stats === null ? (
+        <Typography variant="body2" color="text.secondary" aria-live="polite" sx={{ ml: 'auto' }}>
+          Comparing…
+        </Typography>
+      ) : (
+        <Stack
+          direction="row"
+          spacing={2}
+          aria-live="polite"
+          data-testid="toolbar-diff-stats"
+          sx={{ ml: 'auto', alignItems: 'center' }}
+        >
+          <Stat
+            label="Words +"
+            value={`+${stats.addedWords}`}
+            color={dark ? tokens.badge.green.fgDark : tokens.semantic.successStrong}
+          />
+          <Stat
+            label="Words −"
+            value={`−${stats.removedWords}`}
+            color={dark ? tokens.badge.red.fgDark : tokens.semantic.dangerStrong}
+          />
+          <Stat label="Changes" value={String(changes?.length ?? 0)} />
+          <Stat label={stats.pages.length === 1 ? 'Page' : 'Pages'} value={pagesValue} />
+        </Stack>
+      )}
 
       <Divider orientation="vertical" flexItem />
 

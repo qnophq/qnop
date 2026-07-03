@@ -22,10 +22,27 @@
 import { describe, expect, it, vi } from 'vitest';
 import { fireEvent, render, screen, within } from '@testing-library/react';
 import { ThemeProvider } from '@mui/material/styles';
-import type { DocumentVersionSummary } from '../../../api/generated';
-import { ExtractionStatus } from '../../../api/generated';
+import type { DiffChange, DocumentVersionSummary } from '../../../api/generated';
+import { DiffChangeType, ExtractionStatus } from '../../../api/generated';
 import { buildTheme } from '../../../theme/theme';
 import { CompareToolbar } from './CompareToolbar';
+
+const CHANGES: DiffChange[] = [
+  {
+    type: DiffChangeType.Changed,
+    fromText: 'fourteen days now', // 3 words out
+    toText: 'thirty days', // 2 words in
+    fromLocations: [{ surfaceIndex: 0, box: { x: 0.1, y: 0.1, width: 0.2, height: 0.02 } }],
+    toLocations: [{ surfaceIndex: 0, box: { x: 0.1, y: 0.1, width: 0.2, height: 0.02 } }],
+  },
+  {
+    type: DiffChangeType.Deleted,
+    fromText: 'the prepayment clause',
+    toText: '',
+    fromLocations: [{ surfaceIndex: 2, box: { x: 0.1, y: 0.4, width: 0.4, height: 0.02 } }],
+    toLocations: [],
+  },
+];
 
 const version = (
   versionNumber: number,
@@ -48,7 +65,7 @@ function renderToolbar(overrides: Partial<Parameters<typeof CompareToolbar>[0]> 
     onChangePair: vi.fn(),
     syncScroll: true,
     onSyncScrollChange: vi.fn(),
-    changeCount: 4,
+    changes: CHANGES,
     zoom: 1,
     onZoomChange: vi.fn(),
     ...overrides,
@@ -62,14 +79,33 @@ function renderToolbar(overrides: Partial<Parameters<typeof CompareToolbar>[0]> 
 }
 
 describe('CompareToolbar', () => {
-  it('shows the change count', () => {
+  it('shows the diff statistics', () => {
     renderToolbar();
-    expect(screen.getByText('4 changes')).toBeInTheDocument();
+    const stats = within(screen.getByTestId('toolbar-diff-stats'));
+    expect(stats.getByText('+2')).toBeInTheDocument(); // words in ("thirty days")
+    expect(stats.getByText('−6')).toBeInTheDocument(); // words out (3 + 3)
+    expect(stats.getByText('Changes')).toBeInTheDocument();
+    expect(stats.getByText('2')).toBeInTheDocument();
+    expect(stats.getByText('Pages')).toBeInTheDocument();
+    expect(stats.getByText('1, 3')).toBeInTheDocument();
   });
 
   it('shows a comparing state while the diff loads', () => {
-    renderToolbar({ changeCount: null });
+    renderToolbar({ changes: null });
     expect(screen.getByText('Comparing…')).toBeInTheDocument();
+    expect(screen.queryByTestId('toolbar-diff-stats')).not.toBeInTheDocument();
+  });
+
+  it('collapses long page lists to a count', () => {
+    const spread = [0, 1, 2, 3].map((surfaceIndex) => ({
+      type: DiffChangeType.Inserted,
+      fromText: '',
+      toText: 'word',
+      fromLocations: [],
+      toLocations: [{ surfaceIndex, box: { x: 0.1, y: 0.1, width: 0.2, height: 0.02 } }],
+    }));
+    renderToolbar({ changes: spread });
+    expect(screen.getByText('4 pages')).toBeInTheDocument();
   });
 
   it('disables unextracted versions and the other side in a picker', () => {

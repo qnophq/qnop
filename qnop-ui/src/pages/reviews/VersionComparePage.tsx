@@ -174,7 +174,7 @@ export function VersionComparePage() {
             onChangePair={handleChangePair}
             syncScroll={syncScroll}
             onSyncScrollChange={setSyncScroll}
-            changeCount={changes ? changes.length : null}
+            changes={changes}
             zoom={zoom}
             onZoomChange={setZoom}
           />

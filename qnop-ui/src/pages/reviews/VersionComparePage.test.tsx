@@ -20,7 +20,7 @@
  */
 
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { fireEvent, render, screen } from '@testing-library/react';
+import { fireEvent, render, screen, within } from '@testing-library/react';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { ThemeProvider } from '@mui/material/styles';
 import type { DiffChange, DocumentVersionSummary } from '../../api/generated';
@@ -166,11 +166,13 @@ describe('VersionComparePage', () => {
     expect(screen.queryByTestId('pane-from')).not.toBeInTheDocument();
   });
 
-  it('feeds the changes into panes, toolbar count and summary', () => {
+  it('feeds the changes into panes, toolbar statistics and summary', () => {
     mockData();
     renderPage();
     expect(screen.getByTestId('pane-to')).toHaveAttribute('data-changes', '1');
-    expect(screen.getByText('1 change')).toBeInTheDocument();
+    const stats = within(screen.getByTestId('toolbar-diff-stats'));
+    expect(stats.getByText('+3')).toBeInTheDocument(); // "brand new sentence"
+    expect(stats.getByText('−0')).toBeInTheDocument();
     expect(screen.getByText('brand new sentence')).toBeInTheDocument();
   });
 
