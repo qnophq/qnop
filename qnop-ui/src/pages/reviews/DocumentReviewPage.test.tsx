@@ -184,7 +184,6 @@ describe('DocumentReviewPage', () => {
 
     expect(screen.getByRole('heading', { level: 1, name: 'Supply Contract' })).toBeInTheDocument();
     expect(screen.getByText('In review')).toBeInTheDocument();
-    expect(screen.getByText('Version 2 of 2')).toBeInTheDocument();
     expect(screen.getByTestId('document-viewer')).toHaveAttribute('data-annotation-count', '1');
     expect(screen.getByText('Annotations (1)')).toBeInTheDocument();
     expect(screen.getByText('“Hello”')).toBeInTheDocument();

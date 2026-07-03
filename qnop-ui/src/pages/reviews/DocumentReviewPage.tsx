@@ -223,15 +223,9 @@ export function DocumentReviewPage() {
         minHeight: { md: 480 },
       }}
     >
-      <PageHeader
-        title={document.title}
-        titleAdornment={workflowBadge(document.workflowState)}
-        description={
-          versionNumber !== undefined
-            ? `Version ${versionNumber} of ${latestVersion}`
-            : 'No version uploaded yet.'
-        }
-      />
+      {/* No description line: the version lives in the toolbar dropdown, and
+          every saved pixel goes to the document and its annotations. */}
+      <PageHeader title={document.title} titleAdornment={workflowBadge(document.workflowState)} />
       {versionNumber === undefined ? (
         <Alert severity="info">This review has no uploaded document version yet.</Alert>
       ) : (
