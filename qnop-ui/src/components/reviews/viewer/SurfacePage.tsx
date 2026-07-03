@@ -162,6 +162,15 @@ export function SurfacePage({
             enabled={canAnnotate && tool === 'text' && surface.textSpans.length > 0}
             onTextSelected={onTextSelected}
           />
+          {/* The rubber-band sits BELOW the highlights: existing marks stay
+              hoverable/clickable in region mode exactly as in text mode, and
+              pointer capture keeps an already-started drag alive across them
+              — only starting a drag on a mark belongs to the mark. */}
+          <RegionSelectLayer
+            surfaceIndex={surface.index}
+            enabled={canAnnotate && tool === 'region'}
+            onRegionSelected={onRegionSelected}
+          />
           <HighlightLayer
             annotations={annotations}
             surfaceIndex={surface.index}
@@ -171,11 +180,6 @@ export function SurfacePage({
             onSelect={onSelectAnnotation}
             onHover={onHoverAnnotation}
             pendingAnchor={pendingAnchor}
-          />
-          <RegionSelectLayer
-            surfaceIndex={surface.index}
-            enabled={canAnnotate && tool === 'region'}
-            onRegionSelected={onRegionSelected}
           />
         </>
       )}
