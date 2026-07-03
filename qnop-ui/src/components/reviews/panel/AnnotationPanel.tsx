@@ -113,7 +113,11 @@ function DecisionBar({
   );
 }
 
-/** The composer for a freshly drawn anchor: optional first comment, then create. */
+/**
+ * The composer for a freshly drawn anchor. The first comment is mandatory
+ * (issue #301) — an annotation without text must not exist, so creating stays
+ * disabled (button and submit shortcut) until the trimmed comment is non-empty.
+ */
 function Composer({
   pendingAnchor,
   creating,
@@ -126,6 +130,7 @@ function Composer({
   onCancel: () => void;
 }) {
   const [comment, setComment] = useState('');
+  const canCreate = !creating && comment.trim().length > 0;
   const quote = pendingAnchor.textQuote?.quote;
   return (
     <Paper variant="outlined" sx={{ p: 1.5 }} data-testid="annotation-composer">
@@ -146,15 +151,16 @@ function Composer({
         </Typography>
         <TextField
           multiline
-          minRows={2}
+          minRows={5}
           size="small"
-          placeholder="Add a comment (optional)"
+          required
+          placeholder="Add a comment"
           value={comment}
           onChange={(event) => setComment(event.target.value)}
           onKeyDown={(event) => {
-            if (isSubmitShortcut(event) && !creating) {
+            if (isSubmitShortcut(event)) {
               event.preventDefault();
-              onCreate(comment);
+              if (canCreate) onCreate(comment);
             }
           }}
           slotProps={{ htmlInput: { maxLength: 20000, 'aria-label': 'Annotation comment' } }}
@@ -164,7 +170,7 @@ function Composer({
             size="small"
             variant="contained"
             onClick={() => onCreate(comment)}
-            disabled={creating}
+            disabled={!canCreate}
           >
             Create annotation ({submitShortcutLabel()})
           </Button>

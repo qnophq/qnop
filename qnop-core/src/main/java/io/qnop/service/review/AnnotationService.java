@@ -99,7 +99,8 @@ public class AnnotationService {
       UUID id, UUID annotationId, UUID authorId, String body, Instant createdAt) {}
 
   /**
-   * Creates an annotation on {@code versionNumber}, placed immediately, with an optional comment.
+   * Creates an annotation on {@code versionNumber}, placed immediately, seeded with its mandatory
+   * first comment — an annotation without text must not exist (issue #301).
    */
   @Transactional
   public AnnotationView create(
@@ -109,6 +110,9 @@ public class AnnotationService {
       boolean admin,
       String anchorJson,
       String firstComment) {
+    if (firstComment == null || firstComment.isBlank()) {
+      throw DocumentValidationException.invalidRequest("annotation requires a first comment");
+    }
     documentAccess.getDocument(documentId, author, admin); // visibility → 404 if not a participant
     DocumentVersion version =
         versions
@@ -124,11 +128,8 @@ public class AnnotationService {
     placement.markPlaced(anchorJson);
     placements.save(placement);
 
-    int commentCount = 0;
-    if (firstComment != null && !firstComment.isBlank()) {
-      comments.save(new Comment(annotation.getId(), author, firstComment));
-      commentCount = 1;
-    }
+    comments.save(new Comment(annotation.getId(), author, firstComment));
+    int commentCount = 1;
     auditEvents.save(
         new AuditEvent(
             documentId,

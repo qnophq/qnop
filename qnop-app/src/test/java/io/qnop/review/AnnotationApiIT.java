@@ -137,7 +137,7 @@ class AnnotationApiIT extends SeededIntegrationTest {
         .perform(
             as(post("/api/v1/documents/" + documentId + "/annotations"), EXTERNAL_ID)
                 .contentType(MediaType.APPLICATION_JSON)
-                .content("{\"versionNumber\":1,\"anchor\":" + ANCHOR + "}"))
+                .content("{\"versionNumber\":1,\"anchor\":" + ANCHOR + ",\"comment\":\"hi\"}"))
         .andExpect(status().isNotFound());
   }
 
@@ -219,7 +219,36 @@ class AnnotationApiIT extends SeededIntegrationTest {
         .perform(
             as(post("/api/v1/documents/" + documentId + "/annotations"), MEMBER_ID)
                 .contentType(MediaType.APPLICATION_JSON)
-                .content("{\"versionNumber\":1,\"anchor\":{}}"))
+                .content("{\"versionNumber\":1,\"anchor\":{},\"comment\":\"please clarify\"}"))
+        .andExpect(status().isBadRequest())
+        .andExpect(jsonPath("$.code").value("VALIDATION_ERROR"));
+  }
+
+  @Test
+  void rejectsAnAnnotationWithoutAComment() throws Exception {
+    UUID documentId = seedDocumentWithVersion();
+
+    // The first comment is mandatory (issue #301) — the contract itself rejects its absence.
+    mockMvc
+        .perform(
+            as(post("/api/v1/documents/" + documentId + "/annotations"), MEMBER_ID)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"versionNumber\":1,\"anchor\":" + ANCHOR + "}"))
+        .andExpect(status().isBadRequest())
+        .andExpect(jsonPath("$.code").value("VALIDATION_ERROR"))
+        .andExpect(jsonPath("$.fieldErrors[0].field").value("comment"));
+  }
+
+  @Test
+  void rejectsAnAnnotationWithABlankComment() throws Exception {
+    UUID documentId = seedDocumentWithVersion();
+
+    // Whitespace passes the schema's minLength, so the service guard must catch it (issue #301).
+    mockMvc
+        .perform(
+            as(post("/api/v1/documents/" + documentId + "/annotations"), MEMBER_ID)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"versionNumber\":1,\"anchor\":" + ANCHOR + ",\"comment\":\"   \"}"))
         .andExpect(status().isBadRequest())
         .andExpect(jsonPath("$.code").value("VALIDATION_ERROR"));
   }

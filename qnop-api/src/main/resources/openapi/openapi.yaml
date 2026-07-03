@@ -3954,6 +3954,7 @@ components:
       required:
         - versionNumber
         - anchor
+        - comment
       properties:
         versionNumber:
           type: integer
@@ -3965,7 +3966,10 @@ components:
           type: string
           minLength: 1
           maxLength: 20000
-          description: An optional first comment seeding the discussion thread.
+          description: >-
+            The first comment seeding the discussion thread. Required — an
+            annotation without text must not exist (issue #301); blank-only
+            comments are rejected.
     AnnotationView:
       type: object
       description: |
