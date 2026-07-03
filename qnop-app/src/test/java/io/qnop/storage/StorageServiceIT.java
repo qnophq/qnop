@@ -24,10 +24,12 @@ import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import io.qnop.bootstrap.AbstractIntegrationTest;
+import io.qnop.entity.StorageObjectStatus;
 import io.qnop.repository.StorageObjectRepository;
 import io.qnop.service.storage.StagedObject;
 import io.qnop.service.storage.StorageService;
 import io.qnop.spi.storage.StorageContent;
+import io.qnop.spi.storage.StorageProvider;
 import java.io.ByteArrayInputStream;
 import java.security.MessageDigest;
 import java.util.HexFormat;
@@ -46,6 +48,7 @@ class StorageServiceIT extends AbstractIntegrationTest {
 
   @Autowired private StorageService storage;
   @Autowired private StorageObjectRepository repository;
+  @Autowired private StorageProvider provider;
   @Autowired private JdbcTemplate jdbc;
 
   private static byte[] uniqueContent() {
@@ -84,6 +87,26 @@ class StorageServiceIT extends AbstractIntegrationTest {
 
     assertThat(staged.contentHash()).isEqualTo(expected);
     assertThat(staged.key()).isEqualTo("sha256/" + expected.substring(0, 2) + "/" + expected);
+    storage.delete(staged.key());
+  }
+
+  @Test
+  void reStagingHealsAPoisonedPendingRow() {
+    // Reproduce the #289 poisoning: a PENDING registry row whose object is missing (a put that
+    // failed after the row was persisted). Stage, then delete only the object — the row stays.
+    byte[] data = uniqueContent();
+    StagedObject staged = stage(data, "application/pdf");
+    provider.delete(staged.key());
+    assertThat(provider.exists(staged.key())).isFalse();
+    assertThat(repository.findByObjectKey(staged.key()))
+        .hasValueSatisfying(
+            row -> assertThat(row.getStatus()).isEqualTo(StorageObjectStatus.PENDING));
+
+    // Re-staging identical content must re-upload rather than trust the poisoned row.
+    StagedObject restaged = stage(data, "application/pdf");
+
+    assertThat(restaged.key()).isEqualTo(staged.key());
+    assertThat(provider.exists(staged.key())).isTrue();
     storage.delete(staged.key());
   }
 
