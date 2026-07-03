@@ -75,9 +75,15 @@ public class AnnotationController implements AnnotationsApi {
   }
 
   @Override
-  public ResponseEntity<AnnotationListResponse> listAnnotations(UUID documentId, Integer version) {
+  public ResponseEntity<AnnotationListResponse> listAnnotations(
+      UUID documentId, Integer version, PlacementStatus placementStatus) {
     var views =
-        annotations.list(documentId, version, CurrentUser.requireUserId(), CurrentUser.isAdmin());
+        annotations.list(
+            documentId,
+            version,
+            placementStatus == null ? null : placementStatus.getValue(),
+            CurrentUser.requireUserId(),
+            CurrentUser.isAdmin());
     return ResponseEntity.ok(
         new AnnotationListResponse().annotations(views.stream().map(this::toDto).toList()));
   }

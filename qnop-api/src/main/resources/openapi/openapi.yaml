@@ -1780,6 +1780,15 @@ paths:
           schema:
             type: integer
             minimum: 1
+        - name: placementStatus
+          in: query
+          required: false
+          description: >-
+            Only annotations whose placement on `version` has this status — e.g.
+            `ORPHANED` to review annotations re-anchoring could not relocate
+            (issue #248). Requires `version`.
+          schema:
+            $ref: '#/components/schemas/PlacementStatus'
       responses:
         '200':
           description: The annotations
