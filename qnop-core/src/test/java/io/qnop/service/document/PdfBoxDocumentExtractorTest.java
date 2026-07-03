@@ -125,6 +125,78 @@ class PdfBoxDocumentExtractorTest {
         .isInstanceOf(ExtractionException.class);
   }
 
+  @Test
+  @DisplayName("vertically overlapping runs stay character-intact as separate spans (#296)")
+  void overlappingRunsAreNotInterleaved() throws Exception {
+    // A small kicker line with a large headline right below: the 36 pt glyphs extend upward
+    // into the 11 pt line's y-range, which made position sorting merge both lines and
+    // interleave their characters by x ("KWOALITäIONrSAmUSSCHeUSpS").
+    byte[] pdf;
+    try (PDDocument document = new PDDocument()) {
+      PDPage page = new PDPage(PDRectangle.LETTER);
+      document.addPage(page);
+      try (PDPageContentStream content = new PDPageContentStream(document, page)) {
+        content.beginText();
+        content.setFont(new PDType1Font(Standard14Fonts.FontName.HELVETICA), 11);
+        content.newLineAtOffset(72, 700);
+        content.showText("KOALITIONSAUSSCHUSS");
+        content.endText();
+        content.beginText();
+        content.setFont(new PDType1Font(Standard14Fonts.FontName.HELVETICA_BOLD), 36);
+        content.newLineAtOffset(72, 676);
+        content.showText("Waermepumpe");
+        content.endText();
+      }
+      ByteArrayOutputStream out = new ByteArrayOutputStream();
+      document.save(out);
+      pdf = out.toByteArray();
+    }
+
+    Surface surface = extractor.extract(new ByteArrayInputStream(pdf)).surfaces().get(0);
+
+    assertThat(surface.textSpans().stream().map(TextSpan::text))
+        .containsExactly("KOALITIONSAUSSCHUSS", "Waermepumpe");
+  }
+
+  @Test
+  @DisplayName("spans are ordered top-to-bottom, then left-to-right, regardless of stream order")
+  void spansFollowReadingOrder() throws Exception {
+    byte[] pdf;
+    try (PDDocument document = new PDDocument()) {
+      PDPage page = new PDPage(PDRectangle.LETTER);
+      document.addPage(page);
+      try (PDPageContentStream content = new PDPageContentStream(document, page)) {
+        // Drawn bottom-up and right-to-left on purpose: stream order is the reverse of
+        // reading order, so the ordering below must come from the geometry.
+        for (String[] run :
+            new String[][] {
+              {"last line", "72", "600"},
+              {"right cell", "300", "700"},
+              {"left cell", "72", "700"},
+            }) {
+          content.beginText();
+          content.setFont(new PDType1Font(Standard14Fonts.FontName.HELVETICA), 12);
+          content.newLineAtOffset(Float.parseFloat(run[1]), Float.parseFloat(run[2]));
+          content.showText(run[0]);
+          content.endText();
+        }
+      }
+      ByteArrayOutputStream out = new ByteArrayOutputStream();
+      document.save(out);
+      pdf = out.toByteArray();
+    }
+
+    Surface surface = extractor.extract(new ByteArrayInputStream(pdf)).surfaces().get(0);
+
+    assertThat(surface.textSpans().stream().map(TextSpan::text))
+        .containsExactly("left cell", "right cell", "last line");
+    int expectedOffset = 0;
+    for (TextSpan span : surface.textSpans()) {
+      assertThat(span.startOffset()).isEqualTo(expectedOffset);
+      expectedOffset = span.endOffset() + 1;
+    }
+  }
+
   private static String joinedText(Surface surface) {
     return String.join("\n", surface.textSpans().stream().map(TextSpan::text).toList());
   }

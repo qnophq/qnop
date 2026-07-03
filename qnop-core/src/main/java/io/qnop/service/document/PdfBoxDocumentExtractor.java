@@ -29,6 +29,7 @@ import io.qnop.spi.extract.TextSpan;
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.List;
 import org.apache.pdfbox.Loader;
 import org.apache.pdfbox.pdmodel.PDDocument;
@@ -45,6 +46,12 @@ import org.springframework.stereotype.Component;
  * <p>Character offsets are assigned over the surface's canonical text: span texts joined by a
  * single {@code \n}. Extraction is deterministic (same bytes → same representation), which the job
  * replay (ADR-0033) and re-anchoring (ADR-0009) rely on.
+ *
+ * <p>Runs are collected in content-stream order — {@code sortByPosition} would merge runs whose
+ * y-extents overlap (a large headline beside a small kicker) into one line and interleave their
+ * characters by x (issue #296). The finished spans are then ordered geometrically (baseline, then
+ * x, then stream order) before offsets are assigned, so the canonical text reads top-to-bottom
+ * while every run stays character-intact.
  */
 @Component
 public class PdfBoxDocumentExtractor implements DocumentExtractor {
@@ -91,35 +98,104 @@ public class PdfBoxDocumentExtractor implements DocumentExtractor {
     SpanCollector collector = new SpanCollector(width, height);
     collector.setStartPage(pageIndex + 1); // PDFTextStripper pages are 1-based
     collector.setEndPage(pageIndex + 1);
-    collector.setSortByPosition(true);
+    // Deliberately NOT setSortByPosition(true): position sorting interleaves the characters of
+    // vertically overlapping runs (issue #296). Stream order keeps every run intact; reading
+    // order is restored across whole runs in orderedSpans().
     collector.getText(document); // triggers processing; the returned string is not used
-    return new Surface(pageIndex, width, height, collector.spans());
+    return new Surface(pageIndex, width, height, collector.orderedSpans());
   }
 
   /**
-   * Collects one {@link TextSpan} per stripper-written text run, assigning offsets over the
-   * canonical surface text (runs joined by {@code \n}) and a glyph bounding box normalized to the
-   * crop box. Values are clamped to 0..1 — glyphs may protrude marginally past the crop box.
+   * One collected text run before canonical offsets exist: its text, normalized box, and the raw
+   * geometry (PDF points) plus collection sequence used to establish a deterministic reading order.
+   */
+  private record RawRun(String text, NormalizedBox box, double baselineY, double minX, int seq) {}
+
+  /**
+   * Collects one run per stripper-written string with a glyph bounding box normalized to the crop
+   * box (values clamped to 0..1 — glyphs may protrude marginally past it). {@link #orderedSpans()}
+   * sorts the runs by baseline, then x, then collection order, and only then assigns offsets over
+   * the canonical surface text (runs joined by {@code \n}).
    */
   private static final class SpanCollector extends PDFTextStripper {
 
     private final double pageWidth;
     private final double pageHeight;
-    private final List<TextSpan> spans = new ArrayList<>();
-    private int offset;
+    private final List<RawRun> runs = new ArrayList<>();
 
     private SpanCollector(double pageWidth, double pageHeight) {
       this.pageWidth = pageWidth;
       this.pageHeight = pageHeight;
     }
 
-    List<TextSpan> spans() {
+    List<TextSpan> orderedSpans() {
+      List<RawRun> ordered =
+          runs.stream()
+              .sorted(
+                  Comparator.comparingDouble(RawRun::baselineY)
+                      .thenComparingDouble(RawRun::minX)
+                      .thenComparingInt(RawRun::seq))
+              .toList();
+      List<TextSpan> spans = new ArrayList<>(ordered.size());
+      int offset = 0;
+      for (RawRun run : ordered) {
+        spans.add(new TextSpan(run.text(), offset, offset + run.text().length(), run.box()));
+        offset += run.text().length() + 1; // +1 for the canonical '\n' joiner between runs
+      }
       return spans;
     }
 
     @Override
     protected void writeString(String text, List<TextPosition> positions) {
       if (text.isBlank() || positions.isEmpty()) {
+        return;
+      }
+      // The stripper concatenates same-baseline runs in stream order — a right column drawn
+      // before a left one arrives as one string ("right cellleft cell"). Split the positions
+      // where the pen jumps backwards in x (or to a different baseline) by more than a glyph
+      // height, so each segment is one visually contiguous run. Splitting is only safe when the
+      // given text equals the positions' glyphs; otherwise (stripper-inserted separators) keep
+      // the original text as one run — never corrupt text.
+      StringBuilder glyphs = new StringBuilder();
+      for (TextPosition position : positions) {
+        glyphs.append(position.getUnicode());
+      }
+      if (!glyphs.toString().equals(text)) {
+        addRun(text, positions);
+        return;
+      }
+      List<TextPosition> current = new ArrayList<>();
+      TextPosition previous = null;
+      for (TextPosition position : positions) {
+        if (previous != null && startsNewSegment(previous, position)) {
+          addSegment(current);
+          current = new ArrayList<>();
+        }
+        current.add(position);
+        previous = position;
+      }
+      addSegment(current);
+    }
+
+    private void addSegment(List<TextPosition> positions) {
+      StringBuilder text = new StringBuilder();
+      for (TextPosition position : positions) {
+        text.append(position.getUnicode());
+      }
+      addRun(text.toString(), positions);
+    }
+
+    private static boolean startsNewSegment(TextPosition previous, TextPosition next) {
+      double glyphHeight = Math.max(previous.getHeightDir(), next.getHeightDir());
+      double previousEndX = previous.getXDirAdj() + previous.getWidthDirAdj();
+      boolean jumpsBack = next.getXDirAdj() < previousEndX - glyphHeight;
+      boolean changesBaseline =
+          Math.abs(next.getYDirAdj() - previous.getYDirAdj()) > glyphHeight / 2.0d;
+      return jumpsBack || changesBaseline;
+    }
+
+    private void addRun(String text, List<TextPosition> positions) {
+      if (text.isBlank()) {
         return;
       }
       double minX = Double.MAX_VALUE;
@@ -138,8 +214,7 @@ public class PdfBoxDocumentExtractor implements DocumentExtractor {
               clamp(minTop / pageHeight),
               clamp((maxX - minX) / pageWidth),
               clamp((maxBottom - minTop) / pageHeight));
-      spans.add(new TextSpan(text, offset, offset + text.length(), box));
-      offset += text.length() + 1; // +1 for the canonical '\n' joiner between runs
+      runs.add(new RawRun(text, box, maxBottom, minX, runs.size()));
     }
 
     private static double clamp(double value) {
