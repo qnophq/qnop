@@ -19,6 +19,7 @@
  * SPDX-License-Identifier: AGPL-3.0-only
  */
 
+import { memo } from 'react';
 import Box from '@mui/material/Box';
 import ButtonBase from '@mui/material/ButtonBase';
 import Stack from '@mui/material/Stack';
@@ -88,7 +89,12 @@ interface AnnotationListItemProps {
   active: boolean;
   /** True while the mark on the page is hovered — mirrors the link visually. */
   linked?: boolean;
-  onClick: () => void;
+  /**
+   * Selects this annotation, or deselects (null) when it is already active. Passed the resolved id
+   * so the parent can forward a stable handler — the toggle lives here, keeping the item's props
+   * referentially stable for {@link memo} (issue #333).
+   */
+  onSelect: (annotationId: string | null) => void;
   onHover?: (annotationId: string | null) => void;
 }
 
@@ -100,12 +106,15 @@ interface AnnotationListItemProps {
  * comment timeline follows below. The left rail always carries the colour the
  * mark paints with on the page, and hovering either side of the card↔mark
  * pair lights up the other.
+ *
+ * Memoized (issue #333): the panel re-renders on every hover/selection, but with stable props only
+ * the two items whose {@code active}/{@code linked} actually changed re-render — not the whole list.
  */
-export function AnnotationListItem({
+function AnnotationListItemBase({
   annotation,
   active,
   linked = false,
-  onClick,
+  onSelect,
   onHover,
 }: AnnotationListItemProps) {
   const theme = useTheme();
@@ -129,7 +138,7 @@ export function AnnotationListItem({
 
   return (
     <ButtonBase
-      onClick={onClick}
+      onClick={() => onSelect(active ? null : annotation.id)}
       onMouseEnter={() => onHover?.(annotation.id)}
       onMouseLeave={() => onHover?.(null)}
       onFocus={() => onHover?.(annotation.id)}
@@ -281,3 +290,5 @@ export function AnnotationListItem({
     </ButtonBase>
   );
 }
+
+export const AnnotationListItem = memo(AnnotationListItemBase);
