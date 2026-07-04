@@ -255,9 +255,10 @@ class ReviewWorkflowControllerIT extends SeededIntegrationTest {
   void finalizeSucceedsOnceAnnotationsAreDecidedAndPlacementsAnchored() throws Exception {
     Document document = inReviewOwnedByMember();
     DocumentVersion version =
-        versions.save(
-            new DocumentVersion(
-                document.getId(), 1, "s3://key", "hash", "application/pdf", 10, MEMBER_ID));
+        new DocumentVersion(
+            document.getId(), 1, "s3://key", "hash", "application/pdf", 10, MEMBER_ID);
+    version.attachRenderedDocument("{\"surfaces\":[]}"); // READY (issue #323 finalize precondition)
+    version = versions.save(version);
     Annotation annotation = annotations.save(new Annotation(document.getId(), MEMBER2_ID));
     annotation.reject();
     annotations.save(annotation);
@@ -275,6 +276,25 @@ class ReviewWorkflowControllerIT extends SeededIntegrationTest {
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.state").value("FINALIZED"))
         .andExpect(jsonPath("$.allowedTransitions.length()").value(0));
+  }
+
+  @Test
+  void finalizeIsBlockedWhenTheOnlyVersionFailedExtraction() throws Exception {
+    Document document = inReviewOwnedByMember();
+    DocumentVersion version =
+        new DocumentVersion(
+            document.getId(), 1, "s3://key", "hash", "application/pdf", 10, MEMBER_ID);
+    version.markExtractionFailed(); // no reviewable representation (issue #323)
+    versions.save(version);
+
+    mockMvc
+        .perform(
+            post(workflowPath(document.getId()))
+                .header("Authorization", "Bearer " + token(MEMBER_ID))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"targetState\":\"FINALIZED\"}"))
+        .andExpect(status().isConflict())
+        .andExpect(jsonPath("$.message").value(org.hamcrest.Matchers.containsString("READY")));
   }
 
   // --- annotation decision sub-machine (service-level; the REST surface is #247) ---

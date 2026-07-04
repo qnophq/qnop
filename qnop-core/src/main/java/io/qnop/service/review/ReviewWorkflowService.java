@@ -24,12 +24,14 @@ import io.qnop.entity.Annotation;
 import io.qnop.entity.AnnotationStatus;
 import io.qnop.entity.AuditEvent;
 import io.qnop.entity.Document;
+import io.qnop.entity.ExtractionStatus;
 import io.qnop.entity.PlacementStatus;
 import io.qnop.entity.WorkflowState;
 import io.qnop.repository.AnnotationPlacementRepository;
 import io.qnop.repository.AnnotationRepository;
 import io.qnop.repository.AuditEventRepository;
 import io.qnop.repository.DocumentRepository;
+import io.qnop.repository.DocumentVersionRepository;
 import io.qnop.service.document.DocumentAccessService;
 import io.qnop.service.review.ReviewWorkflowMachine.TransitionContext;
 import io.qnop.service.review.ReviewWorkflowMachine.TransitionResult;
@@ -42,8 +44,10 @@ import org.springframework.transaction.annotation.Transactional;
  * Drives the review workflow (issue #246, ADR-0011): loads the document, feeds the DB-free {@link
  * ReviewWorkflowMachine} choke-point with the guard facts, persists the outcome and appends an
  * {@link AuditEvent} per transition. Authorization is owner-only for state changes (ADR-0011: the
- * owner drives the workflow and decides annotations); concurrent transitions are serialized by the
- * {@code @Version} optimistic lock on {@link Document} (ADR-0030).
+ * owner drives the workflow and decides annotations). State-changing paths load the document under
+ * a pessimistic write lock ({@link DocumentRepository#findByIdForUpdate}), so the finalize-guard
+ * counts and the state write are atomic against a concurrent transition or a new-version upload
+ * that would change the pending-placement picture (issue #324).
  */
 @Service
 public class ReviewWorkflowService {
@@ -57,6 +61,7 @@ public class ReviewWorkflowService {
   private final ReviewWorkflowMachine machine = new ReviewWorkflowMachine();
 
   private final DocumentRepository documents;
+  private final DocumentVersionRepository versions;
   private final AnnotationRepository annotations;
   private final AnnotationPlacementRepository placements;
   private final AuditEventRepository auditEvents;
@@ -64,11 +69,13 @@ public class ReviewWorkflowService {
 
   public ReviewWorkflowService(
       DocumentRepository documents,
+      DocumentVersionRepository versions,
       AnnotationRepository annotations,
       AnnotationPlacementRepository placements,
       AuditEventRepository auditEvents,
       DocumentAccessService documentAccess) {
     this.documents = documents;
+    this.versions = versions;
     this.annotations = annotations;
     this.placements = placements;
     this.auditEvents = auditEvents;
@@ -104,7 +111,7 @@ public class ReviewWorkflowService {
    */
   @Transactional
   public WorkflowStatus transition(UUID documentId, String targetRaw, UUID actorId) {
-    Document document = load(documentId);
+    Document document = loadForUpdate(documentId);
     requireOwner(document, actorId);
     WorkflowState target =
         WorkflowState.fromString(targetRaw)
@@ -132,7 +139,7 @@ public class ReviewWorkflowService {
         annotations
             .findById(annotationId)
             .orElseThrow(() -> new AnnotationNotFoundException(annotationId));
-    Document document = load(annotation.getDocumentId());
+    Document document = loadForUpdate(annotation.getDocumentId());
     if (!document.getOwnerId().equals(actorId) && !annotation.getAuthorId().equals(actorId)) {
       throw new AnnotationDecisionForbiddenException();
     }
@@ -162,7 +169,9 @@ public class ReviewWorkflowService {
     TransitionContext context =
         new TransitionContext(
             annotations.countByDocumentIdAndStatus(document.getId(), AnnotationStatus.OPEN),
-            placements.countByDocumentIdAndStatus(document.getId(), PlacementStatus.PENDING));
+            placements.countByDocumentIdAndStatus(document.getId(), PlacementStatus.PENDING),
+            versions.existsByDocumentIdAndExtractionStatus(
+                document.getId(), ExtractionStatus.READY));
     switch (machine.transition(from, target, context)) {
       case TransitionResult.Allowed allowed -> document.setWorkflowState(allowed.target());
       case TransitionResult.Denied denied ->
@@ -188,6 +197,18 @@ public class ReviewWorkflowService {
   private Document load(UUID documentId) {
     return documents
         .findById(documentId)
+        .orElseThrow(() -> new DocumentNotFoundException(documentId));
+  }
+
+  /**
+   * Loads the document under a pessimistic write lock for a state-changing path (issue #324), so
+   * the finalize-guard counts and the state write happen atomically relative to a concurrent
+   * transition or a new-version upload (which also takes this lock before seeding pending
+   * placements).
+   */
+  private Document loadForUpdate(UUID documentId) {
+    return documents
+        .findByIdForUpdate(documentId)
         .orElseThrow(() -> new DocumentNotFoundException(documentId));
   }
 
