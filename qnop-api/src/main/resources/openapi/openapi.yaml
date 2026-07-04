@@ -2099,6 +2099,15 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
+        '409':
+          description: >-
+            The addressed version is not the latest (`VERSION_READ_ONLY`,
+            issue #306) — annotations are created on the newest version only;
+            older versions are a read-only record.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
   /annotations/{annotationId}:
     parameters:
       - $ref: '#/components/parameters/AnnotationIdParam'

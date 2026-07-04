@@ -64,6 +64,8 @@ interface AnnotationPanelProps {
   /** The document owner — owner or author may decide an annotation (ADR-0011). */
   ownerId: string | null;
   notify: Notify;
+  /** True while an OLDER version is viewed (#306): threads readable, nothing writable. */
+  readOnly?: boolean;
 }
 
 /** A collapsible, counted group of annotation cards (prototype sidebar section). */
@@ -180,6 +182,7 @@ export function AnnotationPanel({
   canAnnotate,
   ownerId,
   notify,
+  readOnly = false,
 }: AnnotationPanelProps) {
   const [filter, setFilter] = useState<StatusFilter>('all');
   const userId = useAuthStore((state) => state.userId);
@@ -208,13 +211,13 @@ export function AnnotationPanel({
           onHover={onHover}
         />
         <Collapse in={active} unmountOnExit>
-          {mayDecideAnnotation(annotation, userId, ownerId) && (
+          {!readOnly && mayDecideAnnotation(annotation, userId, ownerId) && (
             <DecisionBar
               disabled={deciding}
               onDecide={(decision) => decideWith(annotation, decision)}
             />
           )}
-          <CommentThread annotationId={annotation.id} notify={notify} />
+          <CommentThread annotationId={annotation.id} notify={notify} readOnly={readOnly} />
         </Collapse>
       </Stack>
     );

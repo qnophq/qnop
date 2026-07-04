@@ -225,6 +225,33 @@ class AnnotationApiIT extends SeededIntegrationTest {
   }
 
   @Test
+  void createsOnlyOnTheLatestVersion() throws Exception {
+    UUID documentId = seedDocumentWithVersion();
+    versions.save(
+        new DocumentVersion(
+            documentId, 2, "sha256/bb/cafebabe", "cafebabe", "application/pdf", 2345L, MEMBER_ID));
+
+    // Older versions are a read-only record (issue #306).
+    mockMvc
+        .perform(
+            as(post("/api/v1/documents/" + documentId + "/annotations"), MEMBER_ID)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(
+                    "{\"versionNumber\":1,\"anchor\":" + ANCHOR + ",\"comment\":\"too late\"}"))
+        .andExpect(status().isConflict())
+        .andExpect(jsonPath("$.code").value("VERSION_READ_ONLY"));
+
+    // The latest version keeps accepting annotations.
+    mockMvc
+        .perform(
+            as(post("/api/v1/documents/" + documentId + "/annotations"), MEMBER_ID)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(
+                    "{\"versionNumber\":2,\"anchor\":" + ANCHOR + ",\"comment\":\"on latest\"}"))
+        .andExpect(status().isCreated());
+  }
+
+  @Test
   void rejectsAnAnnotationWithoutAComment() throws Exception {
     UUID documentId = seedDocumentWithVersion();
 

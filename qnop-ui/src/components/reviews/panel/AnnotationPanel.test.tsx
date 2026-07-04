@@ -257,4 +257,11 @@ describe('AnnotationPanel', () => {
     fireEvent.keyDown(field, { key: 'Enter', altKey: true });
     expect(props.onCreate).toHaveBeenCalledTimes(2);
   });
+
+  it('suppresses deciding on a read-only (older) version (#306)', () => {
+    useAuthStore.setState({ userId: 'owner-1' });
+    renderPanel({ annotations: [annotation('a1')], activeAnnotationId: 'a1', readOnly: true });
+    expect(screen.queryByTestId('decision-bar')).not.toBeInTheDocument();
+    expect(screen.getByTestId('thread-a1')).toBeInTheDocument();
+  });
 });

@@ -143,4 +143,10 @@ describe('FocusAnnotationCard', () => {
     expect(screen.getByRole('button', { name: 'Next annotation' })).toBeEnabled();
     expect(screen.queryByTestId('decision-bar')).not.toBeInTheDocument();
   });
+
+  it('suppresses deciding on a read-only (older) version (#306)', () => {
+    renderCard({ readOnly: true });
+    expect(screen.queryByTestId('decision-bar')).not.toBeInTheDocument();
+    expect(screen.getByTestId('thread-a2')).toBeInTheDocument();
+  });
 });

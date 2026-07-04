@@ -42,6 +42,8 @@ const LINE_LEFT = AVATAR_SIZE / 2 - 1;
 interface CommentThreadProps {
   annotationId: string;
   notify: Notify;
+  /** Hides the reply composer — older versions are a read-only record (#306). */
+  readOnly?: boolean;
 }
 
 const TIME_FORMAT = new Intl.DateTimeFormat(undefined, {
@@ -57,7 +59,7 @@ const TIME_FORMAT = new Intl.DateTimeFormat(undefined, {
  * of the annotation API yet, so authorship is shown relative to the signed-in
  * user.
  */
-export function CommentThread({ annotationId, notify }: CommentThreadProps) {
+export function CommentThread({ annotationId, notify, readOnly = false }: CommentThreadProps) {
   const theme = useTheme();
   const userId = useAuthStore((state) => state.userId);
   const displayName = useAuthStore((state) => state.displayName);
@@ -144,48 +146,52 @@ export function CommentThread({ annotationId, notify }: CommentThreadProps) {
             No comments yet. Start the discussion.
           </Typography>
         )}
-        {/* Composer continues the thread rail with the signed-in user's avatar. */}
-        <Stack direction="row" spacing={1} sx={{ alignItems: 'flex-start' }}>
-          <Box sx={{ position: 'relative', zIndex: 1, pt: 0.5 }}>
-            <UserAvatar name={displayName ?? 'You'} size={AVATAR_SIZE} imageUrl={avatarUrl} />
-          </Box>
-          <TextField
-            multiline
-            minRows={3}
-            size="small"
-            fullWidth
-            placeholder="Add a comment"
-            value={draft}
-            onChange={(event) => setDraft(event.target.value)}
-            onKeyDown={(event) => {
-              if (isSubmitShortcut(event)) {
-                event.preventDefault();
-                submit();
-              }
-            }}
-            slotProps={{
-              htmlInput: { maxLength: 20000, 'aria-label': 'Add a comment' },
-              input: {
-                sx: { borderRadius: 1, bgcolor: 'background.paper' },
-                endAdornment: (
-                  <Tooltip title={`Send (${submitShortcutLabel()})`}>
-                    <span style={{ alignSelf: 'flex-end' }}>
-                      <IconButton
-                        size="small"
-                        aria-label="Comment"
-                        color="primary"
-                        onClick={submit}
-                        disabled={!draft.trim() || addComment.isPending}
-                      >
-                        <SendHorizontal size={16} />
-                      </IconButton>
-                    </span>
-                  </Tooltip>
-                ),
-              },
-            }}
-          />
-        </Stack>
+        {/* Composer continues the thread rail with the signed-in user's avatar.
+            Hidden on read-only (older) versions — the same thread stays
+            writable when the annotation is opened on the latest version. */}
+        {!readOnly && (
+          <Stack direction="row" spacing={1} sx={{ alignItems: 'flex-start' }}>
+            <Box sx={{ position: 'relative', zIndex: 1, pt: 0.5 }}>
+              <UserAvatar name={displayName ?? 'You'} size={AVATAR_SIZE} imageUrl={avatarUrl} />
+            </Box>
+            <TextField
+              multiline
+              minRows={3}
+              size="small"
+              fullWidth
+              placeholder="Add a comment"
+              value={draft}
+              onChange={(event) => setDraft(event.target.value)}
+              onKeyDown={(event) => {
+                if (isSubmitShortcut(event)) {
+                  event.preventDefault();
+                  submit();
+                }
+              }}
+              slotProps={{
+                htmlInput: { maxLength: 20000, 'aria-label': 'Add a comment' },
+                input: {
+                  sx: { borderRadius: 1, bgcolor: 'background.paper' },
+                  endAdornment: (
+                    <Tooltip title={`Send (${submitShortcutLabel()})`}>
+                      <span style={{ alignSelf: 'flex-end' }}>
+                        <IconButton
+                          size="small"
+                          aria-label="Comment"
+                          color="primary"
+                          onClick={submit}
+                          disabled={!draft.trim() || addComment.isPending}
+                        >
+                          <SendHorizontal size={16} />
+                        </IconButton>
+                      </span>
+                    </Tooltip>
+                  ),
+                },
+              }}
+            />
+          </Stack>
+        )}
       </Stack>
     </Box>
   );

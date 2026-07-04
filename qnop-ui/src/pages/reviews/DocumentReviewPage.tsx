@@ -23,6 +23,7 @@ import { useMemo, useRef, useState } from 'react';
 import { useParams, useSearchParams } from 'react-router-dom';
 import Alert from '@mui/material/Alert';
 import Box from '@mui/material/Box';
+import Button from '@mui/material/Button';
 import CircularProgress from '@mui/material/CircularProgress';
 import ListItemIcon from '@mui/material/ListItemIcon';
 import ListItemText from '@mui/material/ListItemText';
@@ -70,6 +71,7 @@ import { usePdfDocument } from '../../components/reviews/viewer/usePdfDocument';
 import type { ViewerTool } from '../../components/reviews/viewer/ViewerToolbar';
 import { ViewerToolbar } from '../../components/reviews/viewer/ViewerToolbar';
 import { useAuthStore } from '../../stores/authStore';
+import { apiErrorCode } from '../../utils/apiError';
 import { resolveEffectiveVersion } from './resolveEffectiveVersion';
 
 const PANEL_WIDTH_KEY = 'qnop-review-panel-width';
@@ -155,7 +157,15 @@ export function DocumentReviewPage() {
     () => annotationsQuery.data?.annotations ?? [],
     [annotationsQuery.data],
   );
-  const canAnnotate = extractionReady && surfaces !== undefined;
+  // The latest version across BOTH sources (the detail can be stale right
+  // after an upload, #300); mutating review activity is latest-only (#306).
+  const knownVersionNumbers = versionsQuery.data?.versions.map((v) => v.versionNumber) ?? [];
+  const knownLatest = Math.max(
+    latestVersion,
+    ...(knownVersionNumbers.length ? knownVersionNumbers : [0]),
+  );
+  const isLatestVersion = versionNumber !== undefined && versionNumber === knownLatest;
+  const canAnnotate = extractionReady && surfaces !== undefined && isLatestVersion;
   const textToolAvailable = (surfaces ?? []).some((surface) => surface.textSpans.length > 0);
   const pageCount = surfaces?.length ?? pdf?.numPages ?? 0;
 
@@ -222,7 +232,13 @@ export function DocumentReviewPage() {
           setActiveAnnotationId(created.id);
           notify('Annotation created.');
         },
-        onError: () => notify('Could not create the annotation.', 'error'),
+        onError: (error) =>
+          notify(
+            apiErrorCode(error) === 'VERSION_READ_ONLY'
+              ? 'A newer version was uploaded in the meantime — annotations go on the latest version.'
+              : 'Could not create the annotation.',
+            'error',
+          ),
       },
     );
   };
@@ -313,6 +329,23 @@ export function DocumentReviewPage() {
               annotationCount={annotations.length}
               onOpenAnnotationList={() => setListOpen(true)}
             />
+            {!isLatestVersion && versionNumber !== undefined && (
+              <Alert
+                severity="info"
+                data-testid="read-only-banner"
+                action={
+                  <Button
+                    color="inherit"
+                    size="small"
+                    onClick={() => handleVersionChange(knownLatest)}
+                  >
+                    Go to v{knownLatest}
+                  </Button>
+                }
+              >
+                You are viewing an older version — reading only. Annotate on v{knownLatest}.
+              </Alert>
+            )}
             {extractionStatus === ExtractionStatus.Pending && (
               <Alert severity="info">
                 The document is being processed — annotating becomes available once the text layer
@@ -424,6 +457,7 @@ export function DocumentReviewPage() {
                   canAnnotate={canAnnotate}
                   ownerId={document.ownerId}
                   notify={notify}
+                  readOnly={!isLatestVersion}
                 />
               </ErrorBoundary>
             </Box>
@@ -456,6 +490,7 @@ export function DocumentReviewPage() {
               canAnnotate={canAnnotate}
               ownerId={document.ownerId}
               notify={notify}
+              readOnly={!isLatestVersion}
             />
           </ErrorBoundary>
         </FocusDrawer>
@@ -470,6 +505,7 @@ export function DocumentReviewPage() {
           ownerId={document.ownerId}
           userId={userId}
           notify={notify}
+          readOnly={!isLatestVersion}
         />
       )}
       {focusMode && composingPending && pending && (

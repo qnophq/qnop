@@ -70,6 +70,11 @@ public class DocumentValidationException extends RuntimeException {
     return new DocumentValidationException(400, "VALIDATION_ERROR", detail);
   }
 
+  /** Mutating review activity happens on the LATEST version only (issue #306). */
+  public static DocumentValidationException versionReadOnly(String detail) {
+    return new DocumentValidationException(409, "VERSION_READ_ONLY", detail);
+  }
+
   /** The rendered representation is not (yet) available: extraction pending or failed. */
   public static DocumentValidationException renderingUnavailable(String code, String detail) {
     return new DocumentValidationException(409, code, detail);

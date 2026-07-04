@@ -36,6 +36,7 @@ import {
 } from '../../api/hooks/useDocuments';
 import { useAnnotations, useCreateAnnotation } from '../../api/hooks/useAnnotations';
 import { usePdfDocument } from '../../components/reviews/viewer/usePdfDocument';
+import { useAuthStore } from '../../stores/authStore';
 
 vi.mock('../../api/hooks/useDocuments', () => ({
   useDocument: vi.fn(),
@@ -170,10 +171,10 @@ function seedHappyPath(extractionStatus: ExtractionStatus = ExtractionStatus.Rea
   } as unknown as ReturnType<typeof useCreateAnnotation>);
 }
 
-function renderPage() {
+function renderPage(initialEntry = '/reviews/doc-1') {
   render(
     <ThemeProvider theme={buildTheme('light')}>
-      <MemoryRouter initialEntries={['/reviews/doc-1']}>
+      <MemoryRouter initialEntries={[initialEntry]}>
         <Routes>
           <Route path="/reviews/:documentId" element={<DocumentReviewPage />} />
         </Routes>
@@ -317,5 +318,52 @@ describe('DocumentReviewPage focus mode', () => {
 
     expect(screen.getByRole('complementary', { name: 'Annotations' })).toBeInTheDocument();
     expect(localStorage.getItem('qnop-review-view-mode')).toBe('panel');
+  });
+});
+
+// Issue #306: mutating review activity is latest-only — older versions read as
+// an archive: banner + jump, annotation tools off, threads read-only.
+describe('DocumentReviewPage on an older version', () => {
+  it('shows the read-only banner with a jump to the latest version', () => {
+    seedHappyPath();
+    renderPage('/reviews/doc-1?version=1');
+
+    expect(screen.getByTestId('read-only-banner')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Go to v2' }));
+    expect(screen.queryByTestId('read-only-banner')).not.toBeInTheDocument();
+  });
+
+  it('shows no banner on the latest version', () => {
+    seedHappyPath();
+    renderPage();
+    expect(screen.queryByTestId('read-only-banner')).not.toBeInTheDocument();
+  });
+
+  // The page must pass readOnly down to the panel — the decision bar and the
+  // reply composer of an expanded thread are gated there, not in the page.
+  describe('expanded thread', () => {
+    afterEach(() => {
+      useAuthStore.setState({ userId: null });
+    });
+
+    it('is read-only on an older version', () => {
+      seedHappyPath();
+      useAuthStore.setState({ userId: 'u1' });
+      renderPage('/reviews/doc-1?version=1');
+
+      fireEvent.click(screen.getByTestId('annotation-item-a1'));
+      expect(screen.queryByTestId('decision-bar')).not.toBeInTheDocument();
+      expect(screen.queryByLabelText('Add a comment')).not.toBeInTheDocument();
+    });
+
+    it('stays writable on the latest version', () => {
+      seedHappyPath();
+      useAuthStore.setState({ userId: 'u1' });
+      renderPage('/reviews/doc-1?version=2');
+
+      fireEvent.click(screen.getByTestId('annotation-item-a1'));
+      expect(screen.getByTestId('decision-bar')).toBeInTheDocument();
+      expect(screen.getByLabelText('Add a comment')).toBeInTheDocument();
+    });
   });
 });

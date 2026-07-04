@@ -34,10 +34,10 @@ vi.mock('../../../api/hooks/useComments', () => ({
 
 const addMutate = vi.fn();
 
-function renderThread() {
+function renderThread(readOnly = false) {
   return render(
     <ThemeProvider theme={buildTheme('light')}>
-      <CommentThread annotationId="a1" notify={vi.fn()} />
+      <CommentThread annotationId="a1" notify={vi.fn()} readOnly={readOnly} />
     </ThemeProvider>,
   );
 }
@@ -114,5 +114,15 @@ describe('CommentThread', () => {
     fireEvent.click(button);
 
     expect(addMutate).toHaveBeenCalledWith('Needs a stronger clause', expect.anything());
+  });
+
+  it('hides the reply composer on a read-only (older) version (#306)', () => {
+    vi.mocked(useComments).mockReturnValue({
+      isPending: false,
+      isError: false,
+      data: { comments: [] },
+    } as unknown as ReturnType<typeof useComments>);
+    renderThread(true);
+    expect(screen.queryByLabelText('Add a comment')).not.toBeInTheDocument();
   });
 });
