@@ -29,6 +29,7 @@ import type {
   RenderedSurface,
 } from '../../../api/generated';
 import type { ScreenPosition, TextSelectionOffsets } from './anchoring';
+import { FocusScrimLayer } from '../focus/FocusScrimLayer';
 import { HighlightLayer } from './HighlightLayer';
 import { PageCanvas } from './PageCanvas';
 import { RegionSelectLayer } from './RegionSelectLayer';
@@ -58,6 +59,12 @@ interface SurfacePageProps {
   pendingAnchor: Anchor | null;
   onTextSelected: (selection: TextSelectionOffsets, at: ScreenPosition) => void;
   onRegionSelected: (surfaceIndex: number, box: NormalizedBox, at: ScreenPosition) => void;
+  /**
+   * Focus-mode scrim (issue #291): non-null dims this page — with a sharp
+   * spotlight hole when `box` is set (the spotlit passage lives here). The
+   * scrim sits UNDER the highlight layer, so marks stay crisp and clickable.
+   */
+  focusScrim?: { box: NormalizedBox | null; onDismiss: () => void } | null;
 }
 
 /**
@@ -82,6 +89,7 @@ export function SurfacePage({
   pendingAnchor,
   onTextSelected,
   onRegionSelected,
+  focusScrim,
 }: SurfacePageProps) {
   const [fallbackAspect, setFallbackAspect] = useState<number | null>(null);
 
@@ -129,6 +137,13 @@ export function SurfacePage({
             enabled={canAnnotate && tool === 'region'}
             onRegionSelected={onRegionSelected}
           />
+          {focusScrim && (
+            <FocusScrimLayer
+              spotlight={focusScrim.box}
+              onDismiss={focusScrim.onDismiss}
+              surfaceIndex={surface.index}
+            />
+          )}
           <HighlightLayer
             annotations={annotations}
             surfaceIndex={surface.index}

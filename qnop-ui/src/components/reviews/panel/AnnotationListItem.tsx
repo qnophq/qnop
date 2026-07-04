@@ -25,48 +25,21 @@ import Stack from '@mui/material/Stack';
 import Tooltip from '@mui/material/Tooltip';
 import Typography from '@mui/material/Typography';
 import { alpha, keyframes, useTheme } from '@mui/material/styles';
-import type { Theme } from '@mui/material/styles';
-import { CircleCheck, CircleDot, CircleX, MessageSquare } from 'lucide-react';
-import type { LucideIcon } from 'lucide-react';
+import { MessageSquare } from 'lucide-react';
 import type { AnnotationView } from '../../../api/generated';
-import { AnnotationStatus } from '../../../api/generated';
 import { useComments } from '../../../api/hooks/useComments';
 import { useAuthStore } from '../../../stores/authStore';
-import type { BadgeTone } from '../../admin/ToneBadge';
 import { ToneBadge } from '../../admin/ToneBadge';
 import { UserAvatar } from '../../shell/UserAvatar';
 import { highlightColorFor } from '../viewer/markerColors';
 import { PlacementStatusChip } from './PlacementStatusChip';
+import { STATUS_CUES } from './statusCues';
 
 /** Gentle glow on the status rail while the card is linked to its hovered mark. */
 const railGlow = keyframes`
   0%, 100% { box-shadow: 0 0 0 0 transparent; }
   50% { box-shadow: 0 0 10px 2px var(--rail-glow); }
 `;
-
-const STATUS_CUES: Record<
-  AnnotationStatus,
-  { tone: BadgeTone; label: string; icon: LucideIcon; color: (theme: Theme) => string }
-> = {
-  [AnnotationStatus.Open]: {
-    tone: 'blue',
-    label: 'Open',
-    icon: CircleDot,
-    color: (theme) => theme.qnop.brand.blue,
-  },
-  [AnnotationStatus.Accepted]: {
-    tone: 'green',
-    label: 'Accepted',
-    icon: CircleCheck,
-    color: (theme) => theme.palette.success.main,
-  },
-  [AnnotationStatus.Rejected]: {
-    tone: 'neutral',
-    label: 'Rejected',
-    icon: CircleX,
-    color: (theme) => theme.palette.text.disabled,
-  },
-};
 
 /** Up to this many participant avatars stack in the collapsed row. */
 const MAX_AVATARS = 3;
