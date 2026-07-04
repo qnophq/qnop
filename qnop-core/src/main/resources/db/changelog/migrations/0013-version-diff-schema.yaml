@@ -64,3 +64,10 @@ databaseChangeLog:
             tableName: version_diff
             columnNames: from_version_id, to_version_id
             constraintName: ux_version_diff_pair
+        # FK index for the document_id CASCADE and document-scoped lookups (issue #330).
+        # (from_version_id is already covered by the leftmost prefix of ux_version_diff_pair.)
+        - createIndex:
+            indexName: ix_version_diff_document
+            tableName: version_diff
+            columns:
+              - column: { name: document_id }

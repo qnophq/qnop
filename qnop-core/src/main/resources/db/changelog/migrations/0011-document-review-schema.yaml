@@ -273,6 +273,11 @@ databaseChangeLog:
             tableName: annotation
             columns:
               - column: { name: document_id }
+        - createIndex:
+            indexName: ix_annotation_author
+            tableName: annotation
+            columns:
+              - column: { name: author_id }
         - sql:
             comment: Closed set of annotation outcomes (not expressible in JPA).
             sql: |
@@ -326,6 +331,11 @@ databaseChangeLog:
             tableName: comment
             columns:
               - column: { name: annotation_id }
+        - createIndex:
+            indexName: ix_comment_author
+            tableName: comment
+            columns:
+              - column: { name: author_id }
 
   - changeSet:
       id: 0011-annotation-placement
@@ -443,3 +453,8 @@ databaseChangeLog:
             columns:
               - column: { name: document_id }
               - column: { name: created_at }
+        - createIndex:
+            indexName: ix_audit_event_actor
+            tableName: audit_event
+            columns:
+              - column: { name: actor_id }

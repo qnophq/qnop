@@ -36,6 +36,7 @@ import io.qnop.testsupport.SeededIntegrationTest;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
 
 /**
@@ -49,6 +50,19 @@ class VersionDiffIT extends SeededIntegrationTest {
   @Autowired private DocumentVersionRepository versions;
   @Autowired private ReviewParticipantRepository participants;
   @Autowired private VersionDiffRepository diffCache;
+  @Autowired private JdbcTemplate jdbc;
+
+  @Test
+  void indexesTheDocumentForeignKey() {
+    // Postgres does not auto-index FKs; document_id must be indexed for the CASCADE and lookups
+    // (issue #330). from_version_id is already covered by ux_version_diff_pair's leading column.
+    Integer count =
+        jdbc.queryForObject(
+            "SELECT count(*) FROM pg_indexes WHERE tablename = 'version_diff'"
+                + " AND indexname = 'ix_version_diff_document'",
+            Integer.class);
+    assertThat(count).isEqualTo(1);
+  }
 
   /** The jsonb of a one-surface rendered document whose spans are the given lines (ADR-0032). */
   private static String rendered(String... lines) {
