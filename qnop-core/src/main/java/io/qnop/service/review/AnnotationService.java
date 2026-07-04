@@ -104,7 +104,10 @@ public class AnnotationService {
 
   /**
    * Creates an annotation on {@code versionNumber}, placed immediately, seeded with its mandatory
-   * first comment — an annotation without text must not exist (issue #301).
+   * first comment — an annotation without text must not exist (issue #301). Only the LATEST version
+   * accepts new annotations (issue #306) — older versions are a read-only record; the guard answers
+   * 409 {@code VERSION_READ_ONLY} so a client racing a concurrent re-upload gets a stable, mappable
+   * signal.
    */
   @Transactional
   public AnnotationView create(
@@ -123,6 +126,16 @@ public class AnnotationService {
             .findByDocumentIdAndVersionNumber(documentId, versionNumber)
             .orElseThrow(
                 () -> DocumentValidationException.notFound("no such version: " + versionNumber));
+    int latest =
+        versions
+            .findTopByDocumentIdOrderByVersionNumberDesc(documentId)
+            .map(DocumentVersion::getVersionNumber)
+            .orElse(versionNumber);
+    if (versionNumber != latest) {
+      throw DocumentValidationException.versionReadOnly(
+          "annotations are created on the latest version (v%d), not v%d"
+              .formatted(latest, versionNumber));
+    }
 
     // saveAndFlush so the @CreationTimestamp / @UpdateTimestamp are populated on the returned
     // entity (they are only set when the INSERT is flushed) before the view is built.

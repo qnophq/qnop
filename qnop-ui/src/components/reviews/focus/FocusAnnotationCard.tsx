@@ -54,6 +54,8 @@ interface FocusAnnotationCardProps {
   ownerId: string | null;
   userId: string | null;
   notify: Notify;
+  /** True while an OLDER version is viewed (#306): thread readable, nothing writable. */
+  readOnly?: boolean;
 }
 
 /** True when the key event originates in a text field (arrows must move the caret). */
@@ -80,6 +82,7 @@ export function FocusAnnotationCard({
   ownerId,
   userId,
   notify,
+  readOnly = false,
 }: FocusAnnotationCardProps) {
   const theme = useTheme();
   const reducedMotion = useMediaQuery('(prefers-reduced-motion: reduce)');
@@ -280,7 +283,7 @@ export function FocusAnnotationCard({
                   )}
                 </Box>
 
-                {mayDecideAnnotation(annotation, userId, ownerId) && (
+                {!readOnly && mayDecideAnnotation(annotation, userId, ownerId) && (
                   <DecisionBar
                     disabled={deciding}
                     onDecide={(decision) => decideWith(annotation, decision)}
@@ -288,7 +291,7 @@ export function FocusAnnotationCard({
                 )}
 
                 <Box sx={{ overflowY: 'auto', flex: 1, minHeight: 0, px: 0.5, pb: 0.5 }}>
-                  <CommentThread annotationId={annotation.id} notify={notify} />
+                  <CommentThread annotationId={annotation.id} notify={notify} readOnly={readOnly} />
                 </Box>
                 {/* Discoverability for the native resize grip underneath. */}
                 <Box
