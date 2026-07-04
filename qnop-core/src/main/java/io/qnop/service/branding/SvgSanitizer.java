@@ -147,10 +147,11 @@ public final class SvgSanitizer {
         toRemove.add(attribute);
       } else if (name.equals("style")) {
         toRemove.add(attribute);
-      } else if (name.equals("href")) {
+      } else if (isHrefAttribute(attribute, name)) {
         String value = attribute.getValue() == null ? "" : attribute.getValue().trim();
         if (!value.startsWith("#")) {
-          toRemove.add(attribute); // only local fragment references survive
+          // Only a local #fragment survives — covers href and the legacy xlink:href alike.
+          toRemove.add(attribute);
         }
       }
     }
@@ -173,6 +174,23 @@ public final class SvgSanitizer {
         element.removeChild(child); // drops <script>, <foreignObject>, <style>, <image>, …
       }
     }
+  }
+
+  /**
+   * Whether {@code attribute} is a hyperlink reference whose target must be restricted to a local
+   * {@code #fragment} (issue #338): {@code href} in any namespace — including the legacy {@code
+   * xlink:href} (SVG 1.1) that {@code <use>} still relies on. Matched explicitly so the
+   * classification never depends on how the parser resolved the {@code xlink} prefix: the local
+   * name {@code href} (namespace-aware parsing yields this for {@code xlink:href}), plus a fallback
+   * on a qualified name ending in {@code :href} for a prefixed name the parser did not split. Other
+   * XLink attributes ({@code xlink:title}, {@code xlink:show}, …) are deliberately not treated as
+   * links.
+   *
+   * @param localName the attribute's already-lowercased local name
+   */
+  private static boolean isHrefAttribute(Attr attribute, String localName) {
+    return localName.equals("href")
+        || attribute.getNodeName().toLowerCase(Locale.ROOT).endsWith(":href");
   }
 
   private static String localName(Node node) {
