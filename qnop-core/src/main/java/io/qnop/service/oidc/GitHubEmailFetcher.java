@@ -20,8 +20,8 @@
  */
 package io.qnop.service.oidc;
 
+import io.qnop.service.http.HttpClientProperties;
 import java.net.http.HttpClient;
-import java.time.Duration;
 import java.util.List;
 import java.util.Map;
 import org.slf4j.Logger;
@@ -45,19 +45,21 @@ public class GitHubEmailFetcher {
       new ParameterizedTypeReference<>() {};
   private static final Logger log = LoggerFactory.getLogger(GitHubEmailFetcher.class);
 
+  private final RestClient restClient;
+
   // Bound the outbound call (issue #342): RestClient.create() uses the JDK HTTP
   // client with no default timeout, so a slow/hung GitHub response would pin the
-  // login thread. Finite connect + read timeouts keep the OIDC login responsive.
-  private static final Duration CONNECT_TIMEOUT = Duration.ofSeconds(5);
-  private static final Duration READ_TIMEOUT = Duration.ofSeconds(15);
+  // login thread. The configurable connect + read timeouts keep OIDC login responsive.
+  public GitHubEmailFetcher(HttpClientProperties httpClientProperties) {
+    this.restClient =
+        RestClient.builder().requestFactory(timedFactory(httpClientProperties)).build();
+  }
 
-  private final RestClient restClient = RestClient.builder().requestFactory(timedFactory()).build();
-
-  private static JdkClientHttpRequestFactory timedFactory() {
+  private static JdkClientHttpRequestFactory timedFactory(HttpClientProperties properties) {
     JdkClientHttpRequestFactory factory =
         new JdkClientHttpRequestFactory(
-            HttpClient.newBuilder().connectTimeout(CONNECT_TIMEOUT).build());
-    factory.setReadTimeout(READ_TIMEOUT);
+            HttpClient.newBuilder().connectTimeout(properties.outboundConnectTimeout()).build());
+    factory.setReadTimeout(properties.outboundReadTimeout());
     return factory;
   }
 

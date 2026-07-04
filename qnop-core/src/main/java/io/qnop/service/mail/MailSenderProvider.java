@@ -23,6 +23,8 @@ package io.qnop.service.mail;
 import io.qnop.service.ApplicationSettingKey;
 import io.qnop.service.ApplicationSettingsService;
 import io.qnop.service.SettingsChangeListener;
+import io.qnop.service.http.HttpClientProperties;
+import java.time.Duration;
 import java.util.EnumSet;
 import java.util.Properties;
 import java.util.Set;
@@ -48,14 +50,6 @@ public class MailSenderProvider implements SettingsChangeListener {
 
   private static final Logger log = LoggerFactory.getLogger(MailSenderProvider.class);
 
-  // Explicit SMTP transport timeouts (issue #342): without them a hung or slow
-  // mail server pins the sending thread indefinitely. Values are milliseconds, as
-  // Jakarta Mail expects. Generous but finite — mail is best-effort and never on a
-  // request's critical path.
-  private static final String SMTP_CONNECT_TIMEOUT_MS = "10000";
-  private static final String SMTP_READ_TIMEOUT_MS = "30000";
-  private static final String SMTP_WRITE_TIMEOUT_MS = "30000";
-
   // Only the keys that shape the JavaMailSender transport invalidate the cache.
   // smtp.from / smtp.from_name are read per-send from the snapshot (see MailService),
   // not baked into the sender, so changing them must not drop the cached transport.
@@ -69,13 +63,16 @@ public class MailSenderProvider implements SettingsChangeListener {
           ApplicationSettingKey.SMTP_ENCRYPTION);
 
   private final ApplicationSettingsService settings;
+  private final HttpClientProperties httpClientProperties;
   private final AtomicReference<JavaMailSender> cached = new AtomicReference<>();
 
   // @Lazy breaks the construction cycle: ApplicationSettingsService injects the
   // List<SettingsChangeListener> (which includes this bean), while this bean
   // needs the settings service. A lazy proxy defers resolution until first use.
-  public MailSenderProvider(@Lazy ApplicationSettingsService settings) {
+  public MailSenderProvider(
+      @Lazy ApplicationSettingsService settings, HttpClientProperties httpClientProperties) {
     this.settings = settings;
+    this.httpClientProperties = httpClientProperties;
   }
 
   /**
@@ -139,10 +136,11 @@ public class MailSenderProvider implements SettingsChangeListener {
     Properties props = sender.getJavaMailProperties();
     props.put("mail.transport.protocol", "smtp");
     props.put("mail.smtp.auth", String.valueOf(authenticated));
-    // Bound connect/read/write so a stalled SMTP peer cannot hang the sender (#342).
-    props.put("mail.smtp.connectiontimeout", SMTP_CONNECT_TIMEOUT_MS);
-    props.put("mail.smtp.timeout", SMTP_READ_TIMEOUT_MS);
-    props.put("mail.smtp.writetimeout", SMTP_WRITE_TIMEOUT_MS);
+    // Bound connect/read/write so a stalled SMTP peer cannot hang the sender (#342);
+    // ceilings come from the configurable qnop.http-client.smtp-* durations.
+    props.put("mail.smtp.connectiontimeout", millis(httpClientProperties.smtpConnectTimeout()));
+    props.put("mail.smtp.timeout", millis(httpClientProperties.smtpReadTimeout()));
+    props.put("mail.smtp.writetimeout", millis(httpClientProperties.smtpWriteTimeout()));
     applyEncryption(props, settings.getString(ApplicationSettingKey.SMTP_ENCRYPTION));
     return sender;
   }
@@ -176,5 +174,10 @@ public class MailSenderProvider implements SettingsChangeListener {
   private static void requireStartTls(Properties props) {
     props.put("mail.smtp.starttls.enable", "true");
     props.put("mail.smtp.starttls.required", "true");
+  }
+
+  /** Jakarta Mail expects the timeouts as millisecond strings. */
+  private static String millis(Duration duration) {
+    return Long.toString(duration.toMillis());
   }
 }

@@ -26,6 +26,8 @@ import static org.mockito.Mockito.when;
 
 import io.qnop.service.ApplicationSettingKey;
 import io.qnop.service.ApplicationSettingsService;
+import io.qnop.service.http.HttpClientProperties;
+import java.time.Duration;
 import java.util.EnumSet;
 import java.util.Properties;
 import org.junit.jupiter.api.BeforeEach;
@@ -46,7 +48,11 @@ class MailSenderProviderTest {
 
   @BeforeEach
   void setUp() {
-    provider = new MailSenderProvider(settings);
+    // Explicit non-default timeouts prove the transport picks them up from config.
+    HttpClientProperties httpClient =
+        new HttpClientProperties(
+            null, null, Duration.ofSeconds(8), Duration.ofSeconds(24), Duration.ofSeconds(42));
+    provider = new MailSenderProvider(settings, httpClient);
   }
 
   private void configureSmtp() {
@@ -126,15 +132,15 @@ class MailSenderProviderTest {
   }
 
   @Test
-  @DisplayName("the transport carries explicit connect/read/write timeouts (issue #342)")
+  @DisplayName("the transport carries the configured connect/read/write timeouts (issue #342)")
   void transportHasTimeouts() {
     configureSmtp();
 
     Properties props = propsOf(provider.current());
 
-    assertThat(props.getProperty("mail.smtp.connectiontimeout")).isEqualTo("10000");
-    assertThat(props.getProperty("mail.smtp.timeout")).isEqualTo("30000");
-    assertThat(props.getProperty("mail.smtp.writetimeout")).isEqualTo("30000");
+    assertThat(props.getProperty("mail.smtp.connectiontimeout")).isEqualTo("8000");
+    assertThat(props.getProperty("mail.smtp.timeout")).isEqualTo("24000");
+    assertThat(props.getProperty("mail.smtp.writetimeout")).isEqualTo("42000");
   }
 
   @Test

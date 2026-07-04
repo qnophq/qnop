@@ -21,6 +21,7 @@
 package io.qnop.bootstrap;
 
 import io.qnop.security.QnopProperties;
+import io.qnop.service.http.HttpClientProperties;
 import io.qnop.web.security.ratelimit.RateLimitProperties;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
@@ -38,34 +39,17 @@ import org.springframework.scheduling.annotation.EnableScheduling;
  * sibling packages, so they are registered explicitly (the data model arrived with issue #11).
  */
 @SpringBootApplication(scanBasePackages = "io.qnop")
-@EnableConfigurationProperties({QnopProperties.class, RateLimitProperties.class})
+@EnableConfigurationProperties({
+  QnopProperties.class,
+  RateLimitProperties.class,
+  HttpClientProperties.class
+})
 @EntityScan("io.qnop.entity")
 @EnableJpaRepositories("io.qnop.repository")
 @EnableScheduling
 public class QnopApplication {
 
   public static void main(String[] args) {
-    applyDefaultHttpUrlConnectionTimeouts();
     SpringApplication.run(QnopApplication.class, args);
-  }
-
-  /**
-   * Bounds the JDK {@code HttpURLConnection} defaults (issue #342) as a safety net for outbound
-   * calls made over the legacy client that carries no timeout of its own — notably Spring
-   * Security's OIDC issuer discovery ({@code ClientRegistrations}) and JWK-set fetching, which
-   * build a default {@code RestTemplate}. Set only when the operator has not already supplied a
-   * value via {@code -Dsun.net.client.default*Timeout}, so an explicit override always wins.
-   * Clients we construct ourselves (S3, SMTP, the GitHub {@code RestClient}) carry their own
-   * timeouts and are unaffected.
-   */
-  static void applyDefaultHttpUrlConnectionTimeouts() {
-    setPropertyIfAbsent("sun.net.client.defaultConnectTimeout", "5000");
-    setPropertyIfAbsent("sun.net.client.defaultReadTimeout", "15000");
-  }
-
-  private static void setPropertyIfAbsent(String key, String value) {
-    if (System.getProperty(key) == null) {
-      System.setProperty(key, value);
-    }
   }
 }

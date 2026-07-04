@@ -22,6 +22,7 @@ package io.qnop.bootstrap;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import java.time.Duration;
 import java.util.Map;
 import java.util.Optional;
 import org.junit.jupiter.api.AfterEach;
@@ -29,8 +30,11 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
-/** The JDK HttpURLConnection timeout backstop for OIDC discovery / JWK fetching (issue #342). */
-class QnopApplicationTest {
+/**
+ * The configurable JDK HttpURLConnection timeout backstop for OIDC discovery / JWK fetching (issue
+ * #342).
+ */
+class HttpUrlConnectionTimeoutConfigurationTest {
 
   private static final String CONNECT = "sun.net.client.defaultConnectTimeout";
   private static final String READ = "sun.net.client.defaultReadTimeout";
@@ -55,12 +59,12 @@ class QnopApplicationTest {
   }
 
   @Test
-  @DisplayName("sets finite HttpURLConnection connect/read timeouts when unset")
-  void setsDefaultsWhenUnset() {
-    QnopApplication.applyDefaultHttpUrlConnectionTimeouts();
+  @DisplayName("applies the configured connect/read timeouts (in millis) when unset")
+  void appliesConfiguredValuesWhenUnset() {
+    HttpUrlConnectionTimeoutConfiguration.apply(Duration.ofSeconds(7), Duration.ofSeconds(21));
 
-    assertThat(System.getProperty(CONNECT)).isEqualTo("5000");
-    assertThat(System.getProperty(READ)).isEqualTo("15000");
+    assertThat(System.getProperty(CONNECT)).isEqualTo("7000");
+    assertThat(System.getProperty(READ)).isEqualTo("21000");
   }
 
   @Test
@@ -69,7 +73,7 @@ class QnopApplicationTest {
     System.setProperty(CONNECT, "1234");
     System.setProperty(READ, "9999");
 
-    QnopApplication.applyDefaultHttpUrlConnectionTimeouts();
+    HttpUrlConnectionTimeoutConfiguration.apply(Duration.ofSeconds(7), Duration.ofSeconds(21));
 
     assertThat(System.getProperty(CONNECT)).isEqualTo("1234");
     assertThat(System.getProperty(READ)).isEqualTo("9999");

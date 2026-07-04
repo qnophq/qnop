@@ -75,6 +75,16 @@ qnop:
       frontend-base-url: ${QNOP_AUTH_OIDC_FRONTEND_BASE_URL:}
   cors:
     allowed-origins: ${QNOP_CORS_ALLOWED_ORIGINS:http://localhost:5173}
+  # Outbound HTTP timeouts (issue #342). `outbound-*` bound the GitHub email fetch
+  # (OIDC login) and, as JDK HttpURLConnection defaults, the OIDC issuer discovery
+  # and JWK-set fetches; `smtp-*` bound the outgoing-mail transport. All are
+  # durations (e.g. 5s, 500ms, PT2S) and overridable via the QNOP_HTTP_CLIENT_* env.
+  http-client:
+    outbound-connect-timeout: ${QNOP_HTTP_CLIENT_OUTBOUND_CONNECT_TIMEOUT:5s}
+    outbound-read-timeout: ${QNOP_HTTP_CLIENT_OUTBOUND_READ_TIMEOUT:15s}
+    smtp-connect-timeout: ${QNOP_HTTP_CLIENT_SMTP_CONNECT_TIMEOUT:10s}
+    smtp-read-timeout: ${QNOP_HTTP_CLIENT_SMTP_READ_TIMEOUT:30s}
+    smtp-write-timeout: ${QNOP_HTTP_CLIENT_SMTP_WRITE_TIMEOUT:30s}
   # Object storage for binary documents (issue #243, ADR-0005). Defaults target the
   # docker-compose MinIO; leave `endpoint` blank to target real AWS S3 (SaaS). The
   # access/secret keys are storage credentials, not crypto secrets, so short local
