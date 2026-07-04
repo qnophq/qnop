@@ -20,6 +20,7 @@
  */
 
 import { describe, expect, it, vi } from 'vitest';
+import type { Mock } from 'vitest';
 import { fireEvent, render, screen, within } from '@testing-library/react';
 import { ThemeProvider } from '@mui/material/styles';
 import type { AnnotationView } from '../../../api/generated';
@@ -58,7 +59,15 @@ const ANNOTATIONS = [
   annotation('a-done', { status: AnnotationStatus.Accepted }),
 ];
 
-function renderBoard({ mayDecide = () => true, onAccept = vi.fn(), onOpen = vi.fn() } = {}) {
+function renderBoard({
+  mayDecide = () => true,
+  onAccept = vi.fn<(annotationId: string) => void>(),
+  onOpen = vi.fn<(annotationId: string) => void>(),
+}: {
+  mayDecide?: (annotation: AnnotationView) => boolean;
+  onAccept?: Mock<(annotationId: string) => void>;
+  onOpen?: Mock<(annotationId: string) => void>;
+} = {}) {
   render(
     <ThemeProvider theme={buildTheme('light')}>
       <TaskBoard
