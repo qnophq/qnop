@@ -30,22 +30,10 @@ import ToggleButton from '@mui/material/ToggleButton';
 import ToggleButtonGroup from '@mui/material/ToggleButtonGroup';
 import Tooltip from '@mui/material/Tooltip';
 import Typography from '@mui/material/Typography';
-import { Link as RouterLink } from 'react-router-dom';
-import {
-  BoxSelect,
-  ChevronDown,
-  ChevronUp,
-  GitCompareArrows,
-  SquareKanban,
-  NotebookPen,
-  PanelRight,
-  Scan,
-  TextCursor,
-} from 'lucide-react';
+import { BoxSelect, ChevronDown, ChevronUp, NotebookPen, TextCursor } from 'lucide-react';
 import type { DocumentVersionSummary } from '../../../api/generated';
 import { ExtractionStatus } from '../../../api/generated';
 import { ToneBadge } from '../../admin/ToneBadge';
-import type { ReviewViewMode } from '../focus/useViewMode';
 import { ZoomControls } from './ZoomControls';
 
 export type ViewerTool = 'text' | 'region';
@@ -67,13 +55,8 @@ interface ViewerToolbarProps {
   canAnnotate: boolean;
   zoom: number;
   onZoomChange: (zoom: number) => void;
-  /** Link to the version comparison (#252); undefined hides the button (fewer than two extracted versions). */
-  compareHref?: string;
-  /** Link to the tasks board/list of this review (issue #393). */
-  tasksHref?: string;
-  /** The review's presentation (issue #291): side panel, or full-width focus mode. */
-  viewMode: ReviewViewMode;
-  onViewModeChange: (mode: ReviewViewMode) => void;
+  /** True in focus mode (issue #291) — shows the annotation drawer's entry point. */
+  focusMode: boolean;
   /** Shown on the list button in focus mode — the drawer's entry point. */
   annotationCount: number;
   onOpenAnnotationList: () => void;
@@ -99,10 +82,7 @@ export function ViewerToolbar({
   canAnnotate,
   zoom,
   onZoomChange,
-  compareHref,
-  tasksHref,
-  viewMode,
-  onViewModeChange,
+  focusMode,
   annotationCount,
   onOpenAnnotationList,
 }: ViewerToolbarProps) {
@@ -132,25 +112,6 @@ export function ViewerToolbar({
           </MenuItem>
         ))}
       </TextField>
-      {compareHref && (
-        <Tooltip title="Compare versions">
-          <IconButton
-            size="small"
-            aria-label="Compare versions"
-            component={RouterLink}
-            to={compareHref}
-          >
-            <GitCompareArrows size={16} />
-          </IconButton>
-        </Tooltip>
-      )}
-      {tasksHref && (
-        <Tooltip title="Tasks board">
-          <IconButton size="small" aria-label="Tasks board" component={RouterLink} to={tasksHref}>
-            <SquareKanban size={16} />
-          </IconButton>
-        </Tooltip>
-      )}
 
       <Stack direction="row" spacing={0.25} sx={{ alignItems: 'center' }}>
         <IconButton
@@ -216,28 +177,7 @@ export function ViewerToolbar({
 
         <ZoomControls zoom={zoom} onZoomChange={onZoomChange} />
 
-        <Divider orientation="vertical" flexItem />
-
-        <ToggleButtonGroup
-          exclusive
-          size="small"
-          value={viewMode}
-          onChange={(_event, next: ReviewViewMode | null) => next && onViewModeChange(next)}
-          aria-label="View mode"
-        >
-          <ToggleButton value="panel" aria-label="Panel view">
-            <Tooltip title="Panel view — the annotation list stays beside the document">
-              <PanelRight size={16} />
-            </Tooltip>
-          </ToggleButton>
-          <ToggleButton value="focus" aria-label="Focus view">
-            <Tooltip title="Focus view — full document width, discussion on demand">
-              <Scan size={16} />
-            </Tooltip>
-          </ToggleButton>
-        </ToggleButtonGroup>
-
-        {viewMode === 'focus' && (
+        {focusMode && (
           <Tooltip title="Show the annotation list">
             <IconButton
               size="small"
