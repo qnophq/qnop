@@ -215,7 +215,7 @@ export function AnnotationPanel({
           annotation={annotation}
           active={active}
           linked={annotation.id === hoverAnnotationId}
-          onClick={() => onSelect(active ? null : annotation.id)}
+          onSelect={onSelect}
           onHover={onHover}
         />
         <Collapse in={active} unmountOnExit>

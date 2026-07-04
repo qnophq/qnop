@@ -19,7 +19,7 @@
  * SPDX-License-Identifier: AGPL-3.0-only
  */
 
-import { useMemo, useRef, useState } from 'react';
+import { useCallback, useMemo, useRef, useState } from 'react';
 import { useParams, useSearchParams } from 'react-router-dom';
 import Alert from '@mui/material/Alert';
 import Box from '@mui/material/Box';
@@ -242,6 +242,17 @@ export function DocumentReviewPage() {
       },
     );
   };
+
+  // Stable so the focus-mode panel's memoized rows don't all re-render on every hover (issue #333).
+  const handleFocusSelect = useCallback(
+    (id: string | null) => {
+      setActiveAnnotationId(id);
+      // A placed annotation continues in the spotlight; unplaced ones keep their
+      // thread inside the drawer (no mark to spotlight).
+      if (id && annotations.find((a) => a.id === id)?.anchor) setListOpen(false);
+    },
+    [annotations],
+  );
 
   if (documentQuery.isPending) {
     return (
@@ -476,12 +487,7 @@ export function DocumentReviewPage() {
               annotations={annotations}
               activeAnnotationId={activeAnnotationId}
               hoverAnnotationId={hoverAnnotationId}
-              onSelect={(id) => {
-                setActiveAnnotationId(id);
-                // A placed annotation continues in the spotlight; unplaced ones
-                // keep their thread inside the drawer (no mark to spotlight).
-                if (id && annotations.find((a) => a.id === id)?.anchor) setListOpen(false);
-              }}
+              onSelect={handleFocusSelect}
               onHover={setHoverAnnotationId}
               pendingAnchor={null}
               creating={createAnnotation.isPending}
