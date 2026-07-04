@@ -463,12 +463,22 @@ export function DocumentReviewPage() {
             { name: 'preventOverflow', options: { padding: 12 } },
           ]}
         >
-          <Composer
-            pendingAnchor={pending.anchor}
-            creating={createAnnotation.isPending}
-            onCreate={handleCreate}
-            onCancel={() => setPending(null)}
-          />
+          {/* Same floating-surface treatment as the focus card: bordered
+              Paper under one soft ambient shadow. */}
+          <Box
+            sx={{
+              boxShadow: (theme) =>
+                theme.qnop.mode === 'dark' ? 'none' : '0 16px 48px rgba(1,32,66,0.14)',
+              borderRadius: '10px',
+            }}
+          >
+            <Composer
+              pendingAnchor={pending.anchor}
+              creating={createAnnotation.isPending}
+              onCreate={handleCreate}
+              onCancel={() => setPending(null)}
+            />
+          </Box>
         </Popper>
       )}
       {/* The post-selection popup: only an explicit "Create annotation" opens

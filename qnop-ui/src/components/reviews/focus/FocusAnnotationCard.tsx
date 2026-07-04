@@ -21,7 +21,7 @@
 
 import type { KeyboardEvent } from 'react';
 import Box from '@mui/material/Box';
-import Fade from '@mui/material/Fade';
+import Grow from '@mui/material/Grow';
 import IconButton from '@mui/material/IconButton';
 import Paper from '@mui/material/Paper';
 import Popper from '@mui/material/Popper';
@@ -33,6 +33,7 @@ import useMediaQuery from '@mui/material/useMediaQuery';
 import { useTheme } from '@mui/material/styles';
 import { ChevronDown, ChevronUp, X } from 'lucide-react';
 import type { AnnotationView } from '../../../api/generated';
+import { tokens } from '../../../theme/tokens';
 import type { Notify } from '../../admin/layout/useToast';
 import { ToneBadge } from '../../admin/ToneBadge';
 import { STATUS_CUES } from '../panel/statusCues';
@@ -116,16 +117,19 @@ export function FocusAnnotationCard({
         { name: 'preventOverflow', options: { padding: 12 } },
       ]}
     >
-      {({ TransitionProps }) => (
-        <Fade
+      {({ TransitionProps, placement }) => (
+        <Grow
           {...TransitionProps}
           // The staged entrance: scrim first, then the card — collapsed to
           // instant under prefers-reduced-motion.
-          timeout={reducedMotion ? 0 : 180}
-          style={{ transitionDelay: reducedMotion ? '0ms' : '120ms' }}
+          timeout={reducedMotion ? 0 : 200}
+          style={{
+            transitionDelay: reducedMotion ? '0ms' : '120ms',
+            transformOrigin: placement.startsWith('left') ? 'right top' : 'left top',
+          }}
         >
           <Paper
-            elevation={8}
+            variant="outlined"
             data-testid="focus-annotation-card"
             onKeyDown={handleKeyDown}
             sx={{
@@ -134,17 +138,60 @@ export function FocusAnnotationCard({
               maxHeight: 'min(70vh, 560px)',
               display: 'flex',
               flexDirection: 'column',
-              borderRadius: 2,
-              overflow: 'hidden',
+              position: 'relative',
+              borderRadius: '10px',
+              // Bordered surface with ONE soft ambient shadow — the brand
+              // reads as borders, not elevation stacks (theme.ts); dark mode
+              // keeps the hairline edge only (shadows vanish on dark).
+              boxShadow: theme.palette.mode === 'light' ? tokens.shadow.lg : 'none',
+              // The pointer arrow sits just outside the border.
+              overflow: 'visible',
             }}
           >
+            {/* The prototype's card↔mark link cues: a status rail on the edge
+                facing the reader, and a pointer arrow toward the spotlit mark
+                (flips with the Popper placement). */}
+            <Box
+              aria-hidden
+              sx={{
+                position: 'absolute',
+                left: 0,
+                top: 10,
+                bottom: 10,
+                width: 3,
+                borderRadius: '0 3px 3px 0',
+                bgcolor: statusCue.color(theme),
+              }}
+            />
+            <Box
+              aria-hidden
+              data-testid="focus-card-arrow"
+              sx={{
+                position: 'absolute',
+                top: 16,
+                width: 0,
+                height: 0,
+                borderTop: '7px solid transparent',
+                borderBottom: '7px solid transparent',
+                ...(placement.startsWith('left')
+                  ? { right: -8, borderLeft: `8px solid ${statusCue.color(theme)}` }
+                  : { left: -8, borderRight: `8px solid ${statusCue.color(theme)}` }),
+              }}
+            />
             {/* Enforcement stays off: the card coexists with interactive marks
                 and the toolbar — clicking them must not yank focus (and the
                 window scroll) back into the card. Tab still cycles inside. */}
             <FocusTrap open disableRestoreFocus disableEnforceFocus>
               <Box
                 tabIndex={-1}
-                sx={{ display: 'flex', flexDirection: 'column', minHeight: 0, outline: 'none' }}
+                sx={{
+                  display: 'flex',
+                  flexDirection: 'column',
+                  minHeight: 0,
+                  outline: 'none',
+                  borderRadius: '9px',
+                  overflow: 'hidden',
+                }}
               >
                 <Stack
                   direction="row"
@@ -158,9 +205,16 @@ export function FocusAnnotationCard({
                   }}
                 >
                   <Typography
-                    variant="caption"
+                    component="span"
                     aria-live="polite"
-                    sx={{ color: 'text.secondary', fontVariantNumeric: 'tabular-nums' }}
+                    sx={{
+                      fontSize: 10,
+                      fontWeight: 600,
+                      letterSpacing: '0.08em',
+                      textTransform: 'uppercase',
+                      color: 'text.secondary',
+                      fontVariantNumeric: 'tabular-nums',
+                    }}
                   >
                     {position
                       ? `Annotation ${position.index + 1} of ${position.count}`
@@ -207,6 +261,8 @@ export function FocusAnnotationCard({
                       color="text.secondary"
                       sx={{
                         fontStyle: 'italic',
+                        borderLeft: `2px solid ${theme.palette.divider}`,
+                        pl: 1,
                         display: '-webkit-box',
                         WebkitLineClamp: 3,
                         WebkitBoxOrient: 'vertical',
@@ -231,7 +287,7 @@ export function FocusAnnotationCard({
               </Box>
             </FocusTrap>
           </Paper>
-        </Fade>
+        </Grow>
       )}
     </Popper>
   );
