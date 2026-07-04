@@ -71,6 +71,7 @@ export function ReviewTasksPage() {
   const [searchParams, setSearchParams] = useSearchParams();
   const { toast, notify, clear } = useToast();
   const userId = useAuthStore((state) => state.userId);
+  const ownDisplayName = useAuthStore((state) => state.displayName);
 
   const documentQuery = useDocument(documentId);
   const versionsQuery = useDocumentVersions(documentId);
@@ -105,9 +106,14 @@ export function ReviewTasksPage() {
   };
 
   const participants = participantsQuery.data?.participants ?? [];
+  // The panel's naming rule: self by display name; reviewers through the
+  // participant directory; the owner stays structural on the document (never
+  // a participant row), so a foreign owner reads as a plain participant.
   const authorNameOf = (authorId: string) =>
-    participants.find((participant) => participant.principalId === authorId)?.displayName ??
-    'Participant';
+    authorId === userId
+      ? (ownDisplayName ?? 'You')
+      : (participants.find((participant) => participant.principalId === authorId)?.displayName ??
+        'Participant');
 
   const countOf = (key: TaskFilter) =>
     key === 'all'

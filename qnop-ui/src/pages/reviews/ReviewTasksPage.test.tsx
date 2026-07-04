@@ -111,11 +111,11 @@ function renderPage(initialEntry = '/reviews/d1/tasks') {
 
 beforeEach(() => {
   vi.clearAllMocks();
-  useAuthStore.setState({ userId: 'owner-1' });
+  useAuthStore.setState({ userId: 'owner-1', displayName: 'Maxim Owner' });
 });
 
 afterEach(() => {
-  useAuthStore.setState({ userId: null });
+  useAuthStore.setState({ userId: null, displayName: null });
   localStorage.removeItem('qnop-tasks-view');
 });
 
@@ -149,11 +149,19 @@ describe('ReviewTasksPage', () => {
     expect(screen.queryByTestId('task-card-a-open')).not.toBeInTheDocument();
   });
 
-  it('resolves author names through the participants', () => {
+  it('resolves author names through the participants, and self by display name', () => {
     mockData();
+    vi.mocked(useAnnotations).mockReturnValue({
+      isPending: false,
+      data: { annotations: [annotation('a-open'), annotation('a-mine', { authorId: 'owner-1' })] },
+    } as never);
     renderPage();
     expect(
       within(screen.getByTestId('task-card-a-open')).getByText('Sabine Weber'),
+    ).toBeInTheDocument();
+    // The owner is never a participant row — self resolves via the auth store.
+    expect(
+      within(screen.getByTestId('task-card-a-mine')).getByText('Maxim Owner'),
     ).toBeInTheDocument();
   });
 
