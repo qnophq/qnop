@@ -1903,6 +1903,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/DocumentResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
         '404':
           description: Unknown document, or the caller is not a participant
           content:
@@ -1967,6 +1969,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/DocumentVersionListResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
         '404':
           description: Unknown document, or the caller is not a participant
           content:
@@ -1996,6 +2000,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/RenderedDocumentResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
         '404':
           description: Unknown document/version, or the caller is not a participant
           content:
@@ -2047,6 +2053,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/AnnotationListResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
         '404':
           description: Unknown document, or the caller is not a participant
           content:
@@ -2083,6 +2091,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
         '404':
           description: Unknown document/version, or the caller is not a participant
           content:
@@ -2105,6 +2115,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/AnnotationView'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
         '404':
           description: Unknown annotation, or the caller is not a participant
           content:
@@ -2138,6 +2150,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/AnnotationView'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
         '403':
           description: The caller is neither the document owner nor the annotation's author
           content:
@@ -2172,6 +2186,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/CommentListResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
         '404':
           description: Unknown annotation, or the caller is not a participant
           content:
@@ -2203,6 +2219,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
         '404':
           description: Unknown annotation, or the caller is not a participant
           content:
@@ -2254,6 +2272,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
         '404':
           description: Unknown document/version, or the caller is not a participant
           content:
