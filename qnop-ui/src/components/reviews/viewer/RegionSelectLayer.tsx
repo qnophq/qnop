@@ -19,7 +19,7 @@
  * SPDX-License-Identifier: AGPL-3.0-only
  */
 
-import { useRef, useState } from 'react';
+import { useState } from 'react';
 import type { PointerEvent } from 'react';
 import Box from '@mui/material/Box';
 import type { NormalizedBox } from '../../../api/generated';
@@ -54,11 +54,12 @@ export function RegionSelectLayer({
   enabled,
   onRegionSelected,
 }: RegionSelectLayerProps) {
-  const rootRef = useRef<HTMLDivElement>(null);
   const [draft, setDraft] = useState<DraftRect | null>(null);
 
-  const toNormalized = (event: PointerEvent) => {
-    const rect = rootRef.current!.getBoundingClientRect();
+  // `currentTarget` is the surface Box the handlers are bound to — always the
+  // live element during the event, so it needs no ref and no non-null assertion.
+  const toNormalized = (event: PointerEvent<HTMLDivElement>) => {
+    const rect = event.currentTarget.getBoundingClientRect();
     return {
       x: clampUnit((event.clientX - rect.left) / rect.width),
       y: clampUnit((event.clientY - rect.top) / rect.height),
@@ -97,7 +98,6 @@ export function RegionSelectLayer({
 
   return (
     <Box
-      ref={rootRef}
       data-testid={`region-layer-${surfaceIndex}`}
       onPointerDown={handlePointerDown}
       onPointerMove={handlePointerMove}

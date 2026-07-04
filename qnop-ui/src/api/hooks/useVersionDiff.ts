@@ -42,11 +42,13 @@ export function useVersionDiff(documentId: string, from?: number, to?: number) {
   return useQuery<VersionDiffResponse>({
     queryKey: versionDiffKeys.pair(documentId, from ?? 0, to ?? 0),
     queryFn: async () => {
-      const response = await documentsApi.getVersionDiff({
-        documentId,
-        from: from as number,
-        to: to as number,
-      });
+      // `enabled: validPair` guarantees both bounds are defined when the query
+      // runs; the guard narrows them to `number` for the request without a cast
+      // and fails loud should that invariant ever break.
+      if (from === undefined || to === undefined) {
+        throw new Error('useVersionDiff: version bounds must be defined when the query runs');
+      }
+      const response = await documentsApi.getVersionDiff({ documentId, from, to });
       return response.data;
     },
     enabled: documentId.length > 0 && validPair,

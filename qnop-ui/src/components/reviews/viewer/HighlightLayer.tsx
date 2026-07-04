@@ -33,6 +33,9 @@ import { AnnotationStatus, PlacementStatus } from '../../../api/generated';
 import { highlightBoxesForAnchor } from './anchoring';
 import { SELECTION_MARKER_BG, highlightColorFor } from './markerColors';
 
+/** An annotation whose optional {@link Anchor} is known to be present. */
+type AnchoredAnnotation = AnnotationView & { anchor: Anchor };
+
 interface HighlightLayerProps {
   /** All annotations of the document — the layer picks the ones on this surface. */
   annotations: AnnotationView[];
@@ -95,8 +98,11 @@ export function HighlightLayer({
 }: HighlightLayerProps) {
   const theme = useTheme();
 
+  // The predicate narrows the survivors to a guaranteed-anchored shape, so the
+  // render below reads `annotation.anchor` without a non-null assertion.
   const visible = annotations.filter(
-    (annotation) => annotation.anchor?.region.surfaceIndex === surfaceIndex,
+    (annotation): annotation is AnchoredAnnotation =>
+      annotation.anchor?.region.surfaceIndex === surfaceIndex,
   );
   const pending =
     pendingAnchor && pendingAnchor.region.surfaceIndex === surfaceIndex
@@ -129,7 +135,7 @@ export function HighlightLayer({
   return (
     <Box sx={{ position: 'absolute', inset: 0, pointerEvents: 'none' }}>
       {visible.map((annotation) => {
-        const anchor = annotation.anchor!;
+        const anchor = annotation.anchor;
         const { kind, boxes } = highlightBoxesForAnchor(anchor, spans);
         const style = styleFor(annotation);
         const active = annotation.id === activeAnnotationId;
