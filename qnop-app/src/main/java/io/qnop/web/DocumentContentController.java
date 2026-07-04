@@ -67,7 +67,9 @@ public class DocumentContentController {
     }
     ContentDisposition disposition =
         ContentDisposition.inline()
-            .filename(download.title() + "-v" + download.versionNumber() + ".pdf")
+            .filename(
+                DownloadFilename.forVersion(
+                    download.title(), download.versionNumber(), download.contentType()))
             .build();
     return ResponseEntity.ok()
         .eTag(etag)

@@ -135,6 +135,12 @@ class DocumentIngestIT extends AbstractIntegrationTest {
                 get("/api/v1/documents/{id}/versions/1/original", documentId).with(asUser(owner)))
             .andExpect(status().isOk())
             .andExpect(header().string("Content-Type", "application/pdf"))
+            // Filename extension is derived from the content type, not hardcoded (issue #328).
+            .andExpect(
+                header()
+                    .string(
+                        "Content-Disposition",
+                        org.hamcrest.Matchers.containsString("Ingest IT-v1.pdf")))
             .andExpect(header().exists("ETag"))
             .andReturn();
     assertThat(original.getResponse().getContentAsByteArray()).isEqualTo(pdf);
