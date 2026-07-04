@@ -33,8 +33,10 @@ import io.qnop.service.ApplicationSettingKey;
 import io.qnop.service.ApplicationSettingsService;
 import io.qnop.service.job.JobService;
 import io.qnop.service.storage.StagedObject;
+import io.qnop.service.storage.StorageQuotaExceededException;
 import io.qnop.service.storage.StorageService;
-import java.io.ByteArrayInputStream;
+import java.io.IOException;
+import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.util.Comparator;
@@ -104,12 +106,13 @@ public class DocumentIngestService {
    * Creates a new document owned by {@code actor} with the upload as version 1. An optional {@code
    * dueAt} completion deadline (issue #295) must be in the future when set at creation.
    */
-  public UploadResult createDocument(UUID actor, String title, byte[] content, Instant dueAt) {
+  public UploadResult createDocument(UUID actor, String title, UploadSource upload, Instant dueAt) {
     String cleanTitle = requireTitle(title);
     Instant validDueAt = requireFutureOrNull(dueAt);
-    validatePdf(content);
+    long maxBytes = maxUploadBytes();
+    validateUpload(upload, maxBytes);
 
-    StagedObject staged = storage.stage(new ByteArrayInputStream(content), PDF_CONTENT_TYPE);
+    StagedObject staged = stageUpload(upload, maxBytes);
     UploadResult result =
         transactionTemplate.execute(
             status -> {
@@ -127,7 +130,7 @@ public class DocumentIngestService {
   }
 
   /** Appends the upload as the next version of {@code documentId}; owner-only. */
-  public UploadResult addVersion(UUID actor, UUID documentId, byte[] content) {
+  public UploadResult addVersion(UUID actor, UUID documentId, UploadSource upload) {
     Document document =
         documents
             .findById(documentId)
@@ -141,9 +144,10 @@ public class DocumentIngestService {
       }
       throw DocumentValidationException.notOwner("only the owner may upload a new version");
     }
-    validatePdf(content);
+    long maxBytes = maxUploadBytes();
+    validateUpload(upload, maxBytes);
 
-    StagedObject staged = storage.stage(new ByteArrayInputStream(content), PDF_CONTENT_TYPE);
+    StagedObject staged = stageUpload(upload, maxBytes);
     UploadResult result =
         transactionTemplate.execute(
             status -> {
@@ -235,27 +239,48 @@ public class DocumentIngestService {
     return dueAt;
   }
 
-  private void validatePdf(byte[] content) {
-    if (content == null || content.length == 0) {
-      throw DocumentValidationException.invalidRequest("empty upload");
-    }
-    long maxBytes =
-        settings.getInteger(ApplicationSettingKey.UPLOAD_MAX_FILE_SIZE_MB) * 1024L * 1024L;
-    if (content.length > maxBytes) {
+  private long maxUploadBytes() {
+    return settings.getInteger(ApplicationSettingKey.UPLOAD_MAX_FILE_SIZE_MB) * 1024L * 1024L;
+  }
+
+  /**
+   * Rejects an upload before it is buffered: a fast early check on the (advisory) declared size,
+   * then a streaming magic-byte sniff of the real type (ADR-0032 §5 — the client-declared MIME is
+   * never trusted). The authoritative size limit is enforced while staging (issue #361).
+   */
+  private void validateUpload(UploadSource upload, long maxBytes) {
+    if (upload.declaredSize() > maxBytes) {
       throw DocumentValidationException.tooLarge("document exceeds " + maxBytes + " bytes");
     }
-    // Sniff the real type from the bytes (ADR-0032 §5); the client-declared MIME is never trusted.
-    if (!hasPdfMagic(content)) {
+    byte[] prefix = new byte[PDF_MAGIC.length];
+    int read;
+    try (InputStream in = upload.open()) {
+      read = in.readNBytes(prefix, 0, prefix.length);
+    } catch (IOException e) {
+      throw DocumentValidationException.invalidRequest("upload could not be read");
+    }
+    if (read == 0) {
+      throw DocumentValidationException.invalidRequest("empty upload");
+    }
+    if (read < PDF_MAGIC.length || !hasPdfMagic(prefix)) {
       throw DocumentValidationException.unsupportedType("only PDF documents are accepted");
     }
   }
 
-  private static boolean hasPdfMagic(byte[] content) {
-    if (content.length < PDF_MAGIC.length) {
-      return false;
+  /** Streams the upload into storage under the authoritative size cap, mapping its errors. */
+  private StagedObject stageUpload(UploadSource upload, long maxBytes) {
+    try (InputStream in = upload.open()) {
+      return storage.stage(in, PDF_CONTENT_TYPE, maxBytes);
+    } catch (StorageQuotaExceededException e) {
+      throw DocumentValidationException.tooLarge("document exceeds " + e.limitBytes() + " bytes");
+    } catch (IOException e) {
+      throw DocumentValidationException.invalidRequest("upload could not be read");
     }
+  }
+
+  private static boolean hasPdfMagic(byte[] prefix) {
     for (int i = 0; i < PDF_MAGIC.length; i++) {
-      if (content[i] != PDF_MAGIC[i]) {
+      if (prefix[i] != PDF_MAGIC[i]) {
         return false;
       }
     }

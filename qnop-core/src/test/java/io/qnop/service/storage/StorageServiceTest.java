@@ -37,6 +37,7 @@ import java.io.ByteArrayInputStream;
 import java.io.InputStream;
 import java.time.Instant;
 import java.util.Optional;
+import org.assertj.core.api.Assertions;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.dao.DataIntegrityViolationException;
@@ -65,6 +66,29 @@ class StorageServiceTest {
     StorageObject row = pendingRow();
     row.markCommitted(Instant.now());
     return row;
+  }
+
+  @Test
+  @DisplayName("staging aborts over the byte limit before any upload (issue #361)")
+  void overLimitContentIsRejectedBeforeUpload() {
+    InputStream tenBytes = new ByteArrayInputStream("0123456789".getBytes());
+
+    Assertions.assertThatThrownBy(() -> storage.stage(tenBytes, "application/pdf", 4L))
+        .isInstanceOf(StorageQuotaExceededException.class);
+
+    verify(provider, never()).put(anyString(), any(), anyLong(), anyString());
+    verify(repository, never()).save(any());
+  }
+
+  @Test
+  @DisplayName("content exactly at the byte limit still stages")
+  void contentAtLimitIsStaged() {
+    when(repository.findByObjectKey(anyString())).thenReturn(Optional.empty());
+    InputStream fourBytes = new ByteArrayInputStream("abcd".getBytes());
+
+    storage.stage(fourBytes, "application/pdf", 4L);
+
+    verify(provider).put(anyString(), any(), anyLong(), eq("application/pdf"));
   }
 
   @Test

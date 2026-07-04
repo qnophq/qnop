@@ -28,9 +28,9 @@ import io.qnop.spi.storage.StorageException;
 import io.qnop.spi.storage.StorageProvider;
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.OutputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.nio.file.StandardCopyOption;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.time.Instant;
@@ -83,7 +83,18 @@ public class StorageService {
    * failed earlier upload without ever returning a key that points at nothing.
    */
   public StagedObject stage(InputStream content, String contentType) {
-    Path buffer = bufferToTempFile(content);
+    return stage(content, contentType, Long.MAX_VALUE);
+  }
+
+  /**
+   * As {@link #stage(InputStream, String)}, but aborts with {@link StorageQuotaExceededException}
+   * once the stream exceeds {@code maxBytes} — before the whole stream is buffered and before any
+   * upload (issue #361), so an over-limit upload never touches the backend and never fully lands on
+   * local disk. This is the authoritative size check for content whose declared length cannot be
+   * trusted.
+   */
+  public StagedObject stage(InputStream content, String contentType, long maxBytes) {
+    Path buffer = bufferToTempFile(content, maxBytes);
     try {
       String hash = sha256(buffer);
       long size = sizeOf(buffer);
@@ -170,13 +181,42 @@ public class StorageService {
     return "sha256/" + hash.substring(0, 2) + "/" + hash;
   }
 
-  private static Path bufferToTempFile(InputStream content) {
+  private static Path bufferToTempFile(InputStream content, long maxBytes) {
+    Path temp;
     try {
-      Path temp = Files.createTempFile("qnop-storage-", ".tmp");
-      Files.copy(content, temp, StandardCopyOption.REPLACE_EXISTING);
-      return temp;
+      temp = Files.createTempFile("qnop-storage-", ".tmp");
     } catch (IOException e) {
       throw new StorageException("Failed to buffer upload", e);
+    }
+    try (OutputStream out = Files.newOutputStream(temp)) {
+      copyBounded(content, out, maxBytes);
+      return temp;
+    } catch (StorageQuotaExceededException e) {
+      deleteQuietly(temp); // never keep an over-limit partial on disk
+      throw e;
+    } catch (IOException e) {
+      deleteQuietly(temp);
+      throw new StorageException("Failed to buffer upload", e);
+    }
+  }
+
+  /**
+   * Copies at most {@code maxBytes}; if the stream still has data at that point the content is
+   * over-limit and {@link StorageQuotaExceededException} is thrown before more is read (issue
+   * #361).
+   */
+  private static void copyBounded(InputStream in, OutputStream out, long maxBytes)
+      throws IOException {
+    byte[] buffer = new byte[8192];
+    long remaining = maxBytes;
+    int read;
+    while ((read = in.read(buffer)) != -1) {
+      if (read > remaining) {
+        out.write(buffer, 0, (int) remaining); // fill exactly to the limit, then reject
+        throw new StorageQuotaExceededException(maxBytes);
+      }
+      out.write(buffer, 0, read);
+      remaining -= read;
     }
   }
 
