@@ -30,6 +30,19 @@ spring:
       # uploads stream to a temp file, not the heap, so a generous ceiling is safe.
       max-file-size: ${QNOP_UPLOAD_MULTIPART_LIMIT_MB:55}MB
       max-request-size: ${QNOP_UPLOAD_MULTIPART_LIMIT_MB:55}MB
+  mvc:
+    async:
+      # Cap async request handling so a stalled async dispatch cannot pin request
+      # resources indefinitely (issue #342).
+      request-timeout: ${QNOP_HTTP_REQUEST_TIMEOUT:30s}
+
+# Inbound request timeouts (issue #342): bound how long the connector waits on a
+# slow/stalled client so a worker thread is never held open forever.
+server:
+  tomcat:
+    connection-timeout: ${QNOP_HTTP_CONNECTION_TIMEOUT:20s}
+    # Reap idle keep-alive connections rather than holding a thread per socket.
+    keep-alive-timeout: ${QNOP_HTTP_KEEP_ALIVE_TIMEOUT:20s}
 
 management:
   endpoints:

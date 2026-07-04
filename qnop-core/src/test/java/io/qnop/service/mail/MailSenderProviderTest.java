@@ -126,6 +126,18 @@ class MailSenderProviderTest {
   }
 
   @Test
+  @DisplayName("the transport carries explicit connect/read/write timeouts (issue #342)")
+  void transportHasTimeouts() {
+    configureSmtp();
+
+    Properties props = propsOf(provider.current());
+
+    assertThat(props.getProperty("mail.smtp.connectiontimeout")).isEqualTo("10000");
+    assertThat(props.getProperty("mail.smtp.timeout")).isEqualTo("30000");
+    assertThat(props.getProperty("mail.smtp.writetimeout")).isEqualTo("30000");
+  }
+
+  @Test
   @DisplayName("encryption=none leaves the connection plaintext")
   void encryptionNone() {
     configureSmtp("none");

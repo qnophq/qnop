@@ -48,6 +48,14 @@ public class MailSenderProvider implements SettingsChangeListener {
 
   private static final Logger log = LoggerFactory.getLogger(MailSenderProvider.class);
 
+  // Explicit SMTP transport timeouts (issue #342): without them a hung or slow
+  // mail server pins the sending thread indefinitely. Values are milliseconds, as
+  // Jakarta Mail expects. Generous but finite — mail is best-effort and never on a
+  // request's critical path.
+  private static final String SMTP_CONNECT_TIMEOUT_MS = "10000";
+  private static final String SMTP_READ_TIMEOUT_MS = "30000";
+  private static final String SMTP_WRITE_TIMEOUT_MS = "30000";
+
   // Only the keys that shape the JavaMailSender transport invalidate the cache.
   // smtp.from / smtp.from_name are read per-send from the snapshot (see MailService),
   // not baked into the sender, so changing them must not drop the cached transport.
@@ -131,6 +139,10 @@ public class MailSenderProvider implements SettingsChangeListener {
     Properties props = sender.getJavaMailProperties();
     props.put("mail.transport.protocol", "smtp");
     props.put("mail.smtp.auth", String.valueOf(authenticated));
+    // Bound connect/read/write so a stalled SMTP peer cannot hang the sender (#342).
+    props.put("mail.smtp.connectiontimeout", SMTP_CONNECT_TIMEOUT_MS);
+    props.put("mail.smtp.timeout", SMTP_READ_TIMEOUT_MS);
+    props.put("mail.smtp.writetimeout", SMTP_WRITE_TIMEOUT_MS);
     applyEncryption(props, settings.getString(ApplicationSettingKey.SMTP_ENCRYPTION));
     return sender;
   }
