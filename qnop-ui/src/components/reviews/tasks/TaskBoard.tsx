@@ -27,18 +27,28 @@ import Typography from '@mui/material/Typography';
 import { alpha, useTheme } from '@mui/material/styles';
 import type { Theme } from '@mui/material/styles';
 import type { AnnotationView } from '../../../api/generated';
+import { ToneBadge } from '../../admin/ToneBadge';
 import { TaskCard, TASK_DRAG_TYPE } from './TaskCard';
 import type { TaskColumn } from './tasksModel';
 import { TASK_COLUMNS, columnOf } from './tasksModel';
 
-const COLUMN_CUES: Record<TaskColumn, { label: string; color: (theme: Theme) => string }> = {
-  open: { label: 'Open', color: (theme) => theme.qnop.brand.blue },
-  discussion: { label: 'In discussion', color: (theme) => theme.palette.warning.main },
-  done: { label: 'Done', color: (theme) => theme.palette.success.main },
+const COLUMN_CUES: Record<
+  TaskColumn,
+  { label: string; tone: 'blue' | 'amber' | 'green'; color: (theme: Theme) => string }
+> = {
+  open: { label: 'Open', tone: 'blue', color: (theme) => theme.qnop.brand.blue },
+  discussion: {
+    label: 'In discussion',
+    tone: 'amber',
+    color: (theme) => theme.palette.warning.main,
+  },
+  done: { label: 'Done', tone: 'green', color: (theme) => theme.palette.success.main },
 };
 
 interface TaskBoardProps {
   annotations: AnnotationView[];
+  /** Tracker-style shorthand per annotation id ("T-3"). */
+  taskKeyOf: (annotationId: string) => string;
   authorNameOf: (authorId: string) => string;
   /** Whether the viewer may decide this annotation — gates dragging to Done. */
   mayDecide: (annotation: AnnotationView) => boolean;
@@ -56,6 +66,7 @@ interface TaskBoardProps {
  */
 export function TaskBoard({
   annotations,
+  taskKeyOf,
   authorNameOf,
   mayDecide,
   onOpen,
@@ -108,8 +119,10 @@ export function TaskBoard({
               borderRadius: 0.75,
               border: '1px solid',
               borderColor: 'divider',
-              bgcolor: 'background.default',
-              minHeight: 0,
+              // The board contrast the trackers share: tinted lanes, white
+              // cards lifted on top; lanes run the full board height.
+              bgcolor: theme.qnop.surface2,
+              minHeight: { xs: 0, md: 480 },
               overflow: 'hidden',
               ...(isDone &&
                 dropActive && {
@@ -124,40 +137,26 @@ export function TaskBoard({
               spacing={1}
               sx={{
                 alignItems: 'center',
-                px: 1.5,
-                py: 1.25,
+                px: 1.25,
+                py: 1.1,
                 borderBottom: '1px solid',
                 borderColor: 'divider',
+                bgcolor: 'background.paper',
               }}
             >
+              <ToneBadge tone={cue.tone} label={`${cue.label} (${items.length})`} />
+              <Box sx={{ flex: 1 }} />
               <Box
                 sx={{ width: 8, height: 8, borderRadius: '50%', bgcolor: cue.color(theme) }}
                 aria-hidden
               />
-              <Typography variant="body2" sx={{ fontWeight: 600 }}>
-                {cue.label}
-              </Typography>
-              <Typography
-                component="span"
-                variant="caption"
-                sx={{
-                  color: 'text.secondary',
-                  bgcolor: 'background.paper',
-                  border: '1px solid',
-                  borderColor: 'divider',
-                  borderRadius: 999,
-                  px: 0.75,
-                  fontVariantNumeric: 'tabular-nums',
-                }}
-              >
-                {items.length}
-              </Typography>
             </Stack>
             <Stack spacing={1.25} sx={{ flex: 1, overflowY: 'auto', p: 1.25, minHeight: 96 }}>
               {items.map((annotation) => (
                 <TaskCard
                   key={annotation.id}
                   annotation={annotation}
+                  taskKey={taskKeyOf(annotation.id)}
                   authorName={authorNameOf(annotation.authorId)}
                   draggable={!isDone && mayDecide(annotation)}
                   onOpen={onOpen}

@@ -29,6 +29,7 @@ import { useTheme } from '@mui/material/styles';
 import { ExternalLink, X } from 'lucide-react';
 import type { AnnotationView } from '../../../api/generated';
 import { useAuthStore } from '../../../stores/authStore';
+import { tokens } from '../../../theme/tokens';
 import type { Notify } from '../../admin/layout/useToast';
 import { ToneBadge } from '../../admin/ToneBadge';
 import { CommentThread } from '../panel/CommentThread';
@@ -40,6 +41,8 @@ import { PRIORITY_CUES, TYPE_CUES, taskTitle } from './tasksModel';
 
 interface TaskDrawerProps {
   annotation: AnnotationView | null;
+  /** Tracker-style shorthand ("T-3") of the open annotation. */
+  taskKey: string;
   authorName: string;
   ownerId: string;
   notify: Notify;
@@ -58,6 +61,7 @@ interface TaskDrawerProps {
  */
 export function TaskDrawer({
   annotation,
+  taskKey,
   authorName,
   ownerId,
   notify,
@@ -86,6 +90,17 @@ export function TaskDrawer({
       <Stack sx={{ height: '100%' }}>
         <Box sx={{ p: 2, borderBottom: '1px solid', borderColor: 'divider' }}>
           <Stack direction="row" spacing={1} sx={{ alignItems: 'center', mb: 1 }}>
+            <Typography
+              component="span"
+              sx={{
+                fontFamily: tokens.font.mono,
+                fontSize: 12,
+                fontWeight: 600,
+                color: 'text.secondary',
+              }}
+            >
+              {taskKey}
+            </Typography>
             {type && TypeIcon && (
               <Stack
                 direction="row"

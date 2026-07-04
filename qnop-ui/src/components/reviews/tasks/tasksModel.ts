@@ -53,6 +53,18 @@ export function taskTitle(annotation: AnnotationView): string {
 }
 
 /**
+ * Stable per-review shorthand keys (T-1, T-2, …) in creation order — the
+ * tracker-style card id (YouTrack's "CSS-17", Zoho's "MBA-I78"). Purely a
+ * display affordance; the UUID stays the identity.
+ */
+export function taskKeys(annotations: AnnotationView[]): Map<string, string> {
+  const ordered = [...annotations].sort(
+    (a, b) => a.createdAt.localeCompare(b.createdAt) || a.id.localeCompare(b.id),
+  );
+  return new Map(ordered.map((annotation, index) => [annotation.id, `T-${index + 1}`]));
+}
+
+/**
  * The free-text search of the sub-toolbar — title, quoted passage and the
  * resolved author name, mirroring the prototype's task search.
  */

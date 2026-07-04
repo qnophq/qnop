@@ -31,6 +31,7 @@ import type { AnnotationView } from '../../../api/generated';
 import { AnnotationStatus } from '../../../api/generated';
 import { ToneBadge } from '../../admin/ToneBadge';
 import { UserAvatar } from '../../shell/UserAvatar';
+import { tokens } from '../../../theme/tokens';
 import { STATUS_CUES } from '../panel/statusCues';
 import { PRIORITY_CUES, TYPE_CUES, taskTitle } from './tasksModel';
 
@@ -39,6 +40,8 @@ export const TASK_DRAG_TYPE = 'text/qnop-annotation';
 
 interface TaskCardProps {
   annotation: AnnotationView;
+  /** Tracker-style shorthand ("T-3") — display only, the UUID stays the identity. */
+  taskKey: string;
   authorName: string;
   /** True when the viewer may decide — only then the card can be dragged to Done. */
   draggable: boolean;
@@ -51,7 +54,7 @@ interface TaskCardProps {
  * title, the quoted passage as a secondary line, author and thread size at
  * the bottom. Shares the annotation cards' 6px radius — one system.
  */
-export function TaskCard({ annotation, authorName, draggable, onOpen }: TaskCardProps) {
+export function TaskCard({ annotation, taskKey, authorName, draggable, onOpen }: TaskCardProps) {
   const theme = useTheme();
   const type = annotation.type ? TYPE_CUES[annotation.type] : null;
   const priority = annotation.priority ? PRIORITY_CUES[annotation.priority] : null;
@@ -76,9 +79,15 @@ export function TaskCard({ annotation, authorName, draggable, onOpen }: TaskCard
         width: '100%',
         textAlign: 'left',
         p: 1.5,
+        pl: 1.25,
         borderRadius: 0.75,
         border: '1px solid',
         borderColor: 'divider',
+        // The tracker card language (YouTrack/Zoho): a coloured left edge
+        // carrying the priority, a white card lifted off the tinted lane.
+        borderLeft: '3px solid',
+        borderLeftColor: priority ? priority.color(theme) : theme.palette.divider,
+        boxShadow: tokens.shadow.xs,
         bgcolor: 'background.paper',
         cursor: draggable ? 'grab' : 'pointer',
         transition: 'box-shadow 140ms ease, border-color 140ms ease, transform 140ms ease',
@@ -92,20 +101,21 @@ export function TaskCard({ annotation, authorName, draggable, onOpen }: TaskCard
       }}
     >
       <Stack direction="row" spacing={0.75} sx={{ alignItems: 'center', mb: 0.75 }}>
-        {priority && (
-          <Tooltip title={`${priority.label} priority`}>
-            <Box
-              sx={{
-                width: 7,
-                height: 7,
-                borderRadius: '50%',
-                bgcolor: priority.color(theme),
-                flexShrink: 0,
-              }}
-              data-testid="priority-dot"
-            />
-          </Tooltip>
-        )}
+        <Tooltip title={priority ? `${priority.label} priority` : 'No priority'}>
+          <Typography
+            component="span"
+            data-testid="task-key"
+            sx={{
+              fontFamily: tokens.font.mono,
+              fontSize: 11,
+              fontWeight: 600,
+              color: 'text.secondary',
+              letterSpacing: '0.02em',
+            }}
+          >
+            {taskKey}
+          </Typography>
+        </Tooltip>
         {type && TypeIcon && (
           <Stack
             direction="row"

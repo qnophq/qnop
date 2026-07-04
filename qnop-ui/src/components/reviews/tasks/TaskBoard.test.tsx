@@ -72,6 +72,7 @@ function renderBoard({
     <ThemeProvider theme={buildTheme('light')}>
       <TaskBoard
         annotations={ANNOTATIONS}
+        taskKeyOf={() => 'T-1'}
         authorNameOf={() => 'Maxim'}
         mayDecide={mayDecide}
         onOpen={onOpen}

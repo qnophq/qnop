@@ -22,7 +22,7 @@
 import { describe, expect, it } from 'vitest';
 import type { AnnotationView } from '../../../api/generated';
 import { AnnotationStatus, PlacementStatus } from '../../../api/generated';
-import { columnOf, matchesQuery, parseTaskFilter, taskTitle } from './tasksModel';
+import { columnOf, matchesQuery, parseTaskFilter, taskKeys, taskTitle } from './tasksModel';
 
 const annotation = (overrides: Partial<AnnotationView> = {}): AnnotationView => ({
   id: 'a1',
@@ -75,6 +75,16 @@ describe('taskTitle', () => {
   it('falls back to the quote, then to a generic label', () => {
     expect(taskTitle(annotation({ firstComment: undefined }))).toBe('the disputed clause');
     expect(taskTitle(annotation({ firstComment: '  ', anchor: undefined }))).toBe('Annotation');
+  });
+});
+
+describe('taskKeys', () => {
+  it('assigns stable T-n keys in creation order regardless of input order', () => {
+    const first = annotation({ id: 'b', createdAt: '2026-07-01T09:00:00Z' });
+    const second = annotation({ id: 'a', createdAt: '2026-07-01T10:00:00Z' });
+    const keys = taskKeys([second, first]);
+    expect(keys.get('b')).toBe('T-1');
+    expect(keys.get('a')).toBe('T-2');
   });
 });
 

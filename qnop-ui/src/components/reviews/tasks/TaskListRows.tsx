@@ -31,11 +31,14 @@ import type { AnnotationView } from '../../../api/generated';
 import { AnnotationStatus } from '../../../api/generated';
 import { ToneBadge } from '../../admin/ToneBadge';
 import { UserAvatar } from '../../shell/UserAvatar';
+import { tokens } from '../../../theme/tokens';
 import { STATUS_CUES } from '../panel/statusCues';
 import { PRIORITY_CUES, TYPE_CUES, columnOf, taskTitle } from './tasksModel';
 
 interface TaskListRowsProps {
   annotations: AnnotationView[];
+  /** Tracker-style shorthand per annotation id ("T-3"). */
+  taskKeyOf: (annotationId: string) => string;
   authorNameOf: (authorId: string) => string;
   onOpen: (annotationId: string) => void;
 }
@@ -45,7 +48,7 @@ interface TaskListRowsProps {
  * priority dot, type, title with quote/page meta, status badge, author,
  * chevron — for reviews where scanning beats spatial grouping.
  */
-export function TaskListRows({ annotations, authorNameOf, onOpen }: TaskListRowsProps) {
+export function TaskListRows({ annotations, taskKeyOf, authorNameOf, onOpen }: TaskListRowsProps) {
   const theme = useTheme();
   return (
     <Paper
@@ -90,6 +93,19 @@ export function TaskListRows({ annotations, authorNameOf, onOpen }: TaskListRows
                 }}
               />
             </Tooltip>
+            <Typography
+              component="span"
+              sx={{
+                fontFamily: tokens.font.mono,
+                fontSize: 11,
+                fontWeight: 600,
+                color: 'text.secondary',
+                width: 34,
+                flexShrink: 0,
+              }}
+            >
+              {taskKeyOf(annotation.id)}
+            </Typography>
             <Stack
               direction="row"
               spacing={0.5}

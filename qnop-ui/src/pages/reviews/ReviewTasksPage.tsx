@@ -45,7 +45,12 @@ import { TaskBoard } from '../../components/reviews/tasks/TaskBoard';
 import { TaskDrawer } from '../../components/reviews/tasks/TaskDrawer';
 import { TaskListRows } from '../../components/reviews/tasks/TaskListRows';
 import type { TaskFilter } from '../../components/reviews/tasks/tasksModel';
-import { columnOf, matchesQuery, parseTaskFilter } from '../../components/reviews/tasks/tasksModel';
+import {
+  columnOf,
+  matchesQuery,
+  parseTaskFilter,
+  taskKeys,
+} from '../../components/reviews/tasks/tasksModel';
 import { useTasksViewMode } from '../../components/reviews/tasks/useTasksViewMode';
 import { AnnotationDecision } from '../../api/generated';
 import { useAuthStore } from '../../stores/authStore';
@@ -125,6 +130,8 @@ export function ReviewTasksPage() {
     .filter((annotation) => matchesQuery(annotation, authorNameOf(annotation.authorId), query));
 
   const openTask = annotations.find((annotation) => annotation.id === openTaskId) ?? null;
+  const keyByAnnotation = taskKeys(annotations);
+  const taskKeyOf = (annotationId: string) => keyByAnnotation.get(annotationId) ?? '';
 
   const mayDecide = (annotation: (typeof annotations)[number]) =>
     mayDecideAnnotation(annotation, userId, document?.ownerId ?? null);
@@ -228,17 +235,24 @@ export function ReviewTasksPage() {
       ) : view === 'board' ? (
         <TaskBoard
           annotations={visible}
+          taskKeyOf={taskKeyOf}
           authorNameOf={authorNameOf}
           mayDecide={mayDecide}
           onOpen={setOpenTaskId}
           onAccept={acceptByDrop}
         />
       ) : (
-        <TaskListRows annotations={visible} authorNameOf={authorNameOf} onOpen={setOpenTaskId} />
+        <TaskListRows
+          annotations={visible}
+          taskKeyOf={taskKeyOf}
+          authorNameOf={authorNameOf}
+          onOpen={setOpenTaskId}
+        />
       )}
 
       <TaskDrawer
         annotation={openTask}
+        taskKey={openTask ? taskKeyOf(openTask.id) : ''}
         authorName={openTask ? authorNameOf(openTask.authorId) : ''}
         ownerId={document.ownerId}
         notify={notify}
