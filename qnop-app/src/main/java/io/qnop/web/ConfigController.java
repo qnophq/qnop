@@ -89,10 +89,11 @@ public class ConfigController implements ServerConfigApi {
                     .selfRegistrationEnabled(
                         settings.getBoolean(ApplicationSettingKey.AUTH_SELF_REGISTRATION_ENABLED)))
             .upload(new ServerConfigUpload().maxDocumentSizeMb(DEFAULT_MAX_DOCUMENT_SIZE_MB))
-            // The Community edition ingests PDF only — the ingest pipeline sniffs the %PDF- magic
-            // bytes and rejects anything else with 415 (issue #345). DOCX/Markdown are planned
-            // (Enterprise) and will extend this list when their extractors ship; advertising them
-            // now would mislead clients into offering uploads the server refuses.
+            // Report only the formats whose extractor actually ships, so a client never offers an
+            // upload the ingest pipeline would reject with 415 (magic-byte sniffing, issue #345).
+            // Today that is PDF; DOCX and Markdown are Community-scope and join this list once
+            // their
+            // extractors land (further formats are an Enterprise feature).
             .supportedFormats(List.of(SupportedFormat.PDF))
             .branding(buildBranding());
     return ResponseEntity.ok(body);
