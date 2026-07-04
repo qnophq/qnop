@@ -187,7 +187,72 @@ code="$(acode GET "/api/v1/documents/${doc_id}/annotations?version=1")"
 [ "$code" = "200" ] || fail "GET .../annotations?version=1 -> HTTP $code (expected 200)"
 log "GET .../annotations?version=1 -> 200"
 
-# 17) Auth session rotation: the refresh cookie mints a fresh access token, and
+# 17) Multi-version fixtures (#370): five doc1 uploads all extract READY through
+#     the scheduled job, and every version keeps serving its own rendering.
+DOC1_DIR="testdata/documents/doc1"
+upload_json="$(
+  curl -sf -X POST "${BASE_URL}/api/v1/documents" \
+    -H "Authorization: Bearer ${TOKEN}" \
+    -F "title=Fixture Lifecycle" \
+    -F "file=@${DOC1_DIR}/test-dummy-v1.pdf;type=application/pdf"
+)"
+doc1_id="$(echo "$upload_json" | jq -r '.documentId')"
+[ -n "$doc1_id" ] && [ "$doc1_id" != "null" ] || fail "doc1 upload did not return a documentId"
+for v in 2 3 4 5; do
+  curl -sf -X POST "${BASE_URL}/api/v1/documents/${doc1_id}/versions" \
+    -H "Authorization: Bearer ${TOKEN}" \
+    -F "file=@${DOC1_DIR}/test-dummy-v${v}.pdf;type=application/pdf" >/dev/null
+done
+for i in $(seq 1 "$EXTRACT_RETRIES"); do
+  statuses="$(aget "/api/v1/documents/${doc1_id}/versions" | jq -r '[.versions[].extractionStatus] | join(",")')"
+  case "$statuses" in *FAILED*) fail "doc1 extraction FAILED (${statuses})" ;; esac
+  ready_count="$(echo "$statuses" | tr ',' '\n' | grep -c READY || true)"
+  [ "$ready_count" = "5" ] && break
+  if [ "$i" -eq "$EXTRACT_RETRIES" ]; then
+    fail "doc1: only ${ready_count}/5 versions READY within $((EXTRACT_RETRIES * EXTRACT_DELAY))s (${statuses})"
+  fi
+  sleep "$EXTRACT_DELAY"
+done
+latest="$(aget "/api/v1/documents/${doc1_id}" | jq -r '.latestVersionNumber')"
+[ "$latest" = "5" ] || fail "doc1 latestVersionNumber=${latest} (expected 5)"
+v5_text="$(aget "/api/v1/documents/${doc1_id}/versions/5/rendered" | jq -r '[.surfaces[].textSpans[].text] | join(" ")')"
+echo "$v5_text" | grep -q "TEST-DUMMY-V5" || fail "doc1 v5 rendering lacks its TEST-DUMMY-V5 marker"
+v1_text="$(aget "/api/v1/documents/${doc1_id}/versions/1/rendered" | jq -r '[.surfaces[].textSpans[].text] | join(" ")')"
+echo "$v1_text" | grep -q "TEST-DUMMY-V1" || fail "doc1 v1 rendering lacks its TEST-DUMMY-V1 marker"
+log "doc1 fixtures: 5 versions uploaded, all READY, v1/v5 serve their own text"
+
+# 18) Story fixture (#370): the known v1->v2 word edit ("letzten" -> "einsamen")
+#     surfaces in the inter-version diff computed over the real extractions.
+DOC2_DIR="testdata/documents/doc2"
+upload_json="$(
+  curl -sf -X POST "${BASE_URL}/api/v1/documents" \
+    -H "Authorization: Bearer ${TOKEN}" \
+    -F "title=Fixture Story" \
+    -F "file=@${DOC2_DIR}/scifi-story-v1.pdf;type=application/pdf"
+)"
+doc2_id="$(echo "$upload_json" | jq -r '.documentId')"
+[ -n "$doc2_id" ] && [ "$doc2_id" != "null" ] || fail "doc2 upload did not return a documentId"
+curl -sf -X POST "${BASE_URL}/api/v1/documents/${doc2_id}/versions" \
+  -H "Authorization: Bearer ${TOKEN}" \
+  -F "file=@${DOC2_DIR}/scifi-story-v2.pdf;type=application/pdf" >/dev/null
+for i in $(seq 1 "$EXTRACT_RETRIES"); do
+  statuses="$(aget "/api/v1/documents/${doc2_id}/versions" | jq -r '[.versions[].extractionStatus] | join(",")')"
+  case "$statuses" in *FAILED*) fail "doc2 extraction FAILED (${statuses})" ;; esac
+  ready_count="$(echo "$statuses" | tr ',' '\n' | grep -c READY || true)"
+  [ "$ready_count" = "2" ] && break
+  if [ "$i" -eq "$EXTRACT_RETRIES" ]; then
+    fail "doc2: only ${ready_count}/2 versions READY within $((EXTRACT_RETRIES * EXTRACT_DELAY))s (${statuses})"
+  fi
+  sleep "$EXTRACT_DELAY"
+done
+diff_json="$(aget "/api/v1/documents/${doc2_id}/diff?from=1&to=2")"
+echo "$diff_json" | jq -e '[.changes[].fromText] | any(contains("letzten"))' >/dev/null ||
+  fail "doc2 diff misses the removed word 'letzten'"
+echo "$diff_json" | jq -e '[.changes[].toText] | any(contains("einsamen"))' >/dev/null ||
+  fail "doc2 diff misses the inserted word 'einsamen'"
+log "doc2 fixtures: v1->v2 diff reports the letzten -> einsamen edit"
+
+# 19) Auth session rotation: the refresh cookie mints a fresh access token, and
 #     after logout it is revoked (rotation + revocation, ADR-0026). /auth/refresh
 #     and /auth/logout are CSRF-protected by a double-submit cookie token (#175):
 #     the server sets a (non-HttpOnly) XSRF-TOKEN cookie that must be echoed back

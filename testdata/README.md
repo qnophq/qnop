@@ -32,12 +32,25 @@ testdata/
 ├── db/                       # deterministic SQL fixtures (issue #163)
 │   ├── clean.sql             # wipes the seeded tables to a known-empty slate
 │   └── seed.sql              # the shared seeded dataset (users, team, OIDC provider)
-└── documents/                # review document payloads (issue #308)
-    └── sample.pdf            # minimal valid single-page PDF, text "QNOP SMOKE TEST"
+└── documents/                # review document payloads (issues #308, #370)
+    ├── sample.pdf            # minimal valid single-page PDF, text "QNOP SMOKE TEST"
+    ├── doc1/                 # multi-version dummy: test-dummy-v1..v5.pdf (1 page each)
+    └── doc2/                 # multi-version story: scifi-story-v1..v5.pdf (3 pages each)
 ```
 
 The `documents/sample.pdf` fixture backs the ingest smoke test: it is uploaded,
 the extraction job renders it, and the smoke asserts the extracted text — so it
 must stay a real, PDFBox-parsable PDF with extractable text.
+
+The multi-version families (issue #370) drive `DocumentFixtureLifecycleIT` and
+the smoke's multi-version/diff steps:
+
+- **doc1** (`test-dummy-v1..v5.pdf`) — every version names itself in its text
+  (`Testdokument – Version N`, trailer `Dokument-ID: TEST-DUMMY-VN`), so a test
+  can assert that each stored version keeps serving exactly its own rendering.
+- **doc2** (`scifi-story-v1..v5.pdf`) — a three-page story ("Das letzte
+  Signal") with real word-level edits between versions; v1→v2 replaces
+  *letzten* → *einsamen* in the Kalinda sentence, which the diff assertions
+  pin down. Keep those anchor words stable when regenerating the fixtures.
 
 Add new fixture families as sibling directories as the suites that need them land.
