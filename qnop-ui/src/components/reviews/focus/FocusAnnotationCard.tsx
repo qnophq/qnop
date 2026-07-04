@@ -56,6 +56,8 @@ interface FocusAnnotationCardProps {
   notify: Notify;
   /** True while an OLDER version is viewed (#306): thread readable, nothing writable. */
   readOnly?: boolean;
+  /** The previous visit (issue #307) — enables the thread's "new" divider. */
+  previousSeenAt?: string | null;
 }
 
 /** True when the key event originates in a text field (arrows must move the caret). */
@@ -83,6 +85,7 @@ export function FocusAnnotationCard({
   userId,
   notify,
   readOnly = false,
+  previousSeenAt = null,
 }: FocusAnnotationCardProps) {
   const theme = useTheme();
   const reducedMotion = useMediaQuery('(prefers-reduced-motion: reduce)');
@@ -291,7 +294,12 @@ export function FocusAnnotationCard({
                 )}
 
                 <Box sx={{ overflowY: 'auto', flex: 1, minHeight: 0, px: 0.5, pb: 0.5 }}>
-                  <CommentThread annotationId={annotation.id} notify={notify} readOnly={readOnly} />
+                  <CommentThread
+                    annotationId={annotation.id}
+                    notify={notify}
+                    readOnly={readOnly}
+                    previousSeenAt={previousSeenAt}
+                  />
                 </Box>
                 {/* Discoverability for the native resize grip underneath. */}
                 <Box

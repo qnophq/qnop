@@ -19,6 +19,7 @@
  * SPDX-License-Identifier: AGPL-3.0-only
  */
 
+import { useEffect, useRef, useState } from 'react';
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import type {
   DocumentListResponse,
@@ -244,4 +245,27 @@ export function useUploadVersion(documentId: string) {
       queryClient.invalidateQueries({ queryKey: reviewKeys.all });
     },
   });
+}
+
+/**
+ * Stamps the caller's visit once per page mount and returns the PREVIOUS
+ * visit (issue #307) — the session's unseen-marker baseline. The ref guard
+ * keeps StrictMode's double effect from firing a second stamp, which would
+ * instantly wipe the fresh markers. Best-effort: on failure the markers
+ * simply stay off.
+ */
+export function useRecordVisit(documentId: string): string | null {
+  const [previousSeenAt, setPreviousSeenAt] = useState<string | null>(null);
+  const stampedFor = useRef<string | null>(null);
+
+  useEffect(() => {
+    if (!documentId || stampedFor.current === documentId) return;
+    stampedFor.current = documentId;
+    documentsApi.recordVisit({ documentId }).then(
+      (response) => setPreviousSeenAt(response.data.previousSeenAt ?? null),
+      () => undefined,
+    );
+  }, [documentId]);
+
+  return previousSeenAt;
 }

@@ -41,6 +41,8 @@ import { PRIORITY_CUES, TYPE_CUES, taskTitle } from './tasksModel';
 
 interface TaskDrawerProps {
   annotation: AnnotationView | null;
+  /** The previous visit (issue #307) — enables the thread's "new" divider. */
+  previousSeenAt?: string | null;
   /** Tracker-style shorthand ("T-3") of the open annotation. */
   taskKey: string;
   authorName: string;
@@ -61,6 +63,7 @@ interface TaskDrawerProps {
  */
 export function TaskDrawer({
   annotation,
+  previousSeenAt = null,
   taskKey,
   authorName,
   ownerId,
@@ -180,7 +183,11 @@ export function TaskDrawer({
         </Box>
 
         <Box sx={{ flex: 1, overflowY: 'auto', px: 2, py: 1 }}>
-          <CommentThread annotationId={annotation.id} notify={notify} />
+          <CommentThread
+            annotationId={annotation.id}
+            notify={notify}
+            previousSeenAt={previousSeenAt}
+          />
         </Box>
 
         {mayDecideAnnotation(annotation, userId, ownerId) && (

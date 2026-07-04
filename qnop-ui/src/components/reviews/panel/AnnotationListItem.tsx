@@ -32,6 +32,7 @@ import { useComments } from '../../../api/hooks/useComments';
 import { useAuthStore } from '../../../stores/authStore';
 import { ToneBadge } from '../../admin/ToneBadge';
 import { UserAvatar } from '../../shell/UserAvatar';
+import { hasNewComments, isUnseen } from '../newSince';
 import { highlightColorFor } from '../viewer/markerColors';
 import { PlacementStatusChip } from './PlacementStatusChip';
 import { STATUS_CUES } from './statusCues';
@@ -87,6 +88,8 @@ function ParticipantAvatars({ ids }: { ids: string[] }) {
 interface AnnotationListItemProps {
   annotation: AnnotationView;
   active: boolean;
+  /** The previous visit (issue #307) — null hides every unseen cue. */
+  previousSeenAt?: string | null;
   /** True while the mark on the page is hovered — mirrors the link visually. */
   linked?: boolean;
   /**
@@ -113,11 +116,15 @@ interface AnnotationListItemProps {
 function AnnotationListItemBase({
   annotation,
   active,
+  previousSeenAt = null,
   linked = false,
   onSelect,
   onHover,
 }: AnnotationListItemProps) {
   const theme = useTheme();
+  const viewerId = useAuthStore((state) => state.userId);
+  const unseen = isUnseen(annotation, previousSeenAt, viewerId);
+  const freshComments = hasNewComments(annotation, previousSeenAt);
   const quote = annotation.anchor?.textQuote?.quote;
   const region = annotation.anchor?.region;
   const statusCue = STATUS_CUES[annotation.status];
@@ -211,6 +218,7 @@ function AnnotationListItemBase({
         <Stack spacing={0.75}>
           <Stack direction="row" spacing={1} sx={{ alignItems: 'center', flexWrap: 'wrap' }}>
             <ToneBadge tone={statusCue.tone} label={statusCue.label} />
+            {unseen && <ToneBadge tone="blue" label="New" />}
             <PlacementStatusChip status={annotation.placementStatus} />
             <Stack
               direction="row"
@@ -253,6 +261,20 @@ function AnnotationListItemBase({
               <StatusIcon size={15} aria-label={statusCue.label} />
             </Box>
           </Tooltip>
+          {unseen && (
+            <Tooltip title="New since your last visit">
+              <Box
+                data-testid="unseen-dot"
+                sx={{
+                  width: 7,
+                  height: 7,
+                  borderRadius: '50%',
+                  bgcolor: theme.qnop.brand.blue,
+                  flexShrink: 0,
+                }}
+              />
+            </Tooltip>
+          )}
           <Typography
             variant="body2"
             noWrap
@@ -268,7 +290,13 @@ function AnnotationListItemBase({
           <Stack
             direction="row"
             spacing={0.5}
-            sx={{ alignItems: 'center', color: 'text.secondary', flexShrink: 0 }}
+            data-testid="comment-count"
+            sx={{
+              alignItems: 'center',
+              color: freshComments ? theme.qnop.brand.blue : 'text.secondary',
+              fontWeight: freshComments ? 600 : undefined,
+              flexShrink: 0,
+            }}
           >
             <MessageSquare size={13} aria-hidden />
             <Typography variant="caption" aria-label={`${annotation.commentCount} comments`}>

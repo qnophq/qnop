@@ -34,10 +34,15 @@ vi.mock('../../../api/hooks/useComments', () => ({
 
 const addMutate = vi.fn();
 
-function renderThread(readOnly = false) {
+function renderThread(readOnly = false, previousSeenAt: string | null = null) {
   return render(
     <ThemeProvider theme={buildTheme('light')}>
-      <CommentThread annotationId="a1" notify={vi.fn()} readOnly={readOnly} />
+      <CommentThread
+        annotationId="a1"
+        notify={vi.fn()}
+        readOnly={readOnly}
+        previousSeenAt={previousSeenAt}
+      />
     </ThemeProvider>,
   );
 }
@@ -52,6 +57,66 @@ beforeEach(() => {
 });
 
 describe('CommentThread', () => {
+  it('separates foreign comments newer than the previous visit with a divider', () => {
+    vi.mocked(useComments).mockReturnValue({
+      isPending: false,
+      isError: false,
+      data: {
+        comments: [
+          {
+            id: 'c1',
+            annotationId: 'a1',
+            authorId: 'other',
+            body: 'Old',
+            createdAt: '2026-07-01T10:00:00Z',
+          },
+          {
+            id: 'c2',
+            annotationId: 'a1',
+            authorId: 'me',
+            body: 'Mine, new',
+            createdAt: '2026-07-03T10:00:00Z',
+          },
+          {
+            id: 'c3',
+            annotationId: 'a1',
+            authorId: 'other',
+            body: 'Theirs, new',
+            createdAt: '2026-07-04T10:00:00Z',
+          },
+        ],
+      },
+    } as unknown as ReturnType<typeof useComments>);
+
+    renderThread(false, '2026-07-02T00:00:00Z');
+
+    // Exactly one divider, sitting before the first NEW FOREIGN comment —
+    // the user's own newer reply never triggers it (issue #307).
+    expect(screen.getAllByTestId('new-since-divider')).toHaveLength(1);
+    expect(screen.getByText('New since your last visit')).toBeInTheDocument();
+  });
+
+  it('shows no divider on a first visit', () => {
+    vi.mocked(useComments).mockReturnValue({
+      isPending: false,
+      isError: false,
+      data: {
+        comments: [
+          {
+            id: 'c1',
+            annotationId: 'a1',
+            authorId: 'other',
+            body: 'Hi',
+            createdAt: '2026-07-04T10:00:00Z',
+          },
+        ],
+      },
+    } as unknown as ReturnType<typeof useComments>);
+
+    renderThread(false, null);
+    expect(screen.queryByTestId('new-since-divider')).not.toBeInTheDocument();
+  });
+
   it('renders the thread with authorship relative to the signed-in user', () => {
     vi.mocked(useComments).mockReturnValue({
       isPending: false,

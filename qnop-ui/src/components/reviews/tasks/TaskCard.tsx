@@ -30,7 +30,9 @@ import { MessageSquare } from 'lucide-react';
 import type { AnnotationView } from '../../../api/generated';
 import { AnnotationStatus } from '../../../api/generated';
 import { ToneBadge } from '../../admin/ToneBadge';
+import { useAuthStore } from '../../../stores/authStore';
 import { UserAvatar } from '../../shell/UserAvatar';
+import { isUnseen } from '../newSince';
 import { tokens } from '../../../theme/tokens';
 import { STATUS_CUES } from '../panel/statusCues';
 import { PRIORITY_CUES, TYPE_CUES, taskTitle } from './tasksModel';
@@ -40,6 +42,8 @@ export const TASK_DRAG_TYPE = 'text/qnop-annotation';
 
 interface TaskCardProps {
   annotation: AnnotationView;
+  /** The previous visit (issue #307) — null hides the unseen dot. */
+  previousSeenAt?: string | null;
   /** Tracker-style shorthand ("T-3") — display only, the UUID stays the identity. */
   taskKey: string;
   authorName: string;
@@ -54,8 +58,17 @@ interface TaskCardProps {
  * title, the quoted passage as a secondary line, author and thread size at
  * the bottom. Shares the annotation cards' 6px radius — one system.
  */
-export function TaskCard({ annotation, taskKey, authorName, draggable, onOpen }: TaskCardProps) {
+export function TaskCard({
+  annotation,
+  previousSeenAt = null,
+  taskKey,
+  authorName,
+  draggable,
+  onOpen,
+}: TaskCardProps) {
   const theme = useTheme();
+  const viewerId = useAuthStore((state) => state.userId);
+  const unseen = isUnseen(annotation, previousSeenAt, viewerId);
   const type = annotation.type ? TYPE_CUES[annotation.type] : null;
   const priority = annotation.priority ? PRIORITY_CUES[annotation.priority] : null;
   const quote = annotation.anchor?.textQuote?.quote;
@@ -101,6 +114,20 @@ export function TaskCard({ annotation, taskKey, authorName, draggable, onOpen }:
       }}
     >
       <Stack direction="row" spacing={0.75} sx={{ alignItems: 'center', mb: 0.75 }}>
+        {unseen && (
+          <Tooltip title="New since your last visit">
+            <Box
+              data-testid="unseen-dot"
+              sx={{
+                width: 7,
+                height: 7,
+                borderRadius: '50%',
+                bgcolor: theme.qnop.brand.blue,
+                flexShrink: 0,
+              }}
+            />
+          </Tooltip>
+        )}
         <Tooltip title={priority ? `${priority.label} priority` : 'No priority'}>
           <Typography
             component="span"

@@ -38,6 +38,7 @@ import io.qnop.api.v1.model.ParticipantListResponse;
 import io.qnop.api.v1.model.ParticipantView;
 import io.qnop.api.v1.model.RenderedDocumentResponse;
 import io.qnop.api.v1.model.VersionDiffResponse;
+import io.qnop.api.v1.model.VisitResponse;
 import io.qnop.service.diff.VersionDiffService;
 import io.qnop.service.document.DocumentAccessService;
 import io.qnop.service.document.DocumentAccessService.DocumentVersionView;
@@ -45,6 +46,7 @@ import io.qnop.service.document.DocumentAccessService.DocumentView;
 import io.qnop.service.document.DocumentOverviewService;
 import io.qnop.service.document.DocumentUpdateService;
 import io.qnop.service.document.ReviewParticipantService;
+import io.qnop.service.review.ReviewVisitService;
 import java.time.Instant;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
@@ -68,18 +70,21 @@ public class DocumentsController implements DocumentsApi {
   private final DocumentOverviewService overview;
   private final ReviewParticipantService participants;
   private final DocumentUpdateService updates;
+  private final ReviewVisitService visits;
 
   public DocumentsController(
       DocumentAccessService documents,
       VersionDiffService diffs,
       DocumentOverviewService overview,
       ReviewParticipantService participants,
-      DocumentUpdateService updates) {
+      DocumentUpdateService updates,
+      ReviewVisitService visits) {
     this.documents = documents;
     this.diffs = diffs;
     this.overview = overview;
     this.participants = participants;
     this.updates = updates;
+    this.visits = visits;
   }
 
   @Override
@@ -202,6 +207,15 @@ public class DocumentsController implements DocumentsApi {
     DocumentView view =
         documents.getDocument(documentId, CurrentUser.requireUserId(), CurrentUser.isAdmin());
     return ResponseEntity.ok(toResponse(view));
+  }
+
+  @Override
+  public ResponseEntity<VisitResponse> recordVisit(UUID documentId) {
+    Instant previous =
+        visits.recordVisit(documentId, CurrentUser.requireUserId(), CurrentUser.isAdmin());
+    return ResponseEntity.ok(
+        new VisitResponse()
+            .previousSeenAt(previous == null ? null : previous.atOffset(ZoneOffset.UTC)));
   }
 
   @Override

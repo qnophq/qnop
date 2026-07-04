@@ -58,6 +58,7 @@ import {
   walkPosition,
 } from '../../components/reviews/focus/spotlightModel';
 import { useAnchorElement } from '../../components/reviews/focus/useAnchorElement';
+import { useRecordVisit } from '../../api/hooks/useReviews';
 import { useViewMode } from '../../components/reviews/focus/useViewMode';
 import { columnOf } from '../../components/reviews/tasks/tasksModel';
 import { Composer } from '../../components/reviews/panel/Composer';
@@ -125,6 +126,8 @@ export function DocumentReviewPage() {
   const [tool, setTool] = useState<ViewerTool>('text');
   const [zoom, setZoom] = useState(1);
   const [viewMode, setViewMode] = useViewMode();
+  // The unseen-marker baseline (issue #307): the PREVIOUS visit, stamped once.
+  const previousSeenAt = useRecordVisit(documentId);
   // The view tabs (issue #398) address the mode through the URL — ?view= wins
   // over (and updates) the stored preference; the param stays shareable.
   const urlView = searchParams.get('view');
@@ -493,6 +496,7 @@ export function DocumentReviewPage() {
                   ownerId={document.ownerId}
                   notify={notify}
                   readOnly={!isLatestVersion}
+                  previousSeenAt={previousSeenAt}
                 />
               </ErrorBoundary>
             </Box>
@@ -521,6 +525,7 @@ export function DocumentReviewPage() {
               ownerId={document.ownerId}
               notify={notify}
               readOnly={!isLatestVersion}
+              previousSeenAt={previousSeenAt}
             />
           </ErrorBoundary>
         </FocusDrawer>
@@ -536,6 +541,7 @@ export function DocumentReviewPage() {
           userId={userId}
           notify={notify}
           readOnly={!isLatestVersion}
+          previousSeenAt={previousSeenAt}
         />
       )}
       {focusMode && composingPending && pending && (

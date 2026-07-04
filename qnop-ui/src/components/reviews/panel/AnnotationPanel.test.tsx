@@ -87,6 +87,34 @@ function renderPanel(props: Partial<Parameters<typeof AnnotationPanel>[0]> = {})
 }
 
 describe('AnnotationPanel', () => {
+  it('marks unseen foreign activity and counts it in the section header', () => {
+    useAuthStore.setState({ userId: 'me' });
+    renderPanel({
+      previousSeenAt: '2026-07-02T00:00:00Z',
+      annotations: [
+        // Foreign and new → dot; own and new → no dot; old with a fresh foreign reply → dot.
+        annotation('a-new', { authorId: 'other', createdAt: '2026-07-03T10:00:00Z' }),
+        annotation('a-mine', { authorId: 'me', createdAt: '2026-07-03T10:00:00Z' }),
+        annotation('a-replied', {
+          authorId: 'me',
+          createdAt: '2026-07-01T10:00:00Z',
+          latestCommentFromOthersAt: '2026-07-03T12:00:00Z',
+        }),
+      ],
+    });
+
+    expect(
+      within(screen.getByTestId('annotation-item-a-new')).getByTestId('unseen-dot'),
+    ).toBeInTheDocument();
+    expect(
+      within(screen.getByTestId('annotation-item-a-mine')).queryByTestId('unseen-dot'),
+    ).not.toBeInTheDocument();
+    expect(
+      within(screen.getByTestId('annotation-item-a-replied')).getByTestId('unseen-dot'),
+    ).toBeInTheDocument();
+    expect(screen.getByTestId('section-new-count')).toHaveTextContent('2 new');
+  });
+
   it('shows the empty state with the how-to hint when annotating is possible', () => {
     renderPanel();
     expect(

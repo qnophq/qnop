@@ -35,6 +35,7 @@ import { useAuthStore } from '../../../stores/authStore';
 import type { Notify } from '../../admin/layout/useToast';
 import { SectionCard } from '../../admin/layout/SectionCard';
 import { compareAnnotationsByPosition } from '../viewer/anchoring';
+import { isUnseen } from '../newSince';
 import { AnnotationListItem } from './AnnotationListItem';
 import { CommentThread } from './CommentThread';
 import { Composer } from './Composer';
@@ -66,6 +67,8 @@ interface AnnotationPanelProps {
   notify: Notify;
   /** True while an OLDER version is viewed (#306): threads readable, nothing writable. */
   readOnly?: boolean;
+  /** The previous visit (issue #307) — null hides every unseen cue. */
+  previousSeenAt?: string | null;
 }
 
 /** A collapsible, counted group of annotation cards (prototype sidebar section). */
@@ -74,6 +77,7 @@ function PanelSection({
   subtitle,
   icon,
   count,
+  newCount = 0,
   defaultOpen = true,
   children,
 }: {
@@ -81,6 +85,8 @@ function PanelSection({
   subtitle?: string;
   icon: ReactNode;
   count: number;
+  /** Unseen entries in this group (issue #307) — rendered as "· n new". */
+  newCount?: number;
   defaultOpen?: boolean;
   children: ReactNode;
 }) {
@@ -151,6 +157,15 @@ function PanelSection({
         >
           {count}
         </Typography>
+        {newCount > 0 && (
+          <Typography
+            variant="caption"
+            data-testid="section-new-count"
+            sx={{ color: theme.qnop.brand.blue, fontWeight: 600, flexShrink: 0 }}
+          >
+            · {newCount} new
+          </Typography>
+        )}
       </ButtonBase>
       <Collapse in={open} unmountOnExit>
         <Stack spacing={1.5} sx={{ pt: 1 }}>
@@ -183,6 +198,7 @@ export function AnnotationPanel({
   ownerId,
   notify,
   readOnly = false,
+  previousSeenAt = null,
 }: AnnotationPanelProps) {
   const [filter, setFilter] = useState<StatusFilter>('all');
   const userId = useAuthStore((state) => state.userId);
@@ -214,6 +230,7 @@ export function AnnotationPanel({
         <AnnotationListItem
           annotation={annotation}
           active={active}
+          previousSeenAt={previousSeenAt}
           linked={annotation.id === hoverAnnotationId}
           onSelect={onSelect}
           onHover={onHover}
@@ -225,7 +242,12 @@ export function AnnotationPanel({
               onDecide={(decision) => decideWith(annotation, decision)}
             />
           )}
-          <CommentThread annotationId={annotation.id} notify={notify} readOnly={readOnly} />
+          <CommentThread
+            annotationId={annotation.id}
+            notify={notify}
+            readOnly={readOnly}
+            previousSeenAt={previousSeenAt}
+          />
         </Collapse>
       </Stack>
     );
@@ -278,6 +300,7 @@ export function AnnotationPanel({
             subtitle="Anchored to the document"
             icon={<Link2 size={13} aria-hidden />}
             count={placed.length}
+            newCount={placed.filter((a) => isUnseen(a, previousSeenAt, userId)).length}
           >
             {placed.map(renderItem)}
           </PanelSection>
@@ -288,6 +311,7 @@ export function AnnotationPanel({
             subtitle="Anchor lost — needs manual handling"
             icon={<Unlink size={13} aria-hidden />}
             count={unplaced.length}
+            newCount={unplaced.filter((a) => isUnseen(a, previousSeenAt, userId)).length}
           >
             {unplaced.map(renderItem)}
           </PanelSection>

@@ -47,6 +47,8 @@ const COLUMN_CUES: Record<
 
 interface TaskBoardProps {
   annotations: AnnotationView[];
+  /** The previous visit (issue #307). */
+  previousSeenAt?: string | null;
   /** Tracker-style shorthand per annotation id ("T-3"). */
   taskKeyOf: (annotationId: string) => string;
   authorNameOf: (authorId: string) => string;
@@ -66,6 +68,7 @@ interface TaskBoardProps {
  */
 export function TaskBoard({
   annotations,
+  previousSeenAt = null,
   taskKeyOf,
   authorNameOf,
   mayDecide,
@@ -156,6 +159,7 @@ export function TaskBoard({
                 <TaskCard
                   key={annotation.id}
                   annotation={annotation}
+                  previousSeenAt={previousSeenAt}
                   taskKey={taskKeyOf(annotation.id)}
                   authorName={authorNameOf(annotation.authorId)}
                   draggable={!isDone && mayDecide(annotation)}

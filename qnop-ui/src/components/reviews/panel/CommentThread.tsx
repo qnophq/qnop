@@ -19,7 +19,7 @@
  * SPDX-License-Identifier: AGPL-3.0-only
  */
 
-import { useState } from 'react';
+import { Fragment, useState } from 'react';
 import Box from '@mui/material/Box';
 import CircularProgress from '@mui/material/CircularProgress';
 import IconButton from '@mui/material/IconButton';
@@ -27,12 +27,13 @@ import Stack from '@mui/material/Stack';
 import TextField from '@mui/material/TextField';
 import Tooltip from '@mui/material/Tooltip';
 import Typography from '@mui/material/Typography';
-import { useTheme } from '@mui/material/styles';
+import { alpha, useTheme } from '@mui/material/styles';
 import { SendHorizontal } from 'lucide-react';
 import { useAddComment, useComments } from '../../../api/hooks/useComments';
 import { isSubmitShortcut, submitShortcutLabel } from '../../../utils/platform';
 import { useAuthStore } from '../../../stores/authStore';
 import type { Notify } from '../../admin/layout/useToast';
+import { isNewComment } from '../newSince';
 import { UserAvatar } from '../../shell/UserAvatar';
 
 const AVATAR_SIZE = 26;
@@ -44,6 +45,8 @@ interface CommentThreadProps {
   notify: Notify;
   /** Hides the reply composer — older versions are a read-only record (#306). */
   readOnly?: boolean;
+  /** The previous visit (issue #307) — enables the "new" divider inside the thread. */
+  previousSeenAt?: string | null;
 }
 
 const TIME_FORMAT = new Intl.DateTimeFormat(undefined, {
@@ -59,7 +62,12 @@ const TIME_FORMAT = new Intl.DateTimeFormat(undefined, {
  * of the annotation API yet, so authorship is shown relative to the signed-in
  * user.
  */
-export function CommentThread({ annotationId, notify, readOnly = false }: CommentThreadProps) {
+export function CommentThread({
+  annotationId,
+  notify,
+  readOnly = false,
+  previousSeenAt = null,
+}: CommentThreadProps) {
   const theme = useTheme();
   const userId = useAuthStore((state) => state.userId);
   const displayName = useAuthStore((state) => state.displayName);
@@ -78,6 +86,9 @@ export function CommentThread({ annotationId, notify, readOnly = false }: Commen
   };
 
   const comments = commentsQuery.data?.comments ?? [];
+  const firstNewCommentId = comments.find((comment) =>
+    isNewComment(comment, previousSeenAt, userId),
+  )?.id;
 
   return (
     <Box sx={{ position: 'relative', mt: 0.5, ml: 1.5, pl: 0 }}>
@@ -109,36 +120,59 @@ export function CommentThread({ annotationId, notify, readOnly = false }: Commen
           const own = comment.authorId === userId;
           const name = own ? (displayName ?? 'You') : 'Participant';
           return (
-            <Stack key={comment.id} direction="row" spacing={1} sx={{ alignItems: 'flex-start' }}>
-              <Box sx={{ position: 'relative', zIndex: 1, pt: 0.25 }}>
-                <UserAvatar name={name} size={AVATAR_SIZE} imageUrl={own ? avatarUrl : null} />
-              </Box>
-              <Box
-                sx={{
-                  flex: 1,
-                  minWidth: 0,
-                  bgcolor: theme.qnop.surface2,
-                  borderRadius: '3px 8px 8px 8px',
-                  px: 1.25,
-                  py: 0.75,
-                }}
-              >
-                <Stack direction="row" spacing={1} sx={{ alignItems: 'baseline' }}>
-                  <Typography variant="body2" sx={{ fontWeight: 600 }}>
-                    {own ? 'You' : name}
-                  </Typography>
-                  <Typography variant="caption" color="text.secondary">
-                    {TIME_FORMAT.format(new Date(comment.createdAt))}
-                  </Typography>
-                </Stack>
-                <Typography
-                  variant="body2"
-                  sx={{ whiteSpace: 'pre-wrap', overflowWrap: 'anywhere', mt: 0.25 }}
+            <Fragment key={comment.id}>
+              {comment.id === firstNewCommentId && (
+                <Stack
+                  direction="row"
+                  spacing={1}
+                  data-testid="new-since-divider"
+                  sx={{ alignItems: 'center', pl: 4.5 }}
                 >
-                  {comment.body}
-                </Typography>
-              </Box>
-            </Stack>
+                  <Box
+                    sx={{ flex: 1, height: '1px', bgcolor: alpha(theme.qnop.brand.blue, 0.4) }}
+                  />
+                  <Typography
+                    variant="caption"
+                    sx={{ color: theme.qnop.brand.blue, fontWeight: 600, whiteSpace: 'nowrap' }}
+                  >
+                    New since your last visit
+                  </Typography>
+                  <Box
+                    sx={{ flex: 1, height: '1px', bgcolor: alpha(theme.qnop.brand.blue, 0.4) }}
+                  />
+                </Stack>
+              )}
+              <Stack direction="row" spacing={1} sx={{ alignItems: 'flex-start' }}>
+                <Box sx={{ position: 'relative', zIndex: 1, pt: 0.25 }}>
+                  <UserAvatar name={name} size={AVATAR_SIZE} imageUrl={own ? avatarUrl : null} />
+                </Box>
+                <Box
+                  sx={{
+                    flex: 1,
+                    minWidth: 0,
+                    bgcolor: theme.qnop.surface2,
+                    borderRadius: '3px 8px 8px 8px',
+                    px: 1.25,
+                    py: 0.75,
+                  }}
+                >
+                  <Stack direction="row" spacing={1} sx={{ alignItems: 'baseline' }}>
+                    <Typography variant="body2" sx={{ fontWeight: 600 }}>
+                      {own ? 'You' : name}
+                    </Typography>
+                    <Typography variant="caption" color="text.secondary">
+                      {TIME_FORMAT.format(new Date(comment.createdAt))}
+                    </Typography>
+                  </Stack>
+                  <Typography
+                    variant="body2"
+                    sx={{ whiteSpace: 'pre-wrap', overflowWrap: 'anywhere', mt: 0.25 }}
+                  >
+                    {comment.body}
+                  </Typography>
+                </Box>
+              </Stack>
+            </Fragment>
           );
         })}
         {!commentsQuery.isPending && !commentsQuery.isError && comments.length === 0 && (
