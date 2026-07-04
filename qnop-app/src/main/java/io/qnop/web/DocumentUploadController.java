@@ -23,7 +23,9 @@ package io.qnop.web;
 import io.qnop.service.document.DocumentIngestService;
 import io.qnop.service.document.DocumentIngestService.UploadResult;
 import io.qnop.service.document.DocumentValidationException;
+import io.qnop.service.document.UploadSource;
 import java.io.IOException;
+import java.io.InputStream;
 import java.time.Instant;
 import java.time.format.DateTimeParseException;
 import java.util.UUID;
@@ -61,14 +63,16 @@ public class DocumentUploadController {
       @RequestParam("file") MultipartFile file,
       @RequestParam(value = "dueAt", required = false) String dueAt) {
     UploadResult result =
-        ingest.createDocument(CurrentUser.requireUserId(), title, bytesOf(file), parseDueAt(dueAt));
+        ingest.createDocument(
+            CurrentUser.requireUserId(), title, sourceOf(file), parseDueAt(dueAt));
     return ResponseEntity.status(HttpStatus.CREATED).body(DocumentUploadResponse.of(result));
   }
 
   @PostMapping(value = "/{documentId}/versions", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
   public ResponseEntity<DocumentUploadResponse> addVersion(
       @PathVariable UUID documentId, @RequestParam("file") MultipartFile file) {
-    UploadResult result = ingest.addVersion(CurrentUser.requireUserId(), documentId, bytesOf(file));
+    UploadResult result =
+        ingest.addVersion(CurrentUser.requireUserId(), documentId, sourceOf(file));
     return ResponseEntity.status(HttpStatus.CREATED).body(DocumentUploadResponse.of(result));
   }
 
@@ -84,12 +88,24 @@ public class DocumentUploadController {
     }
   }
 
-  private static byte[] bytesOf(MultipartFile file) {
-    try {
-      return file.getBytes();
-    } catch (IOException e) {
-      throw DocumentValidationException.invalidRequest("upload could not be read");
-    }
+  /**
+   * Adapts the multipart part to the framework-free {@link UploadSource} the ingest service
+   * consumes (issue #361), so the upload streams through without being materialized in the heap and
+   * {@code MultipartFile} never crosses into {@code qnop-core} (ADR-0004). {@code getInputStream}
+   * may be opened more than once (ingest sniffs, then stages).
+   */
+  private static UploadSource sourceOf(MultipartFile file) {
+    return new UploadSource() {
+      @Override
+      public InputStream open() throws IOException {
+        return file.getInputStream();
+      }
+
+      @Override
+      public long declaredSize() {
+        return file.getSize();
+      }
+    };
   }
 
   /** What the SPA needs after an upload: where the version landed and its extraction state. */

@@ -35,11 +35,15 @@ import io.qnop.entity.User;
 import io.qnop.repository.DocumentRepository;
 import io.qnop.repository.ReviewParticipantRepository;
 import io.qnop.repository.UserRepository;
+import io.qnop.service.ApplicationSettingKey;
+import io.qnop.service.ApplicationSettingsService;
 import io.qnop.service.job.JobQueuePoller;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 import org.apache.pdfbox.pdmodel.PDDocument;
 import org.apache.pdfbox.pdmodel.PDPage;
@@ -73,6 +77,7 @@ class DocumentIngestIT extends AbstractIntegrationTest {
   @Autowired ReviewParticipantRepository participants;
   @Autowired PasswordEncoder passwordEncoder;
   @Autowired JobQueuePoller poller;
+  @Autowired ApplicationSettingsService settings;
 
   private final List<UUID> createdDocuments = new ArrayList<>();
   private final List<UUID> createdUsers = new ArrayList<>();
@@ -192,6 +197,48 @@ class DocumentIngestIT extends AbstractIntegrationTest {
                 .with(asUser(owner)))
         .andExpect(status().isUnsupportedMediaType())
         .andExpect(jsonPath("$.code").value("UNSUPPORTED_MEDIA_TYPE"));
+  }
+
+  @Test
+  @DisplayName("an empty upload is rejected with 400 and the uniform envelope")
+  void rejectsEmptyUpload() throws Exception {
+    UUID owner = createUser();
+
+    mockMvc
+        .perform(
+            multipart("/api/v1/documents")
+                .file(new MockMultipartFile("file", "empty.pdf", "application/pdf", new byte[0]))
+                .param("title", "Empty")
+                .with(asUser(owner)))
+        .andExpect(status().isBadRequest())
+        .andExpect(jsonPath("$.code").value("VALIDATION_ERROR"));
+  }
+
+  @Test
+  @DisplayName("an upload over the configured size cap is rejected with 413 (before staging)")
+  void rejectsOversizeUpload() throws Exception {
+    UUID owner = createUser();
+    int originalCapMb = settings.getInteger(ApplicationSettingKey.UPLOAD_MAX_FILE_SIZE_MB);
+    try {
+      settings.update(Map.of(ApplicationSettingKey.UPLOAD_MAX_FILE_SIZE_MB.getKey(), "1"), null);
+      byte[] tooBig = new byte[2 * 1024 * 1024]; // 2 MB > 1 MB cap
+      System.arraycopy("%PDF-".getBytes(StandardCharsets.US_ASCII), 0, tooBig, 0, 5);
+
+      mockMvc
+          .perform(
+              multipart("/api/v1/documents")
+                  .file(pdfFile(tooBig))
+                  .param("title", "Too big")
+                  .with(asUser(owner)))
+          .andExpect(status().isPayloadTooLarge())
+          .andExpect(jsonPath("$.code").value("PAYLOAD_TOO_LARGE"));
+    } finally {
+      settings.update(
+          Map.of(
+              ApplicationSettingKey.UPLOAD_MAX_FILE_SIZE_MB.getKey(),
+              String.valueOf(originalCapMb)),
+          null);
+    }
   }
 
   @Test
