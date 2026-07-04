@@ -123,6 +123,17 @@ describe('FocusAnnotationCard', () => {
     expect(props.onNavigate).not.toHaveBeenCalled();
   });
 
+  it('is resizable within hard bounds', () => {
+    renderCard();
+    const body = screen.getByTestId('focus-card-body');
+    const style = getComputedStyle(body);
+    expect(style.resize).toBe('both');
+    expect(style.minWidth).toBe('320px');
+    expect(style.minHeight).toBe('220px');
+    expect(style.maxWidth).toContain('640px');
+    expect(style.maxHeight).toContain('72vh');
+  });
+
   it('disables the ends of the walk and hides deciding from uninvolved users', () => {
     renderCard({
       position: { index: 0, count: 3, prevId: null, nextId: 'a3' },

@@ -133,11 +133,7 @@ export function FocusAnnotationCard({
             data-testid="focus-annotation-card"
             onKeyDown={handleKeyDown}
             sx={{
-              width: 380,
-              maxWidth: 'calc(100vw - 32px)',
-              maxHeight: 'min(70vh, 560px)',
               display: 'flex',
-              flexDirection: 'column',
               position: 'relative',
               borderRadius: '10px',
               // Bordered surface with ONE soft ambient shadow — the brand
@@ -184,13 +180,23 @@ export function FocusAnnotationCard({
             <FocusTrap open disableRestoreFocus disableEnforceFocus>
               <Box
                 tabIndex={-1}
+                data-testid="focus-card-body"
                 sx={{
+                  position: 'relative',
                   display: 'flex',
                   flexDirection: 'column',
-                  minHeight: 0,
                   outline: 'none',
                   borderRadius: '9px',
                   overflow: 'hidden',
+                  // Reader-resizable (long threads, narrow viewports): the
+                  // native grip, hard-bounded so the card can neither
+                  // collapse below usability nor swallow the document.
+                  resize: 'both',
+                  width: 380,
+                  minWidth: 320,
+                  maxWidth: 'min(640px, calc(100vw - 48px))',
+                  minHeight: 220,
+                  maxHeight: 'min(72vh, 680px)',
                 }}
               >
                 <Stack
@@ -281,9 +287,23 @@ export function FocusAnnotationCard({
                   />
                 )}
 
-                <Box sx={{ overflowY: 'auto', minHeight: 0, px: 0.5, pb: 0.5 }}>
+                <Box sx={{ overflowY: 'auto', flex: 1, minHeight: 0, px: 0.5, pb: 0.5 }}>
                   <CommentThread annotationId={annotation.id} notify={notify} />
                 </Box>
+                {/* Discoverability for the native resize grip underneath. */}
+                <Box
+                  aria-hidden
+                  sx={{
+                    position: 'absolute',
+                    right: 2,
+                    bottom: 2,
+                    width: 11,
+                    height: 11,
+                    pointerEvents: 'none',
+                    clipPath: 'polygon(100% 0, 100% 100%, 0 100%)',
+                    background: `repeating-linear-gradient(135deg, transparent 0 2.5px, ${theme.palette.divider} 2.5px 4px)`,
+                  }}
+                />
               </Box>
             </FocusTrap>
           </Paper>
