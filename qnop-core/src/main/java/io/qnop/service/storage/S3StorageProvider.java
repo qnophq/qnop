@@ -25,6 +25,8 @@ import io.qnop.spi.storage.StorageException;
 import io.qnop.spi.storage.StorageProvider;
 import java.io.InputStream;
 import java.util.Optional;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import software.amazon.awssdk.core.ResponseInputStream;
 import software.amazon.awssdk.core.sync.RequestBody;
 import software.amazon.awssdk.services.s3.S3Client;
@@ -42,6 +44,15 @@ import software.amazon.awssdk.services.s3.model.S3Exception;
  */
 public class S3StorageProvider implements StorageProvider {
 
+  /**
+   * The content-addressed key shape this adapter accepts: {@code sha256/<2-hex-shard>/<64-hex>}, as
+   * minted by {@code StorageService.keyFor}. Every entry point rejects anything else before it
+   * reaches S3 (issue #337) — defense-in-depth so a malformed or injected key (traversal segments,
+   * a foreign prefix, a truncated hash) can never address an object, even though object stores
+   * treat keys as opaque flat strings.
+   */
+  private static final Pattern KEY_PATTERN = Pattern.compile("sha256/([0-9a-f]{2})/([0-9a-f]{64})");
+
   private final S3Client s3;
   private final String bucket;
 
@@ -52,6 +63,7 @@ public class S3StorageProvider implements StorageProvider {
 
   @Override
   public void put(String key, InputStream content, long contentLength, String contentType) {
+    requireValidKey(key);
     try {
       s3.putObject(
           PutObjectRequest.builder().bucket(bucket).key(key).contentType(contentType).build(),
@@ -63,6 +75,7 @@ public class S3StorageProvider implements StorageProvider {
 
   @Override
   public Optional<StorageContent> get(String key) {
+    requireValidKey(key);
     try {
       ResponseInputStream<GetObjectResponse> stream =
           s3.getObject(GetObjectRequest.builder().bucket(bucket).key(key).build());
@@ -78,6 +91,7 @@ public class S3StorageProvider implements StorageProvider {
 
   @Override
   public boolean exists(String key) {
+    requireValidKey(key);
     try {
       s3.headObject(HeadObjectRequest.builder().bucket(bucket).key(key).build());
       return true;
@@ -94,6 +108,7 @@ public class S3StorageProvider implements StorageProvider {
 
   @Override
   public boolean delete(String key) {
+    requireValidKey(key);
     if (!exists(key)) {
       return false;
     }
@@ -102,6 +117,18 @@ public class S3StorageProvider implements StorageProvider {
       return true;
     } catch (S3Exception e) {
       throw new StorageException("Failed to delete object " + key, e);
+    }
+  }
+
+  /**
+   * Fails an operation whose key is not a canonical content-addressed key (issue #337). The message
+   * deliberately does not echo the rejected key, so a crafted value can neither poison logs nor
+   * leak back to a caller.
+   */
+  private static void requireValidKey(String key) {
+    Matcher matcher = key == null ? null : KEY_PATTERN.matcher(key);
+    if (matcher == null || !matcher.matches() || !matcher.group(2).startsWith(matcher.group(1))) {
+      throw new StorageException("Rejected storage key with an unexpected format");
     }
   }
 }
