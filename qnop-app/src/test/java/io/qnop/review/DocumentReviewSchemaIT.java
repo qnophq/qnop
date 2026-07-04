@@ -303,6 +303,26 @@ class DocumentReviewSchemaIT extends AbstractIntegrationTest {
         .isInstanceOf(DataIntegrityViolationException.class);
   }
 
+  @Test
+  @DisplayName("the user-referencing FK columns are indexed (issue #330)")
+  void indexesTheUserForeignKeys() {
+    // Postgres does not auto-index FKs; without these, a user delete (RESTRICT check) or an
+    // author/actor join sequentially scans the table.
+    assertThat(indexExists("annotation", "ix_annotation_author")).isTrue();
+    assertThat(indexExists("comment", "ix_comment_author")).isTrue();
+    assertThat(indexExists("audit_event", "ix_audit_event_actor")).isTrue();
+  }
+
+  private boolean indexExists(String tableName, String indexName) {
+    Integer count =
+        jdbc.queryForObject(
+            "SELECT count(*) FROM pg_indexes WHERE tablename = ? AND indexname = ?",
+            Integer.class,
+            tableName,
+            indexName);
+    return count != null && count == 1;
+  }
+
   // --- helpers -------------------------------------------------------------
 
   private User newUser(String displayName) {
