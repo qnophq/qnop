@@ -19,10 +19,11 @@
  * SPDX-License-Identifier: AGPL-3.0-only
  */
 
-import { lazy, Suspense } from 'react';
+import { lazy } from 'react';
 import { createBrowserRouter } from 'react-router-dom';
 import { ShieldCheck } from 'lucide-react';
 import { AppShell } from '../components/shell/AppShell';
+import { LazyBoundary } from '../components/errors/LazyBoundary';
 import { AdminRoute } from '../components/auth/AdminRoute';
 import { ProtectedRoute } from '../components/auth/ProtectedRoute';
 import { RoleRoute } from '../components/auth/RoleRoute';
@@ -63,10 +64,6 @@ const VersionComparePage = lazy(() =>
   import('../pages/reviews/VersionComparePage').then((m) => ({ default: m.VersionComparePage })),
 );
 
-const lazyFallback = (
-  <div style={{ padding: '8px 4px', fontSize: 14, color: '#5E6C7B' }}>Loading…</div>
-);
-
 /**
  * Central route table. Public routes (login, errors) sit outside the shell;
  * everything under the shell requires authentication. Surfaces whose screens
@@ -96,17 +93,17 @@ export const router = createBrowserRouter([
       {
         path: 'reviews/:documentId',
         element: (
-          <Suspense fallback={lazyFallback}>
+          <LazyBoundary>
             <DocumentReviewPage />
-          </Suspense>
+          </LazyBoundary>
         ),
       },
       {
         path: 'reviews/:documentId/compare',
         element: (
-          <Suspense fallback={lazyFallback}>
+          <LazyBoundary>
             <VersionComparePage />
-          </Suspense>
+          </LazyBoundary>
         ),
       },
       {
@@ -181,9 +178,9 @@ export const router = createBrowserRouter([
         path: 'admin/mail-templates/:key',
         element: (
           <AdminRoute>
-            <Suspense fallback={lazyFallback}>
+            <LazyBoundary>
               <MailTemplateEditPage />
-            </Suspense>
+            </LazyBoundary>
           </AdminRoute>
         ),
       },
