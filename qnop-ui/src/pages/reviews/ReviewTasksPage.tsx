@@ -25,6 +25,7 @@ import Box from '@mui/material/Box';
 import Button from '@mui/material/Button';
 import Chip from '@mui/material/Chip';
 import CircularProgress from '@mui/material/CircularProgress';
+import Divider from '@mui/material/Divider';
 import InputAdornment from '@mui/material/InputAdornment';
 import Stack from '@mui/material/Stack';
 import TextField from '@mui/material/TextField';
@@ -196,7 +197,7 @@ export function ReviewTasksPage() {
             <ListIcon size={14} style={{ marginRight: 6 }} /> List
           </ToggleButton>
         </ToggleButtonGroup>
-        <Box sx={{ width: 1, height: 22, bgcolor: 'divider' }} />
+        <Divider orientation="vertical" flexItem sx={{ my: 0.5 }} />
         {FILTERS.map(({ key, label }) => (
           <Chip
             key={key}
