@@ -145,7 +145,17 @@ export function ReviewHubHead({
 
   return (
     <Stack direction="row" spacing={1.5} sx={{ alignItems: 'center', flexWrap: 'wrap' }}>
-      {total > 0 && <ProgressBar decided={decided} total={total} color={theme.qnop.brand.blue} />}
+      {total > 0 && (
+        <ProgressBar
+          decided={decided}
+          total={total}
+          color={theme.palette.success.main}
+          discussion={
+            annotations.filter((a) => a.status === AnnotationStatus.Open && a.commentCount > 1)
+              .length
+          }
+        />
+      )}
 
       {isOwner ? (
         <Tooltip title="Set review due date">

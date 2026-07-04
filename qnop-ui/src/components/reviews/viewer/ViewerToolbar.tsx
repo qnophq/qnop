@@ -36,6 +36,7 @@ import {
   ChevronDown,
   ChevronUp,
   GitCompareArrows,
+  SquareKanban,
   NotebookPen,
   PanelRight,
   Scan,
@@ -68,6 +69,8 @@ interface ViewerToolbarProps {
   onZoomChange: (zoom: number) => void;
   /** Link to the version comparison (#252); undefined hides the button (fewer than two extracted versions). */
   compareHref?: string;
+  /** Link to the tasks board/list of this review (issue #393). */
+  tasksHref?: string;
   /** The review's presentation (issue #291): side panel, or full-width focus mode. */
   viewMode: ReviewViewMode;
   onViewModeChange: (mode: ReviewViewMode) => void;
@@ -97,6 +100,7 @@ export function ViewerToolbar({
   zoom,
   onZoomChange,
   compareHref,
+  tasksHref,
   viewMode,
   onViewModeChange,
   annotationCount,
@@ -137,6 +141,13 @@ export function ViewerToolbar({
             to={compareHref}
           >
             <GitCompareArrows size={16} />
+          </IconButton>
+        </Tooltip>
+      )}
+      {tasksHref && (
+        <Tooltip title="Tasks board">
+          <IconButton size="small" aria-label="Tasks board" component={RouterLink} to={tasksHref}>
+            <SquareKanban size={16} />
           </IconButton>
         </Tooltip>
       )}

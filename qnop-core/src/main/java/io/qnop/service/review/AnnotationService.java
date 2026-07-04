@@ -31,6 +31,7 @@ import io.qnop.entity.AuditEvent;
 import io.qnop.entity.Comment;
 import io.qnop.entity.DocumentVersion;
 import io.qnop.repository.AnnotationCommentCount;
+import io.qnop.repository.AnnotationFirstComment;
 import io.qnop.repository.AnnotationPlacementRepository;
 import io.qnop.repository.AnnotationRepository;
 import io.qnop.repository.AuditEventRepository;
@@ -59,6 +60,9 @@ public class AnnotationService {
 
   static final String AUDIT_ANNOTATION_CREATED = "annotation.created";
   static final String AUDIT_ANNOTATION_CLASSIFIED = "annotation.classified";
+
+  /** Comments can be 20k chars; the view carries only what a card title needs (issue #393). */
+  static final int FIRST_COMMENT_EXCERPT_CHARS = 300;
 
   private final AnnotationRepository annotations;
   private final AnnotationPlacementRepository placements;
@@ -99,6 +103,7 @@ public class AnnotationService {
       String priority,
       String anchorJson,
       String placementStatus,
+      String firstComment,
       int commentCount,
       Instant createdAt,
       Instant updatedAt) {}
@@ -162,7 +167,7 @@ public class AnnotationService {
             AUDIT_ANNOTATION_CREATED,
             author,
             "{\"annotationId\":\"" + annotation.getId() + "\"}"));
-    return view(annotation, placement, commentCount);
+    return view(annotation, placement, excerpt(firstComment), commentCount);
   }
 
   /**
@@ -197,12 +202,14 @@ public class AnnotationService {
             : placements.findByDocumentVersionId(versionId).stream()
                 .collect(toMap(AnnotationPlacement::getAnnotationId, placement -> placement));
     Map<UUID, Integer> threadSizeByAnnotation = threadSizes(documentAnnotations);
+    Map<UUID, String> firstCommentByAnnotation = firstComments(documentAnnotations);
     return documentAnnotations.stream()
         .map(
             annotation ->
                 view(
                     annotation,
                     placementByAnnotation.get(annotation.getId()),
+                    firstCommentByAnnotation.get(annotation.getId()),
                     threadSizeByAnnotation.getOrDefault(annotation.getId(), 0)))
         .filter(view -> placementStatus == null || placementStatus.equals(view.placementStatus()))
         .filter(view -> type == null || type.equals(view.type()))
@@ -237,7 +244,7 @@ public class AnnotationService {
             actor,
             "{\"annotationId\":\"%s\",\"type\":%s,\"priority\":%s}"
                 .formatted(annotationId, jsonString(type), jsonString(priority))));
-    return view(annotation, null, threadSize(annotationId));
+    return view(annotation, null, firstComment(annotationId), threadSize(annotationId));
   }
 
   private static String jsonString(String value) {
@@ -258,7 +265,7 @@ public class AnnotationService {
   public AnnotationView get(UUID annotationId, UUID actor, boolean admin) {
     Annotation annotation = requireAnnotation(annotationId);
     documentAccess.getDocument(annotation.getDocumentId(), actor, admin);
-    return view(annotation, null, threadSize(annotationId));
+    return view(annotation, null, firstComment(annotationId), threadSize(annotationId));
   }
 
   /**
@@ -269,7 +276,7 @@ public class AnnotationService {
   public AnnotationView decide(UUID annotationId, boolean accept, UUID actor) {
     AnnotationStatus decision = accept ? AnnotationStatus.ACCEPTED : AnnotationStatus.REJECTED;
     Annotation updated = workflow.decideAnnotation(annotationId, decision, actor);
-    return view(updated, null, threadSize(updated.getId()));
+    return view(updated, null, firstComment(updated.getId()), threadSize(updated.getId()));
   }
 
   /** Appends a comment to an annotation's thread; visible participants only. */
@@ -311,8 +318,32 @@ public class AnnotationService {
         .collect(toMap(AnnotationCommentCount::annotationId, count -> (int) count.count()));
   }
 
+  /** The opening comment's excerpt for one annotation (list uses the batched variant). */
+  private String firstComment(UUID annotationId) {
+    return comments
+        .findFirstByAnnotationIdOrderByCreatedAtAscIdAsc(annotationId)
+        .map(comment -> excerpt(comment.getBody()))
+        .orElse(null);
+  }
+
+  /** Opening-comment excerpts for a batch of annotations in a single query (issue #393). */
+  private Map<UUID, String> firstComments(List<Annotation> forAnnotations) {
+    if (forAnnotations.isEmpty()) {
+      return Map.of();
+    }
+    List<UUID> ids = forAnnotations.stream().map(Annotation::getId).toList();
+    return comments.findFirstByAnnotationIdIn(ids).stream()
+        .collect(toMap(AnnotationFirstComment::getAnnotationId, first -> excerpt(first.getBody())));
+  }
+
+  private static String excerpt(String body) {
+    return body.length() <= FIRST_COMMENT_EXCERPT_CHARS
+        ? body
+        : body.substring(0, FIRST_COMMENT_EXCERPT_CHARS);
+  }
+
   private static AnnotationView view(
-      Annotation annotation, AnnotationPlacement placement, int commentCount) {
+      Annotation annotation, AnnotationPlacement placement, String firstComment, int commentCount) {
     return new AnnotationView(
         annotation.getId(),
         annotation.getDocumentId(),
@@ -322,6 +353,7 @@ public class AnnotationService {
         annotation.getPriority() == null ? null : annotation.getPriority().name(),
         placement == null ? null : placement.getAnchor(),
         placement == null ? null : placement.getStatus().name(),
+        firstComment,
         commentCount,
         annotation.getCreatedAt(),
         annotation.getUpdatedAt());
