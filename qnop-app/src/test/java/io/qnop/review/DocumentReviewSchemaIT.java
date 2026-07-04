@@ -303,7 +303,26 @@ class DocumentReviewSchemaIT extends AbstractIntegrationTest {
         .isInstanceOf(DataIntegrityViolationException.class);
   }
 
+  @Test
+  @DisplayName("the author/actor foreign keys are indexed")
+  void indexesTheAuthorAndActorForeignKeys() {
+    // Postgres does not auto-index FKs; without these, deleting a qnop_user (the RESTRICT check
+    // on annotation/comment author, the audit actor) or joining by author/actor sequentially
+    // scans the table (issue #330).
+    assertThat(indexCount("annotation", "ix_annotation_author")).isEqualTo(1);
+    assertThat(indexCount("comment", "ix_comment_author")).isEqualTo(1);
+    assertThat(indexCount("audit_event", "ix_audit_event_actor")).isEqualTo(1);
+  }
+
   // --- helpers -------------------------------------------------------------
+
+  private Integer indexCount(String tableName, String indexName) {
+    return jdbc.queryForObject(
+        "SELECT count(*) FROM pg_indexes WHERE tablename = ? AND indexname = ?",
+        Integer.class,
+        tableName,
+        indexName);
+  }
 
   private User newUser(String displayName) {
     return users.saveAndFlush(

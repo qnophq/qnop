@@ -36,6 +36,7 @@ import io.qnop.testsupport.SeededIntegrationTest;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
 
 /**
@@ -49,6 +50,7 @@ class VersionDiffIT extends SeededIntegrationTest {
   @Autowired private DocumentVersionRepository versions;
   @Autowired private ReviewParticipantRepository participants;
   @Autowired private VersionDiffRepository diffCache;
+  @Autowired private JdbcTemplate jdbc;
 
   /** The jsonb of a one-surface rendered document whose spans are the given lines (ADR-0032). */
   private static String rendered(String... lines) {
@@ -188,5 +190,17 @@ class VersionDiffIT extends SeededIntegrationTest {
     seedVersion(documentId, 1, rendered("alpha"));
 
     mockMvc.perform(diffRequest(documentId, 1, 9, MEMBER_ID)).andExpect(status().isNotFound());
+  }
+
+  @Test
+  void indexesTheDocumentForeignKey() {
+    // version_diff.document_id is otherwise an unindexed FK — a document delete (ON DELETE
+    // CASCADE) or a by-document lookup would sequentially scan the cache (issue #330).
+    Integer count =
+        jdbc.queryForObject(
+            "SELECT count(*) FROM pg_indexes WHERE tablename = 'version_diff'"
+                + " AND indexname = 'ix_version_diff_document'",
+            Integer.class);
+    assertThat(count).isEqualTo(1);
   }
 }

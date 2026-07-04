@@ -64,3 +64,8 @@ databaseChangeLog:
             tableName: version_diff
             columnNames: from_version_id, to_version_id
             constraintName: ux_version_diff_pair
+        - createIndex:
+            indexName: ix_version_diff_document
+            tableName: version_diff
+            columns:
+              - column: { name: document_id }
