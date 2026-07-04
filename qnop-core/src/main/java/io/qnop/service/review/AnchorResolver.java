@@ -20,6 +20,7 @@
  */
 package io.qnop.service.review;
 
+import io.qnop.spi.extract.NormalizedBox;
 import io.qnop.spi.extract.RenderedDocument;
 import io.qnop.spi.extract.Surface;
 import io.qnop.spi.extract.TextSpan;
@@ -28,6 +29,7 @@ import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.TreeSet;
 import tools.jackson.core.JacksonException;
 import tools.jackson.databind.JsonNode;
@@ -54,6 +56,10 @@ import tools.jackson.databind.json.JsonMapper;
  *
  * <p>Same inputs always produce the same resolution (job replay, ADR-0033): candidate scanning is
  * ordered, and ties break on (surface, offset).
+ *
+ * <p>The cascade is expressed as an ordered list of {@link CascadeStep}s (issue #320); its
+ * thresholds and weights come from {@link ReanchoringProperties}, and an unreadable anchor surfaces
+ * as a typed {@link Result} rather than a null.
  */
 public final class AnchorResolver {
 
@@ -67,51 +73,124 @@ public final class AnchorResolver {
   /** The decision plus the anchor to store — updated on PLACED/MOVED, untouched on ORPHANED. */
   public record Resolution(Outcome outcome, String anchorJson) {}
 
-  static final double SIMILARITY_THRESHOLD = 0.75;
-  static final double AMBIGUITY_MARGIN = 0.05;
-  private static final int CONTEXT_LENGTH = 32;
-  private static final int MAX_CANDIDATES = 64;
-  private static final double QUOTE_WEIGHT = 0.7;
-  private static final double CONTEXT_WEIGHT = 0.3;
+  /** Why an anchor could not be parsed — the typed alternative to returning {@code null} (#320). */
+  private enum ParseError {
+    BLANK,
+    MALFORMED_JSON
+  }
 
   private static final ObjectMapper MAPPER = JsonMapper.builder().build();
 
+  /** The ordered ADR-0009 cascade; the first step to reach a decision wins. */
+  private static final List<CascadeStep> CASCADE =
+      List.of(new ExactWithContext(), new ExactQuoteOnly(), new DuplicatedQuote(), new Fuzzy());
+
+  private final ReanchoringProperties config;
+
+  /** Uses the documented ADR-0009 defaults (for tests and non-Spring callers). */
+  public AnchorResolver() {
+    this(ReanchoringProperties.defaults());
+  }
+
+  public AnchorResolver(ReanchoringProperties config) {
+    this.config = config;
+  }
+
   /** Resolves {@code anchorJson} against {@code rendered}; never throws on bad anchor content. */
   public Resolution resolve(String anchorJson, RenderedDocument rendered) {
-    ParsedAnchor anchor = parse(anchorJson);
-    if (anchor == null) {
-      // Unreadable anchor: be honest rather than guess (ADR-0009).
-      return new Resolution(Outcome.ORPHANED, anchorJson);
+    ParsedAnchor anchor;
+    switch (parse(anchorJson)) {
+      case Result.Err<ParsedAnchor, ParseError> ignored -> {
+        // Unreadable anchor: be honest rather than guess (ADR-0009).
+        return new Resolution(Outcome.ORPHANED, anchorJson);
+      }
+      case Result.Ok<ParsedAnchor, ParseError> ok -> anchor = ok.value();
     }
     if (anchor.quote() == null || anchor.quote().isEmpty()) {
       // Geometric-only anchor (image region): coordinates carry over, flagged "to review".
       return new Resolution(Outcome.MOVED, anchorJson);
     }
 
-    List<SurfaceText> surfaces = surfaceTexts(rendered);
-
-    // 1) Exact, context-qualified: prefix+quote+suffix unchanged exactly once in the document.
-    List<Match> withContext = exactMatches(surfaces, anchor, true);
-    if (withContext.size() == 1) {
-      return placed(anchor, withContext.get(0), surfaces);
+    Cascade cascade = new Cascade(this, anchor, surfaceTexts(rendered), anchorJson);
+    for (CascadeStep step : CASCADE) {
+      Optional<Resolution> decision = step.attempt(cascade);
+      if (decision.isPresent()) {
+        return decision.get();
+      }
     }
-    // 2) Exact quote alone, unique in the document.
-    List<Match> quoteOnly = exactMatches(surfaces, anchor, false);
-    if (quoteOnly.size() == 1) {
-      return placed(anchor, quoteOnly.get(0), surfaces);
-    }
-    // 3) Duplicated exact quote: context similarity picks one — flagged MOVED — or nobody wins.
-    if (quoteOnly.size() > 1) {
-      return disambiguate(anchor, quoteOnly, surfaces, anchorJson);
-    }
-    // 4) Quote not found verbatim: fuzzy candidates from quote-chunk seeds.
-    List<Match> fuzzy = fuzzyCandidates(surfaces, anchor);
-    return disambiguate(anchor, fuzzy, surfaces, anchorJson);
+    // The Fuzzy step always decides, so this is unreachable — defensive only.
+    return new Resolution(Outcome.ORPHANED, anchorJson);
   }
 
   // --- cascade steps ----------------------------------------------------------
 
-  private static List<Match> exactMatches(
+  /** One stage of the re-anchoring cascade; an empty result means "no decision, try the next". */
+  private sealed interface CascadeStep
+      permits ExactWithContext, ExactQuoteOnly, DuplicatedQuote, Fuzzy {
+    Optional<Resolution> attempt(Cascade cascade);
+  }
+
+  /** Prefix+quote+suffix unchanged and occurring exactly once → a confident PLACED. */
+  private record ExactWithContext() implements CascadeStep {
+    @Override
+    public Optional<Resolution> attempt(Cascade c) {
+      List<Match> matches = c.exactMatches(true);
+      return matches.size() == 1 ? Optional.of(c.placed(matches.get(0))) : Optional.empty();
+    }
+  }
+
+  /** The quote alone, unique in the document → PLACED. */
+  private record ExactQuoteOnly() implements CascadeStep {
+    @Override
+    public Optional<Resolution> attempt(Cascade c) {
+      List<Match> matches = c.exactMatches(false);
+      return matches.size() == 1 ? Optional.of(c.placed(matches.get(0))) : Optional.empty();
+    }
+  }
+
+  /**
+   * The quote occurs verbatim more than once → context similarity disambiguates (or nobody wins).
+   */
+  private record DuplicatedQuote() implements CascadeStep {
+    @Override
+    public Optional<Resolution> attempt(Cascade c) {
+      List<Match> matches = c.exactMatches(false);
+      return matches.size() > 1 ? Optional.of(c.disambiguate(matches)) : Optional.empty();
+    }
+  }
+
+  /** Quote not found verbatim → fuzzy candidates seeded from quote chunks; always decides. */
+  private record Fuzzy() implements CascadeStep {
+    @Override
+    public Optional<Resolution> attempt(Cascade c) {
+      return Optional.of(c.disambiguate(c.fuzzyCandidates()));
+    }
+  }
+
+  /** The per-resolution working set the steps operate on; delegates to the owning resolver. */
+  private record Cascade(
+      AnchorResolver resolver, ParsedAnchor anchor, List<SurfaceText> surfaces, String original) {
+
+    List<Match> exactMatches(boolean withContext) {
+      return resolver.exactMatches(surfaces, anchor, withContext);
+    }
+
+    List<Match> fuzzyCandidates() {
+      return resolver.fuzzyCandidates(surfaces, anchor);
+    }
+
+    Resolution disambiguate(List<Match> candidates) {
+      return resolver.disambiguate(anchor, candidates, original);
+    }
+
+    Resolution placed(Match match) {
+      return new Resolution(Outcome.PLACED, resolver.rebuiltAnchor(match));
+    }
+  }
+
+  // --- matching (config-driven) -----------------------------------------------
+
+  private List<Match> exactMatches(
       List<SurfaceText> surfaces, ParsedAnchor anchor, boolean withContext) {
     String prefix = anchor.prefix() == null ? "" : anchor.prefix();
     String suffix = anchor.suffix() == null ? "" : anchor.suffix();
@@ -128,7 +207,7 @@ public final class AnchorResolver {
       while ((idx = surface.text().indexOf(needle, from)) >= 0) {
         matches.add(new Match(surface, idx + quoteShift, anchor.quote(), 1.0));
         from = idx + 1;
-        if (matches.size() > MAX_CANDIDATES) {
+        if (matches.size() > config.maxCandidates()) {
           return matches; // pathological repetition; counts as ambiguous anyway
         }
       }
@@ -137,14 +216,13 @@ public final class AnchorResolver {
   }
 
   /** The similarity-best candidate wins only above the threshold and with a clear margin. */
-  private Resolution disambiguate(
-      ParsedAnchor anchor, List<Match> candidates, List<SurfaceText> surfaces, String original) {
+  private Resolution disambiguate(ParsedAnchor anchor, List<Match> candidates, String original) {
     if (candidates.isEmpty()) {
       return new Resolution(Outcome.ORPHANED, original);
     }
     List<Scored> scored = new ArrayList<>(candidates.size());
     for (Match candidate : candidates) {
-      scored.add(new Scored(candidate, score(anchor, candidate, surfaces)));
+      scored.add(new Scored(candidate, score(anchor, candidate)));
     }
     scored.sort(
         Comparator.comparingDouble(Scored::score)
@@ -152,31 +230,30 @@ public final class AnchorResolver {
             .thenComparingInt(s -> s.match().surface().index())
             .thenComparingInt(s -> s.match().start()));
     Scored best = scored.get(0);
-    if (best.score() < SIMILARITY_THRESHOLD) {
+    if (best.score() < config.similarityThreshold()) {
       return new Resolution(Outcome.ORPHANED, original);
     }
-    if (scored.size() > 1 && best.score() - scored.get(1).score() < AMBIGUITY_MARGIN) {
+    if (scored.size() > 1 && best.score() - scored.get(1).score() < config.ambiguityMargin()) {
       return new Resolution(Outcome.ORPHANED, original); // ambiguous — never guessed
     }
     return new Resolution(Outcome.MOVED, rebuiltAnchor(best.match()));
   }
 
   /** Candidate windows seeded by verbatim occurrences of quote chunks (cheap, conservative). */
-  private static List<Match> fuzzyCandidates(List<SurfaceText> surfaces, ParsedAnchor anchor) {
+  private List<Match> fuzzyCandidates(List<SurfaceText> surfaces, ParsedAnchor anchor) {
     String quote = anchor.quote();
     List<String> seeds = seeds(quote);
     List<Match> candidates = new ArrayList<>();
     for (SurfaceText surface : surfaces) {
       TreeSet<Integer> starts = new TreeSet<>();
-      for (int s = 0; s < seeds.size(); s++) {
-        String seed = seeds.get(s);
+      for (String seed : seeds) {
         int seedOffset = quote.indexOf(seed);
         int from = 0;
         int idx;
         while ((idx = surface.text().indexOf(seed, from)) >= 0) {
           starts.add(Math.max(0, idx - seedOffset));
           from = idx + 1;
-          if (starts.size() >= MAX_CANDIDATES) {
+          if (starts.size() >= config.maxCandidates()) {
             break;
           }
         }
@@ -189,8 +266,7 @@ public final class AnchorResolver {
         previous = start;
         int end = Math.min(surface.text().length(), start + quote.length());
         String window = surface.text().substring(start, end);
-        double similarity = similarity(quote, window);
-        candidates.add(new Match(surface, start, window, similarity));
+        candidates.add(new Match(surface, start, window, similarity(quote, window)));
       }
     }
     return candidates;
@@ -211,7 +287,7 @@ public final class AnchorResolver {
 
   // --- scoring ----------------------------------------------------------------
 
-  private static double score(ParsedAnchor anchor, Match match, List<SurfaceText> surfaces) {
+  private double score(ParsedAnchor anchor, Match match) {
     String text = match.surface().text();
     double quoteSimilarity = match.quoteSimilarity();
 
@@ -233,7 +309,8 @@ public final class AnchorResolver {
       contextSimilarity += similarity(suffix, text.substring(end, to));
       layers++;
     }
-    return QUOTE_WEIGHT * quoteSimilarity + CONTEXT_WEIGHT * (contextSimilarity / layers);
+    return config.quoteWeight() * quoteSimilarity
+        + config.contextWeight() * (contextSimilarity / layers);
   }
 
   /** Normalized Levenshtein similarity in 0..1; both inputs are window-sized (bounded cost). */
@@ -263,36 +340,33 @@ public final class AnchorResolver {
     return 1.0 - (double) distance / Math.max(a.length(), b.length());
   }
 
-  // --- anchor (re)construction --------------------------------------------------
-
-  private Resolution placed(ParsedAnchor anchor, Match match, List<SurfaceText> surfaces) {
-    return new Resolution(Outcome.PLACED, rebuiltAnchor(match));
-  }
+  // --- anchor (re)construction ------------------------------------------------
 
   /**
    * Builds the resolved anchor: fresh position offsets, the matched text as the new quote with
    * regenerated context slices, and a region box unioned from the spans the match covers.
    */
-  private static String rebuiltAnchor(Match match) {
+  private String rebuiltAnchor(Match match) {
     SurfaceText surface = match.surface();
     int start = match.start();
     int end = start + match.window().length();
     String text = surface.text();
+    int contextLength = config.contextLength();
 
     Map<String, Object> anchor = new LinkedHashMap<>();
     anchor.put(
         "region", Map.of("surfaceIndex", surface.index(), "box", boxFor(surface, start, end)));
     Map<String, Object> quote = new LinkedHashMap<>();
     quote.put("quote", match.window());
-    quote.put("prefix", text.substring(Math.max(0, start - CONTEXT_LENGTH), start));
-    quote.put("suffix", text.substring(end, Math.min(text.length(), end + CONTEXT_LENGTH)));
+    quote.put("prefix", text.substring(Math.max(0, start - contextLength), start));
+    quote.put("suffix", text.substring(end, Math.min(text.length(), end + contextLength)));
     anchor.put("textQuote", quote);
     anchor.put("textPosition", Map.of("start", start, "end", end));
     return MAPPER.writeValueAsString(anchor);
   }
 
   /** Union of the boxes of all spans overlapping [start, end) — the match's visual footprint. */
-  private static Map<String, Double> boxFor(SurfaceText surface, int start, int end) {
+  private static NormalizedBox boxFor(SurfaceText surface, int start, int end) {
     double minX = Double.MAX_VALUE;
     double minY = Double.MAX_VALUE;
     double maxX = -Double.MAX_VALUE;
@@ -308,14 +382,14 @@ public final class AnchorResolver {
       }
     }
     if (!any) {
-      // Text matched but no span covers it — impossible for extractor-produced text; degrade to
-      // a zero-size box at the surface origin rather than invent geometry.
-      return Map.of("x", 0.0, "y", 0.0, "width", 0.0, "height", 0.0);
+      // Text matched but no span covers it — impossible for extractor-produced text; degrade to a
+      // zero-size box at the surface origin rather than invent geometry.
+      return new NormalizedBox(0.0, 0.0, 0.0, 0.0);
     }
-    return Map.of("x", minX, "y", minY, "width", maxX - minX, "height", maxY - minY);
+    return new NormalizedBox(minX, minY, maxX - minX, maxY - minY);
   }
 
-  // --- input models -------------------------------------------------------------
+  // --- input models -----------------------------------------------------------
 
   /**
    * Canonical text per surface: span texts joined by a single {@code \n} (extractor convention).
@@ -335,20 +409,21 @@ public final class AnchorResolver {
     return texts;
   }
 
-  /** Lenient parse of the stored anchor JSON; null when unreadable. */
-  private static ParsedAnchor parse(String anchorJson) {
+  /** Lenient parse of the stored anchor JSON into a typed {@link Result} (issue #320). */
+  private static Result<ParsedAnchor, ParseError> parse(String anchorJson) {
     if (anchorJson == null || anchorJson.isBlank()) {
-      return null;
+      return Result.err(ParseError.BLANK);
     }
     try {
       JsonNode root = MAPPER.readTree(anchorJson);
       JsonNode quote = root.path("textQuote");
-      return new ParsedAnchor(
-          textOrNull(quote.path("quote")),
-          textOrNull(quote.path("prefix")),
-          textOrNull(quote.path("suffix")));
+      return Result.ok(
+          new ParsedAnchor(
+              textOrNull(quote.path("quote")),
+              textOrNull(quote.path("prefix")),
+              textOrNull(quote.path("suffix"))));
     } catch (JacksonException e) {
-      return null;
+      return Result.err(ParseError.MALFORMED_JSON);
     }
   }
 

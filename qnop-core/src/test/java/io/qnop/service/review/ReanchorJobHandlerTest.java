@@ -47,7 +47,8 @@ class ReanchorJobHandlerTest {
   private final DocumentVersionRepository versions = mock(DocumentVersionRepository.class);
   private final AnnotationPlacementRepository placements =
       mock(AnnotationPlacementRepository.class);
-  private final ReanchorJobHandler handler = new ReanchorJobHandler(versions, placements);
+  private final ReanchorJobHandler handler =
+      new ReanchorJobHandler(versions, placements, ReanchoringProperties.defaults());
 
   private final UUID versionId = UUID.randomUUID();
   private DocumentVersion version;

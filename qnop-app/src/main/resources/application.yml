@@ -85,6 +85,10 @@ qnop:
     smtp-connect-timeout: ${QNOP_HTTP_CLIENT_SMTP_CONNECT_TIMEOUT:10s}
     smtp-read-timeout: ${QNOP_HTTP_CLIENT_SMTP_READ_TIMEOUT:30s}
     smtp-write-timeout: ${QNOP_HTTP_CLIENT_SMTP_WRITE_TIMEOUT:30s}
+  # Re-anchoring cascade tunables (ADR-0009, issue #320). Advanced; the conservative
+  # defaults live in ReanchoringProperties. Override per key via QNOP_REANCHORING_*:
+  #   *_SIMILARITY_THRESHOLD (0.75), *_AMBIGUITY_MARGIN (0.05), *_CONTEXT_LENGTH (32),
+  #   *_MAX_CANDIDATES (64), *_QUOTE_WEIGHT (0.7), *_CONTEXT_WEIGHT (0.3)
   # Object storage for binary documents (issue #243, ADR-0005). Defaults target the
   # docker-compose MinIO; leave `endpoint` blank to target real AWS S3 (SaaS). The
   # access/secret keys are storage credentials, not crypto secrets, so short local
