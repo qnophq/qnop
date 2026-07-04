@@ -2046,6 +2046,12 @@ paths:
             (issue #248). Requires `version`.
           schema:
             $ref: '#/components/schemas/PlacementStatus'
+        - name: type
+          in: query
+          required: false
+          description: Only annotations classified with this type (issue #392).
+          schema:
+            $ref: '#/components/schemas/AnnotationType'
       responses:
         '200':
           description: The annotations
@@ -2128,6 +2134,50 @@ paths:
           $ref: '#/components/responses/Unauthorized'
         '404':
           description: Unknown annotation, or the caller is not a participant
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+    patch:
+      tags: [Annotations]
+      summary: Reclassify an annotation
+      description: |
+        Replaces the annotation's optional classification (type + priority,
+        issue #392) wholesale — an absent field clears that facet. Permitted
+        for the document owner or the annotation's author while the annotation
+        is still OPEN; a decided annotation is immutable.
+      operationId: classifyAnnotation
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AnnotationClassificationRequest'
+      responses:
+        '200':
+          description: The reclassified annotation
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AnnotationView'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          description: The caller is a participant but neither owner nor author
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Unknown annotation, or the caller is not a participant
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '409':
+          description: The annotation is already decided (`ANNOTATION_ALREADY_DECIDED`)
           content:
             application/json:
               schema:
@@ -4069,6 +4119,27 @@ components:
         - MOVED
         - ORPHANED
         - FAILED
+    AnnotationType:
+      type: string
+      description: >-
+        The optional kind of point an annotation raises (issue #392). Purely
+        descriptive — it drives the tasks view's visual language and filtering,
+        never the workflow.
+      enum:
+        - CHANGE
+        - PROPOSAL
+        - CONFLICT
+        - QUESTION
+        - RISK
+    AnnotationPriority:
+      type: string
+      description: >-
+        The optional urgency of an annotation (issue #392). Purely descriptive,
+        never workflow-relevant.
+      enum:
+        - HIGH
+        - MEDIUM
+        - LOW
     AnnotationCreateRequest:
       type: object
       description: Create an annotation anchored to a region of a version.
@@ -4091,6 +4162,21 @@ components:
             The first comment seeding the discussion thread. Required — an
             annotation without text must not exist (issue #301); blank-only
             comments are rejected.
+        type:
+          $ref: '#/components/schemas/AnnotationType'
+        priority:
+          $ref: '#/components/schemas/AnnotationPriority'
+    AnnotationClassificationRequest:
+      type: object
+      description: >-
+        Replaces an annotation's classification wholesale (issue #392): the
+        request body becomes the new classification, so an absent field clears
+        that facet. Send both fields to keep both.
+      properties:
+        type:
+          $ref: '#/components/schemas/AnnotationType'
+        priority:
+          $ref: '#/components/schemas/AnnotationPriority'
     AnnotationView:
       type: object
       description: |
@@ -4116,6 +4202,10 @@ components:
           format: uuid
         status:
           $ref: '#/components/schemas/AnnotationStatus'
+        type:
+          $ref: '#/components/schemas/AnnotationType'
+        priority:
+          $ref: '#/components/schemas/AnnotationPriority'
         anchor:
           $ref: '#/components/schemas/Anchor'
         placementStatus:

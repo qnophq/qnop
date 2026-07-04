@@ -242,6 +242,12 @@ databaseChangeLog:
                   type: VARCHAR(16)
                   constraints: { nullable: false }
               - column:
+                  name: type
+                  type: VARCHAR(16)
+              - column:
+                  name: priority
+                  type: VARCHAR(16)
+              - column:
                   name: created_at
                   type: TIMESTAMP WITH TIME ZONE
                   constraints: { nullable: false }
@@ -279,10 +285,14 @@ databaseChangeLog:
             columns:
               - column: { name: author_id }
         - sql:
-            comment: Closed set of annotation outcomes (not expressible in JPA).
+            comment: Closed sets for outcome and classification (not expressible in JPA).
             sql: |
               ALTER TABLE annotation ADD CONSTRAINT ck_annotation_status
                 CHECK (status IN ('OPEN', 'ACCEPTED', 'REJECTED'));
+              ALTER TABLE annotation ADD CONSTRAINT ck_annotation_type
+                CHECK (type IN ('CHANGE', 'PROPOSAL', 'CONFLICT', 'QUESTION', 'RISK'));
+              ALTER TABLE annotation ADD CONSTRAINT ck_annotation_priority
+                CHECK (priority IN ('HIGH', 'MEDIUM', 'LOW'));
 
   - changeSet:
       id: 0011-comment
