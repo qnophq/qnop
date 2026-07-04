@@ -46,6 +46,9 @@ vi.mock('../../api/hooks/useDocuments', () => ({
 vi.mock('../../api/hooks/useReviews', () => ({
   useParticipants: vi.fn(),
 }));
+vi.mock('../../api/hooks/useAnnotations', () => ({
+  useAnnotations: vi.fn().mockReturnValue({ data: undefined }),
+}));
 vi.mock('../../api/hooks/useVersionDiff', async (importOriginal) => ({
   ...(await importOriginal<object>()),
   useVersionDiff: vi.fn(),

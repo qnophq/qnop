@@ -42,14 +42,15 @@ const COLLAPSE_KEY = 'qnop-nav-collapsed';
 export function AppShell() {
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('md'));
-  // The document review workspace (#250) and the version comparison (#252)
-  // span the full width; every other surface keeps the centred reading
-  // container. /reviews/new also matches the dynamic segment but is a regular
-  // centred page (the wizard, #251).
+  // The document review workspace (#250), the version comparison (#252) and
+  // the tasks board (#393) span the full width; every other surface keeps the
+  // centred reading container. /reviews/new also matches the dynamic segment
+  // but is a regular centred page (the wizard, #251).
   const reviewMatch = useMatch('/reviews/:documentId');
   const compareMatch = useMatch('/reviews/:documentId/compare');
+  const tasksMatch = useMatch('/reviews/:documentId/tasks');
   const fullBleed = Boolean(
-    (reviewMatch && reviewMatch.params.documentId !== 'new') || compareMatch,
+    (reviewMatch && reviewMatch.params.documentId !== 'new') || compareMatch || tasksMatch,
   );
   const [collapsed, setCollapsed] = useState<boolean>(() => {
     try {

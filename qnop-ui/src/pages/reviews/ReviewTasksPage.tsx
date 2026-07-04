@@ -20,9 +20,8 @@
  */
 
 import { useState } from 'react';
-import { Link as RouterLink, useNavigate, useParams, useSearchParams } from 'react-router-dom';
+import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import Box from '@mui/material/Box';
-import Button from '@mui/material/Button';
 import Chip from '@mui/material/Chip';
 import CircularProgress from '@mui/material/CircularProgress';
 import Divider from '@mui/material/Divider';
@@ -31,11 +30,12 @@ import Stack from '@mui/material/Stack';
 import TextField from '@mui/material/TextField';
 import ToggleButton from '@mui/material/ToggleButton';
 import ToggleButtonGroup from '@mui/material/ToggleButtonGroup';
-import { ArrowLeft, LayoutGrid, List as ListIcon, Search } from 'lucide-react';
+import { LayoutGrid, List as ListIcon, Search } from 'lucide-react';
 import { useAnnotations } from '../../api/hooks/useAnnotations';
 import { useDocument, useDocumentVersions } from '../../api/hooks/useDocuments';
 import { useParticipants } from '../../api/hooks/useReviews';
 import { AdminToast } from '../../components/admin/layout/AdminToast';
+import { ReviewViewTabs } from '../../components/reviews/hub/ReviewViewTabs';
 import { PageHeader } from '../../components/admin/layout/PageHeader';
 import { useToast } from '../../components/admin/layout/useToast';
 import {
@@ -53,7 +53,7 @@ import {
   taskKeys,
 } from '../../components/reviews/tasks/tasksModel';
 import { useTasksViewMode } from '../../components/reviews/tasks/useTasksViewMode';
-import { AnnotationDecision } from '../../api/generated';
+import { AnnotationDecision, ExtractionStatus } from '../../api/generated';
 import { useAuthStore } from '../../stores/authStore';
 
 const FILTERS: { key: TaskFilter; label: string }[] = [
@@ -168,16 +168,15 @@ export function ReviewTasksPage() {
       <PageHeader
         title={document.title}
         titleAdornment={<Chip size="small" variant="outlined" label="Tasks" />}
-        action={
-          <Button
-            component={RouterLink}
-            to={`/reviews/${documentId}`}
-            variant="outlined"
-            size="small"
-            startIcon={<ArrowLeft size={15} />}
-          >
-            Back to review
-          </Button>
+      />
+      <ReviewViewTabs
+        documentId={documentId}
+        active="tasks"
+        openTaskCount={annotations.filter((annotation) => columnOf(annotation) !== 'done').length}
+        compareEnabled={
+          (versionsQuery.data?.versions.filter(
+            (version) => version.extractionStatus === ExtractionStatus.Ready,
+          ).length ?? 0) >= 2
         }
       />
 

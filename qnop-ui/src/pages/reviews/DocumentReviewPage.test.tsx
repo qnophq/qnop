@@ -327,15 +327,23 @@ describe('DocumentReviewPage focus mode', () => {
     expect(screen.getByText(/Annotations \(/)).toBeInTheDocument();
   });
 
-  it('switches back to panel mode via the toolbar toggle and stores it', () => {
+  it('switches back to panel mode via the Document view tab and stores it', () => {
     localStorage.setItem('qnop-review-view-mode', 'focus');
     seedHappyPath();
     renderPage();
 
-    fireEvent.click(screen.getByRole('button', { name: 'Panel view' }));
+    // The view tabs (issue #398) navigate — ?view=panel syncs into the mode.
+    fireEvent.click(screen.getByTestId('review-view-tab-document'));
 
     expect(screen.getByRole('complementary', { name: 'Annotations' })).toBeInTheDocument();
     expect(localStorage.getItem('qnop-review-view-mode')).toBe('panel');
+  });
+
+  it('activates focus mode through the ?view= deep link', () => {
+    seedHappyPath();
+    renderPage('/reviews/doc-1?view=focus');
+    expect(screen.queryByRole('complementary', { name: 'Annotations' })).not.toBeInTheDocument();
+    expect(localStorage.getItem('qnop-review-view-mode')).toBe('focus');
   });
 });
 

@@ -20,29 +20,31 @@
  */
 
 import { useEffect, useState } from 'react';
-import { Link as RouterLink, useParams, useSearchParams } from 'react-router-dom';
+import { useParams, useSearchParams } from 'react-router-dom';
 import Alert from '@mui/material/Alert';
 import Box from '@mui/material/Box';
-import Button from '@mui/material/Button';
 import Chip from '@mui/material/Chip';
 import CircularProgress from '@mui/material/CircularProgress';
 import IconButton from '@mui/material/IconButton';
 import Paper from '@mui/material/Paper';
 import Stack from '@mui/material/Stack';
 import Typography from '@mui/material/Typography';
-import { ArrowLeft, PanelRightOpen } from 'lucide-react';
+import { PanelRightOpen } from 'lucide-react';
 import { ExtractionStatus } from '../../api/generated';
 import { useDocument, useDocumentVersions } from '../../api/hooks/useDocuments';
 import { useOriginalPdf } from '../../api/hooks/useDocuments';
 import { useRenderedDocument } from '../../api/hooks/useDocuments';
 import { useParticipants } from '../../api/hooks/useReviews';
+import { useAnnotations } from '../../api/hooks/useAnnotations';
 import { useVersionDiff, versionDiffErrorCode } from '../../api/hooks/useVersionDiff';
 import { PageHeader } from '../../components/admin/layout/PageHeader';
+import { ReviewViewTabs } from '../../components/reviews/hub/ReviewViewTabs';
 import { ChangeSummaryPanel } from '../../components/reviews/diff/ChangeSummaryPanel';
 import { ComparePane } from '../../components/reviews/diff/ComparePane';
 import { CompareToolbar } from '../../components/reviews/diff/CompareToolbar';
 import { useRailCollapsed } from '../../components/reviews/diff/useRailCollapsed';
 import { useSyncScroll } from '../../components/reviews/diff/useSyncScroll';
+import { columnOf } from '../../components/reviews/tasks/tasksModel';
 import { usePdfDocument } from '../../components/reviews/viewer/usePdfDocument';
 import { formatDateTime } from '../../utils/formatDate';
 
@@ -91,6 +93,11 @@ export function VersionComparePage() {
   const fromRendered = useRenderedDocument(documentId, from ?? 0, from !== undefined);
   const toRendered = useRenderedDocument(documentId, to ?? 0, to !== undefined);
   const diffQuery = useVersionDiff(documentId, from, to);
+  // The tasks pill on the view tabs (issue #398) — cached alongside the other pages.
+  const annotationsQuery = useAnnotations(documentId, readyNumbers.at(-1));
+  const openTaskCount = (annotationsQuery.data?.annotations ?? []).filter(
+    (annotation) => columnOf(annotation) !== 'done',
+  ).length;
 
   const [activeChange, setActiveChange] = useState<number | null>(null);
   const [syncScroll, setSyncScroll] = useState(true);
@@ -144,24 +151,18 @@ export function VersionComparePage() {
   };
 
   const changes = diffQuery.data?.changes ?? null;
-  const backHref = `/reviews/${documentId}${to !== undefined ? `?version=${to}` : ''}`;
 
   return (
     <Stack spacing={2.5} sx={{ height: { md: '100%' }, minHeight: { md: 480 } }}>
       <PageHeader
         title={document_.title}
         titleAdornment={<Chip size="small" variant="outlined" label="Compare versions" />}
-        action={
-          <Button
-            component={RouterLink}
-            to={backHref}
-            variant="outlined"
-            size="small"
-            startIcon={<ArrowLeft size={15} />}
-          >
-            Back to review
-          </Button>
-        }
+      />
+      <ReviewViewTabs
+        documentId={documentId}
+        active="compare"
+        openTaskCount={openTaskCount}
+        compareEnabled={readyNumbers.length >= 2}
       />
 
       {from === undefined || to === undefined ? (

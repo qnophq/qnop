@@ -47,6 +47,7 @@ import { useToast } from '../../components/admin/layout/useToast';
 import { BoundaryFallback } from '../../components/errors/BoundaryFallback';
 import { ErrorBoundary } from '../../components/errors/ErrorBoundary';
 import { ReviewHubHead } from '../../components/reviews/hub/ReviewHubHead';
+import { ReviewViewTabs } from '../../components/reviews/hub/ReviewViewTabs';
 import { AnnotationPanel } from '../../components/reviews/panel/AnnotationPanel';
 import { PANEL_MIN_WIDTH, PanelResizer } from '../../components/reviews/PanelResizer';
 import { FocusAnnotationCard } from '../../components/reviews/focus/FocusAnnotationCard';
@@ -58,6 +59,7 @@ import {
 } from '../../components/reviews/focus/spotlightModel';
 import { useAnchorElement } from '../../components/reviews/focus/useAnchorElement';
 import { useViewMode } from '../../components/reviews/focus/useViewMode';
+import { columnOf } from '../../components/reviews/tasks/tasksModel';
 import { Composer } from '../../components/reviews/panel/Composer';
 import { WorkflowBadge } from '../../components/reviews/WorkflowBadge';
 import type {
@@ -123,6 +125,16 @@ export function DocumentReviewPage() {
   const [tool, setTool] = useState<ViewerTool>('text');
   const [zoom, setZoom] = useState(1);
   const [viewMode, setViewMode] = useViewMode();
+  // The view tabs (issue #398) address the mode through the URL — ?view= wins
+  // over (and updates) the stored preference; the param stays shareable.
+  const urlView = searchParams.get('view');
+  useEffect(() => {
+    if (urlView === 'focus' || urlView === 'panel') {
+      setViewMode(urlView === 'panel' ? 'panel' : 'focus');
+    }
+    // setViewMode is a stable setter-like callback; syncing on param change only.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [urlView]);
   const [listOpen, setListOpen] = useState(false);
   // Deep link from the tasks view (issue #393): ?annotation= seeds the active
   // annotation once; the param is consumed so in-page selection owns the state.
@@ -314,6 +326,16 @@ export function DocumentReviewPage() {
           />
         }
       />
+      <ReviewViewTabs
+        documentId={documentId}
+        active={focusMode ? 'focus' : 'document'}
+        openTaskCount={annotations.filter((a) => columnOf(a) !== 'done').length}
+        compareEnabled={
+          (versionsQuery.data?.versions.filter(
+            (version) => version.extractionStatus === ExtractionStatus.Ready,
+          ).length ?? 0) >= 2
+        }
+      />
       {versionNumber === undefined ? (
         <Alert severity="info">This review has no uploaded document version yet.</Alert>
       ) : (
@@ -338,19 +360,7 @@ export function DocumentReviewPage() {
               canAnnotate={canAnnotate}
               zoom={zoom}
               onZoomChange={setZoom}
-              compareHref={
-                (versionsQuery.data?.versions.filter(
-                  (version) => version.extractionStatus === ExtractionStatus.Ready,
-                ).length ?? 0) >= 2
-                  ? `/reviews/${documentId}/compare`
-                  : undefined
-              }
-              tasksHref={`/reviews/${documentId}/tasks`}
-              viewMode={viewMode}
-              onViewModeChange={(mode) => {
-                setViewMode(mode);
-                setListOpen(false);
-              }}
+              focusMode={focusMode}
               annotationCount={annotations.length}
               onOpenAnnotationList={() => setListOpen(true)}
             />

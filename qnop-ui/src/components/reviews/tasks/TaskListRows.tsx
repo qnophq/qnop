@@ -51,10 +51,7 @@ interface TaskListRowsProps {
 export function TaskListRows({ annotations, taskKeyOf, authorNameOf, onOpen }: TaskListRowsProps) {
   const theme = useTheme();
   return (
-    <Paper
-      variant="outlined"
-      sx={{ overflow: 'hidden', maxWidth: 1100, mx: 'auto', width: '100%' }}
-    >
+    <Paper variant="outlined" sx={{ overflow: 'hidden', width: '100%' }}>
       {annotations.map((annotation, index) => {
         const type = annotation.type ? TYPE_CUES[annotation.type] : null;
         const priority = annotation.priority ? PRIORITY_CUES[annotation.priority] : null;
