@@ -244,7 +244,9 @@ public class OidcProviderService {
     if (patch.displayNameAttribute() != null) {
       provider.setDisplayNameAttribute(trimToNull(patch.displayNameAttribute()));
     }
-    OidcProviderView view = toView(provider);
+    // Explicit save rather than relying on transactional dirty-checking, mirroring create()
+    // and keeping the persistence intent visible at the call site (issue #339).
+    OidcProviderView view = toView(providers.save(provider));
     events.publishEvent(new OidcProvidersChangedEvent());
     return view;
   }

@@ -28,8 +28,11 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import io.qnop.entity.OidcProvider;
+import io.qnop.entity.OidcProviderType;
 import io.qnop.repository.OidcProviderRepository;
 import io.qnop.service.oidc.OidcProviderService.OidcDiscoveryOutcome;
+import io.qnop.service.oidc.OidcProviderService.OidcProviderPatch;
+import java.util.Optional;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -103,6 +106,38 @@ class OidcProviderServiceTest {
                     null))
         .isInstanceOf(IllegalArgumentException.class);
     verify(providers, never()).save(any());
+  }
+
+  @Test
+  @DisplayName("update persists the managed entity through an explicit save")
+  void updatePersistsExplicitly() {
+    UUID id = UUID.randomUUID();
+    OidcProvider existing = new OidcProvider("Google", OidcProviderType.OIDC, "cid");
+    existing.setEnabled(false);
+    when(providers.findById(id)).thenReturn(Optional.of(existing));
+    when(providers.save(any(OidcProvider.class))).thenAnswer(inv -> inv.getArgument(0));
+
+    OidcProviderView view =
+        service.update(
+            id,
+            new OidcProviderPatch(
+                true,
+                "Google SSO",
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null));
+
+    verify(providers).save(existing);
+    assertThat(view.enabled()).isTrue();
+    assertThat(view.name()).isEqualTo("Google SSO");
   }
 
   @Test
