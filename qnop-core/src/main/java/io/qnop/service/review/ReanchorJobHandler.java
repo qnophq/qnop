@@ -62,12 +62,15 @@ public class ReanchorJobHandler implements JobHandler {
 
   private final DocumentVersionRepository versions;
   private final AnnotationPlacementRepository placements;
-  private final AnchorResolver resolver = new AnchorResolver();
+  private final AnchorResolver resolver;
 
   public ReanchorJobHandler(
-      DocumentVersionRepository versions, AnnotationPlacementRepository placements) {
+      DocumentVersionRepository versions,
+      AnnotationPlacementRepository placements,
+      ReanchoringProperties reanchoringProperties) {
     this.versions = versions;
     this.placements = placements;
+    this.resolver = new AnchorResolver(reanchoringProperties);
   }
 
   @Override

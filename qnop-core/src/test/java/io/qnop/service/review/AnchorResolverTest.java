@@ -225,6 +225,24 @@ class AnchorResolverTest {
     assertThat(first).isEqualTo(second);
   }
 
+  // --- configurable thresholds (issue #320) ----------------------------------
+
+  @Test
+  @DisplayName(
+      "the similarity threshold is configurable: a lower bar re-places what the default orphans")
+  void similarityThresholdIsConfigurable() {
+    // The single fuzzy candidate scores exactly 0.5 (8 of 16 chars match, no context layer).
+    String anchor = anchor("abcdefghijklmnop", null, null);
+    RenderedDocument v2 = doc(surface(0, "abcdefgh________"));
+
+    // Default threshold (0.75): 0.5 is below the bar → ORPHANED, never guessed.
+    assertThat(new AnchorResolver().resolve(anchor, v2).outcome()).isEqualTo(Outcome.ORPHANED);
+
+    // A deployment that lowers the bar to 0.4 accepts the same candidate → MOVED.
+    ReanchoringProperties lenient = new ReanchoringProperties(0.4, null, null, null, null, null);
+    assertThat(new AnchorResolver(lenient).resolve(anchor, v2).outcome()).isEqualTo(Outcome.MOVED);
+  }
+
   // --- helpers ---------------------------------------------------------------
 
   /** An anchor JSON in the stored shape (#247): region + textQuote (+ position best-effort). */
