@@ -32,6 +32,8 @@ import io.qnop.entity.ExtractionStatus;
 import io.qnop.repository.AnnotationPlacementRepository;
 import io.qnop.repository.DocumentVersionRepository;
 import io.qnop.service.job.JobEnqueuer;
+import io.qnop.service.job.JobPayload;
+import io.qnop.service.job.JobPayloadCodec;
 import io.qnop.service.storage.StorageService;
 import io.qnop.spi.extract.DocumentExtractor;
 import io.qnop.spi.extract.ExtractionException;
@@ -76,7 +78,7 @@ class DocumentExtractionJobHandlerTest {
   }
 
   private static String payload(UUID versionId) {
-    return DocumentIngestService.extractionPayload(versionId);
+    return JobPayloadCodec.serialize(new JobPayload.DocumentVersionRef(versionId));
   }
 
   private void givenStoredContent() {

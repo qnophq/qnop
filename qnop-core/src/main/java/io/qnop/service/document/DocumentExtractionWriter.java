@@ -27,6 +27,8 @@ import io.qnop.entity.PlacementStatus;
 import io.qnop.repository.AnnotationPlacementRepository;
 import io.qnop.repository.DocumentVersionRepository;
 import io.qnop.service.job.JobEnqueuer;
+import io.qnop.service.job.JobPayload;
+import io.qnop.service.job.JobPayloadCodec;
 import io.qnop.service.review.ReanchorJobHandler;
 import java.util.List;
 import java.util.UUID;
@@ -81,7 +83,9 @@ class DocumentExtractionWriter {
     if (!placements
         .findByDocumentVersionIdAndStatus(versionId, PlacementStatus.PENDING)
         .isEmpty()) {
-      jobs.enqueue(ReanchorJobHandler.TYPE, DocumentIngestService.extractionPayload(versionId));
+      jobs.enqueue(
+          ReanchorJobHandler.TYPE,
+          JobPayloadCodec.serialize(new JobPayload.DocumentVersionRef(versionId)));
     }
   }
 

@@ -31,6 +31,8 @@ import io.qnop.repository.DocumentRepository;
 import io.qnop.repository.DocumentVersionRepository;
 import io.qnop.service.ApplicationSettingKey;
 import io.qnop.service.ApplicationSettingsService;
+import io.qnop.service.job.JobPayload;
+import io.qnop.service.job.JobPayloadCodec;
 import io.qnop.service.job.JobService;
 import io.qnop.service.storage.StagedObject;
 import io.qnop.service.storage.StorageQuotaExceededException;
@@ -184,7 +186,9 @@ public class DocumentIngestService {
                 actor));
     // Outbox (ADR-0033): the job commits with the version row, so extraction can never be lost
     // for a version that exists, and never fires for one that rolled back.
-    jobs.enqueue(EXTRACTION_JOB_TYPE, extractionPayload(version.getId()));
+    jobs.enqueue(
+        EXTRACTION_JOB_TYPE,
+        JobPayloadCodec.serialize(new JobPayload.DocumentVersionRef(version.getId())));
     return version;
   }
 
@@ -217,11 +221,6 @@ public class DocumentIngestService {
                   new AnnotationPlacement(
                       annotation.getId(), newVersion.getId(), source.getAnchor())));
     }
-  }
-
-  /** The job payload; a tiny hand-built JSON object (single UUID — no mapper needed). */
-  static String extractionPayload(UUID versionId) {
-    return "{\"versionId\":\"" + versionId + "\"}";
   }
 
   private static String requireTitle(String title) {

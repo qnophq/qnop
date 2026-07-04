@@ -27,6 +27,8 @@ import io.qnop.entity.PlacementStatus;
 import io.qnop.repository.AnnotationPlacementRepository;
 import io.qnop.repository.DocumentVersionRepository;
 import io.qnop.service.job.JobHandler;
+import io.qnop.service.job.JobPayload;
+import io.qnop.service.job.JobPayloadCodec;
 import io.qnop.spi.extract.RenderedDocument;
 import java.util.List;
 import java.util.Optional;
@@ -36,7 +38,6 @@ import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 import tools.jackson.core.JacksonException;
-import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 import tools.jackson.databind.json.JsonMapper;
 
@@ -80,7 +81,8 @@ public class ReanchorJobHandler implements JobHandler {
   @Override
   @Transactional
   public void handle(String payload) {
-    UUID versionId = parseVersionId(payload);
+    UUID versionId =
+        JobPayloadCodec.deserialize(payload, JobPayload.DocumentVersionRef.class).versionId();
     Optional<DocumentVersion> found = versions.findById(versionId);
     if (found.isEmpty()) {
       log.info("Re-anchoring skipped: version {} no longer exists.", versionId);
@@ -118,15 +120,6 @@ public class ReanchorJobHandler implements JobHandler {
     } catch (JacksonException e) {
       throw new IllegalStateException(
           "stored rendered document of version " + version.getId() + " is unreadable", e);
-    }
-  }
-
-  private static UUID parseVersionId(String payload) {
-    try {
-      JsonNode node = MAPPER.readTree(payload);
-      return UUID.fromString(node.get("versionId").asText());
-    } catch (JacksonException | NullPointerException | IllegalArgumentException e) {
-      throw new IllegalArgumentException("Malformed re-anchor payload: " + payload, e);
     }
   }
 }

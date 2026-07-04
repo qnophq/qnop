@@ -24,6 +24,8 @@ import io.qnop.entity.DocumentVersion;
 import io.qnop.entity.ExtractionStatus;
 import io.qnop.repository.DocumentVersionRepository;
 import io.qnop.service.job.JobHandler;
+import io.qnop.service.job.JobPayload;
+import io.qnop.service.job.JobPayloadCodec;
 import io.qnop.service.storage.StorageService;
 import io.qnop.spi.extract.DocumentExtractor;
 import io.qnop.spi.extract.ExtractionException;
@@ -36,7 +38,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
 import tools.jackson.core.JacksonException;
-import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 import tools.jackson.databind.json.JsonMapper;
 
@@ -92,7 +93,8 @@ public class DocumentExtractionJobHandler implements JobHandler {
 
   @Override
   public void handle(String payload) {
-    UUID versionId = parseVersionId(payload);
+    UUID versionId =
+        JobPayloadCodec.deserialize(payload, JobPayload.DocumentVersionRef.class).versionId();
     Optional<DocumentVersion> found = versions.findById(versionId);
     if (found.isEmpty()) {
       log.info("Extraction skipped: version {} no longer exists.", versionId);
@@ -137,16 +139,5 @@ public class DocumentExtractionJobHandler implements JobHandler {
       throw new IllegalStateException("Failed to serialize rendered document", e);
     }
     writer.attachRenderedAndChain(versionId, renderedJson);
-  }
-
-  private static UUID parseVersionId(String payload) {
-    try {
-      JsonNode node = MAPPER.readTree(payload);
-      return UUID.fromString(node.get("versionId").asText());
-    } catch (JacksonException | NullPointerException | IllegalArgumentException e) {
-      // A malformed payload can only come from a code bug; retrying cannot fix it, but failing
-      // loudly (job FAILED after max attempts) surfaces it instead of silently dropping work.
-      throw new IllegalArgumentException("Malformed extraction payload: " + payload, e);
-    }
   }
 }
