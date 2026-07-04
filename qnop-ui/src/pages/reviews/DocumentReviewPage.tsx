@@ -72,7 +72,7 @@ import type { ViewerTool } from '../../components/reviews/viewer/ViewerToolbar';
 import { ViewerToolbar } from '../../components/reviews/viewer/ViewerToolbar';
 import { useAuthStore } from '../../stores/authStore';
 import { apiErrorCode } from '../../utils/apiError';
-import { resolveEffectiveVersion } from './resolveEffectiveVersion';
+import { pdfFetchVersion, resolveEffectiveVersion } from './resolveEffectiveVersion';
 
 const PANEL_WIDTH_KEY = 'qnop-review-panel-width';
 
@@ -112,7 +112,10 @@ export function DocumentReviewPage() {
   const extractionReady = extractionStatus === ExtractionStatus.Ready;
 
   const renderedQuery = useRenderedDocument(documentId, versionNumber ?? 0, extractionReady);
-  const pdfQuery = useOriginalPdf(documentId, versionNumber);
+  // The heavy PDF download starts from an explicit ?version= without waiting for
+  // the metadata queries to validate it, so a shared deep link fetches its bytes
+  // in parallel with useDocument/useDocumentVersions (issue #332).
+  const pdfQuery = useOriginalPdf(documentId, pdfFetchVersion(versionNumber, requestedVersion));
   const { pdf, error: pdfError } = usePdfDocument(pdfQuery.data);
   const annotationsQuery = useAnnotations(documentId, versionNumber);
   const createAnnotation = useCreateAnnotation(documentId);

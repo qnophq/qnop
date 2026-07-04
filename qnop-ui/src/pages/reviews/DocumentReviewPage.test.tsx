@@ -27,7 +27,7 @@ import type { AnnotationView, RenderedSurface } from '../../api/generated';
 import { AnnotationStatus, ExtractionStatus, PlacementStatus } from '../../api/generated';
 import { buildTheme } from '../../theme/theme';
 import { DocumentReviewPage } from './DocumentReviewPage';
-import { resolveEffectiveVersion } from './resolveEffectiveVersion';
+import { pdfFetchVersion, resolveEffectiveVersion } from './resolveEffectiveVersion';
 import {
   useDocument,
   useDocumentVersions,
@@ -214,6 +214,24 @@ describe('resolveEffectiveVersion', () => {
 
   it('is undefined while nothing is known yet', () => {
     expect(resolveEffectiveVersion(2, 0, [])).toBeUndefined();
+  });
+});
+
+// Issue #332: the PDF fetch starts from an explicit ?version= before the
+// metadata queries resolve it, so a shared deep link downloads its bytes in
+// parallel with the document + version-list queries.
+describe('pdfFetchVersion', () => {
+  it('uses the resolved version once it is known', () => {
+    expect(pdfFetchVersion(2, 5)).toBe(2);
+  });
+
+  it('fetches the requested version eagerly before resolution (deep-link first paint)', () => {
+    expect(pdfFetchVersion(undefined, 3)).toBe(3);
+  });
+
+  it('is undefined before resolution when no version was requested', () => {
+    expect(pdfFetchVersion(undefined, NaN)).toBeUndefined();
+    expect(pdfFetchVersion(undefined, 0)).toBeUndefined();
   });
 });
 
