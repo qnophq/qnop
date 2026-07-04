@@ -43,6 +43,8 @@ import {
 import { AdminToast } from '../../components/admin/layout/AdminToast';
 import { PageHeader } from '../../components/admin/layout/PageHeader';
 import { useToast } from '../../components/admin/layout/useToast';
+import { BoundaryFallback } from '../../components/errors/BoundaryFallback';
+import { ErrorBoundary } from '../../components/errors/ErrorBoundary';
 import { ReviewHubHead } from '../../components/reviews/hub/ReviewHubHead';
 import { AnnotationPanel } from '../../components/reviews/panel/AnnotationPanel';
 import { PANEL_MIN_WIDTH, PanelResizer } from '../../components/reviews/PanelResizer';
@@ -341,38 +343,47 @@ export function DocumentReviewPage() {
                   bgcolor: (theme) => theme.qnop.surface2,
                 }}
               >
-                <DocumentViewer
-                  ref={viewerRef}
-                  pdf={pdf}
-                  surfaces={surfaces}
-                  zoom={zoom}
-                  annotations={annotations}
-                  activeAnnotationId={activeAnnotationId}
-                  hoverAnnotationId={hoverAnnotationId}
-                  onSelectAnnotation={(id) => {
-                    setActiveAnnotationId(id);
-                    setPending(null);
-                  }}
-                  onHoverAnnotation={setHoverAnnotationId}
-                  onVisiblePageChange={setCurrentPage}
-                  tool={tool}
-                  canAnnotate={canAnnotate}
-                  pendingAnchor={pending?.anchor ?? null}
-                  onTextSelected={handleTextSelected}
-                  onRegionSelected={handleRegionSelected}
-                  focusScrim={
-                    focusOverlayOpen
-                      ? {
-                          spotlight: focusSpotlight,
-                          // The veil never discards a composer mid-typing — the
-                          // card's Cancel is the explicit way out.
-                          onDismiss: () => {
-                            if (!composingPending) closeFocusCard();
-                          },
-                        }
-                      : null
-                  }
-                />
+                {/* A crash in the pdf.js viewer must not take down the panel or the
+                    page — scope it and let the reviewer retry (issue #331). */}
+                <ErrorBoundary
+                  resetKeys={[versionNumber, pdf]}
+                  fallback={(_error, reset) => (
+                    <BoundaryFallback title="The document viewer failed" onRetry={reset} />
+                  )}
+                >
+                  <DocumentViewer
+                    ref={viewerRef}
+                    pdf={pdf}
+                    surfaces={surfaces}
+                    zoom={zoom}
+                    annotations={annotations}
+                    activeAnnotationId={activeAnnotationId}
+                    hoverAnnotationId={hoverAnnotationId}
+                    onSelectAnnotation={(id) => {
+                      setActiveAnnotationId(id);
+                      setPending(null);
+                    }}
+                    onHoverAnnotation={setHoverAnnotationId}
+                    onVisiblePageChange={setCurrentPage}
+                    tool={tool}
+                    canAnnotate={canAnnotate}
+                    pendingAnchor={pending?.anchor ?? null}
+                    onTextSelected={handleTextSelected}
+                    onRegionSelected={handleRegionSelected}
+                    focusScrim={
+                      focusOverlayOpen
+                        ? {
+                            spotlight: focusSpotlight,
+                            // The veil never discards a composer mid-typing — the
+                            // card's Cancel is the explicit way out.
+                            onDismiss: () => {
+                              if (!composingPending) closeFocusCard();
+                            },
+                          }
+                        : null
+                    }
+                  />
+                </ErrorBoundary>
               </Box>
             )}
           </Stack>
@@ -394,45 +405,59 @@ export function DocumentReviewPage() {
                 overflowY: { md: 'auto' },
               }}
             >
-              <AnnotationPanel
-                annotations={annotations}
-                activeAnnotationId={activeAnnotationId}
-                hoverAnnotationId={hoverAnnotationId}
-                onSelect={setActiveAnnotationId}
-                onHover={setHoverAnnotationId}
-                pendingAnchor={pending && !pending.menuPosition ? pending.anchor : null}
-                creating={createAnnotation.isPending}
-                onCreate={handleCreate}
-                onCancelPending={() => setPending(null)}
-                canAnnotate={canAnnotate}
-                ownerId={document.ownerId}
-                notify={notify}
-              />
+              <ErrorBoundary
+                resetKeys={[versionNumber]}
+                fallback={(_error, reset) => (
+                  <BoundaryFallback title="The annotations panel failed" onRetry={reset} dense />
+                )}
+              >
+                <AnnotationPanel
+                  annotations={annotations}
+                  activeAnnotationId={activeAnnotationId}
+                  hoverAnnotationId={hoverAnnotationId}
+                  onSelect={setActiveAnnotationId}
+                  onHover={setHoverAnnotationId}
+                  pendingAnchor={pending && !pending.menuPosition ? pending.anchor : null}
+                  creating={createAnnotation.isPending}
+                  onCreate={handleCreate}
+                  onCancelPending={() => setPending(null)}
+                  canAnnotate={canAnnotate}
+                  ownerId={document.ownerId}
+                  notify={notify}
+                />
+              </ErrorBoundary>
             </Box>
           )}
         </Stack>
       )}
       {focusMode && (
         <FocusDrawer open={listOpen} onClose={() => setListOpen(false)}>
-          <AnnotationPanel
-            annotations={annotations}
-            activeAnnotationId={activeAnnotationId}
-            hoverAnnotationId={hoverAnnotationId}
-            onSelect={(id) => {
-              setActiveAnnotationId(id);
-              // A placed annotation continues in the spotlight; unplaced ones
-              // keep their thread inside the drawer (no mark to spotlight).
-              if (id && annotations.find((a) => a.id === id)?.anchor) setListOpen(false);
-            }}
-            onHover={setHoverAnnotationId}
-            pendingAnchor={null}
-            creating={createAnnotation.isPending}
-            onCreate={handleCreate}
-            onCancelPending={() => setPending(null)}
-            canAnnotate={canAnnotate}
-            ownerId={document.ownerId}
-            notify={notify}
-          />
+          <ErrorBoundary
+            resetKeys={[versionNumber]}
+            fallback={(_error, reset) => (
+              <BoundaryFallback title="The annotations panel failed" onRetry={reset} dense />
+            )}
+          >
+            <AnnotationPanel
+              annotations={annotations}
+              activeAnnotationId={activeAnnotationId}
+              hoverAnnotationId={hoverAnnotationId}
+              onSelect={(id) => {
+                setActiveAnnotationId(id);
+                // A placed annotation continues in the spotlight; unplaced ones
+                // keep their thread inside the drawer (no mark to spotlight).
+                if (id && annotations.find((a) => a.id === id)?.anchor) setListOpen(false);
+              }}
+              onHover={setHoverAnnotationId}
+              pendingAnchor={null}
+              creating={createAnnotation.isPending}
+              onCreate={handleCreate}
+              onCancelPending={() => setPending(null)}
+              canAnnotate={canAnnotate}
+              ownerId={document.ownerId}
+              notify={notify}
+            />
+          </ErrorBoundary>
         </FocusDrawer>
       )}
       {focusMode && activeAnnotation && !listOpen && (
