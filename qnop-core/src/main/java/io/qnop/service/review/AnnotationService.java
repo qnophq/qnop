@@ -24,7 +24,9 @@ import static java.util.stream.Collectors.toMap;
 
 import io.qnop.entity.Annotation;
 import io.qnop.entity.AnnotationPlacement;
+import io.qnop.entity.AnnotationPriority;
 import io.qnop.entity.AnnotationStatus;
+import io.qnop.entity.AnnotationType;
 import io.qnop.entity.AuditEvent;
 import io.qnop.entity.Comment;
 import io.qnop.entity.DocumentVersion;
@@ -56,6 +58,7 @@ import org.springframework.transaction.annotation.Transactional;
 public class AnnotationService {
 
   static final String AUDIT_ANNOTATION_CREATED = "annotation.created";
+  static final String AUDIT_ANNOTATION_CLASSIFIED = "annotation.classified";
 
   private final AnnotationRepository annotations;
   private final AnnotationPlacementRepository placements;
@@ -92,6 +95,8 @@ public class AnnotationService {
       UUID documentId,
       UUID authorId,
       String status,
+      String type,
+      String priority,
       String anchorJson,
       String placementStatus,
       int commentCount,
@@ -116,7 +121,9 @@ public class AnnotationService {
       UUID author,
       boolean admin,
       String anchorJson,
-      String firstComment) {
+      String firstComment,
+      String type,
+      String priority) {
     if (firstComment == null || firstComment.isBlank()) {
       throw DocumentValidationException.invalidRequest("annotation requires a first comment");
     }
@@ -139,7 +146,9 @@ public class AnnotationService {
 
     // saveAndFlush so the @CreationTimestamp / @UpdateTimestamp are populated on the returned
     // entity (they are only set when the INSERT is flushed) before the view is built.
-    Annotation annotation = annotations.saveAndFlush(new Annotation(documentId, author));
+    Annotation created = new Annotation(documentId, author);
+    created.classify(typeOf(type), priorityOf(priority));
+    Annotation annotation = annotations.saveAndFlush(created);
     AnnotationPlacement placement =
         new AnnotationPlacement(annotation.getId(), version.getId(), anchorJson);
     placement.markPlaced(anchorJson);
@@ -163,7 +172,12 @@ public class AnnotationService {
    */
   @Transactional(readOnly = true)
   public List<AnnotationView> list(
-      UUID documentId, Integer versionNumber, String placementStatus, UUID actor, boolean admin) {
+      UUID documentId,
+      Integer versionNumber,
+      String placementStatus,
+      String type,
+      UUID actor,
+      boolean admin) {
     if (placementStatus != null && versionNumber == null) {
       throw DocumentValidationException.invalidRequest("placementStatus requires version");
     }
@@ -191,7 +205,52 @@ public class AnnotationService {
                     placementByAnnotation.get(annotation.getId()),
                     threadSizeByAnnotation.getOrDefault(annotation.getId(), 0)))
         .filter(view -> placementStatus == null || placementStatus.equals(view.placementStatus()))
+        .filter(view -> type == null || type.equals(view.type()))
         .toList();
+  }
+
+  /**
+   * (Re)classifies an annotation — the request replaces the classification wholesale, an absent
+   * facet clears it (issue #392). Permitted for the document owner or the annotation's author while
+   * the annotation is still OPEN. Classification is descriptive only, so it lives here and never
+   * drives the workflow.
+   */
+  @Transactional
+  public AnnotationView updateClassification(
+      UUID annotationId, UUID actor, boolean admin, String type, String priority) {
+    Annotation annotation = requireAnnotation(annotationId);
+    DocumentAccessService.DocumentView document =
+        documentAccess.getDocument(annotation.getDocumentId(), actor, admin);
+    if (!document.ownerId().equals(actor) && !annotation.getAuthorId().equals(actor)) {
+      throw new AnnotationDecisionForbiddenException();
+    }
+    if (annotation.getStatus() != AnnotationStatus.OPEN) {
+      throw new WorkflowTransitionException(
+          WorkflowTransitionException.ANNOTATION_ALREADY_DECIDED,
+          "annotation " + annotationId + " is already " + annotation.getStatus());
+    }
+    annotation.classify(typeOf(type), priorityOf(priority));
+    auditEvents.save(
+        new AuditEvent(
+            annotation.getDocumentId(),
+            AUDIT_ANNOTATION_CLASSIFIED,
+            actor,
+            "{\"annotationId\":\"%s\",\"type\":%s,\"priority\":%s}"
+                .formatted(annotationId, jsonString(type), jsonString(priority))));
+    return view(annotation, null, threadSize(annotationId));
+  }
+
+  private static String jsonString(String value) {
+    return value == null ? "null" : "\"" + value + "\"";
+  }
+
+  /** The entity enum for a contract-validated name; the closed set is enforced by the contract. */
+  private static AnnotationType typeOf(String type) {
+    return type == null ? null : AnnotationType.valueOf(type);
+  }
+
+  private static AnnotationPriority priorityOf(String priority) {
+    return priority == null ? null : AnnotationPriority.valueOf(priority);
   }
 
   /** A single annotation (no version context, so no placement), visible to participants. */
@@ -259,6 +318,8 @@ public class AnnotationService {
         annotation.getDocumentId(),
         annotation.getAuthorId(),
         annotation.getStatus().name(),
+        annotation.getType() == null ? null : annotation.getType().name(),
+        annotation.getPriority() == null ? null : annotation.getPriority().name(),
         placement == null ? null : placement.getAnchor(),
         placement == null ? null : placement.getStatus().name(),
         commentCount,

@@ -63,6 +63,14 @@ public class Annotation {
   @Column(name = "status", nullable = false, length = 16)
   private AnnotationStatus status;
 
+  @Enumerated(EnumType.STRING)
+  @Column(name = "type", length = 16)
+  private AnnotationType type;
+
+  @Enumerated(EnumType.STRING)
+  @Column(name = "priority", length = 16)
+  private AnnotationPriority priority;
+
   @CreationTimestamp
   @Column(name = "created_at", nullable = false, updatable = false)
   private Instant createdAt;
@@ -101,6 +109,12 @@ public class Annotation {
     this.status = AnnotationStatus.OPEN;
   }
 
+  /** (Re)classifies the point — both facets optional, {@code null} clears (issue #392). */
+  public void classify(AnnotationType type, AnnotationPriority priority) {
+    this.type = type;
+    this.priority = priority;
+  }
+
   public UUID getId() {
     return id;
   }
@@ -115,6 +129,14 @@ public class Annotation {
 
   public AnnotationStatus getStatus() {
     return status;
+  }
+
+  public AnnotationType getType() {
+    return type;
+  }
+
+  public AnnotationPriority getPriority() {
+    return priority;
   }
 
   public Instant getCreatedAt() {

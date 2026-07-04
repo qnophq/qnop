@@ -22,6 +22,7 @@ package io.qnop.review;
 
 import static org.hamcrest.Matchers.greaterThanOrEqualTo;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -285,6 +286,123 @@ class AnnotationApiIT extends SeededIntegrationTest {
     mockMvc
         .perform(as(get("/api/v1/annotations/" + UUID.randomUUID()), MEMBER_ID))
         .andExpect(status().isNotFound());
+  }
+
+  // --- classification: optional type & priority (issue #392) --------------------------------
+
+  @Test
+  void createsWithClassificationAndRoundTripsIt() throws Exception {
+    UUID documentId = seedDocumentWithVersion();
+
+    mockMvc
+        .perform(
+            as(post("/api/v1/documents/" + documentId + "/annotations"), AUDITOR_ID)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(
+                    "{\"versionNumber\":1,\"anchor\":"
+                        + ANCHOR
+                        + ",\"comment\":\"conflicts with policy\","
+                        + "\"type\":\"CONFLICT\",\"priority\":\"HIGH\"}"))
+        .andExpect(status().isCreated())
+        .andExpect(jsonPath("$.type").value("CONFLICT"))
+        .andExpect(jsonPath("$.priority").value("HIGH"));
+
+    mockMvc
+        .perform(as(get("/api/v1/documents/" + documentId + "/annotations"), MEMBER_ID))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.annotations[0].type").value("CONFLICT"))
+        .andExpect(jsonPath("$.annotations[0].priority").value("HIGH"));
+  }
+
+  @Test
+  void createsWithoutClassificationAsBefore() throws Exception {
+    UUID documentId = seedDocumentWithVersion();
+    String annotationId = createAnnotation(documentId, AUDITOR_ID);
+
+    // Uncategorised stays a plain annotation — both fields absent, not defaulted.
+    mockMvc
+        .perform(as(get("/api/v1/annotations/" + annotationId), MEMBER_ID))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.type").doesNotExist())
+        .andExpect(jsonPath("$.priority").doesNotExist());
+  }
+
+  @Test
+  void authorAndOwnerReclassifyWhileOpen() throws Exception {
+    UUID documentId = seedDocumentWithVersion();
+    String annotationId = createAnnotation(documentId, AUDITOR_ID);
+
+    mockMvc
+        .perform(
+            as(patch("/api/v1/annotations/" + annotationId), AUDITOR_ID)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"type\":\"QUESTION\",\"priority\":\"LOW\"}"))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.type").value("QUESTION"))
+        .andExpect(jsonPath("$.priority").value("LOW"));
+
+    // The body replaces the classification wholesale — an absent field clears it.
+    mockMvc
+        .perform(
+            as(patch("/api/v1/annotations/" + annotationId), MEMBER_ID)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"type\":\"RISK\"}"))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.type").value("RISK"))
+        .andExpect(jsonPath("$.priority").doesNotExist());
+  }
+
+  @Test
+  void anotherReviewerCannotReclassify() throws Exception {
+    UUID documentId = seedDocumentWithVersion();
+    String annotationId = createAnnotation(documentId, AUDITOR_ID);
+
+    // MEMBER2 is a participant (annotation visible) but neither owner nor author.
+    mockMvc
+        .perform(
+            as(patch("/api/v1/annotations/" + annotationId), MEMBER2_ID)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"type\":\"RISK\"}"))
+        .andExpect(status().isForbidden());
+  }
+
+  @Test
+  void reclassifyingADecidedAnnotationIsConflict() throws Exception {
+    UUID documentId = seedDocumentWithVersion();
+    String annotationId = createAnnotation(documentId, AUDITOR_ID);
+    decide(annotationId, "ACCEPTED", MEMBER_ID).andExpect(status().isOk());
+
+    mockMvc
+        .perform(
+            as(patch("/api/v1/annotations/" + annotationId), MEMBER_ID)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"type\":\"RISK\"}"))
+        .andExpect(status().isConflict())
+        .andExpect(jsonPath("$.code").value("ANNOTATION_ALREADY_DECIDED"));
+  }
+
+  @Test
+  void listsFilteredByType() throws Exception {
+    UUID documentId = seedDocumentWithVersion();
+    mockMvc
+        .perform(
+            as(post("/api/v1/documents/" + documentId + "/annotations"), AUDITOR_ID)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(
+                    "{\"versionNumber\":1,\"anchor\":"
+                        + ANCHOR
+                        + ",\"comment\":\"a conflict\",\"type\":\"CONFLICT\"}"))
+        .andExpect(status().isCreated());
+    createAnnotation(documentId, MEMBER2_ID); // uncategorised
+
+    mockMvc
+        .perform(
+            as(
+                get("/api/v1/documents/" + documentId + "/annotations").param("type", "CONFLICT"),
+                MEMBER_ID))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.annotations.length()").value(1))
+        .andExpect(jsonPath("$.annotations[0].type").value("CONFLICT"));
   }
 
   private org.springframework.test.web.servlet.ResultActions decide(

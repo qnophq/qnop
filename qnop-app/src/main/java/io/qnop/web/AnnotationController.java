@@ -22,11 +22,14 @@ package io.qnop.web;
 
 import io.qnop.api.v1.endpoint.AnnotationsApi;
 import io.qnop.api.v1.model.Anchor;
+import io.qnop.api.v1.model.AnnotationClassificationRequest;
 import io.qnop.api.v1.model.AnnotationCreateRequest;
 import io.qnop.api.v1.model.AnnotationDecision;
 import io.qnop.api.v1.model.AnnotationDecisionRequest;
 import io.qnop.api.v1.model.AnnotationListResponse;
+import io.qnop.api.v1.model.AnnotationPriority;
 import io.qnop.api.v1.model.AnnotationStatus;
+import io.qnop.api.v1.model.AnnotationType;
 import io.qnop.api.v1.model.AnnotationView;
 import io.qnop.api.v1.model.CommentCreateRequest;
 import io.qnop.api.v1.model.CommentListResponse;
@@ -75,22 +78,38 @@ public class AnnotationController implements AnnotationsApi {
             CurrentUser.requireUserId(),
             CurrentUser.isAdmin(),
             mapper.writeValueAsString(request.getAnchor()),
-            request.getComment());
+            request.getComment(),
+            request.getType() == null ? null : request.getType().getValue(),
+            request.getPriority() == null ? null : request.getPriority().getValue());
     return ResponseEntity.status(HttpStatus.CREATED).body(toDto(view));
   }
 
   @Override
   public ResponseEntity<AnnotationListResponse> listAnnotations(
-      UUID documentId, Integer version, PlacementStatus placementStatus) {
+      UUID documentId, Integer version, PlacementStatus placementStatus, AnnotationType type) {
     var views =
         annotations.list(
             documentId,
             version,
             placementStatus == null ? null : placementStatus.getValue(),
+            type == null ? null : type.getValue(),
             CurrentUser.requireUserId(),
             CurrentUser.isAdmin());
     return ResponseEntity.ok(
         new AnnotationListResponse().annotations(views.stream().map(this::toDto).toList()));
+  }
+
+  @Override
+  public ResponseEntity<AnnotationView> classifyAnnotation(
+      UUID annotationId, AnnotationClassificationRequest request) {
+    AnnotationService.AnnotationView view =
+        annotations.updateClassification(
+            annotationId,
+            CurrentUser.requireUserId(),
+            CurrentUser.isAdmin(),
+            request.getType() == null ? null : request.getType().getValue(),
+            request.getPriority() == null ? null : request.getPriority().getValue());
+    return ResponseEntity.ok(toDto(view));
   }
 
   @Override
@@ -129,6 +148,8 @@ public class AnnotationController implements AnnotationsApi {
         .documentId(view.documentId())
         .authorId(view.authorId())
         .status(AnnotationStatus.fromValue(view.status()))
+        .type(view.type() == null ? null : AnnotationType.fromValue(view.type()))
+        .priority(view.priority() == null ? null : AnnotationPriority.fromValue(view.priority()))
         .anchor(
             view.anchorJson() == null ? null : mapper.readValue(view.anchorJson(), Anchor.class))
         .placementStatus(
