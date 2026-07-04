@@ -31,7 +31,7 @@ import io.qnop.entity.DocumentVersion;
 import io.qnop.entity.ExtractionStatus;
 import io.qnop.repository.AnnotationPlacementRepository;
 import io.qnop.repository.DocumentVersionRepository;
-import io.qnop.service.job.JobService;
+import io.qnop.service.job.JobEnqueuer;
 import io.qnop.service.storage.StorageService;
 import io.qnop.spi.extract.DocumentExtractor;
 import io.qnop.spi.extract.ExtractionException;
@@ -48,7 +48,6 @@ import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
-import org.springframework.beans.factory.ObjectProvider;
 
 /** Unit tests for {@link DocumentExtractionJobHandler}'s failure policy and idempotency (#245). */
 class DocumentExtractionJobHandlerTest {
@@ -57,9 +56,7 @@ class DocumentExtractionJobHandlerTest {
   private final StorageService storage = mock(StorageService.class);
   private final AnnotationPlacementRepository placements =
       mock(AnnotationPlacementRepository.class);
-
-  @SuppressWarnings("unchecked")
-  private final ObjectProvider<JobService> jobs = mock(ObjectProvider.class);
+  private final JobEnqueuer jobs = mock(JobEnqueuer.class);
 
   private final UUID versionId = UUID.randomUUID();
   private DocumentVersion version;

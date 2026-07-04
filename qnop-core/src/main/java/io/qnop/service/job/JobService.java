@@ -57,30 +57,31 @@ public class JobService {
   private static final Logger log = LoggerFactory.getLogger(JobService.class);
 
   static final int POLL_BATCH = 20;
-  static final int DEFAULT_MAX_ATTEMPTS = 5;
   static final Duration BACKOFF_BASE = Duration.ofSeconds(10);
   static final Duration BACKOFF_CAP = Duration.ofMinutes(10);
   static final Duration STALE_AFTER = Duration.ofMinutes(5);
   private static final int MAX_ERROR_LENGTH = 2000;
 
   private final JobRepository repository;
+  private final JobEnqueuer enqueuer;
   private final Map<String, JobHandler> handlers;
 
-  public JobService(JobRepository repository, List<JobHandler> handlers) {
+  public JobService(JobRepository repository, JobEnqueuer enqueuer, List<JobHandler> handlers) {
     this.repository = repository;
+    this.enqueuer = enqueuer;
     this.handlers =
         handlers.stream()
             .collect(Collectors.toUnmodifiableMap(JobHandler::type, Function.identity()));
   }
 
   /**
-   * Enqueues a job to run as soon as the poller picks it up. Runs in the caller's transaction
-   * (outbox): the job and the triggering write commit together, or neither does.
+   * Enqueues a job to run as soon as the poller picks it up. Delegates to {@link JobEnqueuer} — the
+   * narrow write-side bean handlers depend on to avoid the dispatch↔handler cycle (issue #318) —
+   * while remaining the queue's public facade for callers that already hold a {@code JobService}.
+   * Runs in the caller's transaction (outbox): the job and the triggering write commit together.
    */
-  @Transactional
   public UUID enqueue(String type, String payload) {
-    Job job = new Job(type, payload, DEFAULT_MAX_ATTEMPTS, Instant.now());
-    return repository.save(job).getId();
+    return enqueuer.enqueue(type, payload);
   }
 
   /** Claims a batch of due jobs (flips them to {@code RUNNING}) and returns their ids. */

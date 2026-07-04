@@ -26,11 +26,10 @@ import io.qnop.entity.ExtractionStatus;
 import io.qnop.entity.PlacementStatus;
 import io.qnop.repository.AnnotationPlacementRepository;
 import io.qnop.repository.DocumentVersionRepository;
-import io.qnop.service.job.JobService;
+import io.qnop.service.job.JobEnqueuer;
 import io.qnop.service.review.ReanchorJobHandler;
 import java.util.List;
 import java.util.UUID;
-import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -51,14 +50,16 @@ class DocumentExtractionWriter {
 
   private final DocumentVersionRepository versions;
   private final AnnotationPlacementRepository placements;
-  // ObjectProvider breaks the constructor cycle: JobService injects every JobHandler, and the
-  // extraction path needs JobService back to enqueue the follow-up re-anchoring job (issue #248).
-  private final ObjectProvider<JobService> jobs;
+  // The narrow write-side queue bean, injected directly (no ObjectProvider): depending on
+  // JobEnqueuer rather than the full JobService keeps the extraction path from closing the
+  // dispatch↔handler cycle, so the follow-up re-anchoring job (issue #248) enqueues without any
+  // lazy indirection (issue #318).
+  private final JobEnqueuer jobs;
 
   DocumentExtractionWriter(
       DocumentVersionRepository versions,
       AnnotationPlacementRepository placements,
-      ObjectProvider<JobService> jobs) {
+      JobEnqueuer jobs) {
     this.versions = versions;
     this.placements = placements;
     this.jobs = jobs;
@@ -80,8 +81,7 @@ class DocumentExtractionWriter {
     if (!placements
         .findByDocumentVersionIdAndStatus(versionId, PlacementStatus.PENDING)
         .isEmpty()) {
-      jobs.getObject()
-          .enqueue(ReanchorJobHandler.TYPE, DocumentIngestService.extractionPayload(versionId));
+      jobs.enqueue(ReanchorJobHandler.TYPE, DocumentIngestService.extractionPayload(versionId));
     }
   }
 
