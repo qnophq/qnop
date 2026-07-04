@@ -21,9 +21,11 @@
 package io.qnop.service.diff;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.within;
 
 import io.qnop.service.diff.VersionDiffEngine.Change;
 import io.qnop.service.diff.VersionDiffEngine.ChangeType;
+import io.qnop.service.diff.VersionDiffEngine.Location;
 import io.qnop.spi.extract.NormalizedBox;
 import io.qnop.spi.extract.RenderedDocument;
 import io.qnop.spi.extract.Surface;
@@ -170,5 +172,77 @@ class VersionDiffEngineTest {
     RenderedDocument b = doc(new Surface(0, 1024, 768, List.of()));
 
     assertThat(VersionDiffEngine.diff(a, b)).isEmpty();
+  }
+
+  // --- word-accurate geometry (issue #369): boxes are cut to the changed characters ---------
+
+  @Test
+  @DisplayName("a mid-run word is cut at uniform character boundaries without charAdvances")
+  void midRunWordIsCutAtUniformCharBoundaries() {
+    // "brown" covers offsets [10,15) of the 19-char run; box x=0.1 width=0.8.
+    RenderedDocument from = doc(surface(0, 0.1, "the quick brown fox"));
+    RenderedDocument to = doc(surface(0, 0.1, "the quick red fox"));
+
+    List<Change> changes = VersionDiffEngine.diff(from, to);
+
+    assertThat(changes).hasSize(1);
+    Location location = changes.get(0).fromLocations().get(0);
+    double charWidth = 0.8 / 19;
+    assertThat(location.box().x()).isCloseTo(0.1 + 10 * charWidth, within(1e-9));
+    assertThat(location.box().width()).isCloseTo(5 * charWidth, within(1e-9));
+    assertThat(location.box().y()).isEqualTo(0.1);
+    assertThat(location.box().height()).isEqualTo(0.05);
+  }
+
+  @Test
+  @DisplayName("a mid-run word is cut at the true glyph edges when the run carries charAdvances")
+  void midRunWordIsCutAtGlyphEdgesWithCharAdvances() {
+    // "cd" covers offsets [3,5): left edge = advances[2], right edge = advances[4].
+    NormalizedBox box = new NormalizedBox(0.1, 0.1, 0.6, 0.05);
+    List<Double> advances = List.of(0.2, 0.3, 0.35, 0.5, 0.7);
+    RenderedDocument from =
+        doc(new Surface(0, 612, 792, List.of(new TextSpan("ab cd", 0, 5, box, advances))));
+    RenderedDocument to = doc(surface(0, 0.1, "ab XX"));
+
+    List<Change> changes = VersionDiffEngine.diff(from, to);
+
+    assertThat(changes).hasSize(1);
+    Location location = changes.get(0).fromLocations().get(0);
+    assertThat(location.box().x()).isCloseTo(0.35, within(1e-9));
+    assertThat(location.box().width()).isCloseTo(0.7 - 0.35, within(1e-9));
+  }
+
+  @Test
+  @DisplayName(
+      "a chunk across two runs cuts the first run from the word start and the last to the word end")
+  void chunkAcrossRunsCutsFirstAndLastRun() {
+    // "beta gamma" → "X Y": run 1 is cut from "beta" (offset 6 of 10), run 2 up to "gamma" (5 of
+    // 11).
+    RenderedDocument from = doc(surface(0, 0.1, "alpha beta", "gamma delta"));
+    RenderedDocument to = doc(surface(0, 0.1, "alpha X", "Y delta"));
+
+    List<Change> changes = VersionDiffEngine.diff(from, to);
+
+    assertThat(changes).hasSize(1);
+    List<Location> locations = changes.get(0).fromLocations();
+    assertThat(locations).hasSize(2);
+    assertThat(locations.get(0).box().x()).isCloseTo(0.1 + 6 * (0.8 / 10), within(1e-9));
+    assertThat(locations.get(0).box().width()).isCloseTo(4 * (0.8 / 10), within(1e-9));
+    assertThat(locations.get(1).box().x()).isCloseTo(0.1, within(1e-9));
+    assertThat(locations.get(1).box().width()).isCloseTo(5 * (0.8 / 11), within(1e-9));
+  }
+
+  @Test
+  @DisplayName("a chunk covering a whole run keeps that run's original box")
+  void wholeRunChunkKeepsTheRunBox() {
+    RenderedDocument from = doc(surface(0, 0.1, "clause one"));
+    RenderedDocument to = doc(surface(0, 0.1, "clause one", "clause two added"));
+
+    List<Change> changes = VersionDiffEngine.diff(from, to);
+
+    assertThat(changes).hasSize(1);
+    NormalizedBox box = changes.get(0).toLocations().get(0).box();
+    assertThat(box.x()).isEqualTo(0.1);
+    assertThat(box.width()).isEqualTo(0.8);
   }
 }

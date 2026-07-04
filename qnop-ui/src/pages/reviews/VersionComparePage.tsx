@@ -26,9 +26,11 @@ import Box from '@mui/material/Box';
 import Button from '@mui/material/Button';
 import Chip from '@mui/material/Chip';
 import CircularProgress from '@mui/material/CircularProgress';
+import IconButton from '@mui/material/IconButton';
 import Paper from '@mui/material/Paper';
 import Stack from '@mui/material/Stack';
-import { ArrowLeft } from 'lucide-react';
+import Typography from '@mui/material/Typography';
+import { ArrowLeft, PanelRightOpen } from 'lucide-react';
 import { ExtractionStatus } from '../../api/generated';
 import { useDocument, useDocumentVersions } from '../../api/hooks/useDocuments';
 import { useOriginalPdf } from '../../api/hooks/useDocuments';
@@ -39,6 +41,7 @@ import { PageHeader } from '../../components/admin/layout/PageHeader';
 import { ChangeSummaryPanel } from '../../components/reviews/diff/ChangeSummaryPanel';
 import { ComparePane } from '../../components/reviews/diff/ComparePane';
 import { CompareToolbar } from '../../components/reviews/diff/CompareToolbar';
+import { useRailCollapsed } from '../../components/reviews/diff/useRailCollapsed';
 import { useSyncScroll } from '../../components/reviews/diff/useSyncScroll';
 import { usePdfDocument } from '../../components/reviews/viewer/usePdfDocument';
 import { formatDateTime } from '../../utils/formatDate';
@@ -92,6 +95,7 @@ export function VersionComparePage() {
   const [activeChange, setActiveChange] = useState<number | null>(null);
   const [syncScroll, setSyncScroll] = useState(true);
   const [zoom, setZoom] = useState(1);
+  const [railCollapsed, setRailCollapsed] = useRailCollapsed();
   // Callback refs held in state: the panes mount only after the data guards,
   // so the sync-scroll listeners must attach when the elements appear.
   const [fromScrollEl, setFromScrollEl] = useState<HTMLDivElement | null>(null);
@@ -188,7 +192,12 @@ export function VersionComparePage() {
           <Box
             sx={{
               display: 'grid',
-              gridTemplateColumns: { xs: '1fr', lg: 'minmax(0,1fr) minmax(0,1fr) 300px' },
+              gridTemplateColumns: {
+                xs: '1fr',
+                lg: railCollapsed
+                  ? 'minmax(0,1fr) minmax(0,1fr) 44px'
+                  : 'minmax(0,1fr) minmax(0,1fr) 300px',
+              },
               gap: 2,
               flex: 1,
               minHeight: 0,
@@ -232,19 +241,58 @@ export function VersionComparePage() {
                 />
               </Paper>
             ))}
-            <Paper variant="outlined" sx={{ p: 2, overflow: 'auto', minHeight: 0 }}>
-              {changes === null && !diffQuery.isError ? (
-                <Stack sx={{ alignItems: 'center', py: 4 }}>
-                  <CircularProgress size={22} />
-                </Stack>
-              ) : (
-                <ChangeSummaryPanel
-                  changes={changes ?? []}
-                  activeChangeIndex={activeChange}
-                  onSelectChange={setActiveChange}
-                />
-              )}
-            </Paper>
+            {railCollapsed ? (
+              <Paper
+                variant="outlined"
+                data-testid="rail-collapsed"
+                sx={{
+                  display: 'flex',
+                  flexDirection: { xs: 'row', lg: 'column' },
+                  alignItems: 'center',
+                  gap: 1,
+                  p: 0.75,
+                  minHeight: 0,
+                }}
+              >
+                <IconButton
+                  size="small"
+                  onClick={() => setRailCollapsed(false)}
+                  aria-label="Expand the changes rail"
+                  data-testid="rail-expand"
+                >
+                  <PanelRightOpen size={15} />
+                </IconButton>
+                {changes !== null && (
+                  <Chip size="small" variant="outlined" label={changes.length} />
+                )}
+                <Typography
+                  variant="overline"
+                  sx={{
+                    color: 'text.secondary',
+                    letterSpacing: '0.08em',
+                    lineHeight: 1,
+                    writingMode: { lg: 'vertical-rl' },
+                  }}
+                >
+                  Changes
+                </Typography>
+              </Paper>
+            ) : (
+              <Paper variant="outlined" sx={{ p: 2, overflow: 'auto', minHeight: 0 }}>
+                {changes === null && !diffQuery.isError ? (
+                  <Stack sx={{ alignItems: 'center', py: 4 }}>
+                    <CircularProgress size={22} />
+                  </Stack>
+                ) : (
+                  <ChangeSummaryPanel
+                    changes={changes ?? []}
+                    activeChangeIndex={activeChange}
+                    onSelectChange={setActiveChange}
+                    onCollapse={() => setRailCollapsed(true)}
+                  />
+                )}
+              </Paper>
+            )}
           </Box>
         </>
       )}

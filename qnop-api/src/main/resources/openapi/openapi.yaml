@@ -4180,7 +4180,9 @@ components:
         - CHANGED
     DiffLocation:
       type: object
-      description: One highlighted rectangle of a change — a text run's box on a surface.
+      description: >-
+        One highlighted rectangle of a change — the box of the affected text on
+        a surface, cut to the changed characters within its run.
       required:
         - surfaceIndex
         - box
@@ -4211,7 +4213,7 @@ components:
           description: The affected text in the baseline version ('' for INSERTED).
         fromLocations:
           type: array
-          description: Boxes of the affected text runs in the baseline version.
+          description: Boxes of the affected text in the baseline version.
           items:
             $ref: '#/components/schemas/DiffLocation'
         toText:
@@ -4219,7 +4221,7 @@ components:
           description: The affected text in the newer version ('' for DELETED).
         toLocations:
           type: array
-          description: Boxes of the affected text runs in the newer version.
+          description: Boxes of the affected text in the newer version.
           items:
             $ref: '#/components/schemas/DiffLocation'
     VersionDiffResponse:

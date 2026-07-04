@@ -33,7 +33,8 @@ import java.util.List;
 /**
  * The inter-version diff core (issue #249, ADR-0034): a Myers diff at word granularity over the two
  * versions' extracted text layers, with every changed span mapped back to the normalized boxes of
- * the text runs it covers — so the frontend can highlight the change on the rendered original.
+ * the affected text — cut to the changed characters within each run (issue #369) — so the frontend
+ * can highlight the change on the rendered original.
  *
  * <p>The diff runs over the <em>document-wide</em> canonical text (each surface's canonical text —
  * spans joined by {@code \n}, ADR-0032 — concatenated with {@code \n} between surfaces), so content
@@ -54,7 +55,7 @@ public final class VersionDiffEngine {
     CHANGED
   }
 
-  /** Where a changed span sits on a version: one surface and one normalized text-run box. */
+  /** Where a changed span sits on a version: one surface and one normalized box of changed text. */
   public record Location(int surfaceIndex, NormalizedBox box) {}
 
   /**
@@ -113,7 +114,42 @@ public final class VersionDiffEngine {
   private record Word(String text, int start) {}
 
   /** A span's home: its surface index and its offset range in the document-wide canonical text. */
-  private record LocatedSpan(int surfaceIndex, int start, int end, NormalizedBox box) {}
+  private record LocatedSpan(
+      int surfaceIndex, int start, int end, NormalizedBox box, List<Double> charAdvances) {
+
+    /**
+     * The run's box cut to its overlap with a chunk range — glyph-true via {@code charAdvances}
+     * (#290) when present, otherwise the uniform character-count approximation. The same mapping
+     * the viewer's {@code boxesForRange} applies client-side, so a diff highlight and a text
+     * selection land on identical geometry.
+     */
+    NormalizedBox cut(Range range) {
+      int length = end - start;
+      int from = Math.max(range.start(), start) - start;
+      int to = Math.min(range.end(), end) - start;
+      if (from <= 0 && to >= length) {
+        return box;
+      }
+      double left = clamp(leftEdgeOf(from));
+      double right = clamp(rightEdgeOf(to - 1));
+      return new NormalizedBox(left, box.y(), Math.max(0, right - left), box.height());
+    }
+
+    private double leftEdgeOf(int index) {
+      return index <= 0 ? box.x() : rightEdgeOf(index - 1);
+    }
+
+    private double rightEdgeOf(int index) {
+      if (charAdvances != null) {
+        return charAdvances.get(Math.min(index, charAdvances.size() - 1));
+      }
+      return box.x() + box.width() * (index + 1) / (end - start);
+    }
+
+    private static double clamp(double value) {
+      return Math.clamp(value, 0.0d, 1.0d);
+    }
+  }
 
   /**
    * One side of the comparison, indexed for the diff: the word tokens of the document-wide
@@ -138,7 +174,8 @@ public final class VersionDiffEngine {
                   surface.index(),
                   surfaceBase + span.startOffset(),
                   surfaceBase + span.endOffset(),
-                  span.box()));
+                  span.box(),
+                  span.charAdvances()));
         }
         canonical.append(canonicalTextOf(surface));
       }
@@ -185,13 +222,13 @@ public final class VersionDiffEngine {
       return canonicalText.substring(range.start(), range.end());
     }
 
-    /** The boxes of every text run overlapping a delta chunk, in document order. */
+    /** The boxes of the affected text, one per overlapping run, cut to the chunk (issue #369). */
     List<Location> locate(Chunk<String> chunk) {
       Range range = rangeOf(chunk);
       List<Location> locations = new ArrayList<>();
       for (LocatedSpan span : spans) {
         if (span.start() < range.end() && range.start() < span.end()) {
-          locations.add(new Location(span.surfaceIndex(), span.box()));
+          locations.add(new Location(span.surfaceIndex(), span.cut(range)));
         }
       }
       return List.copyOf(locations);
