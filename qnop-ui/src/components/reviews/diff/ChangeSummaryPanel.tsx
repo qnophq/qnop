@@ -20,10 +20,11 @@
  */
 
 import ButtonBase from '@mui/material/ButtonBase';
+import IconButton from '@mui/material/IconButton';
 import Stack from '@mui/material/Stack';
 import Typography from '@mui/material/Typography';
 import { alpha, useTheme } from '@mui/material/styles';
-import { ArrowRight } from 'lucide-react';
+import { ArrowRight, PanelRightClose } from 'lucide-react';
 import type { DiffChange } from '../../../api/generated';
 import { DiffChangeType } from '../../../api/generated';
 import { tokens } from '../../../theme/tokens';
@@ -34,6 +35,8 @@ interface ChangeSummaryPanelProps {
   activeChangeIndex: number | null;
   /** Toggles: selecting the active change again clears the selection. */
   onSelectChange: (changeIndex: number | null) => void;
+  /** When present, the header offers collapsing the rail (issue #369). */
+  onCollapse?: () => void;
 }
 
 /**
@@ -48,6 +51,7 @@ export function ChangeSummaryPanel({
   changes,
   activeChangeIndex,
   onSelectChange,
+  onCollapse,
 }: ChangeSummaryPanelProps) {
   const theme = useTheme();
   const dark = theme.palette.mode === 'dark';
@@ -61,12 +65,24 @@ export function ChangeSummaryPanel({
 
   return (
     <Stack spacing={1.5} data-testid="change-summary">
-      <Typography
-        variant="overline"
-        sx={{ color: 'text.secondary', lineHeight: 1.5, letterSpacing: '0.08em' }}
-      >
-        Changes ({changes.length})
-      </Typography>
+      <Stack direction="row" sx={{ alignItems: 'center', justifyContent: 'space-between' }}>
+        <Typography
+          variant="overline"
+          sx={{ color: 'text.secondary', lineHeight: 1.5, letterSpacing: '0.08em' }}
+        >
+          Changes ({changes.length})
+        </Typography>
+        {onCollapse && (
+          <IconButton
+            size="small"
+            onClick={onCollapse}
+            aria-label="Collapse the changes rail"
+            data-testid="rail-collapse"
+          >
+            <PanelRightClose size={15} />
+          </IconButton>
+        )}
+      </Stack>
 
       {changes.length === 0 && (
         <Typography variant="body2" color="text.secondary">
@@ -92,7 +108,8 @@ export function ChangeSummaryPanel({
               textAlign: 'left',
               width: '100%',
               p: 1.5,
-              borderRadius: 2,
+              // The annotation cards' radius (AnnotationListItem) — one system.
+              borderRadius: 0.75,
               bgcolor: badge.bg,
               borderLeft: `3px solid ${rail}`,
               transition: 'box-shadow 120ms ease, background-color 120ms ease',

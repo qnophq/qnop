@@ -19,7 +19,7 @@
  * SPDX-License-Identifier: AGPL-3.0-only
  */
 
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { fireEvent, render, screen, within } from '@testing-library/react';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { ThemeProvider } from '@mui/material/styles';
@@ -197,5 +197,36 @@ describe('VersionComparePage', () => {
     });
     renderPage();
     expect(screen.getByText(/still being processed/)).toBeInTheDocument();
+  });
+
+  // The changes rail collapses to a narrow strip and the choice persists like
+  // the other viewer preferences (issue #369).
+  describe('changes rail', () => {
+    afterEach(() => {
+      localStorage.removeItem('qnop-compare-rail-collapsed');
+    });
+
+    it('collapses to a strip with the change count and persists the choice', () => {
+      mockData();
+      renderPage();
+
+      fireEvent.click(screen.getByTestId('rail-collapse'));
+      expect(screen.queryByTestId('change-summary')).not.toBeInTheDocument();
+      expect(within(screen.getByTestId('rail-collapsed')).getByText('1')).toBeInTheDocument();
+      expect(localStorage.getItem('qnop-compare-rail-collapsed')).toBe('1');
+
+      fireEvent.click(screen.getByTestId('rail-expand'));
+      expect(screen.getByTestId('change-summary')).toBeInTheDocument();
+      expect(localStorage.getItem('qnop-compare-rail-collapsed')).toBe('0');
+    });
+
+    it('starts collapsed when the preference is stored', () => {
+      localStorage.setItem('qnop-compare-rail-collapsed', '1');
+      mockData();
+      renderPage();
+
+      expect(screen.getByTestId('rail-collapsed')).toBeInTheDocument();
+      expect(screen.queryByTestId('change-summary')).not.toBeInTheDocument();
+    });
   });
 });

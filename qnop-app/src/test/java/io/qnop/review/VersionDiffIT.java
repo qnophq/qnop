@@ -21,6 +21,7 @@
 package io.qnop.review;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.hamcrest.Matchers.closeTo;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -130,7 +131,11 @@ class VersionDiffIT extends SeededIntegrationTest {
         .andExpect(jsonPath("$.changes[0].toText").value("red"))
         .andExpect(jsonPath("$.changes[0].fromLocations[0].surfaceIndex").value(0))
         .andExpect(jsonPath("$.changes[0].fromLocations[0].box.y").value(0.1))
-        .andExpect(jsonPath("$.changes[0].toLocations[0].box.width").value(0.8));
+        // Word-accurate geometry (issue #369): the box covers "red" (3 of the
+        // 17-char run), not the whole run.
+        .andExpect(
+            jsonPath("$.changes[0].toLocations[0].box.width")
+                .value(closeTo(3 * 0.8 / 17, 1e-9), Double.class));
   }
 
   @Test
