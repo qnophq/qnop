@@ -468,3 +468,46 @@ databaseChangeLog:
             tableName: audit_event
             columns:
               - column: { name: actor_id }
+
+  - changeSet:
+      id: 0011-review-visit
+      author: qnop
+      comment: Per-user last-visit stamp powering the unseen markers (issue #307).
+      changes:
+        - createTable:
+            tableName: review_visit
+            columns:
+              - column:
+                  name: id
+                  type: UUID
+                  constraints: { primaryKey: true, nullable: false }
+              - column:
+                  name: document_id
+                  type: UUID
+                  constraints: { nullable: false }
+              - column:
+                  name: user_id
+                  type: UUID
+                  constraints: { nullable: false }
+              - column:
+                  name: last_seen_at
+                  type: TIMESTAMP WITH TIME ZONE
+                  constraints: { nullable: false }
+        - addForeignKeyConstraint:
+            constraintName: fk_review_visit_document
+            baseTableName: review_visit
+            baseColumnNames: document_id
+            referencedTableName: document
+            referencedColumnNames: id
+            onDelete: CASCADE
+        - addForeignKeyConstraint:
+            constraintName: fk_review_visit_user
+            baseTableName: review_visit
+            baseColumnNames: user_id
+            referencedTableName: qnop_user
+            referencedColumnNames: id
+            onDelete: CASCADE
+        - addUniqueConstraint:
+            constraintName: ux_review_visit_pair
+            tableName: review_visit
+            columnNames: document_id, user_id

@@ -118,6 +118,25 @@ describe('TaskBoard', () => {
     expect(onAccept).toHaveBeenCalledWith('a-open');
   });
 
+  it('marks foreign cards created after the previous visit', () => {
+    render(
+      <ThemeProvider theme={buildTheme('light')}>
+        <TaskBoard
+          annotations={[annotation('a-new', { authorId: 'someone-else' })]}
+          previousSeenAt="2026-06-30T00:00:00Z"
+          taskKeyOf={() => 'T-1'}
+          authorNameOf={() => 'Maxim'}
+          mayDecide={() => true}
+          onOpen={vi.fn()}
+          onAccept={vi.fn()}
+        />
+      </ThemeProvider>,
+    );
+    expect(
+      within(screen.getByTestId('task-card-a-new')).getByTestId('unseen-dot'),
+    ).toBeInTheDocument();
+  });
+
   it('only permitted cards are draggable; done cards never are', () => {
     renderBoard({ mayDecide: (a) => a.id === 'a-open' });
     expect(screen.getByTestId('task-card-a-open')).toHaveAttribute('draggable', 'true');

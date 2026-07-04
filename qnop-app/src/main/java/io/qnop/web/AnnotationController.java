@@ -158,6 +158,10 @@ public class AnnotationController implements AnnotationsApi {
                 : PlacementStatus.fromValue(view.placementStatus()))
         .firstComment(view.firstComment())
         .commentCount(view.commentCount())
+        .latestCommentFromOthersAt(
+            view.latestCommentFromOthersAt() == null
+                ? null
+                : view.latestCommentFromOthersAt().atOffset(ZoneOffset.UTC))
         .createdAt(view.createdAt().atOffset(ZoneOffset.UTC))
         .updatedAt(view.updatedAt().atOffset(ZoneOffset.UTC));
   }

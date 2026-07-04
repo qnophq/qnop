@@ -30,6 +30,7 @@ import io.qnop.entity.AnnotationType;
 import io.qnop.entity.AuditEvent;
 import io.qnop.entity.Comment;
 import io.qnop.entity.DocumentVersion;
+import io.qnop.repository.AnnotationCommentActivity;
 import io.qnop.repository.AnnotationCommentCount;
 import io.qnop.repository.AnnotationFirstComment;
 import io.qnop.repository.AnnotationPlacementRepository;
@@ -105,6 +106,7 @@ public class AnnotationService {
       String placementStatus,
       String firstComment,
       int commentCount,
+      Instant latestCommentFromOthersAt,
       Instant createdAt,
       Instant updatedAt) {}
 
@@ -167,7 +169,7 @@ public class AnnotationService {
             AUDIT_ANNOTATION_CREATED,
             author,
             "{\"annotationId\":\"" + annotation.getId() + "\"}"));
-    return view(annotation, placement, excerpt(firstComment), commentCount);
+    return view(annotation, placement, excerpt(firstComment), commentCount, null);
   }
 
   /**
@@ -203,6 +205,7 @@ public class AnnotationService {
                 .collect(toMap(AnnotationPlacement::getAnnotationId, placement -> placement));
     Map<UUID, Integer> threadSizeByAnnotation = threadSizes(documentAnnotations);
     Map<UUID, String> firstCommentByAnnotation = firstComments(documentAnnotations);
+    Map<UUID, Instant> foreignActivityByAnnotation = foreignActivity(documentAnnotations, actor);
     return documentAnnotations.stream()
         .map(
             annotation ->
@@ -210,7 +213,8 @@ public class AnnotationService {
                     annotation,
                     placementByAnnotation.get(annotation.getId()),
                     firstCommentByAnnotation.get(annotation.getId()),
-                    threadSizeByAnnotation.getOrDefault(annotation.getId(), 0)))
+                    threadSizeByAnnotation.getOrDefault(annotation.getId(), 0),
+                    foreignActivityByAnnotation.get(annotation.getId())))
         .filter(view -> placementStatus == null || placementStatus.equals(view.placementStatus()))
         .filter(view -> type == null || type.equals(view.type()))
         .toList();
@@ -244,7 +248,12 @@ public class AnnotationService {
             actor,
             "{\"annotationId\":\"%s\",\"type\":%s,\"priority\":%s}"
                 .formatted(annotationId, jsonString(type), jsonString(priority))));
-    return view(annotation, null, firstComment(annotationId), threadSize(annotationId));
+    return view(
+        annotation,
+        null,
+        firstComment(annotationId),
+        threadSize(annotationId),
+        foreignActivity(annotationId, actor));
   }
 
   private static String jsonString(String value) {
@@ -265,7 +274,12 @@ public class AnnotationService {
   public AnnotationView get(UUID annotationId, UUID actor, boolean admin) {
     Annotation annotation = requireAnnotation(annotationId);
     documentAccess.getDocument(annotation.getDocumentId(), actor, admin);
-    return view(annotation, null, firstComment(annotationId), threadSize(annotationId));
+    return view(
+        annotation,
+        null,
+        firstComment(annotationId),
+        threadSize(annotationId),
+        foreignActivity(annotationId, actor));
   }
 
   /**
@@ -276,7 +290,12 @@ public class AnnotationService {
   public AnnotationView decide(UUID annotationId, boolean accept, UUID actor) {
     AnnotationStatus decision = accept ? AnnotationStatus.ACCEPTED : AnnotationStatus.REJECTED;
     Annotation updated = workflow.decideAnnotation(annotationId, decision, actor);
-    return view(updated, null, firstComment(updated.getId()), threadSize(updated.getId()));
+    return view(
+        updated,
+        null,
+        firstComment(updated.getId()),
+        threadSize(updated.getId()),
+        foreignActivity(updated.getId(), actor));
   }
 
   /** Appends a comment to an annotation's thread; visible participants only. */
@@ -336,6 +355,25 @@ public class AnnotationService {
         .collect(toMap(AnnotationFirstComment::getAnnotationId, first -> excerpt(first.getBody())));
   }
 
+  /** The newest foreign comment time for one annotation (list uses the batched variant). */
+  private Instant foreignActivity(UUID annotationId, UUID viewer) {
+    return comments
+        .findFirstByAnnotationIdAndAuthorIdNotOrderByCreatedAtDesc(annotationId, viewer)
+        .map(Comment::getCreatedAt)
+        .orElse(null);
+  }
+
+  /** Newest foreign comment times for a batch of annotations in a single query (issue #307). */
+  private Map<UUID, Instant> foreignActivity(List<Annotation> forAnnotations, UUID viewer) {
+    if (forAnnotations.isEmpty()) {
+      return Map.of();
+    }
+    List<UUID> ids = forAnnotations.stream().map(Annotation::getId).toList();
+    return comments.latestForeignActivityByAnnotationIdIn(ids, viewer).stream()
+        .collect(
+            toMap(AnnotationCommentActivity::annotationId, AnnotationCommentActivity::latestAt));
+  }
+
   private static String excerpt(String body) {
     return body.length() <= FIRST_COMMENT_EXCERPT_CHARS
         ? body
@@ -343,7 +381,11 @@ public class AnnotationService {
   }
 
   private static AnnotationView view(
-      Annotation annotation, AnnotationPlacement placement, String firstComment, int commentCount) {
+      Annotation annotation,
+      AnnotationPlacement placement,
+      String firstComment,
+      int commentCount,
+      Instant latestCommentFromOthersAt) {
     return new AnnotationView(
         annotation.getId(),
         annotation.getDocumentId(),
@@ -355,6 +397,7 @@ public class AnnotationService {
         placement == null ? null : placement.getStatus().name(),
         firstComment,
         commentCount,
+        latestCommentFromOthersAt,
         annotation.getCreatedAt(),
         annotation.getUpdatedAt());
   }

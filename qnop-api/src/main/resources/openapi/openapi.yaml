@@ -1952,6 +1952,37 @@ paths:
                 $ref: '#/components/schemas/ErrorResponse'
         '401':
           $ref: '#/components/responses/Unauthorized'
+  /documents/{documentId}/visit:
+    post:
+      tags:
+        - Documents
+      summary: Record a visit of this review
+      description: |
+        Stamps the caller's personal last-visit time (issue #307) and returns
+        the PREVIOUS stamp — the client's baseline for the unseen markers.
+        The session keeps comparing against the returned value, so content
+        being read right now never flips to "seen" mid-session; the fresh
+        stamp takes effect on the next visit. Absent on the first visit.
+      operationId: recordVisit
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/DocumentIdParam'
+      responses:
+        '200':
+          description: The previous visit
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/VisitResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          description: Unknown document, or the caller is not a participant
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
   /documents/{documentId}/versions:
     get:
       tags:
@@ -4119,6 +4150,14 @@ components:
         - MOVED
         - ORPHANED
         - FAILED
+    VisitResponse:
+      type: object
+      description: The caller's previous visit of the review (issue #307).
+      properties:
+        previousSeenAt:
+          type: string
+          format: date-time
+          description: Absent on the first visit — nothing reads as new then.
     AnnotationType:
       type: string
       description: >-
@@ -4215,6 +4254,13 @@ components:
           description: >-
             Excerpt (first 300 characters) of the thread's opening comment —
             the annotation's de-facto title (issue #393).
+        latestCommentFromOthersAt:
+          type: string
+          format: date-time
+          description: >-
+            Newest comment time by authors other than the caller (issue #307)
+            — compared against the previous visit for the unseen markers.
+            Absent when the thread holds only the caller's own comments.
         commentCount:
           type: integer
           description: Number of comments in the thread.

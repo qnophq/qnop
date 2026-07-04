@@ -327,6 +327,34 @@ class AnnotationApiIT extends SeededIntegrationTest {
         .andExpect(jsonPath("$.annotations[0].firstComment").value("please clarify"));
   }
 
+  @Test
+  void tracksTheLatestCommentFromOthers() throws Exception {
+    UUID documentId = seedDocumentWithVersion();
+    String annotationId = createAnnotation(documentId, AUDITOR_ID);
+
+    // The author sees no foreign activity yet; the owner sees the author's opener.
+    mockMvc
+        .perform(as(get("/api/v1/annotations/" + annotationId), AUDITOR_ID))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.latestCommentFromOthersAt").doesNotExist());
+    mockMvc
+        .perform(as(get("/api/v1/documents/" + documentId + "/annotations"), MEMBER_ID))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.annotations[0].latestCommentFromOthersAt").exists());
+
+    // After the owner replies, the author sees foreign activity too (issue #307).
+    mockMvc
+        .perform(
+            as(post("/api/v1/annotations/" + annotationId + "/comments"), MEMBER_ID)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"body\":\"the owner weighs in\"}"))
+        .andExpect(status().isCreated());
+    mockMvc
+        .perform(as(get("/api/v1/annotations/" + annotationId), AUDITOR_ID))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.latestCommentFromOthersAt").exists());
+  }
+
   // --- classification: optional type & priority (issue #392) --------------------------------
 
   @Test

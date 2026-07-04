@@ -47,6 +47,7 @@ vi.mock('../../api/hooks/useAnnotations', () => ({
 }));
 vi.mock('../../api/hooks/useReviews', () => ({
   useParticipants: vi.fn(),
+  useRecordVisit: vi.fn().mockReturnValue(null),
 }));
 vi.mock('../../api/hooks/useComments', () => ({
   useComments: vi.fn().mockReturnValue({ isPending: true, isError: false, data: undefined }),

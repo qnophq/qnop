@@ -33,7 +33,7 @@ import ToggleButtonGroup from '@mui/material/ToggleButtonGroup';
 import { LayoutGrid, List as ListIcon, Search } from 'lucide-react';
 import { useAnnotations } from '../../api/hooks/useAnnotations';
 import { useDocument, useDocumentVersions } from '../../api/hooks/useDocuments';
-import { useParticipants } from '../../api/hooks/useReviews';
+import { useParticipants, useRecordVisit } from '../../api/hooks/useReviews';
 import { AdminToast } from '../../components/admin/layout/AdminToast';
 import { ReviewViewTabs } from '../../components/reviews/hub/ReviewViewTabs';
 import { PageHeader } from '../../components/admin/layout/PageHeader';
@@ -95,6 +95,8 @@ export function ReviewTasksPage() {
   const annotations = annotationsQuery.data?.annotations ?? [];
 
   const [view, setView] = useTasksViewMode();
+  // The unseen-marker baseline (issue #307): the PREVIOUS visit, stamped once.
+  const previousSeenAt = useRecordVisit(documentId);
   const filter = parseTaskFilter(searchParams.get('filter'));
   const query = searchParams.get('q') ?? '';
   const [openTaskId, setOpenTaskId] = useState<string | null>(null);
@@ -235,6 +237,7 @@ export function ReviewTasksPage() {
       ) : view === 'board' ? (
         <TaskBoard
           annotations={visible}
+          previousSeenAt={previousSeenAt}
           taskKeyOf={taskKeyOf}
           authorNameOf={authorNameOf}
           mayDecide={mayDecide}
@@ -252,6 +255,7 @@ export function ReviewTasksPage() {
 
       <TaskDrawer
         annotation={openTask}
+        previousSeenAt={previousSeenAt}
         taskKey={openTask ? taskKeyOf(openTask.id) : ''}
         authorName={openTask ? authorNameOf(openTask.authorId) : ''}
         ownerId={document.ownerId}

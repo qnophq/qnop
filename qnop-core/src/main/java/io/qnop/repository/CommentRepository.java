@@ -54,6 +54,22 @@ public interface CommentRepository extends JpaRepository<Comment, UUID> {
   /** The size of an annotation's thread (issue #247). */
   long countByAnnotationId(UUID annotationId);
 
+  /** The newest comment by someone other than {@code viewer} (issue #307), single annotation. */
+  Optional<Comment> findFirstByAnnotationIdAndAuthorIdNotOrderByCreatedAtDesc(
+      UUID annotationId, UUID viewer);
+
+  /**
+   * The newest foreign comment time per annotation in one aggregation (issue #307) — the unseen
+   * marker's input, batched like the thread sizes (#313). Annotations whose thread holds only the
+   * viewer's own comments are absent from the result.
+   */
+  @Query(
+      "SELECT new io.qnop.repository.AnnotationCommentActivity(c.annotationId, MAX(c.createdAt))"
+          + " FROM Comment c WHERE c.annotationId IN :annotationIds AND c.authorId <> :viewer"
+          + " GROUP BY c.annotationId")
+  List<AnnotationCommentActivity> latestForeignActivityByAnnotationIdIn(
+      @Param("annotationIds") Collection<UUID> annotationIds, @Param("viewer") UUID viewer);
+
   /**
    * Thread sizes for a set of annotations in one aggregation (issue #313) — annotations with no
    * comments are simply absent from the result, so the caller defaults them to 0.
