@@ -27,7 +27,7 @@ import { ArrowRight } from 'lucide-react';
 import type { DiffChange } from '../../../api/generated';
 import { DiffChangeType } from '../../../api/generated';
 import { tokens } from '../../../theme/tokens';
-import { CHANGE_KIND, changePageNumber, excerpt } from './diffModel';
+import { CHANGE_KIND, changeKey, changePageNumber, excerpt } from './diffModel';
 
 interface ChangeSummaryPanelProps {
   changes: DiffChange[];
@@ -83,7 +83,7 @@ export function ChangeSummaryPanel({
         const isChanged = change.type === DiffChangeType.Changed;
         return (
           <ButtonBase
-            key={index}
+            key={changeKey(change)}
             data-testid={`change-card-${index}`}
             onClick={() => onSelectChange(active ? null : index)}
             aria-pressed={active}

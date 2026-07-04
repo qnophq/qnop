@@ -23,6 +23,7 @@ import { describe, expect, it } from 'vitest';
 import type { DiffChange } from '../../../api/generated';
 import { DiffChangeType } from '../../../api/generated';
 import {
+  changeKey,
   changePageNumber,
   diffStats,
   excerpt,
@@ -103,6 +104,25 @@ describe('diffStats', () => {
 
   it('is empty for an empty diff', () => {
     expect(diffStats([])).toEqual({ addedWords: 0, removedWords: 0, pages: [] });
+  });
+});
+
+describe('changeKey', () => {
+  it('is stable for a change and distinct across changes at different locations', () => {
+    const a = change(DiffChangeType.Changed, [3], [2]);
+    const b = change(DiffChangeType.Deleted, [4], []);
+    expect(changeKey(a)).toBe(changeKey(a));
+    expect(changeKey(a)).not.toBe(changeKey(b));
+  });
+
+  it('anchors on the baseline location when there is no newer geometry', () => {
+    expect(changeKey(change(DiffChangeType.Deleted, [4], []))).toContain('4:');
+  });
+
+  it('falls back to the text when a change carries no geometry', () => {
+    const key = changeKey(change(DiffChangeType.Inserted, [], [], { toText: 'added' }));
+    expect(key).toContain('t:');
+    expect(key).toContain('added');
   });
 });
 

@@ -19,7 +19,7 @@
  * SPDX-License-Identifier: AGPL-3.0-only
  */
 
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import type { ReactNode } from 'react';
 import Box from '@mui/material/Box';
 import ButtonBase from '@mui/material/ButtonBase';
@@ -188,16 +188,24 @@ export function AnnotationPanel({
   const userId = useAuthStore((state) => state.userId);
   const { decideWith, isPending: deciding } = useDecideWithFeedback(notify);
 
-  const matchesFilter = (annotation: AnnotationView) =>
-    filter === 'all' ||
-    (filter === 'open'
-      ? annotation.status === AnnotationStatus.Open
-      : annotation.status !== AnnotationStatus.Open);
-
-  const sorted = [...annotations].sort(compareAnnotationsByPosition);
-  const placed = sorted.filter((annotation) => annotation.anchor && matchesFilter(annotation));
-  const unplaced = sorted.filter((annotation) => !annotation.anchor && matchesFilter(annotation));
-  const hiddenByFilter = annotations.length > 0 && placed.length + unplaced.length === 0;
+  // Sort + status-filter once per (annotations, filter) change, not on every
+  // render (e.g. a hover or selection): the list can be large and the sort is
+  // O(n log n) (issue #334).
+  const { placed, unplaced, hiddenByFilter } = useMemo(() => {
+    const matchesFilter = (annotation: AnnotationView) =>
+      filter === 'all' ||
+      (filter === 'open'
+        ? annotation.status === AnnotationStatus.Open
+        : annotation.status !== AnnotationStatus.Open);
+    const sorted = [...annotations].sort(compareAnnotationsByPosition);
+    const placedItems = sorted.filter((a) => a.anchor && matchesFilter(a));
+    const unplacedItems = sorted.filter((a) => !a.anchor && matchesFilter(a));
+    return {
+      placed: placedItems,
+      unplaced: unplacedItems,
+      hiddenByFilter: annotations.length > 0 && placedItems.length + unplacedItems.length === 0,
+    };
+  }, [annotations, filter]);
 
   const renderItem = (annotation: AnnotationView) => {
     const active = annotation.id === activeAnnotationId;
