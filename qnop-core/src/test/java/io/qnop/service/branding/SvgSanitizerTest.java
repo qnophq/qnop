@@ -67,6 +67,24 @@ class SvgSanitizerTest {
   }
 
   @Test
+  void stripsExternalXlinkHrefButKeepsTheAllowlistedElement() {
+    // The <use> element is allowlisted, so its xlink:href must be neutralized by the href logic
+    // itself (not by element removal): an external target is dropped, a #fragment survives (#338).
+    String out =
+        sanitize(
+            "<svg xmlns=\"http://www.w3.org/2000/svg\""
+                + " xmlns:xlink=\"http://www.w3.org/1999/xlink\" viewBox=\"0 0 10 10\">"
+                + "<use xlink:href=\"https://evil.example/x.svg#i\"/>"
+                + "<use href=\"https://evil.example/y.svg#j\"/>"
+                + "<use xlink:href=\"#safe\"/>"
+                + "</svg>");
+
+    assertFalse(out.toLowerCase(java.util.Locale.ROOT).contains("evil.example"), out);
+    assertTrue(out.contains("#safe"), out); // the local fragment reference survives
+    assertTrue(out.contains("<use"), out); // the allowlisted element itself is kept
+  }
+
+  @Test
   void rejectsDoctypeToBlockXxe() {
     String xxe =
         "<?xml version=\"1.0\"?>"
