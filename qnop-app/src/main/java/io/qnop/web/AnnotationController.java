@@ -39,7 +39,6 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.RestController;
 import tools.jackson.databind.ObjectMapper;
-import tools.jackson.databind.json.JsonMapper;
 
 /**
  * Annotations, comment threads and per-version placements (issue #247, ADR-0009/0011), implementing
@@ -51,13 +50,19 @@ import tools.jackson.databind.json.JsonMapper;
 @RestController
 public class AnnotationController implements AnnotationsApi {
 
-  // Jackson 3 (tools.jackson), matching the stack the document pipeline (de)serializes jsonb with.
-  private static final ObjectMapper MAPPER = JsonMapper.builder().build();
-
   private final AnnotationService annotations;
 
-  public AnnotationController(AnnotationService annotations) {
+  /**
+   * The framework-configured Jackson 3 mapper (issue #329): reusing Boot's MVC {@link ObjectMapper}
+   * — rather than a hand-built one — keeps the jsonb anchor round-trip byte-for-byte consistent
+   * with the HTTP (de)serialization of the same published models and inherits Boot's lenient
+   * defaults (e.g. tolerating unknown properties on a stored anchor).
+   */
+  private final ObjectMapper mapper;
+
+  public AnnotationController(AnnotationService annotations, ObjectMapper mapper) {
     this.annotations = annotations;
+    this.mapper = mapper;
   }
 
   @Override
@@ -69,7 +74,7 @@ public class AnnotationController implements AnnotationsApi {
             request.getVersionNumber(),
             CurrentUser.requireUserId(),
             CurrentUser.isAdmin(),
-            MAPPER.writeValueAsString(request.getAnchor()),
+            mapper.writeValueAsString(request.getAnchor()),
             request.getComment());
     return ResponseEntity.status(HttpStatus.CREATED).body(toDto(view));
   }
@@ -125,7 +130,7 @@ public class AnnotationController implements AnnotationsApi {
         .authorId(view.authorId())
         .status(AnnotationStatus.fromValue(view.status()))
         .anchor(
-            view.anchorJson() == null ? null : MAPPER.readValue(view.anchorJson(), Anchor.class))
+            view.anchorJson() == null ? null : mapper.readValue(view.anchorJson(), Anchor.class))
         .placementStatus(
             view.placementStatus() == null
                 ? null
