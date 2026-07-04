@@ -35,3 +35,18 @@ export function resolveEffectiveVersion(
   if (requestedVersion >= 1 && requestedVersion <= maxKnown) return requestedVersion;
   return maxKnown >= 1 ? maxKnown : undefined;
 }
+
+/**
+ * The version whose original bytes to fetch. Prefers the resolved version, but
+ * before any metadata query has settled it, an explicit `?version=` lets the
+ * heavy PDF download start in parallel with the document + version-list queries
+ * — a shared deep link's first paint no longer waits a round-trip for the
+ * metadata to validate the number (issue #332). An out-of-range URL simply
+ * corrects to the resolved version once known, discarding the eager 404.
+ */
+export function pdfFetchVersion(
+  resolvedVersion: number | undefined,
+  requestedVersion: number,
+): number | undefined {
+  return resolvedVersion ?? (requestedVersion >= 1 ? requestedVersion : undefined);
+}
