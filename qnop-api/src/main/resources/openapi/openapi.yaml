@@ -2445,7 +2445,20 @@ components:
         - ENTERPRISE
     SupportedFormat:
       type: string
-      description: A document format qnop can ingest and review.
+      description: |
+        A document format qnop can ingest and review. Each value maps to the MIME
+        type accepted by the multipart upload endpoints, enforced by server-side
+        magic-byte sniffing (the client-declared `Content-Type` is never trusted;
+        an unrecognized file is rejected with `415`):
+
+        - `PDF`  → `application/pdf` (magic `%PDF-`)
+        - `DOCX` → `application/vnd.openxmlformats-officedocument.wordprocessingml.document`
+        - `MD`   → `text/markdown`
+
+        `PDF`, `DOCX` and `MD` are the Community-scope document formats; further
+        formats are an Enterprise feature. A deployment reports the subset whose
+        extractor currently ships in `ServerConfig.supportedFormats` — `PDF` today,
+        with `DOCX` and Markdown to follow.
       enum:
         - PDF
         - DOCX
@@ -2570,7 +2583,15 @@ components:
           $ref: '#/components/schemas/ServerConfigUpload'
         supportedFormats:
           type: array
-          description: Document formats this server can ingest and review.
+          description: |
+            The document formats this deployment accepts for upload. Uploads go to
+            the multipart `POST /documents` and `POST /documents/{documentId}/versions`
+            endpoints (both `multipart/form-data`, deliberately outside this generated
+            JSON contract — ADR-0021/0028); the ingest pipeline validates the file by
+            magic-byte sniffing and rejects an unsupported type with `415`. Clients
+            should offer only these formats. It reflects the subset whose extractor
+            currently ships — `["PDF"]` today; the Community edition's `DOCX` and
+            Markdown support extends it once their extractors land.
           items:
             $ref: '#/components/schemas/SupportedFormat'
         branding:

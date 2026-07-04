@@ -89,6 +89,9 @@ class ConfigControllerTest {
         .andExpect(jsonPath("$.auth.oidcProviders").isArray())
         .andExpect(jsonPath("$.auth.oidcProviders").isEmpty())
         .andExpect(jsonPath("$.upload.maxDocumentSizeMb").value(50))
+        // Community ingests PDF only — the list must not advertise unsupported formats (issue
+        // #345).
+        .andExpect(jsonPath("$.supportedFormats.length()").value(1))
         .andExpect(jsonPath("$.supportedFormats[0]").value("PDF"))
         .andExpect(jsonPath("$.branding.logoLight.source").value("DEFAULT"))
         .andExpect(
