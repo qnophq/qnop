@@ -106,11 +106,30 @@ public class ApplicationSettingsService {
   }
 
   public int getInteger(ApplicationSettingKey key) {
-    return Integer.parseInt(snapshot.get().get(key).trim());
+    return parseIntSetting(key.getKey(), snapshot.get().get(key));
   }
 
   public boolean getBoolean(ApplicationSettingKey key) {
     return Boolean.parseBoolean(snapshot.get().get(key));
+  }
+
+  /**
+   * Parses an integer setting, failing with a clear, key-named message instead of an opaque {@link
+   * NullPointerException}/{@link NumberFormatException} when the value is absent, blank or
+   * non-numeric (issue #340). A null/blank value here means the key has no usable value (no row and
+   * no numeric default) — a configuration error the caller cannot recover from.
+   */
+  static int parseIntSetting(String keyName, String value) {
+    if (value == null || value.isBlank()) {
+      throw new IllegalStateException(
+          "Setting '" + keyName + "' has no value to read as an integer.");
+    }
+    try {
+      return Integer.parseInt(value.trim());
+    } catch (NumberFormatException e) {
+      throw new IllegalStateException(
+          "Setting '" + keyName + "' is not a valid integer: '" + value + "'.", e);
+    }
   }
 
   /** All settings with their (redacted) current values, for the admin API. */
