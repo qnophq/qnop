@@ -1284,11 +1284,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
         '429':
-          description: Too many registration attempts
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
+          $ref: '#/components/responses/TooManyRequests'
   /auth/verify-email:
     get:
       tags:
@@ -1338,11 +1334,7 @@ paths:
         '204':
           description: Request accepted (no content; outcome intentionally not disclosed)
         '429':
-          description: Too many reset requests
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
+          $ref: '#/components/responses/TooManyRequests'
   /auth/reset-password:
     post:
       tags:
@@ -1439,6 +1431,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
   /auth/logout:
     post:
       tags:
@@ -1505,6 +1499,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
   /users/me:
     get:
       tags:
