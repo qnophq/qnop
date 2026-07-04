@@ -457,6 +457,7 @@ export function DocumentReviewPage() {
                   canAnnotate={canAnnotate}
                   ownerId={document.ownerId}
                   notify={notify}
+                  readOnly={!isLatestVersion}
                 />
               </ErrorBoundary>
             </Box>
@@ -489,6 +490,7 @@ export function DocumentReviewPage() {
               canAnnotate={canAnnotate}
               ownerId={document.ownerId}
               notify={notify}
+              readOnly={!isLatestVersion}
             />
           </ErrorBoundary>
         </FocusDrawer>

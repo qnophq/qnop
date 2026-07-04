@@ -36,6 +36,7 @@ import {
 } from '../../api/hooks/useDocuments';
 import { useAnnotations, useCreateAnnotation } from '../../api/hooks/useAnnotations';
 import { usePdfDocument } from '../../components/reviews/viewer/usePdfDocument';
+import { useAuthStore } from '../../stores/authStore';
 
 vi.mock('../../api/hooks/useDocuments', () => ({
   useDocument: vi.fn(),
@@ -336,5 +337,33 @@ describe('DocumentReviewPage on an older version', () => {
     seedHappyPath();
     renderPage();
     expect(screen.queryByTestId('read-only-banner')).not.toBeInTheDocument();
+  });
+
+  // The page must pass readOnly down to the panel — the decision bar and the
+  // reply composer of an expanded thread are gated there, not in the page.
+  describe('expanded thread', () => {
+    afterEach(() => {
+      useAuthStore.setState({ userId: null });
+    });
+
+    it('is read-only on an older version', () => {
+      seedHappyPath();
+      useAuthStore.setState({ userId: 'u1' });
+      renderPage('/reviews/doc-1?version=1');
+
+      fireEvent.click(screen.getByTestId('annotation-item-a1'));
+      expect(screen.queryByTestId('decision-bar')).not.toBeInTheDocument();
+      expect(screen.queryByLabelText('Add a comment')).not.toBeInTheDocument();
+    });
+
+    it('stays writable on the latest version', () => {
+      seedHappyPath();
+      useAuthStore.setState({ userId: 'u1' });
+      renderPage('/reviews/doc-1?version=2');
+
+      fireEvent.click(screen.getByTestId('annotation-item-a1'));
+      expect(screen.getByTestId('decision-bar')).toBeInTheDocument();
+      expect(screen.getByLabelText('Add a comment')).toBeInTheDocument();
+    });
   });
 });
