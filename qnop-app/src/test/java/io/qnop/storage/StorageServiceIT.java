@@ -134,7 +134,9 @@ class StorageServiceIT extends AbstractIntegrationTest {
 
   @Test
   void getMissingKeyReturnsEmpty() {
-    assertThat(storage.get("sha256/zz/" + UUID.randomUUID())).isEmpty();
+    // A well-formed content-addressed key (issue #337) for content that was never staged: the
+    // all-zero SHA-256, so the shard matches its prefix and the read is a clean miss, not a reject.
+    assertThat(storage.get("sha256/00/" + "0".repeat(64))).isEmpty();
   }
 
   @Test
