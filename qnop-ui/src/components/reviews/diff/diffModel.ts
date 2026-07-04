@@ -97,6 +97,20 @@ export function changePageNumber(change: DiffChange): number | null {
   return location ? location.surfaceIndex + 1 : null;
 }
 
+/**
+ * A stable identity for a change within its (immutable) diff — a React list key
+ * that survives re-renders without leaning on the array index. Each change is a
+ * distinct contiguous region, so its type plus its anchor location's surface and
+ * box is unique; a change with no geometry falls back to its text.
+ */
+export function changeKey(change: DiffChange): string {
+  const location = change.toLocations[0] ?? change.fromLocations[0];
+  const where = location
+    ? `${location.surfaceIndex}:${location.box.x},${location.box.y},${location.box.width},${location.box.height}`
+    : `t:${change.fromText}>${change.toText}`;
+  return `${change.type}#${where}`;
+}
+
 /** Words in a text — the unit of the diff statistics. */
 export function wordCount(text: string): number {
   const trimmed = text.trim();
