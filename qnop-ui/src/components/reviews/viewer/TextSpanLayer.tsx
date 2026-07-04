@@ -137,6 +137,10 @@ export function TextSpanLayer({
     <Box
       ref={rootRef}
       data-testid={`text-layer-${surfaceIndex}`}
+      // Names the otherwise-generic selection surface for assistive tech (issue #341):
+      // the printed glyphs live in the canvas below, so this layer needs its own label.
+      role="group"
+      aria-label={`Selectable document text, page ${surfaceIndex + 1}`}
       onPointerDown={handlePointerDown}
       onPointerMove={handlePointerMove}
       onPointerUp={handlePointerUp}

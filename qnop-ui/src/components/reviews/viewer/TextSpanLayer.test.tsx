@@ -83,6 +83,12 @@ function renderLayer({ enabled = true } = {}) {
 }
 
 describe('TextSpanLayer', () => {
+  it('exposes an accessible label naming the page (issue #341)', () => {
+    renderLayer();
+
+    expect(layerAt()).toHaveAttribute('aria-label', 'Selectable document text, page 1');
+  });
+
   it('selects glyph-true via charAdvances — never the uniform grid', () => {
     const onTextSelected = renderLayer();
     const layer = layerAt();
