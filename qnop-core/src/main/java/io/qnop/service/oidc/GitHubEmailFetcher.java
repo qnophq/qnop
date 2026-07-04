@@ -20,11 +20,14 @@
  */
 package io.qnop.service.oidc;
 
+import io.qnop.service.http.HttpClientProperties;
+import java.net.http.HttpClient;
 import java.util.List;
 import java.util.Map;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.core.ParameterizedTypeReference;
+import org.springframework.http.client.JdkClientHttpRequestFactory;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestClient;
 
@@ -42,7 +45,23 @@ public class GitHubEmailFetcher {
       new ParameterizedTypeReference<>() {};
   private static final Logger log = LoggerFactory.getLogger(GitHubEmailFetcher.class);
 
-  private final RestClient restClient = RestClient.create();
+  private final RestClient restClient;
+
+  // Bound the outbound call (issue #342): RestClient.create() uses the JDK HTTP
+  // client with no default timeout, so a slow/hung GitHub response would pin the
+  // login thread. The configurable connect + read timeouts keep OIDC login responsive.
+  public GitHubEmailFetcher(HttpClientProperties httpClientProperties) {
+    this.restClient =
+        RestClient.builder().requestFactory(timedFactory(httpClientProperties)).build();
+  }
+
+  private static JdkClientHttpRequestFactory timedFactory(HttpClientProperties properties) {
+    JdkClientHttpRequestFactory factory =
+        new JdkClientHttpRequestFactory(
+            HttpClient.newBuilder().connectTimeout(properties.outboundConnectTimeout()).build());
+    factory.setReadTimeout(properties.outboundReadTimeout());
+    return factory;
+  }
 
   /** The primary verified email for the token's user, or {@code null} if none is available. */
   public String fetchPrimaryEmail(String accessToken) {
