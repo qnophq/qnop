@@ -19,7 +19,7 @@
  * SPDX-License-Identifier: AGPL-3.0-only
  */
 
-import { useCallback, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useParams, useSearchParams } from 'react-router-dom';
 import Alert from '@mui/material/Alert';
 import Box from '@mui/material/Box';
@@ -124,7 +124,17 @@ export function DocumentReviewPage() {
   const [zoom, setZoom] = useState(1);
   const [viewMode, setViewMode] = useViewMode();
   const [listOpen, setListOpen] = useState(false);
-  const [activeAnnotationId, setActiveAnnotationId] = useState<string | null>(null);
+  // Deep link from the tasks view (issue #393): ?annotation= seeds the active
+  // annotation once; the param is consumed so in-page selection owns the state.
+  const [activeAnnotationId, setActiveAnnotationId] = useState<string | null>(() =>
+    searchParams.get('annotation'),
+  );
+  useEffect(() => {
+    if (!searchParams.has('annotation')) return;
+    const next = new URLSearchParams(searchParams);
+    next.delete('annotation');
+    setSearchParams(next, { replace: true });
+  }, [searchParams, setSearchParams]);
   // Card↔mark linking (prototype): hovering either side lights up the other.
   const [hoverAnnotationId, setHoverAnnotationId] = useState<string | null>(null);
   const [currentPage, setCurrentPage] = useState(0);
@@ -335,6 +345,7 @@ export function DocumentReviewPage() {
                   ? `/reviews/${documentId}/compare`
                   : undefined
               }
+              tasksHref={`/reviews/${documentId}/tasks`}
               viewMode={viewMode}
               onViewModeChange={(mode) => {
                 setViewMode(mode);

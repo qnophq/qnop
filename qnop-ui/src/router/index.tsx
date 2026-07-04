@@ -63,6 +63,9 @@ const DocumentReviewPage = lazy(() =>
 const VersionComparePage = lazy(() =>
   import('../pages/reviews/VersionComparePage').then((m) => ({ default: m.VersionComparePage })),
 );
+const ReviewTasksPage = lazy(() =>
+  import('../pages/reviews/ReviewTasksPage').then((m) => ({ default: m.ReviewTasksPage })),
+);
 
 /**
  * Central route table. Public routes (login, errors) sit outside the shell;
@@ -103,6 +106,14 @@ export const router = createBrowserRouter([
         element: (
           <LazyBoundary>
             <VersionComparePage />
+          </LazyBoundary>
+        ),
+      },
+      {
+        path: 'reviews/:documentId/tasks',
+        element: (
+          <LazyBoundary>
+            <ReviewTasksPage />
           </LazyBoundary>
         ),
       },

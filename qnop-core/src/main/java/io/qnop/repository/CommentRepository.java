@@ -23,6 +23,7 @@ package io.qnop.repository;
 import io.qnop.entity.Comment;
 import java.util.Collection;
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
@@ -33,6 +34,22 @@ public interface CommentRepository extends JpaRepository<Comment, UUID> {
 
   /** The discussion thread of an annotation, oldest message first. */
   List<Comment> findByAnnotationIdOrderByCreatedAtAsc(UUID annotationId);
+
+  /** The opening message of an annotation's thread (issue #393); id breaks created_at ties. */
+  Optional<Comment> findFirstByAnnotationIdOrderByCreatedAtAscIdAsc(UUID annotationId);
+
+  /**
+   * The opening message per annotation in one query (issue #393) — the tasks view's card title,
+   * batched like the thread sizes (#313). Postgres {@code DISTINCT ON}; ties resolve by id.
+   */
+  @Query(
+      value =
+          "SELECT DISTINCT ON (annotation_id) annotation_id AS \"annotationId\", body"
+              + " FROM comment WHERE annotation_id IN (:annotationIds)"
+              + " ORDER BY annotation_id, created_at, id",
+      nativeQuery = true)
+  List<AnnotationFirstComment> findFirstByAnnotationIdIn(
+      @Param("annotationIds") Collection<UUID> annotationIds);
 
   /** The size of an annotation's thread (issue #247). */
   long countByAnnotationId(UUID annotationId);

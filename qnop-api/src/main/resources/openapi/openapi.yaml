@@ -4210,6 +4210,11 @@ components:
           $ref: '#/components/schemas/Anchor'
         placementStatus:
           $ref: '#/components/schemas/PlacementStatus'
+        firstComment:
+          type: string
+          description: >-
+            Excerpt (first 300 characters) of the thread's opening comment —
+            the annotation's de-facto title (issue #393).
         commentCount:
           type: integer
           description: Number of comments in the thread.

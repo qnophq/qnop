@@ -341,6 +341,16 @@ describe('DocumentReviewPage focus mode', () => {
 
 // Issue #306: mutating review activity is latest-only — older versions read as
 // an archive: banner + jump, annotation tools off, threads read-only.
+describe('DocumentReviewPage deep link', () => {
+  // The tasks view's "Show in document" (issue #393): ?annotation= seeds the
+  // active annotation once and is then consumed from the URL.
+  it('activates the annotation named by ?annotation=', () => {
+    seedHappyPath();
+    renderPage('/reviews/doc-1?annotation=a1');
+    expect(screen.getByTestId('annotation-item-a1')).toHaveAttribute('aria-expanded', 'true');
+  });
+});
+
 describe('DocumentReviewPage on an older version', () => {
   it('shows the read-only banner with a jump to the latest version', () => {
     seedHappyPath();

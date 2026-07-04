@@ -288,6 +288,45 @@ class AnnotationApiIT extends SeededIntegrationTest {
         .andExpect(status().isNotFound());
   }
 
+  @Test
+  void carriesTheFirstCommentExcerptEverywhere() throws Exception {
+    UUID documentId = seedDocumentWithVersion();
+
+    // The tasks view's card title (issue #393): the first comment rides along on the view.
+    String annotationId =
+        JsonPath.read(
+            mockMvc
+                .perform(
+                    as(post("/api/v1/documents/" + documentId + "/annotations"), AUDITOR_ID)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(
+                            "{\"versionNumber\":1,\"anchor\":"
+                                + ANCHOR
+                                + ",\"comment\":\"please clarify\"}"))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.firstComment").value("please clarify"))
+                .andReturn()
+                .getResponse()
+                .getContentAsString(),
+            "$.id");
+
+    // Later replies never displace it.
+    mockMvc
+        .perform(
+            as(post("/api/v1/annotations/" + annotationId + "/comments"), MEMBER_ID)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"body\":\"a later reply\"}"))
+        .andExpect(status().isCreated());
+    mockMvc
+        .perform(as(get("/api/v1/annotations/" + annotationId), MEMBER_ID))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.firstComment").value("please clarify"));
+    mockMvc
+        .perform(as(get("/api/v1/documents/" + documentId + "/annotations"), MEMBER_ID))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.annotations[0].firstComment").value("please clarify"));
+  }
+
   // --- classification: optional type & priority (issue #392) --------------------------------
 
   @Test
