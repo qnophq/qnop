@@ -25,7 +25,7 @@ import ButtonBase from '@mui/material/ButtonBase';
 import Stack from '@mui/material/Stack';
 import Tooltip from '@mui/material/Tooltip';
 import Typography from '@mui/material/Typography';
-import { alpha, keyframes, useTheme } from '@mui/material/styles';
+import { alpha, useTheme } from '@mui/material/styles';
 import { MessageSquare } from 'lucide-react';
 import type { AnnotationView } from '../../../api/generated';
 import { useComments } from '../../../api/hooks/useComments';
@@ -33,16 +33,10 @@ import { useAuthStore } from '../../../stores/authStore';
 import { ToneBadge } from '../../admin/ToneBadge';
 import { UserAvatar } from '../../shell/UserAvatar';
 import { hasNewComments, isUnseen } from '../newSince';
+import { tokens } from '../../../theme/tokens';
 import { PRIORITY_CUES, TYPE_CUES } from '../tasks/tasksModel';
-import { highlightColorFor } from '../viewer/markerColors';
 import { PlacementStatusChip } from './PlacementStatusChip';
 import { STATUS_CUES } from './statusCues';
-
-/** Gentle glow on the status rail while the card is linked to its hovered mark. */
-const railGlow = keyframes`
-  0%, 100% { box-shadow: 0 0 0 0 transparent; }
-  50% { box-shadow: 0 0 10px 2px var(--rail-glow); }
-`;
 
 /** Compact date for the head card's author line. */
 const DATE_FORMAT = new Intl.DateTimeFormat(undefined, {
@@ -113,9 +107,10 @@ interface AnnotationListItemProps {
  * icon, the quoted passage, thread size, page and the participants' avatar
  * stack — so a long review stays scannable. The active (clicked) annotation
  * grows into the detailed card with badges, placement cue and full quote; the
- * comment timeline follows below. The left rail always carries the colour the
- * mark paints with on the page, and hovering either side of the card↔mark
- * pair lights up the other.
+ * comment timeline follows below. Colour stays semantic (issue #403): the
+ * status speaks through icon, badge and the mark on the page; interaction —
+ * hover, the linked mark, the active card — speaks the brand blue in two
+ * quiet steps instead of a status rail with a pointer arrow.
  *
  * Memoized (issue #333): the panel re-renders on every hover/selection, but with stable props only
  * the two items whose {@code active}/{@code linked} actually changed re-render — not the whole list.
@@ -139,9 +134,6 @@ function AnnotationListItemBase({
   const region = annotation.anchor?.region;
   const statusCue = STATUS_CUES[annotation.status];
   const StatusIcon = statusCue.icon;
-  const railColor = annotation.anchor
-    ? highlightColorFor(annotation, theme.palette)
-    : theme.palette.divider;
 
   // Participants: the annotation author plus every commenter already known to
   // the cache (enabled: false never fetches — rows stay cheap; the stack
@@ -176,61 +168,23 @@ function AnnotationListItemBase({
         position: 'relative',
         borderRadius: 0.75,
         border: '1px solid',
-        borderColor: active ? theme.qnop.brand.blue : linked ? railColor : theme.palette.divider,
-        bgcolor: active
-          ? alpha(theme.qnop.brand.blue, 0.06)
-          : linked
-            ? alpha(railColor, 0.08)
-            : 'transparent',
-        pl: 2,
-        pr: 1.25,
+        // Two quiet steps of the interaction blue: hover tints the surface,
+        // the linked mark and the active card share the full accent — the
+        // card↔mark pair reads as one hovered thing, no arrow needed.
+        borderColor: active || linked ? theme.qnop.brand.blue : theme.palette.divider,
+        bgcolor: active || linked ? alpha(theme.qnop.brand.blue, 0.06) : 'transparent',
+        boxShadow: linked && theme.palette.mode === 'light' ? tokens.shadow.sm : 'none',
+        px: 1.25,
         py: active ? 1.25 : 0.75,
-        transition:
-          'border-color 120ms ease, background-color 120ms ease, transform 160ms ease, box-shadow 160ms ease',
+        transition: 'border-color 120ms ease, background-color 120ms ease, box-shadow 120ms ease',
         '@media (prefers-reduced-motion: reduce)': { transition: 'none' },
-        ...(linked && {
-          transform: 'translateX(-3px)',
-          boxShadow: `0 8px 22px -10px ${alpha(railColor, 0.8)}`,
-        }),
-        '&:hover': { borderColor: railColor },
+        '&:hover': {
+          borderColor: active ? theme.qnop.brand.blue : alpha(theme.qnop.brand.blue, 0.4),
+          bgcolor: active ? alpha(theme.qnop.brand.blue, 0.06) : theme.qnop.surface2,
+        },
         '&:focus-visible': { boxShadow: theme.qnop.focusRing },
       }}
     >
-      {/* Link arrow pointing at the document while the pair is hot (prototype). */}
-      {linked && (
-        <Box
-          aria-hidden
-          sx={{
-            position: 'absolute',
-            left: -7,
-            top: '50%',
-            transform: 'translateY(-50%)',
-            width: 0,
-            height: 0,
-            borderTop: '6px solid transparent',
-            borderBottom: '6px solid transparent',
-            borderRight: `7px solid ${railColor}`,
-          }}
-        />
-      )}
-      {/* Status rail — the same colour the mark paints with on the page. */}
-      <Box
-        aria-hidden
-        sx={{
-          position: 'absolute',
-          left: 0,
-          top: 8,
-          bottom: 8,
-          width: 3,
-          borderRadius: '0 3px 3px 0',
-          bgcolor: railColor,
-          opacity: linked || active ? 1 : 0.55,
-          transition: 'opacity 120ms ease',
-          '--rail-glow': alpha(railColor, 0.55),
-          ...(linked && { animation: `${railGlow} 1.1s ease-in-out infinite` }),
-          '@media (prefers-reduced-motion: reduce)': { animation: 'none', transition: 'none' },
-        }}
-      />
       {active ? (
         <Stack spacing={1} data-testid="annotation-head-card">
           <Stack direction="row" spacing={1} sx={{ alignItems: 'center', flexWrap: 'wrap' }}>
@@ -281,7 +235,7 @@ function AnnotationListItemBase({
             <Box
               sx={{
                 borderLeft: '3px solid',
-                borderColor: alpha(railColor, 0.6),
+                borderColor: 'divider',
                 bgcolor: theme.qnop.surface2,
                 borderRadius: '0 6px 6px 0',
                 px: 1.25,
