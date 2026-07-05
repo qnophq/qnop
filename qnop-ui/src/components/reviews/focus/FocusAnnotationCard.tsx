@@ -19,7 +19,8 @@
  * SPDX-License-Identifier: AGPL-3.0-only
  */
 
-import type { KeyboardEvent } from 'react';
+import { useRef, useState } from 'react';
+import type { KeyboardEvent, PointerEvent as ReactPointerEvent } from 'react';
 import Box from '@mui/material/Box';
 import Grow from '@mui/material/Grow';
 import IconButton from '@mui/material/IconButton';
@@ -36,8 +37,7 @@ import type { AnnotationView } from '../../../api/generated';
 import { AnnotationStatus } from '../../../api/generated';
 import { tokens } from '../../../theme/tokens';
 import type { Notify } from '../../admin/layout/useToast';
-import { ToneBadge } from '../../admin/ToneBadge';
-import { STATUS_CUES } from '../panel/statusCues';
+import { AnnotationHead } from '../panel/AnnotationHead';
 import { CommentThread } from '../panel/CommentThread';
 import { ResolveBar } from '../panel/ResolveBar';
 import {
@@ -46,7 +46,6 @@ import {
   useReopenWithFeedback,
   useResolveWithFeedback,
 } from '../panel/resolve';
-import { PlacementStatusChip } from '../panel/PlacementStatusChip';
 import type { WalkPosition } from './spotlightModel';
 
 interface FocusAnnotationCardProps {
@@ -74,10 +73,11 @@ function isTypingTarget(event: KeyboardEvent): boolean {
 }
 
 /**
- * Focus mode's floating discussion card (issue #291): everything the panel
- * card offers — status and placement cues, the quote, the author's Resolve
+ * Focus mode's floating discussion card (issue #291): the panel's expanded
+ * unit as a floating card — the shared AnnotationHead, the author's Resolve
  * bar, the full comment thread with its composer — next to the spotlit mark,
- * never over it.
+ * never over it (issue #403: same anatomy as the document view, no status
+ * rail, no pointer arrow).
  * Prev/Next (and ↑/↓ outside text fields) walk the annotations in document
  * order without closing; the walk position is announced politely. Focus is
  * trapped inside the card; Escape (and the close button) return it to the
@@ -99,8 +99,51 @@ export function FocusAnnotationCard({
   const reducedMotion = useMediaQuery('(prefers-reduced-motion: reduce)');
   const { resolveWith, isPending: resolving } = useResolveWithFeedback(notify);
   const { reopenWith } = useReopenWithFeedback(notify);
-  const statusCue = STATUS_CUES[annotation.status];
-  const quote = annotation.anchor?.textQuote?.quote;
+
+  // The card is draggable by its header (issue #403): the offset rides on
+  // top of the Popper's anchor position and resets when the walk moves to
+  // another annotation (the card snaps to the new mark, as expected).
+  const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
+  const [dragging, setDragging] = useState(false);
+  const dragStart = useRef({ pointerX: 0, pointerY: 0, x: 0, y: 0 });
+  const draggingRef = useRef(false);
+  const [lastAnnotationId, setLastAnnotationId] = useState(annotation.id);
+  if (annotation.id !== lastAnnotationId) {
+    setLastAnnotationId(annotation.id);
+    setDragOffset({ x: 0, y: 0 });
+  }
+
+  const handleDragStart = (event: ReactPointerEvent<HTMLDivElement>) => {
+    // The header's buttons keep their clicks; only the free area drags.
+    if (event.button !== 0 || (event.target as HTMLElement).closest('button')) return;
+    event.preventDefault();
+    dragStart.current = {
+      pointerX: event.clientX,
+      pointerY: event.clientY,
+      x: dragOffset.x,
+      y: dragOffset.y,
+    };
+    draggingRef.current = true;
+    setDragging(true);
+    try {
+      event.currentTarget.setPointerCapture(event.pointerId);
+    } catch {
+      // Synthetic pointer events (tests) have no active pointer to capture.
+    }
+  };
+
+  const handleDragMove = (event: ReactPointerEvent<HTMLDivElement>) => {
+    if (!draggingRef.current) return;
+    setDragOffset({
+      x: dragStart.current.x + (event.clientX - dragStart.current.pointerX),
+      y: dragStart.current.y + (event.clientY - dragStart.current.pointerY),
+    });
+  };
+
+  const handleDragEnd = () => {
+    draggingRef.current = false;
+    setDragging(false);
+  };
 
   const handleKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
     if (event.key === 'Escape') {
@@ -147,6 +190,7 @@ export function FocusAnnotationCard({
             variant="outlined"
             data-testid="focus-annotation-card"
             onKeyDown={handleKeyDown}
+            style={{ translate: `${dragOffset.x}px ${dragOffset.y}px` }}
             sx={{
               display: 'flex',
               position: 'relative',
@@ -159,36 +203,6 @@ export function FocusAnnotationCard({
               overflow: 'visible',
             }}
           >
-            {/* The prototype's card↔mark link cues: a status rail on the edge
-                facing the reader, and a pointer arrow toward the spotlit mark
-                (flips with the Popper placement). */}
-            <Box
-              aria-hidden
-              sx={{
-                position: 'absolute',
-                left: 0,
-                top: 10,
-                bottom: 10,
-                width: 3,
-                borderRadius: '0 3px 3px 0',
-                bgcolor: statusCue.color(theme),
-              }}
-            />
-            <Box
-              aria-hidden
-              data-testid="focus-card-arrow"
-              sx={{
-                position: 'absolute',
-                top: 16,
-                width: 0,
-                height: 0,
-                borderTop: '7px solid transparent',
-                borderBottom: '7px solid transparent',
-                ...(placement.startsWith('left')
-                  ? { right: -8, borderLeft: `8px solid ${statusCue.color(theme)}` }
-                  : { left: -8, borderRight: `8px solid ${statusCue.color(theme)}` }),
-              }}
-            />
             {/* Enforcement stays off: the card coexists with interactive marks
                 and the toolbar — clicking them must not yank focus (and the
                 window scroll) back into the card. Tab still cycles inside. */}
@@ -211,18 +225,28 @@ export function FocusAnnotationCard({
                   minWidth: 320,
                   maxWidth: 'min(640px, calc(100vw - 48px))',
                   minHeight: 220,
-                  maxHeight: 'min(72vh, 680px)',
+                  // Tall threads scroll inside; the card itself stays a
+                  // modest share of the screen (issue #403).
+                  maxHeight: 'min(55vh, 520px)',
                 }}
               >
                 <Stack
                   direction="row"
                   spacing={0.5}
+                  data-testid="focus-card-handle"
+                  onPointerDown={handleDragStart}
+                  onPointerMove={handleDragMove}
+                  onPointerUp={handleDragEnd}
+                  onPointerCancel={handleDragEnd}
                   sx={{
                     alignItems: 'center',
                     px: 1.5,
                     py: 1,
                     borderBottom: `1px solid ${theme.palette.divider}`,
                     flexShrink: 0,
+                    cursor: dragging ? 'grabbing' : 'grab',
+                    touchAction: 'none',
+                    userSelect: 'none',
                   }}
                 >
                   <Typography
@@ -272,48 +296,23 @@ export function FocusAnnotationCard({
                 </Stack>
 
                 <Box sx={{ px: 1.5, pt: 1.25, flexShrink: 0 }}>
-                  <Stack direction="row" spacing={0.75} sx={{ alignItems: 'center', mb: 0.75 }}>
-                    <ToneBadge tone={statusCue.tone} label={statusCue.label} />
-                    <PlacementStatusChip status={annotation.placementStatus} />
-                  </Stack>
-                  {quote && (
-                    <Typography
-                      variant="body2"
-                      color="text.secondary"
-                      sx={{
-                        fontStyle: 'italic',
-                        borderLeft: `2px solid ${theme.palette.divider}`,
-                        pl: 1,
-                        display: '-webkit-box',
-                        WebkitLineClamp: 3,
-                        WebkitBoxOrient: 'vertical',
-                        overflow: 'hidden',
-                      }}
-                    >
-                      {`“${quote}”`}
-                    </Typography>
-                  )}
-                  {/* The opening annotation text — the thread below carries
-                      only the replies (issue #403). */}
-                  {annotation.firstComment && (
-                    <Typography
-                      variant="body2"
-                      sx={{ mt: 0.75, whiteSpace: 'pre-wrap', overflowWrap: 'anywhere' }}
-                      data-testid="opening-text"
-                    >
-                      {annotation.firstComment}
-                    </Typography>
-                  )}
+                  {/* The same root post the panel's expanded card shows. */}
+                  <AnnotationHead annotation={annotation} />
                 </Box>
 
                 {!readOnly && mayResolveAnnotation(annotation, userId) && (
-                  <ResolveBar
-                    disabled={resolving}
-                    onResolve={(note) => resolveWith(annotation, note)}
-                  />
+                  // The bar's flush-right button is the panel's look; inside
+                  // the floating card it breathes like the left side does.
+                  <Box sx={{ pr: 2 }}>
+                    <ResolveBar
+                      disabled={resolving}
+                      onResolve={(note) => resolveWith(annotation, note)}
+                    />
+                  </Box>
                 )}
 
-                <Box sx={{ overflowY: 'auto', flex: 1, minHeight: 0, px: 0.5, pb: 0.5 }}>
+                {/* Same breathing room at the bottom as the head keeps at the top. */}
+                <Box sx={{ overflowY: 'auto', flex: 1, minHeight: 0, pl: 0.5, pr: 2, pb: 1.25 }}>
                   <CommentThread
                     annotationId={annotation.id}
                     notify={notify}
