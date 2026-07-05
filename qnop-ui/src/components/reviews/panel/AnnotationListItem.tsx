@@ -33,6 +33,7 @@ import { useAuthStore } from '../../../stores/authStore';
 import { ToneBadge } from '../../admin/ToneBadge';
 import { UserAvatar } from '../../shell/UserAvatar';
 import { hasNewComments, isUnseen } from '../newSince';
+import { PRIORITY_CUES, TYPE_CUES } from '../tasks/tasksModel';
 import { highlightColorFor } from '../viewer/markerColors';
 import { PlacementStatusChip } from './PlacementStatusChip';
 import { STATUS_CUES } from './statusCues';
@@ -42,6 +43,12 @@ const railGlow = keyframes`
   0%, 100% { box-shadow: 0 0 0 0 transparent; }
   50% { box-shadow: 0 0 10px 2px var(--rail-glow); }
 `;
+
+/** Compact date for the head card's author line. */
+const DATE_FORMAT = new Intl.DateTimeFormat(undefined, {
+  dateStyle: 'medium',
+  timeStyle: 'short',
+});
 
 /** Up to this many participant avatars stack in the collapsed row. */
 const MAX_AVATARS = 3;
@@ -123,6 +130,9 @@ function AnnotationListItemBase({
 }: AnnotationListItemProps) {
   const theme = useTheme();
   const viewerId = useAuthStore((state) => state.userId);
+  const selfDisplayName = useAuthStore((state) => state.displayName);
+  const avatarUrl = useAuthStore((state) => state.avatarUrl);
+  const userId = viewerId;
   const unseen = isUnseen(annotation, previousSeenAt, viewerId);
   const freshComments = hasNewComments(annotation, previousSeenAt);
   const quote = annotation.anchor?.textQuote?.quote;
@@ -137,6 +147,13 @@ function AnnotationListItemBase({
   // the cache (enabled: false never fetches — rows stay cheap; the stack
   // enriches once a thread has been opened or hover-prefetched).
   const cachedComments = useComments(annotation.id, false).data?.comments ?? [];
+  const typeCue = annotation.type ? TYPE_CUES[annotation.type] : null;
+  const TypeIcon = typeCue?.icon;
+  const priorityCue = annotation.priority ? PRIORITY_CUES[annotation.priority] : null;
+  // The opening annotation text: the full body once the thread is cached,
+  // the server-side excerpt as the placeholder until then.
+  const openerText = cachedComments[0]?.body ?? annotation.firstComment ?? null;
+  const authorName = annotation.authorId === userId ? (selfDisplayName ?? 'You') : 'Participant';
   const participantIds = [
     ...new Set([annotation.authorId, ...cachedComments.map((comment) => comment.authorId)]),
   ];
@@ -215,10 +232,35 @@ function AnnotationListItemBase({
         }}
       />
       {active ? (
-        <Stack spacing={0.75}>
+        <Stack spacing={1} data-testid="annotation-head-card">
           <Stack direction="row" spacing={1} sx={{ alignItems: 'center', flexWrap: 'wrap' }}>
             <ToneBadge tone={statusCue.tone} label={statusCue.label} />
             {unseen && <ToneBadge tone="blue" label="New" />}
+            {typeCue && TypeIcon && (
+              <Stack
+                direction="row"
+                spacing={0.5}
+                sx={{ alignItems: 'center', color: typeCue.color(theme) }}
+              >
+                <TypeIcon size={12} aria-hidden />
+                <Typography component="span" sx={{ fontSize: 11, fontWeight: 600 }}>
+                  {typeCue.label}
+                </Typography>
+              </Stack>
+            )}
+            {priorityCue && (
+              <Tooltip title={`${priorityCue.label} priority`}>
+                <Box
+                  sx={{
+                    width: 7,
+                    height: 7,
+                    borderRadius: '50%',
+                    bgcolor: priorityCue.color(theme),
+                    flexShrink: 0,
+                  }}
+                />
+              </Tooltip>
+            )}
             <PlacementStatusChip status={annotation.placementStatus} />
             <Stack
               direction="row"
@@ -234,25 +276,58 @@ function AnnotationListItemBase({
               </Stack>
             </Stack>
           </Stack>
+          {/* The anchored passage, styled as a real quotation. */}
           {quote ? (
-            <Typography
-              variant="body2"
+            <Box
               sx={{
-                fontStyle: 'italic',
-                color: 'text.secondary',
-                display: '-webkit-box',
-                WebkitLineClamp: 4,
-                WebkitBoxOrient: 'vertical',
-                overflow: 'hidden',
+                borderLeft: '3px solid',
+                borderColor: alpha(railColor, 0.6),
+                bgcolor: theme.qnop.surface2,
+                borderRadius: '0 6px 6px 0',
+                px: 1.25,
+                py: 0.75,
               }}
             >
-              “{quote}”
-            </Typography>
+              <Typography
+                variant="body2"
+                sx={{
+                  fontStyle: 'italic',
+                  color: 'text.secondary',
+                  display: '-webkit-box',
+                  WebkitLineClamp: 4,
+                  WebkitBoxOrient: 'vertical',
+                  overflow: 'hidden',
+                }}
+              >
+                “{quote}”
+              </Typography>
+            </Box>
           ) : (
             <Typography variant="body2" color="text.secondary">
               {fallbackLabel}
             </Typography>
           )}
+          {/* The opening annotation text — full body once the thread is cached,
+              the server's excerpt until then (issue #403). */}
+          {openerText && (
+            <Typography
+              variant="body2"
+              sx={{ whiteSpace: 'pre-wrap', overflowWrap: 'anywhere' }}
+              data-testid="opening-text"
+            >
+              {openerText}
+            </Typography>
+          )}
+          <Stack direction="row" spacing={0.75} sx={{ alignItems: 'center' }}>
+            <UserAvatar
+              name={authorName}
+              size={20}
+              imageUrl={annotation.authorId === userId ? avatarUrl : null}
+            />
+            <Typography variant="caption" color="text.secondary" noWrap>
+              {authorName} · {DATE_FORMAT.format(new Date(annotation.createdAt))}
+            </Typography>
+          </Stack>
         </Stack>
       ) : (
         <Stack direction="row" spacing={1} sx={{ alignItems: 'center', minWidth: 0 }}>

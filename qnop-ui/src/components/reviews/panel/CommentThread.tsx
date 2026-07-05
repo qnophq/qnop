@@ -47,6 +47,8 @@ interface CommentThreadProps {
   readOnly?: boolean;
   /** The previous visit (issue #307) — enables the "new" divider inside the thread. */
   previousSeenAt?: string | null;
+  /** True when the surrounding card already renders the opening annotation (issue #403). */
+  skipOpener?: boolean;
 }
 
 const TIME_FORMAT = new Intl.DateTimeFormat(undefined, {
@@ -67,6 +69,7 @@ export function CommentThread({
   notify,
   readOnly = false,
   previousSeenAt = null,
+  skipOpener = false,
 }: CommentThreadProps) {
   const theme = useTheme();
   const userId = useAuthStore((state) => state.userId);
@@ -86,7 +89,10 @@ export function CommentThread({
   };
 
   const comments = commentsQuery.data?.comments ?? [];
-  const firstNewCommentId = comments.find((comment) =>
+  // With the opening annotation living in the head card (issue #403), the
+  // timeline carries only the replies.
+  const visibleComments = skipOpener ? comments.slice(1) : comments;
+  const firstNewCommentId = visibleComments.find((comment) =>
     isNewComment(comment, previousSeenAt, userId),
   )?.id;
 
@@ -116,7 +122,7 @@ export function CommentThread({
             Could not load the comments.
           </Typography>
         )}
-        {comments.map((comment) => {
+        {visibleComments.map((comment) => {
           const own = comment.authorId === userId;
           const name = own ? (displayName ?? 'You') : 'Participant';
           return (
@@ -175,9 +181,9 @@ export function CommentThread({
             </Fragment>
           );
         })}
-        {!commentsQuery.isPending && !commentsQuery.isError && comments.length === 0 && (
+        {!commentsQuery.isPending && !commentsQuery.isError && visibleComments.length === 0 && (
           <Typography variant="body2" color="text.secondary" sx={{ pl: 4.5 }}>
-            No comments yet. Start the discussion.
+            {skipOpener ? 'No replies yet.' : 'No comments yet. Start the discussion.'}
           </Typography>
         )}
         {/* Composer continues the thread rail with the signed-in user's avatar.

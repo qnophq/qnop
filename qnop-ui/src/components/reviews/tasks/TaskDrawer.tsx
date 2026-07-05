@@ -187,6 +187,7 @@ export function TaskDrawer({
             annotationId={annotation.id}
             notify={notify}
             previousSeenAt={previousSeenAt}
+            skipOpener
           />
         </Box>
 

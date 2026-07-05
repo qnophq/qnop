@@ -29,7 +29,12 @@ import Stack from '@mui/material/Stack';
 import Typography from '@mui/material/Typography';
 import { useTheme } from '@mui/material/styles';
 import { ChevronRight, Link2, NotebookPen, Unlink } from 'lucide-react';
-import type { Anchor, AnnotationView } from '../../../api/generated';
+import type {
+  AnnotationPriority,
+  AnnotationType,
+  Anchor,
+  AnnotationView,
+} from '../../../api/generated';
 import { AnnotationStatus } from '../../../api/generated';
 import { useAuthStore } from '../../../stores/authStore';
 import type { Notify } from '../../admin/layout/useToast';
@@ -59,7 +64,7 @@ interface AnnotationPanelProps {
   /** The drawn-but-not-yet-created anchor; non-null opens the composer. */
   pendingAnchor: Anchor | null;
   creating: boolean;
-  onCreate: (comment: string) => void;
+  onCreate: (comment: string, type?: AnnotationType, priority?: AnnotationPriority) => void;
   onCancelPending: () => void;
   canAnnotate: boolean;
   /** The document owner — owner or author may decide an annotation (ADR-0011). */
@@ -247,6 +252,7 @@ export function AnnotationPanel({
             notify={notify}
             readOnly={readOnly}
             previousSeenAt={previousSeenAt}
+            skipOpener
           />
         </Collapse>
       </Stack>
