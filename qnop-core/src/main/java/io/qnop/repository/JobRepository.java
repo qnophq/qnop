@@ -22,6 +22,7 @@ package io.qnop.repository;
 
 import io.qnop.entity.Job;
 import io.qnop.entity.JobStatus;
+import java.time.Instant;
 import java.util.UUID;
 import org.springframework.data.jpa.repository.JpaRepository;
 
@@ -29,4 +30,11 @@ import org.springframework.data.jpa.repository.JpaRepository;
 public interface JobRepository extends JpaRepository<Job, UUID>, JobRepositoryCustom {
 
   long countByStatus(JobStatus status);
+
+  /**
+   * Jobs in {@code status} untouched since {@code updatedBefore} — used by the health indicator to
+   * count {@code RUNNING} jobs stranded past the stale threshold (a worker that died, or a wedged
+   * poller/reaper), issue #348.
+   */
+  long countByStatusAndUpdatedAtBefore(JobStatus status, Instant updatedBefore);
 }
