@@ -55,7 +55,7 @@ export function ReviewCards({ reviews, userId, onOpen }: ReviewCardsProps) {
         return (
           <ButtonBase
             key={review.id}
-            onClick={() => onOpen(review.id)}
+            onClick={() => onOpen(review.slug ?? review.id)}
             data-testid={`review-card-${review.id}`}
             sx={{
               display: 'flex',

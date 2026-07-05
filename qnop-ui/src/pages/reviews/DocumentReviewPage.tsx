@@ -49,6 +49,7 @@ import { BoundaryFallback } from '../../components/errors/BoundaryFallback';
 import { ErrorBoundary } from '../../components/errors/ErrorBoundary';
 import { ReviewHubHead } from '../../components/reviews/hub/ReviewHubHead';
 import { ReviewViewTabs } from '../../components/reviews/hub/ReviewViewTabs';
+import { useReviewDocumentId } from '../../components/reviews/reviewDocumentId';
 import { AnnotationPanel } from '../../components/reviews/panel/AnnotationPanel';
 import {
   DEFAULT_PANEL_FRACTION,
@@ -97,7 +98,10 @@ const LEGACY_PANEL_WIDTH_KEY = 'qnop-review-panel-width';
  * search param, defaulting to the latest.
  */
 export function DocumentReviewPage() {
-  const { documentId = '' } = useParams();
+  // The raw segment may be a slug (issue #411) — sibling links keep it, while
+  // all data access below uses the canonical id resolved by the route gate.
+  const { documentId: routeSegment = '' } = useParams();
+  const documentId = useReviewDocumentId();
   const [searchParams, setSearchParams] = useSearchParams();
   const { toast, notify, clear } = useToast();
   const userId = useAuthStore((s) => s.userId);
@@ -345,7 +349,7 @@ export function DocumentReviewPage() {
         }
       />
       <ReviewViewTabs
-        documentId={documentId}
+        documentId={routeSegment}
         active={focusMode ? 'focus' : 'document'}
         openTaskCount={annotations.filter((a) => columnOf(a) !== 'done').length}
         compareEnabled={

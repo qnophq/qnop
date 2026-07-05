@@ -20,7 +20,13 @@
  */
 
 import { describe, expect, it } from 'vitest';
-import { formatFileSize, titleFromFilename, validateDocumentFile } from './wizardModel';
+import {
+  formatFileSize,
+  suggestSlug,
+  titleFromFilename,
+  validateDocumentFile,
+  validateSlug,
+} from './wizardModel';
 
 function fileOf(name: string, type: string, sizeBytes: number): File {
   const file = new File(['x'], name, { type });
@@ -68,5 +74,54 @@ describe('formatFileSize', () => {
   it('formats kilobytes and never shows 0 KB for tiny files', () => {
     expect(formatFileSize(412 * 1024)).toBe('412 KB');
     expect(formatFileSize(3)).toBe('1 KB');
+  });
+});
+describe('suggestSlug', () => {
+  it('kebab-cases the title', () => {
+    expect(suggestSlug('NDA Acme Corp')).toBe('nda-acme-corp');
+  });
+
+  it('strips diacritics and collapses punctuation runs', () => {
+    expect(suggestSlug('Übergabe — Q3/2026 (final!)')).toBe('ubergabe-q3-2026-final');
+  });
+
+  it('trims leading and trailing separators', () => {
+    expect(suggestSlug('  --Hello World--  ')).toBe('hello-world');
+  });
+
+  it('caps at 64 characters without leaving a dangling hyphen', () => {
+    const suggested = suggestSlug(`${'a'.repeat(63)} tail`);
+    expect(suggested).toHaveLength(63);
+    expect(suggested.endsWith('-')).toBe(false);
+  });
+
+  it('returns empty for titles with no usable characters', () => {
+    expect(suggestSlug('!!! ???')).toBe('');
+  });
+});
+
+describe('validateSlug', () => {
+  it('accepts a kebab-case slug and the empty (optional) value', () => {
+    expect(validateSlug('nda-acme-corp')).toBeNull();
+    expect(validateSlug('')).toBeNull();
+  });
+
+  it('rejects out-of-range lengths', () => {
+    expect(validateSlug('ab')).toBe('The slug must be 3–64 characters long.');
+    expect(validateSlug('x'.repeat(65))).toBe('The slug must be 3–64 characters long.');
+  });
+
+  it('rejects uppercase, underscores, and hyphen runs', () => {
+    const message = 'Only lowercase letters, digits and single hyphens are allowed.';
+    expect(validateSlug('Nda-Acme')).toBe(message);
+    expect(validateSlug('has_underscore')).toBe(message);
+    expect(validateSlug('double--hyphen')).toBe(message);
+    expect(validateSlug('-leading')).toBe(message);
+  });
+
+  it('rejects UUID-shaped slugs, which would shadow id routes', () => {
+    expect(validateSlug('123e4567-e89b-12d3-a456-426614174000')).toBe(
+      'The slug must not look like a document id.',
+    );
   });
 });

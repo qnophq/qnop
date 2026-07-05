@@ -39,6 +39,7 @@ import { useAnnotations } from '../../api/hooks/useAnnotations';
 import { useVersionDiff, versionDiffErrorCode } from '../../api/hooks/useVersionDiff';
 import { PageHeader } from '../../components/admin/layout/PageHeader';
 import { ReviewViewTabs } from '../../components/reviews/hub/ReviewViewTabs';
+import { useReviewDocumentId } from '../../components/reviews/reviewDocumentId';
 import { ChangeSummaryPanel } from '../../components/reviews/diff/ChangeSummaryPanel';
 import { ComparePane } from '../../components/reviews/diff/ComparePane';
 import { CompareToolbar } from '../../components/reviews/diff/CompareToolbar';
@@ -56,7 +57,10 @@ import { formatDateTime } from '../../utils/formatDate';
  * invalid or missing parameters normalise to "previous ↔ latest".
  */
 export function VersionComparePage() {
-  const { documentId = '' } = useParams();
+  // The raw segment may be a slug (issue #411) — sibling links keep it, while
+  // all data access below uses the canonical id resolved by the route gate.
+  const { documentId: routeSegment = '' } = useParams();
+  const documentId = useReviewDocumentId();
   const [searchParams, setSearchParams] = useSearchParams();
 
   const documentQuery = useDocument(documentId);
@@ -159,7 +163,7 @@ export function VersionComparePage() {
         titleAdornment={<Chip size="small" variant="outlined" label="Compare versions" />}
       />
       <ReviewViewTabs
-        documentId={documentId}
+        documentId={routeSegment}
         active="compare"
         openTaskCount={openTaskCount}
         compareEnabled={readyNumbers.length >= 2}

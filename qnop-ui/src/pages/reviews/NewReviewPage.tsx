@@ -41,11 +41,13 @@ import { SummaryStep } from '../../components/reviews/wizard/SummaryStep';
 import type { SubmitPhase } from '../../components/reviews/wizard/SummaryStep';
 import { WizardStepsHeader } from '../../components/reviews/wizard/WizardStepsHeader';
 import {
+  suggestSlug,
   titleFromFilename,
   validateDocumentFile,
+  validateSlug,
 } from '../../components/reviews/wizard/wizardModel';
 import { useAuthStore } from '../../stores/authStore';
-import { apiErrorMessage } from '../../utils/apiError';
+import { apiErrorMessage, apiFieldErrors } from '../../utils/apiError';
 
 const STEPS = [{ label: 'Document' }, { label: 'Reviewers' }, { label: 'Summary & start' }];
 const FALLBACK_MAX_SIZE_MB = 50;
@@ -72,6 +74,9 @@ export function NewReviewPage() {
   const [file, setFile] = useState<File | null>(null);
   const [fileError, setFileError] = useState<string | null>(null);
   const [title, setTitle] = useState('');
+  const [slug, setSlug] = useState('');
+  const [slugTouched, setSlugTouched] = useState(false);
+  const [slugError, setSlugError] = useState<string | null>(null);
   const [reviewers, setReviewers] = useState<PrincipalView[]>([]);
   const [dueAt, setDueAt] = useState<string | null>(null);
   const [startImmediately, setStartImmediately] = useState(true);
@@ -79,6 +84,15 @@ export function NewReviewPage() {
 
   const maxSizeMb = config?.upload.maxDocumentSizeMb ?? FALLBACK_MAX_SIZE_MB;
   const isSubmitting = submit.phase !== 'idle';
+
+  // Until the user edits the slug themselves it mirrors the title (issue #411).
+  const handleTitleChange = (value: string) => {
+    setTitle(value);
+    if (!slugTouched) {
+      setSlug(suggestSlug(value));
+      setSlugError(null);
+    }
+  };
 
   const handleFilePicked = (picked: File) => {
     const error = validateDocumentFile(picked, maxSizeMb);
@@ -88,7 +102,15 @@ export function NewReviewPage() {
     }
     setFileError(null);
     setFile(picked);
-    if (title.trim() === '') setTitle(titleFromFilename(picked.name));
+    if (title.trim() === '') handleTitleChange(titleFromFilename(picked.name));
+  };
+
+  // Submit-then-validate (house pattern): typing only clears a stale error;
+  // the check runs when leaving step 1 and again server-side on create.
+  const handleSlugChange = (value: string) => {
+    setSlugTouched(value !== '');
+    setSlug(value);
+    setSlugError(null);
   };
 
   const addReviewer = (principal: PrincipalView) =>
@@ -100,8 +122,18 @@ export function NewReviewPage() {
 
   const canProceed = step !== 1 || (file !== null && title.trim() !== '');
 
+  const handleNext = () => {
+    if (step === 1) {
+      const error = validateSlug(slug.trim().toLowerCase());
+      setSlugError(error);
+      if (error) return;
+    }
+    setStep(step + 1);
+  };
+
   const handleCreate = async () => {
     if (!file) return;
+    const cleanSlug = slug.trim().toLowerCase();
     setSubmit({ ...SUBMIT_IDLE, phase: 'uploading' });
     let documentId: string;
     try {
@@ -109,10 +141,20 @@ export function NewReviewPage() {
         title: title.trim(),
         file,
         dueAt,
+        slug: cleanSlug || null,
         onProgress: (fraction) => setSubmit((s) => ({ ...s, progress: fraction })),
       });
       documentId = created.documentId;
     } catch (error) {
+      // A slug rejection (taken or malformed, issue #411) belongs on its field —
+      // jump back to step 1 so the user sees the offending input.
+      const slugFieldError = apiFieldErrors(error).slug;
+      if (slugFieldError) {
+        setSlugError(slugFieldError);
+        setSubmit(SUBMIT_IDLE);
+        setStep(1);
+        return;
+      }
       setSubmit({
         ...SUBMIT_IDLE,
         error: apiErrorMessage(error, 'The upload failed. Please try again.'),
@@ -153,7 +195,7 @@ export function NewReviewPage() {
       setSubmit({ ...SUBMIT_IDLE, partial: { documentId, failures } });
       return;
     }
-    navigate(`/reviews/${documentId}`);
+    navigate(`/reviews/${cleanSlug || documentId}`);
   };
 
   if (submit.partial) {
@@ -193,10 +235,13 @@ export function NewReviewPage() {
             file={file}
             title={title}
             fileError={fileError}
+            slug={slug}
+            slugError={slugError}
             maxSizeMb={maxSizeMb}
             onFilePicked={handleFilePicked}
             onFileCleared={() => setFile(null)}
-            onTitleChange={setTitle}
+            onTitleChange={handleTitleChange}
+            onSlugChange={handleSlugChange}
           />
         )}
         {step === 2 && (
@@ -239,7 +284,7 @@ export function NewReviewPage() {
             variant="contained"
             endIcon={<ChevronRight size={16} />}
             disabled={!canProceed}
-            onClick={() => setStep(step + 1)}
+            onClick={handleNext}
           >
             Next
           </Button>

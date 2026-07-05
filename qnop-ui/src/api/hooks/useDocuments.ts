@@ -19,7 +19,7 @@
  * SPDX-License-Identifier: AGPL-3.0-only
  */
 
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import type {
   DocumentResponse,
   DocumentVersionListResponse,
@@ -34,6 +34,7 @@ const EXTRACTION_POLL_MS = 2500;
 export const documentKeys = {
   all: ['documents'] as const,
   detail: (documentId: string) => [...documentKeys.all, 'detail', documentId] as const,
+  bySlug: (slug: string) => [...documentKeys.all, 'by-slug', slug] as const,
   versions: (documentId: string) => [...documentKeys.all, 'versions', documentId] as const,
   rendered: (documentId: string, versionNumber: number) =>
     [...documentKeys.all, 'rendered', documentId, versionNumber] as const,
@@ -49,6 +50,25 @@ export function useDocument(documentId: string) {
       const response = await documentsApi.getDocument({ documentId });
       return response.data;
     },
+  });
+}
+
+/**
+ * Resolves a review by its human-readable slug (issue #411). Seeds the detail
+ * cache with the response so the page's `useDocument` renders without a second
+ * round-trip. Slugs are immutable, so a resolved mapping stays fresh.
+ */
+export function useDocumentBySlug(slug: string, enabled: boolean) {
+  const queryClient = useQueryClient();
+  return useQuery<DocumentResponse>({
+    queryKey: documentKeys.bySlug(slug),
+    queryFn: async () => {
+      const response = await documentsApi.getDocumentBySlug({ slug });
+      queryClient.setQueryData(documentKeys.detail(response.data.id), response.data);
+      return response.data;
+    },
+    enabled,
+    staleTime: Infinity,
   });
 }
 
