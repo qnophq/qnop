@@ -333,6 +333,7 @@ export function DocumentReviewPage() {
         action={
           <ReviewHubHead
             documentId={documentId}
+            ownerId={document.ownerId}
             isOwner={document.ownerId === userId}
             ownUserId={userId}
             annotations={annotations}
@@ -527,6 +528,7 @@ export function DocumentReviewPage() {
           >
             <AnnotationPanel
               documentId={documentId}
+              frameless
               annotations={annotations}
               activeAnnotationId={activeAnnotationId}
               hoverAnnotationId={hoverAnnotationId}

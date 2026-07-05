@@ -33,6 +33,7 @@ import type {
 import { AnnotationStatus, ParticipantKind, PlacementStatus } from '../../../api/generated';
 import { buildTheme } from '../../../theme/theme';
 import { axiosInstance, documentsApi, reviewWorkflowApi } from '../../../api/config';
+import { useAuthStore } from '../../../stores/authStore';
 import { ReviewHubHead } from './ReviewHubHead';
 
 vi.mock('../../../api/config', () => ({
@@ -103,6 +104,7 @@ function renderHub({
   return render(
     <ReviewHubHead
       documentId={DOC_ID}
+      ownerId={isOwner ? ME : 'owner-far-away'}
       isOwner={isOwner}
       ownUserId={ME}
       annotations={annotations}
@@ -127,6 +129,15 @@ beforeEach(() => {
     data: PARTICIPANTS,
   } as Awaited<ReturnType<typeof documentsApi.listParticipants>>);
   mockWorkflow({ state: 'IN_REVIEW', allowedTransitions: ['FINALIZED', 'CANCELLED'] });
+});
+
+describe('ReviewHubHead — owner', () => {
+  it('shows the owner prominently, resolved as self by display name', () => {
+    useAuthStore.setState({ userId: ME, displayName: 'Paula Owner' });
+    renderHub();
+    expect(screen.getByTestId('review-owner')).toHaveTextContent('Owner');
+    expect(screen.getByTestId('review-owner')).toHaveTextContent('Paula Owner');
+  });
 });
 
 describe('ReviewHubHead — progress & participants', () => {
