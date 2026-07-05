@@ -102,7 +102,11 @@ export function ReviewerStep({ selected, ownUserId, onAdd, onRemove }: ReviewerS
                     <Users size={12} aria-hidden />
                   </Box>
                 ) : (
-                  <UserAvatar name={principal.displayName} size={22} />
+                  <UserAvatar
+                    name={principal.displayName}
+                    size={22}
+                    imageUrl={principal.avatarUrl}
+                  />
                 )}
                 <Typography variant="body2" sx={{ fontSize: 12.5, fontWeight: 500 }}>
                   {principal.displayName}
@@ -140,10 +144,14 @@ export function ReviewerStep({ selected, ownUserId, onAdd, onRemove }: ReviewerS
           }}
         />
         <Box
+          data-testid="principal-list"
           sx={{
             border: `1px solid ${theme.palette.divider}`,
             borderRadius: 2,
-            overflow: 'hidden',
+            // The directory can be long (issue #292) — cap the list to roughly
+            // seven rows and let it scroll instead of stretching the wizard.
+            maxHeight: 'min(48vh, 384px)',
+            overflowY: 'auto',
           }}
         >
           {candidates.length === 0 ? (
@@ -187,7 +195,11 @@ export function ReviewerStep({ selected, ownUserId, onAdd, onRemove }: ReviewerS
                     <Users size={14} aria-hidden />
                   </Box>
                 ) : (
-                  <UserAvatar name={principal.displayName} size={28} />
+                  <UserAvatar
+                    name={principal.displayName}
+                    size={28}
+                    imageUrl={principal.avatarUrl}
+                  />
                 )}
                 <Box sx={{ flex: 1, minWidth: 0 }}>
                   <Typography variant="body2" noWrap sx={{ fontWeight: 500 }}>

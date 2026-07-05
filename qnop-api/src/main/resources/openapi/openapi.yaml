@@ -3986,6 +3986,13 @@ components:
           $ref: '#/components/schemas/ParticipantKind'
         displayName:
           type: string
+        avatarUrl:
+          type: string
+          nullable: true
+          description: |
+            URL of the user's profile picture (with a cache-busting `?v=` token);
+            null for teams and for users without one — the UI then renders the
+            initials avatar (or the team glyph).
       required:
         - id
         - kind

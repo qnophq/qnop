@@ -267,7 +267,12 @@ class DocumentOverviewApiIT extends SeededIntegrationTest {
     mockMvc
         .perform(as(get("/api/v1/principals?q=alpha"), MEMBER2_ID))
         .andExpect(status().isOk())
-        .andExpect(jsonPath("$.principals[?(@.displayName == 'Alpha')].kind").value("TEAM"));
+        .andExpect(jsonPath("$.principals[?(@.displayName == 'Alpha')].kind").value("TEAM"))
+        // Teams (and users without a profile picture) carry a null avatarUrl.
+        .andExpect(
+            jsonPath(
+                "$.principals[?(@.displayName == 'Alpha')].avatarUrl",
+                org.hamcrest.Matchers.contains(org.hamcrest.Matchers.nullValue())));
   }
 
   @Test
