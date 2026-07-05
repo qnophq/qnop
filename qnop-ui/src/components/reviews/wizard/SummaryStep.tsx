@@ -21,13 +21,34 @@
 
 import Box from '@mui/material/Box';
 import LinearProgress from '@mui/material/LinearProgress';
+import MenuItem from '@mui/material/MenuItem';
 import Stack from '@mui/material/Stack';
 import Switch from '@mui/material/Switch';
+import TextField from '@mui/material/TextField';
 import Typography from '@mui/material/Typography';
 import { useTheme } from '@mui/material/styles';
 import { EyeOff, FileText, Play, Users } from 'lucide-react';
 import type { PrincipalView } from '../../../api/generated';
-import { ParticipantKind } from '../../../api/generated';
+import { ParticipantKind, ThreadParticipation } from '../../../api/generated';
+
+/** The three thread-participation levels with a one-line explanation each (issue #413). */
+const PARTICIPATION_OPTIONS: { value: ThreadParticipation; label: string; hint: string }[] = [
+  {
+    value: ThreadParticipation.Open,
+    label: 'Open discussion',
+    hint: 'Every reviewer can read and reply to any thread.',
+  },
+  {
+    value: ThreadParticipation.ReadOnly,
+    label: 'Read-only threads',
+    hint: 'Everyone sees every thread, but only its author and the owner may reply.',
+  },
+  {
+    value: ThreadParticipation.Private,
+    label: 'Private threads',
+    hint: 'Reviewers see only their own threads; the owner sees all.',
+  },
+];
 import { DueDatePicker } from '../DueDatePicker';
 import { UserAvatar } from '../../shell/UserAvatar';
 import { formatFileSize } from './wizardModel';
@@ -45,6 +66,9 @@ interface SummaryStepProps {
   /** Anonymous review (issue #413): hides reviewer identities behind pseudonyms. */
   anonymous: boolean;
   onAnonymousChange: (value: boolean) => void;
+  /** Thread participation policy (issue #413): who may see and reply to a thread. */
+  threadParticipation: ThreadParticipation;
+  onThreadParticipationChange: (value: ThreadParticipation) => void;
   phase: SubmitPhase;
   /** Upload progress 0..1, meaningful while phase is `uploading`. */
   progress: number;
@@ -82,11 +106,16 @@ export function SummaryStep({
   onStartImmediatelyChange,
   anonymous,
   onAnonymousChange,
+  threadParticipation,
+  onThreadParticipationChange,
   phase,
   progress,
 }: SummaryStepProps) {
   const theme = useTheme();
   const isSubmitting = phase !== 'idle';
+  const participationHint = PARTICIPATION_OPTIONS.find(
+    (option) => option.value === threadParticipation,
+  )?.hint;
 
   return (
     <Stack spacing={3}>
@@ -204,6 +233,28 @@ export function SummaryStep({
           slotProps={{ input: { 'aria-label': 'Anonymous review' } }}
         />
       </Stack>
+
+      {/* Thread participation policy (issue #413): fixed at creation. */}
+      <SummaryRow label="Thread participation">
+        <TextField
+          select
+          fullWidth
+          size="small"
+          value={threadParticipation}
+          disabled={isSubmitting}
+          onChange={(event) =>
+            onThreadParticipationChange(event.target.value as ThreadParticipation)
+          }
+          helperText={`${participationHint} Can't be changed later.`}
+          slotProps={{ htmlInput: { 'aria-label': 'Thread participation' } }}
+        >
+          {PARTICIPATION_OPTIONS.map((option) => (
+            <MenuItem key={option.value} value={option.value}>
+              {option.label}
+            </MenuItem>
+          ))}
+        </TextField>
+      </SummaryRow>
 
       <Stack
         component="label"

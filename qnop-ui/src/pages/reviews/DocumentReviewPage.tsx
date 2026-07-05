@@ -502,6 +502,8 @@ export function DocumentReviewPage() {
               >
                 <AnnotationPanel
                   anonymous={document.anonymous ?? false}
+                  threadParticipation={document.threadParticipation ?? 'OPEN'}
+                  ownerId={document.ownerId}
                   annotations={annotations}
                   activeAnnotationId={activeAnnotationId}
                   hoverAnnotationId={hoverAnnotationId}
@@ -532,6 +534,8 @@ export function DocumentReviewPage() {
           >
             <AnnotationPanel
               anonymous={document.anonymous ?? false}
+              threadParticipation={document.threadParticipation ?? 'OPEN'}
+              ownerId={document.ownerId}
               frameless
               annotations={annotations}
               activeAnnotationId={activeAnnotationId}
@@ -562,6 +566,8 @@ export function DocumentReviewPage() {
           notify={notify}
           readOnly={!isLatestVersion}
           reviewClosed={!isOpenWorkflowState(document.workflowState)}
+          threadParticipation={document.threadParticipation ?? 'OPEN'}
+          ownerId={document.ownerId}
           previousSeenAt={previousSeenAt}
         />
       )}

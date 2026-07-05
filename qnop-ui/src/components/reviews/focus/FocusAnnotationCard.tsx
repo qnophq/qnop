@@ -62,6 +62,10 @@ interface FocusAnnotationCardProps {
   readOnly?: boolean;
   /** True once the review is FINALIZED/CANCELLED (issue #394): no reopening. */
   reviewClosed?: boolean;
+  /** Thread participation policy (issue #413) — READ_ONLY suppresses foreign composers. */
+  threadParticipation?: string;
+  /** The review owner (issue #413) — the owner may always comment under any policy. */
+  ownerId?: string;
   /** The previous visit (issue #307) — enables the thread's "new" divider. */
   previousSeenAt?: string | null;
 }
@@ -93,10 +97,17 @@ export function FocusAnnotationCard({
   notify,
   readOnly = false,
   reviewClosed = false,
+  threadParticipation = 'OPEN',
+  ownerId,
   previousSeenAt = null,
 }: FocusAnnotationCardProps) {
   const theme = useTheme();
   const reducedMotion = useMediaQuery('(prefers-reduced-motion: reduce)');
+  // READ_ONLY policy (issue #413): only the author and the owner may reply.
+  const policyReadOnly =
+    threadParticipation !== 'OPEN' &&
+    annotation.authorId !== userId &&
+    !(ownerId != null && userId === ownerId);
   const { resolveWith, isPending: resolving } = useResolveWithFeedback(notify);
   const { reopenWith } = useReopenWithFeedback(notify);
 
@@ -317,6 +328,7 @@ export function FocusAnnotationCard({
                     annotationId={annotation.id}
                     notify={notify}
                     readOnly={readOnly}
+                    policyReadOnly={policyReadOnly}
                     closed={annotation.status !== AnnotationStatus.Open}
                     onReopen={
                       !readOnly && !reviewClosed && mayReopenAnnotation(annotation, userId)

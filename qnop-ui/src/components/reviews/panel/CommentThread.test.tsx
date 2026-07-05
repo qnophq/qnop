@@ -162,6 +162,23 @@ describe('CommentThread', () => {
     expect(screen.getByText(/No comments yet/)).toBeInTheDocument();
   });
 
+  it('replaces the composer with a read-only note under a READ_ONLY policy (issue #413)', () => {
+    vi.mocked(useComments).mockReturnValue({
+      isPending: false,
+      isError: false,
+      data: { comments: [] },
+    } as unknown as ReturnType<typeof useComments>);
+
+    render(
+      <ThemeProvider theme={buildTheme('light')}>
+        <CommentThread annotationId="a1" notify={vi.fn()} policyReadOnly />
+      </ThemeProvider>,
+    );
+
+    expect(screen.getByTestId('thread-policy-readonly-note')).toBeInTheDocument();
+    expect(screen.queryByLabelText('Add a comment')).not.toBeInTheDocument();
+  });
+
   it('submits a trimmed comment and blocks empty drafts', () => {
     vi.mocked(useComments).mockReturnValue({
       isPending: false,
