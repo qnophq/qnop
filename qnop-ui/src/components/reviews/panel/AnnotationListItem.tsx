@@ -34,7 +34,6 @@ import { ToneBadge } from '../../admin/ToneBadge';
 import { UserAvatar } from '../../shell/UserAvatar';
 import { shortRelativeTime } from '../../../utils/relativeTime';
 import { hasNewComments, isUnseen } from '../newSince';
-import { tokens } from '../../../theme/tokens';
 import { PRIORITY_CUES, TYPE_CUES } from '../tasks/tasksModel';
 import { PlacementStatusChip } from './PlacementStatusChip';
 import { STATUS_CUES } from './statusCues';
