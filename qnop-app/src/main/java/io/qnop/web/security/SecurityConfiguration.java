@@ -257,7 +257,10 @@ public class SecurityConfiguration {
     CorsConfiguration config = new CorsConfiguration();
     config.setAllowedOrigins(properties.cors().allowedOrigins());
     config.setAllowedMethods(List.of("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
-    config.setAllowedHeaders(List.of("*"));
+    // Explicit headers, not "*": the CORS spec forbids the wildcard together with
+    // allowCredentials=true, so browsers reject "*" for credentialed requests (issue #336).
+    // These cover the SPA's calls: JSON bodies, the Bearer token, and the CSRF header.
+    config.setAllowedHeaders(List.of("Content-Type", "Authorization", "X-XSRF-TOKEN"));
     config.setAllowCredentials(true);
     config.setMaxAge(3_600L);
     UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
