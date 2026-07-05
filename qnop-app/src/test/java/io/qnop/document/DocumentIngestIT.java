@@ -150,7 +150,32 @@ class DocumentIngestIT extends AbstractIntegrationTest {
         .perform(get("/api/v1/documents/{id}", documentId).with(asUser(owner)))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.title").value("Ingest IT"))
-        .andExpect(jsonPath("$.latestVersionNumber").value(1));
+        .andExpect(jsonPath("$.latestVersionNumber").value(1))
+        // Defaults to a non-anonymous review (issue #413).
+        .andExpect(jsonPath("$.anonymous").value(false));
+  }
+
+  @Test
+  @DisplayName("the anonymous form field is persisted and echoed on the document metadata (#413)")
+  void createRespectsTheAnonymousFlag() throws Exception {
+    UUID owner = createUser();
+
+    MvcResult upload =
+        mockMvc
+            .perform(
+                multipart("/api/v1/documents")
+                    .file(pdfFile(pdf("anon")))
+                    .param("title", "Anon review")
+                    .param("anonymous", "true")
+                    .with(asUser(owner)))
+            .andExpect(status().isCreated())
+            .andReturn();
+    UUID documentId = documentIdOf(upload);
+
+    mockMvc
+        .perform(get("/api/v1/documents/{id}", documentId).with(asUser(owner)))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.anonymous").value(true));
   }
 
   @Test

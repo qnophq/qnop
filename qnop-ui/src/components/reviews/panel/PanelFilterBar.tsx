@@ -67,10 +67,12 @@ export interface FilterAuthor {
 interface PanelFilterBarProps {
   filters: AnnotationFilters;
   onChange: (filters: AnnotationFilters) => void;
-  /** Distinct annotation authors, names resolved where the directory knows them. */
+  /** Distinct annotation authors, names resolved server-side (empty in anonymous reviews). */
   authors: FilterAuthor[];
   /** Hide the status facet — the tasks view speaks status through its column chips. */
   statusFacet?: boolean;
+  /** Hide the author facet — an anonymous review has no meaningful author filter (issue #413). */
+  authorFacet?: boolean;
   /** The search field's placeholder and accessible name. */
   searchLabel?: string;
 }
@@ -88,6 +90,7 @@ export function PanelFilterBar({
   onChange,
   authors,
   statusFacet = true,
+  authorFacet = true,
   searchLabel = 'Search annotations',
 }: PanelFilterBarProps) {
   const theme = useTheme();
@@ -177,7 +180,7 @@ export function PanelFilterBar({
                   sx={PILL_SX}
                 />
               )}
-              {filters.author !== null && (
+              {authorFacet && filters.author !== null && (
                 <Chip
                   size="small"
                   icon={<UserAvatar name={nameOf(filters.author)} size={14} imageUrl={null} />}
@@ -299,25 +302,27 @@ export function PanelFilterBar({
               );
             })}
           </TextField>
-          <TextField
-            select
-            size="small"
-            label="Author"
-            value={filters.author ?? ''}
-            onChange={(event) => set({ author: event.target.value || null })}
-          >
-            <MenuItem value="">Anyone</MenuItem>
-            {authors.map((author) => (
-              <MenuItem key={author.id} value={author.id}>
-                <Stack direction="row" spacing={0.75} sx={{ alignItems: 'center' }}>
-                  <UserAvatar name={author.name} size={18} imageUrl={null} />
-                  <Typography component="span" variant="body2">
-                    {author.name}
-                  </Typography>
-                </Stack>
-              </MenuItem>
-            ))}
-          </TextField>
+          {authorFacet && (
+            <TextField
+              select
+              size="small"
+              label="Author"
+              value={filters.author ?? ''}
+              onChange={(event) => set({ author: event.target.value || null })}
+            >
+              <MenuItem value="">Anyone</MenuItem>
+              {authors.map((author) => (
+                <MenuItem key={author.id} value={author.id}>
+                  <Stack direction="row" spacing={0.75} sx={{ alignItems: 'center' }}>
+                    <UserAvatar name={author.name} size={18} imageUrl={null} />
+                    <Typography component="span" variant="body2">
+                      {author.name}
+                    </Typography>
+                  </Stack>
+                </MenuItem>
+              ))}
+            </TextField>
+          )}
           {facets > 0 && (
             <Button
               size="small"

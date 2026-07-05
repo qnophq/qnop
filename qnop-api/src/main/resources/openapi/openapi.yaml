@@ -3855,6 +3855,13 @@ components:
           description: >-
             Optional human-readable identifier chosen at creation (issue #411):
             kebab-case, unique ignoring case, immutable. Null when none was set.
+        anonymous:
+          type: boolean
+          description: >-
+            Whether foreign authors are anonymised in this review (issue #413):
+            when true the API ships no resolvable identity for non-self, non-owner
+            authors and the UI renders stable "Participant N" pseudonyms. Chosen at
+            creation and immutable. Defaults to false.
         ownerId:
           type: string
           format: uuid
@@ -4025,6 +4032,13 @@ components:
           description: >-
             Optional human-readable identifier chosen at creation (issue #411):
             kebab-case, unique ignoring case, immutable. Null when none was set.
+        anonymous:
+          type: boolean
+          description: >-
+            Whether foreign authors are anonymised in this review (issue #413):
+            when true the API ships no resolvable identity for non-self, non-owner
+            authors and the UI renders stable "Participant N" pseudonyms. Chosen at
+            creation and immutable. Defaults to false.
         ownerId:
           type: string
           format: uuid
@@ -4400,6 +4414,18 @@ components:
         authorId:
           type: string
           format: uuid
+          description: >-
+            The author's id. In an anonymous review (issue #413) this is a stable
+            per-document pseudonym token for non-self, non-owner authors — never
+            the real user id — so authorship cannot be correlated to the roster.
+        authorDisplayName:
+          type: string
+          nullable: true
+          description: >-
+            The author's name, resolved server-side (issue #413). The real display
+            name in a normal review (including authors who participate via a team);
+            a stable "Participant N" pseudonym for foreign authors in an anonymous
+            review. Null only for a since-removed user.
         status:
           $ref: '#/components/schemas/AnnotationStatus'
         type:
@@ -4476,6 +4502,16 @@ components:
         authorId:
           type: string
           format: uuid
+          description: >-
+            The author's id — a stable per-document pseudonym token for foreign
+            authors in an anonymous review (issue #413), never the real user id.
+        authorDisplayName:
+          type: string
+          nullable: true
+          description: >-
+            The author's name, resolved server-side (issue #413): the real display
+            name in a normal review, a stable "Participant N" pseudonym for foreign
+            authors in an anonymous review. Null only for a since-removed user.
         body:
           type: string
         createdAt:

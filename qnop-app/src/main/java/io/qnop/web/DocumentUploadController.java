@@ -62,10 +62,12 @@ public class DocumentUploadController {
       @RequestParam("title") String title,
       @RequestParam("file") MultipartFile file,
       @RequestParam(value = "dueAt", required = false) String dueAt,
-      @RequestParam(value = "slug", required = false) String slug) {
+      @RequestParam(value = "slug", required = false) String slug,
+      @RequestParam(value = "anonymous", required = false, defaultValue = "false")
+          boolean anonymous) {
     UploadResult result =
         ingest.createDocument(
-            CurrentUser.requireUserId(), title, sourceOf(file), parseDueAt(dueAt), slug);
+            CurrentUser.requireUserId(), title, sourceOf(file), parseDueAt(dueAt), slug, anonymous);
     return ResponseEntity.status(HttpStatus.CREATED).body(DocumentUploadResponse.of(result));
   }
 

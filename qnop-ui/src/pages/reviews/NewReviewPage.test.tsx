@@ -195,6 +195,30 @@ describe('NewReviewPage — step 3 & submit', () => {
     });
   });
 
+  it('sends the anonymous flag when the toggle is on (issue #413)', async () => {
+    renderPage();
+    await goToStep3WithMax();
+
+    // Default is off — nothing sent.
+    expect(screen.getByRole('switch', { name: 'Anonymous review' })).not.toBeChecked();
+    fireEvent.click(screen.getByRole('switch', { name: 'Anonymous review' }));
+    fireEvent.click(screen.getByRole('button', { name: /Create & start review/ }));
+
+    await waitFor(() => expect(screen.getByTestId('detail-probe')).toBeInTheDocument());
+    const [, form] = vi.mocked(axiosInstance.post).mock.calls[0];
+    expect((form as FormData).get('anonymous')).toBe('true');
+  });
+
+  it('omits the anonymous flag by default', async () => {
+    renderPage();
+    await goToStep3WithMax();
+    fireEvent.click(screen.getByRole('button', { name: /Create & start review/ }));
+
+    await waitFor(() => expect(screen.getByTestId('detail-probe')).toBeInTheDocument());
+    const [, form] = vi.mocked(axiosInstance.post).mock.calls[0];
+    expect((form as FormData).get('anonymous')).toBeNull();
+  });
+
   it('skips the workflow transition when start-immediately is off', async () => {
     renderPage();
     await goToStep3WithMax();

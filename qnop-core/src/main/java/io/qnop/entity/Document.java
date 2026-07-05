@@ -95,6 +95,15 @@ public class Document {
   @Column(name = "slug", length = 64, updatable = false)
   private String slug;
 
+  /**
+   * Per-review anonymity (issue #413): when {@code true}, the review API ships no resolvable
+   * identity for non-self, non-owner authors and the UI renders stable "Participant N" pseudonyms.
+   * Chosen at creation and immutable afterwards (changing it mid-review would rewrite history
+   * semantics).
+   */
+  @Column(name = "anonymous", nullable = false, updatable = false)
+  private boolean anonymous;
+
   @Version
   @Column(name = "version", nullable = false)
   private long version;
@@ -160,6 +169,16 @@ public class Document {
   /** Set once at creation (the column is not updatable); {@code null} means no friendly URL. */
   public void setSlug(String slug) {
     this.slug = slug;
+  }
+
+  /** Whether foreign authors are anonymised in this review's API responses (issue #413). */
+  public boolean isAnonymous() {
+    return anonymous;
+  }
+
+  /** Set once at creation (the column is not updatable). */
+  public void setAnonymous(boolean anonymous) {
+    this.anonymous = anonymous;
   }
 
   /** Sets or clears ({@code null}) the optional completion deadline (issue #295). */

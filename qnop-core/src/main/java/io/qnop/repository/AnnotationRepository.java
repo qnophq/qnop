@@ -35,6 +35,10 @@ public interface AnnotationRepository extends JpaRepository<Annotation, UUID> {
   /** All annotations on a document. */
   List<Annotation> findByDocumentId(UUID documentId);
 
+  /** The distinct users who authored an annotation on a document (issue #413 pseudonyms). */
+  @Query("SELECT DISTINCT a.authorId FROM Annotation a WHERE a.documentId = :documentId")
+  List<UUID> findDistinctAuthorIdsByDocumentId(@Param("documentId") UUID documentId);
+
   /** Annotations on a document in a given status. */
   List<Annotation> findByDocumentIdAndStatus(UUID documentId, AnnotationStatus status);
 

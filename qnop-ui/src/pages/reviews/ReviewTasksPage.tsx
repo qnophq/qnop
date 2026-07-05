@@ -31,7 +31,7 @@ import ToggleButtonGroup from '@mui/material/ToggleButtonGroup';
 import { LayoutGrid, List as ListIcon } from 'lucide-react';
 import { useAnnotations } from '../../api/hooks/useAnnotations';
 import { useDocument, useDocumentVersions } from '../../api/hooks/useDocuments';
-import { useParticipants, useRecordVisit } from '../../api/hooks/useReviews';
+import { useRecordVisit } from '../../api/hooks/useReviews';
 import { AdminToast } from '../../components/admin/layout/AdminToast';
 import { ReviewViewTabs } from '../../components/reviews/hub/ReviewViewTabs';
 import { useReviewDocumentId } from '../../components/reviews/reviewDocumentId';
@@ -83,9 +83,9 @@ export function ReviewTasksPage() {
 
   const documentQuery = useDocument(documentId);
   const versionsQuery = useDocumentVersions(documentId);
-  const participantsQuery = useParticipants(documentId);
 
   const document = documentQuery.data;
+  const anonymous = document?.anonymous ?? false;
   const latestVersion = Math.max(
     document?.latestVersionNumber ?? 0,
     ...(versionsQuery.data?.versions.map((version) => version.versionNumber) ?? [0]),
@@ -142,24 +142,32 @@ export function ReviewTasksPage() {
     setSearchParams(next, { replace: true });
   };
 
-  const participants = participantsQuery.data?.participants ?? [];
-  // The panel's naming rule: self by display name; reviewers through the
-  // participant directory; the owner stays structural on the document (never
-  // a participant row), so a foreign owner reads as a plain participant.
+  // Author names are resolved server-side and ride on the annotation itself
+  // (issue #413), honouring per-review anonymity — own contributions read
+  // "You"; everyone else is the real name or a stable "Participant N" pseudonym.
+  const authorNameById = new Map(
+    annotations.map((annotation) => [
+      annotation.authorId,
+      annotation.authorDisplayName ?? 'Participant',
+    ]),
+  );
   const authorNameOf = (authorId: string) =>
     authorId === userId
       ? (ownDisplayName ?? 'You')
-      : (participants.find((participant) => participant.principalId === authorId)?.displayName ??
-        'Participant');
+      : (authorNameById.get(authorId) ?? 'Participant');
 
   const countOf = (key: TaskFilter) =>
     key === 'all'
       ? annotations.length
       : annotations.filter((annotation) => columnOf(annotation) === key).length;
 
-  const authors: FilterAuthor[] = [
-    ...new Set(annotations.map((annotation) => annotation.authorId)),
-  ].map((id) => ({ id, name: authorNameOf(id) }));
+  // No author facet in an anonymous review (issue #413).
+  const authors: FilterAuthor[] = anonymous
+    ? []
+    : [...new Set(annotations.map((annotation) => annotation.authorId))].map((id) => ({
+        id,
+        name: authorNameOf(id),
+      }));
 
   const visible = annotations
     .filter((annotation) => filter === 'all' || columnOf(annotation) === filter)
@@ -250,6 +258,7 @@ export function ReviewTasksPage() {
             onChange={setFacets}
             authors={authors}
             statusFacet={false}
+            authorFacet={!anonymous}
             searchLabel="Search tasks"
           />
         </Box>

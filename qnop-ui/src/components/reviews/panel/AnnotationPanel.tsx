@@ -35,7 +35,6 @@ import type {
   AnnotationView,
 } from '../../../api/generated';
 import { AnnotationStatus } from '../../../api/generated';
-import { useParticipants } from '../../../api/hooks/useReviews';
 import { useAuthStore } from '../../../stores/authStore';
 import type { Notify } from '../../admin/layout/useToast';
 import { SectionCard } from '../../admin/layout/SectionCard';
@@ -57,8 +56,8 @@ import {
 } from './resolve';
 
 interface AnnotationPanelProps {
-  /** The review the annotations belong to — resolves author names for the filter. */
-  documentId: string;
+  /** True for an anonymous review (issue #413) — hides the author filter facet. */
+  anonymous?: boolean;
   annotations: AnnotationView[];
   activeAnnotationId: string | null;
   hoverAnnotationId?: string | null;
@@ -195,7 +194,7 @@ function PanelSection({
  * mark on the page (and vice versa).
  */
 export function AnnotationPanel({
-  documentId,
+  anonymous = false,
   annotations,
   activeAnnotationId,
   hoverAnnotationId,
@@ -217,32 +216,33 @@ export function AnnotationPanel({
   const { resolveWith, isPending: resolving } = useResolveWithFeedback(notify);
   const { reopenWith } = useReopenWithFeedback(notify);
 
+  // Author names are resolved server-side and travel on the annotation itself
+  // (issue #413), honouring per-review anonymity — the real name in a normal
+  // review, a stable "Participant N" pseudonym in an anonymous one. Own
+  // contributions read "You" from the auth store.
+  const displayName = useAuthStore((state) => state.displayName);
+  const authorNameOf = (annotation: AnnotationView) =>
+    annotation.authorId === userId
+      ? (displayName ?? 'You')
+      : (annotation.authorDisplayName ?? 'Participant');
+  // The author facet is meaningless (and would leak nothing useful) in an
+  // anonymous review, so it is dropped entirely there.
+  const authors: FilterAuthor[] = useMemo(() => {
+    if (anonymous) return [];
+    const byId = new Map<string, string>();
+    for (const annotation of annotations) {
+      if (!byId.has(annotation.authorId)) byId.set(annotation.authorId, authorNameOf(annotation));
+    }
+    return [...byId].map(([id, name]) => ({ id, name }));
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- names derive from the inputs below
+  }, [annotations, anonymous, userId, displayName]);
+
   // Sort + status-filter once per (annotations, filter) change, not on every
   // render (e.g. a hover or selection): the list can be large and the sort is
   // O(n log n) (issue #334).
-  // Author names for the filter facet, resolved like the tasks board does:
-  // self by display name, reviewers via the participant directory, anyone the
-  // directory does not know (the owner) as a plain "Participant".
-  const participants = useParticipants(documentId).data?.participants ?? [];
-  const displayName = useAuthStore((state) => state.displayName);
-  const authorNameOf = (authorId: string) =>
-    authorId === userId
-      ? (displayName ?? 'You')
-      : (participants.find((participant) => participant.principalId === authorId)?.displayName ??
-        'Participant');
-  const authors: FilterAuthor[] = useMemo(
-    () =>
-      [...new Set(annotations.map((annotation) => annotation.authorId))].map((id) => ({
-        id,
-        name: authorNameOf(id),
-      })),
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- names derive from the two inputs below
-    [annotations, participants, userId, displayName],
-  );
-
   const { placed, unplaced, hiddenByFilter } = useMemo(() => {
     const matches = (annotation: AnnotationView) =>
-      matchesFilters(annotation, filters, authorNameOf(annotation.authorId));
+      matchesFilters(annotation, filters, authorNameOf(annotation));
     const sorted = [...annotations].sort(compareAnnotationsByPosition);
     const placedItems = sorted.filter((a) => a.anchor && matches(a));
     const unplacedItems = sorted.filter((a) => !a.anchor && matches(a));
@@ -251,8 +251,8 @@ export function AnnotationPanel({
       unplaced: unplacedItems,
       hiddenByFilter: annotations.length > 0 && placedItems.length + unplacedItems.length === 0,
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- authorNameOf derives from authors' inputs
-  }, [annotations, filters, participants, userId, displayName]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- authorNameOf derives from the inputs below
+  }, [annotations, filters, userId, displayName]);
 
   const renderItem = (annotation: AnnotationView) => {
     const active = annotation.id === activeAnnotationId;
@@ -298,7 +298,12 @@ export function AnnotationPanel({
     >
       <Stack spacing={1.5}>
         {annotations.length > 0 && (
-          <PanelFilterBar filters={filters} onChange={setFilters} authors={authors} />
+          <PanelFilterBar
+            filters={filters}
+            onChange={setFilters}
+            authors={authors}
+            authorFacet={!anonymous}
+          />
         )}
         {pendingAnchor && (
           <Composer

@@ -501,7 +501,7 @@ export function DocumentReviewPage() {
                 )}
               >
                 <AnnotationPanel
-                  documentId={documentId}
+                  anonymous={document.anonymous ?? false}
                   annotations={annotations}
                   activeAnnotationId={activeAnnotationId}
                   hoverAnnotationId={hoverAnnotationId}
@@ -531,7 +531,7 @@ export function DocumentReviewPage() {
             )}
           >
             <AnnotationPanel
-              documentId={documentId}
+              anonymous={document.anonymous ?? false}
               frameless
               annotations={annotations}
               activeAnnotationId={activeAnnotationId}

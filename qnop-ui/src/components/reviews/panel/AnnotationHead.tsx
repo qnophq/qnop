@@ -56,7 +56,11 @@ export function AnnotationHead({ annotation, unseen = false }: AnnotationHeadPro
   const cachedComments = useComments(annotation.id, false).data?.comments ?? [];
   const openerText = cachedComments[0]?.body ?? annotation.firstComment ?? null;
   const own = annotation.authorId === userId;
-  const authorName = own ? (displayName ?? 'You') : 'Participant';
+  // The author name is resolved server-side, honouring per-review anonymity
+  // (issue #413): the real name in a normal review, a stable "Participant N"
+  // pseudonym for foreign authors in an anonymous one. Own contributions read
+  // "You" from the auth store.
+  const authorName = own ? (displayName ?? 'You') : (annotation.authorDisplayName ?? 'Participant');
   const quote = annotation.anchor?.textQuote?.quote;
   const fallbackLabel = annotation.anchor?.region
     ? 'Region annotation'

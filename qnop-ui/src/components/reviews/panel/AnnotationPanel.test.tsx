@@ -84,7 +84,6 @@ const annotation = (id: string, overrides: Partial<AnnotationView> = {}): Annota
 
 function renderPanel(props: Partial<Parameters<typeof AnnotationPanel>[0]> = {}) {
   const defaults: Parameters<typeof AnnotationPanel>[0] = {
-    documentId: 'd1',
     annotations: [],
     activeAnnotationId: null,
     onSelect: vi.fn(),
@@ -216,9 +215,12 @@ describe('AnnotationPanel', () => {
     expect(screen.queryByTestId('annotation-item-a-other')).not.toBeInTheDocument();
   });
 
-  it('filters by author resolved through the participant directory', () => {
+  it('filters by author using the server-resolved display name (issue #413)', () => {
     renderPanel({
-      annotations: [annotation('a-mine'), annotation('a-foreign', { authorId: 'other' })],
+      annotations: [
+        annotation('a-mine'),
+        annotation('a-foreign', { authorId: 'other', authorDisplayName: 'Anna Weber' }),
+      ],
     });
 
     fireEvent.click(screen.getByRole('button', { name: 'Filter annotations' }));
@@ -227,6 +229,19 @@ describe('AnnotationPanel', () => {
 
     expect(screen.getByTestId('annotation-item-a-foreign')).toBeInTheDocument();
     expect(screen.queryByTestId('annotation-item-a-mine')).not.toBeInTheDocument();
+  });
+
+  it('drops the author facet entirely in an anonymous review (issue #413)', () => {
+    renderPanel({
+      anonymous: true,
+      annotations: [
+        annotation('a-mine'),
+        annotation('a-foreign', { authorId: 'other', authorDisplayName: 'Participant 1' }),
+      ],
+    });
+
+    fireEvent.click(screen.getByRole('button', { name: 'Filter annotations' }));
+    expect(screen.queryByLabelText('Author')).not.toBeInTheDocument();
   });
 
   it('collapses a section on click', () => {

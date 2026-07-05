@@ -72,6 +72,7 @@ public class AnnotationService {
   private final AuditEventRepository auditEvents;
   private final DocumentAccessService documentAccess;
   private final ReviewWorkflowService workflow;
+  private final ReviewIdentityResolver identity;
 
   public AnnotationService(
       AnnotationRepository annotations,
@@ -80,7 +81,8 @@ public class AnnotationService {
       DocumentVersionRepository versions,
       AuditEventRepository auditEvents,
       DocumentAccessService documentAccess,
-      ReviewWorkflowService workflow) {
+      ReviewWorkflowService workflow,
+      ReviewIdentityResolver identity) {
     this.annotations = annotations;
     this.placements = placements;
     this.comments = comments;
@@ -88,6 +90,7 @@ public class AnnotationService {
     this.auditEvents = auditEvents;
     this.documentAccess = documentAccess;
     this.workflow = workflow;
+    this.identity = identity;
   }
 
   /**
@@ -99,6 +102,7 @@ public class AnnotationService {
       UUID id,
       UUID documentId,
       UUID authorId,
+      String authorDisplayName,
       String status,
       String type,
       String priority,
@@ -112,7 +116,12 @@ public class AnnotationService {
 
   /** One message in an annotation's thread. */
   public record CommentView(
-      UUID id, UUID annotationId, UUID authorId, String body, Instant createdAt) {}
+      UUID id,
+      UUID annotationId,
+      UUID authorId,
+      String authorDisplayName,
+      String body,
+      Instant createdAt) {}
 
   /**
    * Creates an annotation on {@code versionNumber}, placed immediately, seeded with its mandatory
@@ -172,7 +181,13 @@ public class AnnotationService {
     // The workflow reacts to the raise (issue #405): a closed review rolls this insert back
     // (REVIEW_CLOSED), an IN_REVIEW one derives CHANGES_REQUESTED — both under the document lock.
     workflow.annotationRaised(documentId, author);
-    return view(annotation, placement, excerpt(firstComment), commentCount, null);
+    return view(
+        annotation,
+        placement,
+        excerpt(firstComment),
+        commentCount,
+        null,
+        identity.forDocument(documentId, author));
   }
 
   /**
@@ -209,6 +224,7 @@ public class AnnotationService {
     Map<UUID, Integer> threadSizeByAnnotation = threadSizes(documentAnnotations);
     Map<UUID, String> firstCommentByAnnotation = firstComments(documentAnnotations);
     Map<UUID, Instant> foreignActivityByAnnotation = foreignActivity(documentAnnotations, actor);
+    ReviewIdentityResolver.ReviewIdentities identities = identity.forDocument(documentId, actor);
     return documentAnnotations.stream()
         .map(
             annotation ->
@@ -217,7 +233,8 @@ public class AnnotationService {
                     placementByAnnotation.get(annotation.getId()),
                     firstCommentByAnnotation.get(annotation.getId()),
                     threadSizeByAnnotation.getOrDefault(annotation.getId(), 0),
-                    foreignActivityByAnnotation.get(annotation.getId())))
+                    foreignActivityByAnnotation.get(annotation.getId()),
+                    identities))
         .filter(view -> placementStatus == null || placementStatus.equals(view.placementStatus()))
         .filter(view -> type == null || type.equals(view.type()))
         .toList();
@@ -257,7 +274,8 @@ public class AnnotationService {
         null,
         firstComment(annotationId),
         threadSize(annotationId),
-        foreignActivity(annotationId, actor));
+        foreignActivity(annotationId, actor),
+        identity.forDocument(annotation.getDocumentId(), actor));
   }
 
   private static String jsonString(String value) {
@@ -283,7 +301,8 @@ public class AnnotationService {
         null,
         firstComment(annotationId),
         threadSize(annotationId),
-        foreignActivity(annotationId, actor));
+        foreignActivity(annotationId, actor),
+        identity.forDocument(annotation.getDocumentId(), actor));
   }
 
   /**
@@ -299,7 +318,8 @@ public class AnnotationService {
         null,
         firstComment(updated.getId()),
         threadSize(updated.getId()),
-        foreignActivity(updated.getId(), actor));
+        foreignActivity(updated.getId(), actor),
+        identity.forDocument(updated.getDocumentId(), actor));
   }
 
   /**
@@ -315,7 +335,8 @@ public class AnnotationService {
         null,
         firstComment(updated.getId()),
         threadSize(updated.getId()),
-        foreignActivity(updated.getId(), actor));
+        foreignActivity(updated.getId(), actor),
+        identity.forDocument(updated.getDocumentId(), actor));
   }
 
   /**
@@ -338,7 +359,8 @@ public class AnnotationService {
               + "; its thread is closed");
     }
     // saveAndFlush so @CreationTimestamp is populated on the returned comment before the view.
-    return commentView(comments.saveAndFlush(new Comment(annotationId, author, body)));
+    Comment saved = comments.saveAndFlush(new Comment(annotationId, author, body));
+    return commentView(saved, identity.forDocument(annotation.getDocumentId(), author));
   }
 
   /** An annotation's comment thread, oldest first; visible participants only. */
@@ -346,8 +368,10 @@ public class AnnotationService {
   public List<CommentView> listComments(UUID annotationId, UUID actor, boolean admin) {
     Annotation annotation = requireAnnotation(annotationId);
     documentAccess.getDocument(annotation.getDocumentId(), actor, admin);
+    ReviewIdentityResolver.ReviewIdentities identities =
+        identity.forDocument(annotation.getDocumentId(), actor);
     return comments.findByAnnotationIdOrderByCreatedAtAsc(annotationId).stream()
-        .map(AnnotationService::commentView)
+        .map(comment -> commentView(comment, identities))
         .toList();
   }
 
@@ -419,11 +443,14 @@ public class AnnotationService {
       AnnotationPlacement placement,
       String firstComment,
       int commentCount,
-      Instant latestCommentFromOthersAt) {
+      Instant latestCommentFromOthersAt,
+      ReviewIdentityResolver.ReviewIdentities identities) {
+    UUID authorId = annotation.getAuthorId();
     return new AnnotationView(
         annotation.getId(),
         annotation.getDocumentId(),
-        annotation.getAuthorId(),
+        identities.exposedAuthorId(authorId),
+        identities.displayName(authorId),
         annotation.getStatus().name(),
         annotation.getType() == null ? null : annotation.getType().name(),
         annotation.getPriority() == null ? null : annotation.getPriority().name(),
@@ -436,11 +463,14 @@ public class AnnotationService {
         annotation.getUpdatedAt());
   }
 
-  private static CommentView commentView(Comment comment) {
+  private static CommentView commentView(
+      Comment comment, ReviewIdentityResolver.ReviewIdentities identities) {
+    UUID authorId = comment.getAuthorId();
     return new CommentView(
         comment.getId(),
         comment.getAnnotationId(),
-        comment.getAuthorId(),
+        identities.exposedAuthorId(authorId),
+        identities.displayName(authorId),
         comment.getBody(),
         comment.getCreatedAt());
   }
