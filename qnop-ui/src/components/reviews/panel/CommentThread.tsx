@@ -33,14 +33,13 @@ import { CircleCheck, RotateCcw, SendHorizontal } from 'lucide-react';
 import { useAddComment, useComments } from '../../../api/hooks/useComments';
 import { apiErrorCode } from '../../../utils/apiError';
 import { isSubmitShortcut, submitShortcutLabel } from '../../../utils/platform';
+import { shortRelativeTime } from '../../../utils/relativeTime';
 import { useAuthStore } from '../../../stores/authStore';
 import type { Notify } from '../../admin/layout/useToast';
 import { isNewComment } from '../newSince';
 import { UserAvatar } from '../../shell/UserAvatar';
 
 const AVATAR_SIZE = 26;
-/** Centre of the avatar column — where the thread line runs. */
-const LINE_LEFT = AVATAR_SIZE / 2 - 1;
 
 interface CommentThreadProps {
   annotationId: string;
@@ -63,12 +62,13 @@ const TIME_FORMAT = new Intl.DateTimeFormat(undefined, {
 });
 
 /**
- * The annotation's discussion as a social-style thread (ADR-0011 — the
- * annotation owns the thread): every comment is an avatar on a shared
- * timeline rail with a speech bubble, the composer continues the same rail —
- * the annotation card above is the root post. Participant names are not part
- * of the annotation API yet, so authorship is shown relative to the signed-in
- * user.
+ * The annotation's discussion in the comment anatomy every user knows from
+ * Facebook/Instagram (issue #403): avatar on the left, a rounded bubble
+ * carrying the bold author name above the text, and the compact relative
+ * timestamp in a meta line UNDER the bubble (the full date lives in its
+ * tooltip; likes will join that line, #410). The annotation card above is
+ * the root post. Participant names are not part of the annotation API yet,
+ * so authorship is shown relative to the signed-in user.
  */
 export function CommentThread({
   annotationId,
@@ -112,20 +112,7 @@ export function CommentThread({
 
   return (
     <Box sx={{ position: 'relative', mt: 0.5, ml: 1.5, pl: 0 }}>
-      {/* The timeline rail connecting the annotation card to its thread. */}
-      <Box
-        aria-hidden
-        sx={{
-          position: 'absolute',
-          left: LINE_LEFT,
-          top: -6,
-          bottom: 18,
-          width: 2,
-          borderRadius: 1,
-          bgcolor: theme.palette.divider,
-        }}
-      />
-      <Stack spacing={1.25} sx={{ pt: 1 }}>
+      <Stack spacing={1} sx={{ pt: 1 }}>
         {commentsQuery.isPending && (
           <Stack sx={{ alignItems: 'center', py: 1 }}>
             <CircularProgress size={18} aria-label="Loading comments" />
@@ -163,32 +150,46 @@ export function CommentThread({
                 </Stack>
               )}
               <Stack direction="row" spacing={1} sx={{ alignItems: 'flex-start' }}>
-                <Box sx={{ position: 'relative', zIndex: 1, pt: 0.25 }}>
+                <Box sx={{ pt: 0.25 }}>
                   <UserAvatar name={name} size={AVATAR_SIZE} imageUrl={own ? avatarUrl : null} />
                 </Box>
-                <Box
-                  sx={{
-                    flex: 1,
-                    minWidth: 0,
-                    bgcolor: theme.qnop.surface2,
-                    borderRadius: '3px 8px 8px 8px',
-                    px: 1.25,
-                    py: 0.75,
-                  }}
-                >
-                  <Stack direction="row" spacing={1} sx={{ alignItems: 'baseline' }}>
-                    <Typography variant="body2" sx={{ fontWeight: 600 }}>
+                <Box sx={{ minWidth: 0, maxWidth: '100%' }}>
+                  {/* The bubble: bold name on its own line, the text below —
+                      no date inside (Facebook anatomy, issue #403). */}
+                  <Box
+                    sx={{
+                      display: 'inline-block',
+                      maxWidth: '100%',
+                      bgcolor: theme.qnop.surface2,
+                      borderRadius: '16px',
+                      px: 1.5,
+                      py: 0.75,
+                    }}
+                  >
+                    <Typography variant="body2" sx={{ fontWeight: 600, lineHeight: 1.3 }}>
                       {own ? 'You' : name}
                     </Typography>
-                    <Typography variant="caption" color="text.secondary">
-                      {TIME_FORMAT.format(new Date(comment.createdAt))}
+                    <Typography
+                      variant="body2"
+                      sx={{ whiteSpace: 'pre-wrap', overflowWrap: 'anywhere' }}
+                    >
+                      {comment.body}
                     </Typography>
-                  </Stack>
+                  </Box>
+                  {/* The meta line under the bubble — the compact social
+                      timestamp; likes join here with #410. */}
                   <Typography
-                    variant="body2"
-                    sx={{ whiteSpace: 'pre-wrap', overflowWrap: 'anywhere', mt: 0.25 }}
+                    variant="caption"
+                    title={TIME_FORMAT.format(new Date(comment.createdAt))}
+                    sx={{
+                      display: 'block',
+                      pl: 1.5,
+                      mt: 0.25,
+                      fontWeight: 600,
+                      color: 'text.secondary',
+                    }}
                   >
-                    {comment.body}
+                    {shortRelativeTime(comment.createdAt)}
                   </Typography>
                 </Box>
               </Stack>
@@ -239,7 +240,7 @@ export function CommentThread({
             </Box>
             <TextField
               multiline
-              minRows={3}
+              minRows={1}
               size="small"
               fullWidth
               placeholder="Add a comment"
@@ -254,7 +255,8 @@ export function CommentThread({
               slotProps={{
                 htmlInput: { maxLength: 20000, 'aria-label': 'Add a comment' },
                 input: {
-                  sx: { borderRadius: 1, bgcolor: 'background.paper' },
+                  // The pill composer of the social pattern (issue #403).
+                  sx: { borderRadius: '18px', bgcolor: theme.qnop.surface2 },
                   endAdornment: (
                     <Tooltip title={`Send (${submitShortcutLabel()})`}>
                       <span style={{ alignSelf: 'flex-end' }}>

@@ -32,6 +32,7 @@ import { useComments } from '../../../api/hooks/useComments';
 import { useAuthStore } from '../../../stores/authStore';
 import { ToneBadge } from '../../admin/ToneBadge';
 import { UserAvatar } from '../../shell/UserAvatar';
+import { shortRelativeTime } from '../../../utils/relativeTime';
 import { hasNewComments, isUnseen } from '../newSince';
 import { tokens } from '../../../theme/tokens';
 import { PRIORITY_CUES, TYPE_CUES } from '../tasks/tasksModel';
@@ -278,8 +279,13 @@ function AnnotationListItemBase({
               size={20}
               imageUrl={annotation.authorId === userId ? avatarUrl : null}
             />
-            <Typography variant="caption" color="text.secondary" noWrap>
-              {authorName} · {DATE_FORMAT.format(new Date(annotation.createdAt))}
+            <Typography
+              variant="caption"
+              color="text.secondary"
+              noWrap
+              title={DATE_FORMAT.format(new Date(annotation.createdAt))}
+            >
+              {authorName} · {shortRelativeTime(annotation.createdAt)}
             </Typography>
           </Stack>
         </Stack>

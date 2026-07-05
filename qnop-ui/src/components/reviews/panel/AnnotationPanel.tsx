@@ -25,6 +25,7 @@ import Box from '@mui/material/Box';
 import ButtonBase from '@mui/material/ButtonBase';
 import Chip from '@mui/material/Chip';
 import Collapse from '@mui/material/Collapse';
+import Divider from '@mui/material/Divider';
 import Stack from '@mui/material/Stack';
 import Typography from '@mui/material/Typography';
 import { useTheme } from '@mui/material/styles';
@@ -178,7 +179,9 @@ function PanelSection({
         )}
       </ButtonBase>
       <Collapse in={open} unmountOnExit>
-        <Stack spacing={1.5} sx={{ pt: 1 }}>
+        {/* A hairline between the discussion units keeps neighbouring
+            threads apart, the way feeds separate posts (issue #403). */}
+        <Stack spacing={1.5} divider={<Divider aria-hidden />} sx={{ pt: 1 }}>
           {children}
         </Stack>
       </Collapse>
