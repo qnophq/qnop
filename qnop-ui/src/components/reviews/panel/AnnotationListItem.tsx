@@ -32,6 +32,7 @@ import { useComments } from '../../../api/hooks/useComments';
 import { useAuthStore } from '../../../stores/authStore';
 import { ToneBadge } from '../../admin/ToneBadge';
 import { UserAvatar } from '../../shell/UserAvatar';
+import { tokens } from '../../../theme/tokens';
 import { shortRelativeTime } from '../../../utils/relativeTime';
 import { hasNewComments, isUnseen } from '../newSince';
 import { PRIORITY_CUES, TYPE_CUES } from '../tasks/tasksModel';
@@ -167,15 +168,21 @@ function AnnotationListItemBase({
         textAlign: 'left',
         position: 'relative',
         borderRadius: 0.75,
-        // The discussion unit's card (in the panel) draws the border and the
-        // interaction blue (#403); this row only tints its own surface.
-        bgcolor: active || linked ? alpha(theme.qnop.brand.blue, 0.05) : 'transparent',
+        border: '1px solid',
+        // The frame belongs to the head card alone (#403) — the thread and
+        // composer hang off the timeline rail below it, unframed. Two quiet
+        // steps of the interaction blue on the edge.
+        borderColor: active || linked ? theme.qnop.brand.blue : theme.palette.divider,
+        bgcolor: active || linked ? alpha(theme.qnop.brand.blue, 0.06) : 'background.paper',
+        boxShadow: linked && theme.palette.mode === 'light' ? tokens.shadow.sm : 'none',
         px: 1.25,
         py: active ? 1.25 : 0.75,
-        transition: 'background-color 120ms ease',
+        transition: 'border-color 120ms ease, background-color 120ms ease, box-shadow 120ms ease',
         '@media (prefers-reduced-motion: reduce)': { transition: 'none' },
         '&:hover': {
-          bgcolor: active || linked ? alpha(theme.qnop.brand.blue, 0.05) : theme.qnop.surface2,
+          borderColor: active || linked ? theme.qnop.brand.blue : alpha(theme.qnop.brand.blue, 0.4),
+          bgcolor:
+            active || linked ? alpha(theme.qnop.brand.blue, 0.06) : theme.qnop.surface2,
         },
         '&:focus-visible': { boxShadow: theme.qnop.focusRing },
       }}

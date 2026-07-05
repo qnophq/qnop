@@ -27,7 +27,7 @@ import Chip from '@mui/material/Chip';
 import Collapse from '@mui/material/Collapse';
 import Stack from '@mui/material/Stack';
 import Typography from '@mui/material/Typography';
-import { alpha, useTheme } from '@mui/material/styles';
+import { useTheme } from '@mui/material/styles';
 import { ChevronRight, Link2, NotebookPen, Unlink } from 'lucide-react';
 import type {
   AnnotationPriority,
@@ -40,7 +40,6 @@ import { useAuthStore } from '../../../stores/authStore';
 import type { Notify } from '../../admin/layout/useToast';
 import { SectionCard } from '../../admin/layout/SectionCard';
 import { compareAnnotationsByPosition } from '../viewer/anchoring';
-import { tokens } from '../../../theme/tokens';
 import { isUnseen } from '../newSince';
 import { AnnotationListItem } from './AnnotationListItem';
 import { CommentThread } from './CommentThread';
@@ -211,7 +210,6 @@ export function AnnotationPanel({
   reviewClosed = false,
   previousSeenAt = null,
 }: AnnotationPanelProps) {
-  const theme = useTheme();
   const [filter, setFilter] = useState<StatusFilter>('all');
   const userId = useAuthStore((state) => state.userId);
   const { resolveWith, isPending: resolving } = useResolveWithFeedback(notify);
@@ -239,33 +237,7 @@ export function AnnotationPanel({
   const renderItem = (annotation: AnnotationView) => {
     const active = annotation.id === activeAnnotationId;
     return (
-      <Stack
-        key={annotation.id}
-        spacing={0}
-        data-testid={`annotation-unit-${annotation.id}`}
-        sx={{
-          // ONE card per discussion (issue #403): head, thread and composer
-          // share a single bordered surface; whitespace does the separating.
-          // Interaction states live on this card's edge — the same two-step
-          // blue the collapsed rows spoke before.
-          bgcolor: 'background.paper',
-          borderRadius: 0.75,
-          border: '1px solid',
-          borderColor:
-            active || annotation.id === hoverAnnotationId
-              ? theme.qnop.brand.blue
-              : theme.palette.divider,
-          boxShadow:
-            annotation.id === hoverAnnotationId && theme.palette.mode === 'light'
-              ? tokens.shadow.sm
-              : 'none',
-          transition: 'border-color 120ms ease, box-shadow 120ms ease',
-          '@media (prefers-reduced-motion: reduce)': { transition: 'none' },
-          '&:hover': {
-            borderColor: active ? theme.qnop.brand.blue : alpha(theme.qnop.brand.blue, 0.4),
-          },
-        }}
-      >
+      <Stack key={annotation.id} spacing={0}>
         <AnnotationListItem
           annotation={annotation}
           active={active}
