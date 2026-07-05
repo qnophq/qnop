@@ -44,6 +44,14 @@ set -a; source .env; set +a
 cd qnop-ui && pnpm install && pnpm dev
 ```
 
+> **Postgres 18 data volume.** `postgres:18` stores its cluster under
+> `/var/lib/postgresql/<major>/docker` and refuses a mount at the old
+> `…/data` path, so compose mounts `qnop_pgdata:/var/lib/postgresql` (issue #407).
+> A `qnop_pgdata` volume created before this change won't start — the simplest fix
+> is a fresh volume (`docker compose down -v`, then `docker compose up -d`); to keep
+> existing data instead, copy the old cluster's `18/` directory into it (recipe in
+> issue #407).
+
 ## Repository layout
 
 ```
