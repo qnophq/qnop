@@ -24,6 +24,7 @@ import io.qnop.entity.User;
 import io.qnop.entity.UserRole;
 import io.qnop.entity.UserSource;
 import java.time.Instant;
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -39,6 +40,16 @@ public interface UserRepository extends JpaRepository<User, UUID> {
 
   /** Finds an internal user by case-insensitive email (matches the partial-unique index). */
   Optional<User> findByEmailIgnoreCaseAndSource(String email, UserSource source);
+
+  /**
+   * Display names for a set of user ids (issue #413) — resolves annotation/comment authors to real
+   * names server-side, including authors who participate via a team and so never appear among the
+   * participant rows. A projection so no password hashes or other columns are loaded.
+   */
+  @Query(
+      "SELECT new io.qnop.repository.UserDisplayName(u.id, u.displayName) FROM User u"
+          + " WHERE u.id IN :ids")
+  List<UserDisplayName> findDisplayNamesByIdIn(@Param("ids") Collection<UUID> ids);
 
   /** Finds an internal user by exact username. */
   Optional<User> findByUsernameAndSource(String username, UserSource source);

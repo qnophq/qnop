@@ -116,12 +116,17 @@ public class DocumentIngestService {
 
   /**
    * Creates a new document owned by {@code actor} with the upload as version 1. An optional {@code
-   * dueAt} completion deadline (issue #295) must be in the future when set at creation, and an
-   * optional {@code slug} (issue #411) must be kebab-case, 3–64 characters, not UUID-shaped, and
-   * globally unique ignoring case.
+   * dueAt} completion deadline (issue #295) must be in the future when set at creation; an optional
+   * {@code slug} (issue #411) must be kebab-case, 3–64 characters, not UUID-shaped, and globally
+   * unique ignoring case; {@code anonymous} (issue #413) fixes the review's anonymity at creation.
    */
   public UploadResult createDocument(
-      UUID actor, String title, UploadSource upload, Instant dueAt, String slug) {
+      UUID actor,
+      String title,
+      UploadSource upload,
+      Instant dueAt,
+      String slug,
+      boolean anonymous) {
     String cleanTitle = requireTitle(title);
     Instant validDueAt = requireFutureOrNull(dueAt);
     String cleanSlug = normalizeSlug(slug);
@@ -140,6 +145,7 @@ public class DocumentIngestService {
                 Document document = new Document(actor, cleanTitle);
                 document.setDueAt(validDueAt);
                 document.setSlug(cleanSlug);
+                document.setAnonymous(anonymous);
                 document = documents.save(document);
                 DocumentVersion version = saveVersionAndEnqueue(document.getId(), 1, staged, actor);
                 return new UploadResult(

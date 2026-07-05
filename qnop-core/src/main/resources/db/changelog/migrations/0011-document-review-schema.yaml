@@ -56,6 +56,14 @@ databaseChangeLog:
               - column:
                   name: slug
                   type: VARCHAR(64)
+              # Per-review anonymity (issue #413); when true the API ships no
+              # resolvable identity for non-self, non-owner authors and the UI
+              # renders stable "Participant N" pseudonyms. Immutable after creation.
+              - column:
+                  name: anonymous
+                  type: BOOLEAN
+                  defaultValueBoolean: false
+                  constraints: { nullable: false }
               - column:
                   name: version
                   type: BIGINT

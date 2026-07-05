@@ -35,6 +35,16 @@ public interface CommentRepository extends JpaRepository<Comment, UUID> {
   /** The discussion thread of an annotation, oldest message first. */
   List<Comment> findByAnnotationIdOrderByCreatedAtAsc(UUID annotationId);
 
+  /**
+   * The distinct users who commented on any of a document's threads (issue #413 pseudonyms) — a
+   * comment-only participant never appears among the annotation authors, but still needs a stable
+   * label. Joined through the annotation since comments carry only {@code annotationId}.
+   */
+  @Query(
+      "SELECT DISTINCT c.authorId FROM Comment c, Annotation a"
+          + " WHERE c.annotationId = a.id AND a.documentId = :documentId")
+  List<UUID> findDistinctCommentAuthorIdsByDocumentId(@Param("documentId") UUID documentId);
+
   /** The opening message of an annotation's thread (issue #393); id breaks created_at ties. */
   Optional<Comment> findFirstByAnnotationIdOrderByCreatedAtAscIdAsc(UUID annotationId);
 

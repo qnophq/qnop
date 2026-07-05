@@ -151,6 +151,7 @@ public class AnnotationController implements AnnotationsApi {
         .id(view.id())
         .documentId(view.documentId())
         .authorId(view.authorId())
+        .authorDisplayName(view.authorDisplayName())
         .status(AnnotationStatus.fromValue(view.status()))
         .type(view.type() == null ? null : AnnotationType.fromValue(view.type()))
         .priority(view.priority() == null ? null : AnnotationPriority.fromValue(view.priority()))
@@ -175,6 +176,7 @@ public class AnnotationController implements AnnotationsApi {
         .id(view.id())
         .annotationId(view.annotationId())
         .authorId(view.authorId())
+        .authorDisplayName(view.authorDisplayName())
         .body(view.body())
         .createdAt(view.createdAt().atOffset(ZoneOffset.UTC));
   }
