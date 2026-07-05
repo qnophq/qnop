@@ -157,17 +157,18 @@ class AnnotationApiIT extends SeededIntegrationTest {
   }
 
   @Test
-  void authorDecidesTheirOwnAnnotation() throws Exception {
+  void theAuthorCannotDecideTheirOwnAnnotation() throws Exception {
     UUID documentId = seedDocumentWithVersion();
     String annotationId = createAnnotation(documentId, AUDITOR_ID);
 
+    // Deciding is the owner's call alone (issue #403) — reviewers, including
+    // the annotation's author, can neither accept nor reject.
     mockMvc
         .perform(
             as(post("/api/v1/annotations/" + annotationId + "/decision"), AUDITOR_ID)
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("{\"decision\":\"REJECTED\"}"))
-        .andExpect(status().isOk())
-        .andExpect(jsonPath("$.status").value("REJECTED"));
+        .andExpect(status().isForbidden());
   }
 
   @Test

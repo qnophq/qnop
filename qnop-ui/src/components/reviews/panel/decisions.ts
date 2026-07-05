@@ -30,17 +30,17 @@ const DECISION_CONFLICTS: Record<string, string> = {
   ANNOTATION_ALREADY_DECIDED: 'This annotation was already decided.',
 };
 
-/** Owner or author may decide an OPEN annotation (ADR-0011). */
+/**
+ * Only the OWNER decides an OPEN annotation — issue #403 tightened the
+ * original owner-or-author rule (#247): reviewers raise and discuss, the
+ * owner rules. Mirrors the ReviewWorkflowService guard.
+ */
 export function mayDecideAnnotation(
   annotation: AnnotationView,
   userId: string | null,
   ownerId: string | null,
 ): boolean {
-  return (
-    annotation.status === AnnotationStatus.Open &&
-    userId !== null &&
-    (ownerId === userId || annotation.authorId === userId)
-  );
+  return annotation.status === AnnotationStatus.Open && userId !== null && ownerId === userId;
 }
 
 /**

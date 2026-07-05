@@ -94,7 +94,12 @@ describe('FocusAnnotationCard', () => {
     expect(screen.getByText('“the disputed clause”')).toBeInTheDocument();
     expect(screen.getByText('Open')).toBeInTheDocument();
     expect(screen.getByTestId('thread-a2')).toBeInTheDocument();
-    // The author may decide their own annotation (ADR-0011).
+    // Deciding is owner-only (issue #403) — the author sees no decision bar.
+    expect(screen.queryByTestId('decision-bar')).not.toBeInTheDocument();
+  });
+
+  it('offers deciding to the owner alone', () => {
+    renderCard({ userId: 'owner-1' });
     expect(screen.getByTestId('decision-bar')).toBeInTheDocument();
   });
 

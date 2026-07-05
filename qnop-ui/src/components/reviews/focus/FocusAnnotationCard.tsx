@@ -284,6 +284,17 @@ export function FocusAnnotationCard({
                       {`“${quote}”`}
                     </Typography>
                   )}
+                  {/* The opening annotation text — the thread below carries
+                      only the replies (issue #403). */}
+                  {annotation.firstComment && (
+                    <Typography
+                      variant="body2"
+                      sx={{ mt: 0.75, whiteSpace: 'pre-wrap', overflowWrap: 'anywhere' }}
+                      data-testid="opening-text"
+                    >
+                      {annotation.firstComment}
+                    </Typography>
+                  )}
                 </Box>
 
                 {!readOnly && mayDecideAnnotation(annotation, userId, ownerId) && (
@@ -299,6 +310,7 @@ export function FocusAnnotationCard({
                     notify={notify}
                     readOnly={readOnly}
                     previousSeenAt={previousSeenAt}
+                    skipOpener
                   />
                 </Box>
                 {/* Discoverability for the native resize grip underneath. */}
