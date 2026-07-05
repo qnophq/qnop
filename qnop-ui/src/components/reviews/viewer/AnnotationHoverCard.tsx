@@ -43,8 +43,7 @@ const SHOW_DELAY_MS = 320;
 
 const STATUS_CUES: Record<AnnotationStatus, { tone: BadgeTone; label: string }> = {
   [AnnotationStatus.Open]: { tone: 'blue', label: 'Open' },
-  [AnnotationStatus.Accepted]: { tone: 'green', label: 'Accepted' },
-  [AnnotationStatus.Rejected]: { tone: 'neutral', label: 'Rejected' },
+  [AnnotationStatus.Resolved]: { tone: 'green', label: 'Resolved' },
 };
 
 const TIME_FORMAT = new Intl.DateTimeFormat(undefined, {

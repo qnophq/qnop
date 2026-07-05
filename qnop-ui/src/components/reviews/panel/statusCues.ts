@@ -20,7 +20,7 @@
  */
 
 import type { LucideIcon } from 'lucide-react';
-import { CircleCheck, CircleDot, CircleX } from 'lucide-react';
+import { CircleCheck, CircleDot } from 'lucide-react';
 import type { Theme } from '@mui/material/styles';
 import { AnnotationStatus } from '../../../api/generated';
 import type { BadgeTone } from '../../admin/ToneBadge';
@@ -39,16 +39,10 @@ export const STATUS_CUES: Record<
     icon: CircleDot,
     color: (theme) => theme.qnop.brand.blue,
   },
-  [AnnotationStatus.Accepted]: {
+  [AnnotationStatus.Resolved]: {
     tone: 'green',
-    label: 'Accepted',
+    label: 'Resolved',
     icon: CircleCheck,
     color: (theme) => theme.palette.success.main,
-  },
-  [AnnotationStatus.Rejected]: {
-    tone: 'neutral',
-    label: 'Rejected',
-    icon: CircleX,
-    color: (theme) => theme.palette.text.disabled,
   },
 };

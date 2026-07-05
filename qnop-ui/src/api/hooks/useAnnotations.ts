@@ -20,12 +20,9 @@
  */
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import type {
-  AnnotationCreateRequest,
-  AnnotationDecision,
-  AnnotationListResponse,
-} from '../generated';
+import type { AnnotationCreateRequest, AnnotationListResponse } from '../generated';
 import { annotationsApi } from '../config';
+import { commentKeys } from './useComments';
 
 export const annotationKeys = {
   all: ['annotations'] as const,
@@ -65,22 +62,25 @@ export function useCreateAnnotation(documentId: string) {
 }
 
 /**
- * Decides an annotation (owner or author): OPEN -> ACCEPTED | REJECTED. The
- * first acceptance moves the workflow to CHANGES_REQUESTED (ADR-0011), so the
- * reviews/workflow caches are invalidated alongside the annotation lists.
+ * Resolves an annotation as its author: OPEN -> RESOLVED, with an optional
+ * closing note that lands in the thread as a regular comment (issue #405).
+ * Settling the last open annotation returns the workflow to IN_REVIEW, so the
+ * reviews/workflow caches are invalidated alongside the annotation lists —
+ * and the comment threads, because of the note.
  */
-export function useDecideAnnotation() {
+export function useResolveAnnotation() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: async (vars: { annotationId: string; decision: AnnotationDecision }) => {
-      const response = await annotationsApi.decideAnnotation({
+    mutationFn: async (vars: { annotationId: string; note?: string }) => {
+      const response = await annotationsApi.resolveAnnotation({
         annotationId: vars.annotationId,
-        annotationDecisionRequest: { decision: vars.decision },
+        annotationResolveRequest: vars.note ? { note: vars.note } : undefined,
       });
       return response.data;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: annotationKeys.all });
+      queryClient.invalidateQueries({ queryKey: commentKeys.all });
       queryClient.invalidateQueries({ queryKey: ['reviews'] });
     },
   });

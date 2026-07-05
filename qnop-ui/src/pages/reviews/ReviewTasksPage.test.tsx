@@ -43,7 +43,7 @@ vi.mock('../../api/hooks/useDocuments', () => ({
 }));
 vi.mock('../../api/hooks/useAnnotations', () => ({
   useAnnotations: vi.fn(),
-  useDecideAnnotation: vi.fn().mockReturnValue({ mutate: vi.fn(), isPending: false }),
+  useResolveAnnotation: vi.fn().mockReturnValue({ mutate: vi.fn(), isPending: false }),
 }));
 vi.mock('../../api/hooks/useReviews', () => ({
   useParticipants: vi.fn(),
@@ -88,7 +88,7 @@ function mockData() {
       annotations: [
         annotation('a-open'),
         annotation('a-talk', { commentCount: 4, type: AnnotationType.Question }),
-        annotation('a-done', { status: AnnotationStatus.Accepted }),
+        annotation('a-done', { status: AnnotationStatus.Resolved }),
       ],
     },
   } as never);

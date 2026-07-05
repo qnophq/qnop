@@ -33,8 +33,8 @@ import { tokens } from '../../../theme/tokens';
 import type { Notify } from '../../admin/layout/useToast';
 import { ToneBadge } from '../../admin/ToneBadge';
 import { CommentThread } from '../panel/CommentThread';
-import { DecisionBar } from '../panel/DecisionBar';
-import { mayDecideAnnotation, useDecideWithFeedback } from '../panel/decisions';
+import { ResolveBar } from '../panel/ResolveBar';
+import { mayResolveAnnotation, useResolveWithFeedback } from '../panel/resolve';
 import { PlacementStatusChip } from '../panel/PlacementStatusChip';
 import { STATUS_CUES } from '../panel/statusCues';
 import { PRIORITY_CUES, TYPE_CUES, taskTitle } from './tasksModel';
@@ -46,7 +46,6 @@ interface TaskDrawerProps {
   /** Tracker-style shorthand ("T-3") of the open annotation. */
   taskKey: string;
   authorName: string;
-  ownerId: string;
   notify: Notify;
   onClose: () => void;
   /** Jumps to the review page with this annotation active (deep link). */
@@ -56,24 +55,23 @@ interface TaskDrawerProps {
 /**
  * The task's issue-detail drawer (issue #393, prototype `reviewhub.jsx`):
  * type/priority/anchor header, the opening comment as the title, the full
- * discussion thread and the decision actions — reusing the panel's
- * `CommentThread` and `DecisionBar`, so a thread reads and behaves
- * identically on every surface. Also the keyboard path for deciding (the
- * board's drag-to-Done is a pointer shortcut).
+ * discussion thread and the author's Resolve bar — reusing the panel's
+ * `CommentThread` and `ResolveBar`, so a thread reads and behaves identically
+ * on every surface. Also the keyboard path for resolving (the board's
+ * drag-to-Resolved is a pointer shortcut).
  */
 export function TaskDrawer({
   annotation,
   previousSeenAt = null,
   taskKey,
   authorName,
-  ownerId,
   notify,
   onClose,
   onShowInDocument,
 }: TaskDrawerProps) {
   const theme = useTheme();
   const userId = useAuthStore((state) => state.userId);
-  const { decideWith, isPending } = useDecideWithFeedback(notify);
+  const { resolveWith, isPending } = useResolveWithFeedback(notify);
 
   if (!annotation) return null;
   const type = annotation.type ? TYPE_CUES[annotation.type] : null;
@@ -191,12 +189,9 @@ export function TaskDrawer({
           />
         </Box>
 
-        {mayDecideAnnotation(annotation, userId, ownerId) && (
+        {mayResolveAnnotation(annotation, userId) && (
           <Box sx={{ borderTop: '1px solid', borderColor: 'divider', px: 1, py: 0.5 }}>
-            <DecisionBar
-              disabled={isPending}
-              onDecide={(decision) => decideWith(annotation, decision)}
-            />
+            <ResolveBar disabled={isPending} onResolve={(note) => resolveWith(annotation, note)} />
           </Box>
         )}
       </Stack>

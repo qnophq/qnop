@@ -494,7 +494,6 @@ export function DocumentReviewPage() {
                   onCreate={handleCreate}
                   onCancelPending={() => setPending(null)}
                   canAnnotate={canAnnotate}
-                  ownerId={document.ownerId}
                   notify={notify}
                   readOnly={!isLatestVersion}
                   previousSeenAt={previousSeenAt}
@@ -523,7 +522,6 @@ export function DocumentReviewPage() {
               onCreate={handleCreate}
               onCancelPending={() => setPending(null)}
               canAnnotate={canAnnotate}
-              ownerId={document.ownerId}
               notify={notify}
               readOnly={!isLatestVersion}
               previousSeenAt={previousSeenAt}
@@ -538,7 +536,6 @@ export function DocumentReviewPage() {
           position={walkPosition(annotations, activeAnnotation.id)}
           onNavigate={setActiveAnnotationId}
           onClose={closeFocusCard}
-          ownerId={document.ownerId}
           userId={userId}
           notify={notify}
           readOnly={!isLatestVersion}

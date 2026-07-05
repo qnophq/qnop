@@ -50,11 +50,11 @@ describe('columnOf', () => {
     expect(columnOf(annotation({ commentCount: 2 }))).toBe('discussion');
   });
 
-  it('places decided annotations in done regardless of thread size', () => {
-    expect(columnOf(annotation({ status: AnnotationStatus.Accepted, commentCount: 5 }))).toBe(
+  it('places resolved annotations in done regardless of thread size', () => {
+    expect(columnOf(annotation({ status: AnnotationStatus.Resolved, commentCount: 5 }))).toBe(
       'done',
     );
-    expect(columnOf(annotation({ status: AnnotationStatus.Rejected }))).toBe('done');
+    expect(columnOf(annotation({ status: AnnotationStatus.Resolved }))).toBe('done');
   });
 });
 

@@ -42,7 +42,7 @@ const COLUMN_CUES: Record<
     tone: 'amber',
     color: (theme) => theme.palette.warning.main,
   },
-  done: { label: 'Done', tone: 'green', color: (theme) => theme.palette.success.main },
+  done: { label: 'Resolved', tone: 'green', color: (theme) => theme.palette.success.main },
 };
 
 interface TaskBoardProps {
@@ -52,28 +52,29 @@ interface TaskBoardProps {
   /** Tracker-style shorthand per annotation id ("T-3"). */
   taskKeyOf: (annotationId: string) => string;
   authorNameOf: (authorId: string) => string;
-  /** Whether the viewer may decide this annotation — gates dragging to Done. */
-  mayDecide: (annotation: AnnotationView) => boolean;
+  /** Whether the viewer may resolve this annotation (author-only, #405) — gates dragging. */
+  mayResolve: (annotation: AnnotationView) => boolean;
   onOpen: (annotationId: string) => void;
-  /** Dropping an undecided card on Done accepts it (the drawer offers reject). */
-  onAccept: (annotationId: string) => void;
+  /** Dropping one's own open card on Resolved resolves it (the drawer offers a note). */
+  onResolve: (annotationId: string) => void;
 }
 
 /**
  * The kanban presentation (issue #393, prototype `reviewhub.jsx`): three
- * columns — Open, the derived In discussion, Done — with independently
- * scrolling card stacks. Done is the only drop target (Open ↔ In discussion
- * is derived state); the drag-over column shows the prototype's dashed
- * accent outline. Deciding via the drawer stays the keyboard path.
+ * columns — Open, the derived In discussion, Resolved — with independently
+ * scrolling card stacks. Resolved is the only drop target (Open ↔ In
+ * discussion is derived state) and only the author's own cards drag (issue
+ * #405); the drag-over column shows the prototype's dashed accent outline.
+ * Resolving via the drawer stays the keyboard path.
  */
 export function TaskBoard({
   annotations,
   previousSeenAt = null,
   taskKeyOf,
   authorNameOf,
-  mayDecide,
+  mayResolve,
   onOpen,
-  onAccept,
+  onResolve,
 }: TaskBoardProps) {
   const theme = useTheme();
   const [dropActive, setDropActive] = useState(false);
@@ -92,7 +93,7 @@ export function TaskBoard({
     event.preventDefault();
     setDropActive(false);
     const annotationId = event.dataTransfer.getData(TASK_DRAG_TYPE);
-    if (annotationId) onAccept(annotationId);
+    if (annotationId) onResolve(annotationId);
   };
 
   return (
@@ -162,7 +163,7 @@ export function TaskBoard({
                   previousSeenAt={previousSeenAt}
                   taskKey={taskKeyOf(annotation.id)}
                   authorName={authorNameOf(annotation.authorId)}
-                  draggable={!isDone && mayDecide(annotation)}
+                  draggable={!isDone && mayResolve(annotation)}
                   onOpen={onOpen}
                 />
               ))}
@@ -172,7 +173,7 @@ export function TaskBoard({
                   color="text.secondary"
                   sx={{ textAlign: 'center', py: 3 }}
                 >
-                  {isDone ? 'Drop a card here to accept it' : 'Nothing here'}
+                  {isDone ? 'Drop your card here to resolve it' : 'Nothing here'}
                 </Typography>
               )}
             </Stack>

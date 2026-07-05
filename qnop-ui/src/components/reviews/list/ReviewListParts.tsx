@@ -69,16 +69,16 @@ export function DocumentIcon({ size = 30 }: { size?: number }) {
 
 /**
  * Decided/total bar in the status colour. `discussion` (issue #393) adds the
- * prototype's second tone: open-but-discussed annotations trail the decided
+ * prototype's second tone: open-but-discussed annotations trail the resolved
  * segment in amber, so the strip reads "done · in flight · untouched".
  */
 export function ProgressBar({
-  decided,
+  resolved,
   total,
   color,
   discussion = 0,
 }: {
-  decided: number;
+  resolved: number;
   total: number;
   color: string;
   discussion?: number;
@@ -98,10 +98,10 @@ export function ProgressBar({
         role="progressbar"
         aria-valuemin={0}
         aria-valuemax={total}
-        aria-valuenow={decided}
-        aria-label={`${decided} of ${total} annotations decided`}
+        aria-valuenow={resolved}
+        aria-label={`${resolved} of ${total} annotations resolved`}
       >
-        <Box sx={{ width: `${(decided / total) * 100}%`, height: '100%', bgcolor: color }} />
+        <Box sx={{ width: `${(resolved / total) * 100}%`, height: '100%', bgcolor: color }} />
         {discussion > 0 && (
           <Box
             sx={{
@@ -117,7 +117,7 @@ export function ProgressBar({
         color="text.secondary"
         sx={{ fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap' }}
       >
-        {decided}/{total}
+        {resolved}/{total}
       </Typography>
     </Stack>
   );

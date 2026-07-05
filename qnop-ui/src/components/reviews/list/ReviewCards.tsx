@@ -100,13 +100,13 @@ export function ReviewCards({ reviews, userId, onOpen }: ReviewCardsProps) {
                   color="text.secondary"
                   sx={{ fontVariantNumeric: 'tabular-nums' }}
                 >
-                  {progress.decided}/{progress.total} decided
+                  {progress.resolved}/{progress.total} resolved
                 </Typography>
               )}
             </Stack>
             {progress && (
               <ProgressBar
-                decided={progress.decided}
+                resolved={progress.resolved}
                 total={progress.total}
                 color={theme.qnop.brand.blue}
               />

@@ -38,13 +38,13 @@ vi.mock('../../../api/hooks/useComments', () => ({
   useComments: vi.fn().mockReturnValue({ isPending: false, isError: false, data: undefined }),
 }));
 
-const { decideMutate } = vi.hoisted(() => ({ decideMutate: vi.fn() }));
+const { resolveMutate } = vi.hoisted(() => ({ resolveMutate: vi.fn() }));
 vi.mock('../../../api/hooks/useAnnotations', () => ({
-  useDecideAnnotation: () => ({ mutate: decideMutate, isPending: false }),
+  useResolveAnnotation: () => ({ mutate: resolveMutate, isPending: false }),
 }));
 
 beforeEach(() => {
-  decideMutate.mockClear();
+  resolveMutate.mockClear();
   useAuthStore.setState({ userId: null });
 });
 
@@ -74,7 +74,6 @@ function renderPanel(props: Partial<Parameters<typeof AnnotationPanel>[0]> = {})
     onCreate: vi.fn(),
     onCancelPending: vi.fn(),
     canAnnotate: true,
-    ownerId: 'owner-1',
     notify: vi.fn(),
   };
   const merged = { ...defaults, ...props };
@@ -156,17 +155,17 @@ describe('AnnotationPanel', () => {
     renderPanel({
       annotations: [
         annotation('open-1'),
-        annotation('accepted-1', { status: AnnotationStatus.Accepted }),
+        annotation('resolved-1', { status: AnnotationStatus.Resolved }),
       ],
     });
 
     fireEvent.click(screen.getByRole('button', { name: 'Open' }));
     expect(screen.getByTestId('annotation-item-open-1')).toBeInTheDocument();
-    expect(screen.queryByTestId('annotation-item-accepted-1')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('annotation-item-resolved-1')).not.toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole('button', { name: 'Decided' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Resolved' }));
     expect(screen.queryByTestId('annotation-item-open-1')).not.toBeInTheDocument();
-    expect(screen.getByTestId('annotation-item-accepted-1')).toBeInTheDocument();
+    expect(screen.getByTestId('annotation-item-resolved-1')).toBeInTheDocument();
   });
 
   it('collapses a section on click', () => {
@@ -244,37 +243,41 @@ describe('AnnotationPanel', () => {
     expect(props.onCreate).toHaveBeenCalledWith('Needs a source', undefined, undefined);
   });
 
-  it('offers Accept/Reject to the owner on an open active annotation', () => {
-    useAuthStore.setState({ userId: 'owner-1' });
+  it('offers Resolve to the author on their open active annotation (#405)', () => {
+    useAuthStore.setState({ userId: 'u1' });
     renderPanel({ annotations: [annotation('a1')], activeAnnotationId: 'a1' });
 
-    fireEvent.click(within(screen.getByTestId('decision-bar')).getByText('Accept'));
+    const bar = within(screen.getByTestId('resolve-bar'));
+    fireEvent.change(bar.getByLabelText('Optional closing note'), {
+      target: { value: 'Fixed in v2.' },
+    });
+    fireEvent.click(bar.getByText('Resolve'));
 
-    expect(decideMutate).toHaveBeenCalledWith(
-      { annotationId: 'a1', decision: 'ACCEPTED' },
+    expect(resolveMutate).toHaveBeenCalledWith(
+      { annotationId: 'a1', note: 'Fixed in v2.' },
       expect.anything(),
     );
   });
 
-  it('hides the decision from the author — deciding is owner-only (#403)', () => {
-    useAuthStore.setState({ userId: 'u1' });
+  it("hides the resolve bar from the owner — resolving is the author's call (#405)", () => {
+    useAuthStore.setState({ userId: 'owner-1' });
     renderPanel({ annotations: [annotation('a1')], activeAnnotationId: 'a1' });
 
-    expect(screen.queryByTestId('decision-bar')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('resolve-bar')).not.toBeInTheDocument();
   });
 
-  it('hides the decision bar from uninvolved participants and on decided annotations', () => {
+  it('hides the resolve bar from uninvolved participants and on resolved annotations', () => {
     useAuthStore.setState({ userId: 'stranger' });
     renderPanel({ annotations: [annotation('a1')], activeAnnotationId: 'a1' });
-    expect(screen.queryByTestId('decision-bar')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('resolve-bar')).not.toBeInTheDocument();
     cleanup();
 
-    useAuthStore.setState({ userId: 'owner-1' });
+    useAuthStore.setState({ userId: 'u1' });
     renderPanel({
-      annotations: [annotation('a2', { status: AnnotationStatus.Accepted })],
+      annotations: [annotation('a2', { status: AnnotationStatus.Resolved })],
       activeAnnotationId: 'a2',
     });
-    expect(screen.queryByTestId('decision-bar')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('resolve-bar')).not.toBeInTheDocument();
   });
 
   it('creates via the submit shortcut and shows the hint', () => {
@@ -299,10 +302,10 @@ describe('AnnotationPanel', () => {
     expect(props.onCreate).toHaveBeenCalledTimes(2);
   });
 
-  it('suppresses deciding on a read-only (older) version (#306)', () => {
-    useAuthStore.setState({ userId: 'owner-1' });
+  it('suppresses resolving on a read-only (older) version (#306)', () => {
+    useAuthStore.setState({ userId: 'u1' });
     renderPanel({ annotations: [annotation('a1')], activeAnnotationId: 'a1', readOnly: true });
-    expect(screen.queryByTestId('decision-bar')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('resolve-bar')).not.toBeInTheDocument();
     expect(screen.getByTestId('thread-a1')).toBeInTheDocument();
   });
 });

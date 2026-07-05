@@ -27,10 +27,10 @@ export function roleOf(review: DocumentSummary, userId: string | null): 'owner' 
 }
 
 /** Decided/total progress of a review; null when it has no annotations yet. */
-export function progressOf(review: DocumentSummary): { decided: number; total: number } | null {
+export function progressOf(review: DocumentSummary): { resolved: number; total: number } | null {
   if (review.annotationCount === 0) return null;
   return {
-    decided: review.annotationCount - review.openAnnotationCount,
+    resolved: review.annotationCount - review.openAnnotationCount,
     total: review.annotationCount,
   };
 }

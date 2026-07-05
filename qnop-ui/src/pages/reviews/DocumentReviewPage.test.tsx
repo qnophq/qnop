@@ -47,7 +47,7 @@ vi.mock('../../api/hooks/useDocuments', () => ({
 vi.mock('../../api/hooks/useAnnotations', () => ({
   useAnnotations: vi.fn(),
   useCreateAnnotation: vi.fn(),
-  useDecideAnnotation: vi.fn().mockReturnValue({ mutate: vi.fn(), isPending: false }),
+  useResolveAnnotation: vi.fn().mockReturnValue({ mutate: vi.fn(), isPending: false }),
 }));
 vi.mock('../../api/hooks/useReviews', () => ({
   useRecordVisit: vi.fn().mockReturnValue(null),
@@ -378,7 +378,7 @@ describe('DocumentReviewPage on an older version', () => {
     expect(screen.queryByTestId('read-only-banner')).not.toBeInTheDocument();
   });
 
-  // The page must pass readOnly down to the panel — the decision bar and the
+  // The page must pass readOnly down to the panel — the resolve bar and the
   // reply composer of an expanded thread are gated there, not in the page.
   describe('expanded thread', () => {
     afterEach(() => {
@@ -391,7 +391,7 @@ describe('DocumentReviewPage on an older version', () => {
       renderPage('/reviews/doc-1?version=1');
 
       fireEvent.click(screen.getByTestId('annotation-item-a1'));
-      expect(screen.queryByTestId('decision-bar')).not.toBeInTheDocument();
+      expect(screen.queryByTestId('resolve-bar')).not.toBeInTheDocument();
       expect(screen.queryByLabelText('Add a comment')).not.toBeInTheDocument();
     });
 
@@ -401,7 +401,7 @@ describe('DocumentReviewPage on an older version', () => {
       renderPage('/reviews/doc-1?version=2');
 
       fireEvent.click(screen.getByTestId('annotation-item-a1'));
-      expect(screen.getByTestId('decision-bar')).toBeInTheDocument();
+      expect(screen.getByTestId('resolve-bar')).toBeInTheDocument();
       expect(screen.getByLabelText('Add a comment')).toBeInTheDocument();
     });
   });
