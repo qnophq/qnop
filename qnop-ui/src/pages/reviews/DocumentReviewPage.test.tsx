@@ -48,9 +48,11 @@ vi.mock('../../api/hooks/useAnnotations', () => ({
   useAnnotations: vi.fn(),
   useCreateAnnotation: vi.fn(),
   useResolveAnnotation: vi.fn().mockReturnValue({ mutate: vi.fn(), isPending: false }),
+  useReopenAnnotation: vi.fn().mockReturnValue({ mutate: vi.fn(), isPending: false }),
 }));
 vi.mock('../../api/hooks/useReviews', () => ({
   useRecordVisit: vi.fn().mockReturnValue(null),
+  useParticipants: vi.fn().mockReturnValue({ data: { participants: [] } }),
 }));
 vi.mock('../../api/hooks/useComments', () => ({
   useComments: vi.fn().mockReturnValue({ isPending: true, isError: false, data: undefined }),

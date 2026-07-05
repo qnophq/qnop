@@ -21,7 +21,7 @@
 
 import type { AnnotationView } from '../../../api/generated';
 import { AnnotationStatus } from '../../../api/generated';
-import { useResolveAnnotation } from '../../../api/hooks/useAnnotations';
+import { useReopenAnnotation, useResolveAnnotation } from '../../../api/hooks/useAnnotations';
 import { apiErrorCode } from '../../../utils/apiError';
 import type { Notify } from '../../admin/layout/useToast';
 
@@ -63,4 +63,42 @@ export function useResolveWithFeedback(notify: Notify) {
     );
   };
   return { resolveWith, isPending: resolve.isPending };
+}
+
+/**
+ * Only the AUTHOR reopens their RESOLVED annotation (issue #394); the caller
+ * additionally gates on the review still running (FINALIZED/CANCELLED are a
+ * closed record). Mirrors the ReviewWorkflowService guard.
+ */
+export function mayReopenAnnotation(annotation: AnnotationView, userId: string | null): boolean {
+  return (
+    annotation.status === AnnotationStatus.Resolved &&
+    userId !== null &&
+    annotation.authorId === userId
+  );
+}
+
+/** Known reopen conflicts (409) — mapped to friendly text, never server prose. */
+const REOPEN_CONFLICTS: Record<string, string> = {
+  REVIEW_CLOSED: 'The review is finalized — resolved annotations stay closed.',
+  ANNOTATION_NOT_RESOLVED: 'This annotation is already open.',
+};
+
+/** The reopen mutation with the shared toast feedback (issue #394). */
+export function useReopenWithFeedback(notify: Notify) {
+  const reopen = useReopenAnnotation();
+  const reopenWith = (annotation: AnnotationView) => {
+    reopen.mutate(
+      { annotationId: annotation.id },
+      {
+        onSuccess: () => notify('Annotation reopened.'),
+        onError: (error) =>
+          notify(
+            REOPEN_CONFLICTS[apiErrorCode(error) ?? ''] ?? 'The annotation could not be reopened.',
+            'error',
+          ),
+      },
+    );
+  };
+  return { reopenWith, isPending: reopen.isPending };
 }

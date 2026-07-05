@@ -33,13 +33,19 @@ import useMediaQuery from '@mui/material/useMediaQuery';
 import { useTheme } from '@mui/material/styles';
 import { ChevronDown, ChevronUp, X } from 'lucide-react';
 import type { AnnotationView } from '../../../api/generated';
+import { AnnotationStatus } from '../../../api/generated';
 import { tokens } from '../../../theme/tokens';
 import type { Notify } from '../../admin/layout/useToast';
 import { ToneBadge } from '../../admin/ToneBadge';
 import { STATUS_CUES } from '../panel/statusCues';
 import { CommentThread } from '../panel/CommentThread';
 import { ResolveBar } from '../panel/ResolveBar';
-import { mayResolveAnnotation, useResolveWithFeedback } from '../panel/resolve';
+import {
+  mayReopenAnnotation,
+  mayResolveAnnotation,
+  useReopenWithFeedback,
+  useResolveWithFeedback,
+} from '../panel/resolve';
 import { PlacementStatusChip } from '../panel/PlacementStatusChip';
 import type { WalkPosition } from './spotlightModel';
 
@@ -55,6 +61,8 @@ interface FocusAnnotationCardProps {
   notify: Notify;
   /** True while an OLDER version is viewed (#306): thread readable, nothing writable. */
   readOnly?: boolean;
+  /** True once the review is FINALIZED/CANCELLED (issue #394): no reopening. */
+  reviewClosed?: boolean;
   /** The previous visit (issue #307) — enables the thread's "new" divider. */
   previousSeenAt?: string | null;
 }
@@ -84,11 +92,13 @@ export function FocusAnnotationCard({
   userId,
   notify,
   readOnly = false,
+  reviewClosed = false,
   previousSeenAt = null,
 }: FocusAnnotationCardProps) {
   const theme = useTheme();
   const reducedMotion = useMediaQuery('(prefers-reduced-motion: reduce)');
   const { resolveWith, isPending: resolving } = useResolveWithFeedback(notify);
+  const { reopenWith } = useReopenWithFeedback(notify);
   const statusCue = STATUS_CUES[annotation.status];
   const quote = annotation.anchor?.textQuote?.quote;
 
@@ -308,6 +318,12 @@ export function FocusAnnotationCard({
                     annotationId={annotation.id}
                     notify={notify}
                     readOnly={readOnly}
+                    closed={annotation.status !== AnnotationStatus.Open}
+                    onReopen={
+                      !readOnly && !reviewClosed && mayReopenAnnotation(annotation, userId)
+                        ? () => reopenWith(annotation)
+                        : undefined
+                    }
                     previousSeenAt={previousSeenAt}
                     skipOpener
                   />

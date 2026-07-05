@@ -302,11 +302,41 @@ public class AnnotationService {
         foreignActivity(updated.getId(), actor));
   }
 
-  /** Appends a comment to an annotation's thread; visible participants only. */
+  /**
+   * Reopens the annotation as its author (issue #394) via the workflow choke-point (which enforces
+   * the authorization, the closed-review guard and the state re-derivation), and returns the
+   * updated annotation's view.
+   */
+  @Transactional
+  public AnnotationView reopen(UUID annotationId, UUID actor) {
+    Annotation updated = workflow.reopenAnnotation(annotationId, actor);
+    return view(
+        updated,
+        null,
+        firstComment(updated.getId()),
+        threadSize(updated.getId()),
+        foreignActivity(updated.getId(), actor));
+  }
+
+  /**
+   * Appends a comment to an annotation's thread; visible participants only. A RESOLVED annotation's
+   * thread is a closed record (issue #403) — the author settled the concern, so further comments
+   * are refused with 409 (the resolve note itself is written by {@link
+   * ReviewWorkflowService#resolveAnnotation} before the status flips).
+   */
   @Transactional
   public CommentView addComment(UUID annotationId, UUID author, boolean admin, String body) {
     Annotation annotation = requireAnnotation(annotationId);
     documentAccess.getDocument(annotation.getDocumentId(), author, admin);
+    if (annotation.getStatus() != AnnotationStatus.OPEN) {
+      throw new WorkflowTransitionException(
+          WorkflowTransitionException.ANNOTATION_ALREADY_RESOLVED,
+          "annotation "
+              + annotationId
+              + " is "
+              + annotation.getStatus()
+              + "; its thread is closed");
+    }
     // saveAndFlush so @CreationTimestamp is populated on the returned comment before the view.
     return commentView(comments.saveAndFlush(new Comment(annotationId, author, body)));
   }

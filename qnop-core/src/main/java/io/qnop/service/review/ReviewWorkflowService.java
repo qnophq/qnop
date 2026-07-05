@@ -61,6 +61,9 @@ public class ReviewWorkflowService {
   /** Audit event type for an annotation resolution; detail carries the annotation id. */
   static final String AUDIT_ANNOTATION_RESOLVED = "annotation.resolved";
 
+  /** Audit event type for an annotation reopen; detail carries the annotation id. */
+  static final String AUDIT_ANNOTATION_REOPENED = "annotation.reopened";
+
   private final ReviewWorkflowMachine machine = new ReviewWorkflowMachine();
 
   private final DocumentRepository documents;
@@ -168,6 +171,40 @@ public class ReviewWorkflowService {
   }
 
   /**
+   * Reopens a resolved annotation — {@code RESOLVED → OPEN} (issue #394), permitted for the
+   * annotation's author alone and only while the review is still running: a {@code FINALIZED} or
+   * {@code CANCELLED} review is a closed record. The open-annotation count then re-derives the
+   * {@code IN_REVIEW ⇄ CHANGES_REQUESTED} pair — a reopened concern moves the review back to {@code
+   * CHANGES_REQUESTED}.
+   */
+  @Transactional
+  public Annotation reopenAnnotation(UUID annotationId, UUID actorId) {
+    Annotation annotation =
+        annotations
+            .findById(annotationId)
+            .orElseThrow(() -> new AnnotationNotFoundException(annotationId));
+    Document document = loadForUpdate(annotation.getDocumentId());
+    if (!annotation.getAuthorId().equals(actorId)) {
+      throw new AnnotationActionForbiddenException("Only the annotation's author may reopen it");
+    }
+    requireReviewOpen(document);
+    if (annotation.getStatus() != AnnotationStatus.RESOLVED) {
+      throw new WorkflowTransitionException(
+          WorkflowTransitionException.ANNOTATION_NOT_RESOLVED,
+          "annotation " + annotationId + " is " + annotation.getStatus() + "; nothing to reopen");
+    }
+    annotation.reopen();
+    auditEvents.save(
+        new AuditEvent(
+            document.getId(),
+            AUDIT_ANNOTATION_REOPENED,
+            actorId,
+            "{\"annotationId\":\"" + annotationId + "\"}"));
+    rederiveWorkflow(document, actorId);
+    return annotation;
+  }
+
+  /**
    * Registers a freshly raised annotation with the workflow (issue #405): takes the document write
    * lock, refuses the annotation when the review is closed ({@code FINALIZED} or {@code CANCELLED}
    * — the caller's transaction rolls the insert back), and re-derives the {@code IN_REVIEW ⇄
@@ -177,6 +214,12 @@ public class ReviewWorkflowService {
   @Transactional
   public void annotationRaised(UUID documentId, UUID actorId) {
     Document document = loadForUpdate(documentId);
+    requireReviewOpen(document);
+    rederiveWorkflow(document, actorId);
+  }
+
+  /** Refuses the mutation when the review is a closed record (issues #394/#405). */
+  private static void requireReviewOpen(Document document) {
     boolean closed =
         WorkflowState.fromString(document.getWorkflowState())
             .map(state -> state == WorkflowState.FINALIZED || state == WorkflowState.CANCELLED)
@@ -184,9 +227,8 @@ public class ReviewWorkflowService {
     if (closed) {
       throw new WorkflowTransitionException(
           WorkflowTransitionException.REVIEW_CLOSED,
-          "the review is " + document.getWorkflowState() + "; it accepts no new annotations");
+          "the review is " + document.getWorkflowState() + "; annotations can no longer change");
     }
-    rederiveWorkflow(document, actorId);
   }
 
   /**

@@ -53,6 +53,7 @@ import {
   taskKeys,
 } from '../../components/reviews/tasks/tasksModel';
 import { useTasksViewMode } from '../../components/reviews/tasks/useTasksViewMode';
+import { isOpenWorkflowState } from '../../components/reviews/workflowMeta';
 import { ExtractionStatus } from '../../api/generated';
 import { useAuthStore } from '../../stores/authStore';
 
@@ -259,6 +260,7 @@ export function ReviewTasksPage() {
         taskKey={openTask ? taskKeyOf(openTask.id) : ''}
         authorName={openTask ? authorNameOf(openTask.authorId) : ''}
         notify={notify}
+        reviewClosed={!isOpenWorkflowState(document.workflowState)}
         onClose={() => setOpenTaskId(null)}
         onShowInDocument={showInDocument}
       />

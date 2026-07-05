@@ -23,7 +23,6 @@ import { useMemo, useState } from 'react';
 import type { ReactNode } from 'react';
 import Box from '@mui/material/Box';
 import ButtonBase from '@mui/material/ButtonBase';
-import Chip from '@mui/material/Chip';
 import Collapse from '@mui/material/Collapse';
 import Stack from '@mui/material/Stack';
 import Typography from '@mui/material/Typography';
@@ -36,6 +35,7 @@ import type {
   AnnotationView,
 } from '../../../api/generated';
 import { AnnotationStatus } from '../../../api/generated';
+import { useParticipants } from '../../../api/hooks/useReviews';
 import { useAuthStore } from '../../../stores/authStore';
 import type { Notify } from '../../admin/layout/useToast';
 import { SectionCard } from '../../admin/layout/SectionCard';
@@ -44,18 +44,21 @@ import { isUnseen } from '../newSince';
 import { AnnotationListItem } from './AnnotationListItem';
 import { CommentThread } from './CommentThread';
 import { Composer } from './Composer';
+import type { FilterAuthor } from './PanelFilterBar';
+import { PanelFilterBar } from './PanelFilterBar';
+import type { AnnotationFilters } from './panelFilters';
+import { EMPTY_FILTERS, matchesFilters } from './panelFilters';
 import { ResolveBar } from './ResolveBar';
-import { mayResolveAnnotation, useResolveWithFeedback } from './resolve';
-
-type StatusFilter = 'all' | 'open' | 'resolved';
-
-const FILTERS: { value: StatusFilter; label: string }[] = [
-  { value: 'all', label: 'All' },
-  { value: 'open', label: 'Open' },
-  { value: 'resolved', label: 'Resolved' },
-];
+import {
+  mayReopenAnnotation,
+  mayResolveAnnotation,
+  useReopenWithFeedback,
+  useResolveWithFeedback,
+} from './resolve';
 
 interface AnnotationPanelProps {
+  /** The review the annotations belong to — resolves author names for the filter. */
+  documentId: string;
   annotations: AnnotationView[];
   activeAnnotationId: string | null;
   hoverAnnotationId?: string | null;
@@ -67,10 +70,11 @@ interface AnnotationPanelProps {
   onCreate: (comment: string, type?: AnnotationType, priority?: AnnotationPriority) => void;
   onCancelPending: () => void;
   canAnnotate: boolean;
-  /** The document owner — owner or author may decide an annotation (ADR-0011). */
   notify: Notify;
   /** True while an OLDER version is viewed (#306): threads readable, nothing writable. */
   readOnly?: boolean;
+  /** True once the review is FINALIZED/CANCELLED (issue #394): no reopening. */
+  reviewClosed?: boolean;
   /** The previous visit (issue #307) — null hides every unseen cue. */
   previousSeenAt?: string | null;
 }
@@ -189,6 +193,7 @@ function PanelSection({
  * mark on the page (and vice versa).
  */
 export function AnnotationPanel({
+  documentId,
   annotations,
   activeAnnotationId,
   hoverAnnotationId,
@@ -201,30 +206,50 @@ export function AnnotationPanel({
   canAnnotate,
   notify,
   readOnly = false,
+  reviewClosed = false,
   previousSeenAt = null,
 }: AnnotationPanelProps) {
-  const [filter, setFilter] = useState<StatusFilter>('all');
+  const [filters, setFilters] = useState<AnnotationFilters>(EMPTY_FILTERS);
   const userId = useAuthStore((state) => state.userId);
   const { resolveWith, isPending: resolving } = useResolveWithFeedback(notify);
+  const { reopenWith } = useReopenWithFeedback(notify);
 
   // Sort + status-filter once per (annotations, filter) change, not on every
   // render (e.g. a hover or selection): the list can be large and the sort is
   // O(n log n) (issue #334).
+  // Author names for the filter facet, resolved like the tasks board does:
+  // self by display name, reviewers via the participant directory, anyone the
+  // directory does not know (the owner) as a plain "Participant".
+  const participants = useParticipants(documentId).data?.participants ?? [];
+  const displayName = useAuthStore((state) => state.displayName);
+  const authorNameOf = (authorId: string) =>
+    authorId === userId
+      ? (displayName ?? 'You')
+      : (participants.find((participant) => participant.principalId === authorId)?.displayName ??
+        'Participant');
+  const authors: FilterAuthor[] = useMemo(
+    () =>
+      [...new Set(annotations.map((annotation) => annotation.authorId))].map((id) => ({
+        id,
+        name: authorNameOf(id),
+      })),
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- names derive from the two inputs below
+    [annotations, participants, userId, displayName],
+  );
+
   const { placed, unplaced, hiddenByFilter } = useMemo(() => {
-    const matchesFilter = (annotation: AnnotationView) =>
-      filter === 'all' ||
-      (filter === 'open'
-        ? annotation.status === AnnotationStatus.Open
-        : annotation.status !== AnnotationStatus.Open);
+    const matches = (annotation: AnnotationView) =>
+      matchesFilters(annotation, filters, authorNameOf(annotation.authorId));
     const sorted = [...annotations].sort(compareAnnotationsByPosition);
-    const placedItems = sorted.filter((a) => a.anchor && matchesFilter(a));
-    const unplacedItems = sorted.filter((a) => !a.anchor && matchesFilter(a));
+    const placedItems = sorted.filter((a) => a.anchor && matches(a));
+    const unplacedItems = sorted.filter((a) => !a.anchor && matches(a));
     return {
       placed: placedItems,
       unplaced: unplacedItems,
       hiddenByFilter: annotations.length > 0 && placedItems.length + unplacedItems.length === 0,
     };
-  }, [annotations, filter]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- authorNameOf derives from authors' inputs
+  }, [annotations, filters, participants, userId, displayName]);
 
   const renderItem = (annotation: AnnotationView) => {
     const active = annotation.id === activeAnnotationId;
@@ -242,10 +267,17 @@ export function AnnotationPanel({
           {!readOnly && mayResolveAnnotation(annotation, userId) && (
             <ResolveBar disabled={resolving} onResolve={(note) => resolveWith(annotation, note)} />
           )}
+          {/* The thread stays inside the unit's card. */}
           <CommentThread
             annotationId={annotation.id}
             notify={notify}
             readOnly={readOnly}
+            closed={annotation.status !== AnnotationStatus.Open}
+            onReopen={
+              !readOnly && !reviewClosed && mayReopenAnnotation(annotation, userId)
+                ? () => reopenWith(annotation)
+                : undefined
+            }
             previousSeenAt={previousSeenAt}
             skipOpener
           />
@@ -262,19 +294,7 @@ export function AnnotationPanel({
     >
       <Stack spacing={1.5}>
         {annotations.length > 0 && (
-          <Stack direction="row" spacing={0.5} role="group" aria-label="Filter annotations">
-            {FILTERS.map(({ value, label }) => (
-              <Chip
-                key={value}
-                label={label}
-                size="small"
-                variant={filter === value ? 'filled' : 'outlined'}
-                color={filter === value ? 'primary' : 'default'}
-                onClick={() => setFilter(value)}
-                aria-pressed={filter === value}
-              />
-            ))}
-          </Stack>
+          <PanelFilterBar filters={filters} onChange={setFilters} authors={authors} />
         )}
         {pendingAnchor && (
           <Composer

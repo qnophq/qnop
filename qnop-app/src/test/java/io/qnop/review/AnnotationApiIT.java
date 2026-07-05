@@ -201,6 +201,79 @@ class AnnotationApiIT extends SeededIntegrationTest {
   }
 
   @Test
+  void aResolvedThreadRefusesNewComments() throws Exception {
+    UUID documentId = seedDocumentWithVersion();
+    String annotationId = createAnnotation(documentId, AUDITOR_ID);
+    resolve(annotationId, AUDITOR_ID).andExpect(status().isOk());
+
+    // The thread is a closed record (issue #403) — even for the author/owner.
+    mockMvc
+        .perform(
+            as(post("/api/v1/annotations/" + annotationId + "/comments"), MEMBER_ID)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"body\":\"too late\"}"))
+        .andExpect(status().isConflict())
+        .andExpect(jsonPath("$.code").value("ANNOTATION_ALREADY_RESOLVED"));
+  }
+
+  @Test
+  void theAuthorReopensTheirResolvedAnnotation() throws Exception {
+    UUID documentId = seedDocumentWithVersion();
+    String annotationId = createAnnotation(documentId, AUDITOR_ID);
+    resolve(annotationId, AUDITOR_ID).andExpect(status().isOk());
+
+    mockMvc
+        .perform(as(post("/api/v1/annotations/" + annotationId + "/reopen"), AUDITOR_ID))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.status").value("OPEN"));
+
+    // The thread accepts comments again (issue #394).
+    mockMvc
+        .perform(
+            as(post("/api/v1/annotations/" + annotationId + "/comments"), MEMBER_ID)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"body\":\"welcome back\"}"))
+        .andExpect(status().isCreated());
+  }
+
+  @Test
+  void theOwnerCannotReopenAForeignAnnotation() throws Exception {
+    UUID documentId = seedDocumentWithVersion();
+    String annotationId = createAnnotation(documentId, AUDITOR_ID);
+    resolve(annotationId, AUDITOR_ID).andExpect(status().isOk());
+
+    mockMvc
+        .perform(as(post("/api/v1/annotations/" + annotationId + "/reopen"), MEMBER_ID))
+        .andExpect(status().isForbidden());
+  }
+
+  @Test
+  void reopeningAnOpenAnnotationIsConflict() throws Exception {
+    UUID documentId = seedDocumentWithVersion();
+    String annotationId = createAnnotation(documentId, AUDITOR_ID);
+
+    mockMvc
+        .perform(as(post("/api/v1/annotations/" + annotationId + "/reopen"), AUDITOR_ID))
+        .andExpect(status().isConflict())
+        .andExpect(jsonPath("$.code").value("ANNOTATION_NOT_RESOLVED"));
+  }
+
+  @Test
+  void reopeningOnAFinalizedReviewIsRefused() throws Exception {
+    UUID documentId = seedDocumentWithVersion();
+    String annotationId = createAnnotation(documentId, AUDITOR_ID);
+    resolve(annotationId, AUDITOR_ID).andExpect(status().isOk());
+    Document document = documents.findById(documentId).orElseThrow();
+    document.setWorkflowState(WorkflowState.FINALIZED);
+    documents.save(document);
+
+    mockMvc
+        .perform(as(post("/api/v1/annotations/" + annotationId + "/reopen"), AUDITOR_ID))
+        .andExpect(status().isConflict())
+        .andExpect(jsonPath("$.code").value("REVIEW_CLOSED"));
+  }
+
+  @Test
   void aClosedReviewAcceptsNoNewAnnotations() throws Exception {
     UUID documentId = seedDocumentWithVersion();
     Document document = documents.findById(documentId).orElseThrow();

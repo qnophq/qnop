@@ -37,6 +37,9 @@ public class WorkflowTransitionException extends RuntimeException {
   /** An annotation was raised on a review that is already FINALIZED or CANCELLED (issue #405). */
   public static final String REVIEW_CLOSED = "REVIEW_CLOSED";
 
+  /** A reopen was requested on an annotation that is not RESOLVED (issue #394). */
+  public static final String ANNOTATION_NOT_RESOLVED = "ANNOTATION_NOT_RESOLVED";
+
   private final String code;
 
   public WorkflowTransitionException(String code, String message) {

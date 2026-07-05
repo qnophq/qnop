@@ -28,13 +28,19 @@ import Typography from '@mui/material/Typography';
 import { useTheme } from '@mui/material/styles';
 import { ExternalLink, X } from 'lucide-react';
 import type { AnnotationView } from '../../../api/generated';
+import { AnnotationStatus } from '../../../api/generated';
 import { useAuthStore } from '../../../stores/authStore';
 import { tokens } from '../../../theme/tokens';
 import type { Notify } from '../../admin/layout/useToast';
 import { ToneBadge } from '../../admin/ToneBadge';
 import { CommentThread } from '../panel/CommentThread';
 import { ResolveBar } from '../panel/ResolveBar';
-import { mayResolveAnnotation, useResolveWithFeedback } from '../panel/resolve';
+import {
+  mayReopenAnnotation,
+  mayResolveAnnotation,
+  useReopenWithFeedback,
+  useResolveWithFeedback,
+} from '../panel/resolve';
 import { PlacementStatusChip } from '../panel/PlacementStatusChip';
 import { STATUS_CUES } from '../panel/statusCues';
 import { PRIORITY_CUES, TYPE_CUES, taskTitle } from './tasksModel';
@@ -47,6 +53,8 @@ interface TaskDrawerProps {
   taskKey: string;
   authorName: string;
   notify: Notify;
+  /** True once the review is FINALIZED/CANCELLED (issue #394): no reopening. */
+  reviewClosed?: boolean;
   onClose: () => void;
   /** Jumps to the review page with this annotation active (deep link). */
   onShowInDocument: (annotationId: string) => void;
@@ -66,12 +74,14 @@ export function TaskDrawer({
   taskKey,
   authorName,
   notify,
+  reviewClosed = false,
   onClose,
   onShowInDocument,
 }: TaskDrawerProps) {
   const theme = useTheme();
   const userId = useAuthStore((state) => state.userId);
   const { resolveWith, isPending } = useResolveWithFeedback(notify);
+  const { reopenWith } = useReopenWithFeedback(notify);
 
   if (!annotation) return null;
   const type = annotation.type ? TYPE_CUES[annotation.type] : null;
@@ -184,6 +194,12 @@ export function TaskDrawer({
           <CommentThread
             annotationId={annotation.id}
             notify={notify}
+            closed={annotation.status !== AnnotationStatus.Open}
+            onReopen={
+              !reviewClosed && mayReopenAnnotation(annotation, userId)
+                ? () => reopenWith(annotation)
+                : undefined
+            }
             previousSeenAt={previousSeenAt}
             skipOpener
           />

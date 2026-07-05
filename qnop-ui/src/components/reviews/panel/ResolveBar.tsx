@@ -56,7 +56,7 @@ export function ResolveBar({
       direction="row"
       spacing={1}
       data-testid="resolve-bar"
-      sx={{ alignItems: 'center', pl: 2, pr: 1.5, py: 1 }}
+      sx={{ alignItems: 'center', pl: 2, pr: 0, py: 1 }}
     >
       <InputBase
         value={note}
@@ -69,7 +69,8 @@ export function ResolveBar({
           fontSize: 13,
           px: 1.25,
           py: 0.25,
-          borderRadius: 999,
+          // Same rounding as the thread's comment composer block.
+          borderRadius: '12px',
           bgcolor: theme.qnop.surface2,
           border: `1px solid ${theme.palette.divider}`,
           transition: theme.transitions.create(['border-color', 'box-shadow'], {

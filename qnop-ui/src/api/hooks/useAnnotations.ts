@@ -71,6 +71,26 @@ export function useCreateAnnotation(documentId: string) {
 }
 
 /**
+ * Reopens a resolved annotation as its author: RESOLVED -> OPEN (issue #394).
+ * A reopened concern re-derives CHANGES_REQUESTED, so the workflow-bearing
+ * caches are invalidated too.
+ */
+export function useReopenAnnotation() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (vars: { annotationId: string }) => {
+      const response = await annotationsApi.reopenAnnotation({ annotationId: vars.annotationId });
+      return response.data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: annotationKeys.all });
+      queryClient.invalidateQueries({ queryKey: ['reviews'] });
+      queryClient.invalidateQueries({ queryKey: documentKeys.all });
+    },
+  });
+}
+
+/**
  * Resolves an annotation as its author: OPEN -> RESOLVED, with an optional
  * closing note that lands in the thread as a regular comment (issue #405).
  * Settling the last open annotation returns the workflow to IN_REVIEW, so the

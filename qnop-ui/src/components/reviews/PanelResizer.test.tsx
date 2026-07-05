@@ -23,47 +23,78 @@ import { describe, expect, it, vi } from 'vitest';
 import { fireEvent, render, screen } from '@testing-library/react';
 import { ThemeProvider } from '@mui/material/styles';
 import { buildTheme } from '../../theme/theme';
-import { PANEL_MAX_WIDTH, PANEL_MIN_WIDTH, PanelResizer } from './PanelResizer';
+import {
+  DEFAULT_PANEL_FRACTION,
+  PANEL_MAX_FRACTION,
+  PANEL_MIN_FRACTION,
+  PanelResizer,
+} from './PanelResizer';
 
-function renderResizer(width = 400, onWidthChange = vi.fn()) {
+function renderResizer(fraction = 1 / 3, onFractionChange = vi.fn()) {
   render(
     <ThemeProvider theme={buildTheme('light')}>
-      <PanelResizer width={width} defaultWidth={PANEL_MIN_WIDTH} onWidthChange={onWidthChange} />
+      <PanelResizer fraction={fraction} onFractionChange={onFractionChange} />
     </ThemeProvider>,
   );
-  return onWidthChange;
+  return onFractionChange;
 }
 
 describe('PanelResizer', () => {
-  it('exposes separator semantics with value bounds', () => {
-    renderResizer(400);
+  it('exposes separator semantics with percent value bounds', () => {
+    renderResizer(DEFAULT_PANEL_FRACTION);
     const separator = screen.getByRole('separator', { name: 'Resize annotations panel' });
-    expect(separator).toHaveAttribute('aria-valuenow', '400');
-    expect(separator).toHaveAttribute('aria-valuemin', String(PANEL_MIN_WIDTH));
-    expect(separator).toHaveAttribute('aria-valuemax', String(PANEL_MAX_WIDTH));
+    expect(separator).toHaveAttribute('aria-valuenow', '33');
+    expect(separator).toHaveAttribute('aria-valuemin', '20');
+    expect(separator).toHaveAttribute('aria-valuemax', '50');
   });
 
   it('resizes with the keyboard, clamped to the bounds', () => {
-    const onWidthChange = renderResizer(PANEL_MIN_WIDTH);
+    const onFractionChange = renderResizer(PANEL_MIN_FRACTION);
     const separator = screen.getByRole('separator');
 
     fireEvent.keyDown(separator, { key: 'ArrowLeft' });
-    expect(onWidthChange).toHaveBeenLastCalledWith(PANEL_MIN_WIDTH + 16);
+    expect(onFractionChange).toHaveBeenLastCalledWith(PANEL_MIN_FRACTION + 0.02);
 
     // Shrinking below the minimum clamps.
     fireEvent.keyDown(separator, { key: 'ArrowRight' });
-    expect(onWidthChange).toHaveBeenLastCalledWith(PANEL_MIN_WIDTH);
+    expect(onFractionChange).toHaveBeenLastCalledWith(PANEL_MIN_FRACTION);
 
     fireEvent.keyDown(separator, { key: 'Home' });
-    expect(onWidthChange).toHaveBeenLastCalledWith(PANEL_MAX_WIDTH);
+    expect(onFractionChange).toHaveBeenLastCalledWith(PANEL_MAX_FRACTION);
 
     fireEvent.keyDown(separator, { key: 'End' });
-    expect(onWidthChange).toHaveBeenLastCalledWith(PANEL_MIN_WIDTH);
+    expect(onFractionChange).toHaveBeenLastCalledWith(PANEL_MIN_FRACTION);
   });
 
-  it('resets to the default width on double-click', () => {
-    const onWidthChange = renderResizer(600);
+  it('restores the 2:1 default on double-click', () => {
+    const onFractionChange = renderResizer(0.5);
     fireEvent.doubleClick(screen.getByRole('separator'));
-    expect(onWidthChange).toHaveBeenCalledWith(PANEL_MIN_WIDTH);
+    expect(onFractionChange).toHaveBeenCalledWith(DEFAULT_PANEL_FRACTION);
+  });
+
+  it('derives the fraction from the pointer inside the split container', () => {
+    const onFractionChange = vi.fn();
+    render(
+      <ThemeProvider theme={buildTheme('light')}>
+        <div style={{ display: 'flex', width: 1000 }}>
+          <PanelResizer fraction={1 / 3} onFractionChange={onFractionChange} />
+        </div>
+      </ThemeProvider>,
+    );
+    const separator = screen.getByRole('separator');
+    const container = separator.parentElement as HTMLElement;
+    vi.spyOn(container, 'getBoundingClientRect').mockReturnValue({
+      right: 1000,
+      width: 1000,
+    } as DOMRect);
+
+    fireEvent.pointerDown(separator, { button: 0, clientX: 660 });
+    // Pointer at x=592: panel = (1000 - 592 - 8) / 1000 = 0.4.
+    fireEvent.pointerMove(separator, { clientX: 592 });
+    expect(onFractionChange).toHaveBeenLastCalledWith(0.4);
+
+    // Dragging far right clamps at the minimum share.
+    fireEvent.pointerMove(separator, { clientX: 990 });
+    expect(onFractionChange).toHaveBeenLastCalledWith(PANEL_MIN_FRACTION);
   });
 });

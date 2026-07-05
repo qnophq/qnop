@@ -2269,6 +2269,51 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
+  /annotations/{annotationId}/reopen:
+    parameters:
+      - $ref: '#/components/parameters/AnnotationIdParam'
+    post:
+      tags: [Annotations]
+      summary: Reopen a resolved annotation (author only)
+      description: |
+        Reverses a resolution, `RESOLVED → OPEN` (issue #394) — allowed for the
+        annotation's author alone, and only while the review is still running:
+        a FINALIZED or CANCELLED review is a closed record (`REVIEW_CLOSED`,
+        409). The thread stays intact and accepts comments again; the
+        open-annotation count re-derives the review state (a reopened concern
+        moves `IN_REVIEW` back to `CHANGES_REQUESTED`).
+      operationId: reopenAnnotation
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: The updated annotation
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AnnotationView'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          description: The caller is not the annotation's author
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Unknown annotation
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '409':
+          description: >-
+            The annotation is not RESOLVED (`ANNOTATION_NOT_RESOLVED`), or the
+            review is FINALIZED/CANCELLED (`REVIEW_CLOSED`)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
   /annotations/{annotationId}/comments:
     parameters:
       - $ref: '#/components/parameters/AnnotationIdParam'
@@ -2296,6 +2341,9 @@ paths:
     post:
       tags: [Annotations]
       summary: Add a comment to an annotation
+      description: |
+        Appends to the discussion thread. A RESOLVED annotation's thread is a
+        closed record (issue #403) and refuses further comments with `409`.
       operationId: addComment
       security:
         - bearerAuth: []
@@ -2322,6 +2370,12 @@ paths:
           $ref: '#/components/responses/Unauthorized'
         '404':
           description: Unknown annotation, or the caller is not a participant
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '409':
+          description: The annotation is RESOLVED (`ANNOTATION_ALREADY_RESOLVED`) — its thread is closed
           content:
             application/json:
               schema:

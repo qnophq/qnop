@@ -34,13 +34,14 @@ vi.mock('../../../api/hooks/useComments', () => ({
 
 const addMutate = vi.fn();
 
-function renderThread(readOnly = false, previousSeenAt: string | null = null) {
+function renderThread(readOnly = false, previousSeenAt: string | null = null, closed = false) {
   return render(
     <ThemeProvider theme={buildTheme('light')}>
       <CommentThread
         annotationId="a1"
         notify={vi.fn()}
         readOnly={readOnly}
+        closed={closed}
         previousSeenAt={previousSeenAt}
       />
     </ThemeProvider>,
@@ -189,5 +190,63 @@ describe('CommentThread', () => {
     } as unknown as ReturnType<typeof useComments>);
     renderThread(true);
     expect(screen.queryByLabelText('Add a comment')).not.toBeInTheDocument();
+    // The closing line belongs to the resolved state, not to read-only.
+    expect(screen.queryByTestId('thread-closed-note')).not.toBeInTheDocument();
+  });
+
+  it('closes a resolved thread: no composer, a quiet closing line instead (#403)', () => {
+    vi.mocked(useComments).mockReturnValue({
+      isPending: false,
+      isError: false,
+      data: { comments: [] },
+    } as unknown as ReturnType<typeof useComments>);
+    renderThread(false, null, true);
+    expect(screen.queryByLabelText('Add a comment')).not.toBeInTheDocument();
+    expect(screen.getByTestId('thread-closed-note')).toHaveTextContent(
+      'Resolved — this thread is closed.',
+    );
+    // Reopening is offered only when the caller wires it (author, running review).
+    expect(screen.queryByRole('button', { name: 'Reopen' })).not.toBeInTheDocument();
+  });
+
+  it('drops the "yet" once a resolved thread has no replies (#403)', () => {
+    vi.mocked(useComments).mockReturnValue({
+      isPending: false,
+      isError: false,
+      data: {
+        comments: [
+          {
+            id: 'c1',
+            annotationId: 'a1',
+            authorId: 'me',
+            body: 'opener',
+            createdAt: '2026-07-01T10:00:00Z',
+          },
+        ],
+      },
+    } as unknown as ReturnType<typeof useComments>);
+    render(
+      <ThemeProvider theme={buildTheme('light')}>
+        <CommentThread annotationId="a1" notify={vi.fn()} closed skipOpener />
+      </ThemeProvider>,
+    );
+    expect(screen.getByText('No replies.')).toBeInTheDocument();
+    expect(screen.queryByText('No replies yet.')).not.toBeInTheDocument();
+  });
+
+  it('offers Reopen on a closed thread when wired, and forwards the click (#394)', () => {
+    vi.mocked(useComments).mockReturnValue({
+      isPending: false,
+      isError: false,
+      data: { comments: [] },
+    } as unknown as ReturnType<typeof useComments>);
+    const onReopen = vi.fn();
+    render(
+      <ThemeProvider theme={buildTheme('light')}>
+        <CommentThread annotationId="a1" notify={vi.fn()} closed onReopen={onReopen} />
+      </ThemeProvider>,
+    );
+    fireEvent.click(screen.getByRole('button', { name: 'Reopen' }));
+    expect(onReopen).toHaveBeenCalled();
   });
 });

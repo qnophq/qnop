@@ -362,6 +362,25 @@ class ReviewWorkflowControllerIT extends SeededIntegrationTest {
   }
 
   @Test
+  void reopeningDerivesChangesRequestedAgain() {
+    Document document = inReviewOwnedByMember();
+    Annotation annotation = annotations.save(new Annotation(document.getId(), MEMBER2_ID));
+    annotation.resolve();
+    annotations.save(annotation);
+
+    workflow.reopenAnnotation(annotation.getId(), MEMBER2_ID);
+
+    assertThat(annotations.findById(annotation.getId()).orElseThrow().getStatus())
+        .isEqualTo(AnnotationStatus.OPEN);
+    assertThat(documents.findById(document.getId()).orElseThrow().getWorkflowState())
+        .isEqualTo("CHANGES_REQUESTED");
+    assertThat(
+            auditEvents.findByDocumentIdOrderByCreatedAtDesc(document.getId()).stream()
+                .map(AuditEvent::getEventType))
+        .contains("annotation.reopened", "workflow.transition");
+  }
+
+  @Test
   void resolvingANonLastAnnotationLeavesChangesRequested() {
     Document document = inReviewOwnedByMember();
     document.setWorkflowState(WorkflowState.CHANGES_REQUESTED);
