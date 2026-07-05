@@ -17,7 +17,9 @@ services:
     ports:
       - '${QNOP_DB_PORT:-5432}:5432'
     volumes:
-      - qnop_pgdata:/var/lib/postgresql/data
+      # postgres:18+ stores data under /var/lib/postgresql/<major>/docker and refuses any mount
+      # at the legacy /var/lib/postgresql/data — mount the parent instead (issue #407).
+      - qnop_pgdata:/var/lib/postgresql
     healthcheck:
       test: ['CMD-SHELL', 'pg_isready -U ${QNOP_DB_USERNAME:-qnop} -d ${QNOP_DB_NAME:-qnop}']
       interval: 10s
