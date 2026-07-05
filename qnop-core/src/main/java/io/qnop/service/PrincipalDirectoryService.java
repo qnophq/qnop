@@ -20,6 +20,7 @@
  */
 package io.qnop.service;
 
+import io.qnop.repository.TeamMembershipRepository;
 import io.qnop.repository.TeamRepository;
 import io.qnop.repository.UserRepository;
 import java.util.Comparator;
@@ -43,10 +44,13 @@ public class PrincipalDirectoryService {
 
   private final UserRepository users;
   private final TeamRepository teams;
+  private final TeamMembershipRepository memberships;
 
-  public PrincipalDirectoryService(UserRepository users, TeamRepository teams) {
+  public PrincipalDirectoryService(
+      UserRepository users, TeamRepository teams, TeamMembershipRepository memberships) {
     this.users = users;
     this.teams = teams;
+    this.memberships = memberships;
   }
 
   @Transactional(readOnly = true)
@@ -63,6 +67,20 @@ public class PrincipalDirectoryService {
     return Stream.concat(userViews, teamViews)
         .sorted(Comparator.comparing(view -> view.displayName().toLowerCase(Locale.ROOT)))
         .limit(size)
+        .toList();
+  }
+
+  /**
+   * A team's members, display names only (issue #403): lets a participant list unfold a team to see
+   * who reviews behind it — the same visibility rule as the directory itself.
+   */
+  @Transactional(readOnly = true)
+  public List<PrincipalView> teamMembers(UUID teamId) {
+    if (!teams.existsById(teamId)) {
+      throw new TeamNotFoundException("team not found: " + teamId);
+    }
+    return memberships.findMembersByTeamId(teamId).stream()
+        .map(member -> new PrincipalView(member.userId(), false, member.displayName()))
         .toList();
   }
 

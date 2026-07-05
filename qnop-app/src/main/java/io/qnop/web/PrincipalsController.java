@@ -21,11 +21,17 @@
 package io.qnop.web;
 
 import io.qnop.api.v1.endpoint.PrincipalsApi;
+import io.qnop.api.v1.model.ErrorResponse;
 import io.qnop.api.v1.model.ParticipantKind;
 import io.qnop.api.v1.model.PrincipalListResponse;
 import io.qnop.api.v1.model.PrincipalView;
 import io.qnop.service.PrincipalDirectoryService;
+import io.qnop.service.TeamNotFoundException;
+import java.time.OffsetDateTime;
+import java.util.UUID;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestController;
 
 /**
@@ -55,5 +61,31 @@ public class PrincipalsController implements PrincipalsApi {
                                 .kind(view.team() ? ParticipantKind.TEAM : ParticipantKind.USER)
                                 .displayName(view.displayName()))
                     .toList()));
+  }
+
+  @Override
+  public ResponseEntity<PrincipalListResponse> listTeamMembers(UUID teamId) {
+    CurrentUser.requireUserId();
+    return ResponseEntity.ok(
+        new PrincipalListResponse()
+            .principals(
+                directory.teamMembers(teamId).stream()
+                    .map(
+                        view ->
+                            new PrincipalView()
+                                .id(view.id())
+                                .kind(ParticipantKind.USER)
+                                .displayName(view.displayName()))
+                    .toList()));
+  }
+
+  @ExceptionHandler(TeamNotFoundException.class)
+  public ResponseEntity<ErrorResponse> onTeamNotFound(TeamNotFoundException ex) {
+    return ResponseEntity.status(HttpStatus.NOT_FOUND)
+        .body(
+            new ErrorResponse()
+                .code("TEAM_NOT_FOUND")
+                .message(ex.getMessage())
+                .timestamp(OffsetDateTime.now()));
   }
 }

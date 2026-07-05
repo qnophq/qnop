@@ -26,30 +26,15 @@ import Skeleton from '@mui/material/Skeleton';
 import Stack from '@mui/material/Stack';
 import Typography from '@mui/material/Typography';
 import { useTheme } from '@mui/material/styles';
-import { MessageSquare } from 'lucide-react';
 import type { AnnotationView } from '../../../api/generated';
 import type { ScreenPosition } from './anchoring';
-import { AnnotationStatus } from '../../../api/generated';
 import { useComments } from '../../../api/hooks/useComments';
 import { useAuthStore } from '../../../stores/authStore';
-import type { BadgeTone } from '../../admin/ToneBadge';
-import { ToneBadge } from '../../admin/ToneBadge';
-import { UserAvatar } from '../../shell/UserAvatar';
-import { PlacementStatusChip } from '../panel/PlacementStatusChip';
-import { highlightColorFor } from './markerColors';
+import { AnnotationBadgeRow } from '../panel/AnnotationBadgeRow';
+import { CommentBubble } from '../panel/CommentBubble';
 
 /** Hover intent: the preview appears only after the pointer settles on a mark. */
 const SHOW_DELAY_MS = 320;
-
-const STATUS_CUES: Record<AnnotationStatus, { tone: BadgeTone; label: string }> = {
-  [AnnotationStatus.Open]: { tone: 'blue', label: 'Open' },
-  [AnnotationStatus.Resolved]: { tone: 'green', label: 'Resolved' },
-};
-
-const TIME_FORMAT = new Intl.DateTimeFormat(undefined, {
-  dateStyle: 'medium',
-  timeStyle: 'short',
-});
 
 /** Vertical offset so the card sits just below the pointer, not under it. */
 const POINTER_OFFSET_PX = 14;
@@ -62,10 +47,11 @@ interface AnnotationHoverCardProps {
 
 /**
  * The mark's hover preview: who opened the discussion and where it stands,
- * without leaving the document. Shows the first comment with its author's
- * avatar, the annotation status, the placement cue and the thread size.
- * Hovering also warms the comments cache, so opening the thread afterwards is
- * instant. Pointer events pass through — the card never traps the mouse.
+ * without leaving the document — speaking exactly the document view's
+ * language (issue #403): the panel's badge row on top, the opening comment
+ * as the same social bubble the thread renders. Hovering also warms the
+ * comments cache, so opening the thread afterwards is instant. Pointer
+ * events pass through — the card never traps the mouse.
  */
 export function AnnotationHoverCard({ annotation, getAnchorPosition }: AnnotationHoverCardProps) {
   const theme = useTheme();
@@ -94,10 +80,6 @@ export function AnnotationHoverCard({ annotation, getAnchorPosition }: Annotatio
   const authorId = firstComment?.authorId ?? annotation.authorId;
   const own = authorId === userId;
   const authorName = own ? (displayName ?? 'You') : 'Participant';
-  const statusCue = STATUS_CUES[annotation.status];
-  const railColor = highlightColorFor(annotation, theme.palette);
-  const commentLabel =
-    annotation.commentCount === 1 ? '1 comment' : `${annotation.commentCount} comments`;
 
   return (
     <Popover
@@ -125,25 +107,9 @@ export function AnnotationHoverCard({ annotation, getAnchorPosition }: Annotatio
         },
       }}
     >
-      <Box sx={{ position: 'relative', pl: 2, pr: 1.75, py: 1.5 }}>
-        {/* The rail binds the card to its mark: same colour as the highlight. */}
-        <Box
-          aria-hidden
-          sx={{ position: 'absolute', left: 0, top: 0, bottom: 0, width: 4, bgcolor: railColor }}
-        />
+      <Box sx={{ px: 1.5, py: 1.25 }}>
         <Stack spacing={1}>
-          <Stack direction="row" spacing={1} sx={{ alignItems: 'center' }}>
-            <UserAvatar name={authorName} size={28} imageUrl={own ? avatarUrl : null} />
-            <Box sx={{ minWidth: 0, flex: 1 }}>
-              <Typography variant="body2" sx={{ fontWeight: 600, lineHeight: 1.2 }} noWrap>
-                {own ? 'You' : authorName}
-              </Typography>
-              <Typography variant="caption" color="text.secondary">
-                {TIME_FORMAT.format(new Date(firstComment?.createdAt ?? annotation.createdAt))}
-              </Typography>
-            </Box>
-            <ToneBadge tone={statusCue.tone} label={statusCue.label} />
-          </Stack>
+          <AnnotationBadgeRow annotation={annotation} />
 
           {annotation.commentCount > 0 ? (
             commentsQuery.isPending ? (
@@ -152,18 +118,14 @@ export function AnnotationHoverCard({ annotation, getAnchorPosition }: Annotatio
                 <Skeleton variant="text" width="65%" />
               </Stack>
             ) : (
-              <Typography
-                variant="body2"
-                sx={{
-                  display: '-webkit-box',
-                  WebkitLineClamp: 3,
-                  WebkitBoxOrient: 'vertical',
-                  overflow: 'hidden',
-                  overflowWrap: 'anywhere',
-                }}
-              >
-                {firstComment?.body ?? ''}
-              </Typography>
+              <CommentBubble
+                name={authorName}
+                own={own}
+                avatarUrl={avatarUrl}
+                body={firstComment?.body ?? annotation.firstComment ?? ''}
+                createdAt={firstComment?.createdAt ?? annotation.createdAt}
+                clampLines={3}
+              />
             )
           ) : (
             <Typography variant="body2" color="text.secondary" sx={{ fontStyle: 'italic' }}>
@@ -171,20 +133,9 @@ export function AnnotationHoverCard({ annotation, getAnchorPosition }: Annotatio
             </Typography>
           )}
 
-          <Stack direction="row" spacing={1} sx={{ alignItems: 'center' }}>
-            <Stack
-              direction="row"
-              spacing={0.5}
-              sx={{ alignItems: 'center', color: 'text.secondary' }}
-            >
-              <MessageSquare size={13} aria-hidden />
-              <Typography variant="caption">{commentLabel}</Typography>
-            </Stack>
-            <PlacementStatusChip status={annotation.placementStatus} />
-            <Typography variant="caption" color="text.secondary" sx={{ ml: 'auto' }}>
-              Click to open the thread
-            </Typography>
-          </Stack>
+          <Typography variant="caption" color="text.secondary" sx={{ textAlign: 'right' }}>
+            Click to open the thread
+          </Typography>
         </Stack>
       </Box>
     </Popover>

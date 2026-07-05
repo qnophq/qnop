@@ -25,12 +25,10 @@ import Box from '@mui/material/Box';
 import Chip from '@mui/material/Chip';
 import CircularProgress from '@mui/material/CircularProgress';
 import Divider from '@mui/material/Divider';
-import InputAdornment from '@mui/material/InputAdornment';
 import Stack from '@mui/material/Stack';
-import TextField from '@mui/material/TextField';
 import ToggleButton from '@mui/material/ToggleButton';
 import ToggleButtonGroup from '@mui/material/ToggleButtonGroup';
-import { LayoutGrid, List as ListIcon, Search } from 'lucide-react';
+import { LayoutGrid, List as ListIcon } from 'lucide-react';
 import { useAnnotations } from '../../api/hooks/useAnnotations';
 import { useDocument, useDocumentVersions } from '../../api/hooks/useDocuments';
 import { useParticipants, useRecordVisit } from '../../api/hooks/useReviews';
@@ -38,6 +36,10 @@ import { AdminToast } from '../../components/admin/layout/AdminToast';
 import { ReviewViewTabs } from '../../components/reviews/hub/ReviewViewTabs';
 import { PageHeader } from '../../components/admin/layout/PageHeader';
 import { useToast } from '../../components/admin/layout/useToast';
+import type { FilterAuthor } from '../../components/reviews/panel/PanelFilterBar';
+import { PanelFilterBar } from '../../components/reviews/panel/PanelFilterBar';
+import type { AnnotationFilters } from '../../components/reviews/panel/panelFilters';
+import { matchesFilters } from '../../components/reviews/panel/panelFilters';
 import {
   mayResolveAnnotation,
   useResolveWithFeedback,
@@ -46,15 +48,10 @@ import { TaskBoard } from '../../components/reviews/tasks/TaskBoard';
 import { TaskDrawer } from '../../components/reviews/tasks/TaskDrawer';
 import { TaskListRows } from '../../components/reviews/tasks/TaskListRows';
 import type { TaskFilter } from '../../components/reviews/tasks/tasksModel';
-import {
-  columnOf,
-  matchesQuery,
-  parseTaskFilter,
-  taskKeys,
-} from '../../components/reviews/tasks/tasksModel';
+import { columnOf, parseTaskFilter, taskKeys } from '../../components/reviews/tasks/tasksModel';
 import { useTasksViewMode } from '../../components/reviews/tasks/useTasksViewMode';
 import { isOpenWorkflowState } from '../../components/reviews/workflowMeta';
-import { ExtractionStatus } from '../../api/generated';
+import { AnnotationPriority, AnnotationType, ExtractionStatus } from '../../api/generated';
 import { useAuthStore } from '../../stores/authStore';
 
 const FILTERS: { key: TaskFilter; label: string }[] = [
@@ -99,18 +96,45 @@ export function ReviewTasksPage() {
   // The unseen-marker baseline (issue #307): the PREVIOUS visit, stamped once.
   const previousSeenAt = useRecordVisit(documentId);
   const filter = parseTaskFilter(searchParams.get('filter'));
-  const query = searchParams.get('q') ?? '';
+  // The facet filters share the panel's model (#403) and live in the URL like
+  // everything else on this page.
+  const typeParam = searchParams.get('type');
+  const priorityParam = searchParams.get('priority');
+  const facets: AnnotationFilters = {
+    status: 'all',
+    type: Object.values(AnnotationType).includes(typeParam as AnnotationType)
+      ? (typeParam as AnnotationType)
+      : null,
+    priority: Object.values(AnnotationPriority).includes(priorityParam as AnnotationPriority)
+      ? (priorityParam as AnnotationPriority)
+      : null,
+    author: searchParams.get('author'),
+    query: searchParams.get('q') ?? '',
+  };
   const [openTaskId, setOpenTaskId] = useState<string | null>(null);
 
   const { resolveWith } = useResolveWithFeedback(notify);
 
-  const setParam = (key: 'filter' | 'q', value: string | null) => {
+  const setParam = (key: string, value: string | null) => {
     const next = new URLSearchParams(searchParams);
     if (value === null || value === '' || value === 'all') {
       next.delete(key);
     } else {
       next.set(key, value);
     }
+    setSearchParams(next, { replace: true });
+  };
+
+  const setFacets = (nextFacets: AnnotationFilters) => {
+    const next = new URLSearchParams(searchParams);
+    const write = (key: string, value: string | null) => {
+      if (value === null || value === '') next.delete(key);
+      else next.set(key, value);
+    };
+    write('type', nextFacets.type);
+    write('priority', nextFacets.priority);
+    write('author', nextFacets.author);
+    write('q', nextFacets.query);
     setSearchParams(next, { replace: true });
   };
 
@@ -129,9 +153,13 @@ export function ReviewTasksPage() {
       ? annotations.length
       : annotations.filter((annotation) => columnOf(annotation) === key).length;
 
+  const authors: FilterAuthor[] = [
+    ...new Set(annotations.map((annotation) => annotation.authorId)),
+  ].map((id) => ({ id, name: authorNameOf(id) }));
+
   const visible = annotations
     .filter((annotation) => filter === 'all' || columnOf(annotation) === filter)
-    .filter((annotation) => matchesQuery(annotation, authorNameOf(annotation.authorId), query));
+    .filter((annotation) => matchesFilters(annotation, facets, authorNameOf(annotation.authorId)));
 
   const openTask = annotations.find((annotation) => annotation.id === openTaskId) ?? null;
   const keyByAnnotation = taskKeys(annotations);
@@ -212,23 +240,15 @@ export function ReviewTasksPage() {
           />
         ))}
         <Box sx={{ flex: 1 }} />
-        <TextField
-          size="small"
-          placeholder="Search tasks…"
-          value={query}
-          onChange={(event) => setParam('q', event.target.value)}
-          slotProps={{
-            input: {
-              startAdornment: (
-                <InputAdornment position="start">
-                  <Search size={14} />
-                </InputAdornment>
-              ),
-              'aria-label': 'Search tasks',
-            },
-          }}
-          sx={{ width: 220 }}
-        />
+        <Box sx={{ width: { xs: '100%', sm: 560, md: 720 } }}>
+          <PanelFilterBar
+            filters={facets}
+            onChange={setFacets}
+            authors={authors}
+            statusFacet={false}
+            searchLabel="Search tasks"
+          />
+        </Box>
       </Stack>
 
       {annotationsQuery.isPending ? (

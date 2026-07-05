@@ -75,6 +75,8 @@ interface AnnotationPanelProps {
   readOnly?: boolean;
   /** True once the review is FINALIZED/CANCELLED (issue #394): no reopening. */
   reviewClosed?: boolean;
+  /** Drops the section's outer card frame — the focus drawer brings its own edge. */
+  frameless?: boolean;
   /** The previous visit (issue #307) — null hides every unseen cue. */
   previousSeenAt?: string | null;
 }
@@ -207,6 +209,7 @@ export function AnnotationPanel({
   notify,
   readOnly = false,
   reviewClosed = false,
+  frameless = false,
   previousSeenAt = null,
 }: AnnotationPanelProps) {
   const [filters, setFilters] = useState<AnnotationFilters>(EMPTY_FILTERS);
@@ -291,6 +294,7 @@ export function AnnotationPanel({
       icon={NotebookPen}
       title={`Annotations (${annotations.length})`}
       description="Marks and their discussion on this version."
+      frameless={frameless}
     >
       <Stack spacing={1.5}>
         {annotations.length > 0 && (

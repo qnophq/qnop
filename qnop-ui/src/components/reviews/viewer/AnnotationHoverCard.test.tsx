@@ -88,7 +88,7 @@ describe('AnnotationHoverCard', () => {
     expect(screen.getByText('Participant')).toBeInTheDocument();
     expect(screen.getByText('Open')).toBeInTheDocument();
     expect(screen.getByText('Moved')).toBeInTheDocument();
-    expect(screen.getByText('3 comments')).toBeInTheDocument();
+    expect(screen.getByLabelText('3 comments')).toBeInTheDocument();
     expect(useComments).toHaveBeenCalledWith('a1', true);
   });
 
@@ -103,6 +103,6 @@ describe('AnnotationHoverCard', () => {
 
     await waitFor(() => expect(screen.getByText('No comments yet.')).toBeInTheDocument());
     expect(useComments).toHaveBeenCalledWith('a1', false);
-    expect(screen.getByText('0 comments')).toBeInTheDocument();
+    expect(screen.getByLabelText('0 comments')).toBeInTheDocument();
   });
 });

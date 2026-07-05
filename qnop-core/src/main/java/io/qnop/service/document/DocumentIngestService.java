@@ -22,7 +22,6 @@ package io.qnop.service.document;
 
 import io.qnop.entity.Annotation;
 import io.qnop.entity.AnnotationPlacement;
-import io.qnop.entity.AnnotationStatus;
 import io.qnop.entity.Document;
 import io.qnop.entity.DocumentVersion;
 import io.qnop.repository.AnnotationPlacementRepository;
@@ -193,21 +192,24 @@ public class DocumentIngestService {
   }
 
   /**
-   * Seeds a PENDING placement on the new version for every OPEN annotation (issue #248, ADR-0009),
-   * carrying the annotation's most recent anchor as the re-anchoring hypothesis. Runs in the upload
-   * transaction, so the version is never visible without its pending placements — which is exactly
-   * what keeps it non-finalizable until re-anchoring resolves (ADR-0011). The re-anchor job itself
-   * is enqueued by the extraction handler once the new text layer is READY.
+   * Seeds a PENDING placement on the new version for EVERY annotation (issue #248, ADR-0009),
+   * carrying the annotation's most recent anchor as the re-anchoring hypothesis. Resolved
+   * annotations are included deliberately: since #405/#394 RESOLVED is not terminal — the thread
+   * stays a readable record on the new version and the author may reopen, so the mark must follow
+   * the document (an OPEN-only filter left reopened annotations permanently placement-less). Runs
+   * in the upload transaction, so the version is never visible without its pending placements —
+   * which is exactly what keeps it non-finalizable until re-anchoring resolves (ADR-0011). The
+   * re-anchor job itself is enqueued by the extraction handler once the new text layer is READY.
    */
   private void seedPendingPlacements(UUID documentId, DocumentVersion newVersion) {
-    var open = annotations.findByDocumentIdAndStatus(documentId, AnnotationStatus.OPEN);
-    if (open.isEmpty()) {
+    var all = annotations.findByDocumentId(documentId);
+    if (all.isEmpty()) {
       return;
     }
     Map<UUID, Integer> versionNumberById =
         versions.findByDocumentIdOrderByVersionNumberAsc(documentId).stream()
             .collect(Collectors.toMap(DocumentVersion::getId, DocumentVersion::getVersionNumber));
-    for (Annotation annotation : open) {
+    for (Annotation annotation : all) {
       Optional<AnnotationPlacement> latest =
           placements.findByAnnotationId(annotation.getId()).stream()
               .filter(p -> !p.getDocumentVersionId().equals(newVersion.getId()))

@@ -35,6 +35,8 @@ interface SectionCardProps {
   description?: string;
   /** Optional element pinned to the top-right of the header (e.g. a status badge). */
   action?: ReactNode;
+  /** Drops the outlined card chrome — for hosts that bring their own edge (e.g. a drawer). */
+  frameless?: boolean;
   children: ReactNode;
 }
 
@@ -51,11 +53,16 @@ export function SectionCard({
   title,
   description,
   action,
+  frameless = false,
   children,
 }: SectionCardProps) {
   const theme = useTheme();
   return (
-    <Paper variant="outlined" sx={{ p: { xs: 2, sm: 3 } }}>
+    <Paper
+      variant={frameless ? 'elevation' : 'outlined'}
+      elevation={0}
+      sx={{ p: { xs: 2, sm: 3 }, ...(frameless && { bgcolor: 'transparent' }) }}
+    >
       <Stack direction="row" spacing={1.5} sx={{ mb: 2.5, alignItems: 'flex-start' }}>
         {Icon && (
           <Box

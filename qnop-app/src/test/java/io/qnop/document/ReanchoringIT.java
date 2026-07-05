@@ -84,6 +84,48 @@ class ReanchoringIT extends AbstractIntegrationTest {
   }
 
   @Test
+  @DisplayName("a RESOLVED annotation follows the document onto the new version (#403 regression)")
+  void resolvedAnnotationsAreReanchoredToo() throws Exception {
+    UUID owner = createUser();
+    UUID documentId =
+        upload(owner, "whereas " + QUOTE + " from invoice", "a second unrelated line");
+    poller.poll(); // extract v1
+
+    String created =
+        mockMvc
+            .perform(
+                post("/api/v1/documents/{id}/annotations", documentId)
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content(annotationBody())
+                    .with(asUser(owner)))
+            .andExpect(status().isCreated())
+            .andReturn()
+            .getResponse()
+            .getContentAsString();
+    String annotationId = JsonPath.read(created, "$.id");
+
+    // The author settles the concern BEFORE the new version arrives — since
+    // #405 that is not terminal (the thread stays a record, reopen exists),
+    // so the mark must still follow the document.
+    mockMvc
+        .perform(post("/api/v1/annotations/{id}/resolve", annotationId).with(asUser(owner)))
+        .andExpect(status().isOk());
+
+    addVersion(owner, documentId, "a brand new intro line", "whereas " + QUOTE + " from invoice");
+    poller.poll(); // extract v2 → chains the re-anchor job
+    poller.poll(); // run the re-anchor job
+
+    mockMvc
+        .perform(
+            get("/api/v1/documents/{id}/annotations", documentId)
+                .param("version", "2")
+                .with(asUser(owner)))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.annotations[0].status").value("RESOLVED"))
+        .andExpect(jsonPath("$.annotations[0].placementStatus").value("PLACED"));
+  }
+
+  @Test
   @DisplayName("a new version re-places the annotation; a version without the text orphans it")
   void reanchorsAcrossVersions() throws Exception {
     UUID owner = createUser();

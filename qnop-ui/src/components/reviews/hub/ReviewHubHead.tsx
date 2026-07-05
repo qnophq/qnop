@@ -21,6 +21,7 @@
 
 import { useRef, useState } from 'react';
 import Box from '@mui/material/Box';
+import Divider from '@mui/material/Divider';
 import Button from '@mui/material/Button';
 import ButtonBase from '@mui/material/ButtonBase';
 import Menu from '@mui/material/Menu';
@@ -35,10 +36,12 @@ import { AnnotationStatus, ParticipantKind } from '../../../api/generated';
 import { useConfig } from '../../../api/hooks/useConfig';
 import {
   useParticipants,
+  usePrincipalSearch,
   useTransitionWorkflow,
   useUploadVersion,
   useWorkflow,
 } from '../../../api/hooks/useReviews';
+import { useAuthStore } from '../../../stores/authStore';
 import { ConfirmDialog } from '../../admin/ConfirmDialog';
 import type { Notify } from '../../admin/layout/useToast';
 import { UserAvatar } from '../../shell/UserAvatar';
@@ -61,6 +64,8 @@ const TRANSITION_CONFLICTS: Record<string, string> = {
 
 interface ReviewHubHeadProps {
   documentId: string;
+  /** The document owner — shown prominently in the header (issue #403). */
+  ownerId: string;
   isOwner: boolean;
   ownUserId: string | null;
   annotations: AnnotationView[];
@@ -81,6 +86,7 @@ interface ReviewHubHeadProps {
  */
 export function ReviewHubHead({
   documentId,
+  ownerId,
   isOwner,
   ownUserId,
   annotations,
@@ -103,11 +109,23 @@ export function ReviewHubHead({
   const uploadVersion = useUploadVersion(documentId);
 
   const participants = participantsQuery.data?.participants ?? [];
+  // The owner never sits in the participant rows; the principal directory
+  // (names only, #292) resolves them — self by display name.
+  const principals = usePrincipalSearch('').data?.principals ?? [];
+  const ownDisplayName = useAuthStore((state) => state.displayName);
+  const ownAvatarUrl = useAuthStore((state) => state.avatarUrl);
+  const ownerName =
+    ownerId === ownUserId
+      ? (ownDisplayName ?? 'You')
+      : (principals.find((principal) => principal.id === ownerId)?.displayName ?? 'Owner');
   const transitions = workflowQuery.data?.allowedTransitions ?? [];
   const maxSizeMb = config?.upload.maxDocumentSizeMb ?? FALLBACK_MAX_SIZE_MB;
 
   const total = annotations.length;
   const resolved = annotations.filter((a) => a.status !== AnnotationStatus.Open).length;
+  const inDiscussion = annotations.filter(
+    (a) => a.status === AnnotationStatus.Open && a.commentCount > 1,
+  ).length;
 
   const handleTransitionConfirmed = (targetState: string) => {
     setConfirmTarget(null);
@@ -145,16 +163,57 @@ export function ReviewHubHead({
 
   return (
     <Stack direction="row" spacing={1.5} sx={{ alignItems: 'center', flexWrap: 'wrap' }}>
+      <Tooltip title="Review owner">
+        <Stack
+          direction="row"
+          spacing={0.75}
+          data-testid="review-owner"
+          sx={{ alignItems: 'center', minWidth: 0 }}
+        >
+          <UserAvatar
+            name={ownerName}
+            size={24}
+            imageUrl={ownerId === ownUserId ? ownAvatarUrl : null}
+          />
+          <Box sx={{ minWidth: 0 }}>
+            <Typography
+              sx={{
+                fontSize: 9,
+                fontWeight: 700,
+                letterSpacing: '0.08em',
+                textTransform: 'uppercase',
+                color: 'text.secondary',
+                lineHeight: 1.1,
+              }}
+            >
+              Owner
+            </Typography>
+            <Typography variant="body2" noWrap sx={{ fontWeight: 600, lineHeight: 1.2 }}>
+              {ownerName}
+            </Typography>
+          </Box>
+        </Stack>
+      </Tooltip>
+      <Divider orientation="vertical" flexItem sx={{ my: 0.5 }} />
       {total > 0 && (
-        <ProgressBar
-          resolved={resolved}
-          total={total}
-          color={theme.palette.success.main}
-          discussion={
-            annotations.filter((a) => a.status === AnnotationStatus.Open && a.commentCount > 1)
-              .length
-          }
-        />
+        <Tooltip
+          title={`Review progress: ${resolved} of ${total} annotation${total === 1 ? '' : 's'} resolved${
+            inDiscussion > 0
+              ? ` · ${inDiscussion} open in discussion`
+              : total - resolved > 0
+                ? ` · ${total - resolved} still open`
+                : ' — ready to finalize'
+          }`}
+        >
+          <Box sx={{ display: 'flex' }}>
+            <ProgressBar
+              resolved={resolved}
+              total={total}
+              color={theme.palette.success.main}
+              discussion={inDiscussion}
+            />
+          </Box>
+        </Tooltip>
       )}
 
       {isOwner ? (

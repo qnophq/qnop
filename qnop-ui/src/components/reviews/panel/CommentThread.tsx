@@ -33,10 +33,10 @@ import { CircleCheck, RotateCcw, SendHorizontal } from 'lucide-react';
 import { useAddComment, useComments } from '../../../api/hooks/useComments';
 import { apiErrorCode } from '../../../utils/apiError';
 import { isSubmitShortcut, submitShortcutLabel } from '../../../utils/platform';
-import { shortRelativeTime } from '../../../utils/relativeTime';
 import { useAuthStore } from '../../../stores/authStore';
 import type { Notify } from '../../admin/layout/useToast';
 import { isNewComment } from '../newSince';
+import { CommentBubble } from './CommentBubble';
 import { UserAvatar } from '../../shell/UserAvatar';
 
 const AVATAR_SIZE = 26;
@@ -57,11 +57,6 @@ interface CommentThreadProps {
   /** True when the surrounding card already renders the opening annotation (issue #403). */
   skipOpener?: boolean;
 }
-
-const TIME_FORMAT = new Intl.DateTimeFormat(undefined, {
-  dateStyle: 'medium',
-  timeStyle: 'short',
-});
 
 /**
  * The annotation's discussion — the comment anatomy of Facebook/Instagram
@@ -165,51 +160,13 @@ export function CommentThread({
                   />
                 </Stack>
               )}
-              <Stack direction="row" spacing={1} sx={{ alignItems: 'flex-start' }}>
-                <Box sx={{ position: 'relative', zIndex: 1, pt: 0.25 }}>
-                  <UserAvatar name={name} size={AVATAR_SIZE} imageUrl={own ? avatarUrl : null} />
-                </Box>
-                <Box sx={{ minWidth: 0, maxWidth: '100%' }}>
-                  {/* The bubble: bold name on its own line, the text below —
-                      no date inside (Facebook anatomy); the tucked top-left
-                      corner points back at the avatar on the rail. */}
-                  <Box
-                    sx={{
-                      display: 'inline-block',
-                      maxWidth: '100%',
-                      bgcolor: theme.qnop.surface2,
-                      borderRadius: '4px 10px 10px 10px',
-                      px: 1.5,
-                      py: 0.75,
-                    }}
-                  >
-                    <Typography variant="body2" sx={{ fontWeight: 600, lineHeight: 1.3 }}>
-                      {own ? 'You' : name}
-                    </Typography>
-                    <Typography
-                      variant="body2"
-                      sx={{ whiteSpace: 'pre-wrap', overflowWrap: 'anywhere' }}
-                    >
-                      {comment.body}
-                    </Typography>
-                  </Box>
-                  {/* The meta line under the bubble — the compact social
-                      timestamp; likes join here with #410. */}
-                  <Typography
-                    variant="caption"
-                    title={TIME_FORMAT.format(new Date(comment.createdAt))}
-                    sx={{
-                      display: 'block',
-                      pl: 1.5,
-                      mt: 0.25,
-                      fontWeight: 600,
-                      color: 'text.secondary',
-                    }}
-                  >
-                    {shortRelativeTime(comment.createdAt)}
-                  </Typography>
-                </Box>
-              </Stack>
+              <CommentBubble
+                name={name}
+                own={own}
+                avatarUrl={avatarUrl}
+                body={comment.body}
+                createdAt={comment.createdAt}
+              />
             </Fragment>
           );
         })}

@@ -35,6 +35,10 @@ vi.mock('../panel/CommentThread', () => ({
   ),
 }));
 
+vi.mock('../../../api/hooks/useComments', () => ({
+  useComments: vi.fn().mockReturnValue({ isPending: false, isError: false, data: undefined }),
+}));
+
 const { resolveMutate } = vi.hoisted(() => ({ resolveMutate: vi.fn() }));
 vi.mock('../../../api/hooks/useAnnotations', () => ({
   useResolveAnnotation: () => ({ mutate: resolveMutate, isPending: false }),
@@ -142,7 +146,27 @@ describe('FocusAnnotationCard', () => {
     expect(style.minWidth).toBe('320px');
     expect(style.minHeight).toBe('220px');
     expect(style.maxWidth).toContain('640px');
-    expect(style.maxHeight).toContain('72vh');
+    expect(style.maxHeight).toContain('55vh');
+  });
+
+  it('drags by the header — buttons excluded — and offsets the card', () => {
+    renderCard();
+    const handle = screen.getByTestId('focus-card-handle');
+    const card = screen.getByTestId('focus-annotation-card');
+
+    fireEvent.pointerDown(handle, { button: 0, clientX: 100, clientY: 100 });
+    fireEvent.pointerMove(handle, { clientX: 140, clientY: 70 });
+    fireEvent.pointerUp(handle);
+    expect(card.style.translate).toBe('40px -30px');
+
+    // A pointer-down on the walk buttons must not start a drag.
+    fireEvent.pointerDown(screen.getByRole('button', { name: 'Next annotation' }), {
+      button: 0,
+      clientX: 0,
+      clientY: 0,
+    });
+    fireEvent.pointerMove(handle, { clientX: 50, clientY: 50 });
+    expect(card.style.translate).toBe('40px -30px');
   });
 
   it('disables the ends of the walk and hides resolving from other reviewers', () => {
