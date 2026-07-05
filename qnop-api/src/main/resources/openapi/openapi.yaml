@@ -2296,6 +2296,9 @@ paths:
     post:
       tags: [Annotations]
       summary: Add a comment to an annotation
+      description: |
+        Appends to the discussion thread. A RESOLVED annotation's thread is a
+        closed record (issue #403) and refuses further comments with `409`.
       operationId: addComment
       security:
         - bearerAuth: []
@@ -2322,6 +2325,12 @@ paths:
           $ref: '#/components/responses/Unauthorized'
         '404':
           description: Unknown annotation, or the caller is not a participant
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '409':
+          description: The annotation is RESOLVED (`ANNOTATION_ALREADY_RESOLVED`) — its thread is closed
           content:
             application/json:
               schema:

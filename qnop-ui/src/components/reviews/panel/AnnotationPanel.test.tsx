@@ -29,8 +29,8 @@ import { useAuthStore } from '../../../stores/authStore';
 import { AnnotationPanel } from './AnnotationPanel';
 
 vi.mock('./CommentThread', () => ({
-  CommentThread: ({ annotationId }: { annotationId: string }) => (
-    <div data-testid={`thread-${annotationId}`} />
+  CommentThread: ({ annotationId, closed }: { annotationId: string; closed?: boolean }) => (
+    <div data-testid={`thread-${annotationId}`} data-closed={closed ? 'true' : 'false'} />
   ),
 }));
 
@@ -278,6 +278,15 @@ describe('AnnotationPanel', () => {
       activeAnnotationId: 'a2',
     });
     expect(screen.queryByTestId('resolve-bar')).not.toBeInTheDocument();
+    // The page-level wiring the thread relies on (#403): a resolved
+    // annotation's thread is marked closed.
+    expect(screen.getByTestId('thread-a2')).toHaveAttribute('data-closed', 'true');
+  });
+
+  it("keeps an open annotation's thread writable", () => {
+    useAuthStore.setState({ userId: 'u1' });
+    renderPanel({ annotations: [annotation('a1')], activeAnnotationId: 'a1' });
+    expect(screen.getByTestId('thread-a1')).toHaveAttribute('data-closed', 'false');
   });
 
   it('creates via the submit shortcut and shows the hint', () => {

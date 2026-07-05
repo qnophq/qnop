@@ -34,13 +34,14 @@ vi.mock('../../../api/hooks/useComments', () => ({
 
 const addMutate = vi.fn();
 
-function renderThread(readOnly = false, previousSeenAt: string | null = null) {
+function renderThread(readOnly = false, previousSeenAt: string | null = null, closed = false) {
   return render(
     <ThemeProvider theme={buildTheme('light')}>
       <CommentThread
         annotationId="a1"
         notify={vi.fn()}
         readOnly={readOnly}
+        closed={closed}
         previousSeenAt={previousSeenAt}
       />
     </ThemeProvider>,
@@ -189,5 +190,20 @@ describe('CommentThread', () => {
     } as unknown as ReturnType<typeof useComments>);
     renderThread(true);
     expect(screen.queryByLabelText('Add a comment')).not.toBeInTheDocument();
+    // The closing line belongs to the resolved state, not to read-only.
+    expect(screen.queryByTestId('thread-closed-note')).not.toBeInTheDocument();
+  });
+
+  it('closes a resolved thread: no composer, a quiet closing line instead (#403)', () => {
+    vi.mocked(useComments).mockReturnValue({
+      isPending: false,
+      isError: false,
+      data: { comments: [] },
+    } as unknown as ReturnType<typeof useComments>);
+    renderThread(false, null, true);
+    expect(screen.queryByLabelText('Add a comment')).not.toBeInTheDocument();
+    expect(screen.getByTestId('thread-closed-note')).toHaveTextContent(
+      'Resolved — this thread is closed.',
+    );
   });
 });

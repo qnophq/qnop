@@ -28,6 +28,7 @@ import Typography from '@mui/material/Typography';
 import { useTheme } from '@mui/material/styles';
 import { ExternalLink, X } from 'lucide-react';
 import type { AnnotationView } from '../../../api/generated';
+import { AnnotationStatus } from '../../../api/generated';
 import { useAuthStore } from '../../../stores/authStore';
 import { tokens } from '../../../theme/tokens';
 import type { Notify } from '../../admin/layout/useToast';
@@ -184,6 +185,7 @@ export function TaskDrawer({
           <CommentThread
             annotationId={annotation.id}
             notify={notify}
+            closed={annotation.status !== AnnotationStatus.Open}
             previousSeenAt={previousSeenAt}
             skipOpener
           />

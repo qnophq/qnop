@@ -28,8 +28,9 @@ import TextField from '@mui/material/TextField';
 import Tooltip from '@mui/material/Tooltip';
 import Typography from '@mui/material/Typography';
 import { alpha, useTheme } from '@mui/material/styles';
-import { SendHorizontal } from 'lucide-react';
+import { CircleCheck, SendHorizontal } from 'lucide-react';
 import { useAddComment, useComments } from '../../../api/hooks/useComments';
+import { apiErrorCode } from '../../../utils/apiError';
 import { isSubmitShortcut, submitShortcutLabel } from '../../../utils/platform';
 import { useAuthStore } from '../../../stores/authStore';
 import type { Notify } from '../../admin/layout/useToast';
@@ -45,6 +46,8 @@ interface CommentThreadProps {
   notify: Notify;
   /** Hides the reply composer — older versions are a read-only record (#306). */
   readOnly?: boolean;
+  /** True on a RESOLVED annotation (#403): the thread is a closed record. */
+  closed?: boolean;
   /** The previous visit (issue #307) — enables the "new" divider inside the thread. */
   previousSeenAt?: string | null;
   /** True when the surrounding card already renders the opening annotation (issue #403). */
@@ -68,6 +71,7 @@ export function CommentThread({
   annotationId,
   notify,
   readOnly = false,
+  closed = false,
   previousSeenAt = null,
   skipOpener = false,
 }: CommentThreadProps) {
@@ -84,7 +88,13 @@ export function CommentThread({
     if (!body) return;
     addComment.mutate(body, {
       onSuccess: () => setDraft(''),
-      onError: () => notify('Could not add the comment.', 'error'),
+      onError: (error) =>
+        notify(
+          apiErrorCode(error) === 'ANNOTATION_ALREADY_RESOLVED'
+            ? 'The annotation was resolved — its thread is closed.'
+            : 'Could not add the comment.',
+          'error',
+        ),
     });
   };
 
@@ -186,10 +196,24 @@ export function CommentThread({
             {skipOpener ? 'No replies yet.' : 'No comments yet. Start the discussion.'}
           </Typography>
         )}
+        {/* A resolved annotation's thread is a record (#403): the composer
+            gives way to a quiet closing line, so its absence reads as a state,
+            not a glitch. */}
+        {closed && !readOnly && (
+          <Stack
+            direction="row"
+            spacing={0.75}
+            data-testid="thread-closed-note"
+            sx={{ alignItems: 'center', pl: 4.5, color: 'text.secondary' }}
+          >
+            <CircleCheck size={13} aria-hidden color={theme.palette.success.main} />
+            <Typography variant="caption">Resolved — this thread is closed.</Typography>
+          </Stack>
+        )}
         {/* Composer continues the thread rail with the signed-in user's avatar.
             Hidden on read-only (older) versions — the same thread stays
             writable when the annotation is opened on the latest version. */}
-        {!readOnly && (
+        {!readOnly && !closed && (
           <Stack direction="row" spacing={1} sx={{ alignItems: 'flex-start' }}>
             <Box sx={{ position: 'relative', zIndex: 1, pt: 0.5 }}>
               <UserAvatar name={displayName ?? 'You'} size={AVATAR_SIZE} imageUrl={avatarUrl} />

@@ -33,6 +33,7 @@ import useMediaQuery from '@mui/material/useMediaQuery';
 import { useTheme } from '@mui/material/styles';
 import { ChevronDown, ChevronUp, X } from 'lucide-react';
 import type { AnnotationView } from '../../../api/generated';
+import { AnnotationStatus } from '../../../api/generated';
 import { tokens } from '../../../theme/tokens';
 import type { Notify } from '../../admin/layout/useToast';
 import { ToneBadge } from '../../admin/ToneBadge';
@@ -308,6 +309,7 @@ export function FocusAnnotationCard({
                     annotationId={annotation.id}
                     notify={notify}
                     readOnly={readOnly}
+                    closed={annotation.status !== AnnotationStatus.Open}
                     previousSeenAt={previousSeenAt}
                     skipOpener
                   />

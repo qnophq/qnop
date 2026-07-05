@@ -246,6 +246,7 @@ export function AnnotationPanel({
             annotationId={annotation.id}
             notify={notify}
             readOnly={readOnly}
+            closed={annotation.status !== AnnotationStatus.Open}
             previousSeenAt={previousSeenAt}
             skipOpener
           />

@@ -201,6 +201,22 @@ class AnnotationApiIT extends SeededIntegrationTest {
   }
 
   @Test
+  void aResolvedThreadRefusesNewComments() throws Exception {
+    UUID documentId = seedDocumentWithVersion();
+    String annotationId = createAnnotation(documentId, AUDITOR_ID);
+    resolve(annotationId, AUDITOR_ID).andExpect(status().isOk());
+
+    // The thread is a closed record (issue #403) — even for the author/owner.
+    mockMvc
+        .perform(
+            as(post("/api/v1/annotations/" + annotationId + "/comments"), MEMBER_ID)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"body\":\"too late\"}"))
+        .andExpect(status().isConflict())
+        .andExpect(jsonPath("$.code").value("ANNOTATION_ALREADY_RESOLVED"));
+  }
+
+  @Test
   void aClosedReviewAcceptsNoNewAnnotations() throws Exception {
     UUID documentId = seedDocumentWithVersion();
     Document document = documents.findById(documentId).orElseThrow();
