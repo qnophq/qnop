@@ -23,6 +23,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import type { AnnotationCreateRequest, AnnotationListResponse } from '../generated';
 import { annotationsApi } from '../config';
 import { commentKeys } from './useComments';
+import { documentKeys } from './useDocuments';
 
 export const annotationKeys = {
   all: ['annotations'] as const,
@@ -46,7 +47,11 @@ export function useAnnotations(documentId: string, version: number | undefined) 
   });
 }
 
-/** Creates an annotation on the drawn version; the placement is PLACED immediately. */
+/**
+ * Creates an annotation on the drawn version; the placement is PLACED
+ * immediately. Raising the first open annotation derives CHANGES_REQUESTED
+ * (issue #405), so the workflow-bearing caches are invalidated too.
+ */
 export function useCreateAnnotation(documentId: string) {
   const queryClient = useQueryClient();
   return useMutation({
@@ -57,7 +62,11 @@ export function useCreateAnnotation(documentId: string) {
       });
       return response.data;
     },
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: annotationKeys.all }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: annotationKeys.all });
+      queryClient.invalidateQueries({ queryKey: ['reviews'] });
+      queryClient.invalidateQueries({ queryKey: documentKeys.all });
+    },
   });
 }
 
@@ -82,6 +91,9 @@ export function useResolveAnnotation() {
       queryClient.invalidateQueries({ queryKey: annotationKeys.all });
       queryClient.invalidateQueries({ queryKey: commentKeys.all });
       queryClient.invalidateQueries({ queryKey: ['reviews'] });
+      // The derived workflow pair (#405) surfaces on the document detail too
+      // (the header's status chip reads document.workflowState).
+      queryClient.invalidateQueries({ queryKey: documentKeys.all });
     },
   });
 }
