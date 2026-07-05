@@ -50,7 +50,13 @@ import { ErrorBoundary } from '../../components/errors/ErrorBoundary';
 import { ReviewHubHead } from '../../components/reviews/hub/ReviewHubHead';
 import { ReviewViewTabs } from '../../components/reviews/hub/ReviewViewTabs';
 import { AnnotationPanel } from '../../components/reviews/panel/AnnotationPanel';
-import { PANEL_MIN_WIDTH, PanelResizer } from '../../components/reviews/PanelResizer';
+import {
+  DEFAULT_PANEL_FRACTION,
+  PANEL_MAX_FRACTION,
+  PANEL_MIN_FRACTION,
+  PanelResizer,
+  RESIZER_WIDTH,
+} from '../../components/reviews/PanelResizer';
 import { FocusAnnotationCard } from '../../components/reviews/focus/FocusAnnotationCard';
 import { FocusDrawer } from '../../components/reviews/focus/FocusDrawer';
 import {
@@ -78,7 +84,9 @@ import { useAuthStore } from '../../stores/authStore';
 import { apiErrorCode } from '../../utils/apiError';
 import { pdfFetchVersion, resolveEffectiveVersion } from './resolveEffectiveVersion';
 
-const PANEL_WIDTH_KEY = 'qnop-review-panel-width';
+const PANEL_SPLIT_KEY = 'qnop-review-split';
+/** The pre-#403 pixel-width key — superseded by the fraction split, cleaned on load. */
+const LEGACY_PANEL_WIDTH_KEY = 'qnop-review-panel-width';
 
 /**
  * The review surface of one document (#250): pdf.js renders the original for
@@ -155,19 +163,23 @@ export function DocumentReviewPage() {
   const [hoverAnnotationId, setHoverAnnotationId] = useState<string | null>(null);
   const [currentPage, setCurrentPage] = useState(0);
   const viewerRef = useRef<DocumentViewerHandle>(null);
-  const [panelWidth, setPanelWidth] = useState<number>(() => {
+  // Document : panel defaults to 2 : 1; a user's adjustment sticks (issue #403).
+  const [panelFraction, setPanelFraction] = useState<number>(() => {
     try {
-      const stored = Number(localStorage.getItem(PANEL_WIDTH_KEY));
-      return stored >= PANEL_MIN_WIDTH ? stored : PANEL_MIN_WIDTH;
+      localStorage.removeItem(LEGACY_PANEL_WIDTH_KEY);
+      const stored = Number(localStorage.getItem(PANEL_SPLIT_KEY));
+      return stored >= PANEL_MIN_FRACTION && stored <= PANEL_MAX_FRACTION
+        ? stored
+        : DEFAULT_PANEL_FRACTION;
     } catch {
-      return PANEL_MIN_WIDTH;
+      return DEFAULT_PANEL_FRACTION;
     }
   });
 
-  const handlePanelWidthChange = (width: number) => {
-    setPanelWidth(width);
+  const handlePanelFractionChange = (fraction: number) => {
+    setPanelFraction(fraction);
     try {
-      localStorage.setItem(PANEL_WIDTH_KEY, String(width));
+      localStorage.setItem(PANEL_SPLIT_KEY, String(fraction));
     } catch {
       // best-effort persistence
     }
@@ -460,18 +472,17 @@ export function DocumentReviewPage() {
             )}
           </Stack>
           {!focusMode && (
-            <PanelResizer
-              width={panelWidth}
-              defaultWidth={PANEL_MIN_WIDTH}
-              onWidthChange={handlePanelWidthChange}
-            />
+            <PanelResizer fraction={panelFraction} onFractionChange={handlePanelFractionChange} />
           )}
           {!focusMode && (
             <Box
               component="aside"
               aria-label="Annotations"
               sx={{
-                width: { xs: '100%', md: panelWidth },
+                // The divider's width is off the top, so the split reads
+                // exactly document : panel = (1 - f) : f.
+                width: { xs: '100%', md: `calc((100% - ${RESIZER_WIDTH}px) * ${panelFraction})` },
+                minWidth: { md: 320 },
                 flexShrink: 0,
                 minHeight: 0,
                 overflowY: { md: 'auto' },

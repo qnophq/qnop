@@ -24,42 +24,52 @@ import type { KeyboardEvent, PointerEvent } from 'react';
 import Box from '@mui/material/Box';
 import { useTheme } from '@mui/material/styles';
 
-export const PANEL_MIN_WIDTH = 360;
-export const PANEL_MAX_WIDTH = 720;
-const KEYBOARD_STEP = 16;
+/** Document : panel = 2 : 1 by default (issue #403). */
+export const DEFAULT_PANEL_FRACTION = 1 / 3;
+export const PANEL_MIN_FRACTION = 0.2;
+export const PANEL_MAX_FRACTION = 0.5;
+const KEYBOARD_STEP = 0.02;
+/** The divider's own width — subtracted before the panes split the rest. */
+export const RESIZER_WIDTH = 16;
 
 interface PanelResizerProps {
-  /** Current width of the panel to the RIGHT of the divider. */
-  width: number;
-  defaultWidth: number;
-  onWidthChange: (width: number) => void;
+  /** The panel's share of the split (0..1), panel to the RIGHT of the divider. */
+  fraction: number;
+  onFractionChange: (fraction: number) => void;
 }
 
-function clamp(width: number): number {
-  return Math.min(PANEL_MAX_WIDTH, Math.max(PANEL_MIN_WIDTH, width));
+function clamp(fraction: number): number {
+  return Math.min(PANEL_MAX_FRACTION, Math.max(PANEL_MIN_FRACTION, fraction));
 }
 
 /**
- * The draggable divider between the document pane and the annotation panel:
- * dragging left widens the panel (down to its current default as the
- * minimum), double-click resets, and arrow keys resize from the keyboard —
- * a real `separator` with value semantics for assistive tech. The visible
- * hairline thickens and tints on hover/drag; the hit area stays comfortably
- * wide.
+ * The draggable divider between the document pane and the annotation panel.
+ * The split is a FRACTION of the container — the default reads document :
+ * panel = 2 : 1 at any window size (issue #403) — dragging left widens the
+ * panel, double-click restores the default, and arrow keys resize from the
+ * keyboard: a real `separator` with percent value semantics for assistive
+ * tech. The visible hairline thickens and tints on hover/drag; the hit area
+ * stays comfortably wide.
  */
-export function PanelResizer({ width, defaultWidth, onWidthChange }: PanelResizerProps) {
+export function PanelResizer({ fraction, onFractionChange }: PanelResizerProps) {
   const theme = useTheme();
   // Drag state lives in a ref so pointermove handlers never read a stale
   // closure (moves can arrive before React re-renders); the state mirror only
   // drives the visual dragging style.
   const draggingRef = useRef(false);
   const [dragging, setDragging] = useState(false);
-  const start = useRef({ x: 0, width });
+  // The split container's box, captured once per drag — the divider sits
+  // directly inside it, so the parent IS the container.
+  const containerBox = useRef({ right: 0, width: 1 });
 
   const handlePointerDown = (event: PointerEvent<HTMLDivElement>) => {
     if (event.button !== 0) return;
     event.preventDefault();
-    start.current = { x: event.clientX, width };
+    const parent = event.currentTarget.parentElement;
+    if (parent) {
+      const rect = parent.getBoundingClientRect();
+      containerBox.current = { right: rect.right, width: Math.max(1, rect.width) };
+    }
     draggingRef.current = true;
     setDragging(true);
     try {
@@ -71,24 +81,25 @@ export function PanelResizer({ width, defaultWidth, onWidthChange }: PanelResize
 
   const handlePointerMove = (event: PointerEvent<HTMLDivElement>) => {
     if (!draggingRef.current) return;
-    // Dragging left grows the right-hand panel.
-    onWidthChange(clamp(start.current.width + (start.current.x - event.clientX)));
+    // The panel spans from the pointer (plus half the divider) to the right edge.
+    const { right, width } = containerBox.current;
+    onFractionChange(clamp((right - event.clientX - RESIZER_WIDTH / 2) / width));
   };
 
   const handleKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
     const next =
       event.key === 'ArrowLeft'
-        ? width + KEYBOARD_STEP
+        ? fraction + KEYBOARD_STEP
         : event.key === 'ArrowRight'
-          ? width - KEYBOARD_STEP
+          ? fraction - KEYBOARD_STEP
           : event.key === 'Home'
-            ? PANEL_MAX_WIDTH
+            ? PANEL_MAX_FRACTION
             : event.key === 'End'
-              ? PANEL_MIN_WIDTH
+              ? PANEL_MIN_FRACTION
               : null;
     if (next === null) return;
     event.preventDefault();
-    onWidthChange(clamp(next));
+    onFractionChange(clamp(next));
   };
 
   return (
@@ -96,9 +107,10 @@ export function PanelResizer({ width, defaultWidth, onWidthChange }: PanelResize
       role="separator"
       aria-orientation="vertical"
       aria-label="Resize annotations panel"
-      aria-valuemin={PANEL_MIN_WIDTH}
-      aria-valuemax={PANEL_MAX_WIDTH}
-      aria-valuenow={width}
+      aria-valuemin={Math.round(PANEL_MIN_FRACTION * 100)}
+      aria-valuemax={Math.round(PANEL_MAX_FRACTION * 100)}
+      aria-valuenow={Math.round(fraction * 100)}
+      aria-valuetext={`${Math.round(fraction * 100)}% of the workspace`}
       tabIndex={0}
       data-dragging={dragging}
       onPointerDown={handlePointerDown}
@@ -111,10 +123,10 @@ export function PanelResizer({ width, defaultWidth, onWidthChange }: PanelResize
         draggingRef.current = false;
         setDragging(false);
       }}
-      onDoubleClick={() => onWidthChange(defaultWidth)}
+      onDoubleClick={() => onFractionChange(DEFAULT_PANEL_FRACTION)}
       onKeyDown={handleKeyDown}
       sx={{
-        width: 16,
+        width: RESIZER_WIDTH,
         flexShrink: 0,
         alignSelf: 'stretch',
         display: { xs: 'none', md: 'flex' },
