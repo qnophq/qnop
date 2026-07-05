@@ -181,8 +181,7 @@ function AnnotationListItemBase({
         '@media (prefers-reduced-motion: reduce)': { transition: 'none' },
         '&:hover': {
           borderColor: active || linked ? theme.qnop.brand.blue : alpha(theme.qnop.brand.blue, 0.4),
-          bgcolor:
-            active || linked ? alpha(theme.qnop.brand.blue, 0.06) : theme.qnop.surface2,
+          bgcolor: active || linked ? alpha(theme.qnop.brand.blue, 0.06) : theme.qnop.surface2,
         },
         '&:focus-visible': { boxShadow: theme.qnop.focusRing },
       }}
