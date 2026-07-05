@@ -80,6 +80,7 @@ import { DocumentViewer } from '../../components/reviews/viewer/DocumentViewer';
 import { usePdfDocument } from '../../components/reviews/viewer/usePdfDocument';
 import type { ViewerTool } from '../../components/reviews/viewer/ViewerToolbar';
 import { ViewerToolbar } from '../../components/reviews/viewer/ViewerToolbar';
+import { isOpenWorkflowState } from '../../components/reviews/workflowMeta';
 import { useAuthStore } from '../../stores/authStore';
 import { apiErrorCode } from '../../utils/apiError';
 import { pdfFetchVersion, resolveEffectiveVersion } from './resolveEffectiveVersion';
@@ -507,6 +508,7 @@ export function DocumentReviewPage() {
                   canAnnotate={canAnnotate}
                   notify={notify}
                   readOnly={!isLatestVersion}
+                  reviewClosed={!isOpenWorkflowState(document.workflowState)}
                   previousSeenAt={previousSeenAt}
                 />
               </ErrorBoundary>
@@ -535,6 +537,7 @@ export function DocumentReviewPage() {
               canAnnotate={canAnnotate}
               notify={notify}
               readOnly={!isLatestVersion}
+              reviewClosed={!isOpenWorkflowState(document.workflowState)}
               previousSeenAt={previousSeenAt}
             />
           </ErrorBoundary>
@@ -550,6 +553,7 @@ export function DocumentReviewPage() {
           userId={userId}
           notify={notify}
           readOnly={!isLatestVersion}
+          reviewClosed={!isOpenWorkflowState(document.workflowState)}
           previousSeenAt={previousSeenAt}
         />
       )}

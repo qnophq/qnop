@@ -21,6 +21,7 @@
 
 import { Fragment, useState } from 'react';
 import Box from '@mui/material/Box';
+import Button from '@mui/material/Button';
 import CircularProgress from '@mui/material/CircularProgress';
 import IconButton from '@mui/material/IconButton';
 import Stack from '@mui/material/Stack';
@@ -28,7 +29,7 @@ import TextField from '@mui/material/TextField';
 import Tooltip from '@mui/material/Tooltip';
 import Typography from '@mui/material/Typography';
 import { alpha, useTheme } from '@mui/material/styles';
-import { CircleCheck, SendHorizontal } from 'lucide-react';
+import { CircleCheck, RotateCcw, SendHorizontal } from 'lucide-react';
 import { useAddComment, useComments } from '../../../api/hooks/useComments';
 import { apiErrorCode } from '../../../utils/apiError';
 import { isSubmitShortcut, submitShortcutLabel } from '../../../utils/platform';
@@ -48,6 +49,8 @@ interface CommentThreadProps {
   readOnly?: boolean;
   /** True on a RESOLVED annotation (#403): the thread is a closed record. */
   closed?: boolean;
+  /** Reopens the annotation (issue #394) — set only when the viewer may. */
+  onReopen?: () => void;
   /** The previous visit (issue #307) — enables the "new" divider inside the thread. */
   previousSeenAt?: string | null;
   /** True when the surrounding card already renders the opening annotation (issue #403). */
@@ -72,6 +75,7 @@ export function CommentThread({
   notify,
   readOnly = false,
   closed = false,
+  onReopen,
   previousSeenAt = null,
   skipOpener = false,
 }: CommentThreadProps) {
@@ -193,7 +197,11 @@ export function CommentThread({
         })}
         {!commentsQuery.isPending && !commentsQuery.isError && visibleComments.length === 0 && (
           <Typography variant="body2" color="text.secondary" sx={{ pl: 4.5 }}>
-            {skipOpener ? 'No replies yet.' : 'No comments yet. Start the discussion.'}
+            {skipOpener
+              ? closed
+                ? 'No replies.'
+                : 'No replies yet.'
+              : 'No comments yet. Start the discussion.'}
           </Typography>
         )}
         {/* A resolved annotation's thread is a record (#403): the composer
@@ -204,10 +212,21 @@ export function CommentThread({
             direction="row"
             spacing={0.75}
             data-testid="thread-closed-note"
-            sx={{ alignItems: 'center', pl: 4.5, color: 'text.secondary' }}
+            sx={{ alignItems: 'center', pl: 4.5, color: 'text.secondary', minHeight: 26 }}
           >
             <CircleCheck size={13} aria-hidden color={theme.palette.success.main} />
             <Typography variant="caption">Resolved — this thread is closed.</Typography>
+            {onReopen && (
+              <Button
+                size="small"
+                variant="text"
+                startIcon={<RotateCcw size={12} />}
+                onClick={onReopen}
+                sx={{ ml: 0.5, py: 0, minHeight: 0, fontSize: 12 }}
+              >
+                Reopen
+              </Button>
+            )}
           </Stack>
         )}
         {/* Composer continues the thread rail with the signed-in user's avatar.

@@ -45,7 +45,12 @@ import { AnnotationListItem } from './AnnotationListItem';
 import { CommentThread } from './CommentThread';
 import { Composer } from './Composer';
 import { ResolveBar } from './ResolveBar';
-import { mayResolveAnnotation, useResolveWithFeedback } from './resolve';
+import {
+  mayReopenAnnotation,
+  mayResolveAnnotation,
+  useReopenWithFeedback,
+  useResolveWithFeedback,
+} from './resolve';
 
 type StatusFilter = 'all' | 'open' | 'resolved';
 
@@ -67,10 +72,11 @@ interface AnnotationPanelProps {
   onCreate: (comment: string, type?: AnnotationType, priority?: AnnotationPriority) => void;
   onCancelPending: () => void;
   canAnnotate: boolean;
-  /** The document owner — owner or author may decide an annotation (ADR-0011). */
   notify: Notify;
   /** True while an OLDER version is viewed (#306): threads readable, nothing writable. */
   readOnly?: boolean;
+  /** True once the review is FINALIZED/CANCELLED (issue #394): no reopening. */
+  reviewClosed?: boolean;
   /** The previous visit (issue #307) — null hides every unseen cue. */
   previousSeenAt?: string | null;
 }
@@ -201,11 +207,13 @@ export function AnnotationPanel({
   canAnnotate,
   notify,
   readOnly = false,
+  reviewClosed = false,
   previousSeenAt = null,
 }: AnnotationPanelProps) {
   const [filter, setFilter] = useState<StatusFilter>('all');
   const userId = useAuthStore((state) => state.userId);
   const { resolveWith, isPending: resolving } = useResolveWithFeedback(notify);
+  const { reopenWith } = useReopenWithFeedback(notify);
 
   // Sort + status-filter once per (annotations, filter) change, not on every
   // render (e.g. a hover or selection): the list can be large and the sort is
@@ -247,6 +255,11 @@ export function AnnotationPanel({
             notify={notify}
             readOnly={readOnly}
             closed={annotation.status !== AnnotationStatus.Open}
+            onReopen={
+              !readOnly && !reviewClosed && mayReopenAnnotation(annotation, userId)
+                ? () => reopenWith(annotation)
+                : undefined
+            }
             previousSeenAt={previousSeenAt}
             skipOpener
           />

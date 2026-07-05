@@ -29,8 +29,20 @@ import { useAuthStore } from '../../../stores/authStore';
 import { AnnotationPanel } from './AnnotationPanel';
 
 vi.mock('./CommentThread', () => ({
-  CommentThread: ({ annotationId, closed }: { annotationId: string; closed?: boolean }) => (
-    <div data-testid={`thread-${annotationId}`} data-closed={closed ? 'true' : 'false'} />
+  CommentThread: ({
+    annotationId,
+    closed,
+    onReopen,
+  }: {
+    annotationId: string;
+    closed?: boolean;
+    onReopen?: () => void;
+  }) => (
+    <div
+      data-testid={`thread-${annotationId}`}
+      data-closed={closed ? 'true' : 'false'}
+      data-can-reopen={onReopen ? 'true' : 'false'}
+    />
   ),
 }));
 
@@ -41,6 +53,7 @@ vi.mock('../../../api/hooks/useComments', () => ({
 const { resolveMutate } = vi.hoisted(() => ({ resolveMutate: vi.fn() }));
 vi.mock('../../../api/hooks/useAnnotations', () => ({
   useResolveAnnotation: () => ({ mutate: resolveMutate, isPending: false }),
+  useReopenAnnotation: () => ({ mutate: vi.fn(), isPending: false }),
 }));
 
 beforeEach(() => {
@@ -279,8 +292,29 @@ describe('AnnotationPanel', () => {
     });
     expect(screen.queryByTestId('resolve-bar')).not.toBeInTheDocument();
     // The page-level wiring the thread relies on (#403): a resolved
-    // annotation's thread is marked closed.
+    // annotation's thread is marked closed — and its author may reopen it
+    // while the review is still running (#394).
     expect(screen.getByTestId('thread-a2')).toHaveAttribute('data-closed', 'true');
+    expect(screen.getByTestId('thread-a2')).toHaveAttribute('data-can-reopen', 'true');
+    cleanup();
+
+    // Not the author -> no reopen.
+    useAuthStore.setState({ userId: 'stranger' });
+    renderPanel({
+      annotations: [annotation('a3', { status: AnnotationStatus.Resolved })],
+      activeAnnotationId: 'a3',
+    });
+    expect(screen.getByTestId('thread-a3')).toHaveAttribute('data-can-reopen', 'false');
+    cleanup();
+
+    // Finalized review -> resolved annotations stay closed.
+    useAuthStore.setState({ userId: 'u1' });
+    renderPanel({
+      annotations: [annotation('a4', { status: AnnotationStatus.Resolved })],
+      activeAnnotationId: 'a4',
+      reviewClosed: true,
+    });
+    expect(screen.getByTestId('thread-a4')).toHaveAttribute('data-can-reopen', 'false');
   });
 
   it("keeps an open annotation's thread writable", () => {

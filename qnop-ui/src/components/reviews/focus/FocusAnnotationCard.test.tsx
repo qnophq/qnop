@@ -38,6 +38,7 @@ vi.mock('../panel/CommentThread', () => ({
 const { resolveMutate } = vi.hoisted(() => ({ resolveMutate: vi.fn() }));
 vi.mock('../../../api/hooks/useAnnotations', () => ({
   useResolveAnnotation: () => ({ mutate: resolveMutate, isPending: false }),
+  useReopenAnnotation: () => ({ mutate: vi.fn(), isPending: false }),
 }));
 
 const ANNOTATION: AnnotationView = {

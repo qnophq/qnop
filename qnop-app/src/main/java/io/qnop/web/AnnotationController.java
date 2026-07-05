@@ -118,6 +118,11 @@ public class AnnotationController implements AnnotationsApi {
   }
 
   @Override
+  public ResponseEntity<AnnotationView> reopenAnnotation(UUID annotationId) {
+    return ResponseEntity.ok(toDto(annotations.reopen(annotationId, CurrentUser.requireUserId())));
+  }
+
+  @Override
   public ResponseEntity<AnnotationView> resolveAnnotation(
       UUID annotationId, AnnotationResolveRequest request) {
     String note = request == null ? null : request.getNote();
