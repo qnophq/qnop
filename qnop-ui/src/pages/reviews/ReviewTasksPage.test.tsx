@@ -151,6 +151,26 @@ describe('ReviewTasksPage', () => {
     expect(screen.queryByTestId('task-card-a-open')).not.toBeInTheDocument();
   });
 
+  it('filters by the type facet from the URL, with a removable chip', () => {
+    mockData();
+    renderPage('/reviews/d1/tasks?type=QUESTION');
+    expect(screen.getByTestId('task-card-a-talk')).toBeInTheDocument();
+    expect(screen.queryByTestId('task-card-a-open')).not.toBeInTheDocument();
+    expect(screen.getByTestId('active-filter-chips')).toHaveTextContent('Question');
+  });
+
+  it('offers the facet popover without the status facet (columns speak status)', () => {
+    mockData();
+    renderPage();
+    fireEvent.click(screen.getByRole('button', { name: 'Filter annotations' }));
+    expect(screen.queryByLabelText('Status')).not.toBeInTheDocument();
+
+    fireEvent.mouseDown(screen.getByLabelText('Type'));
+    fireEvent.click(screen.getByRole('option', { name: 'Question' }));
+    expect(screen.getByTestId('task-card-a-talk')).toBeInTheDocument();
+    expect(screen.queryByTestId('task-card-a-done')).not.toBeInTheDocument();
+  });
+
   it('resolves author names through the participants, and self by display name', () => {
     mockData();
     vi.mocked(useAnnotations).mockReturnValue({
