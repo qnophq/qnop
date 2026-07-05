@@ -25,7 +25,6 @@ import Box from '@mui/material/Box';
 import ButtonBase from '@mui/material/ButtonBase';
 import Chip from '@mui/material/Chip';
 import Collapse from '@mui/material/Collapse';
-import Divider from '@mui/material/Divider';
 import Stack from '@mui/material/Stack';
 import Typography from '@mui/material/Typography';
 import { useTheme } from '@mui/material/styles';
@@ -41,6 +40,7 @@ import { useAuthStore } from '../../../stores/authStore';
 import type { Notify } from '../../admin/layout/useToast';
 import { SectionCard } from '../../admin/layout/SectionCard';
 import { compareAnnotationsByPosition } from '../viewer/anchoring';
+import { tokens } from '../../../theme/tokens';
 import { isUnseen } from '../newSince';
 import { AnnotationListItem } from './AnnotationListItem';
 import { CommentThread } from './CommentThread';
@@ -179,9 +179,10 @@ function PanelSection({
         )}
       </ButtonBase>
       <Collapse in={open} unmountOnExit>
-        {/* A hairline between the discussion units keeps neighbouring
-            threads apart, the way feeds separate posts (issue #403). */}
-        <Stack spacing={1.5} divider={<Divider aria-hidden />} sx={{ pt: 1 }}>
+        {/* The board's lane contrast, brought to the panel (issue #403):
+            a tinted lane with one white post-card per discussion unit —
+            separation through surface, not rules. */}
+        <Stack sx={{ mt: 1, p: 0.75, borderRadius: 1, bgcolor: theme.qnop.surface2, gap: 1 }}>
           {children}
         </Stack>
       </Collapse>
@@ -240,7 +241,20 @@ export function AnnotationPanel({
   const renderItem = (annotation: AnnotationView) => {
     const active = annotation.id === activeAnnotationId;
     return (
-      <Stack key={annotation.id} spacing={0}>
+      <Stack
+        key={annotation.id}
+        spacing={0}
+        sx={{
+          bgcolor: 'background.paper',
+          borderRadius: 1,
+          p: 0.5,
+          // Lifted like the board's cards: one soft shadow on light, a
+          // hairline edge on dark (shadows vanish there).
+          boxShadow: (t) => (t.palette.mode === 'light' ? tokens.shadow.xs : 'none'),
+          border: '1px solid',
+          borderColor: (t) => (t.palette.mode === 'light' ? 'transparent' : t.palette.divider),
+        }}
+      >
         <AnnotationListItem
           annotation={annotation}
           active={active}

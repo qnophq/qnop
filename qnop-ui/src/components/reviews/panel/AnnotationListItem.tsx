@@ -171,8 +171,10 @@ function AnnotationListItemBase({
         border: '1px solid',
         // Two quiet steps of the interaction blue: hover tints the surface,
         // the linked mark and the active card share the full accent — the
-        // card↔mark pair reads as one hovered thing, no arrow needed.
-        borderColor: active || linked ? theme.qnop.brand.blue : theme.palette.divider,
+        // card↔mark pair reads as one hovered thing, no arrow needed. The
+        // resting identity lives on the unit's white post-card around this
+        // item (#403), so the resting border stays silent.
+        borderColor: active || linked ? theme.qnop.brand.blue : 'transparent',
         bgcolor: active || linked ? alpha(theme.qnop.brand.blue, 0.06) : 'transparent',
         boxShadow: linked && theme.palette.mode === 'light' ? tokens.shadow.sm : 'none',
         px: 1.25,
