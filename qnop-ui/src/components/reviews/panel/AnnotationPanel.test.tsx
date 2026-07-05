@@ -51,6 +51,11 @@ vi.mock('../../../api/hooks/useComments', () => ({
 }));
 
 const { resolveMutate } = vi.hoisted(() => ({ resolveMutate: vi.fn() }));
+vi.mock('../../../api/hooks/useReviews', () => ({
+  useParticipants: vi.fn().mockReturnValue({
+    data: { participants: [{ principalId: 'other', displayName: 'Anna Weber' }] },
+  }),
+}));
 vi.mock('../../../api/hooks/useAnnotations', () => ({
   useResolveAnnotation: () => ({ mutate: resolveMutate, isPending: false }),
   useReopenAnnotation: () => ({ mutate: vi.fn(), isPending: false }),
@@ -79,6 +84,7 @@ const annotation = (id: string, overrides: Partial<AnnotationView> = {}): Annota
 
 function renderPanel(props: Partial<Parameters<typeof AnnotationPanel>[0]> = {}) {
   const defaults: Parameters<typeof AnnotationPanel>[0] = {
+    documentId: 'd1',
     annotations: [],
     activeAnnotationId: null,
     onSelect: vi.fn(),
@@ -164,7 +170,7 @@ describe('AnnotationPanel', () => {
     expect(props.onSelect).toHaveBeenCalledWith(null);
   });
 
-  it('filters annotations by status', () => {
+  it('filters by status through the filter popover, with a removable chip', () => {
     renderPanel({
       annotations: [
         annotation('open-1'),
@@ -172,13 +178,55 @@ describe('AnnotationPanel', () => {
       ],
     });
 
-    fireEvent.click(screen.getByRole('button', { name: 'Open' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Filter annotations' }));
+    fireEvent.mouseDown(screen.getByLabelText('Status'));
+    fireEvent.click(screen.getByRole('option', { name: 'Open' }));
+
     expect(screen.getByTestId('annotation-item-open-1')).toBeInTheDocument();
     expect(screen.queryByTestId('annotation-item-resolved-1')).not.toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole('button', { name: 'Resolved' }));
-    expect(screen.queryByTestId('annotation-item-open-1')).not.toBeInTheDocument();
+    // The active facet surfaces as a removable chip.
+    const chips = within(screen.getByTestId('active-filter-chips'));
+    fireEvent.click(
+      within(chips.getByText('Open').closest('.MuiChip-root') as HTMLElement).getByTestId(
+        'CancelIcon',
+      ),
+    );
     expect(screen.getByTestId('annotation-item-resolved-1')).toBeInTheDocument();
+  });
+
+  it('narrows by full-text search over quote, opening text and author', () => {
+    renderPanel({
+      annotations: [
+        annotation('a-quote'),
+        annotation('a-other', {
+          anchor: {
+            region: { surfaceIndex: 0, box: { x: 0.1, y: 0.1, width: 0.2, height: 0.05 } },
+            textQuote: { quote: 'a completely different passage' },
+          },
+          firstComment: 'unrelated opener',
+        }),
+      ],
+    });
+
+    fireEvent.change(screen.getByLabelText('Search annotations'), {
+      target: { value: 'quoted text' },
+    });
+    expect(screen.getByTestId('annotation-item-a-quote')).toBeInTheDocument();
+    expect(screen.queryByTestId('annotation-item-a-other')).not.toBeInTheDocument();
+  });
+
+  it('filters by author resolved through the participant directory', () => {
+    renderPanel({
+      annotations: [annotation('a-mine'), annotation('a-foreign', { authorId: 'other' })],
+    });
+
+    fireEvent.click(screen.getByRole('button', { name: 'Filter annotations' }));
+    fireEvent.mouseDown(screen.getByLabelText('Author'));
+    fireEvent.click(screen.getByRole('option', { name: 'Anna Weber' }));
+
+    expect(screen.getByTestId('annotation-item-a-foreign')).toBeInTheDocument();
+    expect(screen.queryByTestId('annotation-item-a-mine')).not.toBeInTheDocument();
   });
 
   it('collapses a section on click', () => {

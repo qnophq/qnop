@@ -496,6 +496,7 @@ export function DocumentReviewPage() {
                 )}
               >
                 <AnnotationPanel
+                  documentId={documentId}
                   annotations={annotations}
                   activeAnnotationId={activeAnnotationId}
                   hoverAnnotationId={hoverAnnotationId}
@@ -525,6 +526,7 @@ export function DocumentReviewPage() {
             )}
           >
             <AnnotationPanel
+              documentId={documentId}
               annotations={annotations}
               activeAnnotationId={activeAnnotationId}
               hoverAnnotationId={hoverAnnotationId}
