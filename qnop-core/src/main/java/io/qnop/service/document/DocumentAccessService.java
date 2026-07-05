@@ -84,12 +84,26 @@ public class DocumentAccessService {
     return new DocumentView(
         document.getId(),
         document.getTitle(),
+        document.getSlug(),
         document.getOwnerId(),
         document.getWorkflowState(),
         latest,
         document.getCreatedAt(),
         document.getUpdatedAt(),
         document.getDueAt());
+  }
+
+  /**
+   * Resolves a review by its human-readable slug (issue #411). An unknown slug and a slug on a
+   * document the actor may not see both answer 404, so slugs are as non-enumerable as ids.
+   */
+  @Transactional(readOnly = true)
+  public DocumentView getDocumentBySlug(String slug, UUID actor, boolean admin) {
+    Document document =
+        documents
+            .findBySlugIgnoreCase(slug)
+            .orElseThrow(() -> DocumentValidationException.notFound("no such document: " + slug));
+    return getDocument(document.getId(), actor, admin);
   }
 
   /** All versions of a visible document, oldest first. */
@@ -204,6 +218,7 @@ public class DocumentAccessService {
   public record DocumentView(
       UUID id,
       String title,
+      String slug,
       UUID ownerId,
       String workflowState,
       int latestVersionNumber,

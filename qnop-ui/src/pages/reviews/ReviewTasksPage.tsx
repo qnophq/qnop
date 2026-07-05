@@ -34,6 +34,7 @@ import { useDocument, useDocumentVersions } from '../../api/hooks/useDocuments';
 import { useParticipants, useRecordVisit } from '../../api/hooks/useReviews';
 import { AdminToast } from '../../components/admin/layout/AdminToast';
 import { ReviewViewTabs } from '../../components/reviews/hub/ReviewViewTabs';
+import { useReviewDocumentId } from '../../components/reviews/reviewDocumentId';
 import { PageHeader } from '../../components/admin/layout/PageHeader';
 import { useToast } from '../../components/admin/layout/useToast';
 import type { FilterAuthor } from '../../components/reviews/panel/PanelFilterBar';
@@ -70,7 +71,10 @@ const FILTERS: { key: TaskFilter; label: string }[] = [
  * task drawer, which reuses the panel's thread and resolve pieces.
  */
 export function ReviewTasksPage() {
-  const { documentId = '' } = useParams();
+  // The raw segment may be a slug (issue #411) — sibling links keep it, while
+  // all data access below uses the canonical id resolved by the route gate.
+  const { documentId: routeSegment = '' } = useParams();
+  const documentId = useReviewDocumentId();
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const { toast, notify, clear } = useToast();
@@ -175,7 +179,7 @@ export function ReviewTasksPage() {
   };
 
   const showInDocument = (annotationId: string) => {
-    void navigate(`/reviews/${documentId}?annotation=${annotationId}`);
+    void navigate(`/reviews/${routeSegment}?annotation=${annotationId}`);
   };
 
   if (documentQuery.isPending) {
@@ -201,7 +205,7 @@ export function ReviewTasksPage() {
         titleAdornment={<Chip size="small" variant="outlined" label="Tasks" />}
       />
       <ReviewViewTabs
-        documentId={documentId}
+        documentId={routeSegment}
         active="tasks"
         openTaskCount={annotations.filter((annotation) => columnOf(annotation) !== 'done').length}
         compareEnabled={

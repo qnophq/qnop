@@ -27,7 +27,9 @@ import Typography from '@mui/material/Typography';
 import { useTheme } from '@mui/material/styles';
 import { FileText, Play, Users } from 'lucide-react';
 import type { PrincipalView } from '../../../api/generated';
+import { ParticipantKind } from '../../../api/generated';
 import { DueDatePicker } from '../DueDatePicker';
+import { UserAvatar } from '../../shell/UserAvatar';
 import { formatFileSize } from './wizardModel';
 
 export type SubmitPhase = 'idle' | 'uploading' | 'finalizing';
@@ -101,11 +103,46 @@ export function SummaryStep({
             None yet — the review starts with you only; reviewers can be added any time.
           </Typography>
         ) : (
-          <Stack direction="row" spacing={1} sx={{ alignItems: 'center', flexWrap: 'wrap' }}>
-            <Users size={16} aria-hidden style={{ color: theme.palette.text.secondary }} />
-            <Typography variant="body2">
-              {reviewers.map((r) => r.displayName).join(', ')}
-            </Typography>
+          <Stack direction="row" spacing={1} sx={{ flexWrap: 'wrap', rowGap: 1 }}>
+            {reviewers.map((reviewer) => (
+              <Stack
+                key={`${reviewer.kind}:${reviewer.id}`}
+                direction="row"
+                spacing={0.75}
+                data-testid={`summary-reviewer-${reviewer.id}`}
+                sx={{
+                  alignItems: 'center',
+                  pl: 0.5,
+                  pr: 1.25,
+                  py: 0.5,
+                  borderRadius: 99,
+                  bgcolor: theme.qnop.surface2,
+                }}
+              >
+                {reviewer.kind === ParticipantKind.Team ? (
+                  <Box
+                    sx={{
+                      width: 22,
+                      height: 22,
+                      borderRadius: '50%',
+                      bgcolor: theme.palette.background.paper,
+                      color: 'text.secondary',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      flexShrink: 0,
+                    }}
+                  >
+                    <Users size={12} aria-hidden />
+                  </Box>
+                ) : (
+                  <UserAvatar name={reviewer.displayName} size={22} imageUrl={reviewer.avatarUrl} />
+                )}
+                <Typography variant="body2" sx={{ fontSize: 12.5, fontWeight: 500 }}>
+                  {reviewer.displayName}
+                </Typography>
+              </Stack>
+            ))}
           </Stack>
         )}
       </SummaryRow>

@@ -41,6 +41,47 @@ export function titleFromFilename(filename: string): string {
   return filename.replace(/\.pdf$/i, '').trim();
 }
 
+export const SLUG_MIN_LENGTH = 3;
+export const SLUG_MAX_LENGTH = 64;
+const SLUG_PATTERN = /^[a-z0-9]+(-[a-z0-9]+)*$/;
+// A slug must never be UUID-shaped — routes resolve those segments as document ids.
+const UUID_SHAPE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
+
+/**
+ * Suggests a slug from the review title (issue #411): lowercased, diacritics
+ * stripped, everything non-alphanumeric collapsed into single hyphens, capped
+ * at the server's maximum length. May return '' when the title has no usable
+ * characters — the slug stays optional either way.
+ */
+export function suggestSlug(title: string): string {
+  return title
+    .normalize('NFKD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    .slice(0, SLUG_MAX_LENGTH)
+    .replace(/-+$/, '');
+}
+
+/**
+ * Client-side mirror of the server's slug rules (issue #411; the backend is
+ * authoritative). Empty means "no slug" and is valid.
+ */
+export function validateSlug(slug: string): string | null {
+  if (slug === '') return null;
+  if (slug.length < SLUG_MIN_LENGTH || slug.length > SLUG_MAX_LENGTH) {
+    return `The slug must be ${SLUG_MIN_LENGTH}–${SLUG_MAX_LENGTH} characters long.`;
+  }
+  if (!SLUG_PATTERN.test(slug)) {
+    return 'Only lowercase letters, digits and single hyphens are allowed.';
+  }
+  if (UUID_SHAPE.test(slug)) {
+    return 'The slug must not look like a document id.';
+  }
+  return null;
+}
+
 /** Human-readable file size ("2.4 MB", "412 KB"). */
 export function formatFileSize(bytes: number): string {
   if (bytes >= BYTES_PER_MB) return `${(bytes / BYTES_PER_MB).toFixed(1)} MB`;

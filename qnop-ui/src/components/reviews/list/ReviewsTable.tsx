@@ -78,7 +78,7 @@ export function ReviewsTable({ reviews, userId, onOpen }: ReviewsTableProps) {
                 <TableRow
                   key={review.id}
                   hover
-                  onClick={() => onOpen(review.id)}
+                  onClick={() => onOpen(review.slug ?? review.id)}
                   data-testid={`review-row-${review.id}`}
                   sx={{ cursor: 'pointer', '&:last-child td': { borderBottom: 0 } }}
                 >

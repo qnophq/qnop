@@ -50,6 +50,12 @@ databaseChangeLog:
               - column:
                   name: due_at
                   type: TIMESTAMP WITH TIME ZONE
+              # Optional friendly URL slug (issue #411); nullable, globally unique
+              # case-insensitively (see the lower(slug) index below), format pinned
+              # by the CHECK — kebab-case, never UUID-shaped, 3-64 chars.
+              - column:
+                  name: slug
+                  type: VARCHAR(64)
               - column:
                   name: version
                   type: BIGINT
@@ -72,6 +78,14 @@ databaseChangeLog:
             tableName: document
             columns:
               - column: { name: workflow_state }
+        - sql:
+            comment: >-
+              Slug rules (issue #411) — case-insensitive global uniqueness and the
+              kebab-case format, both not expressible in Liquibase primitives.
+            sql: |
+              CREATE UNIQUE INDEX ux_document_slug_lower ON document (LOWER(slug)) WHERE slug IS NOT NULL;
+              ALTER TABLE document ADD CONSTRAINT ck_document_slug
+                CHECK (slug IS NULL OR (slug ~ '^[a-z0-9]+(-[a-z0-9]+)*$' AND length(slug) BETWEEN 3 AND 64));
 
   - changeSet:
       id: 0011-document-version

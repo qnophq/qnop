@@ -183,12 +183,14 @@ export function useCreateReview() {
       title: string;
       file: File;
       dueAt?: string | null;
+      slug?: string | null;
       onProgress?: (fraction: number) => void;
     }) => {
       const form = new FormData();
       form.append('title', input.title);
       form.append('file', input.file);
       if (input.dueAt) form.append('dueAt', input.dueAt);
+      if (input.slug) form.append('slug', input.slug);
       const response = await axiosInstance.post<UploadResult>('/documents', form, {
         onUploadProgress: (event) => {
           if (event.total) input.onProgress?.(event.loaded / event.total);

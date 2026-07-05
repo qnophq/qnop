@@ -1991,6 +1991,42 @@ paths:
                 $ref: '#/components/schemas/ErrorResponse'
         '401':
           $ref: '#/components/responses/Unauthorized'
+  /documents/by-slug/{slug}:
+    get:
+      tags:
+        - Documents
+      summary: Resolve a document by its slug
+      description: |
+        Resolves a review by its optional human-readable slug (issue #411).
+        Matching ignores case. Unknown slugs and slugs on documents the caller
+        may not see both answer 404, so slugs are as non-enumerable as ids.
+      operationId: getDocumentBySlug
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: slug
+          in: path
+          required: true
+          description: The review slug (kebab-case, 3-64 characters).
+          schema:
+            type: string
+            minLength: 3
+            maxLength: 64
+      responses:
+        '200':
+          description: The document
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DocumentResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          description: Unknown slug, or the caller is not a participant
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
   /documents/{documentId}/visit:
     post:
       tags:
@@ -3811,6 +3847,14 @@ components:
         title:
           type: string
           maxLength: 500
+        slug:
+          type: string
+          nullable: true
+          minLength: 3
+          maxLength: 64
+          description: >-
+            Optional human-readable identifier chosen at creation (issue #411):
+            kebab-case, unique ignoring case, immutable. Null when none was set.
         ownerId:
           type: string
           format: uuid
@@ -3942,6 +3986,13 @@ components:
           $ref: '#/components/schemas/ParticipantKind'
         displayName:
           type: string
+        avatarUrl:
+          type: string
+          nullable: true
+          description: |
+            URL of the user's profile picture (with a cache-busting `?v=` token);
+            null for teams and for users without one — the UI then renders the
+            initials avatar (or the team glyph).
       required:
         - id
         - kind
@@ -3966,6 +4017,14 @@ components:
         title:
           type: string
           maxLength: 500
+        slug:
+          type: string
+          nullable: true
+          minLength: 3
+          maxLength: 64
+          description: >-
+            Optional human-readable identifier chosen at creation (issue #411):
+            kebab-case, unique ignoring case, immutable. Null when none was set.
         ownerId:
           type: string
           format: uuid

@@ -141,6 +141,7 @@ public class DocumentsController implements DocumentsApi {
     return new DocumentSummary()
         .id(view.id())
         .title(view.title())
+        .slug(view.slug())
         .ownerId(view.ownerId())
         .workflowState(view.workflowState())
         .latestVersionNumber(view.latestVersionNumber())
@@ -210,6 +211,13 @@ public class DocumentsController implements DocumentsApi {
   }
 
   @Override
+  public ResponseEntity<DocumentResponse> getDocumentBySlug(String slug) {
+    DocumentView view =
+        documents.getDocumentBySlug(slug, CurrentUser.requireUserId(), CurrentUser.isAdmin());
+    return ResponseEntity.ok(toResponse(view));
+  }
+
+  @Override
   public ResponseEntity<VisitResponse> recordVisit(UUID documentId) {
     Instant previous =
         visits.recordVisit(documentId, CurrentUser.requireUserId(), CurrentUser.isAdmin());
@@ -234,6 +242,7 @@ public class DocumentsController implements DocumentsApi {
     return new DocumentResponse()
         .id(view.id())
         .title(view.title())
+        .slug(view.slug())
         .ownerId(view.ownerId())
         .workflowState(view.workflowState())
         .latestVersionNumber(view.latestVersionNumber())

@@ -48,6 +48,7 @@ import { ForbiddenPage } from '../pages/errors/ForbiddenPage';
 import { NotFoundPage } from '../pages/errors/NotFoundPage';
 import { NewReviewPage } from '../pages/reviews/NewReviewPage';
 import { ReviewsPage } from '../pages/reviews/ReviewsPage';
+import { ReviewParamGate } from '../components/reviews/ReviewParamGate';
 
 // The template editor pulls in CodeMirror; load it lazily so the rest of the app stays light.
 const MailTemplateEditPage = lazy(() =>
@@ -96,25 +97,31 @@ export const router = createBrowserRouter([
       {
         path: 'reviews/:documentId',
         element: (
-          <LazyBoundary>
-            <DocumentReviewPage />
-          </LazyBoundary>
+          <ReviewParamGate>
+            <LazyBoundary>
+              <DocumentReviewPage />
+            </LazyBoundary>
+          </ReviewParamGate>
         ),
       },
       {
         path: 'reviews/:documentId/compare',
         element: (
-          <LazyBoundary>
-            <VersionComparePage />
-          </LazyBoundary>
+          <ReviewParamGate>
+            <LazyBoundary>
+              <VersionComparePage />
+            </LazyBoundary>
+          </ReviewParamGate>
         ),
       },
       {
         path: 'reviews/:documentId/tasks',
         element: (
-          <LazyBoundary>
-            <ReviewTasksPage />
-          </LazyBoundary>
+          <ReviewParamGate>
+            <LazyBoundary>
+              <ReviewTasksPage />
+            </LazyBoundary>
+          </ReviewParamGate>
         ),
       },
       {

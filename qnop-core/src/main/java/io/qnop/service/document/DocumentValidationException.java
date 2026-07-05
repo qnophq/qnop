@@ -29,11 +29,17 @@ public class DocumentValidationException extends RuntimeException {
 
   private final int status;
   private final String code;
+  private final String field;
 
   public DocumentValidationException(int status, String code, String message) {
+    this(status, code, message, null);
+  }
+
+  public DocumentValidationException(int status, String code, String message, String field) {
     super(message);
     this.status = status;
     this.code = code;
+    this.field = field;
   }
 
   public int getStatus() {
@@ -42,6 +48,11 @@ public class DocumentValidationException extends RuntimeException {
 
   public String getCode() {
     return code;
+  }
+
+  /** The offending request field, when the rejection maps onto exactly one (issue #411). */
+  public String getField() {
+    return field;
   }
 
   /** Unknown document/version — also used to hide documents from non-participants (404). */
@@ -68,6 +79,16 @@ public class DocumentValidationException extends RuntimeException {
 
   public static DocumentValidationException invalidRequest(String detail) {
     return new DocumentValidationException(400, "VALIDATION_ERROR", detail);
+  }
+
+  /** A single-field rejection, surfaced as {@code fieldErrors} on the envelope (issue #411). */
+  public static DocumentValidationException invalidField(String field, String detail) {
+    return new DocumentValidationException(400, "VALIDATION_ERROR", detail, field);
+  }
+
+  /** The requested slug is already in use — uniqueness is case-insensitive (issue #411). */
+  public static DocumentValidationException slugTaken(String detail) {
+    return new DocumentValidationException(409, "SLUG_TAKEN", detail, "slug");
   }
 
   /** Mutating review activity happens on the LATEST version only (issue #306). */

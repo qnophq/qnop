@@ -27,7 +27,11 @@ import io.qnop.api.v1.model.PrincipalListResponse;
 import io.qnop.api.v1.model.PrincipalView;
 import io.qnop.service.PrincipalDirectoryService;
 import io.qnop.service.TeamNotFoundException;
+import io.qnop.service.avatar.AvatarService;
+import java.time.Instant;
 import java.time.OffsetDateTime;
+import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -36,47 +40,55 @@ import org.springframework.web.bind.annotation.RestController;
 
 /**
  * The assignable-principal directory (issue #292): enabled users and teams for picking review
- * participants — display names only, available to every authenticated user.
+ * participants — display names plus the users' avatar URLs, available to every authenticated user.
  */
 @RestController
 public class PrincipalsController implements PrincipalsApi {
 
   private final PrincipalDirectoryService directory;
+  private final AvatarService avatars;
 
-  public PrincipalsController(PrincipalDirectoryService directory) {
+  public PrincipalsController(PrincipalDirectoryService directory, AvatarService avatars) {
     this.directory = directory;
+    this.avatars = avatars;
   }
 
   @Override
   public ResponseEntity<PrincipalListResponse> searchPrincipals(String q, Integer size) {
     CurrentUser.requireUserId();
-    return ResponseEntity.ok(
-        new PrincipalListResponse()
-            .principals(
-                directory.search(q, size == null ? 20 : size).stream()
-                    .map(
-                        view ->
-                            new PrincipalView()
-                                .id(view.id())
-                                .kind(view.team() ? ParticipantKind.TEAM : ParticipantKind.USER)
-                                .displayName(view.displayName()))
-                    .toList()));
+    return ResponseEntity.ok(toResponse(directory.search(q, size == null ? 20 : size)));
   }
 
   @Override
   public ResponseEntity<PrincipalListResponse> listTeamMembers(UUID teamId) {
     CurrentUser.requireUserId();
-    return ResponseEntity.ok(
-        new PrincipalListResponse()
-            .principals(
-                directory.teamMembers(teamId).stream()
-                    .map(
-                        view ->
-                            new PrincipalView()
-                                .id(view.id())
-                                .kind(ParticipantKind.USER)
-                                .displayName(view.displayName()))
-                    .toList()));
+    return ResponseEntity.ok(toResponse(directory.teamMembers(teamId)));
+  }
+
+  private PrincipalListResponse toResponse(List<PrincipalDirectoryService.PrincipalView> views) {
+    // One batched lookup for the page of user principals, so building avatar
+    // URLs never streams image bytes (same pattern as the admin user list).
+    Map<UUID, Instant> avatarTimestamps =
+        avatars.updatedAt(
+            views.stream()
+                .filter(view -> !view.team())
+                .map(PrincipalDirectoryService.PrincipalView::id)
+                .toList());
+    return new PrincipalListResponse()
+        .principals(
+            views.stream()
+                .map(
+                    view ->
+                        new PrincipalView()
+                            .id(view.id())
+                            .kind(view.team() ? ParticipantKind.TEAM : ParticipantKind.USER)
+                            .displayName(view.displayName())
+                            .avatarUrl(
+                                view.team()
+                                    ? null
+                                    : AvatarUrls.forUser(
+                                        view.id(), avatarTimestamps.get(view.id()))))
+                .toList());
   }
 
   @ExceptionHandler(TeamNotFoundException.class)

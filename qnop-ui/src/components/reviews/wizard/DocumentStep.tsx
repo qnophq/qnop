@@ -38,10 +38,15 @@ interface DocumentStepProps {
   title: string;
   /** Validation error from the last file pick, if any. */
   fileError: string | null;
+  /** Optional review slug (issue #411) — auto-suggested from the title. */
+  slug: string;
+  /** Client- or server-side slug rejection to attach to the field. */
+  slugError: string | null;
   maxSizeMb: number;
   onFilePicked: (file: File) => void;
   onFileCleared: () => void;
   onTitleChange: (title: string) => void;
+  onSlugChange: (slug: string) => void;
 }
 
 /** Step 1 — pick the PDF (dropzone or picker) and name the review. */
@@ -49,10 +54,13 @@ export function DocumentStep({
   file,
   title,
   fileError,
+  slug,
+  slugError,
   maxSizeMb,
   onFilePicked,
   onFileCleared,
   onTitleChange,
+  onSlugChange,
 }: DocumentStepProps) {
   const theme = useTheme();
   const inputRef = useRef<HTMLInputElement>(null);
@@ -177,6 +185,20 @@ export function DocumentStep({
         onChange={(e) => onTitleChange(e.target.value)}
         placeholder="e.g. NDA Acme Corp"
         helperText="Shown in the overview and to every reviewer."
+        fullWidth
+      />
+
+      <TextField
+        label="URL slug (optional)"
+        value={slug}
+        onChange={(e) => onSlugChange(e.target.value)}
+        placeholder="e.g. nda-acme-corp"
+        error={slugError !== null}
+        helperText={
+          slugError ??
+          'A readable address for this review: lowercase letters, digits and hyphens. Cannot be changed later.'
+        }
+        slotProps={{ htmlInput: { 'data-testid': 'wizard-slug-input', maxLength: 64 } }}
         fullWidth
       />
     </Stack>
