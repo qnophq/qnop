@@ -180,6 +180,24 @@ describe('AnnotationPanel', () => {
     expect(header).toHaveAttribute('aria-expanded', 'false');
   });
 
+  it('passes the chosen classification to onCreate (issue #403)', () => {
+    const props = renderPanel({
+      pendingAnchor: {
+        region: { surfaceIndex: 0, box: { x: 0.1, y: 0.1, width: 0.2, height: 0.1 } },
+      },
+    });
+    const composer = within(screen.getByTestId('annotation-composer'));
+    fireEvent.change(composer.getByLabelText('Annotation comment'), {
+      target: { value: 'Conflicts with policy' },
+    });
+    fireEvent.mouseDown(composer.getAllByRole('combobox')[0]);
+    fireEvent.click(screen.getByRole('option', { name: /Conflict/ }));
+    fireEvent.mouseDown(composer.getAllByRole('combobox')[1]);
+    fireEvent.click(screen.getByRole('option', { name: /High/ }));
+    fireEvent.click(composer.getByRole('button', { name: /Create annotation/ }));
+    expect(props.onCreate).toHaveBeenCalledWith('Conflicts with policy', 'CONFLICT', 'HIGH');
+  });
+
   it('opens the composer for a pending anchor and creates with the comment', () => {
     const props = renderPanel({
       pendingAnchor: {
@@ -194,7 +212,7 @@ describe('AnnotationPanel', () => {
       target: { value: 'Wrong figure' },
     });
     fireEvent.click(composer.getByRole('button', { name: /Create annotation/ }));
-    expect(props.onCreate).toHaveBeenCalledWith('Wrong figure');
+    expect(props.onCreate).toHaveBeenCalledWith('Wrong figure', undefined, undefined);
 
     fireEvent.click(composer.getByRole('button', { name: 'Cancel' }));
     expect(props.onCancelPending).toHaveBeenCalled();
@@ -223,7 +241,7 @@ describe('AnnotationPanel', () => {
     fireEvent.change(field, { target: { value: 'Needs a source' } });
     expect(create).toBeEnabled();
     fireEvent.click(create);
-    expect(props.onCreate).toHaveBeenCalledWith('Needs a source');
+    expect(props.onCreate).toHaveBeenCalledWith('Needs a source', undefined, undefined);
   });
 
   it('offers Accept/Reject to the owner on an open active annotation', () => {
@@ -238,16 +256,11 @@ describe('AnnotationPanel', () => {
     );
   });
 
-  it('offers the decision to the author as well', () => {
+  it('hides the decision from the author — deciding is owner-only (#403)', () => {
     useAuthStore.setState({ userId: 'u1' });
     renderPanel({ annotations: [annotation('a1')], activeAnnotationId: 'a1' });
 
-    fireEvent.click(within(screen.getByTestId('decision-bar')).getByText('Reject'));
-
-    expect(decideMutate).toHaveBeenCalledWith(
-      { annotationId: 'a1', decision: 'REJECTED' },
-      expect.anything(),
-    );
+    expect(screen.queryByTestId('decision-bar')).not.toBeInTheDocument();
   });
 
   it('hides the decision bar from uninvolved participants and on decided annotations', () => {
@@ -277,7 +290,7 @@ describe('AnnotationPanel', () => {
     const field = composer.getByLabelText('Annotation comment');
     fireEvent.change(field, { target: { value: 'Shortcut comment' } });
     fireEvent.keyDown(field, { key: 'Enter', metaKey: true });
-    expect(props.onCreate).toHaveBeenCalledWith('Shortcut comment');
+    expect(props.onCreate).toHaveBeenCalledWith('Shortcut comment', undefined, undefined);
 
     // Plain Enter stays a newline, Alt+Enter submits too.
     fireEvent.keyDown(field, { key: 'Enter' });
