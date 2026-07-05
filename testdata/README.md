@@ -31,7 +31,9 @@ testdata/
 │   └── not-an-image.txt      # plain text — must be rejected as an unsupported type (415)
 ├── db/                       # deterministic SQL fixtures (issue #163)
 │   ├── clean.sql             # wipes the seeded tables to a known-empty slate
-│   └── seed.sql              # the shared seeded dataset (users, team, OIDC provider)
+│   └── seed.sql              # the shared seeded dataset (users, teams, OIDC provider,
+│                             # Mailpit SMTP settings; issue #401 adds a 20-user crowd
+│                             # and 5 department teams for manual testing)
 └── documents/                # review document payloads (issues #308, #370)
     ├── sample.pdf            # minimal valid single-page PDF, text "QNOP SMOKE TEST"
     ├── doc1/                 # multi-version dummy: test-dummy-v1..v5.pdf (1 page each)
@@ -52,5 +54,13 @@ the smoke's multi-version/diff steps:
   Signal") with real word-level edits between versions; v1→v2 replaces
   *letzten* → *einsamen* in the Kalinda sentence, which the diff assertions
   pin down. Keep those anchor words stable when regenerating the fixtures.
+
+The seed's role/state users (`admin`, `member`, `auditor`, …) are pinned by
+`SeededAdminUsersIT`/`SeededTeamIT` — keep their rows and the Alpha/Beta teams
+byte-stable. The issue #401 crowd (20 MEMBER users `nora`…`david`, teams Legal/
+Compliance/Finance/Procurement/Engineering, 5 users teamless) exists for manual
+testing and carries no pinned counts; all passwords are `Test-Pass-1234!`. The
+SMTP settings point at the docker-compose Mailpit (`localhost:1025`, inbox on
+`localhost:8025`).
 
 Add new fixture families as sibling directories as the suites that need them land.

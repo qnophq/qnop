@@ -41,6 +41,9 @@ import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilde
  */
 class SeededMailTemplateIT extends SeededIntegrationTest {
 
+  @org.springframework.beans.factory.annotation.Autowired
+  private io.qnop.service.ApplicationSettingsService settings;
+
   private static final String TEMPLATES = "/api/v1/admin/email/templates";
   private static final String RESET_KEY = "auth.password_reset";
 
@@ -111,6 +114,10 @@ class SeededMailTemplateIT extends SeededIntegrationTest {
 
   @Test
   void sendingATestEmailIsSkippedWhenSmtpIsNotConfigured() throws Exception {
+    // The seed points SMTP at Mailpit (issue #401) — this test owns the
+    // skip path, so it switches the master toggle off itself.
+    settings.update(java.util.Map.of("smtp.enabled", "false"), null);
+
     mockMvc
         .perform(
             asAdmin(post("/api/v1/admin/email/test"))

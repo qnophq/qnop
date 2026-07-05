@@ -61,7 +61,9 @@ class SettingsServiceIT extends AbstractIntegrationTest {
     assertThat(settings.getString(ApplicationSettingKey.GENERAL_APPLICATION_NAME))
         .isEqualTo("qnop");
     assertThat(settings.getInteger(ApplicationSettingKey.UPLOAD_MAX_FILE_SIZE_MB)).isEqualTo(25);
-    assertThat(settings.getString(ApplicationSettingKey.SMTP_ENCRYPTION)).isEqualTo("starttls");
+    // No SMTP key here: the test seed repoints SMTP at Mailpit (issue #401),
+    // but the snapshot loads at BOOT while the seed runs per test transaction —
+    // an SMTP value would depend on which test refreshed the snapshot first.
   }
 
   @Test
