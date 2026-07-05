@@ -35,6 +35,9 @@ import io.qnop.bootstrap.AbstractIntegrationTest;
 import io.qnop.entity.User;
 import io.qnop.entity.UserRole;
 import io.qnop.repository.UserRepository;
+import io.qnop.service.ApplicationSettingKey;
+import io.qnop.service.ApplicationSettingsService;
+import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.regex.Matcher;
@@ -70,6 +73,7 @@ class AdminUserControllerIT extends AbstractIntegrationTest {
   @Autowired MockMvc mockMvc;
   @Autowired UserRepository userRepository;
   @Autowired PasswordEncoder passwordEncoder;
+  @Autowired ApplicationSettingsService settings;
 
   @Test
   void anonymousIsUnauthorized() throws Exception {
@@ -265,8 +269,12 @@ class AdminUserControllerIT extends AbstractIntegrationTest {
     createUser("root", UserRole.ADMIN);
     User target = createUser("member", UserRole.MEMBER);
     String token = adminToken();
+    // This test owns the no-SMTP fallback path. The seed may leave SMTP enabled
+    // (Mailpit, issue #401), so switch the master toggle off here instead of
+    // depending on class order; @Transactional rolls the change back.
+    settings.update(Map.of(ApplicationSettingKey.SMTP_ENABLED.getKey(), "false"), null);
 
-    // No SMTP is configured in the IT, so the email is "skipped" and the fallback link is returned.
+    // With SMTP off the email is "skipped" and the fallback link is returned.
     mockMvc
         .perform(
             post("/api/v1/admin/users/{id}/password-reset", target.getId())
