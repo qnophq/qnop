@@ -1,4 +1,4 @@
-# ADR-0037: Per-review privacy — anonymity and thread participation policy
+# ADR-0038: Per-review privacy — anonymity and thread participation policy
 
 - **Status:** Accepted
 - **Date:** 2026-07-05

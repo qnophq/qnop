@@ -47,6 +47,9 @@ dependencies {
 
     implementation(libs.spring.boot.starter.web)
     implementation(libs.spring.boot.starter.actuator)
+    // Prometheus scrape registry for the /actuator/prometheus endpoint (issue #348). Runtime-only:
+    // Boot auto-configures it; the metrics/health code uses micrometer-core (via actuator) directly.
+    runtimeOnly(libs.micrometer.registry.prometheus)
     // Servlet security filter chain (io.qnop.web.security, issue #10 / ADR-0022).
     implementation(libs.spring.boot.starter.security)
     // Resource-server filter that validates the bearer JWT on each request, plus
