@@ -69,7 +69,8 @@ export function ResolveBar({
           fontSize: 13,
           px: 1.25,
           py: 0.25,
-          borderRadius: 999,
+          // Same rounding as the thread's comment composer block.
+          borderRadius: '12px',
           bgcolor: theme.qnop.surface2,
           border: `1px solid ${theme.palette.divider}`,
           transition: theme.transitions.create(['border-color', 'box-shadow'], {
