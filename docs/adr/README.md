@@ -48,6 +48,7 @@ Important architecture decisions are recorded here as ADRs (see [ADR-0001](0001-
 | [0034](0034-inter-version-diff.md) | Inter-version diff | Accepted |
 | [0035](0035-esignature-approval-enterprise-feature.md) | E-signature approval as a post-finalization enterprise feature | Accepted |
 | [0036](0036-object-storage-lifecycle-staging-and-reaper.md) | Object-storage lifecycle: staging registry + orphan reaper | Accepted |
+| [0037](0037-per-review-privacy.md) | Per-review privacy: anonymity & thread participation policy | Accepted |
 
 ## Template
 
