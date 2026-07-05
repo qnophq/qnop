@@ -29,13 +29,13 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import io.qnop.entity.Annotation;
-import io.qnop.entity.AnnotationStatus;
 import io.qnop.entity.AuditEvent;
 import io.qnop.entity.Document;
 import io.qnop.entity.WorkflowState;
 import io.qnop.repository.AnnotationPlacementRepository;
 import io.qnop.repository.AnnotationRepository;
 import io.qnop.repository.AuditEventRepository;
+import io.qnop.repository.CommentRepository;
 import io.qnop.repository.DocumentRepository;
 import io.qnop.repository.DocumentVersionRepository;
 import io.qnop.service.document.DocumentAccessService;
@@ -57,12 +57,13 @@ class ReviewWorkflowServiceLockTest {
   private final AnnotationRepository annotations = mock(AnnotationRepository.class);
   private final AnnotationPlacementRepository placements =
       mock(AnnotationPlacementRepository.class);
+  private final CommentRepository comments = mock(CommentRepository.class);
   private final AuditEventRepository auditEvents = mock(AuditEventRepository.class);
   private final DocumentAccessService documentAccess = mock(DocumentAccessService.class);
 
   private final ReviewWorkflowService service =
       new ReviewWorkflowService(
-          documents, versions, annotations, placements, auditEvents, documentAccess);
+          documents, versions, annotations, placements, comments, auditEvents, documentAccess);
 
   private final UUID documentId = UUID.randomUUID();
   private final UUID owner = UUID.randomUUID();
@@ -96,14 +97,26 @@ class ReviewWorkflowServiceLockTest {
   }
 
   @Test
-  @DisplayName("deciding an annotation loads its document under the write lock")
-  void decideAnnotationAcquiresTheWriteLock() {
-    Annotation annotation = new Annotation(documentId, owner);
-    Document document = new Document(owner, "Decided review");
+  @DisplayName("resolving an annotation loads its document under the write lock")
+  void resolveAnnotationAcquiresTheWriteLock() {
+    Annotation annotation = new Annotation(documentId, owner); // authored by the actor
+    Document document = new Document(owner, "Resolved review");
     when(annotations.findById(any())).thenReturn(Optional.of(annotation));
     when(documents.findByIdForUpdate(documentId)).thenReturn(Optional.of(document));
 
-    service.decideAnnotation(UUID.randomUUID(), AnnotationStatus.REJECTED, owner);
+    service.resolveAnnotation(UUID.randomUUID(), null, owner);
+
+    verify(documents).findByIdForUpdate(documentId);
+    verify(documents, never()).findById(any());
+  }
+
+  @Test
+  @DisplayName("registering a raised annotation loads its document under the write lock (#405)")
+  void annotationRaisedAcquiresTheWriteLock() {
+    Document document = new Document(owner, "Raised review"); // DRAFT: no derivation, not closed
+    when(documents.findByIdForUpdate(documentId)).thenReturn(Optional.of(document));
+
+    service.annotationRaised(documentId, owner);
 
     verify(documents).findByIdForUpdate(documentId);
     verify(documents, never()).findById(any());

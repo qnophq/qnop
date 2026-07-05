@@ -21,12 +21,13 @@
 package io.qnop.service.review;
 
 /**
- * The acting user may not decide this annotation (issue #247, ADR-0011): accept/reject is limited
- * to the document owner (issue #403). Mapped to HTTP 403.
+ * The acting user may not perform this action on the annotation — resolving is limited to the
+ * annotation's author (ADR-0011 as amended by issue #405), classifying to the owner or the author
+ * (issue #392). Mapped to HTTP 403.
  */
-public class AnnotationDecisionForbiddenException extends RuntimeException {
+public class AnnotationActionForbiddenException extends RuntimeException {
 
-  public AnnotationDecisionForbiddenException() {
-    super("Only the document owner may decide this annotation");
+  public AnnotationActionForbiddenException(String message) {
+    super(message);
   }
 }

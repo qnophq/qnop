@@ -73,7 +73,9 @@ tags:
       The review workflow of a document (issue #246, ADR-0011): reading the
       current state with its reachable transitions, and requesting a transition
       through the single state-machine choke-point. State-changing calls are
-      owner-only. The state is an open string: the Community edition ships
+      owner-only; the `IN_REVIEW ⇄ CHANGES_REQUESTED` pair however is derived
+      from the open-annotation count (issue #405) and never requested
+      explicitly. The state is an open string: the Community edition ships
       `DRAFT`, `IN_REVIEW`, `CHANGES_REQUESTED`, `FINALIZED` and `CANCELLED`,
       but an enterprise-extended state machine may add further states.
   - name: Documents
@@ -1642,9 +1644,11 @@ paths:
       description: |
         Moves the review to `targetState` through the state-machine choke-point
         (ADR-0011). Rejected with `409` when the edge is not in the transition
-        table, when a guard vetoes it — finalization requires zero OPEN
-        annotations and zero PENDING placements (re-anchoring complete) — or
-        when the current or target state is not managed by this edition.
+        table, when it belongs to the derived `IN_REVIEW ⇄ CHANGES_REQUESTED`
+        pair (issue #405 — that pair follows the open-annotation count and is
+        never set by hand), when a guard vetoes it — finalization requires zero
+        OPEN annotations and zero PENDING placements (re-anchoring complete) —
+        or when the current or target state is not managed by this edition.
       operationId: transitionDocumentWorkflow
       security:
         - bearerAuth: []
@@ -2140,7 +2144,9 @@ paths:
           description: >-
             The addressed version is not the latest (`VERSION_READ_ONLY`,
             issue #306) — annotations are created on the newest version only;
-            older versions are a read-only record.
+            older versions are a read-only record. Or the review is already
+            FINALIZED or CANCELLED (`REVIEW_CLOSED`, issue #405) and accepts
+            no new annotations.
           content:
             application/json:
               schema:
@@ -2176,7 +2182,7 @@ paths:
         Replaces the annotation's optional classification (type + priority,
         issue #392) wholesale — an absent field clears that facet. Permitted
         for the document owner or the annotation's author while the annotation
-        is still OPEN; a decided annotation is immutable.
+        is still OPEN; a resolved annotation is immutable.
       operationId: classifyAnnotation
       security:
         - bearerAuth: []
@@ -2208,31 +2214,34 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
         '409':
-          description: The annotation is already decided (`ANNOTATION_ALREADY_DECIDED`)
+          description: The annotation is already resolved (`ANNOTATION_ALREADY_RESOLVED`)
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
-  /annotations/{annotationId}/decision:
+  /annotations/{annotationId}/resolve:
     parameters:
       - $ref: '#/components/parameters/AnnotationIdParam'
     post:
       tags: [Annotations]
-      summary: Accept or reject an annotation (owner or author)
+      summary: Resolve an annotation (author only)
       description: |
-        Applies the `OPEN → ACCEPTED | REJECTED` decision (ADR-0011). Allowed for
-        the document owner or the annotation's author. Accepting drives the review
-        workflow (`IN_REVIEW → CHANGES_REQUESTED`) through the state-machine
-        choke-point. Rejected with `409` if the annotation is already decided.
-      operationId: decideAnnotation
+        Closes the annotation, `OPEN → RESOLVED` (ADR-0011 as amended by issue
+        #405) — allowed for the annotation's author alone: they raised the
+        concern, only they know when it is settled. An optional closing note is
+        appended to the thread as a regular comment. The open-annotation count
+        re-derives the review state through the state-machine choke-point
+        (resolving the last open annotation returns `CHANGES_REQUESTED` to
+        `IN_REVIEW`). Rejected with `409` if the annotation is already resolved.
+      operationId: resolveAnnotation
       security:
         - bearerAuth: []
       requestBody:
-        required: true
+        required: false
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/AnnotationDecisionRequest'
+              $ref: '#/components/schemas/AnnotationResolveRequest'
       responses:
         '200':
           description: The updated annotation
@@ -2243,7 +2252,7 @@ paths:
         '401':
           $ref: '#/components/responses/Unauthorized'
         '403':
-          description: The caller is neither the document owner nor the annotation's author
+          description: The caller is not the annotation's author
           content:
             application/json:
               schema:
@@ -2255,7 +2264,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
         '409':
-          description: The annotation has already been decided
+          description: The annotation has already been resolved (`ANNOTATION_ALREADY_RESOLVED`)
           content:
             application/json:
               schema:
@@ -2498,12 +2507,14 @@ components:
         allowedTransitions:
           type: array
           description: |
-            Target states structurally reachable from `state` (transition table
-            only; guards are evaluated on the transition request). Empty for
-            terminal states and for states this edition does not manage.
+            Target states the owner may request explicitly from `state` (manual
+            transition table only; guards are evaluated on the transition
+            request, and the derived `IN_REVIEW ⇄ CHANGES_REQUESTED` pair is
+            excluded, issue #405). Empty for terminal states and for states
+            this edition does not manage.
           items:
             type: string
-          example: [CHANGES_REQUESTED, FINALIZED, CANCELLED]
+          example: [FINALIZED, CANCELLED]
     WorkflowTransitionRequest:
       type: object
       description: A request to move the review to `targetState` (issue #246, ADR-0011).
@@ -4132,11 +4143,13 @@ components:
           $ref: '#/components/schemas/TextPositionAnchor'
     AnnotationStatus:
       type: string
-      description: The owner-decided lifecycle of an annotation (ADR-0011).
+      description: |
+        The lifecycle of an annotation (ADR-0011 as amended by issue #405):
+        raised by a reviewer, resolved by that same author once the concern is
+        settled.
       enum:
         - OPEN
-        - ACCEPTED
-        - REJECTED
+        - RESOLVED
     PlacementStatus:
       type: string
       description: |
@@ -4279,19 +4292,15 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/AnnotationView'
-    AnnotationDecision:
-      type: string
-      description: An owner/author decision on an annotation (ADR-0011).
-      enum:
-        - ACCEPTED
-        - REJECTED
-    AnnotationDecisionRequest:
+    AnnotationResolveRequest:
       type: object
-      required:
-        - decision
+      description: |
+        Optional closing note for a resolution (issue #405) — appended to the
+        annotation's thread as a regular comment authored by the resolver.
       properties:
-        decision:
-          $ref: '#/components/schemas/AnnotationDecision'
+        note:
+          type: string
+          maxLength: 20000
     CommentCreateRequest:
       type: object
       required:

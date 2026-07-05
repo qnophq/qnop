@@ -31,6 +31,7 @@ import com.jayway.jsonpath.JsonPath;
 import io.qnop.entity.Document;
 import io.qnop.entity.DocumentVersion;
 import io.qnop.entity.ReviewParticipant;
+import io.qnop.entity.WorkflowState;
 import io.qnop.repository.DocumentRepository;
 import io.qnop.repository.DocumentVersionRepository;
 import io.qnop.repository.ReviewParticipantRepository;
@@ -143,55 +144,94 @@ class AnnotationApiIT extends SeededIntegrationTest {
   }
 
   @Test
-  void ownerDecidesAccept() throws Exception {
+  void theAuthorResolvesWithAClosingNote() throws Exception {
     UUID documentId = seedDocumentWithVersion();
     String annotationId = createAnnotation(documentId, AUDITOR_ID);
 
     mockMvc
         .perform(
-            as(post("/api/v1/annotations/" + annotationId + "/decision"), MEMBER_ID)
+            as(post("/api/v1/annotations/" + annotationId + "/resolve"), AUDITOR_ID)
                 .contentType(MediaType.APPLICATION_JSON)
-                .content("{\"decision\":\"ACCEPTED\"}"))
+                .content("{\"note\":\"Addressed in the discussion.\"}"))
         .andExpect(status().isOk())
-        .andExpect(jsonPath("$.status").value("ACCEPTED"));
+        .andExpect(jsonPath("$.status").value("RESOLVED"))
+        // The note lands as the thread's last comment, authored by the resolver.
+        .andExpect(jsonPath("$.commentCount").value(2));
+
+    mockMvc
+        .perform(as(get("/api/v1/annotations/" + annotationId + "/comments"), MEMBER_ID))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.comments[1].body").value("Addressed in the discussion."))
+        .andExpect(jsonPath("$.comments[1].authorId").value(AUDITOR_ID.toString()));
   }
 
   @Test
-  void theAuthorCannotDecideTheirOwnAnnotation() throws Exception {
+  void theAuthorResolvesWithoutANote() throws Exception {
     UUID documentId = seedDocumentWithVersion();
     String annotationId = createAnnotation(documentId, AUDITOR_ID);
 
-    // Deciding is the owner's call alone (issue #403) — reviewers, including
-    // the annotation's author, can neither accept nor reject.
     mockMvc
-        .perform(
-            as(post("/api/v1/annotations/" + annotationId + "/decision"), AUDITOR_ID)
-                .contentType(MediaType.APPLICATION_JSON)
-                .content("{\"decision\":\"REJECTED\"}"))
+        .perform(as(post("/api/v1/annotations/" + annotationId + "/resolve"), AUDITOR_ID))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.status").value("RESOLVED"))
+        .andExpect(jsonPath("$.commentCount").value(1));
+  }
+
+  @Test
+  void theOwnerCannotResolveAForeignAnnotation() throws Exception {
+    UUID documentId = seedDocumentWithVersion();
+    String annotationId = createAnnotation(documentId, AUDITOR_ID);
+
+    // Resolving is the author's call alone (issue #405) — the owner responds
+    // in the thread or uploads a new version, but never closes the concern.
+    mockMvc
+        .perform(as(post("/api/v1/annotations/" + annotationId + "/resolve"), MEMBER_ID))
         .andExpect(status().isForbidden());
   }
 
   @Test
-  void anotherReviewerCannotDecide() throws Exception {
+  void anotherReviewerCannotResolve() throws Exception {
     UUID documentId = seedDocumentWithVersion();
     String annotationId = createAnnotation(documentId, AUDITOR_ID);
 
-    // MEMBER2 is a participant (so the annotation is visible) but neither owner nor author.
+    // MEMBER2 is a participant (so the annotation is visible) but not the author.
     mockMvc
-        .perform(
-            as(post("/api/v1/annotations/" + annotationId + "/decision"), MEMBER2_ID)
-                .contentType(MediaType.APPLICATION_JSON)
-                .content("{\"decision\":\"ACCEPTED\"}"))
+        .perform(as(post("/api/v1/annotations/" + annotationId + "/resolve"), MEMBER2_ID))
         .andExpect(status().isForbidden());
   }
 
   @Test
-  void decidingAnAlreadyDecidedAnnotationIsConflict() throws Exception {
+  void aClosedReviewAcceptsNoNewAnnotations() throws Exception {
+    UUID documentId = seedDocumentWithVersion();
+    Document document = documents.findById(documentId).orElseThrow();
+    document.setWorkflowState(WorkflowState.FINALIZED);
+    documents.save(document);
+
+    // The workflow guard refuses the raise and rolls the insert back (issue #405).
+    mockMvc
+        .perform(
+            as(post("/api/v1/documents/" + documentId + "/annotations"), AUDITOR_ID)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(
+                    "{\"versionNumber\":1,\"anchor\":" + ANCHOR + ",\"comment\":\"too late\"}"))
+        .andExpect(status().isConflict())
+        .andExpect(jsonPath("$.code").value("REVIEW_CLOSED"));
+
+    mockMvc
+        .perform(as(get("/api/v1/documents/" + documentId + "/annotations"), MEMBER_ID))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.annotations.length()").value(0));
+  }
+
+  @Test
+  void resolvingAnAlreadyResolvedAnnotationIsConflict() throws Exception {
     UUID documentId = seedDocumentWithVersion();
     String annotationId = createAnnotation(documentId, AUDITOR_ID);
-    decide(annotationId, "ACCEPTED", MEMBER_ID).andExpect(status().isOk());
+    resolve(annotationId, AUDITOR_ID).andExpect(status().isOk());
 
-    decide(annotationId, "REJECTED", MEMBER_ID).andExpect(status().isConflict());
+    resolve(annotationId, AUDITOR_ID)
+        .andExpect(status().isConflict())
+        .andExpect(jsonPath("$.code").value("ANNOTATION_ALREADY_RESOLVED"));
   }
 
   @Test
@@ -435,10 +475,10 @@ class AnnotationApiIT extends SeededIntegrationTest {
   }
 
   @Test
-  void reclassifyingADecidedAnnotationIsConflict() throws Exception {
+  void reclassifyingAResolvedAnnotationIsConflict() throws Exception {
     UUID documentId = seedDocumentWithVersion();
     String annotationId = createAnnotation(documentId, AUDITOR_ID);
-    decide(annotationId, "ACCEPTED", MEMBER_ID).andExpect(status().isOk());
+    resolve(annotationId, AUDITOR_ID).andExpect(status().isOk());
 
     mockMvc
         .perform(
@@ -446,7 +486,7 @@ class AnnotationApiIT extends SeededIntegrationTest {
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("{\"type\":\"RISK\"}"))
         .andExpect(status().isConflict())
-        .andExpect(jsonPath("$.code").value("ANNOTATION_ALREADY_DECIDED"));
+        .andExpect(jsonPath("$.code").value("ANNOTATION_ALREADY_RESOLVED"));
   }
 
   @Test
@@ -473,11 +513,8 @@ class AnnotationApiIT extends SeededIntegrationTest {
         .andExpect(jsonPath("$.annotations[0].type").value("CONFLICT"));
   }
 
-  private org.springframework.test.web.servlet.ResultActions decide(
-      String annotationId, String decision, UUID actor) throws Exception {
-    return mockMvc.perform(
-        as(post("/api/v1/annotations/" + annotationId + "/decision"), actor)
-            .contentType(MediaType.APPLICATION_JSON)
-            .content("{\"decision\":\"" + decision + "\"}"));
+  private org.springframework.test.web.servlet.ResultActions resolve(
+      String annotationId, UUID actor) throws Exception {
+    return mockMvc.perform(as(post("/api/v1/annotations/" + annotationId + "/resolve"), actor));
   }
 }

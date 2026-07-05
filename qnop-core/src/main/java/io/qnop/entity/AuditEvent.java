@@ -34,7 +34,7 @@ import org.hibernate.type.SqlTypes;
 
 /**
  * An append-only record of something that happened to a {@link Document} (issue #244, ADR-0011) —
- * the review's audit trail (versions uploaded, annotations decided, workflow transitions, …).
+ * the review's audit trail (versions uploaded, annotations resolved, workflow transitions, …).
  *
  * <p>{@code eventType} is an open string (not an enum) so new event kinds — including
  * enterprise-only ones — need no schema change. {@code actorId} is the acting user, or null for

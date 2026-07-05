@@ -51,6 +51,13 @@ public class ReviewWorkflowMachine {
   /** The structural transition table: which target states each known state may move to. */
   private static final Map<WorkflowState, Set<WorkflowState>> EDGES = buildEdges();
 
+  /**
+   * The transitions the owner may request explicitly. The {@code IN_REVIEW ⇄ CHANGES_REQUESTED}
+   * pair is missing on purpose: it is derived from the open-annotation count (issue #405, {@link
+   * #annotationDrivenTarget}) and never crossed by hand.
+   */
+  private static final Map<WorkflowState, Set<WorkflowState>> MANUAL_EDGES = buildManualEdges();
+
   private static Map<WorkflowState, Set<WorkflowState>> buildEdges() {
     Map<WorkflowState, Set<WorkflowState>> edges = new EnumMap<>(WorkflowState.class);
     edges.put(WorkflowState.DRAFT, EnumSet.of(WorkflowState.IN_REVIEW, WorkflowState.CANCELLED));
@@ -61,6 +68,17 @@ public class ReviewWorkflowMachine {
     edges.put(
         WorkflowState.CHANGES_REQUESTED,
         EnumSet.of(WorkflowState.IN_REVIEW, WorkflowState.CANCELLED));
+    edges.put(WorkflowState.FINALIZED, EnumSet.noneOf(WorkflowState.class));
+    edges.put(WorkflowState.CANCELLED, EnumSet.noneOf(WorkflowState.class));
+    return edges;
+  }
+
+  private static Map<WorkflowState, Set<WorkflowState>> buildManualEdges() {
+    Map<WorkflowState, Set<WorkflowState>> edges = new EnumMap<>(WorkflowState.class);
+    edges.put(WorkflowState.DRAFT, EnumSet.of(WorkflowState.IN_REVIEW, WorkflowState.CANCELLED));
+    edges.put(
+        WorkflowState.IN_REVIEW, EnumSet.of(WorkflowState.FINALIZED, WorkflowState.CANCELLED));
+    edges.put(WorkflowState.CHANGES_REQUESTED, EnumSet.of(WorkflowState.CANCELLED));
     edges.put(WorkflowState.FINALIZED, EnumSet.noneOf(WorkflowState.class));
     edges.put(WorkflowState.CANCELLED, EnumSet.noneOf(WorkflowState.class));
     return edges;
@@ -104,7 +122,7 @@ public class ReviewWorkflowMachine {
       return Optional.of(
           "cannot finalize: "
               + context.openAnnotations()
-              + " open annotation(s) must be accepted or rejected first");
+              + " open annotation(s) must be resolved first");
     }
     if (context.pendingPlacements() > 0) {
       return Optional.of(
@@ -146,38 +164,66 @@ public class ReviewWorkflowMachine {
   }
 
   /**
-   * The structurally reachable target states from {@code currentRaw} — the transition table only,
-   * guards not applied (a guard's verdict can change at any moment; the authoritative check is the
-   * {@link #transition} call itself). Empty for terminal or unknown states.
+   * Like {@link #transition}, but for an owner-requested move (issue #405): a structurally legal
+   * edge that is not in the manual table — the derived {@code IN_REVIEW ⇄ CHANGES_REQUESTED} pair —
+   * is refused before guards run.
+   */
+  public TransitionResult manualTransition(
+      String currentRaw, WorkflowState target, TransitionContext context) {
+    boolean derivedEdge =
+        WorkflowState.fromString(currentRaw)
+            .map(
+                state ->
+                    EDGES.get(state).contains(target) && !MANUAL_EDGES.get(state).contains(target))
+            .orElse(false);
+    if (derivedEdge) {
+      return new TransitionResult.Denied(
+          "the state between IN_REVIEW and CHANGES_REQUESTED is derived from the open-annotation"
+              + " count and cannot be set by hand");
+    }
+    return transition(currentRaw, target, context);
+  }
+
+  /**
+   * The target states the owner may request explicitly from {@code currentRaw} — the manual
+   * transition table only, guards not applied (a guard's verdict can change at any moment; the
+   * authoritative check is the {@link #transition} call itself). Empty for terminal or unknown
+   * states.
    */
   public List<WorkflowState> allowedTransitions(String currentRaw) {
     return WorkflowState.fromString(currentRaw)
-        .map(state -> List.copyOf(EDGES.get(state)))
+        .map(state -> List.copyOf(MANUAL_EDGES.get(state)))
         .orElse(List.of());
   }
 
-  // --- annotation sub-machine (ADR-0011) --------------------------------------
+  // --- annotation sub-machine (ADR-0011, amended by #405) ----------------------
 
-  /** Whether an annotation in {@code current} may still be decided: only {@code OPEN} may. */
-  public static boolean canDecide(AnnotationStatus current) {
+  /** Whether an annotation in {@code current} may still be resolved: only {@code OPEN} may. */
+  public static boolean canResolve(AnnotationStatus current) {
     return current == AnnotationStatus.OPEN;
   }
 
   /**
-   * The workflow transition an annotation decision drives, if any (ADR-0011: the sub-machine
-   * "drives IN_REVIEW → CHANGES_REQUESTED"): accepting an annotation while the document is {@code
-   * IN_REVIEW} means a change is owed, so the review moves to {@code CHANGES_REQUESTED}. Rejections
-   * and decisions in any other state drive nothing.
+   * The workflow transition the open-annotation count drives, if any (issue #405): the {@code
+   * IN_REVIEW ⇄ CHANGES_REQUESTED} pair is derived — an open concern moves the review to {@code
+   * CHANGES_REQUESTED}, settling the last one returns it to {@code IN_REVIEW}. No owner action
+   * involved; every other state drives nothing.
    */
-  public static Optional<WorkflowState> decisionDrivenTarget(
-      String currentRaw, AnnotationStatus decision) {
-    boolean inReview =
-        WorkflowState.fromString(currentRaw)
-            .map(state -> state == WorkflowState.IN_REVIEW)
-            .orElse(false);
-    if (inReview && decision == AnnotationStatus.ACCEPTED) {
-      return Optional.of(WorkflowState.CHANGES_REQUESTED);
-    }
-    return Optional.empty();
+  public static Optional<WorkflowState> annotationDrivenTarget(
+      String currentRaw, long openAnnotations) {
+    return WorkflowState.fromString(currentRaw)
+        .flatMap(
+            state ->
+                switch (state) {
+                  case IN_REVIEW ->
+                      openAnnotations > 0
+                          ? Optional.of(WorkflowState.CHANGES_REQUESTED)
+                          : Optional.empty();
+                  case CHANGES_REQUESTED ->
+                      openAnnotations == 0
+                          ? Optional.of(WorkflowState.IN_REVIEW)
+                          : Optional.empty();
+                  default -> Optional.empty();
+                });
   }
 }
