@@ -59,6 +59,9 @@ archunit-junit5 = { group = "com.tngtech.archunit", name = "archunit-junit5", ve
 spring-boot-dependencies = { group = "org.springframework.boot", name = "spring-boot-dependencies", version.ref = "springBoot" }
 spring-boot-starter-web = { module = "org.springframework.boot:spring-boot-starter-web" }
 spring-boot-starter-actuator = { module = "org.springframework.boot:spring-boot-starter-actuator" }
+# Prometheus scrape registry for Actuator metrics (issue #348, ADR-0013). Version via the BOM;
+# auto-configured at runtime, so it is a runtime-only dependency (no compile-time symbols).
+micrometer-registry-prometheus = { module = "io.micrometer:micrometer-registry-prometheus" }
 spring-boot-starter-data-jpa = { module = "org.springframework.boot:spring-boot-starter-data-jpa" }
 liquibase-core = { module = "org.liquibase:liquibase-core" }
 # Spring Boot 4 split LiquibaseAutoConfiguration out of spring-boot-autoconfigure
