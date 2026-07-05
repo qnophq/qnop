@@ -48,11 +48,16 @@ management:
   endpoints:
     web:
       exposure:
-        include: health
+        # health is public (probes); prometheus is admin-only (SecurityConfiguration), scraped by
+        # an ops Prometheus with an admin token (issue #348, ADR-0013).
+        include: health,prometheus
   endpoint:
     health:
       probes:
         enabled: true
+      # Anonymous callers (k8s probes) see only UP/DOWN; the job-queue counts and staleness
+      # details are revealed only to an authenticated admin.
+      show-details: when_authorized
 
 # Security & crypto foundation (issue #10, ADR-0022). Secrets come from the
 # QNOP_AUTH_* environment namespace — no secure default is baked in; the

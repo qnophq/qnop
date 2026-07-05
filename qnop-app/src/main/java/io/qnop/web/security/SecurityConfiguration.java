@@ -124,6 +124,10 @@ public class SecurityConfiguration {
             auth ->
                 auth.requestMatchers("/actuator/health", "/actuator/health/**")
                     .permitAll()
+                    // Every other management endpoint (prometheus scrape, health details) is
+                    // ops-only — an admin bearer token, never anonymous (issue #348).
+                    .requestMatchers("/actuator/**")
+                    .hasRole("ADMIN")
                     .requestMatchers(
                         "/api/v1/auth/login", "/api/v1/auth/refresh", "/api/v1/auth/logout")
                     .permitAll()

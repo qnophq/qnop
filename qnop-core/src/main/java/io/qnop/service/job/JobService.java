@@ -150,6 +150,26 @@ public class JobService {
     return repository.reapStaleRunning(now.minus(STALE_AFTER), now);
   }
 
+  /**
+   * A queue-depth snapshot for observability (issue #348): the backlog ({@code pending}), the
+   * in-flight count ({@code running}), how many of those are stranded past the stale threshold
+   * ({@code staleRunning} — a dead worker or a wedged poller/reaper), and the terminal failures
+   * ({@code failed}). Returned as primitives so the web/actuator layer never touches the entity
+   * enum.
+   */
+  public record QueueStats(long pending, long running, long staleRunning, long failed) {}
+
+  /** The current queue-depth snapshot (issue #348), reusing the reaper's stale threshold. */
+  @Transactional(readOnly = true)
+  public QueueStats queueStats() {
+    Instant staleBefore = Instant.now().minus(STALE_AFTER);
+    return new QueueStats(
+        repository.countByStatus(JobStatus.PENDING),
+        repository.countByStatus(JobStatus.RUNNING),
+        repository.countByStatusAndUpdatedAtBefore(JobStatus.RUNNING, staleBefore),
+        repository.countByStatus(JobStatus.FAILED));
+  }
+
   /** Capped exponential backoff: {@code base * 2^(attempts-1)}, clamped to the cap. */
   static Duration backoff(int attempts) {
     int shift = Math.min(Math.max(attempts - 1, 0), 20);
