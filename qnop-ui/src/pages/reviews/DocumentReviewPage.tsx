@@ -34,6 +34,7 @@ import Stack from '@mui/material/Stack';
 import { NotebookPen } from 'lucide-react';
 import type { Anchor, NormalizedBox } from '../../api/generated';
 import { ExtractionStatus } from '../../api/generated';
+import type { AnnotationPriority, AnnotationType } from '../../api/generated';
 import { useAnnotations, useCreateAnnotation } from '../../api/hooks/useAnnotations';
 import {
   useDocument,
@@ -247,13 +248,13 @@ export function DocumentReviewPage() {
     if (anchor) stagePending(anchor, at);
   };
 
-  const handleCreate = (comment: string) => {
+  const handleCreate = (comment: string, type?: AnnotationType, priority?: AnnotationPriority) => {
     // The first comment is mandatory (issue #301) — the composer only submits
     // non-blank text; this guard keeps the invariant at the API boundary too.
     const trimmed = comment.trim();
     if (!pending || versionNumber === undefined || trimmed.length === 0) return;
     createAnnotation.mutate(
-      { versionNumber, anchor: pending.anchor, comment: trimmed },
+      { versionNumber, anchor: pending.anchor, comment: trimmed, type, priority },
       {
         onSuccess: (created) => {
           setPending(null);

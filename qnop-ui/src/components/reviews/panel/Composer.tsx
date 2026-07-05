@@ -20,13 +20,18 @@
  */
 
 import { useState } from 'react';
+import Box from '@mui/material/Box';
 import Button from '@mui/material/Button';
+import MenuItem from '@mui/material/MenuItem';
 import Paper from '@mui/material/Paper';
 import Stack from '@mui/material/Stack';
 import TextField from '@mui/material/TextField';
 import Typography from '@mui/material/Typography';
+import { useTheme } from '@mui/material/styles';
 import type { Anchor } from '../../../api/generated';
+import { AnnotationPriority, AnnotationType } from '../../../api/generated';
 import { isSubmitShortcut, submitShortcutLabel } from '../../../utils/platform';
+import { PRIORITY_CUES, TYPE_CUES } from '../tasks/tasksModel';
 
 /**
  * The composer for a freshly drawn anchor — rendered in the panel, and in
@@ -43,12 +48,16 @@ export function Composer({
 }: {
   pendingAnchor: Anchor;
   creating: boolean;
-  onCreate: (comment: string) => void;
+  onCreate: (comment: string, type?: AnnotationType, priority?: AnnotationPriority) => void;
   onCancel: () => void;
 }) {
+  const theme = useTheme();
   const [comment, setComment] = useState('');
+  const [type, setType] = useState<AnnotationType | ''>('');
+  const [priority, setPriority] = useState<AnnotationPriority | ''>('');
   const canCreate = !creating && comment.trim().length > 0;
   const quote = pendingAnchor.textQuote?.quote;
+  const create = () => onCreate(comment, type || undefined, priority || undefined);
   return (
     <Paper variant="outlined" sx={{ p: 1.5 }} data-testid="annotation-composer">
       <Stack spacing={1}>
@@ -77,18 +86,80 @@ export function Composer({
           onKeyDown={(event) => {
             if (isSubmitShortcut(event)) {
               event.preventDefault();
-              if (canCreate) onCreate(comment);
+              if (canCreate) create();
             }
           }}
           slotProps={{ htmlInput: { maxLength: 20000, 'aria-label': 'Annotation comment' } }}
         />
-        <Stack direction="row" spacing={1} sx={{ justifyContent: 'flex-end' }}>
-          <Button
+        {/* Optional classification (issue #392) in the system's task language. */}
+        <Stack direction="row" spacing={1}>
+          <TextField
+            select
             size="small"
-            variant="contained"
-            onClick={() => onCreate(comment)}
-            disabled={!canCreate}
+            label="Type"
+            value={type}
+            onChange={(event) => setType(event.target.value as AnnotationType | '')}
+            sx={{ flex: 1 }}
+            slotProps={{ htmlInput: { 'aria-label': 'Annotation type' } }}
           >
+            <MenuItem value="">
+              <Typography component="span" variant="body2" color="text.secondary">
+                None
+              </Typography>
+            </MenuItem>
+            {Object.values(AnnotationType).map((value) => {
+              const cue = TYPE_CUES[value];
+              const CueIcon = cue.icon;
+              return (
+                <MenuItem key={value} value={value}>
+                  <Stack
+                    direction="row"
+                    spacing={0.75}
+                    sx={{ alignItems: 'center', color: cue.color(theme) }}
+                  >
+                    <CueIcon size={13} aria-hidden />
+                    <Typography component="span" variant="body2">
+                      {cue.label}
+                    </Typography>
+                  </Stack>
+                </MenuItem>
+              );
+            })}
+          </TextField>
+          <TextField
+            select
+            size="small"
+            label="Priority"
+            value={priority}
+            onChange={(event) => setPriority(event.target.value as AnnotationPriority | '')}
+            sx={{ flex: 1 }}
+            slotProps={{ htmlInput: { 'aria-label': 'Annotation priority' } }}
+          >
+            <MenuItem value="">
+              <Typography component="span" variant="body2" color="text.secondary">
+                None
+              </Typography>
+            </MenuItem>
+            {Object.values(AnnotationPriority).map((value) => {
+              const cue = PRIORITY_CUES[value];
+              return (
+                <MenuItem key={value} value={value}>
+                  <Stack direction="row" spacing={0.75} sx={{ alignItems: 'center' }}>
+                    <Box
+                      sx={{ width: 7, height: 7, borderRadius: '50%', bgcolor: cue.color(theme) }}
+                      aria-hidden
+                    />
+                    <Typography component="span" variant="body2">
+                      {cue.label}
+                    </Typography>
+                  </Stack>
+                </MenuItem>
+              );
+            })}
+          </TextField>
+        </Stack>
+        <Stack direction="row" spacing={1} sx={{ justifyContent: 'flex-end' }}>
+          <Button size="small" variant="contained" onClick={create} disabled={!canCreate}>
             Create annotation ({submitShortcutLabel()})
           </Button>
           <Button size="small" onClick={onCancel} disabled={creating}>
