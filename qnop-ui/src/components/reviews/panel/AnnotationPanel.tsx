@@ -27,7 +27,7 @@ import Chip from '@mui/material/Chip';
 import Collapse from '@mui/material/Collapse';
 import Stack from '@mui/material/Stack';
 import Typography from '@mui/material/Typography';
-import { useTheme } from '@mui/material/styles';
+import { alpha, useTheme } from '@mui/material/styles';
 import { ChevronRight, Link2, NotebookPen, Unlink } from 'lucide-react';
 import type {
   AnnotationPriority,
@@ -179,10 +179,7 @@ function PanelSection({
         )}
       </ButtonBase>
       <Collapse in={open} unmountOnExit>
-        {/* The board's lane contrast, brought to the panel (issue #403):
-            a tinted lane with one white post-card per discussion unit —
-            separation through surface, not rules. */}
-        <Stack sx={{ mt: 1, p: 0.75, borderRadius: 1, bgcolor: theme.qnop.surface2, gap: 1 }}>
+        <Stack spacing={1.5} sx={{ pt: 1 }}>
           {children}
         </Stack>
       </Collapse>
@@ -214,6 +211,7 @@ export function AnnotationPanel({
   reviewClosed = false,
   previousSeenAt = null,
 }: AnnotationPanelProps) {
+  const theme = useTheme();
   const [filter, setFilter] = useState<StatusFilter>('all');
   const userId = useAuthStore((state) => state.userId);
   const { resolveWith, isPending: resolving } = useResolveWithFeedback(notify);
@@ -244,15 +242,28 @@ export function AnnotationPanel({
       <Stack
         key={annotation.id}
         spacing={0}
+        data-testid={`annotation-unit-${annotation.id}`}
         sx={{
+          // ONE card per discussion (issue #403): head, thread and composer
+          // share a single bordered surface; whitespace does the separating.
+          // Interaction states live on this card's edge — the same two-step
+          // blue the collapsed rows spoke before.
           bgcolor: 'background.paper',
-          borderRadius: 1,
-          p: 0.5,
-          // Lifted like the board's cards: one soft shadow on light, a
-          // hairline edge on dark (shadows vanish there).
-          boxShadow: (t) => (t.palette.mode === 'light' ? tokens.shadow.xs : 'none'),
+          borderRadius: 0.75,
           border: '1px solid',
-          borderColor: (t) => (t.palette.mode === 'light' ? 'transparent' : t.palette.divider),
+          borderColor:
+            active || annotation.id === hoverAnnotationId
+              ? theme.qnop.brand.blue
+              : theme.palette.divider,
+          boxShadow:
+            annotation.id === hoverAnnotationId && theme.palette.mode === 'light'
+              ? tokens.shadow.sm
+              : 'none',
+          transition: 'border-color 120ms ease, box-shadow 120ms ease',
+          '@media (prefers-reduced-motion: reduce)': { transition: 'none' },
+          '&:hover': {
+            borderColor: active ? theme.qnop.brand.blue : alpha(theme.qnop.brand.blue, 0.4),
+          },
         }}
       >
         <AnnotationListItem
@@ -267,6 +278,7 @@ export function AnnotationPanel({
           {!readOnly && mayResolveAnnotation(annotation, userId) && (
             <ResolveBar disabled={resolving} onResolve={(note) => resolveWith(annotation, note)} />
           )}
+          {/* The thread stays inside the unit's card. */}
           <CommentThread
             annotationId={annotation.id}
             notify={notify}

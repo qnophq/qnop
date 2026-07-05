@@ -168,22 +168,15 @@ function AnnotationListItemBase({
         textAlign: 'left',
         position: 'relative',
         borderRadius: 0.75,
-        border: '1px solid',
-        // Two quiet steps of the interaction blue: hover tints the surface,
-        // the linked mark and the active card share the full accent — the
-        // card↔mark pair reads as one hovered thing, no arrow needed. The
-        // resting identity lives on the unit's white post-card around this
-        // item (#403), so the resting border stays silent.
-        borderColor: active || linked ? theme.qnop.brand.blue : 'transparent',
-        bgcolor: active || linked ? alpha(theme.qnop.brand.blue, 0.06) : 'transparent',
-        boxShadow: linked && theme.palette.mode === 'light' ? tokens.shadow.sm : 'none',
+        // The discussion unit's card (in the panel) draws the border and the
+        // interaction blue (#403); this row only tints its own surface.
+        bgcolor: active || linked ? alpha(theme.qnop.brand.blue, 0.05) : 'transparent',
         px: 1.25,
         py: active ? 1.25 : 0.75,
-        transition: 'border-color 120ms ease, background-color 120ms ease, box-shadow 120ms ease',
+        transition: 'background-color 120ms ease',
         '@media (prefers-reduced-motion: reduce)': { transition: 'none' },
         '&:hover': {
-          borderColor: active ? theme.qnop.brand.blue : alpha(theme.qnop.brand.blue, 0.4),
-          bgcolor: active ? alpha(theme.qnop.brand.blue, 0.06) : theme.qnop.surface2,
+          bgcolor: active || linked ? alpha(theme.qnop.brand.blue, 0.05) : theme.qnop.surface2,
         },
         '&:focus-visible': { boxShadow: theme.qnop.focusRing },
       }}
