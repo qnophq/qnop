@@ -23,12 +23,15 @@ package io.qnop.web.security;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import io.qnop.bootstrap.AbstractIntegrationTest;
+import io.qnop.security.QnopProperties;
 import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.net.http.HttpResponse.BodyHandlers;
+import java.util.Locale;
 import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.web.server.LocalServerPort;
 
 /**
@@ -40,6 +43,7 @@ import org.springframework.boot.test.web.server.LocalServerPort;
 class SecurityConfigurationTest extends AbstractIntegrationTest {
 
   @LocalServerPort int port;
+  @Autowired QnopProperties properties;
 
   private HttpResponse<String> get(String path) throws Exception {
     HttpRequest request =
@@ -70,5 +74,35 @@ class SecurityConfigurationTest extends AbstractIntegrationTest {
     assertThat(response.headers().firstValue("Content-Security-Policy")).isPresent();
     assertThat(response.headers().firstValue("Referrer-Policy"))
         .hasValue("strict-origin-when-cross-origin");
+  }
+
+  @Test
+  void credentialedPreflightAllowsTheExplicitHeadersNotAWildcard() throws Exception {
+    // The CORS spec forbids allowed-headers "*" together with allowCredentials=true; browsers
+    // reject the combination for credentialed requests. The preflight must therefore echo the
+    // explicit headers the SPA uses, never "*" (issue #336).
+    String origin = properties.cors().allowedOrigins().get(0);
+    HttpRequest preflight =
+        HttpRequest.newBuilder(URI.create("http://localhost:" + port + "/api/v1/auth/login"))
+            .method("OPTIONS", HttpRequest.BodyPublishers.noBody())
+            .header("Origin", origin)
+            .header("Access-Control-Request-Method", "POST")
+            .header("Access-Control-Request-Headers", "content-type,authorization,x-xsrf-token")
+            .build();
+
+    HttpResponse<String> response =
+        HttpClient.newHttpClient().send(preflight, BodyHandlers.ofString());
+
+    assertThat(response.statusCode()).isEqualTo(200);
+    assertThat(response.headers().firstValue("Access-Control-Allow-Origin")).hasValue(origin);
+    assertThat(response.headers().firstValue("Access-Control-Allow-Credentials")).hasValue("true");
+
+    String allowedHeaders =
+        response.headers().firstValue("Access-Control-Allow-Headers").orElse("");
+    assertThat(allowedHeaders).doesNotContain("*");
+    assertThat(allowedHeaders.toLowerCase(Locale.ROOT))
+        .contains("content-type")
+        .contains("authorization")
+        .contains("x-xsrf-token");
   }
 }
