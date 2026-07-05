@@ -104,7 +104,7 @@ export function ReviewsTable({ reviews, userId, onOpen }: ReviewsTableProps) {
                   <TableCell sx={{ minWidth: 120 }}>
                     {progress ? (
                       <ProgressBar
-                        decided={progress.decided}
+                        resolved={progress.resolved}
                         total={progress.total}
                         color={theme.qnop.brand.blue}
                       />

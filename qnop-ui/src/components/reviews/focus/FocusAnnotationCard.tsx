@@ -38,8 +38,8 @@ import type { Notify } from '../../admin/layout/useToast';
 import { ToneBadge } from '../../admin/ToneBadge';
 import { STATUS_CUES } from '../panel/statusCues';
 import { CommentThread } from '../panel/CommentThread';
-import { DecisionBar } from '../panel/DecisionBar';
-import { mayDecideAnnotation, useDecideWithFeedback } from '../panel/decisions';
+import { ResolveBar } from '../panel/ResolveBar';
+import { mayResolveAnnotation, useResolveWithFeedback } from '../panel/resolve';
 import { PlacementStatusChip } from '../panel/PlacementStatusChip';
 import type { WalkPosition } from './spotlightModel';
 
@@ -51,7 +51,6 @@ interface FocusAnnotationCardProps {
   position: WalkPosition | null;
   onNavigate: (annotationId: string) => void;
   onClose: () => void;
-  ownerId: string | null;
   userId: string | null;
   notify: Notify;
   /** True while an OLDER version is viewed (#306): thread readable, nothing writable. */
@@ -68,8 +67,9 @@ function isTypingTarget(event: KeyboardEvent): boolean {
 
 /**
  * Focus mode's floating discussion card (issue #291): everything the panel
- * card offers — status and placement cues, the quote, Accept/Reject, the full
- * comment thread with its composer — next to the spotlit mark, never over it.
+ * card offers — status and placement cues, the quote, the author's Resolve
+ * bar, the full comment thread with its composer — next to the spotlit mark,
+ * never over it.
  * Prev/Next (and ↑/↓ outside text fields) walk the annotations in document
  * order without closing; the walk position is announced politely. Focus is
  * trapped inside the card; Escape (and the close button) return it to the
@@ -81,7 +81,6 @@ export function FocusAnnotationCard({
   position,
   onNavigate,
   onClose,
-  ownerId,
   userId,
   notify,
   readOnly = false,
@@ -89,7 +88,7 @@ export function FocusAnnotationCard({
 }: FocusAnnotationCardProps) {
   const theme = useTheme();
   const reducedMotion = useMediaQuery('(prefers-reduced-motion: reduce)');
-  const { decideWith, isPending: deciding } = useDecideWithFeedback(notify);
+  const { resolveWith, isPending: resolving } = useResolveWithFeedback(notify);
   const statusCue = STATUS_CUES[annotation.status];
   const quote = annotation.anchor?.textQuote?.quote;
 
@@ -297,10 +296,10 @@ export function FocusAnnotationCard({
                   )}
                 </Box>
 
-                {!readOnly && mayDecideAnnotation(annotation, userId, ownerId) && (
-                  <DecisionBar
-                    disabled={deciding}
-                    onDecide={(decision) => decideWith(annotation, decision)}
+                {!readOnly && mayResolveAnnotation(annotation, userId) && (
+                  <ResolveBar
+                    disabled={resolving}
+                    onResolve={(note) => resolveWith(annotation, note)}
                   />
                 )}
 

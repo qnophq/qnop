@@ -23,6 +23,7 @@ package io.qnop.service.review;
 import io.qnop.entity.Annotation;
 import io.qnop.entity.AnnotationStatus;
 import io.qnop.entity.AuditEvent;
+import io.qnop.entity.Comment;
 import io.qnop.entity.Document;
 import io.qnop.entity.ExtractionStatus;
 import io.qnop.entity.PlacementStatus;
@@ -30,6 +31,7 @@ import io.qnop.entity.WorkflowState;
 import io.qnop.repository.AnnotationPlacementRepository;
 import io.qnop.repository.AnnotationRepository;
 import io.qnop.repository.AuditEventRepository;
+import io.qnop.repository.CommentRepository;
 import io.qnop.repository.DocumentRepository;
 import io.qnop.repository.DocumentVersionRepository;
 import io.qnop.service.document.DocumentAccessService;
@@ -43,11 +45,12 @@ import org.springframework.transaction.annotation.Transactional;
 /**
  * Drives the review workflow (issue #246, ADR-0011): loads the document, feeds the DB-free {@link
  * ReviewWorkflowMachine} choke-point with the guard facts, persists the outcome and appends an
- * {@link AuditEvent} per transition. Authorization is owner-only for state changes (ADR-0011: the
- * owner drives the workflow and decides annotations). State-changing paths load the document under
- * a pessimistic write lock ({@link DocumentRepository#findByIdForUpdate}), so the finalize-guard
- * counts and the state write are atomic against a concurrent transition or a new-version upload
- * that would change the pending-placement picture (issue #324).
+ * {@link AuditEvent} per transition. Explicit state changes are owner-only; the {@code IN_REVIEW ⇄
+ * CHANGES_REQUESTED} pair is derived from the open-annotation count instead (issue #405), and an
+ * annotation is resolved by its author alone. State-changing paths load the document under a
+ * pessimistic write lock ({@link DocumentRepository#findByIdForUpdate}), so the guard counts and
+ * the state write are atomic against a concurrent transition or a new-version upload that would
+ * change the pending-placement picture (issue #324).
  */
 @Service
 public class ReviewWorkflowService {
@@ -55,8 +58,8 @@ public class ReviewWorkflowService {
   /** Audit event type for a workflow state change; detail carries {@code {"from","to"}}. */
   static final String AUDIT_WORKFLOW_TRANSITION = "workflow.transition";
 
-  /** Audit event type for an annotation decision; detail carries the annotation id + decision. */
-  static final String AUDIT_ANNOTATION_DECIDED = "annotation.decided";
+  /** Audit event type for an annotation resolution; detail carries the annotation id. */
+  static final String AUDIT_ANNOTATION_RESOLVED = "annotation.resolved";
 
   private final ReviewWorkflowMachine machine = new ReviewWorkflowMachine();
 
@@ -64,6 +67,7 @@ public class ReviewWorkflowService {
   private final DocumentVersionRepository versions;
   private final AnnotationRepository annotations;
   private final AnnotationPlacementRepository placements;
+  private final CommentRepository comments;
   private final AuditEventRepository auditEvents;
   private final DocumentAccessService documentAccess;
 
@@ -72,12 +76,14 @@ public class ReviewWorkflowService {
       DocumentVersionRepository versions,
       AnnotationRepository annotations,
       AnnotationPlacementRepository placements,
+      CommentRepository comments,
       AuditEventRepository auditEvents,
       DocumentAccessService documentAccess) {
     this.documents = documents;
     this.versions = versions;
     this.annotations = annotations;
     this.placements = placements;
+    this.comments = comments;
     this.auditEvents = auditEvents;
     this.documentAccess = documentAccess;
   }
@@ -105,8 +111,9 @@ public class ReviewWorkflowService {
   }
 
   /**
-   * Requests the transition to {@code targetRaw}, owner-only. A target this edition does not know,
-   * an illegal edge, or a vetoing guard (the FINALIZED invariant) is rejected with {@link
+   * Requests an explicit transition to {@code targetRaw}, owner-only. A target this edition does
+   * not know, an illegal edge, the derived {@code IN_REVIEW ⇄ CHANGES_REQUESTED} pair (issue #405),
+   * or a vetoing guard (the FINALIZED invariant) is rejected with {@link
    * WorkflowTransitionException} (HTTP 409).
    */
   @Transactional
@@ -120,52 +127,81 @@ public class ReviewWorkflowService {
                     new WorkflowTransitionException(
                         WorkflowTransitionException.INVALID_TRANSITION,
                         "unknown target state '" + targetRaw + "'"));
-    applyTransition(document, target, actorId);
+    applyTransition(document, target, actorId, true);
     return statusOf(document);
   }
 
   /**
-   * Applies a decision on an annotation — the {@code OPEN → ACCEPTED | REJECTED} sub-machine
-   * (ADR-0011), permitted for the document owner alone (issue #403 tightened the original
-   * owner-or-author rule of #247: reviewers raise and discuss, the owner rules). Accepting while
-   * the document is {@code IN_REVIEW} drives the workflow to {@code CHANGES_REQUESTED} through the
-   * same choke-point (with its own audit event).
+   * Resolves an annotation — the {@code OPEN → RESOLVED} sub-machine (ADR-0011 as amended by issue
+   * #405), permitted for the annotation's author alone: the author raised the concern, so only they
+   * know when it is settled. An optional closing note lands as a regular comment in the thread; the
+   * open-annotation count then re-derives the {@code IN_REVIEW ⇄ CHANGES_REQUESTED} pair through
+   * the same choke-point (with its own audit event).
    */
   @Transactional
-  public Annotation decideAnnotation(UUID annotationId, AnnotationStatus decision, UUID actorId) {
-    if (decision != AnnotationStatus.ACCEPTED && decision != AnnotationStatus.REJECTED) {
-      throw new IllegalArgumentException("decision must be ACCEPTED or REJECTED, not " + decision);
-    }
+  public Annotation resolveAnnotation(UUID annotationId, String note, UUID actorId) {
     Annotation annotation =
         annotations
             .findById(annotationId)
             .orElseThrow(() -> new AnnotationNotFoundException(annotationId));
     Document document = loadForUpdate(annotation.getDocumentId());
-    if (!document.getOwnerId().equals(actorId)) {
-      throw new AnnotationDecisionForbiddenException();
+    if (!annotation.getAuthorId().equals(actorId)) {
+      throw new AnnotationActionForbiddenException("Only the annotation's author may resolve it");
     }
-    if (!ReviewWorkflowMachine.canDecide(annotation.getStatus())) {
+    if (!ReviewWorkflowMachine.canResolve(annotation.getStatus())) {
       throw new WorkflowTransitionException(
-          WorkflowTransitionException.ANNOTATION_ALREADY_DECIDED,
+          WorkflowTransitionException.ANNOTATION_ALREADY_RESOLVED,
           "annotation " + annotationId + " is already " + annotation.getStatus());
     }
-    if (decision == AnnotationStatus.ACCEPTED) {
-      annotation.accept();
-    } else {
-      annotation.reject();
+    if (note != null && !note.isBlank()) {
+      comments.save(new Comment(annotationId, actorId, note.trim()));
     }
+    annotation.resolve();
     auditEvents.save(
         new AuditEvent(
             document.getId(),
-            AUDIT_ANNOTATION_DECIDED,
+            AUDIT_ANNOTATION_RESOLVED,
             actorId,
-            "{\"annotationId\":\"" + annotationId + "\",\"decision\":\"" + decision + "\"}"));
-    ReviewWorkflowMachine.decisionDrivenTarget(document.getWorkflowState(), decision)
-        .ifPresent(target -> applyTransition(document, target, actorId));
+            "{\"annotationId\":\"" + annotationId + "\"}"));
+    rederiveWorkflow(document, actorId);
     return annotation;
   }
 
-  private void applyTransition(Document document, WorkflowState target, UUID actorId) {
+  /**
+   * Registers a freshly raised annotation with the workflow (issue #405): takes the document write
+   * lock, refuses the annotation when the review is closed ({@code FINALIZED} or {@code CANCELLED}
+   * — the caller's transaction rolls the insert back), and re-derives the {@code IN_REVIEW ⇄
+   * CHANGES_REQUESTED} pair. Runs inside {@code AnnotationService.create}'s transaction, after the
+   * insert.
+   */
+  @Transactional
+  public void annotationRaised(UUID documentId, UUID actorId) {
+    Document document = loadForUpdate(documentId);
+    boolean closed =
+        WorkflowState.fromString(document.getWorkflowState())
+            .map(state -> state == WorkflowState.FINALIZED || state == WorkflowState.CANCELLED)
+            .orElse(false);
+    if (closed) {
+      throw new WorkflowTransitionException(
+          WorkflowTransitionException.REVIEW_CLOSED,
+          "the review is " + document.getWorkflowState() + "; it accepts no new annotations");
+    }
+    rederiveWorkflow(document, actorId);
+  }
+
+  /**
+   * Re-derives the annotation-driven workflow pair (issue #405) from the current open-annotation
+   * count; a no-op outside {@code IN_REVIEW}/{@code CHANGES_REQUESTED}. The caller holds the
+   * document write lock, so the count and the state write are atomic (issue #324).
+   */
+  private void rederiveWorkflow(Document document, UUID actorId) {
+    long open = annotations.countByDocumentIdAndStatus(document.getId(), AnnotationStatus.OPEN);
+    ReviewWorkflowMachine.annotationDrivenTarget(document.getWorkflowState(), open)
+        .ifPresent(target -> applyTransition(document, target, actorId, false));
+  }
+
+  private void applyTransition(
+      Document document, WorkflowState target, UUID actorId, boolean manual) {
     String from = document.getWorkflowState();
     TransitionContext context =
         new TransitionContext(
@@ -173,7 +209,11 @@ public class ReviewWorkflowService {
             placements.countByDocumentIdAndStatus(document.getId(), PlacementStatus.PENDING),
             versions.existsByDocumentIdAndExtractionStatus(
                 document.getId(), ExtractionStatus.READY));
-    switch (machine.transition(from, target, context)) {
+    TransitionResult result =
+        manual
+            ? machine.manualTransition(from, target, context)
+            : machine.transition(from, target, context);
+    switch (result) {
       case TransitionResult.Allowed allowed -> document.setWorkflowState(allowed.target());
       case TransitionResult.Denied denied ->
           throw new WorkflowTransitionException(

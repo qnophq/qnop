@@ -21,6 +21,7 @@
 package io.qnop.review;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -41,6 +42,7 @@ import io.qnop.repository.DocumentRepository;
 import io.qnop.repository.DocumentVersionRepository;
 import io.qnop.repository.ReviewParticipantRepository;
 import io.qnop.service.review.ReviewWorkflowService;
+import io.qnop.service.review.WorkflowTransitionException;
 import io.qnop.testsupport.SeededIntegrationTest;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
@@ -48,11 +50,11 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.MediaType;
 
 /**
- * End-to-end tests for the workflow transition endpoints (issue #246, ADR-0011) against a real
- * PostgreSQL: legal and illegal transitions, the FINALIZED guard invariant (open annotations /
- * pending placements), owner-only authorization, the audit trail, and the annotation-decision
- * sub-machine driving CHANGES_REQUESTED. Documents are seeded directly via repositories — the
- * upload pipeline is #245. Requires Docker.
+ * End-to-end tests for the workflow transition endpoints (issue #246, ADR-0011 as amended by #405)
+ * against a real PostgreSQL: legal and illegal transitions, the FINALIZED guard invariant (open
+ * annotations / pending placements), owner-only authorization, the audit trail, and the
+ * annotation-driven {@code IN_REVIEW ⇄ CHANGES_REQUESTED} derivation. Documents are seeded directly
+ * via repositories — the upload pipeline is #245. Requires Docker.
  */
 class ReviewWorkflowControllerIT extends SeededIntegrationTest {
 
@@ -236,7 +238,7 @@ class ReviewWorkflowControllerIT extends SeededIntegrationTest {
             new DocumentVersion(
                 document.getId(), 1, "s3://key", "hash", "application/pdf", 10, MEMBER_ID));
     Annotation annotation = annotations.save(new Annotation(document.getId(), MEMBER2_ID));
-    annotation.reject(); // decided — only the PENDING placement blocks now
+    annotation.resolve(); // resolved — only the PENDING placement blocks now
     annotations.save(annotation);
     placements.save(new AnnotationPlacement(annotation.getId(), version.getId(), "{\"p\":1}"));
 
@@ -252,7 +254,7 @@ class ReviewWorkflowControllerIT extends SeededIntegrationTest {
   }
 
   @Test
-  void finalizeSucceedsOnceAnnotationsAreDecidedAndPlacementsAnchored() throws Exception {
+  void finalizeSucceedsOnceAnnotationsAreResolvedAndPlacementsAnchored() throws Exception {
     Document document = inReviewOwnedByMember();
     DocumentVersion version =
         new DocumentVersion(
@@ -260,7 +262,7 @@ class ReviewWorkflowControllerIT extends SeededIntegrationTest {
     version.attachRenderedDocument("{\"surfaces\":[]}"); // READY (issue #323 finalize precondition)
     version = versions.save(version);
     Annotation annotation = annotations.save(new Annotation(document.getId(), MEMBER2_ID));
-    annotation.reject();
+    annotation.resolve();
     annotations.save(annotation);
     AnnotationPlacement placement =
         new AnnotationPlacement(annotation.getId(), version.getId(), "{\"p\":1}");
@@ -297,33 +299,79 @@ class ReviewWorkflowControllerIT extends SeededIntegrationTest {
         .andExpect(jsonPath("$.message").value(org.hamcrest.Matchers.containsString("READY")));
   }
 
-  // --- annotation decision sub-machine (service-level; the REST surface is #247) ---
+  // --- the derived IN_REVIEW ⇄ CHANGES_REQUESTED pair (issue #405) ------------------
 
   @Test
-  void acceptingAnAnnotationDrivesInReviewToChangesRequestedWithAudit() {
+  void manualCrossingOfTheDerivedPairIsRejectedWith409() throws Exception {
     Document document = inReviewOwnedByMember();
-    Annotation annotation = annotations.save(new Annotation(document.getId(), MEMBER2_ID));
 
-    workflow.decideAnnotation(annotation.getId(), AnnotationStatus.ACCEPTED, MEMBER_ID);
+    mockMvc
+        .perform(
+            post(workflowPath(document.getId()))
+                .header("Authorization", "Bearer " + token(MEMBER_ID))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"targetState\":\"CHANGES_REQUESTED\"}"))
+        .andExpect(status().isConflict())
+        .andExpect(jsonPath("$.code").value("INVALID_TRANSITION"))
+        .andExpect(jsonPath("$.message").value(org.hamcrest.Matchers.containsString("derived")));
+  }
 
-    assertThat(annotations.findById(annotation.getId()).orElseThrow().getStatus())
-        .isEqualTo(AnnotationStatus.ACCEPTED);
+  @Test
+  void raisingAnAnnotationDerivesInReviewToChangesRequestedWithAudit() {
+    Document document = inReviewOwnedByMember();
+    annotations.save(new Annotation(document.getId(), MEMBER2_ID));
+
+    workflow.annotationRaised(document.getId(), MEMBER2_ID);
+
     assertThat(documents.findById(document.getId()).orElseThrow().getWorkflowState())
         .isEqualTo("CHANGES_REQUESTED");
     assertThat(
             auditEvents.findByDocumentIdOrderByCreatedAtDesc(document.getId()).stream()
                 .map(AuditEvent::getEventType))
-        .contains("annotation.decided", "workflow.transition");
+        .contains("workflow.transition");
   }
 
   @Test
-  void rejectingAnAnnotationLeavesTheWorkflowInReview() {
+  void raisingAnAnnotationOnAClosedReviewIsRefused() {
+    Document document = draftOwnedByMember();
+    document.setWorkflowState(WorkflowState.FINALIZED);
+    documents.save(document);
+
+    assertThatThrownBy(() -> workflow.annotationRaised(document.getId(), MEMBER2_ID))
+        .isInstanceOf(WorkflowTransitionException.class)
+        .hasMessageContaining("FINALIZED");
+  }
+
+  @Test
+  void resolvingTheLastOpenAnnotationReturnsTheReviewToInReview() {
     Document document = inReviewOwnedByMember();
+    document.setWorkflowState(WorkflowState.CHANGES_REQUESTED);
+    documents.save(document);
     Annotation annotation = annotations.save(new Annotation(document.getId(), MEMBER2_ID));
 
-    workflow.decideAnnotation(annotation.getId(), AnnotationStatus.REJECTED, MEMBER_ID);
+    workflow.resolveAnnotation(annotation.getId(), null, MEMBER2_ID);
 
+    assertThat(annotations.findById(annotation.getId()).orElseThrow().getStatus())
+        .isEqualTo(AnnotationStatus.RESOLVED);
     assertThat(documents.findById(document.getId()).orElseThrow().getWorkflowState())
         .isEqualTo("IN_REVIEW");
+    assertThat(
+            auditEvents.findByDocumentIdOrderByCreatedAtDesc(document.getId()).stream()
+                .map(AuditEvent::getEventType))
+        .contains("annotation.resolved", "workflow.transition");
+  }
+
+  @Test
+  void resolvingANonLastAnnotationLeavesChangesRequested() {
+    Document document = inReviewOwnedByMember();
+    document.setWorkflowState(WorkflowState.CHANGES_REQUESTED);
+    documents.save(document);
+    Annotation first = annotations.save(new Annotation(document.getId(), MEMBER2_ID));
+    annotations.save(new Annotation(document.getId(), MEMBER2_ID));
+
+    workflow.resolveAnnotation(first.getId(), null, MEMBER2_ID);
+
+    assertThat(documents.findById(document.getId()).orElseThrow().getWorkflowState())
+        .isEqualTo("CHANGES_REQUESTED");
   }
 }

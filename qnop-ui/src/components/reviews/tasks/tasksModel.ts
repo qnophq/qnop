@@ -29,7 +29,8 @@ import { AnnotationPriority, AnnotationStatus, AnnotationType } from '../../../a
  * The board's columns (issue #393, prototype reviewhub): *In discussion* is
  * DERIVED — an OPEN annotation whose thread grew beyond its mandatory first
  * comment (#301) is being discussed, exactly like the prototype's auto
- * promotion on reply. *Done* is any decided annotation.
+ * promotion on reply. The `done` column carries every resolved annotation
+ * (labelled *Resolved*, issue #405).
  */
 export type TaskColumn = 'open' | 'discussion' | 'done';
 

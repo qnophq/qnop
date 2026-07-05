@@ -118,7 +118,7 @@ class DocumentOverviewApiIT extends SeededIntegrationTest {
     UUID documentId = seedReview("Overview progress agreement");
     annotations.save(new Annotation(documentId, AUDITOR_ID));
     Annotation decided = new Annotation(documentId, AUDITOR_ID);
-    decided.accept();
+    decided.resolve();
     annotations.save(decided);
 
     mockMvc

@@ -127,11 +127,11 @@ describe('ReviewsPage', () => {
     expect(screen.getByText('Finalized')).toBeInTheDocument();
   });
 
-  it('shows decided/total progress for reviews with annotations', () => {
+  it('shows resolved/total progress for reviews with annotations', () => {
     renderPage();
 
     expect(
-      screen.getByRole('progressbar', { name: '2 of 3 annotations decided' }),
+      screen.getByRole('progressbar', { name: '2 of 3 annotations resolved' }),
     ).toBeInTheDocument();
     expect(screen.getByText('2/3')).toBeInTheDocument();
   });

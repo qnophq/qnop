@@ -22,16 +22,20 @@ package io.qnop.service.review;
 
 /**
  * A refused workflow action (issue #246, ADR-0011): an illegal edge, a vetoing guard (e.g. the
- * FINALIZED invariant), a decision on a non-OPEN annotation, or a state this edition does not
- * manage. Carries a stable {@code code} for the uniform error envelope; mapped to HTTP 409.
+ * FINALIZED invariant), resolving a non-OPEN annotation, annotating a closed review, or a state
+ * this edition does not manage. Carries a stable {@code code} for the uniform error envelope;
+ * mapped to HTTP 409.
  */
 public class WorkflowTransitionException extends RuntimeException {
 
   /** Stable machine-readable code for the error envelope. */
   public static final String INVALID_TRANSITION = "INVALID_TRANSITION";
 
-  /** A decision was requested on an annotation that is no longer {@code OPEN}. */
-  public static final String ANNOTATION_ALREADY_DECIDED = "ANNOTATION_ALREADY_DECIDED";
+  /** A resolution was requested on an annotation that is no longer {@code OPEN}. */
+  public static final String ANNOTATION_ALREADY_RESOLVED = "ANNOTATION_ALREADY_RESOLVED";
+
+  /** An annotation was raised on a review that is already FINALIZED or CANCELLED (issue #405). */
+  public static final String REVIEW_CLOSED = "REVIEW_CLOSED";
 
   private final String code;
 

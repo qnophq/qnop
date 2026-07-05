@@ -52,7 +52,7 @@ import org.springframework.transaction.annotation.Transactional;
  *
  * <p>A participant creates an anchored annotation on a version they are viewing; the placement on
  * that version is {@code PLACED} immediately (a human drew it — re-anchoring onto later versions is
- * the async job of #248). The owner/author decision (accept/reject) is the workflow's concern and
+ * the async job of #248). Resolving an annotation (author-only, #405) is the workflow's concern and
  * lives in {@link ReviewWorkflowService}. Visibility is delegated to {@link DocumentAccessService},
  * so a non-participant sees the same 404 as for the document itself (anti-enumeration).
  */
@@ -169,6 +169,9 @@ public class AnnotationService {
             AUDIT_ANNOTATION_CREATED,
             author,
             "{\"annotationId\":\"" + annotation.getId() + "\"}"));
+    // The workflow reacts to the raise (issue #405): a closed review rolls this insert back
+    // (REVIEW_CLOSED), an IN_REVIEW one derives CHANGES_REQUESTED — both under the document lock.
+    workflow.annotationRaised(documentId, author);
     return view(annotation, placement, excerpt(firstComment), commentCount, null);
   }
 
@@ -233,11 +236,12 @@ public class AnnotationService {
     DocumentAccessService.DocumentView document =
         documentAccess.getDocument(annotation.getDocumentId(), actor, admin);
     if (!document.ownerId().equals(actor) && !annotation.getAuthorId().equals(actor)) {
-      throw new AnnotationDecisionForbiddenException();
+      throw new AnnotationActionForbiddenException(
+          "Only the document owner or the annotation's author may classify it");
     }
     if (annotation.getStatus() != AnnotationStatus.OPEN) {
       throw new WorkflowTransitionException(
-          WorkflowTransitionException.ANNOTATION_ALREADY_DECIDED,
+          WorkflowTransitionException.ANNOTATION_ALREADY_RESOLVED,
           "annotation " + annotationId + " is already " + annotation.getStatus());
     }
     annotation.classify(typeOf(type), priorityOf(priority));
@@ -283,13 +287,13 @@ public class AnnotationService {
   }
 
   /**
-   * Applies the owner/author decision (ADR-0011) via the workflow choke-point (which enforces the
-   * authorization and drives the document state), and returns the updated annotation's view.
+   * Resolves the annotation as its author (ADR-0011 as amended by #405) via the workflow
+   * choke-point (which enforces the authorization, appends the optional closing note to the thread
+   * and re-derives the document state), and returns the updated annotation's view.
    */
   @Transactional
-  public AnnotationView decide(UUID annotationId, boolean accept, UUID actor) {
-    AnnotationStatus decision = accept ? AnnotationStatus.ACCEPTED : AnnotationStatus.REJECTED;
-    Annotation updated = workflow.decideAnnotation(annotationId, decision, actor);
+  public AnnotationView resolve(UUID annotationId, String note, UUID actor) {
+    Annotation updated = workflow.resolveAnnotation(annotationId, note, actor);
     return view(
         updated,
         null,

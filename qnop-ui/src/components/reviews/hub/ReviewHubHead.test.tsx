@@ -130,17 +130,17 @@ beforeEach(() => {
 });
 
 describe('ReviewHubHead — progress & participants', () => {
-  it('shows decided/total progress from the annotations', async () => {
+  it('shows resolved/total progress from the annotations', async () => {
     renderHub({
       annotations: [
         annotation(AnnotationStatus.Open),
-        annotation(AnnotationStatus.Accepted),
-        annotation(AnnotationStatus.Rejected),
+        annotation(AnnotationStatus.Resolved),
+        annotation(AnnotationStatus.Resolved),
       ],
     });
 
     expect(
-      screen.getByRole('progressbar', { name: '2 of 3 annotations decided' }),
+      screen.getByRole('progressbar', { name: '2 of 3 annotations resolved' }),
     ).toBeInTheDocument();
     await waitFor(() => expect(screen.getByText('1')).toBeInTheDocument());
   });

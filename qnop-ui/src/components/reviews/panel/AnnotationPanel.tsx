@@ -44,15 +44,15 @@ import { isUnseen } from '../newSince';
 import { AnnotationListItem } from './AnnotationListItem';
 import { CommentThread } from './CommentThread';
 import { Composer } from './Composer';
-import { DecisionBar } from './DecisionBar';
-import { mayDecideAnnotation, useDecideWithFeedback } from './decisions';
+import { ResolveBar } from './ResolveBar';
+import { mayResolveAnnotation, useResolveWithFeedback } from './resolve';
 
-type StatusFilter = 'all' | 'open' | 'decided';
+type StatusFilter = 'all' | 'open' | 'resolved';
 
 const FILTERS: { value: StatusFilter; label: string }[] = [
   { value: 'all', label: 'All' },
   { value: 'open', label: 'Open' },
-  { value: 'decided', label: 'Decided' },
+  { value: 'resolved', label: 'Resolved' },
 ];
 
 interface AnnotationPanelProps {
@@ -68,7 +68,6 @@ interface AnnotationPanelProps {
   onCancelPending: () => void;
   canAnnotate: boolean;
   /** The document owner — owner or author may decide an annotation (ADR-0011). */
-  ownerId: string | null;
   notify: Notify;
   /** True while an OLDER version is viewed (#306): threads readable, nothing writable. */
   readOnly?: boolean;
@@ -200,14 +199,13 @@ export function AnnotationPanel({
   onCreate,
   onCancelPending,
   canAnnotate,
-  ownerId,
   notify,
   readOnly = false,
   previousSeenAt = null,
 }: AnnotationPanelProps) {
   const [filter, setFilter] = useState<StatusFilter>('all');
   const userId = useAuthStore((state) => state.userId);
-  const { decideWith, isPending: deciding } = useDecideWithFeedback(notify);
+  const { resolveWith, isPending: resolving } = useResolveWithFeedback(notify);
 
   // Sort + status-filter once per (annotations, filter) change, not on every
   // render (e.g. a hover or selection): the list can be large and the sort is
@@ -241,11 +239,8 @@ export function AnnotationPanel({
           onHover={onHover}
         />
         <Collapse in={active} unmountOnExit>
-          {!readOnly && mayDecideAnnotation(annotation, userId, ownerId) && (
-            <DecisionBar
-              disabled={deciding}
-              onDecide={(decision) => decideWith(annotation, decision)}
-            />
+          {!readOnly && mayResolveAnnotation(annotation, userId) && (
+            <ResolveBar disabled={resolving} onResolve={(note) => resolveWith(annotation, note)} />
           )}
           <CommentThread
             annotationId={annotation.id}

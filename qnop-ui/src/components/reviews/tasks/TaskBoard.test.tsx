@@ -56,16 +56,16 @@ const annotation = (id: string, overrides: Partial<AnnotationView> = {}): Annota
 const ANNOTATIONS = [
   annotation('a-open'),
   annotation('a-talk', { commentCount: 3 }),
-  annotation('a-done', { status: AnnotationStatus.Accepted }),
+  annotation('a-done', { status: AnnotationStatus.Resolved }),
 ];
 
 function renderBoard({
-  mayDecide = () => true,
-  onAccept = vi.fn<(annotationId: string) => void>(),
+  mayResolve = () => true,
+  onResolve = vi.fn<(annotationId: string) => void>(),
   onOpen = vi.fn<(annotationId: string) => void>(),
 }: {
-  mayDecide?: (annotation: AnnotationView) => boolean;
-  onAccept?: Mock<(annotationId: string) => void>;
+  mayResolve?: (annotation: AnnotationView) => boolean;
+  onResolve?: Mock<(annotationId: string) => void>;
   onOpen?: Mock<(annotationId: string) => void>;
 } = {}) {
   render(
@@ -74,13 +74,13 @@ function renderBoard({
         annotations={ANNOTATIONS}
         taskKeyOf={() => 'T-1'}
         authorNameOf={() => 'Maxim'}
-        mayDecide={mayDecide}
+        mayResolve={mayResolve}
         onOpen={onOpen}
-        onAccept={onAccept}
+        onResolve={onResolve}
       />
     </ThemeProvider>,
   );
-  return { onAccept, onOpen };
+  return { onResolve, onOpen };
 }
 
 const dataTransfer = (id: string) => ({
@@ -91,7 +91,7 @@ const dataTransfer = (id: string) => ({
 });
 
 describe('TaskBoard', () => {
-  it('sorts annotations into open, derived discussion and done columns', () => {
+  it('sorts annotations into open, derived discussion and resolved columns', () => {
     renderBoard();
     expect(
       within(screen.getByTestId('task-column-open')).getByTestId('task-card-a-open'),
@@ -110,12 +110,12 @@ describe('TaskBoard', () => {
     expect(onOpen).toHaveBeenCalledWith('a-open');
   });
 
-  it('accepts a card dropped on the Done column', () => {
-    const { onAccept } = renderBoard();
+  it('resolves a card dropped on the Resolved column', () => {
+    const { onResolve } = renderBoard();
     fireEvent.drop(screen.getByTestId('task-column-done'), {
       dataTransfer: dataTransfer('a-open'),
     });
-    expect(onAccept).toHaveBeenCalledWith('a-open');
+    expect(onResolve).toHaveBeenCalledWith('a-open');
   });
 
   it('marks foreign cards created after the previous visit', () => {
@@ -126,9 +126,9 @@ describe('TaskBoard', () => {
           previousSeenAt="2026-06-30T00:00:00Z"
           taskKeyOf={() => 'T-1'}
           authorNameOf={() => 'Maxim'}
-          mayDecide={() => true}
+          mayResolve={() => true}
           onOpen={vi.fn()}
-          onAccept={vi.fn()}
+          onResolve={vi.fn()}
         />
       </ThemeProvider>,
     );
@@ -137,8 +137,8 @@ describe('TaskBoard', () => {
     ).toBeInTheDocument();
   });
 
-  it('only permitted cards are draggable; done cards never are', () => {
-    renderBoard({ mayDecide: (a) => a.id === 'a-open' });
+  it("only the author's own cards are draggable; resolved cards never are", () => {
+    renderBoard({ mayResolve: (a) => a.id === 'a-open' });
     expect(screen.getByTestId('task-card-a-open')).toHaveAttribute('draggable', 'true');
     expect(screen.getByTestId('task-card-a-talk')).toHaveAttribute('draggable', 'false');
     expect(screen.getByTestId('task-card-a-done')).toHaveAttribute('draggable', 'false');

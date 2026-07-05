@@ -24,10 +24,9 @@ import io.qnop.api.v1.endpoint.AnnotationsApi;
 import io.qnop.api.v1.model.Anchor;
 import io.qnop.api.v1.model.AnnotationClassificationRequest;
 import io.qnop.api.v1.model.AnnotationCreateRequest;
-import io.qnop.api.v1.model.AnnotationDecision;
-import io.qnop.api.v1.model.AnnotationDecisionRequest;
 import io.qnop.api.v1.model.AnnotationListResponse;
 import io.qnop.api.v1.model.AnnotationPriority;
+import io.qnop.api.v1.model.AnnotationResolveRequest;
 import io.qnop.api.v1.model.AnnotationStatus;
 import io.qnop.api.v1.model.AnnotationType;
 import io.qnop.api.v1.model.AnnotationView;
@@ -45,9 +44,9 @@ import tools.jackson.databind.ObjectMapper;
 
 /**
  * Annotations, comment threads and per-version placements (issue #247, ADR-0009/0011), implementing
- * the generated {@link AnnotationsApi} contract. Participant visibility and the owner/author
- * decision rule live in {@link AnnotationService} — this layer maps views to the published models
- * and (de)serializes the jsonb anchor. Domain exceptions are mapped globally by {@link
+ * the generated {@link AnnotationsApi} contract. Participant visibility and the author-only resolve
+ * rule (issue #405) live in {@link AnnotationService} — this layer maps views to the published
+ * models and (de)serializes the jsonb anchor. Domain exceptions are mapped globally by {@link
  * DocumentExceptionHandler}.
  */
 @RestController
@@ -119,11 +118,11 @@ public class AnnotationController implements AnnotationsApi {
   }
 
   @Override
-  public ResponseEntity<AnnotationView> decideAnnotation(
-      UUID annotationId, AnnotationDecisionRequest request) {
-    boolean accept = request.getDecision() == AnnotationDecision.ACCEPTED;
+  public ResponseEntity<AnnotationView> resolveAnnotation(
+      UUID annotationId, AnnotationResolveRequest request) {
+    String note = request == null ? null : request.getNote();
     return ResponseEntity.ok(
-        toDto(annotations.decide(annotationId, accept, CurrentUser.requireUserId())));
+        toDto(annotations.resolve(annotationId, note, CurrentUser.requireUserId())));
   }
 
   @Override

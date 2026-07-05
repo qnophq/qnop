@@ -20,7 +20,7 @@
  */
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { fireEvent, render, screen } from '@testing-library/react';
+import { fireEvent, render, screen, within } from '@testing-library/react';
 import { ThemeProvider } from '@mui/material/styles';
 import type { AnnotationView } from '../../../api/generated';
 import { AnnotationStatus, PlacementStatus } from '../../../api/generated';
@@ -35,9 +35,9 @@ vi.mock('../panel/CommentThread', () => ({
   ),
 }));
 
-const { decideMutate } = vi.hoisted(() => ({ decideMutate: vi.fn() }));
+const { resolveMutate } = vi.hoisted(() => ({ resolveMutate: vi.fn() }));
 vi.mock('../../../api/hooks/useAnnotations', () => ({
-  useDecideAnnotation: () => ({ mutate: decideMutate, isPending: false }),
+  useResolveAnnotation: () => ({ mutate: resolveMutate, isPending: false }),
 }));
 
 const ANNOTATION: AnnotationView = {
@@ -64,7 +64,7 @@ beforeEach(() => {
 
 afterEach(() => {
   anchor.remove();
-  decideMutate.mockClear();
+  resolveMutate.mockClear();
 });
 
 function renderCard(overrides: Partial<Parameters<typeof FocusAnnotationCard>[0]> = {}) {
@@ -74,7 +74,6 @@ function renderCard(overrides: Partial<Parameters<typeof FocusAnnotationCard>[0]
     position: { index: 1, count: 3, prevId: 'a1', nextId: 'a3' },
     onNavigate: vi.fn(),
     onClose: vi.fn(),
-    ownerId: 'owner-1',
     userId: 'author-1',
     notify: vi.fn(),
     ...overrides,
@@ -94,13 +93,19 @@ describe('FocusAnnotationCard', () => {
     expect(screen.getByText('“the disputed clause”')).toBeInTheDocument();
     expect(screen.getByText('Open')).toBeInTheDocument();
     expect(screen.getByTestId('thread-a2')).toBeInTheDocument();
-    // Deciding is owner-only (issue #403) — the author sees no decision bar.
-    expect(screen.queryByTestId('decision-bar')).not.toBeInTheDocument();
+    // Resolving belongs to the author (issue #405) — the default viewer IS
+    // the author, so the resolve bar shows and reports the resolve on click.
+    const bar = within(screen.getByTestId('resolve-bar'));
+    fireEvent.click(bar.getByText('Resolve'));
+    expect(resolveMutate).toHaveBeenCalledWith(
+      { annotationId: 'a2', note: undefined },
+      expect.anything(),
+    );
   });
 
-  it('offers deciding to the owner alone', () => {
+  it("hides the resolve bar from the owner — resolving is the author's call (#405)", () => {
     renderCard({ userId: 'owner-1' });
-    expect(screen.getByTestId('decision-bar')).toBeInTheDocument();
+    expect(screen.queryByTestId('resolve-bar')).not.toBeInTheDocument();
   });
 
   it('walks prev/next via the buttons', () => {
@@ -139,19 +144,19 @@ describe('FocusAnnotationCard', () => {
     expect(style.maxHeight).toContain('72vh');
   });
 
-  it('disables the ends of the walk and hides deciding from uninvolved users', () => {
+  it('disables the ends of the walk and hides resolving from other reviewers', () => {
     renderCard({
       position: { index: 0, count: 3, prevId: null, nextId: 'a3' },
       userId: 'stranger',
     });
     expect(screen.getByRole('button', { name: 'Previous annotation' })).toBeDisabled();
     expect(screen.getByRole('button', { name: 'Next annotation' })).toBeEnabled();
-    expect(screen.queryByTestId('decision-bar')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('resolve-bar')).not.toBeInTheDocument();
   });
 
-  it('suppresses deciding on a read-only (older) version (#306)', () => {
+  it('suppresses resolving on a read-only (older) version (#306)', () => {
     renderCard({ readOnly: true });
-    expect(screen.queryByTestId('decision-bar')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('resolve-bar')).not.toBeInTheDocument();
     expect(screen.getByTestId('thread-a2')).toBeInTheDocument();
   });
 });

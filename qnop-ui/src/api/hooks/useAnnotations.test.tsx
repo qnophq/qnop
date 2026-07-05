@@ -28,7 +28,7 @@ import {
   annotationKeys,
   useAnnotations,
   useCreateAnnotation,
-  useDecideAnnotation,
+  useResolveAnnotation,
 } from './useAnnotations';
 import { annotationsApi } from '../config';
 
@@ -36,7 +36,7 @@ vi.mock('../config', () => ({
   annotationsApi: {
     listAnnotations: vi.fn(),
     createAnnotation: vi.fn(),
-    decideAnnotation: vi.fn(),
+    resolveAnnotation: vi.fn(),
   },
 }));
 
@@ -99,18 +99,32 @@ describe('useCreateAnnotation', () => {
   });
 });
 
-describe('useDecideAnnotation', () => {
-  it('posts the decision', async () => {
-    vi.mocked(annotationsApi.decideAnnotation).mockResolvedValue({ data: { id: 'a1' } } as Awaited<
-      ReturnType<typeof annotationsApi.decideAnnotation>
+describe('useResolveAnnotation', () => {
+  it('posts the resolution with its closing note', async () => {
+    vi.mocked(annotationsApi.resolveAnnotation).mockResolvedValue({ data: { id: 'a1' } } as Awaited<
+      ReturnType<typeof annotationsApi.resolveAnnotation>
     >);
 
-    const { result } = renderHook(() => useDecideAnnotation(), { wrapper });
-    await result.current.mutateAsync({ annotationId: 'a1', decision: 'ACCEPTED' });
+    const { result } = renderHook(() => useResolveAnnotation(), { wrapper });
+    await result.current.mutateAsync({ annotationId: 'a1', note: 'Addressed in v2.' });
 
-    expect(annotationsApi.decideAnnotation).toHaveBeenCalledWith({
+    expect(annotationsApi.resolveAnnotation).toHaveBeenCalledWith({
       annotationId: 'a1',
-      annotationDecisionRequest: { decision: 'ACCEPTED' },
+      annotationResolveRequest: { note: 'Addressed in v2.' },
+    });
+  });
+
+  it('omits the request body when there is no note', async () => {
+    vi.mocked(annotationsApi.resolveAnnotation).mockResolvedValue({ data: { id: 'a1' } } as Awaited<
+      ReturnType<typeof annotationsApi.resolveAnnotation>
+    >);
+
+    const { result } = renderHook(() => useResolveAnnotation(), { wrapper });
+    await result.current.mutateAsync({ annotationId: 'a1' });
+
+    expect(annotationsApi.resolveAnnotation).toHaveBeenCalledWith({
+      annotationId: 'a1',
+      annotationResolveRequest: undefined,
     });
   });
 });

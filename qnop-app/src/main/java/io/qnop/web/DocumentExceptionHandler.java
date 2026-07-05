@@ -22,7 +22,7 @@ package io.qnop.web;
 
 import io.qnop.api.v1.model.ErrorResponse;
 import io.qnop.service.document.DocumentValidationException;
-import io.qnop.service.review.AnnotationDecisionForbiddenException;
+import io.qnop.service.review.AnnotationActionForbiddenException;
 import io.qnop.service.review.AnnotationNotFoundException;
 import io.qnop.service.review.DocumentNotFoundException;
 import io.qnop.service.review.NotDocumentOwnerException;
@@ -62,10 +62,10 @@ public class DocumentExceptionHandler {
     return error(HttpStatus.FORBIDDEN.value(), "NOT_DOCUMENT_OWNER", ex.getMessage());
   }
 
-  @ExceptionHandler(AnnotationDecisionForbiddenException.class)
-  public ResponseEntity<ErrorResponse> onDecisionForbidden(
-      AnnotationDecisionForbiddenException ex) {
-    return error(HttpStatus.FORBIDDEN.value(), "ANNOTATION_DECISION_FORBIDDEN", ex.getMessage());
+  @ExceptionHandler(AnnotationActionForbiddenException.class)
+  public ResponseEntity<ErrorResponse> onAnnotationActionForbidden(
+      AnnotationActionForbiddenException ex) {
+    return error(HttpStatus.FORBIDDEN.value(), "ANNOTATION_ACTION_FORBIDDEN", ex.getMessage());
   }
 
   @ExceptionHandler(WorkflowTransitionException.class)

@@ -74,7 +74,7 @@ interface ReviewHubHeadProps {
 }
 
 /**
- * The review hub controls in the page header (#251): decided/total progress,
+ * The review hub controls in the page header (#251): resolved/total progress,
  * the participant stack with its management dialog, workflow transitions
  * (POST is authoritative — guard vetoes surface as toasts, ADR-0011) and the
  * owner-only new-version upload.
@@ -107,7 +107,7 @@ export function ReviewHubHead({
   const maxSizeMb = config?.upload.maxDocumentSizeMb ?? FALLBACK_MAX_SIZE_MB;
 
   const total = annotations.length;
-  const decided = annotations.filter((a) => a.status !== AnnotationStatus.Open).length;
+  const resolved = annotations.filter((a) => a.status !== AnnotationStatus.Open).length;
 
   const handleTransitionConfirmed = (targetState: string) => {
     setConfirmTarget(null);
@@ -147,7 +147,7 @@ export function ReviewHubHead({
     <Stack direction="row" spacing={1.5} sx={{ alignItems: 'center', flexWrap: 'wrap' }}>
       {total > 0 && (
         <ProgressBar
-          decided={decided}
+          resolved={resolved}
           total={total}
           color={theme.palette.success.main}
           discussion={

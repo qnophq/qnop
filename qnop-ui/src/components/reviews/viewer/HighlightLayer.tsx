@@ -29,7 +29,7 @@ import type {
   NormalizedBox,
   RenderedTextSpan,
 } from '../../../api/generated';
-import { AnnotationStatus, PlacementStatus } from '../../../api/generated';
+import { PlacementStatus } from '../../../api/generated';
 import { highlightBoxesForAnchor } from './anchoring';
 import { SELECTION_MARKER_BG, highlightColorFor } from './markerColors';
 
@@ -112,17 +112,12 @@ export function HighlightLayer({
   /**
    * The mark's colour: open marks paint highlighter yellow — text as per-line
    * bands, regions as one borderless filled box. Cue colours override the
-   * base — decided annotations turn green/grey, a MOVED placement turns
-   * amber, a still-pending placement renders dimmed.
+   * base — resolved annotations turn green, a MOVED placement turns amber, a
+   * still-pending placement renders dimmed.
    */
   const styleFor = (annotation: AnnotationView) => ({
     color: highlightColorFor(annotation, theme.palette),
-    opacity:
-      annotation.status === AnnotationStatus.Rejected
-        ? 0.7
-        : annotation.placementStatus === PlacementStatus.Pending
-          ? 0.6
-          : 1,
+    opacity: annotation.placementStatus === PlacementStatus.Pending ? 0.6 : 1,
   });
 
   const handleKeyDown = (event: KeyboardEvent, annotationId: string) => {

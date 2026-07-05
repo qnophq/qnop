@@ -34,9 +34,9 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
 
 /**
- * Exhaustive, DB-free tests for the Community workflow state machine (issue #246, ADR-0011): the
- * full transition matrix, the FINALIZED guard invariant, unknown (enterprise) state handling, and
- * the annotation sub-machine.
+ * Exhaustive, DB-free tests for the Community workflow state machine (issue #246, ADR-0011 as
+ * amended by #405): the full transition matrix, the manual/derived edge split, the FINALIZED guard
+ * invariant, unknown (enterprise) state handling, and the annotation sub-machine.
  */
 class ReviewWorkflowMachineTest {
 
@@ -82,6 +82,34 @@ class ReviewWorkflowMachineTest {
             .isEqualTo(expected);
       }
     }
+  }
+
+  // --- manual vs. derived edges (issue #405) -----------------------------------
+
+  @ParameterizedTest(name = "manual {0} -> {1} is refused as derived")
+  @CsvSource({
+    "IN_REVIEW,CHANGES_REQUESTED",
+    "CHANGES_REQUESTED,IN_REVIEW",
+  })
+  void refusesManualCrossingsOfTheDerivedPair(WorkflowState from, WorkflowState to) {
+    TransitionResult result = machine.manualTransition(from.name(), to, CLEAN);
+
+    assertThat(result).isInstanceOf(TransitionResult.Denied.class);
+    assertThat(((TransitionResult.Denied) result).reason()).contains("derived");
+  }
+
+  @Test
+  void manualTransitionStillAllowsTheOwnerEdges() {
+    assertThat(machine.manualTransition("DRAFT", WorkflowState.IN_REVIEW, CLEAN))
+        .isInstanceOf(TransitionResult.Allowed.class);
+    assertThat(machine.manualTransition("IN_REVIEW", WorkflowState.FINALIZED, CLEAN))
+        .isInstanceOf(TransitionResult.Allowed.class);
+    assertThat(machine.manualTransition("CHANGES_REQUESTED", WorkflowState.CANCELLED, CLEAN))
+        .isInstanceOf(TransitionResult.Allowed.class);
+    // A non-edge falls through to the structural denial, not the derived one.
+    TransitionResult result = machine.manualTransition("DRAFT", WorkflowState.FINALIZED, CLEAN);
+    assertThat(result).isInstanceOf(TransitionResult.Denied.class);
+    assertThat(((TransitionResult.Denied) result).reason()).contains("no transition");
   }
 
   @Test
@@ -165,45 +193,46 @@ class ReviewWorkflowMachineTest {
   // --- allowedTransitions -------------------------------------------------------
 
   @Test
-  void allowedTransitionsReflectTheStructuralTable() {
+  @DisplayName("allowedTransitions offers the manual table only — the derived pair is absent")
+  void allowedTransitionsReflectTheManualTable() {
     assertThat(machine.allowedTransitions("DRAFT"))
         .containsExactlyInAnyOrder(WorkflowState.IN_REVIEW, WorkflowState.CANCELLED);
     assertThat(machine.allowedTransitions("IN_REVIEW"))
-        .containsExactlyInAnyOrder(
-            WorkflowState.CHANGES_REQUESTED, WorkflowState.FINALIZED, WorkflowState.CANCELLED);
+        .containsExactlyInAnyOrder(WorkflowState.FINALIZED, WorkflowState.CANCELLED);
     assertThat(machine.allowedTransitions("CHANGES_REQUESTED"))
-        .containsExactlyInAnyOrder(WorkflowState.IN_REVIEW, WorkflowState.CANCELLED);
+        .containsExactlyInAnyOrder(WorkflowState.CANCELLED);
   }
 
   // --- annotation sub-machine -----------------------------------------------------
 
   @Test
-  void onlyOpenAnnotationsCanBeDecided() {
-    assertThat(ReviewWorkflowMachine.canDecide(AnnotationStatus.OPEN)).isTrue();
-    assertThat(ReviewWorkflowMachine.canDecide(AnnotationStatus.ACCEPTED)).isFalse();
-    assertThat(ReviewWorkflowMachine.canDecide(AnnotationStatus.REJECTED)).isFalse();
+  void onlyOpenAnnotationsCanBeResolved() {
+    assertThat(ReviewWorkflowMachine.canResolve(AnnotationStatus.OPEN)).isTrue();
+    assertThat(ReviewWorkflowMachine.canResolve(AnnotationStatus.RESOLVED)).isFalse();
   }
 
   @Test
-  @DisplayName("an ACCEPTED decision in IN_REVIEW drives the workflow to CHANGES_REQUESTED")
-  void acceptedDecisionDrivesChangesRequested() {
-    assertThat(ReviewWorkflowMachine.decisionDrivenTarget("IN_REVIEW", AnnotationStatus.ACCEPTED))
+  @DisplayName("the first open annotation in IN_REVIEW derives CHANGES_REQUESTED (issue #405)")
+  void openAnnotationsDeriveChangesRequested() {
+    assertThat(ReviewWorkflowMachine.annotationDrivenTarget("IN_REVIEW", 1))
+        .contains(WorkflowState.CHANGES_REQUESTED);
+    assertThat(ReviewWorkflowMachine.annotationDrivenTarget("IN_REVIEW", 3))
         .contains(WorkflowState.CHANGES_REQUESTED);
   }
 
   @Test
-  void rejectedDecisionDoesNotDriveTheWorkflow() {
-    assertThat(ReviewWorkflowMachine.decisionDrivenTarget("IN_REVIEW", AnnotationStatus.REJECTED))
-        .isEmpty();
+  @DisplayName("settling the last open annotation derives the return to IN_REVIEW (issue #405)")
+  void zeroOpenAnnotationsDeriveTheReturnToInReview() {
+    assertThat(ReviewWorkflowMachine.annotationDrivenTarget("CHANGES_REQUESTED", 0))
+        .contains(WorkflowState.IN_REVIEW);
+    assertThat(ReviewWorkflowMachine.annotationDrivenTarget("CHANGES_REQUESTED", 2)).isEmpty();
   }
 
   @Test
-  void acceptedDecisionOutsideInReviewDoesNotDriveTheWorkflow() {
-    assertThat(
-            ReviewWorkflowMachine.decisionDrivenTarget(
-                "CHANGES_REQUESTED", AnnotationStatus.ACCEPTED))
-        .isEmpty();
-    assertThat(ReviewWorkflowMachine.decisionDrivenTarget("SIGNING", AnnotationStatus.ACCEPTED))
-        .isEmpty();
+  void statesOutsideTheDerivedPairAreNeverDriven() {
+    assertThat(ReviewWorkflowMachine.annotationDrivenTarget("IN_REVIEW", 0)).isEmpty();
+    assertThat(ReviewWorkflowMachine.annotationDrivenTarget("DRAFT", 4)).isEmpty();
+    assertThat(ReviewWorkflowMachine.annotationDrivenTarget("FINALIZED", 1)).isEmpty();
+    assertThat(ReviewWorkflowMachine.annotationDrivenTarget("SIGNING", 1)).isEmpty();
   }
 }

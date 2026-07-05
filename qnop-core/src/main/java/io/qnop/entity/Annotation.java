@@ -40,9 +40,9 @@ import org.hibernate.annotations.UuidGenerator;
  * sits in each version is a separate {@link AnnotationPlacement} (re-anchored per version,
  * ADR-0009). Its discussion is the {@link Comment} thread keyed by this annotation.
  *
- * <p>A review is finalizable once no annotation is still {@link AnnotationStatus#OPEN}. The owner
- * resolves each via {@link #accept()} / {@link #reject()}; {@code @Version} guards concurrent
- * decisions (ADR-0030).
+ * <p>A review is finalizable once no annotation is still {@link AnnotationStatus#OPEN}. The
+ * annotation's author closes it via {@link #resolve()} once their concern is settled (issue #405);
+ * {@code @Version} guards concurrent resolutions (ADR-0030).
  */
 @Entity
 @Table(name = "annotation")
@@ -94,17 +94,12 @@ public class Annotation {
     this.status = AnnotationStatus.OPEN;
   }
 
-  /** The owner agrees; the point will be addressed in a new version. */
-  public void accept() {
-    this.status = AnnotationStatus.ACCEPTED;
+  /** The author's concern is settled; the annotation is closed (issue #405). */
+  public void resolve() {
+    this.status = AnnotationStatus.RESOLVED;
   }
 
-  /** The owner declines; the point stands as-is. */
-  public void reject() {
-    this.status = AnnotationStatus.REJECTED;
-  }
-
-  /** Reopens a previously decided annotation (e.g. reconsidered during discussion). */
+  /** Reopens a previously resolved annotation (e.g. the concern resurfaced). */
   public void reopen() {
     this.status = AnnotationStatus.OPEN;
   }

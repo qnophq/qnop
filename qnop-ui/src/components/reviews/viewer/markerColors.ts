@@ -55,8 +55,7 @@ export function highlightColorFor(
     text: { disabled: string };
   },
 ): string {
-  if (annotation.status === AnnotationStatus.Accepted) return palette.success.main;
-  if (annotation.status === AnnotationStatus.Rejected) return palette.text.disabled;
+  if (annotation.status === AnnotationStatus.Resolved) return palette.success.main;
   if (annotation.placementStatus === PlacementStatus.Moved) return palette.warning.main;
   return MARKER_YELLOW;
 }

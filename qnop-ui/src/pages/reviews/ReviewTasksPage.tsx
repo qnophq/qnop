@@ -39,9 +39,9 @@ import { ReviewViewTabs } from '../../components/reviews/hub/ReviewViewTabs';
 import { PageHeader } from '../../components/admin/layout/PageHeader';
 import { useToast } from '../../components/admin/layout/useToast';
 import {
-  mayDecideAnnotation,
-  useDecideWithFeedback,
-} from '../../components/reviews/panel/decisions';
+  mayResolveAnnotation,
+  useResolveWithFeedback,
+} from '../../components/reviews/panel/resolve';
 import { TaskBoard } from '../../components/reviews/tasks/TaskBoard';
 import { TaskDrawer } from '../../components/reviews/tasks/TaskDrawer';
 import { TaskListRows } from '../../components/reviews/tasks/TaskListRows';
@@ -53,23 +53,23 @@ import {
   taskKeys,
 } from '../../components/reviews/tasks/tasksModel';
 import { useTasksViewMode } from '../../components/reviews/tasks/useTasksViewMode';
-import { AnnotationDecision, ExtractionStatus } from '../../api/generated';
+import { ExtractionStatus } from '../../api/generated';
 import { useAuthStore } from '../../stores/authStore';
 
 const FILTERS: { key: TaskFilter; label: string }[] = [
   { key: 'all', label: 'All' },
   { key: 'open', label: 'Open' },
   { key: 'discussion', label: 'In discussion' },
-  { key: 'done', label: 'Done' },
+  { key: 'done', label: 'Resolved' },
 ];
 
 /**
  * The review's tasks workspace (issue #393, prototype `reviewhub.jsx`):
  * every annotation as an issue-tracker task on a kanban board or in a dense
  * list. The status filter and search live in the URL (shareable); the
- * board/list choice is a persisted personal preference. Dropping a card on
- * Done accepts it; everything else runs through the task drawer, which reuses
- * the panel's thread and decision pieces.
+ * board/list choice is a persisted personal preference. Dropping one's own
+ * card on Resolved resolves it (issue #405); everything else runs through the
+ * task drawer, which reuses the panel's thread and resolve pieces.
  */
 export function ReviewTasksPage() {
   const { documentId = '' } = useParams();
@@ -101,7 +101,7 @@ export function ReviewTasksPage() {
   const query = searchParams.get('q') ?? '';
   const [openTaskId, setOpenTaskId] = useState<string | null>(null);
 
-  const { decideWith } = useDecideWithFeedback(notify);
+  const { resolveWith } = useResolveWithFeedback(notify);
 
   const setParam = (key: 'filter' | 'q', value: string | null) => {
     const next = new URLSearchParams(searchParams);
@@ -136,13 +136,13 @@ export function ReviewTasksPage() {
   const keyByAnnotation = taskKeys(annotations);
   const taskKeyOf = (annotationId: string) => keyByAnnotation.get(annotationId) ?? '';
 
-  const mayDecide = (annotation: (typeof annotations)[number]) =>
-    mayDecideAnnotation(annotation, userId, document?.ownerId ?? null);
+  const mayResolve = (annotation: (typeof annotations)[number]) =>
+    mayResolveAnnotation(annotation, userId);
 
-  const acceptByDrop = (annotationId: string) => {
+  const resolveByDrop = (annotationId: string) => {
     const annotation = annotations.find((candidate) => candidate.id === annotationId);
-    if (!annotation || !mayDecide(annotation)) return;
-    decideWith(annotation, AnnotationDecision.Accepted);
+    if (!annotation || !mayResolve(annotation)) return;
+    resolveWith(annotation);
   };
 
   const showInDocument = (annotationId: string) => {
@@ -240,9 +240,9 @@ export function ReviewTasksPage() {
           previousSeenAt={previousSeenAt}
           taskKeyOf={taskKeyOf}
           authorNameOf={authorNameOf}
-          mayDecide={mayDecide}
+          mayResolve={mayResolve}
           onOpen={setOpenTaskId}
-          onAccept={acceptByDrop}
+          onResolve={resolveByDrop}
         />
       ) : (
         <TaskListRows
@@ -258,7 +258,6 @@ export function ReviewTasksPage() {
         previousSeenAt={previousSeenAt}
         taskKey={openTask ? taskKeyOf(openTask.id) : ''}
         authorName={openTask ? authorNameOf(openTask.authorId) : ''}
-        ownerId={document.ownerId}
         notify={notify}
         onClose={() => setOpenTaskId(null)}
         onShowInDocument={showInDocument}

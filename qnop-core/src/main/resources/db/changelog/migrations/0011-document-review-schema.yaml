@@ -288,7 +288,7 @@ databaseChangeLog:
             comment: Closed sets for outcome and classification (not expressible in JPA).
             sql: |
               ALTER TABLE annotation ADD CONSTRAINT ck_annotation_status
-                CHECK (status IN ('OPEN', 'ACCEPTED', 'REJECTED'));
+                CHECK (status IN ('OPEN', 'RESOLVED'));
               ALTER TABLE annotation ADD CONSTRAINT ck_annotation_type
                 CHECK (type IN ('CHANGE', 'PROPOSAL', 'CONFLICT', 'QUESTION', 'RISK'));
               ALTER TABLE annotation ADD CONSTRAINT ck_annotation_priority
