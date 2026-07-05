@@ -64,6 +64,15 @@ databaseChangeLog:
                   type: BOOLEAN
                   defaultValueBoolean: false
                   constraints: { nullable: false }
+              # Thread participation policy (issue #413): who besides an
+              # annotation's author and the owner may see/write a thread —
+              # PRIVATE | READ_ONLY | OPEN (default). Closed set pinned by the
+              # CHECK below. Immutable after creation.
+              - column:
+                  name: thread_participation
+                  type: VARCHAR(16)
+                  defaultValue: OPEN
+                  constraints: { nullable: false }
               - column:
                   name: version
                   type: BIGINT
@@ -94,6 +103,13 @@ databaseChangeLog:
               CREATE UNIQUE INDEX ux_document_slug_lower ON document (LOWER(slug)) WHERE slug IS NOT NULL;
               ALTER TABLE document ADD CONSTRAINT ck_document_slug
                 CHECK (slug IS NULL OR (slug ~ '^[a-z0-9]+(-[a-z0-9]+)*$' AND length(slug) BETWEEN 3 AND 64));
+        - sql:
+            comment: >-
+              Thread participation policy (issue #413) is a closed set; the CHECK
+              is not a Liquibase primitive (mirrors the annotation status/type CHECKs).
+            sql: |
+              ALTER TABLE document ADD CONSTRAINT ck_document_thread_participation
+                CHECK (thread_participation IN ('PRIVATE', 'READ_ONLY', 'OPEN'));
 
   - changeSet:
       id: 0011-document-version

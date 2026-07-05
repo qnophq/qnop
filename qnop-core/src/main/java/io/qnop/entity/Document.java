@@ -22,6 +22,8 @@ package io.qnop.entity;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
 import jakarta.persistence.Version;
@@ -104,6 +106,15 @@ public class Document {
   @Column(name = "anonymous", nullable = false, updatable = false)
   private boolean anonymous;
 
+  /**
+   * Thread participation policy (issue #413): who besides an annotation's author and the owner may
+   * see and write a thread. Chosen at creation and immutable afterwards. Defaults to {@link
+   * ThreadParticipation#OPEN}.
+   */
+  @Enumerated(EnumType.STRING)
+  @Column(name = "thread_participation", length = 16, nullable = false, updatable = false)
+  private ThreadParticipation threadParticipation = ThreadParticipation.OPEN;
+
   @Version
   @Column(name = "version", nullable = false)
   private long version;
@@ -179,6 +190,18 @@ public class Document {
   /** Set once at creation (the column is not updatable). */
   public void setAnonymous(boolean anonymous) {
     this.anonymous = anonymous;
+  }
+
+  /** The thread participation policy (issue #413); never null (defaults to OPEN). */
+  public ThreadParticipation getThreadParticipation() {
+    return threadParticipation;
+  }
+
+  /** Set once at creation (the column is not updatable). {@code null} keeps the OPEN default. */
+  public void setThreadParticipation(ThreadParticipation threadParticipation) {
+    if (threadParticipation != null) {
+      this.threadParticipation = threadParticipation;
+    }
   }
 
   /** Sets or clears ({@code null}) the optional completion deadline (issue #295). */

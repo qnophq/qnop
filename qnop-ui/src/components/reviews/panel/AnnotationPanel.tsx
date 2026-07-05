@@ -58,6 +58,10 @@ import {
 interface AnnotationPanelProps {
   /** True for an anonymous review (issue #413) — hides the author filter facet. */
   anonymous?: boolean;
+  /** Thread participation policy (issue #413) — READ_ONLY suppresses foreign composers. */
+  threadParticipation?: string;
+  /** The review owner (issue #413) — the owner may always comment under any policy. */
+  ownerId?: string;
   annotations: AnnotationView[];
   activeAnnotationId: string | null;
   hoverAnnotationId?: string | null;
@@ -195,6 +199,8 @@ function PanelSection({
  */
 export function AnnotationPanel({
   anonymous = false,
+  threadParticipation = 'OPEN',
+  ownerId,
   annotations,
   activeAnnotationId,
   hoverAnnotationId,
@@ -254,6 +260,14 @@ export function AnnotationPanel({
     // eslint-disable-next-line react-hooks/exhaustive-deps -- authorNameOf derives from the inputs below
   }, [annotations, filters, userId, displayName]);
 
+  // Under a non-OPEN policy (issue #413) only the annotation's author and the
+  // owner may reply; the composer is suppressed for everyone else. (A PRIVATE
+  // foreign thread is not in the list at all, so this only bites READ_ONLY.)
+  const mayComment = (annotation: AnnotationView) =>
+    threadParticipation === 'OPEN' ||
+    annotation.authorId === userId ||
+    (ownerId != null && userId === ownerId);
+
   const renderItem = (annotation: AnnotationView) => {
     const active = annotation.id === activeAnnotationId;
     return (
@@ -275,6 +289,7 @@ export function AnnotationPanel({
             annotationId={annotation.id}
             notify={notify}
             readOnly={readOnly}
+            policyReadOnly={!mayComment(annotation)}
             closed={annotation.status !== AnnotationStatus.Open}
             onReopen={
               !readOnly && !reviewClosed && mayReopenAnnotation(annotation, userId)

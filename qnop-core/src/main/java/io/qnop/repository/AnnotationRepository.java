@@ -54,4 +54,21 @@ public interface AnnotationRepository extends JpaRepository<Annotation, UUID> {
           + " FROM Annotation a WHERE a.documentId IN :documentIds GROUP BY a.documentId")
   List<DocumentAnnotationCounts> countByDocumentIds(
       @Param("documentIds") Collection<UUID> documentIds);
+
+  /**
+   * Batched counts scoped to what {@code actor} may see (issue #413): under a PRIVATE thread policy
+   * only the actor's own annotations (and, if they own the review, all of them) count — so the
+   * reviews overview's totals follow the caller's visibility rather than over-counting hidden
+   * threads. A document where the actor sees nothing is simply absent (the caller defaults to 0).
+   */
+  @Query(
+      "SELECT new io.qnop.repository.DocumentAnnotationCounts(a.documentId, COUNT(a),"
+          + " SUM(CASE WHEN a.status = io.qnop.entity.AnnotationStatus.OPEN THEN 1 ELSE 0 END))"
+          + " FROM Annotation a, Document d"
+          + " WHERE a.documentId = d.id AND a.documentId IN :documentIds"
+          + " AND (d.threadParticipation <> io.qnop.entity.ThreadParticipation.PRIVATE"
+          + " OR d.ownerId = :actor OR a.authorId = :actor)"
+          + " GROUP BY a.documentId")
+  List<DocumentAnnotationCounts> countVisibleByDocumentIds(
+      @Param("documentIds") Collection<UUID> documentIds, @Param("actor") UUID actor);
 }

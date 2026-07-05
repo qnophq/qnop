@@ -87,6 +87,7 @@ public class DocumentUpdateService {
         document.getTitle(),
         document.getSlug(),
         document.isAnonymous(),
+        document.getThreadParticipation().name(),
         document.getOwnerId(),
         document.getWorkflowState(),
         latest,

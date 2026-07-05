@@ -85,10 +85,12 @@ public class DocumentOverviewService {
                 .collect(
                     Collectors.toMap(
                         DocumentMaxVersion::documentId, DocumentMaxVersion::maxVersion));
+    // Visibility-scoped (issue #413): under PRIVATE the overview counts follow
+    // what the caller can actually see, not the true (possibly larger) set.
     Map<UUID, DocumentAnnotationCounts> counts =
         ids.isEmpty()
             ? Map.of()
-            : annotations.countByDocumentIds(ids).stream()
+            : annotations.countVisibleByDocumentIds(ids, actor).stream()
                 .collect(
                     Collectors.toMap(DocumentAnnotationCounts::documentId, Function.identity()));
     Map<UUID, List<ParticipantProjection>> participantsByDocument =
@@ -107,6 +109,7 @@ public class DocumentOverviewService {
                       document.getTitle(),
                       document.getSlug(),
                       document.isAnonymous(),
+                      document.getThreadParticipation().name(),
                       document.getOwnerId(),
                       document.getWorkflowState(),
                       maxVersions.getOrDefault(document.getId(), 0),
@@ -146,6 +149,7 @@ public class DocumentOverviewService {
       String title,
       String slug,
       boolean anonymous,
+      String threadParticipation,
       UUID ownerId,
       String workflowState,
       int latestVersionNumber,

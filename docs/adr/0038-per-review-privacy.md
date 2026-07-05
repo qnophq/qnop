@@ -48,7 +48,7 @@ Enforced at the API, after the existing coarse document-level visibility check:
 
 Owner and admin are exempt (they see and coordinate everything — the owner must, to finalize). Raising a *new* annotation is unaffected by the policy: an annotation you raise is your own thread.
 
-**Consequences of `PRIVATE` on counts:** the `FINALIZED` gate keeps counting the *true* open set (unchanged) — and since finalizing is owner-only and the owner is exempt, the finalizer never sees a discrepancy. Presentation counts (progress bar, tasks board) derive from the filtered list, so they follow the caller's visibility automatically; a reviewer is shown a "not visible to you" hint for the difference against the true total.
+**Consequences of `PRIVATE` on counts:** the `FINALIZED` gate keeps counting the *true* open set (unchanged) — and since finalizing is owner-only and the owner is exempt, the finalizer always sees the true state and never a discrepancy. Presentation counts follow the caller's visibility: the review-hub progress bar derives from the (now filtered) annotation list, and the reviews-overview totals use a visibility-scoped count query. Deliberately, a reviewer is **not** shown a "N not visible to you" hint — surfacing the count of threads they may not see would itself leak information a `PRIVATE` review is meant to withhold, and the only actor who needs the true count (the owner, to finalize) already has it.
 
 ## Rationale
 

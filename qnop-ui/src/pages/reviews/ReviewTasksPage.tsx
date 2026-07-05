@@ -294,6 +294,8 @@ export function ReviewTasksPage() {
         authorName={openTask ? authorNameOf(openTask.authorId) : ''}
         notify={notify}
         reviewClosed={!isOpenWorkflowState(document.workflowState)}
+        threadParticipation={document.threadParticipation ?? 'OPEN'}
+        ownerId={document.ownerId}
         onClose={() => setOpenTaskId(null)}
         onShowInDocument={showInDocument}
       />

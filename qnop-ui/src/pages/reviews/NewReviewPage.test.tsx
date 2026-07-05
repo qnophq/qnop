@@ -219,6 +219,29 @@ describe('NewReviewPage — step 3 & submit', () => {
     expect((form as FormData).get('anonymous')).toBeNull();
   });
 
+  it('sends a non-default thread participation policy, omitting OPEN (issue #413)', async () => {
+    renderPage();
+    await goToStep3WithMax();
+
+    fireEvent.mouseDown(screen.getByLabelText('Thread participation'));
+    fireEvent.click(screen.getByRole('option', { name: 'Private threads' }));
+    fireEvent.click(screen.getByRole('button', { name: /Create & start review/ }));
+
+    await waitFor(() => expect(screen.getByTestId('detail-probe')).toBeInTheDocument());
+    const [, form] = vi.mocked(axiosInstance.post).mock.calls[0];
+    expect((form as FormData).get('threadParticipation')).toBe('PRIVATE');
+  });
+
+  it('omits threadParticipation for the default open policy', async () => {
+    renderPage();
+    await goToStep3WithMax();
+    fireEvent.click(screen.getByRole('button', { name: /Create & start review/ }));
+
+    await waitFor(() => expect(screen.getByTestId('detail-probe')).toBeInTheDocument());
+    const [, form] = vi.mocked(axiosInstance.post).mock.calls[0];
+    expect((form as FormData).get('threadParticipation')).toBeNull();
+  });
+
   it('skips the workflow transition when start-immediately is off', async () => {
     renderPage();
     await goToStep3WithMax();
