@@ -45,6 +45,7 @@ export const reviewKeys = {
   participants: (documentId: string) => [...reviewKeys.all, 'participants', documentId] as const,
   workflow: (documentId: string) => [...reviewKeys.all, 'workflow', documentId] as const,
   principals: (q: string) => [...reviewKeys.all, 'principals', q] as const,
+  teamMembers: (teamId: string) => [...reviewKeys.all, 'team-members', teamId] as const,
 };
 
 /** A page of the caller's reviews (owned or participating, incl. via team). */
@@ -115,6 +116,18 @@ export function usePrincipalSearch(q: string) {
       return response.data;
     },
     placeholderData: keepPreviousData,
+  });
+}
+
+/** The users behind a team principal — names only (issue #403). */
+export function useTeamMembers(teamId: string, enabled: boolean) {
+  return useQuery<PrincipalListResponse>({
+    queryKey: reviewKeys.teamMembers(teamId),
+    queryFn: async () => {
+      const response = await principalsApi.listTeamMembers({ teamId });
+      return response.data;
+    },
+    enabled,
   });
 }
 

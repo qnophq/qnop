@@ -38,7 +38,7 @@ vi.mock('../../../api/config', () => ({
     addParticipant: vi.fn(),
     removeParticipant: vi.fn(),
   },
-  principalsApi: { searchPrincipals: vi.fn() },
+  principalsApi: { searchPrincipals: vi.fn(), listTeamMembers: vi.fn() },
   reviewWorkflowApi: {
     getDocumentWorkflow: vi.fn(),
     transitionDocumentWorkflow: vi.fn(),
@@ -166,5 +166,23 @@ describe('ParticipantsDialog — owner management', () => {
     await waitFor(() =>
       expect(notify).toHaveBeenCalledWith('Already a reviewer on this document.', 'error'),
     );
+  });
+
+  it('unfolds a team to show its members, names only (#403)', async () => {
+    vi.mocked(principalsApi.listTeamMembers).mockResolvedValue({
+      data: {
+        principals: [
+          { id: 'u-clara', kind: ParticipantKind.User, displayName: 'Clara Vogt' },
+          { id: 'u-jonas', kind: ParticipantKind.User, displayName: 'Jonas Keller' },
+        ],
+      },
+    } as Awaited<ReturnType<typeof principalsApi.listTeamMembers>>);
+    renderDialog(false);
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Show members of Team Alpha' }));
+
+    expect(await screen.findByText('Clara Vogt')).toBeInTheDocument();
+    expect(screen.getByText('Jonas Keller')).toBeInTheDocument();
+    expect(vi.mocked(principalsApi.listTeamMembers)).toHaveBeenCalledWith({ teamId: 't-alpha' });
   });
 });

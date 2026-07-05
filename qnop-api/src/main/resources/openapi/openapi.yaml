@@ -1890,6 +1890,41 @@ paths:
                 $ref: '#/components/schemas/PrincipalListResponse'
         '401':
           $ref: '#/components/responses/Unauthorized'
+  /principals/teams/{teamId}/members:
+    get:
+      tags:
+        - Principals
+      summary: List a team's members (names only)
+      description: |
+        The users behind a team principal (issue #403): lets a participant
+        list unfold a team to see who reviews behind it. Same deliberate
+        Community visibility rule as the directory itself — available to every
+        authenticated user, display names only.
+      operationId: listTeamMembers
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: teamId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: The team's members as USER principals, ordered by display name
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PrincipalListResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          description: Unknown team (`TEAM_NOT_FOUND`)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
   /documents/{documentId}:
     get:
       tags:

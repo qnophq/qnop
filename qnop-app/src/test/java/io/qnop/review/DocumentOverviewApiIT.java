@@ -271,6 +271,30 @@ class DocumentOverviewApiIT extends SeededIntegrationTest {
   }
 
   @Test
+  void teamMembersAreListedForPlainMembersNamesOnly() throws Exception {
+    // Team Alpha carries three seeded members (SeededTeamIT pins that count).
+    mockMvc
+        .perform(as(get("/api/v1/principals/teams/" + TEAM_ALPHA_ID + "/members"), MEMBER2_ID))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.principals.length()").value(3))
+        .andExpect(jsonPath("$.principals[0].kind").value("USER"))
+        .andExpect(jsonPath("$.principals[0].displayName").isNotEmpty())
+        // Names only — the members endpoint must never leak emails.
+        .andExpect(jsonPath("$.principals[0].email").doesNotExist());
+  }
+
+  @Test
+  void teamMembersOfAnUnknownTeamAre404() throws Exception {
+    mockMvc
+        .perform(
+            as(
+                get("/api/v1/principals/teams/00000000-0000-0000-0000-00000000dead/members"),
+                MEMBER_ID))
+        .andExpect(status().isNotFound())
+        .andExpect(jsonPath("$.code").value("TEAM_NOT_FOUND"));
+  }
+
+  @Test
   void principalDirectoryHidesDisabledUsersAndNeverMatchesEmails() throws Exception {
     mockMvc
         .perform(as(get("/api/v1/principals?q=dana"), MEMBER_ID))

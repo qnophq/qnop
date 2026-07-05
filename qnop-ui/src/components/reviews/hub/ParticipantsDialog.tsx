@@ -19,8 +19,10 @@
  * SPDX-License-Identifier: AGPL-3.0-only
  */
 
-import { useState } from 'react';
+import { Fragment, useState } from 'react';
 import Box from '@mui/material/Box';
+import CircularProgress from '@mui/material/CircularProgress';
+import Collapse from '@mui/material/Collapse';
 import Button from '@mui/material/Button';
 import ButtonBase from '@mui/material/ButtonBase';
 import Dialog from '@mui/material/Dialog';
@@ -34,7 +36,7 @@ import TextField from '@mui/material/TextField';
 import Tooltip from '@mui/material/Tooltip';
 import Typography from '@mui/material/Typography';
 import { useTheme } from '@mui/material/styles';
-import { Plus, Search, Users, X } from 'lucide-react';
+import { ChevronRight, Plus, Search, Users, X } from 'lucide-react';
 import type { ParticipantView, PrincipalView } from '../../../api/generated';
 import { ParticipantKind } from '../../../api/generated';
 import {
@@ -42,6 +44,7 @@ import {
   useParticipants,
   usePrincipalSearch,
   useRemoveParticipant,
+  useTeamMembers,
 } from '../../../api/hooks/useReviews';
 import type { ToastSeverity } from '../../admin/layout/useToast';
 import { UserAvatar } from '../../shell/UserAvatar';
@@ -86,6 +89,42 @@ function PrincipalIcon({ kind, size }: { kind: ParticipantKind; size: number }) 
 }
 
 /** View & (owner-only) manage the reviewers of one document. */
+/** The unfolded team: its members as quiet indented rows on a thin branch. */
+function TeamMemberList({ teamId }: { teamId: string }) {
+  const membersQuery = useTeamMembers(teamId, true);
+  const members = membersQuery.data?.principals ?? [];
+  if (membersQuery.isPending) {
+    return (
+      <Stack sx={{ alignItems: 'flex-start', pl: 7, py: 0.5 }}>
+        <CircularProgress size={14} aria-label="Loading team members" />
+      </Stack>
+    );
+  }
+  if (members.length === 0) {
+    return (
+      <Typography variant="caption" color="text.secondary" sx={{ display: 'block', pl: 7 }}>
+        No members in this team.
+      </Typography>
+    );
+  }
+  return (
+    <Stack
+      spacing={0.25}
+      data-testid={`team-members-${teamId}`}
+      sx={{ ml: 3.25, pl: 1.75, my: 0.25, borderLeft: '2px solid', borderColor: 'divider' }}
+    >
+      {members.map((member) => (
+        <Stack key={member.id} direction="row" spacing={1} sx={{ alignItems: 'center', py: 0.25 }}>
+          <UserAvatar name={member.displayName} size={20} />
+          <Typography variant="body2" noWrap>
+            {member.displayName}
+          </Typography>
+        </Stack>
+      ))}
+    </Stack>
+  );
+}
+
 export function ParticipantsDialog({
   documentId,
   open,
@@ -96,6 +135,15 @@ export function ParticipantsDialog({
 }: ParticipantsDialogProps) {
   const theme = useTheme();
   const [query, setQuery] = useState('');
+  // Teams unfold to show who reviews behind them (issue #403).
+  const [expandedTeams, setExpandedTeams] = useState<Set<string>>(new Set());
+  const toggleTeam = (teamId: string) =>
+    setExpandedTeams((current) => {
+      const next = new Set(current);
+      if (next.has(teamId)) next.delete(teamId);
+      else next.add(teamId);
+      return next;
+    });
 
   const participantsQuery = useParticipants(documentId, open);
   const searchQuery = usePrincipalSearch(open && isOwner ? query.trim() : '');
@@ -142,40 +190,63 @@ export function ParticipantsDialog({
             </Typography>
           ) : (
             <Stack spacing={0.5} data-testid="participants-list">
-              {participants.map((participant) => (
-                <Stack
-                  key={participant.id}
-                  direction="row"
-                  spacing={1.25}
-                  sx={{ alignItems: 'center', py: 0.5 }}
-                >
-                  {participant.kind === ParticipantKind.Team ? (
-                    <PrincipalIcon kind={participant.kind} size={28} />
-                  ) : (
-                    <UserAvatar name={participant.displayName} size={28} />
-                  )}
-                  <Box sx={{ flex: 1, minWidth: 0 }}>
-                    <Typography variant="body2" noWrap sx={{ fontWeight: 500 }}>
-                      {participant.displayName}
-                    </Typography>
-                    <Typography variant="caption" color="text.secondary">
-                      {participant.kind === ParticipantKind.Team ? 'Team' : 'User'}
-                    </Typography>
-                  </Box>
-                  {isOwner && (
-                    <Tooltip title={`Remove ${participant.displayName}`}>
-                      <IconButton
-                        size="small"
-                        aria-label={`Remove ${participant.displayName}`}
-                        disabled={removeParticipant.isPending}
-                        onClick={() => handleRemove(participant)}
-                      >
-                        <X size={15} />
-                      </IconButton>
-                    </Tooltip>
-                  )}
-                </Stack>
-              ))}
+              {participants.map((participant) => {
+                const isTeam = participant.kind === ParticipantKind.Team;
+                const expanded = isTeam && expandedTeams.has(participant.principalId);
+                return (
+                  <Fragment key={participant.id}>
+                    <Stack direction="row" spacing={1.25} sx={{ alignItems: 'center', py: 0.5 }}>
+                      {isTeam ? (
+                        <IconButton
+                          size="small"
+                          aria-label={`Show members of ${participant.displayName}`}
+                          aria-expanded={expanded}
+                          onClick={() => toggleTeam(participant.principalId)}
+                          sx={{ ml: -1, mr: -0.75 }}
+                        >
+                          <ChevronRight
+                            size={14}
+                            style={{
+                              transform: expanded ? 'rotate(90deg)' : 'none',
+                              transition: 'transform 150ms ease',
+                            }}
+                          />
+                        </IconButton>
+                      ) : null}
+                      {isTeam ? (
+                        <PrincipalIcon kind={participant.kind} size={28} />
+                      ) : (
+                        <UserAvatar name={participant.displayName} size={28} />
+                      )}
+                      <Box sx={{ flex: 1, minWidth: 0 }}>
+                        <Typography variant="body2" noWrap sx={{ fontWeight: 500 }}>
+                          {participant.displayName}
+                        </Typography>
+                        <Typography variant="caption" color="text.secondary">
+                          {isTeam ? 'Team' : 'User'}
+                        </Typography>
+                      </Box>
+                      {isOwner && (
+                        <Tooltip title={`Remove ${participant.displayName}`}>
+                          <IconButton
+                            size="small"
+                            aria-label={`Remove ${participant.displayName}`}
+                            disabled={removeParticipant.isPending}
+                            onClick={() => handleRemove(participant)}
+                          >
+                            <X size={15} />
+                          </IconButton>
+                        </Tooltip>
+                      )}
+                    </Stack>
+                    {isTeam && (
+                      <Collapse in={expanded} unmountOnExit>
+                        <TeamMemberList teamId={participant.principalId} />
+                      </Collapse>
+                    )}
+                  </Fragment>
+                );
+              })}
             </Stack>
           )}
 
