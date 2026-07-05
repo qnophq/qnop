@@ -40,6 +40,8 @@ import { isNewComment } from '../newSince';
 import { UserAvatar } from '../../shell/UserAvatar';
 
 const AVATAR_SIZE = 26;
+/** Centre of the avatar column — where the timeline rail runs. */
+const LINE_LEFT = AVATAR_SIZE / 2 - 1;
 
 interface CommentThreadProps {
   annotationId: string;
@@ -62,13 +64,14 @@ const TIME_FORMAT = new Intl.DateTimeFormat(undefined, {
 });
 
 /**
- * The annotation's discussion in the comment anatomy every user knows from
- * Facebook/Instagram (issue #403): avatar on the left, a rounded bubble
- * carrying the bold author name above the text, and the compact relative
- * timestamp in a meta line UNDER the bubble (the full date lives in its
- * tooltip; likes will join that line, #410). The annotation card above is
- * the root post. Participant names are not part of the annotation API yet,
- * so authorship is shown relative to the signed-in user.
+ * The annotation's discussion — the comment anatomy of Facebook/Instagram
+ * married to the timeline of the original design (issue #403): a vertical
+ * rail runs through the avatar column and connects the root card to every
+ * reply and the composer; each comment is a softly rounded bubble carrying
+ * the bold author name above the text, with the compact relative timestamp
+ * in a meta line UNDER the bubble (full date in its tooltip; likes join
+ * that line with #410). Participant names are not part of the annotation
+ * API yet, so authorship is shown relative to the signed-in user.
  */
 export function CommentThread({
   annotationId,
@@ -112,6 +115,19 @@ export function CommentThread({
 
   return (
     <Box sx={{ position: 'relative', mt: 0.5, ml: 1.5, pl: 0 }}>
+      {/* The timeline rail connecting the annotation card to its thread. */}
+      <Box
+        aria-hidden
+        sx={{
+          position: 'absolute',
+          left: LINE_LEFT,
+          top: -6,
+          bottom: 18,
+          width: 2,
+          borderRadius: 1,
+          bgcolor: theme.palette.divider,
+        }}
+      />
       <Stack spacing={1} sx={{ pt: 1 }}>
         {commentsQuery.isPending && (
           <Stack sx={{ alignItems: 'center', py: 1 }}>
@@ -150,18 +166,19 @@ export function CommentThread({
                 </Stack>
               )}
               <Stack direction="row" spacing={1} sx={{ alignItems: 'flex-start' }}>
-                <Box sx={{ pt: 0.25 }}>
+                <Box sx={{ position: 'relative', zIndex: 1, pt: 0.25 }}>
                   <UserAvatar name={name} size={AVATAR_SIZE} imageUrl={own ? avatarUrl : null} />
                 </Box>
                 <Box sx={{ minWidth: 0, maxWidth: '100%' }}>
                   {/* The bubble: bold name on its own line, the text below —
-                      no date inside (Facebook anatomy, issue #403). */}
+                      no date inside (Facebook anatomy); the tucked top-left
+                      corner points back at the avatar on the rail. */}
                   <Box
                     sx={{
                       display: 'inline-block',
                       maxWidth: '100%',
                       bgcolor: theme.qnop.surface2,
-                      borderRadius: '16px',
+                      borderRadius: '4px 10px 10px 10px',
                       px: 1.5,
                       py: 0.75,
                     }}
