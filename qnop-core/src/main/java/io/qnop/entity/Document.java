@@ -87,6 +87,14 @@ public class Document {
   @Column(name = "due_at")
   private Instant dueAt;
 
+  /**
+   * Optional friendly URL slug (issue #411): kebab-case, globally unique case-insensitively, never
+   * UUID-shaped — the format and uniqueness are pinned in Liquibase; normalisation and the
+   * UUID-shape guard live in the service.
+   */
+  @Column(name = "slug", length = 64, updatable = false)
+  private String slug;
+
   @Version
   @Column(name = "version", nullable = false)
   private long version;
@@ -143,6 +151,15 @@ public class Document {
   /** The optional completion deadline, or {@code null} when none is set (issue #295). */
   public Instant getDueAt() {
     return dueAt;
+  }
+
+  public String getSlug() {
+    return slug;
+  }
+
+  /** Set once at creation (the column is not updatable); {@code null} means no friendly URL. */
+  public void setSlug(String slug) {
+    this.slug = slug;
   }
 
   /** Sets or clears ({@code null}) the optional completion deadline (issue #295). */

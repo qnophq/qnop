@@ -85,6 +85,7 @@ public class DocumentUpdateService {
     return new DocumentView(
         document.getId(),
         document.getTitle(),
+        document.getSlug(),
         document.getOwnerId(),
         document.getWorkflowState(),
         latest,

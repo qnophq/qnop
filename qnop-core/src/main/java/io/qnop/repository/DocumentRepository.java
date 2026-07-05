@@ -48,6 +48,12 @@ public interface DocumentRepository extends JpaRepository<Document, UUID> {
   /** Documents owned by the given user. */
   List<Document> findByOwnerId(UUID ownerId);
 
+  /** Resolves a review by its human-readable slug (issue #411) — uniqueness is per LOWER(slug). */
+  Optional<Document> findBySlugIgnoreCase(String slug);
+
+  /** True when the slug is already claimed, ignoring case (issue #411). */
+  boolean existsBySlugIgnoreCase(String slug);
+
   /**
    * The documents visible to a user for the reviews overview (issue #292): owned, joined as a
    * direct participant, or joined through membership in a participating team. {@code q} must be

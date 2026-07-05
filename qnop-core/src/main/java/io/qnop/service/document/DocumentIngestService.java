@@ -41,10 +41,13 @@ import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.util.Comparator;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.regex.Pattern;
 import java.util.stream.Collectors;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.support.TransactionTemplate;
@@ -71,6 +74,14 @@ public class DocumentIngestService {
   static final String PDF_CONTENT_TYPE = "application/pdf";
   private static final byte[] PDF_MAGIC = "%PDF-".getBytes(StandardCharsets.US_ASCII);
   private static final int MAX_TITLE_LENGTH = 500;
+
+  private static final int MIN_SLUG_LENGTH = 3;
+  private static final int MAX_SLUG_LENGTH = 64;
+  private static final Pattern SLUG_PATTERN = Pattern.compile("^[a-z0-9]+(-[a-z0-9]+)*$");
+  // A slug must never look like a UUID: routes and links resolve UUID-shaped
+  // segments as document ids, so a UUID-shaped slug would be unreachable.
+  private static final Pattern UUID_SHAPE =
+      Pattern.compile("^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$");
 
   private final DocumentRepository documents;
   private final DocumentVersionRepository versions;
@@ -105,27 +116,45 @@ public class DocumentIngestService {
 
   /**
    * Creates a new document owned by {@code actor} with the upload as version 1. An optional {@code
-   * dueAt} completion deadline (issue #295) must be in the future when set at creation.
+   * dueAt} completion deadline (issue #295) must be in the future when set at creation, and an
+   * optional {@code slug} (issue #411) must be kebab-case, 3–64 characters, not UUID-shaped, and
+   * globally unique ignoring case.
    */
-  public UploadResult createDocument(UUID actor, String title, UploadSource upload, Instant dueAt) {
+  public UploadResult createDocument(
+      UUID actor, String title, UploadSource upload, Instant dueAt, String slug) {
     String cleanTitle = requireTitle(title);
     Instant validDueAt = requireFutureOrNull(dueAt);
+    String cleanSlug = normalizeSlug(slug);
+    if (cleanSlug != null && documents.existsBySlugIgnoreCase(cleanSlug)) {
+      throw DocumentValidationException.slugTaken("slug is already in use: " + cleanSlug);
+    }
     long maxBytes = maxUploadBytes();
     validateUpload(upload, maxBytes);
 
     StagedObject staged = stageUpload(upload, maxBytes);
-    UploadResult result =
-        transactionTemplate.execute(
-            status -> {
-              Document document = new Document(actor, cleanTitle);
-              document.setDueAt(validDueAt);
-              document = documents.save(document);
-              DocumentVersion version = saveVersionAndEnqueue(document.getId(), 1, staged, actor);
-              return new UploadResult(
-                  document.getId(),
-                  version.getVersionNumber(),
-                  version.getExtractionStatus().name());
-            });
+    UploadResult result;
+    try {
+      result =
+          transactionTemplate.execute(
+              status -> {
+                Document document = new Document(actor, cleanTitle);
+                document.setDueAt(validDueAt);
+                document.setSlug(cleanSlug);
+                document = documents.save(document);
+                DocumentVersion version = saveVersionAndEnqueue(document.getId(), 1, staged, actor);
+                return new UploadResult(
+                    document.getId(),
+                    version.getVersionNumber(),
+                    version.getExtractionStatus().name());
+              });
+    } catch (DataIntegrityViolationException e) {
+      // The unique index backstops the pre-check against a concurrent create
+      // racing the same slug; without a slug the violation is not ours to map.
+      if (cleanSlug != null) {
+        throw DocumentValidationException.slugTaken("slug is already in use: " + cleanSlug);
+      }
+      throw e;
+    }
     storage.commit(staged.key());
     return result;
   }
@@ -242,6 +271,27 @@ public class DocumentIngestService {
       throw DocumentValidationException.invalidRequest("dueAt must be in the future");
     }
     return dueAt;
+  }
+
+  /**
+   * Normalizes and validates the optional review slug (issue #411): trims and lowercases, then
+   * enforces the kebab-case shape the DB CHECK constraint mirrors. Blank means "no slug".
+   */
+  private static String normalizeSlug(String slug) {
+    if (slug == null || slug.isBlank()) {
+      return null;
+    }
+    String normalized = slug.trim().toLowerCase(Locale.ROOT);
+    if (normalized.length() < MIN_SLUG_LENGTH
+        || normalized.length() > MAX_SLUG_LENGTH
+        || !SLUG_PATTERN.matcher(normalized).matches()) {
+      throw DocumentValidationException.invalidField(
+          "slug", "slug must be 3-64 characters of lowercase letters, digits and single hyphens");
+    }
+    if (UUID_SHAPE.matcher(normalized).matches()) {
+      throw DocumentValidationException.invalidField("slug", "slug must not look like a UUID");
+    }
+    return normalized;
   }
 
   private long maxUploadBytes() {

@@ -21,6 +21,7 @@
 package io.qnop.web;
 
 import io.qnop.api.v1.model.ErrorResponse;
+import io.qnop.api.v1.model.FieldError;
 import io.qnop.service.document.DocumentValidationException;
 import io.qnop.service.review.AnnotationActionForbiddenException;
 import io.qnop.service.review.AnnotationNotFoundException;
@@ -28,6 +29,7 @@ import io.qnop.service.review.DocumentNotFoundException;
 import io.qnop.service.review.NotDocumentOwnerException;
 import io.qnop.service.review.WorkflowTransitionException;
 import java.time.OffsetDateTime;
+import java.util.List;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.ExceptionHandler;
@@ -44,7 +46,17 @@ public class DocumentExceptionHandler {
 
   @ExceptionHandler(DocumentValidationException.class)
   public ResponseEntity<ErrorResponse> onDocumentError(DocumentValidationException ex) {
-    return error(ex.getStatus(), ex.getCode(), ex.getMessage());
+    ErrorResponse body =
+        new ErrorResponse()
+            .code(ex.getCode())
+            .message(ex.getMessage())
+            .timestamp(OffsetDateTime.now());
+    if (ex.getField() != null) {
+      // Field-scoped rejections (e.g. the slug, issue #411) carry the fieldErrors
+      // detail so forms can attach the message to the offending input.
+      body.fieldErrors(List.of(new FieldError().field(ex.getField()).message(ex.getMessage())));
+    }
+    return ResponseEntity.status(ex.getStatus()).body(body);
   }
 
   @ExceptionHandler(DocumentNotFoundException.class)

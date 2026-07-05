@@ -61,10 +61,11 @@ public class DocumentUploadController {
   public ResponseEntity<DocumentUploadResponse> createDocument(
       @RequestParam("title") String title,
       @RequestParam("file") MultipartFile file,
-      @RequestParam(value = "dueAt", required = false) String dueAt) {
+      @RequestParam(value = "dueAt", required = false) String dueAt,
+      @RequestParam(value = "slug", required = false) String slug) {
     UploadResult result =
         ingest.createDocument(
-            CurrentUser.requireUserId(), title, sourceOf(file), parseDueAt(dueAt));
+            CurrentUser.requireUserId(), title, sourceOf(file), parseDueAt(dueAt), slug);
     return ResponseEntity.status(HttpStatus.CREATED).body(DocumentUploadResponse.of(result));
   }
 

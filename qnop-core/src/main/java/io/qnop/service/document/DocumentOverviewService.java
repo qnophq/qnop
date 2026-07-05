@@ -105,6 +105,7 @@ public class DocumentOverviewService {
                   return new DocumentSummaryView(
                       document.getId(),
                       document.getTitle(),
+                      document.getSlug(),
                       document.getOwnerId(),
                       document.getWorkflowState(),
                       maxVersions.getOrDefault(document.getId(), 0),
@@ -142,6 +143,7 @@ public class DocumentOverviewService {
   public record DocumentSummaryView(
       UUID id,
       String title,
+      String slug,
       UUID ownerId,
       String workflowState,
       int latestVersionNumber,
