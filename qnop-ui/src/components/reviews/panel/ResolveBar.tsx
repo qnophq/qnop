@@ -56,7 +56,7 @@ export function ResolveBar({
       direction="row"
       spacing={1}
       data-testid="resolve-bar"
-      sx={{ alignItems: 'center', pl: 2, pr: 1.5, py: 1 }}
+      sx={{ alignItems: 'center', pl: 2, pr: 0, py: 1 }}
     >
       <InputBase
         value={note}
