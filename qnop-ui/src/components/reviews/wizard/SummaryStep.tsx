@@ -25,7 +25,7 @@ import Stack from '@mui/material/Stack';
 import Switch from '@mui/material/Switch';
 import Typography from '@mui/material/Typography';
 import { useTheme } from '@mui/material/styles';
-import { FileText, Play, Users } from 'lucide-react';
+import { EyeOff, FileText, Play, Users } from 'lucide-react';
 import type { PrincipalView } from '../../../api/generated';
 import { ParticipantKind } from '../../../api/generated';
 import { DueDatePicker } from '../DueDatePicker';
@@ -42,6 +42,9 @@ interface SummaryStepProps {
   onDueAtChange: (value: string | null) => void;
   startImmediately: boolean;
   onStartImmediatelyChange: (value: boolean) => void;
+  /** Anonymous review (issue #413): hides reviewer identities behind pseudonyms. */
+  anonymous: boolean;
+  onAnonymousChange: (value: boolean) => void;
   phase: SubmitPhase;
   /** Upload progress 0..1, meaningful while phase is `uploading`. */
   progress: number;
@@ -77,6 +80,8 @@ export function SummaryStep({
   onDueAtChange,
   startImmediately,
   onStartImmediatelyChange,
+  anonymous,
+  onAnonymousChange,
   phase,
   progress,
 }: SummaryStepProps) {
@@ -152,6 +157,53 @@ export function SummaryStep({
           <DueDatePicker value={dueAt} onChange={onDueAtChange} disabled={isSubmitting} />
         </Box>
       </SummaryRow>
+
+      {/* Anonymous review (issue #413): a fixed-at-creation privacy choice. */}
+      <Stack
+        component="label"
+        direction="row"
+        spacing={1.5}
+        sx={{
+          alignItems: 'center',
+          p: 1.75,
+          borderRadius: 2,
+          cursor: isSubmitting ? 'default' : 'pointer',
+          border: `1px solid ${anonymous ? theme.qnop.brand.blue : theme.palette.divider}`,
+          bgcolor: anonymous ? theme.palette.primary.light : 'transparent',
+          transition: 'border-color 160ms ease, background-color 160ms ease',
+        }}
+      >
+        <Box
+          sx={{
+            width: 32,
+            height: 32,
+            borderRadius: 2,
+            flexShrink: 0,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            bgcolor: anonymous ? theme.qnop.brand.blue : theme.qnop.surface2,
+            color: anonymous ? '#fff' : 'text.secondary',
+          }}
+        >
+          <EyeOff size={16} aria-hidden />
+        </Box>
+        <Box sx={{ flex: 1 }}>
+          <Typography variant="body2" sx={{ fontWeight: 500 }}>
+            Anonymous review
+          </Typography>
+          <Typography variant="caption" color="text.secondary">
+            Reviewers' names are hidden — foreign authors show as stable "Participant N". Can't be
+            changed later.
+          </Typography>
+        </Box>
+        <Switch
+          checked={anonymous}
+          disabled={isSubmitting}
+          onChange={(e) => onAnonymousChange(e.target.checked)}
+          slotProps={{ input: { 'aria-label': 'Anonymous review' } }}
+        />
+      </Stack>
 
       <Stack
         component="label"

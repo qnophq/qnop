@@ -65,8 +65,9 @@ interface CommentThreadProps {
  * reply and the composer; each comment is a softly rounded bubble carrying
  * the bold author name above the text, with the compact relative timestamp
  * in a meta line UNDER the bubble (full date in its tooltip; likes join
- * that line with #410). Participant names are not part of the annotation
- * API yet, so authorship is shown relative to the signed-in user.
+ * that line with #410). Author names are resolved server-side and travel on
+ * each comment (issue #413), honouring per-review anonymity; own contributions
+ * read "You".
  */
 export function CommentThread({
   annotationId,
@@ -136,7 +137,8 @@ export function CommentThread({
         )}
         {visibleComments.map((comment) => {
           const own = comment.authorId === userId;
-          const name = own ? (displayName ?? 'You') : 'Participant';
+          // Server-resolved name, honouring per-review anonymity (issue #413).
+          const name = own ? (displayName ?? 'You') : (comment.authorDisplayName ?? 'Participant');
           return (
             <Fragment key={comment.id}>
               {comment.id === firstNewCommentId && (

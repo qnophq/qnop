@@ -59,6 +59,8 @@ const annotation = (id: string, overrides: Partial<AnnotationView> = {}): Annota
   id,
   documentId: 'd1',
   authorId: 'author-1',
+  // Author name is resolved server-side and travels on the annotation now (#413).
+  authorDisplayName: 'Sabine Weber',
   status: AnnotationStatus.Open,
   placementStatus: PlacementStatus.Placed,
   anchor: {
@@ -171,7 +173,7 @@ describe('ReviewTasksPage', () => {
     expect(screen.queryByTestId('task-card-a-done')).not.toBeInTheDocument();
   });
 
-  it('resolves author names through the participants, and self by display name', () => {
+  it('shows the server-resolved author name, and self by display name (issue #413)', () => {
     mockData();
     vi.mocked(useAnnotations).mockReturnValue({
       isPending: false,
@@ -181,10 +183,28 @@ describe('ReviewTasksPage', () => {
     expect(
       within(screen.getByTestId('task-card-a-open')).getByText('Sabine Weber'),
     ).toBeInTheDocument();
-    // The owner is never a participant row — self resolves via the auth store.
+    // Own contributions read "You"-side name from the auth store, not the payload.
     expect(
       within(screen.getByTestId('task-card-a-mine')).getByText('Maxim Owner'),
     ).toBeInTheDocument();
+  });
+
+  it('drops the author facet in an anonymous review (issue #413)', () => {
+    mockData();
+    vi.mocked(useDocument).mockReturnValue({
+      isPending: false,
+      isError: false,
+      data: {
+        id: 'd1',
+        title: 'Supply Contract',
+        ownerId: 'owner-1',
+        latestVersionNumber: 2,
+        anonymous: true,
+      },
+    } as never);
+    renderPage();
+    fireEvent.click(screen.getByRole('button', { name: 'Filter annotations' }));
+    expect(screen.queryByLabelText('Author')).not.toBeInTheDocument();
   });
 
   it('opens the drawer from a card and jumps to the document with the deep link', () => {

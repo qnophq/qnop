@@ -39,19 +39,25 @@ import { STATUS_CUES } from './statusCues';
 /** Up to this many participant avatars stack in the collapsed row. */
 const MAX_AVATARS = 3;
 
+interface DiscussionParticipant {
+  id: string;
+  /** Server-resolved name honouring anonymity (issue #413); real name or "Participant N". */
+  name: string | null | undefined;
+}
+
 /** Overlapping avatar stack of everyone involved in the discussion. */
-function ParticipantAvatars({ ids }: { ids: string[] }) {
+function ParticipantAvatars({ participants }: { participants: DiscussionParticipant[] }) {
   const userId = useAuthStore((state) => state.userId);
   const displayName = useAuthStore((state) => state.displayName);
   const avatarUrl = useAuthStore((state) => state.avatarUrl);
-  const shown = ids.slice(0, MAX_AVATARS);
+  const shown = participants.slice(0, MAX_AVATARS);
   return (
     <Stack direction="row" sx={{ alignItems: 'center', flexShrink: 0 }}>
-      {shown.map((id, index) => {
-        const own = id === userId;
+      {shown.map((participant, index) => {
+        const own = participant.id === userId;
         return (
           <Box
-            key={id}
+            key={participant.id}
             sx={{
               borderRadius: '50%',
               border: '2px solid',
@@ -62,16 +68,16 @@ function ParticipantAvatars({ ids }: { ids: string[] }) {
             }}
           >
             <UserAvatar
-              name={own ? (displayName ?? 'You') : 'Participant'}
+              name={own ? (displayName ?? 'You') : (participant.name ?? 'Participant')}
               size={20}
               imageUrl={own ? avatarUrl : null}
             />
           </Box>
         );
       })}
-      {ids.length > MAX_AVATARS && (
+      {participants.length > MAX_AVATARS && (
         <Typography variant="caption" color="text.secondary" sx={{ ml: 0.5 }}>
-          +{ids.length - MAX_AVATARS}
+          +{participants.length - MAX_AVATARS}
         </Typography>
       )}
     </Stack>
@@ -128,9 +134,18 @@ function AnnotationListItemBase({
   // the cache (enabled: false never fetches — rows stay cheap; the stack
   // enriches once a thread has been opened or hover-prefetched).
   const cachedComments = useComments(annotation.id, false).data?.comments ?? [];
-  const participantIds = [
-    ...new Set([annotation.authorId, ...cachedComments.map((comment) => comment.authorId)]),
-  ];
+  // Distinct participants with their server-resolved names (issue #413) — the
+  // author, then commenters — so each pseudonym in an anonymous review gets its
+  // own distinct avatar rather than a shared "Participant" glyph.
+  const participants = [
+    { id: annotation.authorId, name: annotation.authorDisplayName },
+    ...cachedComments.map((comment) => ({
+      id: comment.authorId,
+      name: comment.authorDisplayName,
+    })),
+  ].filter(
+    (participant, index, all) => all.findIndex((other) => other.id === participant.id) === index,
+  );
 
   const fallbackLabel = region ? 'Region annotation' : 'No placement on this version';
 
@@ -227,7 +242,7 @@ function AnnotationListItemBase({
               p. {region.surfaceIndex + 1}
             </Typography>
           )}
-          <ParticipantAvatars ids={participantIds} />
+          <ParticipantAvatars participants={participants} />
         </Stack>
       )}
     </ButtonBase>

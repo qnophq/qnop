@@ -79,7 +79,10 @@ export function AnnotationHoverCard({ annotation, getAnchorPosition }: Annotatio
   const firstComment = commentsQuery.data?.comments[0];
   const authorId = firstComment?.authorId ?? annotation.authorId;
   const own = authorId === userId;
-  const authorName = own ? (displayName ?? 'You') : 'Participant';
+  // Server-resolved name, honouring per-review anonymity (issue #413).
+  const authorName = own
+    ? (displayName ?? 'You')
+    : (firstComment?.authorDisplayName ?? annotation.authorDisplayName ?? 'Participant');
 
   return (
     <Popover

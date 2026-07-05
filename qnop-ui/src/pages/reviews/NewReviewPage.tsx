@@ -79,6 +79,7 @@ export function NewReviewPage() {
   const [slugError, setSlugError] = useState<string | null>(null);
   const [reviewers, setReviewers] = useState<PrincipalView[]>([]);
   const [dueAt, setDueAt] = useState<string | null>(null);
+  const [anonymous, setAnonymous] = useState(false);
   const [startImmediately, setStartImmediately] = useState(true);
   const [submit, setSubmit] = useState<SubmitState>(SUBMIT_IDLE);
 
@@ -142,6 +143,7 @@ export function NewReviewPage() {
         file,
         dueAt,
         slug: cleanSlug || null,
+        anonymous,
         onProgress: (fraction) => setSubmit((s) => ({ ...s, progress: fraction })),
       });
       documentId = created.documentId;
@@ -261,6 +263,8 @@ export function NewReviewPage() {
             onDueAtChange={setDueAt}
             startImmediately={startImmediately}
             onStartImmediatelyChange={setStartImmediately}
+            anonymous={anonymous}
+            onAnonymousChange={setAnonymous}
             phase={submit.phase}
             progress={submit.progress}
           />
