@@ -37,6 +37,7 @@ import io.qnop.api.v1.model.ParticipantKind;
 import io.qnop.api.v1.model.ParticipantListResponse;
 import io.qnop.api.v1.model.ParticipantView;
 import io.qnop.api.v1.model.RenderedDocumentResponse;
+import io.qnop.api.v1.model.ThreadParticipation;
 import io.qnop.api.v1.model.VersionDiffResponse;
 import io.qnop.api.v1.model.VisitResponse;
 import io.qnop.service.diff.VersionDiffService;
@@ -143,6 +144,7 @@ public class DocumentsController implements DocumentsApi {
         .title(view.title())
         .slug(view.slug())
         .anonymous(view.anonymous())
+        .threadParticipation(ThreadParticipation.fromValue(view.threadParticipation()))
         .ownerId(view.ownerId())
         .workflowState(view.workflowState())
         .latestVersionNumber(view.latestVersionNumber())
@@ -245,6 +247,7 @@ public class DocumentsController implements DocumentsApi {
         .title(view.title())
         .slug(view.slug())
         .anonymous(view.anonymous())
+        .threadParticipation(ThreadParticipation.fromValue(view.threadParticipation()))
         .ownerId(view.ownerId())
         .workflowState(view.workflowState())
         .latestVersionNumber(view.latestVersionNumber())

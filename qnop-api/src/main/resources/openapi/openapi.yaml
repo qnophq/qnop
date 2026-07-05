@@ -3862,6 +3862,8 @@ components:
             when true the API ships no resolvable identity for non-self, non-owner
             authors and the UI renders stable "Participant N" pseudonyms. Chosen at
             creation and immutable. Defaults to false.
+        threadParticipation:
+          $ref: '#/components/schemas/ThreadParticipation'
         ownerId:
           type: string
           format: uuid
@@ -3940,6 +3942,18 @@ components:
       enum:
         - USER
         - TEAM
+    ThreadParticipation:
+      type: string
+      description: >-
+        Who, besides an annotation's author and the review owner, may see and
+        write in a thread (issue #413), chosen at creation and immutable:
+        `PRIVATE` hides foreign threads entirely, `READ_ONLY` shows them but
+        accepts comments only from the author and owner, `OPEN` (the default) is
+        fully participable.
+      enum:
+        - PRIVATE
+        - READ_ONLY
+        - OPEN
     ParticipantView:
       type: object
       description: A review participant — a user or a team acting as reviewer (ADR-0011).
@@ -4039,6 +4053,8 @@ components:
             when true the API ships no resolvable identity for non-self, non-owner
             authors and the UI renders stable "Participant N" pseudonyms. Chosen at
             creation and immutable. Defaults to false.
+        threadParticipation:
+          $ref: '#/components/schemas/ThreadParticipation'
         ownerId:
           type: string
           format: uuid

@@ -30,6 +30,7 @@ import io.qnop.entity.AnnotationType;
 import io.qnop.entity.AuditEvent;
 import io.qnop.entity.Comment;
 import io.qnop.entity.DocumentVersion;
+import io.qnop.entity.ThreadParticipation;
 import io.qnop.repository.AnnotationCommentActivity;
 import io.qnop.repository.AnnotationCommentCount;
 import io.qnop.repository.AnnotationFirstComment;
@@ -206,7 +207,8 @@ public class AnnotationService {
     if (placementStatus != null && versionNumber == null) {
       throw DocumentValidationException.invalidRequest("placementStatus requires version");
     }
-    documentAccess.getDocument(documentId, actor, admin); // visibility → 404 if not a participant
+    DocumentAccessService.DocumentView document =
+        documentAccess.getDocument(documentId, actor, admin); // 404 if not a participant
     UUID versionId =
         versionNumber == null
             ? null
@@ -214,7 +216,12 @@ public class AnnotationService {
                 .findByDocumentIdAndVersionNumber(documentId, versionNumber)
                 .map(DocumentVersion::getId)
                 .orElse(null);
-    List<Annotation> documentAnnotations = annotations.findByDocumentId(documentId);
+    // Under a PRIVATE policy (issue #413) foreign threads are dropped here, so the
+    // batched counts and the FE-derived progress follow the caller's visibility.
+    List<Annotation> documentAnnotations =
+        annotations.findByDocumentId(documentId).stream()
+            .filter(annotation -> canSeeThread(document, annotation.getAuthorId(), actor, admin))
+            .toList();
     // Batch the placements and comment counts (issue #313): one query each instead of 2N.
     Map<UUID, AnnotationPlacement> placementByAnnotation =
         versionId == null
@@ -295,7 +302,12 @@ public class AnnotationService {
   @Transactional(readOnly = true)
   public AnnotationView get(UUID annotationId, UUID actor, boolean admin) {
     Annotation annotation = requireAnnotation(annotationId);
-    documentAccess.getDocument(annotation.getDocumentId(), actor, admin);
+    DocumentAccessService.DocumentView document =
+        documentAccess.getDocument(annotation.getDocumentId(), actor, admin);
+    if (!canSeeThread(document, annotation.getAuthorId(), actor, admin)) {
+      // A PRIVATE foreign thread is invisible — 404, like the document itself.
+      throw DocumentValidationException.notFound("no such annotation: " + annotationId);
+    }
     return view(
         annotation,
         null,
@@ -348,7 +360,17 @@ public class AnnotationService {
   @Transactional
   public CommentView addComment(UUID annotationId, UUID author, boolean admin, String body) {
     Annotation annotation = requireAnnotation(annotationId);
-    documentAccess.getDocument(annotation.getDocumentId(), author, admin);
+    DocumentAccessService.DocumentView document =
+        documentAccess.getDocument(annotation.getDocumentId(), author, admin);
+    if (!canSeeThread(document, annotation.getAuthorId(), author, admin)) {
+      // Invisible under PRIVATE — same 404 as the read paths (anti-enumeration).
+      throw DocumentValidationException.notFound("no such annotation: " + annotationId);
+    }
+    if (!canWriteThread(document, annotation.getAuthorId(), author, admin)) {
+      // READ_ONLY (issue #413): the thread is visible, but only the author and owner may comment.
+      throw DocumentValidationException.threadReadOnly(
+          "this review's threads accept comments only from the author and the owner");
+    }
     if (annotation.getStatus() != AnnotationStatus.OPEN) {
       throw new WorkflowTransitionException(
           WorkflowTransitionException.ANNOTATION_ALREADY_RESOLVED,
@@ -367,7 +389,11 @@ public class AnnotationService {
   @Transactional(readOnly = true)
   public List<CommentView> listComments(UUID annotationId, UUID actor, boolean admin) {
     Annotation annotation = requireAnnotation(annotationId);
-    documentAccess.getDocument(annotation.getDocumentId(), actor, admin);
+    DocumentAccessService.DocumentView document =
+        documentAccess.getDocument(annotation.getDocumentId(), actor, admin);
+    if (!canSeeThread(document, annotation.getAuthorId(), actor, admin)) {
+      throw DocumentValidationException.notFound("no such annotation: " + annotationId);
+    }
     ReviewIdentityResolver.ReviewIdentities identities =
         identity.forDocument(annotation.getDocumentId(), actor);
     return comments.findByAnnotationIdOrderByCreatedAtAsc(annotationId).stream()
@@ -436,6 +462,33 @@ public class AnnotationService {
     return body.length() <= FIRST_COMMENT_EXCERPT_CHARS
         ? body
         : body.substring(0, FIRST_COMMENT_EXCERPT_CHARS);
+  }
+
+  /**
+   * Whether {@code actor} may SEE this annotation's thread under the review's participation policy
+   * (issue #413). Only PRIVATE hides a foreign thread (a caller who is neither its author nor the
+   * owner); READ_ONLY and OPEN show every thread. Admins see everything.
+   */
+  private static boolean canSeeThread(
+      DocumentAccessService.DocumentView document, UUID authorId, UUID actor, boolean admin) {
+    if (!ThreadParticipation.PRIVATE.name().equals(document.threadParticipation())) {
+      return true;
+    }
+    return admin || actor.equals(document.ownerId()) || actor.equals(authorId);
+  }
+
+  /**
+   * Whether {@code actor} may COMMENT in this annotation's thread (issue #413). OPEN lets every
+   * participant write; PRIVATE and READ_ONLY restrict writing to the author and the owner (a
+   * foreign PRIVATE thread is already invisible, so this only bites READ_ONLY). Admins may always
+   * write.
+   */
+  private static boolean canWriteThread(
+      DocumentAccessService.DocumentView document, UUID authorId, UUID actor, boolean admin) {
+    if (ThreadParticipation.OPEN.name().equals(document.threadParticipation())) {
+      return true;
+    }
+    return admin || actor.equals(document.ownerId()) || actor.equals(authorId);
   }
 
   private static AnnotationView view(

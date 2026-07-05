@@ -96,6 +96,11 @@ public class DocumentValidationException extends RuntimeException {
     return new DocumentValidationException(409, "VERSION_READ_ONLY", detail);
   }
 
+  /** A READ_ONLY thread policy (issue #413): only the author and the owner may comment. */
+  public static DocumentValidationException threadReadOnly(String detail) {
+    return new DocumentValidationException(403, "THREAD_READ_ONLY", detail);
+  }
+
   /** The rendered representation is not (yet) available: extraction pending or failed. */
   public static DocumentValidationException renderingUnavailable(String code, String detail) {
     return new DocumentValidationException(409, code, detail);

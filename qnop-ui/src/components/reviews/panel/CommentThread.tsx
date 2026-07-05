@@ -29,7 +29,7 @@ import InputBase from '@mui/material/InputBase';
 import Tooltip from '@mui/material/Tooltip';
 import Typography from '@mui/material/Typography';
 import { alpha, useTheme } from '@mui/material/styles';
-import { CircleCheck, RotateCcw, SendHorizontal } from 'lucide-react';
+import { CircleCheck, Lock, RotateCcw, SendHorizontal } from 'lucide-react';
 import { useAddComment, useComments } from '../../../api/hooks/useComments';
 import { apiErrorCode } from '../../../utils/apiError';
 import { isSubmitShortcut, submitShortcutLabel } from '../../../utils/platform';
@@ -48,6 +48,11 @@ interface CommentThreadProps {
   notify: Notify;
   /** Hides the reply composer — older versions are a read-only record (#306). */
   readOnly?: boolean;
+  /**
+   * READ_ONLY thread policy (issue #413): the thread is visible but the viewer is neither its
+   * author nor the owner, so the composer gives way to a quiet "only author and owner" line.
+   */
+  policyReadOnly?: boolean;
   /** True on a RESOLVED annotation (#403): the thread is a closed record. */
   closed?: boolean;
   /** Reopens the annotation (issue #394) — set only when the viewer may. */
@@ -73,6 +78,7 @@ export function CommentThread({
   annotationId,
   notify,
   readOnly = false,
+  policyReadOnly = false,
   closed = false,
   onReopen,
   previousSeenAt = null,
@@ -91,13 +97,17 @@ export function CommentThread({
     if (!body) return;
     addComment.mutate(body, {
       onSuccess: () => setDraft(''),
-      onError: (error) =>
+      onError: (error) => {
+        const code = apiErrorCode(error);
         notify(
-          apiErrorCode(error) === 'ANNOTATION_ALREADY_RESOLVED'
+          code === 'ANNOTATION_ALREADY_RESOLVED'
             ? 'The annotation was resolved — its thread is closed.'
-            : 'Could not add the comment.',
+            : code === 'THREAD_READ_ONLY'
+              ? 'Only the author and the owner can reply in this review.'
+              : 'Could not add the comment.',
           'error',
-        ),
+        );
+      },
     });
   };
 
@@ -206,10 +216,26 @@ export function CommentThread({
             )}
           </Stack>
         )}
+        {/* READ_ONLY policy (issue #413): the thread is a record for this
+            viewer — a quiet line replaces the composer, so its absence reads as
+            a state, not a glitch. */}
+        {policyReadOnly && !closed && !readOnly && (
+          <Stack
+            direction="row"
+            spacing={0.75}
+            data-testid="thread-policy-readonly-note"
+            sx={{ alignItems: 'center', pl: 4.5, color: 'text.secondary', minHeight: 26 }}
+          >
+            <Lock size={13} aria-hidden />
+            <Typography variant="caption">
+              Only the author and the owner can reply in this review.
+            </Typography>
+          </Stack>
+        )}
         {/* Composer continues the thread rail with the signed-in user's avatar.
             Hidden on read-only (older) versions — the same thread stays
             writable when the annotation is opened on the latest version. */}
-        {!readOnly && !closed && (
+        {!readOnly && !closed && !policyReadOnly && (
           <Stack direction="row" spacing={1} sx={{ alignItems: 'flex-start' }}>
             <Box sx={{ position: 'relative', zIndex: 1, pt: 0.5 }}>
               <UserAvatar name={displayName ?? 'You'} size={AVATAR_SIZE} imageUrl={avatarUrl} />

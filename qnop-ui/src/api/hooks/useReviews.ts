@@ -185,6 +185,7 @@ export function useCreateReview() {
       dueAt?: string | null;
       slug?: string | null;
       anonymous?: boolean;
+      threadParticipation?: string;
       onProgress?: (fraction: number) => void;
     }) => {
       const form = new FormData();
@@ -193,6 +194,10 @@ export function useCreateReview() {
       if (input.dueAt) form.append('dueAt', input.dueAt);
       if (input.slug) form.append('slug', input.slug);
       if (input.anonymous) form.append('anonymous', 'true');
+      // OPEN is the server default; only send a non-default policy (issue #413).
+      if (input.threadParticipation && input.threadParticipation !== 'OPEN') {
+        form.append('threadParticipation', input.threadParticipation);
+      }
       const response = await axiosInstance.post<UploadResult>('/documents', form, {
         onUploadProgress: (event) => {
           if (event.total) input.onProgress?.(event.loaded / event.total);

@@ -30,7 +30,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { ChevronLeft, ChevronRight, Zap } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import type { PrincipalView } from '../../api/generated';
-import { ParticipantKind } from '../../api/generated';
+import { ParticipantKind, ThreadParticipation } from '../../api/generated';
 import { documentsApi, reviewWorkflowApi } from '../../api/config';
 import { useConfig } from '../../api/hooks/useConfig';
 import { reviewKeys, useCreateReview } from '../../api/hooks/useReviews';
@@ -80,6 +80,9 @@ export function NewReviewPage() {
   const [reviewers, setReviewers] = useState<PrincipalView[]>([]);
   const [dueAt, setDueAt] = useState<string | null>(null);
   const [anonymous, setAnonymous] = useState(false);
+  const [threadParticipation, setThreadParticipation] = useState<ThreadParticipation>(
+    ThreadParticipation.Open,
+  );
   const [startImmediately, setStartImmediately] = useState(true);
   const [submit, setSubmit] = useState<SubmitState>(SUBMIT_IDLE);
 
@@ -144,6 +147,7 @@ export function NewReviewPage() {
         dueAt,
         slug: cleanSlug || null,
         anonymous,
+        threadParticipation,
         onProgress: (fraction) => setSubmit((s) => ({ ...s, progress: fraction })),
       });
       documentId = created.documentId;
@@ -265,6 +269,8 @@ export function NewReviewPage() {
             onStartImmediatelyChange={setStartImmediately}
             anonymous={anonymous}
             onAnonymousChange={setAnonymous}
+            threadParticipation={threadParticipation}
+            onThreadParticipationChange={setThreadParticipation}
             phase={submit.phase}
             progress={submit.progress}
           />

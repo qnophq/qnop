@@ -55,6 +55,10 @@ interface TaskDrawerProps {
   notify: Notify;
   /** True once the review is FINALIZED/CANCELLED (issue #394): no reopening. */
   reviewClosed?: boolean;
+  /** Thread participation policy (issue #413) — READ_ONLY suppresses foreign composers. */
+  threadParticipation?: string;
+  /** The review owner (issue #413) — the owner may always comment under any policy. */
+  ownerId?: string;
   onClose: () => void;
   /** Jumps to the review page with this annotation active (deep link). */
   onShowInDocument: (annotationId: string) => void;
@@ -75,6 +79,8 @@ export function TaskDrawer({
   authorName,
   notify,
   reviewClosed = false,
+  threadParticipation = 'OPEN',
+  ownerId,
   onClose,
   onShowInDocument,
 }: TaskDrawerProps) {
@@ -84,6 +90,11 @@ export function TaskDrawer({
   const { reopenWith } = useReopenWithFeedback(notify);
 
   if (!annotation) return null;
+  // READ_ONLY policy (issue #413): only the author and the owner may reply.
+  const policyReadOnly =
+    threadParticipation !== 'OPEN' &&
+    annotation.authorId !== userId &&
+    !(ownerId != null && userId === ownerId);
   const type = annotation.type ? TYPE_CUES[annotation.type] : null;
   const priority = annotation.priority ? PRIORITY_CUES[annotation.priority] : null;
   const TypeIcon = type?.icon;
@@ -194,6 +205,7 @@ export function TaskDrawer({
           <CommentThread
             annotationId={annotation.id}
             notify={notify}
+            policyReadOnly={policyReadOnly}
             closed={annotation.status !== AnnotationStatus.Open}
             onReopen={
               !reviewClosed && mayReopenAnnotation(annotation, userId)
