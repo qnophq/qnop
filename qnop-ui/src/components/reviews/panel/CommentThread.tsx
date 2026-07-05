@@ -25,7 +25,7 @@ import Button from '@mui/material/Button';
 import CircularProgress from '@mui/material/CircularProgress';
 import IconButton from '@mui/material/IconButton';
 import Stack from '@mui/material/Stack';
-import TextField from '@mui/material/TextField';
+import InputBase from '@mui/material/InputBase';
 import Tooltip from '@mui/material/Tooltip';
 import Typography from '@mui/material/Typography';
 import { alpha, useTheme } from '@mui/material/styles';
@@ -255,43 +255,57 @@ export function CommentThread({
             <Box sx={{ position: 'relative', zIndex: 1, pt: 0.5 }}>
               <UserAvatar name={displayName ?? 'You'} size={AVATAR_SIZE} imageUrl={avatarUrl} />
             </Box>
-            <TextField
-              multiline
-              minRows={1}
-              size="small"
-              fullWidth
-              placeholder="Add a comment"
-              value={draft}
-              onChange={(event) => setDraft(event.target.value)}
-              onKeyDown={(event) => {
-                if (isSubmitShortcut(event)) {
-                  event.preventDefault();
-                  submit();
-                }
-              }}
-              slotProps={{
-                htmlInput: { maxLength: 20000, 'aria-label': 'Add a comment' },
-                input: {
-                  // The pill composer of the social pattern (issue #403).
-                  sx: { borderRadius: '18px', bgcolor: theme.qnop.surface2 },
-                  endAdornment: (
-                    <Tooltip title={`Send (${submitShortcutLabel()})`}>
-                      <span style={{ alignSelf: 'flex-end' }}>
-                        <IconButton
-                          size="small"
-                          aria-label="Comment"
-                          color="primary"
-                          onClick={submit}
-                          disabled={!draft.trim() || addComment.isPending}
-                        >
-                          <SendHorizontal size={16} />
-                        </IconButton>
-                      </span>
-                    </Tooltip>
-                  ),
+            {/* The borderless composer block of the social pattern (#403):
+                a soft rounded surface holding the multiline field, with the
+                action row underneath — send bottom-right, like the feeds. */}
+            <Box
+              sx={{
+                flex: 1,
+                minWidth: 0,
+                bgcolor: theme.qnop.surface2,
+                borderRadius: '12px',
+                px: 1.5,
+                pt: 1,
+                pb: 0.5,
+                transition: 'box-shadow 120ms ease',
+                '&:focus-within': {
+                  boxShadow: `0 0 0 2px ${alpha(theme.qnop.brand.blue, 0.25)}`,
                 },
+                '@media (prefers-reduced-motion: reduce)': { transition: 'none' },
               }}
-            />
+            >
+              <InputBase
+                multiline
+                minRows={2}
+                fullWidth
+                placeholder="Add a comment"
+                value={draft}
+                onChange={(event) => setDraft(event.target.value)}
+                onKeyDown={(event) => {
+                  if (isSubmitShortcut(event)) {
+                    event.preventDefault();
+                    submit();
+                  }
+                }}
+                inputProps={{ maxLength: 20000, 'aria-label': 'Add a comment' }}
+                sx={{ p: 0, fontSize: 14, lineHeight: 1.45 }}
+              />
+              <Stack direction="row" sx={{ justifyContent: 'flex-end' }}>
+                <Tooltip title={`Send (${submitShortcutLabel()})`}>
+                  <span>
+                    <IconButton
+                      size="small"
+                      aria-label="Comment"
+                      color="primary"
+                      onClick={submit}
+                      disabled={!draft.trim() || addComment.isPending}
+                    >
+                      <SendHorizontal size={16} />
+                    </IconButton>
+                  </span>
+                </Tooltip>
+              </Stack>
+            </Box>
           </Stack>
         )}
       </Stack>
