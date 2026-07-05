@@ -24,6 +24,7 @@ import io.qnop.entity.Annotation;
 import io.qnop.entity.AnnotationPlacement;
 import io.qnop.entity.Document;
 import io.qnop.entity.DocumentVersion;
+import io.qnop.entity.ThreadParticipation;
 import io.qnop.repository.AnnotationPlacementRepository;
 import io.qnop.repository.AnnotationRepository;
 import io.qnop.repository.DocumentRepository;
@@ -118,7 +119,8 @@ public class DocumentIngestService {
    * Creates a new document owned by {@code actor} with the upload as version 1. An optional {@code
    * dueAt} completion deadline (issue #295) must be in the future when set at creation; an optional
    * {@code slug} (issue #411) must be kebab-case, 3–64 characters, not UUID-shaped, and globally
-   * unique ignoring case; {@code anonymous} (issue #413) fixes the review's anonymity at creation.
+   * unique ignoring case; {@code anonymous} and {@code threadParticipation} (issue #413) fix the
+   * review's privacy at creation ({@code threadParticipation} defaults to OPEN when null/blank).
    */
   public UploadResult createDocument(
       UUID actor,
@@ -126,10 +128,12 @@ public class DocumentIngestService {
       UploadSource upload,
       Instant dueAt,
       String slug,
-      boolean anonymous) {
+      boolean anonymous,
+      String threadParticipation) {
     String cleanTitle = requireTitle(title);
     Instant validDueAt = requireFutureOrNull(dueAt);
     String cleanSlug = normalizeSlug(slug);
+    ThreadParticipation policy = normalizeThreadParticipation(threadParticipation);
     if (cleanSlug != null && documents.existsBySlugIgnoreCase(cleanSlug)) {
       throw DocumentValidationException.slugTaken("slug is already in use: " + cleanSlug);
     }
@@ -146,6 +150,7 @@ public class DocumentIngestService {
                 document.setDueAt(validDueAt);
                 document.setSlug(cleanSlug);
                 document.setAnonymous(anonymous);
+                document.setThreadParticipation(policy);
                 document = documents.save(document);
                 DocumentVersion version = saveVersionAndEnqueue(document.getId(), 1, staged, actor);
                 return new UploadResult(
@@ -270,6 +275,22 @@ public class DocumentIngestService {
           "title exceeds " + MAX_TITLE_LENGTH + " characters");
     }
     return trimmed;
+  }
+
+  /**
+   * The thread participation policy for a create request (issue #413): blank/absent defaults to
+   * OPEN; anything else must name a known policy. Uppercased so the wire value is case-insensitive.
+   */
+  private static ThreadParticipation normalizeThreadParticipation(String value) {
+    if (value == null || value.isBlank()) {
+      return ThreadParticipation.OPEN;
+    }
+    try {
+      return ThreadParticipation.valueOf(value.trim().toUpperCase(Locale.ROOT));
+    } catch (IllegalArgumentException e) {
+      throw DocumentValidationException.invalidField(
+          "threadParticipation", "threadParticipation must be one of PRIVATE, READ_ONLY, OPEN");
+    }
   }
 
   private static Instant requireFutureOrNull(Instant dueAt) {

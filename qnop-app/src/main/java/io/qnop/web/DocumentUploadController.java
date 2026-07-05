@@ -64,10 +64,17 @@ public class DocumentUploadController {
       @RequestParam(value = "dueAt", required = false) String dueAt,
       @RequestParam(value = "slug", required = false) String slug,
       @RequestParam(value = "anonymous", required = false, defaultValue = "false")
-          boolean anonymous) {
+          boolean anonymous,
+      @RequestParam(value = "threadParticipation", required = false) String threadParticipation) {
     UploadResult result =
         ingest.createDocument(
-            CurrentUser.requireUserId(), title, sourceOf(file), parseDueAt(dueAt), slug, anonymous);
+            CurrentUser.requireUserId(),
+            title,
+            sourceOf(file),
+            parseDueAt(dueAt),
+            slug,
+            anonymous,
+            threadParticipation);
     return ResponseEntity.status(HttpStatus.CREATED).body(DocumentUploadResponse.of(result));
   }
 
