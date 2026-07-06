@@ -184,11 +184,9 @@ class AnnotationAnonymityIT extends SeededIntegrationTest {
             jsonPath("$.participants[?(@.principalId == '" + AUDITOR_ID + "')]").doesNotExist())
         .andExpect(jsonPath("$.participants[*].displayName", hasItem("Participant 2")))
         .andExpect(jsonPath("$.participants[*].displayName", not(hasItem(realName(AUDITOR_ID)))))
-        // The viewer's own row stays real (they know themselves).
-        .andExpect(
-            jsonPath(
-                "$.participants[?(@.principalId == '" + MEMBER2_ID + "')].displayName",
-                hasItem(realName(MEMBER2_ID))));
+        // The viewer's own row is sorted first and stays real (they know themselves).
+        .andExpect(jsonPath("$.participants[0].principalId").value(MEMBER2_ID.toString()))
+        .andExpect(jsonPath("$.participants[0].displayName").value(realName(MEMBER2_ID)));
   }
 
   @Test

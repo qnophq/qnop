@@ -141,6 +141,11 @@ public class ReviewIdentityResolver {
       this.ordinals = ordinals;
     }
 
+    /** Whether {@code userId} is the signed-in caller — used to sort the caller's own row first. */
+    public boolean isSelf(UUID userId) {
+      return userId != null && userId.equals(actor);
+    }
+
     /**
      * The display name to ship for {@code authorId}. Non-anonymous → the real name (or {@code null}
      * for a since-removed user, which the UI renders as a neutral placeholder). Anonymous → the

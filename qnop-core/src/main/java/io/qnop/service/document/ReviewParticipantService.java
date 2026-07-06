@@ -34,6 +34,7 @@ import io.qnop.service.review.ReviewIdentityResolver.ReviewIdentities;
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.List;
 import java.util.UUID;
 import org.springframework.stereotype.Service;
@@ -100,13 +101,19 @@ public class ReviewParticipantService {
    * "Participant N" pseudonym (their own row stays real — they know themselves) with the same
    * synthetic token used on their annotations; each team becomes a nameless "Reviewer team" whose
    * token derives from its position, not its real id, so the roster cannot be matched against the
-   * principal directory. Shared by {@link #list} and the reviews overview.
+   * principal directory. The caller's own row is sorted first, then the pseudonyms in their
+   * original order. Shared by {@link #list} and the reviews overview.
    */
   static List<ParticipantView> anonymiseRoster(
       UUID documentId, List<ParticipantProjection> rows, ReviewIdentities identities) {
-    List<ParticipantView> out = new ArrayList<>(rows.size());
+    // Caller first, everyone else in their existing (creation) order — a stable sort preserves it.
+    List<ParticipantProjection> ordered =
+        rows.stream()
+            .sorted(Comparator.comparingInt(r -> identities.isSelf(r.userId()) ? 0 : 1))
+            .toList();
+    List<ParticipantView> out = new ArrayList<>(ordered.size());
     int teamIndex = 0;
-    for (ParticipantProjection row : rows) {
+    for (ParticipantProjection row : ordered) {
       if (row.teamId() == null) {
         out.add(
             new ParticipantView(
