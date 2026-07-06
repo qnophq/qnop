@@ -50,6 +50,7 @@ import { ErrorBoundary } from '../../components/errors/ErrorBoundary';
 import { ReviewHubHead } from '../../components/reviews/hub/ReviewHubHead';
 import { ReviewViewTabs } from '../../components/reviews/hub/ReviewViewTabs';
 import { useReviewDocumentId } from '../../components/reviews/reviewDocumentId';
+import { useReviewPermalink } from '../../components/reviews/useReviewPermalink';
 import { AnnotationPanel } from '../../components/reviews/panel/AnnotationPanel';
 import {
   DEFAULT_PANEL_FRACTION,
@@ -154,15 +155,23 @@ export function DocumentReviewPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [urlView]);
   const [listOpen, setListOpen] = useState(false);
-  // Deep link from the tasks view (issue #393): ?annotation= seeds the active
-  // annotation once; the param is consumed so in-page selection owns the state.
+  // Deep link (issues #393/#412): ?annotation= seeds the active annotation and
+  // ?comment= seeds a comment scroll target once; both params are consumed so
+  // in-page selection owns the state afterwards. The original ?annotation= is
+  // kept in a ref to validate the target once the annotations settle.
   const [activeAnnotationId, setActiveAnnotationId] = useState<string | null>(() =>
     searchParams.get('annotation'),
   );
+  const [scrollToCommentId, setScrollToCommentId] = useState<string | null>(() =>
+    searchParams.get('comment'),
+  );
+  const clearScrollToComment = useCallback(() => setScrollToCommentId(null), []);
+  const deepLinkAnnotationRef = useRef<string | null>(searchParams.get('annotation'));
   useEffect(() => {
-    if (!searchParams.has('annotation')) return;
+    if (!searchParams.has('annotation') && !searchParams.has('comment')) return;
     const next = new URLSearchParams(searchParams);
     next.delete('annotation');
+    next.delete('comment');
     setSearchParams(next, { replace: true });
   }, [searchParams, setSearchParams]);
   // Card↔mark linking (prototype): hovering either side lights up the other.
@@ -221,6 +230,21 @@ export function DocumentReviewPage() {
   // to the mark elements the highlight layer renders.
   const focusMode = viewMode === 'focus';
   const activeAnnotation = annotations.find((a) => a.id === activeAnnotationId);
+  // Permalinks (issue #412): the builder carries the current view so a copied
+  // link reopens the same surface; it only builds URLs, the server still gates
+  // access. A deep-linked annotation that no longer exists degrades to a toast
+  // once the annotations settle (validated once via the ref above).
+  const buildPermalink = useReviewPermalink(focusMode ? 'focus' : 'panel');
+  useEffect(() => {
+    const target = deepLinkAnnotationRef.current;
+    if (!target || annotationsQuery.isPending || annotationsQuery.isError) return;
+    deepLinkAnnotationRef.current = null;
+    if (!annotations.some((a) => a.id === target)) {
+      notify('This annotation no longer exists.', 'error');
+      setActiveAnnotationId(null);
+      setScrollToCommentId(null);
+    }
+  }, [annotations, annotationsQuery.isPending, annotationsQuery.isError, notify]);
   const composingPending = Boolean(pending && !pending.menuPosition);
   const focusSpotlight = !focusMode
     ? null
@@ -525,6 +549,9 @@ export function DocumentReviewPage() {
                   readOnly={!isLatestVersion}
                   reviewClosed={!isOpenWorkflowState(document.workflowState)}
                   previousSeenAt={previousSeenAt}
+                  buildPermalink={buildPermalink}
+                  scrollToCommentId={scrollToCommentId}
+                  onScrolledToComment={clearScrollToComment}
                 />
               </ErrorBoundary>
             </Box>
@@ -558,6 +585,9 @@ export function DocumentReviewPage() {
               readOnly={!isLatestVersion}
               reviewClosed={!isOpenWorkflowState(document.workflowState)}
               previousSeenAt={previousSeenAt}
+              buildPermalink={buildPermalink}
+              scrollToCommentId={scrollToCommentId}
+              onScrolledToComment={clearScrollToComment}
             />
           </ErrorBoundary>
         </FocusDrawer>
@@ -576,6 +606,9 @@ export function DocumentReviewPage() {
           threadParticipation={document.threadParticipation ?? 'OPEN'}
           ownerId={document.ownerId}
           previousSeenAt={previousSeenAt}
+          buildPermalink={buildPermalink}
+          scrollToCommentId={scrollToCommentId}
+          onScrolledToComment={clearScrollToComment}
         />
       )}
       {focusMode && composingPending && pending && (

@@ -19,7 +19,7 @@
  * SPDX-License-Identifier: AGPL-3.0-only
  */
 
-import { Fragment, useState } from 'react';
+import { Fragment, useEffect, useMemo, useRef, useState } from 'react';
 import Box from '@mui/material/Box';
 import Button from '@mui/material/Button';
 import CircularProgress from '@mui/material/CircularProgress';
@@ -36,6 +36,7 @@ import { isSubmitShortcut, submitShortcutLabel } from '../../../utils/platform';
 import { useAuthStore } from '../../../stores/authStore';
 import type { Notify } from '../../admin/layout/useToast';
 import { isNewComment } from '../newSince';
+import type { BuildPermalink } from '../useReviewPermalink';
 import { CommentBubble } from './CommentBubble';
 import { UserAvatar } from '../../shell/UserAvatar';
 
@@ -61,6 +62,14 @@ interface CommentThreadProps {
   previousSeenAt?: string | null;
   /** True when the surrounding card already renders the opening annotation (issue #403). */
   skipOpener?: boolean;
+  /** Builds a per-comment permalink (issue #412) — enables the meta-line copy affordance. */
+  buildPermalink?: BuildPermalink;
+  /**
+   * A comment permalink target (issue #412): once the thread has loaded, its bubble is scrolled
+   * into view and pulsed once. An unknown id degrades to a toast. Consumed via `onScrolledToComment`.
+   */
+  scrollToCommentId?: string | null;
+  onScrolledToComment?: () => void;
 }
 
 /**
@@ -83,6 +92,9 @@ export function CommentThread({
   onReopen,
   previousSeenAt = null,
   skipOpener = false,
+  buildPermalink,
+  scrollToCommentId = null,
+  onScrolledToComment,
 }: CommentThreadProps) {
   const theme = useTheme();
   const userId = useAuthStore((state) => state.userId);
@@ -91,6 +103,7 @@ export function CommentThread({
   const commentsQuery = useComments(annotationId);
   const addComment = useAddComment(annotationId);
   const [draft, setDraft] = useState('');
+  const pulseColor = alpha(theme.qnop.brand.blue, 0.5);
 
   const submit = () => {
     const body = draft.trim();
@@ -111,13 +124,56 @@ export function CommentThread({
     });
   };
 
-  const comments = commentsQuery.data?.comments ?? [];
+  const comments = useMemo(() => commentsQuery.data?.comments ?? [], [commentsQuery.data]);
   // With the opening annotation living in the head card (issue #403), the
   // timeline carries only the replies.
   const visibleComments = skipOpener ? comments.slice(1) : comments;
   const firstNewCommentId = visibleComments.find((comment) =>
     isNewComment(comment, previousSeenAt, userId),
   )?.id;
+
+  // A comment permalink target (issue #412): once the thread has loaded, scroll
+  // its bubble into view (reduced-motion aware) and pulse it once. The opening
+  // comment already shows in the head card, so it needs no scroll; an unknown
+  // id degrades to a toast. Handled once per target so a re-render never
+  // re-scrolls or re-toasts.
+  const handledScrollRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (!scrollToCommentId || commentsQuery.isPending) return;
+    if (handledScrollRef.current === scrollToCommentId) return;
+    handledScrollRef.current = scrollToCommentId;
+
+    const index = comments.findIndex((comment) => comment.id === scrollToCommentId);
+    if (index === -1) {
+      notify('This comment no longer exists.', 'error');
+    } else if (!(skipOpener && index === 0)) {
+      const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+      const el = document.getElementById(`comment-${scrollToCommentId}`);
+      el?.scrollIntoView({ behavior: reduced ? 'auto' : 'smooth', block: 'center' });
+      // A one-shot ring in the unseen-marker blue, driven imperatively so it
+      // outlives the parent clearing the target; skipped under reduced motion
+      // and where the Web Animations API is unavailable (jsdom).
+      if (!reduced) {
+        el?.animate?.(
+          [
+            { boxShadow: `0 0 0 3px ${pulseColor}` },
+            { boxShadow: '0 0 0 3px transparent', offset: 0.6 },
+            { boxShadow: '0 0 0 0 transparent' },
+          ],
+          { duration: 1200, easing: 'ease-out' },
+        );
+      }
+    }
+    onScrolledToComment?.();
+  }, [
+    scrollToCommentId,
+    commentsQuery.isPending,
+    comments,
+    skipOpener,
+    notify,
+    onScrolledToComment,
+    pulseColor,
+  ]);
 
   return (
     <Box sx={{ position: 'relative', mt: 0.5, ml: 1.5, pl: 0 }}>
@@ -178,6 +234,9 @@ export function CommentThread({
                 avatarUrl={avatarUrl}
                 body={comment.body}
                 createdAt={comment.createdAt}
+                domId={`comment-${comment.id}`}
+                permalinkUrl={buildPermalink?.(annotationId, comment.id)}
+                notify={notify}
               />
             </Fragment>
           );

@@ -24,7 +24,9 @@ import Stack from '@mui/material/Stack';
 import Typography from '@mui/material/Typography';
 import { useTheme } from '@mui/material/styles';
 import { shortRelativeTime } from '../../../utils/relativeTime';
+import type { Notify } from '../../admin/layout/useToast';
 import { UserAvatar } from '../../shell/UserAvatar';
+import { CopyLinkButton } from '../permalink/CopyLinkButton';
 
 const AVATAR_SIZE = 26;
 
@@ -42,14 +44,20 @@ interface CommentBubbleProps {
   createdAt: string;
   /** Clamp the body to N lines (the hover preview); unset shows everything. */
   clampLines?: number;
+  /** A stable DOM id on the bubble root — the scroll/pulse target of a comment permalink (#412). */
+  domId?: string;
+  /** The comment's permalink; with `notify` it renders the meta-line copy affordance (issue #412). */
+  permalinkUrl?: string;
+  notify?: Notify;
 }
 
 /**
  * One comment in the social anatomy (issue #403): avatar, a softly rounded
  * bubble carrying the bold author name above the text, and the compact
- * relative timestamp in the meta line underneath (full date in the tooltip).
- * Shared by the thread and the mark's hover preview, so a comment reads
- * identically everywhere.
+ * relative timestamp in the meta line underneath (full date in the tooltip),
+ * where a quiet copy-link affordance joins it in the thread (issue #412; likes
+ * #410 share this line too). Shared by the thread and the mark's hover
+ * preview, so a comment reads identically everywhere.
  */
 export function CommentBubble({
   name,
@@ -58,10 +66,13 @@ export function CommentBubble({
   body,
   createdAt,
   clampLines,
+  domId,
+  permalinkUrl,
+  notify,
 }: CommentBubbleProps) {
   const theme = useTheme();
   return (
-    <Stack direction="row" spacing={1} sx={{ alignItems: 'flex-start' }}>
+    <Stack id={domId} direction="row" spacing={1} sx={{ alignItems: 'flex-start' }}>
       <Box sx={{ position: 'relative', zIndex: 1, pt: 0.25 }}>
         <UserAvatar name={name} size={AVATAR_SIZE} imageUrl={own ? avatarUrl : null} />
       </Box>
@@ -96,13 +107,18 @@ export function CommentBubble({
             {body}
           </Typography>
         </Box>
-        <Typography
-          variant="caption"
-          title={TIME_FORMAT.format(new Date(createdAt))}
-          sx={{ display: 'block', pl: 1.5, mt: 0.25, fontWeight: 600, color: 'text.secondary' }}
-        >
-          {shortRelativeTime(createdAt)}
-        </Typography>
+        <Stack direction="row" spacing={0.25} sx={{ alignItems: 'center', pl: 1.5, mt: 0.25 }}>
+          <Typography
+            variant="caption"
+            title={TIME_FORMAT.format(new Date(createdAt))}
+            sx={{ fontWeight: 600, color: 'text.secondary' }}
+          >
+            {shortRelativeTime(createdAt)}
+          </Typography>
+          {permalinkUrl && notify && (
+            <CopyLinkButton url={permalinkUrl} notify={notify} label="Copy link to comment" />
+          )}
+        </Stack>
       </Box>
     </Stack>
   );

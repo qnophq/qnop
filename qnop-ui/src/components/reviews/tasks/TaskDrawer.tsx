@@ -33,6 +33,8 @@ import { useAuthStore } from '../../../stores/authStore';
 import { tokens } from '../../../theme/tokens';
 import type { Notify } from '../../admin/layout/useToast';
 import { ToneBadge } from '../../admin/ToneBadge';
+import type { BuildPermalink } from '../useReviewPermalink';
+import { CopyLinkButton } from '../permalink/CopyLinkButton';
 import { CommentThread } from '../panel/CommentThread';
 import { ResolveBar } from '../panel/ResolveBar';
 import {
@@ -62,6 +64,8 @@ interface TaskDrawerProps {
   onClose: () => void;
   /** Jumps to the review page with this annotation active (deep link). */
   onShowInDocument: (annotationId: string) => void;
+  /** Builds annotation/comment permalinks (issue #412) — enables the copy affordances. */
+  buildPermalink?: BuildPermalink;
 }
 
 /**
@@ -83,6 +87,7 @@ export function TaskDrawer({
   ownerId,
   onClose,
   onShowInDocument,
+  buildPermalink,
 }: TaskDrawerProps) {
   const theme = useTheme();
   const userId = useAuthStore((state) => state.userId);
@@ -190,15 +195,23 @@ export function TaskDrawer({
               “{annotation.anchor.textQuote.quote}”
             </Typography>
           )}
-          <Button
-            size="small"
-            variant="text"
-            startIcon={<ExternalLink size={13} />}
-            onClick={() => onShowInDocument(annotation.id)}
-            sx={{ mt: 1 }}
-          >
-            Show in document
-          </Button>
+          <Stack direction="row" spacing={0.5} sx={{ alignItems: 'center', mt: 1 }}>
+            <Button
+              size="small"
+              variant="text"
+              startIcon={<ExternalLink size={13} />}
+              onClick={() => onShowInDocument(annotation.id)}
+            >
+              Show in document
+            </Button>
+            {buildPermalink && (
+              <CopyLinkButton
+                url={buildPermalink(annotation.id)}
+                notify={notify}
+                label="Copy link to annotation"
+              />
+            )}
+          </Stack>
         </Box>
 
         <Box sx={{ flex: 1, overflowY: 'auto', px: 2, py: 1 }}>
@@ -214,6 +227,7 @@ export function TaskDrawer({
             }
             previousSeenAt={previousSeenAt}
             skipOpener
+            buildPermalink={buildPermalink}
           />
         </Box>
 

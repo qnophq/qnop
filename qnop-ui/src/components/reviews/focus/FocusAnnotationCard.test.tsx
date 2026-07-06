@@ -184,4 +184,10 @@ describe('FocusAnnotationCard', () => {
     expect(screen.queryByTestId('resolve-bar')).not.toBeInTheDocument();
     expect(screen.getByTestId('thread-a2')).toBeInTheDocument();
   });
+
+  // Issue #412: the shared copy-link affordance rides the card header.
+  it('offers a copy-link affordance in the header when a permalink builder is wired', () => {
+    renderCard({ buildPermalink: (id) => `https://qnop.example/reviews/d?annotation=${id}` });
+    expect(screen.getByRole('button', { name: 'Copy link to annotation' })).toBeInTheDocument();
+  });
 });

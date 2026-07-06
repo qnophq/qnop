@@ -35,6 +35,7 @@ import {
   useRenderedDocument,
 } from '../../api/hooks/useDocuments';
 import { useAnnotations, useCreateAnnotation } from '../../api/hooks/useAnnotations';
+import { useComments } from '../../api/hooks/useComments';
 import { usePdfDocument } from '../../components/reviews/viewer/usePdfDocument';
 import { useAuthStore } from '../../stores/authStore';
 
@@ -361,6 +362,49 @@ describe('DocumentReviewPage deep link', () => {
     seedHappyPath();
     renderPage('/reviews/doc-1?annotation=a1');
     expect(screen.getByTestId('annotation-item-a1')).toHaveAttribute('aria-expanded', 'true');
+  });
+
+  // Issue #412: a comment permalink opens the annotation AND scrolls its thread
+  // to the referenced comment once the thread has loaded.
+  it('scrolls to the comment named by ?comment= on the deep-linked annotation', () => {
+    const scrollIntoView = vi.fn();
+    Element.prototype.scrollIntoView = scrollIntoView;
+    seedHappyPath();
+    vi.mocked(useComments).mockReturnValue({
+      isPending: false,
+      isError: false,
+      data: {
+        comments: [
+          {
+            id: 'op',
+            annotationId: 'a1',
+            authorId: 'u1',
+            body: 'opener',
+            createdAt: '2026-07-01T10:00:00Z',
+          },
+          {
+            id: 'c9',
+            annotationId: 'a1',
+            authorId: 'u1',
+            body: 'the reply',
+            createdAt: '2026-07-02T10:00:00Z',
+          },
+        ],
+      },
+    } as unknown as ReturnType<typeof useComments>);
+
+    renderPage('/reviews/doc-1?annotation=a1&comment=c9');
+
+    expect(screen.getByTestId('annotation-item-a1')).toHaveAttribute('aria-expanded', 'true');
+    expect(scrollIntoView).toHaveBeenCalled();
+  });
+
+  // Issue #412: an annotation that no longer exists degrades to a toast rather
+  // than a silently empty page; the review itself still opens.
+  it('degrades an unknown ?annotation= target to a toast', () => {
+    seedHappyPath();
+    renderPage('/reviews/doc-1?annotation=does-not-exist');
+    expect(screen.getByText('This annotation no longer exists.')).toBeInTheDocument();
   });
 });
 
