@@ -414,4 +414,22 @@ describe('AnnotationPanel', () => {
     expect(screen.queryByTestId('resolve-bar')).not.toBeInTheDocument();
     expect(screen.getByTestId('thread-a1')).toBeInTheDocument();
   });
+
+  // Issue #412: the annotation copy-link appears on the expanded card when a
+  // permalink builder is wired, and stays absent without one.
+  it('offers a copy-link affordance on the active annotation with a permalink builder', () => {
+    renderPanel({
+      annotations: [annotation('a1')],
+      activeAnnotationId: 'a1',
+      buildPermalink: (id) => `https://qnop.example/reviews/d?annotation=${id}`,
+    });
+    expect(screen.getByRole('button', { name: 'Copy link to annotation' })).toBeInTheDocument();
+  });
+
+  it('omits the copy-link affordance without a permalink builder', () => {
+    renderPanel({ annotations: [annotation('a1')], activeAnnotationId: 'a1' });
+    expect(
+      screen.queryByRole('button', { name: 'Copy link to annotation' }),
+    ).not.toBeInTheDocument();
+  });
 });

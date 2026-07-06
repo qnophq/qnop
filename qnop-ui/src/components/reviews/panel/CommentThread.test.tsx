@@ -267,3 +267,95 @@ describe('CommentThread', () => {
     expect(onReopen).toHaveBeenCalled();
   });
 });
+
+// Issue #412: permalinks. The thread carries a per-comment copy affordance and
+// resolves an incoming comment permalink target — scroll into view + pulse, or
+// a toast when the id is gone.
+describe('CommentThread permalinks (#412)', () => {
+  const TWO_COMMENTS = {
+    isPending: false,
+    isError: false,
+    data: {
+      comments: [
+        {
+          id: 'c1',
+          annotationId: 'a1',
+          authorId: 'me',
+          body: 'first',
+          createdAt: '2026-07-01T10:00:00Z',
+        },
+        {
+          id: 'c2',
+          annotationId: 'a1',
+          authorId: 'other',
+          body: 'second',
+          createdAt: '2026-07-02T10:00:00Z',
+        },
+      ],
+    },
+  } as unknown as ReturnType<typeof useComments>;
+
+  const buildPermalink = (annotationId: string, commentId?: string) =>
+    `https://qnop.example/reviews/d?annotation=${annotationId}${
+      commentId ? `&comment=${commentId}` : ''
+    }`;
+
+  it('renders a copy-link affordance on every comment when a builder is provided', () => {
+    vi.mocked(useComments).mockReturnValue(TWO_COMMENTS);
+    render(
+      <ThemeProvider theme={buildTheme('light')}>
+        <CommentThread annotationId="a1" notify={vi.fn()} buildPermalink={buildPermalink} />
+      </ThemeProvider>,
+    );
+    expect(screen.getAllByRole('button', { name: 'Copy link to comment' })).toHaveLength(2);
+  });
+
+  it('shows no per-comment copy affordance without a builder (e.g. the hover preview)', () => {
+    vi.mocked(useComments).mockReturnValue(TWO_COMMENTS);
+    render(
+      <ThemeProvider theme={buildTheme('light')}>
+        <CommentThread annotationId="a1" notify={vi.fn()} />
+      </ThemeProvider>,
+    );
+    expect(screen.queryByRole('button', { name: 'Copy link to comment' })).not.toBeInTheDocument();
+  });
+
+  it('scrolls a comment permalink target into view and consumes it once', () => {
+    const scrollIntoView = vi.fn();
+    Element.prototype.scrollIntoView = scrollIntoView;
+    vi.mocked(useComments).mockReturnValue(TWO_COMMENTS);
+    const notify = vi.fn();
+    const onScrolledToComment = vi.fn();
+    render(
+      <ThemeProvider theme={buildTheme('light')}>
+        <CommentThread
+          annotationId="a1"
+          notify={notify}
+          scrollToCommentId="c2"
+          onScrolledToComment={onScrolledToComment}
+        />
+      </ThemeProvider>,
+    );
+    expect(scrollIntoView).toHaveBeenCalledTimes(1);
+    expect(onScrolledToComment).toHaveBeenCalledTimes(1);
+    expect(notify).not.toHaveBeenCalled();
+  });
+
+  it('degrades an unknown comment permalink target to a toast', () => {
+    vi.mocked(useComments).mockReturnValue(TWO_COMMENTS);
+    const notify = vi.fn();
+    const onScrolledToComment = vi.fn();
+    render(
+      <ThemeProvider theme={buildTheme('light')}>
+        <CommentThread
+          annotationId="a1"
+          notify={notify}
+          scrollToCommentId="ghost"
+          onScrolledToComment={onScrolledToComment}
+        />
+      </ThemeProvider>,
+    );
+    expect(notify).toHaveBeenCalledWith('This comment no longer exists.', 'error');
+    expect(onScrolledToComment).toHaveBeenCalledTimes(1);
+  });
+});

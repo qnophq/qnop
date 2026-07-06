@@ -37,6 +37,8 @@ import type { AnnotationView } from '../../../api/generated';
 import { AnnotationStatus } from '../../../api/generated';
 import { tokens } from '../../../theme/tokens';
 import type { Notify } from '../../admin/layout/useToast';
+import type { BuildPermalink } from '../useReviewPermalink';
+import { CopyLinkButton } from '../permalink/CopyLinkButton';
 import { AnnotationHead } from '../panel/AnnotationHead';
 import { CommentThread } from '../panel/CommentThread';
 import { ResolveBar } from '../panel/ResolveBar';
@@ -68,6 +70,11 @@ interface FocusAnnotationCardProps {
   ownerId?: string;
   /** The previous visit (issue #307) — enables the thread's "new" divider. */
   previousSeenAt?: string | null;
+  /** Builds annotation/comment permalinks (issue #412) — enables the copy affordances. */
+  buildPermalink?: BuildPermalink;
+  /** A comment permalink target (issue #412) — scrolled to + pulsed once the thread loads. */
+  scrollToCommentId?: string | null;
+  onScrolledToComment?: () => void;
 }
 
 /** True when the key event originates in a text field (arrows must move the caret). */
@@ -100,6 +107,9 @@ export function FocusAnnotationCard({
   threadParticipation = 'OPEN',
   ownerId,
   previousSeenAt = null,
+  buildPermalink,
+  scrollToCommentId = null,
+  onScrolledToComment,
 }: FocusAnnotationCardProps) {
   const theme = useTheme();
   const reducedMotion = useMediaQuery('(prefers-reduced-motion: reduce)');
@@ -277,6 +287,13 @@ export function FocusAnnotationCard({
                       : 'Annotation'}
                   </Typography>
                   <Box sx={{ flex: 1 }} />
+                  {buildPermalink && (
+                    <CopyLinkButton
+                      url={buildPermalink(annotation.id)}
+                      notify={notify}
+                      label="Copy link to annotation"
+                    />
+                  )}
                   <Tooltip title="Previous annotation (↑)">
                     <span>
                       <IconButton
@@ -337,6 +354,9 @@ export function FocusAnnotationCard({
                     }
                     previousSeenAt={previousSeenAt}
                     skipOpener
+                    buildPermalink={buildPermalink}
+                    scrollToCommentId={scrollToCommentId}
+                    onScrolledToComment={onScrolledToComment}
                   />
                 </Box>
                 {/* Discoverability for the native resize grip underneath. */}

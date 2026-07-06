@@ -35,6 +35,7 @@ import { useRecordVisit } from '../../api/hooks/useReviews';
 import { AdminToast } from '../../components/admin/layout/AdminToast';
 import { ReviewViewTabs } from '../../components/reviews/hub/ReviewViewTabs';
 import { useReviewDocumentId } from '../../components/reviews/reviewDocumentId';
+import { useReviewPermalink } from '../../components/reviews/useReviewPermalink';
 import { PageHeader } from '../../components/admin/layout/PageHeader';
 import { useToast } from '../../components/admin/layout/useToast';
 import type { FilterAuthor } from '../../components/reviews/panel/PanelFilterBar';
@@ -78,6 +79,9 @@ export function ReviewTasksPage() {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const { toast, notify, clear } = useToast();
+  // Permalinks from the tasks drawer open the document in the recipient's own
+  // view preference — the sharer is on the tasks surface, not panel/focus (#412).
+  const buildPermalink = useReviewPermalink();
   const userId = useAuthStore((state) => state.userId);
   const ownDisplayName = useAuthStore((state) => state.displayName);
 
@@ -298,6 +302,7 @@ export function ReviewTasksPage() {
         ownerId={document.ownerId}
         onClose={() => setOpenTaskId(null)}
         onShowInDocument={showInDocument}
+        buildPermalink={buildPermalink}
       />
       <AdminToast toast={toast} onClose={clear} />
     </Stack>

@@ -219,6 +219,19 @@ describe('ReviewTasksPage', () => {
     expect(screen.getByTestId('review-page')).toBeInTheDocument();
   });
 
+  // Issue #412: the drawer is the third thread surface — it carries the
+  // annotation copy-link alongside its "Show in document" deep link.
+  it('offers an annotation copy-link in the drawer header', () => {
+    mockData();
+    renderPage();
+
+    fireEvent.click(screen.getByTestId('task-card-a-open'));
+    const drawer = screen.getByTestId('task-drawer');
+    expect(
+      within(drawer).getByRole('button', { name: 'Copy link to annotation' }),
+    ).toBeInTheDocument();
+  });
+
   it('honours the stored list preference', () => {
     localStorage.setItem('qnop-tasks-view', 'list');
     mockData();

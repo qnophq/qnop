@@ -40,6 +40,8 @@ import type { Notify } from '../../admin/layout/useToast';
 import { SectionCard } from '../../admin/layout/SectionCard';
 import { compareAnnotationsByPosition } from '../viewer/anchoring';
 import { isUnseen } from '../newSince';
+import type { BuildPermalink } from '../useReviewPermalink';
+import { CopyLinkButton } from '../permalink/CopyLinkButton';
 import { AnnotationListItem } from './AnnotationListItem';
 import { CommentThread } from './CommentThread';
 import { Composer } from './Composer';
@@ -82,6 +84,11 @@ interface AnnotationPanelProps {
   frameless?: boolean;
   /** The previous visit (issue #307) — null hides every unseen cue. */
   previousSeenAt?: string | null;
+  /** Builds annotation/comment permalinks (issue #412) — enables the copy affordances. */
+  buildPermalink?: BuildPermalink;
+  /** A comment permalink target (issue #412) — scrolled to + pulsed in the active thread. */
+  scrollToCommentId?: string | null;
+  onScrolledToComment?: () => void;
 }
 
 /** A collapsible, counted group of annotation cards (prototype sidebar section). */
@@ -216,6 +223,9 @@ export function AnnotationPanel({
   reviewClosed = false,
   frameless = false,
   previousSeenAt = null,
+  buildPermalink,
+  scrollToCommentId = null,
+  onScrolledToComment,
 }: AnnotationPanelProps) {
   const [filters, setFilters] = useState<AnnotationFilters>(EMPTY_FILTERS);
   const userId = useAuthStore((state) => state.userId);
@@ -281,6 +291,18 @@ export function AnnotationPanel({
           onHover={onHover}
         />
         <Collapse in={active} unmountOnExit>
+          {/* The annotation permalink (issue #412) — a quiet right-aligned link
+              under the head card; a sibling of the row's ButtonBase, never
+              nested inside it. */}
+          {buildPermalink && (
+            <Stack direction="row" sx={{ justifyContent: 'flex-end', pt: 0.5 }}>
+              <CopyLinkButton
+                url={buildPermalink(annotation.id)}
+                notify={notify}
+                label="Copy link to annotation"
+              />
+            </Stack>
+          )}
           {!readOnly && mayResolveAnnotation(annotation, userId) && (
             <ResolveBar disabled={resolving} onResolve={(note) => resolveWith(annotation, note)} />
           )}
@@ -298,6 +320,9 @@ export function AnnotationPanel({
             }
             previousSeenAt={previousSeenAt}
             skipOpener
+            buildPermalink={buildPermalink}
+            scrollToCommentId={active ? scrollToCommentId : null}
+            onScrolledToComment={onScrolledToComment}
           />
         </Collapse>
       </Stack>
