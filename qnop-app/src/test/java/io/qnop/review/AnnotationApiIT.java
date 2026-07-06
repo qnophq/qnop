@@ -93,6 +93,23 @@ class AnnotationApiIT extends SeededIntegrationTest {
     return JsonPath.read(json, "$.id");
   }
 
+  /** Creates an anchor-free, document-scoped annotation (issue #395) on the latest version. */
+  private String createDocumentScopedAnnotation(UUID documentId, UUID actor) throws Exception {
+    String json =
+        mockMvc
+            .perform(
+                as(post("/api/v1/documents/" + documentId + "/annotations"), actor)
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content(
+                        "{\"versionNumber\":1,\"comment\":\"unify terminology across the"
+                            + " contract\"}"))
+            .andExpect(status().isCreated())
+            .andReturn()
+            .getResponse()
+            .getContentAsString();
+    return JsonPath.read(json, "$.id");
+  }
+
   @Test
   void participantCreatesAnAnnotationPlacedOnTheVersion() throws Exception {
     UUID documentId = seedDocumentWithVersion();
@@ -126,6 +143,51 @@ class AnnotationApiIT extends SeededIntegrationTest {
         .andExpect(jsonPath("$.annotations.length()").value(1))
         .andExpect(jsonPath("$.annotations[0].placementStatus").value("PLACED"))
         .andExpect(jsonPath("$.annotations[0].anchor.region.box.width").value(0.3));
+  }
+
+  @Test
+  void createsADocumentScopedAnnotationWithoutAnAnchor() throws Exception {
+    UUID documentId = seedDocumentWithVersion();
+
+    // A general remark that pins to no passage (issue #395): the anchor is omitted, so no
+    // placement is created — the view carries neither an anchor nor a placement status.
+    mockMvc
+        .perform(
+            as(post("/api/v1/documents/" + documentId + "/annotations"), AUDITOR_ID)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(
+                    "{\"versionNumber\":1,\"comment\":\"unify terminology across the contract\"}"))
+        .andExpect(status().isCreated())
+        .andExpect(jsonPath("$.status").value("OPEN"))
+        .andExpect(jsonPath("$.authorId").value(AUDITOR_ID.toString()))
+        .andExpect(jsonPath("$.anchor").doesNotExist())
+        .andExpect(jsonPath("$.placementStatus").doesNotExist())
+        .andExpect(jsonPath("$.commentCount").value(1));
+  }
+
+  @Test
+  void documentScopedAnnotationAppearsOnEveryVersionWithoutAPlacement() throws Exception {
+    UUID documentId = seedDocumentWithVersion();
+    createDocumentScopedAnnotation(documentId, AUDITOR_ID);
+
+    // A second version is uploaded: a located annotation would re-anchor, but a document-scoped
+    // one has no placement to carry forward — it stays valid on every version, never PENDING or
+    // ORPHANED (issue #395, ADR-0009).
+    versions.save(
+        new DocumentVersion(
+            documentId, 2, "sha256/bb/cafebabe", "cafebabe", "application/pdf", 2345L, MEMBER_ID));
+
+    for (String version : new String[] {"1", "2"}) {
+      mockMvc
+          .perform(
+              as(
+                  get("/api/v1/documents/" + documentId + "/annotations").param("version", version),
+                  MEMBER_ID))
+          .andExpect(status().isOk())
+          .andExpect(jsonPath("$.annotations.length()").value(1))
+          .andExpect(jsonPath("$.annotations[0].anchor").doesNotExist())
+          .andExpect(jsonPath("$.annotations[0].placementStatus").doesNotExist());
+    }
   }
 
   @Test

@@ -125,11 +125,12 @@ public class AnnotationService {
       Instant createdAt) {}
 
   /**
-   * Creates an annotation on {@code versionNumber}, placed immediately, seeded with its mandatory
-   * first comment — an annotation without text must not exist (issue #301). Only the LATEST version
-   * accepts new annotations (issue #306) — older versions are a read-only record; the guard answers
-   * 409 {@code VERSION_READ_ONLY} so a client racing a concurrent re-upload gets a stable, mappable
-   * signal.
+   * Creates an annotation on {@code versionNumber}, seeded with its mandatory first comment — an
+   * annotation without text must not exist (issue #301). With an {@code anchorJson} it is placed
+   * immediately; without one it is document-scoped (issue #395) — no placement, valid on every
+   * version. Only the LATEST version accepts new annotations (issue #306) — older versions are a
+   * read-only record; the guard answers 409 {@code VERSION_READ_ONLY} so a client racing a
+   * concurrent re-upload gets a stable, mappable signal.
    */
   @Transactional
   public AnnotationView create(
@@ -166,10 +167,16 @@ public class AnnotationService {
     Annotation created = new Annotation(documentId, author);
     created.classify(typeOf(type), priorityOf(priority));
     Annotation annotation = annotations.saveAndFlush(created);
-    AnnotationPlacement placement =
-        new AnnotationPlacement(annotation.getId(), version.getId(), anchorJson);
-    placement.markPlaced(anchorJson);
-    placements.save(placement);
+    // A located annotation is placed immediately on the version it was drawn on. A document-scoped
+    // annotation (issue #395) carries no anchor and gets no placement at all — it stays valid on
+    // every version, never re-anchored and never orphaned (ADR-0009). The null placement flows
+    // through to a view with a null anchor/placementStatus, the client's document-scope signal.
+    AnnotationPlacement placement = null;
+    if (anchorJson != null) {
+      placement = new AnnotationPlacement(annotation.getId(), version.getId(), anchorJson);
+      placement.markPlaced(anchorJson);
+      placements.save(placement);
+    }
 
     comments.save(new Comment(annotation.getId(), author, firstComment));
     int commentCount = 1;

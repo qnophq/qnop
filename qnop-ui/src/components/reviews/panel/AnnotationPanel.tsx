@@ -27,7 +27,7 @@ import Collapse from '@mui/material/Collapse';
 import Stack from '@mui/material/Stack';
 import Typography from '@mui/material/Typography';
 import { useTheme } from '@mui/material/styles';
-import { ChevronRight, Link2, NotebookPen, Unlink } from 'lucide-react';
+import { ChevronRight, FileText, Link2, NotebookPen } from 'lucide-react';
 import type {
   AnnotationPriority,
   AnnotationType,
@@ -40,6 +40,7 @@ import type { Notify } from '../../admin/layout/useToast';
 import { SectionCard } from '../../admin/layout/SectionCard';
 import { compareAnnotationsByPosition } from '../viewer/anchoring';
 import { isUnseen } from '../newSince';
+import { isDocumentScoped } from '../annotationScope';
 import type { BuildPermalink } from '../useReviewPermalink';
 import { CopyLinkButton } from '../permalink/CopyLinkButton';
 import { AnnotationListItem } from './AnnotationListItem';
@@ -256,16 +257,19 @@ export function AnnotationPanel({
   // Sort + status-filter once per (annotations, filter) change, not on every
   // render (e.g. a hover or selection): the list can be large and the sort is
   // O(n log n) (issue #334).
-  const { placed, unplaced, hiddenByFilter } = useMemo(() => {
+  const { located, documentScoped, hiddenByFilter } = useMemo(() => {
     const matches = (annotation: AnnotationView) =>
       matchesFilters(annotation, filters, authorNameOf(annotation));
     const sorted = [...annotations].sort(compareAnnotationsByPosition);
-    const placedItems = sorted.filter((a) => a.anchor && matches(a));
-    const unplacedItems = sorted.filter((a) => !a.anchor && matches(a));
+    // Located annotations anchor to a passage; document-scoped ones (issue #395) apply to the
+    // whole document — no anchor, never orphaned — and group on their own.
+    const locatedItems = sorted.filter((a) => !isDocumentScoped(a) && matches(a));
+    const documentScopedItems = sorted.filter((a) => isDocumentScoped(a) && matches(a));
     return {
-      placed: placedItems,
-      unplaced: unplacedItems,
-      hiddenByFilter: annotations.length > 0 && placedItems.length + unplacedItems.length === 0,
+      located: locatedItems,
+      documentScoped: documentScopedItems,
+      hiddenByFilter:
+        annotations.length > 0 && locatedItems.length + documentScopedItems.length === 0,
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps -- authorNameOf derives from the inputs below
   }, [annotations, filters, userId, displayName]);
@@ -364,26 +368,26 @@ export function AnnotationPanel({
             No annotations match this filter.
           </Typography>
         )}
-        {placed.length > 0 && (
+        {located.length > 0 && (
           <PanelSection
             title="On this version"
             subtitle="Anchored to the document"
             icon={<Link2 size={13} aria-hidden />}
-            count={placed.length}
-            newCount={placed.filter((a) => isUnseen(a, previousSeenAt, userId)).length}
+            count={located.length}
+            newCount={located.filter((a) => isUnseen(a, previousSeenAt, userId)).length}
           >
-            {placed.map(renderItem)}
+            {located.map(renderItem)}
           </PanelSection>
         )}
-        {unplaced.length > 0 && (
+        {documentScoped.length > 0 && (
           <PanelSection
-            title="Not placed on this version"
-            subtitle="Anchor lost — needs manual handling"
-            icon={<Unlink size={13} aria-hidden />}
-            count={unplaced.length}
-            newCount={unplaced.filter((a) => isUnseen(a, previousSeenAt, userId)).length}
+            title="Whole document"
+            subtitle="General remarks — not pinned to a passage"
+            icon={<FileText size={13} aria-hidden />}
+            count={documentScoped.length}
+            newCount={documentScoped.filter((a) => isUnseen(a, previousSeenAt, userId)).length}
           >
-            {unplaced.map(renderItem)}
+            {documentScoped.map(renderItem)}
           </PanelSection>
         )}
       </Stack>

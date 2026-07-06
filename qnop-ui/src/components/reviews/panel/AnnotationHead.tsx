@@ -28,6 +28,7 @@ import { useComments } from '../../../api/hooks/useComments';
 import { useAuthStore } from '../../../stores/authStore';
 import { shortRelativeTime } from '../../../utils/relativeTime';
 import { UserAvatar } from '../../shell/UserAvatar';
+import { isDocumentScoped } from '../annotationScope';
 import { AnnotationBadgeRow } from './AnnotationBadgeRow';
 
 const DATE_FORMAT = new Intl.DateTimeFormat(undefined, {
@@ -96,9 +97,13 @@ export function AnnotationHead({ annotation, unseen = false }: AnnotationHeadPro
           </Typography>
         </Box>
       ) : (
-        <Typography variant="body2" color="text.secondary">
-          {fallbackLabel}
-        </Typography>
+        // A document-scoped annotation (issue #395) has no passage; its scope reads from the
+        // "Whole document" chip in the badge row above, so no fallback line is needed here.
+        !isDocumentScoped(annotation) && (
+          <Typography variant="body2" color="text.secondary">
+            {fallbackLabel}
+          </Typography>
+        )
       )}
       {openerText && (
         <Typography

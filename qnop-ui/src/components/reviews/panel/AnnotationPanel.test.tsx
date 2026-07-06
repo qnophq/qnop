@@ -139,26 +139,24 @@ describe('AnnotationPanel', () => {
     ).toBeInTheDocument();
   });
 
-  it('lists placed annotations and separates unplaced ones', () => {
+  it('separates document-scoped annotations into their own group (#395)', () => {
     renderPanel({
       annotations: [
         annotation('placed-1'),
-        annotation('orphaned-1', {
-          anchor: undefined,
-          placementStatus: PlacementStatus.Orphaned,
-        }),
+        // A document-scoped annotation: no anchor and no placement (issue #395).
+        annotation('doc-1', { anchor: undefined, placementStatus: undefined }),
       ],
-      // The unplaced annotation is expanded: placement cues are
-      // expanded-state details; collapsed rows stay a single dense line.
-      activeAnnotationId: 'orphaned-1',
+      activeAnnotationId: 'doc-1',
     });
 
     expect(screen.getByText('Annotations (2)')).toBeInTheDocument();
-    expect(screen.getByText('Not placed on this version')).toBeInTheDocument();
-    expect(screen.getByText('“quoted text”')).toBeInTheDocument();
-    // The collapsed placed row shows the page as a compact caption.
+    // The anchor-free annotation groups under "Whole document", not the "anchor lost" bucket.
+    expect(screen.getByText('Whole document')).toBeInTheDocument();
+    expect(screen.queryByText('Not placed on this version')).not.toBeInTheDocument();
+    // The located annotation's collapsed row still shows its page.
     expect(screen.getByText('p. 1')).toBeInTheDocument();
-    expect(screen.getByText('Orphaned')).toBeInTheDocument();
+    // The active document-scoped annotation carries the whole-document chip.
+    expect(screen.getByTestId('whole-document-chip')).toBeInTheDocument();
   });
 
   it('toggles the active annotation and reveals its thread', () => {

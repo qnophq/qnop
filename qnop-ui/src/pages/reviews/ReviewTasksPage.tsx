@@ -22,13 +22,14 @@
 import { useState } from 'react';
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import Box from '@mui/material/Box';
+import Button from '@mui/material/Button';
 import Chip from '@mui/material/Chip';
 import CircularProgress from '@mui/material/CircularProgress';
 import Divider from '@mui/material/Divider';
 import Stack from '@mui/material/Stack';
 import ToggleButton from '@mui/material/ToggleButton';
 import ToggleButtonGroup from '@mui/material/ToggleButtonGroup';
-import { LayoutGrid, List as ListIcon } from 'lucide-react';
+import { LayoutGrid, List as ListIcon, Plus } from 'lucide-react';
 import { useAnnotations } from '../../api/hooks/useAnnotations';
 import { useDocument, useDocumentVersions } from '../../api/hooks/useDocuments';
 import { useRecordVisit } from '../../api/hooks/useReviews';
@@ -46,6 +47,7 @@ import {
   mayResolveAnnotation,
   useResolveWithFeedback,
 } from '../../components/reviews/panel/resolve';
+import { NewTaskDialog } from '../../components/reviews/tasks/NewTaskDialog';
 import { TaskBoard } from '../../components/reviews/tasks/TaskBoard';
 import { TaskDrawer } from '../../components/reviews/tasks/TaskDrawer';
 import { TaskListRows } from '../../components/reviews/tasks/TaskListRows';
@@ -120,6 +122,7 @@ export function ReviewTasksPage() {
     query: searchParams.get('q') ?? '',
   };
   const [openTaskId, setOpenTaskId] = useState<string | null>(null);
+  const [newTaskOpen, setNewTaskOpen] = useState(false);
 
   const { resolveWith } = useResolveWithFeedback(notify);
 
@@ -215,6 +218,20 @@ export function ReviewTasksPage() {
       <PageHeader
         title={document.title}
         titleAdornment={<Chip size="small" variant="outlined" label="Tasks" />}
+        action={
+          // A document-scoped task (issue #395) needs no selection — offered while the review is
+          // open and has a version to author against; the server refuses a closed review anyway.
+          isOpenWorkflowState(document.workflowState) && latestVersion >= 1 ? (
+            <Button
+              variant="contained"
+              size="small"
+              startIcon={<Plus size={16} />}
+              onClick={() => setNewTaskOpen(true)}
+            >
+              New task
+            </Button>
+          ) : undefined
+        }
       />
       <ReviewViewTabs
         documentId={routeSegment}
@@ -303,6 +320,13 @@ export function ReviewTasksPage() {
         onClose={() => setOpenTaskId(null)}
         onShowInDocument={showInDocument}
         buildPermalink={buildPermalink}
+      />
+      <NewTaskDialog
+        open={newTaskOpen}
+        documentId={documentId}
+        versionNumber={latestVersion}
+        notify={notify}
+        onClose={() => setNewTaskOpen(false)}
       />
       <AdminToast toast={toast} onClose={clear} />
     </Stack>

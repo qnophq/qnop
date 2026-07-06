@@ -76,7 +76,9 @@ public class AnnotationController implements AnnotationsApi {
             request.getVersionNumber(),
             CurrentUser.requireUserId(),
             CurrentUser.isAdmin(),
-            mapper.writeValueAsString(request.getAnchor()),
+            // A document-scoped annotation (issue #395) carries no anchor; keep it a Java null
+            // rather than the JSON literal "null" so the service creates no placement for it.
+            request.getAnchor() == null ? null : mapper.writeValueAsString(request.getAnchor()),
             request.getComment(),
             request.getType() == null ? null : request.getType().getValue(),
             request.getPriority() == null ? null : request.getPriority().getValue());

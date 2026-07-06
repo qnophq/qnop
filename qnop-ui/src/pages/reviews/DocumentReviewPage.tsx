@@ -51,6 +51,7 @@ import { ReviewHubHead } from '../../components/reviews/hub/ReviewHubHead';
 import { ReviewViewTabs } from '../../components/reviews/hub/ReviewViewTabs';
 import { useReviewDocumentId } from '../../components/reviews/reviewDocumentId';
 import { useReviewPermalink } from '../../components/reviews/useReviewPermalink';
+import { isDocumentScoped } from '../../components/reviews/annotationScope';
 import { AnnotationPanel } from '../../components/reviews/panel/AnnotationPanel';
 import {
   DEFAULT_PANEL_FRACTION,
@@ -318,9 +319,11 @@ export function DocumentReviewPage() {
   const handleFocusSelect = useCallback(
     (id: string | null) => {
       setActiveAnnotationId(id);
-      // A placed annotation continues in the spotlight; unplaced ones keep their
-      // thread inside the drawer (no mark to spotlight).
-      if (id && annotations.find((a) => a.id === id)?.anchor) setListOpen(false);
+      if (!id) return;
+      const selected = annotations.find((a) => a.id === id);
+      // A located annotation closes the drawer to reveal its floating card; a document-scoped one
+      // (issue #395) has no mark to float by, so it stays in the drawer where its thread expands.
+      if (selected) setListOpen(isDocumentScoped(selected));
     },
     [annotations],
   );

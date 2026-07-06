@@ -147,7 +147,9 @@ function AnnotationListItemBase({
     (participant, index, all) => all.findIndex((other) => other.id === participant.id) === index,
   );
 
-  const fallbackLabel = region ? 'Region annotation' : 'No placement on this version';
+  // No region means no placement at all → a document-scoped annotation (issue #395); an orphaned
+  // annotation keeps its anchor, so it never lands here.
+  const fallbackLabel = region ? 'Region annotation' : 'Whole document';
 
   return (
     <ButtonBase
