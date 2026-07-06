@@ -256,12 +256,13 @@ describe('DocumentReviewPage', () => {
     expect(screen.getByText('Moved')).toBeInTheDocument();
   });
 
-  // Issue #395: a whole-document task can be raised from the panel too, not only the tasks view.
-  it('opens the New task dialog from the annotations panel', () => {
+  // Issue #395: a whole-document ("global") annotation can be raised from the panel too, not only
+  // the tasks view.
+  it('opens the global annotation dialog from the annotations panel', () => {
     seedHappyPath();
     renderPage();
 
-    fireEvent.click(screen.getByRole('button', { name: 'New task' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Global annotation' }));
     expect(screen.getByText(/applies to the whole document/i)).toBeInTheDocument();
   });
 

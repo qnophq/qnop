@@ -159,25 +159,25 @@ describe('AnnotationPanel', () => {
     expect(screen.getByTestId('whole-document-chip')).toBeInTheDocument();
   });
 
-  it('offers a New task action for a whole-document note when writable (#395)', () => {
+  it('offers a Global annotation action for a whole-document remark when writable (#395)', () => {
     const onNewDocumentNote = vi.fn();
     renderPanel({ onNewDocumentNote });
 
-    fireEvent.click(screen.getByRole('button', { name: 'New task' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Global annotation' }));
     expect(onNewDocumentNote).toHaveBeenCalledTimes(1);
   });
 
-  it('hides New task on a read-only or closed review, or without a handler (#395)', () => {
+  it('hides Global annotation on a read-only or closed review, or without a handler (#395)', () => {
     renderPanel({ onNewDocumentNote: vi.fn(), readOnly: true });
-    expect(screen.queryByRole('button', { name: 'New task' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Global annotation' })).not.toBeInTheDocument();
     cleanup();
 
     renderPanel({ onNewDocumentNote: vi.fn(), reviewClosed: true });
-    expect(screen.queryByRole('button', { name: 'New task' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Global annotation' })).not.toBeInTheDocument();
     cleanup();
 
     renderPanel({});
-    expect(screen.queryByRole('button', { name: 'New task' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Global annotation' })).not.toBeInTheDocument();
   });
 
   it('toggles the active annotation and reveals its thread', () => {
@@ -266,7 +266,7 @@ describe('AnnotationPanel', () => {
   it('collapses a section on click', () => {
     renderPanel({ annotations: [annotation('a1')] });
 
-    const header = screen.getByRole('button', { name: /On this version/ });
+    const header = screen.getByRole('button', { name: /Anchored to the document/ });
     expect(header).toHaveAttribute('aria-expanded', 'true');
     expect(screen.getByTestId('annotation-item-a1')).toBeVisible();
 

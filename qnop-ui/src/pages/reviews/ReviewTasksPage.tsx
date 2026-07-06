@@ -228,7 +228,7 @@ export function ReviewTasksPage() {
               startIcon={<Plus size={16} />}
               onClick={() => setNewTaskOpen(true)}
             >
-              New task
+              Global annotation
             </Button>
           ) : undefined
         }

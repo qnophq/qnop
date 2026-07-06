@@ -41,11 +41,12 @@ interface NewTaskDialogProps {
 }
 
 /**
- * Creates a document-scoped annotation from the tasks view (issue #395): a
- * general remark that needs no text selection. It reuses the panel's `Composer`
- * (frameless) so the comment + optional type/priority read identically to a
- * located annotation; the request simply carries no anchor, which the server
- * takes as document-scoped.
+ * Creates a document-scoped ("global") annotation (issue #395): a general
+ * remark that applies to the whole document and needs no text selection,
+ * raisable from the tasks, document and focus views. It reuses the panel's
+ * `Composer` (frameless) so the comment + optional type/priority read
+ * identically to a located annotation; the request simply carries no anchor,
+ * which the server takes as document-scoped.
  */
 export function NewTaskDialog({
   open,
@@ -62,14 +63,14 @@ export function NewTaskDialog({
       { versionNumber, comment, type, priority },
       {
         onSuccess: () => {
-          notify('Task created.');
+          notify('Annotation created.');
           onClose();
         },
         onError: (error) =>
           notify(
             apiErrorCode(error) === 'REVIEW_CLOSED'
-              ? 'This review is closed — no new tasks can be added.'
-              : 'Could not create the task.',
+              ? 'This review is closed — no new annotations can be added.'
+              : 'Could not create the annotation.',
             'error',
           ),
       },
@@ -81,7 +82,7 @@ export function NewTaskDialog({
       <DialogTitle>
         <Stack direction="row" spacing={1} sx={{ alignItems: 'center' }}>
           <FileText size={18} aria-hidden />
-          New task
+          New global annotation
         </Stack>
       </DialogTitle>
       <DialogContent>

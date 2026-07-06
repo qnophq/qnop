@@ -242,12 +242,12 @@ describe('ReviewTasksPage', () => {
     expect(screen.queryByTestId('task-board')).not.toBeInTheDocument();
   });
 
-  // Issue #395: document-scoped tasks.
-  it('creates a document-scoped task from the New task dialog, with no anchor', () => {
+  // Issue #395: document-scoped ("global") annotations.
+  it('creates a document-scoped annotation from the dialog, with no anchor', () => {
     mockData();
     renderPage();
 
-    fireEvent.click(screen.getByRole('button', { name: 'New task' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Global annotation' }));
     const dialog = screen.getByRole('dialog');
     fireEvent.change(within(dialog).getByLabelText('Annotation comment'), {
       target: { value: 'Unify terminology across the contract' },
@@ -264,7 +264,7 @@ describe('ReviewTasksPage', () => {
     expect(payload.anchor).toBeUndefined();
   });
 
-  it('hides New task on a closed review', () => {
+  it('hides the Global annotation action on a closed review', () => {
     mockData();
     vi.mocked(useDocument).mockReturnValue({
       isPending: false,
@@ -279,7 +279,7 @@ describe('ReviewTasksPage', () => {
     } as never);
     renderPage();
 
-    expect(screen.queryByRole('button', { name: 'New task' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Global annotation' })).not.toBeInTheDocument();
   });
 
   it('marks a document-scoped task with the whole-document chip', () => {

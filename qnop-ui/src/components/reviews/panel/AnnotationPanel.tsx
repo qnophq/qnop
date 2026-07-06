@@ -93,8 +93,9 @@ interface AnnotationPanelProps {
   onScrolledToComment?: () => void;
   /**
    * Opens the "new whole-document task" dialog (issue #395) — a general remark that needs no
-   * selection. When set (and the review is writable) a quiet "New task" button rides the panel
-   * header, so document-scoped tasks can also be raised from the document and focus views.
+   * selection. When set (and the review is writable) a quiet "Global annotation" button rides the
+   * panel header, so document-scoped annotations can also be raised from the document and focus
+   * views.
    */
   onNewDocumentNote?: () => void;
 }
@@ -357,7 +358,7 @@ export function AnnotationPanel({
             startIcon={<Plus size={15} />}
             onClick={onNewDocumentNote}
           >
-            New task
+            Global annotation
           </Button>
         ) : undefined
       }
@@ -390,17 +391,6 @@ export function AnnotationPanel({
             No annotations match this filter.
           </Typography>
         )}
-        {located.length > 0 && (
-          <PanelSection
-            title="On this version"
-            subtitle="Anchored to the document"
-            icon={<Link2 size={13} aria-hidden />}
-            count={located.length}
-            newCount={located.filter((a) => isUnseen(a, previousSeenAt, userId)).length}
-          >
-            {located.map(renderItem)}
-          </PanelSection>
-        )}
         {documentScoped.length > 0 && (
           <PanelSection
             title="Whole document"
@@ -410,6 +400,17 @@ export function AnnotationPanel({
             newCount={documentScoped.filter((a) => isUnseen(a, previousSeenAt, userId)).length}
           >
             {documentScoped.map(renderItem)}
+          </PanelSection>
+        )}
+        {located.length > 0 && (
+          <PanelSection
+            title="Anchored to the document"
+            subtitle="Placed on this version"
+            icon={<Link2 size={13} aria-hidden />}
+            count={located.length}
+            newCount={located.filter((a) => isUnseen(a, previousSeenAt, userId)).length}
+          >
+            {located.map(renderItem)}
           </PanelSection>
         )}
       </Stack>
