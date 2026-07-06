@@ -256,6 +256,15 @@ describe('DocumentReviewPage', () => {
     expect(screen.getByText('Moved')).toBeInTheDocument();
   });
 
+  // Issue #395: a whole-document task can be raised from the panel too, not only the tasks view.
+  it('opens the New task dialog from the annotations panel', () => {
+    seedHappyPath();
+    renderPage();
+
+    fireEvent.click(screen.getByRole('button', { name: 'New task' }));
+    expect(screen.getByText(/applies to the whole document/i)).toBeInTheDocument();
+  });
+
   it('announces a still-processing version and keeps annotating disabled', () => {
     seedHappyPath(ExtractionStatus.Pending);
     renderPage();

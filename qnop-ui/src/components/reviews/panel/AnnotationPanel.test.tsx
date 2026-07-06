@@ -159,6 +159,27 @@ describe('AnnotationPanel', () => {
     expect(screen.getByTestId('whole-document-chip')).toBeInTheDocument();
   });
 
+  it('offers a New task action for a whole-document note when writable (#395)', () => {
+    const onNewDocumentNote = vi.fn();
+    renderPanel({ onNewDocumentNote });
+
+    fireEvent.click(screen.getByRole('button', { name: 'New task' }));
+    expect(onNewDocumentNote).toHaveBeenCalledTimes(1);
+  });
+
+  it('hides New task on a read-only or closed review, or without a handler (#395)', () => {
+    renderPanel({ onNewDocumentNote: vi.fn(), readOnly: true });
+    expect(screen.queryByRole('button', { name: 'New task' })).not.toBeInTheDocument();
+    cleanup();
+
+    renderPanel({ onNewDocumentNote: vi.fn(), reviewClosed: true });
+    expect(screen.queryByRole('button', { name: 'New task' })).not.toBeInTheDocument();
+    cleanup();
+
+    renderPanel({});
+    expect(screen.queryByRole('button', { name: 'New task' })).not.toBeInTheDocument();
+  });
+
   it('toggles the active annotation and reveals its thread', () => {
     const props = renderPanel({ annotations: [annotation('a1')], activeAnnotationId: 'a1' });
 

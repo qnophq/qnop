@@ -71,6 +71,7 @@ import { useAnchorElement } from '../../components/reviews/focus/useAnchorElemen
 import { useRecordVisit } from '../../api/hooks/useReviews';
 import { useViewMode } from '../../components/reviews/focus/useViewMode';
 import { columnOf } from '../../components/reviews/tasks/tasksModel';
+import { NewTaskDialog } from '../../components/reviews/tasks/NewTaskDialog';
 import { Composer } from '../../components/reviews/panel/Composer';
 import { WorkflowBadge } from '../../components/reviews/WorkflowBadge';
 import { AnonymousBadge } from '../../components/reviews/AnonymousBadge';
@@ -156,6 +157,9 @@ export function DocumentReviewPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [urlView]);
   const [listOpen, setListOpen] = useState(false);
+  // The "new whole-document task" dialog (issue #395), reachable from the panel in both the
+  // document and focus views — the same anchor-free create the tasks view offers.
+  const [newNoteOpen, setNewNoteOpen] = useState(false);
   // Deep link (issues #393/#412): ?annotation= seeds the active annotation and
   // ?comment= seeds a comment scroll target once; both params are consumed so
   // in-page selection owns the state afterwards. The original ?annotation= is
@@ -555,6 +559,7 @@ export function DocumentReviewPage() {
                   buildPermalink={buildPermalink}
                   scrollToCommentId={scrollToCommentId}
                   onScrolledToComment={clearScrollToComment}
+                  onNewDocumentNote={() => setNewNoteOpen(true)}
                 />
               </ErrorBoundary>
             </Box>
@@ -591,6 +596,7 @@ export function DocumentReviewPage() {
               buildPermalink={buildPermalink}
               scrollToCommentId={scrollToCommentId}
               onScrolledToComment={clearScrollToComment}
+              onNewDocumentNote={() => setNewNoteOpen(true)}
             />
           </ErrorBoundary>
         </FocusDrawer>
@@ -663,6 +669,13 @@ export function DocumentReviewPage() {
           <ListItemText>Create annotation</ListItemText>
         </MenuItem>
       </Menu>
+      <NewTaskDialog
+        open={newNoteOpen}
+        documentId={documentId}
+        versionNumber={knownLatest}
+        notify={notify}
+        onClose={() => setNewNoteOpen(false)}
+      />
       <AdminToast toast={toast} onClose={clear} />
     </Stack>
   );

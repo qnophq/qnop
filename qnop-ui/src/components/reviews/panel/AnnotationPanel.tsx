@@ -22,12 +22,13 @@
 import { useMemo, useState } from 'react';
 import type { ReactNode } from 'react';
 import Box from '@mui/material/Box';
+import Button from '@mui/material/Button';
 import ButtonBase from '@mui/material/ButtonBase';
 import Collapse from '@mui/material/Collapse';
 import Stack from '@mui/material/Stack';
 import Typography from '@mui/material/Typography';
 import { useTheme } from '@mui/material/styles';
-import { ChevronRight, FileText, Link2, NotebookPen } from 'lucide-react';
+import { ChevronRight, FileText, Link2, NotebookPen, Plus } from 'lucide-react';
 import type {
   AnnotationPriority,
   AnnotationType,
@@ -90,6 +91,12 @@ interface AnnotationPanelProps {
   /** A comment permalink target (issue #412) — scrolled to + pulsed in the active thread. */
   scrollToCommentId?: string | null;
   onScrolledToComment?: () => void;
+  /**
+   * Opens the "new whole-document task" dialog (issue #395) — a general remark that needs no
+   * selection. When set (and the review is writable) a quiet "New task" button rides the panel
+   * header, so document-scoped tasks can also be raised from the document and focus views.
+   */
+  onNewDocumentNote?: () => void;
 }
 
 /** A collapsible, counted group of annotation cards (prototype sidebar section). */
@@ -227,6 +234,7 @@ export function AnnotationPanel({
   buildPermalink,
   scrollToCommentId = null,
   onScrolledToComment,
+  onNewDocumentNote,
 }: AnnotationPanelProps) {
   const [filters, setFilters] = useState<AnnotationFilters>(EMPTY_FILTERS);
   const userId = useAuthStore((state) => state.userId);
@@ -339,6 +347,20 @@ export function AnnotationPanel({
       title={`Annotations (${annotations.length})`}
       description="Marks and their discussion on this version."
       frameless={frameless}
+      action={
+        // Raise a whole-document task without a selection (issue #395) — a quiet peer to the
+        // text-selection gesture, offered while the latest version is open for review.
+        onNewDocumentNote && !readOnly && !reviewClosed ? (
+          <Button
+            size="small"
+            variant="outlined"
+            startIcon={<Plus size={15} />}
+            onClick={onNewDocumentNote}
+          >
+            New task
+          </Button>
+        ) : undefined
+      }
     >
       <Stack spacing={1.5}>
         {annotations.length > 0 && (
