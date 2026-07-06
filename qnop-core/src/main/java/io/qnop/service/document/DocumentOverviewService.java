@@ -29,6 +29,7 @@ import io.qnop.repository.DocumentVersionRepository;
 import io.qnop.repository.ParticipantProjection;
 import io.qnop.repository.ReviewParticipantRepository;
 import io.qnop.service.document.ReviewParticipantService.ParticipantView;
+import io.qnop.service.review.ReviewIdentityResolver;
 import java.time.Instant;
 import java.util.List;
 import java.util.Locale;
@@ -58,16 +59,19 @@ public class DocumentOverviewService {
   private final DocumentVersionRepository versions;
   private final AnnotationRepository annotations;
   private final ReviewParticipantRepository participants;
+  private final ReviewIdentityResolver identity;
 
   public DocumentOverviewService(
       DocumentRepository documents,
       DocumentVersionRepository versions,
       AnnotationRepository annotations,
-      ReviewParticipantRepository participants) {
+      ReviewParticipantRepository participants,
+      ReviewIdentityResolver identity) {
     this.documents = documents;
     this.versions = versions;
     this.annotations = annotations;
     this.participants = participants;
+    this.identity = identity;
   }
 
   @Transactional(readOnly = true)
@@ -115,15 +119,29 @@ public class DocumentOverviewService {
                       maxVersions.getOrDefault(document.getId(), 0),
                       count == null ? 0 : Math.toIntExact(count.total()),
                       count == null ? 0 : Math.toIntExact(count.open()),
-                      participantsByDocument.getOrDefault(document.getId(), List.of()).stream()
-                          .map(ParticipantView::of)
-                          .toList(),
+                      rosterFor(
+                          document,
+                          actor,
+                          participantsByDocument.getOrDefault(document.getId(), List.of())),
                       document.getCreatedAt(),
                       document.getUpdatedAt(),
                       document.getDueAt());
                 })
             .toList();
     return new DocumentPage(items, result.getTotalElements(), page, size);
+  }
+
+  /**
+   * The reviewer set for one summary card, anonymised (issue #422) when the review is anonymous and
+   * the caller is not its owner — so the overview never leaks the roster of an anonymous review.
+   */
+  private List<ParticipantView> rosterFor(
+      Document document, UUID actor, List<ParticipantProjection> rows) {
+    if (!document.isAnonymous() || document.getOwnerId().equals(actor)) {
+      return rows.stream().map(ParticipantView::of).toList();
+    }
+    return ReviewParticipantService.anonymiseRoster(
+        document.getId(), rows, identity.forDocument(document.getId(), actor));
   }
 
   private Sort parseSort(String sort) {

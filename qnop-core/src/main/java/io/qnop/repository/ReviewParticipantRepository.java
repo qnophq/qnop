@@ -34,6 +34,15 @@ public interface ReviewParticipantRepository extends JpaRepository<ReviewPartici
   /** The reviewers (user and team principals) on a document. */
   List<ReviewParticipant> findByDocumentId(UUID documentId);
 
+  /**
+   * The direct-user participant ids on a document (issue #422) — so the anonymity pseudonym ordinal
+   * covers reviewers who joined directly, not only those who authored something. Team participants
+   * carry no user id and are excluded.
+   */
+  @Query(
+      "SELECT p.userId FROM ReviewParticipant p WHERE p.documentId = :documentId AND p.userId IS NOT NULL")
+  List<UUID> findDirectUserIdsByDocumentId(@Param("documentId") UUID documentId);
+
   /** The reviews a given user is a direct participant in. */
   List<ReviewParticipant> findByUserId(UUID userId);
 

@@ -30,9 +30,9 @@ Author identity is resolved **server-side** into a new `authorDisplayName` on `A
 
 Chosen sub-decisions (the open points the issue left to planning):
 
-- **Stable pseudonyms, not one uniform label** — "Participant 2/3" keeps a thread followable (you can tell whether two comments are the same reviewer) without revealing who. The ordinal is assigned by ascending author id over the document's non-owner authors: deterministic, stable across requests and surfaces, and revealing nothing but a count.
+- **Stable pseudonyms, not one uniform label** — "Participant 2/3" keeps a thread followable (you can tell whether two comments are the same reviewer) without revealing who. The ordinal is assigned by ascending user id over the document's non-owner **users** — everyone who authored something *or* is a direct participant (amended for #422) — so the roster and the notes share one numbering; deterministic, stable across requests and surfaces, and revealing nothing but a count.
 - **The owner is exempt from anonymisation** — the owner's *authored* items show the owner's real name, because the owner's identity is already structural and public. This is authorship-exemption only: the owner, *as a viewer*, is still blind to foreign authorship (they see other reviewers as "Participant N" too).
-- **The participant roster stays visible** — anonymity hides *who wrote which note*, the standard blind-review model; it does not hide the invited-reviewers list (that would change the "add reviewers" UX). Hiding the roster too is a possible future tightening, not part of this decision.
+- **The roster is anonymised for non-owners** (amended for #422) — the original decision left the invited-reviewers list visible to everyone, but that lets any participant read off exactly who is reviewing, defeating the anonymity. So in an anonymous review only the owner (and an admin) see who the reviewers are; every other participant sees the roster as the same "Participant N" pseudonyms (users) and nameless "Reviewer team" entries (teams), with principal ids replaced by synthetic tokens (team tokens derive from position, not the real team id, so the roster can't be matched against the principal directory). Enforced server-side on both the participants endpoint and the reviews-overview summary.
 
 The author filter facet disappears entirely in an anonymous review.
 

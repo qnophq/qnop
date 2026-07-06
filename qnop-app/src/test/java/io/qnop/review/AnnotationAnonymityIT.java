@@ -20,6 +20,7 @@
  */
 package io.qnop.review;
 
+import static org.hamcrest.Matchers.hasItem;
 import static org.hamcrest.Matchers.not;
 import static org.hamcrest.Matchers.startsWith;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -117,11 +118,12 @@ class AnnotationAnonymityIT extends SeededIntegrationTest {
     UUID documentId = seedDocument(true);
     createAnnotation(documentId, AUDITOR_ID);
 
-    // The foreign reviewer sees a stable pseudonym and NOT the real id or name.
+    // The foreign reviewer sees a stable pseudonym and NOT the real id or name. The ordinal covers
+    // all non-owner participants (issue #422), sorted by id: MEMBER2 (…003) is 1, AUDITOR (…004) 2.
     mockMvc
         .perform(as(get("/api/v1/documents/" + documentId + "/annotations"), MEMBER2_ID))
         .andExpect(status().isOk())
-        .andExpect(jsonPath("$.annotations[0].authorDisplayName").value("Participant 1"))
+        .andExpect(jsonPath("$.annotations[0].authorDisplayName").value("Participant 2"))
         .andExpect(jsonPath("$.annotations[0].authorId").value(not(AUDITOR_ID.toString())))
         .andExpect(jsonPath("$.annotations[0].authorDisplayName").value(not(realName(AUDITOR_ID))));
   }
@@ -159,11 +161,72 @@ class AnnotationAnonymityIT extends SeededIntegrationTest {
     UUID documentId = seedDocument(true);
     String annotationId = createAnnotation(documentId, AUDITOR_ID);
 
-    // The opening comment (authored by AUDITOR) is pseudonymised for a foreign viewer.
+    // The opening comment (authored by AUDITOR) is pseudonymised for a foreign viewer; AUDITOR is
+    // "Participant 2" under the participant-covering numbering (issue #422).
     mockMvc
         .perform(as(get("/api/v1/annotations/" + annotationId + "/comments"), MEMBER2_ID))
         .andExpect(status().isOk())
-        .andExpect(jsonPath("$.comments[0].authorDisplayName").value("Participant 1"))
+        .andExpect(jsonPath("$.comments[0].authorDisplayName").value("Participant 2"))
         .andExpect(jsonPath("$.comments[0].authorId").value(not(AUDITOR_ID.toString())));
+  }
+
+  // ── Roster anonymity (issue #422) ────────────────────────────────────────
+
+  @Test
+  void anonymousReviewHidesTheRosterFromForeignReviewers() throws Exception {
+    UUID documentId = seedDocument(true);
+
+    mockMvc
+        .perform(as(get("/api/v1/documents/" + documentId + "/participants"), MEMBER2_ID))
+        .andExpect(status().isOk())
+        // A peer (AUDITOR) is neither their real id nor their real name — a pseudonym instead.
+        .andExpect(
+            jsonPath("$.participants[?(@.principalId == '" + AUDITOR_ID + "')]").doesNotExist())
+        .andExpect(jsonPath("$.participants[*].displayName", hasItem("Participant 2")))
+        .andExpect(jsonPath("$.participants[*].displayName", not(hasItem(realName(AUDITOR_ID)))))
+        // The viewer's own row stays real (they know themselves).
+        .andExpect(
+            jsonPath(
+                "$.participants[?(@.principalId == '" + MEMBER2_ID + "')].displayName",
+                hasItem(realName(MEMBER2_ID))));
+  }
+
+  @Test
+  void anonymousReviewShowsTheRealRosterToTheOwner() throws Exception {
+    UUID documentId = seedDocument(true);
+
+    mockMvc
+        .perform(as(get("/api/v1/documents/" + documentId + "/participants"), MEMBER_ID))
+        .andExpect(status().isOk())
+        .andExpect(
+            jsonPath(
+                "$.participants[?(@.principalId == '" + AUDITOR_ID + "')].displayName",
+                hasItem(realName(AUDITOR_ID))));
+  }
+
+  @Test
+  void nonAnonymousReviewShowsTheRealRosterToEveryone() throws Exception {
+    UUID documentId = seedDocument(false);
+
+    mockMvc
+        .perform(as(get("/api/v1/documents/" + documentId + "/participants"), MEMBER2_ID))
+        .andExpect(status().isOk())
+        .andExpect(
+            jsonPath(
+                "$.participants[?(@.principalId == '" + AUDITOR_ID + "')].displayName",
+                hasItem(realName(AUDITOR_ID))));
+  }
+
+  @Test
+  void anonymousReviewHidesTheRosterInTheOverview() throws Exception {
+    UUID documentId = seedDocument(true);
+
+    mockMvc
+        .perform(as(get("/api/v1/documents"), MEMBER2_ID))
+        .andExpect(status().isOk())
+        .andExpect(
+            jsonPath(
+                "$.items[?(@.id == '" + documentId + "')].participants[*].displayName",
+                not(hasItem(realName(AUDITOR_ID)))));
   }
 }
