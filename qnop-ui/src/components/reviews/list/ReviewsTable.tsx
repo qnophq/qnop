@@ -34,6 +34,7 @@ import type { DocumentSummary } from '../../../api/generated';
 import { formatRelative } from '../../../utils/formatDate';
 import { DueDateLabel } from '../DueDateLabel';
 import { WorkflowBadge } from '../WorkflowBadge';
+import { AnonymousBadge } from '../AnonymousBadge';
 import { DocumentIcon, ProgressBar, ReviewerStack, RoleBadge } from './ReviewListParts';
 import { progressOf, roleOf } from './reviewListModel';
 
@@ -99,7 +100,10 @@ export function ReviewsTable({ reviews, userId, onOpen }: ReviewsTableProps) {
                     <RoleBadge role={roleOf(review, userId)} />
                   </TableCell>
                   <TableCell>
-                    <WorkflowBadge state={review.workflowState} />
+                    <Stack direction="row" spacing={0.75} sx={{ alignItems: 'center' }}>
+                      <WorkflowBadge state={review.workflowState} />
+                      {review.anonymous && <AnonymousBadge compact />}
+                    </Stack>
                   </TableCell>
                   <TableCell sx={{ minWidth: 120 }}>
                     {progress ? (

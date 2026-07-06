@@ -24,6 +24,7 @@ import io.qnop.entity.Document;
 import io.qnop.repository.AnnotationRepository;
 import io.qnop.repository.CommentRepository;
 import io.qnop.repository.DocumentRepository;
+import io.qnop.repository.ReviewParticipantRepository;
 import io.qnop.repository.UserDisplayName;
 import io.qnop.repository.UserRepository;
 import java.nio.charset.StandardCharsets;
@@ -54,8 +55,10 @@ import org.springframework.stereotype.Service;
  *       client cannot correlate it back to the participant roster.
  * </ul>
  *
- * <p>The pseudonym ordinal is assigned by ascending author id over the document's non-owner
- * authors: stable across requests and surfaces, deterministic, and revealing nothing but a count.
+ * <p>The pseudonym ordinal is assigned by ascending user id over the document's non-owner users —
+ * everyone who authored something <em>or</em> is a direct participant (issue #422), so the roster
+ * and the annotations share one numbering: stable across requests and surfaces, deterministic, and
+ * revealing nothing but a count.
  */
 @Service
 public class ReviewIdentityResolver {
@@ -63,16 +66,19 @@ public class ReviewIdentityResolver {
   private final DocumentRepository documents;
   private final AnnotationRepository annotations;
   private final CommentRepository comments;
+  private final ReviewParticipantRepository participants;
   private final UserRepository users;
 
   public ReviewIdentityResolver(
       DocumentRepository documents,
       AnnotationRepository annotations,
       CommentRepository comments,
+      ReviewParticipantRepository participants,
       UserRepository users) {
     this.documents = documents;
     this.annotations = annotations;
     this.comments = comments;
+    this.participants = participants;
     this.users = users;
   }
 
@@ -86,20 +92,23 @@ public class ReviewIdentityResolver {
         documents.findById(documentId).orElseThrow(() -> new DocumentNotFoundException(documentId));
     UUID ownerId = document.getOwnerId();
 
-    // Distinct authors across annotations AND comment-only participants — both need a label.
-    Set<UUID> authorIds = new LinkedHashSet<>();
-    authorIds.addAll(annotations.findDistinctAuthorIdsByDocumentId(documentId));
-    authorIds.addAll(comments.findDistinctCommentAuthorIdsByDocumentId(documentId));
+    // Every non-owner user who needs a stable label: annotation authors, comment-only authors, AND
+    // direct participants who never wrote anything (issue #422) — one numbering across the roster
+    // and the notes. Authors who participate via a team are covered by their authorship.
+    Set<UUID> userIds = new LinkedHashSet<>();
+    userIds.addAll(annotations.findDistinctAuthorIdsByDocumentId(documentId));
+    userIds.addAll(comments.findDistinctCommentAuthorIdsByDocumentId(documentId));
+    userIds.addAll(participants.findDirectUserIdsByDocumentId(documentId));
 
     Map<UUID, String> names =
-        authorIds.isEmpty()
+        userIds.isEmpty()
             ? Map.of()
-            : users.findDisplayNamesByIdIn(authorIds).stream()
+            : users.findDisplayNamesByIdIn(userIds).stream()
                 .collect(Collectors.toMap(UserDisplayName::id, UserDisplayName::displayName));
 
     Map<UUID, Integer> ordinals = new HashMap<>();
     int next = 0;
-    for (UUID id : authorIds.stream().filter(id -> !id.equals(ownerId)).sorted().toList()) {
+    for (UUID id : userIds.stream().filter(id -> !id.equals(ownerId)).sorted().toList()) {
       ordinals.put(id, ++next);
     }
 
@@ -130,6 +139,11 @@ public class ReviewIdentityResolver {
       this.documentId = documentId;
       this.names = names;
       this.ordinals = ordinals;
+    }
+
+    /** Whether {@code userId} is the signed-in caller — used to sort the caller's own row first. */
+    public boolean isSelf(UUID userId) {
+      return userId != null && userId.equals(actor);
     }
 
     /**

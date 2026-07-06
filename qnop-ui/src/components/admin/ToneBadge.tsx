@@ -19,13 +19,23 @@
  * SPDX-License-Identifier: AGPL-3.0-only
  */
 
+import type { ReactNode } from 'react';
 import Box from '@mui/material/Box';
 import { useTheme } from '@mui/material/styles';
 
 export type BadgeTone = 'blue' | 'green' | 'amber' | 'red' | 'neutral';
 
 /** A compact, system-coloured pill driven by the shared `qnop.badge` tones (#104/#105). */
-export function ToneBadge({ tone, label }: { tone: BadgeTone; label: string }) {
+export function ToneBadge({
+  tone,
+  label,
+  icon,
+}: {
+  tone: BadgeTone;
+  label: string;
+  /** Optional leading glyph (e.g. an anonymity eye-off, issue #422). */
+  icon?: ReactNode;
+}) {
   const theme = useTheme();
   const t =
     tone === 'neutral'
@@ -41,6 +51,7 @@ export function ToneBadge({ tone, label }: { tone: BadgeTone; label: string }) {
       sx={{
         display: 'inline-flex',
         alignItems: 'center',
+        gap: 0.5,
         px: 1,
         py: 0.25,
         borderRadius: 1,
@@ -54,6 +65,7 @@ export function ToneBadge({ tone, label }: { tone: BadgeTone; label: string }) {
         borderColor: t.border,
       }}
     >
+      {icon}
       {label}
     </Box>
   );

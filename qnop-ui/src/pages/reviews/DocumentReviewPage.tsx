@@ -71,6 +71,7 @@ import { useViewMode } from '../../components/reviews/focus/useViewMode';
 import { columnOf } from '../../components/reviews/tasks/tasksModel';
 import { Composer } from '../../components/reviews/panel/Composer';
 import { WorkflowBadge } from '../../components/reviews/WorkflowBadge';
+import { AnonymousBadge } from '../../components/reviews/AnonymousBadge';
 import type {
   ScreenPosition,
   TextSelectionOffsets,
@@ -333,13 +334,19 @@ export function DocumentReviewPage() {
           every saved pixel goes to the document and its annotations. */}
       <PageHeader
         title={document.title}
-        titleAdornment={<WorkflowBadge state={document.workflowState} />}
+        titleAdornment={
+          <>
+            <WorkflowBadge state={document.workflowState} />
+            {document.anonymous && <AnonymousBadge />}
+          </>
+        }
         action={
           <ReviewHubHead
             documentId={documentId}
             ownerId={document.ownerId}
             isOwner={document.ownerId === userId}
             ownUserId={userId}
+            anonymous={document.anonymous ?? false}
             annotations={annotations}
             dueAt={document.dueAt ?? null}
             workflowState={document.workflowState}

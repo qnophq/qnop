@@ -29,7 +29,12 @@ import io.qnop.repository.ParticipantProjection;
 import io.qnop.repository.ReviewParticipantRepository;
 import io.qnop.repository.TeamRepository;
 import io.qnop.repository.UserRepository;
+import io.qnop.service.review.ReviewIdentityResolver;
+import io.qnop.service.review.ReviewIdentityResolver.ReviewIdentities;
+import java.nio.charset.StandardCharsets;
 import java.time.Instant;
+import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.List;
 import java.util.UUID;
 import org.springframework.stereotype.Service;
@@ -49,29 +54,83 @@ public class ReviewParticipantService {
   private final UserRepository users;
   private final TeamRepository teams;
   private final DocumentAccessService access;
+  private final ReviewIdentityResolver identity;
 
   public ReviewParticipantService(
       DocumentRepository documents,
       ReviewParticipantRepository participants,
       UserRepository users,
       TeamRepository teams,
-      DocumentAccessService access) {
+      DocumentAccessService access,
+      ReviewIdentityResolver identity) {
     this.documents = documents;
     this.participants = participants;
     this.users = users;
     this.teams = teams;
     this.access = access;
+    this.identity = identity;
   }
 
-  /** The document's reviewers with display names, oldest first. */
+  /**
+   * The document's reviewers with display names, oldest first. In an anonymous review (issue #413/
+   * #422) only the owner (and an admin) may see who the reviewers are; every other participant sees
+   * the roster anonymised — each reviewer as a stable "Participant N" pseudonym (shared with the
+   * annotation labels) or a nameless "Reviewer team", with the principal id replaced by a synthetic
+   * per-document token so it cannot be correlated back to a real user or team.
+   */
   @Transactional(readOnly = true)
   public List<ParticipantView> list(UUID documentId, UUID actor, boolean admin) {
     if (!access.isVisible(documentId, actor, admin)) {
       throw DocumentValidationException.notFound("document " + documentId);
     }
-    return participants.findViewsByDocumentId(documentId).stream()
-        .map(ParticipantView::of)
-        .toList();
+    Document document =
+        documents
+            .findById(documentId)
+            .orElseThrow(() -> DocumentValidationException.notFound("document " + documentId));
+    List<ParticipantProjection> rows = participants.findViewsByDocumentId(documentId);
+    boolean anonymise = document.isAnonymous() && !admin && !document.getOwnerId().equals(actor);
+    if (!anonymise) {
+      return rows.stream().map(ParticipantView::of).toList();
+    }
+
+    return anonymiseRoster(documentId, rows, identity.forDocument(documentId, actor));
+  }
+
+  /**
+   * Anonymises a document's roster (issue #422): each user reviewer becomes their stable
+   * "Participant N" pseudonym (their own row stays real — they know themselves) with the same
+   * synthetic token used on their annotations; each team becomes a nameless "Reviewer team" whose
+   * token derives from its position, not its real id, so the roster cannot be matched against the
+   * principal directory. The caller's own row is sorted first, then the pseudonyms in their
+   * original order. Shared by {@link #list} and the reviews overview.
+   */
+  static List<ParticipantView> anonymiseRoster(
+      UUID documentId, List<ParticipantProjection> rows, ReviewIdentities identities) {
+    // Caller first, everyone else in their existing (creation) order — a stable sort preserves it.
+    List<ParticipantProjection> ordered =
+        rows.stream()
+            .sorted(Comparator.comparingInt(r -> identities.isSelf(r.userId()) ? 0 : 1))
+            .toList();
+    List<ParticipantView> out = new ArrayList<>(ordered.size());
+    int teamIndex = 0;
+    for (ParticipantProjection row : ordered) {
+      if (row.teamId() == null) {
+        out.add(
+            new ParticipantView(
+                row.id(),
+                identities.exposedAuthorId(row.userId()),
+                false,
+                identities.displayName(row.userId()),
+                row.createdAt()));
+      } else {
+        teamIndex++;
+        UUID token =
+            UUID.nameUUIDFromBytes(
+                (documentId + ":anonteam:" + teamIndex).getBytes(StandardCharsets.UTF_8));
+        out.add(new ParticipantView(row.id(), token, true, "Reviewer team", row.createdAt()));
+      }
+    }
+    return out;
   }
 
   /** Adds a reviewer (owner-only): exactly one of {@code userId} / {@code teamId}. */
