@@ -107,6 +107,7 @@ function renderHub({
       ownerId={isOwner ? ME : 'owner-far-away'}
       isOwner={isOwner}
       ownUserId={ME}
+      anonymous={false}
       annotations={annotations}
       dueAt={dueAt}
       workflowState={workflowState}

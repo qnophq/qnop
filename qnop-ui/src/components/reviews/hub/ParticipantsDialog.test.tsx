@@ -74,7 +74,7 @@ function wrapper({ children }: { children: ReactNode }) {
 
 const notify = vi.fn();
 
-function renderDialog(isOwner: boolean) {
+function renderDialog(isOwner: boolean, anonymised = false) {
   return render(
     <ParticipantsDialog
       documentId={DOC_ID}
@@ -82,6 +82,7 @@ function renderDialog(isOwner: boolean) {
       onClose={vi.fn()}
       isOwner={isOwner}
       ownUserId={ME}
+      anonymised={anonymised}
       notify={notify}
     />,
     { wrapper },
@@ -112,6 +113,19 @@ describe('ParticipantsDialog — read-only for participants', () => {
     expect(screen.getByText('Team Alpha')).toBeInTheDocument();
     expect(screen.queryByPlaceholderText('Add people or teams…')).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /Remove/ })).not.toBeInTheDocument();
+  });
+
+  it('offers the team unfold to a non-anonymised viewer', async () => {
+    renderDialog(false);
+    expect(await screen.findByText('Team Alpha')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Show members of/ })).toBeInTheDocument();
+  });
+
+  it('hides the team unfold when the roster is anonymised (issue #422)', async () => {
+    renderDialog(false, true);
+    expect(await screen.findByText('Team Alpha')).toBeInTheDocument();
+    // A synthetic team id must not be unfoldable to reveal members.
+    expect(screen.queryByRole('button', { name: /Show members of/ })).not.toBeInTheDocument();
   });
 });
 

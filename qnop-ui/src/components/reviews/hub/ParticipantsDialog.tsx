@@ -63,6 +63,8 @@ interface ParticipantsDialogProps {
   isOwner: boolean;
   /** The owner cannot become a participant, so hide them from the picker. */
   ownUserId: string | null;
+  /** True when the roster is anonymised for this viewer (issue #422): teams can't be unfolded. */
+  anonymised?: boolean;
   notify: (message: string, severity?: ToastSeverity) => void;
 }
 
@@ -131,6 +133,7 @@ export function ParticipantsDialog({
   onClose,
   isOwner,
   ownUserId,
+  anonymised = false,
   notify,
 }: ParticipantsDialogProps) {
   const theme = useTheme();
@@ -192,11 +195,14 @@ export function ParticipantsDialog({
             <Stack spacing={0.5} data-testid="participants-list">
               {participants.map((participant) => {
                 const isTeam = participant.kind === ParticipantKind.Team;
-                const expanded = isTeam && expandedTeams.has(participant.principalId);
+                // An anonymised team carries a synthetic id and a hidden name (issue #422), so it
+                // cannot — and must not — be unfolded to reveal its members.
+                const canUnfold = isTeam && !anonymised;
+                const expanded = canUnfold && expandedTeams.has(participant.principalId);
                 return (
                   <Fragment key={participant.id}>
                     <Stack direction="row" spacing={1.25} sx={{ alignItems: 'center', py: 0.5 }}>
-                      {isTeam ? (
+                      {canUnfold ? (
                         <IconButton
                           size="small"
                           aria-label={`Show members of ${participant.displayName}`}
@@ -239,7 +245,7 @@ export function ParticipantsDialog({
                         </Tooltip>
                       )}
                     </Stack>
-                    {isTeam && (
+                    {canUnfold && (
                       <Collapse in={expanded} unmountOnExit>
                         <TeamMemberList teamId={participant.principalId} />
                       </Collapse>

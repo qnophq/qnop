@@ -68,6 +68,8 @@ interface ReviewHubHeadProps {
   ownerId: string;
   isOwner: boolean;
   ownUserId: string | null;
+  /** True for an anonymous review (issue #422) — the roster is anonymised for non-owners. */
+  anonymous: boolean;
   annotations: AnnotationView[];
   /** The review's optional due date (ISO instant) or null (issue #295). */
   dueAt: string | null;
@@ -89,6 +91,7 @@ export function ReviewHubHead({
   ownerId,
   isOwner,
   ownUserId,
+  anonymous,
   annotations,
   dueAt,
   workflowState,
@@ -381,6 +384,7 @@ export function ReviewHubHead({
         onClose={() => setParticipantsOpen(false)}
         isOwner={isOwner}
         ownUserId={ownUserId}
+        anonymised={anonymous && !isOwner}
         notify={notify}
       />
 

@@ -30,6 +30,7 @@ import type { DocumentSummary } from '../../../api/generated';
 import { formatRelative } from '../../../utils/formatDate';
 import { DueDateLabel } from '../DueDateLabel';
 import { WorkflowBadge } from '../WorkflowBadge';
+import { AnonymousBadge } from '../AnonymousBadge';
 import { DocumentIcon, ProgressBar, ReviewerStack, RoleBadge } from './ReviewListParts';
 import { progressOf, roleOf } from './reviewListModel';
 
@@ -94,6 +95,7 @@ export function ReviewCards({ reviews, userId, onOpen }: ReviewCardsProps) {
             </Box>
             <Stack direction="row" spacing={1} sx={{ alignItems: 'center' }}>
               <WorkflowBadge state={review.workflowState} />
+              {review.anonymous && <AnonymousBadge compact />}
               {progress && (
                 <Typography
                   variant="caption"
