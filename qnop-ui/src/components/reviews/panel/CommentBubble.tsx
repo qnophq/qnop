@@ -26,6 +26,7 @@ import { useTheme } from '@mui/material/styles';
 import { shortRelativeTime } from '../../../utils/relativeTime';
 import type { Notify } from '../../admin/layout/useToast';
 import { UserAvatar } from '../../shell/UserAvatar';
+import { Markdown } from '../markdown/Markdown';
 import { CopyLinkButton } from '../permalink/CopyLinkButton';
 
 const AVATAR_SIZE = 26;
@@ -90,22 +91,9 @@ export function CommentBubble({
           <Typography variant="body2" sx={{ fontWeight: 600, lineHeight: 1.3 }}>
             {own ? 'You' : name}
           </Typography>
-          <Typography
-            variant="body2"
-            sx={{
-              whiteSpace: 'pre-wrap',
-              overflowWrap: 'anywhere',
-              ...(clampLines !== undefined && {
-                display: '-webkit-box',
-                WebkitLineClamp: clampLines,
-                WebkitBoxOrient: 'vertical',
-                overflow: 'hidden',
-                whiteSpace: 'normal',
-              }),
-            }}
-          >
-            {body}
-          </Typography>
+          {/* The body renders as sanitised Markdown (issue #427); the hover
+              preview passes clampLines to cap its height. */}
+          <Markdown clampLines={clampLines}>{body}</Markdown>
         </Box>
         <Stack direction="row" spacing={0.25} sx={{ alignItems: 'center', pl: 1.5, mt: 0.25 }}>
           <Typography

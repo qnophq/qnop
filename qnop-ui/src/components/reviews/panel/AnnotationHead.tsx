@@ -29,6 +29,7 @@ import { useAuthStore } from '../../../stores/authStore';
 import { shortRelativeTime } from '../../../utils/relativeTime';
 import { UserAvatar } from '../../shell/UserAvatar';
 import { isDocumentScoped } from '../annotationScope';
+import { Markdown } from '../markdown/Markdown';
 import { AnnotationBadgeRow } from './AnnotationBadgeRow';
 
 const DATE_FORMAT = new Intl.DateTimeFormat(undefined, {
@@ -106,13 +107,10 @@ export function AnnotationHead({ annotation, unseen = false }: AnnotationHeadPro
         )
       )}
       {openerText && (
-        <Typography
-          variant="body2"
-          sx={{ whiteSpace: 'pre-wrap', overflowWrap: 'anywhere' }}
-          data-testid="opening-text"
-        >
-          {openerText}
-        </Typography>
+        // The opening comment renders as sanitised Markdown (issue #427).
+        <Box data-testid="opening-text">
+          <Markdown>{openerText}</Markdown>
+        </Box>
       )}
       <Stack direction="row" spacing={0.75} sx={{ alignItems: 'center' }}>
         <UserAvatar name={authorName} size={20} imageUrl={own ? avatarUrl : null} />

@@ -76,6 +76,12 @@ describe('taskTitle', () => {
     expect(taskTitle(annotation({ firstComment: undefined }))).toBe('the disputed clause');
     expect(taskTitle(annotation({ firstComment: '  ', anchor: undefined }))).toBe('Annotation');
   });
+
+  it('strips Markdown so the title reads as prose (#427)', () => {
+    expect(
+      taskTitle(annotation({ firstComment: '**Unify** _terminology_ across the [contract](/x)' })),
+    ).toBe('Unify terminology across the contract');
+  });
 });
 
 describe('taskKeys', () => {
@@ -98,5 +104,12 @@ describe('matchesQuery', () => {
 
   it('matches everything on a blank query', () => {
     expect(matchesQuery(annotation(), 'Maxim', '  ')).toBe(true);
+  });
+
+  it('matches the stripped opening text, not the Markdown syntax (#427)', () => {
+    const a = annotation({ firstComment: '**terminology** must be consistent' });
+    expect(matchesQuery(a, 'Maxim', 'terminology')).toBe(true);
+    // The asterisks are formatting, not content — a search for them misses.
+    expect(matchesQuery(a, 'Maxim', '**terminology**')).toBe(false);
   });
 });

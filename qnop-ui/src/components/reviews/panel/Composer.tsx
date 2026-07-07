@@ -32,6 +32,7 @@ import type { Anchor } from '../../../api/generated';
 import { AnnotationPriority, AnnotationType } from '../../../api/generated';
 import { isSubmitShortcut, submitShortcutLabel } from '../../../utils/platform';
 import { PRIORITY_CUES, TYPE_CUES } from '../tasks/tasksModel';
+import { MarkdownHint } from '../markdown/MarkdownHint';
 
 /**
  * The composer for a freshly drawn anchor — rendered in the panel, and in
@@ -171,13 +172,20 @@ export function Composer({
             })}
           </TextField>
         </Stack>
-        <Stack direction="row" spacing={1} sx={{ justifyContent: 'flex-end' }}>
-          <Button size="small" variant="contained" onClick={create} disabled={!canCreate}>
-            Create annotation ({submitShortcutLabel()})
-          </Button>
-          <Button size="small" onClick={onCancel} disabled={creating}>
-            Cancel
-          </Button>
+        <Stack
+          direction="row"
+          spacing={1}
+          sx={{ justifyContent: 'space-between', alignItems: 'center' }}
+        >
+          <MarkdownHint />
+          <Stack direction="row" spacing={1}>
+            <Button size="small" variant="contained" onClick={create} disabled={!canCreate}>
+              Create annotation ({submitShortcutLabel()})
+            </Button>
+            <Button size="small" onClick={onCancel} disabled={creating}>
+              Cancel
+            </Button>
+          </Stack>
         </Stack>
       </Stack>
     </Paper>

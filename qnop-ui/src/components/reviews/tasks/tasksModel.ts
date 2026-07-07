@@ -24,6 +24,7 @@ import { Flag, MessageCircleQuestion, Pencil, Plus, TriangleAlert } from 'lucide
 import type { Theme } from '@mui/material/styles';
 import type { AnnotationView } from '../../../api/generated';
 import { AnnotationPriority, AnnotationStatus, AnnotationType } from '../../../api/generated';
+import { stripMarkdown } from '../../../utils/markdown';
 
 /**
  * The board's columns (issue #393, prototype reviewhub): *In discussion* is
@@ -48,9 +49,15 @@ export function parseTaskFilter(raw: string | null): TaskFilter {
   return raw === 'open' || raw === 'discussion' || raw === 'done' ? raw : 'all';
 }
 
-/** The card's title: the thread's opening comment; quote/fallback otherwise. */
+/**
+ * The card's title: the thread's opening comment; quote/fallback otherwise. The
+ * opener is Markdown (issue #427), so it is stripped to plain text — a title is
+ * a one-liner, never `**bold**`. The quoted passage is already plain text.
+ */
 export function taskTitle(annotation: AnnotationView): string {
-  return annotation.firstComment?.trim() || annotation.anchor?.textQuote?.quote || 'Annotation';
+  return (
+    stripMarkdown(annotation.firstComment) || annotation.anchor?.textQuote?.quote || 'Annotation'
+  );
 }
 
 /**

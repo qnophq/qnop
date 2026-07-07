@@ -37,6 +37,7 @@ import { useAuthStore } from '../../../stores/authStore';
 import type { Notify } from '../../admin/layout/useToast';
 import { isNewComment } from '../newSince';
 import type { BuildPermalink } from '../useReviewPermalink';
+import { MarkdownHint } from '../markdown/MarkdownHint';
 import { CommentBubble } from './CommentBubble';
 import { UserAvatar } from '../../shell/UserAvatar';
 
@@ -334,7 +335,8 @@ export function CommentThread({
                 inputProps={{ maxLength: 20000, 'aria-label': 'Add a comment' }}
                 sx={{ p: 0, fontSize: 14, lineHeight: 1.45 }}
               />
-              <Stack direction="row" sx={{ justifyContent: 'flex-end' }}>
+              <Stack direction="row" sx={{ justifyContent: 'space-between', alignItems: 'center' }}>
+                <MarkdownHint />
                 <Tooltip title={`Send (${submitShortcutLabel()})`}>
                   <span>
                     <IconButton

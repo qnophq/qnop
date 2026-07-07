@@ -21,6 +21,7 @@
 
 import type { AnnotationView } from '../../../api/generated';
 import { AnnotationPriority, AnnotationStatus, AnnotationType } from '../../../api/generated';
+import { stripMarkdown } from '../../../utils/markdown';
 
 /** The panel's filter facets (issue #403); `null`/`'all'`/`''` mean "any". */
 export interface AnnotationFilters {
@@ -64,9 +65,11 @@ export function matchesFilters(
   if (filters.author !== null && annotation.authorId !== filters.author) return false;
   const needle = filters.query.trim().toLowerCase();
   if (!needle) return true;
+  // The opening comment is Markdown (issue #427); match its stripped plain text
+  // so search hits words, not `**` and `[](…)` syntax. The quote is plain.
   return (
     (annotation.anchor?.textQuote?.quote ?? '').toLowerCase().includes(needle) ||
-    (annotation.firstComment ?? '').toLowerCase().includes(needle) ||
+    stripMarkdown(annotation.firstComment).toLowerCase().includes(needle) ||
     authorName.toLowerCase().includes(needle)
   );
 }
