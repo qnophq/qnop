@@ -22,12 +22,13 @@
 import { useMemo, useState } from 'react';
 import type { ReactNode } from 'react';
 import Box from '@mui/material/Box';
+import Button from '@mui/material/Button';
 import ButtonBase from '@mui/material/ButtonBase';
 import Collapse from '@mui/material/Collapse';
 import Stack from '@mui/material/Stack';
 import Typography from '@mui/material/Typography';
 import { useTheme } from '@mui/material/styles';
-import { ChevronRight, Link2, NotebookPen, Unlink } from 'lucide-react';
+import { ChevronRight, FileText, Link2, NotebookPen, Plus } from 'lucide-react';
 import type {
   AnnotationPriority,
   AnnotationType,
@@ -40,6 +41,7 @@ import type { Notify } from '../../admin/layout/useToast';
 import { SectionCard } from '../../admin/layout/SectionCard';
 import { compareAnnotationsByPosition } from '../viewer/anchoring';
 import { isUnseen } from '../newSince';
+import { isDocumentScoped } from '../annotationScope';
 import type { BuildPermalink } from '../useReviewPermalink';
 import { CopyLinkButton } from '../permalink/CopyLinkButton';
 import { AnnotationListItem } from './AnnotationListItem';
@@ -89,6 +91,13 @@ interface AnnotationPanelProps {
   /** A comment permalink target (issue #412) — scrolled to + pulsed in the active thread. */
   scrollToCommentId?: string | null;
   onScrolledToComment?: () => void;
+  /**
+   * Opens the "new whole-document task" dialog (issue #395) — a general remark that needs no
+   * selection. When set (and the review is writable) a quiet "Global annotation" button rides the
+   * panel header, so document-scoped annotations can also be raised from the document and focus
+   * views.
+   */
+  onNewDocumentNote?: () => void;
 }
 
 /** A collapsible, counted group of annotation cards (prototype sidebar section). */
@@ -226,6 +235,7 @@ export function AnnotationPanel({
   buildPermalink,
   scrollToCommentId = null,
   onScrolledToComment,
+  onNewDocumentNote,
 }: AnnotationPanelProps) {
   const [filters, setFilters] = useState<AnnotationFilters>(EMPTY_FILTERS);
   const userId = useAuthStore((state) => state.userId);
@@ -256,16 +266,19 @@ export function AnnotationPanel({
   // Sort + status-filter once per (annotations, filter) change, not on every
   // render (e.g. a hover or selection): the list can be large and the sort is
   // O(n log n) (issue #334).
-  const { placed, unplaced, hiddenByFilter } = useMemo(() => {
+  const { located, documentScoped, hiddenByFilter } = useMemo(() => {
     const matches = (annotation: AnnotationView) =>
       matchesFilters(annotation, filters, authorNameOf(annotation));
     const sorted = [...annotations].sort(compareAnnotationsByPosition);
-    const placedItems = sorted.filter((a) => a.anchor && matches(a));
-    const unplacedItems = sorted.filter((a) => !a.anchor && matches(a));
+    // Located annotations anchor to a passage; document-scoped ones (issue #395) apply to the
+    // whole document — no anchor, never orphaned — and group on their own.
+    const locatedItems = sorted.filter((a) => !isDocumentScoped(a) && matches(a));
+    const documentScopedItems = sorted.filter((a) => isDocumentScoped(a) && matches(a));
     return {
-      placed: placedItems,
-      unplaced: unplacedItems,
-      hiddenByFilter: annotations.length > 0 && placedItems.length + unplacedItems.length === 0,
+      located: locatedItems,
+      documentScoped: documentScopedItems,
+      hiddenByFilter:
+        annotations.length > 0 && locatedItems.length + documentScopedItems.length === 0,
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps -- authorNameOf derives from the inputs below
   }, [annotations, filters, userId, displayName]);
@@ -335,6 +348,20 @@ export function AnnotationPanel({
       title={`Annotations (${annotations.length})`}
       description="Marks and their discussion on this version."
       frameless={frameless}
+      action={
+        // Raise a whole-document task without a selection (issue #395) — a quiet peer to the
+        // text-selection gesture, offered while the latest version is open for review.
+        onNewDocumentNote && !readOnly && !reviewClosed ? (
+          <Button
+            size="small"
+            variant="outlined"
+            startIcon={<Plus size={15} />}
+            onClick={onNewDocumentNote}
+          >
+            Global annotation
+          </Button>
+        ) : undefined
+      }
     >
       <Stack spacing={1.5}>
         {annotations.length > 0 && (
@@ -364,26 +391,26 @@ export function AnnotationPanel({
             No annotations match this filter.
           </Typography>
         )}
-        {placed.length > 0 && (
+        {documentScoped.length > 0 && (
           <PanelSection
-            title="On this version"
-            subtitle="Anchored to the document"
-            icon={<Link2 size={13} aria-hidden />}
-            count={placed.length}
-            newCount={placed.filter((a) => isUnseen(a, previousSeenAt, userId)).length}
+            title="Whole document"
+            subtitle="General remarks — not pinned to a passage"
+            icon={<FileText size={13} aria-hidden />}
+            count={documentScoped.length}
+            newCount={documentScoped.filter((a) => isUnseen(a, previousSeenAt, userId)).length}
           >
-            {placed.map(renderItem)}
+            {documentScoped.map(renderItem)}
           </PanelSection>
         )}
-        {unplaced.length > 0 && (
+        {located.length > 0 && (
           <PanelSection
-            title="Not placed on this version"
-            subtitle="Anchor lost — needs manual handling"
-            icon={<Unlink size={13} aria-hidden />}
-            count={unplaced.length}
-            newCount={unplaced.filter((a) => isUnseen(a, previousSeenAt, userId)).length}
+            title="Anchored to the document"
+            subtitle="Placed on this version"
+            icon={<Link2 size={13} aria-hidden />}
+            count={located.length}
+            newCount={located.filter((a) => isUnseen(a, previousSeenAt, userId)).length}
           >
-            {unplaced.map(renderItem)}
+            {located.map(renderItem)}
           </PanelSection>
         )}
       </Stack>

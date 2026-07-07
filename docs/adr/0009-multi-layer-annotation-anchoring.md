@@ -47,3 +47,12 @@ PENDING → PLACED | MOVED | ORPHANED | FAILED
 - **Text-quote as the sole/primary strategy with layout as a mere fallback.** Rejected: images have no quote; geometry must be a first-class, always-present layer.
 - **Synchronous re-anchoring at upload.** Rejected: blocks the upload for large documents/many annotations; async with a `PENDING` lifecycle is the chosen shape ([ADR-0033](0033-durable-async-job-execution-on-postgres.md)).
 - **Auto-placing low-confidence matches.** Rejected: a mis-attached objection on a contract is worse than a visible orphan.
+
+## Amendment — document-scoped annotations (2026-07-06, issue #395)
+
+The region anchor is the universal base layer for *located* annotations. This amendment adds the explicit **unlocated** case: an annotation may be created **without any anchor** — a document-scoped remark ("unify terminology across the contract") that pins to no passage.
+
+- **Modeled as an annotation with no `AnnotationPlacement` row at all** — not a placement carrying a null anchor. It is implicitly valid on every version, never enters re-anchoring, and is never `PENDING`/`ORPHANED`.
+- **Identity, thread, status and the FINALIZED gate are unchanged** — an OPEN document-scoped annotation still blocks FINALIZED (it is counted like any other OPEN annotation), and a document-scoped annotation contributes no pending placement.
+- **No new discriminator field is needed.** An orphaned annotation keeps its anchor (a placement row with status `ORPHANED`), so in the `AnnotationView` a **null anchor ⇒ document-scoped**; the client reads that signal directly.
+- **Out of scope:** converting a document-scoped annotation into a located one (re-anchor UI is [#326] territory).

@@ -27,6 +27,8 @@ import { useTheme } from '@mui/material/styles';
 import { MessageSquare } from 'lucide-react';
 import type { AnnotationView } from '../../../api/generated';
 import { ToneBadge } from '../../admin/ToneBadge';
+import { isDocumentScoped } from '../annotationScope';
+import { WholeDocumentChip } from '../WholeDocumentChip';
 import { PRIORITY_CUES, TYPE_CUES } from '../tasks/tasksModel';
 import { PlacementStatusChip } from './PlacementStatusChip';
 import { STATUS_CUES } from './statusCues';
@@ -86,7 +88,11 @@ export function AnnotationBadgeRow({ annotation, unseen = false }: AnnotationBad
         spacing={1}
         sx={{ alignItems: 'center', ml: 'auto', color: 'text.secondary' }}
       >
-        {region && <Typography variant="caption">Page {region.surfaceIndex + 1}</Typography>}
+        {isDocumentScoped(annotation) ? (
+          <WholeDocumentChip compact />
+        ) : (
+          region && <Typography variant="caption">Page {region.surfaceIndex + 1}</Typography>
+        )}
         <Stack direction="row" spacing={0.5} sx={{ alignItems: 'center' }}>
           <MessageSquare size={13} aria-hidden />
           <Typography variant="caption" aria-label={`${annotation.commentCount} comments`}>

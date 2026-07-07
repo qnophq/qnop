@@ -281,6 +281,42 @@ class ReviewWorkflowControllerIT extends SeededIntegrationTest {
   }
 
   @Test
+  void documentScopedAnnotationBlocksFinalizeWhileOpenThenFinalizesWithoutAPlacement()
+      throws Exception {
+    Document document = inReviewOwnedByMember();
+    DocumentVersion version =
+        new DocumentVersion(
+            document.getId(), 1, "s3://key", "hash", "application/pdf", 10, MEMBER_ID);
+    version.attachRenderedDocument("{\"surfaces\":[]}"); // READY (issue #323 finalize precondition)
+    versions.save(version);
+    // A document-scoped annotation (issue #395) — no placement row at all.
+    Annotation annotation = annotations.save(new Annotation(document.getId(), MEMBER2_ID));
+
+    // OPEN → the FINALIZED gate counts it like any other open annotation.
+    mockMvc
+        .perform(
+            post(workflowPath(document.getId()))
+                .header("Authorization", "Bearer " + token(MEMBER_ID))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"targetState\":\"FINALIZED\"}"))
+        .andExpect(status().isConflict())
+        .andExpect(jsonPath("$.message").value(org.hamcrest.Matchers.containsString("open")));
+
+    // Resolved → it contributes no pending placement, so FINALIZED succeeds without one ever
+    // existing (it is never PENDING/ORPHANED, ADR-0009 as amended by #395).
+    annotation.resolve();
+    annotations.save(annotation);
+    mockMvc
+        .perform(
+            post(workflowPath(document.getId()))
+                .header("Authorization", "Bearer " + token(MEMBER_ID))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"targetState\":\"FINALIZED\"}"))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.state").value("FINALIZED"));
+  }
+
+  @Test
   void finalizeIsBlockedWhenTheOnlyVersionFailedExtraction() throws Exception {
     Document document = inReviewOwnedByMember();
     DocumentVersion version =

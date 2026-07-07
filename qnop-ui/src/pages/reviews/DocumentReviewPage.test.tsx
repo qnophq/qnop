@@ -256,6 +256,16 @@ describe('DocumentReviewPage', () => {
     expect(screen.getByText('Moved')).toBeInTheDocument();
   });
 
+  // Issue #395: a whole-document ("global") annotation can be raised from the panel too, not only
+  // the tasks view.
+  it('opens the global annotation dialog from the annotations panel', () => {
+    seedHappyPath();
+    renderPage();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Global annotation' }));
+    expect(screen.getByText(/applies to the whole document/i)).toBeInTheDocument();
+  });
+
   it('announces a still-processing version and keeps annotating disabled', () => {
     seedHappyPath(ExtractionStatus.Pending);
     renderPage();

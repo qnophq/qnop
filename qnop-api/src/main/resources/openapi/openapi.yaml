@@ -4372,16 +4372,22 @@ components:
         - LOW
     AnnotationCreateRequest:
       type: object
-      description: Create an annotation anchored to a region of a version.
+      description: >-
+        Create an annotation. With an anchor it is located on a region of the
+        version and re-anchors across versions (ADR-0009); without an anchor it
+        is document-scoped (issue #395) — a general remark valid on every
+        version, never placed and never orphaned.
       required:
         - versionNumber
-        - anchor
         - comment
       properties:
         versionNumber:
           type: integer
           minimum: 1
-          description: The 1-based version the annotation is drawn on.
+          description: >-
+            The 1-based version the annotation is authored on. For a located
+            annotation it is the version the region is drawn on; a document-scoped
+            annotation carries no placement on it.
         anchor:
           $ref: '#/components/schemas/Anchor'
         comment:

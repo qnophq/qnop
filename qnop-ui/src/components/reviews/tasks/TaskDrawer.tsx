@@ -33,6 +33,8 @@ import { useAuthStore } from '../../../stores/authStore';
 import { tokens } from '../../../theme/tokens';
 import type { Notify } from '../../admin/layout/useToast';
 import { ToneBadge } from '../../admin/ToneBadge';
+import { isDocumentScoped } from '../annotationScope';
+import { WholeDocumentChip } from '../WholeDocumentChip';
 import type { BuildPermalink } from '../useReviewPermalink';
 import { CopyLinkButton } from '../permalink/CopyLinkButton';
 import { CommentThread } from '../panel/CommentThread';
@@ -167,6 +169,7 @@ export function TaskDrawer({
           <Stack direction="row" spacing={1} sx={{ alignItems: 'center', mt: 1, flexWrap: 'wrap' }}>
             <ToneBadge tone={statusCue.tone} label={statusCue.label} />
             <PlacementStatusChip status={annotation.placementStatus} />
+            {isDocumentScoped(annotation) && <WholeDocumentChip />}
             {page !== null && (
               <Typography variant="caption" color="text.secondary">
                 p. {page}

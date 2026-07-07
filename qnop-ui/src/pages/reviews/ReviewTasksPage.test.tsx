@@ -41,8 +41,10 @@ vi.mock('../../api/hooks/useDocuments', () => ({
   useDocument: vi.fn(),
   useDocumentVersions: vi.fn(),
 }));
+const { createMutate } = vi.hoisted(() => ({ createMutate: vi.fn() }));
 vi.mock('../../api/hooks/useAnnotations', () => ({
   useAnnotations: vi.fn(),
+  useCreateAnnotation: vi.fn().mockReturnValue({ mutate: createMutate, isPending: false }),
   useResolveAnnotation: vi.fn().mockReturnValue({ mutate: vi.fn(), isPending: false }),
   useReopenAnnotation: vi.fn().mockReturnValue({ mutate: vi.fn(), isPending: false }),
 }));
@@ -238,5 +240,58 @@ describe('ReviewTasksPage', () => {
     renderPage();
     expect(screen.getByTestId('task-row-a-open')).toBeInTheDocument();
     expect(screen.queryByTestId('task-board')).not.toBeInTheDocument();
+  });
+
+  // Issue #395: document-scoped ("global") annotations.
+  it('creates a document-scoped annotation from the dialog, with no anchor', () => {
+    mockData();
+    renderPage();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Global annotation' }));
+    const dialog = screen.getByRole('dialog');
+    fireEvent.change(within(dialog).getByLabelText('Annotation comment'), {
+      target: { value: 'Unify terminology across the contract' },
+    });
+    fireEvent.click(within(dialog).getByRole('button', { name: /Create annotation/ }));
+
+    expect(createMutate).toHaveBeenCalledTimes(1);
+    const [payload] = createMutate.mock.calls[0];
+    expect(payload).toMatchObject({
+      versionNumber: 2,
+      comment: 'Unify terminology across the contract',
+    });
+    // No anchor is sent → the server takes it as document-scoped.
+    expect(payload.anchor).toBeUndefined();
+  });
+
+  it('hides the Global annotation action on a closed review', () => {
+    mockData();
+    vi.mocked(useDocument).mockReturnValue({
+      isPending: false,
+      isError: false,
+      data: {
+        id: 'd1',
+        title: 'Supply Contract',
+        ownerId: 'owner-1',
+        latestVersionNumber: 2,
+        workflowState: 'FINALIZED',
+      },
+    } as never);
+    renderPage();
+
+    expect(screen.queryByRole('button', { name: 'Global annotation' })).not.toBeInTheDocument();
+  });
+
+  it('marks a document-scoped task with the whole-document chip', () => {
+    mockData();
+    vi.mocked(useAnnotations).mockReturnValue({
+      isPending: false,
+      data: {
+        annotations: [annotation('a-doc', { anchor: undefined, placementStatus: undefined })],
+      },
+    } as never);
+    renderPage();
+
+    expect(screen.getByTestId('whole-document-chip')).toBeInTheDocument();
   });
 });

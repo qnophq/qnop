@@ -32,6 +32,7 @@ import { AnnotationStatus } from '../../../api/generated';
 import { ToneBadge } from '../../admin/ToneBadge';
 import { UserAvatar } from '../../shell/UserAvatar';
 import { tokens } from '../../../theme/tokens';
+import { isDocumentScoped } from '../annotationScope';
 import { STATUS_CUES } from '../panel/statusCues';
 import { PRIORITY_CUES, TYPE_CUES, columnOf, taskTitle } from './tasksModel';
 
@@ -123,9 +124,11 @@ export function TaskListRows({ annotations, taskKeyOf, authorNameOf, onOpen }: T
                 {taskTitle(annotation)}
               </Typography>
               <Typography variant="caption" color="text.secondary" noWrap sx={{ display: 'block' }}>
-                {annotation.anchor?.textQuote?.quote
-                  ? `“${annotation.anchor.textQuote.quote}”`
-                  : 'No text anchor'}
+                {isDocumentScoped(annotation)
+                  ? 'Whole document'
+                  : annotation.anchor?.textQuote?.quote
+                    ? `“${annotation.anchor.textQuote.quote}”`
+                    : 'No text anchor'}
                 {page !== null && ` · p. ${page}`}
                 {` · ${authorNameOf(annotation.authorId)}`}
               </Typography>

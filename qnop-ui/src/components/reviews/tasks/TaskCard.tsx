@@ -33,6 +33,8 @@ import { ToneBadge } from '../../admin/ToneBadge';
 import { useAuthStore } from '../../../stores/authStore';
 import { UserAvatar } from '../../shell/UserAvatar';
 import { isUnseen } from '../newSince';
+import { isDocumentScoped } from '../annotationScope';
+import { WholeDocumentChip } from '../WholeDocumentChip';
 import { tokens } from '../../../theme/tokens';
 import { STATUS_CUES } from '../panel/statusCues';
 import { PRIORITY_CUES, TYPE_CUES, taskTitle } from './tasksModel';
@@ -156,14 +158,18 @@ export function TaskCard({
           </Stack>
         )}
         <Box sx={{ flex: 1 }} />
-        {page !== null && (
-          <Typography
-            variant="caption"
-            color="text.secondary"
-            sx={{ fontVariantNumeric: 'tabular-nums' }}
-          >
-            p. {page}
-          </Typography>
+        {isDocumentScoped(annotation) ? (
+          <WholeDocumentChip compact />
+        ) : (
+          page !== null && (
+            <Typography
+              variant="caption"
+              color="text.secondary"
+              sx={{ fontVariantNumeric: 'tabular-nums' }}
+            >
+              p. {page}
+            </Typography>
+          )
         )}
       </Stack>
 

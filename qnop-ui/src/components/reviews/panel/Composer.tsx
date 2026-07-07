@@ -35,46 +35,59 @@ import { PRIORITY_CUES, TYPE_CUES } from '../tasks/tasksModel';
 
 /**
  * The composer for a freshly drawn anchor — rendered in the panel, and in
- * focus mode inside the overlay card. The first comment is mandatory (issue
- * #301) — an annotation without text must not exist, so creating stays
- * disabled (button and submit shortcut) until the trimmed comment is
- * non-empty.
+ * focus mode inside the overlay card. Also runs anchor-free (`pendingAnchor`
+ * null) for a document-scoped remark (issue #395), where the surrounding
+ * dialog owns the heading, so it renders `frameless` and drops its own frame
+ * and passage line. The first comment is mandatory (issue #301) — an
+ * annotation without text must not exist, so creating stays disabled (button
+ * and submit shortcut) until the trimmed comment is non-empty.
  */
 export function Composer({
   pendingAnchor,
   creating,
   onCreate,
   onCancel,
+  frameless = false,
 }: {
-  pendingAnchor: Anchor;
+  /** The drawn region, or null for a document-scoped annotation (issue #395). */
+  pendingAnchor: Anchor | null;
   creating: boolean;
   onCreate: (comment: string, type?: AnnotationType, priority?: AnnotationPriority) => void;
   onCancel: () => void;
+  /** Drops the card frame and heading/passage line — for hosting inside a dialog. */
+  frameless?: boolean;
 }) {
   const theme = useTheme();
   const [comment, setComment] = useState('');
   const [type, setType] = useState<AnnotationType | ''>('');
   const [priority, setPriority] = useState<AnnotationPriority | ''>('');
   const canCreate = !creating && comment.trim().length > 0;
-  const quote = pendingAnchor.textQuote?.quote;
+  const quote = pendingAnchor?.textQuote?.quote;
   const create = () => onCreate(comment, type || undefined, priority || undefined);
   return (
-    <Paper variant="outlined" sx={{ p: 1.5 }} data-testid="annotation-composer">
+    <Paper
+      variant={frameless ? 'elevation' : 'outlined'}
+      elevation={0}
+      sx={{ p: frameless ? 0 : 1.5, bgcolor: 'transparent' }}
+      data-testid="annotation-composer"
+    >
       <Stack spacing={1}>
-        <Typography variant="subtitle2">New annotation</Typography>
-        <Typography
-          variant="body2"
-          color="text.secondary"
-          sx={{
-            fontStyle: quote ? 'italic' : 'normal',
-            display: '-webkit-box',
-            WebkitLineClamp: 3,
-            WebkitBoxOrient: 'vertical',
-            overflow: 'hidden',
-          }}
-        >
-          {quote ? `“${quote}”` : `Region on page ${pendingAnchor.region.surfaceIndex + 1}`}
-        </Typography>
+        {!frameless && <Typography variant="subtitle2">New annotation</Typography>}
+        {!frameless && pendingAnchor && (
+          <Typography
+            variant="body2"
+            color="text.secondary"
+            sx={{
+              fontStyle: quote ? 'italic' : 'normal',
+              display: '-webkit-box',
+              WebkitLineClamp: 3,
+              WebkitBoxOrient: 'vertical',
+              overflow: 'hidden',
+            }}
+          >
+            {quote ? `“${quote}”` : `Region on page ${pendingAnchor.region.surfaceIndex + 1}`}
+          </Typography>
+        )}
         <TextField
           multiline
           minRows={5}
