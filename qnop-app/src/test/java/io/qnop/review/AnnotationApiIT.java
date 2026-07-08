@@ -20,6 +20,7 @@
  */
 package io.qnop.review;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.hamcrest.Matchers.greaterThanOrEqualTo;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
@@ -32,6 +33,7 @@ import io.qnop.entity.Document;
 import io.qnop.entity.DocumentVersion;
 import io.qnop.entity.ReviewParticipant;
 import io.qnop.entity.WorkflowState;
+import io.qnop.repository.AuditEventRepository;
 import io.qnop.repository.DocumentRepository;
 import io.qnop.repository.DocumentVersionRepository;
 import io.qnop.repository.ReviewParticipantRepository;
@@ -56,6 +58,7 @@ class AnnotationApiIT extends SeededIntegrationTest {
   @Autowired private DocumentRepository documents;
   @Autowired private DocumentVersionRepository versions;
   @Autowired private ReviewParticipantRepository participants;
+  @Autowired private AuditEventRepository auditEvents;
 
   /** A DRAFT document owned by MEMBER with AUDITOR + MEMBER2 as reviewers and one version. */
   private UUID seedDocumentWithVersion() {
@@ -248,7 +251,12 @@ class AnnotationApiIT extends SeededIntegrationTest {
     // in the thread or uploads a new version, but never closes the concern.
     mockMvc
         .perform(as(post("/api/v1/annotations/" + annotationId + "/resolve"), MEMBER_ID))
-        .andExpect(status().isForbidden());
+        .andExpect(status().isForbidden())
+        .andExpect(jsonPath("$.code").value("ANNOTATION_ACTION_FORBIDDEN"));
+
+    // The refused decision leaves no audit trail — nobody "resolved" anything (issue #351).
+    assertThat(auditEvents.findByDocumentIdOrderByCreatedAtDesc(documentId))
+        .noneMatch(event -> "annotation.resolved".equals(event.getEventType()));
   }
 
   @Test
@@ -259,7 +267,33 @@ class AnnotationApiIT extends SeededIntegrationTest {
     // MEMBER2 is a participant (so the annotation is visible) but not the author.
     mockMvc
         .perform(as(post("/api/v1/annotations/" + annotationId + "/resolve"), MEMBER2_ID))
-        .andExpect(status().isForbidden());
+        .andExpect(status().isForbidden())
+        .andExpect(jsonPath("$.code").value("ANNOTATION_ACTION_FORBIDDEN"));
+
+    assertThat(auditEvents.findByDocumentIdOrderByCreatedAtDesc(documentId))
+        .noneMatch(event -> "annotation.resolved".equals(event.getEventType()));
+  }
+
+  @Test
+  void theAuthorsResolveIsAuditedWithTheAuthorAsActor() throws Exception {
+    UUID documentId = seedDocumentWithVersion();
+    // AUDITOR authors an annotation on a document owned by someone else (MEMBER) and,
+    // as the author, may decide (resolve) it — the audit event must attribute the act to
+    // the author, not the document owner (issue #351).
+    String annotationId = createAnnotation(documentId, AUDITOR_ID);
+
+    mockMvc
+        .perform(as(post("/api/v1/annotations/" + annotationId + "/resolve"), AUDITOR_ID))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.status").value("RESOLVED"));
+
+    assertThat(auditEvents.findByDocumentIdOrderByCreatedAtDesc(documentId))
+        .anySatisfy(
+            event -> {
+              assertThat(event.getEventType()).isEqualTo("annotation.resolved");
+              assertThat(event.getActorId()).isEqualTo(AUDITOR_ID);
+              assertThat(event.getDetail()).contains(annotationId);
+            });
   }
 
   @Test
