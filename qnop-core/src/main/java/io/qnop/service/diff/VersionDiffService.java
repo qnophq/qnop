@@ -55,14 +55,17 @@ public class VersionDiffService {
 
   private final DocumentVersionRepository versions;
   private final VersionDiffRepository diffs;
+  private final VersionDiffCacheWriter cacheWriter;
   private final DocumentAccessService documentAccess;
 
   public VersionDiffService(
       DocumentVersionRepository versions,
       VersionDiffRepository diffs,
+      VersionDiffCacheWriter cacheWriter,
       DocumentAccessService documentAccess) {
     this.versions = versions;
     this.diffs = diffs;
+    this.cacheWriter = cacheWriter;
     this.documentAccess = documentAccess;
   }
 
@@ -110,7 +113,10 @@ public class VersionDiffService {
     List<ChangeView> changes =
         VersionDiffEngine.diff(left, right).stream().map(VersionDiffService::toView).toList();
     try {
-      diffs.save(
+      // The insert runs in its own REQUIRES_NEW transaction (VersionDiffCacheWriter): a concurrent
+      // first-writer's unique-pair violation then rolls back only that isolated insert and
+      // propagates here, never poisoning this transaction (issue #351).
+      cacheWriter.store(
           new VersionDiff(
               documentId, from.getId(), to.getId(), MAPPER.writeValueAsString(changes)));
     } catch (DataIntegrityViolationException e) {
