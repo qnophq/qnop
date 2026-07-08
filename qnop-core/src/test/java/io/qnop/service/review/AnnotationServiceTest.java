@@ -50,10 +50,11 @@ import org.mockito.ArgumentCaptor;
 
 /**
  * Unit tests for {@link AnnotationService} (issue #349): the mandatory first comment, visibility
- * delegated to {@link DocumentAccessService} (non-participant → 404), the latest-version-only guard,
- * the placement-status list filter, classification authorization, closed-thread comment refusal and
- * the audit events. Non-strict {@code mock()} wiring keeps the eight collaborators readable; the
- * identity/anonymity resolver is mocked (its exposed id / display name are nullable in a view).
+ * delegated to {@link DocumentAccessService} (non-participant → 404), the latest-version-only
+ * guard, the placement-status list filter, classification authorization, closed-thread comment
+ * refusal and the audit events. Non-strict {@code mock()} wiring keeps the eight collaborators
+ * readable; the identity/anonymity resolver is mocked (its exposed id / display name are nullable
+ * in a view).
  */
 class AnnotationServiceTest {
 
@@ -69,7 +70,13 @@ class AnnotationServiceTest {
 
   private final AnnotationService service =
       new AnnotationService(
-          annotations, placements, comments, versions, auditEvents, documentAccess, workflow,
+          annotations,
+          placements,
+          comments,
+          versions,
+          auditEvents,
+          documentAccess,
+          workflow,
           identity);
 
   private final UUID documentId = UUID.randomUUID();
@@ -77,9 +84,19 @@ class AnnotationServiceTest {
   private final UUID owner = UUID.randomUUID();
   private final UUID stranger = UUID.randomUUID();
 
-  private DocumentAccessService.DocumentView documentView(UUID ownerId, String threadParticipation) {
+  private DocumentAccessService.DocumentView documentView(
+      UUID ownerId, String threadParticipation) {
     return new DocumentAccessService.DocumentView(
-        documentId, "Doc", null, false, threadParticipation, ownerId, "IN_REVIEW", 1, null, null,
+        documentId,
+        "Doc",
+        null,
+        false,
+        threadParticipation,
+        ownerId,
+        "IN_REVIEW",
+        1,
+        null,
+        null,
         null);
   }
 
@@ -104,8 +121,7 @@ class AnnotationServiceTest {
   @Test
   @DisplayName("create refuses a blank first comment (an annotation must have text)")
   void createRejectsBlankFirstComment() {
-    assertThatThrownBy(
-            () -> service.create(documentId, 1, author, false, "{}", "  ", null, null))
+    assertThatThrownBy(() -> service.create(documentId, 1, author, false, "{}", "  ", null, null))
         .isInstanceOfSatisfying(
             DocumentValidationException.class, e -> assertThat(e.getStatus()).isEqualTo(400));
   }
@@ -116,8 +132,7 @@ class AnnotationServiceTest {
     when(documentAccess.getDocument(any(), any(), anyBoolean()))
         .thenThrow(DocumentValidationException.notFound("no such document"));
 
-    assertThatThrownBy(
-            () -> service.create(documentId, 1, stranger, false, "{}", "hi", null, null))
+    assertThatThrownBy(() -> service.create(documentId, 1, stranger, false, "{}", "hi", null, null))
         .isInstanceOfSatisfying(
             DocumentValidationException.class, e -> assertThat(e.getStatus()).isEqualTo(404));
   }
@@ -128,8 +143,7 @@ class AnnotationServiceTest {
     visibleDocument(owner, "OPEN");
     when(versions.findByDocumentIdAndVersionNumber(documentId, 9)).thenReturn(Optional.empty());
 
-    assertThatThrownBy(
-            () -> service.create(documentId, 9, author, false, "{}", "hi", null, null))
+    assertThatThrownBy(() -> service.create(documentId, 9, author, false, "{}", "hi", null, null))
         .isInstanceOfSatisfying(
             DocumentValidationException.class, e -> assertThat(e.getStatus()).isEqualTo(404));
   }
@@ -143,8 +157,7 @@ class AnnotationServiceTest {
     when(versions.findTopByDocumentIdOrderByVersionNumberDesc(documentId))
         .thenReturn(Optional.of(version(2)));
 
-    assertThatThrownBy(
-            () -> service.create(documentId, 1, author, false, "{}", "hi", null, null))
+    assertThatThrownBy(() -> service.create(documentId, 1, author, false, "{}", "hi", null, null))
         .isInstanceOfSatisfying(
             DocumentValidationException.class,
             e -> {
@@ -195,8 +208,7 @@ class AnnotationServiceTest {
     when(version.getId()).thenReturn(versionId);
     visibleDocument(owner, "OPEN");
     resolvableIdentities();
-    when(versions.findByDocumentIdAndVersionNumber(documentId, 1))
-        .thenReturn(Optional.of(version));
+    when(versions.findByDocumentIdAndVersionNumber(documentId, 1)).thenReturn(Optional.of(version));
     when(annotations.findByDocumentId(documentId))
         .thenReturn(List.of(new Annotation(documentId, author)));
     AnnotationPlacement orphaned = new AnnotationPlacement(null, versionId, "{}");

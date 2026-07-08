@@ -41,8 +41,8 @@ import org.mockito.junit.jupiter.MockitoExtension;
 
 /**
  * Unit tests for the durable-queue poller (issue #349). {@link JobQueuePoller}'s only collaborator
- * is {@link JobService}, so a mock fully isolates the batch-dispatch contract: run each claimed job,
- * record a handler failure without aborting the batch, and reap stale jobs. The transactional/
+ * is {@link JobService}, so a mock fully isolates the batch-dispatch contract: run each claimed
+ * job, record a handler failure without aborting the batch, and reap stale jobs. The transactional/
  * ShedLock semantics are inert without a Spring context and are covered by {@code JobQueueIT}.
  */
 @ExtendWith(MockitoExtension.class)
@@ -99,7 +99,9 @@ class JobQueuePollerTest {
     UUID next = UUID.randomUUID();
     when(jobService.claimBatch()).thenReturn(List.of(boom, next));
     doThrow(new IllegalStateException("handler blew up")).when(jobService).runOne(boom);
-    doThrow(new IllegalStateException("could not record")).when(jobService).recordFailure(eq(boom), any());
+    doThrow(new IllegalStateException("could not record"))
+        .when(jobService)
+        .recordFailure(eq(boom), any());
 
     assertThatCode(() -> poller.poll()).doesNotThrowAnyException();
     // Even when recordFailure itself throws, the next job is still processed.

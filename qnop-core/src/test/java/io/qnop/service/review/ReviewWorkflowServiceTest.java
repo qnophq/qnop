@@ -50,8 +50,8 @@ import org.mockito.ArgumentCaptor;
 /**
  * Unit tests for {@link ReviewWorkflowService} (issue #349): owner-only transition authorization,
  * the finalize guard fed by open-work counts, transition persistence + audit format, and the
- * annotation resolve/reopen author checks. The pessimistic locking mechanism is covered by
- * {@link ReviewWorkflowServiceLockTest}; the state machine itself by {@code ReviewWorkflowMachineTest}.
+ * annotation resolve/reopen author checks. The pessimistic locking mechanism is covered by {@link
+ * ReviewWorkflowServiceLockTest}; the state machine itself by {@code ReviewWorkflowMachineTest}.
  * Non-strict {@code mock()} wiring matches the lock test — the finalize context counts are always
  * computed, so lenient stubbing keeps the tests readable.
  */
