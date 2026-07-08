@@ -27,10 +27,13 @@ export default defineConfig({
       // setup, queryClient), presentational stubs (pages, AppShell) and the
       // bootstrap (main, router) are covered by component/visual/E2E tests as
       // their real screens land (#102/#103), not by markup assertions here.
+      // Scope grows per the #352 coverage waves (auth → viewer → admin → shell),
+      // each wave adding its slice here alongside the tests that cover it.
       include: [
         'src/stores/**/*.ts',
         'src/utils/**/*.ts',
         'src/api/refresh.ts',
+        'src/api/auth.ts',
         'src/api/hooks/**/*.ts',
         // Auth guards are logic (unit-tested); the presentational auth
         // components (AuthLayout, OidcButtons, PasswordField, the strength
@@ -40,6 +43,8 @@ export default defineConfig({
         'src/components/auth/RoleRoute.tsx',
         'src/components/auth/AuthHydrationBoundary.tsx',
         'src/components/shell/navConfig.tsx',
+        // Auth screens — the critical entry flow (issue #352, wave 1).
+        'src/pages/auth/**/*.tsx',
         // The viewer's pure anchor-building logic (#250); the presentational
         // viewer/panel components are covered by component tests, and the
         // pdf.js wiring (usePdfDocument, SurfacePage canvas) by E2E later.
