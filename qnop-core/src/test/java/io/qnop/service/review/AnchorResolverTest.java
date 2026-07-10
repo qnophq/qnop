@@ -243,6 +243,95 @@ class AnchorResolverTest {
     assertThat(new AnchorResolver(lenient).resolve(anchor, v2).outcome()).isEqualTo(Outcome.MOVED);
   }
 
+  // --- boundary edge cases (issue #351) --------------------------------------
+
+  @Test
+  @DisplayName("a candidate at exactly the 0.75 threshold is re-placed — the check is strict '<'")
+  void similarityExactlyAtThresholdIsMoved() {
+    // 16-char quote, window matching the first 12 chars → 4 of 16 edited → similarity == 0.75.
+    String anchor = anchor("abcdefghijklmnop", null, null);
+    RenderedDocument v2 = doc(surface(0, "abcdefghijkl____"));
+
+    // 0.75 is not < 0.75, so the default bar accepts it.
+    assertThat(new AnchorResolver().resolve(anchor, v2).outcome()).isEqualTo(Outcome.MOVED);
+
+    // Nudging the bar the slightest bit above 0.75 drops the very same candidate.
+    ReanchoringProperties stricter = new ReanchoringProperties(0.8, null, null, null, null, null);
+    assertThat(new AnchorResolver(stricter).resolve(anchor, v2).outcome())
+        .isEqualTo(Outcome.ORPHANED);
+  }
+
+  @Test
+  @DisplayName("two candidates within the ambiguity margin are ORPHANED, never guessed")
+  void candidatesWithinTheAmbiguityMarginAreOrphaned() {
+    // 32-char quote; two windows score 0.75 (8 edited) and 0.71875 (9 edited) — a ~0.031 lead,
+    // under the default 0.05 margin.
+    String anchor = anchor("AAAAAAAABBBBBBBBCCCCCCCCDDDDDDDD", null, null);
+    RenderedDocument v2 =
+        doc(surface(0, "AAAAAAAABBBBBBBBCCCCCCCC________", "AAAAAAAABBBBBBBBCCCCCCC_________"));
+
+    // Best lead over the runner-up is below the margin → ambiguous → ORPHANED.
+    assertThat(new AnchorResolver().resolve(anchor, v2).outcome()).isEqualTo(Outcome.ORPHANED);
+
+    // A deployment that trusts a razor-thin lead re-places the best candidate instead.
+    ReanchoringProperties decisive = new ReanchoringProperties(null, 0.001, null, null, null, null);
+    assertThat(new AnchorResolver(decisive).resolve(anchor, v2).outcome()).isEqualTo(Outcome.MOVED);
+  }
+
+  @Test
+  @DisplayName("two fuzzy candidates with identical scores tie and are ORPHANED (never guessed)")
+  void tiedFuzzyCandidatesAreOrphaned() {
+    // Two identical edited windows → equal score → zero lead → below any positive margin.
+    String anchor = anchor("AAAAAAAABBBBBBBBCCCCCCCCDDDDDDDD", null, null);
+    RenderedDocument v2 =
+        doc(surface(0, "AAAAAAAABBBBBBBBCCCCCCCC________", "AAAAAAAABBBBBBBBCCCCCCCC________"));
+
+    Resolution resolution = resolver.resolve(anchor, v2);
+
+    assertThat(resolution.outcome()).isEqualTo(Outcome.ORPHANED);
+    assertThat(resolution.anchorJson()).isEqualTo(anchor); // untouched
+  }
+
+  @Test
+  @DisplayName("a duplicated quote is disambiguated by a prefix-only context (suffix absent)")
+  void prefixOnlyContextDisambiguates() {
+    String anchor = anchor("liability is capped", "clause nine: ", null);
+    RenderedDocument v2 =
+        doc(
+            surface(
+                0,
+                "first liability is capped here somehow",
+                "clause 9: liability is capped and more"));
+
+    Resolution resolution = resolver.resolve(anchor, v2);
+
+    assertThat(resolution.outcome()).isEqualTo(Outcome.MOVED);
+    int start = JSON.readTree(resolution.anchorJson()).path("textPosition").path("start").asInt();
+    assertThat(start)
+        .isEqualTo("first liability is capped here somehow".length() + 1 + "clause 9: ".length());
+  }
+
+  @Test
+  @DisplayName("a duplicated quote is disambiguated by a suffix-only context (prefix absent)")
+  void suffixOnlyContextDisambiguates() {
+    // Suffix edited ("as clause nine" → "as clause 9") so no verbatim quote+suffix match exists —
+    // the suffix-only similarity (the layers==1 branch) must decide.
+    String anchor = anchor("liability is capped", null, " as clause nine");
+    RenderedDocument v2 =
+        doc(
+            surface(
+                0,
+                "first liability is capped here somehow",
+                "the liability is capped as clause 9 today"));
+
+    Resolution resolution = resolver.resolve(anchor, v2);
+
+    assertThat(resolution.outcome()).isEqualTo(Outcome.MOVED);
+    int start = JSON.readTree(resolution.anchorJson()).path("textPosition").path("start").asInt();
+    assertThat(start)
+        .isEqualTo("first liability is capped here somehow".length() + 1 + "the ".length());
+  }
+
   // --- helpers ---------------------------------------------------------------
 
   /** An anchor JSON in the stored shape (#247): region + textQuote (+ position best-effort). */
