@@ -63,8 +63,8 @@ importers:
         specifier: 19.2.7
         version: 19.2.7(react@19.2.7)
       react-easy-crop:
-        specifier: 6.1.0
-        version: 6.1.0(react-dom@19.2.7(react@19.2.7))(react@19.2.7)
+        specifier: 6.2.0
+        version: 6.2.0(react-dom@19.2.7(react@19.2.7))(react@19.2.7)
       react-image-crop:
         specifier: 11.1.2
         version: 11.1.2(react@19.2.7)
@@ -2353,8 +2353,8 @@ packages:
     peerDependencies:
       react: ^19.2.7
 
-  react-easy-crop@6.1.0:
-    resolution: {integrity: sha512-zimsbH7DLuajy2hA4UpQpTVoisV8EpeE0/CFmph8tFS3EUbr83iL5TXMVYS0xli990VN6hVepmLNVRZ3SyD05A==}
+  react-easy-crop@6.2.0:
+    resolution: {integrity: sha512-8CEes7M8UkNoRPaz/krm70xMTbpar07crz/OrPSJwdGopV6lPcqdEmamDYTXgsqukb/1e2fbFd9/mROi8Qkp+A==}
     peerDependencies:
       react: '>=16.4.0'
       react-dom: '>=16.4.0'
@@ -5337,7 +5337,7 @@ snapshots:
       react: 19.2.7
       scheduler: 0.27.0
 
-  react-easy-crop@6.1.0(react-dom@19.2.7(react@19.2.7))(react@19.2.7):
+  react-easy-crop@6.2.0(react-dom@19.2.7(react@19.2.7))(react@19.2.7):
     dependencies:
       normalize-wheel: 1.0.1
       react: 19.2.7
