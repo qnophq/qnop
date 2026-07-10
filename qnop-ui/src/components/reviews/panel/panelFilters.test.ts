@@ -92,6 +92,12 @@ describe('matchesFilters', () => {
       false,
     );
   });
+
+  it('matches the opening text stripped of Markdown, not its syntax (#427)', () => {
+    const a = annotation({ firstComment: '**Please** rephrase the _liability_ clause' });
+    expect(matchesFilters(a, { ...EMPTY_FILTERS, query: 'liability' }, 'Paul')).toBe(true);
+    expect(matchesFilters(a, { ...EMPTY_FILTERS, query: '_liability_' }, 'Paul')).toBe(false);
+  });
 });
 
 describe('activeFacetCount', () => {
