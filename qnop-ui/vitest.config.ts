@@ -45,6 +45,17 @@ export default defineConfig({
         'src/components/shell/navConfig.tsx',
         // Auth screens — the critical entry flow (issue #352, wave 1).
         'src/pages/auth/**/*.tsx',
+        // Admin screens — users, teams, settings, branding and OIDC (issue
+        // #352, wave 3). The pages own the orchestration/state; their heavy
+        // child dialogs/tables/forms stay on their own component tests. (The
+        // mail admin pages carry their own tests but predate this gate and are
+        // not yet at the 80% bar, so they stay off the allowlist for now.)
+        'src/pages/admin/UsersPage.tsx',
+        'src/pages/admin/TeamsPage.tsx',
+        'src/pages/admin/TeamDetailPage.tsx',
+        'src/pages/admin/SettingsPage.tsx',
+        'src/pages/admin/BrandingPage.tsx',
+        'src/pages/admin/OidcProvidersPage.tsx',
         // The viewer's pure anchor-building logic (#250) plus the document
         // surface (issue #352, wave 2): the pdf.js loader/canvas wiring and the
         // scrollable page stack with its scroll spy and rubber-band selection.
