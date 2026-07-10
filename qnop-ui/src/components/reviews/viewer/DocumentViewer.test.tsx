@@ -146,9 +146,38 @@ describe('DocumentViewer', () => {
     update({ activeAnnotationId: 'a1' });
 
     expect(Element.prototype.scrollIntoView).toHaveBeenCalledWith({
-      behavior: 'smooth',
+      behavior: 'auto',
       block: 'center',
     });
+  });
+
+  it('retries the deep-link scroll until the mark has rendered (issue #403)', () => {
+    // "Show in document" / ?annotation= seeds the active id BEFORE the
+    // annotations arrive — the first pass finds no mark and must not give up.
+    const { update } = renderViewer({
+      annotations: [] as AnnotationView[],
+      activeAnnotationId: 'a1',
+    });
+    expect(Element.prototype.scrollIntoView).not.toHaveBeenCalled();
+
+    update({ annotations: [{ id: 'a1' }] as AnnotationView[] });
+
+    expect(Element.prototype.scrollIntoView).toHaveBeenCalledTimes(1);
+  });
+
+  it('scrolls once per selection — a data refetch never yanks the reader back', () => {
+    const { update } = renderViewer({ annotations: [{ id: 'a1' }] as AnnotationView[] });
+    update({ activeAnnotationId: 'a1' });
+    expect(Element.prototype.scrollIntoView).toHaveBeenCalledTimes(1);
+
+    // Annotations refresh (same id, new identity) — no second scroll.
+    update({ annotations: [{ id: 'a1' }] as AnnotationView[] });
+    expect(Element.prototype.scrollIntoView).toHaveBeenCalledTimes(1);
+
+    // Deselect + reselect scrolls again.
+    update({ activeAnnotationId: null });
+    update({ activeAnnotationId: 'a1' });
+    expect(Element.prototype.scrollIntoView).toHaveBeenCalledTimes(2);
   });
 
   it('never scrolls on hover — skimming the panel must not move the page (issue #403)', () => {
