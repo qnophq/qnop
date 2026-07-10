@@ -45,6 +45,7 @@ import { isDocumentScoped } from '../annotationScope';
 import type { BuildPermalink } from '../useReviewPermalink';
 import { CopyLinkButton } from '../permalink/CopyLinkButton';
 import { AnnotationListItem } from './AnnotationListItem';
+import type { UploadedAttachment } from '../markdown/useCommentAttachmentUpload';
 import { CommentThread } from './CommentThread';
 import { Composer } from './Composer';
 import type { FilterAuthor } from './PanelFilterBar';
@@ -78,6 +79,8 @@ interface AnnotationPanelProps {
   onCancelPending: () => void;
   canAnnotate: boolean;
   notify: Notify;
+  /** Uploads a local composer file (issue #446); built by the page, which owns the document id. */
+  onUploadAttachment?: (file: File) => Promise<UploadedAttachment>;
   /** True while an OLDER version is viewed (#306): threads readable, nothing writable. */
   readOnly?: boolean;
   /** True once the review is FINALIZED/CANCELLED (issue #394): no reopening. */
@@ -228,6 +231,7 @@ export function AnnotationPanel({
   onCancelPending,
   canAnnotate,
   notify,
+  onUploadAttachment,
   readOnly = false,
   reviewClosed = false,
   frameless = false,
@@ -322,6 +326,7 @@ export function AnnotationPanel({
           {/* The thread stays inside the unit's card. */}
           <CommentThread
             annotationId={annotation.id}
+            documentId={annotation.documentId}
             notify={notify}
             readOnly={readOnly}
             policyReadOnly={!mayComment(annotation)}
@@ -378,6 +383,7 @@ export function AnnotationPanel({
             creating={creating}
             onCreate={onCreate}
             onCancel={onCancelPending}
+            onUploadAttachment={onUploadAttachment}
           />
         )}
         {annotations.length === 0 && !pendingAnchor && (

@@ -30,9 +30,10 @@ import Typography from '@mui/material/Typography';
 import { useTheme } from '@mui/material/styles';
 import type { Anchor } from '../../../api/generated';
 import { AnnotationPriority, AnnotationType } from '../../../api/generated';
-import { isSubmitShortcut, submitShortcutLabel } from '../../../utils/platform';
+import { submitShortcutLabel } from '../../../utils/platform';
 import { PRIORITY_CUES, TYPE_CUES } from '../tasks/tasksModel';
-import { MarkdownHint } from '../markdown/MarkdownHint';
+import { MarkdownComposer } from '../markdown/MarkdownComposer';
+import type { UploadedAttachment } from '../markdown/useCommentAttachmentUpload';
 
 /**
  * The composer for a freshly drawn anchor — rendered in the panel, and in
@@ -49,6 +50,7 @@ export function Composer({
   onCreate,
   onCancel,
   frameless = false,
+  onUploadAttachment,
 }: {
   /** The drawn region, or null for a document-scoped annotation (issue #395). */
   pendingAnchor: Anchor | null;
@@ -57,6 +59,8 @@ export function Composer({
   onCancel: () => void;
   /** Drops the card frame and heading/passage line — for hosting inside a dialog. */
   frameless?: boolean;
+  /** Enables attaching local files (issue #446); built by the host, which owns the document id. */
+  onUploadAttachment?: (file: File) => Promise<UploadedAttachment>;
 }) {
   const theme = useTheme();
   const [comment, setComment] = useState('');
@@ -89,21 +93,16 @@ export function Composer({
             {quote ? `“${quote}”` : `Region on page ${pendingAnchor.region.surfaceIndex + 1}`}
           </Typography>
         )}
-        <TextField
-          multiline
-          minRows={5}
-          size="small"
-          required
-          placeholder="Add a comment"
+        <MarkdownComposer
           value={comment}
-          onChange={(event) => setComment(event.target.value)}
-          onKeyDown={(event) => {
-            if (isSubmitShortcut(event)) {
-              event.preventDefault();
-              if (canCreate) create();
-            }
+          onChange={setComment}
+          onSubmit={() => {
+            if (canCreate) create();
           }}
-          slotProps={{ htmlInput: { maxLength: 20000, 'aria-label': 'Annotation comment' } }}
+          inputAriaLabel="Annotation comment"
+          minRows={5}
+          disabled={creating}
+          onUploadAttachment={onUploadAttachment}
         />
         {/* Optional classification (issue #392) in the system's task language. */}
         <Stack direction="row" spacing={1}>
@@ -175,17 +174,14 @@ export function Composer({
         <Stack
           direction="row"
           spacing={1}
-          sx={{ justifyContent: 'space-between', alignItems: 'center' }}
+          sx={{ justifyContent: 'flex-end', alignItems: 'center' }}
         >
-          <MarkdownHint />
-          <Stack direction="row" spacing={1}>
-            <Button size="small" variant="contained" onClick={create} disabled={!canCreate}>
-              Create annotation ({submitShortcutLabel()})
-            </Button>
-            <Button size="small" onClick={onCancel} disabled={creating}>
-              Cancel
-            </Button>
-          </Stack>
+          <Button size="small" variant="contained" onClick={create} disabled={!canCreate}>
+            Create annotation ({submitShortcutLabel()})
+          </Button>
+          <Button size="small" onClick={onCancel} disabled={creating}>
+            Cancel
+          </Button>
         </Stack>
       </Stack>
     </Paper>

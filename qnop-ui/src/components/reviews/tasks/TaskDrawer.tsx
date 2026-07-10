@@ -220,6 +220,7 @@ export function TaskDrawer({
         <Box sx={{ flex: 1, overflowY: 'auto', px: 2, py: 1 }}>
           <CommentThread
             annotationId={annotation.id}
+            documentId={annotation.documentId}
             notify={notify}
             policyReadOnly={policyReadOnly}
             closed={annotation.status !== AnnotationStatus.Open}

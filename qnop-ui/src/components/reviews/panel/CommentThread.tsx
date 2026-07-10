@@ -25,29 +25,32 @@ import Button from '@mui/material/Button';
 import CircularProgress from '@mui/material/CircularProgress';
 import IconButton from '@mui/material/IconButton';
 import Stack from '@mui/material/Stack';
-import InputBase from '@mui/material/InputBase';
 import Tooltip from '@mui/material/Tooltip';
 import Typography from '@mui/material/Typography';
 import { alpha, useTheme } from '@mui/material/styles';
 import { CircleCheck, Lock, RotateCcw, SendHorizontal } from 'lucide-react';
 import { useAddComment, useComments } from '../../../api/hooks/useComments';
 import { apiErrorCode } from '../../../utils/apiError';
-import { isSubmitShortcut, submitShortcutLabel } from '../../../utils/platform';
+import { submitShortcutLabel } from '../../../utils/platform';
 import { useAuthStore } from '../../../stores/authStore';
 import type { Notify } from '../../admin/layout/useToast';
 import { isNewComment } from '../newSince';
 import type { BuildPermalink } from '../useReviewPermalink';
-import { MarkdownHint } from '../markdown/MarkdownHint';
-import { CommentBubble } from './CommentBubble';
+import { MarkdownComposer } from '../markdown/MarkdownComposer';
+import { useCommentAttachmentUpload } from '../markdown/useCommentAttachmentUpload';
+import { AVATAR_SIZE, CommentMessage } from './CommentMessage';
 import { UserAvatar } from '../../shell/UserAvatar';
 
-const AVATAR_SIZE = 26;
 /** Centre of the avatar column — where the timeline rail runs. */
 const LINE_LEFT = AVATAR_SIZE / 2 - 1;
+/** Left indent that aligns loose lines (notes, dividers) with the message column. */
+const CONTENT_INDENT = `${AVATAR_SIZE + 10}px`;
 
 interface CommentThreadProps {
   annotationId: string;
   notify: Notify;
+  /** Enables attaching local files to replies (issue #446) — the upload is document-scoped. */
+  documentId?: string;
   /** Hides the reply composer — older versions are a read-only record (#306). */
   readOnly?: boolean;
   /**
@@ -74,19 +77,19 @@ interface CommentThreadProps {
 }
 
 /**
- * The annotation's discussion — the comment anatomy of Facebook/Instagram
- * married to the timeline of the original design (issue #403): a vertical
- * rail runs through the avatar column and connects the root card to every
- * reply and the composer; each comment is a softly rounded bubble carrying
- * the bold author name above the text, with the compact relative timestamp
- * in a meta line UNDER the bubble (full date in its tooltip; likes join
- * that line with #410). Author names are resolved server-side and travel on
- * each comment (issue #413), honouring per-review anonymity; own contributions
- * read "You".
+ * The annotation's discussion — Slack's message anatomy (issue #445) married
+ * to the timeline of the original design (issue #403): a vertical rail runs
+ * through the avatar column and connects the root card to every reply and the
+ * composer; each comment is a full-width message row with the bold author name
+ * and the compact relative timestamp on its header line (full date in the
+ * tooltip). Replies are written in the shared Slack-style MarkdownComposer.
+ * Author names are resolved server-side and travel on each comment (issue
+ * #413), honouring per-review anonymity; own contributions read "You".
  */
 export function CommentThread({
   annotationId,
   notify,
+  documentId,
   readOnly = false,
   policyReadOnly = false,
   closed = false,
@@ -103,12 +106,13 @@ export function CommentThread({
   const avatarUrl = useAuthStore((state) => state.avatarUrl);
   const commentsQuery = useComments(annotationId);
   const addComment = useAddComment(annotationId);
+  const uploadAttachment = useCommentAttachmentUpload(documentId, notify);
   const [draft, setDraft] = useState('');
   const pulseColor = alpha(theme.qnop.brand.blue, 0.5);
 
   const submit = () => {
     const body = draft.trim();
-    if (!body) return;
+    if (!body || addComment.isPending) return;
     addComment.mutate(body, {
       onSuccess: () => setDraft(''),
       onError: (error) => {
@@ -191,14 +195,14 @@ export function CommentThread({
           bgcolor: theme.palette.divider,
         }}
       />
-      <Stack spacing={1} sx={{ pt: 1 }}>
+      <Stack spacing={2} sx={{ pt: 1.25 }}>
         {commentsQuery.isPending && (
           <Stack sx={{ alignItems: 'center', py: 1 }}>
             <CircularProgress size={18} aria-label="Loading comments" />
           </Stack>
         )}
         {commentsQuery.isError && (
-          <Typography variant="body2" color="error" sx={{ pl: 4.5 }}>
+          <Typography variant="body2" color="error" sx={{ pl: CONTENT_INDENT }}>
             Could not load the comments.
           </Typography>
         )}
@@ -213,7 +217,7 @@ export function CommentThread({
                   direction="row"
                   spacing={1}
                   data-testid="new-since-divider"
-                  sx={{ alignItems: 'center', pl: 4.5 }}
+                  sx={{ alignItems: 'center', pl: CONTENT_INDENT }}
                 >
                   <Box
                     sx={{ flex: 1, height: '1px', bgcolor: alpha(theme.qnop.brand.blue, 0.4) }}
@@ -229,7 +233,7 @@ export function CommentThread({
                   />
                 </Stack>
               )}
-              <CommentBubble
+              <CommentMessage
                 name={name}
                 own={own}
                 avatarUrl={avatarUrl}
@@ -243,7 +247,7 @@ export function CommentThread({
           );
         })}
         {!commentsQuery.isPending && !commentsQuery.isError && visibleComments.length === 0 && (
-          <Typography variant="body2" color="text.secondary" sx={{ pl: 4.5 }}>
+          <Typography variant="body2" color="text.secondary" sx={{ pl: CONTENT_INDENT }}>
             {skipOpener
               ? closed
                 ? 'No replies.'
@@ -259,7 +263,12 @@ export function CommentThread({
             direction="row"
             spacing={0.75}
             data-testid="thread-closed-note"
-            sx={{ alignItems: 'center', pl: 4.5, color: 'text.secondary', minHeight: 26 }}
+            sx={{
+              alignItems: 'center',
+              pl: CONTENT_INDENT,
+              color: 'text.secondary',
+              minHeight: 26,
+            }}
           >
             <CircleCheck size={13} aria-hidden color={theme.palette.success.main} />
             <Typography variant="caption">Resolved — this thread is closed.</Typography>
@@ -284,7 +293,12 @@ export function CommentThread({
             direction="row"
             spacing={0.75}
             data-testid="thread-policy-readonly-note"
-            sx={{ alignItems: 'center', pl: 4.5, color: 'text.secondary', minHeight: 26 }}
+            sx={{
+              alignItems: 'center',
+              pl: CONTENT_INDENT,
+              color: 'text.secondary',
+              minHeight: 26,
+            }}
           >
             <Lock size={13} aria-hidden />
             <Typography variant="caption">
@@ -296,61 +310,36 @@ export function CommentThread({
             Hidden on read-only (older) versions — the same thread stays
             writable when the annotation is opened on the latest version. */}
         {!readOnly && !closed && !policyReadOnly && (
-          <Stack direction="row" spacing={1} sx={{ alignItems: 'flex-start' }}>
+          <Stack direction="row" spacing={1.25} sx={{ alignItems: 'flex-start' }}>
             <Box sx={{ position: 'relative', zIndex: 1, pt: 0.5 }}>
               <UserAvatar name={displayName ?? 'You'} size={AVATAR_SIZE} imageUrl={avatarUrl} />
             </Box>
-            {/* The borderless composer block of the social pattern (#403):
-                a soft rounded surface holding the multiline field, with the
-                action row underneath — send bottom-right, like the feeds. */}
-            <Box
-              sx={{
-                flex: 1,
-                minWidth: 0,
-                bgcolor: theme.qnop.surface2,
-                borderRadius: '12px',
-                px: 1.5,
-                pt: 1,
-                pb: 0.5,
-                transition: 'box-shadow 120ms ease',
-                '&:focus-within': {
-                  boxShadow: `0 0 0 2px ${alpha(theme.qnop.brand.blue, 0.25)}`,
-                },
-                '@media (prefers-reduced-motion: reduce)': { transition: 'none' },
-              }}
-            >
-              <InputBase
-                multiline
-                minRows={2}
-                fullWidth
-                placeholder="Add a comment"
+            {/* The shared Slack-style writing surface (issue #445): formatting
+                toolbar, roomy auto-growing field, emoji — send bottom-right. */}
+            <Box sx={{ flex: 1, minWidth: 0 }}>
+              <MarkdownComposer
                 value={draft}
-                onChange={(event) => setDraft(event.target.value)}
-                onKeyDown={(event) => {
-                  if (isSubmitShortcut(event)) {
-                    event.preventDefault();
-                    submit();
-                  }
-                }}
-                inputProps={{ maxLength: 20000, 'aria-label': 'Add a comment' }}
-                sx={{ p: 0, fontSize: 14, lineHeight: 1.45 }}
+                onChange={setDraft}
+                onSubmit={submit}
+                inputAriaLabel="Add a comment"
+                minRows={3}
+                onUploadAttachment={uploadAttachment}
+                actions={
+                  <Tooltip title={`Send (${submitShortcutLabel()})`}>
+                    <span>
+                      <IconButton
+                        size="small"
+                        aria-label="Comment"
+                        color="primary"
+                        onClick={submit}
+                        disabled={!draft.trim() || addComment.isPending}
+                      >
+                        <SendHorizontal size={16} />
+                      </IconButton>
+                    </span>
+                  </Tooltip>
+                }
               />
-              <Stack direction="row" sx={{ justifyContent: 'space-between', alignItems: 'center' }}>
-                <MarkdownHint />
-                <Tooltip title={`Send (${submitShortcutLabel()})`}>
-                  <span>
-                    <IconButton
-                      size="small"
-                      aria-label="Comment"
-                      color="primary"
-                      onClick={submit}
-                      disabled={!draft.trim() || addComment.isPending}
-                    >
-                      <SendHorizontal size={16} />
-                    </IconButton>
-                  </span>
-                </Tooltip>
-              </Stack>
             </Box>
           </Stack>
         )}
