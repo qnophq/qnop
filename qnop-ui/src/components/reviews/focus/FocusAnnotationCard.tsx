@@ -343,6 +343,7 @@ export function FocusAnnotationCard({
                 <Box sx={{ overflowY: 'auto', flex: 1, minHeight: 0, pl: 0.5, pr: 2, pb: 1.25 }}>
                   <CommentThread
                     annotationId={annotation.id}
+                    documentId={annotation.documentId}
                     notify={notify}
                     readOnly={readOnly}
                     policyReadOnly={policyReadOnly}

@@ -23,7 +23,7 @@ spring:
   servlet:
     multipart:
       # Headroom over the largest service-level cap — the document upload setting
-      # (upload.max_file_size_mb, default 25 MB; issue #245) — so the size checks in
+      # (upload.document_max_file_size_mb, default 25 MB; issue #245) — so the size checks in
       # AvatarService/BrandingService/DocumentIngestService return a clean 413 before
       # the container rejects the request. Operators raising the document setting past
       # this ceiling must raise QNOP_UPLOAD_MULTIPART_LIMIT_MB with it. Multipart

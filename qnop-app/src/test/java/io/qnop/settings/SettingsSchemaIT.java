@@ -71,7 +71,7 @@ class SettingsSchemaIT extends AbstractIntegrationTest {
 
   @Test
   void seedsDefaultSettingsWithDeclaredTypes() {
-    assertThat(applicationSettings.findById("upload.max_file_size_mb"))
+    assertThat(applicationSettings.findById("upload.document_max_file_size_mb"))
         .get()
         .satisfies(
             s -> {
