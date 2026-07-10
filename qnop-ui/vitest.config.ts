@@ -43,6 +43,10 @@ export default defineConfig({
         'src/components/auth/RoleRoute.tsx',
         'src/components/auth/AuthHydrationBoundary.tsx',
         'src/components/shell/navConfig.tsx',
+        // The application shell (issue #352, wave 4): sidebar collapse persistence,
+        // the mobile drawer, and the full-bleed vs centred content switch. Its
+        // presentational children (TopBar, SidebarContent) keep their own tests.
+        'src/components/shell/AppShell.tsx',
         // Auth screens — the critical entry flow (issue #352, wave 1).
         'src/pages/auth/**/*.tsx',
         // Admin screens — users, teams, settings, branding and OIDC (issue
