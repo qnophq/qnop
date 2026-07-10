@@ -146,7 +146,7 @@ describe('FocusAnnotationCard', () => {
     expect(style.minWidth).toBe('320px');
     expect(style.minHeight).toBe('220px');
     expect(style.maxWidth).toContain('640px');
-    expect(style.maxHeight).toContain('55vh');
+    expect(style.maxHeight).toContain('64vh');
   });
 
   it('drags by the header — buttons excluded — and offsets the card', () => {
