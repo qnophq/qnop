@@ -271,8 +271,12 @@ class AdminUserControllerIT extends AbstractIntegrationTest {
     String token = adminToken();
     // This test owns the no-SMTP fallback path. The seed may leave SMTP enabled
     // (Mailpit, issue #401), so switch the master toggle off here instead of
-    // depending on class order; @Transactional rolls the change back.
+    // depending on class order; @Transactional rolls the change back. Inside an
+    // active test transaction update()'s snapshot refresh is an afterCommit hook
+    // that never fires, so reload() re-reads the (uncommitted) rows explicitly —
+    // without it the switch is a no-op and the assertion rides on suite order.
     settings.update(Map.of(ApplicationSettingKey.SMTP_ENABLED.getKey(), "false"), null);
+    settings.reload();
 
     // With SMTP off the email is "skipped" and the fallback link is returned.
     mockMvc

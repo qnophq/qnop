@@ -124,9 +124,16 @@ databaseChangeLog:
         - insert:
             tableName: application_setting
             columns:
-              - column: { name: setting_key, value: "upload.max_file_size_mb" }
+              - column: { name: setting_key, value: "upload.document_max_file_size_mb" }
               - column: { name: setting_value, value: "25" }
               - column: { name: setting_desc, value: "Maximum document upload size in megabytes." }
+              - column: { name: value_type, value: "INTEGER" }
+        - insert:
+            tableName: application_setting
+            columns:
+              - column: { name: setting_key, value: "upload.attachment_max_file_size_mb" }
+              - column: { name: setting_value, value: "10" }
+              - column: { name: setting_desc, value: "Maximum comment attachment size in megabytes." }
               - column: { name: value_type, value: "INTEGER" }
         - insert:
             tableName: application_setting

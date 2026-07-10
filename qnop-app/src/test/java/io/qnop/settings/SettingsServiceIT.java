@@ -51,7 +51,7 @@ class SettingsServiceIT extends AbstractIntegrationTest {
   void resetMutatedKeys() {
     settings.update(
         Map.of(
-            ApplicationSettingKey.UPLOAD_MAX_FILE_SIZE_MB.getKey(), "25",
+            ApplicationSettingKey.UPLOAD_DOCUMENT_MAX_FILE_SIZE_MB.getKey(), "25",
             ApplicationSettingKey.SMTP_PASSWORD.getKey(), ""),
         null);
   }
@@ -60,7 +60,8 @@ class SettingsServiceIT extends AbstractIntegrationTest {
   void loadsSeededDefaultsIntoSnapshot() {
     assertThat(settings.getString(ApplicationSettingKey.GENERAL_APPLICATION_NAME))
         .isEqualTo("qnop");
-    assertThat(settings.getInteger(ApplicationSettingKey.UPLOAD_MAX_FILE_SIZE_MB)).isEqualTo(25);
+    assertThat(settings.getInteger(ApplicationSettingKey.UPLOAD_DOCUMENT_MAX_FILE_SIZE_MB))
+        .isEqualTo(25);
     // No SMTP key here: the test seed repoints SMTP at Mailpit (issue #401),
     // but the snapshot loads at BOOT while the seed runs per test transaction —
     // an SMTP value would depend on which test refreshed the snapshot first.
@@ -68,9 +69,11 @@ class SettingsServiceIT extends AbstractIntegrationTest {
 
   @Test
   void updateRefreshesSnapshotAfterCommit() {
-    settings.update(Map.of(ApplicationSettingKey.UPLOAD_MAX_FILE_SIZE_MB.getKey(), "50"), null);
+    settings.update(
+        Map.of(ApplicationSettingKey.UPLOAD_DOCUMENT_MAX_FILE_SIZE_MB.getKey(), "50"), null);
 
-    assertThat(settings.getInteger(ApplicationSettingKey.UPLOAD_MAX_FILE_SIZE_MB)).isEqualTo(50);
+    assertThat(settings.getInteger(ApplicationSettingKey.UPLOAD_DOCUMENT_MAX_FILE_SIZE_MB))
+        .isEqualTo(50);
   }
 
   @Test
@@ -104,7 +107,8 @@ class SettingsServiceIT extends AbstractIntegrationTest {
 
   @Test
   void rejectsTypeInvalidValue() {
-    assertThatThrownBy(() -> settings.update(Map.of("upload.max_file_size_mb", "abc"), null))
+    assertThatThrownBy(
+            () -> settings.update(Map.of("upload.document_max_file_size_mb", "abc"), null))
         .isInstanceOf(SettingsValidationException.class);
   }
 

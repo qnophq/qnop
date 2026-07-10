@@ -322,7 +322,9 @@ public class DocumentIngestService {
   }
 
   private long maxUploadBytes() {
-    return settings.getInteger(ApplicationSettingKey.UPLOAD_MAX_FILE_SIZE_MB) * 1024L * 1024L;
+    return settings.getInteger(ApplicationSettingKey.UPLOAD_DOCUMENT_MAX_FILE_SIZE_MB)
+        * 1024L
+        * 1024L;
   }
 
   /**
