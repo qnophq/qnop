@@ -69,7 +69,7 @@ import {
 } from '../../components/reviews/focus/spotlightModel';
 import { useAnchorElement } from '../../components/reviews/focus/useAnchorElement';
 import { useRecordVisit } from '../../api/hooks/useReviews';
-import { useViewMode } from '../../components/reviews/focus/useViewMode';
+import { useViewMode, type ReviewViewMode } from '../../components/reviews/focus/useViewMode';
 import { columnOf } from '../../components/reviews/tasks/tasksModel';
 import { NewTaskDialog } from '../../components/reviews/tasks/NewTaskDialog';
 import { Composer } from '../../components/reviews/panel/Composer';
@@ -158,6 +158,19 @@ export function DocumentReviewPage() {
     // setViewMode is a stable setter-like callback; syncing on param change only.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [urlView]);
+  // The toolbar's panel/focus switch (issue #403) goes through the URL, so the
+  // address stays shareable and the ?view= sync above remains the single path
+  // into the stored preference.
+  const switchViewMode = (mode: ReviewViewMode) => {
+    setSearchParams(
+      (params) => {
+        const next = new URLSearchParams(params);
+        next.set('view', mode);
+        return next;
+      },
+      { replace: true },
+    );
+  };
   const [listOpen, setListOpen] = useState(false);
   // The "new whole-document task" dialog (issue #395), reachable from the panel in both the
   // document and focus views — the same anchor-free create the tasks view offers.
@@ -307,7 +320,12 @@ export function DocumentReviewPage() {
       {
         onSuccess: (created) => {
           setPending(null);
-          setActiveAnnotationId(created.id);
+          // In the panel the fresh annotation expands in place — helpful. In
+          // focus mode activating it would re-open the overlay on the spot the
+          // writer just left: the scrim (blur) stays up and the card's focus
+          // trap yanks the viewport to a mark that hasn't rendered yet (issue
+          // #403). Creating is a closing gesture there: page stays put, sharp.
+          if (!focusMode) setActiveAnnotationId(created.id);
           notify('Annotation created.');
         },
         onError: (error) =>
@@ -390,7 +408,7 @@ export function DocumentReviewPage() {
       />
       <ReviewViewTabs
         documentId={routeSegment}
-        active={focusMode ? 'focus' : 'document'}
+        active="document"
         openTaskCount={annotations.filter((a) => columnOf(a) !== 'done').length}
         compareEnabled={
           (versionsQuery.data?.versions.filter(
@@ -422,7 +440,8 @@ export function DocumentReviewPage() {
               canAnnotate={canAnnotate}
               zoom={zoom}
               onZoomChange={setZoom}
-              focusMode={focusMode}
+              viewMode={viewMode}
+              onViewModeChange={switchViewMode}
               annotationCount={annotations.length}
               onOpenAnnotationList={() => setListOpen(true)}
             />
@@ -628,11 +647,7 @@ export function DocumentReviewPage() {
           open={Boolean(pendingMarkEl)}
           anchorEl={pendingMarkEl}
           placement="right-start"
-          sx={(theme) => ({
-            zIndex: theme.zIndex.modal,
-            width: 380,
-            maxWidth: 'calc(100vw - 32px)',
-          })}
+          sx={(theme) => ({ zIndex: theme.zIndex.modal })}
           modifiers={[
             { name: 'offset', options: { offset: [0, 16] } },
             { name: 'flip', options: { fallbackPlacements: ['left-start', 'bottom', 'top'] } },
@@ -640,13 +655,28 @@ export function DocumentReviewPage() {
           ]}
         >
           {/* Same floating-surface treatment as the focus card: bordered
-              Paper under one soft ambient shadow. */}
+              Paper under one soft ambient shadow. The Composer's own Paper is
+              deliberately transparent (it normally sits on the panel), so this
+              wrapper supplies the opaque surface — floating over the document
+              it must never shine through (issue #403). */}
           <Box
-            sx={{
-              boxShadow: (theme) =>
-                theme.qnop.mode === 'dark' ? 'none' : '0 16px 48px rgba(1,32,66,0.14)',
+            sx={(theme) => ({
+              position: 'relative',
+              boxShadow: theme.qnop.mode === 'dark' ? 'none' : '0 16px 48px rgba(1,32,66,0.14)',
               borderRadius: '10px',
-            }}
+              bgcolor: 'background.paper',
+              overflow: 'hidden',
+              // Writer-resizable (issue #403), like the focus card — but only
+              // horizontally: height stays content-driven (the textarea grows
+              // as you type), so width is the axis worth grabbing.
+              resize: 'horizontal',
+              width: 380,
+              minWidth: 320,
+              maxWidth: 'min(720px, calc(100vw - 48px))',
+              // The inner outlined Paper draws the border; align its corners
+              // with this surface so the edge reads as ONE rounded frame.
+              '& > .MuiPaper-root': { borderRadius: '10px' },
+            })}
           >
             <Composer
               pendingAnchor={pending.anchor}
@@ -654,6 +684,20 @@ export function DocumentReviewPage() {
               onCreate={handleCreate}
               onCancel={() => setPending(null)}
               onUploadAttachment={uploadAttachment}
+            />
+            {/* Discoverability for the native resize grip underneath. */}
+            <Box
+              aria-hidden
+              sx={(theme) => ({
+                position: 'absolute',
+                right: 2,
+                bottom: 2,
+                width: 11,
+                height: 11,
+                pointerEvents: 'none',
+                clipPath: 'polygon(100% 0, 100% 100%, 0 100%)',
+                background: `repeating-linear-gradient(135deg, transparent 0 2.5px, ${theme.palette.divider} 2.5px 4px)`,
+              })}
             />
           </Box>
         </Popper>

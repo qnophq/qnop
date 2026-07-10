@@ -151,15 +151,12 @@ describe('DocumentViewer', () => {
     });
   });
 
-  it('brings an off-screen hovered mark into view', () => {
+  it('never scrolls on hover — skimming the panel must not move the page (issue #403)', () => {
     const { update } = renderViewer({ annotations: [{ id: 'a1' }] as AnnotationView[] });
 
     update({ hoverAnnotationId: 'a1' });
 
-    expect(Element.prototype.scrollIntoView).toHaveBeenCalledWith({
-      behavior: 'smooth',
-      block: 'center',
-    });
+    expect(Element.prototype.scrollIntoView).not.toHaveBeenCalled();
   });
 
   it('forwards a mark selection from the page stack', () => {

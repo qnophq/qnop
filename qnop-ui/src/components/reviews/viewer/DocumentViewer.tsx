@@ -167,21 +167,6 @@ export function DocumentViewer({
       ?.scrollIntoView({ behavior: reduced ? 'auto' : 'smooth', block: 'center' });
   }, [activeAnnotationId]);
 
-  // Hovering a panel card brings its mark into view — but only when it is
-  // off-screen, so hovering an already-visible mark never causes scroll jumps.
-  useEffect(() => {
-    const container = containerRef.current;
-    if (!hoverAnnotationId || !container) return;
-    const mark = document.getElementById(`annotation-highlight-${hoverAnnotationId}`);
-    if (!mark) return;
-    const markRect = mark.getBoundingClientRect();
-    const viewRect = container.getBoundingClientRect();
-    if (markRect.top < viewRect.top + 24 || markRect.bottom > viewRect.bottom - 8) {
-      const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-      mark.scrollIntoView({ behavior: reduced ? 'auto' : 'smooth', block: 'center' });
-    }
-  }, [hoverAnnotationId]);
-
   const pageWidth = Math.max(0, (containerWidth - 2 * PAGE_GUTTER_PX) * zoom);
   const pageCount = surfaces?.length ?? pdf.numPages;
   // Only a PANEL-card hover stages the mark's spotlight treatment; hovering

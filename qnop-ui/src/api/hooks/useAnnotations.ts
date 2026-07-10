@@ -65,7 +65,10 @@ export function useCreateAnnotation(documentId: string) {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: annotationKeys.all });
       queryClient.invalidateQueries({ queryKey: ['reviews'] });
-      queryClient.invalidateQueries({ queryKey: documentKeys.all });
+      // Detail only (workflow chip / counts) — NEVER documentKeys.all: that
+      // sweeps in the rendered/original binaries and reloading the PDF
+      // remounts the viewer, snapping the scroll back to page 1 (issue #403).
+      queryClient.invalidateQueries({ queryKey: documentKeys.detail(documentId) });
     },
   });
 }
@@ -82,10 +85,12 @@ export function useReopenAnnotation() {
       const response = await annotationsApi.reopenAnnotation({ annotationId: vars.annotationId });
       return response.data;
     },
-    onSuccess: () => {
+    onSuccess: (updated) => {
       queryClient.invalidateQueries({ queryKey: annotationKeys.all });
       queryClient.invalidateQueries({ queryKey: ['reviews'] });
-      queryClient.invalidateQueries({ queryKey: documentKeys.all });
+      // Detail only — see useCreateAnnotation: touching documentKeys.all
+      // reloads the PDF and costs the reader their scroll position.
+      queryClient.invalidateQueries({ queryKey: documentKeys.detail(updated.documentId) });
     },
   });
 }
@@ -107,13 +112,14 @@ export function useResolveAnnotation() {
       });
       return response.data;
     },
-    onSuccess: () => {
+    onSuccess: (updated) => {
       queryClient.invalidateQueries({ queryKey: annotationKeys.all });
       queryClient.invalidateQueries({ queryKey: commentKeys.all });
       queryClient.invalidateQueries({ queryKey: ['reviews'] });
-      // The derived workflow pair (#405) surfaces on the document detail too
-      // (the header's status chip reads document.workflowState).
-      queryClient.invalidateQueries({ queryKey: documentKeys.all });
+      // The derived workflow pair (#405) surfaces on the document detail
+      // (the header's status chip reads document.workflowState) — detail
+      // only, so the PDF/rendered caches stay put (issue #403).
+      queryClient.invalidateQueries({ queryKey: documentKeys.detail(updated.documentId) });
     },
   });
 }
