@@ -45,10 +45,15 @@ export default defineConfig({
         'src/components/shell/navConfig.tsx',
         // Auth screens — the critical entry flow (issue #352, wave 1).
         'src/pages/auth/**/*.tsx',
-        // The viewer's pure anchor-building logic (#250); the presentational
-        // viewer/panel components are covered by component tests, and the
-        // pdf.js wiring (usePdfDocument, SurfacePage canvas) by E2E later.
+        // The viewer's pure anchor-building logic (#250) plus the document
+        // surface (issue #352, wave 2): the pdf.js loader/canvas wiring and the
+        // scrollable page stack with its scroll spy and rubber-band selection.
+        // SurfacePage and the presentational layers stay on component/E2E tests.
         'src/components/reviews/viewer/anchoring.ts',
+        'src/components/reviews/viewer/usePdfDocument.ts',
+        'src/components/reviews/viewer/PageCanvas.tsx',
+        'src/components/reviews/viewer/DocumentViewer.tsx',
+        'src/components/reviews/viewer/RegionSelectLayer.tsx',
         'src/theme/**/*.ts',
       ],
       thresholds: {
