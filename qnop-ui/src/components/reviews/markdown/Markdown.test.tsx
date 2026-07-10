@@ -19,11 +19,20 @@
  * SPDX-License-Identifier: AGPL-3.0-only
  */
 
-import { describe, expect, it } from 'vitest';
-import { render } from '@testing-library/react';
+import { describe, expect, it, vi } from 'vitest';
+import { render, waitFor } from '@testing-library/react';
 import { ThemeProvider } from '@mui/material/styles';
 import { buildTheme } from '../../../theme/theme';
+import { axiosInstance } from '../../../api/config';
 import { Markdown } from './Markdown';
+
+vi.mock('../../../api/config', () => ({
+  axiosInstance: { get: vi.fn().mockResolvedValue({ data: new Blob(['png']) }) },
+}));
+
+// jsdom has no object URLs — the attachment loader needs both ends stubbed.
+URL.createObjectURL = vi.fn(() => 'blob:attachment');
+URL.revokeObjectURL = vi.fn();
 
 function renderMd(md: string) {
   return render(
@@ -52,6 +61,25 @@ describe('Markdown render (#427)', () => {
     expect(container.querySelector('pre code')).toHaveTextContent('const x = 1;');
   });
 
+  it('syntax-highlights a language-tagged fence (issue #445 follow-up)', () => {
+    const { container } = renderMd('```js\nconst x = 1; // answer\n```');
+    expect(container.querySelector('pre code .hljs-keyword')).toHaveTextContent('const');
+    expect(container.querySelector('pre code .hljs-comment')).toHaveTextContent('// answer');
+  });
+
+  it('leaves an untagged fence unhighlighted (no auto-detection, as on GitHub)', () => {
+    const { container } = renderMd('```\nconst x = 1;\n```');
+    expect(container.querySelector('pre code .hljs-keyword')).toBeNull();
+  });
+
+  it('renders a single newline as a hard line break (issue #445)', () => {
+    // Comments are chat-like prose: Enter must produce a visible break, as in
+    // Slack/GitHub comments — CommonMark alone would collapse it into a space.
+    const { container } = renderMd('line one\nline two');
+    expect(container.querySelectorAll('br')).toHaveLength(1);
+    expect(container.querySelectorAll('p')).toHaveLength(1);
+  });
+
   it('renders links as safe new-tab anchors', () => {
     const { container } = renderMd('[the clause](https://example.com/x)');
     const a = container.querySelector('a');
@@ -66,6 +94,30 @@ describe('Markdown render (#427)', () => {
     expect(img).toHaveAttribute('src', 'https://example.com/d.png');
     expect(img).toHaveAttribute('referrerpolicy', 'no-referrer');
     expect(img).toHaveAttribute('loading', 'lazy');
+  });
+
+  it('loads app attachment sources with the bearer and shows a blob URL (issue #446)', async () => {
+    const { container } = renderMd('![shot](/api/v1/documents/d1/attachments/a1)');
+
+    await waitFor(() =>
+      expect(container.querySelector('img')).toHaveAttribute('src', 'blob:attachment'),
+    );
+    expect(vi.mocked(axiosInstance.get)).toHaveBeenCalledWith('/documents/d1/attachments/a1', {
+      responseType: 'blob',
+    });
+  });
+
+  it('renders an app attachment link as a downloading file chip (issue #446)', () => {
+    const { container, getByTestId } = renderMd(
+      '[report.pdf](/api/v1/documents/d1/attachments/a2)',
+    );
+
+    const chip = getByTestId('attachment-link');
+    expect(chip).toHaveTextContent('report.pdf');
+    // No new-tab navigation — the chip downloads through the bearer fetch.
+    expect(chip).not.toHaveAttribute('target');
+    // External links keep the plain new-tab anchor.
+    expect(container.querySelector('a[target="_blank"]')).toBeNull();
   });
 });
 

@@ -34,7 +34,7 @@ class ApplicationSettingsServiceTest {
 
   @Test
   void parsesAValidInteger() {
-    assertThat(ApplicationSettingsService.parseIntSetting("upload.max_file_size_mb", "25"))
+    assertThat(ApplicationSettingsService.parseIntSetting("upload.document_max_file_size_mb", "25"))
         .isEqualTo(25);
   }
 

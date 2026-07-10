@@ -73,6 +73,7 @@ import { useViewMode } from '../../components/reviews/focus/useViewMode';
 import { columnOf } from '../../components/reviews/tasks/tasksModel';
 import { NewTaskDialog } from '../../components/reviews/tasks/NewTaskDialog';
 import { Composer } from '../../components/reviews/panel/Composer';
+import { useCommentAttachmentUpload } from '../../components/reviews/markdown/useCommentAttachmentUpload';
 import { WorkflowBadge } from '../../components/reviews/WorkflowBadge';
 import { AnonymousBadge } from '../../components/reviews/AnonymousBadge';
 import type {
@@ -108,6 +109,7 @@ export function DocumentReviewPage() {
   const documentId = useReviewDocumentId();
   const [searchParams, setSearchParams] = useSearchParams();
   const { toast, notify, clear } = useToast();
+  const uploadAttachment = useCommentAttachmentUpload(documentId, notify);
   const userId = useAuthStore((s) => s.userId);
 
   const documentQuery = useDocument(documentId);
@@ -553,6 +555,7 @@ export function DocumentReviewPage() {
                   onCancelPending={() => setPending(null)}
                   canAnnotate={canAnnotate}
                   notify={notify}
+                  onUploadAttachment={uploadAttachment}
                   readOnly={!isLatestVersion}
                   reviewClosed={!isOpenWorkflowState(document.workflowState)}
                   previousSeenAt={previousSeenAt}
@@ -650,6 +653,7 @@ export function DocumentReviewPage() {
               creating={createAnnotation.isPending}
               onCreate={handleCreate}
               onCancel={() => setPending(null)}
+              onUploadAttachment={uploadAttachment}
             />
           </Box>
         </Popper>

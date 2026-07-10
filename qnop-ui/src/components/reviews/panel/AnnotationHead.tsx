@@ -37,6 +37,9 @@ const DATE_FORMAT = new Intl.DateTimeFormat(undefined, {
   timeStyle: 'short',
 });
 
+/** Larger than a reply's avatar (28) — the opener carries the thread. */
+const AUTHOR_AVATAR_SIZE = 36;
+
 interface AnnotationHeadProps {
   annotation: AnnotationView;
   /** Adds the "New" badge (issue #307). */
@@ -44,10 +47,13 @@ interface AnnotationHeadProps {
 }
 
 /**
- * The opening annotation as the discussion's root post (issue #403): badge
- * row, the anchored passage styled as a real quotation, the opening text and
- * the author line. ONE component shared by the panel's expanded card and the
- * focus mode's floating card, so the head reads identically on both.
+ * The opening annotation as the discussion's root post (issue #403): the
+ * author header leading the card (issue #445 follow-up) — a larger avatar with
+ * the bold name over a "Started this discussion" line, so whoever opened the
+ * thread is unmistakable — then the badge row, the anchored passage styled as
+ * a real quotation, and the opening text. ONE component shared by the panel's
+ * expanded card and the focus mode's floating card, so the head reads
+ * identically on both.
  */
 export function AnnotationHead({ annotation, unseen = false }: AnnotationHeadProps) {
   const theme = useTheme();
@@ -69,7 +75,30 @@ export function AnnotationHead({ annotation, unseen = false }: AnnotationHeadPro
     : 'No placement on this version';
 
   return (
-    <Stack spacing={1} data-testid="annotation-head-card">
+    <Stack spacing={1.25} data-testid="annotation-head-card">
+      {/* The thread starter, front and centre — this is their discussion. */}
+      <Stack direction="row" spacing={1.25} sx={{ alignItems: 'center', minWidth: 0 }}>
+        <UserAvatar name={authorName} size={AUTHOR_AVATAR_SIZE} imageUrl={own ? avatarUrl : null} />
+        <Box sx={{ minWidth: 0 }}>
+          <Typography
+            noWrap
+            sx={{ fontWeight: 700, fontSize: '0.9375rem', lineHeight: 1.3 }}
+            data-testid="annotation-author"
+          >
+            {authorName}
+          </Typography>
+          <Typography
+            variant="caption"
+            color="text.secondary"
+            noWrap
+            component="p"
+            title={DATE_FORMAT.format(new Date(annotation.createdAt))}
+            sx={{ lineHeight: 1.4 }}
+          >
+            Started this discussion · {shortRelativeTime(annotation.createdAt)}
+          </Typography>
+        </Box>
+      </Stack>
       <AnnotationBadgeRow annotation={annotation} unseen={unseen} />
       {/* The anchored passage, styled as a real quotation. */}
       {quote ? (
@@ -112,17 +141,6 @@ export function AnnotationHead({ annotation, unseen = false }: AnnotationHeadPro
           <Markdown>{openerText}</Markdown>
         </Box>
       )}
-      <Stack direction="row" spacing={0.75} sx={{ alignItems: 'center' }}>
-        <UserAvatar name={authorName} size={20} imageUrl={own ? avatarUrl : null} />
-        <Typography
-          variant="caption"
-          color="text.secondary"
-          noWrap
-          title={DATE_FORMAT.format(new Date(annotation.createdAt))}
-        >
-          {authorName} · {shortRelativeTime(annotation.createdAt)}
-        </Typography>
-      </Stack>
     </Stack>
   );
 }

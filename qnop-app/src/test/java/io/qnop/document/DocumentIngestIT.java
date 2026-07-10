@@ -249,9 +249,10 @@ class DocumentIngestIT extends AbstractIntegrationTest {
   @DisplayName("an upload over the configured size cap is rejected with 413 (before staging)")
   void rejectsOversizeUpload() throws Exception {
     UUID owner = createUser();
-    int originalCapMb = settings.getInteger(ApplicationSettingKey.UPLOAD_MAX_FILE_SIZE_MB);
+    int originalCapMb = settings.getInteger(ApplicationSettingKey.UPLOAD_DOCUMENT_MAX_FILE_SIZE_MB);
     try {
-      settings.update(Map.of(ApplicationSettingKey.UPLOAD_MAX_FILE_SIZE_MB.getKey(), "1"), null);
+      settings.update(
+          Map.of(ApplicationSettingKey.UPLOAD_DOCUMENT_MAX_FILE_SIZE_MB.getKey(), "1"), null);
       byte[] tooBig = new byte[2 * 1024 * 1024]; // 2 MB > 1 MB cap
       System.arraycopy("%PDF-".getBytes(StandardCharsets.US_ASCII), 0, tooBig, 0, 5);
 
@@ -266,7 +267,7 @@ class DocumentIngestIT extends AbstractIntegrationTest {
     } finally {
       settings.update(
           Map.of(
-              ApplicationSettingKey.UPLOAD_MAX_FILE_SIZE_MB.getKey(),
+              ApplicationSettingKey.UPLOAD_DOCUMENT_MAX_FILE_SIZE_MB.getKey(),
               String.valueOf(originalCapMb)),
           null);
     }
