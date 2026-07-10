@@ -30,6 +30,7 @@ import { MessageSquare } from 'lucide-react';
 import type { AnnotationView } from '../../../api/generated';
 import { useComments } from '../../../api/hooks/useComments';
 import { useAuthStore } from '../../../stores/authStore';
+import type { Notify } from '../../admin/layout/useToast';
 import { UserAvatar } from '../../shell/UserAvatar';
 import { tokens } from '../../../theme/tokens';
 import { shortRelativeTime } from '../../../utils/relativeTime';
@@ -122,6 +123,9 @@ interface AnnotationListItemProps {
    * referentially stable for {@link memo} (issue #333).
    */
   onSelect: (annotationId: string | null) => void;
+  /** The annotation permalink (issue #412) — shown in the expanded head's author row. */
+  permalinkUrl?: string;
+  notify?: Notify;
   onHover?: (annotationId: string | null) => void;
 }
 
@@ -145,6 +149,8 @@ function AnnotationListItemBase({
   linked = false,
   onSelect,
   onHover,
+  permalinkUrl,
+  notify,
 }: AnnotationListItemProps) {
   const theme = useTheme();
   const viewerId = useAuthStore((state) => state.userId);
@@ -186,6 +192,9 @@ function AnnotationListItemBase({
 
   return (
     <ButtonBase
+      // Expanded, the card hosts real buttons (the head's copy-link) — a
+      // <button> may not nest, so the active card is a div with button role.
+      component={active ? 'div' : 'button'}
       onClick={() => onSelect(active ? null : annotation.id)}
       onMouseEnter={() => onHover?.(annotation.id)}
       onMouseLeave={() => onHover?.(null)}
@@ -218,7 +227,12 @@ function AnnotationListItemBase({
       }}
     >
       {active ? (
-        <AnnotationHead annotation={annotation} unseen={unseen} />
+        <AnnotationHead
+          annotation={annotation}
+          unseen={unseen}
+          permalinkUrl={permalinkUrl}
+          notify={notify}
+        />
       ) : (
         <Stack spacing={0.5} sx={{ minWidth: 0 }}>
           {/* Title line: status tile, the content itself, participants. */}

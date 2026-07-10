@@ -43,7 +43,6 @@ import { compareAnnotationsByPosition } from '../viewer/anchoring';
 import { isUnseen } from '../newSince';
 import { isDocumentScoped } from '../annotationScope';
 import type { BuildPermalink } from '../useReviewPermalink';
-import { CopyLinkButton } from '../permalink/CopyLinkButton';
 import { AnnotationListItem } from './AnnotationListItem';
 import type { UploadedAttachment } from '../markdown/useCommentAttachmentUpload';
 import { CommentThread } from './CommentThread';
@@ -306,20 +305,10 @@ export function AnnotationPanel({
           linked={annotation.id === hoverAnnotationId}
           onSelect={onSelect}
           onHover={onHover}
+          permalinkUrl={buildPermalink?.(annotation.id)}
+          notify={notify}
         />
         <Collapse in={active} unmountOnExit>
-          {/* The annotation permalink (issue #412) — a quiet right-aligned link
-              under the head card; a sibling of the row's ButtonBase, never
-              nested inside it. */}
-          {buildPermalink && (
-            <Stack direction="row" sx={{ justifyContent: 'flex-end', pt: 0.5 }}>
-              <CopyLinkButton
-                url={buildPermalink(annotation.id)}
-                notify={notify}
-                label="Copy link to annotation"
-              />
-            </Stack>
-          )}
           {!readOnly && mayResolveAnnotation(annotation, userId) && (
             <ResolveBar disabled={resolving} onResolve={(note) => resolveWith(annotation, note)} />
           )}

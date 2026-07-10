@@ -38,7 +38,6 @@ import { AnnotationStatus } from '../../../api/generated';
 import { tokens } from '../../../theme/tokens';
 import type { Notify } from '../../admin/layout/useToast';
 import type { BuildPermalink } from '../useReviewPermalink';
-import { CopyLinkButton } from '../permalink/CopyLinkButton';
 import { AnnotationHead } from '../panel/AnnotationHead';
 import { CommentThread } from '../panel/CommentThread';
 import { ResolveBar } from '../panel/ResolveBar';
@@ -287,13 +286,6 @@ export function FocusAnnotationCard({
                       : 'Annotation'}
                   </Typography>
                   <Box sx={{ flex: 1 }} />
-                  {buildPermalink && (
-                    <CopyLinkButton
-                      url={buildPermalink(annotation.id)}
-                      notify={notify}
-                      label="Copy link to annotation"
-                    />
-                  )}
                   <Tooltip title="Previous annotation (↑)">
                     <span>
                       <IconButton
@@ -329,8 +321,13 @@ export function FocusAnnotationCard({
                     own tail — clean out of the card. */}
                 <Box sx={{ overflowY: 'auto', flex: 1, minHeight: 0 }}>
                   <Box sx={{ px: 1.5, pt: 1.25 }}>
-                    {/* The same root post the panel's expanded card shows. */}
-                    <AnnotationHead annotation={annotation} />
+                    {/* The same root post the panel's expanded card shows —
+                        including the author row's copy-link (issue #412). */}
+                    <AnnotationHead
+                      annotation={annotation}
+                      permalinkUrl={buildPermalink?.(annotation.id)}
+                      notify={notify}
+                    />
                   </Box>
 
                   {!readOnly && mayResolveAnnotation(annotation, userId) && (
