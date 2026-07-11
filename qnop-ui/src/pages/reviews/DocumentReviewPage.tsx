@@ -87,6 +87,7 @@ import { usePdfDocument } from '../../components/reviews/viewer/usePdfDocument';
 import type { ViewerTool } from '../../components/reviews/viewer/ViewerToolbar';
 import { ViewerToolbar } from '../../components/reviews/viewer/ViewerToolbar';
 import { isOpenWorkflowState } from '../../components/reviews/workflowMeta';
+import { recordRecentReview } from '../../components/dashboard/recentReviews';
 import { useAuthStore } from '../../stores/authStore';
 import { apiErrorCode } from '../../utils/apiError';
 import { pdfFetchVersion, resolveEffectiveVersion } from './resolveEffectiveVersion';
@@ -148,6 +149,18 @@ export function DocumentReviewPage() {
   const [viewMode, setViewMode] = useViewMode();
   // The unseen-marker baseline (issue #307): the PREVIOUS visit, stamped once.
   const previousSeenAt = useRecordVisit(documentId);
+  // Feed the dashboard's "continue where you left off" (issue #454) —
+  // device-local by design, so a plain localStorage stamp per resolved doc.
+  const resolvedDocument = documentQuery.data;
+  useEffect(() => {
+    if (resolvedDocument) {
+      recordRecentReview({
+        id: resolvedDocument.id,
+        slug: resolvedDocument.slug ?? null,
+        title: resolvedDocument.title,
+      });
+    }
+  }, [resolvedDocument]);
   // The view tabs (issue #398) address the mode through the URL — ?view= wins
   // over (and updates) the stored preference; the param stays shareable.
   const urlView = searchParams.get('view');

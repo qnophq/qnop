@@ -31,6 +31,7 @@ import { ComingSoonPage } from '../pages/ComingSoonPage';
 import { HomePage } from '../pages/HomePage';
 import { BrandingPage } from '../pages/admin/BrandingPage';
 import { ProfilePage } from '../pages/ProfilePage';
+import { UserProfilePage } from '../pages/UserProfilePage';
 import { EmailServerPage } from '../pages/admin/EmailServerPage';
 import { MailTemplatesListPage } from '../pages/admin/MailTemplatesListPage';
 import { OidcProvidersPage } from '../pages/admin/OidcProvidersPage';
@@ -92,6 +93,7 @@ export const router = createBrowserRouter([
     children: [
       { index: true, element: <HomePage /> },
       { path: 'profile', element: <ProfilePage /> },
+      { path: 'users/:userId', element: <UserProfilePage /> },
       { path: 'reviews', element: <ReviewsPage /> },
       { path: 'reviews/new', element: <NewReviewPage /> },
       {

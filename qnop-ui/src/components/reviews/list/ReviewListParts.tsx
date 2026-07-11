@@ -147,7 +147,16 @@ export function ReviewerStack({ participants }: { participants: ParticipantView[
               zIndex: shown.length - index,
             }}
           >
-            <UserAvatar name={participant.displayName} size={24} />
+            <UserAvatar
+              name={participant.displayName}
+              size={24}
+              // Public read path (ADR-0031); a 404 quietly falls back to initials.
+              imageUrl={
+                participant.kind === 'USER'
+                  ? `/api/v1/users/${participant.principalId}/avatar`
+                  : null
+              }
+            />
           </Box>
         </Tooltip>
       ))}
