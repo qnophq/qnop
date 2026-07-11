@@ -312,7 +312,6 @@ export function ReviewTasksPage() {
         annotation={openTask}
         previousSeenAt={previousSeenAt}
         taskKey={openTask ? taskKeyOf(openTask.id) : ''}
-        authorName={openTask ? authorNameOf(openTask.authorId) : ''}
         notify={notify}
         reviewClosed={!isOpenWorkflowState(document.workflowState)}
         threadParticipation={document.threadParticipation ?? 'OPEN'}

@@ -25,18 +25,14 @@ import Drawer from '@mui/material/Drawer';
 import IconButton from '@mui/material/IconButton';
 import Stack from '@mui/material/Stack';
 import Typography from '@mui/material/Typography';
-import { useTheme } from '@mui/material/styles';
 import { ExternalLink, X } from 'lucide-react';
 import type { AnnotationView } from '../../../api/generated';
 import { AnnotationStatus } from '../../../api/generated';
 import { useAuthStore } from '../../../stores/authStore';
 import { tokens } from '../../../theme/tokens';
 import type { Notify } from '../../admin/layout/useToast';
-import { ToneBadge } from '../../admin/ToneBadge';
-import { isDocumentScoped } from '../annotationScope';
-import { WholeDocumentChip } from '../WholeDocumentChip';
 import type { BuildPermalink } from '../useReviewPermalink';
-import { CopyLinkButton } from '../permalink/CopyLinkButton';
+import { AnnotationHead } from '../panel/AnnotationHead';
 import { CommentThread } from '../panel/CommentThread';
 import { ResolveBar } from '../panel/ResolveBar';
 import {
@@ -45,9 +41,6 @@ import {
   useReopenWithFeedback,
   useResolveWithFeedback,
 } from '../panel/resolve';
-import { PlacementStatusChip } from '../panel/PlacementStatusChip';
-import { STATUS_CUES } from '../panel/statusCues';
-import { PRIORITY_CUES, TYPE_CUES, taskTitle } from './tasksModel';
 
 interface TaskDrawerProps {
   annotation: AnnotationView | null;
@@ -55,7 +48,6 @@ interface TaskDrawerProps {
   previousSeenAt?: string | null;
   /** Tracker-style shorthand ("T-3") of the open annotation. */
   taskKey: string;
-  authorName: string;
   notify: Notify;
   /** True once the review is FINALIZED/CANCELLED (issue #394): no reopening. */
   reviewClosed?: boolean;
@@ -71,18 +63,18 @@ interface TaskDrawerProps {
 }
 
 /**
- * The task's issue-detail drawer (issue #393, prototype `reviewhub.jsx`):
- * type/priority/anchor header, the opening comment as the title, the full
- * discussion thread and the author's Resolve bar — reusing the panel's
- * `CommentThread` and `ResolveBar`, so a thread reads and behaves identically
- * on every surface. Also the keyboard path for resolving (the board's
- * drag-to-Resolved is a pointer shortcut).
+ * The task's issue-detail drawer (issue #393, prototype `reviewhub.jsx`): a
+ * slim tracker header (task key, deep link, close), then the discussion led by
+ * the same author-fronted `AnnotationHead` the document view opens with
+ * (issue #403 follow-up) — the thread starter, badges, quoted passage and
+ * opening text read identically on every surface — followed by the full
+ * `CommentThread` and the author's Resolve bar. Also the keyboard path for
+ * resolving (the board's drag-to-Resolved is a pointer shortcut).
  */
 export function TaskDrawer({
   annotation,
   previousSeenAt = null,
   taskKey,
-  authorName,
   notify,
   reviewClosed = false,
   threadParticipation = 'OPEN',
@@ -91,7 +83,6 @@ export function TaskDrawer({
   onShowInDocument,
   buildPermalink,
 }: TaskDrawerProps) {
-  const theme = useTheme();
   const userId = useAuthStore((state) => state.userId);
   const { resolveWith, isPending } = useResolveWithFeedback(notify);
   const { reopenWith } = useReopenWithFeedback(notify);
@@ -102,12 +93,6 @@ export function TaskDrawer({
     threadParticipation !== 'OPEN' &&
     annotation.authorId !== userId &&
     !(ownerId != null && userId === ownerId);
-  const type = annotation.type ? TYPE_CUES[annotation.type] : null;
-  const priority = annotation.priority ? PRIORITY_CUES[annotation.priority] : null;
-  const TypeIcon = type?.icon;
-  const statusCue = STATUS_CUES[annotation.status];
-  const page = annotation.anchor?.region ? annotation.anchor.region.surfaceIndex + 1 : null;
-
   return (
     <Drawer
       anchor="right"
@@ -117,8 +102,9 @@ export function TaskDrawer({
       data-testid="task-drawer"
     >
       <Stack sx={{ height: '100%' }}>
-        <Box sx={{ p: 2, borderBottom: '1px solid', borderColor: 'divider' }}>
-          <Stack direction="row" spacing={1} sx={{ alignItems: 'center', mb: 1 }}>
+        {/* Slim tracker header — the discussion below leads with the head. */}
+        <Box sx={{ px: 2, py: 1, borderBottom: '1px solid', borderColor: 'divider' }}>
+          <Stack direction="row" spacing={1} sx={{ alignItems: 'center' }}>
             <Typography
               component="span"
               sx={{
@@ -130,75 +116,7 @@ export function TaskDrawer({
             >
               {taskKey}
             </Typography>
-            {type && TypeIcon && (
-              <Stack
-                direction="row"
-                spacing={0.5}
-                sx={{ alignItems: 'center', color: type.color(theme) }}
-              >
-                <TypeIcon size={13} aria-hidden />
-                <Typography component="span" sx={{ fontSize: 11.5, fontWeight: 600 }}>
-                  {type.label}
-                </Typography>
-              </Stack>
-            )}
-            {priority && (
-              <Stack direction="row" spacing={0.5} sx={{ alignItems: 'center' }}>
-                <Box
-                  sx={{
-                    width: 6,
-                    height: 6,
-                    borderRadius: '50%',
-                    bgcolor: priority.color(theme),
-                  }}
-                  aria-hidden
-                />
-                <Typography variant="caption" color="text.secondary">
-                  {priority.label}
-                </Typography>
-              </Stack>
-            )}
             <Box sx={{ flex: 1 }} />
-            <IconButton size="small" onClick={onClose} aria-label="Close task">
-              <X size={16} />
-            </IconButton>
-          </Stack>
-          <Typography variant="subtitle1" sx={{ fontWeight: 600, lineHeight: 1.3 }}>
-            {taskTitle(annotation)}
-          </Typography>
-          <Stack direction="row" spacing={1} sx={{ alignItems: 'center', mt: 1, flexWrap: 'wrap' }}>
-            <ToneBadge tone={statusCue.tone} label={statusCue.label} />
-            <PlacementStatusChip status={annotation.placementStatus} />
-            {isDocumentScoped(annotation) && <WholeDocumentChip />}
-            {page !== null && (
-              <Typography variant="caption" color="text.secondary">
-                p. {page}
-              </Typography>
-            )}
-            <Typography variant="caption" color="text.secondary">
-              · opened by {authorName}
-            </Typography>
-          </Stack>
-          {annotation.anchor?.textQuote?.quote && (
-            <Typography
-              variant="body2"
-              sx={{
-                mt: 1.25,
-                fontStyle: 'italic',
-                color: 'text.secondary',
-                borderLeft: '3px solid',
-                borderColor: 'divider',
-                pl: 1.25,
-                display: '-webkit-box',
-                WebkitLineClamp: 3,
-                WebkitBoxOrient: 'vertical',
-                overflow: 'hidden',
-              }}
-            >
-              “{annotation.anchor.textQuote.quote}”
-            </Typography>
-          )}
-          <Stack direction="row" spacing={0.5} sx={{ alignItems: 'center', mt: 1 }}>
             <Button
               size="small"
               variant="text"
@@ -207,17 +125,22 @@ export function TaskDrawer({
             >
               Show in document
             </Button>
-            {buildPermalink && (
-              <CopyLinkButton
-                url={buildPermalink(annotation.id)}
-                notify={notify}
-                label="Copy link to annotation"
-              />
-            )}
+            <IconButton size="small" onClick={onClose} aria-label="Close task">
+              <X size={16} />
+            </IconButton>
           </Stack>
         </Box>
 
-        <Box sx={{ flex: 1, overflowY: 'auto', px: 2, py: 1 }}>
+        <Box sx={{ flex: 1, overflowY: 'auto', px: 2, py: 1.5 }}>
+          {/* The root post, exactly as the document view presents it: the
+              author leading, badges, the quoted passage and the opening text
+              (issue #403 follow-up). It carries the annotation copy-link in
+              its author row. */}
+          <AnnotationHead
+            annotation={annotation}
+            permalinkUrl={buildPermalink?.(annotation.id)}
+            notify={notify}
+          />
           <CommentThread
             annotationId={annotation.id}
             documentId={annotation.documentId}
