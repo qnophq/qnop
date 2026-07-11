@@ -33,6 +33,7 @@ const annotation = (overrides: Partial<AnnotationView> = {}): AnnotationView => 
   status: AnnotationStatus.Open,
   placementStatus: PlacementStatus.Placed,
   commentCount: 1,
+  reactions: [],
   createdAt: '2026-07-04T13:00:00Z',
   updatedAt: '2026-07-04T13:00:00Z',
   ...overrides,
@@ -40,6 +41,7 @@ const annotation = (overrides: Partial<AnnotationView> = {}): AnnotationView => 
 
 const comment = (overrides: Partial<CommentView> = {}): CommentView => ({
   id: 'c1',
+  reactions: [],
   annotationId: 'a1',
   authorId: 'other',
   body: 'hello',

@@ -53,3 +53,6 @@ databaseChangeLog:
   - include:
       file: migrations/0014-document-attachment-schema.yaml
       relativeToChangelogFile: true
+  - include:
+      file: migrations/0015-reaction-schema.yaml
+      relativeToChangelogFile: true

@@ -48,6 +48,7 @@ const annotation = (id: string, overrides: Partial<AnnotationView> = {}): Annota
   priority: AnnotationPriority.High,
   firstComment: `first comment of ${id}`,
   commentCount: 1,
+  reactions: [],
   createdAt: '2026-07-01T10:00:00Z',
   updatedAt: '2026-07-01T10:00:00Z',
   ...overrides,

@@ -2385,6 +2385,146 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
+  /annotations/{annotationId}/reactions/{emoji}:
+    parameters:
+      - $ref: '#/components/parameters/AnnotationIdParam'
+      - $ref: '#/components/parameters/EmojiParam'
+    put:
+      tags: [Annotations]
+      summary: Add the caller's emoji reaction to an annotation
+      description: |
+        Slack-style reaction (issue #410): adds the caller's `emoji` to the
+        annotation; repeating the call is a no-op, so the PUT/DELETE pair is
+        idempotent. A reaction is a lightweight signal, not a discussion
+        contribution — RESOLVED annotations stay reactable; only a
+        FINALIZED/CANCELLED review refuses (`REVIEW_CLOSED`, 409). One reaction
+        per user per emoji; several different emojis per user are fine.
+      operationId: reactToAnnotation
+      security:
+        - bearerAuth: []
+      responses:
+        '204':
+          description: The reaction is present (added now or already there)
+        '400':
+          description: The path segment is not a plausible emoji
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          description: Unknown annotation
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '409':
+          description: The review is FINALIZED/CANCELLED (`REVIEW_CLOSED`)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+    delete:
+      tags: [Annotations]
+      summary: Remove the caller's emoji reaction from an annotation
+      description: |
+        The inverse of `reactToAnnotation` (issue #410); removing an absent
+        reaction is a no-op.
+      operationId: unreactFromAnnotation
+      security:
+        - bearerAuth: []
+      responses:
+        '204':
+          description: The reaction is absent (removed now or never there)
+        '400':
+          description: The path segment is not a plausible emoji
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          description: Unknown annotation
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '409':
+          description: The review is FINALIZED/CANCELLED (`REVIEW_CLOSED`)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /comments/{commentId}/reactions/{emoji}:
+    parameters:
+      - $ref: '#/components/parameters/CommentIdParam'
+      - $ref: '#/components/parameters/EmojiParam'
+    put:
+      tags: [Annotations]
+      summary: Add the caller's emoji reaction to a comment
+      description: |
+        Slack-style reaction on a thread message (issue #410); the same
+        semantics as `reactToAnnotation`, keyed by the comment id.
+      operationId: reactToComment
+      security:
+        - bearerAuth: []
+      responses:
+        '204':
+          description: The reaction is present (added now or already there)
+        '400':
+          description: The path segment is not a plausible emoji
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          description: Unknown comment
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '409':
+          description: The review is FINALIZED/CANCELLED (`REVIEW_CLOSED`)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+    delete:
+      tags: [Annotations]
+      summary: Remove the caller's emoji reaction from a comment
+      description: |
+        The inverse of `reactToComment` (issue #410); removing an absent
+        reaction is a no-op.
+      operationId: unreactFromComment
+      security:
+        - bearerAuth: []
+      responses:
+        '204':
+          description: The reaction is absent (removed now or never there)
+        '400':
+          description: The path segment is not a plausible emoji
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          description: Unknown comment
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '409':
+          description: The review is FINALIZED/CANCELLED (`REVIEW_CLOSED`)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
   /annotations/{annotationId}/comments:
     parameters:
       - $ref: '#/components/parameters/AnnotationIdParam'
@@ -2571,6 +2711,24 @@ components:
       schema:
         type: string
         format: uuid
+    CommentIdParam:
+      name: commentId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    EmojiParam:
+      name: emoji
+      in: path
+      required: true
+      description: >-
+        The reaction emoji, URL-encoded — stored and grouped verbatim, so ZWJ
+        sequences and skin-tone variants are distinct reactions.
+      schema:
+        type: string
+        minLength: 1
+        maxLength: 32
     AnnotationIdParam:
       name: annotationId
       in: path
@@ -4413,17 +4571,42 @@ components:
           $ref: '#/components/schemas/AnnotationType'
         priority:
           $ref: '#/components/schemas/AnnotationPriority'
+    ReactionGroup:
+      type: object
+      description: >-
+        One grouped emoji reaction on an annotation or comment (issue #410):
+        the chip's emoji, how many participants reacted with it, whether the
+        caller is among them, and the reactors' display names (resolved
+        server-side, honouring per-review anonymity, issue #413) in reaction
+        order.
+      required:
+        - emoji
+        - count
+        - reactedByMe
+        - reactors
+      properties:
+        emoji:
+          type: string
+        count:
+          type: integer
+        reactedByMe:
+          type: boolean
+        reactors:
+          type: array
+          items:
+            type: string
     AnnotationView:
       type: object
       description: |
         An annotation with, when a version was requested, its placement on that
-        version and the size of its comment thread.
+        version, the size of its comment thread and its reaction chips.
       required:
         - id
         - documentId
         - authorId
         - status
         - commentCount
+        - reactions
         - createdAt
         - updatedAt
       properties:
@@ -4473,6 +4656,11 @@ components:
         commentCount:
           type: integer
           description: Number of comments in the thread.
+        reactions:
+          type: array
+          description: The annotation's grouped emoji reactions (issue #410).
+          items:
+            $ref: '#/components/schemas/ReactionGroup'
         createdAt:
           type: string
           format: date-time
@@ -4513,6 +4701,7 @@ components:
         - annotationId
         - authorId
         - body
+        - reactions
         - createdAt
       properties:
         id:
@@ -4536,6 +4725,11 @@ components:
             authors in an anonymous review. Null only for a since-removed user.
         body:
           type: string
+        reactions:
+          type: array
+          description: The comment's grouped emoji reactions (issue #410).
+          items:
+            $ref: '#/components/schemas/ReactionGroup'
         createdAt:
           type: string
           format: date-time

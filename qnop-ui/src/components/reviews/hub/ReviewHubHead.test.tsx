@@ -67,6 +67,7 @@ function annotation(status: AnnotationStatus): AnnotationView {
     placementStatus: PlacementStatus.Placed,
     anchor: { region: { surfaceIndex: 0, box: { x: 0, y: 0, width: 0.1, height: 0.1 } } },
     commentCount: 0,
+    reactions: [],
     createdAt: '2026-07-01T10:00:00Z',
     updatedAt: '2026-07-01T10:00:00Z',
   };

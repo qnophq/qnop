@@ -22,11 +22,14 @@
 import Box from '@mui/material/Box';
 import Stack from '@mui/material/Stack';
 import Typography from '@mui/material/Typography';
+import type { ReactionGroup } from '../../../api/generated';
 import { shortRelativeTime } from '../../../utils/relativeTime';
 import type { Notify } from '../../admin/layout/useToast';
 import { UserAvatar } from '../../shell/UserAvatar';
 import { Markdown } from '../markdown/Markdown';
 import { CopyLinkButton } from '../permalink/CopyLinkButton';
+import { AddReactionButton } from '../reactions/AddReactionButton';
+import { ReactionBar } from '../reactions/ReactionBar';
 
 /** Shared with the thread's rail and composer, so the columns stay aligned. */
 export const AVATAR_SIZE = 28;
@@ -50,6 +53,10 @@ interface CommentMessageProps {
   /** The comment's permalink; with `notify` it renders the hover copy affordance (issue #412). */
   permalinkUrl?: string;
   notify?: Notify;
+  /** The comment's grouped emoji reactions (issue #410). */
+  reactions?: ReactionGroup[];
+  /** Toggles the viewer's reaction; its presence renders the reaction affordances. */
+  onToggleReaction?: (emoji: string, reacted: boolean) => void;
 }
 
 /**
@@ -71,6 +78,8 @@ export function CommentMessage({
   domId,
   permalinkUrl,
   notify,
+  reactions = [],
+  onToggleReaction,
 }: CommentMessageProps) {
   return (
     <Stack
@@ -111,15 +120,32 @@ export function CommentMessage({
           >
             {shortRelativeTime(createdAt)}
           </Typography>
-          {permalinkUrl && notify && (
-            <Box className="comment-hover-actions" sx={{ display: 'flex' }}>
-              <CopyLinkButton url={permalinkUrl} notify={notify} label="Copy link to comment" />
+          {(onToggleReaction || (permalinkUrl && notify)) && (
+            <Box className="comment-hover-actions" sx={{ display: 'flex', alignItems: 'center' }}>
+              {permalinkUrl && notify && (
+                <CopyLinkButton url={permalinkUrl} notify={notify} label="Copy link to comment" />
+              )}
+              {onToggleReaction && (
+                <AddReactionButton
+                  onPick={(emoji) =>
+                    onToggleReaction(
+                      emoji,
+                      reactions.find((group) => group.emoji === emoji)?.reactedByMe ?? false,
+                    )
+                  }
+                />
+              )}
             </Box>
           )}
         </Stack>
         {/* The body renders as sanitised Markdown (issue #427); the hover
             preview passes clampLines to cap its height. */}
         <Markdown clampLines={clampLines}>{body}</Markdown>
+        {onToggleReaction && reactions.length > 0 && (
+          <Box sx={{ mt: 0.75 }}>
+            <ReactionBar reactions={reactions} onToggle={onToggleReaction} />
+          </Box>
+        )}
       </Box>
     </Stack>
   );

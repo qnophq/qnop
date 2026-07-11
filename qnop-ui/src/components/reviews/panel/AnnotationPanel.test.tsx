@@ -21,12 +21,17 @@
 
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { cleanup, fireEvent, render, screen, within } from '@testing-library/react';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { ThemeProvider } from '@mui/material/styles';
 import type { AnnotationView } from '../../../api/generated';
 import { AnnotationStatus, PlacementStatus } from '../../../api/generated';
 import { buildTheme } from '../../../theme/theme';
 import { useAuthStore } from '../../../stores/authStore';
 import { AnnotationPanel } from './AnnotationPanel';
+
+// The reaction toggles (issue #410) reach for the query client; the data
+// hooks above stay mocked, so a bare client per file is all the tests need.
+const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
 
 vi.mock('./CommentThread', () => ({
   CommentThread: ({
@@ -77,6 +82,7 @@ const annotation = (id: string, overrides: Partial<AnnotationView> = {}): Annota
     textQuote: { quote: 'quoted text' },
   },
   commentCount: 2,
+  reactions: [],
   createdAt: '2026-07-01T10:00:00Z',
   updatedAt: '2026-07-01T10:00:00Z',
   ...overrides,
@@ -96,9 +102,11 @@ function renderPanel(props: Partial<Parameters<typeof AnnotationPanel>[0]> = {})
   };
   const merged = { ...defaults, ...props };
   render(
-    <ThemeProvider theme={buildTheme('light')}>
-      <AnnotationPanel {...merged} />
-    </ThemeProvider>,
+    <QueryClientProvider client={queryClient}>
+      <ThemeProvider theme={buildTheme('light')}>
+        <AnnotationPanel {...merged} />
+      </ThemeProvider>
+    </QueryClientProvider>,
   );
   return merged;
 }

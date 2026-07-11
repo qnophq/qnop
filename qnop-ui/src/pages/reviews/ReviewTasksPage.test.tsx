@@ -21,6 +21,7 @@
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { fireEvent, render, screen, within } from '@testing-library/react';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { ThemeProvider } from '@mui/material/styles';
 import type { AnnotationView } from '../../api/generated';
@@ -36,6 +37,10 @@ import { useParticipants } from '../../api/hooks/useReviews';
 import { buildTheme } from '../../theme/theme';
 import { useAuthStore } from '../../stores/authStore';
 import { ReviewTasksPage } from './ReviewTasksPage';
+
+// The reaction toggles (issue #410) reach for the query client; the data
+// hooks above stay mocked, so a bare client per file is all the tests need.
+const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
 
 vi.mock('../../api/hooks/useDocuments', () => ({
   useDocument: vi.fn(),
@@ -73,6 +78,7 @@ const annotation = (id: string, overrides: Partial<AnnotationView> = {}): Annota
   priority: AnnotationPriority.High,
   firstComment: `Concern ${id}`,
   commentCount: 1,
+  reactions: [],
   createdAt: '2026-07-01T10:00:00Z',
   updatedAt: '2026-07-01T10:00:00Z',
   ...overrides,
@@ -104,14 +110,16 @@ function mockData() {
 
 function renderPage(initialEntry = '/reviews/d1/tasks') {
   render(
-    <ThemeProvider theme={buildTheme('light')}>
-      <MemoryRouter initialEntries={[initialEntry]}>
-        <Routes>
-          <Route path="/reviews/:documentId/tasks" element={<ReviewTasksPage />} />
-          <Route path="/reviews/:documentId" element={<div data-testid="review-page" />} />
-        </Routes>
-      </MemoryRouter>
-    </ThemeProvider>,
+    <QueryClientProvider client={queryClient}>
+      <ThemeProvider theme={buildTheme('light')}>
+        <MemoryRouter initialEntries={[initialEntry]}>
+          <Routes>
+            <Route path="/reviews/:documentId/tasks" element={<ReviewTasksPage />} />
+            <Route path="/reviews/:documentId" element={<div data-testid="review-page" />} />
+          </Routes>
+        </MemoryRouter>
+      </ThemeProvider>
+    </QueryClientProvider>,
   );
 }
 
