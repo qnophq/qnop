@@ -58,7 +58,10 @@ export function FocusScrimLayer({ spotlight, onDismiss, surfaceIndex }: FocusScr
         backdropFilter: 'blur(1px)',
         '@media (prefers-reduced-transparency: reduce)': {
           backdropFilter: 'none',
-          bgcolor: 'rgba(1, 32, 66, 0.14)',
+          // Neutral veil per mode (issue #423): navy tint in light, plain
+          // white-alpha lift on the black-based dark surfaces.
+          bgcolor: (theme) =>
+            theme.palette.mode === 'light' ? 'rgba(1, 32, 66, 0.14)' : 'rgba(255, 255, 255, 0.10)',
         },
         clipPath: spotlight ? holePolygon(spotlight) : undefined,
         transition: `clip-path ${tokens.motion.durSlow}ms ${tokens.motion.easeInOut}`,
