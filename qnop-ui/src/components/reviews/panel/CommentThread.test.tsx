@@ -20,7 +20,7 @@
  */
 
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { fireEvent, render, screen } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { ThemeProvider } from '@mui/material/styles';
 import { buildTheme } from '../../../theme/theme';
 import { useAuthStore } from '../../../stores/authStore';
@@ -357,5 +357,81 @@ describe('CommentThread permalinks (#412)', () => {
     );
     expect(notify).toHaveBeenCalledWith('This comment no longer exists.', 'error');
     expect(onScrolledToComment).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('full-screen writing stage (issue #403)', () => {
+  const comments = [
+    {
+      id: 'c1',
+      annotationId: 'a1',
+      authorId: 'other',
+      authorDisplayName: 'Anna',
+      body: 'The opening thought',
+      createdAt: '2026-07-01T10:00:00Z',
+    },
+    {
+      id: 'c2',
+      annotationId: 'a1',
+      authorId: 'other',
+      authorDisplayName: 'Anna',
+      body: 'A follow-up',
+      createdAt: '2026-07-02T10:00:00Z',
+    },
+  ];
+
+  beforeEach(() => {
+    vi.mocked(useComments).mockReturnValue({
+      isPending: false,
+      isError: false,
+      data: { comments },
+    } as unknown as ReturnType<typeof useComments>);
+  });
+
+  it('opens the stage with the whole discussion as context and carries the draft both ways', async () => {
+    renderThread();
+    fireEvent.change(screen.getByLabelText('Add a comment'), {
+      target: { value: 'Half a thought' },
+    });
+
+    fireEvent.click(screen.getByRole('button', { name: 'Full screen' }));
+    const dialog = screen.getByTestId('fullscreen-composer');
+
+    // The rail shows the discussion from its opener on.
+    const rail = within(dialog).getByTestId('fullscreen-composer-context');
+    expect(rail).toHaveTextContent('The opening thought');
+    expect(rail).toHaveTextContent('A follow-up');
+
+    // The SAME draft continues on the stage…
+    const stageInput = within(dialog).getByLabelText('Add a comment');
+    expect(stageInput).toHaveValue('Half a thought');
+    fireEvent.change(stageInput, { target: { value: 'Half a thought, finished.' } });
+
+    // …and survives the way back to the inline field (the stage fades out
+    // before unmounting, so wait for it to leave the tree).
+    fireEvent.click(within(dialog).getAllByRole('button', { name: 'Exit full screen' })[0]);
+    await waitFor(() =>
+      expect(screen.queryByTestId('fullscreen-composer')).not.toBeInTheDocument(),
+    );
+    expect(screen.getByLabelText('Add a comment')).toHaveValue('Half a thought, finished.');
+  });
+
+  it('sends from the stage and closes it', async () => {
+    addMutate.mockImplementation((_body: string, options: { onSuccess: () => void }) =>
+      options.onSuccess(),
+    );
+    renderThread();
+    fireEvent.change(screen.getByLabelText('Add a comment'), {
+      target: { value: 'Written on the stage' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Full screen' }));
+    const dialog = screen.getByTestId('fullscreen-composer');
+
+    fireEvent.click(within(dialog).getByRole('button', { name: /^Comment/ }));
+
+    expect(addMutate).toHaveBeenCalledWith('Written on the stage', expect.anything());
+    await waitFor(() =>
+      expect(screen.queryByTestId('fullscreen-composer')).not.toBeInTheDocument(),
+    );
   });
 });

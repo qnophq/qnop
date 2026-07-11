@@ -32,6 +32,7 @@ import type { Anchor } from '../../../api/generated';
 import { AnnotationPriority, AnnotationType } from '../../../api/generated';
 import { submitShortcutLabel } from '../../../utils/platform';
 import { PRIORITY_CUES, TYPE_CUES } from '../tasks/tasksModel';
+import { FullscreenComposerDialog } from '../markdown/FullscreenComposerDialog';
 import { MarkdownComposer } from '../markdown/MarkdownComposer';
 import type { UploadedAttachment } from '../markdown/useCommentAttachmentUpload';
 
@@ -66,9 +67,96 @@ export function Composer({
   const [comment, setComment] = useState('');
   const [type, setType] = useState<AnnotationType | ''>('');
   const [priority, setPriority] = useState<AnnotationPriority | ''>('');
+  // The full-screen writing stage (issue #403 follow-up); the draft and the
+  // classification live HERE, so they survive the mode switch both ways.
+  const [writingFullscreen, setWritingFullscreen] = useState(false);
   const canCreate = !creating && comment.trim().length > 0;
   const quote = pendingAnchor?.textQuote?.quote;
   const create = () => onCreate(comment, type || undefined, priority || undefined);
+
+  // Rendered twice — inline and on the full-screen stage — over the SAME
+  // state, so the two views can never drift apart. Inline the selects stretch;
+  // on the stage's bottom action bar they stay compact.
+  const classificationRow = (compact: boolean) => (
+    <Stack direction="row" spacing={1}>
+      <TextField
+        select
+        size="small"
+        label="Type"
+        value={type}
+        onChange={(event) => setType(event.target.value as AnnotationType | '')}
+        sx={compact ? { width: 150 } : { flex: 1 }}
+        slotProps={{ htmlInput: { 'aria-label': 'Annotation type' } }}
+      >
+        <MenuItem value="">
+          <Typography component="span" variant="body2" color="text.secondary">
+            None
+          </Typography>
+        </MenuItem>
+        {Object.values(AnnotationType).map((value) => {
+          const cue = TYPE_CUES[value];
+          const CueIcon = cue.icon;
+          return (
+            <MenuItem key={value} value={value}>
+              <Stack
+                direction="row"
+                spacing={0.75}
+                sx={{ alignItems: 'center', color: cue.color(theme) }}
+              >
+                <CueIcon size={13} aria-hidden />
+                <Typography component="span" variant="body2">
+                  {cue.label}
+                </Typography>
+              </Stack>
+            </MenuItem>
+          );
+        })}
+      </TextField>
+      <TextField
+        select
+        size="small"
+        label="Priority"
+        value={priority}
+        onChange={(event) => setPriority(event.target.value as AnnotationPriority | '')}
+        sx={compact ? { width: 150 } : { flex: 1 }}
+        slotProps={{ htmlInput: { 'aria-label': 'Annotation priority' } }}
+      >
+        <MenuItem value="">
+          <Typography component="span" variant="body2" color="text.secondary">
+            None
+          </Typography>
+        </MenuItem>
+        {Object.values(AnnotationPriority).map((value) => {
+          const cue = PRIORITY_CUES[value];
+          return (
+            <MenuItem key={value} value={value}>
+              <Stack direction="row" spacing={0.75} sx={{ alignItems: 'center' }}>
+                <Box
+                  sx={{ width: 7, height: 7, borderRadius: '50%', bgcolor: cue.color(theme) }}
+                  aria-hidden
+                />
+                <Typography component="span" variant="body2">
+                  {cue.label}
+                </Typography>
+              </Stack>
+            </MenuItem>
+          );
+        })}
+      </TextField>
+    </Stack>
+  );
+
+  const actionRow = (
+    <Stack direction="row" spacing={1} sx={{ justifyContent: 'flex-end', alignItems: 'center' }}>
+      <Button size="small" variant="contained" onClick={create} disabled={!canCreate}>
+        Create annotation ({submitShortcutLabel()})
+      </Button>
+      <Button size="small" onClick={onCancel} disabled={creating}>
+        Cancel
+      </Button>
+    </Stack>
+  );
+
   return (
     <Paper
       variant={frameless ? 'elevation' : 'outlined'}
@@ -103,87 +191,72 @@ export function Composer({
           minRows={5}
           disabled={creating}
           onUploadAttachment={onUploadAttachment}
+          onToggleFullscreen={() => setWritingFullscreen(true)}
         />
         {/* Optional classification (issue #392) in the system's task language. */}
-        <Stack direction="row" spacing={1}>
-          <TextField
-            select
-            size="small"
-            label="Type"
-            value={type}
-            onChange={(event) => setType(event.target.value as AnnotationType | '')}
-            sx={{ flex: 1 }}
-            slotProps={{ htmlInput: { 'aria-label': 'Annotation type' } }}
-          >
-            <MenuItem value="">
-              <Typography component="span" variant="body2" color="text.secondary">
-                None
-              </Typography>
-            </MenuItem>
-            {Object.values(AnnotationType).map((value) => {
-              const cue = TYPE_CUES[value];
-              const CueIcon = cue.icon;
-              return (
-                <MenuItem key={value} value={value}>
-                  <Stack
-                    direction="row"
-                    spacing={0.75}
-                    sx={{ alignItems: 'center', color: cue.color(theme) }}
-                  >
-                    <CueIcon size={13} aria-hidden />
-                    <Typography component="span" variant="body2">
-                      {cue.label}
-                    </Typography>
-                  </Stack>
-                </MenuItem>
-              );
-            })}
-          </TextField>
-          <TextField
-            select
-            size="small"
-            label="Priority"
-            value={priority}
-            onChange={(event) => setPriority(event.target.value as AnnotationPriority | '')}
-            sx={{ flex: 1 }}
-            slotProps={{ htmlInput: { 'aria-label': 'Annotation priority' } }}
-          >
-            <MenuItem value="">
-              <Typography component="span" variant="body2" color="text.secondary">
-                None
-              </Typography>
-            </MenuItem>
-            {Object.values(AnnotationPriority).map((value) => {
-              const cue = PRIORITY_CUES[value];
-              return (
-                <MenuItem key={value} value={value}>
-                  <Stack direction="row" spacing={0.75} sx={{ alignItems: 'center' }}>
-                    <Box
-                      sx={{ width: 7, height: 7, borderRadius: '50%', bgcolor: cue.color(theme) }}
-                      aria-hidden
-                    />
-                    <Typography component="span" variant="body2">
-                      {cue.label}
-                    </Typography>
-                  </Stack>
-                </MenuItem>
-              );
-            })}
-          </TextField>
-        </Stack>
-        <Stack
-          direction="row"
-          spacing={1}
-          sx={{ justifyContent: 'flex-end', alignItems: 'center' }}
-        >
-          <Button size="small" variant="contained" onClick={create} disabled={!canCreate}>
-            Create annotation ({submitShortcutLabel()})
-          </Button>
-          <Button size="small" onClick={onCancel} disabled={creating}>
-            Cancel
-          </Button>
-        </Stack>
+        {classificationRow(false)}
+        {actionRow}
       </Stack>
+      {/* The full-screen writing stage (issue #403 follow-up): the same
+          controlled draft on a reading-wide column, with the passage under
+          annotation as the context rail. */}
+      <FullscreenComposerDialog
+        open={writingFullscreen}
+        onClose={() => setWritingFullscreen(false)}
+        title="New annotation"
+        contextTitle="You are annotating"
+        context={
+          quote ? (
+            <Box
+              sx={{
+                borderLeft: '3px solid',
+                borderColor: 'divider',
+                bgcolor: 'background.paper',
+                borderRadius: '0 6px 6px 0',
+                px: 1.25,
+                py: 0.75,
+              }}
+            >
+              <Typography variant="body2" sx={{ fontStyle: 'italic', color: 'text.secondary' }}>
+                “{quote}”
+              </Typography>
+            </Box>
+          ) : pendingAnchor?.region ? (
+            <Typography variant="body2" color="text.secondary">
+              A region on page {pendingAnchor.region.surfaceIndex + 1}.
+            </Typography>
+          ) : (
+            <Typography variant="body2" color="text.secondary">
+              A general remark on the whole document — not pinned to a passage.
+            </Typography>
+          )
+        }
+      >
+        <MarkdownComposer
+          value={comment}
+          onChange={setComment}
+          onSubmit={() => {
+            if (canCreate) create();
+          }}
+          inputAriaLabel="Annotation comment"
+          bare
+          disabled={creating}
+          onUploadAttachment={onUploadAttachment}
+          fullscreen
+          onToggleFullscreen={() => setWritingFullscreen(false)}
+          actions={
+            <Stack direction="row" spacing={1} sx={{ alignItems: 'center', flexWrap: 'wrap' }}>
+              {classificationRow(true)}
+              <Button size="small" variant="contained" onClick={create} disabled={!canCreate}>
+                Create annotation ({submitShortcutLabel()})
+              </Button>
+              <Button size="small" onClick={onCancel} disabled={creating}>
+                Cancel
+              </Button>
+            </Stack>
+          }
+        />
+      </FullscreenComposerDialog>
     </Paper>
   );
 }
