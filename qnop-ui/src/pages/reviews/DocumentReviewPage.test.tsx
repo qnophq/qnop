@@ -51,6 +51,7 @@ vi.mock('../../api/hooks/useDocuments', () => ({
   useOriginalPdf: vi.fn(),
 }));
 vi.mock('../../api/hooks/useAnnotations', () => ({
+  useConfirmPlacement: vi.fn().mockReturnValue({ mutate: vi.fn(), isPending: false }),
   useAnnotations: vi.fn(),
   useCreateAnnotation: vi.fn(),
   useResolveAnnotation: vi.fn().mockReturnValue({ mutate: vi.fn(), isPending: false }),

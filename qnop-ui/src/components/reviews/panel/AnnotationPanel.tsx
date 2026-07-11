@@ -43,12 +43,14 @@ import { compareAnnotationsByPosition } from '../viewer/anchoring';
 import { isUnseen } from '../newSince';
 import { isDocumentScoped } from '../annotationScope';
 import type { BuildPermalink } from '../useReviewPermalink';
+import { useConfirmPlacement } from '../../../api/hooks/useAnnotations';
 import { AnnotationListItem } from './AnnotationListItem';
 import type { UploadedAttachment } from '../markdown/useCommentAttachmentUpload';
 import { CommentThread } from './CommentThread';
 import { Composer } from './Composer';
 import type { FilterAuthor } from './PanelFilterBar';
 import { PanelFilterBar } from './PanelFilterBar';
+import { ReanchorBanner } from './ReanchorBanner';
 import type { AnnotationFilters } from './panelFilters';
 import { EMPTY_FILTERS, matchesFilters } from './panelFilters';
 import { ResolveBar } from './ResolveBar';
@@ -82,6 +84,8 @@ interface AnnotationPanelProps {
   onUploadAttachment?: (file: File) => Promise<UploadedAttachment>;
   /** True while an OLDER version is viewed (#306): threads readable, nothing writable. */
   readOnly?: boolean;
+  /** The viewed version — the scope of placement outcomes and their confirmation (issue #326). */
+  versionNumber?: number | null;
   /** True once the review is FINALIZED/CANCELLED (issue #394): no reopening. */
   reviewClosed?: boolean;
   /** Drops the section's outer card frame — the focus drawer brings its own edge. */
@@ -232,6 +236,7 @@ export function AnnotationPanel({
   notify,
   onUploadAttachment,
   readOnly = false,
+  versionNumber = null,
   reviewClosed = false,
   frameless = false,
   previousSeenAt = null,
@@ -243,6 +248,7 @@ export function AnnotationPanel({
   const [filters, setFilters] = useState<AnnotationFilters>(EMPTY_FILTERS);
   const userId = useAuthStore((state) => state.userId);
   const { resolveWith, isPending: resolving } = useResolveWithFeedback(notify);
+  const confirmPlacement = useConfirmPlacement(notify);
   const { reopenWith } = useReopenWithFeedback(notify);
 
   // Author names are resolved server-side and travel on the annotation itself
@@ -307,6 +313,15 @@ export function AnnotationPanel({
           onHover={onHover}
           permalinkUrl={buildPermalink?.(annotation.id)}
           notify={notify}
+          onConfirmPlacement={
+            versionNumber != null &&
+            !readOnly &&
+            !reviewClosed &&
+            annotation.placementStatus === 'MOVED' &&
+            (userId === ownerId || userId === annotation.authorId)
+              ? () => confirmPlacement.mutate({ annotationId: annotation.id, versionNumber })
+              : undefined
+          }
         />
         <Collapse in={active} unmountOnExit>
           {!readOnly && mayResolveAnnotation(annotation, userId) && (
@@ -358,6 +373,13 @@ export function AnnotationPanel({
       }
     >
       <Stack spacing={1.5}>
+        {versionNumber != null && (
+          <ReanchorBanner
+            annotations={annotations}
+            versionNumber={versionNumber}
+            onReview={() => setFilters((current) => ({ ...current, placement: 'attention' }))}
+          />
+        )}
         {annotations.length > 0 && (
           <PanelFilterBar
             filters={filters}

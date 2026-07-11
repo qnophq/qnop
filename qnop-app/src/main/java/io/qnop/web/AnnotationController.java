@@ -138,6 +138,14 @@ public class AnnotationController implements AnnotationsApi {
   }
 
   @Override
+  public ResponseEntity<AnnotationView> confirmPlacement(UUID annotationId, Integer versionNumber) {
+    return ResponseEntity.ok(
+        toDto(
+            annotations.confirmPlacement(
+                annotationId, versionNumber, CurrentUser.requireUserId(), CurrentUser.isAdmin())));
+  }
+
+  @Override
   public ResponseEntity<CommentView> addComment(UUID annotationId, CommentCreateRequest request) {
     AnnotationService.CommentView view =
         annotations.addComment(

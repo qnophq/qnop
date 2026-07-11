@@ -22,6 +22,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import type { AnnotationCreateRequest, AnnotationListResponse } from '../generated';
 import { annotationsApi } from '../config';
+import type { Notify } from '../../components/admin/layout/useToast';
 import { commentKeys } from './useComments';
 import { documentKeys } from './useDocuments';
 
@@ -121,5 +122,25 @@ export function useResolveAnnotation() {
       // only, so the PDF/rendered caches stay put (issue #403).
       queryClient.invalidateQueries({ queryKey: documentKeys.detail(updated.documentId) });
     },
+  });
+}
+
+/**
+ * Confirms a reviewed MOVED placement back to PLACED (ADR-0009, issue #326) —
+ * the human half of re-anchoring, allowed for the owner or the annotation's
+ * author on the version whose highlight was verified.
+ */
+export function useConfirmPlacement(notify: Notify) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (input: { annotationId: string; versionNumber: number }) => {
+      const response = await annotationsApi.confirmPlacement(input);
+      return response.data;
+    },
+    onSuccess: () => {
+      notify('Placement confirmed.', 'success');
+      queryClient.invalidateQueries({ queryKey: annotationKeys.all });
+    },
+    onError: () => notify('Could not confirm the placement.', 'error'),
   });
 }

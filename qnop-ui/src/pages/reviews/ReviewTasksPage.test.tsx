@@ -48,6 +48,7 @@ vi.mock('../../api/hooks/useDocuments', () => ({
 }));
 const { createMutate } = vi.hoisted(() => ({ createMutate: vi.fn() }));
 vi.mock('../../api/hooks/useAnnotations', () => ({
+  useConfirmPlacement: vi.fn().mockReturnValue({ mutate: vi.fn(), isPending: false }),
   useAnnotations: vi.fn(),
   useCreateAnnotation: vi.fn().mockReturnValue({ mutate: createMutate, isPending: false }),
   useResolveAnnotation: vi.fn().mockReturnValue({ mutate: vi.fn(), isPending: false }),

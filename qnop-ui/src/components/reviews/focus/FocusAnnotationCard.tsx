@@ -38,6 +38,7 @@ import { AnnotationStatus } from '../../../api/generated';
 import { tokens } from '../../../theme/tokens';
 import type { Notify } from '../../admin/layout/useToast';
 import type { BuildPermalink } from '../useReviewPermalink';
+import { useConfirmPlacement } from '../../../api/hooks/useAnnotations';
 import { AnnotationHead } from '../panel/AnnotationHead';
 import { CommentThread } from '../panel/CommentThread';
 import { ResolveBar } from '../panel/ResolveBar';
@@ -61,6 +62,8 @@ interface FocusAnnotationCardProps {
   notify: Notify;
   /** True while an OLDER version is viewed (#306): thread readable, nothing writable. */
   readOnly?: boolean;
+  /** The viewed version — the scope of placement confirmation (issue #326). */
+  versionNumber?: number | null;
   /** True once the review is FINALIZED/CANCELLED (issue #394): no reopening. */
   reviewClosed?: boolean;
   /** Thread participation policy (issue #413) — READ_ONLY suppresses foreign composers. */
@@ -102,6 +105,7 @@ export function FocusAnnotationCard({
   userId,
   notify,
   readOnly = false,
+  versionNumber = null,
   reviewClosed = false,
   threadParticipation = 'OPEN',
   ownerId,
@@ -117,6 +121,7 @@ export function FocusAnnotationCard({
     threadParticipation !== 'OPEN' &&
     annotation.authorId !== userId &&
     !(ownerId != null && userId === ownerId);
+  const confirmPlacement = useConfirmPlacement(notify);
   const { resolveWith, isPending: resolving } = useResolveWithFeedback(notify);
   const { reopenWith } = useReopenWithFeedback(notify);
 
@@ -327,6 +332,19 @@ export function FocusAnnotationCard({
                       annotation={annotation}
                       permalinkUrl={buildPermalink?.(annotation.id)}
                       notify={notify}
+                      onConfirmPlacement={
+                        versionNumber != null &&
+                        !readOnly &&
+                        !reviewClosed &&
+                        annotation.placementStatus === 'MOVED' &&
+                        (userId === ownerId || userId === annotation.authorId)
+                          ? () =>
+                              confirmPlacement.mutate({
+                                annotationId: annotation.id,
+                                versionNumber,
+                              })
+                          : undefined
+                      }
                     />
                   </Box>
 

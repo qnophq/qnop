@@ -30,6 +30,7 @@ import io.qnop.entity.AnnotationType;
 import io.qnop.entity.AuditEvent;
 import io.qnop.entity.Comment;
 import io.qnop.entity.DocumentVersion;
+import io.qnop.entity.PlacementStatus;
 import io.qnop.entity.ThreadParticipation;
 import io.qnop.repository.AnnotationCommentActivity;
 import io.qnop.repository.AnnotationCommentCount;
@@ -62,6 +63,7 @@ public class AnnotationService {
 
   static final String AUDIT_ANNOTATION_CREATED = "annotation.created";
   static final String AUDIT_ANNOTATION_CLASSIFIED = "annotation.classified";
+  static final String AUDIT_PLACEMENT_CONFIRMED = "placement.confirmed";
 
   /** Comments can be 20k chars; the view carries only what a card title needs (issue #393). */
   static final int FIRST_COMMENT_EXCERPT_CHARS = 300;
@@ -378,6 +380,62 @@ public class AnnotationService {
         threadSize(updated.getId()),
         foreignActivity(updated.getId(), actor),
         annotationReactions(updated.getId(), actor, identities),
+        identities);
+  }
+
+  /**
+   * Confirms a MOVED placement after human review (ADR-0009, issue #326): the document owner or the
+   * annotation's author verified the relocated highlight on {@code versionNumber}, so the placement
+   * flips back to PLACED, keeping the resolved anchor. Only MOVED confirms — anything else answers
+   * 409, so a stale client racing the re-anchoring job gets a stable signal.
+   */
+  @Transactional
+  public AnnotationView confirmPlacement(
+      UUID annotationId, int versionNumber, UUID actor, boolean admin) {
+    Annotation annotation = requireAnnotation(annotationId);
+    DocumentAccessService.DocumentView document =
+        documentAccess.getDocument(annotation.getDocumentId(), actor, admin);
+    if (!canSeeThread(document, annotation.getAuthorId(), actor, admin)) {
+      throw DocumentValidationException.notFound("no such annotation: " + annotationId);
+    }
+    if (!admin && !document.ownerId().equals(actor) && !annotation.getAuthorId().equals(actor)) {
+      throw new AnnotationActionForbiddenException(
+          "Only the document owner or the annotation's author may confirm a placement");
+    }
+    DocumentVersion version =
+        versions
+            .findByDocumentIdAndVersionNumber(annotation.getDocumentId(), versionNumber)
+            .orElseThrow(
+                () -> DocumentValidationException.notFound("no such version: " + versionNumber));
+    AnnotationPlacement placement =
+        placements
+            .findByAnnotationIdAndDocumentVersionId(annotationId, version.getId())
+            .orElseThrow(
+                () ->
+                    DocumentValidationException.notFound(
+                        "no placement on version " + versionNumber));
+    if (placement.getStatus() != PlacementStatus.MOVED) {
+      throw new WorkflowTransitionException(
+          WorkflowTransitionException.PLACEMENT_NOT_MOVED,
+          "placement is " + placement.getStatus() + "; only MOVED placements confirm");
+    }
+    placement.markPlaced(placement.getAnchor());
+    auditEvents.save(
+        new AuditEvent(
+            annotation.getDocumentId(),
+            AUDIT_PLACEMENT_CONFIRMED,
+            actor,
+            "{\"annotationId\":\"%s\",\"versionNumber\":%d}"
+                .formatted(annotationId, versionNumber)));
+    ReviewIdentityResolver.ReviewIdentities identities =
+        identity.forDocument(annotation.getDocumentId(), actor);
+    return view(
+        annotation,
+        placement,
+        firstComment(annotationId),
+        threadSize(annotationId),
+        foreignActivity(annotationId, actor),
+        annotationReactions(annotationId, actor, identities),
         identities);
   }
 

@@ -2584,6 +2584,55 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
+  /annotations/{annotationId}/placements/{versionNumber}/confirm:
+    parameters:
+      - $ref: '#/components/parameters/AnnotationIdParam'
+      - name: versionNumber
+        in: path
+        required: true
+        schema:
+          type: integer
+    post:
+      tags: [Annotations]
+      summary: Confirm a MOVED placement after review (owner or author)
+      description: |
+        The human half of re-anchoring (ADR-0009, issue #326): a MOVED
+        placement means the anchor was relocated with a change worth checking.
+        Once the document owner or the annotation's author has verified the
+        highlight on that version, confirming flips the placement back to
+        PLACED, keeping the resolved anchor. Only MOVED placements confirm —
+        anything else answers 409 (`PLACEMENT_NOT_MOVED`); orphans are handled
+        by re-drawing or resolving instead.
+      operationId: confirmPlacement
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: The updated annotation with the confirmed placement
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AnnotationView'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          description: The caller is neither the document owner nor the annotation's author
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Unknown annotation, version, or no placement on that version
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '409':
+          description: The placement is not MOVED (`PLACEMENT_NOT_MOVED`)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
   /annotations/{annotationId}/comments:
     parameters:
       - $ref: '#/components/parameters/AnnotationIdParam'

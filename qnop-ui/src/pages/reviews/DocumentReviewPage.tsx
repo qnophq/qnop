@@ -589,6 +589,7 @@ export function DocumentReviewPage() {
                   notify={notify}
                   onUploadAttachment={uploadAttachment}
                   readOnly={!isLatestVersion}
+                  versionNumber={versionNumber}
                   reviewClosed={!isOpenWorkflowState(document.workflowState)}
                   previousSeenAt={previousSeenAt}
                   buildPermalink={buildPermalink}
@@ -646,6 +647,7 @@ export function DocumentReviewPage() {
           userId={userId}
           notify={notify}
           readOnly={!isLatestVersion}
+          versionNumber={versionNumber}
           reviewClosed={!isOpenWorkflowState(document.workflowState)}
           threadParticipation={document.threadParticipation ?? 'OPEN'}
           ownerId={document.ownerId}
