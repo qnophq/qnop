@@ -20,32 +20,100 @@
  */
 
 import Box from '@mui/material/Box';
-import Card from '@mui/material/Card';
-import CardContent from '@mui/material/CardContent';
+import Button from '@mui/material/Button';
+import Chip from '@mui/material/Chip';
+import Skeleton from '@mui/material/Skeleton';
 import Stack from '@mui/material/Stack';
 import Typography from '@mui/material/Typography';
-import { Inbox } from 'lucide-react';
+import { FileText, History, Inbox, Plus, UserCheck } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
+import { useDashboard } from '../api/hooks/useDashboard';
+import { useReviews } from '../api/hooks/useReviews';
+import { ActivityCard } from '../components/dashboard/ActivityCard';
+import {
+  deadlines,
+  dueUrgency,
+  greeting,
+  myReviews,
+  reviewPath,
+  waitingOnYou,
+} from '../components/dashboard/dashboardModel';
+import { DeadlinesCard } from '../components/dashboard/DeadlinesCard';
+import { readRecentReviews } from '../components/dashboard/recentReviews';
+import { RepliesCard } from '../components/dashboard/RepliesCard';
+import { ReviewListCard } from '../components/dashboard/ReviewListCard';
+import { StatStrip } from '../components/dashboard/StatStrip';
+import { isOpenWorkflowState } from '../components/reviews/workflowMeta';
 import { useAuthStore } from '../stores/authStore';
 
+const DATE_FORMAT = new Intl.DateTimeFormat('en-US', {
+  weekday: 'long',
+  day: 'numeric',
+  month: 'long',
+});
+
 /**
- * Dashboard placeholder (#102). Shows the signed-in user (from GET /users/me)
- * and frames the review workspace to come. The real command-centre dashboard
- * from the prototype lands in the PDF vertical slice (Phase B).
+ * The command-centre dashboard (issue #454, prototype `dashboard.jsx`): a
+ * greeting masthead with the glance numbers, then the two hats side by side —
+ * what the caller owes as a reviewer, what their own reviews are up to —
+ * flanked by replies directed at them, the deadline rail and the recent
+ * activity of their reviews. Renders from exactly two requests: the reviews
+ * overview and the dashboard aggregates.
  */
 export function HomePage() {
+  const navigate = useNavigate();
   const displayName = useAuthStore((s) => s.displayName);
+  const userId = useAuthStore((s) => s.userId);
+  const reviewsQuery = useReviews({ page: 0, size: 100, sort: 'updatedAt,desc' });
+  const dashboardQuery = useDashboard();
+
+  const reviews = reviewsQuery.data?.items ?? [];
+  const waiting = waitingOnYou(reviews, userId);
+  const owned = myReviews(reviews, userId);
+  const due = deadlines(reviews);
+  const recents = readRecentReviews();
+  const firstName = displayName?.split(' ')[0];
+
+  const overdueCount = due.filter(
+    (review) => dueUrgency(review.dueAt as string).level === 'overdue',
+  ).length;
+  const dueSoonCount = due.filter((review) =>
+    ['overdue', 'today', 'soon'].includes(dueUrgency(review.dueAt as string).level),
+  ).length;
+
+  const loading = reviewsQuery.isPending || dashboardQuery.isPending;
+  const empty = !reviewsQuery.isPending && reviews.length === 0;
 
   return (
     <Stack spacing={3}>
+      {/* Masthead: who, when, and the day's numbers. */}
       <Box>
-        <Typography variant="h1">Welcome{displayName ? `, ${displayName}` : ''}.</Typography>
-        <Typography color="text.secondary" sx={{ mt: 1 }}>
-          Your review workspace will take shape here over the next steps.
+        <Typography variant="h1">
+          {greeting(new Date().getHours())}
+          {firstName ? `, ${firstName}` : ''}.
+        </Typography>
+        <Typography color="text.secondary" sx={{ mt: 0.5 }}>
+          {DATE_FORMAT.format(new Date())}
         </Typography>
       </Box>
 
-      <Card>
-        <CardContent>
+      {loading ? (
+        <Stack spacing={2}>
+          <Skeleton variant="rounded" height={76} />
+          <Skeleton variant="rounded" height={220} />
+        </Stack>
+      ) : empty ? (
+        // A brand-new workspace: keep the calm single-card welcome.
+        <Stack
+          spacing={2}
+          sx={{
+            alignItems: 'flex-start',
+            border: '1px solid',
+            borderColor: 'divider',
+            borderRadius: '12px',
+            p: 3,
+          }}
+        >
           <Stack direction="row" spacing={2} sx={{ alignItems: 'center' }}>
             <Box
               sx={{
@@ -65,12 +133,91 @@ export function HomePage() {
             <Box>
               <Typography variant="h6">No reviews yet</Typography>
               <Typography color="text.secondary">
-                Once document upload is ready, your reviews will appear here.
+                Start your first review — upload a document and invite reviewers.
               </Typography>
             </Box>
           </Stack>
-        </CardContent>
-      </Card>
+          <Button
+            variant="contained"
+            startIcon={<Plus size={16} />}
+            onClick={() => navigate('/reviews')}
+          >
+            New review
+          </Button>
+        </Stack>
+      ) : (
+        <>
+          <StatStrip
+            tiles={[
+              {
+                label: 'Open reviews',
+                value: reviews.filter((r) => isOpenWorkflowState(r.workflowState)).length,
+              },
+              { label: 'Waiting on you', value: waiting.length, tone: 'accent' },
+              {
+                label: 'Due soon',
+                value: dueSoonCount,
+                tone: overdueCount > 0 ? 'danger' : 'warning',
+              },
+              {
+                label: 'Resolved this week',
+                value: dashboardQuery.data?.stats.resolvedThisWeek ?? 0,
+              },
+            ]}
+          />
+
+          {/* Continue where you left off — device-local, one click back in. */}
+          {recents.length > 0 && (
+            <Stack direction="row" spacing={1} sx={{ alignItems: 'center', flexWrap: 'wrap' }}>
+              <History size={14} aria-hidden style={{ opacity: 0.6 }} />
+              <Typography variant="caption" color="text.secondary">
+                Continue where you left off:
+              </Typography>
+              {recents.map((recent) => (
+                <Chip
+                  key={recent.id}
+                  label={recent.title}
+                  size="small"
+                  onClick={() => navigate(reviewPath(recent))}
+                />
+              ))}
+            </Stack>
+          )}
+
+          {/* The two hats plus context — main column and rail. */}
+          <Box
+            sx={{
+              display: 'grid',
+              gap: 2.5,
+              gridTemplateColumns: { xs: '1fr', lg: 'minmax(0, 7fr) minmax(0, 5fr)' },
+              alignItems: 'start',
+            }}
+          >
+            <Stack spacing={2.5} sx={{ minWidth: 0 }}>
+              <ReviewListCard
+                icon={UserCheck}
+                title="Waiting on you"
+                description="Reviews you are asked to work through."
+                reviews={waiting}
+                emptyText="Nothing waits on you — enjoy the quiet."
+              />
+              <ReviewListCard
+                icon={FileText}
+                title="My reviews"
+                description="Reviews you own, running ones first."
+                reviews={owned}
+                emptyText="You own no reviews yet."
+                ownerCues
+              />
+              <RepliesCard replies={dashboardQuery.data?.replies ?? []} />
+            </Stack>
+            <Stack spacing={2.5} sx={{ minWidth: 0 }}>
+              <DeadlinesCard reviews={due} />
+              <ActivityCard activity={dashboardQuery.data?.activity ?? []} />
+            </Stack>
+          </Box>
+        </>
+      )}
     </Stack>
   );
 }

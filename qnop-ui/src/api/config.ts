@@ -35,6 +35,7 @@ import {
   ReviewWorkflowApi,
   ServerConfigApi,
   UsersApi,
+  DashboardApi,
 } from './generated';
 import { performRefresh } from './refresh';
 import { useAuthStore } from '../stores/authStore';
@@ -97,6 +98,7 @@ export const adminSettingsApi = new AdminSettingsApi(undefined, undefined, axios
 export const adminOidcProvidersApi = new AdminOidcProvidersApi(undefined, undefined, axiosInstance);
 export const adminEmailApi = new AdminEmailApi(undefined, undefined, axiosInstance);
 export const documentsApi = new DocumentsApi(undefined, undefined, axiosInstance);
+export const dashboardApi = new DashboardApi(undefined, undefined, axiosInstance);
 export const annotationsApi = new AnnotationsApi(undefined, undefined, axiosInstance);
 export const principalsApi = new PrincipalsApi(undefined, undefined, axiosInstance);
 export const reviewWorkflowApi = new ReviewWorkflowApi(undefined, undefined, axiosInstance);

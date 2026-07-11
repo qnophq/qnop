@@ -1689,6 +1689,31 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
+  /dashboard:
+    get:
+      tags: [Dashboard]
+      summary: The caller's dashboard aggregates
+      description: |
+        The cross-review aggregates of the command-centre dashboard (issue
+        #454): the latest replies by others in threads the caller started or
+        joined, the recent activity of their reviews (from the audit trail),
+        and the weekly resolved count. Everything per-review (state, progress,
+        participants, due date) already travels on `GET /documents` — a client
+        renders the whole dashboard from those two calls. Names honour
+        per-review anonymity (issue #413); annotation activity of a
+        PRIVATE-participation review is shown only to its owner.
+      operationId: getDashboard
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: The dashboard aggregates
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DashboardResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
   /documents:
     get:
       tags:
@@ -3995,6 +4020,103 @@ components:
       required:
         - field
         - message
+    DashboardReply:
+      type: object
+      description: >-
+        One reply by someone else in a thread the caller started or joined
+        (issue #454), newest first. `annotationExcerpt` is the thread's opening
+        line for context; `authorDisplayName` is resolved server-side,
+        honouring per-review anonymity (issue #413).
+      required:
+        - commentId
+        - annotationId
+        - documentId
+        - documentTitle
+        - body
+        - createdAt
+      properties:
+        commentId:
+          type: string
+          format: uuid
+        annotationId:
+          type: string
+          format: uuid
+        documentId:
+          type: string
+          format: uuid
+        documentTitle:
+          type: string
+        documentSlug:
+          type: string
+          nullable: true
+        authorDisplayName:
+          type: string
+          nullable: true
+        body:
+          type: string
+          description: The reply, excerpted for the card.
+        annotationExcerpt:
+          type: string
+          nullable: true
+        createdAt:
+          type: string
+          format: date-time
+    DashboardActivity:
+      type: object
+      description: >-
+        One feed entry from the audit trail of the caller's reviews (issue
+        #454) — the caller's own actions are excluded.
+      required:
+        - type
+        - documentId
+        - documentTitle
+        - createdAt
+      properties:
+        type:
+          type: string
+          description: >-
+            The audit event type — annotation.created, annotation.resolved,
+            annotation.reopened, workflow.transition or
+            document.due_date.changed.
+        documentId:
+          type: string
+          format: uuid
+        documentTitle:
+          type: string
+        documentSlug:
+          type: string
+          nullable: true
+        actorDisplayName:
+          type: string
+          nullable: true
+        createdAt:
+          type: string
+          format: date-time
+    DashboardStats:
+      type: object
+      required:
+        - resolvedThisWeek
+      properties:
+        resolvedThisWeek:
+          type: integer
+          description: Annotations resolved across the caller's reviews in the last 7 days.
+    DashboardResponse:
+      type: object
+      required:
+        - replies
+        - activity
+        - stats
+      properties:
+        replies:
+          type: array
+          items:
+            $ref: '#/components/schemas/DashboardReply'
+        activity:
+          type: array
+          items:
+            $ref: '#/components/schemas/DashboardActivity'
+        stats:
+          $ref: '#/components/schemas/DashboardStats'
     DocumentSummary:
       type: object
       description: One document in the caller's reviews overview (issue #292).
