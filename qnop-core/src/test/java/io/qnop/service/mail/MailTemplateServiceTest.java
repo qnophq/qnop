@@ -49,13 +49,20 @@ class MailTemplateServiceTest {
   @Mock private UserRepository userRepository;
   @Mock private ApplicationSettingsService settings;
 
-  /** Exactly the variable set the live send flows supply (issue #140). */
+  /** Exactly the variable set the live send flows supply (issues #140, #316). */
   private static final Map<String, Object> FLOW_VARS =
-      Map.of(
-          "siteName", "qnop",
-          "recipientName", "Jane",
-          "actionUrl", "https://qnop.example/reset?token=abc",
-          "expiresAtHuman", "in 30 minutes");
+      Map.ofEntries(
+          Map.entry("siteName", "qnop"),
+          Map.entry("recipientName", "Jane"),
+          Map.entry("actionUrl", "https://qnop.example/reset?token=abc"),
+          Map.entry("expiresAtHuman", "in 30 minutes"),
+          Map.entry("actorName", "Alex Reviewer"),
+          Map.entry("documentTitle", "Q3 contract draft"),
+          Map.entry("annotationExcerpt", "The liability clause needs a cap."),
+          Map.entry("commentExcerpt", "Agreed — let's cap it at 12 months."),
+          Map.entry("decision", "resolved"),
+          Map.entry("oldState", "In review"),
+          Map.entry("newState", "Changes requested"));
 
   private MailTemplateService service;
 

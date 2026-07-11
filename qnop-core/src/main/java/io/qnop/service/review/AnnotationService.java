@@ -46,6 +46,7 @@ import java.time.Instant;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -77,6 +78,7 @@ public class AnnotationService {
   private final DocumentAccessService documentAccess;
   private final ReviewWorkflowService workflow;
   private final ReviewIdentityResolver identity;
+  private final ApplicationEventPublisher events;
   private final ReactionService reactions_;
 
   public AnnotationService(
@@ -88,7 +90,8 @@ public class AnnotationService {
       DocumentAccessService documentAccess,
       ReviewWorkflowService workflow,
       ReviewIdentityResolver identity,
-      ReactionService reactions) {
+      ReactionService reactions,
+      ApplicationEventPublisher events) {
     this.annotations = annotations;
     this.placements = placements;
     this.comments = comments;
@@ -98,6 +101,7 @@ public class AnnotationService {
     this.workflow = workflow;
     this.identity = identity;
     this.reactions_ = reactions;
+    this.events = events;
   }
 
   /**
@@ -197,6 +201,7 @@ public class AnnotationService {
     // The workflow reacts to the raise (issue #405): a closed review rolls this insert back
     // (REVIEW_CLOSED), an IN_REVIEW one derives CHANGES_REQUESTED — both under the document lock.
     workflow.annotationRaised(documentId, author);
+    events.publishEvent(new ReviewEvent.AnnotationCreated(documentId, author, annotation.getId()));
     return view(
         annotation,
         placement,
@@ -552,6 +557,9 @@ public class AnnotationService {
     }
     // saveAndFlush so @CreationTimestamp is populated on the returned comment before the view.
     Comment saved = comments.saveAndFlush(new Comment(annotationId, author, body));
+    events.publishEvent(
+        new ReviewEvent.CommentAdded(
+            annotation.getDocumentId(), author, annotationId, saved.getId()));
     return commentView(saved, List.of(), identity.forDocument(annotation.getDocumentId(), author));
   }
 

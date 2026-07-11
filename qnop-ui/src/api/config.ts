@@ -34,6 +34,7 @@ import {
   PrincipalsApi,
   ReviewWorkflowApi,
   ServerConfigApi,
+  UserSettingsApi,
   UsersApi,
   DashboardApi,
 } from './generated';
@@ -102,3 +103,4 @@ export const dashboardApi = new DashboardApi(undefined, undefined, axiosInstance
 export const annotationsApi = new AnnotationsApi(undefined, undefined, axiosInstance);
 export const principalsApi = new PrincipalsApi(undefined, undefined, axiosInstance);
 export const reviewWorkflowApi = new ReviewWorkflowApi(undefined, undefined, axiosInstance);
+export const userSettingsApi = new UserSettingsApi(undefined, undefined, axiosInstance);

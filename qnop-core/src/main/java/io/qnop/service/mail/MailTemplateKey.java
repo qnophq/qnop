@@ -117,18 +117,169 @@ public enum MailTemplateKey {
       "siteName",
       "recipientName",
       "actionUrl",
-      "expiresAtHuman");
+      "expiresAtHuman"),
+  REVIEW_PARTICIPANT_ADDED(
+      "review.participant_added",
+      "Review invitation",
+      "You were added as a reviewer on “{{documentTitle}}”",
+      """
+      Hi {{recipientName}},
+
+      {{actorName}} added you as a reviewer on "{{documentTitle}}" ({{siteName}}).
+
+      Open the review to see the document and its discussion:
+
+      {{actionUrl}}
+      """,
+      """
+      <h1 style="margin:0 0 14px;color:#18191f;font-size:22px;font-weight:700;letter-spacing:-0.01em;line-height:1.3;">You're on a review</h1>
+      <p style="margin:0 0 14px;">Hi {{recipientName}},</p>
+      <p style="margin:0 0 14px;"><strong style="color:#18191f;">{{actorName}}</strong> added you as a reviewer on <strong style="color:#18191f;">&#8220;{{documentTitle}}&#8221;</strong>.</p>
+      <p style="margin:0;color:#9a9ea8;font-size:13px;">Open the review to see the document and its discussion.</p>
+      """,
+      "Open review",
+      "{{actorName}} added you as a reviewer on “{{documentTitle}}”.",
+      "siteName",
+      "recipientName",
+      "actorName",
+      "documentTitle",
+      "actionUrl"),
+  REVIEW_ANNOTATION_CREATED(
+      "review.annotation_created",
+      "New annotation",
+      "New annotation on “{{documentTitle}}”",
+      """
+      Hi {{recipientName}},
+
+      {{actorName}} raised a new annotation on "{{documentTitle}}" ({{siteName}}):
+
+      "{{annotationExcerpt}}"
+
+      Open the annotation:
+
+      {{actionUrl}}
+      """,
+      """
+      <h1 style="margin:0 0 14px;color:#18191f;font-size:22px;font-weight:700;letter-spacing:-0.01em;line-height:1.3;">New annotation</h1>
+      <p style="margin:0 0 14px;">Hi {{recipientName}},</p>
+      <p style="margin:0 0 14px;"><strong style="color:#18191f;">{{actorName}}</strong> raised a new annotation on <strong style="color:#18191f;">&#8220;{{documentTitle}}&#8221;</strong>:</p>
+      <p style="margin:0 0 14px;padding:10px 14px;border-left:3px solid #d5d9e0;color:#5a5f6a;">{{annotationExcerpt}}</p>
+      <p style="margin:0;color:#9a9ea8;font-size:13px;">Open the annotation to reply or resolve it.</p>
+      """,
+      "Open annotation",
+      "{{actorName}} raised a new annotation on “{{documentTitle}}”.",
+      "siteName",
+      "recipientName",
+      "actorName",
+      "documentTitle",
+      "annotationExcerpt",
+      "actionUrl"),
+  REVIEW_ANNOTATION_DECIDED(
+      "review.annotation_decided",
+      "Annotation decision",
+      "An annotation on “{{documentTitle}}” was {{decision}}",
+      """
+      Hi {{recipientName}},
+
+      {{actorName}} {{decision}} an annotation on "{{documentTitle}}" ({{siteName}}):
+
+      "{{annotationExcerpt}}"
+
+      Open the annotation:
+
+      {{actionUrl}}
+      """,
+      """
+      <h1 style="margin:0 0 14px;color:#18191f;font-size:22px;font-weight:700;letter-spacing:-0.01em;line-height:1.3;">Annotation {{decision}}</h1>
+      <p style="margin:0 0 14px;">Hi {{recipientName}},</p>
+      <p style="margin:0 0 14px;"><strong style="color:#18191f;">{{actorName}}</strong> {{decision}} an annotation on <strong style="color:#18191f;">&#8220;{{documentTitle}}&#8221;</strong>:</p>
+      <p style="margin:0 0 14px;padding:10px 14px;border-left:3px solid #d5d9e0;color:#5a5f6a;">{{annotationExcerpt}}</p>
+      <p style="margin:0;color:#9a9ea8;font-size:13px;">Open the annotation to see the discussion.</p>
+      """,
+      "Open annotation",
+      "An annotation on “{{documentTitle}}” was {{decision}}.",
+      "siteName",
+      "recipientName",
+      "actorName",
+      "documentTitle",
+      "annotationExcerpt",
+      "decision",
+      "actionUrl"),
+  REVIEW_COMMENT_ADDED(
+      "review.comment_added",
+      "New reply",
+      "New reply on “{{documentTitle}}”",
+      """
+      Hi {{recipientName}},
+
+      {{actorName}} replied in a discussion you follow on "{{documentTitle}}" ({{siteName}}):
+
+      "{{commentExcerpt}}"
+
+      Open the reply:
+
+      {{actionUrl}}
+      """,
+      """
+      <h1 style="margin:0 0 14px;color:#18191f;font-size:22px;font-weight:700;letter-spacing:-0.01em;line-height:1.3;">New reply</h1>
+      <p style="margin:0 0 14px;">Hi {{recipientName}},</p>
+      <p style="margin:0 0 14px;"><strong style="color:#18191f;">{{actorName}}</strong> replied in a discussion you follow on <strong style="color:#18191f;">&#8220;{{documentTitle}}&#8221;</strong>:</p>
+      <p style="margin:0 0 14px;padding:10px 14px;border-left:3px solid #d5d9e0;color:#5a5f6a;">{{commentExcerpt}}</p>
+      <p style="margin:0;color:#9a9ea8;font-size:13px;">Open the thread to answer.</p>
+      """,
+      "Open reply",
+      "{{actorName}} replied on “{{documentTitle}}”.",
+      "siteName",
+      "recipientName",
+      "actorName",
+      "documentTitle",
+      "commentExcerpt",
+      "actionUrl"),
+  REVIEW_WORKFLOW_CHANGED(
+      "review.workflow_changed",
+      "Review status change",
+      "“{{documentTitle}}” moved to {{newState}}",
+      """
+      Hi {{recipientName}},
+
+      The review "{{documentTitle}}" ({{siteName}}) changed its status: {{oldState}} -> {{newState}}.
+
+      Open the review:
+
+      {{actionUrl}}
+      """,
+      """
+      <h1 style="margin:0 0 14px;color:#18191f;font-size:22px;font-weight:700;letter-spacing:-0.01em;line-height:1.3;">Review status change</h1>
+      <p style="margin:0 0 14px;">Hi {{recipientName}},</p>
+      <p style="margin:0 0 14px;"><strong style="color:#18191f;">&#8220;{{documentTitle}}&#8221;</strong> changed its status: {{oldState}} &#8594; <strong style="color:#18191f;">{{newState}}</strong>.</p>
+      <p style="margin:0;color:#9a9ea8;font-size:13px;">Open the review for the details.</p>
+      """,
+      "Open review",
+      "“{{documentTitle}}” moved to {{newState}}.",
+      "siteName",
+      "recipientName",
+      "documentTitle",
+      "oldState",
+      "newState",
+      "actionUrl");
 
   /**
    * Representative demo value per known placeholder, used to prefill the preview's sample-variable
    * editor (issue #141). Every placeholder a template declares must have an entry here.
    */
   private static final Map<String, String> DEMO_VALUES =
-      Map.of(
-          "siteName", "qnop",
-          "recipientName", "Jane Doe",
-          "actionUrl", "https://qnop.example/action?token=SAMPLE",
-          "expiresAtHuman", "in 30 minutes");
+      Map.ofEntries(
+          Map.entry("siteName", "qnop"),
+          Map.entry("recipientName", "Jane Doe"),
+          Map.entry("actionUrl", "https://qnop.example/action?token=SAMPLE"),
+          Map.entry("expiresAtHuman", "in 30 minutes"),
+          Map.entry("actorName", "Alex Reviewer"),
+          Map.entry("documentTitle", "Q3 contract draft"),
+          Map.entry("annotationExcerpt", "The liability clause needs a cap."),
+          Map.entry("commentExcerpt", "Agreed — let's cap it at 12 months."),
+          Map.entry("decision", "resolved"),
+          Map.entry("oldState", "In review"),
+          Map.entry("newState", "Changes requested"));
 
   private final String key;
   private final String friendlyName;

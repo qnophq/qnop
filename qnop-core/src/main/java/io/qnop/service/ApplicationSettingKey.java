@@ -119,7 +119,12 @@ public enum ApplicationSettingKey {
       "auth.password_reset_token_ttl_minutes",
       SettingValueType.INTEGER,
       "30",
-      "Validity window of a password-reset token, in minutes.");
+      "Validity window of a password-reset token, in minutes."),
+  NOTIFICATIONS_REVIEW_EMAILS_ENABLED(
+      "notifications.review_emails_enabled",
+      SettingValueType.BOOLEAN,
+      "true",
+      "Send email notifications for review activity (reviewer added, annotations, replies, status changes).");
 
   private static final Map<String, ApplicationSettingKey> BY_KEY =
       Arrays.stream(values())

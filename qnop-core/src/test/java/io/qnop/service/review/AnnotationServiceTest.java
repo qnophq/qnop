@@ -79,7 +79,8 @@ class AnnotationServiceTest {
           documentAccess,
           workflow,
           identity,
-          reactions);
+          reactions,
+          mock(org.springframework.context.ApplicationEventPublisher.class));
 
   private final UUID documentId = UUID.randomUUID();
   private final UUID author = UUID.randomUUID();
