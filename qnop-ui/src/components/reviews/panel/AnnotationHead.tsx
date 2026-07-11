@@ -114,25 +114,34 @@ export function AnnotationHead({
           >
             {authorName}
           </Typography>
-          <Typography
-            variant="caption"
-            color="text.secondary"
-            noWrap
-            component="p"
-            title={DATE_FORMAT.format(new Date(annotation.createdAt))}
-            sx={{ lineHeight: 1.4 }}
-          >
-            Started this discussion · {shortRelativeTime(annotation.createdAt)}
-          </Typography>
+          <Stack direction="row" spacing={0.5} sx={{ alignItems: 'center', minWidth: 0 }}>
+            <Typography
+              variant="caption"
+              color="text.secondary"
+              noWrap
+              component="p"
+              title={DATE_FORMAT.format(new Date(annotation.createdAt))}
+              sx={{ lineHeight: 1.4 }}
+            >
+              Started this discussion · {shortRelativeTime(annotation.createdAt)}
+            </Typography>
+            {permalinkUrl && notify && (
+              // Directly after the timestamp, exactly like a comment row's
+              // link. The negative margin keeps the icon button from growing
+              // the caption line beyond the avatar's height.
+              <Box
+                className="annotation-hover-actions"
+                sx={{ display: 'flex', flexShrink: 0, my: '-3px' }}
+              >
+                <CopyLinkButton
+                  url={permalinkUrl}
+                  notify={notify}
+                  label="Copy link to annotation"
+                />
+              </Box>
+            )}
+          </Stack>
         </Box>
-        {permalinkUrl && notify && (
-          // Inline after the author block, exactly like a comment row's link
-          // after its timestamp (no ml:auto — Stack spacing margins would
-          // override it anyway).
-          <Box className="annotation-hover-actions" sx={{ display: 'flex', flexShrink: 0 }}>
-            <CopyLinkButton url={permalinkUrl} notify={notify} label="Copy link to annotation" />
-          </Box>
-        )}
       </Stack>
       <AnnotationBadgeRow annotation={annotation} unseen={unseen} />
       {/* The anchored passage, styled as a real quotation. */}
