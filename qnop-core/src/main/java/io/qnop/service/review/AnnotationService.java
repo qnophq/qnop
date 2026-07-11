@@ -64,6 +64,7 @@ public class AnnotationService {
   static final String AUDIT_ANNOTATION_CREATED = "annotation.created";
   static final String AUDIT_ANNOTATION_CLASSIFIED = "annotation.classified";
   static final String AUDIT_PLACEMENT_CONFIRMED = "placement.confirmed";
+  static final String AUDIT_PLACEMENT_REATTACHED = "placement.reattached";
 
   /** Comments can be 20k chars; the view carries only what a card title needs (issue #393). */
   static final int FIRST_COMMENT_EXCERPT_CHARS = 300;
@@ -437,6 +438,87 @@ public class AnnotationService {
         foreignActivity(annotationId, actor),
         annotationReactions(annotationId, actor, identities),
         identities);
+  }
+
+  /**
+   * Re-attaches a lost placement by hand (ADR-0009, issue #457): the owner or the annotation's
+   * author picked a new passage on the LATEST version, so the placement takes that anchor and flips
+   * to PLACED — the thread stays untouched. Allowed from ORPHANED, FAILED and MOVED (a manual
+   * correction); PLACED refuses, so nothing is overwritten by accident.
+   */
+  @Transactional
+  public AnnotationView reattachPlacement(
+      UUID annotationId, int versionNumber, String anchorJson, UUID actor, boolean admin) {
+    if (anchorJson == null || anchorJson.isBlank()) {
+      throw DocumentValidationException.invalidRequest("anchor is required");
+    }
+    Annotation annotation = requireAnnotation(annotationId);
+    DocumentAccessService.DocumentView document =
+        documentAccess.getDocument(annotation.getDocumentId(), actor, admin);
+    if (!canSeeThread(document, annotation.getAuthorId(), actor, admin)) {
+      throw DocumentValidationException.notFound("no such annotation: " + annotationId);
+    }
+    if (!admin && !document.ownerId().equals(actor) && !annotation.getAuthorId().equals(actor)) {
+      throw new AnnotationActionForbiddenException(
+          "Only the document owner or the annotation's author may re-attach a placement");
+    }
+    if (isClosed(document.workflowState())) {
+      throw new WorkflowTransitionException(
+          WorkflowTransitionException.REVIEW_CLOSED,
+          "the review is " + document.workflowState() + "; placements can no longer change");
+    }
+    DocumentVersion version =
+        versions
+            .findByDocumentIdAndVersionNumber(annotation.getDocumentId(), versionNumber)
+            .orElseThrow(
+                () -> DocumentValidationException.notFound("no such version: " + versionNumber));
+    int latest =
+        versions
+            .findTopByDocumentIdOrderByVersionNumberDesc(annotation.getDocumentId())
+            .map(DocumentVersion::getVersionNumber)
+            .orElse(versionNumber);
+    if (versionNumber != latest) {
+      throw DocumentValidationException.versionReadOnly(
+          "placements are re-attached on the latest version (v%d), not v%d"
+              .formatted(latest, versionNumber));
+    }
+    AnnotationPlacement placement =
+        placements
+            .findByAnnotationIdAndDocumentVersionId(annotationId, version.getId())
+            .orElseThrow(
+                () ->
+                    DocumentValidationException.notFound(
+                        "no placement on version " + versionNumber));
+    if (placement.getStatus() == PlacementStatus.PLACED
+        || placement.getStatus() == PlacementStatus.PENDING) {
+      throw new WorkflowTransitionException(
+          WorkflowTransitionException.PLACEMENT_NOT_REATTACHABLE,
+          "placement is " + placement.getStatus() + "; re-attach rescues lost placements");
+    }
+    placement.markPlaced(anchorJson);
+    auditEvents.save(
+        new AuditEvent(
+            annotation.getDocumentId(),
+            AUDIT_PLACEMENT_REATTACHED,
+            actor,
+            "{\"annotationId\":\"%s\",\"versionNumber\":%d}"
+                .formatted(annotationId, versionNumber)));
+    ReviewIdentityResolver.ReviewIdentities identities =
+        identity.forDocument(annotation.getDocumentId(), actor);
+    return view(
+        annotation,
+        placement,
+        firstComment(annotationId),
+        threadSize(annotationId),
+        foreignActivity(annotationId, actor),
+        annotationReactions(annotationId, actor, identities),
+        identities);
+  }
+
+  /** FINALIZED/CANCELLED as strings — the column tolerates enterprise states (ADR-0011). */
+  private static boolean isClosed(String workflowState) {
+    return io.qnop.entity.WorkflowState.FINALIZED.name().equals(workflowState)
+        || io.qnop.entity.WorkflowState.CANCELLED.name().equals(workflowState);
   }
 
   /**

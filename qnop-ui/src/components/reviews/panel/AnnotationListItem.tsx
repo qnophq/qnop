@@ -129,6 +129,8 @@ interface AnnotationListItemProps {
   notify?: Notify;
   /** Confirms a reviewed MOVED placement (issue #326) — threaded to the head's badge row. */
   onConfirmPlacement?: () => void;
+  /** Arms re-attaching a lost placement (issue #457). */
+  onReattachPlacement?: () => void;
   onHover?: (annotationId: string | null) => void;
 }
 
@@ -155,6 +157,7 @@ function AnnotationListItemBase({
   permalinkUrl,
   notify,
   onConfirmPlacement,
+  onReattachPlacement,
 }: AnnotationListItemProps) {
   const theme = useTheme();
   const viewerId = useAuthStore((state) => state.userId);
@@ -246,6 +249,7 @@ function AnnotationListItemBase({
           permalinkUrl={permalinkUrl}
           notify={notify}
           onConfirmPlacement={onConfirmPlacement}
+          onReattachPlacement={onReattachPlacement}
         />
       ) : (
         <Stack spacing={0.5} sx={{ minWidth: 0 }}>

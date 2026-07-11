@@ -86,6 +86,11 @@ interface AnnotationPanelProps {
   readOnly?: boolean;
   /** The viewed version — the scope of placement outcomes and their confirmation (issue #326). */
   versionNumber?: number | null;
+  /**
+   * Arms re-attaching a lost placement (issue #457) — the page owns the
+   * viewer, so it turns the next selection into the new anchor.
+   */
+  onArmReattach?: (annotation: AnnotationView) => void;
   /** True once the review is FINALIZED/CANCELLED (issue #394): no reopening. */
   reviewClosed?: boolean;
   /** Drops the section's outer card frame — the focus drawer brings its own edge. */
@@ -237,6 +242,7 @@ export function AnnotationPanel({
   onUploadAttachment,
   readOnly = false,
   versionNumber = null,
+  onArmReattach,
   reviewClosed = false,
   frameless = false,
   previousSeenAt = null,
@@ -320,6 +326,17 @@ export function AnnotationPanel({
             annotation.placementStatus === 'MOVED' &&
             (userId === ownerId || userId === annotation.authorId)
               ? () => confirmPlacement.mutate({ annotationId: annotation.id, versionNumber })
+              : undefined
+          }
+          onReattachPlacement={
+            onArmReattach != null &&
+            versionNumber != null &&
+            !readOnly &&
+            !reviewClosed &&
+            (annotation.placementStatus === 'ORPHANED' ||
+              annotation.placementStatus === 'FAILED') &&
+            (userId === ownerId || userId === annotation.authorId)
+              ? () => onArmReattach(annotation)
               : undefined
           }
         />

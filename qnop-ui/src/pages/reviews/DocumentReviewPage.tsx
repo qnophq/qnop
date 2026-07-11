@@ -32,10 +32,14 @@ import MenuItem from '@mui/material/MenuItem';
 import Popper from '@mui/material/Popper';
 import Stack from '@mui/material/Stack';
 import { NotebookPen } from 'lucide-react';
-import type { Anchor, NormalizedBox } from '../../api/generated';
+import type { Anchor, AnnotationView, NormalizedBox } from '../../api/generated';
 import { ExtractionStatus } from '../../api/generated';
 import type { AnnotationPriority, AnnotationType } from '../../api/generated';
-import { useAnnotations, useCreateAnnotation } from '../../api/hooks/useAnnotations';
+import {
+  useAnnotations,
+  useCreateAnnotation,
+  useReattachPlacement,
+} from '../../api/hooks/useAnnotations';
 import {
   useDocument,
   useDocumentVersions,
@@ -86,6 +90,7 @@ import { DocumentViewer } from '../../components/reviews/viewer/DocumentViewer';
 import { usePdfDocument } from '../../components/reviews/viewer/usePdfDocument';
 import type { ViewerTool } from '../../components/reviews/viewer/ViewerToolbar';
 import { ViewerToolbar } from '../../components/reviews/viewer/ViewerToolbar';
+import { ReattachHintBar } from '../../components/reviews/viewer/ReattachHintBar';
 import { isOpenWorkflowState } from '../../components/reviews/workflowMeta';
 import { recordRecentReview } from '../../components/dashboard/recentReviews';
 import { useAuthStore } from '../../stores/authStore';
@@ -240,6 +245,13 @@ export function DocumentReviewPage() {
     anchor: Anchor;
     menuPosition: { left: number; top: number } | null;
   } | null>(null);
+  // Re-attach mode (issue #457): while armed, the next text/region selection
+  // becomes the lost annotation's new anchor instead of a fresh mark.
+  const [reattaching, setReattaching] = useState<{
+    annotationId: string;
+    excerpt: string | null;
+  } | null>(null);
+  const reattachPlacement = useReattachPlacement(notify);
 
   const surfaces = renderedQuery.data?.surfaces;
   const annotations = useMemo(
@@ -292,6 +304,16 @@ export function DocumentReviewPage() {
     focusMode && composingPending ? 'pending-highlight' : null,
   );
 
+  // Escape leaves the re-attach mode without touching anything (issue #457).
+  useEffect(() => {
+    if (!reattaching) return;
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setReattaching(null);
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [reattaching]);
+
   const closeFocusCard = () => {
     setActiveAnnotationId(null);
     activeMarkEl?.focus();
@@ -301,11 +323,35 @@ export function DocumentReviewPage() {
     setSearchParams({ version: String(version) });
     setActiveAnnotationId(null);
     setPending(null);
+    setReattaching(null);
   };
 
   const stagePending = (anchor: Anchor, at: ScreenPosition) => {
+    if (reattaching && versionNumber !== undefined) {
+      const { annotationId } = reattaching;
+      setReattaching(null);
+      reattachPlacement.mutate(
+        { annotationId, versionNumber, anchor },
+        // Land on the re-homed thread — except in focus mode, where activating
+        // would re-open the overlay the user just aimed past (issue #403).
+        { onSuccess: () => (focusMode ? undefined : setActiveAnnotationId(annotationId)) },
+      );
+      return;
+    }
     setPending({ anchor, menuPosition: at });
     setActiveAnnotationId(null);
+  };
+
+  // Arming (issue #457): mutually exclusive with drafting a new mark, and the
+  // focus overlay/drawer make way so the document is selectable.
+  const armReattach = (annotation: AnnotationView) => {
+    setPending(null);
+    setActiveAnnotationId(null);
+    setListOpen(false);
+    setReattaching({
+      annotationId: annotation.id,
+      excerpt: annotation.anchor?.textQuote?.quote ?? null,
+    });
   };
 
   const handleTextSelected = (
@@ -502,9 +548,17 @@ export function DocumentReviewPage() {
                   flex: 1,
                   minHeight: { xs: 480, md: 0 },
                   borderRadius: 1,
+                  // The re-attach hint pill anchors to this stage (issue #457).
+                  position: 'relative',
                   bgcolor: (theme) => theme.qnop.surface2,
                 }}
               >
+                {reattaching && (
+                  <ReattachHintBar
+                    excerpt={reattaching.excerpt}
+                    onCancel={() => setReattaching(null)}
+                  />
+                )}
                 {/* A crash in the pdf.js viewer must not take down the panel or the
                     page — scope it and let the reviewer retry (issue #331). */}
                 <ErrorBoundary
@@ -524,6 +578,7 @@ export function DocumentReviewPage() {
                     onSelectAnnotation={(id) => {
                       setActiveAnnotationId(id);
                       setPending(null);
+                      setReattaching(null);
                     }}
                     onHoverAnnotation={setHoverAnnotationId}
                     onVisiblePageChange={setCurrentPage}
@@ -590,6 +645,7 @@ export function DocumentReviewPage() {
                   onUploadAttachment={uploadAttachment}
                   readOnly={!isLatestVersion}
                   versionNumber={versionNumber}
+                  onArmReattach={armReattach}
                   reviewClosed={!isOpenWorkflowState(document.workflowState)}
                   previousSeenAt={previousSeenAt}
                   buildPermalink={buildPermalink}
@@ -627,6 +683,8 @@ export function DocumentReviewPage() {
               canAnnotate={canAnnotate}
               notify={notify}
               readOnly={!isLatestVersion}
+              versionNumber={versionNumber}
+              onArmReattach={armReattach}
               reviewClosed={!isOpenWorkflowState(document.workflowState)}
               previousSeenAt={previousSeenAt}
               buildPermalink={buildPermalink}
@@ -648,6 +706,7 @@ export function DocumentReviewPage() {
           notify={notify}
           readOnly={!isLatestVersion}
           versionNumber={versionNumber}
+          onArmReattach={armReattach}
           reviewClosed={!isOpenWorkflowState(document.workflowState)}
           threadParticipation={document.threadParticipation ?? 'OPEN'}
           ownerId={document.ownerId}
