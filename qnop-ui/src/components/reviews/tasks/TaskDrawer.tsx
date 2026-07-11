@@ -21,7 +21,6 @@
 
 import Box from '@mui/material/Box';
 import Button from '@mui/material/Button';
-import Drawer from '@mui/material/Drawer';
 import IconButton from '@mui/material/IconButton';
 import Stack from '@mui/material/Stack';
 import Typography from '@mui/material/Typography';
@@ -32,6 +31,7 @@ import { useAuthStore } from '../../../stores/authStore';
 import { tokens } from '../../../theme/tokens';
 import type { Notify } from '../../admin/layout/useToast';
 import type { BuildPermalink } from '../useReviewPermalink';
+import { ResizableDrawer } from '../ResizableDrawer';
 import { AnnotationHead } from '../panel/AnnotationHead';
 import { CommentThread } from '../panel/CommentThread';
 import { ResolveBar } from '../panel/ResolveBar';
@@ -94,12 +94,14 @@ export function TaskDrawer({
     annotation.authorId !== userId &&
     !(ownerId != null && userId === ownerId);
   return (
-    <Drawer
-      anchor="right"
+    <ResizableDrawer
       open
       onClose={onClose}
-      slotProps={{ paper: { sx: { width: { xs: '100%', sm: 460 } } } }}
-      data-testid="task-drawer"
+      storageKey="qnop-task-drawer-width"
+      defaultWidth={460}
+      handleAriaLabel="Resize the task drawer"
+      handleTestId="task-drawer-resize-handle"
+      drawerTestId="task-drawer"
     >
       <Stack sx={{ height: '100%' }}>
         {/* Slim tracker header — the discussion below leads with the head. */}
@@ -164,6 +166,6 @@ export function TaskDrawer({
           </Box>
         )}
       </Stack>
-    </Drawer>
+    </ResizableDrawer>
   );
 }
