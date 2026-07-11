@@ -36,7 +36,7 @@ import Stack from '@mui/material/Stack';
 import Tooltip from '@mui/material/Tooltip';
 import Typography from '@mui/material/Typography';
 import { alpha, useTheme, type Theme } from '@mui/material/styles';
-import { Paperclip } from 'lucide-react';
+import { Maximize2, Minimize2, Paperclip } from 'lucide-react';
 import { isSubmitShortcut } from '../../../utils/platform';
 import { applyMarkdownAction, type MarkdownAction } from './markdownFormatting';
 import { EmojiPickerButton } from './EmojiPickerButton';
@@ -91,6 +91,15 @@ interface MarkdownComposerProps {
   onUploadAttachment?: (file: File) => Promise<UploadedAttachment>;
   /** Right side of the footer row — the send / create actions. */
   actions?: ReactNode;
+  /**
+   * Offered by hosts that can stage the composer full screen (issue #403
+   * follow-up): renders the expand/collapse affordance in the mode row.
+   */
+  onToggleFullscreen?: () => void;
+  /** True on the full-screen instance — flips the affordance to "exit". */
+  fullscreen?: boolean;
+  /** Larger reading type for the full-screen stage. */
+  roomy?: boolean;
 }
 
 /**
@@ -112,9 +121,16 @@ export function MarkdownComposer({
   maxRows = 12,
   disabled = false,
   onUploadAttachment,
+  onToggleFullscreen,
+  fullscreen = false,
+  roomy = false,
   actions,
 }: MarkdownComposerProps) {
   const theme = useTheme();
+  // The full-screen stage reads larger; both the input and the preview's
+  // row-derived heights follow the same metrics.
+  const fontSize = roomy ? 16 : 14;
+  const lineHeight = roomy ? 1.65 : 1.55;
   const inputRef = useRef<HTMLTextAreaElement | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   // Selection for the controlled-update fallback, applied after the re-render.
@@ -368,7 +384,20 @@ export function MarkdownComposer({
             Preview
           </ButtonBase>
         </Stack>
-        {!previewing && <MarkdownToolbar onAction={handleAction} disabled={disabled} />}
+        <Stack direction="row" spacing={0.25} sx={{ alignItems: 'center', flexWrap: 'wrap' }}>
+          {!previewing && <MarkdownToolbar onAction={handleAction} disabled={disabled} />}
+          {onToggleFullscreen && (
+            <Tooltip title={fullscreen ? 'Exit full screen' : 'Full screen'}>
+              <IconButton
+                size="small"
+                aria-label={fullscreen ? 'Exit full screen' : 'Full screen'}
+                onClick={onToggleFullscreen}
+              >
+                {fullscreen ? <Minimize2 size={14} /> : <Maximize2 size={14} />}
+              </IconButton>
+            </Tooltip>
+          )}
+        </Stack>
       </Stack>
       {previewing ? (
         <Box
@@ -376,8 +405,8 @@ export function MarkdownComposer({
           sx={{
             px: 1.5,
             py: 1.25,
-            minHeight: Math.round(minRows * 14 * 1.55) + 20,
-            maxHeight: Math.round(maxRows * 14 * 1.55) + 20,
+            minHeight: Math.round(minRows * fontSize * lineHeight) + 20,
+            maxHeight: Math.round(maxRows * fontSize * lineHeight) + 20,
             overflowY: 'auto',
           }}
         >
@@ -403,7 +432,7 @@ export function MarkdownComposer({
           onKeyDown={handleKeyDown}
           onPaste={handlePaste}
           inputProps={{ maxLength: BODY_MAX_LENGTH, 'aria-label': inputAriaLabel }}
-          sx={{ px: 1.5, py: 1.25, fontSize: 14, lineHeight: 1.55 }}
+          sx={{ px: 1.5, py: 1.25, fontSize, lineHeight }}
         />
       )}
       <Stack

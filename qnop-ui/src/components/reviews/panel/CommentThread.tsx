@@ -36,6 +36,7 @@ import { useAuthStore } from '../../../stores/authStore';
 import type { Notify } from '../../admin/layout/useToast';
 import { isNewComment } from '../newSince';
 import type { BuildPermalink } from '../useReviewPermalink';
+import { FullscreenComposerDialog } from '../markdown/FullscreenComposerDialog';
 import { MarkdownComposer } from '../markdown/MarkdownComposer';
 import { useCommentAttachmentUpload } from '../markdown/useCommentAttachmentUpload';
 import { AVATAR_SIZE, CommentMessage } from './CommentMessage';
@@ -108,13 +109,19 @@ export function CommentThread({
   const addComment = useAddComment(annotationId);
   const uploadAttachment = useCommentAttachmentUpload(documentId, notify);
   const [draft, setDraft] = useState('');
+  // The full-screen writing stage (issue #403 follow-up). The draft state
+  // stays HERE, so it survives entering and leaving the stage.
+  const [writingFullscreen, setWritingFullscreen] = useState(false);
   const pulseColor = alpha(theme.qnop.brand.blue, 0.5);
 
-  const submit = () => {
+  const submit = (onDone?: () => void) => {
     const body = draft.trim();
     if (!body || addComment.isPending) return;
     addComment.mutate(body, {
-      onSuccess: () => setDraft(''),
+      onSuccess: () => {
+        setDraft('');
+        onDone?.();
+      },
       onError: (error) => {
         const code = apiErrorCode(error);
         notify(
@@ -128,6 +135,22 @@ export function CommentThread({
       },
     });
   };
+
+  const sendAction = (onDone?: () => void) => (
+    <Tooltip title={`Send (${submitShortcutLabel()})`}>
+      <span>
+        <IconButton
+          size="small"
+          aria-label="Comment"
+          color="primary"
+          onClick={() => submit(onDone)}
+          disabled={!draft.trim() || addComment.isPending}
+        >
+          <SendHorizontal size={16} />
+        </IconButton>
+      </span>
+    </Tooltip>
+  );
 
   const comments = useMemo(() => commentsQuery.data?.comments ?? [], [commentsQuery.data]);
   // With the opening annotation living in the head card (issue #403), the
@@ -320,30 +343,66 @@ export function CommentThread({
               <MarkdownComposer
                 value={draft}
                 onChange={setDraft}
-                onSubmit={submit}
+                onSubmit={() => submit()}
                 inputAriaLabel="Add a comment"
                 minRows={3}
                 onUploadAttachment={uploadAttachment}
-                actions={
-                  <Tooltip title={`Send (${submitShortcutLabel()})`}>
-                    <span>
-                      <IconButton
-                        size="small"
-                        aria-label="Comment"
-                        color="primary"
-                        onClick={submit}
-                        disabled={!draft.trim() || addComment.isPending}
-                      >
-                        <SendHorizontal size={16} />
-                      </IconButton>
-                    </span>
-                  </Tooltip>
-                }
+                onToggleFullscreen={() => setWritingFullscreen(true)}
+                actions={sendAction()}
               />
             </Box>
           </Stack>
         )}
       </Stack>
+      {/* The full-screen writing stage (issue #403 follow-up): the same
+          controlled draft on a reading-wide column, with the whole discussion
+          — opener included — in the context rail. Sending closes the stage. */}
+      <FullscreenComposerDialog
+        open={writingFullscreen}
+        onClose={() => setWritingFullscreen(false)}
+        title="Write a reply"
+        contextTitle={`Discussion (${comments.length})`}
+        context={
+          <Stack spacing={2}>
+            {comments.map((comment) => {
+              const own = comment.authorId === userId;
+              const name = own
+                ? (displayName ?? 'You')
+                : (comment.authorDisplayName ?? 'Participant');
+              return (
+                <CommentMessage
+                  key={comment.id}
+                  name={name}
+                  own={own}
+                  avatarUrl={avatarUrl}
+                  body={comment.body}
+                  createdAt={comment.createdAt}
+                  notify={notify}
+                />
+              );
+            })}
+            {comments.length === 0 && (
+              <Typography variant="body2" color="text.secondary">
+                No comments yet.
+              </Typography>
+            )}
+          </Stack>
+        }
+      >
+        <MarkdownComposer
+          value={draft}
+          onChange={setDraft}
+          onSubmit={() => submit(() => setWritingFullscreen(false))}
+          inputAriaLabel="Add a comment"
+          minRows={12}
+          maxRows={26}
+          roomy
+          onUploadAttachment={uploadAttachment}
+          fullscreen
+          onToggleFullscreen={() => setWritingFullscreen(false)}
+          actions={sendAction(() => setWritingFullscreen(false))}
+        />
+      </FullscreenComposerDialog>
     </Box>
   );
 }

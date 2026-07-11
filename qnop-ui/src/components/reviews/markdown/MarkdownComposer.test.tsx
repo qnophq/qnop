@@ -31,10 +31,12 @@ import type { UploadedAttachment } from './useCommentAttachmentUpload';
 function Host({
   onSubmit,
   onUploadAttachment,
+  onToggleFullscreen,
   initial = '',
 }: {
   onSubmit?: () => void;
   onUploadAttachment?: (file: File) => Promise<UploadedAttachment>;
+  onToggleFullscreen?: () => void;
   initial?: string;
 }) {
   const [value, setValue] = useState(initial);
@@ -45,6 +47,7 @@ function Host({
         onChange={setValue}
         onSubmit={onSubmit}
         onUploadAttachment={onUploadAttachment}
+        onToggleFullscreen={onToggleFullscreen}
         inputAriaLabel="Test comment"
       />
     </ThemeProvider>
@@ -235,5 +238,19 @@ describe('MarkdownComposer — attachments (issue #446)', () => {
     fireEvent.paste(textarea(), { clipboardData: { files: [file] } });
 
     await waitFor(() => expect(upload).toHaveBeenCalledWith(file));
+  });
+
+  it('offers the full-screen toggle only when the host provides one (issue #403)', () => {
+    render(<Host />);
+    expect(screen.queryByRole('button', { name: 'Full screen' })).not.toBeInTheDocument();
+  });
+
+  it('fires the full-screen toggle', () => {
+    const onToggleFullscreen = vi.fn();
+    render(<Host onToggleFullscreen={onToggleFullscreen} />);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Full screen' }));
+
+    expect(onToggleFullscreen).toHaveBeenCalledTimes(1);
   });
 });
