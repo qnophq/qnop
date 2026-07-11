@@ -25,8 +25,10 @@ import io.qnop.api.v1.model.DashboardActivity;
 import io.qnop.api.v1.model.DashboardReply;
 import io.qnop.api.v1.model.DashboardResponse;
 import io.qnop.api.v1.model.DashboardStats;
+import io.qnop.service.avatar.AvatarService;
 import io.qnop.service.review.DashboardService;
 import java.time.ZoneOffset;
+import java.util.UUID;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -38,9 +40,11 @@ import org.springframework.web.bind.annotation.RestController;
 public class DashboardController implements DashboardApi {
 
   private final DashboardService dashboard;
+  private final AvatarService avatars;
 
-  public DashboardController(DashboardService dashboard) {
+  public DashboardController(DashboardService dashboard, AvatarService avatars) {
     this.dashboard = dashboard;
+    this.avatars = avatars;
   }
 
   @Override
@@ -48,31 +52,43 @@ public class DashboardController implements DashboardApi {
     DashboardService.DashboardView view = dashboard.overview(CurrentUser.requireUserId());
     return ResponseEntity.ok(
         new DashboardResponse()
-            .replies(view.replies().stream().map(DashboardController::toDto).toList())
-            .activity(view.activity().stream().map(DashboardController::toDto).toList())
+            .replies(view.replies().stream().map(this::toDto).toList())
+            .activity(view.activity().stream().map(this::toDto).toList())
             .stats(new DashboardStats().resolvedThisWeek(view.resolvedThisWeek())));
   }
 
-  private static DashboardReply toDto(DashboardService.ReplyView view) {
+  private DashboardReply toDto(DashboardService.ReplyView view) {
     return new DashboardReply()
         .commentId(view.commentId())
         .annotationId(view.annotationId())
         .documentId(view.documentId())
         .documentTitle(view.documentTitle())
         .documentSlug(view.documentSlug())
+        .authorId(view.authorId())
+        .authorAvatarUrl(avatarUrlOf(view.authorId()))
         .authorDisplayName(view.authorDisplayName())
         .body(view.body())
         .annotationExcerpt(view.annotationExcerpt())
         .createdAt(view.createdAt().atOffset(ZoneOffset.UTC));
   }
 
-  private static DashboardActivity toDto(DashboardService.ActivityView view) {
+  private DashboardActivity toDto(DashboardService.ActivityView view) {
     return new DashboardActivity()
         .type(view.type())
         .documentId(view.documentId())
         .documentTitle(view.documentTitle())
         .documentSlug(view.documentSlug())
+        .actorId(view.actorId())
+        .actorAvatarUrl(avatarUrlOf(view.actorId()))
         .actorDisplayName(view.actorDisplayName())
         .createdAt(view.createdAt().atOffset(ZoneOffset.UTC));
+  }
+
+  /** Null for anonymised identities (no id) and for users without an uploaded avatar. */
+  private String avatarUrlOf(UUID userId) {
+    if (userId == null) {
+      return null;
+    }
+    return AvatarUrls.forUser(userId, avatars.updatedAt(userId).orElse(null));
   }
 }

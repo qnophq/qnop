@@ -148,6 +148,10 @@ export function crumbsFor(pathname: string): Crumb[] {
   if (pathname === '/') {
     return [{ label: 'Dashboard' }];
   }
+  // A colleague's public profile (issue #454) — never show the raw id.
+  if (pathname.startsWith('/users/')) {
+    return [{ label: 'Profile' }];
+  }
   for (const group of NAV_GROUPS) {
     // Exact match, or a detail page nested under an item (e.g. /admin/teams/:id):
     // both resolve to the item's section context (the id segment is not shown).

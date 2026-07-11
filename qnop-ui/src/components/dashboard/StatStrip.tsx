@@ -21,14 +21,17 @@
 
 import Box from '@mui/material/Box';
 import Paper from '@mui/material/Paper';
+import Stack from '@mui/material/Stack';
 import Typography from '@mui/material/Typography';
 import { alpha, useTheme } from '@mui/material/styles';
+import type { LucideIcon } from 'lucide-react';
 
 export interface StatTile {
   label: string;
   value: number;
-  /** Colours the value once it deserves attention (e.g. anything overdue). */
-  tone?: 'accent' | 'warning' | 'danger';
+  icon: LucideIcon;
+  /** Colours the tile once it deserves attention (e.g. anything overdue). */
+  tone?: 'accent' | 'warning' | 'danger' | 'success';
 }
 
 /**
@@ -43,9 +46,11 @@ export function StatStrip({ tiles }: { tiles: StatTile[] }) {
       ? theme.palette.error.main
       : tone === 'warning'
         ? theme.palette.warning.main
-        : tone === 'accent'
-          ? theme.qnop.brand.blue
-          : theme.palette.text.primary;
+        : tone === 'success'
+          ? theme.palette.success.main
+          : tone === 'accent'
+            ? theme.qnop.brand.blue
+            : theme.palette.text.primary;
 
   return (
     <Box
@@ -55,34 +60,60 @@ export function StatStrip({ tiles }: { tiles: StatTile[] }) {
         gap: 1.5,
       }}
     >
-      {tiles.map((tile) => (
-        <Paper
-          key={tile.label}
-          variant="outlined"
-          sx={{
-            px: 2,
-            py: 1.5,
-            borderRadius: '10px',
-            bgcolor:
-              tile.tone && tile.value > 0 ? alpha(toneColor(tile.tone), 0.05) : 'background.paper',
-          }}
-        >
-          <Typography
+      {tiles.map((tile) => {
+        const active = tile.tone && tile.value > 0;
+        const color = toneColor(tile.tone);
+        const Icon = tile.icon;
+        return (
+          <Paper
+            key={tile.label}
+            variant="outlined"
             sx={{
-              fontSize: '1.5rem',
-              fontWeight: 800,
-              lineHeight: 1.2,
-              fontVariantNumeric: 'tabular-nums',
-              color: tile.value > 0 ? toneColor(tile.tone) : 'text.primary',
+              px: 2,
+              py: 1.5,
+              borderRadius: '12px',
+              bgcolor: active ? alpha(color, 0.05) : 'background.paper',
+              borderColor: active ? alpha(color, 0.35) : 'divider',
             }}
           >
-            {tile.value}
-          </Typography>
-          <Typography variant="caption" color="text.secondary" noWrap component="p">
-            {tile.label}
-          </Typography>
-        </Paper>
-      ))}
+            <Stack direction="row" spacing={1.5} sx={{ alignItems: 'center' }}>
+              {/* A playful tinted round — the tile's mood at a glance. */}
+              <Box
+                aria-hidden
+                sx={{
+                  width: 34,
+                  height: 34,
+                  borderRadius: '10px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  flexShrink: 0,
+                  color: active ? color : 'text.secondary',
+                  bgcolor: alpha(active ? color : theme.palette.text.secondary, 0.1),
+                }}
+              >
+                <Icon size={16} />
+              </Box>
+              <Box sx={{ minWidth: 0 }}>
+                <Typography
+                  sx={{
+                    fontSize: '1.4rem',
+                    fontWeight: 800,
+                    lineHeight: 1.2,
+                    fontVariantNumeric: 'tabular-nums',
+                    color: tile.value > 0 ? color : 'text.primary',
+                  }}
+                >
+                  {tile.value}
+                </Typography>
+                <Typography variant="caption" color="text.secondary" noWrap component="p">
+                  {tile.label}
+                </Typography>
+              </Box>
+            </Stack>
+          </Paper>
+        );
+      })}
     </Box>
   );
 }

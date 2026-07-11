@@ -29,7 +29,7 @@ import { useNavigate } from 'react-router-dom';
 import type { DashboardReply } from '../../api/generated';
 import { shortRelativeTime } from '../../utils/relativeTime';
 import { SectionCard } from '../admin/layout/SectionCard';
-import { UserAvatar } from '../shell/UserAvatar';
+import { PersonLink } from './PersonLink';
 import { reviewPath } from './dashboardModel';
 
 interface RepliesCardProps {
@@ -76,18 +76,13 @@ export function RepliesCard({ replies }: RepliesCardProps) {
               }}
             >
               <Stack direction="row" spacing={1.25} sx={{ alignItems: 'flex-start', minWidth: 0 }}>
-                <Box sx={{ pt: 0.25 }}>
-                  <UserAvatar name={reply.authorDisplayName ?? 'Participant'} size={26} />
-                </Box>
                 <Box sx={{ flex: 1, minWidth: 0 }}>
                   <Stack direction="row" spacing={0.75} sx={{ alignItems: 'center', minWidth: 0 }}>
-                    <Typography
-                      component="span"
-                      noWrap
-                      sx={{ fontWeight: 700, fontSize: '0.85rem' }}
-                    >
-                      {reply.authorDisplayName ?? 'Participant'}
-                    </Typography>
+                    <PersonLink
+                      userId={reply.authorId}
+                      name={reply.authorDisplayName ?? 'Participant'}
+                      avatarUrl={reply.authorAvatarUrl}
+                    />
                     <Typography component="span" variant="caption" color="text.secondary" noWrap>
                       in {reply.documentTitle} · {shortRelativeTime(reply.createdAt)}
                     </Typography>

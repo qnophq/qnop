@@ -25,7 +25,7 @@ import Chip from '@mui/material/Chip';
 import Skeleton from '@mui/material/Skeleton';
 import Stack from '@mui/material/Stack';
 import Typography from '@mui/material/Typography';
-import { FileText, History, Inbox, Plus, UserCheck } from 'lucide-react';
+import { CalendarClock, FileText, History, Inbox, Plus, Trophy, UserCheck } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useDashboard } from '../api/hooks/useDashboard';
 import { useReviews } from '../api/hooks/useReviews';
@@ -34,6 +34,7 @@ import {
   deadlines,
   dueUrgency,
   greeting,
+  greetingEmoji,
   myReviews,
   reviewPath,
   waitingOnYou,
@@ -90,7 +91,10 @@ export function HomePage() {
       <Box>
         <Typography variant="h1">
           {greeting(new Date().getHours())}
-          {firstName ? `, ${firstName}` : ''}.
+          {firstName ? `, ${firstName}` : ''}.{' '}
+          <Box component="span" aria-hidden sx={{ fontSize: '0.8em' }}>
+            {greetingEmoji(new Date().getHours())}
+          </Box>
         </Typography>
         <Typography color="text.secondary" sx={{ mt: 0.5 }}>
           {DATE_FORMAT.format(new Date())}
@@ -152,16 +156,20 @@ export function HomePage() {
               {
                 label: 'Open reviews',
                 value: reviews.filter((r) => isOpenWorkflowState(r.workflowState)).length,
+                icon: Inbox,
               },
-              { label: 'Waiting on you', value: waiting.length, tone: 'accent' },
+              { label: 'Waiting on you', value: waiting.length, tone: 'accent', icon: UserCheck },
               {
                 label: 'Due soon',
                 value: dueSoonCount,
                 tone: overdueCount > 0 ? 'danger' : 'warning',
+                icon: CalendarClock,
               },
               {
                 label: 'Resolved this week',
                 value: dashboardQuery.data?.stats.resolvedThisWeek ?? 0,
+                tone: 'success',
+                icon: Trophy,
               },
             ]}
           />
@@ -200,6 +208,7 @@ export function HomePage() {
                 description="Reviews you are asked to work through."
                 reviews={waiting}
                 emptyText="Nothing waits on you — enjoy the quiet."
+                celebrateEmpty
               />
               <ReviewListCard
                 icon={FileText}

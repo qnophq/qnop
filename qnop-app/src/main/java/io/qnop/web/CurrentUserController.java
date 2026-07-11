@@ -22,13 +22,19 @@ package io.qnop.web;
 
 import io.qnop.api.v1.endpoint.UsersApi;
 import io.qnop.api.v1.model.CurrentUserResponse;
+import io.qnop.api.v1.model.ErrorResponse;
+import io.qnop.api.v1.model.PublicUserProfile;
 import io.qnop.api.v1.model.UserRole;
 import io.qnop.api.v1.model.UserSource;
+import io.qnop.service.UserNotFoundException;
 import io.qnop.service.UserService;
+import io.qnop.service.UserService.PublicUserProfileView;
 import io.qnop.service.UserService.UserProfileView;
 import io.qnop.service.avatar.AvatarService;
 import java.util.UUID;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestController;
 
 /**
@@ -60,5 +66,23 @@ public class CurrentUserController implements UsersApi {
             .role(UserRole.fromValue(profile.role()))
             .source(UserSource.fromValue(profile.source()))
             .avatarUrl(AvatarUrls.forUser(userId, avatars.updatedAt(userId).orElse(null))));
+  }
+
+  @Override
+  public ResponseEntity<PublicUserProfile> getUserProfile(UUID userId) {
+    CurrentUser.requireUserId(); // signed-in colleagues only, any role
+    PublicUserProfileView profile = users.getPublicProfile(userId);
+    return ResponseEntity.ok(
+        new PublicUserProfile()
+            .id(profile.id())
+            .displayName(profile.displayName())
+            .avatarUrl(AvatarUrls.forUser(userId, avatars.updatedAt(userId).orElse(null)))
+            .createdAt(profile.createdAt().atOffset(java.time.ZoneOffset.UTC)));
+  }
+
+  @ExceptionHandler(UserNotFoundException.class)
+  public ResponseEntity<ErrorResponse> onUserNotFound(UserNotFoundException ex) {
+    return ResponseEntity.status(HttpStatus.NOT_FOUND)
+        .body(new ErrorResponse().code("USER_NOT_FOUND").message("No such user."));
   }
 }

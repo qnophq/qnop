@@ -117,9 +117,12 @@ class DashboardApiIT extends SeededIntegrationTest {
         .andExpect(jsonPath("$.replies[0].body").value("after I joined"))
         .andExpect(jsonPath("$.replies[0].annotationExcerpt").value("their concern"))
         .andExpect(jsonPath("$.replies[0].documentTitle").value("Master services agreement"))
-        // …then the reply on my own annotation.
+        // …then the reply on my own annotation — with the author's REAL id and
+        // name (this review is not anonymous, issue #413/#454).
         .andExpect(jsonPath("$.replies[1].body").value("will do"))
-        .andExpect(jsonPath("$.replies[1].annotationId").value(mine));
+        .andExpect(jsonPath("$.replies[1].annotationId").value(mine))
+        .andExpect(jsonPath("$.replies[1].authorId").value(AUDITOR_ID.toString()))
+        .andExpect(jsonPath("$.replies[1].authorDisplayName").value("Avery Auditor"));
   }
 
   @Test
@@ -145,6 +148,7 @@ class DashboardApiIT extends SeededIntegrationTest {
         // Newest first: MEMBER's resolve, then MEMBER's creation — AUDITOR's own
         // annotation.created is filtered out.
         .andExpect(jsonPath("$.activity[0].type").value("annotation.resolved"))
+        .andExpect(jsonPath("$.activity[0].actorId").value(MEMBER_ID.toString()))
         .andExpect(jsonPath("$.activity[0].actorDisplayName").value("Mia Member"));
 
     mockMvc

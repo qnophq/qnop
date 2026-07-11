@@ -1503,6 +1503,40 @@ paths:
                 $ref: '#/components/schemas/ErrorResponse'
         '429':
           $ref: '#/components/responses/TooManyRequests'
+  /users/{userId}:
+    get:
+      tags:
+        - Users
+      summary: A user's workspace-public profile
+      description: |
+        The lean slice any signed-in user may see about a colleague (issue
+        #454): display name, avatar and tenure — no email, role or source.
+        Backs the profile links on dashboards and review surfaces.
+      operationId: getUserProfile
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: userId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: The user's public profile
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PublicUserProfile'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          description: Unknown user
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
   /users/me:
     get:
       tags:
@@ -3379,6 +3413,25 @@ components:
       enum:
         - INTERNAL
         - EXTERNAL
+    PublicUserProfile:
+      type: object
+      description: The workspace-public slice of a user (issue #454).
+      required:
+        - id
+        - displayName
+        - createdAt
+      properties:
+        id:
+          type: string
+          format: uuid
+        displayName:
+          type: string
+        avatarUrl:
+          type: string
+          nullable: true
+        createdAt:
+          type: string
+          format: date-time
     CurrentUserResponse:
       type: object
       description: The authenticated user's own profile.
@@ -4049,6 +4102,18 @@ components:
         documentSlug:
           type: string
           nullable: true
+        authorId:
+          type: string
+          format: uuid
+          nullable: true
+          description: >-
+            The author's REAL user id — null when the review anonymises this
+            author towards the caller (issue #413); the client links and loads
+            avatars only when present.
+        authorAvatarUrl:
+          type: string
+          nullable: true
+          description: The author's avatar URL, when identifiable and uploaded.
         authorDisplayName:
           type: string
           nullable: true
@@ -4086,6 +4151,15 @@ components:
         documentSlug:
           type: string
           nullable: true
+        actorId:
+          type: string
+          format: uuid
+          nullable: true
+          description: The actor's REAL user id — null when anonymised (issue #413).
+        actorAvatarUrl:
+          type: string
+          nullable: true
+          description: The actor's avatar URL, when identifiable and uploaded.
         actorDisplayName:
           type: string
           nullable: true

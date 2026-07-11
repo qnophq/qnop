@@ -37,6 +37,7 @@ import Link from '@mui/material/Link';
 import type { DashboardActivity } from '../../api/generated';
 import { shortRelativeTime } from '../../utils/relativeTime';
 import { SectionCard } from '../admin/layout/SectionCard';
+import { PersonLink } from './PersonLink';
 import { activityPhrase, reviewPath } from './dashboardModel';
 
 const TYPE_ICONS: Record<string, LucideIcon> = {
@@ -84,6 +85,15 @@ export function ActivityCard({ activity }: ActivityCardProps) {
                   sx={{ color: theme.palette.text.secondary, pt: 0.25, flexShrink: 0 }}
                 >
                   <Icon size={14} />
+                </Box>
+                <Box sx={{ pt: '1px', flexShrink: 0 }}>
+                  <PersonLink
+                    userId={item.actorId}
+                    name={item.actorDisplayName ?? 'Someone'}
+                    avatarUrl={item.actorAvatarUrl}
+                    size={20}
+                    avatarOnly
+                  />
                 </Box>
                 <Typography variant="body2" sx={{ minWidth: 0, color: 'text.secondary' }}>
                   <Typography

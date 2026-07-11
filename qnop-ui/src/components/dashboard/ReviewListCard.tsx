@@ -24,13 +24,13 @@ import ButtonBase from '@mui/material/ButtonBase';
 import Stack from '@mui/material/Stack';
 import Typography from '@mui/material/Typography';
 import { alpha, useTheme } from '@mui/material/styles';
-import { CircleCheck, type LucideIcon } from 'lucide-react';
+import { CircleCheck, PartyPopper, type LucideIcon } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import type { DocumentSummary } from '../../api/generated';
 import { ToneBadge } from '../admin/ToneBadge';
 import { SectionCard } from '../admin/layout/SectionCard';
 import { DueDateLabel } from '../reviews/DueDateLabel';
-import { ProgressBar } from '../reviews/list/ReviewListParts';
+import { ProgressBar, ReviewerStack } from '../reviews/list/ReviewListParts';
 import { progressOf } from '../reviews/list/reviewListModel';
 import { WORKFLOW_TONES, workflowLabel } from '../reviews/workflowMeta';
 import { readyToFinalize, reviewPath } from './dashboardModel';
@@ -45,6 +45,8 @@ interface ReviewListCardProps {
   ownerCues?: boolean;
   /** Caps the visible rows; the card stays a glance, not a second list page. */
   maxRows?: number;
+  /** Turns the empty state into a small celebration — earned quiet, not absence. */
+  celebrateEmpty?: boolean;
 }
 
 /**
@@ -60,6 +62,7 @@ export function ReviewListCard({
   emptyText,
   ownerCues = false,
   maxRows = 5,
+  celebrateEmpty = false,
 }: ReviewListCardProps) {
   const theme = useTheme();
   const navigate = useNavigate();
@@ -68,9 +71,33 @@ export function ReviewListCard({
   return (
     <SectionCard icon={icon} title={title} description={description}>
       {visible.length === 0 ? (
-        <Typography variant="body2" color="text.secondary">
-          {emptyText}
-        </Typography>
+        celebrateEmpty ? (
+          <Stack spacing={1} sx={{ alignItems: 'center', py: 2 }}>
+            <Box
+              aria-hidden
+              sx={{
+                width: 44,
+                height: 44,
+                borderRadius: '50%',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                color: theme.palette.success.main,
+                bgcolor: alpha(theme.palette.success.main, 0.12),
+              }}
+            >
+              <PartyPopper size={20} />
+            </Box>
+            <Typography sx={{ fontWeight: 700 }}>All caught up!</Typography>
+            <Typography variant="body2" color="text.secondary">
+              {emptyText}
+            </Typography>
+          </Stack>
+        ) : (
+          <Typography variant="body2" color="text.secondary">
+            {emptyText}
+          </Typography>
+        )
       ) : (
         <Stack spacing={0.5} sx={{ mx: -1 }}>
           {visible.map((review) => {
@@ -127,6 +154,7 @@ export function ReviewListCard({
                     </Typography>
                   )}
                   <Box sx={{ flex: 1 }} />
+                  <ReviewerStack participants={review.participants ?? []} />
                   <DueDateLabel dueAt={review.dueAt} workflowState={review.workflowState} />
                 </Stack>
               </ButtonBase>

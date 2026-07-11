@@ -124,6 +124,13 @@ export function greeting(hour: number): string {
   return 'Good evening';
 }
 
+/** The greeting's small companion — one emoji, matched to the hour. */
+export function greetingEmoji(hour: number): string {
+  if (hour < 11) return '☀️';
+  if (hour < 18) return '👋';
+  return '🌙';
+}
+
 /** The review page path — the slug when one exists, the id otherwise. */
 export function reviewPath(review: { id: string; slug?: string | null }): string {
   return `/reviews/${review.slug ?? review.id}`;

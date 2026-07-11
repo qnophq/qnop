@@ -96,24 +96,30 @@ public class DashboardService {
     this.identity = identity;
   }
 
-  /** One reply by someone else in a thread the caller started or joined. */
+  /**
+   * One reply by someone else in a thread the caller started or joined. {@code authorId} is the
+   * REAL user id when the review does not anonymise the author towards the caller, and null for a
+   * pseudonymised identity (issue #413) — the client links and loads avatars only when present.
+   */
   public record ReplyView(
       UUID commentId,
       UUID annotationId,
       UUID documentId,
       String documentTitle,
       String documentSlug,
+      UUID authorId,
       String authorDisplayName,
       String body,
       String annotationExcerpt,
       Instant createdAt) {}
 
-  /** One feed entry from the audit trail of the caller's reviews. */
+  /** One feed entry from the audit trail; {@code actorId} follows the same anonymity rule. */
   public record ActivityView(
       String type,
       UUID documentId,
       String documentTitle,
       String documentSlug,
+      UUID actorId,
       String actorDisplayName,
       Instant createdAt) {}
 
@@ -173,13 +179,16 @@ public class DashboardService {
             comment -> {
               Annotation annotation = annotationById.get(comment.getAnnotationId());
               Document document = documentById.get(annotation.getDocumentId());
+              ReviewIdentityResolver.ReviewIdentities documentIdentities =
+                  identitiesOf.apply(document.getId());
               return new ReplyView(
                   comment.getId(),
                   comment.getAnnotationId(),
                   document.getId(),
                   document.getTitle(),
                   document.getSlug(),
-                  identitiesOf.apply(document.getId()).displayName(comment.getAuthorId()),
+                  realIdOrNull(documentIdentities, comment.getAuthorId()),
+                  documentIdentities.displayName(comment.getAuthorId()),
                   excerpt(comment.getBody(), REPLY_EXCERPT_CHARS),
                   contextByAnnotation.get(comment.getAnnotationId()),
                   comment.getCreatedAt());
@@ -203,6 +212,8 @@ public class DashboardService {
         .map(
             event -> {
               Document document = documentById.get(event.getDocumentId());
+              ReviewIdentityResolver.ReviewIdentities documentIdentities =
+                  identitiesOf.apply(document.getId());
               return new ActivityView(
                   event.getEventType(),
                   document.getId(),
@@ -210,7 +221,10 @@ public class DashboardService {
                   document.getSlug(),
                   event.getActorId() == null
                       ? null
-                      : identitiesOf.apply(document.getId()).displayName(event.getActorId()),
+                      : realIdOrNull(documentIdentities, event.getActorId()),
+                  event.getActorId() == null
+                      ? null
+                      : documentIdentities.displayName(event.getActorId()),
                   event.getCreatedAt());
             })
         .toList();
@@ -229,6 +243,16 @@ public class DashboardService {
       return true;
     }
     return document.getOwnerId().equals(actor);
+  }
+
+  /**
+   * The id the caller may see: the real user id when the identities expose it unchanged, null when
+   * the review pseudonymises this author towards the caller (issue #413) — a pseudonym token must
+   * neither link to a profile nor load an avatar.
+   */
+  private static UUID realIdOrNull(
+      ReviewIdentityResolver.ReviewIdentities identities, UUID userId) {
+    return userId.equals(identities.exposedAuthorId(userId)) ? userId : null;
   }
 
   private static String excerpt(String body, int max) {
