@@ -104,7 +104,8 @@ export function AnnotationHoverCard({ annotation, getAnchorPosition }: Annotatio
             width: 320,
             borderRadius: 0.75,
             border: `1px solid ${theme.palette.divider}`,
-            boxShadow: '0 12px 32px -8px rgba(1, 32, 66, 0.25)',
+            boxShadow:
+              theme.palette.mode === 'light' ? '0 12px 32px -8px rgba(1, 32, 66, 0.25)' : 'none',
             overflow: 'hidden',
           },
         },

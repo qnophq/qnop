@@ -68,13 +68,19 @@ const light = {
   borderStrong: '#CBD4DF',
 } as const;
 
+// Black-based neutral ramp (issue #423): a near-black base with a hair of
+// cool temperature (not clinical #000), surfaces raised in even neutral
+// steps, and an untinted text ramp. Calibrated programmatically: fg ≥15:1,
+// fg2 ≥8:1, fg3 ≥4.9:1 on every surface; brand blue reads at ≥5.1:1 and all
+// badge fgDark tones at ≥6.4:1 on their tinted surfaces. The borders were
+// already neutral white-alpha and carry over unchanged.
 const dark = {
-  bg: '#0A1828',
-  surface: '#0F2340',
-  surface2: '#132A4A',
-  fg: '#EAF1FA',
-  fg2: '#B9C6D4',
-  fg3: '#7A8BA0',
+  bg: '#0B0C0E',
+  surface: '#141518',
+  surface2: '#1C1D21',
+  fg: '#F2F3F5',
+  fg2: '#B4B8BF',
+  fg3: '#878B93',
   border: 'rgba(255,255,255,0.08)',
   borderStrong: 'rgba(255,255,255,0.14)',
 } as const;

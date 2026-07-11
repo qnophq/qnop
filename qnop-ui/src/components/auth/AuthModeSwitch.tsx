@@ -56,7 +56,7 @@ export function AuthModeSwitch({ active }: { active: Mode }) {
             to={to}
             replace
             aria-current={isActive ? 'page' : undefined}
-            sx={{
+            sx={(theme) => ({
               flex: 1,
               height: 38,
               display: 'flex',
@@ -70,9 +70,12 @@ export function AuthModeSwitch({ active }: { active: Mode }) {
               transition: 'all .15s',
               color: isActive ? 'text.primary' : 'text.secondary',
               bgcolor: isActive ? 'background.paper' : 'transparent',
-              boxShadow: isActive ? '0 1px 3px rgba(1,32,66,0.10)' : 'none',
+              boxShadow:
+                isActive && theme.palette.mode === 'light'
+                  ? '0 1px 3px rgba(1,32,66,0.10)'
+                  : 'none',
               '&:hover': { color: isActive ? 'text.primary' : 'text.primary' },
-            }}
+            })}
           >
             {label}
           </Box>

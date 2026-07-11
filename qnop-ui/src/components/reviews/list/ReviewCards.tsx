@@ -72,7 +72,10 @@ export function ReviewCards({ reviews, userId, onOpen }: ReviewCardsProps) {
               '@media (prefers-reduced-motion: reduce)': { transition: 'none' },
               '&:hover': {
                 transform: 'translateY(-3px)',
-                boxShadow: '0 14px 36px -14px rgba(1, 32, 66, 0.22)',
+                boxShadow:
+                  theme.palette.mode === 'light'
+                    ? '0 14px 36px -14px rgba(1, 32, 66, 0.22)'
+                    : 'none',
                 borderColor: theme.palette.text.disabled,
               },
               '&:focus-visible': { boxShadow: theme.qnop.focusRing },
