@@ -37,6 +37,8 @@ import Link from '@mui/material/Link';
 import type { DashboardActivity } from '../../api/generated';
 import { shortRelativeTime } from '../../utils/relativeTime';
 import { SectionCard } from '../admin/layout/SectionCard';
+import { CardScroller } from './CardScroller';
+import { CountPill } from './CountPill';
 import { PersonLink } from './PersonLink';
 import { activityPhrase, reviewPath } from './dashboardModel';
 
@@ -64,60 +66,63 @@ export function ActivityCard({ activity }: ActivityCardProps) {
       icon={Activity}
       title="Recent activity"
       description="What happened across your reviews."
+      action={<CountPill value={activity.length} />}
     >
       {activity.length === 0 ? (
         <Typography variant="body2" color="text.secondary">
           Nothing new — you are all caught up.
         </Typography>
       ) : (
-        <Stack spacing={1.25}>
-          {activity.map((item, index) => {
-            const Icon = TYPE_ICONS[item.type] ?? Activity;
-            return (
-              <Stack
-                key={`${item.type}-${item.createdAt}-${index}`}
-                direction="row"
-                spacing={1.25}
-                sx={{ alignItems: 'flex-start', minWidth: 0 }}
-              >
-                <Box
-                  aria-hidden
-                  sx={{ color: theme.palette.text.secondary, pt: 0.25, flexShrink: 0 }}
+        <CardScroller>
+          <Stack spacing={1.25}>
+            {activity.map((item, index) => {
+              const Icon = TYPE_ICONS[item.type] ?? Activity;
+              return (
+                <Stack
+                  key={`${item.type}-${item.createdAt}-${index}`}
+                  direction="row"
+                  spacing={1.25}
+                  sx={{ alignItems: 'flex-start', minWidth: 0 }}
                 >
-                  <Icon size={14} />
-                </Box>
-                <Box sx={{ pt: '1px', flexShrink: 0 }}>
-                  <PersonLink
-                    userId={item.actorId}
-                    name={item.actorDisplayName ?? 'Someone'}
-                    avatarUrl={item.actorAvatarUrl}
-                    size={20}
-                    avatarOnly
-                  />
-                </Box>
-                <Typography variant="body2" sx={{ minWidth: 0, color: 'text.secondary' }}>
-                  <Typography
-                    component="span"
-                    variant="body2"
-                    sx={{ fontWeight: 600, color: 'text.primary' }}
+                  <Box
+                    aria-hidden
+                    sx={{ color: theme.palette.text.secondary, pt: 0.25, flexShrink: 0 }}
                   >
-                    {item.actorDisplayName ?? 'Someone'}
-                  </Typography>{' '}
-                  {activityPhrase(item.type)}{' '}
-                  <Link
-                    component={RouterLink}
-                    to={reviewPath({ id: item.documentId, slug: item.documentSlug })}
-                    underline="hover"
-                    sx={{ fontWeight: 600 }}
-                  >
-                    {item.documentTitle}
-                  </Link>{' '}
-                  · {shortRelativeTime(item.createdAt)}
-                </Typography>
-              </Stack>
-            );
-          })}
-        </Stack>
+                    <Icon size={14} />
+                  </Box>
+                  <Box sx={{ pt: '1px', flexShrink: 0 }}>
+                    <PersonLink
+                      userId={item.actorId}
+                      name={item.actorDisplayName ?? 'Someone'}
+                      avatarUrl={item.actorAvatarUrl}
+                      size={20}
+                      avatarOnly
+                    />
+                  </Box>
+                  <Typography variant="body2" sx={{ minWidth: 0, color: 'text.secondary' }}>
+                    <Typography
+                      component="span"
+                      variant="body2"
+                      sx={{ fontWeight: 600, color: 'text.primary' }}
+                    >
+                      {item.actorDisplayName ?? 'Someone'}
+                    </Typography>{' '}
+                    {activityPhrase(item.type)}{' '}
+                    <Link
+                      component={RouterLink}
+                      to={reviewPath({ id: item.documentId, slug: item.documentSlug })}
+                      underline="hover"
+                      sx={{ fontWeight: 600 }}
+                    >
+                      {item.documentTitle}
+                    </Link>{' '}
+                    · {shortRelativeTime(item.createdAt)}
+                  </Typography>
+                </Stack>
+              );
+            })}
+          </Stack>
+        </CardScroller>
       )}
     </SectionCard>
   );

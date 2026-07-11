@@ -29,6 +29,8 @@ import { useNavigate } from 'react-router-dom';
 import type { DashboardReply } from '../../api/generated';
 import { shortRelativeTime } from '../../utils/relativeTime';
 import { SectionCard } from '../admin/layout/SectionCard';
+import { CardScroller } from './CardScroller';
+import { CountPill } from './CountPill';
 import { PersonLink } from './PersonLink';
 import { reviewPath } from './dashboardModel';
 
@@ -50,77 +52,88 @@ export function RepliesCard({ replies }: RepliesCardProps) {
       icon={MessagesSquare}
       title="Replies to you"
       description="The latest answers in discussions you started or joined."
+      action={<CountPill value={replies.length} />}
     >
       {replies.length === 0 ? (
         <Typography variant="body2" color="text.secondary">
           No new replies — your threads are quiet.
         </Typography>
       ) : (
-        <Stack spacing={0.5} sx={{ mx: -1 }}>
-          {replies.map((reply) => (
-            <ButtonBase
-              key={reply.commentId}
-              onClick={() =>
-                navigate(
-                  `${reviewPath({ id: reply.documentId, slug: reply.documentSlug })}` +
-                    `?annotation=${reply.annotationId}&comment=${reply.commentId}`,
-                )
-              }
-              sx={{
-                display: 'block',
-                textAlign: 'left',
-                borderRadius: '8px',
-                px: 1,
-                py: 0.75,
-                '&:hover': { bgcolor: alpha(theme.qnop.brand.blue, 0.05) },
-              }}
-            >
-              <Stack direction="row" spacing={1.25} sx={{ alignItems: 'flex-start', minWidth: 0 }}>
-                <Box sx={{ flex: 1, minWidth: 0 }}>
-                  <Stack direction="row" spacing={0.75} sx={{ alignItems: 'center', minWidth: 0 }}>
-                    <PersonLink
-                      userId={reply.authorId}
-                      name={reply.authorDisplayName ?? 'Participant'}
-                      avatarUrl={reply.authorAvatarUrl}
-                    />
-                    <Typography component="span" variant="caption" color="text.secondary" noWrap>
-                      in {reply.documentTitle} · {shortRelativeTime(reply.createdAt)}
-                    </Typography>
-                  </Stack>
-                  <Typography
-                    variant="body2"
-                    sx={{
-                      mt: 0.25,
-                      display: '-webkit-box',
-                      WebkitLineClamp: 2,
-                      WebkitBoxOrient: 'vertical',
-                      overflow: 'hidden',
-                    }}
-                  >
-                    {reply.body}
-                  </Typography>
-                  {reply.annotationExcerpt && (
+        <CardScroller>
+          <Stack spacing={0.5} sx={{ mx: -1 }}>
+            {replies.map((reply) => (
+              <ButtonBase
+                key={reply.commentId}
+                onClick={() =>
+                  navigate(
+                    `${reviewPath({ id: reply.documentId, slug: reply.documentSlug })}` +
+                      `?annotation=${reply.annotationId}&comment=${reply.commentId}`,
+                  )
+                }
+                sx={{
+                  display: 'block',
+                  textAlign: 'left',
+                  borderRadius: '8px',
+                  px: 1,
+                  py: 0.75,
+                  '&:hover': { bgcolor: alpha(theme.qnop.brand.blue, 0.05) },
+                }}
+              >
+                <Stack
+                  direction="row"
+                  spacing={1.25}
+                  sx={{ alignItems: 'flex-start', minWidth: 0 }}
+                >
+                  <Box sx={{ flex: 1, minWidth: 0 }}>
+                    <Stack
+                      direction="row"
+                      spacing={0.75}
+                      sx={{ alignItems: 'center', minWidth: 0 }}
+                    >
+                      <PersonLink
+                        userId={reply.authorId}
+                        name={reply.authorDisplayName ?? 'Participant'}
+                        avatarUrl={reply.authorAvatarUrl}
+                      />
+                      <Typography component="span" variant="caption" color="text.secondary" noWrap>
+                        in {reply.documentTitle} · {shortRelativeTime(reply.createdAt)}
+                      </Typography>
+                    </Stack>
                     <Typography
-                      variant="caption"
-                      noWrap
-                      component="p"
+                      variant="body2"
                       sx={{
                         mt: 0.25,
-                        color: 'text.secondary',
-                        fontStyle: 'italic',
-                        borderLeft: '2px solid',
-                        borderColor: 'divider',
-                        pl: 0.75,
+                        display: '-webkit-box',
+                        WebkitLineClamp: 2,
+                        WebkitBoxOrient: 'vertical',
+                        overflow: 'hidden',
                       }}
                     >
-                      {reply.annotationExcerpt}
+                      {reply.body}
                     </Typography>
-                  )}
-                </Box>
-              </Stack>
-            </ButtonBase>
-          ))}
-        </Stack>
+                    {reply.annotationExcerpt && (
+                      <Typography
+                        variant="caption"
+                        noWrap
+                        component="p"
+                        sx={{
+                          mt: 0.25,
+                          color: 'text.secondary',
+                          fontStyle: 'italic',
+                          borderLeft: '2px solid',
+                          borderColor: 'divider',
+                          pl: 0.75,
+                        }}
+                      >
+                        {reply.annotationExcerpt}
+                      </Typography>
+                    )}
+                  </Box>
+                </Stack>
+              </ButtonBase>
+            ))}
+          </Stack>
+        </CardScroller>
       )}
     </SectionCard>
   );
