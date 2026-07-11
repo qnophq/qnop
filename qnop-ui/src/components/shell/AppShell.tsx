@@ -43,15 +43,21 @@ export function AppShell() {
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('md'));
   // The document review workspace (#250), the version comparison (#252) and
-  // the tasks board (#393) span the full width; every other surface keeps the
-  // centred reading container. /reviews/new also matches the dynamic segment
-  // but is a regular centred page (the wizard, #251).
+  // the tasks board (#393) manage their own scrolling and tight padding.
+  // /reviews/new also matches the dynamic segment but is a regular page (the
+  // wizard, #251).
   const reviewMatch = useMatch('/reviews/:documentId');
   const compareMatch = useMatch('/reviews/:documentId/compare');
   const tasksMatch = useMatch('/reviews/:documentId/tasks');
   const fullBleed = Boolean(
     (reviewMatch && reviewMatch.params.documentId !== 'new') || compareMatch || tasksMatch,
   );
+  // The work surfaces share one width language (issue #454 follow-up): the
+  // dashboard and the reviews overview span the full width like the review
+  // workspace; admin and profile keep the centred reading container.
+  const dashboardMatch = useMatch('/');
+  const reviewsListMatch = useMatch('/reviews');
+  const wide = fullBleed || Boolean(dashboardMatch) || Boolean(reviewsListMatch);
   const [collapsed, setCollapsed] = useState<boolean>(() => {
     try {
       return localStorage.getItem(COLLAPSE_KEY) === '1';
@@ -129,7 +135,7 @@ export function AppShell() {
           }}
         >
           <Container
-            maxWidth={fullBleed ? false : 'lg'}
+            maxWidth={wide ? false : 'lg'}
             sx={{
               py: fullBleed ? 2 : { xs: 3, md: 4 },
               height: fullBleed ? { md: '100%' } : undefined,
