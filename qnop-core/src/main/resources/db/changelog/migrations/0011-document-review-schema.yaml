@@ -157,6 +157,10 @@ databaseChangeLog:
                   type: VARCHAR(16)
                   defaultValue: PENDING
                   constraints: { nullable: false }
+              # Why extraction failed (issue #325): the extractor's message or "no
+              # extractor ...", persisted for operators. Null unless extraction_status
+              # is FAILED; server-side only (never surfaced to reviewers).
+              - column: { name: extraction_failure_reason, type: VARCHAR(2000) }
               - column:
                   name: created_by
                   type: UUID

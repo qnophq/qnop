@@ -113,7 +113,8 @@ public class DocumentExtractionJobHandler implements JobHandler {
           "No DocumentExtractor supports {} — marking version {} FAILED.",
           version.getContentType(),
           versionId);
-      writer.failPermanently(versionId);
+      writer.failPermanently(
+          versionId, "no extractor supports content type " + version.getContentType());
       return;
     }
 
@@ -131,7 +132,7 @@ public class DocumentExtractionJobHandler implements JobHandler {
       renderedJson = MAPPER.writeValueAsString(rendered);
     } catch (ExtractionException e) {
       log.warn("Extraction of version {} failed permanently: {}", versionId, e.getMessage());
-      writer.failPermanently(versionId);
+      writer.failPermanently(versionId, e.getMessage());
       return;
     } catch (JacksonException e) {
       // Serializing our own SPI records can only fail on a code bug; add context and let the

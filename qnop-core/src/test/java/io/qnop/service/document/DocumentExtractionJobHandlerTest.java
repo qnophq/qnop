@@ -30,6 +30,7 @@ import static org.mockito.Mockito.when;
 import io.qnop.entity.DocumentVersion;
 import io.qnop.entity.ExtractionStatus;
 import io.qnop.repository.AnnotationPlacementRepository;
+import io.qnop.repository.AuditEventRepository;
 import io.qnop.repository.DocumentVersionRepository;
 import io.qnop.service.job.JobEnqueuer;
 import io.qnop.service.job.JobPayload;
@@ -59,6 +60,7 @@ class DocumentExtractionJobHandlerTest {
   private final AnnotationPlacementRepository placements =
       mock(AnnotationPlacementRepository.class);
   private final JobEnqueuer jobs = mock(JobEnqueuer.class);
+  private final AuditEventRepository auditEvents = mock(AuditEventRepository.class);
 
   private final UUID versionId = UUID.randomUUID();
   private DocumentVersion version;
@@ -73,7 +75,8 @@ class DocumentExtractionJobHandlerTest {
   private DocumentExtractionJobHandler handler(DocumentExtractor... extractors) {
     // The write phase lives in DocumentExtractionWriter (issue #314); in this unit test it runs
     // directly (no Spring proxy), over the same mocked repositories.
-    DocumentExtractionWriter writer = new DocumentExtractionWriter(versions, placements, jobs);
+    DocumentExtractionWriter writer =
+        new DocumentExtractionWriter(versions, placements, jobs, auditEvents);
     return new DocumentExtractionJobHandler(versions, storage, List.of(extractors), writer);
   }
 
@@ -120,6 +123,8 @@ class DocumentExtractionJobHandlerTest {
     verify(versions).save(version);
     assertThat(version.getExtractionStatus()).isEqualTo(ExtractionStatus.FAILED);
     assertThat(version.getRenderedDocument()).isNull();
+    // The extractor's message is threaded through and persisted for operators (issue #325).
+    assertThat(version.getExtractionFailureReason()).isEqualTo("corrupt");
   }
 
   @Test
@@ -130,6 +135,8 @@ class DocumentExtractionJobHandlerTest {
     handler(/* no extractors */ ).handle(payload(versionId));
 
     assertThat(version.getExtractionStatus()).isEqualTo(ExtractionStatus.FAILED);
+    assertThat(version.getExtractionFailureReason())
+        .isEqualTo("no extractor supports content type application/pdf");
   }
 
   @Test
