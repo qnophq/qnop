@@ -40,10 +40,9 @@ const annotation = (overrides: Partial<AnnotationView>): AnnotationView =>
     ...overrides,
   }) as AnnotationView;
 
-function renderRow(
-  view: AnnotationView,
-  handlers: Parameters<typeof AnnotationBadgeRow>[0] = {} as never,
-) {
+type Handlers = Partial<Omit<Parameters<typeof AnnotationBadgeRow>[0], 'annotation'>>;
+
+function renderRow(view: AnnotationView, handlers: Handlers = {}) {
   render(
     <ThemeProvider theme={buildTheme('light')}>
       <AnnotationBadgeRow annotation={view} {...handlers} />
@@ -75,7 +74,7 @@ describe('AnnotationBadgeRow placement affordances', () => {
   it('offers Re-attach for a FAILED placement too', () => {
     renderRow(annotation({ placementStatus: PlacementStatus.Failed }), {
       onReattachPlacement: vi.fn(),
-    } as never);
+    });
     expect(screen.getByRole('button', { name: 'Re-attach' })).toBeInTheDocument();
   });
 
@@ -83,7 +82,7 @@ describe('AnnotationBadgeRow placement affordances', () => {
     renderRow(annotation({ placementStatus: PlacementStatus.Placed }), {
       onReattachPlacement: vi.fn(),
       onConfirmPlacement: vi.fn(),
-    } as never);
+    });
     expect(screen.queryByRole('button', { name: 'Re-attach' })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Looks right' })).not.toBeInTheDocument();
   });
