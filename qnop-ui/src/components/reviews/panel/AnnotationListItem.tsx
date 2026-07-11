@@ -25,9 +25,10 @@ import ButtonBase from '@mui/material/ButtonBase';
 import Stack from '@mui/material/Stack';
 import Tooltip from '@mui/material/Tooltip';
 import Typography from '@mui/material/Typography';
-import { alpha, useTheme } from '@mui/material/styles';
-import { MessageSquare } from 'lucide-react';
+import { alpha, useTheme, type Theme } from '@mui/material/styles';
+import { MessageSquare, MoveRight, Unlink } from 'lucide-react';
 import type { AnnotationView } from '../../../api/generated';
+import { PlacementStatus } from '../../../api/generated';
 import { useComments } from '../../../api/hooks/useComments';
 import { useAuthStore } from '../../../stores/authStore';
 import type { Notify } from '../../admin/layout/useToast';
@@ -126,6 +127,8 @@ interface AnnotationListItemProps {
   /** The annotation permalink (issue #412) — shown in the expanded head's author row. */
   permalinkUrl?: string;
   notify?: Notify;
+  /** Confirms a reviewed MOVED placement (issue #326) — threaded to the head's badge row. */
+  onConfirmPlacement?: () => void;
   onHover?: (annotationId: string | null) => void;
 }
 
@@ -151,6 +154,7 @@ function AnnotationListItemBase({
   onHover,
   permalinkUrl,
   notify,
+  onConfirmPlacement,
 }: AnnotationListItemProps) {
   const theme = useTheme();
   const viewerId = useAuthStore((state) => state.userId);
@@ -161,6 +165,15 @@ function AnnotationListItemBase({
   const statusCue = STATUS_CUES[annotation.status];
   const StatusIcon = statusCue.icon;
   const typeCue = annotation.type ? TYPE_CUES[annotation.type] : null;
+  // Re-anchoring outcome worth a glance (ADR-0009, issue #326): amber for a
+  // relocated highlight, red for one the resolver lost.
+  const placementCue =
+    annotation.placementStatus === PlacementStatus.Moved
+      ? { icon: MoveRight, label: 'Moved', color: (t: Theme) => t.palette.warning.main }
+      : annotation.placementStatus === PlacementStatus.Orphaned ||
+          annotation.placementStatus === PlacementStatus.Failed
+        ? { icon: Unlink, label: 'Orphaned', color: (t: Theme) => t.palette.error.main }
+        : null;
   const priorityCue = annotation.priority ? PRIORITY_CUES[annotation.priority] : null;
   const viewerAvatarUrl = useAuthStore((state) => state.avatarUrl);
   const viewerName = useAuthStore((state) => state.displayName);
@@ -232,6 +245,7 @@ function AnnotationListItemBase({
           unseen={unseen}
           permalinkUrl={permalinkUrl}
           notify={notify}
+          onConfirmPlacement={onConfirmPlacement}
         />
       ) : (
         <Stack spacing={0.5} sx={{ minWidth: 0 }}>
@@ -307,6 +321,18 @@ function AnnotationListItemBase({
             >
               {shortRelativeTime(annotation.createdAt)}
             </Typography>
+            {placementCue && (
+              <Stack
+                direction="row"
+                spacing={0.4}
+                sx={{ alignItems: 'center', color: placementCue.color(theme), flexShrink: 0 }}
+              >
+                <placementCue.icon size={11} aria-hidden />
+                <Typography component="span" sx={{ fontSize: 11, fontWeight: 700 }}>
+                  {placementCue.label}
+                </Typography>
+              </Stack>
+            )}
             {typeCue && (
               <Stack
                 direction="row"

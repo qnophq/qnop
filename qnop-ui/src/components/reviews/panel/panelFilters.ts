@@ -20,12 +20,19 @@
  */
 
 import type { AnnotationView } from '../../../api/generated';
-import { AnnotationPriority, AnnotationStatus, AnnotationType } from '../../../api/generated';
+import {
+  AnnotationPriority,
+  AnnotationStatus,
+  AnnotationType,
+  PlacementStatus,
+} from '../../../api/generated';
 import { stripMarkdown } from '../../../utils/markdown';
 
 /** The panel's filter facets (issue #403); `null`/`'all'`/`''` mean "any". */
 export interface AnnotationFilters {
   status: 'all' | 'open' | 'resolved';
+  /** Re-anchoring outcome (ADR-0009, issue #326); 'attention' = MOVED/ORPHANED/FAILED. */
+  placement: 'all' | 'attention' | 'moved' | 'orphaned';
   type: AnnotationType | null;
   priority: AnnotationPriority | null;
   /** The author's principal id. */
@@ -36,6 +43,7 @@ export interface AnnotationFilters {
 
 export const EMPTY_FILTERS: AnnotationFilters = {
   status: 'all',
+  placement: 'all',
   type: null,
   priority: null,
   author: null,
@@ -46,9 +54,26 @@ export const EMPTY_FILTERS: AnnotationFilters = {
 export function activeFacetCount(filters: AnnotationFilters): number {
   return (
     (filters.status !== 'all' ? 1 : 0) +
+    (filters.placement !== 'all' ? 1 : 0) +
     (filters.type !== null ? 1 : 0) +
     (filters.priority !== null ? 1 : 0) +
     (filters.author !== null ? 1 : 0)
+  );
+}
+
+/** The re-anchoring facet (issue #326): which placement outcomes pass. */
+function matchesPlacement(
+  annotation: AnnotationView,
+  placement: AnnotationFilters['placement'],
+): boolean {
+  if (placement === 'all') return true;
+  const status = annotation.placementStatus;
+  if (placement === 'moved') return status === PlacementStatus.Moved;
+  if (placement === 'orphaned') return status === PlacementStatus.Orphaned;
+  return (
+    status === PlacementStatus.Moved ||
+    status === PlacementStatus.Orphaned ||
+    status === PlacementStatus.Failed
   );
 }
 
@@ -60,6 +85,7 @@ export function matchesFilters(
 ): boolean {
   if (filters.status === 'open' && annotation.status !== AnnotationStatus.Open) return false;
   if (filters.status === 'resolved' && annotation.status === AnnotationStatus.Open) return false;
+  if (!matchesPlacement(annotation, filters.placement)) return false;
   if (filters.type !== null && annotation.type !== filters.type) return false;
   if (filters.priority !== null && annotation.priority !== filters.priority) return false;
   if (filters.author !== null && annotation.authorId !== filters.author) return false;
@@ -72,4 +98,17 @@ export function matchesFilters(
     stripMarkdown(annotation.firstComment).toLowerCase().includes(needle) ||
     authorName.toLowerCase().includes(needle)
   );
+}
+
+/** What the current version's re-anchoring left for humans (issue #326). */
+export function reanchorSummary(annotations: AnnotationView[]) {
+  const moved = annotations.filter(
+    (annotation) => annotation.placementStatus === PlacementStatus.Moved,
+  ).length;
+  const orphaned = annotations.filter(
+    (annotation) =>
+      annotation.placementStatus === PlacementStatus.Orphaned ||
+      annotation.placementStatus === PlacementStatus.Failed,
+  ).length;
+  return { moved, orphaned, total: moved + orphaned };
 }

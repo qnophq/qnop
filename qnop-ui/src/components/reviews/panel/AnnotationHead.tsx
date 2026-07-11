@@ -52,6 +52,8 @@ interface AnnotationHeadProps {
   /** With `notify`, the author row carries the hover-revealed copy-link (issue #412). */
   permalinkUrl?: string;
   notify?: Notify;
+  /** Confirms a reviewed MOVED placement (issue #326) — rendered beside the Moved chip. */
+  onConfirmPlacement?: () => void;
 }
 
 /**
@@ -68,6 +70,7 @@ export function AnnotationHead({
   unseen = false,
   permalinkUrl,
   notify,
+  onConfirmPlacement,
 }: AnnotationHeadProps) {
   const theme = useTheme();
   // Reactions on the opener (issue #410) — active wherever notify travels;
@@ -165,7 +168,11 @@ export function AnnotationHead({
           </Stack>
         </Box>
       </Stack>
-      <AnnotationBadgeRow annotation={annotation} unseen={unseen} />
+      <AnnotationBadgeRow
+        annotation={annotation}
+        unseen={unseen}
+        onConfirmPlacement={onConfirmPlacement}
+      />
       {/* The anchored passage, styled as a real quotation. */}
       {quote ? (
         <Box

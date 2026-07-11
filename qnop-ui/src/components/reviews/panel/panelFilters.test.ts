@@ -21,8 +21,13 @@
 
 import { describe, expect, it } from 'vitest';
 import type { AnnotationView } from '../../../api/generated';
-import { AnnotationPriority, AnnotationStatus, AnnotationType } from '../../../api/generated';
-import { EMPTY_FILTERS, activeFacetCount, matchesFilters } from './panelFilters';
+import {
+  AnnotationPriority,
+  AnnotationStatus,
+  AnnotationType,
+  PlacementStatus,
+} from '../../../api/generated';
+import { EMPTY_FILTERS, activeFacetCount, matchesFilters, reanchorSummary } from './panelFilters';
 
 const annotation = (overrides: Partial<AnnotationView> = {}): AnnotationView => ({
   id: 'a1',
@@ -113,5 +118,39 @@ describe('activeFacetCount', () => {
         query: 'ignored',
       }),
     ).toBe(3);
+  });
+});
+
+describe('placement facet & re-anchoring summary (issue #326)', () => {
+  const placed = annotation({ id: 'p1', placementStatus: PlacementStatus.Placed });
+  const moved = annotation({ id: 'm1', placementStatus: PlacementStatus.Moved });
+  const orphaned = annotation({ id: 'o1', placementStatus: PlacementStatus.Orphaned });
+  const failed = annotation({ id: 'f1', placementStatus: PlacementStatus.Failed });
+
+  it("'attention' keeps every outcome a human still owes a look", () => {
+    const filters = { ...EMPTY_FILTERS, placement: 'attention' as const };
+    expect(matchesFilters(placed, filters, '')).toBe(false);
+    expect(matchesFilters(moved, filters, '')).toBe(true);
+    expect(matchesFilters(orphaned, filters, '')).toBe(true);
+    expect(matchesFilters(failed, filters, '')).toBe(true);
+  });
+
+  it('moved and orphaned narrow to their exact outcome', () => {
+    expect(matchesFilters(moved, { ...EMPTY_FILTERS, placement: 'moved' }, '')).toBe(true);
+    expect(matchesFilters(orphaned, { ...EMPTY_FILTERS, placement: 'moved' }, '')).toBe(false);
+    expect(matchesFilters(orphaned, { ...EMPTY_FILTERS, placement: 'orphaned' }, '')).toBe(true);
+  });
+
+  it('counts as an active facet', () => {
+    expect(activeFacetCount({ ...EMPTY_FILTERS, placement: 'attention' })).toBe(1);
+  });
+
+  it('summarises what re-anchoring left for humans', () => {
+    expect(reanchorSummary([placed, moved, orphaned, failed])).toEqual({
+      moved: 1,
+      orphaned: 2,
+      total: 3,
+    });
+    expect(reanchorSummary([placed]).total).toBe(0);
   });
 });

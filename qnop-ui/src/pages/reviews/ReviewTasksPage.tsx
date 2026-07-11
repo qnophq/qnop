@@ -112,6 +112,7 @@ export function ReviewTasksPage() {
   const priorityParam = searchParams.get('priority');
   const facets: AnnotationFilters = {
     status: 'all',
+    placement: 'all',
     type: Object.values(AnnotationType).includes(typeParam as AnnotationType)
       ? (typeParam as AnnotationType)
       : null,

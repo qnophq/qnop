@@ -34,6 +34,8 @@ public class WorkflowTransitionException extends RuntimeException {
   /** A resolution was requested on an annotation that is no longer {@code OPEN}. */
   public static final String ANNOTATION_ALREADY_RESOLVED = "ANNOTATION_ALREADY_RESOLVED";
 
+  public static final String PLACEMENT_NOT_MOVED = "PLACEMENT_NOT_MOVED";
+
   /** An annotation was raised on a review that is already FINALIZED or CANCELLED (issue #405). */
   public static final String REVIEW_CLOSED = "REVIEW_CLOSED";
 
