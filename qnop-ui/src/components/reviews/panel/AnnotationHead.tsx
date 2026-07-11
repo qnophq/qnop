@@ -27,6 +27,9 @@ import type { AnnotationView } from '../../../api/generated';
 import { useComments } from '../../../api/hooks/useComments';
 import type { Notify } from '../../admin/layout/useToast';
 import { CopyLinkButton } from '../permalink/CopyLinkButton';
+import { AddReactionButton } from '../reactions/AddReactionButton';
+import { ReactionBar } from '../reactions/ReactionBar';
+import { useToggleAnnotationReaction } from '../reactions/useReactions';
 import { useAuthStore } from '../../../stores/authStore';
 import { shortRelativeTime } from '../../../utils/relativeTime';
 import { UserAvatar } from '../../shell/UserAvatar';
@@ -67,6 +70,12 @@ export function AnnotationHead({
   notify,
 }: AnnotationHeadProps) {
   const theme = useTheme();
+  // Reactions on the opener (issue #410) — active wherever notify travels;
+  // a closed review answers REVIEW_CLOSED and the optimistic flip rolls back.
+  const toggleReaction = useToggleAnnotationReaction(annotation.id, notify ?? (() => undefined));
+  const onToggleReaction = notify
+    ? (emoji: string, reacted: boolean) => toggleReaction.mutate({ emoji, reacted })
+    : undefined;
   const userId = useAuthStore((state) => state.userId);
   const displayName = useAuthStore((state) => state.displayName);
   const avatarUrl = useAuthStore((state) => state.avatarUrl);
@@ -125,19 +134,32 @@ export function AnnotationHead({
             >
               Started this discussion · {shortRelativeTime(annotation.createdAt)}
             </Typography>
-            {permalinkUrl && notify && (
+            {(onToggleReaction || (permalinkUrl && notify)) && (
               // Directly after the timestamp, exactly like a comment row's
-              // link. The negative margin keeps the icon button from growing
+              // link. The negative margin keeps the icon buttons from growing
               // the caption line beyond the avatar's height.
               <Box
                 className="annotation-hover-actions"
-                sx={{ display: 'flex', flexShrink: 0, my: '-3px' }}
+                sx={{ display: 'flex', alignItems: 'center', flexShrink: 0, my: '-3px' }}
               >
-                <CopyLinkButton
-                  url={permalinkUrl}
-                  notify={notify}
-                  label="Copy link to annotation"
-                />
+                {permalinkUrl && notify && (
+                  <CopyLinkButton
+                    url={permalinkUrl}
+                    notify={notify}
+                    label="Copy link to annotation"
+                  />
+                )}
+                {onToggleReaction && (
+                  <AddReactionButton
+                    onPick={(emoji) =>
+                      onToggleReaction(
+                        emoji,
+                        annotation.reactions.find((group) => group.emoji === emoji)?.reactedByMe ??
+                          false,
+                      )
+                    }
+                  />
+                )}
               </Box>
             )}
           </Stack>
@@ -184,6 +206,10 @@ export function AnnotationHead({
         <Box data-testid="opening-text">
           <Markdown>{openerText}</Markdown>
         </Box>
+      )}
+      {/* The opener's reaction chips (issue #410), Slack-style under the text. */}
+      {onToggleReaction && annotation.reactions.length > 0 && (
+        <ReactionBar reactions={annotation.reactions} onToggle={onToggleReaction} />
       )}
     </Stack>
   );

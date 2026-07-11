@@ -36,6 +36,7 @@ const annotation = (overrides: Partial<AnnotationView> = {}): AnnotationView => 
   },
   firstComment: 'Please extend the payment target',
   commentCount: 1,
+  reactions: [],
   createdAt: '2026-07-01T10:00:00Z',
   updatedAt: '2026-07-01T10:00:00Z',
   ...overrides,

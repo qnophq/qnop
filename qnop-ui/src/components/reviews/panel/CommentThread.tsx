@@ -36,6 +36,7 @@ import { useAuthStore } from '../../../stores/authStore';
 import type { Notify } from '../../admin/layout/useToast';
 import { isNewComment } from '../newSince';
 import type { BuildPermalink } from '../useReviewPermalink';
+import { useToggleCommentReaction } from '../reactions/useReactions';
 import { FullscreenComposerDialog } from '../markdown/FullscreenComposerDialog';
 import { MarkdownComposer } from '../markdown/MarkdownComposer';
 import { useCommentAttachmentUpload } from '../markdown/useCommentAttachmentUpload';
@@ -107,6 +108,7 @@ export function CommentThread({
   const avatarUrl = useAuthStore((state) => state.avatarUrl);
   const commentsQuery = useComments(annotationId);
   const addComment = useAddComment(annotationId);
+  const toggleReaction = useToggleCommentReaction(annotationId, notify);
   const uploadAttachment = useCommentAttachmentUpload(documentId, notify);
   const [draft, setDraft] = useState('');
   // The full-screen writing stage (issue #403 follow-up). The draft state
@@ -265,6 +267,13 @@ export function CommentThread({
                 domId={`comment-${comment.id}`}
                 permalinkUrl={buildPermalink?.(annotationId, comment.id)}
                 notify={notify}
+                reactions={comment.reactions}
+                onToggleReaction={
+                  readOnly
+                    ? undefined
+                    : (emoji, reacted) =>
+                        toggleReaction.mutate({ commentId: comment.id, emoji, reacted })
+                }
               />
             </Fragment>
           );

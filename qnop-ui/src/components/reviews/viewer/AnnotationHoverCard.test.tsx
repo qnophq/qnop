@@ -44,6 +44,7 @@ const annotation = (overrides: Partial<AnnotationView> = {}): AnnotationView => 
     textQuote: { quote: 'quoted text' },
   },
   commentCount: 3,
+  reactions: [],
   createdAt: '2026-07-01T10:00:00Z',
   updatedAt: '2026-07-01T10:00:00Z',
   ...overrides,

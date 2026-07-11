@@ -350,6 +350,7 @@ describe('compareAnnotationsByPosition', () => {
     authorId: 'u1',
     status: AnnotationStatus.Open,
     commentCount: 0,
+    reactions: [],
     createdAt,
     updatedAt: createdAt,
     ...(region && {

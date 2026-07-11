@@ -21,6 +21,7 @@
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { fireEvent, render, screen } from '@testing-library/react';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { ThemeProvider } from '@mui/material/styles';
 import type { AnnotationView, RenderedSurface } from '../../api/generated';
@@ -38,6 +39,10 @@ import { useAnnotations, useCreateAnnotation } from '../../api/hooks/useAnnotati
 import { useComments } from '../../api/hooks/useComments';
 import { usePdfDocument } from '../../components/reviews/viewer/usePdfDocument';
 import { useAuthStore } from '../../stores/authStore';
+
+// The reaction toggles (issue #410) reach for the query client; the data
+// hooks above stay mocked, so a bare client per file is all the tests need.
+const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
 
 vi.mock('../../api/hooks/useDocuments', () => ({
   useDocument: vi.fn(),
@@ -127,6 +132,7 @@ const ANNOTATIONS: AnnotationView[] = [
       textQuote: { quote: 'Hello' },
     },
     commentCount: 0,
+    reactions: [],
     createdAt: '2026-07-01T10:00:00Z',
     updatedAt: '2026-07-01T10:00:00Z',
   },
@@ -179,13 +185,15 @@ function seedHappyPath(extractionStatus: ExtractionStatus = ExtractionStatus.Rea
 
 function renderPage(initialEntry = '/reviews/doc-1') {
   render(
-    <ThemeProvider theme={buildTheme('light')}>
-      <MemoryRouter initialEntries={[initialEntry]}>
-        <Routes>
-          <Route path="/reviews/:documentId" element={<DocumentReviewPage />} />
-        </Routes>
-      </MemoryRouter>
-    </ThemeProvider>,
+    <QueryClientProvider client={queryClient}>
+      <ThemeProvider theme={buildTheme('light')}>
+        <MemoryRouter initialEntries={[initialEntry]}>
+          <Routes>
+            <Route path="/reviews/:documentId" element={<DocumentReviewPage />} />
+          </Routes>
+        </MemoryRouter>
+      </ThemeProvider>
+    </QueryClientProvider>,
   );
 }
 

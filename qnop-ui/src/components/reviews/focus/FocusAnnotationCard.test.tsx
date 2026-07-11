@@ -21,11 +21,16 @@
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { fireEvent, render, screen, within } from '@testing-library/react';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { ThemeProvider } from '@mui/material/styles';
 import type { AnnotationView } from '../../../api/generated';
 import { AnnotationStatus, PlacementStatus } from '../../../api/generated';
 import { buildTheme } from '../../../theme/theme';
 import { FocusAnnotationCard } from './FocusAnnotationCard';
+
+// The reaction toggles (issue #410) reach for the query client; the data
+// hooks above stay mocked, so a bare client per file is all the tests need.
+const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
 
 vi.mock('../panel/CommentThread', () => ({
   CommentThread: ({ annotationId }: { annotationId: string }) => (
@@ -56,6 +61,7 @@ const ANNOTATION: AnnotationView = {
     textQuote: { quote: 'the disputed clause' },
   },
   commentCount: 2,
+  reactions: [],
   createdAt: '2026-07-01T10:00:00Z',
   updatedAt: '2026-07-01T10:00:00Z',
 };
@@ -84,9 +90,11 @@ function renderCard(overrides: Partial<Parameters<typeof FocusAnnotationCard>[0]
     ...overrides,
   };
   render(
-    <ThemeProvider theme={buildTheme('light')}>
-      <FocusAnnotationCard {...props} />
-    </ThemeProvider>,
+    <QueryClientProvider client={queryClient}>
+      <ThemeProvider theme={buildTheme('light')}>
+        <FocusAnnotationCard {...props} />
+      </ThemeProvider>
+    </QueryClientProvider>,
   );
   return props;
 }

@@ -1,0 +1,85 @@
+# SPDX-License-Identifier: AGPL-3.0-only
+#
+# Emoji reactions on annotations and comments (issue #410). One row per
+# user × emoji × target; the target is an annotation XOR a comment. Partial
+# unique indexes enforce "one reaction per user per emoji per target" while a
+# user may still add several DIFFERENT emojis, as in Slack.
+databaseChangeLog:
+  - changeSet:
+      id: 0015-reaction-schema
+      author: qnop
+      comment: Emoji reactions on annotations and comments (issue #410).
+      changes:
+        - createTable:
+            tableName: reaction
+            columns:
+              - column:
+                  name: id
+                  type: UUID
+                  constraints: { primaryKey: true, nullable: false }
+              - column:
+                  name: annotation_id
+                  type: UUID
+                  constraints: { nullable: true }
+              - column:
+                  name: comment_id
+                  type: UUID
+                  constraints: { nullable: true }
+              - column:
+                  name: user_id
+                  type: UUID
+                  constraints: { nullable: false }
+              - column:
+                  name: emoji
+                  type: VARCHAR(32)
+                  constraints: { nullable: false }
+              - column:
+                  name: created_at
+                  type: TIMESTAMP WITH TIME ZONE
+                  constraints: { nullable: false }
+        - addForeignKeyConstraint:
+            constraintName: fk_reaction_annotation
+            baseTableName: reaction
+            baseColumnNames: annotation_id
+            referencedTableName: annotation
+            referencedColumnNames: id
+            onDelete: CASCADE
+        - addForeignKeyConstraint:
+            constraintName: fk_reaction_comment
+            baseTableName: reaction
+            baseColumnNames: comment_id
+            referencedTableName: comment
+            referencedColumnNames: id
+            onDelete: CASCADE
+        - addForeignKeyConstraint:
+            constraintName: fk_reaction_user
+            baseTableName: reaction
+            baseColumnNames: user_id
+            referencedTableName: qnop_user
+            referencedColumnNames: id
+            onDelete: CASCADE
+        - sql:
+            comment: A reaction targets an annotation XOR a comment (issue #410).
+            sql: |
+              ALTER TABLE reaction ADD CONSTRAINT ck_reaction_single_target
+                CHECK ((annotation_id IS NULL) <> (comment_id IS NULL));
+        - sql:
+            comment: >-
+              One reaction per user per emoji per target — partial unique
+              indexes, because a plain composite index would treat the NULL
+              half of the XOR as distinct and never fire.
+            sql: |
+              CREATE UNIQUE INDEX ux_reaction_annotation_user_emoji
+                ON reaction (annotation_id, user_id, emoji) WHERE annotation_id IS NOT NULL;
+              CREATE UNIQUE INDEX ux_reaction_comment_user_emoji
+                ON reaction (comment_id, user_id, emoji) WHERE comment_id IS NOT NULL;
+        - createIndex:
+            indexName: ix_reaction_annotation
+            tableName: reaction
+            columns:
+              - column: { name: annotation_id }
+        - createIndex:
+            indexName: ix_reaction_comment
+            tableName: reaction
+            columns:
+              - column: { name: comment_id }

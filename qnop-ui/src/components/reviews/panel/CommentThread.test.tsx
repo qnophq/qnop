@@ -21,11 +21,16 @@
 
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { ThemeProvider } from '@mui/material/styles';
 import { buildTheme } from '../../../theme/theme';
 import { useAuthStore } from '../../../stores/authStore';
 import { CommentThread } from './CommentThread';
 import { useAddComment, useComments } from '../../../api/hooks/useComments';
+
+// The reaction toggles (issue #410) reach for the query client; the data
+// hooks above stay mocked, so a bare client per file is all the tests need.
+const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
 
 vi.mock('../../../api/hooks/useComments', () => ({
   useComments: vi.fn(),
@@ -36,15 +41,17 @@ const addMutate = vi.fn();
 
 function renderThread(readOnly = false, previousSeenAt: string | null = null, closed = false) {
   return render(
-    <ThemeProvider theme={buildTheme('light')}>
-      <CommentThread
-        annotationId="a1"
-        notify={vi.fn()}
-        readOnly={readOnly}
-        closed={closed}
-        previousSeenAt={previousSeenAt}
-      />
-    </ThemeProvider>,
+    <QueryClientProvider client={queryClient}>
+      <ThemeProvider theme={buildTheme('light')}>
+        <CommentThread
+          annotationId="a1"
+          notify={vi.fn()}
+          readOnly={readOnly}
+          closed={closed}
+          previousSeenAt={previousSeenAt}
+        />
+      </ThemeProvider>
+    </QueryClientProvider>,
   );
 }
 
@@ -170,9 +177,11 @@ describe('CommentThread', () => {
     } as unknown as ReturnType<typeof useComments>);
 
     render(
-      <ThemeProvider theme={buildTheme('light')}>
-        <CommentThread annotationId="a1" notify={vi.fn()} policyReadOnly />
-      </ThemeProvider>,
+      <QueryClientProvider client={queryClient}>
+        <ThemeProvider theme={buildTheme('light')}>
+          <CommentThread annotationId="a1" notify={vi.fn()} policyReadOnly />
+        </ThemeProvider>
+      </QueryClientProvider>,
     );
 
     expect(screen.getByTestId('thread-policy-readonly-note')).toBeInTheDocument();
@@ -243,9 +252,11 @@ describe('CommentThread', () => {
       },
     } as unknown as ReturnType<typeof useComments>);
     render(
-      <ThemeProvider theme={buildTheme('light')}>
-        <CommentThread annotationId="a1" notify={vi.fn()} closed skipOpener />
-      </ThemeProvider>,
+      <QueryClientProvider client={queryClient}>
+        <ThemeProvider theme={buildTheme('light')}>
+          <CommentThread annotationId="a1" notify={vi.fn()} closed skipOpener />
+        </ThemeProvider>
+      </QueryClientProvider>,
     );
     expect(screen.getByText('No replies.')).toBeInTheDocument();
     expect(screen.queryByText('No replies yet.')).not.toBeInTheDocument();
@@ -259,9 +270,11 @@ describe('CommentThread', () => {
     } as unknown as ReturnType<typeof useComments>);
     const onReopen = vi.fn();
     render(
-      <ThemeProvider theme={buildTheme('light')}>
-        <CommentThread annotationId="a1" notify={vi.fn()} closed onReopen={onReopen} />
-      </ThemeProvider>,
+      <QueryClientProvider client={queryClient}>
+        <ThemeProvider theme={buildTheme('light')}>
+          <CommentThread annotationId="a1" notify={vi.fn()} closed onReopen={onReopen} />
+        </ThemeProvider>
+      </QueryClientProvider>,
     );
     fireEvent.click(screen.getByRole('button', { name: 'Reopen' }));
     expect(onReopen).toHaveBeenCalled();
@@ -303,9 +316,11 @@ describe('CommentThread permalinks (#412)', () => {
   it('renders a copy-link affordance on every comment when a builder is provided', () => {
     vi.mocked(useComments).mockReturnValue(TWO_COMMENTS);
     render(
-      <ThemeProvider theme={buildTheme('light')}>
-        <CommentThread annotationId="a1" notify={vi.fn()} buildPermalink={buildPermalink} />
-      </ThemeProvider>,
+      <QueryClientProvider client={queryClient}>
+        <ThemeProvider theme={buildTheme('light')}>
+          <CommentThread annotationId="a1" notify={vi.fn()} buildPermalink={buildPermalink} />
+        </ThemeProvider>
+      </QueryClientProvider>,
     );
     expect(screen.getAllByRole('button', { name: 'Copy link to comment' })).toHaveLength(2);
   });
@@ -313,9 +328,11 @@ describe('CommentThread permalinks (#412)', () => {
   it('shows no per-comment copy affordance without a builder (e.g. the hover preview)', () => {
     vi.mocked(useComments).mockReturnValue(TWO_COMMENTS);
     render(
-      <ThemeProvider theme={buildTheme('light')}>
-        <CommentThread annotationId="a1" notify={vi.fn()} />
-      </ThemeProvider>,
+      <QueryClientProvider client={queryClient}>
+        <ThemeProvider theme={buildTheme('light')}>
+          <CommentThread annotationId="a1" notify={vi.fn()} />
+        </ThemeProvider>
+      </QueryClientProvider>,
     );
     expect(screen.queryByRole('button', { name: 'Copy link to comment' })).not.toBeInTheDocument();
   });
@@ -327,14 +344,16 @@ describe('CommentThread permalinks (#412)', () => {
     const notify = vi.fn();
     const onScrolledToComment = vi.fn();
     render(
-      <ThemeProvider theme={buildTheme('light')}>
-        <CommentThread
-          annotationId="a1"
-          notify={notify}
-          scrollToCommentId="c2"
-          onScrolledToComment={onScrolledToComment}
-        />
-      </ThemeProvider>,
+      <QueryClientProvider client={queryClient}>
+        <ThemeProvider theme={buildTheme('light')}>
+          <CommentThread
+            annotationId="a1"
+            notify={notify}
+            scrollToCommentId="c2"
+            onScrolledToComment={onScrolledToComment}
+          />
+        </ThemeProvider>
+      </QueryClientProvider>,
     );
     expect(scrollIntoView).toHaveBeenCalledTimes(1);
     expect(onScrolledToComment).toHaveBeenCalledTimes(1);
@@ -346,14 +365,16 @@ describe('CommentThread permalinks (#412)', () => {
     const notify = vi.fn();
     const onScrolledToComment = vi.fn();
     render(
-      <ThemeProvider theme={buildTheme('light')}>
-        <CommentThread
-          annotationId="a1"
-          notify={notify}
-          scrollToCommentId="ghost"
-          onScrolledToComment={onScrolledToComment}
-        />
-      </ThemeProvider>,
+      <QueryClientProvider client={queryClient}>
+        <ThemeProvider theme={buildTheme('light')}>
+          <CommentThread
+            annotationId="a1"
+            notify={notify}
+            scrollToCommentId="ghost"
+            onScrolledToComment={onScrolledToComment}
+          />
+        </ThemeProvider>
+      </QueryClientProvider>,
     );
     expect(notify).toHaveBeenCalledWith('This comment no longer exists.', 'error');
     expect(onScrolledToComment).toHaveBeenCalledTimes(1);

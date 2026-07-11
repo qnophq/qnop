@@ -31,6 +31,7 @@ const annotation = (overrides: Partial<AnnotationView> = {}): AnnotationView => 
   status: AnnotationStatus.Open,
   placementStatus: 'PLACED' as AnnotationView['placementStatus'],
   commentCount: 1,
+  reactions: [],
   anchor: {
     region: { surfaceIndex: 0, box: { x: 0.1, y: 0.1, width: 0.2, height: 0.05 } },
     textQuote: { quote: 'the disputed clause' },
