@@ -156,31 +156,29 @@ export function DocumentViewer({
     };
   }, [onVisiblePageChange]);
 
-  // A panel click (or the focus card's prev/next walk, #291) scrolls the
-  // possibly off-screen highlight into view. scrollIntoView ignores the CSS
-  // scroll-behavior override, so reduced motion is honoured explicitly.
+  // A panel click, the focus card's prev/next walk (#291) or a deep link (the
+  // tasks view's "Show in document", ?annotation= permalinks — issue #403)
+  // scrolls the possibly off-screen highlight into view. On a fresh navigation
+  // the marks are NOT there yet — data arrives after the first render, and the
+  // page stack itself waits for the measured containerWidth — so the effect
+  // retries on every data/layout pass until the mark exists, but scrolls only
+  // once per id (the ref), so later refetches never yank the reader back.
+  const scrolledToAnnotationRef = useRef<string | null>(null);
   useEffect(() => {
-    if (!activeAnnotationId) return;
-    const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-    document
-      .getElementById(`annotation-highlight-${activeAnnotationId}`)
-      ?.scrollIntoView({ behavior: reduced ? 'auto' : 'smooth', block: 'center' });
-  }, [activeAnnotationId]);
-
-  // Hovering a panel card brings its mark into view — but only when it is
-  // off-screen, so hovering an already-visible mark never causes scroll jumps.
-  useEffect(() => {
-    const container = containerRef.current;
-    if (!hoverAnnotationId || !container) return;
-    const mark = document.getElementById(`annotation-highlight-${hoverAnnotationId}`);
-    if (!mark) return;
-    const markRect = mark.getBoundingClientRect();
-    const viewRect = container.getBoundingClientRect();
-    if (markRect.top < viewRect.top + 24 || markRect.bottom > viewRect.bottom - 8) {
-      const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-      mark.scrollIntoView({ behavior: reduced ? 'auto' : 'smooth', block: 'center' });
+    if (!activeAnnotationId) {
+      scrolledToAnnotationRef.current = null; // re-selecting scrolls again
+      return;
     }
-  }, [hoverAnnotationId]);
+    if (scrolledToAnnotationRef.current === activeAnnotationId) return;
+    const mark = document.getElementById(`annotation-highlight-${activeAnnotationId}`);
+    if (!mark) return; // marks not rendered yet — retry once the data lands
+    scrolledToAnnotationRef.current = activeAnnotationId;
+    // Instant by design: "show in document" means a jump, and Chromium can
+    // wedge smooth container scrolls started while the page stack is still
+    // settling — the animation then silently never moves. Instant is
+    // deterministic and needs no reduced-motion branch.
+    mark.scrollIntoView({ behavior: 'auto', block: 'center' });
+  }, [activeAnnotationId, annotations, surfaces, containerWidth]);
 
   const pageWidth = Math.max(0, (containerWidth - 2 * PAGE_GUTTER_PX) * zoom);
   const pageCount = surfaces?.length ?? pdf.numPages;

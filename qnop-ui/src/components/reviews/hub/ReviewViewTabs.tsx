@@ -27,11 +27,11 @@ import Tooltip from '@mui/material/Tooltip';
 import Typography from '@mui/material/Typography';
 import { alpha, useTheme } from '@mui/material/styles';
 import type { LucideIcon } from 'lucide-react';
-import { FileText, Focus, GitCompareArrows, SquareKanban } from 'lucide-react';
+import { FileText, GitCompareArrows, SquareKanban } from 'lucide-react';
 import { tokens } from '../../../theme/tokens';
 
-/** The review's four ways of working (issue #398). */
-export type ReviewView = 'document' | 'focus' | 'tasks' | 'compare';
+/** The review's three ways of working (issue #398; focus folded into Document, issue #403). */
+export type ReviewView = 'document' | 'tasks' | 'compare';
 
 interface ReviewViewTabsProps {
   documentId: string;
@@ -47,10 +47,10 @@ const TABS: { view: ReviewView; label: string; icon: LucideIcon; href: (id: stri
     {
       view: 'document',
       label: 'Document',
+      // No ?view= param: the stored panel/focus preference decides (issue #403).
       icon: FileText,
-      href: (id) => `/reviews/${id}?view=panel`,
+      href: (id) => `/reviews/${id}`,
     },
-    { view: 'focus', label: 'Focus', icon: Focus, href: (id) => `/reviews/${id}?view=focus` },
     { view: 'tasks', label: 'Tasks', icon: SquareKanban, href: (id) => `/reviews/${id}/tasks` },
     {
       view: 'compare',
@@ -63,7 +63,9 @@ const TABS: { view: ReviewView; label: string; icon: LucideIcon; href: (id: stri
 /**
  * The review's view switcher (issue #398, prototype `rh-tab`): one labeled,
  * always-visible strip under the hub head on every review page — Document,
- * Focus, Tasks (with the open-count pill), Compare. Every tab is a plain
+ * Tasks (with the open-count pill), Compare. The former Focus tab folded
+ * into Document as a toolbar-level presentation switch (issue #403), so the
+ * strip navigates between surfaces, not layouts. Every tab is a plain
  * link (router tabs, not ARIA tabpanels), so the strip is stateless and
  * identical everywhere; the active tab carries the prototype's 2px accent
  * underline. Icon-only navigation was the discoverability problem this

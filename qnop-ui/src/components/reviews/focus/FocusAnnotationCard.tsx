@@ -38,7 +38,6 @@ import { AnnotationStatus } from '../../../api/generated';
 import { tokens } from '../../../theme/tokens';
 import type { Notify } from '../../admin/layout/useToast';
 import type { BuildPermalink } from '../useReviewPermalink';
-import { CopyLinkButton } from '../permalink/CopyLinkButton';
 import { AnnotationHead } from '../panel/AnnotationHead';
 import { CommentThread } from '../panel/CommentThread';
 import { ResolveBar } from '../panel/ResolveBar';
@@ -242,13 +241,13 @@ export function FocusAnnotationCard({
                   // native grip, hard-bounded so the card can neither
                   // collapse below usability nor swallow the document.
                   resize: 'both',
-                  width: 380,
+                  width: 460,
                   minWidth: 320,
                   maxWidth: 'min(640px, calc(100vw - 48px))',
                   minHeight: 220,
-                  // Tall threads scroll inside; the card itself stays a
+                  // Tall content scrolls inside; the card itself stays a
                   // modest share of the screen (issue #403).
-                  maxHeight: 'min(55vh, 520px)',
+                  maxHeight: 'min(64vh, 600px)',
                 }}
               >
                 <Stack
@@ -287,13 +286,6 @@ export function FocusAnnotationCard({
                       : 'Annotation'}
                   </Typography>
                   <Box sx={{ flex: 1 }} />
-                  {buildPermalink && (
-                    <CopyLinkButton
-                      url={buildPermalink(annotation.id)}
-                      notify={notify}
-                      label="Copy link to annotation"
-                    />
-                  )}
                   <Tooltip title="Previous annotation (↑)">
                     <span>
                       <IconButton
@@ -323,42 +315,53 @@ export function FocusAnnotationCard({
                   </IconButton>
                 </Stack>
 
-                <Box sx={{ px: 1.5, pt: 1.25, flexShrink: 0 }}>
-                  {/* The same root post the panel's expanded card shows. */}
-                  <AnnotationHead annotation={annotation} />
-                </Box>
-
-                {!readOnly && mayResolveAnnotation(annotation, userId) && (
-                  // The bar's flush-right button is the panel's look; inside
-                  // the floating card it breathes like the left side does.
-                  <Box sx={{ pr: 2 }}>
-                    <ResolveBar
-                      disabled={resolving}
-                      onResolve={(note) => resolveWith(annotation, note)}
+                {/* ONE scroll container for everything below the handle
+                    (issue #403): the opening text used to sit in a fixed
+                    block, so a long annotation pushed the thread — and its
+                    own tail — clean out of the card. */}
+                <Box sx={{ overflowY: 'auto', flex: 1, minHeight: 0 }}>
+                  <Box sx={{ px: 1.5, pt: 1.25 }}>
+                    {/* The same root post the panel's expanded card shows —
+                        including the author row's copy-link (issue #412). */}
+                    <AnnotationHead
+                      annotation={annotation}
+                      permalinkUrl={buildPermalink?.(annotation.id)}
+                      notify={notify}
                     />
                   </Box>
-                )}
 
-                {/* Same breathing room at the bottom as the head keeps at the top. */}
-                <Box sx={{ overflowY: 'auto', flex: 1, minHeight: 0, pl: 0.5, pr: 2, pb: 1.25 }}>
-                  <CommentThread
-                    annotationId={annotation.id}
-                    documentId={annotation.documentId}
-                    notify={notify}
-                    readOnly={readOnly}
-                    policyReadOnly={policyReadOnly}
-                    closed={annotation.status !== AnnotationStatus.Open}
-                    onReopen={
-                      !readOnly && !reviewClosed && mayReopenAnnotation(annotation, userId)
-                        ? () => reopenWith(annotation)
-                        : undefined
-                    }
-                    previousSeenAt={previousSeenAt}
-                    skipOpener
-                    buildPermalink={buildPermalink}
-                    scrollToCommentId={scrollToCommentId}
-                    onScrolledToComment={onScrolledToComment}
-                  />
+                  {!readOnly && mayResolveAnnotation(annotation, userId) && (
+                    // The bar's flush-right button is the panel's look; inside
+                    // the floating card it breathes like the left side does.
+                    <Box sx={{ pr: 2 }}>
+                      <ResolveBar
+                        disabled={resolving}
+                        onResolve={(note) => resolveWith(annotation, note)}
+                      />
+                    </Box>
+                  )}
+
+                  {/* Same breathing room at the bottom as the head keeps at the top. */}
+                  <Box sx={{ pl: 0.5, pr: 2, pb: 1.25 }}>
+                    <CommentThread
+                      annotationId={annotation.id}
+                      documentId={annotation.documentId}
+                      notify={notify}
+                      readOnly={readOnly}
+                      policyReadOnly={policyReadOnly}
+                      closed={annotation.status !== AnnotationStatus.Open}
+                      onReopen={
+                        !readOnly && !reviewClosed && mayReopenAnnotation(annotation, userId)
+                          ? () => reopenWith(annotation)
+                          : undefined
+                      }
+                      previousSeenAt={previousSeenAt}
+                      skipOpener
+                      buildPermalink={buildPermalink}
+                      scrollToCommentId={scrollToCommentId}
+                      onScrolledToComment={onScrolledToComment}
+                    />
+                  </Box>
                 </Box>
                 {/* Discoverability for the native resize grip underneath. */}
                 <Box

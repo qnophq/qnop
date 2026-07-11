@@ -46,14 +46,10 @@ describe('ReviewViewTabs', () => {
   it('links every view and marks the active one', () => {
     renderTabs({ active: 'tasks' });
 
-    expect(screen.getByTestId('review-view-tab-document')).toHaveAttribute(
-      'href',
-      '/reviews/d1?view=panel',
-    );
-    expect(screen.getByTestId('review-view-tab-focus')).toHaveAttribute(
-      'href',
-      '/reviews/d1?view=focus',
-    );
+    // No ?view= param — the stored panel/focus preference decides (issue #403).
+    expect(screen.getByTestId('review-view-tab-document')).toHaveAttribute('href', '/reviews/d1');
+    // Focus is a toolbar-level presentation of the Document tab, not a tab (issue #403).
+    expect(screen.queryByTestId('review-view-tab-focus')).not.toBeInTheDocument();
     expect(screen.getByTestId('review-view-tab-compare')).toHaveAttribute(
       'href',
       '/reviews/d1/compare',

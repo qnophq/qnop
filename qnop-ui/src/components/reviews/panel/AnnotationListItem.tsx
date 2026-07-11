@@ -30,14 +30,40 @@ import { MessageSquare } from 'lucide-react';
 import type { AnnotationView } from '../../../api/generated';
 import { useComments } from '../../../api/hooks/useComments';
 import { useAuthStore } from '../../../stores/authStore';
+import type { Notify } from '../../admin/layout/useToast';
 import { UserAvatar } from '../../shell/UserAvatar';
 import { tokens } from '../../../theme/tokens';
+import { shortRelativeTime } from '../../../utils/relativeTime';
 import { hasNewComments, isUnseen } from '../newSince';
+import { PRIORITY_CUES, TYPE_CUES } from '../tasks/tasksModel';
 import { AnnotationHead } from './AnnotationHead';
 import { STATUS_CUES } from './statusCues';
 
 /** Up to this many participant avatars stack in the collapsed row. */
 const MAX_AVATARS = 3;
+
+/** Status tile + gap — the meta line indents to align under the title. */
+const TILE_INDENT = '34px';
+
+const DATE_FORMAT = new Intl.DateTimeFormat(undefined, {
+  dateStyle: 'medium',
+  timeStyle: 'short',
+});
+
+/**
+ * One-line plain-text excerpt of a Markdown body (issue #403): a collapsed
+ * document-scoped annotation shows what it SAYS instead of a generic "Whole
+ * document" label, so four general remarks stop reading identically. Cheap
+ * marker stripping only — the full body renders properly once expanded.
+ */
+function plainExcerpt(markdown: string): string {
+  return markdown
+    .replace(/!?\[([^\]]*)\]\([^)]*\)/g, '$1')
+    .replace(/^[#>\-*\d.\s]+/gm, '')
+    .replace(/[`*_~]/g, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
 
 interface DiscussionParticipant {
   id: string;
@@ -97,6 +123,9 @@ interface AnnotationListItemProps {
    * referentially stable for {@link memo} (issue #333).
    */
   onSelect: (annotationId: string | null) => void;
+  /** The annotation permalink (issue #412) — shown in the expanded head's author row. */
+  permalinkUrl?: string;
+  notify?: Notify;
   onHover?: (annotationId: string | null) => void;
 }
 
@@ -120,6 +149,8 @@ function AnnotationListItemBase({
   linked = false,
   onSelect,
   onHover,
+  permalinkUrl,
+  notify,
 }: AnnotationListItemProps) {
   const theme = useTheme();
   const viewerId = useAuthStore((state) => state.userId);
@@ -129,6 +160,14 @@ function AnnotationListItemBase({
   const region = annotation.anchor?.region;
   const statusCue = STATUS_CUES[annotation.status];
   const StatusIcon = statusCue.icon;
+  const typeCue = annotation.type ? TYPE_CUES[annotation.type] : null;
+  const priorityCue = annotation.priority ? PRIORITY_CUES[annotation.priority] : null;
+  const viewerAvatarUrl = useAuthStore((state) => state.avatarUrl);
+  const viewerName = useAuthStore((state) => state.displayName);
+  const authorName =
+    annotation.authorId === viewerId
+      ? (viewerName ?? 'You')
+      : (annotation.authorDisplayName ?? 'Participant');
 
   // Participants: the annotation author plus every commenter already known to
   // the cache (enabled: false never fetches — rows stay cheap; the stack
@@ -153,6 +192,9 @@ function AnnotationListItemBase({
 
   return (
     <ButtonBase
+      // Expanded, the card hosts real buttons (the head's copy-link) — a
+      // <button> may not nest, so the active card is a div with button role.
+      component={active ? 'div' : 'button'}
       onClick={() => onSelect(active ? null : annotation.id)}
       onMouseEnter={() => onHover?.(annotation.id)}
       onMouseLeave={() => onHover?.(null)}
@@ -185,66 +227,136 @@ function AnnotationListItemBase({
       }}
     >
       {active ? (
-        <AnnotationHead annotation={annotation} unseen={unseen} />
+        <AnnotationHead
+          annotation={annotation}
+          unseen={unseen}
+          permalinkUrl={permalinkUrl}
+          notify={notify}
+        />
       ) : (
-        <Stack direction="row" spacing={1} sx={{ alignItems: 'center', minWidth: 0 }}>
-          <Tooltip title={statusCue.label}>
-            <Box sx={{ display: 'flex', color: statusCue.color(theme), flexShrink: 0 }}>
-              <StatusIcon size={15} aria-label={statusCue.label} />
-            </Box>
-          </Tooltip>
-          {unseen && (
-            <Tooltip title="New since your last visit">
+        <Stack spacing={0.5} sx={{ minWidth: 0 }}>
+          {/* Title line: status tile, the content itself, participants. */}
+          <Stack direction="row" spacing={1} sx={{ alignItems: 'center', minWidth: 0 }}>
+            <Tooltip title={statusCue.label}>
               <Box
-                data-testid="unseen-dot"
                 sx={{
-                  width: 7,
-                  height: 7,
-                  borderRadius: '50%',
-                  bgcolor: theme.qnop.brand.blue,
+                  position: 'relative',
+                  width: 26,
+                  height: 26,
+                  borderRadius: '8px',
+                  display: 'grid',
+                  placeItems: 'center',
+                  bgcolor: alpha(statusCue.color(theme), 0.12),
+                  color: statusCue.color(theme),
                   flexShrink: 0,
                 }}
-              />
+              >
+                <StatusIcon size={14} aria-label={statusCue.label} />
+                {unseen && (
+                  <Tooltip title="New since your last visit">
+                    <Box
+                      data-testid="unseen-dot"
+                      sx={{
+                        position: 'absolute',
+                        top: -3,
+                        right: -3,
+                        width: 9,
+                        height: 9,
+                        borderRadius: '50%',
+                        bgcolor: theme.qnop.brand.blue,
+                        border: '2px solid',
+                        borderColor: 'background.paper',
+                      }}
+                    />
+                  </Tooltip>
+                )}
+              </Box>
             </Tooltip>
-          )}
-          <Typography
-            variant="body2"
-            noWrap
-            sx={{
-              flex: 1,
-              minWidth: 0,
-              color: 'text.secondary',
-              fontStyle: quote ? 'italic' : 'normal',
-            }}
-          >
-            {quote ? `“${quote}”` : fallbackLabel}
-          </Typography>
+            <Typography
+              variant="body2"
+              noWrap
+              sx={{
+                flex: 1,
+                minWidth: 0,
+                color: annotation.status === 'RESOLVED' ? 'text.secondary' : 'text.primary',
+                fontStyle: quote ? 'italic' : 'normal',
+              }}
+            >
+              {quote ? `“${quote}”` : plainExcerpt(annotation.firstComment ?? '') || fallbackLabel}
+            </Typography>
+            <ParticipantAvatars participants={participants} />
+          </Stack>
+          {/* Meta line: who, when, what kind — then the counters. */}
           <Stack
             direction="row"
-            spacing={0.5}
-            data-testid="comment-count"
-            sx={{
-              alignItems: 'center',
-              color: freshComments ? theme.qnop.brand.blue : 'text.secondary',
-              fontWeight: freshComments ? 600 : undefined,
-              flexShrink: 0,
-            }}
+            spacing={0.75}
+            sx={{ alignItems: 'center', minWidth: 0, pl: TILE_INDENT, color: 'text.secondary' }}
           >
-            <MessageSquare size={13} aria-hidden />
-            <Typography variant="caption" aria-label={`${annotation.commentCount} comments`}>
-              {annotation.commentCount}
+            <UserAvatar
+              name={authorName}
+              size={16}
+              imageUrl={annotation.authorId === viewerId ? viewerAvatarUrl : null}
+            />
+            <Typography variant="caption" noWrap sx={{ fontWeight: 500, flexShrink: 1 }}>
+              {authorName}
             </Typography>
-          </Stack>
-          {region && (
             <Typography
               variant="caption"
-              color="text.secondary"
-              sx={{ flexShrink: 0, fontVariantNumeric: 'tabular-nums' }}
+              title={DATE_FORMAT.format(new Date(annotation.createdAt))}
+              sx={{ flexShrink: 0, color: 'text.disabled' }}
             >
-              p. {region.surfaceIndex + 1}
+              {shortRelativeTime(annotation.createdAt)}
             </Typography>
-          )}
-          <ParticipantAvatars participants={participants} />
+            {typeCue && (
+              <Stack
+                direction="row"
+                spacing={0.4}
+                sx={{ alignItems: 'center', color: typeCue.color(theme), flexShrink: 0 }}
+              >
+                <typeCue.icon size={11} aria-hidden />
+                <Typography variant="caption">{typeCue.label}</Typography>
+              </Stack>
+            )}
+            {priorityCue && (
+              <Tooltip title={`${priorityCue.label} priority`}>
+                <Box
+                  sx={{
+                    width: 7,
+                    height: 7,
+                    borderRadius: '50%',
+                    bgcolor: priorityCue.color(theme),
+                    flexShrink: 0,
+                  }}
+                />
+              </Tooltip>
+            )}
+            <Box sx={{ flex: 1 }} />
+            <Stack
+              direction="row"
+              spacing={0.5}
+              data-testid="comment-count"
+              sx={{
+                alignItems: 'center',
+                color: freshComments ? theme.qnop.brand.blue : 'text.secondary',
+                fontWeight: freshComments ? 600 : undefined,
+                flexShrink: 0,
+              }}
+            >
+              <MessageSquare size={12} aria-hidden />
+              <Typography variant="caption" aria-label={`${annotation.commentCount} comments`}>
+                {annotation.commentCount}
+              </Typography>
+            </Stack>
+            {region && (
+              <Typography
+                variant="caption"
+                color="text.secondary"
+                sx={{ flexShrink: 0, fontVariantNumeric: 'tabular-nums' }}
+              >
+                p. {region.surfaceIndex + 1}
+              </Typography>
+            )}
+          </Stack>
         </Stack>
       )}
     </ButtonBase>

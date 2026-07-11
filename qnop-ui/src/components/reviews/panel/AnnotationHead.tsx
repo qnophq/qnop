@@ -25,6 +25,8 @@ import Typography from '@mui/material/Typography';
 import { useTheme } from '@mui/material/styles';
 import type { AnnotationView } from '../../../api/generated';
 import { useComments } from '../../../api/hooks/useComments';
+import type { Notify } from '../../admin/layout/useToast';
+import { CopyLinkButton } from '../permalink/CopyLinkButton';
 import { useAuthStore } from '../../../stores/authStore';
 import { shortRelativeTime } from '../../../utils/relativeTime';
 import { UserAvatar } from '../../shell/UserAvatar';
@@ -44,6 +46,9 @@ interface AnnotationHeadProps {
   annotation: AnnotationView;
   /** Adds the "New" badge (issue #307). */
   unseen?: boolean;
+  /** With `notify`, the author row carries the hover-revealed copy-link (issue #412). */
+  permalinkUrl?: string;
+  notify?: Notify;
 }
 
 /**
@@ -55,7 +60,12 @@ interface AnnotationHeadProps {
  * expanded card and the focus mode's floating card, so the head reads
  * identically on both.
  */
-export function AnnotationHead({ annotation, unseen = false }: AnnotationHeadProps) {
+export function AnnotationHead({
+  annotation,
+  unseen = false,
+  permalinkUrl,
+  notify,
+}: AnnotationHeadProps) {
   const theme = useTheme();
   const userId = useAuthStore((state) => state.userId);
   const displayName = useAuthStore((state) => state.displayName);
@@ -75,7 +85,24 @@ export function AnnotationHead({ annotation, unseen = false }: AnnotationHeadPro
     : 'No placement on this version';
 
   return (
-    <Stack spacing={1.25} data-testid="annotation-head-card">
+    <Stack
+      spacing={1.25}
+      data-testid="annotation-head-card"
+      sx={{
+        // The same quiet reveal the comment rows use (issue #412): the
+        // copy-link stays invisible until the card is hovered or focused;
+        // pointer-less devices see it permanently.
+        '& .annotation-hover-actions': {
+          opacity: 0,
+          transition: 'opacity 120ms ease',
+          '@media (prefers-reduced-motion: reduce)': { transition: 'none' },
+          '@media (hover: none)': { opacity: 1 },
+        },
+        '&:hover .annotation-hover-actions, &:focus-within .annotation-hover-actions': {
+          opacity: 1,
+        },
+      }}
+    >
       {/* The thread starter, front and centre — this is their discussion. */}
       <Stack direction="row" spacing={1.25} sx={{ alignItems: 'center', minWidth: 0 }}>
         <UserAvatar name={authorName} size={AUTHOR_AVATAR_SIZE} imageUrl={own ? avatarUrl : null} />
@@ -87,16 +114,33 @@ export function AnnotationHead({ annotation, unseen = false }: AnnotationHeadPro
           >
             {authorName}
           </Typography>
-          <Typography
-            variant="caption"
-            color="text.secondary"
-            noWrap
-            component="p"
-            title={DATE_FORMAT.format(new Date(annotation.createdAt))}
-            sx={{ lineHeight: 1.4 }}
-          >
-            Started this discussion · {shortRelativeTime(annotation.createdAt)}
-          </Typography>
+          <Stack direction="row" spacing={0.5} sx={{ alignItems: 'center', minWidth: 0 }}>
+            <Typography
+              variant="caption"
+              color="text.secondary"
+              noWrap
+              component="p"
+              title={DATE_FORMAT.format(new Date(annotation.createdAt))}
+              sx={{ lineHeight: 1.4 }}
+            >
+              Started this discussion · {shortRelativeTime(annotation.createdAt)}
+            </Typography>
+            {permalinkUrl && notify && (
+              // Directly after the timestamp, exactly like a comment row's
+              // link. The negative margin keeps the icon button from growing
+              // the caption line beyond the avatar's height.
+              <Box
+                className="annotation-hover-actions"
+                sx={{ display: 'flex', flexShrink: 0, my: '-3px' }}
+              >
+                <CopyLinkButton
+                  url={permalinkUrl}
+                  notify={notify}
+                  label="Copy link to annotation"
+                />
+              </Box>
+            )}
+          </Stack>
         </Box>
       </Stack>
       <AnnotationBadgeRow annotation={annotation} unseen={unseen} />

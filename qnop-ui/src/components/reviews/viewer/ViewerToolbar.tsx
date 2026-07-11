@@ -30,8 +30,17 @@ import ToggleButton from '@mui/material/ToggleButton';
 import ToggleButtonGroup from '@mui/material/ToggleButtonGroup';
 import Tooltip from '@mui/material/Tooltip';
 import Typography from '@mui/material/Typography';
-import { BoxSelect, ChevronDown, ChevronUp, NotebookPen, TextCursor } from 'lucide-react';
+import {
+  BoxSelect,
+  ChevronDown,
+  ChevronUp,
+  Focus,
+  NotebookPen,
+  PanelRight,
+  TextCursor,
+} from 'lucide-react';
 import type { DocumentVersionSummary } from '../../../api/generated';
+import type { ReviewViewMode } from '../focus/useViewMode';
 import { ExtractionStatus } from '../../../api/generated';
 import { ToneBadge } from '../../admin/ToneBadge';
 import { ZoomControls } from './ZoomControls';
@@ -55,8 +64,12 @@ interface ViewerToolbarProps {
   canAnnotate: boolean;
   zoom: number;
   onZoomChange: (zoom: number) => void;
-  /** True in focus mode (issue #291) — shows the annotation drawer's entry point. */
-  focusMode: boolean;
+  /**
+   * The surface's presentation (issue #403): side panel or spotlight focus.
+   * Both live inside the Document tab; this toolbar hosts the switch.
+   */
+  viewMode: ReviewViewMode;
+  onViewModeChange: (mode: ReviewViewMode) => void;
   /** Shown on the list button in focus mode — the drawer's entry point. */
   annotationCount: number;
   onOpenAnnotationList: () => void;
@@ -82,10 +95,12 @@ export function ViewerToolbar({
   canAnnotate,
   zoom,
   onZoomChange,
-  focusMode,
+  viewMode,
+  onViewModeChange,
   annotationCount,
   onOpenAnnotationList,
 }: ViewerToolbarProps) {
+  const focusMode = viewMode === 'focus';
   return (
     <Paper
       variant="outlined"
@@ -176,6 +191,39 @@ export function ViewerToolbar({
         <Divider orientation="vertical" flexItem />
 
         <ZoomControls zoom={zoom} onZoomChange={onZoomChange} />
+
+        <Divider orientation="vertical" flexItem />
+
+        {/* Panel vs. focus is a presentation of THIS tab (issue #403), so the
+            switch lives here rather than in the page-level tab strip. */}
+        <ToggleButtonGroup
+          exclusive
+          size="small"
+          value={viewMode}
+          onChange={(_event, next: ReviewViewMode | null) => next && onViewModeChange(next)}
+          aria-label="Document layout"
+        >
+          <ToggleButton value="panel" aria-label="Panel view" sx={{ gap: 0.5, px: 1 }}>
+            <Tooltip title="Document beside the annotation panel">
+              <Stack direction="row" spacing={0.5} sx={{ alignItems: 'center' }}>
+                <PanelRight size={15} />
+                <Typography variant="caption" sx={{ fontWeight: 600, lineHeight: 1 }}>
+                  Panel
+                </Typography>
+              </Stack>
+            </Tooltip>
+          </ToggleButton>
+          <ToggleButton value="focus" aria-label="Focus view" sx={{ gap: 0.5, px: 1 }}>
+            <Tooltip title="Full-width document with the spotlight overlay">
+              <Stack direction="row" spacing={0.5} sx={{ alignItems: 'center' }}>
+                <Focus size={15} />
+                <Typography variant="caption" sx={{ fontWeight: 600, lineHeight: 1 }}>
+                  Focus
+                </Typography>
+              </Stack>
+            </Tooltip>
+          </ToggleButton>
+        </ToggleButtonGroup>
 
         {focusMode && (
           <Tooltip title="Show the annotation list">
