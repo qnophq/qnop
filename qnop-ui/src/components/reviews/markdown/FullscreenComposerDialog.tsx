@@ -29,10 +29,12 @@ import Tooltip from '@mui/material/Tooltip';
 import Typography from '@mui/material/Typography';
 import { alpha, useTheme } from '@mui/material/styles';
 import { Minimize2, PenLine } from 'lucide-react';
+import { ResizeHandle } from '../ResizeHandle';
+import { useResizeHandle } from '../useResizeHandle';
 
-/** Reading-comfortable line length for the writing column. */
-const STAGE_MAX_WIDTH = 860;
-const RAIL_WIDTH = 400;
+/** The context rail never crowds the editor, never vanishes. */
+const RAIL_MIN_WIDTH = 320;
+const RAIL_DEFAULT_WIDTH = 400;
 
 interface FullscreenComposerDialogProps {
   open: boolean;
@@ -48,12 +50,12 @@ interface FullscreenComposerDialogProps {
 
 /**
  * The full-screen writing stage (issue #403 follow-up): long thoughts deserve
- * more room than an inline reply box. The editor takes a centred, reading-wide
- * column; the conversation stays visible in a quiet rail on the right — where
- * discussions live everywhere else in the app — so writers keep the thread's
- * context without scrolling the page behind. The host renders the SAME
- * controlled composer inside, so the draft carries over in both directions;
- * Escape or the minimize affordance returns to the inline field.
+ * more room than an inline reply box. The editor fills the whole stage — the
+ * host renders the SAME controlled composer in its frameless `bare` mode, so
+ * the draft carries over in both directions and the composer's footer becomes
+ * the bottom-fixed action bar. The conversation stays visible in a quiet,
+ * resizable rail on the right — where discussions live everywhere else in the
+ * app. Escape or the minimize affordance returns to the inline field.
  */
 export function FullscreenComposerDialog({
   open,
@@ -65,6 +67,12 @@ export function FullscreenComposerDialog({
 }: FullscreenComposerDialogProps) {
   const theme = useTheme();
   const stageRef = useRef<HTMLDivElement>(null);
+  const rail = useResizeHandle({
+    storageKey: 'qnop-stage-rail-width',
+    defaultWidth: RAIL_DEFAULT_WIDTH,
+    minWidth: RAIL_MIN_WIDTH,
+    maxWidth: () => Math.max(RAIL_MIN_WIDTH, Math.min(680, Math.round(window.innerWidth * 0.5))),
+  });
 
   // Writers expect the caret in the field, at the end of their draft — the
   // dialog's default focus lands on the first button instead.
@@ -149,20 +157,23 @@ export function FullscreenComposerDialog({
         </Stack>
 
         <Stack direction="row" sx={{ flex: 1, minHeight: 0 }}>
-          {/* The writing stage: a centred, reading-wide column. */}
-          <Box ref={stageRef} sx={{ flex: 1, minWidth: 0, overflowY: 'auto' }}>
-            <Box sx={{ maxWidth: STAGE_MAX_WIDTH, mx: 'auto', px: { xs: 2, sm: 3 }, py: 3 }}>
-              {children}
-            </Box>
+          {/* The editor owns the whole stage; the host's bare composer brings
+              its own bottom action bar. */}
+          <Box
+            ref={stageRef}
+            sx={{ flex: 1, minWidth: 0, minHeight: 0, display: 'flex', flexDirection: 'column' }}
+          >
+            {children}
           </Box>
 
-          {/* The conversation, kept in sight — quiet, read-only, on the right
-              where discussions live everywhere else in the app. */}
+          {/* The conversation, kept in sight — quiet, read-only, resizable, on
+              the right where discussions live everywhere else in the app. */}
           {context && (
             <Box
               data-testid="fullscreen-composer-context"
               sx={{
-                width: RAIL_WIDTH,
+                position: 'relative',
+                width: rail.width,
                 flexShrink: 0,
                 display: { xs: 'none', md: 'flex' },
                 flexDirection: 'column',
@@ -172,6 +183,12 @@ export function FullscreenComposerDialog({
                 bgcolor: theme.qnop.surface2,
               }}
             >
+              <ResizeHandle
+                ariaLabel="Resize the context rail"
+                testId="stage-rail-resize-handle"
+                minWidth={RAIL_MIN_WIDTH}
+                state={rail}
+              />
               <Typography
                 variant="overline"
                 sx={{

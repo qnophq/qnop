@@ -100,6 +100,12 @@ interface MarkdownComposerProps {
   fullscreen?: boolean;
   /** Larger reading type for the full-screen stage. */
   roomy?: boolean;
+  /**
+   * Editor mode for the full-screen stage (issue #403 follow-up): no frame,
+   * the writing area fills all available height, and the footer becomes the
+   * stage's bottom-fixed action bar. Implies the larger reading type.
+   */
+  bare?: boolean;
 }
 
 /**
@@ -124,13 +130,14 @@ export function MarkdownComposer({
   onToggleFullscreen,
   fullscreen = false,
   roomy = false,
+  bare = false,
   actions,
 }: MarkdownComposerProps) {
   const theme = useTheme();
   // The full-screen stage reads larger; both the input and the preview's
   // row-derived heights follow the same metrics.
-  const fontSize = roomy ? 16 : 14;
-  const lineHeight = roomy ? 1.65 : 1.55;
+  const fontSize = roomy || bare ? 16 : 14;
+  const lineHeight = roomy || bare ? 1.65 : 1.55;
   const inputRef = useRef<HTMLTextAreaElement | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   // Selection for the controlled-update fallback, applied after the re-render.
@@ -333,15 +340,20 @@ export function MarkdownComposer({
       onDrop={handleDrop}
       sx={{
         position: 'relative',
-        border: '1px solid',
-        borderColor: 'divider',
-        borderRadius: '10px',
         bgcolor: 'background.paper',
-        transition: 'border-color 120ms ease, box-shadow 120ms ease',
-        '&:focus-within': {
-          borderColor: theme.qnop.brand.blue,
-          boxShadow: `0 0 0 2px ${alpha(theme.qnop.brand.blue, 0.18)}`,
-        },
+        // The stage IS the surface (issue #403): no frame, fill the host.
+        ...(bare
+          ? { height: '100%', display: 'flex', flexDirection: 'column', minHeight: 0 }
+          : {
+              border: '1px solid',
+              borderColor: 'divider',
+              borderRadius: '10px',
+              transition: 'border-color 120ms ease, box-shadow 120ms ease',
+              '&:focus-within': {
+                borderColor: theme.qnop.brand.blue,
+                boxShadow: `0 0 0 2px ${alpha(theme.qnop.brand.blue, 0.18)}`,
+              },
+            }),
         '@media (prefers-reduced-motion: reduce)': { transition: 'none' },
       }}
     >
@@ -402,13 +414,17 @@ export function MarkdownComposer({
       {previewing ? (
         <Box
           data-testid="composer-preview"
-          sx={{
-            px: 1.5,
-            py: 1.25,
-            minHeight: Math.round(minRows * fontSize * lineHeight) + 20,
-            maxHeight: Math.round(maxRows * fontSize * lineHeight) + 20,
-            overflowY: 'auto',
-          }}
+          sx={
+            bare
+              ? { flex: 1, minHeight: 0, overflowY: 'auto', px: { xs: 2.5, md: 4 }, py: 2.5 }
+              : {
+                  px: 1.5,
+                  py: 1.25,
+                  minHeight: Math.round(minRows * fontSize * lineHeight) + 20,
+                  maxHeight: Math.round(maxRows * fontSize * lineHeight) + 20,
+                  overflowY: 'auto',
+                }
+          }
         >
           {value.trim() ? (
             <Markdown>{value}</Markdown>
@@ -432,13 +448,41 @@ export function MarkdownComposer({
           onKeyDown={handleKeyDown}
           onPaste={handlePaste}
           inputProps={{ maxLength: BODY_MAX_LENGTH, 'aria-label': inputAriaLabel }}
-          sx={{ px: 1.5, py: 1.25, fontSize, lineHeight }}
+          sx={
+            bare
+              ? {
+                  flex: 1,
+                  minHeight: 0,
+                  alignItems: 'stretch',
+                  px: { xs: 2.5, md: 4 },
+                  py: 2.5,
+                  fontSize,
+                  lineHeight,
+                  // The autosizing textarea would grow the page; on the stage
+                  // it IS the scroll container instead.
+                  '& textarea': { height: '100% !important', overflowY: 'auto !important' },
+                }
+              : { px: 1.5, py: 1.25, fontSize, lineHeight }
+          }
         />
       )}
       <Stack
         direction="row"
         spacing={1}
-        sx={{ px: 0.75, pb: 0.75, justifyContent: 'space-between', alignItems: 'center' }}
+        sx={
+          bare
+            ? {
+                px: 2,
+                py: 1,
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                borderTop: '1px solid',
+                borderColor: 'divider',
+                flexWrap: 'wrap',
+                gap: 0.5,
+              }
+            : { px: 0.75, pb: 0.75, justifyContent: 'space-between', alignItems: 'center' }
+        }
       >
         <Stack direction="row" spacing={1} sx={{ alignItems: 'center', pl: 0.25 }}>
           <EmojiPickerButton onSelect={insertEmoji} disabled={disabled || previewing} />

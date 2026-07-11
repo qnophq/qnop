@@ -75,8 +75,9 @@ export function Composer({
   const create = () => onCreate(comment, type || undefined, priority || undefined);
 
   // Rendered twice — inline and on the full-screen stage — over the SAME
-  // state, so the two views can never drift apart.
-  const classification = (
+  // state, so the two views can never drift apart. Inline the selects stretch;
+  // on the stage's bottom action bar they stay compact.
+  const classificationRow = (compact: boolean) => (
     <Stack direction="row" spacing={1}>
       <TextField
         select
@@ -84,7 +85,7 @@ export function Composer({
         label="Type"
         value={type}
         onChange={(event) => setType(event.target.value as AnnotationType | '')}
-        sx={{ flex: 1 }}
+        sx={compact ? { width: 150 } : { flex: 1 }}
         slotProps={{ htmlInput: { 'aria-label': 'Annotation type' } }}
       >
         <MenuItem value="">
@@ -117,7 +118,7 @@ export function Composer({
         label="Priority"
         value={priority}
         onChange={(event) => setPriority(event.target.value as AnnotationPriority | '')}
-        sx={{ flex: 1 }}
+        sx={compact ? { width: 150 } : { flex: 1 }}
         slotProps={{ htmlInput: { 'aria-label': 'Annotation priority' } }}
       >
         <MenuItem value="">
@@ -193,7 +194,7 @@ export function Composer({
           onToggleFullscreen={() => setWritingFullscreen(true)}
         />
         {/* Optional classification (issue #392) in the system's task language. */}
-        {classification}
+        {classificationRow(false)}
         {actionRow}
       </Stack>
       {/* The full-screen writing stage (issue #403 follow-up): the same
@@ -231,25 +232,30 @@ export function Composer({
           )
         }
       >
-        <Stack spacing={1.5}>
-          <MarkdownComposer
-            value={comment}
-            onChange={setComment}
-            onSubmit={() => {
-              if (canCreate) create();
-            }}
-            inputAriaLabel="Annotation comment"
-            minRows={12}
-            maxRows={26}
-            roomy
-            disabled={creating}
-            onUploadAttachment={onUploadAttachment}
-            fullscreen
-            onToggleFullscreen={() => setWritingFullscreen(false)}
-          />
-          {classification}
-          {actionRow}
-        </Stack>
+        <MarkdownComposer
+          value={comment}
+          onChange={setComment}
+          onSubmit={() => {
+            if (canCreate) create();
+          }}
+          inputAriaLabel="Annotation comment"
+          bare
+          disabled={creating}
+          onUploadAttachment={onUploadAttachment}
+          fullscreen
+          onToggleFullscreen={() => setWritingFullscreen(false)}
+          actions={
+            <Stack direction="row" spacing={1} sx={{ alignItems: 'center', flexWrap: 'wrap' }}>
+              {classificationRow(true)}
+              <Button size="small" variant="contained" onClick={create} disabled={!canCreate}>
+                Create annotation ({submitShortcutLabel()})
+              </Button>
+              <Button size="small" onClick={onCancel} disabled={creating}>
+                Cancel
+              </Button>
+            </Stack>
+          }
+        />
       </FullscreenComposerDialog>
     </Paper>
   );

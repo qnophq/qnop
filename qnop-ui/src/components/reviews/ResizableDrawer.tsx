@@ -19,40 +19,13 @@
  * SPDX-License-Identifier: AGPL-3.0-only
  */
 
-import { useRef, useState, type KeyboardEvent, type PointerEvent, type ReactNode } from 'react';
-import Box from '@mui/material/Box';
+import type { ReactNode } from 'react';
 import Drawer from '@mui/material/Drawer';
-import { alpha, useTheme } from '@mui/material/styles';
+import { ResizeHandle } from './ResizeHandle';
+import { useResizeHandle } from './useResizeHandle';
 
 /** Never narrower than a thread needs to breathe, never the whole viewport. */
 const DEFAULT_MIN_WIDTH = 380;
-const KEYBOARD_STEP = 24;
-
-/** Keeps a slice of the underlying page visible even on generous drags. */
-function maxWidth(minWidth: number): number {
-  return Math.max(minWidth, Math.min(900, window.innerWidth - 240));
-}
-
-function clampWidth(width: number, minWidth: number): number {
-  return Math.min(Math.max(width, minWidth), maxWidth(minWidth));
-}
-
-function storedWidth(storageKey: string, minWidth: number, defaultWidth: number): number {
-  try {
-    const value = Number(localStorage.getItem(storageKey));
-    return Number.isFinite(value) && value >= minWidth ? clampWidth(value, minWidth) : defaultWidth;
-  } catch {
-    return defaultWidth;
-  }
-}
-
-function persistWidth(storageKey: string, width: number) {
-  try {
-    localStorage.setItem(storageKey, String(width));
-  } catch {
-    // best-effort persistence
-  }
-}
 
 interface ResizableDrawerProps {
   open: boolean;
@@ -70,10 +43,9 @@ interface ResizableDrawerProps {
 
 /**
  * A right-anchored drawer whose width is a personal working preference
- * (issue #403): a grab handle on the leading edge resizes it (pointer drag,
- * or arrow keys on the focused separator) and the choice persists per
- * `storageKey`. One mechanism for every review drawer — focus-mode panel and
- * task details resize and remember identically.
+ * (issue #403), resized and persisted through {@link useResizeHandle}. One
+ * mechanism for every review drawer — focus-mode panel and task details
+ * resize and remember identically.
  */
 export function ResizableDrawer({
   open,
@@ -86,96 +58,23 @@ export function ResizableDrawer({
   drawerTestId,
   children,
 }: ResizableDrawerProps) {
-  const theme = useTheme();
-  const [width, setWidth] = useState<number>(() => storedWidth(storageKey, minWidth, defaultWidth));
-  const [resizing, setResizing] = useState(false);
-  // The live value for the pointer-up persist — state updates lag the drag.
-  const widthRef = useRef(width);
-
-  const applyWidth = (next: number) => {
-    const clamped = clampWidth(next, minWidth);
-    widthRef.current = clamped;
-    setWidth(clamped);
-    return clamped;
-  };
-
-  const handlePointerDown = (event: PointerEvent<HTMLDivElement>) => {
-    event.preventDefault();
-    event.currentTarget.setPointerCapture?.(event.pointerId);
-    setResizing(true);
-  };
-
-  const handlePointerMove = (event: PointerEvent<HTMLDivElement>) => {
-    if (!event.currentTarget.hasPointerCapture?.(event.pointerId)) return;
-    // Anchored right: the drawer spans from the pointer to the viewport edge.
-    applyWidth(window.innerWidth - event.clientX);
-  };
-
-  const handlePointerUp = (event: PointerEvent<HTMLDivElement>) => {
-    event.currentTarget.releasePointerCapture?.(event.pointerId);
-    setResizing(false);
-    persistWidth(storageKey, widthRef.current);
-  };
-
-  const handleKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
-    // The handle sits on the LEADING edge: left grows the drawer, right shrinks it.
-    if (event.key !== 'ArrowLeft' && event.key !== 'ArrowRight') return;
-    event.preventDefault();
-    // widthRef, not state: key-repeat bursts outpace re-renders.
-    persistWidth(
-      storageKey,
-      applyWidth(widthRef.current + (event.key === 'ArrowLeft' ? KEYBOARD_STEP : -KEYBOARD_STEP)),
-    );
-  };
+  const resize = useResizeHandle({ storageKey, defaultWidth, minWidth });
 
   return (
     <Drawer
       anchor="right"
       open={open}
       onClose={onClose}
-      slotProps={{ paper: { sx: { width: { xs: '100%', sm: width }, overflow: 'visible' } } }}
+      slotProps={{
+        paper: { sx: { width: { xs: '100%', sm: resize.width }, overflow: 'visible' } },
+      }}
       data-testid={drawerTestId}
     >
-      <Box
-        role="separator"
-        aria-orientation="vertical"
-        aria-label={handleAriaLabel}
-        aria-valuemin={minWidth}
-        aria-valuenow={Math.round(width)}
-        tabIndex={0}
-        data-testid={handleTestId}
-        onPointerDown={handlePointerDown}
-        onPointerMove={handlePointerMove}
-        onPointerUp={handlePointerUp}
-        onKeyDown={handleKeyDown}
-        sx={{
-          position: 'absolute',
-          left: -5,
-          top: 0,
-          bottom: 0,
-          width: 10,
-          zIndex: 1,
-          display: { xs: 'none', sm: 'flex' },
-          alignItems: 'center',
-          justifyContent: 'center',
-          cursor: 'col-resize',
-          touchAction: 'none',
-          '&:focus-visible': { outline: 'none', boxShadow: theme.qnop.focusRing },
-          // The visible grip: a quiet hairline that wakes on hover/drag.
-          '&::after': {
-            content: '""',
-            width: '3px',
-            height: 48,
-            borderRadius: 2,
-            bgcolor: resizing ? theme.qnop.brand.blue : theme.palette.divider,
-            transition: 'background-color 120ms ease, height 120ms ease',
-          },
-          '&:hover::after': {
-            bgcolor: resizing ? theme.qnop.brand.blue : alpha(theme.qnop.brand.blue, 0.6),
-            height: 72,
-          },
-          '@media (prefers-reduced-motion: reduce)': { '&::after': { transition: 'none' } },
-        }}
+      <ResizeHandle
+        ariaLabel={handleAriaLabel}
+        testId={handleTestId}
+        minWidth={minWidth}
+        state={resize}
       />
       {children}
     </Drawer>

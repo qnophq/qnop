@@ -427,7 +427,7 @@ describe('full-screen writing stage (issue #403)', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Full screen' }));
     const dialog = screen.getByTestId('fullscreen-composer');
 
-    fireEvent.click(within(dialog).getByRole('button', { name: 'Comment' }));
+    fireEvent.click(within(dialog).getByRole('button', { name: /^Comment/ }));
 
     expect(addMutate).toHaveBeenCalledWith('Written on the stage', expect.anything());
     await waitFor(() =>

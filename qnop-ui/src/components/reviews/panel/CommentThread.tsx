@@ -355,38 +355,21 @@ export function CommentThread({
         )}
       </Stack>
       {/* The full-screen writing stage (issue #403 follow-up): the same
-          controlled draft on a reading-wide column, with the whole discussion
-          — opener included — in the context rail. Sending closes the stage. */}
+          controlled draft as a frameless editor filling the stage, with the
+          whole discussion — opener included, timeline anatomy and all — in the
+          resizable context rail. Sending closes the stage. */}
       <FullscreenComposerDialog
         open={writingFullscreen}
         onClose={() => setWritingFullscreen(false)}
         title="Write a reply"
         contextTitle={`Discussion (${comments.length})`}
         context={
-          <Stack spacing={2}>
-            {comments.map((comment) => {
-              const own = comment.authorId === userId;
-              const name = own
-                ? (displayName ?? 'You')
-                : (comment.authorDisplayName ?? 'Participant');
-              return (
-                <CommentMessage
-                  key={comment.id}
-                  name={name}
-                  own={own}
-                  avatarUrl={avatarUrl}
-                  body={comment.body}
-                  createdAt={comment.createdAt}
-                  notify={notify}
-                />
-              );
-            })}
-            {comments.length === 0 && (
-              <Typography variant="body2" color="text.secondary">
-                No comments yet.
-              </Typography>
-            )}
-          </Stack>
+          <CommentThread
+            annotationId={annotationId}
+            notify={notify}
+            readOnly
+            previousSeenAt={previousSeenAt}
+          />
         }
       >
         <MarkdownComposer
@@ -394,13 +377,20 @@ export function CommentThread({
           onChange={setDraft}
           onSubmit={() => submit(() => setWritingFullscreen(false))}
           inputAriaLabel="Add a comment"
-          minRows={12}
-          maxRows={26}
-          roomy
+          bare
           onUploadAttachment={uploadAttachment}
           fullscreen
           onToggleFullscreen={() => setWritingFullscreen(false)}
-          actions={sendAction(() => setWritingFullscreen(false))}
+          actions={
+            <Button
+              size="small"
+              variant="contained"
+              onClick={() => submit(() => setWritingFullscreen(false))}
+              disabled={!draft.trim() || addComment.isPending}
+            >
+              Comment ({submitShortcutLabel()})
+            </Button>
+          }
         />
       </FullscreenComposerDialog>
     </Box>
