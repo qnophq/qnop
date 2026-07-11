@@ -189,7 +189,7 @@ export function HomePage() {
             sx={{
               display: 'grid',
               gap: 2.5,
-              gridTemplateColumns: { xs: '1fr', lg: 'minmax(0, 7fr) minmax(0, 5fr)' },
+              gridTemplateColumns: { xs: '1fr', lg: 'repeat(2, minmax(0, 1fr))' },
               alignItems: 'start',
             }}
           >
