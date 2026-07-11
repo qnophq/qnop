@@ -64,6 +64,8 @@ interface FocusAnnotationCardProps {
   readOnly?: boolean;
   /** The viewed version — the scope of placement confirmation (issue #326). */
   versionNumber?: number | null;
+  /** Arms re-attaching a lost placement (issue #457) — the page closes the card and waits for the selection. */
+  onArmReattach?: (annotation: AnnotationView) => void;
   /** True once the review is FINALIZED/CANCELLED (issue #394): no reopening. */
   reviewClosed?: boolean;
   /** Thread participation policy (issue #413) — READ_ONLY suppresses foreign composers. */
@@ -106,6 +108,7 @@ export function FocusAnnotationCard({
   notify,
   readOnly = false,
   versionNumber = null,
+  onArmReattach,
   reviewClosed = false,
   threadParticipation = 'OPEN',
   ownerId,
@@ -343,6 +346,17 @@ export function FocusAnnotationCard({
                                 annotationId: annotation.id,
                                 versionNumber,
                               })
+                          : undefined
+                      }
+                      onReattachPlacement={
+                        onArmReattach != null &&
+                        versionNumber != null &&
+                        !readOnly &&
+                        !reviewClosed &&
+                        (annotation.placementStatus === 'ORPHANED' ||
+                          annotation.placementStatus === 'FAILED') &&
+                        (userId === ownerId || userId === annotation.authorId)
+                          ? () => onArmReattach(annotation)
                           : undefined
                       }
                     />

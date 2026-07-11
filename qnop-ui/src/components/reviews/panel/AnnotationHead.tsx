@@ -54,6 +54,8 @@ interface AnnotationHeadProps {
   notify?: Notify;
   /** Confirms a reviewed MOVED placement (issue #326) — rendered beside the Moved chip. */
   onConfirmPlacement?: () => void;
+  /** Arms re-attaching a lost placement (issue #457) — rendered beside the Orphaned chip. */
+  onReattachPlacement?: () => void;
 }
 
 /**
@@ -71,6 +73,7 @@ export function AnnotationHead({
   permalinkUrl,
   notify,
   onConfirmPlacement,
+  onReattachPlacement,
 }: AnnotationHeadProps) {
   const theme = useTheme();
   // Reactions on the opener (issue #410) — active wherever notify travels;
@@ -172,6 +175,7 @@ export function AnnotationHead({
         annotation={annotation}
         unseen={unseen}
         onConfirmPlacement={onConfirmPlacement}
+        onReattachPlacement={onReattachPlacement}
       />
       {/* The anchored passage, styled as a real quotation. */}
       {quote ? (

@@ -25,7 +25,7 @@ import Stack from '@mui/material/Stack';
 import Tooltip from '@mui/material/Tooltip';
 import Typography from '@mui/material/Typography';
 import { useTheme } from '@mui/material/styles';
-import { Check, MessageSquare } from 'lucide-react';
+import { Check, Crosshair, MessageSquare } from 'lucide-react';
 import type { AnnotationView } from '../../../api/generated';
 import { PlacementStatus } from '../../../api/generated';
 import { ToneBadge } from '../../admin/ToneBadge';
@@ -44,6 +44,11 @@ interface AnnotationBadgeRowProps {
    * renders the "Looks right" affordance beside the Moved chip.
    */
   onConfirmPlacement?: () => void;
+  /**
+   * Arms re-attaching a lost placement (issue #457) — its presence renders the
+   * "Re-attach" affordance beside the Orphaned/Failed chip.
+   */
+  onReattachPlacement?: () => void;
 }
 
 /**
@@ -56,6 +61,7 @@ export function AnnotationBadgeRow({
   annotation,
   unseen = false,
   onConfirmPlacement,
+  onReattachPlacement,
 }: AnnotationBadgeRowProps) {
   const theme = useTheme();
   const statusCue = STATUS_CUES[annotation.status];
@@ -109,6 +115,23 @@ export function AnnotationBadgeRow({
           Looks right
         </Button>
       )}
+      {onReattachPlacement &&
+        (annotation.placementStatus === PlacementStatus.Orphaned ||
+          annotation.placementStatus === PlacementStatus.Failed) && (
+          <Button
+            size="small"
+            variant="text"
+            startIcon={<Crosshair size={12} />}
+            onClick={(event) => {
+              // Sits inside clickable cards — arming must not toggle them.
+              event.stopPropagation();
+              onReattachPlacement();
+            }}
+            sx={{ py: 0, minHeight: 0, fontSize: 12 }}
+          >
+            Re-attach
+          </Button>
+        )}
       <Stack
         direction="row"
         spacing={1}

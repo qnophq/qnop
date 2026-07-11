@@ -75,6 +75,7 @@ public class DashboardService {
           "annotation.resolved",
           "annotation.reopened",
           "placement.confirmed",
+          "placement.reattached",
           "workflow.transition",
           "document.due_date.changed");
 

@@ -2633,6 +2633,71 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
+  /annotations/{annotationId}/placements/{versionNumber}/anchor:
+    parameters:
+      - $ref: '#/components/parameters/AnnotationIdParam'
+      - name: versionNumber
+        in: path
+        required: true
+        schema:
+          type: integer
+    put:
+      tags: [Annotations]
+      summary: Re-attach an annotation by replacing its anchor (owner or author)
+      description: |
+        The manual rescue for lost placements (ADR-0009, issue #457): the
+        document owner or the annotation's author picks a new passage on the
+        LATEST version and the placement takes that anchor, flipping to
+        PLACED — the discussion thread stays untouched. Allowed from ORPHANED,
+        FAILED and MOVED (a manual correction of a bad guess); a PLACED
+        placement answers 409 (`PLACEMENT_NOT_REATTACHABLE`) so nothing is
+        overwritten by accident. Older versions are a read-only record
+        (`VERSION_READ_ONLY`), closed reviews refuse (`REVIEW_CLOSED`).
+      operationId: reattachPlacement
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PlacementReattachRequest'
+      responses:
+        '200':
+          description: The updated annotation with the re-attached placement
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AnnotationView'
+        '400':
+          description: The anchor is missing or malformed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          description: The caller is neither the document owner nor the annotation's author
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Unknown annotation, version, or no placement on that version
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '409':
+          description: >-
+            The placement is PLACED (`PLACEMENT_NOT_REATTACHABLE`), the version
+            is not the latest (`VERSION_READ_ONLY`), or the review is closed
+            (`REVIEW_CLOSED`)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
   /annotations/{annotationId}/comments:
     parameters:
       - $ref: '#/components/parameters/AnnotationIdParam'
@@ -3462,6 +3527,14 @@ components:
       enum:
         - INTERNAL
         - EXTERNAL
+    PlacementReattachRequest:
+      type: object
+      description: The new home of a lost placement (issue #457).
+      required:
+        - anchor
+      properties:
+        anchor:
+          $ref: '#/components/schemas/Anchor'
     PublicUserProfile:
       type: object
       description: The workspace-public slice of a user (issue #454).

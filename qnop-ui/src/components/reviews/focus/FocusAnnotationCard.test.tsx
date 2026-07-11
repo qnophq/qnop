@@ -47,6 +47,7 @@ vi.mock('../../../api/hooks/useComments', () => ({
 const { resolveMutate } = vi.hoisted(() => ({ resolveMutate: vi.fn() }));
 vi.mock('../../../api/hooks/useAnnotations', () => ({
   useConfirmPlacement: vi.fn().mockReturnValue({ mutate: vi.fn(), isPending: false }),
+  useReattachPlacement: vi.fn().mockReturnValue({ mutate: vi.fn(), isPending: false }),
   useResolveAnnotation: () => ({ mutate: resolveMutate, isPending: false }),
   useReopenAnnotation: () => ({ mutate: vi.fn(), isPending: false }),
 }));

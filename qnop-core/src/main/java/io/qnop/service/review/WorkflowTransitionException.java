@@ -36,6 +36,8 @@ public class WorkflowTransitionException extends RuntimeException {
 
   public static final String PLACEMENT_NOT_MOVED = "PLACEMENT_NOT_MOVED";
 
+  public static final String PLACEMENT_NOT_REATTACHABLE = "PLACEMENT_NOT_REATTACHABLE";
+
   /** An annotation was raised on a review that is already FINALIZED or CANCELLED (issue #405). */
   public static final String REVIEW_CLOSED = "REVIEW_CLOSED";
 

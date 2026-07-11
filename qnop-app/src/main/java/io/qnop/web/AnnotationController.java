@@ -33,6 +33,7 @@ import io.qnop.api.v1.model.AnnotationView;
 import io.qnop.api.v1.model.CommentCreateRequest;
 import io.qnop.api.v1.model.CommentListResponse;
 import io.qnop.api.v1.model.CommentView;
+import io.qnop.api.v1.model.PlacementReattachRequest;
 import io.qnop.api.v1.model.PlacementStatus;
 import io.qnop.api.v1.model.ReactionGroup;
 import io.qnop.service.review.AnnotationService;
@@ -135,6 +136,19 @@ public class AnnotationController implements AnnotationsApi {
     String note = request == null ? null : request.getNote();
     return ResponseEntity.ok(
         toDto(annotations.resolve(annotationId, note, CurrentUser.requireUserId())));
+  }
+
+  @Override
+  public ResponseEntity<AnnotationView> reattachPlacement(
+      UUID annotationId, Integer versionNumber, PlacementReattachRequest request) {
+    return ResponseEntity.ok(
+        toDto(
+            annotations.reattachPlacement(
+                annotationId,
+                versionNumber,
+                request.getAnchor() == null ? null : mapper.writeValueAsString(request.getAnchor()),
+                CurrentUser.requireUserId(),
+                CurrentUser.isAdmin())));
   }
 
   @Override
