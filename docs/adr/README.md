@@ -23,9 +23,9 @@ Important architecture decisions are recorded here as ADRs (see [ADR-0001](0001-
 | [0009](0009-multi-layer-annotation-anchoring.md) | Multi-layer annotation anchoring | Accepted |
 | [0010](0010-docx-representation-strategy.md) | DOCX representation strategy | Accepted |
 | [0011](0011-review-workflow-state-model.md) | Review workflow & domain model | Accepted |
-| [0012](0012-edition-vs-entitlements.md) | Edition vs. entitlements / license gating | Proposed |
+| [0012](0012-edition-vs-entitlements.md) | Edition vs. entitlements / license gating | Accepted (finalized by 0039) |
 | [0013](0013-redis-and-search-deferred.md) | Redis & search index deferred | Proposed |
-| [0014](0014-frontend-enterprise-separation.md) | Frontend enterprise separation | Proposed |
+| [0014](0014-frontend-enterprise-separation.md) | Frontend enterprise separation | Accepted (finalized by 0039) |
 | [0015](0015-published-rest-api-contract-module.md) | Published REST API contract module (qnop-api) | Accepted |
 | [0016](0016-contributor-license-agreement.md) | Contributor License Agreement enforced via CLA Assistant | Accepted |
 | [0017](0017-renovate-dependency-automation.md) | Dependency automation via self-hosted Renovate + org-wide preset | Accepted |
@@ -50,6 +50,7 @@ Important architecture decisions are recorded here as ADRs (see [ADR-0001](0001-
 | [0036](0036-object-storage-lifecycle-staging-and-reaper.md) | Object-storage lifecycle: staging registry + orphan reaper | Accepted |
 | [0037](0037-observability-actuator-health-and-prometheus.md) | Observability: Actuator health, job-queue health indicator, Prometheus metrics | Accepted |
 | [0038](0038-per-review-privacy.md) | Per-review privacy: anonymity & thread participation policy | Accepted |
+| [0039](0039-enterprise-packaging-and-runtime-extensions.md) | Enterprise packaging and runtime UI extension model | Accepted |
 
 ## Template
 
