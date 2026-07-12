@@ -160,6 +160,27 @@ class DashboardApiIT extends SeededIntegrationTest {
   }
 
   @Test
+  @DisplayName("resolves the owner's name for owner-driven events they never wrote in (issue #472)")
+  void ownerNameResolvesWithoutAuthorship() throws Exception {
+    UUID documentId = seedDocumentWithVersion();
+    // The owner's only action is a workflow transition — no annotation, no
+    // comment. Their name must still resolve (the UI otherwise says "Someone").
+    mockMvc
+        .perform(
+            as(post("/api/v1/documents/" + documentId + "/workflow"), MEMBER_ID)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"targetState\":\"IN_REVIEW\"}"))
+        .andExpect(status().isOk());
+
+    mockMvc
+        .perform(as(get("/api/v1/dashboard"), AUDITOR_ID))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.activity[0].type").value("workflow.transition"))
+        .andExpect(jsonPath("$.activity[0].actorId").value(MEMBER_ID.toString()))
+        .andExpect(jsonPath("$.activity[0].actorDisplayName").value("Mia Member"));
+  }
+
+  @Test
   @DisplayName("a user without reviews gets clean empty aggregates")
   void emptyDashboard() throws Exception {
     mockMvc
