@@ -59,7 +59,8 @@ class ApplicationSettingKeyTest {
           "auth.self_registration_enabled",
           "auth.self_registration_default_role",
           "auth.password_reset_enabled",
-          "auth.password_reset_token_ttl_minutes");
+          "auth.password_reset_token_ttl_minutes",
+          "notifications.review_emails_enabled");
 
   @Test
   void registryMatchesSeededKeys() {

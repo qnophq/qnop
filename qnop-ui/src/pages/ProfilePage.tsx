@@ -23,15 +23,22 @@ import { useState } from 'react';
 import Alert from '@mui/material/Alert';
 import Box from '@mui/material/Box';
 import Divider from '@mui/material/Divider';
+import FormControlLabel from '@mui/material/FormControlLabel';
 import Paper from '@mui/material/Paper';
 import Snackbar from '@mui/material/Snackbar';
 import Stack from '@mui/material/Stack';
+import Switch from '@mui/material/Switch';
 import Typography from '@mui/material/Typography';
 import { useAuthStore } from '../stores/authStore';
 import { useUploadMyAvatar, useRemoveMyAvatar } from '../api/hooks/useAvatar';
 import { UserAvatar } from '../components/shell/UserAvatar';
 import { UserRoleBadge, UserSourceBadge } from '../components/admin/users/UserBadges';
 import { AvatarUploader } from '../components/profile/AvatarUploader';
+import {
+  EMAIL_REVIEW_NOTIFICATIONS_KEY,
+  useUpdateUserSettings,
+  useUserSettings,
+} from '../api/hooks/useUserSettings';
 
 type Toast = { message: string; severity: 'success' | 'error' } | null;
 
@@ -51,6 +58,23 @@ export function ProfilePage() {
   const remove = useRemoveMyAvatar();
   const [toast, setToast] = useState<Toast>(null);
   const busy = upload.isPending || remove.isPending;
+
+  const settingsQuery = useUserSettings();
+  const updateSettings = useUpdateUserSettings();
+  const reviewMailsSetting = settingsQuery.data?.settings.find(
+    (setting) => setting.key === EMAIL_REVIEW_NOTIFICATIONS_KEY,
+  );
+  // Absent value = registry default (true) — the toggle reflects what the server does.
+  const reviewMailsOn = reviewMailsSetting ? reviewMailsSetting.value !== 'false' : true;
+
+  const onToggleReviewMails = (checked: boolean) => {
+    updateSettings.mutate(
+      { [EMAIL_REVIEW_NOTIFICATIONS_KEY]: String(checked) },
+      {
+        onError: () => setToast({ message: 'The setting could not be saved.', severity: 'error' }),
+      },
+    );
+  };
 
   const onSelect = async (blob: Blob) => {
     try {
@@ -118,6 +142,26 @@ export function ProfilePage() {
           busy={busy}
           onSelect={onSelect}
           onRemove={onRemove}
+        />
+      </Paper>
+
+      <Paper variant="outlined" sx={{ p: { xs: 2.5, sm: 3 } }}>
+        <Typography sx={{ fontSize: 16, fontWeight: 600 }}>Notifications</Typography>
+        <Typography color="text.secondary" sx={{ fontSize: 14, mt: 0.5, mb: 2.5 }}>
+          Emails about reviews you are part of — being added as a reviewer, new annotations, replies
+          in your discussions, decisions, and status changes.
+        </Typography>
+        <Divider sx={{ mb: 1.5 }} />
+        <FormControlLabel
+          control={
+            <Switch
+              checked={reviewMailsOn}
+              onChange={(event) => onToggleReviewMails(event.target.checked)}
+              disabled={settingsQuery.isPending}
+              slotProps={{ input: { 'aria-label': 'Email me about review activity' } }}
+            />
+          }
+          label="Email me about review activity"
         />
       </Paper>
 

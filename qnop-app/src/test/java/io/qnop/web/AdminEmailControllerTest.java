@@ -96,6 +96,39 @@ class AdminEmailControllerTest {
   }
 
   @Test
+  void templateTestSendRendersAndSends() throws Exception {
+    MailPreview preview =
+        new MailPreview(
+            new RenderedMail("Reset qnop", "Hi Jane Doe", "<p>Hi</p>"), Map.of("siteName", "qnop"));
+    when(templates.preview(eq(MailTemplateKey.PASSWORD_RESET), any(), any(), any()))
+        .thenReturn(preview);
+    when(mailService.sendMail(any(), any(), any(), any()))
+        .thenReturn(new MailService.SendResult.Sent("admin@qnop.test"));
+
+    mockMvc
+        .perform(
+            post("/api/v1/admin/email/templates/auth.password_reset/test")
+                .contentType("application/json")
+                .content("{\"recipient\":\"admin@qnop.test\"}"))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.status").value("SENT"))
+        .andExpect(jsonPath("$.detail").value("Sent to admin@qnop.test"));
+
+    // The RENDERED template travels, HTML alternative included.
+    verify(mailService).sendMail("admin@qnop.test", "Reset qnop", "Hi Jane Doe", "<p>Hi</p>");
+  }
+
+  @Test
+  void templateTestSendAnswers404ForUnknownKey() throws Exception {
+    mockMvc
+        .perform(
+            post("/api/v1/admin/email/templates/no.such_template/test")
+                .contentType("application/json")
+                .content("{\"recipient\":\"admin@qnop.test\"}"))
+        .andExpect(status().isNotFound());
+  }
+
+  @Test
   void previewReturnsEffectiveSampleVars() throws Exception {
     MailPreview preview =
         new MailPreview(

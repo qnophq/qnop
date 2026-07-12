@@ -45,7 +45,12 @@ public enum UserSettingKey {
       List.of("system", "light", "dark")),
   PREFERRED_LANGUAGE(
       "preferred_language", SettingValueType.STRING, "en", "Preferred UI language (ISO 639-1)."),
-  TIMEZONE("timezone", SettingValueType.STRING, "UTC", "Preferred display timezone (IANA id).");
+  TIMEZONE("timezone", SettingValueType.STRING, "UTC", "Preferred display timezone (IANA id)."),
+  EMAIL_REVIEW_NOTIFICATIONS(
+      "email_review_notifications",
+      SettingValueType.BOOLEAN,
+      "true",
+      "Receive email notifications for review activity (issue #316).");
 
   private static final Map<String, UserSettingKey> BY_KEY =
       Arrays.stream(values())

@@ -29,6 +29,7 @@ import io.qnop.repository.ParticipantProjection;
 import io.qnop.repository.ReviewParticipantRepository;
 import io.qnop.repository.TeamRepository;
 import io.qnop.repository.UserRepository;
+import io.qnop.service.review.ReviewEvent;
 import io.qnop.service.review.ReviewIdentityResolver;
 import io.qnop.service.review.ReviewIdentityResolver.ReviewIdentities;
 import java.nio.charset.StandardCharsets;
@@ -37,6 +38,7 @@ import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
 import java.util.UUID;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -55,6 +57,7 @@ public class ReviewParticipantService {
   private final TeamRepository teams;
   private final DocumentAccessService access;
   private final ReviewIdentityResolver identity;
+  private final ApplicationEventPublisher events;
 
   public ReviewParticipantService(
       DocumentRepository documents,
@@ -62,13 +65,15 @@ public class ReviewParticipantService {
       UserRepository users,
       TeamRepository teams,
       DocumentAccessService access,
-      ReviewIdentityResolver identity) {
+      ReviewIdentityResolver identity,
+      ApplicationEventPublisher events) {
     this.documents = documents;
     this.participants = participants;
     this.users = users;
     this.teams = teams;
     this.access = access;
     this.identity = identity;
+    this.events = events;
   }
 
   /**
@@ -155,6 +160,7 @@ public class ReviewParticipantService {
         throw DocumentValidationException.duplicateParticipant("user is already a participant");
       }
       ReviewParticipant saved = participants.save(ReviewParticipant.forUser(documentId, userId));
+      events.publishEvent(new ReviewEvent.ParticipantAdded(documentId, actor, userId, null));
       return new ParticipantView(
           saved.getId(), userId, false, user.getDisplayName(), saved.getCreatedAt());
     }
@@ -168,6 +174,7 @@ public class ReviewParticipantService {
       throw DocumentValidationException.duplicateParticipant("team is already a participant");
     }
     ReviewParticipant saved = participants.save(ReviewParticipant.forTeam(documentId, teamId));
+    events.publishEvent(new ReviewEvent.ParticipantAdded(documentId, actor, null, teamId));
     return new ParticipantView(saved.getId(), teamId, true, team.getName(), saved.getCreatedAt());
   }
 

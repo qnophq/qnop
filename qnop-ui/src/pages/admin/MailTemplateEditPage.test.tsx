@@ -53,6 +53,7 @@ vi.mock('../../api/hooks/useMailTemplates', () => ({
   useMailTemplate: () => ({ data: TEMPLATE, isLoading: false, isError: false, isFetching: false }),
   useUpdateMailTemplate: () => ({ mutateAsync: updateMutate, isPending: false }),
   useResetMailTemplate: () => ({ mutateAsync: resetMutate, isPending: false }),
+  useSendTestEmail: () => ({ mutateAsync: vi.fn(), isPending: false }),
 }));
 
 vi.mock('../../api/hooks/useMailTemplatePreview', () => ({

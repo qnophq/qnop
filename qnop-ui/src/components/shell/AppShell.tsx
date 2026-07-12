@@ -53,11 +53,14 @@ export function AppShell() {
     (reviewMatch && reviewMatch.params.documentId !== 'new') || compareMatch || tasksMatch,
   );
   // The work surfaces share one width language (issue #454 follow-up): the
-  // dashboard and the reviews overview span the full width like the review
-  // workspace; admin and profile keep the centred reading container.
+  // dashboard, the reviews overview and the admin surfaces span the full
+  // width like the review workspace; the profile keeps the centred reading
+  // container (issue #316 polish).
   const dashboardMatch = useMatch('/');
   const reviewsListMatch = useMatch('/reviews');
-  const wide = fullBleed || Boolean(dashboardMatch) || Boolean(reviewsListMatch);
+  const adminMatch = useMatch('/admin/*');
+  const wide =
+    fullBleed || Boolean(dashboardMatch) || Boolean(reviewsListMatch) || Boolean(adminMatch);
   const [collapsed, setCollapsed] = useState<boolean>(() => {
     try {
       return localStorage.getItem(COLLAPSE_KEY) === '1';

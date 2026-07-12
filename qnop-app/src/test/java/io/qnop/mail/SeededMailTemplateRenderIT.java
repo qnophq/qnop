@@ -43,13 +43,21 @@ import org.springframework.beans.factory.annotation.Autowired;
  */
 class SeededMailTemplateRenderIT extends AbstractIntegrationTest {
 
-  /** Exactly the variables the registration / password-reset / admin-reset flows supply (#140). */
+  /** Exactly the variables the auth flows (#140) and review notifications (#316) supply. */
   private static final Map<String, Object> FLOW_VARS =
-      Map.of(
-          "siteName", "qnop",
-          "recipientName", "Jane Doe",
-          "actionUrl", "https://qnop.example/action?token=abc123",
-          "expiresAtHuman", "in 30 minutes");
+      Map.ofEntries(
+          Map.entry("siteName", "qnop"),
+          Map.entry("recipientName", "Jane Doe"),
+          Map.entry("actionUrl", "https://qnop.example/action?token=abc123"),
+          Map.entry("expiresAtHuman", "in 30 minutes"),
+          Map.entry("actorName", "Alex Reviewer"),
+          Map.entry("documentTitle", "Q3 contract draft"),
+          Map.entry("annotationExcerpt", "The liability clause needs a cap."),
+          Map.entry("commentExcerpt", "Agreed — let's cap it at 12 months."),
+          Map.entry("decision", "resolved"),
+          Map.entry("versionNumber", "3"),
+          Map.entry("oldState", "In review"),
+          Map.entry("newState", "Changes requested"));
 
   @Autowired MailTemplateRepository templates;
   @Autowired MailTemplateService templateService;
@@ -71,7 +79,10 @@ class SeededMailTemplateRenderIT extends AbstractIntegrationTest {
 
       RenderedMail mail = templateService.render(key, FLOW_VARS, row.getLocale());
       assertThat(mail.subject()).isNotBlank();
-      assertThat(mail.bodyPlain()).contains("Jane Doe").contains("in 30 minutes");
+      assertThat(mail.bodyPlain()).contains("Jane Doe");
+      if (row.getTemplateKey().startsWith("auth.")) {
+        assertThat(mail.bodyPlain()).contains("in 30 minutes");
+      }
       // The branded HTML chrome is built by EmailLayoutBuilder for every template.
       assertThat(mail.bodyHtml()).isNotNull().contains("<!DOCTYPE html>").contains("qnop");
     }

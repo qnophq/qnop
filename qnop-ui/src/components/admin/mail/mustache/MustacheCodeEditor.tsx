@@ -23,7 +23,7 @@ import { forwardRef, useImperativeHandle, useMemo, useRef } from 'react';
 import Box from '@mui/material/Box';
 import { useTheme } from '@mui/material/styles';
 import { html } from '@codemirror/lang-html';
-import { EditorView } from '@codemirror/view';
+import { EditorView, dropCursor } from '@codemirror/view';
 import CodeMirror, { type ReactCodeMirrorRef } from '@uiw/react-codemirror';
 import { mustacheExtension } from './mustacheExtension';
 
@@ -79,6 +79,9 @@ export const MustacheCodeEditor = forwardRef<MustacheEditorHandle, MustacheCodeE
     const extensions = useMemo(
       () => [
         EditorView.lineWrapping,
+        // Chips can be dragged in (issue #316 polish); the drop cursor shows
+        // where the placeholder will land while hovering.
+        dropCursor(),
         mustacheExtension(placeholders, language),
         ...(language === 'html' ? [html({ autoCloseTags: true, matchClosingTags: true })] : []),
       ],

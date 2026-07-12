@@ -68,7 +68,14 @@ class ReviewWorkflowServiceTest {
 
   private final ReviewWorkflowService service =
       new ReviewWorkflowService(
-          documents, versions, annotations, placements, comments, auditEvents, documentAccess);
+          documents,
+          versions,
+          annotations,
+          placements,
+          comments,
+          auditEvents,
+          documentAccess,
+          mock(org.springframework.context.ApplicationEventPublisher.class));
 
   private final UUID documentId = UUID.randomUUID();
   private final UUID owner = UUID.randomUUID();
