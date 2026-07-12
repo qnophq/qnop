@@ -19,7 +19,7 @@
  * SPDX-License-Identifier: AGPL-3.0-only
  */
 
-import { useState, type FormEvent } from 'react';
+import { useEffect, useState, type FormEvent } from 'react';
 import Alert from '@mui/material/Alert';
 import Box from '@mui/material/Box';
 import Button from '@mui/material/Button';
@@ -36,6 +36,15 @@ import { apiErrorMessage } from '../../../utils/apiError';
 interface SendTestEmailDialogProps {
   open: boolean;
   onClose: () => void;
+  /** Prefills the recipient (e.g. the signed-in admin's own address). */
+  initialRecipient?: string;
+  /**
+   * Custom sender — the template editor posts the rendered draft (issue #316).
+   * Defaults to the generic SMTP test message.
+   */
+  send?: (recipient: string) => Promise<SendTestEmailResponse>;
+  /** Replaces the default helper line under the recipient field. */
+  helperText?: string;
 }
 
 const SEVERITY: Record<SendTestEmailResponse['status'], 'success' | 'warning' | 'error'> = {
@@ -45,20 +54,44 @@ const SEVERITY: Record<SendTestEmailResponse['status'], 'success' | 'warning' | 
 };
 
 /** Sends a test email with the current SMTP settings and reports the outcome. */
-export function SendTestEmailDialog({ open, onClose }: SendTestEmailDialogProps) {
+export function SendTestEmailDialog({
+  open,
+  onClose,
+  initialRecipient = '',
+  send,
+  helperText = 'Uses the configured SMTP settings.',
+}: SendTestEmailDialogProps) {
   const sendTest = useSendTestEmail();
-  const [recipient, setRecipient] = useState('');
+  const [recipient, setRecipient] = useState(initialRecipient);
+  const [sending, setSending] = useState(false);
   const [result, setResult] = useState<SendTestEmailResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
 
+  // Every opening starts fresh, prefilled with the caller's suggestion.
+  useEffect(() => {
+    if (open) {
+      setRecipient(initialRecipient);
+      setResult(null);
+      setError(null);
+    }
+  }, [open, initialRecipient]);
+
   const onSubmit = async (event: FormEvent) => {
     event.preventDefault();
+    // The dialog renders in a portal, but React bubbles the submit through the
+    // REACT tree — without this, a host page's surrounding form submits too
+    // (the template editor would silently save the draft).
+    event.stopPropagation();
     setError(null);
     setResult(null);
+    setSending(true);
     try {
-      setResult(await sendTest.mutateAsync(recipient.trim()));
+      const to = recipient.trim();
+      setResult(await (send ? send(to) : sendTest.mutateAsync(to)));
     } catch (err) {
       setError(apiErrorMessage(err, 'The test email could not be sent.'));
+    } finally {
+      setSending(false);
     }
   };
 
@@ -76,7 +109,7 @@ export function SendTestEmailDialog({ open, onClose }: SendTestEmailDialogProps)
               fullWidth
               required
               autoComplete="off"
-              helperText="Uses the configured SMTP settings."
+              helperText={helperText}
             />
             {result && <Alert severity={SEVERITY[result.status]}>{result.detail}</Alert>}
             {error && <Alert severity="error">{error}</Alert>}
@@ -89,9 +122,9 @@ export function SendTestEmailDialog({ open, onClose }: SendTestEmailDialogProps)
           <Button
             type="submit"
             variant="contained"
-            disabled={sendTest.isPending || recipient.trim().length === 0}
+            disabled={sending || recipient.trim().length === 0}
           >
-            {sendTest.isPending ? 'Sending…' : 'Send'}
+            {sending ? 'Sending…' : 'Send'}
           </Button>
         </DialogActions>
       </Box>

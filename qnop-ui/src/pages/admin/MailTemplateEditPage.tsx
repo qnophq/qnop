@@ -33,7 +33,7 @@ import Stack from '@mui/material/Stack';
 import Switch from '@mui/material/Switch';
 import TextField from '@mui/material/TextField';
 import Typography from '@mui/material/Typography';
-import { Eye, RotateCcw, Variable } from 'lucide-react';
+import { Send, Eye, RotateCcw, Variable } from 'lucide-react';
 import { Link as RouterLink, useParams } from 'react-router-dom';
 import type { MailTemplateResponse } from '../../api/generated';
 import {
@@ -44,6 +44,9 @@ import {
 import { useMailTemplatePreview } from '../../api/hooks/useMailTemplatePreview';
 import { PageHeader } from '../../components/admin/layout/PageHeader';
 import { SectionCard } from '../../components/admin/layout/SectionCard';
+import { adminEmailApi } from '../../api/config';
+import { useAuthStore } from '../../stores/authStore';
+import { SendTestEmailDialog } from '../../components/admin/mail/SendTestEmailDialog';
 import { AdminToast } from '../../components/admin/layout/AdminToast';
 import { useToast } from '../../components/admin/layout/useToast';
 import { ToneBadge } from '../../components/admin/ToneBadge';
@@ -152,6 +155,25 @@ function EditForm({
     variables: sampleOverrides,
   });
   const sampleValues = { ...(preview.data?.sampleVars ?? {}), ...sampleOverrides };
+
+  // Sends exactly what the live preview shows — current draft + sample values —
+  // to a recipient of the admin's choosing, prefilled with their own address
+  // (issue #316).
+  const ownEmail = useAuthStore((s) => s.email);
+  const [testOpen, setTestOpen] = useState(false);
+  const sendTemplateTest = async (recipient: string) => {
+    const response = await adminEmailApi.sendTemplateTestEmail({
+      key: template.key,
+      templateTestEmailRequest: {
+        recipient,
+        subject,
+        bodyPlain,
+        bodyHtml: htmlEnabled ? bodyHtml : undefined,
+        variables: sampleValues,
+      },
+    });
+    return response.data;
+  };
 
   const insertPlaceholder = (name: string) => {
     if (lastFocused.current === 'bodyHtml' && showHtml) {
@@ -353,15 +375,24 @@ function EditForm({
                 spacing={1.5}
                 sx={{ alignItems: { sm: 'center' }, justifyContent: 'space-between' }}
               >
-                <Button
-                  type="button"
-                  color="error"
-                  startIcon={<RotateCcw size={18} />}
-                  disabled={!isCustomised || resetTemplate.isPending}
-                  onClick={() => setConfirmReset(true)}
-                >
-                  Reset to default
-                </Button>
+                <Stack direction="row" spacing={1.5}>
+                  <Button
+                    type="button"
+                    color="error"
+                    startIcon={<RotateCcw size={18} />}
+                    disabled={!isCustomised || resetTemplate.isPending}
+                    onClick={() => setConfirmReset(true)}
+                  >
+                    Reset to default
+                  </Button>
+                  <Button
+                    type="button"
+                    startIcon={<Send size={16} />}
+                    onClick={() => setTestOpen(true)}
+                  >
+                    Send test email
+                  </Button>
+                </Stack>
                 <Stack direction="row" spacing={1.5} sx={{ alignItems: 'center' }}>
                   {updateTemplate.isPending && <LinearProgress sx={{ width: 100 }} />}
                   <Button
@@ -403,6 +434,13 @@ function EditForm({
         onClose={() => setConfirmReset(false)}
       />
 
+      <SendTestEmailDialog
+        open={testOpen}
+        onClose={() => setTestOpen(false)}
+        initialRecipient={ownEmail ?? ''}
+        send={sendTemplateTest}
+        helperText="Sends this template rendered with the current draft and sample data."
+      />
       <AdminToast toast={toast} onClose={clear} />
     </Box>
   );

@@ -669,6 +669,58 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
+  /admin/email/templates/{key}/test:
+    post:
+      tags:
+        - AdminEmail
+      summary: Send a template test email
+      description: |
+        Renders the template exactly like the preview (stored version, or the
+        supplied unsaved draft, with sample/override variables) and sends the
+        result to the given recipient. Superadmin only. Never returns a 5xx for
+        a delivery problem — the outcome is reported in the body `status`.
+      operationId: sendTemplateTestEmail
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/MailTemplateKeyParam'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TemplateTestEmailRequest'
+      responses:
+        '200':
+          description: Send attempt completed (see `status` for the outcome)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SendTestEmailResponse'
+        '400':
+          description: Invalid recipient or render error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Unknown template key
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Caller is not a superadmin
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
   /admin/users:
     get:
       tags:
@@ -3299,6 +3351,33 @@ components:
         - accessToken
         - tokenType
         - expiresInSeconds
+    TemplateTestEmailRequest:
+      type: object
+      description: Send a rendered template to a recipient as a test (issue #316).
+      properties:
+        recipient:
+          type: string
+          format: email
+          description: Address the rendered template is sent to.
+        locale:
+          type: string
+          description: Locale to render; falls back to the default language when omitted.
+        subject:
+          type: string
+          description: Draft subject to render instead of the stored version.
+        bodyPlain:
+          type: string
+          description: Draft plain-text body; honoured only together with a draft subject.
+        bodyHtml:
+          type: string
+          description: Optional draft HTML alternative.
+        variables:
+          type: object
+          additionalProperties:
+            type: string
+          description: Template variables; representative sample data is used when omitted.
+      required:
+        - recipient
     SendTestEmailRequest:
       type: object
       description: Request to send a test email.
