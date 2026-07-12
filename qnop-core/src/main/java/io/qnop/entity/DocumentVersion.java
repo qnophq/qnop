@@ -50,6 +50,9 @@ import org.hibernate.type.SqlTypes;
 @Table(name = "document_version")
 public class DocumentVersion {
 
+  /** Column cap for the persisted failure reason (issue #325); longer messages are truncated. */
+  static final int MAX_FAILURE_REASON_LENGTH = 2000;
+
   @Id
   @UuidGenerator(style = UuidGenerator.Style.VERSION_7)
   @Column(name = "id", nullable = false, updatable = false)
@@ -83,6 +86,14 @@ public class DocumentVersion {
   @Enumerated(EnumType.STRING)
   @Column(name = "extraction_status", nullable = false, length = 16)
   private ExtractionStatus extractionStatus = ExtractionStatus.PENDING;
+
+  /**
+   * Why extraction failed (issue #325): the extractor's message or "no extractor …", persisted for
+   * operators. Null unless {@code extractionStatus == FAILED}. Server-side only — never surfaced to
+   * reviewers, who see the opaque {@code EXTRACTION_FAILED} on serving.
+   */
+  @Column(name = "extraction_failure_reason", length = MAX_FAILURE_REASON_LENGTH)
+  private String extractionFailureReason;
 
   @Column(name = "created_by", nullable = false, updatable = false)
   private UUID createdBy;
@@ -127,12 +138,29 @@ public class DocumentVersion {
 
   /** Marks the extraction permanently failed (unprocessable content, issue #245). */
   public void markExtractionFailed() {
+    markExtractionFailed(null);
+  }
+
+  /**
+   * Marks the extraction permanently failed and records why (issue #325). The reason is truncated
+   * to the column cap; null leaves it unset.
+   */
+  public void markExtractionFailed(String reason) {
     this.renderedDocument = null;
     this.extractionStatus = ExtractionStatus.FAILED;
+    this.extractionFailureReason =
+        reason == null || reason.length() <= MAX_FAILURE_REASON_LENGTH
+            ? reason
+            : reason.substring(0, MAX_FAILURE_REASON_LENGTH);
   }
 
   public ExtractionStatus getExtractionStatus() {
     return extractionStatus;
+  }
+
+  /** Why extraction failed (issue #325), or null when not FAILED. Operator-facing only. */
+  public String getExtractionFailureReason() {
+    return extractionFailureReason;
   }
 
   public UUID getId() {
