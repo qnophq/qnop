@@ -19,7 +19,7 @@
  * SPDX-License-Identifier: AGPL-3.0-only
  */
 
-import { useEffect, useState, type FormEvent } from 'react';
+import { useState, type FormEvent } from 'react';
 import Alert from '@mui/material/Alert';
 import Box from '@mui/material/Box';
 import Button from '@mui/material/Button';
@@ -61,20 +61,32 @@ export function SendTestEmailDialog({
   send,
   helperText = 'Uses the configured SMTP settings.',
 }: SendTestEmailDialogProps) {
+  return (
+    <Dialog open={open} onClose={onClose} fullWidth maxWidth="xs">
+      {/* The form lives in its own component: the Dialog unmounts its children
+          when closed, so every opening starts fresh (prefilled recipient, no
+          stale result) without effect-driven state resets. */}
+      <SendTestEmailForm
+        onClose={onClose}
+        initialRecipient={initialRecipient}
+        send={send}
+        helperText={helperText}
+      />
+    </Dialog>
+  );
+}
+
+function SendTestEmailForm({
+  onClose,
+  initialRecipient,
+  send,
+  helperText,
+}: Omit<SendTestEmailDialogProps, 'open'> & { initialRecipient: string; helperText: string }) {
   const sendTest = useSendTestEmail();
   const [recipient, setRecipient] = useState(initialRecipient);
   const [sending, setSending] = useState(false);
   const [result, setResult] = useState<SendTestEmailResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
-
-  // Every opening starts fresh, prefilled with the caller's suggestion.
-  useEffect(() => {
-    if (open) {
-      setRecipient(initialRecipient);
-      setResult(null);
-      setError(null);
-    }
-  }, [open, initialRecipient]);
 
   const onSubmit = async (event: FormEvent) => {
     event.preventDefault();
@@ -96,38 +108,36 @@ export function SendTestEmailDialog({
   };
 
   return (
-    <Dialog open={open} onClose={onClose} fullWidth maxWidth="xs">
-      <Box component="form" onSubmit={onSubmit} noValidate>
-        <DialogTitle>Send test email</DialogTitle>
-        <DialogContent>
-          <Stack spacing={2} sx={{ mt: 1 }}>
-            <TextField
-              label="Recipient"
-              type="email"
-              value={recipient}
-              onChange={(e) => setRecipient(e.target.value)}
-              fullWidth
-              required
-              autoComplete="off"
-              helperText={helperText}
-            />
-            {result && <Alert severity={SEVERITY[result.status]}>{result.detail}</Alert>}
-            {error && <Alert severity="error">{error}</Alert>}
-          </Stack>
-        </DialogContent>
-        <DialogActions sx={{ px: 3, pb: 2.5 }}>
-          <Button onClick={onClose} color="inherit">
-            Close
-          </Button>
-          <Button
-            type="submit"
-            variant="contained"
-            disabled={sending || recipient.trim().length === 0}
-          >
-            {sending ? 'Sending…' : 'Send'}
-          </Button>
-        </DialogActions>
-      </Box>
-    </Dialog>
+    <Box component="form" onSubmit={onSubmit} noValidate>
+      <DialogTitle>Send test email</DialogTitle>
+      <DialogContent>
+        <Stack spacing={2} sx={{ mt: 1 }}>
+          <TextField
+            label="Recipient"
+            type="email"
+            value={recipient}
+            onChange={(e) => setRecipient(e.target.value)}
+            fullWidth
+            required
+            autoComplete="off"
+            helperText={helperText}
+          />
+          {result && <Alert severity={SEVERITY[result.status]}>{result.detail}</Alert>}
+          {error && <Alert severity="error">{error}</Alert>}
+        </Stack>
+      </DialogContent>
+      <DialogActions sx={{ px: 3, pb: 2.5 }}>
+        <Button onClick={onClose} color="inherit">
+          Close
+        </Button>
+        <Button
+          type="submit"
+          variant="contained"
+          disabled={sending || recipient.trim().length === 0}
+        >
+          {sending ? 'Sending…' : 'Send'}
+        </Button>
+      </DialogActions>
+    </Box>
   );
 }
