@@ -53,12 +53,12 @@ export function AppShell() {
     (reviewMatch && reviewMatch.params.documentId !== 'new') || compareMatch || tasksMatch,
   );
   // The work surfaces share one width language (issue #454 follow-up): the
-  // dashboard, the reviews overview and the admin surfaces span the full
-  // width like the review workspace; the profile keeps the centred reading
-  // container (issue #316 polish).
+  // dashboard, the reviews overview, the admin surfaces and the profile span
+  // the full width like the review workspace (issues #316/#469 polish).
   const dashboardMatch = useMatch('/');
   const reviewsListMatch = useMatch('/reviews');
   const adminMatch = useMatch('/admin/*');
+  const profileMatch = useMatch('/profile');
   // The new-review wizard (#469 polish) spans the full width too — it lays out
   // as form + launch-checklist rail.
   const wizardMatch = Boolean(reviewMatch && reviewMatch.params.documentId === 'new');
@@ -67,6 +67,7 @@ export function AppShell() {
     Boolean(dashboardMatch) ||
     Boolean(reviewsListMatch) ||
     Boolean(adminMatch) ||
+    Boolean(profileMatch) ||
     wizardMatch;
   const [collapsed, setCollapsed] = useState<boolean>(() => {
     try {

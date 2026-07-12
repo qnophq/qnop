@@ -101,7 +101,7 @@ export function ProfilePage() {
   };
 
   return (
-    <Stack spacing={3} sx={{ maxWidth: 720 }}>
+    <Stack spacing={3}>
       <Box>
         <Typography variant="h1" sx={{ fontSize: 28 }}>
           Profile
