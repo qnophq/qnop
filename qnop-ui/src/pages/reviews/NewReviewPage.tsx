@@ -35,6 +35,7 @@ import { documentsApi, reviewWorkflowApi } from '../../api/config';
 import { useConfig } from '../../api/hooks/useConfig';
 import { reviewKeys, useCreateReview } from '../../api/hooks/useReviews';
 import { PageHeader } from '../../components/admin/layout/PageHeader';
+import { CommanderCard } from '../../components/reviews/wizard/CommanderCard';
 import { DocumentStep } from '../../components/reviews/wizard/DocumentStep';
 import { LaunchChecklist } from '../../components/reviews/wizard/LaunchChecklist';
 import { ReviewerStep } from '../../components/reviews/wizard/ReviewerStep';
@@ -333,9 +334,10 @@ export function NewReviewPage() {
         </Stack>
 
         {/* The mission rail: sticks alongside while the form scrolls. */}
-        <Box sx={{ position: { lg: 'sticky' }, top: { lg: 16 }, minWidth: 0 }}>
+        <Stack spacing={2.5} sx={{ position: { lg: 'sticky' }, top: { lg: 16 }, minWidth: 0 }}>
+          <CommanderCard />
           <LaunchChecklist items={checklist} />
-        </Box>
+        </Stack>
       </Box>
     </Stack>
   );
