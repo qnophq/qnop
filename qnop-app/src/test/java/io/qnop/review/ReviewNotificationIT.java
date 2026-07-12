@@ -28,6 +28,7 @@ import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.after;
 import static org.mockito.Mockito.timeout;
 import static org.mockito.Mockito.verify;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -47,13 +48,21 @@ import io.qnop.service.UserSettingKey;
 import io.qnop.service.mail.MailService;
 import io.qnop.service.mail.MailTemplateKey;
 import io.qnop.testsupport.SeededIntegrationTest;
+import java.io.ByteArrayOutputStream;
 import java.util.Map;
 import java.util.UUID;
+import org.apache.pdfbox.pdmodel.PDDocument;
+import org.apache.pdfbox.pdmodel.PDPage;
+import org.apache.pdfbox.pdmodel.PDPageContentStream;
+import org.apache.pdfbox.pdmodel.common.PDRectangle;
+import org.apache.pdfbox.pdmodel.font.PDType1Font;
+import org.apache.pdfbox.pdmodel.font.Standard14Fonts;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.MediaType;
+import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
 
@@ -237,6 +246,45 @@ class ReviewNotificationIT extends SeededIntegrationTest {
     verify(mail, after(300).never())
         .sendMailFromTemplate(
             eq(MailTemplateKey.REVIEW_WORKFLOW_CHANGED), eq(emailOf(MEMBER2_ID)), anyMap(), any());
+  }
+
+  @Test
+  @DisplayName("a new version mails every participant with the version deep link")
+  void versionUploadedMailsParticipants() throws Exception {
+    seedDocument(false);
+
+    try (PDDocument pdf = new PDDocument()) {
+      PDPage page = new PDPage(PDRectangle.LETTER);
+      pdf.addPage(page);
+      try (PDPageContentStream content = new PDPageContentStream(pdf, page)) {
+        content.setFont(new PDType1Font(Standard14Fonts.FontName.HELVETICA), 12);
+        content.beginText();
+        content.newLineAtOffset(72, 700);
+        content.showText("the clause, revised");
+        content.endText();
+      }
+      ByteArrayOutputStream out = new ByteArrayOutputStream();
+      pdf.save(out);
+      mockMvc
+          .perform(
+              multipart("/api/v1/documents/" + documentId + "/versions")
+                  .file(
+                      new MockMultipartFile(
+                          "file", "doc.pdf", "application/pdf", out.toByteArray()))
+                  .header("Authorization", "Bearer " + token(MEMBER_ID)))
+          .andExpect(status().isCreated());
+    }
+
+    @SuppressWarnings("unchecked")
+    ArgumentCaptor<Map<String, Object>> vars = ArgumentCaptor.forClass(Map.class);
+    verify(mail, timeout(5000))
+        .sendMailFromTemplate(
+            eq(MailTemplateKey.REVIEW_VERSION_UPLOADED),
+            eq(emailOf(AUDITOR_ID)),
+            vars.capture(),
+            isNull());
+    assertThat(vars.getValue()).containsEntry("versionNumber", "2");
+    assertThat((String) vars.getValue().get("actionUrl")).endsWith("?version=2");
   }
 
   @Test

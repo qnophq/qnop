@@ -51,6 +51,9 @@ public sealed interface ReviewEvent {
   record CommentAdded(UUID documentId, UUID actorId, UUID annotationId, UUID commentId)
       implements ReviewEvent {}
 
+  /** A new document version was committed; re-anchoring of existing annotations begins. */
+  record VersionUploaded(UUID documentId, UUID actorId, int versionNumber) implements ReviewEvent {}
+
   /**
    * The review changed workflow state. {@code manual} distinguishes owner-initiated transitions
    * from the derived {@code IN_REVIEW ⇄ CHANGES_REQUESTED} pair (issue #405) — derived flips ride

@@ -61,6 +61,7 @@ class MailTemplateServiceTest {
           Map.entry("annotationExcerpt", "The liability clause needs a cap."),
           Map.entry("commentExcerpt", "Agreed — let's cap it at 12 months."),
           Map.entry("decision", "resolved"),
+          Map.entry("versionNumber", "3"),
           Map.entry("oldState", "In review"),
           Map.entry("newState", "Changes requested"));
 

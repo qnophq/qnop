@@ -282,3 +282,30 @@ databaseChangeLog:
         - delete:
             tableName: mail_template
             where: "template_key = 'review.workflow_changed' AND locale = 'en'"
+
+  - changeSet:
+      id: 0003-seed-review-version-uploaded-en
+      author: qnop
+      comment: English default for the new-document-version notification (issue #316).
+      changes:
+        - insert:
+            tableName: mail_template
+            columns:
+              - column: { name: id, valueComputed: gen_random_uuid() }
+              - column: { name: template_key, value: review.version_uploaded }
+              - column: { name: locale, value: en }
+              - column: { name: subject, value: "New version of “{{documentTitle}}” — v{{versionNumber}}" }
+              - column:
+                  name: body_plain
+                  value: |
+                    Hi {{recipientName}},
+
+                    {{actorName}} uploaded version {{versionNumber}} of "{{documentTitle}}" ({{siteName}}).
+
+                    Existing annotations are being re-anchored onto the new text. Open the review to continue:
+
+                    {{actionUrl}}
+      rollback:
+        - delete:
+            tableName: mail_template
+            where: "template_key = 'review.version_uploaded' AND locale = 'en'"

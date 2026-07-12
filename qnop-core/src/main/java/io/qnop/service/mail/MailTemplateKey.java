@@ -261,6 +261,33 @@ public enum MailTemplateKey {
       "documentTitle",
       "oldState",
       "newState",
+      "actionUrl"),
+  REVIEW_VERSION_UPLOADED(
+      "review.version_uploaded",
+      "New document version",
+      "New version of “{{documentTitle}}” — v{{versionNumber}}",
+      """
+      Hi {{recipientName}},
+
+      {{actorName}} uploaded version {{versionNumber}} of "{{documentTitle}}" ({{siteName}}).
+
+      Existing annotations are being re-anchored onto the new text. Open the review to continue:
+
+      {{actionUrl}}
+      """,
+      """
+      <h1 style="margin:0 0 14px;color:#18191f;font-size:22px;font-weight:700;letter-spacing:-0.01em;line-height:1.3;">New document version</h1>
+      <p style="margin:0 0 14px;">Hi {{recipientName}},</p>
+      <p style="margin:0 0 14px;"><strong style="color:#18191f;">{{actorName}}</strong> uploaded version <strong style="color:#18191f;">v{{versionNumber}}</strong> of <strong style="color:#18191f;">&#8220;{{documentTitle}}&#8221;</strong>.</p>
+      <p style="margin:0;color:#9a9ea8;font-size:13px;">Existing annotations are being re-anchored onto the new text. Open the review to continue.</p>
+      """,
+      "Open new version",
+      "{{actorName}} uploaded v{{versionNumber}} of “{{documentTitle}}”.",
+      "siteName",
+      "recipientName",
+      "actorName",
+      "documentTitle",
+      "versionNumber",
       "actionUrl");
 
   /**
@@ -278,6 +305,7 @@ public enum MailTemplateKey {
           Map.entry("annotationExcerpt", "The liability clause needs a cap."),
           Map.entry("commentExcerpt", "Agreed — let's cap it at 12 months."),
           Map.entry("decision", "resolved"),
+          Map.entry("versionNumber", "3"),
           Map.entry("oldState", "In review"),
           Map.entry("newState", "Changes requested"));
 

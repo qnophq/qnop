@@ -63,7 +63,8 @@ class MailTemplateSchemaIT extends AbstractIntegrationTest {
           "review.annotation_created",
           "review.annotation_decided",
           "review.comment_added",
-          "review.workflow_changed"
+          "review.workflow_changed",
+          "review.version_uploaded"
         }) {
       assertThat(templates.findByTemplateKeyAndLocale(key, "en"))
           .hasValueSatisfying(

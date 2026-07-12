@@ -113,6 +113,7 @@ public class ReviewNotificationService {
       case ReviewEvent.AnnotationCreated created -> annotationCreated(document, created);
       case ReviewEvent.AnnotationDecided decided -> annotationDecided(document, decided);
       case ReviewEvent.CommentAdded comment -> commentAdded(document, comment);
+      case ReviewEvent.VersionUploaded uploaded -> versionUploaded(document, uploaded);
       case ReviewEvent.WorkflowChanged changed -> workflowChanged(document, changed);
     }
   }
@@ -203,24 +204,32 @@ public class ReviewNotificationService {
     }
   }
 
+  private void versionUploaded(Document document, ReviewEvent.VersionUploaded event) {
+    if (event.versionNumber() <= 1) {
+      // The first version IS the review's creation — participants joining later get
+      // the invitation mail instead; there is no "new" version to announce.
+      return;
+    }
+    // Uploads are owner-only and the owner acts under their public name (issue #413).
+    String actorName =
+        users.findById(event.actorId()).map(User::getDisplayName).orElse("The owner");
+    for (User recipient : deliverable(reviewCircle(document), event.actorId())) {
+      Map<String, Object> vars = baseVars(document, recipient);
+      vars.put("actorName", actorName);
+      vars.put("versionNumber", String.valueOf(event.versionNumber()));
+      vars.put("actionUrl", reviewUrl(document) + "?version=" + event.versionNumber());
+      mail.sendMailFromTemplate(
+          MailTemplateKey.REVIEW_VERSION_UPLOADED, recipient.getEmail(), vars, null);
+    }
+  }
+
   private void workflowChanged(Document document, ReviewEvent.WorkflowChanged event) {
     if (!event.manual()) {
       // Derived IN_REVIEW ⇄ CHANGES_REQUESTED flips are announced by the annotation
       // mails that caused them — a second mail would say the same thing twice.
       return;
     }
-    Set<UUID> recipients = new LinkedHashSet<>();
-    recipients.add(document.getOwnerId());
-    for (ReviewParticipant participant : participants.findByDocumentId(document.getId())) {
-      if (participant.getUserId() != null) {
-        recipients.add(participant.getUserId());
-      } else if (participant.getTeamId() != null) {
-        teamMembers.findMembersByTeamId(participant.getTeamId()).stream()
-            .map(TeamMemberProjection::userId)
-            .forEach(recipients::add);
-      }
-    }
-    for (User recipient : deliverable(recipients, event.actorId())) {
+    for (User recipient : deliverable(reviewCircle(document), event.actorId())) {
       Map<String, Object> vars = baseVars(document, recipient);
       vars.put("oldState", humanState(event.fromState()));
       vars.put("newState", humanState(event.toState()));
@@ -235,6 +244,22 @@ public class ReviewNotificationService {
    * users with an address who have not opted out ({@link
    * UserSettingKey#EMAIL_REVIEW_NOTIFICATIONS}).
    */
+  /** Everyone attached to the review: the owner, direct participants, and team members. */
+  private Set<UUID> reviewCircle(Document document) {
+    Set<UUID> recipients = new LinkedHashSet<>();
+    recipients.add(document.getOwnerId());
+    for (ReviewParticipant participant : participants.findByDocumentId(document.getId())) {
+      if (participant.getUserId() != null) {
+        recipients.add(participant.getUserId());
+      } else if (participant.getTeamId() != null) {
+        teamMembers.findMembersByTeamId(participant.getTeamId()).stream()
+            .map(TeamMemberProjection::userId)
+            .forEach(recipients::add);
+      }
+    }
+    return recipients;
+  }
+
   private List<User> deliverable(Set<UUID> candidates, UUID actorId) {
     Set<UUID> ids = new LinkedHashSet<>(candidates);
     ids.remove(actorId);

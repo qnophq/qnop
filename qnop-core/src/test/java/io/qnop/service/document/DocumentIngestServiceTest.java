@@ -100,7 +100,8 @@ class DocumentIngestServiceTest {
         access,
         annotations,
         placements,
-        transactionManager);
+        transactionManager,
+        org.mockito.Mockito.mock(org.springframework.context.ApplicationEventPublisher.class));
   }
 
   // --- request validation (rejected before any storage or settings work) -----
