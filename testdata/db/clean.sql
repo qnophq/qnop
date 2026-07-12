@@ -25,4 +25,5 @@ TRUNCATE TABLE annotation_placement, comment, annotation, audit_event,
 TRUNCATE TABLE team_membership, team, oidc_provider, user_setting, application_asset
                RESTART IDENTITY CASCADE;
 
+DELETE FROM user_avatar;
 DELETE FROM qnop_user;
