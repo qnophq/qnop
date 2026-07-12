@@ -33,6 +33,7 @@ import { useToggleAnnotationReaction } from '../reactions/useReactions';
 import { useAuthStore } from '../../../stores/authStore';
 import { shortRelativeTime } from '../../../utils/relativeTime';
 import { UserAvatar } from '../../shell/UserAvatar';
+import { avatarSrc } from '../../../utils/avatarUrl';
 import { isDocumentScoped } from '../annotationScope';
 import { Markdown } from '../markdown/Markdown';
 import { AnnotationBadgeRow } from './AnnotationBadgeRow';
@@ -120,7 +121,11 @@ export function AnnotationHead({
     >
       {/* The thread starter, front and centre — this is their discussion. */}
       <Stack direction="row" spacing={1.25} sx={{ alignItems: 'center', minWidth: 0 }}>
-        <UserAvatar name={authorName} size={AUTHOR_AVATAR_SIZE} imageUrl={own ? avatarUrl : null} />
+        <UserAvatar
+          name={authorName}
+          size={AUTHOR_AVATAR_SIZE}
+          imageUrl={own ? avatarUrl : avatarSrc(annotation.authorId)}
+        />
         <Box sx={{ minWidth: 0 }}>
           <Typography
             noWrap

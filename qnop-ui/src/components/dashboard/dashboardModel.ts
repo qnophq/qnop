@@ -57,16 +57,15 @@ function byUrgencyThenActivity(a: DocumentSummary, b: DocumentSummary): number {
 }
 
 /**
- * The reviewer hat's worklist: reviews I do NOT own, still running, with open
- * annotations — what the round is waiting on.
+ * The reviewer hat's worklist: every still-running review I do NOT own — a
+ * fresh assignment without a single annotation yet waits on the reviewer most
+ * of all (issue #472).
  */
 export function waitingOnYou(reviews: DocumentSummary[], userId: string | null) {
   return reviews
     .filter(
       (review) =>
-        roleOf(review, userId) === 'reviewer' &&
-        isOpenWorkflowState(review.workflowState) &&
-        review.openAnnotationCount > 0,
+        roleOf(review, userId) === 'reviewer' && isOpenWorkflowState(review.workflowState),
     )
     .sort(byUrgencyThenActivity);
 }

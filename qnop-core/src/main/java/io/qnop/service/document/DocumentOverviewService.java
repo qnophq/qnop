@@ -28,12 +28,15 @@ import io.qnop.repository.DocumentRepository;
 import io.qnop.repository.DocumentVersionRepository;
 import io.qnop.repository.ParticipantProjection;
 import io.qnop.repository.ReviewParticipantRepository;
+import io.qnop.repository.UserDisplayName;
+import io.qnop.repository.UserRepository;
 import io.qnop.service.document.ReviewParticipantService.ParticipantView;
 import io.qnop.service.review.ReviewIdentityResolver;
 import java.time.Instant;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 import java.util.function.Function;
 import java.util.stream.Collectors;
@@ -60,18 +63,21 @@ public class DocumentOverviewService {
   private final AnnotationRepository annotations;
   private final ReviewParticipantRepository participants;
   private final ReviewIdentityResolver identity;
+  private final UserRepository users;
 
   public DocumentOverviewService(
       DocumentRepository documents,
       DocumentVersionRepository versions,
       AnnotationRepository annotations,
       ReviewParticipantRepository participants,
-      ReviewIdentityResolver identity) {
+      ReviewIdentityResolver identity,
+      UserRepository users) {
     this.documents = documents;
     this.versions = versions;
     this.annotations = annotations;
     this.participants = participants;
     this.identity = identity;
+    this.users = users;
   }
 
   @Transactional(readOnly = true)
@@ -97,6 +103,14 @@ public class DocumentOverviewService {
             : annotations.countVisibleByDocumentIds(ids, actor).stream()
                 .collect(
                     Collectors.toMap(DocumentAnnotationCounts::documentId, Function.identity()));
+    // Owner names, batched (issue #469 polish): structurally public (#413).
+    Set<UUID> ownerIds =
+        result.getContent().stream().map(Document::getOwnerId).collect(Collectors.toSet());
+    Map<UUID, String> ownerNames =
+        ownerIds.isEmpty()
+            ? Map.of()
+            : users.findDisplayNamesByIdIn(ownerIds).stream()
+                .collect(Collectors.toMap(UserDisplayName::id, UserDisplayName::displayName));
     Map<UUID, List<ParticipantProjection>> participantsByDocument =
         ids.isEmpty()
             ? Map.of()
@@ -115,6 +129,7 @@ public class DocumentOverviewService {
                       document.isAnonymous(),
                       document.getThreadParticipation().name(),
                       document.getOwnerId(),
+                      ownerNames.getOrDefault(document.getOwnerId(), ""),
                       document.getWorkflowState(),
                       maxVersions.getOrDefault(document.getId(), 0),
                       count == null ? 0 : Math.toIntExact(count.total()),
@@ -169,6 +184,7 @@ public class DocumentOverviewService {
       boolean anonymous,
       String threadParticipation,
       UUID ownerId,
+      String ownerDisplayName,
       String workflowState,
       int latestVersionNumber,
       int annotationCount,

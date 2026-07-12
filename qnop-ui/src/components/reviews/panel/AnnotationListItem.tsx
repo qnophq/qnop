@@ -33,6 +33,7 @@ import { useComments } from '../../../api/hooks/useComments';
 import { useAuthStore } from '../../../stores/authStore';
 import type { Notify } from '../../admin/layout/useToast';
 import { UserAvatar } from '../../shell/UserAvatar';
+import { avatarSrc } from '../../../utils/avatarUrl';
 import { tokens } from '../../../theme/tokens';
 import { shortRelativeTime } from '../../../utils/relativeTime';
 import { hasNewComments, isUnseen } from '../newSince';
@@ -97,7 +98,7 @@ function ParticipantAvatars({ participants }: { participants: DiscussionParticip
             <UserAvatar
               name={own ? (displayName ?? 'You') : (participant.name ?? 'Participant')}
               size={20}
-              imageUrl={own ? avatarUrl : null}
+              imageUrl={own ? avatarUrl : avatarSrc(participant.id)}
             />
           </Box>
         );
@@ -313,7 +314,9 @@ function AnnotationListItemBase({
             <UserAvatar
               name={authorName}
               size={16}
-              imageUrl={annotation.authorId === viewerId ? viewerAvatarUrl : null}
+              imageUrl={
+                annotation.authorId === viewerId ? viewerAvatarUrl : avatarSrc(annotation.authorId)
+              }
             />
             <Typography variant="caption" noWrap sx={{ fontWeight: 500, flexShrink: 1 }}>
               {authorName}

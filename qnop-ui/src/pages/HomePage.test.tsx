@@ -185,7 +185,8 @@ describe('HomePage dashboard (issue #454)', () => {
     mockData([]);
     renderPage();
 
-    expect(screen.getByText('No reviews yet')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /New review/ })).toBeInTheDocument();
+    expect(screen.getByTestId('empty-dashboard')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Start your first review/ })).toBeInTheDocument();
+    expect(screen.getByText('Three moves to your first review')).toBeInTheDocument();
   });
 });

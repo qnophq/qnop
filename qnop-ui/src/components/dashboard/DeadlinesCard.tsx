@@ -67,7 +67,7 @@ export function DeadlinesCard({ reviews }: DeadlinesCardProps) {
         </Typography>
       ) : (
         <CardScroller>
-          <Stack spacing={0.5} sx={{ mx: -1 }}>
+          <Stack spacing={0.5}>
             {reviews.map((review) => {
               const urgency = dueUrgency(review.dueAt as string);
               const color = urgencyColor(urgency.level);
@@ -81,8 +81,8 @@ export function DeadlinesCard({ reviews }: DeadlinesCardProps) {
                     gap: 1.25,
                     textAlign: 'left',
                     borderRadius: '8px',
-                    px: 1,
-                    py: 0.75,
+                    px: 1.25,
+                    py: 1,
                     '&:hover': { bgcolor: alpha(theme.qnop.brand.blue, 0.05) },
                   }}
                 >

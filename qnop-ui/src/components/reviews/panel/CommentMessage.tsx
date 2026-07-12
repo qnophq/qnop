@@ -43,6 +43,7 @@ interface CommentMessageProps {
   /** The display name; the message prints "You" for the viewer's own. */
   name: string;
   own: boolean;
+  /** Resolved by the caller: the viewer's own (cache-busted) or the public path. */
   avatarUrl: string | null;
   body: string;
   createdAt: string;
@@ -101,7 +102,7 @@ export function CommentMessage({
       }}
     >
       <Box sx={{ position: 'relative', zIndex: 1 }}>
-        <UserAvatar name={name} size={AVATAR_SIZE} imageUrl={own ? avatarUrl : null} />
+        <UserAvatar name={name} size={AVATAR_SIZE} imageUrl={avatarUrl} />
       </Box>
       <Box sx={{ flex: 1, minWidth: 0 }}>
         <Stack direction="row" spacing={0.75} sx={{ alignItems: 'center', minWidth: 0, mb: 0.25 }}>

@@ -79,14 +79,15 @@ describe('dueUrgency (issue #454)', () => {
 });
 
 describe('role split (issue #454)', () => {
-  it('waitingOnYou keeps only open foreign reviews with open annotations', () => {
+  it('waitingOnYou keeps every open foreign review — fresh assignments included', () => {
     const reviews = [
       review({ id: 'w1' }), // reviewer, open work → waiting
       review({ id: 'o1', ownerId: ME }), // owned → not waiting
       review({ id: 'f1', workflowState: 'FINALIZED' }), // closed → not waiting
-      review({ id: 'z1', openAnnotationCount: 0 }), // nothing open → not waiting
+      // Freshly assigned, no annotations yet — waits on the reviewer (issue #472).
+      review({ id: 'z1', openAnnotationCount: 0, updatedAt: '2026-06-01T00:00:00Z' }),
     ];
-    expect(waitingOnYou(reviews, ME).map((r) => r.id)).toEqual(['w1']);
+    expect(waitingOnYou(reviews, ME).map((r) => r.id)).toEqual(['w1', 'z1']);
   });
 
   it('sorts the waiting list by due date first, then latest activity', () => {

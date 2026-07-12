@@ -28,6 +28,7 @@ import { Eye, FileText, User } from 'lucide-react';
 import type { ParticipantView } from '../../../api/generated';
 import { ToneBadge } from '../../admin/ToneBadge';
 import { UserAvatar } from '../../shell/UserAvatar';
+import { avatarSrc } from '../../../utils/avatarUrl';
 
 /** Shared bits of the reviews overview: role badge, doc icon, progress, reviewer stack. */
 
@@ -165,6 +166,18 @@ export function ReviewerStack({ participants }: { participants: ParticipantView[
           +{participants.length - 3}
         </Typography>
       )}
+    </Stack>
+  );
+}
+
+/** The review's owner as a compact identity chip (issue #469): picture + name. */
+export function OwnerChip({ ownerId, name }: { ownerId: string; name?: string | null }) {
+  return (
+    <Stack direction="row" spacing={0.75} sx={{ alignItems: 'center', minWidth: 0 }}>
+      <UserAvatar name={name ?? '?'} size={20} imageUrl={avatarSrc(ownerId)} />
+      <Typography variant="caption" noWrap sx={{ color: 'text.secondary', maxWidth: 140 }}>
+        {name ?? '—'}
+      </Typography>
     </Stack>
   );
 }

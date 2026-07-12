@@ -99,6 +99,10 @@ public class ReviewIdentityResolver {
     userIds.addAll(annotations.findDistinctAuthorIdsByDocumentId(documentId));
     userIds.addAll(comments.findDistinctCommentAuthorIdsByDocumentId(documentId));
     userIds.addAll(participants.findDirectUserIdsByDocumentId(documentId));
+    // The owner is structurally public (#413) but is no participant row and may
+    // not have written anything yet — without this, owner-driven events (workflow
+    // transitions, reviewer additions) resolve to a null name (issue #472).
+    userIds.add(ownerId);
 
     Map<UUID, String> names =
         userIds.isEmpty()

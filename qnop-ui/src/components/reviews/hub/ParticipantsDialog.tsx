@@ -48,6 +48,7 @@ import {
 } from '../../../api/hooks/useReviews';
 import type { ToastSeverity } from '../../admin/layout/useToast';
 import { UserAvatar } from '../../shell/UserAvatar';
+import { avatarSrc } from '../../../utils/avatarUrl';
 import { apiErrorCode } from '../../../utils/apiError';
 
 /** Known participant conflicts — codes map to friendly text (never server prose). */
@@ -117,7 +118,7 @@ function TeamMemberList({ teamId }: { teamId: string }) {
     >
       {members.map((member) => (
         <Stack key={member.id} direction="row" spacing={1} sx={{ alignItems: 'center', py: 0.25 }}>
-          <UserAvatar name={member.displayName} size={20} />
+          <UserAvatar name={member.displayName} size={20} imageUrl={avatarSrc(member.id)} />
           <Typography variant="body2" noWrap>
             {member.displayName}
           </Typography>
@@ -222,7 +223,11 @@ export function ParticipantsDialog({
                       {isTeam ? (
                         <PrincipalIcon kind={participant.kind} size={28} />
                       ) : (
-                        <UserAvatar name={participant.displayName} size={28} />
+                        <UserAvatar
+                          name={participant.displayName}
+                          size={28}
+                          imageUrl={avatarSrc(participant.principalId)}
+                        />
                       )}
                       <Box sx={{ flex: 1, minWidth: 0 }}>
                         <Typography variant="body2" noWrap sx={{ fontWeight: 500 }}>
@@ -312,7 +317,11 @@ export function ParticipantsDialog({
                       {principal.kind === ParticipantKind.Team ? (
                         <PrincipalIcon kind={principal.kind} size={26} />
                       ) : (
-                        <UserAvatar name={principal.displayName} size={26} />
+                        <UserAvatar
+                          name={principal.displayName}
+                          size={26}
+                          imageUrl={avatarSrc(principal.id)}
+                        />
                       )}
                       <Box sx={{ flex: 1, minWidth: 0 }}>
                         <Typography variant="body2" noWrap>

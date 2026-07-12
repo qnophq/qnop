@@ -45,6 +45,7 @@ import { useAuthStore } from '../../../stores/authStore';
 import { ConfirmDialog } from '../../admin/ConfirmDialog';
 import type { Notify } from '../../admin/layout/useToast';
 import { UserAvatar } from '../../shell/UserAvatar';
+import { avatarSrc } from '../../../utils/avatarUrl';
 import { DueDateLabel } from '../DueDateLabel';
 import { ProgressBar } from '../list/ReviewListParts';
 import { workflowLabel } from '../workflowMeta';
@@ -176,7 +177,7 @@ export function ReviewHubHead({
           <UserAvatar
             name={ownerName}
             size={24}
-            imageUrl={ownerId === ownUserId ? ownAvatarUrl : null}
+            imageUrl={ownerId === ownUserId ? ownAvatarUrl : avatarSrc(ownerId)}
           />
           <Box sx={{ minWidth: 0 }}>
             <Typography
@@ -304,7 +305,11 @@ export function ReviewHubHead({
                       <Users size={12} aria-hidden />
                     </Box>
                   ) : (
-                    <UserAvatar name={participant.displayName} size={24} />
+                    <UserAvatar
+                      name={participant.displayName}
+                      size={24}
+                      imageUrl={avatarSrc(participant.principalId)}
+                    />
                   )}
                 </Box>
               ))}

@@ -32,6 +32,7 @@ import { useComments } from '../../../api/hooks/useComments';
 import { useAuthStore } from '../../../stores/authStore';
 import { AnnotationBadgeRow } from '../panel/AnnotationBadgeRow';
 import { CommentMessage } from '../panel/CommentMessage';
+import { avatarSrc } from '../../../utils/avatarUrl';
 
 /** Hover intent: the preview appears only after the pointer settles on a mark. */
 const SHOW_DELAY_MS = 320;
@@ -125,7 +126,7 @@ export function AnnotationHoverCard({ annotation, getAnchorPosition }: Annotatio
               <CommentMessage
                 name={authorName}
                 own={own}
-                avatarUrl={avatarUrl}
+                avatarUrl={own ? avatarUrl : avatarSrc(authorId)}
                 body={firstComment?.body ?? annotation.firstComment ?? ''}
                 createdAt={firstComment?.createdAt ?? annotation.createdAt}
                 clampLines={3}
