@@ -1,6 +1,6 @@
 # ADR-0012: Edition vs. entitlements / license gating
 
-- **Status:** Proposed
+- **Status:** Accepted — finalized by [ADR-0039](0039-enterprise-packaging-and-runtime-extensions.md)
 - **Date:** 2026-06-13
 - **Deciders:** qnop core team
 
