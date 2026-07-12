@@ -37,6 +37,7 @@ import type { Notify } from '../../admin/layout/useToast';
 import { isNewComment } from '../newSince';
 import type { BuildPermalink } from '../useReviewPermalink';
 import { useToggleCommentReaction } from '../reactions/useReactions';
+import { avatarSrc } from '../../../utils/avatarUrl';
 import { FullscreenComposerDialog } from '../markdown/FullscreenComposerDialog';
 import { MarkdownComposer } from '../markdown/MarkdownComposer';
 import { useCommentAttachmentUpload } from '../markdown/useCommentAttachmentUpload';
@@ -261,7 +262,7 @@ export function CommentThread({
               <CommentMessage
                 name={name}
                 own={own}
-                avatarUrl={avatarUrl}
+                avatarUrl={own ? avatarUrl : avatarSrc(comment.authorId)}
                 body={comment.body}
                 createdAt={comment.createdAt}
                 domId={`comment-${comment.id}`}
