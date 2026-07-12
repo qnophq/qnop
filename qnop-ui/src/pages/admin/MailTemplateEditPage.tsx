@@ -236,7 +236,7 @@ function EditForm({
             <SectionCard
               icon={Variable}
               title="Available variables"
-              description="Click a chip to insert it at the caret of the last field you edited."
+              description="Click a chip to insert it at the caret of the last field you edited — or drag it straight into a field."
             >
               {template.placeholders.length === 0 ? (
                 <Typography color="text.secondary" sx={{ fontSize: 14, fontStyle: 'italic' }}>
@@ -251,7 +251,20 @@ function EditForm({
                       size="small"
                       variant="outlined"
                       onClick={() => insertPlaceholder(name)}
-                      sx={{ fontFamily: 'monospace', fontSize: 12.5 }}
+                      // Draggable into the subject and body fields: the payload is the
+                      // literal token, so the browser's native text drop (input) and
+                      // CodeMirror's drop handling insert it at the pointer.
+                      draggable
+                      onDragStart={(event) => {
+                        event.dataTransfer.setData('text/plain', `{{${name}}}`);
+                        event.dataTransfer.effectAllowed = 'copy';
+                      }}
+                      sx={{
+                        fontFamily: 'monospace',
+                        fontSize: 12.5,
+                        cursor: 'grab',
+                        '&:active': { cursor: 'grabbing' },
+                      }}
                     />
                   ))}
                 </Stack>
