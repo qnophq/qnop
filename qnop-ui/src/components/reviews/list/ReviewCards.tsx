@@ -31,7 +31,9 @@ import { formatRelative } from '../../../utils/formatDate';
 import { DueDateLabel } from '../DueDateLabel';
 import { WorkflowBadge } from '../WorkflowBadge';
 import { AnonymousBadge } from '../AnonymousBadge';
-import { DocumentIcon, ProgressBar, ReviewerStack, RoleBadge } from './ReviewListParts';
+import { ToneBadge } from '../../admin/ToneBadge';
+import { readyToFinalize } from '../../dashboard/dashboardModel';
+import { DocumentIcon, OwnerChip, ProgressBar, ReviewerStack, RoleBadge } from './ReviewListParts';
 import { progressOf, roleOf } from './reviewListModel';
 
 interface ReviewCardsProps {
@@ -99,6 +101,9 @@ export function ReviewCards({ reviews, userId, onOpen }: ReviewCardsProps) {
             <Stack direction="row" spacing={1} sx={{ alignItems: 'center' }}>
               <WorkflowBadge state={review.workflowState} />
               {review.anonymous && <AnonymousBadge compact />}
+              {roleOf(review, userId) === 'owner' && readyToFinalize(review) && (
+                <ToneBadge tone="green" label="Ready to finalize" />
+              )}
               {progress && (
                 <Typography
                   variant="caption"
@@ -113,11 +118,16 @@ export function ReviewCards({ reviews, userId, onOpen }: ReviewCardsProps) {
               <ProgressBar
                 resolved={progress.resolved}
                 total={progress.total}
-                color={theme.qnop.brand.blue}
+                color={
+                  progress.resolved === progress.total
+                    ? theme.palette.success.main
+                    : theme.qnop.brand.blue
+                }
               />
             )}
             <Divider />
             <Stack direction="row" spacing={1.5} sx={{ alignItems: 'center' }}>
+              <OwnerChip ownerId={review.ownerId} name={review.ownerDisplayName} />
               <ReviewerStack participants={review.participants} />
               <Box sx={{ flex: 1 }} />
               <Stack

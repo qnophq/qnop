@@ -4422,6 +4422,9 @@ components:
         ownerId:
           type: string
           format: uuid
+        ownerDisplayName:
+          type: string
+          description: The owner's display name — structurally public, also in anonymous reviews.
         workflowState:
           type: string
           description: The review workflow state (open string set, ADR-0011).

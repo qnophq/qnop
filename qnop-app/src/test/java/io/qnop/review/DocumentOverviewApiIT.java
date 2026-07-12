@@ -99,6 +99,7 @@ class DocumentOverviewApiIT extends SeededIntegrationTest {
           .andExpect(jsonPath("$.total").value(1))
           .andExpect(jsonPath("$.items[0].id").value(documentId.toString()))
           .andExpect(jsonPath("$.items[0].workflowState").value("DRAFT"))
+          .andExpect(jsonPath("$.items[0].ownerDisplayName").value("Mia Member"))
           .andExpect(jsonPath("$.items[0].latestVersionNumber").value(1));
     }
   }

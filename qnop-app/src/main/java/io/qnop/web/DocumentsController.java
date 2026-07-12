@@ -146,6 +146,7 @@ public class DocumentsController implements DocumentsApi {
         .anonymous(view.anonymous())
         .threadParticipation(ThreadParticipation.fromValue(view.threadParticipation()))
         .ownerId(view.ownerId())
+        .ownerDisplayName(view.ownerDisplayName())
         .workflowState(view.workflowState())
         .latestVersionNumber(view.latestVersionNumber())
         .annotationCount(view.annotationCount())

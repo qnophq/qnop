@@ -121,7 +121,7 @@ describe('ReviewsPage', () => {
     expect(screen.getByText('NDA Acme Corp')).toBeInTheDocument();
     expect(screen.getByText('Architecture handbook')).toBeInTheDocument();
     expect(screen.getByText('Final contract')).toBeInTheDocument();
-    expect(screen.getByText('Owner')).toBeInTheDocument();
+    expect(screen.getAllByText('Owner').length).toBeGreaterThanOrEqual(1);
     expect(screen.getAllByText('Reviewer')).toHaveLength(2);
     expect(screen.getByText('In review')).toBeInTheDocument();
     expect(screen.getByText('Finalized')).toBeInTheDocument();
