@@ -20,12 +20,11 @@
  */
 
 import Box from '@mui/material/Box';
-import Button from '@mui/material/Button';
 import Chip from '@mui/material/Chip';
 import Skeleton from '@mui/material/Skeleton';
 import Stack from '@mui/material/Stack';
 import Typography from '@mui/material/Typography';
-import { CalendarClock, FileText, History, Inbox, Plus, Trophy, UserCheck } from 'lucide-react';
+import { CalendarClock, FileText, History, Inbox, Trophy, UserCheck } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useDashboard } from '../api/hooks/useDashboard';
 import { useReviews } from '../api/hooks/useReviews';
@@ -40,6 +39,7 @@ import {
   waitingOnYou,
 } from '../components/dashboard/dashboardModel';
 import { DeadlinesCard } from '../components/dashboard/DeadlinesCard';
+import { EmptyDashboard } from '../components/dashboard/EmptyDashboard';
 import { readRecentReviews } from '../components/dashboard/recentReviews';
 import { RepliesCard } from '../components/dashboard/RepliesCard';
 import { ReviewListCard } from '../components/dashboard/ReviewListCard';
@@ -107,48 +107,8 @@ export function HomePage() {
           <Skeleton variant="rounded" height={220} />
         </Stack>
       ) : empty ? (
-        // A brand-new workspace: keep the calm single-card welcome.
-        <Stack
-          spacing={2}
-          sx={{
-            alignItems: 'flex-start',
-            border: '1px solid',
-            borderColor: 'divider',
-            borderRadius: '12px',
-            p: 3,
-          }}
-        >
-          <Stack direction="row" spacing={2} sx={{ alignItems: 'center' }}>
-            <Box
-              sx={{
-                width: 44,
-                height: 44,
-                borderRadius: 1.75,
-                bgcolor: 'primary.light',
-                color: 'primary.main',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                flexShrink: 0,
-              }}
-            >
-              <Inbox size={22} />
-            </Box>
-            <Box>
-              <Typography variant="h6">No reviews yet</Typography>
-              <Typography color="text.secondary">
-                Start your first review — upload a document and invite reviewers.
-              </Typography>
-            </Box>
-          </Stack>
-          <Button
-            variant="contained"
-            startIcon={<Plus size={16} />}
-            onClick={() => navigate('/reviews')}
-          >
-            New review
-          </Button>
-        </Stack>
+        // A brand-new workspace: the gamified launch pad (issue #469).
+        <EmptyDashboard />
       ) : (
         <>
           <StatStrip
