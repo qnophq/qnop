@@ -72,6 +72,16 @@ export function WizardStepsHeader({ steps, active }: WizardStepsHeaderProps) {
                       : theme.qnop.surface2,
                   color: isDone || isActive ? '#fff' : 'text.disabled',
                   boxShadow: isActive ? `0 0 0 3px ${theme.qnop.brand.blue}33` : 'none',
+                  // The active step breathes, like the launch pad's armed step (#469).
+                  ...(isActive && {
+                    '@keyframes wizardStepPulse': {
+                      '0%': { boxShadow: `0 0 0 0 ${theme.qnop.brand.blue}59` },
+                      '70%': { boxShadow: `0 0 0 8px ${theme.qnop.brand.blue}00` },
+                      '100%': { boxShadow: `0 0 0 0 ${theme.qnop.brand.blue}00` },
+                    },
+                    animation: 'wizardStepPulse 2.4s ease-out infinite',
+                    '@media (prefers-reduced-motion: reduce)': { animation: 'none' },
+                  }),
                 }}
                 aria-current={isActive ? 'step' : undefined}
               >

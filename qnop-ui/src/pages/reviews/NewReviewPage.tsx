@@ -27,7 +27,7 @@ import Paper from '@mui/material/Paper';
 import Stack from '@mui/material/Stack';
 import Typography from '@mui/material/Typography';
 import { useQueryClient } from '@tanstack/react-query';
-import { ChevronLeft, ChevronRight, Zap } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Rocket } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import type { PrincipalView } from '../../api/generated';
 import { ParticipantKind, ThreadParticipation } from '../../api/generated';
@@ -36,11 +36,13 @@ import { useConfig } from '../../api/hooks/useConfig';
 import { reviewKeys, useCreateReview } from '../../api/hooks/useReviews';
 import { PageHeader } from '../../components/admin/layout/PageHeader';
 import { DocumentStep } from '../../components/reviews/wizard/DocumentStep';
+import { LaunchChecklist } from '../../components/reviews/wizard/LaunchChecklist';
 import { ReviewerStep } from '../../components/reviews/wizard/ReviewerStep';
 import { SummaryStep } from '../../components/reviews/wizard/SummaryStep';
 import type { SubmitPhase } from '../../components/reviews/wizard/SummaryStep';
 import { WizardStepsHeader } from '../../components/reviews/wizard/WizardStepsHeader';
 import {
+  launchChecklist,
   suggestSlug,
   titleFromFilename,
   validateDocumentFile,
@@ -125,6 +127,16 @@ export function NewReviewPage() {
     );
 
   const canProceed = step !== 1 || (file !== null && title.trim() !== '');
+
+  // The gamified sidekick (issue #469): every tick derives from live form state.
+  const checklist = launchChecklist({
+    hasFile: file !== null,
+    title,
+    slug,
+    reviewerCount: reviewers.length,
+    dueAt,
+    startImmediately,
+  });
 
   const handleNext = () => {
     if (step === 1) {
@@ -225,90 +237,106 @@ export function NewReviewPage() {
   }
 
   return (
-    <Stack spacing={3} sx={{ maxWidth: 860, mx: 'auto' }}>
+    <Stack spacing={3}>
       <PageHeader
         title="New review"
         description="Guided three-step setup: document, reviewers, start."
       />
 
-      <WizardStepsHeader steps={STEPS} active={step} />
+      <Box
+        sx={{
+          display: 'grid',
+          gap: 2.5,
+          gridTemplateColumns: { xs: '1fr', lg: 'minmax(0, 1fr) 320px' },
+          alignItems: 'start',
+        }}
+      >
+        <Stack spacing={3} sx={{ minWidth: 0 }}>
+          <WizardStepsHeader steps={STEPS} active={step} />
 
-      {submit.error && <Alert severity="error">{submit.error}</Alert>}
+          {submit.error && <Alert severity="error">{submit.error}</Alert>}
 
-      <Paper variant="outlined" sx={{ p: { xs: 2.5, sm: 3.5 } }}>
-        {step === 1 && (
-          <DocumentStep
-            file={file}
-            title={title}
-            fileError={fileError}
-            slug={slug}
-            slugError={slugError}
-            maxSizeMb={maxSizeMb}
-            onFilePicked={handleFilePicked}
-            onFileCleared={() => setFile(null)}
-            onTitleChange={handleTitleChange}
-            onSlugChange={handleSlugChange}
-          />
-        )}
-        {step === 2 && (
-          <ReviewerStep
-            selected={reviewers}
-            ownUserId={userId}
-            onAdd={addReviewer}
-            onRemove={removeReviewer}
-          />
-        )}
-        {step === 3 && file && (
-          <SummaryStep
-            file={file}
-            title={title.trim()}
-            reviewers={reviewers}
-            dueAt={dueAt}
-            onDueAtChange={setDueAt}
-            startImmediately={startImmediately}
-            onStartImmediatelyChange={setStartImmediately}
-            anonymous={anonymous}
-            onAnonymousChange={setAnonymous}
-            threadParticipation={threadParticipation}
-            onThreadParticipationChange={setThreadParticipation}
-            phase={submit.phase}
-            progress={submit.progress}
-          />
-        )}
-      </Paper>
+          <Paper variant="outlined" sx={{ p: { xs: 2.5, sm: 3.5 } }}>
+            {step === 1 && (
+              <DocumentStep
+                file={file}
+                title={title}
+                fileError={fileError}
+                slug={slug}
+                slugError={slugError}
+                maxSizeMb={maxSizeMb}
+                onFilePicked={handleFilePicked}
+                onFileCleared={() => setFile(null)}
+                onTitleChange={handleTitleChange}
+                onSlugChange={handleSlugChange}
+              />
+            )}
+            {step === 2 && (
+              <ReviewerStep
+                selected={reviewers}
+                ownUserId={userId}
+                onAdd={addReviewer}
+                onRemove={removeReviewer}
+              />
+            )}
+            {step === 3 && file && (
+              <SummaryStep
+                file={file}
+                title={title.trim()}
+                reviewers={reviewers}
+                dueAt={dueAt}
+                onDueAtChange={setDueAt}
+                startImmediately={startImmediately}
+                onStartImmediatelyChange={setStartImmediately}
+                anonymous={anonymous}
+                onAnonymousChange={setAnonymous}
+                threadParticipation={threadParticipation}
+                onThreadParticipationChange={setThreadParticipation}
+                phase={submit.phase}
+                progress={submit.progress}
+              />
+            )}
+          </Paper>
 
-      <Stack direction="row" sx={{ justifyContent: 'space-between', alignItems: 'center' }}>
-        <Button
-          color="inherit"
-          startIcon={<ChevronLeft size={16} />}
-          disabled={isSubmitting}
-          onClick={() => (step > 1 ? setStep(step - 1) : navigate('/reviews'))}
-        >
-          {step > 1 ? 'Back' : 'Cancel'}
-        </Button>
-        <Typography variant="caption" color="text.secondary">
-          Step {step} of {STEPS.length}
-        </Typography>
-        {step < STEPS.length ? (
-          <Button
-            variant="contained"
-            endIcon={<ChevronRight size={16} />}
-            disabled={!canProceed}
-            onClick={handleNext}
-          >
-            Next
-          </Button>
-        ) : (
-          <Button
-            variant="contained"
-            startIcon={<Zap size={16} />}
-            disabled={isSubmitting}
-            onClick={handleCreate}
-          >
-            {startImmediately ? 'Create & start review' : 'Create review'}
-          </Button>
-        )}
-      </Stack>
+          <Stack direction="row" sx={{ justifyContent: 'space-between', alignItems: 'center' }}>
+            <Button
+              color="inherit"
+              startIcon={<ChevronLeft size={16} />}
+              disabled={isSubmitting}
+              onClick={() => (step > 1 ? setStep(step - 1) : navigate('/reviews'))}
+            >
+              {step > 1 ? 'Back' : 'Cancel'}
+            </Button>
+            <Typography variant="caption" color="text.secondary">
+              Step {step} of {STEPS.length}
+            </Typography>
+            {step < STEPS.length ? (
+              <Button
+                variant="contained"
+                endIcon={<ChevronRight size={16} />}
+                disabled={!canProceed}
+                onClick={handleNext}
+              >
+                Next
+              </Button>
+            ) : (
+              <Button
+                variant="contained"
+                startIcon={<Rocket size={16} />}
+                disabled={isSubmitting}
+                onClick={handleCreate}
+              >
+                {startImmediately ? 'Create & start review' : 'Create review'}
+              </Button>
+            )}
+          </Stack>
+        </Stack>
+
+        {/* The mission rail: sticks alongside while the form scrolls. */}
+        <Box sx={{ position: { lg: 'sticky' }, top: { lg: 16 }, minWidth: 0 }}>
+          <LaunchChecklist items={checklist} />
+        </Box>
+      </Box>
     </Stack>
   );
 }

@@ -87,3 +87,59 @@ export function formatFileSize(bytes: number): string {
   if (bytes >= BYTES_PER_MB) return `${(bytes / BYTES_PER_MB).toFixed(1)} MB`;
   return `${Math.max(1, Math.round(bytes / 1024))} KB`;
 }
+
+/** One line of the launch checklist (issue #469): what, whether it counts, whether it's done. */
+export interface LaunchItem {
+  label: string;
+  done: boolean;
+  /** Optional items sweeten readiness but never block the launch. */
+  optional: boolean;
+  detail?: string;
+}
+
+/** The wizard's live launch checklist, derived purely from the form state. */
+export function launchChecklist(state: {
+  hasFile: boolean;
+  title: string;
+  slug: string;
+  reviewerCount: number;
+  dueAt: string | null;
+  startImmediately: boolean;
+}): LaunchItem[] {
+  return [
+    { label: 'Document aboard', done: state.hasFile, optional: false },
+    { label: 'Title set', done: state.title.trim() !== '', optional: false },
+    { label: 'Friendly link', done: state.slug.trim() !== '', optional: true },
+    {
+      label: 'Crew invited',
+      done: state.reviewerCount > 0,
+      optional: true,
+      detail:
+        state.reviewerCount > 0
+          ? `${state.reviewerCount} reviewer${state.reviewerCount === 1 ? '' : 's'}`
+          : undefined,
+    },
+    { label: 'Deadline locked', done: state.dueAt !== null, optional: true },
+    {
+      label: 'Ignition on create',
+      done: state.startImmediately,
+      optional: true,
+      detail: state.startImmediately ? 'starts immediately' : 'starts later, manually',
+    },
+  ];
+}
+
+/**
+ * Launch readiness in percent: required items carry the weight (70%), the
+ * optional extras top it up — 100% needs everything, but launch is possible
+ * from 70%.
+ */
+export function launchReadiness(items: LaunchItem[]): number {
+  const required = items.filter((item) => !item.optional);
+  const optional = items.filter((item) => item.optional);
+  const requiredShare =
+    required.length === 0 ? 0.7 : (required.filter((i) => i.done).length / required.length) * 0.7;
+  const optionalShare =
+    optional.length === 0 ? 0.3 : (optional.filter((i) => i.done).length / optional.length) * 0.3;
+  return Math.round((requiredShare + optionalShare) * 100);
+}

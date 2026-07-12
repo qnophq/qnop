@@ -21,6 +21,8 @@
 
 import { describe, expect, it } from 'vitest';
 import {
+  launchChecklist,
+  launchReadiness,
   formatFileSize,
   suggestSlug,
   titleFromFilename,
@@ -123,5 +125,48 @@ describe('validateSlug', () => {
     expect(validateSlug('123e4567-e89b-12d3-a456-426614174000')).toBe(
       'The slug must not look like a document id.',
     );
+  });
+});
+
+describe('launchChecklist / launchReadiness (issue #469)', () => {
+  const base = {
+    hasFile: false,
+    title: '',
+    slug: '',
+    reviewerCount: 0,
+    dueAt: null as string | null,
+    startImmediately: false,
+  };
+
+  it('starts empty and climbs with the essentials', () => {
+    expect(launchReadiness(launchChecklist(base))).toBe(0);
+    const essentials = launchChecklist({ ...base, hasFile: true, title: 'Q3 contract' });
+    expect(launchReadiness(essentials)).toBe(70);
+    expect(essentials.filter((i) => !i.optional).every((i) => i.done)).toBe(true);
+  });
+
+  it('tops up to 100% only with every bonus item', () => {
+    const all = launchChecklist({
+      hasFile: true,
+      title: 'Q3 contract',
+      slug: 'q3-contract',
+      reviewerCount: 2,
+      dueAt: '2027-01-01T00:00:00Z',
+      startImmediately: true,
+    });
+    expect(launchReadiness(all)).toBe(100);
+    expect(all.find((i) => i.label === 'Crew invited')?.detail).toBe('2 reviewers');
+  });
+
+  it('bonus items alone never reach the launch threshold', () => {
+    const onlyBonus = launchChecklist({
+      ...base,
+      slug: 'x',
+      reviewerCount: 1,
+      dueAt: '2027-01-01T00:00:00Z',
+      startImmediately: true,
+    });
+    expect(launchReadiness(onlyBonus)).toBe(30);
+    expect(onlyBonus.filter((i) => !i.optional).some((i) => !i.done)).toBe(true);
   });
 });

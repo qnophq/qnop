@@ -126,7 +126,7 @@ export function EmptyDashboard() {
               variant="contained"
               size="large"
               startIcon={<Rocket size={18} />}
-              onClick={() => navigate('/reviews')}
+              onClick={() => navigate('/reviews/new')}
               sx={{ mt: 3 }}
             >
               Start your first review

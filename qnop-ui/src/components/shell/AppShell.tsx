@@ -59,8 +59,15 @@ export function AppShell() {
   const dashboardMatch = useMatch('/');
   const reviewsListMatch = useMatch('/reviews');
   const adminMatch = useMatch('/admin/*');
+  // The new-review wizard (#469 polish) spans the full width too — it lays out
+  // as form + launch-checklist rail.
+  const wizardMatch = Boolean(reviewMatch && reviewMatch.params.documentId === 'new');
   const wide =
-    fullBleed || Boolean(dashboardMatch) || Boolean(reviewsListMatch) || Boolean(adminMatch);
+    fullBleed ||
+    Boolean(dashboardMatch) ||
+    Boolean(reviewsListMatch) ||
+    Boolean(adminMatch) ||
+    wizardMatch;
   const [collapsed, setCollapsed] = useState<boolean>(() => {
     try {
       return localStorage.getItem(COLLAPSE_KEY) === '1';
