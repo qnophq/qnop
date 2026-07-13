@@ -25,7 +25,7 @@ import Tooltip from '@mui/material/Tooltip';
 import Typography from '@mui/material/Typography';
 import { alpha, useTheme } from '@mui/material/styles';
 import type { LucideIcon } from 'lucide-react';
-import { BellRing, Rocket, Smile, Trophy, Users } from 'lucide-react';
+import { BellRing, Eye, MessagesSquare, Rocket, Smile, Trophy, Users } from 'lucide-react';
 import type { Achievement } from './profileModel';
 
 const BADGE_ICONS: Record<string, LucideIcon> = {
@@ -34,6 +34,8 @@ const BADGE_ICONS: Record<string, LucideIcon> = {
   closer: Trophy,
   face: Smile,
   'tuned-in': BellRing,
+  voice: MessagesSquare,
+  'sharp-eye': Eye,
 };
 
 const BADGE_TONE: Record<string, 'blue' | 'warning' | 'success'> = {
@@ -42,6 +44,8 @@ const BADGE_TONE: Record<string, 'blue' | 'warning' | 'success'> = {
   closer: 'warning',
   face: 'blue',
   'tuned-in': 'success',
+  voice: 'blue',
+  'sharp-eye': 'warning',
 };
 
 /**

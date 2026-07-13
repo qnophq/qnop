@@ -19,7 +19,7 @@
  * SPDX-License-Identifier: AGPL-3.0-only
  */
 
-import type { DocumentSummary } from '../../api/generated';
+import type { DocumentSummary, PublicUserStats } from '../../api/generated';
 
 /** One achievement sticker on the player card (issue #469). */
 export interface Achievement {
@@ -92,6 +92,57 @@ export function profileAchievements(state: {
         ? 'Review mails keep you posted'
         : 'Switch review notifications on',
       earned: state.notificationsOn,
+    },
+  ];
+}
+
+/** Milestones for the voice / sharp-eye badges (issue #473). */
+const VOICE_MILESTONE = 10;
+const SHARP_EYE_MILESTONE = 25;
+
+/**
+ * The PUBLIC profile's achievements (issue #473), derived from the server's
+ * contribution aggregates — captions read in the third person, and the
+ * private badges (avatar, notifications) stay off a colleague's page.
+ */
+export function publicProfileAchievements(stats: PublicUserStats): Achievement[] {
+  return [
+    {
+      key: 'liftoff',
+      title: 'Liftoff',
+      caption: stats.reviewsOwned > 0 ? 'Started a review' : 'No review started yet',
+      earned: stats.reviewsOwned > 0,
+    },
+    {
+      key: 'crew',
+      title: 'Crew member',
+      caption: stats.reviewsParticipating > 0 ? 'Joined a review crew' : 'Not on a crew yet',
+      earned: stats.reviewsParticipating > 0,
+    },
+    {
+      key: 'closer',
+      title: 'Closer',
+      caption:
+        stats.annotationsResolved > 0 ? 'Resolved a raised concern' : 'No concern settled yet',
+      earned: stats.annotationsResolved > 0,
+    },
+    {
+      key: 'voice',
+      title: 'Voice',
+      caption:
+        stats.commentsWritten >= VOICE_MILESTONE
+          ? `${VOICE_MILESTONE}+ comments in discussions`
+          : `Earned at ${VOICE_MILESTONE} comments`,
+      earned: stats.commentsWritten >= VOICE_MILESTONE,
+    },
+    {
+      key: 'sharp-eye',
+      title: 'Sharp eye',
+      caption:
+        stats.annotationsRaised >= SHARP_EYE_MILESTONE
+          ? `${SHARP_EYE_MILESTONE}+ annotations raised`
+          : `Earned at ${SHARP_EYE_MILESTONE} annotations`,
+      earned: stats.annotationsRaised >= SHARP_EYE_MILESTONE,
     },
   ];
 }

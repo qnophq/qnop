@@ -24,11 +24,13 @@ import io.qnop.api.v1.endpoint.UsersApi;
 import io.qnop.api.v1.model.CurrentUserResponse;
 import io.qnop.api.v1.model.ErrorResponse;
 import io.qnop.api.v1.model.PublicUserProfile;
+import io.qnop.api.v1.model.PublicUserStats;
+import io.qnop.api.v1.model.PublicUserTeam;
 import io.qnop.api.v1.model.UserRole;
 import io.qnop.api.v1.model.UserSource;
+import io.qnop.service.PublicProfileService;
 import io.qnop.service.UserNotFoundException;
 import io.qnop.service.UserService;
-import io.qnop.service.UserService.PublicUserProfileView;
 import io.qnop.service.UserService.UserProfileView;
 import io.qnop.service.avatar.AvatarService;
 import java.util.UUID;
@@ -47,11 +49,14 @@ import org.springframework.web.bind.annotation.RestController;
 public class CurrentUserController implements UsersApi {
 
   private final UserService users;
+  private final PublicProfileService publicProfiles;
   private final AvatarService avatars;
 
-  public CurrentUserController(UserService users, AvatarService avatars) {
+  public CurrentUserController(
+      UserService users, AvatarService avatars, PublicProfileService publicProfiles) {
     this.users = users;
     this.avatars = avatars;
+    this.publicProfiles = publicProfiles;
   }
 
   @Override
@@ -71,13 +76,29 @@ public class CurrentUserController implements UsersApi {
   @Override
   public ResponseEntity<PublicUserProfile> getUserProfile(UUID userId) {
     CurrentUser.requireUserId(); // signed-in colleagues only, any role
-    PublicUserProfileView profile = users.getPublicProfile(userId);
+    PublicProfileService.PublicProfileView profile = publicProfiles.getProfile(userId);
     return ResponseEntity.ok(
         new PublicUserProfile()
             .id(profile.id())
             .displayName(profile.displayName())
             .avatarUrl(AvatarUrls.forUser(userId, avatars.updatedAt(userId).orElse(null)))
-            .createdAt(profile.createdAt().atOffset(java.time.ZoneOffset.UTC)));
+            .createdAt(profile.createdAt().atOffset(java.time.ZoneOffset.UTC))
+            .stats(
+                new PublicUserStats()
+                    .reviewsOwned((int) profile.stats().reviewsOwned())
+                    .reviewsParticipating((int) profile.stats().reviewsParticipating())
+                    .annotationsRaised((int) profile.stats().annotationsRaised())
+                    .annotationsResolved((int) profile.stats().annotationsResolved())
+                    .commentsWritten((int) profile.stats().commentsWritten()))
+            .teams(
+                profile.teams().stream()
+                    .map(
+                        team ->
+                            new PublicUserTeam()
+                                .id(team.id())
+                                .name(team.name())
+                                .role(PublicUserTeam.RoleEnum.fromValue(team.role())))
+                    .toList()));
   }
 
   @ExceptionHandler(UserNotFoundException.class)

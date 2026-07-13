@@ -67,4 +67,7 @@ public interface DocumentRepository extends JpaRepository<Document, UUID> {
           + " OR EXISTS (SELECT 1 FROM ReviewParticipant pt, TeamMembership m"
           + "   WHERE pt.documentId = d.id AND pt.teamId = m.teamId AND m.userId = :actor))")
   Page<Document> findVisibleTo(@Param("actor") UUID actor, @Param("q") String q, Pageable pageable);
+
+  /** Reviews the user owns — ownership is structurally public, anonymous ones included (#473). */
+  long countByOwnerId(UUID ownerId);
 }
