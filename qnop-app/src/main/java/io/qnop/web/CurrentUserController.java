@@ -76,29 +76,39 @@ public class CurrentUserController implements UsersApi {
   @Override
   public ResponseEntity<PublicUserProfile> getUserProfile(UUID userId) {
     CurrentUser.requireUserId(); // signed-in colleagues only, any role
-    PublicProfileService.PublicProfileView profile = publicProfiles.getProfile(userId);
-    return ResponseEntity.ok(
-        new PublicUserProfile()
-            .id(profile.id())
-            .displayName(profile.displayName())
-            .avatarUrl(AvatarUrls.forUser(userId, avatars.updatedAt(userId).orElse(null)))
-            .createdAt(profile.createdAt().atOffset(java.time.ZoneOffset.UTC))
-            .stats(
-                new PublicUserStats()
-                    .reviewsOwned((int) profile.stats().reviewsOwned())
-                    .reviewsParticipating((int) profile.stats().reviewsParticipating())
-                    .annotationsRaised((int) profile.stats().annotationsRaised())
-                    .annotationsResolved((int) profile.stats().annotationsResolved())
-                    .commentsWritten((int) profile.stats().commentsWritten()))
-            .teams(
-                profile.teams().stream()
-                    .map(
-                        team ->
-                            new PublicUserTeam()
-                                .id(team.id())
-                                .name(team.name())
-                                .role(PublicUserTeam.RoleEnum.fromValue(team.role())))
-                    .toList()));
+    return ResponseEntity.ok(toPublicUserProfile(publicProfiles.getProfile(userId)));
+  }
+
+  @Override
+  public ResponseEntity<PublicUserProfile> getUserProfileBySlug(String slug) {
+    CurrentUser.requireUserId(); // signed-in colleagues only, any role
+    return ResponseEntity.ok(toPublicUserProfile(publicProfiles.getProfileBySlug(slug)));
+  }
+
+  private PublicUserProfile toPublicUserProfile(PublicProfileService.PublicProfileView profile) {
+    UUID userId = profile.id();
+    return new PublicUserProfile()
+        .id(userId)
+        .displayName(profile.displayName())
+        .slug(profile.slug())
+        .avatarUrl(AvatarUrls.forUser(userId, avatars.updatedAt(userId).orElse(null)))
+        .createdAt(profile.createdAt().atOffset(java.time.ZoneOffset.UTC))
+        .stats(
+            new PublicUserStats()
+                .reviewsOwned((int) profile.stats().reviewsOwned())
+                .reviewsParticipating((int) profile.stats().reviewsParticipating())
+                .annotationsRaised((int) profile.stats().annotationsRaised())
+                .annotationsResolved((int) profile.stats().annotationsResolved())
+                .commentsWritten((int) profile.stats().commentsWritten()))
+        .teams(
+            profile.teams().stream()
+                .map(
+                    team ->
+                        new PublicUserTeam()
+                            .id(team.id())
+                            .name(team.name())
+                            .role(PublicUserTeam.RoleEnum.fromValue(team.role())))
+                .toList());
   }
 
   @ExceptionHandler(UserNotFoundException.class)

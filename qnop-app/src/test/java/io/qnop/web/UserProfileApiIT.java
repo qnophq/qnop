@@ -59,10 +59,67 @@ class UserProfileApiIT extends SeededIntegrationTest {
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.id").value(MEMBER_ID.toString()))
         .andExpect(jsonPath("$.displayName").value("Mia Member"))
+        .andExpect(jsonPath("$.slug").value("mia-member"))
         .andExpect(jsonPath("$.createdAt").exists())
         // The lean slice: nothing beyond name, avatar and tenure.
         .andExpect(jsonPath("$.email").doesNotExist())
         .andExpect(jsonPath("$.role").doesNotExist());
+  }
+
+  @Test
+  @DisplayName("resolves the profile by its slug, ignoring case (#486)")
+  void resolvesBySlug() throws Exception {
+    mockMvc
+        .perform(
+            get("/api/v1/users/by-slug/MIA-member")
+                .header("Authorization", "Bearer " + token(AUDITOR_ID)))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.id").value(MEMBER_ID.toString()))
+        .andExpect(jsonPath("$.slug").value("mia-member"))
+        .andExpect(jsonPath("$.displayName").value("Mia Member"))
+        .andExpect(jsonPath("$.stats").exists());
+
+    mockMvc
+        .perform(
+            get("/api/v1/users/by-slug/no-such-slug")
+                .header("Authorization", "Bearer " + token(MEMBER_ID)))
+        .andExpect(status().isNotFound());
+  }
+
+  @Test
+  @DisplayName("allocates collision-suffixed slugs at account creation (#486)")
+  void allocatesSuffixedSlugOnCollision() throws Exception {
+    // Seeded "Mia Member" already owns mia-member; two namesakes join after her.
+    createAdminUser("Mia Member", "mia2", "mia2@example.com");
+    createAdminUser("Mia Member", "mia3", "mia3@example.com");
+
+    mockMvc
+        .perform(
+            get("/api/v1/users/by-slug/mia-member-2")
+                .header("Authorization", "Bearer " + token(MEMBER_ID)))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.displayName").value("Mia Member"));
+    mockMvc
+        .perform(
+            get("/api/v1/users/by-slug/mia-member-3")
+                .header("Authorization", "Bearer " + token(MEMBER_ID)))
+        .andExpect(status().isOk());
+  }
+
+  private void createAdminUser(String displayName, String username, String email) throws Exception {
+    String body =
+        """
+        {"displayName":"%s","username":"%s","email":"%s",\
+        "role":"MEMBER","initialPassword":"a-strong-pass-1"}"""
+            .formatted(displayName, username, email);
+    mockMvc
+        .perform(
+            org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post(
+                    "/api/v1/admin/users")
+                .header("Authorization", "Bearer " + token(ADMIN_ID))
+                .contentType(org.springframework.http.MediaType.APPLICATION_JSON)
+                .content(body))
+        .andExpect(status().isCreated());
   }
 
   @Test

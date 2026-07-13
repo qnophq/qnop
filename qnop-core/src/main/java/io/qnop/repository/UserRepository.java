@@ -54,6 +54,12 @@ public interface UserRepository extends JpaRepository<User, UUID> {
   /** Finds an internal user by exact username. */
   Optional<User> findByUsernameAndSource(String username, UserSource source);
 
+  /** Resolves a user by the profile slug (issue #486) — uniqueness is per LOWER(slug). */
+  Optional<User> findBySlugIgnoreCase(String slug);
+
+  /** True when the profile slug is already claimed, ignoring case (issue #486). */
+  boolean existsBySlugIgnoreCase(String slug);
+
   /**
    * Paginated admin search (issues #104/#124): an optional case-insensitive match on display name,
    * email or username, plus optional role and enabled-status filters. {@code q} must be passed
