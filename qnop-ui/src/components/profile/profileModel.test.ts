@@ -21,7 +21,7 @@
 
 import { describe, expect, it } from 'vitest';
 import type { DocumentSummary } from '../../api/generated';
-import { profileAchievements, profileStats } from './profileModel';
+import { profileAchievements, profileStats, publicProfileAchievements } from './profileModel';
 
 const ME = 'user-me';
 
@@ -69,5 +69,41 @@ describe('profileModel (issue #469)', () => {
     });
     expect(achievements.every((a) => !a.earned)).toBe(true);
     expect(achievements.find((a) => a.key === 'liftoff')?.caption).toBe('Start your first review');
+  });
+});
+
+describe('publicProfileAchievements (issue #473)', () => {
+  const stats = (overrides: Partial<import('../../api/generated').PublicUserStats> = {}) => ({
+    reviewsOwned: 0,
+    reviewsParticipating: 0,
+    annotationsRaised: 0,
+    annotationsResolved: 0,
+    commentsWritten: 0,
+    ...overrides,
+  });
+
+  it('locks everything for an inactive user with third-person captions', () => {
+    const achievements = publicProfileAchievements(stats());
+    expect(achievements.every((a) => !a.earned)).toBe(true);
+    expect(achievements.find((a) => a.key === 'liftoff')?.caption).toBe('No review started yet');
+  });
+
+  it('applies the milestone thresholds for voice and sharp eye', () => {
+    const below = publicProfileAchievements(stats({ commentsWritten: 9, annotationsRaised: 24 }));
+    expect(below.find((a) => a.key === 'voice')?.earned).toBe(false);
+    expect(below.find((a) => a.key === 'sharp-eye')?.earned).toBe(false);
+
+    const at = publicProfileAchievements(stats({ commentsWritten: 10, annotationsRaised: 25 }));
+    expect(at.find((a) => a.key === 'voice')?.earned).toBe(true);
+    expect(at.find((a) => a.key === 'sharp-eye')?.earned).toBe(true);
+  });
+
+  it('earns the shared badges from server aggregates', () => {
+    const achievements = publicProfileAchievements(
+      stats({ reviewsOwned: 1, reviewsParticipating: 2, annotationsResolved: 3 }),
+    );
+    expect(achievements.find((a) => a.key === 'liftoff')?.earned).toBe(true);
+    expect(achievements.find((a) => a.key === 'crew')?.earned).toBe(true);
+    expect(achievements.find((a) => a.key === 'closer')?.earned).toBe(true);
   });
 });

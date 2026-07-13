@@ -21,25 +21,55 @@
 
 import Alert from '@mui/material/Alert';
 import Box from '@mui/material/Box';
+import Chip from '@mui/material/Chip';
+import Paper from '@mui/material/Paper';
 import Skeleton from '@mui/material/Skeleton';
 import Stack from '@mui/material/Stack';
+import Tooltip from '@mui/material/Tooltip';
 import Typography from '@mui/material/Typography';
 import { alpha, useTheme } from '@mui/material/styles';
-import { CalendarDays } from 'lucide-react';
+import type { LucideIcon } from 'lucide-react';
+import {
+  CalendarDays,
+  CheckCircle2,
+  Crown,
+  FileText,
+  MessagesSquare,
+  NotebookPen,
+  UserCheck,
+  Users,
+} from 'lucide-react';
 import { Navigate, useParams } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import type { PublicUserProfile } from '../api/generated';
 import { usersApi } from '../api/config';
 import { useAuthStore } from '../stores/authStore';
+import { AchievementRow } from '../components/profile/AchievementRow';
+import { publicProfileAchievements } from '../components/profile/profileModel';
 import { UserAvatar } from '../components/shell/UserAvatar';
 
 const SINCE_FORMAT = new Intl.DateTimeFormat('en-US', { month: 'long', year: 'numeric' });
 
+const STAT_TILES: { key: keyof PublicUserProfile['stats']; label: string; icon: LucideIcon }[] = [
+  { key: 'reviewsOwned', label: 'Reviews owned', icon: FileText },
+  { key: 'reviewsParticipating', label: 'Reviewing', icon: UserCheck },
+  { key: 'annotationsRaised', label: 'Annotations raised', icon: NotebookPen },
+  { key: 'annotationsResolved', label: 'Resolved', icon: CheckCircle2 },
+  { key: 'commentsWritten', label: 'Comments', icon: MessagesSquare },
+];
+
+const fadeUp = {
+  '@keyframes publicProfileFadeUp': {
+    from: { opacity: 0, transform: 'translateY(10px)' },
+    to: { opacity: 1, transform: 'translateY(0)' },
+  },
+};
+
 /**
- * A colleague's workspace-public profile (issue #454): the person behind the
- * avatars and names linked across the dashboards — display name, picture and
- * tenure, deliberately nothing more. Your own id redirects to the full
- * {@code /profile}.
+ * A colleague's workspace-public profile (issues #454, #473): the campaign's
+ * player-card language — identity hero with team affiliations, the
+ * contribution scoreboard and the achievement stickers, all fed by the
+ * server's ADR-0038-safe aggregates. Your own id redirects to `/profile`.
  */
 export function UserProfilePage() {
   const theme = useTheme();
@@ -54,72 +84,206 @@ export function UserProfilePage() {
     enabled: Boolean(userId) && userId !== selfId,
   });
 
+  const blue = theme.qnop.brand.blue;
+  const dark = theme.qnop.mode === 'dark';
+  const stagger = (index: number) => ({
+    ...fadeUp,
+    animation: `publicProfileFadeUp 0.45s ${theme.transitions.easing.easeOut} both`,
+    animationDelay: `${index * 90}ms`,
+    '@media (prefers-reduced-motion: reduce)': { animation: 'none' },
+  });
+
   if (userId && userId === selfId) {
     return <Navigate to="/profile" replace />;
   }
   if (profileQuery.isPending) {
-    return <Skeleton variant="rounded" height={220} sx={{ maxWidth: 560 }} />;
+    return (
+      <Stack spacing={2.5}>
+        <Skeleton variant="rounded" height={210} />
+        <Skeleton variant="rounded" height={92} />
+        <Skeleton variant="rounded" height={130} />
+      </Stack>
+    );
   }
   if (profileQuery.isError || !profileQuery.data) {
     return <Alert severity="error">This user does not exist.</Alert>;
   }
 
   const profile = profileQuery.data;
+  const achievements = publicProfileAchievements(profile.stats);
+  const earnedCount = achievements.filter((a) => a.earned).length;
+
   return (
-    <Stack spacing={0} sx={{ maxWidth: 560 }}>
-      {/* A soft identity band — the avatar palette's tint as atmosphere. */}
-      <Box
+    <Stack spacing={2.5} data-testid="public-profile">
+      {/* Identity hero: the player card a colleague sees. */}
+      <Paper
+        variant="outlined"
         sx={{
-          height: 84,
-          borderRadius: '14px 14px 0 0',
-          background: `linear-gradient(120deg, ${alpha(theme.qnop.brand.blue, 0.16)}, ${alpha(
-            theme.qnop.brand.blue,
-            0.04,
-          )})`,
-          border: '1px solid',
-          borderBottom: 'none',
-          borderColor: 'divider',
-        }}
-      />
-      <Stack
-        spacing={1.5}
-        sx={{
-          px: 3,
-          pb: 3,
-          border: '1px solid',
-          borderTop: 'none',
-          borderColor: 'divider',
-          borderRadius: '0 0 14px 14px',
+          ...stagger(0),
+          overflow: 'hidden',
+          borderRadius: '16px',
         }}
       >
-        <Box sx={{ mt: -4.5 }}>
-          <Box
-            sx={{
-              display: 'inline-flex',
-              borderRadius: '50%',
-              border: '4px solid',
-              borderColor: 'background.paper',
-            }}
-          >
-            <UserAvatar name={profile.displayName} size={76} imageUrl={profile.avatarUrl ?? null} />
-          </Box>
-        </Box>
-        <Box>
-          <Typography variant="h2" sx={{ fontSize: '1.4rem' }}>
-            {profile.displayName}
-          </Typography>
+        <Box
+          aria-hidden
+          sx={{
+            height: 96,
+            background: `
+              radial-gradient(60% 150% at 80% 0%, ${alpha(blue, dark ? 0.28 : 0.16)} 0%, transparent 100%),
+              linear-gradient(120deg, ${alpha(blue, dark ? 0.18 : 0.1)}, ${alpha(blue, 0.03)})
+            `,
+          }}
+        />
+        <Box sx={{ px: { xs: 2.5, sm: 3 }, pb: 2.5 }}>
           <Stack
-            direction="row"
-            spacing={0.75}
-            sx={{ alignItems: 'center', color: 'text.secondary', mt: 0.5 }}
+            direction={{ xs: 'column', sm: 'row' }}
+            spacing={2}
+            sx={{ alignItems: { sm: 'flex-end' }, mt: -5 }}
           >
-            <CalendarDays size={14} aria-hidden />
-            <Typography variant="body2">
-              Member since {SINCE_FORMAT.format(new Date(profile.createdAt))}
-            </Typography>
+            <Box
+              sx={{
+                display: 'inline-flex',
+                borderRadius: '50%',
+                p: '3px',
+                bgcolor: 'background.paper',
+                border: `2px solid ${alpha(blue, 0.45)}`,
+                width: 'fit-content',
+              }}
+            >
+              <UserAvatar
+                name={profile.displayName}
+                size={84}
+                imageUrl={profile.avatarUrl ?? null}
+              />
+            </Box>
+            <Box sx={{ minWidth: 0, pb: 0.5 }}>
+              <Typography variant="h2" sx={{ fontSize: '1.5rem', lineHeight: 1.2 }}>
+                {profile.displayName}
+              </Typography>
+              <Stack
+                direction="row"
+                spacing={0.75}
+                sx={{ alignItems: 'center', color: 'text.secondary', mt: 0.5 }}
+              >
+                <CalendarDays size={14} aria-hidden />
+                <Typography variant="body2">
+                  Member since {SINCE_FORMAT.format(new Date(profile.createdAt))}
+                </Typography>
+              </Stack>
+            </Box>
           </Stack>
+
+          {profile.teams.length > 0 && (
+            <Stack
+              direction="row"
+              spacing={1}
+              useFlexGap
+              sx={{ flexWrap: 'wrap', mt: 2 }}
+              data-testid="profile-teams"
+            >
+              {profile.teams.map((team) => {
+                const lead = team.role === 'LEAD';
+                return (
+                  <Tooltip
+                    key={team.id}
+                    title={lead ? `Leads ${team.name}` : `Member of ${team.name}`}
+                  >
+                    <Chip
+                      size="small"
+                      icon={
+                        lead ? (
+                          <Crown size={13} style={{ color: theme.palette.warning.main }} />
+                        ) : (
+                          <Users size={13} />
+                        )
+                      }
+                      label={team.name}
+                      sx={{
+                        fontWeight: 500,
+                        ...(lead && {
+                          borderColor: alpha(theme.palette.warning.main, 0.5),
+                          bgcolor: alpha(theme.palette.warning.main, dark ? 0.14 : 0.08),
+                        }),
+                      }}
+                      variant="outlined"
+                    />
+                  </Tooltip>
+                );
+              })}
+            </Stack>
+          )}
         </Box>
-      </Stack>
+      </Paper>
+
+      {/* The contribution scoreboard — ADR-0038-safe aggregates. */}
+      <Box
+        sx={{
+          ...stagger(1),
+          display: 'grid',
+          gridTemplateColumns: { xs: '1fr 1fr', sm: 'repeat(5, 1fr)' },
+          gap: 1.5,
+        }}
+      >
+        {STAT_TILES.map(({ key, label, icon: Icon }) => {
+          const value = profile.stats[key];
+          return (
+            <Paper key={key} variant="outlined" sx={{ px: 2, py: 1.5, borderRadius: '12px' }}>
+              <Stack direction="row" spacing={1.5} sx={{ alignItems: 'center' }}>
+                <Box
+                  aria-hidden
+                  sx={{
+                    width: 34,
+                    height: 34,
+                    borderRadius: '10px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    flexShrink: 0,
+                    color: value > 0 ? blue : 'text.secondary',
+                    bgcolor: alpha(
+                      value > 0 ? blue : theme.palette.text.secondary,
+                      dark ? 0.16 : 0.1,
+                    ),
+                  }}
+                >
+                  <Icon size={16} />
+                </Box>
+                <Box sx={{ minWidth: 0 }}>
+                  <Typography
+                    sx={{
+                      fontSize: '1.4rem',
+                      fontWeight: 800,
+                      lineHeight: 1.2,
+                      fontVariantNumeric: 'tabular-nums',
+                      color: value > 0 ? 'text.primary' : 'text.disabled',
+                    }}
+                  >
+                    {value}
+                  </Typography>
+                  <Typography variant="caption" color="text.secondary" noWrap component="p">
+                    {label}
+                  </Typography>
+                </Box>
+              </Stack>
+            </Paper>
+          );
+        })}
+      </Box>
+
+      {/* Achievements — the same sticker language as the own player card. */}
+      <Paper variant="outlined" sx={{ ...stagger(2), p: { xs: 2.5, sm: 3 }, borderRadius: '16px' }}>
+        <Stack
+          direction="row"
+          spacing={1}
+          sx={{ alignItems: 'baseline', justifyContent: 'space-between', mb: 1.5 }}
+        >
+          <Typography sx={{ fontSize: 14, fontWeight: 700 }}>Achievements</Typography>
+          <Typography variant="caption" color="text.secondary">
+            {earnedCount} of {achievements.length} earned
+          </Typography>
+        </Stack>
+        <AchievementRow achievements={achievements} />
+      </Paper>
     </Stack>
   );
 }

@@ -108,17 +108,6 @@ public class UserService {
    * The lean, workspace-public slice of a user (issue #454): what any signed-in user may see about
    * a colleague — display name and tenure, nothing more (no email, role or source).
    */
-  @Transactional(readOnly = true)
-  public PublicUserProfileView getPublicProfile(UUID id) {
-    return users
-        .findById(id)
-        .map(u -> new PublicUserProfileView(u.getId(), u.getDisplayName(), u.getCreatedAt()))
-        .orElseThrow(() -> new UserNotFoundException(id));
-  }
-
-  /** The public slice served by {@code GET /users/{userId}} (issue #454). */
-  public record PublicUserProfileView(UUID id, String displayName, Instant createdAt) {}
-
   /** Activates a user after successful email verification. */
   @Transactional
   public User enable(UUID id) {

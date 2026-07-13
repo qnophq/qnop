@@ -80,4 +80,10 @@ public interface ReviewParticipantRepository extends JpaRepository<ReviewPartici
   @Query(VIEW_SELECT + " WHERE p.documentId IN :documentIds ORDER BY p.createdAt")
   List<ParticipantProjection> findViewsByDocumentIds(
       @Param("documentIds") Collection<UUID> documentIds);
+
+  /** Direct participations in NON-anonymous reviews (ADR-0038, issue #473). */
+  @Query(
+      "SELECT count(p) FROM ReviewParticipant p, Document d"
+          + " WHERE d.id = p.documentId AND p.userId = :userId AND d.anonymous = false")
+  long countPublicParticipations(@Param("userId") UUID userId);
 }

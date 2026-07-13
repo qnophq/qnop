@@ -24,6 +24,12 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import io.qnop.entity.Document;
+import io.qnop.entity.DocumentVersion;
+import io.qnop.entity.ReviewParticipant;
+import io.qnop.repository.DocumentRepository;
+import io.qnop.repository.DocumentVersionRepository;
+import io.qnop.repository.ReviewParticipantRepository;
 import io.qnop.testsupport.SeededIntegrationTest;
 import java.util.UUID;
 import org.junit.jupiter.api.DisplayName;
@@ -34,6 +40,14 @@ import org.junit.jupiter.api.Test;
  * name and tenure — never email, role or source — and unknown ids answer 404.
  */
 class UserProfileApiIT extends SeededIntegrationTest {
+
+  @org.springframework.beans.factory.annotation.Autowired private DocumentRepository documents;
+
+  @org.springframework.beans.factory.annotation.Autowired
+  private DocumentVersionRepository versions;
+
+  @org.springframework.beans.factory.annotation.Autowired
+  private ReviewParticipantRepository participants;
 
   @Test
   @DisplayName("serves a colleague's lean profile to any signed-in user")
@@ -49,6 +63,79 @@ class UserProfileApiIT extends SeededIntegrationTest {
         // The lean slice: nothing beyond name, avatar and tenure.
         .andExpect(jsonPath("$.email").doesNotExist())
         .andExpect(jsonPath("$.role").doesNotExist());
+  }
+
+  @Test
+  @DisplayName("aggregates contribution stats, excluding anonymous-review activity (#473)")
+  void statsRespectAnonymity() throws Exception {
+    // A public review with MEMBER's activity...
+    Document open = documents.save(new Document(MEMBER_ID, "Public contract"));
+    participants.save(ReviewParticipant.forUser(open.getId(), AUDITOR_ID));
+    versions.save(
+        new DocumentVersion(
+            open.getId(), 1, "sha256/aa/deadbeef", "deadbeef", "application/pdf", 10L, MEMBER_ID));
+    createAnnotation(open.getId(), AUDITOR_ID);
+    // ...and an ANONYMOUS review where AUDITOR also participates and annotates.
+    Document anon = new Document(MEMBER_ID, "Anonymous review");
+    anon.setAnonymous(true);
+    documents.save(anon);
+    participants.save(ReviewParticipant.forUser(anon.getId(), AUDITOR_ID));
+    versions.save(
+        new DocumentVersion(
+            anon.getId(), 1, "sha256/bb/cafebabe", "cafebabe", "application/pdf", 10L, MEMBER_ID));
+    createAnnotation(anon.getId(), AUDITOR_ID);
+
+    mockMvc
+        .perform(
+            get("/api/v1/users/" + AUDITOR_ID)
+                .header("Authorization", "Bearer " + token(MEMBER_ID)))
+        .andExpect(status().isOk())
+        // The anonymous review's participation, annotation and comment stay
+        // OUT of the public numbers (ADR-0038).
+        .andExpect(jsonPath("$.stats.reviewsOwned").value(0))
+        .andExpect(jsonPath("$.stats.reviewsParticipating").value(1))
+        .andExpect(jsonPath("$.stats.annotationsRaised").value(1))
+        .andExpect(jsonPath("$.stats.annotationsResolved").value(0))
+        .andExpect(jsonPath("$.stats.commentsWritten").value(1));
+
+    // Ownership is structurally public — the owner's count includes BOTH reviews.
+    mockMvc
+        .perform(
+            get("/api/v1/users/" + MEMBER_ID)
+                .header("Authorization", "Bearer " + token(AUDITOR_ID)))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.stats.reviewsOwned").value(2));
+  }
+
+  @Test
+  @DisplayName("lists the user's enabled teams with their role, ordered by name (#473)")
+  void teamsWithRoles() throws Exception {
+    mockMvc
+        .perform(
+            get("/api/v1/users/" + MEMBER_ID)
+                .header("Authorization", "Bearer " + token(AUDITOR_ID)))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.teams[0].name").value("Alpha"))
+        .andExpect(jsonPath("$.teams[0].role").exists());
+
+    // A user in no team carries an empty list.
+    mockMvc
+        .perform(
+            get("/api/v1/users/" + EXTERNAL_ID)
+                .header("Authorization", "Bearer " + token(MEMBER_ID)))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.teams", org.hamcrest.Matchers.hasSize(0)));
+  }
+
+  private void createAnnotation(java.util.UUID documentId, java.util.UUID author) throws Exception {
+    mockMvc
+        .perform(
+            org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post(
+                    "/api/v1/documents/" + documentId + "/annotations")
+                .header("Authorization", "Bearer " + token(author))
+                .contentType(org.springframework.http.MediaType.APPLICATION_JSON)
+                .content("{\"versionNumber\":1,\"anchor\":null,\"comment\":\"a concern\"}"))
+        .andExpect(status().isCreated());
   }
 
   @Test

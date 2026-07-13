@@ -49,4 +49,12 @@ public interface TeamMembershipRepository extends JpaRepository<TeamMembership, 
       "SELECT new io.qnop.repository.TeamMemberCount(m.teamId, COUNT(m)) "
           + "FROM TeamMembership m WHERE m.teamId IN :teamIds GROUP BY m.teamId")
   List<TeamMemberCount> countMembersByTeamIds(@Param("teamIds") Collection<UUID> teamIds);
+
+  /** The user's enabled teams with their role there, ordered by name (issue #473). */
+  @Query(
+      "SELECT new io.qnop.repository.UserTeamProjection(t.id, t.name, m.teamRole)"
+          + " FROM TeamMembership m, Team t"
+          + " WHERE t.id = m.teamId AND m.userId = :userId AND t.enabled = true"
+          + " ORDER BY t.name")
+  java.util.List<UserTeamProjection> findTeamsOfUser(@Param("userId") UUID userId);
 }

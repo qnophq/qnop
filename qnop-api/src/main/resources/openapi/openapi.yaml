@@ -3616,11 +3616,13 @@ components:
           $ref: '#/components/schemas/Anchor'
     PublicUserProfile:
       type: object
-      description: The workspace-public slice of a user (issue #454).
+      description: The workspace-public slice of a user (issues #454, #473).
       required:
         - id
         - displayName
         - createdAt
+        - stats
+        - teams
       properties:
         id:
           type: string
@@ -3633,6 +3635,53 @@ components:
         createdAt:
           type: string
           format: date-time
+        stats:
+          $ref: '#/components/schemas/PublicUserStats'
+        teams:
+          type: array
+          description: Enabled teams the user belongs to, ordered by name.
+          items:
+            $ref: '#/components/schemas/PublicUserTeam'
+    PublicUserStats:
+      type: object
+      description: >-
+        Contribution aggregates for the public profile (issue #473). Activity
+        counters cover NON-anonymous reviews only (ADR-0038 — what anonymity
+        hides never feeds a public number); owned reviews count fully, since
+        ownership is structurally public.
+      required:
+        - reviewsOwned
+        - reviewsParticipating
+        - annotationsRaised
+        - annotationsResolved
+        - commentsWritten
+      properties:
+        reviewsOwned:
+          type: integer
+        reviewsParticipating:
+          type: integer
+        annotationsRaised:
+          type: integer
+        annotationsResolved:
+          type: integer
+        commentsWritten:
+          type: integer
+    PublicUserTeam:
+      type: object
+      description: A team membership shown on the public profile (issue #473).
+      required:
+        - id
+        - name
+        - role
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        role:
+          type: string
+          enum: [LEAD, MEMBER]
     CurrentUserResponse:
       type: object
       description: The authenticated user's own profile.

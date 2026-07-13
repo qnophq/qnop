@@ -107,4 +107,11 @@ public interface CommentRepository extends JpaRepository<Comment, UUID> {
       @Param("documentIds") Collection<UUID> documentIds,
       @Param("viewer") UUID viewer,
       Pageable pageable);
+
+  /** Comments the user wrote in NON-anonymous reviews (ADR-0038, issue #473). */
+  @Query(
+      "SELECT count(c) FROM Comment c, Annotation a, Document d"
+          + " WHERE a.id = c.annotationId AND d.id = a.documentId"
+          + " AND c.authorId = :authorId AND d.anonymous = false")
+  long countPublicByAuthor(@Param("authorId") UUID authorId);
 }
