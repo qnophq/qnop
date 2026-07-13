@@ -31,7 +31,7 @@ import Menu from '@mui/material/Menu';
 import MenuItem from '@mui/material/MenuItem';
 import Popper from '@mui/material/Popper';
 import Stack from '@mui/material/Stack';
-import { NotebookPen } from 'lucide-react';
+import { Copy, NotebookPen } from 'lucide-react';
 import type { Anchor, AnnotationView, NormalizedBox } from '../../api/generated';
 import { ExtractionStatus } from '../../api/generated';
 import type { AnnotationPriority, AnnotationType } from '../../api/generated';
@@ -47,6 +47,7 @@ import {
   useRenderedDocument,
 } from '../../api/hooks/useDocuments';
 import { AdminToast } from '../../components/admin/layout/AdminToast';
+import { copyToClipboard } from '../../utils/clipboard';
 import { PageHeader } from '../../components/admin/layout/PageHeader';
 import { useToast } from '../../components/admin/layout/useToast';
 import { BoundaryFallback } from '../../components/errors/BoundaryFallback';
@@ -313,6 +314,28 @@ export function DocumentReviewPage() {
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);
   }, [reattaching]);
+
+  // Copy the drawn selection with the native gesture (issue #478): while a
+  // TEXT selection is pending, Cmd/Ctrl+C copies its quote — unless the user
+  // is in an input or made a real DOM selection somewhere (those keep native
+  // copy). Region selections carry no text and stay untouched.
+  const pendingQuote = pending?.anchor?.textQuote?.quote;
+  useEffect(() => {
+    if (!pendingQuote) return;
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (!(event.metaKey || event.ctrlKey) || event.key.toLowerCase() !== 'c') return;
+      const target = event.target as HTMLElement | null;
+      if (target?.closest('input, textarea, [contenteditable="true"]')) return;
+      const domSelection = window.getSelection();
+      if (domSelection && !domSelection.isCollapsed) return;
+      event.preventDefault();
+      void copyToClipboard(pendingQuote).then((ok) =>
+        notify(ok ? 'Text copied.' : 'Could not copy to the clipboard.', ok ? 'success' : 'error'),
+      );
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [pendingQuote, notify]);
 
   const closeFocusCard = () => {
     setActiveAnnotationId(null);
@@ -790,6 +813,24 @@ export function DocumentReviewPage() {
           </ListItemIcon>
           <ListItemText>Create annotation</ListItemText>
         </MenuItem>
+        {pendingQuote && (
+          <MenuItem
+            onClick={() => {
+              void copyToClipboard(pendingQuote).then((ok) =>
+                notify(
+                  ok ? 'Text copied.' : 'Could not copy to the clipboard.',
+                  ok ? 'success' : 'error',
+                ),
+              );
+              setPending(null);
+            }}
+          >
+            <ListItemIcon>
+              <Copy size={16} />
+            </ListItemIcon>
+            <ListItemText>Copy text</ListItemText>
+          </MenuItem>
+        )}
       </Menu>
       <NewTaskDialog
         open={newNoteOpen}

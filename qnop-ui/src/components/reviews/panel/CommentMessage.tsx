@@ -27,6 +27,7 @@ import { shortRelativeTime } from '../../../utils/relativeTime';
 import type { Notify } from '../../admin/layout/useToast';
 import { UserAvatar } from '../../shell/UserAvatar';
 import { Markdown } from '../markdown/Markdown';
+import { CopyTextButton } from '../CopyTextButton';
 import { CopyLinkButton } from '../permalink/CopyLinkButton';
 import { AddReactionButton } from '../reactions/AddReactionButton';
 import { ReactionBar } from '../reactions/ReactionBar';
@@ -121,8 +122,16 @@ export function CommentMessage({
           >
             {shortRelativeTime(createdAt)}
           </Typography>
-          {(onToggleReaction || (permalinkUrl && notify)) && (
+          {(onToggleReaction || notify) && (
             <Box className="comment-hover-actions" sx={{ display: 'flex', alignItems: 'center' }}>
+              {notify && (
+                <CopyTextButton
+                  text={body}
+                  notify={notify}
+                  label="Copy comment"
+                  copiedMessage="Comment copied."
+                />
+              )}
               {permalinkUrl && notify && (
                 <CopyLinkButton url={permalinkUrl} notify={notify} label="Copy link to comment" />
               )}

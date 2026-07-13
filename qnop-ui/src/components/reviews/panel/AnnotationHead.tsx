@@ -26,6 +26,7 @@ import { useTheme } from '@mui/material/styles';
 import type { AnnotationView } from '../../../api/generated';
 import { useComments } from '../../../api/hooks/useComments';
 import type { Notify } from '../../admin/layout/useToast';
+import { CopyTextButton } from '../CopyTextButton';
 import { CopyLinkButton } from '../permalink/CopyLinkButton';
 import { AddReactionButton } from '../reactions/AddReactionButton';
 import { ReactionBar } from '../reactions/ReactionBar';
@@ -89,6 +90,10 @@ export function AnnotationHead({
   // Full opener once the thread is cached; the server-side excerpt until then.
   const cachedComments = useComments(annotation.id, false).data?.comments ?? [];
   const openerText = cachedComments[0]?.body ?? annotation.firstComment ?? null;
+  // Every annotation offers a copy payload (issue #478): the quoted passage
+  // when anchored to text, otherwise the opening text (document-scoped and
+  // region annotations carry no quote).
+  const copyText = annotation.anchor?.textQuote?.quote ?? openerText;
   const own = annotation.authorId === userId;
   // The author name is resolved server-side, honouring per-review anonymity
   // (issue #413): the real name in a normal review, a stable "Participant N"
@@ -145,7 +150,7 @@ export function AnnotationHead({
             >
               Started this discussion · {shortRelativeTime(annotation.createdAt)}
             </Typography>
-            {(onToggleReaction || (permalinkUrl && notify)) && (
+            {(onToggleReaction || (copyText && notify) || (permalinkUrl && notify)) && (
               // Directly after the timestamp, exactly like a comment row's
               // link. The negative margin keeps the icon buttons from growing
               // the caption line beyond the avatar's height.
@@ -153,6 +158,14 @@ export function AnnotationHead({
                 className="annotation-hover-actions"
                 sx={{ display: 'flex', alignItems: 'center', flexShrink: 0, my: '-3px' }}
               >
+                {copyText && notify && (
+                  <CopyTextButton
+                    text={copyText}
+                    notify={notify}
+                    label={quote ? 'Copy quote' : 'Copy text'}
+                    copiedMessage={quote ? 'Quote copied.' : 'Text copied.'}
+                  />
+                )}
                 {permalinkUrl && notify && (
                   <CopyLinkButton
                     url={permalinkUrl}
@@ -190,6 +203,9 @@ export function AnnotationHead({
             borderColor: 'divider',
             bgcolor: theme.qnop.surface2,
             borderRadius: '0 6px 6px 0',
+            // The passage is copy material (issue #478) — selectable even
+            // inside the clickable card (ButtonBase disables selection).
+            userSelect: 'text',
             px: 1.25,
             py: 0.75,
           }}
