@@ -27,6 +27,8 @@ import {
   PlacementStatus,
 } from '../../../api/generated';
 import { stripMarkdown } from '../../../utils/markdown';
+import { isDocumentScoped } from '../annotationScope';
+import { compareAnnotationsByPosition } from '../viewer/anchoring';
 
 /** The panel's filter facets (issue #403); `null`/`'all'`/`''` mean "any". */
 export interface AnnotationFilters {
@@ -111,4 +113,17 @@ export function reanchorSummary(annotations: AnnotationView[]) {
       annotation.placementStatus === PlacementStatus.Failed,
   ).length;
   return { moved, orphaned, total: moved + orphaned };
+}
+
+/**
+ * The flat panel order (issue #481): document-scoped remarks lead — they have
+ * no position and read like a preface — oldest first, then anchored
+ * annotations by their document position (unchanged from the sectioned view).
+ */
+export function comparePanelOrder(a: AnnotationView, b: AnnotationView): number {
+  const aScoped = isDocumentScoped(a);
+  const bScoped = isDocumentScoped(b);
+  if (aScoped !== bScoped) return aScoped ? -1 : 1;
+  if (aScoped && bScoped) return a.createdAt.localeCompare(b.createdAt);
+  return compareAnnotationsByPosition(a, b);
 }

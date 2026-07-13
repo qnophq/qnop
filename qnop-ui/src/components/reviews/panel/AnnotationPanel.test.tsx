@@ -139,7 +139,7 @@ describe('AnnotationPanel', () => {
     expect(
       within(screen.getByTestId('annotation-item-a-replied')).getByTestId('unseen-dot'),
     ).toBeInTheDocument();
-    expect(screen.getByTestId('section-new-count')).toHaveTextContent('2 new');
+    expect(screen.getByTestId('panel-new-count')).toHaveTextContent('2 new');
   });
 
   it('shows the empty state with the how-to hint when annotating is possible', () => {
@@ -149,7 +149,7 @@ describe('AnnotationPanel', () => {
     ).toBeInTheDocument();
   });
 
-  it('separates document-scoped annotations into their own group (#395)', () => {
+  it('renders one flat list; document-scoped cards carry their own marker (#481)', () => {
     renderPanel({
       annotations: [
         annotation('placed-1'),
@@ -160,9 +160,11 @@ describe('AnnotationPanel', () => {
     });
 
     expect(screen.getByText('Annotations (2)')).toBeInTheDocument();
-    // The anchor-free annotation groups under "Whole document", not the "anchor lost" bucket.
-    expect(screen.getByText('Whole document')).toBeInTheDocument();
-    expect(screen.queryByText('Not placed on this version')).not.toBeInTheDocument();
+    // No section chrome anymore — the scope reads per card (issue #481).
+    expect(screen.queryByText('General remarks — not pinned to a passage')).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole('button', { name: /Anchored to the document/ }),
+    ).not.toBeInTheDocument();
     // The located annotation's collapsed row still shows its page.
     expect(screen.getByText('p. 1')).toBeInTheDocument();
     // The active document-scoped annotation carries the whole-document chip.
@@ -273,15 +275,25 @@ describe('AnnotationPanel', () => {
     expect(screen.queryByLabelText('Author')).not.toBeInTheDocument();
   });
 
-  it('collapses a section on click', () => {
-    renderPanel({ annotations: [annotation('a1')] });
+  it('orders the flat list: document-scoped first, then anchored by position (#481)', () => {
+    renderPanel({
+      annotations: [
+        annotation('page-2', {
+          anchor: { region: { surfaceIndex: 1, box: { x: 0.1, y: 0.1, width: 0.2, height: 0.1 } } },
+        }),
+        annotation('page-1'),
+        annotation('doc-note', { anchor: undefined, placementStatus: undefined }),
+      ],
+    });
 
-    const header = screen.getByRole('button', { name: /Anchored to the document/ });
-    expect(header).toHaveAttribute('aria-expanded', 'true');
-    expect(screen.getByTestId('annotation-item-a1')).toBeVisible();
-
-    fireEvent.click(header);
-    expect(header).toHaveAttribute('aria-expanded', 'false');
+    const ids = screen
+      .getAllByTestId(/annotation-item-/)
+      .map((el) => el.getAttribute('data-testid'));
+    expect(ids).toEqual([
+      'annotation-item-doc-note',
+      'annotation-item-page-1',
+      'annotation-item-page-2',
+    ]);
   });
 
   it('passes the chosen classification to onCreate (issue #403)', () => {

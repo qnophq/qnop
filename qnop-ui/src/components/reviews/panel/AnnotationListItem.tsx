@@ -34,6 +34,8 @@ import { useAuthStore } from '../../../stores/authStore';
 import type { Notify } from '../../admin/layout/useToast';
 import { UserAvatar } from '../../shell/UserAvatar';
 import { avatarSrc } from '../../../utils/avatarUrl';
+import { isDocumentScoped } from '../annotationScope';
+import { WholeDocumentChip } from '../WholeDocumentChip';
 import { tokens } from '../../../theme/tokens';
 import { shortRelativeTime } from '../../../utils/relativeTime';
 import { hasNewComments, isUnseen } from '../newSince';
@@ -386,7 +388,7 @@ function AnnotationListItemBase({
                 {annotation.commentCount}
               </Typography>
             </Stack>
-            {region && (
+            {region ? (
               <Typography
                 variant="caption"
                 color="text.secondary"
@@ -394,6 +396,11 @@ function AnnotationListItemBase({
               >
                 p. {region.surfaceIndex + 1}
               </Typography>
+            ) : (
+              // In the flat list (issue #481) the scope must read per card —
+              // collapsed document-scoped rows mark themselves like the
+              // anchored ones mark their page.
+              isDocumentScoped(annotation) && <WholeDocumentChip compact />
             )}
           </Stack>
         </Stack>

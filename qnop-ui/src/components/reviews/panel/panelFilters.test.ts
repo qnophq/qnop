@@ -27,7 +27,13 @@ import {
   AnnotationType,
   PlacementStatus,
 } from '../../../api/generated';
-import { EMPTY_FILTERS, activeFacetCount, matchesFilters, reanchorSummary } from './panelFilters';
+import {
+  EMPTY_FILTERS,
+  activeFacetCount,
+  comparePanelOrder,
+  matchesFilters,
+  reanchorSummary,
+} from './panelFilters';
 
 const annotation = (overrides: Partial<AnnotationView> = {}): AnnotationView => ({
   id: 'a1',
@@ -152,5 +158,29 @@ describe('placement facet & re-anchoring summary (issue #326)', () => {
       total: 3,
     });
     expect(reanchorSummary([placed]).total).toBe(0);
+  });
+});
+
+describe('comparePanelOrder (issue #481)', () => {
+  const doc = (id: string, createdAt: string) => annotation({ id, anchor: undefined, createdAt });
+  const placed = (id: string, surfaceIndex: number, y = 0.1) =>
+    annotation({
+      id,
+      anchor: { region: { surfaceIndex, box: { x: 0.1, y, width: 0.2, height: 0.1 } } },
+    });
+
+  it('leads with document-scoped remarks (oldest first), then anchored by position', () => {
+    const list = [
+      placed('p2', 1),
+      doc('d-late', '2026-07-02T10:00:00Z'),
+      placed('p1', 0),
+      doc('d-early', '2026-07-01T10:00:00Z'),
+    ];
+    expect(list.sort(comparePanelOrder).map((a) => a.id)).toEqual([
+      'd-early',
+      'd-late',
+      'p1',
+      'p2',
+    ]);
   });
 });
