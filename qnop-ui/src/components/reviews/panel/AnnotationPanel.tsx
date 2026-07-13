@@ -20,15 +20,12 @@
  */
 
 import { useMemo, useState } from 'react';
-import type { ReactNode } from 'react';
 import Box from '@mui/material/Box';
 import Button from '@mui/material/Button';
-import ButtonBase from '@mui/material/ButtonBase';
 import Collapse from '@mui/material/Collapse';
 import Stack from '@mui/material/Stack';
 import Typography from '@mui/material/Typography';
-import { useTheme } from '@mui/material/styles';
-import { ChevronRight, FileText, Link2, NotebookPen, Plus } from 'lucide-react';
+import { NotebookPen, Plus } from 'lucide-react';
 import type {
   AnnotationPriority,
   AnnotationType,
@@ -39,9 +36,8 @@ import { AnnotationStatus } from '../../../api/generated';
 import { useAuthStore } from '../../../stores/authStore';
 import type { Notify } from '../../admin/layout/useToast';
 import { SectionCard } from '../../admin/layout/SectionCard';
-import { compareAnnotationsByPosition } from '../viewer/anchoring';
+import { ToneBadge } from '../../admin/ToneBadge';
 import { isUnseen } from '../newSince';
-import { isDocumentScoped } from '../annotationScope';
 import type { BuildPermalink } from '../useReviewPermalink';
 import { useConfirmPlacement } from '../../../api/hooks/useAnnotations';
 import { AnnotationListItem } from './AnnotationListItem';
@@ -52,7 +48,7 @@ import type { FilterAuthor } from './PanelFilterBar';
 import { PanelFilterBar } from './PanelFilterBar';
 import { ReanchorBanner } from './ReanchorBanner';
 import type { AnnotationFilters } from './panelFilters';
-import { EMPTY_FILTERS, matchesFilters } from './panelFilters';
+import { EMPTY_FILTERS, matchesFilters, comparePanelOrder } from './panelFilters';
 import { ResolveBar } from './ResolveBar';
 import {
   mayReopenAnnotation,
@@ -112,110 +108,6 @@ interface AnnotationPanelProps {
 }
 
 /** A collapsible, counted group of annotation cards (prototype sidebar section). */
-function PanelSection({
-  title,
-  subtitle,
-  icon,
-  count,
-  newCount = 0,
-  defaultOpen = true,
-  children,
-}: {
-  title: string;
-  subtitle?: string;
-  icon: ReactNode;
-  count: number;
-  /** Unseen entries in this group (issue #307) — rendered as "· n new". */
-  newCount?: number;
-  defaultOpen?: boolean;
-  children: ReactNode;
-}) {
-  const theme = useTheme();
-  const [open, setOpen] = useState(defaultOpen);
-  return (
-    <Box>
-      <ButtonBase
-        onClick={() => setOpen((value) => !value)}
-        aria-expanded={open}
-        sx={{
-          width: '100%',
-          display: 'flex',
-          alignItems: 'center',
-          gap: 1,
-          textAlign: 'left',
-          borderRadius: 1,
-          px: 0.5,
-          py: 0.75,
-          '&:focus-visible': { boxShadow: theme.qnop.focusRing },
-        }}
-      >
-        <ChevronRight
-          size={14}
-          aria-hidden
-          style={{
-            color: theme.palette.text.secondary,
-            flexShrink: 0,
-            transform: open ? 'rotate(90deg)' : 'none',
-            transition: 'transform 150ms ease',
-          }}
-        />
-        <Box
-          aria-hidden
-          sx={{
-            width: 24,
-            height: 24,
-            borderRadius: 1,
-            display: 'grid',
-            placeItems: 'center',
-            bgcolor: theme.qnop.badge.blue.bg,
-            color: theme.qnop.brand.blue,
-            flexShrink: 0,
-          }}
-        >
-          {icon}
-        </Box>
-        <Box sx={{ minWidth: 0, flex: 1 }}>
-          <Typography variant="subtitle2" sx={{ lineHeight: 1.25 }}>
-            {title}
-          </Typography>
-          {subtitle && (
-            <Typography variant="caption" color="text.secondary">
-              {subtitle}
-            </Typography>
-          )}
-        </Box>
-        <Typography
-          variant="caption"
-          sx={{
-            color: 'text.secondary',
-            bgcolor: theme.qnop.surface2,
-            borderRadius: 99,
-            px: 0.75,
-            fontVariantNumeric: 'tabular-nums',
-            flexShrink: 0,
-          }}
-        >
-          {count}
-        </Typography>
-        {newCount > 0 && (
-          <Typography
-            variant="caption"
-            data-testid="section-new-count"
-            sx={{ color: theme.qnop.brand.blue, fontWeight: 600, flexShrink: 0 }}
-          >
-            · {newCount} new
-          </Typography>
-        )}
-      </ButtonBase>
-      <Collapse in={open} unmountOnExit>
-        <Stack spacing={1.5} sx={{ pt: 1 }}>
-          {children}
-        </Stack>
-      </Collapse>
-    </Box>
-  );
-}
-
 /**
  * The right-hand review panel: the composer for a pending mark, a status
  * filter, and the annotations of the viewed version grouped into collapsible
@@ -281,22 +173,19 @@ export function AnnotationPanel({
   // Sort + status-filter once per (annotations, filter) change, not on every
   // render (e.g. a hover or selection): the list can be large and the sort is
   // O(n log n) (issue #334).
-  const { located, documentScoped, hiddenByFilter } = useMemo(() => {
+  const { visible, hiddenByFilter } = useMemo(() => {
     const matches = (annotation: AnnotationView) =>
       matchesFilters(annotation, filters, authorNameOf(annotation));
-    const sorted = [...annotations].sort(compareAnnotationsByPosition);
-    // Located annotations anchor to a passage; document-scoped ones (issue #395) apply to the
-    // whole document — no anchor, never orphaned — and group on their own.
-    const locatedItems = sorted.filter((a) => !isDocumentScoped(a) && matches(a));
-    const documentScopedItems = sorted.filter((a) => isDocumentScoped(a) && matches(a));
+    // ONE flat list (issue #481): document-scoped remarks lead, then anchored
+    // ones by document position — each card carries its own scope marker.
+    const items = [...annotations].sort(comparePanelOrder).filter(matches);
     return {
-      located: locatedItems,
-      documentScoped: documentScopedItems,
-      hiddenByFilter:
-        annotations.length > 0 && locatedItems.length + documentScopedItems.length === 0,
+      visible: items,
+      hiddenByFilter: annotations.length > 0 && items.length === 0,
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps -- authorNameOf derives from the inputs below
   }, [annotations, filters, userId, displayName]);
+  const newCount = visible.filter((a) => isUnseen(a, previousSeenAt, userId)).length;
 
   // Under a non-OPEN policy (issue #413) only the annotation's author and the
   // owner may reply; the composer is suppressed for everyone else. (A PRIVATE
@@ -375,18 +264,39 @@ export function AnnotationPanel({
       description="Marks and their discussion on this version."
       frameless={frameless}
       action={
-        // Raise a whole-document task without a selection (issue #395) — a quiet peer to the
-        // text-selection gesture, offered while the latest version is open for review.
-        onNewDocumentNote && !readOnly && !reviewClosed ? (
-          <Button
-            size="small"
-            variant="outlined"
-            startIcon={<Plus size={15} />}
-            onClick={onNewDocumentNote}
-          >
-            Global annotation
-          </Button>
-        ) : undefined
+        <Stack direction="row" spacing={1} sx={{ alignItems: 'center' }}>
+          {newCount > 0 && (
+            // The header's fresh-arrivals cue (issue #481): the per-section
+            // "n new" counts collapse into one badge that breathes gently.
+            <Box
+              data-testid="panel-new-count"
+              sx={{
+                '@keyframes panelNewPulse': {
+                  '0%, 100%': { opacity: 1 },
+                  '50%': { opacity: 0.6 },
+                },
+                animation: 'panelNewPulse 2.4s ease-in-out infinite',
+                '@media (prefers-reduced-motion: reduce)': { animation: 'none' },
+              }}
+            >
+              <ToneBadge tone="blue" label={`${newCount} new`} />
+            </Box>
+          )}
+          {
+            // Raise a whole-document task without a selection (issue #395) — a quiet peer to the
+            // text-selection gesture, offered while the latest version is open for review.
+            onNewDocumentNote && !readOnly && !reviewClosed ? (
+              <Button
+                size="small"
+                variant="outlined"
+                startIcon={<Plus size={15} />}
+                onClick={onNewDocumentNote}
+              >
+                Global annotation
+              </Button>
+            ) : undefined
+          }
+        </Stack>
       }
     >
       <Stack spacing={1.5}>
@@ -425,28 +335,7 @@ export function AnnotationPanel({
             No annotations match this filter.
           </Typography>
         )}
-        {documentScoped.length > 0 && (
-          <PanelSection
-            title="Whole document"
-            subtitle="General remarks — not pinned to a passage"
-            icon={<FileText size={13} aria-hidden />}
-            count={documentScoped.length}
-            newCount={documentScoped.filter((a) => isUnseen(a, previousSeenAt, userId)).length}
-          >
-            {documentScoped.map(renderItem)}
-          </PanelSection>
-        )}
-        {located.length > 0 && (
-          <PanelSection
-            title="Anchored to the document"
-            subtitle="Placed on this version"
-            icon={<Link2 size={13} aria-hidden />}
-            count={located.length}
-            newCount={located.filter((a) => isUnseen(a, previousSeenAt, userId)).length}
-          >
-            {located.map(renderItem)}
-          </PanelSection>
-        )}
+        {visible.map(renderItem)}
       </Stack>
     </SectionCard>
   );
