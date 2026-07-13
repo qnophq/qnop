@@ -32,6 +32,11 @@ interface PersonLinkProps {
    * (issue #413), which then render as a plain avatar+name without a link.
    */
   userId?: string | null;
+  /**
+   * The person's profile slug (issue #486) — preferred over the id for the
+   * link target, absent under the same anonymity rule.
+   */
+  slug?: string | null;
   name: string;
   /** Server-built avatar URL (null when none is uploaded). */
   avatarUrl?: string | null;
@@ -43,11 +48,13 @@ interface PersonLinkProps {
 /**
  * A person as the product shows people (issue #454): avatar and bold name in
  * one unit, linking to the profile — `/profile` for yourself, the colleague's
- * `/users/{id}` page otherwise. Pseudonymised identities stay unlinked and
- * initials-only, so anonymity never leaks through a click.
+ * `/users/{slug}` page otherwise (falling back to the id for accounts without
+ * a slug). Pseudonymised identities stay unlinked and initials-only, so
+ * anonymity never leaks through a click.
  */
 export function PersonLink({
   userId,
+  slug,
   name,
   avatarUrl,
   size = 26,
@@ -55,7 +62,7 @@ export function PersonLink({
 }: PersonLinkProps) {
   const theme = useTheme();
   const selfId = useAuthStore((s) => s.userId);
-  const to = userId ? (userId === selfId ? '/profile' : `/users/${userId}`) : null;
+  const to = userId ? (userId === selfId ? '/profile' : `/users/${slug ?? userId}`) : null;
 
   const body = (
     <Stack direction="row" spacing={0.75} sx={{ alignItems: 'center', minWidth: 0 }}>

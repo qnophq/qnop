@@ -93,6 +93,7 @@ export function ActivityCard({ activity }: ActivityCardProps) {
                   <Box sx={{ pt: '1px', flexShrink: 0 }}>
                     <PersonLink
                       userId={item.actorId}
+                      slug={item.actorSlug}
                       name={item.actorDisplayName ?? 'Someone'}
                       avatarUrl={item.actorAvatarUrl}
                       size={20}

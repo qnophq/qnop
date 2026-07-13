@@ -65,6 +65,7 @@ public class DashboardController implements DashboardApi {
         .documentTitle(view.documentTitle())
         .documentSlug(view.documentSlug())
         .authorId(view.authorId())
+        .authorSlug(view.authorSlug())
         .authorAvatarUrl(avatarUrlOf(view.authorId()))
         .authorDisplayName(view.authorDisplayName())
         .body(view.body())
@@ -79,6 +80,7 @@ public class DashboardController implements DashboardApi {
         .documentTitle(view.documentTitle())
         .documentSlug(view.documentSlug())
         .actorId(view.actorId())
+        .actorSlug(view.actorSlug())
         .actorAvatarUrl(avatarUrlOf(view.actorId()))
         .actorDisplayName(view.actorDisplayName())
         .createdAt(view.createdAt().atOffset(ZoneOffset.UTC));

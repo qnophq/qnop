@@ -122,7 +122,37 @@ class DashboardApiIT extends SeededIntegrationTest {
         .andExpect(jsonPath("$.replies[1].body").value("will do"))
         .andExpect(jsonPath("$.replies[1].annotationId").value(mine))
         .andExpect(jsonPath("$.replies[1].authorId").value(AUDITOR_ID.toString()))
+        .andExpect(jsonPath("$.replies[1].authorSlug").value("avery-auditor"))
         .andExpect(jsonPath("$.replies[1].authorDisplayName").value("Avery Auditor"));
+  }
+
+  @Test
+  @DisplayName("anonymised identities carry no slug either (#486)")
+  void anonymisedIdentitiesCarryNoSlug() throws Exception {
+    Document document = new Document(MEMBER_ID, "Anonymous review");
+    document.setAnonymous(true);
+    documents.save(document);
+    participants.save(ReviewParticipant.forUser(document.getId(), AUDITOR_ID));
+    versions.save(
+        new DocumentVersion(
+            document.getId(),
+            1,
+            "sha256/cc/feedface",
+            "feedface",
+            "application/pdf",
+            10L,
+            MEMBER_ID));
+    String mine = createAnnotation(document.getId(), MEMBER_ID, "please clarify");
+    addComment(mine, AUDITOR_ID, "will do");
+
+    mockMvc
+        .perform(as(get("/api/v1/dashboard"), MEMBER_ID))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.replies[0].body").value("will do"))
+        // The pseudonymised author exposes neither id nor slug — a slug would
+        // deanonymise just as surely as the id (issue #413/#486).
+        .andExpect(jsonPath("$.replies[0].authorId").doesNotExist())
+        .andExpect(jsonPath("$.replies[0].authorSlug").doesNotExist());
   }
 
   @Test
@@ -149,6 +179,7 @@ class DashboardApiIT extends SeededIntegrationTest {
         // annotation.created is filtered out.
         .andExpect(jsonPath("$.activity[0].type").value("annotation.resolved"))
         .andExpect(jsonPath("$.activity[0].actorId").value(MEMBER_ID.toString()))
+        .andExpect(jsonPath("$.activity[0].actorSlug").value("mia-member"))
         .andExpect(jsonPath("$.activity[0].actorDisplayName").value("Mia Member"));
 
     mockMvc

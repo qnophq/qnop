@@ -32,11 +32,15 @@ import io.qnop.repository.AnnotationRepository;
 import io.qnop.repository.AuditEventRepository;
 import io.qnop.repository.CommentRepository;
 import io.qnop.repository.DocumentRepository;
+import io.qnop.repository.UserRepository;
+import io.qnop.repository.UserSlug;
 import java.time.Duration;
 import java.time.Instant;
+import java.util.Collection;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.UUID;
 import java.util.function.Function;
 import org.springframework.data.domain.PageRequest;
@@ -84,18 +88,21 @@ public class DashboardService {
   private final CommentRepository comments;
   private final AuditEventRepository auditEvents;
   private final ReviewIdentityResolver identity;
+  private final UserRepository users;
 
   public DashboardService(
       DocumentRepository documents,
       AnnotationRepository annotations,
       CommentRepository comments,
       AuditEventRepository auditEvents,
-      ReviewIdentityResolver identity) {
+      ReviewIdentityResolver identity,
+      UserRepository users) {
     this.documents = documents;
     this.annotations = annotations;
     this.comments = comments;
     this.auditEvents = auditEvents;
     this.identity = identity;
+    this.users = users;
   }
 
   /**
@@ -110,6 +117,7 @@ public class DashboardService {
       String documentTitle,
       String documentSlug,
       UUID authorId,
+      String authorSlug,
       String authorDisplayName,
       String body,
       String annotationExcerpt,
@@ -122,6 +130,7 @@ public class DashboardService {
       String documentTitle,
       String documentSlug,
       UUID actorId,
+      String actorSlug,
       String actorDisplayName,
       Instant createdAt) {}
 
@@ -169,6 +178,7 @@ public class DashboardService {
     Map<UUID, Annotation> annotationById =
         annotations.findAllById(annotationIds).stream()
             .collect(toMap(Annotation::getId, annotation -> annotation));
+    Map<UUID, String> slugById = slugsOf(latest.stream().map(Comment::getAuthorId).toList());
     // The thread's opening line as context — batched like the views do (#393).
     Map<UUID, String> contextByAnnotation =
         comments.findFirstByAnnotationIdIn(annotationIds).stream()
@@ -183,13 +193,15 @@ public class DashboardService {
               Document document = documentById.get(annotation.getDocumentId());
               ReviewIdentityResolver.ReviewIdentities documentIdentities =
                   identitiesOf.apply(document.getId());
+              UUID realAuthor = realIdOrNull(documentIdentities, comment.getAuthorId());
               return new ReplyView(
                   comment.getId(),
                   comment.getAnnotationId(),
                   document.getId(),
                   document.getTitle(),
                   document.getSlug(),
-                  realIdOrNull(documentIdentities, comment.getAuthorId()),
+                  realAuthor,
+                  realAuthor == null ? null : slugById.get(realAuthor),
                   documentIdentities.displayName(comment.getAuthorId()),
                   excerpt(comment.getBody(), REPLY_EXCERPT_CHARS),
                   contextByAnnotation.get(comment.getAnnotationId()),
@@ -207,6 +219,7 @@ public class DashboardService {
     List<AuditEvent> events =
         auditEvents.findByDocumentIdInAndEventTypeInOrderByCreatedAtDesc(
             documentIds, FEED_EVENT_TYPES, PageRequest.of(0, MAX_ACTIVITY * 3));
+    Map<UUID, String> slugById = slugsOf(events.stream().map(AuditEvent::getActorId).toList());
     return events.stream()
         .filter(event -> !actor.equals(event.getActorId()))
         .filter(event -> visibleActivity(event, documentById.get(event.getDocumentId()), actor))
@@ -216,14 +229,17 @@ public class DashboardService {
               Document document = documentById.get(event.getDocumentId());
               ReviewIdentityResolver.ReviewIdentities documentIdentities =
                   identitiesOf.apply(document.getId());
+              UUID realActor =
+                  event.getActorId() == null
+                      ? null
+                      : realIdOrNull(documentIdentities, event.getActorId());
               return new ActivityView(
                   event.getEventType(),
                   document.getId(),
                   document.getTitle(),
                   document.getSlug(),
-                  event.getActorId() == null
-                      ? null
-                      : realIdOrNull(documentIdentities, event.getActorId()),
+                  realActor,
+                  realActor == null ? null : slugById.get(realActor),
                   event.getActorId() == null
                       ? null
                       : documentIdentities.displayName(event.getActorId()),
@@ -255,6 +271,20 @@ public class DashboardService {
   private static UUID realIdOrNull(
       ReviewIdentityResolver.ReviewIdentities identities, UUID userId) {
     return userId.equals(identities.exposedAuthorId(userId)) ? userId : null;
+  }
+
+  /**
+   * Batch id→slug map for pretty profile links (issue #486). Fed the CANDIDATE ids (pre-anonymity);
+   * the mappers only read entries for identities they expose anyway, so nothing anonymised leaks.
+   */
+  private Map<UUID, String> slugsOf(Collection<UUID> candidateIds) {
+    List<UUID> ids = candidateIds.stream().filter(Objects::nonNull).distinct().toList();
+    if (ids.isEmpty()) {
+      return Map.of();
+    }
+    return users.findSlugsByIdIn(ids).stream()
+        .filter(row -> row.slug() != null)
+        .collect(toMap(UserSlug::id, UserSlug::slug));
   }
 
   private static String excerpt(String body, int max) {
