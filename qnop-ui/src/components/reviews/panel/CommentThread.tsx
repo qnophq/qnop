@@ -30,6 +30,8 @@ import Typography from '@mui/material/Typography';
 import { alpha, useTheme } from '@mui/material/styles';
 import { CircleCheck, Lock, RotateCcw, SendHorizontal } from 'lucide-react';
 import { useAddComment, useComments } from '../../../api/hooks/useComments';
+import { useDocument } from '../../../api/hooks/useDocuments';
+import { realAuthorId } from '../../people/realAuthorId';
 import { apiErrorCode } from '../../../utils/apiError';
 import { submitShortcutLabel } from '../../../utils/platform';
 import { useAuthStore } from '../../../stores/authStore';
@@ -108,6 +110,10 @@ export function CommentThread({
   const displayName = useAuthStore((state) => state.displayName);
   const avatarUrl = useAuthStore((state) => state.avatarUrl);
   const commentsQuery = useComments(annotationId);
+  // For the author hover cards (issue #482): the anonymity gate reads the
+  // review's flags from the already-cached document. No document, no cards —
+  // realAuthorId treats a missing review as "expose nothing".
+  const review = useDocument(documentId ?? '').data;
   const addComment = useAddComment(annotationId);
   const toggleReaction = useToggleCommentReaction(annotationId, notify);
   const uploadAttachment = useCommentAttachmentUpload(documentId, notify);
@@ -263,6 +269,7 @@ export function CommentThread({
                 name={name}
                 own={own}
                 avatarUrl={own ? avatarUrl : avatarSrc(comment.authorId)}
+                hoverUserId={realAuthorId(review, userId, comment.authorId)}
                 body={comment.body}
                 createdAt={comment.createdAt}
                 domId={`comment-${comment.id}`}

@@ -25,7 +25,11 @@ import Typography from '@mui/material/Typography';
 import { useTheme } from '@mui/material/styles';
 import type { AnnotationView } from '../../../api/generated';
 import { useComments } from '../../../api/hooks/useComments';
+import { useDocument } from '../../../api/hooks/useDocuments';
 import type { Notify } from '../../admin/layout/useToast';
+import { realAuthorId } from '../../people/realAuthorId';
+import { UserHoverCard } from '../../people/UserHoverCard';
+import { useReviewDocumentId } from '../reviewDocumentId';
 import { CopyTextButton } from '../CopyTextButton';
 import { CopyLinkButton } from '../permalink/CopyLinkButton';
 import { AddReactionButton } from '../reactions/AddReactionButton';
@@ -100,6 +104,10 @@ export function AnnotationHead({
   // pseudonym for foreign authors in an anonymous one. Own contributions read
   // "You" from the auth store.
   const authorName = own ? (displayName ?? 'You') : (annotation.authorDisplayName ?? 'Participant');
+  // The hover card (issue #482) attaches only to guaranteed-real author ids —
+  // in an anonymous review a foreign authorId is a pseudonym token.
+  const review = useDocument(useReviewDocumentId()).data;
+  const hoverUserId = realAuthorId(review, userId, annotation.authorId);
   const quote = annotation.anchor?.textQuote?.quote;
   const fallbackLabel = annotation.anchor?.region
     ? 'Region annotation'
@@ -126,11 +134,13 @@ export function AnnotationHead({
     >
       {/* The thread starter, front and centre — this is their discussion. */}
       <Stack direction="row" spacing={1.25} sx={{ alignItems: 'center', minWidth: 0 }}>
-        <UserAvatar
-          name={authorName}
-          size={AUTHOR_AVATAR_SIZE}
-          imageUrl={own ? avatarUrl : avatarSrc(annotation.authorId)}
-        />
+        <UserHoverCard userId={hoverUserId}>
+          <UserAvatar
+            name={authorName}
+            size={AUTHOR_AVATAR_SIZE}
+            imageUrl={own ? avatarUrl : avatarSrc(annotation.authorId)}
+          />
+        </UserHoverCard>
         <Box sx={{ minWidth: 0 }}>
           <Typography
             noWrap

@@ -24,6 +24,7 @@ import Typography from '@mui/material/Typography';
 import { alpha, useTheme } from '@mui/material/styles';
 import { Link as RouterLink } from 'react-router-dom';
 import { useAuthStore } from '../../stores/authStore';
+import { UserHoverCard } from '../people/UserHoverCard';
 import { UserAvatar } from '../shell/UserAvatar';
 
 interface PersonLinkProps {
@@ -81,24 +82,28 @@ export function PersonLink({
 
   if (!to) return body;
   return (
-    <Stack
-      component={RouterLink}
-      to={to}
-      onClick={(event) => event.stopPropagation()}
-      direction="row"
-      sx={{
-        alignItems: 'center',
-        minWidth: 0,
-        textDecoration: 'none',
-        borderRadius: '6px',
-        '&:hover': {
-          bgcolor: alpha(theme.qnop.brand.blue, 0.08),
-          '& .MuiTypography-root': { color: theme.qnop.brand.blue },
-        },
-      }}
-      aria-label={`View ${name}'s profile`}
-    >
-      {body}
-    </Stack>
+    // The link branch only exists for REAL ids, so the hover card (issue
+    // #482) inherits PersonLink's anonymity gate for free.
+    <UserHoverCard userId={userId}>
+      <Stack
+        component={RouterLink}
+        to={to}
+        onClick={(event) => event.stopPropagation()}
+        direction="row"
+        sx={{
+          alignItems: 'center',
+          minWidth: 0,
+          textDecoration: 'none',
+          borderRadius: '6px',
+          '&:hover': {
+            bgcolor: alpha(theme.qnop.brand.blue, 0.08),
+            '& .MuiTypography-root': { color: theme.qnop.brand.blue },
+          },
+        }}
+        aria-label={`View ${name}'s profile`}
+      >
+        {body}
+      </Stack>
+    </UserHoverCard>
   );
 }

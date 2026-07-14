@@ -38,6 +38,7 @@ import Tooltip from '@mui/material/Tooltip';
 import Typography from '@mui/material/Typography';
 import { KeyRound, KeySquare, MoreVertical, SquarePen, Trash2 } from 'lucide-react';
 import type { AdminUserSummary } from '../../../api/generated';
+import { UserHoverCard } from '../../people/UserHoverCard';
 import { UserAvatar } from '../../shell/UserAvatar';
 import { formatDateTime, formatRelative } from '../../../utils/formatDate';
 import { ToneBadge } from '../ToneBadge';
@@ -126,7 +127,9 @@ export function UsersTable({
             <TableRow key={user.id} hover>
               <TableCell>
                 <Stack direction="row" spacing={1.5} sx={{ alignItems: 'center' }}>
-                  <UserAvatar name={user.displayName} size={36} imageUrl={user.avatarUrl} />
+                  <UserHoverCard userId={user.id}>
+                    <UserAvatar name={user.displayName} size={36} imageUrl={user.avatarUrl} />
+                  </UserHoverCard>
                   <Box sx={{ minWidth: 0 }}>
                     <Stack
                       direction="row"

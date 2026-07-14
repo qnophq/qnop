@@ -47,6 +47,7 @@ import {
   useTeamMembers,
 } from '../../../api/hooks/useReviews';
 import type { ToastSeverity } from '../../admin/layout/useToast';
+import { UserHoverCard } from '../../people/UserHoverCard';
 import { UserAvatar } from '../../shell/UserAvatar';
 import { avatarSrc } from '../../../utils/avatarUrl';
 import { apiErrorCode } from '../../../utils/apiError';
@@ -117,12 +118,15 @@ function TeamMemberList({ teamId }: { teamId: string }) {
       sx={{ ml: 3.25, pl: 1.75, my: 0.25, borderLeft: '2px solid', borderColor: 'divider' }}
     >
       {members.map((member) => (
-        <Stack key={member.id} direction="row" spacing={1} sx={{ alignItems: 'center', py: 0.25 }}>
-          <UserAvatar name={member.displayName} size={20} imageUrl={avatarSrc(member.id)} />
-          <Typography variant="body2" noWrap>
-            {member.displayName}
-          </Typography>
-        </Stack>
+        // Teams only unfold on non-anonymised rosters, so these are real ids.
+        <UserHoverCard key={member.id} userId={member.id}>
+          <Stack direction="row" spacing={1} sx={{ alignItems: 'center', py: 0.25 }}>
+            <UserAvatar name={member.displayName} size={20} imageUrl={avatarSrc(member.id)} />
+            <Typography variant="body2" noWrap>
+              {member.displayName}
+            </Typography>
+          </Stack>
+        </UserHoverCard>
       ))}
     </Stack>
   );
@@ -223,11 +227,15 @@ export function ParticipantsDialog({
                       {isTeam ? (
                         <PrincipalIcon kind={participant.kind} size={28} />
                       ) : (
-                        <UserAvatar
-                          name={participant.displayName}
-                          size={28}
-                          imageUrl={avatarSrc(participant.principalId)}
-                        />
+                        // An anonymised roster carries synthetic ids (issue
+                        // #422) — no card there (issue #482).
+                        <UserHoverCard userId={anonymised ? null : participant.principalId}>
+                          <UserAvatar
+                            name={participant.displayName}
+                            size={28}
+                            imageUrl={avatarSrc(participant.principalId)}
+                          />
+                        </UserHoverCard>
                       )}
                       <Box sx={{ flex: 1, minWidth: 0 }}>
                         <Typography variant="body2" noWrap sx={{ fontWeight: 500 }}>

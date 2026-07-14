@@ -44,6 +44,7 @@ import {
 import { useAuthStore } from '../../../stores/authStore';
 import { ConfirmDialog } from '../../admin/ConfirmDialog';
 import type { Notify } from '../../admin/layout/useToast';
+import { UserHoverCard } from '../../people/UserHoverCard';
 import { UserAvatar } from '../../shell/UserAvatar';
 import { avatarSrc } from '../../../utils/avatarUrl';
 import { DueDateLabel } from '../DueDateLabel';
@@ -167,7 +168,10 @@ export function ReviewHubHead({
 
   return (
     <Stack direction="row" spacing={1.5} sx={{ alignItems: 'center', flexWrap: 'wrap' }}>
-      <Tooltip title="Review owner">
+      {/* The owner is structurally public (issue #472), so the hover card
+          (issue #482) may attach even in anonymous reviews — it replaces the
+          old "Review owner" tooltip, which the OWNER label already spells. */}
+      <UserHoverCard userId={ownerId}>
         <Stack
           direction="row"
           spacing={0.75}
@@ -197,7 +201,7 @@ export function ReviewHubHead({
             </Typography>
           </Box>
         </Stack>
-      </Tooltip>
+      </UserHoverCard>
       <Divider orientation="vertical" flexItem sx={{ my: 0.5 }} />
       {total > 0 && (
         <Tooltip

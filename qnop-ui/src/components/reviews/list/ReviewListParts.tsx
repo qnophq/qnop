@@ -27,6 +27,7 @@ import { useTheme } from '@mui/material/styles';
 import { Eye, FileText, User } from 'lucide-react';
 import type { ParticipantView } from '../../../api/generated';
 import { ToneBadge } from '../../admin/ToneBadge';
+import { UserHoverCard } from '../../people/UserHoverCard';
 import { UserAvatar } from '../../shell/UserAvatar';
 import { avatarSrc } from '../../../utils/avatarUrl';
 
@@ -125,7 +126,14 @@ export function ProgressBar({
 }
 
 /** Overlapping reviewer avatars with real display names (max 3 + counter). */
-export function ReviewerStack({ participants }: { participants: ParticipantView[] }) {
+export function ReviewerStack({
+  participants,
+  anonymous = false,
+}: {
+  participants: ParticipantView[];
+  /** True for an anonymous review — its roster ids are synthetic (issue #422), so no hover cards. */
+  anonymous?: boolean;
+}) {
   if (participants.length === 0) {
     return (
       <Typography variant="caption" color="text.secondary">
@@ -137,29 +145,34 @@ export function ReviewerStack({ participants }: { participants: ParticipantView[
   return (
     <Stack direction="row" sx={{ alignItems: 'center' }}>
       {shown.map((participant, index) => (
-        <Tooltip key={participant.id} title={participant.displayName}>
-          <Box
-            sx={{
-              borderRadius: '50%',
-              border: '2px solid',
-              borderColor: 'background.paper',
-              ml: index === 0 ? 0 : -0.75,
-              display: 'flex',
-              zIndex: shown.length - index,
-            }}
-          >
-            <UserAvatar
-              name={participant.displayName}
-              size={24}
-              // Public read path (ADR-0031); a 404 quietly falls back to initials.
-              imageUrl={
-                participant.kind === 'USER'
-                  ? `/api/v1/users/${participant.principalId}/avatar`
-                  : null
-              }
-            />
-          </Box>
-        </Tooltip>
+        <UserHoverCard
+          key={participant.id}
+          userId={participant.kind === 'USER' && !anonymous ? participant.principalId : null}
+        >
+          <Tooltip title={participant.displayName}>
+            <Box
+              sx={{
+                borderRadius: '50%',
+                border: '2px solid',
+                borderColor: 'background.paper',
+                ml: index === 0 ? 0 : -0.75,
+                display: 'flex',
+                zIndex: shown.length - index,
+              }}
+            >
+              <UserAvatar
+                name={participant.displayName}
+                size={24}
+                // Public read path (ADR-0031); a 404 quietly falls back to initials.
+                imageUrl={
+                  participant.kind === 'USER'
+                    ? `/api/v1/users/${participant.principalId}/avatar`
+                    : null
+                }
+              />
+            </Box>
+          </Tooltip>
+        </UserHoverCard>
       ))}
       {participants.length > 3 && (
         <Typography variant="caption" color="text.secondary" sx={{ ml: 0.5 }}>
@@ -173,11 +186,15 @@ export function ReviewerStack({ participants }: { participants: ParticipantView[
 /** The review's owner as a compact identity chip (issue #469): picture + name. */
 export function OwnerChip({ ownerId, name }: { ownerId: string; name?: string | null }) {
   return (
-    <Stack direction="row" spacing={0.75} sx={{ alignItems: 'center', minWidth: 0 }}>
-      <UserAvatar name={name ?? '?'} size={20} imageUrl={avatarSrc(ownerId)} />
-      <Typography variant="caption" noWrap sx={{ color: 'text.secondary', maxWidth: 140 }}>
-        {name ?? '—'}
-      </Typography>
-    </Stack>
+    // Ownership is structurally public (issue #472), so the hover card may
+    // attach even on anonymous reviews.
+    <UserHoverCard userId={ownerId}>
+      <Stack direction="row" spacing={0.75} sx={{ alignItems: 'center', minWidth: 0 }}>
+        <UserAvatar name={name ?? '?'} size={20} imageUrl={avatarSrc(ownerId)} />
+        <Typography variant="caption" noWrap sx={{ color: 'text.secondary', maxWidth: 140 }}>
+          {name ?? '—'}
+        </Typography>
+      </Stack>
+    </UserHoverCard>
   );
 }

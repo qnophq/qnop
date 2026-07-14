@@ -145,7 +145,10 @@ export function ReviewsTable({ reviews, userId, onOpen }: ReviewsTableProps) {
                     )}
                   </TableCell>
                   <TableCell>
-                    <ReviewerStack participants={review.participants} />
+                    <ReviewerStack
+                      participants={review.participants}
+                      anonymous={review.anonymous}
+                    />
                   </TableCell>
                   <TableCell sx={{ whiteSpace: 'nowrap' }}>
                     {review.dueAt ? (

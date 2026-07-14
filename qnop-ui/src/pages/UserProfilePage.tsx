@@ -41,9 +41,9 @@ import {
 } from 'lucide-react';
 import { useEffect } from 'react';
 import { Navigate, useNavigate, useParams } from 'react-router-dom';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useQueryClient } from '@tanstack/react-query';
 import type { PublicUserProfile } from '../api/generated';
-import { usersApi } from '../api/config';
+import { userKeys, useUserProfile } from '../api/hooks/useUsers';
 import { useAuthStore } from '../stores/authStore';
 import { AchievementRow } from '../components/profile/AchievementRow';
 import { publicProfileAchievements } from '../components/profile/profileModel';
@@ -68,8 +68,6 @@ const fadeUp = {
 
 const UUID_SHAPE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
-const profileKey = (segment: string) => ['users', 'public-profile', segment] as const;
-
 /**
  * A colleague's workspace-public profile (issues #454, #473): the campaign's
  * player-card language — identity hero with team affiliations, the
@@ -88,26 +86,16 @@ export function UserProfilePage() {
   const selfId = useAuthStore((s) => s.userId);
   const navigate = useNavigate();
   const queryClient = useQueryClient();
-  const profileQuery = useQuery<PublicUserProfile>({
-    queryKey: profileKey(segment),
-    queryFn: async () => {
-      const response = isId
-        ? await usersApi.getUserProfile({ userId: segment })
-        : await usersApi.getUserProfileBySlug({ slug: segment });
-      return response.data;
-    },
-    enabled: segment !== '' && segment !== selfId,
-    // Keeps the canonical UUID→slug replace below fetch-free: the seeded
-    // cache entry is still fresh when the slug URL mounts.
-    staleTime: 30_000,
-  });
+  // Shared with the hover card (issue #482): one cache entry per person, so
+  // hover→page (and the canonicalisation below) stay fetch-free.
+  const profileQuery = useUserProfile(segment, segment !== selfId);
 
   // Canonicalise /users/<uuid> to /users/<slug>: seed the slug's cache entry
   // first so the replace renders instantly instead of refetching.
   const loadedSlug = profileQuery.data?.slug;
   useEffect(() => {
     if (isId && loadedSlug && profileQuery.data) {
-      queryClient.setQueryData(profileKey(loadedSlug), profileQuery.data);
+      queryClient.setQueryData(userKeys.publicProfile(loadedSlug), profileQuery.data);
       navigate(`/users/${loadedSlug}`, { replace: true });
     }
   }, [isId, loadedSlug, profileQuery.data, queryClient, navigate]);
