@@ -36,7 +36,6 @@ import { AnnotationStatus, ParticipantKind } from '../../../api/generated';
 import { useConfig } from '../../../api/hooks/useConfig';
 import {
   useParticipants,
-  usePrincipalSearch,
   useTransitionWorkflow,
   useUploadVersion,
   useWorkflow,
@@ -70,6 +69,8 @@ interface ReviewHubHeadProps {
   ownerId: string;
   /** The owner's profile slug (issue #486) — structurally public (#472). */
   ownerSlug?: string | null;
+  /** The owner's display name, resolved on the document (structurally public, #472). */
+  ownerDisplayName?: string | null;
   isOwner: boolean;
   ownUserId: string | null;
   /** True for an anonymous review (issue #422) — the roster is anonymised for non-owners. */
@@ -94,6 +95,7 @@ export function ReviewHubHead({
   documentId,
   ownerId,
   ownerSlug,
+  ownerDisplayName,
   isOwner,
   ownUserId,
   anonymous,
@@ -117,15 +119,13 @@ export function ReviewHubHead({
   const uploadVersion = useUploadVersion(documentId);
 
   const participants = participantsQuery.data?.participants ?? [];
-  // The owner never sits in the participant rows; the principal directory
-  // (names only, #292) resolves them — self by display name.
-  const principals = usePrincipalSearch('').data?.principals ?? [];
   const ownDisplayName = useAuthStore((state) => state.displayName);
   const ownAvatarUrl = useAuthStore((state) => state.avatarUrl);
+  // The owner never sits in the participant rows; their name travels on the
+  // document itself (structurally public, #472) — never resolved via the
+  // size-capped principal directory, which drops users in big workspaces.
   const ownerName =
-    ownerId === ownUserId
-      ? (ownDisplayName ?? 'You')
-      : (principals.find((principal) => principal.id === ownerId)?.displayName ?? 'Owner');
+    ownerId === ownUserId ? (ownDisplayName ?? 'You') : (ownerDisplayName ?? 'Owner');
   const transitions = workflowQuery.data?.allowedTransitions ?? [];
   const maxSizeMb = config?.upload.maxDocumentSizeMb ?? FALLBACK_MAX_SIZE_MB;
 
