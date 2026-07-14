@@ -159,7 +159,10 @@ export function ReviewListCard({
                       </Typography>
                     )}
                     <Box sx={{ flex: 1 }} />
-                    <ReviewerStack participants={review.participants ?? []} />
+                    <ReviewerStack
+                      participants={review.participants ?? []}
+                      anonymous={review.anonymous}
+                    />
                     <DueDateLabel dueAt={review.dueAt} workflowState={review.workflowState} />
                   </Stack>
                 </ButtonBase>

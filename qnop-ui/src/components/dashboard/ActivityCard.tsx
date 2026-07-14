@@ -39,6 +39,7 @@ import { shortRelativeTime } from '../../utils/relativeTime';
 import { SectionCard } from '../admin/layout/SectionCard';
 import { CardScroller } from './CardScroller';
 import { CountPill } from './CountPill';
+import { UserHoverCard } from '../people/UserHoverCard';
 import { PersonLink } from './PersonLink';
 import { activityPhrase, reviewPath } from './dashboardModel';
 
@@ -101,13 +102,21 @@ export function ActivityCard({ activity }: ActivityCardProps) {
                     />
                   </Box>
                   <Typography variant="body2" sx={{ minWidth: 0, color: 'text.secondary' }}>
-                    <Typography
-                      component="span"
-                      variant="body2"
-                      sx={{ fontWeight: 600, color: 'text.primary' }}
-                    >
-                      {item.actorDisplayName ?? 'Someone'}
-                    </Typography>{' '}
+                    {/* The name triggers the card just like the avatar (#482);
+                        anonymised actors carry no id and stay plain text. */}
+                    <UserHoverCard userId={item.actorId} slug={item.actorSlug}>
+                      <Typography
+                        component="span"
+                        variant="body2"
+                        sx={{
+                          fontWeight: 600,
+                          color: 'text.primary',
+                          '&:hover': { color: theme.qnop.brand.blue },
+                        }}
+                      >
+                        {item.actorDisplayName ?? 'Someone'}
+                      </Typography>
+                    </UserHoverCard>{' '}
                     {activityPhrase(item.type)}{' '}
                     <Link
                       component={RouterLink}

@@ -144,38 +144,45 @@ export function ReviewerStack({
   const shown = participants.slice(0, 3);
   return (
     <Stack direction="row" sx={{ alignItems: 'center' }}>
-      {shown.map((participant, index) => (
-        <UserHoverCard
-          key={participant.id}
-          userId={participant.kind === 'USER' && !anonymous ? participant.principalId : null}
-          slug={participant.slug}
-          profileName={participant.displayName}
-        >
-          <Tooltip title={participant.displayName}>
-            <Box
-              sx={{
-                borderRadius: '50%',
-                border: '2px solid',
-                borderColor: 'background.paper',
-                ml: index === 0 ? 0 : -0.75,
-                display: 'flex',
-                zIndex: shown.length - index,
-              }}
-            >
-              <UserAvatar
-                name={participant.displayName}
-                size={24}
-                // Public read path (ADR-0031); a 404 quietly falls back to initials.
-                imageUrl={
-                  participant.kind === 'USER'
-                    ? `/api/v1/users/${participant.principalId}/avatar`
-                    : null
-                }
-              />
-            </Box>
-          </Tooltip>
-        </UserHoverCard>
-      ))}
+      {shown.map((participant, index) => {
+        const cardUserId =
+          participant.kind === 'USER' && !anonymous ? participant.principalId : null;
+        const avatar = (
+          <Box
+            sx={{
+              borderRadius: '50%',
+              border: '2px solid',
+              borderColor: 'background.paper',
+              ml: index === 0 ? 0 : -0.75,
+              display: 'flex',
+              zIndex: shown.length - index,
+            }}
+          >
+            <UserAvatar
+              name={participant.displayName}
+              size={24}
+              // Public read path (ADR-0031); a 404 quietly falls back to initials.
+              imageUrl={
+                participant.kind === 'USER'
+                  ? `/api/v1/users/${participant.principalId}/avatar`
+                  : null
+              }
+            />
+          </Box>
+        );
+        return (
+          <UserHoverCard
+            key={participant.id}
+            userId={cardUserId}
+            slug={participant.slug}
+            profileName={participant.displayName}
+          >
+            {/* The card names the person already — the tooltip only steps in
+                where no card may attach (teams, anonymised rosters). */}
+            {cardUserId ? avatar : <Tooltip title={participant.displayName}>{avatar}</Tooltip>}
+          </UserHoverCard>
+        );
+      })}
       {participants.length > 3 && (
         <Typography variant="caption" color="text.secondary" sx={{ ml: 0.5 }}>
           +{participants.length - 3}
