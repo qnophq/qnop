@@ -167,6 +167,7 @@ public class AdminUserController implements AdminUsersApi {
   private static AdminUserSummary toSummary(AdminUserView v, Instant avatarUpdatedAt) {
     return new AdminUserSummary()
         .id(v.id())
+        .slug(v.slug())
         .displayName(v.displayName())
         .email(v.email())
         .username(v.username())

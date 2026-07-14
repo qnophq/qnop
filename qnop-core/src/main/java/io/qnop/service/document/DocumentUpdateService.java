@@ -23,9 +23,11 @@ package io.qnop.service.document;
 import io.qnop.entity.AuditEvent;
 import io.qnop.entity.Document;
 import io.qnop.entity.DocumentVersion;
+import io.qnop.entity.User;
 import io.qnop.repository.AuditEventRepository;
 import io.qnop.repository.DocumentRepository;
 import io.qnop.repository.DocumentVersionRepository;
+import io.qnop.repository.UserRepository;
 import io.qnop.service.document.DocumentAccessService.DocumentView;
 import java.time.Instant;
 import java.util.Objects;
@@ -53,16 +55,19 @@ public class DocumentUpdateService {
   private final DocumentVersionRepository versions;
   private final AuditEventRepository auditEvents;
   private final DocumentAccessService access;
+  private final UserRepository users;
 
   public DocumentUpdateService(
       DocumentRepository documents,
       DocumentVersionRepository versions,
       AuditEventRepository auditEvents,
-      DocumentAccessService access) {
+      DocumentAccessService access,
+      UserRepository users) {
     this.documents = documents;
     this.versions = versions;
     this.auditEvents = auditEvents;
     this.access = access;
+    this.users = users;
   }
 
   /** Sets ({@code dueAt}) or clears ({@code null}) the completion deadline; owner-only. */
@@ -89,6 +94,8 @@ public class DocumentUpdateService {
         document.isAnonymous(),
         document.getThreadParticipation().name(),
         document.getOwnerId(),
+        // The actor here IS the owner — their own slug, structurally public.
+        users.findById(document.getOwnerId()).map(User::getSlug).orElse(null),
         document.getWorkflowState(),
         latest,
         document.getCreatedAt(),

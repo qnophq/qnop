@@ -39,7 +39,7 @@ public interface TeamMembershipRepository extends JpaRepository<TeamMembership, 
   /** The members of a team joined with their user identity, ordered by display name. */
   @Query(
       "SELECT new io.qnop.repository.TeamMemberProjection("
-          + "m.id, u.id, u.displayName, u.email, m.teamRole, m.joinedAt) "
+          + "m.id, u.id, u.displayName, u.slug, u.email, m.teamRole, m.joinedAt) "
           + "FROM TeamMembership m JOIN User u ON u.id = m.userId "
           + "WHERE m.teamId = :teamId ORDER BY LOWER(u.displayName)")
   List<TeamMemberProjection> findMembersByTeamId(@Param("teamId") UUID teamId);

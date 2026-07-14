@@ -119,7 +119,12 @@ function TeamMemberList({ teamId }: { teamId: string }) {
     >
       {members.map((member) => (
         // Teams only unfold on non-anonymised rosters, so these are real ids.
-        <UserHoverCard key={member.id} userId={member.id} profileName={member.displayName}>
+        <UserHoverCard
+          key={member.id}
+          userId={member.id}
+          slug={member.slug}
+          profileName={member.displayName}
+        >
           <Stack direction="row" spacing={1} sx={{ alignItems: 'center', py: 0.25 }}>
             <UserAvatar name={member.displayName} size={20} imageUrl={avatarSrc(member.id)} />
             <Typography variant="body2" noWrap>
@@ -242,6 +247,7 @@ export function ParticipantsDialog({
                         // (issue #422) — neither card nor link there (#482).
                         <UserHoverCard
                           userId={anonymised ? null : participant.principalId}
+                          slug={participant.slug}
                           profileName={participant.displayName}
                           sx={{ flex: 1, alignItems: 'center', gap: 1.25 }}
                         >

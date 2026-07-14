@@ -127,7 +127,7 @@ export function UsersTable({
             <TableRow key={user.id} hover>
               <TableCell>
                 <Stack direction="row" spacing={1.5} sx={{ alignItems: 'center' }}>
-                  <UserHoverCard userId={user.id} profileName={user.displayName}>
+                  <UserHoverCard userId={user.id} slug={user.slug} profileName={user.displayName}>
                     <UserAvatar name={user.displayName} size={36} imageUrl={user.avatarUrl} />
                   </UserHoverCard>
                   <Box sx={{ minWidth: 0 }}>
@@ -136,7 +136,7 @@ export function UsersTable({
                       spacing={0.75}
                       sx={{ alignItems: 'center', flexWrap: 'wrap' }}
                     >
-                      <UserHoverCard userId={user.id}>
+                      <UserHoverCard userId={user.id} slug={user.slug}>
                         <Typography sx={{ fontWeight: 600, lineHeight: 1.3 }} noWrap>
                           {user.displayName}
                         </Typography>

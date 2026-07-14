@@ -27,6 +27,7 @@ import io.qnop.repository.DocumentRepository;
 import io.qnop.repository.ReviewParticipantRepository;
 import io.qnop.repository.UserDisplayName;
 import io.qnop.repository.UserRepository;
+import io.qnop.repository.UserSlug;
 import java.nio.charset.StandardCharsets;
 import java.util.HashMap;
 import java.util.LinkedHashSet;
@@ -109,6 +110,14 @@ public class ReviewIdentityResolver {
             ? Map.of()
             : users.findDisplayNamesByIdIn(userIds).stream()
                 .collect(Collectors.toMap(UserDisplayName::id, UserDisplayName::displayName));
+    // Profile slugs for pretty profile links (issue #486); shipped under the
+    // exact same exposure rule as the real author id.
+    Map<UUID, String> slugs =
+        userIds.isEmpty()
+            ? Map.of()
+            : users.findSlugsByIdIn(userIds).stream()
+                .filter(row -> row.slug() != null)
+                .collect(Collectors.toMap(UserSlug::id, UserSlug::slug));
 
     Map<UUID, Integer> ordinals = new HashMap<>();
     int next = 0;
@@ -117,7 +126,7 @@ public class ReviewIdentityResolver {
     }
 
     return new ReviewIdentities(
-        document.isAnonymous(), ownerId, actor, documentId, names, ordinals);
+        document.isAnonymous(), ownerId, actor, documentId, names, slugs, ordinals);
   }
 
   /** An immutable, request-scoped view of a review's author identities (issue #413). */
@@ -128,6 +137,7 @@ public class ReviewIdentityResolver {
     private final UUID actor;
     private final UUID documentId;
     private final Map<UUID, String> names;
+    private final Map<UUID, String> slugs;
     private final Map<UUID, Integer> ordinals;
 
     ReviewIdentities(
@@ -136,12 +146,14 @@ public class ReviewIdentityResolver {
         UUID actor,
         UUID documentId,
         Map<UUID, String> names,
+        Map<UUID, String> slugs,
         Map<UUID, Integer> ordinals) {
       this.anonymous = anonymous;
       this.ownerId = ownerId;
       this.actor = actor;
       this.documentId = documentId;
       this.names = names;
+      this.slugs = slugs;
       this.ordinals = ordinals;
     }
 
@@ -175,6 +187,18 @@ public class ReviewIdentityResolver {
       int ordinal = ordinals.getOrDefault(authorId, 0);
       return UUID.nameUUIDFromBytes(
           (documentId + ":anon:" + ordinal).getBytes(StandardCharsets.UTF_8));
+    }
+
+    /**
+     * The profile slug to ship for {@code authorId} (issue #486) — pretty profile links, under the
+     * SAME exposure rule as {@link #exposedAuthorId}: a slug identifies as surely as the id, so a
+     * pseudonymised author ships {@code null} (as does a user without a slug).
+     */
+    public String slug(UUID authorId) {
+      if (!anonymous || authorId.equals(actor) || authorId.equals(ownerId)) {
+        return slugs.get(authorId);
+      }
+      return null;
     }
   }
 }

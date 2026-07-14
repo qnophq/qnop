@@ -3763,6 +3763,10 @@ components:
         id:
           type: string
           format: uuid
+        slug:
+          type: string
+          nullable: true
+          description: The user's profile slug (issue #486); null for pre-slug accounts.
         displayName:
           type: string
           maxLength: 255
@@ -4527,6 +4531,12 @@ components:
         ownerId:
           type: string
           format: uuid
+        ownerSlug:
+          type: string
+          nullable: true
+          description: >-
+            The owner's profile slug (issue #486) — structurally public, also in
+            anonymous reviews (issue #472). Null for pre-slug accounts.
         ownerDisplayName:
           type: string
           description: The owner's display name — structurally public, also in anonymous reviews.
@@ -4631,6 +4641,12 @@ components:
           type: string
           format: uuid
           description: The user's or team's id.
+        slug:
+          type: string
+          nullable: true
+          description: >-
+            The user's profile slug (issue #486) — null for teams and on
+            anonymised rosters (issue #422), where it would deanonymise.
         displayName:
           type: string
           description: The user's display name or the team's name.
@@ -4668,6 +4684,10 @@ components:
           format: uuid
         kind:
           $ref: '#/components/schemas/ParticipantKind'
+        slug:
+          type: string
+          nullable: true
+          description: The user's profile slug (issue #486); null for teams.
         displayName:
           type: string
         avatarUrl:
@@ -4721,6 +4741,12 @@ components:
         ownerId:
           type: string
           format: uuid
+        ownerSlug:
+          type: string
+          nullable: true
+          description: >-
+            The owner's profile slug (issue #486) — structurally public, also in
+            anonymous reviews (issue #472). Null for pre-slug accounts.
         workflowState:
           type: string
           description: The review workflow state (state machine lands with #246).
@@ -5128,6 +5154,12 @@ components:
             The author's id. In an anonymous review (issue #413) this is a stable
             per-document pseudonym token for non-self, non-owner authors — never
             the real user id — so authorship cannot be correlated to the roster.
+        authorSlug:
+          type: string
+          nullable: true
+          description: >-
+            The author's profile slug (issue #486) for pretty profile links —
+            null under the same anonymity rule as the real author id.
         authorDisplayName:
           type: string
           nullable: true
@@ -5221,6 +5253,12 @@ components:
           description: >-
             The author's id — a stable per-document pseudonym token for foreign
             authors in an anonymous review (issue #413), never the real user id.
+        authorSlug:
+          type: string
+          nullable: true
+          description: >-
+            The author's profile slug (issue #486) for pretty profile links —
+            null under the same anonymity rule as the real author id.
         authorDisplayName:
           type: string
           nullable: true

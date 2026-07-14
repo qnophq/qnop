@@ -270,6 +270,7 @@ export function CommentThread({
                 own={own}
                 avatarUrl={own ? avatarUrl : avatarSrc(comment.authorId)}
                 hoverUserId={realAuthorId(review, userId, comment.authorId)}
+                hoverUserSlug={comment.authorSlug}
                 body={comment.body}
                 createdAt={comment.createdAt}
                 domId={`comment-${comment.id}`}

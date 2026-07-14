@@ -127,7 +127,11 @@ export function ReviewCards({ reviews, userId, onOpen }: ReviewCardsProps) {
             )}
             <Divider />
             <Stack direction="row" spacing={1.5} sx={{ alignItems: 'center' }}>
-              <OwnerChip ownerId={review.ownerId} name={review.ownerDisplayName} />
+              <OwnerChip
+                ownerId={review.ownerId}
+                slug={review.ownerSlug}
+                name={review.ownerDisplayName}
+              />
               <ReviewerStack participants={review.participants} anonymous={review.anonymous} />
               <Box sx={{ flex: 1 }} />
               <Stack

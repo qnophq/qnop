@@ -144,6 +144,25 @@ describe('UserHoverCard (issue #482)', () => {
     );
   });
 
+  it('prefers the profile slug for the rendered href', () => {
+    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    render(
+      <ThemeProvider theme={buildTheme('light')}>
+        <QueryClientProvider client={queryClient}>
+          <MemoryRouter>
+            <UserHoverCard userId={ANNA_ID} slug="anna-krause" profileName="Anna Krause">
+              <button type="button">Anna Krause</button>
+            </UserHoverCard>
+          </MemoryRouter>
+        </QueryClientProvider>
+      </ThemeProvider>,
+    );
+    expect(screen.getByRole('link', { name: "View Anna Krause's profile" })).toHaveAttribute(
+      'href',
+      '/users/anna-krause',
+    );
+  });
+
   it('links yourself to /profile, without a card', () => {
     renderCard(SELF_ID, true);
     expect(screen.getByRole('link', { name: "View Anna Krause's profile" })).toHaveAttribute(

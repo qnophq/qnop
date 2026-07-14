@@ -29,6 +29,7 @@ public record TeamMemberProjection(
     UUID membershipId,
     UUID userId,
     String displayName,
+    String slug,
     String email,
     TeamRole teamRole,
     Instant joinedAt) {}

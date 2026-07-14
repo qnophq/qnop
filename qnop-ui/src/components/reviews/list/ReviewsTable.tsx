@@ -110,7 +110,11 @@ export function ReviewsTable({ reviews, userId, onOpen }: ReviewsTableProps) {
                     <RoleBadge role={roleOf(review, userId)} />
                   </TableCell>
                   <TableCell>
-                    <OwnerChip ownerId={review.ownerId} name={review.ownerDisplayName} />
+                    <OwnerChip
+                      ownerId={review.ownerId}
+                      slug={review.ownerSlug}
+                      name={review.ownerDisplayName}
+                    />
                   </TableCell>
                   <TableCell>
                     <Stack

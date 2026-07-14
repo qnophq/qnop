@@ -24,9 +24,11 @@ import io.qnop.api.v1.model.RenderedDocumentResponse;
 import io.qnop.entity.Document;
 import io.qnop.entity.DocumentVersion;
 import io.qnop.entity.ExtractionStatus;
+import io.qnop.entity.User;
 import io.qnop.repository.DocumentRepository;
 import io.qnop.repository.DocumentVersionRepository;
 import io.qnop.repository.ReviewParticipantRepository;
+import io.qnop.repository.UserRepository;
 import io.qnop.service.storage.StorageService;
 import io.qnop.spi.storage.StorageContent;
 import java.io.IOException;
@@ -60,16 +62,19 @@ public class DocumentAccessService {
   private final DocumentVersionRepository versions;
   private final ReviewParticipantRepository participants;
   private final StorageService storage;
+  private final UserRepository users;
 
   public DocumentAccessService(
       DocumentRepository documents,
       DocumentVersionRepository versions,
       ReviewParticipantRepository participants,
-      StorageService storage) {
+      StorageService storage,
+      UserRepository users) {
     this.documents = documents;
     this.versions = versions;
     this.participants = participants;
     this.storage = storage;
+    this.users = users;
   }
 
   /** The document's metadata, if visible to {@code actor}. */
@@ -88,6 +93,8 @@ public class DocumentAccessService {
         document.isAnonymous(),
         document.getThreadParticipation().name(),
         document.getOwnerId(),
+        // Structurally public (issue #472) — the owner's pretty profile link (#486).
+        users.findById(document.getOwnerId()).map(User::getSlug).orElse(null),
         document.getWorkflowState(),
         latest,
         document.getCreatedAt(),
@@ -224,6 +231,7 @@ public class DocumentAccessService {
       boolean anonymous,
       String threadParticipation,
       UUID ownerId,
+      String ownerSlug,
       String workflowState,
       int latestVersionNumber,
       Instant createdAt,

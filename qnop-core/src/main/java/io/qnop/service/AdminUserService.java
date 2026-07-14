@@ -291,6 +291,7 @@ public class AdminUserService {
   private static AdminUserView toView(User u, String providerName) {
     return new AdminUserView(
         u.getId(),
+        u.getSlug(),
         u.getDisplayName(),
         u.getEmail(),
         u.getUsername(),
@@ -349,6 +350,7 @@ public class AdminUserService {
   /** A Spring-free, entity-free projection of a user for the admin surface. */
   public record AdminUserView(
       UUID id,
+      String slug,
       String displayName,
       String email,
       String username,

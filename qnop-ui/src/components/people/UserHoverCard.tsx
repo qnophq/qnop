@@ -60,6 +60,12 @@ interface UserHoverCardProps {
    * Your own id renders no card (just the /profile link).
    */
   userId: string | null | undefined;
+  /**
+   * The person's profile slug (issue #486) — preferred over the id for the
+   * link target, so rendered hrefs read /users/anna-krause. Absent under the
+   * same anonymity rule as the id.
+   */
+  slug?: string | null;
   children: ReactNode;
   /**
    * Clicking the trigger navigates to the person's profile (default). Opt
@@ -84,6 +90,7 @@ interface UserHoverCardProps {
  */
 export function UserHoverCard({
   userId,
+  slug,
   children,
   link = true,
   profileName,
@@ -105,7 +112,7 @@ export function UserHoverCard({
     );
   }
   return (
-    <HoverCard userId={userId} link={link} profileName={profileName} sx={sx}>
+    <HoverCard userId={userId} slug={slug} link={link} profileName={profileName} sx={sx}>
       {children}
     </HoverCard>
   );
@@ -155,12 +162,14 @@ function TriggerFrame({ children, to, profileName, sx, ...events }: TriggerFrame
 
 function HoverCard({
   userId,
+  slug,
   children,
   link,
   profileName,
   sx,
 }: {
   userId: string;
+  slug?: string | null;
   children: ReactNode;
   link: boolean;
   profileName?: string;
@@ -191,7 +200,7 @@ function HoverCard({
   return (
     <>
       <TriggerFrame
-        to={link ? `/users/${userId}` : undefined}
+        to={link ? `/users/${slug ?? userId}` : undefined}
         profileName={profileName}
         sx={sx}
         onMouseEnter={(event) => show(event.currentTarget)}

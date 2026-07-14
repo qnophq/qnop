@@ -134,7 +134,7 @@ export function AnnotationHead({
     >
       {/* The thread starter, front and centre — this is their discussion. */}
       <Stack direction="row" spacing={1.25} sx={{ alignItems: 'center', minWidth: 0 }}>
-        <UserHoverCard userId={hoverUserId} profileName={authorName}>
+        <UserHoverCard userId={hoverUserId} slug={annotation.authorSlug} profileName={authorName}>
           <UserAvatar
             name={authorName}
             size={AUTHOR_AVATAR_SIZE}
@@ -142,7 +142,7 @@ export function AnnotationHead({
           />
         </UserHoverCard>
         <Box sx={{ minWidth: 0 }}>
-          <UserHoverCard userId={hoverUserId}>
+          <UserHoverCard userId={hoverUserId} slug={annotation.authorSlug}>
             <Typography
               noWrap
               sx={{ fontWeight: 700, fontSize: '0.9375rem', lineHeight: 1.3 }}

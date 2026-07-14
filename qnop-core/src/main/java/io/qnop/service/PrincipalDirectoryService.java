@@ -60,10 +60,12 @@ public class PrincipalDirectoryService {
     Pageable limit = PageRequest.of(0, size);
     Stream<PrincipalView> userViews =
         users.searchEnabledPrincipals(like, limit).stream()
-            .map(user -> new PrincipalView(user.getId(), false, user.getDisplayName()));
+            .map(
+                user ->
+                    new PrincipalView(user.getId(), false, user.getSlug(), user.getDisplayName()));
     Stream<PrincipalView> teamViews =
         teams.searchEnabledPrincipals(like, limit).stream()
-            .map(team -> new PrincipalView(team.getId(), true, team.getName()));
+            .map(team -> new PrincipalView(team.getId(), true, null, team.getName()));
     return Stream.concat(userViews, teamViews)
         .sorted(Comparator.comparing(view -> view.displayName().toLowerCase(Locale.ROOT)))
         .limit(size)
@@ -80,10 +82,12 @@ public class PrincipalDirectoryService {
       throw new TeamNotFoundException("team not found: " + teamId);
     }
     return memberships.findMembersByTeamId(teamId).stream()
-        .map(member -> new PrincipalView(member.userId(), false, member.displayName()))
+        .map(
+            member ->
+                new PrincipalView(member.userId(), false, member.slug(), member.displayName()))
         .toList();
   }
 
-  /** An assignable principal — an enabled user or team. */
-  public record PrincipalView(UUID id, boolean team, String displayName) {}
+  /** An assignable principal — an enabled user or team; {@code slug} is null for teams (#486). */
+  public record PrincipalView(UUID id, boolean team, String slug, String displayName) {}
 }
