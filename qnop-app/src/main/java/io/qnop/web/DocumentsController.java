@@ -253,6 +253,7 @@ public class DocumentsController implements DocumentsApi {
         .threadParticipation(ThreadParticipation.fromValue(view.threadParticipation()))
         .ownerId(view.ownerId())
         .ownerSlug(view.ownerSlug())
+        .ownerDisplayName(view.ownerDisplayName())
         .workflowState(view.workflowState())
         .latestVersionNumber(view.latestVersionNumber())
         .createdAt(view.createdAt().atOffset(ZoneOffset.UTC))

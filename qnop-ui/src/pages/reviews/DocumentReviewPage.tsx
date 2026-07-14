@@ -478,6 +478,7 @@ export function DocumentReviewPage() {
             documentId={documentId}
             ownerId={document.ownerId}
             ownerSlug={document.ownerSlug}
+            ownerDisplayName={document.ownerDisplayName}
             isOwner={document.ownerId === userId}
             ownUserId={userId}
             anonymous={document.anonymous ?? false}

@@ -87,6 +87,7 @@ public class DocumentUpdateService {
             .findTopByDocumentIdOrderByVersionNumberDesc(documentId)
             .map(DocumentVersion::getVersionNumber)
             .orElse(0);
+    java.util.Optional<User> owner = users.findById(document.getOwnerId());
     return new DocumentView(
         document.getId(),
         document.getTitle(),
@@ -94,8 +95,9 @@ public class DocumentUpdateService {
         document.isAnonymous(),
         document.getThreadParticipation().name(),
         document.getOwnerId(),
-        // The actor here IS the owner — their own slug, structurally public.
-        users.findById(document.getOwnerId()).map(User::getSlug).orElse(null),
+        // The actor here IS the owner — their own identity, structurally public.
+        owner.map(User::getSlug).orElse(null),
+        owner.map(User::getDisplayName).orElse(null),
         document.getWorkflowState(),
         latest,
         document.getCreatedAt(),

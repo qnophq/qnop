@@ -97,6 +97,7 @@ class AnnotationServiceTest {
         threadParticipation,
         ownerId,
         null,
+        null,
         "IN_REVIEW",
         1,
         null,

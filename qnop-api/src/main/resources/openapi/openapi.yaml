@@ -4747,6 +4747,13 @@ components:
           description: >-
             The owner's profile slug (issue #486) — structurally public, also in
             anonymous reviews (issue #472). Null for pre-slug accounts.
+        ownerDisplayName:
+          type: string
+          nullable: true
+          description: >-
+            The owner's display name — structurally public, also in anonymous
+            reviews (issue #472). Resolved here so clients never depend on the
+            size-capped principal directory for it.
         workflowState:
           type: string
           description: The review workflow state (state machine lands with #246).
