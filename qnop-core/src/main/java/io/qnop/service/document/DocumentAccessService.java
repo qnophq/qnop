@@ -35,6 +35,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.time.Instant;
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -86,6 +87,7 @@ public class DocumentAccessService {
             .findTopByDocumentIdOrderByVersionNumberDesc(documentId)
             .map(DocumentVersion::getVersionNumber)
             .orElse(0);
+    Optional<User> owner = users.findById(document.getOwnerId());
     return new DocumentView(
         document.getId(),
         document.getTitle(),
@@ -93,8 +95,11 @@ public class DocumentAccessService {
         document.isAnonymous(),
         document.getThreadParticipation().name(),
         document.getOwnerId(),
-        // Structurally public (issue #472) — the owner's pretty profile link (#486).
-        users.findById(document.getOwnerId()).map(User::getSlug).orElse(null),
+        // Structurally public (issue #472): slug for the pretty profile link
+        // (#486) and the display name — resolved HERE so the client never
+        // depends on the size-capped principal directory for the owner.
+        owner.map(User::getSlug).orElse(null),
+        owner.map(User::getDisplayName).orElse(null),
         document.getWorkflowState(),
         latest,
         document.getCreatedAt(),
@@ -232,6 +237,7 @@ public class DocumentAccessService {
       String threadParticipation,
       UUID ownerId,
       String ownerSlug,
+      String ownerDisplayName,
       String workflowState,
       int latestVersionNumber,
       Instant createdAt,
