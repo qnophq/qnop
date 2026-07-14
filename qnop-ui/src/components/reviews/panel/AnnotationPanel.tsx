@@ -33,6 +33,7 @@ import type {
   AnnotationView,
 } from '../../../api/generated';
 import { AnnotationStatus } from '../../../api/generated';
+import { revealInScroller } from '../../../utils/revealInScroller';
 import { useAuthStore } from '../../../stores/authStore';
 import type { Notify } from '../../admin/layout/useToast';
 import { SectionCard } from '../../admin/layout/SectionCard';
@@ -147,15 +148,12 @@ export function AnnotationPanel({
   const userId = useAuthStore((state) => state.userId);
 
   // A newly selected annotation must be in view (issue #491) — in a long list
-  // it expands invisibly below the fold otherwise. block:'nearest' keeps
-  // in-list clicks untouched: a row that is already visible does not move.
-  // Instant on purpose — Chrome silently drops a smooth scrollIntoView
-  // whenever another scroll just happened (optional call: jsdom lacks it).
+  // it expands invisibly below the fold otherwise. 'nearest' keeps in-list
+  // clicks untouched: a row that is already visible does not move.
   useEffect(() => {
     if (!activeAnnotationId) return;
-    document
-      .getElementById(`annotation-item-${activeAnnotationId}`)
-      ?.scrollIntoView?.({ block: 'nearest' });
+    const el = document.getElementById(`annotation-item-${activeAnnotationId}`);
+    if (el) revealInScroller(el, 'nearest');
   }, [activeAnnotationId]);
   const { resolveWith, isPending: resolving } = useResolveWithFeedback(notify);
   const confirmPlacement = useConfirmPlacement(notify);
