@@ -126,14 +126,13 @@ describe('UserHoverCard (issue #482)', () => {
     expect(usersApi.getUserProfile).not.toHaveBeenCalled();
   });
 
-  it('never attaches to yourself', async () => {
+  it('shows your own card too — a roster row that ignores the hover reads as broken', async () => {
     renderCard(SELF_ID);
 
     fireEvent.mouseEnter(trigger());
-    await new Promise((resolve) => setTimeout(resolve, 400));
 
-    expect(screen.queryByTestId('user-hover-card')).not.toBeInTheDocument();
-    expect(usersApi.getUserProfile).not.toHaveBeenCalled();
+    expect(await screen.findByTestId('user-hover-card', {}, { timeout: 2000 })).toBeInTheDocument();
+    expect(usersApi.getUserProfile).toHaveBeenCalledWith({ userId: SELF_ID });
   });
 
   it('links the trigger to the profile by default', () => {
@@ -163,7 +162,7 @@ describe('UserHoverCard (issue #482)', () => {
     );
   });
 
-  it('links yourself to /profile, without a card', () => {
+  it('links yourself to /profile', () => {
     renderCard(SELF_ID, true);
     expect(screen.getByRole('link', { name: "View Anna Krause's profile" })).toHaveAttribute(
       'href',

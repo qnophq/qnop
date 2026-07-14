@@ -57,7 +57,8 @@ interface UserHoverCardProps {
    * The person's REAL user id. Callers must pass null for pseudonymised
    * identities (see {@link realAuthorId}) — the trigger then renders neither
    * a card nor a link, so anonymity cannot leak through a hover or a click.
-   * Your own id renders no card (just the /profile link).
+   * Your own id shows your own card (consistent rows read as working rows)
+   * and links to /profile.
    */
   userId: string | null | undefined;
   /**
@@ -101,18 +102,12 @@ export function UserHoverCard({
   if (!userId) {
     return children;
   }
-  if (userId === selfId) {
-    // No card over yourself — but the click affordance stays.
-    return link ? (
-      <TriggerFrame to="/profile" profileName={profileName} sx={sx}>
-        {children}
-      </TriggerFrame>
-    ) : (
-      children
-    );
-  }
+  // Yourself included: a roster where one row silently ignores the hover
+  // reads as broken, and your own card exposes nothing new. Only the click
+  // target differs — your own profile lives at /profile.
+  const to = !link ? undefined : userId === selfId ? '/profile' : `/users/${slug ?? userId}`;
   return (
-    <HoverCard userId={userId} slug={slug} link={link} profileName={profileName} sx={sx}>
+    <HoverCard userId={userId} to={to} profileName={profileName} sx={sx}>
       {children}
     </HoverCard>
   );
@@ -162,16 +157,15 @@ function TriggerFrame({ children, to, profileName, sx, ...events }: TriggerFrame
 
 function HoverCard({
   userId,
-  slug,
+  to,
   children,
-  link,
   profileName,
   sx,
 }: {
   userId: string;
-  slug?: string | null;
+  /** The profile link target; undefined when the caller renders its own anchor. */
+  to?: string;
   children: ReactNode;
-  link: boolean;
   profileName?: string;
   sx?: SxProps<Theme>;
 }) {
@@ -200,7 +194,7 @@ function HoverCard({
   return (
     <>
       <TriggerFrame
-        to={link ? `/users/${slug ?? userId}` : undefined}
+        to={to}
         profileName={profileName}
         sx={sx}
         onMouseEnter={(event) => show(event.currentTarget)}
