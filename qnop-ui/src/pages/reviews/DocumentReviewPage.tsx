@@ -96,6 +96,7 @@ import { isOpenWorkflowState } from '../../components/reviews/workflowMeta';
 import { recordRecentReview } from '../../components/dashboard/recentReviews';
 import { useAuthStore } from '../../stores/authStore';
 import { apiErrorCode } from '../../utils/apiError';
+import { revealInScroller } from '../../utils/revealInScroller';
 import { pdfFetchVersion, resolveEffectiveVersion } from './resolveEffectiveVersion';
 
 const PANEL_SPLIT_KEY = 'qnop-review-split';
@@ -604,6 +605,21 @@ export function DocumentReviewPage() {
                       setActiveAnnotationId(id);
                       setPending(null);
                       setReattaching(null);
+                      // Reveal the row's HEAD in the panel on EVERY mark
+                      // click (#491) — also when the annotation is already the
+                      // active one, where the panel's state-change effect
+                      // cannot fire. 'start' on purpose: the expanded card is
+                      // often taller than the panel, and 'nearest' treats a
+                      // partially visible card as in view. setTimeout(0) runs
+                      // after React committed the expansion.
+                      if (id) {
+                        setTimeout(() => {
+                          // window.document explicitly — the component scope
+                          // shadows `document` with the DocumentResponse.
+                          const el = window.document.getElementById(`annotation-item-${id}`);
+                          if (el) revealInScroller(el, 'start');
+                        }, 0);
+                      }
                     }}
                     onHoverAnnotation={setHoverAnnotationId}
                     onVisiblePageChange={setCurrentPage}

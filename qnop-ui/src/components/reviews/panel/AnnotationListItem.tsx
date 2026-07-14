@@ -248,6 +248,8 @@ function AnnotationListItemBase({
       onFocus={() => onHover?.(annotation.id)}
       onBlur={() => onHover?.(null)}
       aria-expanded={active}
+      // Stable DOM id — the scroll target when a mark click selects this row (#491).
+      id={`annotation-item-${annotation.id}`}
       data-testid={`annotation-item-${annotation.id}`}
       sx={{
         display: 'block',

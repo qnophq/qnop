@@ -19,7 +19,7 @@
  * SPDX-License-Identifier: AGPL-3.0-only
  */
 
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import Box from '@mui/material/Box';
 import Button from '@mui/material/Button';
 import Collapse from '@mui/material/Collapse';
@@ -33,6 +33,7 @@ import type {
   AnnotationView,
 } from '../../../api/generated';
 import { AnnotationStatus } from '../../../api/generated';
+import { revealInScroller } from '../../../utils/revealInScroller';
 import { useAuthStore } from '../../../stores/authStore';
 import type { Notify } from '../../admin/layout/useToast';
 import { SectionCard } from '../../admin/layout/SectionCard';
@@ -145,6 +146,15 @@ export function AnnotationPanel({
 }: AnnotationPanelProps) {
   const [filters, setFilters] = useState<AnnotationFilters>(EMPTY_FILTERS);
   const userId = useAuthStore((state) => state.userId);
+
+  // A newly selected annotation must be in view (issue #491) — in a long list
+  // it expands invisibly below the fold otherwise. 'nearest' keeps in-list
+  // clicks untouched: a row that is already visible does not move.
+  useEffect(() => {
+    if (!activeAnnotationId) return;
+    const el = document.getElementById(`annotation-item-${activeAnnotationId}`);
+    if (el) revealInScroller(el, 'nearest');
+  }, [activeAnnotationId]);
   const { resolveWith, isPending: resolving } = useResolveWithFeedback(notify);
   const confirmPlacement = useConfirmPlacement(notify);
   const { reopenWith } = useReopenWithFeedback(notify);
