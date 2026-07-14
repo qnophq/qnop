@@ -142,6 +142,19 @@ describe('AnnotationPanel', () => {
     expect(screen.getByTestId('panel-new-count')).toHaveTextContent('2 new');
   });
 
+  it('scrolls the selected row into view when a mark click activates it (#491)', () => {
+    const scrollSpy = vi.fn();
+    Element.prototype.scrollIntoView = scrollSpy;
+
+    renderPanel({
+      annotations: [annotation('a1'), annotation('a2')],
+      activeAnnotationId: 'a2',
+    });
+
+    expect(scrollSpy).toHaveBeenCalledWith({ block: 'nearest' });
+    expect(scrollSpy.mock.instances[0]).toBe(screen.getByTestId('annotation-item-a2'));
+  });
+
   it('shows the empty state with the how-to hint when annotating is possible', () => {
     renderPanel();
     expect(

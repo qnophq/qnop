@@ -603,6 +603,22 @@ export function DocumentReviewPage() {
                       setActiveAnnotationId(id);
                       setPending(null);
                       setReattaching(null);
+                      // Reveal the row's HEAD in the panel on EVERY mark
+                      // click (#491) — also when the annotation is already the
+                      // active one, where the panel's state-change effect
+                      // cannot fire. block:'start' on purpose: the expanded
+                      // card is often taller than the panel, and 'nearest'
+                      // treats a partially visible card as in view. Instant on
+                      // purpose too — Chrome silently drops a smooth
+                      // scrollIntoView whenever another scroll just happened.
+                      // setTimeout(0) runs after React committed the expansion.
+                      if (id) {
+                        setTimeout(() => {
+                          document
+                            .getElementById(`annotation-item-${id}`)
+                            ?.scrollIntoView?.({ block: 'start' });
+                        }, 0);
+                      }
                     }}
                     onHoverAnnotation={setHoverAnnotationId}
                     onVisiblePageChange={setCurrentPage}
