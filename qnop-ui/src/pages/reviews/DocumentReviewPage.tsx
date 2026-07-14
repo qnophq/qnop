@@ -613,7 +613,9 @@ export function DocumentReviewPage() {
                       // after React committed the expansion.
                       if (id) {
                         setTimeout(() => {
-                          const el = document.getElementById(`annotation-item-${id}`);
+                          // window.document explicitly — the component scope
+                          // shadows `document` with the DocumentResponse.
+                          const el = window.document.getElementById(`annotation-item-${id}`);
                           if (el) revealInScroller(el, 'start');
                         }, 0);
                       }
