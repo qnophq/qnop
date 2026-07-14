@@ -32,6 +32,10 @@ import { PlacementStatus } from '../../../api/generated';
 import { useComments } from '../../../api/hooks/useComments';
 import { useAuthStore } from '../../../stores/authStore';
 import type { Notify } from '../../admin/layout/useToast';
+import { useDocument } from '../../../api/hooks/useDocuments';
+import { realAuthorId } from '../../people/realAuthorId';
+import { UserHoverCard } from '../../people/UserHoverCard';
+import { useReviewDocumentId } from '../reviewDocumentId';
 import { UserAvatar } from '../../shell/UserAvatar';
 import { avatarSrc } from '../../../utils/avatarUrl';
 import { isDocumentScoped } from '../annotationScope';
@@ -73,10 +77,18 @@ interface DiscussionParticipant {
   id: string;
   /** Server-resolved name honouring anonymity (issue #413); real name or "Participant N". */
   name: string | null | undefined;
+  slug?: string | null;
 }
 
 /** Overlapping avatar stack of everyone involved in the discussion. */
-function ParticipantAvatars({ participants }: { participants: DiscussionParticipant[] }) {
+function ParticipantAvatars({
+  participants,
+  review,
+}: {
+  participants: DiscussionParticipant[];
+  /** The review's anonymity context — gates the hover cards (issue #482). */
+  review: { anonymous?: boolean; ownerId?: string } | undefined;
+}) {
   const userId = useAuthStore((state) => state.userId);
   const displayName = useAuthStore((state) => state.displayName);
   const avatarUrl = useAuthStore((state) => state.avatarUrl);
@@ -86,23 +98,29 @@ function ParticipantAvatars({ participants }: { participants: DiscussionParticip
       {shown.map((participant, index) => {
         const own = participant.id === userId;
         return (
-          <Box
+          <UserHoverCard
             key={participant.id}
-            sx={{
-              borderRadius: '50%',
-              border: '2px solid',
-              borderColor: 'background.paper',
-              ml: index === 0 ? 0 : -0.75,
-              display: 'flex',
-              zIndex: shown.length - index,
-            }}
+            userId={realAuthorId(review, userId, participant.id)}
+            slug={participant.slug}
+            profileName={participant.name ?? undefined}
           >
-            <UserAvatar
-              name={own ? (displayName ?? 'You') : (participant.name ?? 'Participant')}
-              size={20}
-              imageUrl={own ? avatarUrl : avatarSrc(participant.id)}
-            />
-          </Box>
+            <Box
+              sx={{
+                borderRadius: '50%',
+                border: '2px solid',
+                borderColor: 'background.paper',
+                ml: index === 0 ? 0 : -0.75,
+                display: 'flex',
+                zIndex: shown.length - index,
+              }}
+            >
+              <UserAvatar
+                name={own ? (displayName ?? 'You') : (participant.name ?? 'Participant')}
+                size={20}
+                imageUrl={own ? avatarUrl : avatarSrc(participant.id)}
+              />
+            </Box>
+          </UserHoverCard>
         );
       })}
       {participants.length > MAX_AVATARS && (
@@ -183,6 +201,9 @@ function AnnotationListItemBase({
   const priorityCue = annotation.priority ? PRIORITY_CUES[annotation.priority] : null;
   const viewerAvatarUrl = useAuthStore((state) => state.avatarUrl);
   const viewerName = useAuthStore((state) => state.displayName);
+  // Hover-card anonymity gate (issue #482): read from the cached document.
+  const review = useDocument(useReviewDocumentId()).data;
+  const hoverUserId = realAuthorId(review, viewerId, annotation.authorId);
   const authorName =
     annotation.authorId === viewerId
       ? (viewerName ?? 'You')
@@ -196,10 +217,11 @@ function AnnotationListItemBase({
   // author, then commenters — so each pseudonym in an anonymous review gets its
   // own distinct avatar rather than a shared "Participant" glyph.
   const participants = [
-    { id: annotation.authorId, name: annotation.authorDisplayName },
+    { id: annotation.authorId, name: annotation.authorDisplayName, slug: annotation.authorSlug },
     ...cachedComments.map((comment) => ({
       id: comment.authorId,
       name: comment.authorDisplayName,
+      slug: comment.authorSlug,
     })),
   ].filter(
     (participant, index, all) => all.findIndex((other) => other.id === participant.id) === index,
@@ -311,7 +333,7 @@ function AnnotationListItemBase({
             >
               {quote ? `“${quote}”` : plainExcerpt(annotation.firstComment ?? '') || fallbackLabel}
             </Typography>
-            <ParticipantAvatars participants={participants} />
+            <ParticipantAvatars participants={participants} review={review} />
           </Stack>
           {/* Meta line: who, when, what kind — then the counters. */}
           <Stack
@@ -319,16 +341,25 @@ function AnnotationListItemBase({
             spacing={0.75}
             sx={{ alignItems: 'center', minWidth: 0, pl: TILE_INDENT, color: 'text.secondary' }}
           >
-            <UserAvatar
-              name={authorName}
-              size={16}
-              imageUrl={
-                annotation.authorId === viewerId ? viewerAvatarUrl : avatarSrc(annotation.authorId)
-              }
-            />
-            <Typography variant="caption" noWrap sx={{ fontWeight: 500, flexShrink: 1 }}>
-              {authorName}
-            </Typography>
+            <UserHoverCard
+              userId={hoverUserId}
+              slug={annotation.authorSlug}
+              profileName={authorName}
+              sx={{ alignItems: 'center', gap: 0.75, flexShrink: 1 }}
+            >
+              <UserAvatar
+                name={authorName}
+                size={16}
+                imageUrl={
+                  annotation.authorId === viewerId
+                    ? viewerAvatarUrl
+                    : avatarSrc(annotation.authorId)
+                }
+              />
+              <Typography variant="caption" noWrap sx={{ fontWeight: 500, flexShrink: 1 }}>
+                {authorName}
+              </Typography>
+            </UserHoverCard>
             <Typography
               variant="caption"
               title={DATE_FORMAT.format(new Date(annotation.createdAt))}

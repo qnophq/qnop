@@ -19,7 +19,7 @@
  * SPDX-License-Identifier: AGPL-3.0-only
  */
 
-import type { DocumentSummary, PublicUserStats } from '../../api/generated';
+import type { DashboardActivity, DocumentSummary, PublicUserStats } from '../../api/generated';
 
 /** One achievement sticker on the player card (issue #469). */
 export interface Achievement {
@@ -145,4 +145,43 @@ export function publicProfileAchievements(stats: PublicUserStats): Achievement[]
       earned: stats.annotationsRaised >= SHARP_EYE_MILESTONE,
     },
   ];
+}
+
+/** The viewer-visible reviews split by the profiled person's role (issue #482 polish). */
+export interface SharedReviews {
+  /** Reviews the person owns — ownership is structurally public (#472). */
+  owned: DocumentSummary[];
+  /** Reviews the person reviews. Anonymised rosters carry synthetic ids and never match. */
+  reviewing: DocumentSummary[];
+}
+
+/**
+ * Splits the VIEWER's reviews overview by the profiled person's role. The
+ * overview is already visibility-scoped and anonymity-safe server-side, so
+ * this only ever surfaces what the viewer could open anyway.
+ */
+export function sharedReviewsWith(profileId: string, reviews: DocumentSummary[]): SharedReviews {
+  return {
+    owned: reviews.filter((review) => review.ownerId === profileId),
+    reviewing: reviews.filter(
+      (review) =>
+        review.ownerId !== profileId &&
+        (review.participants ?? []).some(
+          (participant) => participant.kind === 'USER' && participant.principalId === profileId,
+        ),
+    ),
+  };
+}
+
+/**
+ * The person's recent moves as seen by the viewer (issue #482 polish): the
+ * dashboard feed filtered to this actor. The feed is scoped to the viewer's
+ * reviews and pseudonymises anonymous ones server-side (a token never equals
+ * a real id), so nothing appears here that the viewer may not attribute.
+ */
+export function profileMoves(
+  profileId: string,
+  activity: DashboardActivity[],
+): DashboardActivity[] {
+  return activity.filter((item) => item.actorId === profileId);
 }

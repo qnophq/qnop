@@ -477,6 +477,7 @@ export function DocumentReviewPage() {
           <ReviewHubHead
             documentId={documentId}
             ownerId={document.ownerId}
+            ownerSlug={document.ownerSlug}
             isOwner={document.ownerId === userId}
             ownUserId={userId}
             anonymous={document.anonymous ?? false}

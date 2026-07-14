@@ -50,6 +50,8 @@ export function useDocument(documentId: string) {
       const response = await documentsApi.getDocument({ documentId });
       return response.data;
     },
+    // Callers may sit outside a resolved review (empty id) — never fetch then.
+    enabled: documentId !== '',
   });
 }
 

@@ -146,6 +146,7 @@ public class DocumentsController implements DocumentsApi {
         .anonymous(view.anonymous())
         .threadParticipation(ThreadParticipation.fromValue(view.threadParticipation()))
         .ownerId(view.ownerId())
+        .ownerSlug(view.ownerSlug())
         .ownerDisplayName(view.ownerDisplayName())
         .workflowState(view.workflowState())
         .latestVersionNumber(view.latestVersionNumber())
@@ -172,6 +173,7 @@ public class DocumentsController implements DocumentsApi {
         .id(view.id())
         .kind(view.team() ? ParticipantKind.TEAM : ParticipantKind.USER)
         .principalId(view.principalId())
+        .slug(view.slug())
         .displayName(view.displayName());
   }
 
@@ -250,6 +252,7 @@ public class DocumentsController implements DocumentsApi {
         .anonymous(view.anonymous())
         .threadParticipation(ThreadParticipation.fromValue(view.threadParticipation()))
         .ownerId(view.ownerId())
+        .ownerSlug(view.ownerSlug())
         .workflowState(view.workflowState())
         .latestVersionNumber(view.latestVersionNumber())
         .createdAt(view.createdAt().atOffset(ZoneOffset.UTC))

@@ -37,6 +37,14 @@ vi.mock('../api/config', () => ({
     getUserProfileBySlug: vi.fn(),
   },
 }));
+// The shared-mission/moves sections load the viewer's overview and feed —
+// stubbed empty here; their derivation is covered by profileModel tests.
+vi.mock('../api/hooks/useReviews', () => ({
+  useReviews: vi.fn(() => ({ data: { items: [] } })),
+}));
+vi.mock('../api/hooks/useDashboard', () => ({
+  useDashboard: vi.fn(() => ({ data: { replies: [], activity: [] } })),
+}));
 
 const ANNA_ID = '123e4567-e89b-12d3-a456-426614174000';
 const SELF_ID = '999e4567-e89b-12d3-a456-426614174999';

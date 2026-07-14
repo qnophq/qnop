@@ -21,7 +21,13 @@
 
 import { describe, expect, it } from 'vitest';
 import type { DocumentSummary } from '../../api/generated';
-import { profileAchievements, profileStats, publicProfileAchievements } from './profileModel';
+import {
+  profileAchievements,
+  profileStats,
+  publicProfileAchievements,
+  profileMoves,
+  sharedReviewsWith,
+} from './profileModel';
 
 const ME = 'user-me';
 
@@ -105,5 +111,63 @@ describe('publicProfileAchievements (issue #473)', () => {
     expect(achievements.find((a) => a.key === 'liftoff')?.earned).toBe(true);
     expect(achievements.find((a) => a.key === 'crew')?.earned).toBe(true);
     expect(achievements.find((a) => a.key === 'closer')?.earned).toBe(true);
+  });
+});
+
+describe('sharedReviewsWith (issue #482 polish)', () => {
+  const review = (overrides: Record<string, unknown>) =>
+    ({
+      id: 'd1',
+      title: 'Doc',
+      ownerId: 'someone',
+      participants: [],
+      ...overrides,
+    }) as never;
+
+  it('splits the overview into commanded and joined missions', () => {
+    const owned = review({ id: 'o1', ownerId: 'anna' });
+    const reviewing = review({
+      id: 'r1',
+      participants: [{ id: 'p1', kind: 'USER', principalId: 'anna', displayName: 'Anna' }],
+    });
+    const unrelated = review({ id: 'x1' });
+
+    const shared = sharedReviewsWith('anna', [owned, reviewing, unrelated]);
+
+    expect(shared.owned.map((r: { id: string }) => r.id)).toEqual(['o1']);
+    expect(shared.reviewing.map((r: { id: string }) => r.id)).toEqual(['r1']);
+  });
+
+  it('never counts teams or an owned review as joined', () => {
+    const ownAndParticipant = review({
+      id: 'o1',
+      ownerId: 'anna',
+      participants: [{ id: 'p1', kind: 'USER', principalId: 'anna', displayName: 'Anna' }],
+    });
+    const teamOnly = review({
+      id: 't1',
+      participants: [{ id: 'p2', kind: 'TEAM', principalId: 'anna', displayName: 'Team' }],
+    });
+
+    const shared = sharedReviewsWith('anna', [ownAndParticipant, teamOnly]);
+
+    expect(shared.owned.map((r: { id: string }) => r.id)).toEqual(['o1']);
+    expect(shared.reviewing).toHaveLength(0);
+  });
+});
+
+describe('profileMoves (issue #482 polish)', () => {
+  it('keeps only the profiled actor’s feed items', () => {
+    const move = (actorId: string | undefined, type: string) =>
+      ({ actorId, type, documentId: 'd', documentTitle: 'Doc', createdAt: 'now' }) as never;
+
+    const moves = profileMoves('anna', [
+      move('anna', 'annotation.created'),
+      move('ben', 'annotation.resolved'),
+      move(undefined, 'workflow.transition'), // anonymised actors never match
+    ]);
+
+    expect(moves).toHaveLength(1);
+    expect((moves[0] as { type: string }).type).toBe('annotation.created');
   });
 });

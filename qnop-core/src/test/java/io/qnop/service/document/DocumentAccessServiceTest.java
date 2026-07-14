@@ -34,6 +34,7 @@ import io.qnop.entity.DocumentVersion;
 import io.qnop.repository.DocumentRepository;
 import io.qnop.repository.DocumentVersionRepository;
 import io.qnop.repository.ReviewParticipantRepository;
+import io.qnop.repository.UserRepository;
 import io.qnop.service.storage.StorageService;
 import io.qnop.spi.storage.StorageContent;
 import java.io.ByteArrayInputStream;
@@ -60,6 +61,7 @@ class DocumentAccessServiceTest {
   @Mock private DocumentVersionRepository versions;
   @Mock private ReviewParticipantRepository participants;
   @Mock private StorageService storage;
+  @Mock private UserRepository users;
 
   private DocumentAccessService service;
 
@@ -70,7 +72,7 @@ class DocumentAccessServiceTest {
 
   @BeforeEach
   void setUp() {
-    service = new DocumentAccessService(documents, versions, participants, storage);
+    service = new DocumentAccessService(documents, versions, participants, storage, users);
   }
 
   private Document ownedDocument() {

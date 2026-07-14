@@ -27,6 +27,7 @@ import { useTheme } from '@mui/material/styles';
 import { Eye, FileText, User } from 'lucide-react';
 import type { ParticipantView } from '../../../api/generated';
 import { ToneBadge } from '../../admin/ToneBadge';
+import { UserHoverCard } from '../../people/UserHoverCard';
 import { UserAvatar } from '../../shell/UserAvatar';
 import { avatarSrc } from '../../../utils/avatarUrl';
 
@@ -125,7 +126,14 @@ export function ProgressBar({
 }
 
 /** Overlapping reviewer avatars with real display names (max 3 + counter). */
-export function ReviewerStack({ participants }: { participants: ParticipantView[] }) {
+export function ReviewerStack({
+  participants,
+  anonymous = false,
+}: {
+  participants: ParticipantView[];
+  /** True for an anonymous review — its roster ids are synthetic (issue #422), so no hover cards. */
+  anonymous?: boolean;
+}) {
   if (participants.length === 0) {
     return (
       <Typography variant="caption" color="text.secondary">
@@ -136,8 +144,10 @@ export function ReviewerStack({ participants }: { participants: ParticipantView[
   const shown = participants.slice(0, 3);
   return (
     <Stack direction="row" sx={{ alignItems: 'center' }}>
-      {shown.map((participant, index) => (
-        <Tooltip key={participant.id} title={participant.displayName}>
+      {shown.map((participant, index) => {
+        const cardUserId =
+          participant.kind === 'USER' && !anonymous ? participant.principalId : null;
+        const avatar = (
           <Box
             sx={{
               borderRadius: '50%',
@@ -159,8 +169,20 @@ export function ReviewerStack({ participants }: { participants: ParticipantView[
               }
             />
           </Box>
-        </Tooltip>
-      ))}
+        );
+        return (
+          <UserHoverCard
+            key={participant.id}
+            userId={cardUserId}
+            slug={participant.slug}
+            profileName={participant.displayName}
+          >
+            {/* The card names the person already — the tooltip only steps in
+                where no card may attach (teams, anonymised rosters). */}
+            {cardUserId ? avatar : <Tooltip title={participant.displayName}>{avatar}</Tooltip>}
+          </UserHoverCard>
+        );
+      })}
       {participants.length > 3 && (
         <Typography variant="caption" color="text.secondary" sx={{ ml: 0.5 }}>
           +{participants.length - 3}
@@ -171,13 +193,25 @@ export function ReviewerStack({ participants }: { participants: ParticipantView[
 }
 
 /** The review's owner as a compact identity chip (issue #469): picture + name. */
-export function OwnerChip({ ownerId, name }: { ownerId: string; name?: string | null }) {
+export function OwnerChip({
+  ownerId,
+  slug,
+  name,
+}: {
+  ownerId: string;
+  slug?: string | null;
+  name?: string | null;
+}) {
   return (
-    <Stack direction="row" spacing={0.75} sx={{ alignItems: 'center', minWidth: 0 }}>
-      <UserAvatar name={name ?? '?'} size={20} imageUrl={avatarSrc(ownerId)} />
-      <Typography variant="caption" noWrap sx={{ color: 'text.secondary', maxWidth: 140 }}>
-        {name ?? '—'}
-      </Typography>
-    </Stack>
+    // Ownership is structurally public (issue #472), so the hover card may
+    // attach even on anonymous reviews.
+    <UserHoverCard userId={ownerId} slug={slug} profileName={name ?? undefined}>
+      <Stack direction="row" spacing={0.75} sx={{ alignItems: 'center', minWidth: 0 }}>
+        <UserAvatar name={name ?? '?'} size={20} imageUrl={avatarSrc(ownerId)} />
+        <Typography variant="caption" noWrap sx={{ color: 'text.secondary', maxWidth: 140 }}>
+          {name ?? '—'}
+        </Typography>
+      </Stack>
+    </UserHoverCard>
   );
 }

@@ -41,12 +41,20 @@ import {
 } from 'lucide-react';
 import { useEffect } from 'react';
 import { Navigate, useNavigate, useParams } from 'react-router-dom';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useQueryClient } from '@tanstack/react-query';
 import type { PublicUserProfile } from '../api/generated';
-import { usersApi } from '../api/config';
+import { useDashboard } from '../api/hooks/useDashboard';
+import { useReviews } from '../api/hooks/useReviews';
+import { userKeys, useUserProfile } from '../api/hooks/useUsers';
 import { useAuthStore } from '../stores/authStore';
 import { AchievementRow } from '../components/profile/AchievementRow';
-import { publicProfileAchievements } from '../components/profile/profileModel';
+import { ProfileMissionList } from '../components/profile/ProfileMissionList';
+import { ProfileMovesCard } from '../components/profile/ProfileMovesCard';
+import {
+  profileMoves,
+  publicProfileAchievements,
+  sharedReviewsWith,
+} from '../components/profile/profileModel';
 import { UserAvatar } from '../components/shell/UserAvatar';
 
 const SINCE_FORMAT = new Intl.DateTimeFormat('en-US', { month: 'long', year: 'numeric' });
@@ -68,8 +76,6 @@ const fadeUp = {
 
 const UUID_SHAPE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
-const profileKey = (segment: string) => ['users', 'public-profile', segment] as const;
-
 /**
  * A colleague's workspace-public profile (issues #454, #473): the campaign's
  * player-card language — identity hero with team affiliations, the
@@ -88,26 +94,21 @@ export function UserProfilePage() {
   const selfId = useAuthStore((s) => s.userId);
   const navigate = useNavigate();
   const queryClient = useQueryClient();
-  const profileQuery = useQuery<PublicUserProfile>({
-    queryKey: profileKey(segment),
-    queryFn: async () => {
-      const response = isId
-        ? await usersApi.getUserProfile({ userId: segment })
-        : await usersApi.getUserProfileBySlug({ slug: segment });
-      return response.data;
-    },
-    enabled: segment !== '' && segment !== selfId,
-    // Keeps the canonical UUID→slug replace below fetch-free: the seeded
-    // cache entry is still fresh when the slug URL mounts.
-    staleTime: 30_000,
-  });
+  // Shared with the hover card (issue #482): one cache entry per person, so
+  // hover→page (and the canonicalisation below) stay fetch-free.
+  const profileQuery = useUserProfile(segment, segment !== selfId);
+  // The shared-mission and moves sections (issue #482 polish) derive from the
+  // VIEWER's own overview and feed — both already visibility-scoped and
+  // anonymity-safe server-side, and warm from the dashboard's cache.
+  const reviewsQuery = useReviews({ page: 0, size: 100, sort: 'updatedAt,desc' });
+  const dashboardQuery = useDashboard();
 
   // Canonicalise /users/<uuid> to /users/<slug>: seed the slug's cache entry
   // first so the replace renders instantly instead of refetching.
   const loadedSlug = profileQuery.data?.slug;
   useEffect(() => {
     if (isId && loadedSlug && profileQuery.data) {
-      queryClient.setQueryData(profileKey(loadedSlug), profileQuery.data);
+      queryClient.setQueryData(userKeys.publicProfile(loadedSlug), profileQuery.data);
       navigate(`/users/${loadedSlug}`, { replace: true });
     }
   }, [isId, loadedSlug, profileQuery.data, queryClient, navigate]);
@@ -141,6 +142,9 @@ export function UserProfilePage() {
 
   const profile = profileQuery.data;
   const achievements = publicProfileAchievements(profile.stats);
+  const shared = sharedReviewsWith(profile.id, reviewsQuery.data?.items ?? []);
+  const moves = profileMoves(profile.id, dashboardQuery.data?.activity ?? []);
+  const firstName = profile.displayName.split(' ')[0] || profile.displayName;
   const earnedCount = achievements.filter((a) => a.earned).length;
 
   return (
@@ -314,6 +318,28 @@ export function UserProfilePage() {
         </Stack>
         <AchievementRow achievements={achievements} />
       </Paper>
+
+      {/* The shared campaign: their missions and moves, from the viewer's
+          own (already anonymity-safe) overview and feed. */}
+      <Box
+        sx={{
+          ...stagger(3),
+          display: 'grid',
+          gap: 2.5,
+          gridTemplateColumns: { xs: '1fr', md: '1.2fr 1fr' },
+          alignItems: 'start',
+        }}
+      >
+        <Stack spacing={2.5}>
+          <ProfileMissionList variant="owned" firstName={firstName} reviews={shared.owned} />
+          <ProfileMissionList
+            variant="reviewing"
+            firstName={firstName}
+            reviews={shared.reviewing}
+          />
+        </Stack>
+        <ProfileMovesCard firstName={firstName} moves={moves} />
+      </Box>
     </Stack>
   );
 }

@@ -25,6 +25,7 @@ import Typography from '@mui/material/Typography';
 import type { ReactionGroup } from '../../../api/generated';
 import { shortRelativeTime } from '../../../utils/relativeTime';
 import type { Notify } from '../../admin/layout/useToast';
+import { UserHoverCard } from '../../people/UserHoverCard';
 import { UserAvatar } from '../../shell/UserAvatar';
 import { Markdown } from '../markdown/Markdown';
 import { CopyTextButton } from '../CopyTextButton';
@@ -59,6 +60,14 @@ interface CommentMessageProps {
   reactions?: ReactionGroup[];
   /** Toggles the viewer's reaction; its presence renders the reaction affordances. */
   onToggleReaction?: (emoji: string, reacted: boolean) => void;
+  /**
+   * Attaches the profile hover card (issue #482) to the author's avatar.
+   * Callers pass a GUARANTEED-REAL user id (see realAuthorId) or nothing —
+   * pseudonymised authors in anonymous reviews must never carry a card.
+   */
+  hoverUserId?: string | null;
+  /** The author's profile slug (issue #486) — prettifies the trigger's href. */
+  hoverUserSlug?: string | null;
 }
 
 /**
@@ -82,6 +91,8 @@ export function CommentMessage({
   notify,
   reactions = [],
   onToggleReaction,
+  hoverUserId,
+  hoverUserSlug,
 }: CommentMessageProps) {
   return (
     <Stack
@@ -103,17 +114,21 @@ export function CommentMessage({
       }}
     >
       <Box sx={{ position: 'relative', zIndex: 1 }}>
-        <UserAvatar name={name} size={AVATAR_SIZE} imageUrl={avatarUrl} />
+        <UserHoverCard userId={hoverUserId} slug={hoverUserSlug} profileName={name}>
+          <UserAvatar name={name} size={AVATAR_SIZE} imageUrl={avatarUrl} />
+        </UserHoverCard>
       </Box>
       <Box sx={{ flex: 1, minWidth: 0 }}>
         <Stack direction="row" spacing={0.75} sx={{ alignItems: 'center', minWidth: 0, mb: 0.25 }}>
-          <Typography
-            component="span"
-            noWrap
-            sx={{ fontWeight: 700, fontSize: '0.875rem', lineHeight: 1.4 }}
-          >
-            {own ? 'You' : name}
-          </Typography>
+          <UserHoverCard userId={hoverUserId} slug={hoverUserSlug}>
+            <Typography
+              component="span"
+              noWrap
+              sx={{ fontWeight: 700, fontSize: '0.875rem', lineHeight: 1.4 }}
+            >
+              {own ? 'You' : name}
+            </Typography>
+          </UserHoverCard>
           <Typography
             component="span"
             variant="caption"

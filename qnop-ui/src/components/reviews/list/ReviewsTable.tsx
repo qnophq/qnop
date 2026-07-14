@@ -110,7 +110,11 @@ export function ReviewsTable({ reviews, userId, onOpen }: ReviewsTableProps) {
                     <RoleBadge role={roleOf(review, userId)} />
                   </TableCell>
                   <TableCell>
-                    <OwnerChip ownerId={review.ownerId} name={review.ownerDisplayName} />
+                    <OwnerChip
+                      ownerId={review.ownerId}
+                      slug={review.ownerSlug}
+                      name={review.ownerDisplayName}
+                    />
                   </TableCell>
                   <TableCell>
                     <Stack
@@ -145,7 +149,10 @@ export function ReviewsTable({ reviews, userId, onOpen }: ReviewsTableProps) {
                     )}
                   </TableCell>
                   <TableCell>
-                    <ReviewerStack participants={review.participants} />
+                    <ReviewerStack
+                      participants={review.participants}
+                      anonymous={review.anonymous}
+                    />
                   </TableCell>
                   <TableCell sx={{ whiteSpace: 'nowrap' }}>
                     {review.dueAt ? (

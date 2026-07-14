@@ -105,11 +105,12 @@ class AnnotationAnonymityIT extends SeededIntegrationTest {
     UUID documentId = seedDocument(false);
     createAnnotation(documentId, AUDITOR_ID);
 
-    // A different reviewer sees the author's real name and real id.
+    // A different reviewer sees the author's real name, real id and slug (#486).
     mockMvc
         .perform(as(get("/api/v1/documents/" + documentId + "/annotations"), MEMBER2_ID))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.annotations[0].authorId").value(AUDITOR_ID.toString()))
+        .andExpect(jsonPath("$.annotations[0].authorSlug").value("avery-auditor"))
         .andExpect(jsonPath("$.annotations[0].authorDisplayName").value(realName(AUDITOR_ID)));
   }
 
@@ -125,7 +126,9 @@ class AnnotationAnonymityIT extends SeededIntegrationTest {
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.annotations[0].authorDisplayName").value("Participant 2"))
         .andExpect(jsonPath("$.annotations[0].authorId").value(not(AUDITOR_ID.toString())))
-        .andExpect(jsonPath("$.annotations[0].authorDisplayName").value(not(realName(AUDITOR_ID))));
+        .andExpect(jsonPath("$.annotations[0].authorDisplayName").value(not(realName(AUDITOR_ID))))
+        // A slug identifies as surely as the id — pseudonymised authors ship none (#486).
+        .andExpect(jsonPath("$.annotations[0].authorSlug").doesNotExist());
   }
 
   @Test
