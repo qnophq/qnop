@@ -22,7 +22,7 @@
 /** Breathing room above a 'start'-aligned target, so it never sticks to the edge. */
 const START_GAP_PX = 8;
 
-const GLIDE_MS = 280;
+const GLIDE_MS = 450;
 
 /** One glide per scroller — a newer reveal cancels the one still in flight. */
 const inFlight = new WeakMap<HTMLElement, number>();
