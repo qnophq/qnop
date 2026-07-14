@@ -382,8 +382,11 @@ export function CommentThread({
         title="Write a reply"
         contextTitle={`Discussion (${comments.length})`}
         context={
+          // documentId travels along so the author hover cards keep their
+          // anonymity context in the fullscreen stage too (issue #482).
           <CommentThread
             annotationId={annotationId}
+            documentId={documentId}
             notify={notify}
             readOnly
             previousSeenAt={previousSeenAt}
