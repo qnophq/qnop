@@ -83,8 +83,9 @@ export function PersonLink({
   if (!to) return body;
   return (
     // The link branch only exists for REAL ids, so the hover card (issue
-    // #482) inherits PersonLink's anonymity gate for free.
-    <UserHoverCard userId={userId}>
+    // #482) inherits PersonLink's anonymity gate for free. link=false:
+    // PersonLink renders its own anchor below.
+    <UserHoverCard userId={userId} link={false}>
       <Stack
         component={RouterLink}
         to={to}

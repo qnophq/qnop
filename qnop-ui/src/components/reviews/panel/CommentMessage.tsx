@@ -111,19 +111,21 @@ export function CommentMessage({
       }}
     >
       <Box sx={{ position: 'relative', zIndex: 1 }}>
-        <UserHoverCard userId={hoverUserId}>
+        <UserHoverCard userId={hoverUserId} profileName={name}>
           <UserAvatar name={name} size={AVATAR_SIZE} imageUrl={avatarUrl} />
         </UserHoverCard>
       </Box>
       <Box sx={{ flex: 1, minWidth: 0 }}>
         <Stack direction="row" spacing={0.75} sx={{ alignItems: 'center', minWidth: 0, mb: 0.25 }}>
-          <Typography
-            component="span"
-            noWrap
-            sx={{ fontWeight: 700, fontSize: '0.875rem', lineHeight: 1.4 }}
-          >
-            {own ? 'You' : name}
-          </Typography>
+          <UserHoverCard userId={hoverUserId}>
+            <Typography
+              component="span"
+              noWrap
+              sx={{ fontWeight: 700, fontSize: '0.875rem', lineHeight: 1.4 }}
+            >
+              {own ? 'You' : name}
+            </Typography>
+          </UserHoverCard>
           <Typography
             component="span"
             variant="caption"

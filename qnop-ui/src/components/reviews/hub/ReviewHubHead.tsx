@@ -171,7 +171,7 @@ export function ReviewHubHead({
       {/* The owner is structurally public (issue #472), so the hover card
           (issue #482) may attach even in anonymous reviews — it replaces the
           old "Review owner" tooltip, which the OWNER label already spells. */}
-      <UserHoverCard userId={ownerId}>
+      <UserHoverCard userId={ownerId} profileName={ownerName}>
         <Stack
           direction="row"
           spacing={0.75}

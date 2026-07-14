@@ -19,7 +19,7 @@
  * SPDX-License-Identifier: AGPL-3.0-only
  */
 
-import type { KeyboardEvent, ReactNode } from 'react';
+import type { FocusEvent, KeyboardEvent, MouseEvent, ReactNode } from 'react';
 import { useEffect, useState } from 'react';
 import Box from '@mui/material/Box';
 import Paper from '@mui/material/Paper';
@@ -28,7 +28,9 @@ import Skeleton from '@mui/material/Skeleton';
 import Stack from '@mui/material/Stack';
 import Tooltip from '@mui/material/Tooltip';
 import Typography from '@mui/material/Typography';
+import type { SxProps, Theme } from '@mui/material/styles';
 import { alpha, useTheme } from '@mui/material/styles';
+import { Link as RouterLink } from 'react-router-dom';
 import { CalendarDays, Crown, Users } from 'lucide-react';
 import type { PublicUserProfile } from '../../api/generated';
 import { useUserProfile } from '../../api/hooks/useUsers';
@@ -53,12 +55,21 @@ const STAT_CELLS: { key: keyof PublicUserProfile['stats']; label: string }[] = [
 interface UserHoverCardProps {
   /**
    * The person's REAL user id. Callers must pass null for pseudonymised
-   * identities (see {@link realAuthorId}) — the card then never attaches, so
-   * anonymity cannot leak through a hover. Your own id renders no card
-   * either (the full page redirects to /profile anyway).
+   * identities (see {@link realAuthorId}) — the trigger then renders neither
+   * a card nor a link, so anonymity cannot leak through a hover or a click.
+   * Your own id renders no card (just the /profile link).
    */
   userId: string | null | undefined;
   children: ReactNode;
+  /**
+   * Clicking the trigger navigates to the person's profile (default). Opt
+   * out when the caller renders its own link — nested anchors are invalid.
+   */
+  link?: boolean;
+  /** Accessible name for the link, e.g. when the trigger is a decorative avatar. */
+  profileName?: string;
+  /** Layout overrides for the trigger element (e.g. flex sizing inside rows). */
+  sx?: SxProps<Theme>;
 }
 
 /**
@@ -68,19 +79,93 @@ interface UserHoverCardProps {
  * miniature, speaking exactly the `/users/:slug` page's language (#473).
  * Modeled on {@link AnnotationHoverCard}: hover-intent delay, cache warmed
  * the moment the pointer arrives, pointer events pass through — a pure
- * preview that never traps focus or blocks the click-through to the profile.
+ * preview that never traps focus. Unless opted out, the trigger doubles as
+ * the link to the full profile (`/profile` for yourself).
  */
-export function UserHoverCard({ userId, children }: UserHoverCardProps) {
+export function UserHoverCard({
+  userId,
+  children,
+  link = true,
+  profileName,
+  sx,
+}: UserHoverCardProps) {
   const selfId = useAuthStore((s) => s.userId);
-  const active = Boolean(userId) && userId !== selfId;
 
-  if (!active) {
+  if (!userId) {
     return children;
   }
-  return <HoverCard userId={userId as string}>{children}</HoverCard>;
+  if (userId === selfId) {
+    // No card over yourself — but the click affordance stays.
+    return link ? (
+      <TriggerFrame to="/profile" profileName={profileName} sx={sx}>
+        {children}
+      </TriggerFrame>
+    ) : (
+      children
+    );
+  }
+  return (
+    <HoverCard userId={userId} link={link} profileName={profileName} sx={sx}>
+      {children}
+    </HoverCard>
+  );
 }
 
-function HoverCard({ userId, children }: { userId: string; children: ReactNode }) {
+interface TriggerFrameProps {
+  children: ReactNode;
+  /** Renders a RouterLink to this profile path; a plain span when absent. */
+  to?: string;
+  profileName?: string;
+  sx?: SxProps<Theme>;
+  onMouseEnter?: (event: MouseEvent<HTMLElement>) => void;
+  onMouseLeave?: () => void;
+  onFocus?: (event: FocusEvent<HTMLElement>) => void;
+  onBlur?: () => void;
+  onKeyDown?: (event: KeyboardEvent<HTMLElement>) => void;
+}
+
+/** The hoverable trigger shell — a profile link when `to` is set, else a span. */
+function TriggerFrame({ children, to, profileName, sx, ...events }: TriggerFrameProps) {
+  return (
+    <Box
+      component={to ? RouterLink : 'span'}
+      {...(to
+        ? {
+            to,
+            // Rows and cards underneath often have their own click targets
+            // (open review, expand annotation) — the profile click wins.
+            onClick: (event: MouseEvent) => event.stopPropagation(),
+            'aria-label': profileName ? `View ${profileName}'s profile` : undefined,
+          }
+        : {})}
+      sx={{
+        display: 'inline-flex',
+        minWidth: 0,
+        maxWidth: '100%',
+        textDecoration: 'none',
+        color: 'inherit',
+        ...sx,
+      }}
+      {...events}
+    >
+      {children}
+    </Box>
+  );
+}
+
+function HoverCard({
+  userId,
+  children,
+  link,
+  profileName,
+  sx,
+}: {
+  userId: string;
+  children: ReactNode;
+  link: boolean;
+  profileName?: string;
+  sx?: SxProps<Theme>;
+}) {
   const [anchorEl, setAnchorEl] = useState<HTMLElement | null>(null);
   const [open, setOpen] = useState(false);
 
@@ -105,9 +190,10 @@ function HoverCard({ userId, children }: { userId: string; children: ReactNode }
 
   return (
     <>
-      <Box
-        component="span"
-        sx={{ display: 'inline-flex', minWidth: 0, maxWidth: '100%' }}
+      <TriggerFrame
+        to={link ? `/users/${userId}` : undefined}
+        profileName={profileName}
+        sx={sx}
         onMouseEnter={(event) => show(event.currentTarget)}
         onMouseLeave={hide}
         onFocus={(event) => show(event.currentTarget)}
@@ -115,7 +201,7 @@ function HoverCard({ userId, children }: { userId: string; children: ReactNode }
         onKeyDown={onKeyDown}
       >
         {children}
-      </Box>
+      </TriggerFrame>
       {/* Mounted only once hovered: a list of fifty people carries no query
           instances until the pointer actually arrives somewhere. */}
       {anchorEl && <HoverCardPopover userId={userId} anchorEl={anchorEl} open={open} />}

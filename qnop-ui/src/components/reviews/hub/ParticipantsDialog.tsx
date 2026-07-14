@@ -119,7 +119,7 @@ function TeamMemberList({ teamId }: { teamId: string }) {
     >
       {members.map((member) => (
         // Teams only unfold on non-anonymised rosters, so these are real ids.
-        <UserHoverCard key={member.id} userId={member.id}>
+        <UserHoverCard key={member.id} userId={member.id} profileName={member.displayName}>
           <Stack direction="row" spacing={1} sx={{ alignItems: 'center', py: 0.25 }}>
             <UserAvatar name={member.displayName} size={20} imageUrl={avatarSrc(member.id)} />
             <Typography variant="body2" noWrap>
@@ -225,26 +225,41 @@ export function ParticipantsDialog({
                         </IconButton>
                       ) : null}
                       {isTeam ? (
-                        <PrincipalIcon kind={participant.kind} size={28} />
+                        <>
+                          <PrincipalIcon kind={participant.kind} size={28} />
+                          <Box sx={{ flex: 1, minWidth: 0 }}>
+                            <Typography variant="body2" noWrap sx={{ fontWeight: 500 }}>
+                              {participant.displayName}
+                            </Typography>
+                            <Typography variant="caption" color="text.secondary">
+                              Team
+                            </Typography>
+                          </Box>
+                        </>
                       ) : (
-                        // An anonymised roster carries synthetic ids (issue
-                        // #422) — no card there (issue #482).
-                        <UserHoverCard userId={anonymised ? null : participant.principalId}>
+                        // Avatar AND name trigger the card and link to the
+                        // profile. An anonymised roster carries synthetic ids
+                        // (issue #422) — neither card nor link there (#482).
+                        <UserHoverCard
+                          userId={anonymised ? null : participant.principalId}
+                          profileName={participant.displayName}
+                          sx={{ flex: 1, alignItems: 'center', gap: 1.25 }}
+                        >
                           <UserAvatar
                             name={participant.displayName}
                             size={28}
                             imageUrl={avatarSrc(participant.principalId)}
                           />
+                          <Box sx={{ flex: 1, minWidth: 0 }}>
+                            <Typography variant="body2" noWrap sx={{ fontWeight: 500 }}>
+                              {participant.displayName}
+                            </Typography>
+                            <Typography variant="caption" color="text.secondary">
+                              User
+                            </Typography>
+                          </Box>
                         </UserHoverCard>
                       )}
-                      <Box sx={{ flex: 1, minWidth: 0 }}>
-                        <Typography variant="body2" noWrap sx={{ fontWeight: 500 }}>
-                          {participant.displayName}
-                        </Typography>
-                        <Typography variant="caption" color="text.secondary">
-                          {isTeam ? 'Team' : 'User'}
-                        </Typography>
-                      </Box>
                       {isOwner && (
                         <Tooltip title={`Remove ${participant.displayName}`}>
                           <IconButton

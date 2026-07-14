@@ -22,6 +22,7 @@
 import type { ReactNode } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { MemoryRouter } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { ThemeProvider } from '@mui/material/styles';
 import { AxiosError, type AxiosResponse } from 'axios';
@@ -67,7 +68,10 @@ function wrapper({ children }: { children: ReactNode }) {
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   return (
     <ThemeProvider theme={buildTheme('light')}>
-      <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
+      {/* The user hover-card triggers render profile RouterLinks (issue #482). */}
+      <QueryClientProvider client={queryClient}>
+        <MemoryRouter>{children}</MemoryRouter>
+      </QueryClientProvider>
     </ThemeProvider>
   );
 }

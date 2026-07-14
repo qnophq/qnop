@@ -21,6 +21,7 @@
 
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { MemoryRouter } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { ThemeProvider } from '@mui/material/styles';
 import type { AxiosResponse } from 'axios';
@@ -54,14 +55,16 @@ function profile(): PublicUserProfile {
   };
 }
 
-function renderCard(userId: string | null) {
+function renderCard(userId: string | null, link = false) {
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   return render(
     <ThemeProvider theme={buildTheme('light')}>
       <QueryClientProvider client={queryClient}>
-        <UserHoverCard userId={userId}>
-          <button type="button">Anna Krause</button>
-        </UserHoverCard>
+        <MemoryRouter>
+          <UserHoverCard userId={userId} link={link} profileName="Anna Krause">
+            <button type="button">Anna Krause</button>
+          </UserHoverCard>
+        </MemoryRouter>
       </QueryClientProvider>
     </ThemeProvider>,
   );
@@ -131,5 +134,31 @@ describe('UserHoverCard (issue #482)', () => {
 
     expect(screen.queryByTestId('user-hover-card')).not.toBeInTheDocument();
     expect(usersApi.getUserProfile).not.toHaveBeenCalled();
+  });
+
+  it('links the trigger to the profile by default', () => {
+    renderCard(ANNA_ID, true);
+    expect(screen.getByRole('link', { name: "View Anna Krause's profile" })).toHaveAttribute(
+      'href',
+      `/users/${ANNA_ID}`,
+    );
+  });
+
+  it('links yourself to /profile, without a card', () => {
+    renderCard(SELF_ID, true);
+    expect(screen.getByRole('link', { name: "View Anna Krause's profile" })).toHaveAttribute(
+      'href',
+      '/profile',
+    );
+  });
+
+  it('renders neither link nor card for pseudonymised identities', () => {
+    renderCard(null, true);
+    expect(screen.queryByRole('link')).not.toBeInTheDocument();
+  });
+
+  it('renders no link when the caller opts out', () => {
+    renderCard(ANNA_ID, false);
+    expect(screen.queryByRole('link')).not.toBeInTheDocument();
   });
 });

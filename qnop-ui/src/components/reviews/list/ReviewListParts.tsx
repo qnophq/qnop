@@ -148,6 +148,7 @@ export function ReviewerStack({
         <UserHoverCard
           key={participant.id}
           userId={participant.kind === 'USER' && !anonymous ? participant.principalId : null}
+          profileName={participant.displayName}
         >
           <Tooltip title={participant.displayName}>
             <Box
@@ -188,7 +189,7 @@ export function OwnerChip({ ownerId, name }: { ownerId: string; name?: string | 
   return (
     // Ownership is structurally public (issue #472), so the hover card may
     // attach even on anonymous reviews.
-    <UserHoverCard userId={ownerId}>
+    <UserHoverCard userId={ownerId} profileName={name ?? undefined}>
       <Stack direction="row" spacing={0.75} sx={{ alignItems: 'center', minWidth: 0 }}>
         <UserAvatar name={name ?? '?'} size={20} imageUrl={avatarSrc(ownerId)} />
         <Typography variant="caption" noWrap sx={{ color: 'text.secondary', maxWidth: 140 }}>
