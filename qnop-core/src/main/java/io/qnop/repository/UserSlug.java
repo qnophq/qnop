@@ -18,18 +18,9 @@
  *
  * SPDX-License-Identifier: AGPL-3.0-only
  */
-package io.qnop.service;
+package io.qnop.repository;
 
 import java.util.UUID;
 
-/** Thrown when a user lookup by id or profile slug finds no matching {@code qnop_user} row. */
-public class UserNotFoundException extends RuntimeException {
-
-  public UserNotFoundException(UUID id) {
-    super("User not found: " + id);
-  }
-
-  public UserNotFoundException(String slug) {
-    super("User not found: slug=" + slug);
-  }
-}
+/** A user's id paired with just their profile slug (issue #486 pretty profile links). */
+public record UserSlug(UUID id, String slug) {}

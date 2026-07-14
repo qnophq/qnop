@@ -45,10 +45,12 @@ public class UserService {
 
   private final UserRepository users;
   private final PasswordEncoder passwordEncoder;
+  private final UserSlugService slugs;
 
-  public UserService(UserRepository users, PasswordEncoder passwordEncoder) {
+  public UserService(UserRepository users, PasswordEncoder passwordEncoder, UserSlugService slugs) {
     this.users = users;
     this.passwordEncoder = passwordEncoder;
+    this.slugs = slugs;
   }
 
   /** Creates a disabled internal user with the given role, pending email verification. */
@@ -60,6 +62,7 @@ public class UserService {
         User.internal(name, normalizeEmail(email), username, passwordEncoder.encode(rawPassword));
     user.setRole(role);
     user.setEnabled(false);
+    user.setSlug(slugs.allocate(name));
     return users.save(user);
   }
 
@@ -132,6 +135,7 @@ public class UserService {
   public User provisionExternal(String displayName, String email) {
     User user = User.external(displayName, normalizeEmail(email));
     user.setEnabled(true);
+    user.setSlug(slugs.allocate(displayName));
     return users.save(user);
   }
 
@@ -168,6 +172,7 @@ public class UserService {
     admin.setRole(UserRole.ADMIN);
     admin.setEnabled(true);
     admin.setPasswordChangeRequired(passwordChangeRequired);
+    admin.setSlug(slugs.allocate(displayName));
     return users.save(admin);
   }
 

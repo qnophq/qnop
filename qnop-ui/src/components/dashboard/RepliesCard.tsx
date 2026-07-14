@@ -92,6 +92,7 @@ export function RepliesCard({ replies }: RepliesCardProps) {
                     >
                       <PersonLink
                         userId={reply.authorId}
+                        slug={reply.authorSlug}
                         name={reply.authorDisplayName ?? 'Participant'}
                         avatarUrl={reply.authorAvatarUrl}
                       />

@@ -17,31 +17,31 @@
 -- Users: one per role / source / state.
 -- ---------------------------------------------------------------------------
 INSERT INTO qnop_user
-  (id, display_name, email, source, username, password_hash, enabled,
+  (id, display_name, slug, email, source, username, password_hash, enabled,
    password_change_required, role, last_login_at, created_at, updated_at, version)
 VALUES
-  ('a0000000-0000-0000-0000-000000000001', 'Ada Admin', 'admin@qnop.test', 'INTERNAL',
+  ('a0000000-0000-0000-0000-000000000001', 'Ada Admin', 'ada-admin', 'admin@qnop.test', 'INTERNAL',
    'admin', '$2a$10$MGmtbGfpKSL2Ev2Bl8XxzOu/D4yAsfZaVchQlI2meWVmp9O3LKBV6', true,
    false, 'ADMIN', TIMESTAMPTZ '2026-02-01 09:00:00+00', TIMESTAMPTZ '2026-01-01 08:00:00+00', TIMESTAMPTZ '2026-01-01 08:00:00+00', 0),
-  ('a0000000-0000-0000-0000-000000000008', 'Boss Admin', 'admin2@qnop.test', 'INTERNAL',
+  ('a0000000-0000-0000-0000-000000000008', 'Boss Admin', 'boss-admin', 'admin2@qnop.test', 'INTERNAL',
    'admin2', '$2a$10$MGmtbGfpKSL2Ev2Bl8XxzOu/D4yAsfZaVchQlI2meWVmp9O3LKBV6', true,
    false, 'ADMIN', NULL, TIMESTAMPTZ '2026-01-01 08:05:00+00', TIMESTAMPTZ '2026-01-01 08:05:00+00', 0),
-  ('a0000000-0000-0000-0000-000000000002', 'Mia Member', 'member@qnop.test', 'INTERNAL',
+  ('a0000000-0000-0000-0000-000000000002', 'Mia Member', 'mia-member', 'member@qnop.test', 'INTERNAL',
    'member', '$2a$10$MGmtbGfpKSL2Ev2Bl8XxzOu/D4yAsfZaVchQlI2meWVmp9O3LKBV6', true,
    false, 'MEMBER', TIMESTAMPTZ '2026-02-02 12:30:00+00', TIMESTAMPTZ '2026-01-01 08:10:00+00', TIMESTAMPTZ '2026-01-01 08:10:00+00', 0),
-  ('a0000000-0000-0000-0000-000000000003', 'Max Member', 'member2@qnop.test', 'INTERNAL',
+  ('a0000000-0000-0000-0000-000000000003', 'Max Member', 'max-member', 'member2@qnop.test', 'INTERNAL',
    'member2', '$2a$10$MGmtbGfpKSL2Ev2Bl8XxzOu/D4yAsfZaVchQlI2meWVmp9O3LKBV6', true,
    false, 'MEMBER', NULL, TIMESTAMPTZ '2026-01-01 08:15:00+00', TIMESTAMPTZ '2026-01-01 08:15:00+00', 0),
-  ('a0000000-0000-0000-0000-000000000004', 'Avery Auditor', 'auditor@qnop.test', 'INTERNAL',
+  ('a0000000-0000-0000-0000-000000000004', 'Avery Auditor', 'avery-auditor', 'auditor@qnop.test', 'INTERNAL',
    'auditor', '$2a$10$MGmtbGfpKSL2Ev2Bl8XxzOu/D4yAsfZaVchQlI2meWVmp9O3LKBV6', true,
    false, 'AUDITOR', NULL, TIMESTAMPTZ '2026-01-01 08:20:00+00', TIMESTAMPTZ '2026-01-01 08:20:00+00', 0),
-  ('a0000000-0000-0000-0000-000000000005', 'Dana Disabled', 'disabled@qnop.test', 'INTERNAL',
+  ('a0000000-0000-0000-0000-000000000005', 'Dana Disabled', 'dana-disabled', 'disabled@qnop.test', 'INTERNAL',
    'disabled', '$2a$10$MGmtbGfpKSL2Ev2Bl8XxzOu/D4yAsfZaVchQlI2meWVmp9O3LKBV6', false,
    false, 'MEMBER', NULL, TIMESTAMPTZ '2026-01-01 08:25:00+00', TIMESTAMPTZ '2026-01-01 08:25:00+00', 0),
-  ('a0000000-0000-0000-0000-000000000006', 'Pat Pending', 'pwchange@qnop.test', 'INTERNAL',
+  ('a0000000-0000-0000-0000-000000000006', 'Pat Pending', 'pat-pending', 'pwchange@qnop.test', 'INTERNAL',
    'pwchange', '$2a$10$MGmtbGfpKSL2Ev2Bl8XxzOu/D4yAsfZaVchQlI2meWVmp9O3LKBV6', true,
    true, 'MEMBER', NULL, TIMESTAMPTZ '2026-01-01 08:30:00+00', TIMESTAMPTZ '2026-01-01 08:30:00+00', 0),
-  ('a0000000-0000-0000-0000-000000000007', 'Ext Ernal', 'external@qnop.test', 'EXTERNAL',
+  ('a0000000-0000-0000-0000-000000000007', 'Ext Ernal', 'ext-ernal', 'external@qnop.test', 'EXTERNAL',
    NULL, NULL, true,
    false, 'MEMBER', NULL, TIMESTAMPTZ '2026-01-01 08:35:00+00', TIMESTAMPTZ '2026-01-01 08:35:00+00', 0);
 
@@ -97,29 +97,29 @@ VALUES
 -- MEMBER only: SeededAdminUsersIT pins the ADMIN (2) and AUDITOR (1) counts.
 -- ---------------------------------------------------------------------------
 INSERT INTO qnop_user
-  (id, display_name, email, source, username, password_hash, enabled,
+  (id, display_name, slug, email, source, username, password_hash, enabled,
    password_change_required, role, last_login_at, created_at, updated_at, version)
 VALUES
-  ('a0000000-0000-0000-0000-000000000009', 'Nora Weber',    'nora@qnop.test',  'INTERNAL', 'nora',  '$2a$10$MGmtbGfpKSL2Ev2Bl8XxzOu/D4yAsfZaVchQlI2meWVmp9O3LKBV6', true, false, 'MEMBER', NULL, TIMESTAMPTZ '2026-01-05 09:00:00+00', TIMESTAMPTZ '2026-01-05 09:00:00+00', 0),
-  ('a0000000-0000-0000-0000-00000000000a', 'Felix Braun',   'felix@qnop.test', 'INTERNAL', 'felix', '$2a$10$MGmtbGfpKSL2Ev2Bl8XxzOu/D4yAsfZaVchQlI2meWVmp9O3LKBV6', true, false, 'MEMBER', NULL, TIMESTAMPTZ '2026-01-05 09:01:00+00', TIMESTAMPTZ '2026-01-05 09:01:00+00', 0),
-  ('a0000000-0000-0000-0000-00000000000b', 'Lena Fischer',  'lena@qnop.test',  'INTERNAL', 'lena',  '$2a$10$MGmtbGfpKSL2Ev2Bl8XxzOu/D4yAsfZaVchQlI2meWVmp9O3LKBV6', true, false, 'MEMBER', NULL, TIMESTAMPTZ '2026-01-05 09:02:00+00', TIMESTAMPTZ '2026-01-05 09:02:00+00', 0),
-  ('a0000000-0000-0000-0000-00000000000c', 'Jonas Keller',  'jonas@qnop.test', 'INTERNAL', 'jonas', '$2a$10$MGmtbGfpKSL2Ev2Bl8XxzOu/D4yAsfZaVchQlI2meWVmp9O3LKBV6', true, false, 'MEMBER', NULL, TIMESTAMPTZ '2026-01-05 09:03:00+00', TIMESTAMPTZ '2026-01-05 09:03:00+00', 0),
-  ('a0000000-0000-0000-0000-00000000000d', 'Clara Vogt',    'clara@qnop.test', 'INTERNAL', 'clara', '$2a$10$MGmtbGfpKSL2Ev2Bl8XxzOu/D4yAsfZaVchQlI2meWVmp9O3LKBV6', true, false, 'MEMBER', NULL, TIMESTAMPTZ '2026-01-05 09:04:00+00', TIMESTAMPTZ '2026-01-05 09:04:00+00', 0),
-  ('a0000000-0000-0000-0000-00000000000e', 'Paul Richter',  'paul@qnop.test',  'INTERNAL', 'paul',  '$2a$10$MGmtbGfpKSL2Ev2Bl8XxzOu/D4yAsfZaVchQlI2meWVmp9O3LKBV6', true, false, 'MEMBER', NULL, TIMESTAMPTZ '2026-01-05 09:05:00+00', TIMESTAMPTZ '2026-01-05 09:05:00+00', 0),
-  ('a0000000-0000-0000-0000-00000000000f', 'Ida Hoffmann',  'ida@qnop.test',   'INTERNAL', 'ida',   '$2a$10$MGmtbGfpKSL2Ev2Bl8XxzOu/D4yAsfZaVchQlI2meWVmp9O3LKBV6', true, false, 'MEMBER', NULL, TIMESTAMPTZ '2026-01-05 09:06:00+00', TIMESTAMPTZ '2026-01-05 09:06:00+00', 0),
-  ('a0000000-0000-0000-0000-000000000010', 'Tom Schneider', 'tom@qnop.test',   'INTERNAL', 'tom',   '$2a$10$MGmtbGfpKSL2Ev2Bl8XxzOu/D4yAsfZaVchQlI2meWVmp9O3LKBV6', true, false, 'MEMBER', NULL, TIMESTAMPTZ '2026-01-05 09:07:00+00', TIMESTAMPTZ '2026-01-05 09:07:00+00', 0),
-  ('a0000000-0000-0000-0000-000000000011', 'Eva Brandt',    'eva@qnop.test',   'INTERNAL', 'eva',   '$2a$10$MGmtbGfpKSL2Ev2Bl8XxzOu/D4yAsfZaVchQlI2meWVmp9O3LKBV6', true, false, 'MEMBER', NULL, TIMESTAMPTZ '2026-01-05 09:08:00+00', TIMESTAMPTZ '2026-01-05 09:08:00+00', 0),
-  ('a0000000-0000-0000-0000-000000000012', 'Nils Weiss',    'nils@qnop.test',  'INTERNAL', 'nils',  '$2a$10$MGmtbGfpKSL2Ev2Bl8XxzOu/D4yAsfZaVchQlI2meWVmp9O3LKBV6', true, false, 'MEMBER', NULL, TIMESTAMPTZ '2026-01-05 09:09:00+00', TIMESTAMPTZ '2026-01-05 09:09:00+00', 0),
-  ('a0000000-0000-0000-0000-000000000013', 'Anna Krause',   'anna@qnop.test',  'INTERNAL', 'anna',  '$2a$10$MGmtbGfpKSL2Ev2Bl8XxzOu/D4yAsfZaVchQlI2meWVmp9O3LKBV6', true, false, 'MEMBER', NULL, TIMESTAMPTZ '2026-01-05 09:10:00+00', TIMESTAMPTZ '2026-01-05 09:10:00+00', 0),
-  ('a0000000-0000-0000-0000-000000000014', 'Ben Roth',      'ben@qnop.test',   'INTERNAL', 'ben',   '$2a$10$MGmtbGfpKSL2Ev2Bl8XxzOu/D4yAsfZaVchQlI2meWVmp9O3LKBV6', true, false, 'MEMBER', NULL, TIMESTAMPTZ '2026-01-05 09:11:00+00', TIMESTAMPTZ '2026-01-05 09:11:00+00', 0),
-  ('a0000000-0000-0000-0000-000000000015', 'Marie Lang',    'marie@qnop.test', 'INTERNAL', 'marie', '$2a$10$MGmtbGfpKSL2Ev2Bl8XxzOu/D4yAsfZaVchQlI2meWVmp9O3LKBV6', true, false, 'MEMBER', NULL, TIMESTAMPTZ '2026-01-05 09:12:00+00', TIMESTAMPTZ '2026-01-05 09:12:00+00', 0),
-  ('a0000000-0000-0000-0000-000000000016', 'Leo Hartmann',  'leo@qnop.test',   'INTERNAL', 'leo',   '$2a$10$MGmtbGfpKSL2Ev2Bl8XxzOu/D4yAsfZaVchQlI2meWVmp9O3LKBV6', true, false, 'MEMBER', NULL, TIMESTAMPTZ '2026-01-05 09:13:00+00', TIMESTAMPTZ '2026-01-05 09:13:00+00', 0),
-  ('a0000000-0000-0000-0000-000000000017', 'Sofia Berg',    'sofia@qnop.test', 'INTERNAL', 'sofia', '$2a$10$MGmtbGfpKSL2Ev2Bl8XxzOu/D4yAsfZaVchQlI2meWVmp9O3LKBV6', true, false, 'MEMBER', NULL, TIMESTAMPTZ '2026-01-05 09:14:00+00', TIMESTAMPTZ '2026-01-05 09:14:00+00', 0),
-  ('a0000000-0000-0000-0000-000000000018', 'Emil Franke',   'emil@qnop.test',  'INTERNAL', 'emil',  '$2a$10$MGmtbGfpKSL2Ev2Bl8XxzOu/D4yAsfZaVchQlI2meWVmp9O3LKBV6', true, false, 'MEMBER', NULL, TIMESTAMPTZ '2026-01-05 09:15:00+00', TIMESTAMPTZ '2026-01-05 09:15:00+00', 0),
-  ('a0000000-0000-0000-0000-000000000019', 'Greta Simon',   'greta@qnop.test', 'INTERNAL', 'greta', '$2a$10$MGmtbGfpKSL2Ev2Bl8XxzOu/D4yAsfZaVchQlI2meWVmp9O3LKBV6', true, false, 'MEMBER', NULL, TIMESTAMPTZ '2026-01-05 09:16:00+00', TIMESTAMPTZ '2026-01-05 09:16:00+00', 0),
-  ('a0000000-0000-0000-0000-00000000001a', 'Oskar Thiel',   'oskar@qnop.test', 'INTERNAL', 'oskar', '$2a$10$MGmtbGfpKSL2Ev2Bl8XxzOu/D4yAsfZaVchQlI2meWVmp9O3LKBV6', true, false, 'MEMBER', NULL, TIMESTAMPTZ '2026-01-05 09:17:00+00', TIMESTAMPTZ '2026-01-05 09:17:00+00', 0),
-  ('a0000000-0000-0000-0000-00000000001b', 'Julia Winter',  'julia@qnop.test', 'INTERNAL', 'julia', '$2a$10$MGmtbGfpKSL2Ev2Bl8XxzOu/D4yAsfZaVchQlI2meWVmp9O3LKBV6', true, false, 'MEMBER', NULL, TIMESTAMPTZ '2026-01-05 09:18:00+00', TIMESTAMPTZ '2026-01-05 09:18:00+00', 0),
-  ('a0000000-0000-0000-0000-00000000001c', 'David Sommer',  'david@qnop.test', 'INTERNAL', 'david', '$2a$10$MGmtbGfpKSL2Ev2Bl8XxzOu/D4yAsfZaVchQlI2meWVmp9O3LKBV6', true, false, 'MEMBER', NULL, TIMESTAMPTZ '2026-01-05 09:19:00+00', TIMESTAMPTZ '2026-01-05 09:19:00+00', 0);
+  ('a0000000-0000-0000-0000-000000000009', 'Nora Weber',    'nora-weber', 'nora@qnop.test',  'INTERNAL', 'nora',  '$2a$10$MGmtbGfpKSL2Ev2Bl8XxzOu/D4yAsfZaVchQlI2meWVmp9O3LKBV6', true, false, 'MEMBER', NULL, TIMESTAMPTZ '2026-01-05 09:00:00+00', TIMESTAMPTZ '2026-01-05 09:00:00+00', 0),
+  ('a0000000-0000-0000-0000-00000000000a', 'Felix Braun',   'felix-braun', 'felix@qnop.test', 'INTERNAL', 'felix', '$2a$10$MGmtbGfpKSL2Ev2Bl8XxzOu/D4yAsfZaVchQlI2meWVmp9O3LKBV6', true, false, 'MEMBER', NULL, TIMESTAMPTZ '2026-01-05 09:01:00+00', TIMESTAMPTZ '2026-01-05 09:01:00+00', 0),
+  ('a0000000-0000-0000-0000-00000000000b', 'Lena Fischer',  'lena-fischer', 'lena@qnop.test',  'INTERNAL', 'lena',  '$2a$10$MGmtbGfpKSL2Ev2Bl8XxzOu/D4yAsfZaVchQlI2meWVmp9O3LKBV6', true, false, 'MEMBER', NULL, TIMESTAMPTZ '2026-01-05 09:02:00+00', TIMESTAMPTZ '2026-01-05 09:02:00+00', 0),
+  ('a0000000-0000-0000-0000-00000000000c', 'Jonas Keller',  'jonas-keller', 'jonas@qnop.test', 'INTERNAL', 'jonas', '$2a$10$MGmtbGfpKSL2Ev2Bl8XxzOu/D4yAsfZaVchQlI2meWVmp9O3LKBV6', true, false, 'MEMBER', NULL, TIMESTAMPTZ '2026-01-05 09:03:00+00', TIMESTAMPTZ '2026-01-05 09:03:00+00', 0),
+  ('a0000000-0000-0000-0000-00000000000d', 'Clara Vogt',    'clara-vogt', 'clara@qnop.test', 'INTERNAL', 'clara', '$2a$10$MGmtbGfpKSL2Ev2Bl8XxzOu/D4yAsfZaVchQlI2meWVmp9O3LKBV6', true, false, 'MEMBER', NULL, TIMESTAMPTZ '2026-01-05 09:04:00+00', TIMESTAMPTZ '2026-01-05 09:04:00+00', 0),
+  ('a0000000-0000-0000-0000-00000000000e', 'Paul Richter',  'paul-richter', 'paul@qnop.test',  'INTERNAL', 'paul',  '$2a$10$MGmtbGfpKSL2Ev2Bl8XxzOu/D4yAsfZaVchQlI2meWVmp9O3LKBV6', true, false, 'MEMBER', NULL, TIMESTAMPTZ '2026-01-05 09:05:00+00', TIMESTAMPTZ '2026-01-05 09:05:00+00', 0),
+  ('a0000000-0000-0000-0000-00000000000f', 'Ida Hoffmann',  'ida-hoffmann', 'ida@qnop.test',   'INTERNAL', 'ida',   '$2a$10$MGmtbGfpKSL2Ev2Bl8XxzOu/D4yAsfZaVchQlI2meWVmp9O3LKBV6', true, false, 'MEMBER', NULL, TIMESTAMPTZ '2026-01-05 09:06:00+00', TIMESTAMPTZ '2026-01-05 09:06:00+00', 0),
+  ('a0000000-0000-0000-0000-000000000010', 'Tom Schneider', 'tom-schneider', 'tom@qnop.test',   'INTERNAL', 'tom',   '$2a$10$MGmtbGfpKSL2Ev2Bl8XxzOu/D4yAsfZaVchQlI2meWVmp9O3LKBV6', true, false, 'MEMBER', NULL, TIMESTAMPTZ '2026-01-05 09:07:00+00', TIMESTAMPTZ '2026-01-05 09:07:00+00', 0),
+  ('a0000000-0000-0000-0000-000000000011', 'Eva Brandt',    'eva-brandt', 'eva@qnop.test',   'INTERNAL', 'eva',   '$2a$10$MGmtbGfpKSL2Ev2Bl8XxzOu/D4yAsfZaVchQlI2meWVmp9O3LKBV6', true, false, 'MEMBER', NULL, TIMESTAMPTZ '2026-01-05 09:08:00+00', TIMESTAMPTZ '2026-01-05 09:08:00+00', 0),
+  ('a0000000-0000-0000-0000-000000000012', 'Nils Weiss',    'nils-weiss', 'nils@qnop.test',  'INTERNAL', 'nils',  '$2a$10$MGmtbGfpKSL2Ev2Bl8XxzOu/D4yAsfZaVchQlI2meWVmp9O3LKBV6', true, false, 'MEMBER', NULL, TIMESTAMPTZ '2026-01-05 09:09:00+00', TIMESTAMPTZ '2026-01-05 09:09:00+00', 0),
+  ('a0000000-0000-0000-0000-000000000013', 'Anna Krause',   'anna-krause', 'anna@qnop.test',  'INTERNAL', 'anna',  '$2a$10$MGmtbGfpKSL2Ev2Bl8XxzOu/D4yAsfZaVchQlI2meWVmp9O3LKBV6', true, false, 'MEMBER', NULL, TIMESTAMPTZ '2026-01-05 09:10:00+00', TIMESTAMPTZ '2026-01-05 09:10:00+00', 0),
+  ('a0000000-0000-0000-0000-000000000014', 'Ben Roth',      'ben-roth', 'ben@qnop.test',   'INTERNAL', 'ben',   '$2a$10$MGmtbGfpKSL2Ev2Bl8XxzOu/D4yAsfZaVchQlI2meWVmp9O3LKBV6', true, false, 'MEMBER', NULL, TIMESTAMPTZ '2026-01-05 09:11:00+00', TIMESTAMPTZ '2026-01-05 09:11:00+00', 0),
+  ('a0000000-0000-0000-0000-000000000015', 'Marie Lang',    'marie-lang', 'marie@qnop.test', 'INTERNAL', 'marie', '$2a$10$MGmtbGfpKSL2Ev2Bl8XxzOu/D4yAsfZaVchQlI2meWVmp9O3LKBV6', true, false, 'MEMBER', NULL, TIMESTAMPTZ '2026-01-05 09:12:00+00', TIMESTAMPTZ '2026-01-05 09:12:00+00', 0),
+  ('a0000000-0000-0000-0000-000000000016', 'Leo Hartmann',  'leo-hartmann', 'leo@qnop.test',   'INTERNAL', 'leo',   '$2a$10$MGmtbGfpKSL2Ev2Bl8XxzOu/D4yAsfZaVchQlI2meWVmp9O3LKBV6', true, false, 'MEMBER', NULL, TIMESTAMPTZ '2026-01-05 09:13:00+00', TIMESTAMPTZ '2026-01-05 09:13:00+00', 0),
+  ('a0000000-0000-0000-0000-000000000017', 'Sofia Berg',    'sofia-berg', 'sofia@qnop.test', 'INTERNAL', 'sofia', '$2a$10$MGmtbGfpKSL2Ev2Bl8XxzOu/D4yAsfZaVchQlI2meWVmp9O3LKBV6', true, false, 'MEMBER', NULL, TIMESTAMPTZ '2026-01-05 09:14:00+00', TIMESTAMPTZ '2026-01-05 09:14:00+00', 0),
+  ('a0000000-0000-0000-0000-000000000018', 'Emil Franke',   'emil-franke', 'emil@qnop.test',  'INTERNAL', 'emil',  '$2a$10$MGmtbGfpKSL2Ev2Bl8XxzOu/D4yAsfZaVchQlI2meWVmp9O3LKBV6', true, false, 'MEMBER', NULL, TIMESTAMPTZ '2026-01-05 09:15:00+00', TIMESTAMPTZ '2026-01-05 09:15:00+00', 0),
+  ('a0000000-0000-0000-0000-000000000019', 'Greta Simon',   'greta-simon', 'greta@qnop.test', 'INTERNAL', 'greta', '$2a$10$MGmtbGfpKSL2Ev2Bl8XxzOu/D4yAsfZaVchQlI2meWVmp9O3LKBV6', true, false, 'MEMBER', NULL, TIMESTAMPTZ '2026-01-05 09:16:00+00', TIMESTAMPTZ '2026-01-05 09:16:00+00', 0),
+  ('a0000000-0000-0000-0000-00000000001a', 'Oskar Thiel',   'oskar-thiel', 'oskar@qnop.test', 'INTERNAL', 'oskar', '$2a$10$MGmtbGfpKSL2Ev2Bl8XxzOu/D4yAsfZaVchQlI2meWVmp9O3LKBV6', true, false, 'MEMBER', NULL, TIMESTAMPTZ '2026-01-05 09:17:00+00', TIMESTAMPTZ '2026-01-05 09:17:00+00', 0),
+  ('a0000000-0000-0000-0000-00000000001b', 'Julia Winter',  'julia-winter', 'julia@qnop.test', 'INTERNAL', 'julia', '$2a$10$MGmtbGfpKSL2Ev2Bl8XxzOu/D4yAsfZaVchQlI2meWVmp9O3LKBV6', true, false, 'MEMBER', NULL, TIMESTAMPTZ '2026-01-05 09:18:00+00', TIMESTAMPTZ '2026-01-05 09:18:00+00', 0),
+  ('a0000000-0000-0000-0000-00000000001c', 'David Sommer',  'david-sommer', 'david@qnop.test', 'INTERNAL', 'david', '$2a$10$MGmtbGfpKSL2Ev2Bl8XxzOu/D4yAsfZaVchQlI2meWVmp9O3LKBV6', true, false, 'MEMBER', NULL, TIMESTAMPTZ '2026-01-05 09:19:00+00', TIMESTAMPTZ '2026-01-05 09:19:00+00', 0);
 
 -- ---------------------------------------------------------------------------
 -- Crowd teams (issue #401): five departments, 3 crowd users each (one LEAD),

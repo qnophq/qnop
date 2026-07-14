@@ -50,6 +50,10 @@ databaseChangeLog:
                   constraints: { nullable: false }
               - column: { name: password_invalidated_before, type: TIMESTAMP WITH TIME ZONE }
               - column: { name: last_login_at, type: TIMESTAMP WITH TIME ZONE }
+              # Immutable, human-readable profile slug (issue #486), auto-derived
+              # from the display name at account creation; nullable only for rows
+              # predating slugs. Uniqueness/format pinned by the SQL block below.
+              - column: { name: slug, type: VARCHAR(64) }
               - column:
                   name: created_at
                   type: TIMESTAMP WITH TIME ZONE
@@ -81,6 +85,10 @@ databaseChangeLog:
                 ON qnop_user (LOWER(email)) WHERE source = 'INTERNAL';
               CREATE UNIQUE INDEX ux_qnop_user_username_internal
                 ON qnop_user (username) WHERE source = 'INTERNAL';
+              CREATE UNIQUE INDEX ux_qnop_user_slug_lower
+                ON qnop_user (LOWER(slug)) WHERE slug IS NOT NULL;
+              ALTER TABLE qnop_user ADD CONSTRAINT ck_qnop_user_slug
+                CHECK (slug IS NULL OR (slug ~ '^[a-z0-9]+(-[a-z0-9]+)*$' AND length(slug) BETWEEN 3 AND 64));
 
   - changeSet:
       id: 0001-identity-oidc-provider

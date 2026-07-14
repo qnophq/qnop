@@ -39,8 +39,9 @@ import {
   UserCheck,
   Users,
 } from 'lucide-react';
-import { Navigate, useParams } from 'react-router-dom';
-import { useQuery } from '@tanstack/react-query';
+import { useEffect } from 'react';
+import { Navigate, useNavigate, useParams } from 'react-router-dom';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import type { PublicUserProfile } from '../api/generated';
 import { usersApi } from '../api/config';
 import { useAuthStore } from '../stores/authStore';
@@ -65,24 +66,51 @@ const fadeUp = {
   },
 };
 
+const UUID_SHAPE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+const profileKey = (segment: string) => ['users', 'public-profile', segment] as const;
+
 /**
  * A colleague's workspace-public profile (issues #454, #473): the campaign's
  * player-card language — identity hero with team affiliations, the
  * contribution scoreboard and the achievement stickers, all fed by the
- * server's ADR-0038-safe aggregates. Your own id redirects to `/profile`.
+ * server's ADR-0038-safe aggregates. Your own profile redirects to `/profile`.
+ *
+ * The `/users/:userId` segment accepts an id OR the profile slug (issue
+ * #486, the ReviewParamGate convention): UUID-shaped segments resolve by id,
+ * anything else via the by-slug endpoint — and an id visit is canonicalised
+ * to the pretty slug URL once the profile is known.
  */
 export function UserProfilePage() {
   const theme = useTheme();
-  const { userId } = useParams<{ userId: string }>();
+  const { userId: segment = '' } = useParams<{ userId: string }>();
+  const isId = UUID_SHAPE.test(segment);
   const selfId = useAuthStore((s) => s.userId);
+  const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const profileQuery = useQuery<PublicUserProfile>({
-    queryKey: ['users', 'public-profile', userId],
+    queryKey: profileKey(segment),
     queryFn: async () => {
-      const response = await usersApi.getUserProfile({ userId: userId as string });
+      const response = isId
+        ? await usersApi.getUserProfile({ userId: segment })
+        : await usersApi.getUserProfileBySlug({ slug: segment });
       return response.data;
     },
-    enabled: Boolean(userId) && userId !== selfId,
+    enabled: segment !== '' && segment !== selfId,
+    // Keeps the canonical UUID→slug replace below fetch-free: the seeded
+    // cache entry is still fresh when the slug URL mounts.
+    staleTime: 30_000,
   });
+
+  // Canonicalise /users/<uuid> to /users/<slug>: seed the slug's cache entry
+  // first so the replace renders instantly instead of refetching.
+  const loadedSlug = profileQuery.data?.slug;
+  useEffect(() => {
+    if (isId && loadedSlug && profileQuery.data) {
+      queryClient.setQueryData(profileKey(loadedSlug), profileQuery.data);
+      navigate(`/users/${loadedSlug}`, { replace: true });
+    }
+  }, [isId, loadedSlug, profileQuery.data, queryClient, navigate]);
 
   const blue = theme.qnop.brand.blue;
   const dark = theme.qnop.mode === 'dark';
@@ -93,7 +121,9 @@ export function UserProfilePage() {
     '@media (prefers-reduced-motion: reduce)': { animation: 'none' },
   });
 
-  if (userId && userId === selfId) {
+  // Own profile: the id short-circuits before fetching; a slug visit is
+  // recognised once the payload's id matches.
+  if ((segment !== '' && segment === selfId) || profileQuery.data?.id === selfId) {
     return <Navigate to="/profile" replace />;
   }
   if (profileQuery.isPending) {

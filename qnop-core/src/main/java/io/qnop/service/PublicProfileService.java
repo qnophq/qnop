@@ -68,7 +68,21 @@ public class PublicProfileService {
 
   @Transactional(readOnly = true)
   public PublicProfileView getProfile(UUID id) {
-    User user = users.findById(id).orElseThrow(() -> new UserNotFoundException(id));
+    return buildProfile(users.findById(id).orElseThrow(() -> new UserNotFoundException(id)));
+  }
+
+  /**
+   * Resolves a profile by the immutable, case-insensitively unique profile slug (issue #486).
+   * Unknown slugs answer the same 404 as unknown ids.
+   */
+  @Transactional(readOnly = true)
+  public PublicProfileView getProfileBySlug(String slug) {
+    return buildProfile(
+        users.findBySlugIgnoreCase(slug).orElseThrow(() -> new UserNotFoundException(slug)));
+  }
+
+  private PublicProfileView buildProfile(User user) {
+    UUID id = user.getId();
     PublicStatsView stats =
         new PublicStatsView(
             documents.countByOwnerId(id),
@@ -79,13 +93,14 @@ public class PublicProfileService {
     List<UserTeamView> teams =
         teamMemberships.findTeamsOfUser(id).stream().map(UserTeamView::of).toList();
     return new PublicProfileView(
-        user.getId(), user.getDisplayName(), user.getCreatedAt(), stats, teams);
+        id, user.getDisplayName(), user.getSlug(), user.getCreatedAt(), stats, teams);
   }
 
-  /** The public slice served by {@code GET /users/{userId}}. */
+  /** The public slice served by {@code GET /users/{userId}} and {@code /users/by-slug/{slug}}. */
   public record PublicProfileView(
       UUID id,
       String displayName,
+      String slug,
       Instant createdAt,
       PublicStatsView stats,
       List<UserTeamView> teams) {}

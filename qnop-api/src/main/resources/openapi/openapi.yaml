@@ -1589,6 +1589,43 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
+  /users/by-slug/{slug}:
+    get:
+      tags:
+        - Users
+      summary: Resolve a user's public profile by its slug
+      description: |
+        Resolves a colleague's workspace-public profile by the immutable,
+        human-readable profile slug (issue #486), auto-derived from the display
+        name at account creation. Matching ignores case. Slugs never look like
+        UUIDs, so `/users/{userId}` and this route can share links safely.
+      operationId: getUserProfileBySlug
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: slug
+          in: path
+          required: true
+          description: The profile slug (kebab-case, 3-64 characters).
+          schema:
+            type: string
+            minLength: 3
+            maxLength: 64
+      responses:
+        '200':
+          description: The user's public profile
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PublicUserProfile'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          description: Unknown slug
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
   /users/me:
     get:
       tags:
@@ -3629,6 +3666,13 @@ components:
           format: uuid
         displayName:
           type: string
+        slug:
+          type: string
+          nullable: true
+          description: >-
+            Immutable, human-readable profile slug (issue #486), auto-derived
+            from the display name at account creation. Null only for accounts
+            created before slugs existed.
         avatarUrl:
           type: string
           nullable: true
@@ -4360,6 +4404,12 @@ components:
             The author's REAL user id — null when the review anonymises this
             author towards the caller (issue #413); the client links and loads
             avatars only when present.
+        authorSlug:
+          type: string
+          nullable: true
+          description: >-
+            The author's profile slug (issue #486) for pretty profile links —
+            null under the same anonymity rule as `authorId`.
         authorAvatarUrl:
           type: string
           nullable: true
@@ -4406,6 +4456,12 @@ components:
           format: uuid
           nullable: true
           description: The actor's REAL user id — null when anonymised (issue #413).
+        actorSlug:
+          type: string
+          nullable: true
+          description: >-
+            The actor's profile slug (issue #486) for pretty profile links —
+            null under the same anonymity rule as `actorId`.
         actorAvatarUrl:
           type: string
           nullable: true
