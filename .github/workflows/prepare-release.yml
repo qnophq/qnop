@@ -15,7 +15,7 @@ on:
   workflow_dispatch:
     inputs:
       release_version:
-        description: 'Release version (e.g., 0.1.0 or 0.1.0-rc.1)'
+        description: 'Release version (e.g., 1.0.0 or 1.0.0-rc.1)'
         required: true
       next_version:
         description: 'Next development version (e.g., 0.2.0-SNAPSHOT)'

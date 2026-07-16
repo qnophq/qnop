@@ -6,7 +6,7 @@ The fastest start is [`deploy/docker-compose.yml`](../deploy/docker-compose.yml)
 
 ```bash
 cd deploy
-QNOP_VERSION=0.1.0 \
+QNOP_VERSION=1.0.0 \
 QNOP_DB_PASSWORD="$(openssl rand -base64 24)" \
 QNOP_S3_ACCESS_KEY=qnop \
 QNOP_S3_SECRET_KEY="$(openssl rand -base64 24)" \
