@@ -24,6 +24,7 @@ The release artifact is **one container image** containing the Spring Boot jar w
 - **`prepare-release.yml`** (`workflow_dispatch`): the operator enters `release_version` and `next_version` (`-SNAPSHOT`). The job verifies the actor holds admin/maintain, validates inputs (semver, tag free, `VERSION` currently a snapshot, branch `main`), then commits `VERSION=release`, tags `v<release>`, commits `VERSION=next-snapshot`, pushes, and watches the triggered release run. It authenticates with the **`RELEASE_TOKEN`** secret (fine-grained PAT, contents:write) because tags pushed with the default `GITHUB_TOKEN` do not trigger downstream workflows.
 - **`release.yml`** (`on: push: tags: v*`): rejects `-SNAPSHOT` tags, verifies the tag matches `VERSION`, builds `:qnop-app:bootJar -PembedUi`, and publishes a **multi-arch image (linux/amd64 + linux/arm64)** to **GHCR** as `ghcr.io/qnophq/qnop` with semver tags (`{version}`, `{major}.{minor}`, `latest`) and OCI labels (`licenses=AGPL-3.0-only`, source, title, description). It then creates the GitHub Release with `gh release create --generate-notes`.
 - **Snapshot images from `main`** (`ci.yml`, job `snapshot-image`): every push to `main` whose CI gates pass additionally publishes the same embedded-SPA artifact to GHCR under the **moving `main` tag** plus an immutable `sha-*` tag. `latest` and semver tags stay reserved for tag-driven releases.
+- **Docker Hub (opt-in)**: when the `DOCKERHUB_USERNAME`/`DOCKERHUB_TOKEN` secrets are configured, releases additionally publish `docker.io/qnophq/qnop` in the same build and sync the Docker Hub README from `deploy/dockerhub-readme.md` (plugwerk-style). Without the secrets the release stays GHCR-only and emits a notice instead of failing. Snapshots stay GHCR-only either way.
 - **No CHANGELOG file.** Conventional-Commit PRs make generated release notes accurate; the GitHub Release is the changelog.
 - The published image builds from the **copy-only** `deploy/Dockerfile` (jar staged by CI); building from source stays possible via the root `Dockerfile`.
 
@@ -35,5 +36,5 @@ The release artifact is **one container image** containing the Spring Boot jar w
 
 - Releasing is a one-click, permission-gated operation; every release is reproducible from a tag.
 - One image serves API + UI; deployments that want a separate frontend can still build `qnop-ui` themselves (the embedding is additive, not exclusive).
-- `RELEASE_TOKEN` must exist as a repository secret before the first release.
+- `RELEASE_TOKEN` must exist as a repository secret before the first release; `DOCKERHUB_USERNAME`/`DOCKERHUB_TOKEN` are optional and activate the Docker Hub publication when added.
 - Maven publication of `qnop-spi`/`qnop-api` (needed by qnop-enterprise) is deliberately out of scope here — tracked in #497; a rolling snapshot workflow may follow later.
