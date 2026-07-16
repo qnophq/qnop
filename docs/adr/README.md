@@ -56,6 +56,7 @@ Two refinement conventions (see the 2026-07-16 amendment to [ADR-0001](0001-reco
 | [0037](0037-observability-actuator-health-and-prometheus.md) | Observability: Actuator health, job-queue health indicator, Prometheus metrics | Accepted |
 | [0038](0038-per-review-privacy.md) | Per-review privacy: anonymity & thread participation policy | Accepted |
 | [0039](0039-enterprise-packaging-and-runtime-extensions.md) | Enterprise packaging and runtime UI extension model | Accepted |
+| [0040](0040-release-pipeline-and-spa-embedding.md) | Release pipeline & SPA embedding | Accepted |
 
 ## Template
 

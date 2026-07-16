@@ -41,6 +41,8 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.function.Function;
 import java.util.stream.Collectors;
+import org.springframework.beans.factory.ObjectProvider;
+import org.springframework.boot.info.BuildProperties;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -66,21 +68,24 @@ public class ConfigController implements ServerConfigApi {
   private final OidcProviderService oidcProviders;
   private final ApplicationSettingsService settings;
   private final BrandingService branding;
+  private final BuildProperties buildProperties;
 
   public ConfigController(
       OidcProviderService oidcProviders,
       ApplicationSettingsService settings,
-      BrandingService branding) {
+      BrandingService branding,
+      ObjectProvider<BuildProperties> buildProperties) {
     this.oidcProviders = oidcProviders;
     this.settings = settings;
     this.branding = branding;
+    this.buildProperties = buildProperties.getIfAvailable();
   }
 
   @Override
   public ResponseEntity<ServerConfigResponse> getServerConfig() {
     ServerConfigResponse body =
         new ServerConfigResponse()
-            .version(resolveVersion())
+            .version(resolveVersion(buildProperties))
             .edition(Edition.COMMUNITY)
             .general(new ServerConfigGeneral().siteName("qnop").defaultTimezone("UTC"))
             .auth(
@@ -132,7 +137,15 @@ public class ConfigController implements ServerConfigApi {
   }
 
   /** Reads the server version from the JAR manifest, falling back to {@code "unknown"}. */
-  private static String resolveVersion() {
+  /**
+   * The running version, from Boot's build-info.properties (stamped by {@code springBoot {
+   * buildInfo() }}, issue #495) with the jar manifest as fallback — "unknown" only when running
+   * from exploded classes without build info (e.g. IDE runs).
+   */
+  private static String resolveVersion(BuildProperties buildProperties) {
+    if (buildProperties != null && buildProperties.getVersion() != null) {
+      return buildProperties.getVersion();
+    }
     return Optional.ofNullable(ConfigController.class.getPackage().getImplementationVersion())
         .orElse(UNKNOWN_VERSION);
   }

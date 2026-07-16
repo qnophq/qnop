@@ -7,6 +7,9 @@
 # docker-compose Postgres; production may override with the standard
 # SPRING_DATASOURCE_* keys.
 spring:
+  lifecycle:
+    # Upper bound for the graceful-shutdown drain (issue #495).
+    timeout-per-shutdown-phase: ${QNOP_HTTP_SHUTDOWN_GRACE:30s}
   application:
     name: qnop
   datasource:
@@ -39,6 +42,12 @@ spring:
 # Inbound request timeouts (issue #342): bound how long the connector waits on a
 # slow/stalled client so a worker thread is never held open forever.
 server:
+  # Drain in-flight requests on SIGTERM (container stops, rolling deploys)
+  # before the JVM exits (issue #495).
+  shutdown: graceful
+  # Behind a trusted reverse proxy set QNOP_HTTP_FORWARD_HEADERS_STRATEGY=framework
+  # so X-Forwarded-* drive scheme/host (Secure cookies, redirect URLs).
+  forward-headers-strategy: ${QNOP_HTTP_FORWARD_HEADERS_STRATEGY:none}
   tomcat:
     connection-timeout: ${QNOP_HTTP_CONNECTION_TIMEOUT:20s}
     # Reap idle keep-alive connections rather than holding a thread per socket.
