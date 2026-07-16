@@ -33,3 +33,10 @@ Commit messages follow Conventional Commits (`type: subject`).
 
 - **Commit straight to `main` for small changes** — rejected: breaks traceability and the protected-branch guarantee.
 - **Trunk-based with no PR** — rejected: loses mandatory review and the issue trail.
+
+## Amendment (2026-07-16, branch types & attribution form)
+
+Two alignments with the repo working rules (`CLAUDE.md`):
+
+- **Branch types** follow [Conventional Branch](https://conventionalbranch.org/): the set is `{feat, fix, hotfix, release, chore}` (`feat`/`fix` being the accepted short forms of `feature`/`bugfix`), lowercase + hyphens, optional issue number (e.g. `feat/issue-123-new-login`). The `docs/…` prefix sketched in rule 3 is not part of the set; documentation changes ride `chore/…` or `feat/…` branches.
+- **Attribution is English throughout:** commits carry `Co-Authored-By: Claude <noreply@anthropic.com>`; issues and PRs carry `🤖 Co-Author: Claude (Opus 4.x) via Claude Code` (replacing the German `🤖 Mitarbeit: …` example in rule 4).

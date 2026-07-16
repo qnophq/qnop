@@ -1,6 +1,6 @@
 # ADR-0013: Redis & search index deferred
 
-- **Status:** Proposed
+- **Status:** Accepted
 - **Date:** 2026-06-13
 - **Deciders:** qnop core team
 

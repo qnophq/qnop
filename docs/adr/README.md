@@ -8,6 +8,11 @@ Important architecture decisions are recorded here as ADRs (see [ADR-0001](0001-
 - **Proposed** — the direction is set, but details are deferred to a later phase. Not yet binding.
 - **Superseded by ADR-NNNN** — replaced.
 
+Two refinement conventions (see the 2026-07-16 amendment to [ADR-0001](0001-record-architecture-decisions.md)):
+
+- An Accepted ADR may carry dated, clearly-labelled `## Amendment (YYYY-MM-DD, …)` sections appended at the end of the file. Amendments refine; only an amendment explicitly flagged as reversing (or a superseding ADR) may reverse a decision.
+- **Accepted (finalized by NNNN)** in the index marks a direction-setting ADR whose deferred details were later pinned by ADR-NNNN.
+
 ## Index
 
 | ADR | Title | Status |
@@ -24,7 +29,7 @@ Important architecture decisions are recorded here as ADRs (see [ADR-0001](0001-
 | [0010](0010-docx-representation-strategy.md) | DOCX representation strategy | Accepted |
 | [0011](0011-review-workflow-state-model.md) | Review workflow & domain model | Accepted |
 | [0012](0012-edition-vs-entitlements.md) | Edition vs. entitlements / license gating | Accepted (finalized by 0039) |
-| [0013](0013-redis-and-search-deferred.md) | Redis & search index deferred | Proposed |
+| [0013](0013-redis-and-search-deferred.md) | Redis & search index deferred | Accepted |
 | [0014](0014-frontend-enterprise-separation.md) | Frontend enterprise separation | Accepted (finalized by 0039) |
 | [0015](0015-published-rest-api-contract-module.md) | Published REST API contract module (qnop-api) | Accepted |
 | [0016](0016-contributor-license-agreement.md) | Contributor License Agreement enforced via CLA Assistant | Accepted |

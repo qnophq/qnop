@@ -55,3 +55,7 @@ The original `GITHUB_TOKEN` model could push branches but **never opened PRs** (
 An App installation token is a distinct identity: it is not bound by the Actions-can't-create-PRs policy, and its PRs trigger consumer CI normally. The model stays **single-repo** — the installation token is scoped to the calling repo, preserving the "own/self-hosted instance, no cross-repo write" property. We still avoid the Mend-hosted SaaS App; this is our own App under org control.
 
 **Consequence:** onboarding a new repo to Renovate now also requires installing the App and adding the two secrets, not just the workflow stub. The trade-off buys working PRs *with* CI, which the `GITHUB_TOKEN` model could not provide.
+
+## Amendment (2026-07-16): frontend lockfile
+
+The frontend lockfile noted as missing under *Consequences* (`qnop-ui/pnpm-lock.yaml`) has since been committed; Renovate updates it as part of its npm PRs.

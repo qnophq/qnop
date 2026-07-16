@@ -23,3 +23,7 @@ An open-core business under AGPL-3.0 depends on (a) being able to prove which co
 ## Alternatives considered
 
 - **No header/scan policy** — rejected: risks silent contamination and loss of relicensing rights.
+
+## Amendment (2026-07-16, license scanner still pending)
+
+The full dependency-license scanner promised "once real dependencies land" (e.g. ScanCode/ORT or a Gradle license plugin) is still not wired into CI — the check in place remains the SPDX-header job. Tracked in issue #498.

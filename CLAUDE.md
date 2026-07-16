@@ -25,11 +25,17 @@ Read `docs/ARCHITECTURE.md` and `docs/adr/` first — they hold the binding deci
 
 Commits are signed off (`git commit -s`, DCO). See `CONTRIBUTING.md`.
 
-## Current state — Phase 1 (identity & administration shipped)
+## Current state
 
-The Spring Boot server **boots and runs** (PostgreSQL + Liquibase + JPA, ADR-0020) with the full identity & administration layer of epic #7 in place — `io.qnop.entity` (JPA model), `io.qnop.repository` (Spring Data), `io.qnop.service` (business services) and the framework-light `io.qnop.security` (crypto/key-derivation, ADR-0022) are all populated. **Shipped:** local login with JWT access + rotating refresh tokens and revocation (ADR-0026), OIDC/OAuth2 providers, self-registration, email verification and password reset, auth rate limiting (ADR-0027), users & teams, application settings (ADR-0025), mail templates, branding upload with SVG sanitization (ADR-0028; assets stored as Postgres `bytea`, ADR-0024), profile avatars (ADR-0031), ShedLock distributed scheduling (ADR-0029) and optimistic concurrency control (ADR-0030). The REST contract is OpenAPI-first (ADR-0021) and the `qnop-ui` SPA (login, profile, admin surfaces) consumes it; `/config` exposes the running edition.
+The Spring Boot server **boots and runs** (PostgreSQL + Liquibase + JPA, ADR-0020) with two shipped verticals:
 
-**Genuinely still pending (do not assume they exist):** the document-review domain core — the review workflow state machine, annotation anchoring/re-anchoring, and the ingest pipeline. The `qnop-spi` extension-point boundary now carries its first published contract, the `StorageProvider` SPI, with the S3/MinIO Community default in `io.qnop.service.storage` (issue #243, ADR-0005/0036) — so MinIO **is now consumed** (object bytes for `document_version.storage_key`), with an upload-then-commit staging registry (`storage_object`) and orphan reaper. `docker-compose.yml` provides local Postgres (+ MinIO) for `bootRun`; the test suite spins up its own Postgres **and MinIO** via **Testcontainers** (Docker required).
+**Identity & administration** (epic #7): local login with JWT access + rotating refresh tokens and revocation (ADR-0026), OIDC/OAuth2 providers, self-registration, email verification and password reset, auth rate limiting (ADR-0027), users & teams, application settings (ADR-0025), mail templates, branding upload with SVG sanitization (ADR-0028; assets as Postgres `bytea`, ADR-0024), profile avatars (ADR-0031), public profiles with slugs (#473/#486), ShedLock scheduling (ADR-0029) and optimistic concurrency control (ADR-0030).
+
+**Document review — the PDF vertical** (epic #241 + follow-ups): server-mediated ingest with the canonical extraction pipeline (ADR-0032) on the durable Postgres job queue (ADR-0033), multi-layer annotation anchoring with fuzzy re-anchoring across versions (ADR-0009, #326/#457), the review workflow state machine (ADR-0011), inter-version diff (ADR-0034), per-review privacy/anonymity (ADR-0038), review e-mail notifications (#316), dashboard (#454), and the full review UI (viewer, panel, focus mode, tasks, compare). Object storage flows through the `StorageProvider` SPI with the S3/MinIO Community default and an upload-then-commit staging registry + orphan reaper (ADR-0005/0036). `qnop-spi` publishes **two** contracts: `StorageProvider` and `DocumentExtractor`.
+
+The REST contract is OpenAPI-first (ADR-0021); the `qnop-ui` SPA consumes the generated client; `GET /api/v1/config` exposes the running edition.
+
+**Genuinely still pending (do not assume they exist):** DOCX/Markdown ingest (ADR-0010 — the code accepts PDF only), enterprise runtime extensions and their packaging (ADR-0039), Redis/search (ADR-0013). `docker-compose.yml` provides local Postgres (+ MinIO) for `bootRun`; the test suite spins up its own Postgres **and MinIO** via **Testcontainers** (Docker required).
 
 ## Stack
 
