@@ -2,29 +2,13 @@
 
 An enterprise **document review** system with a browser-first, maximally usable review experience.
 
-Reviewers — individual users or whole teams — mark up lines and regions of a document, comment, and run a coordinated review workflow: comments are accepted or rejected, changes produce new document versions, and a review is finalized once no open annotations remain.
+Reviewers — individual users or whole teams — mark up passages of a document, discuss them, and run a coordinated review workflow: annotations are raised and resolved, changes produce new document versions, and a review is finalized once no open annotations remain. qnop reviews **PDF documents today**; DOCX and Markdown follow the same ingest pipeline later ([ADR-0010](docs/adr/0010-docx-representation-strategy.md), [ADR-0032](docs/adr/0032-document-representation-and-rendering-pipeline.md)).
 
-The focus is on **textual documents first — PDF, Word (DOCX), and Markdown**. Support for further formats (for example images) may follow once the text review workflow is solid, and such formats are a likely **Enterprise** feature rather than part of the Community scope.
-
-> **Status: Phase 1 — identity & administration layer shipped.** The server boots (PostgreSQL + Liquibase + JPA) with the full identity/auth subsystem — local login with JWT access + rotating refresh tokens, revocation, OIDC/OAuth2 providers, self-registration, email verification and password reset, rate limiting — plus users & teams, application settings, mail templates, branding upload (with SVG sanitization) and profile avatars. The document-review domain (ingest, annotation anchoring, the review workflow state machine) is Phase 2. See [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) and the roadmap there.
-
-## Editions
-
-qnop is open-core:
-
-- **Community** (this repo) — **AGPL-3.0**, base features.
-- **Enterprise** — commercial add-ons (e.g. AI reviewers, summarization, duplicate-annotation detection), built in a separate private repository against this repo's published `qnop-spi` artifact.
-- A **SaaS** offering is a future possibility.
-
-## Tech stack
-
-- **Backend**: Java 21 · Gradle (Kotlin DSL) multi-module · Spring Boot 4.x (Phase 1)
-- **Frontend**: Vite · React 19 · TypeScript · MaterialUI (`qnop-ui/`)
-- **Data**: PostgreSQL + Liquibase · S3-compatible object storage (MinIO locally)
+qnop is open-core: this repository is the **AGPL-3.0 Community edition**; commercial add-ons live in a separate private repository built against the published `qnop-spi` contract.
 
 ## Getting started
 
-Requires JDK 21, Node 24 + pnpm, and Docker. **Docker must be running for the backend test suite** — tests boot a real PostgreSQL via Testcontainers (ADR-0020).
+Requires JDK 21, Node 24 + pnpm, and Docker. **Docker must be running for the backend test suite** — tests boot real PostgreSQL and MinIO containers via Testcontainers (ADR-0020).
 
 ```bash
 # Local infrastructure (Postgres for bootRun + MinIO)
@@ -44,30 +28,11 @@ set -a; source .env; set +a
 cd qnop-ui && pnpm install && pnpm dev
 ```
 
-> **Postgres 18 data volume.** `postgres:18` stores its cluster under
-> `/var/lib/postgresql/<major>/docker` and refuses a mount at the old
-> `…/data` path, so compose mounts `qnop_pgdata:/var/lib/postgresql` (issue #407).
-> A `qnop_pgdata` volume created before this change won't start — the simplest fix
-> is a fresh volume (`docker compose down -v`, then `docker compose up -d`); to keep
-> existing data instead, copy the old cluster's `18/` directory into it (recipe in
-> issue #407).
-
-## Repository layout
-
-```
-qnop-spi/            # published plugin contract (Spring-free)
-qnop-api/            # published REST contract: DTOs + OpenAPI (Spring-free)
-qnop-core/           # entity/ repository/ service/  (the Spring backend core)
-qnop-app/            # @RestControllers + Spring Boot bootstrap (the runnable)
-build-logic/         # Gradle convention plugins
-qnop-ui/             # Vite + React + MUI SPA
-docs/ARCHITECTURE.md # the map
-docs/adr/            # architecture decision records
-```
+Architecture, module map, and stack: [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) · decisions: [`docs/adr/`](docs/adr/README.md)
 
 ## Contributing
 
-Issue → feature branch → PR; never commit to `main`. All changes are reviewed and CI-gated. See [`CONTRIBUTING.md`](CONTRIBUTING.md) and the [ADRs](docs/adr/README.md).
+Issue → feature branch → PR; never commit to `main`. All changes are reviewed and CI-gated. See [`CONTRIBUTING.md`](CONTRIBUTING.md).
 
 ## License
 

@@ -96,3 +96,7 @@ Rationale:
 - **Reuse `application_asset` (branding's table).** Rejected: its schema is
   slot-keyed and config-scoped; per-user avatars want a `user_id`-keyed table
   with a cascading FK.
+
+## Amendment (2026-07-16)
+
+The "mandated but entirely unbuilt" characterization of the ADR-0005 seam under *Context* is historical: the `StorageProvider` SPI and its S3/MinIO Community default have since shipped (issue #243, [ADR-0036](0036-object-storage-lifecycle-staging-and-reaper.md)).

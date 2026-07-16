@@ -22,3 +22,7 @@ Every important architecture decision is captured as a numbered ADR in `docs/adr
 
 - **Document only in the wiki / PRs** — rejected: not versioned with the code, hard to audit.
 - **No formal record** — rejected: the open-core/AGPL decisions in particular need a defensible paper trail.
+
+## Amendment (2026-07-16, in-file amendments)
+
+Practice has established a refinement mechanism this ADR did not spell out: an Accepted ADR may be **amended in place** with a dated, clearly-labelled `## Amendment (YYYY-MM-DD, …)` section appended at the end of the file (as done across ADR-0009, ADR-0011, ADR-0017, ADR-0033, ADR-0035). Amendments record refinements and implementation-time precisions; the decision text above them stays untouched. A **genuine reversal** still requires either a superseding ADR or an amendment that explicitly flags itself as reversing (as the 2026-07-05 amendment to ADR-0011 does).

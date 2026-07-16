@@ -9,7 +9,7 @@ Thanks for contributing! qnop is the AGPL-3.0 Community core of an open-core pro
 3. **Never commit or push directly to `main`.** `main` is integration-only and protected; all changes land via Pull Request.
 4. **Open a PR** that references its issue (e.g. `Closes #12`). Keep PRs focused.
 5. **Sign the CLA** on your first PR (see below) — a bot will prompt you.
-6. CI must be green (backend build + ArchUnit + Spotless, frontend lint/build, SPDX check) before merge.
+6. CI must be green before merge — see `.github/workflows/ci.yml` for the authoritative gate set (backend build with ArchUnit/Spotless, dependency audits, frontend checks, docker-compose smoke deployment, SPDX scan).
 
 ## Language
 

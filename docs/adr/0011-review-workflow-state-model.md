@@ -27,7 +27,7 @@ DRAFT → IN_REVIEW → CHANGES_REQUESTED → IN_REVIEW (after new version) → 
 ```
 
 - **Core invariant:** transition to `FINALIZED` is allowed only when there are **zero** annotations in status `OPEN` — *and* no `AnnotationPlacement` is still `PENDING` (re-anchoring must have completed, [ADR-0033](0033-durable-async-job-execution-on-postgres.md)). This is a domain invariant, not a controller check.
-- Annotation lifecycle is a small sub-machine: `OPEN → ACCEPTED | REJECTED` (owner-decided), which drives `IN_REVIEW → CHANGES_REQUESTED`.
+- Annotation lifecycle is a small sub-machine: `OPEN → ACCEPTED | REJECTED` (owner-decided) *(reversed by the 2026-07-05 amendment below)*, which drives `IN_REVIEW → CHANGES_REQUESTED` *(reversed by the 2026-07-05 amendment below)*.
 - Every transition emits an append-only `AuditEvent`.
 
 ## Rationale
