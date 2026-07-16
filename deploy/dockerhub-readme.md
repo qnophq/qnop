@@ -5,7 +5,7 @@
 - 🏠 Source: https://github.com/qnophq/qnop
 - 📘 Deployment guide: https://github.com/qnophq/qnop/blob/main/docs/DEPLOYMENT.md
 - 🐛 Issues: https://github.com/qnophq/qnop/issues
-- 📦 GHCR mirror: `ghcr.io/qnophq/qnop`
+- 📦 GHCR mirror: `ghcr.io/qnophq/qnop-ce`
 
 ## Supported tags
 
@@ -13,7 +13,7 @@
 |---|---|
 | `latest` | Latest stable release (semver, no pre-release) |
 | `1.0.0`, `1.0` | Specific versions and minor aliases |
-| `main`, `sha-*` | Rolling development build of the `main` branch (on [GHCR only](https://github.com/qnophq/qnop/pkgs/container/qnop)) |
+| `main`, `sha-*` | Rolling development build of the `main` branch (on [GHCR only](https://github.com/qnophq/qnop/pkgs/container/qnop-ce)) |
 
 Multi-architecture: `linux/amd64`, `linux/arm64`.
 

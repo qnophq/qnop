@@ -13,7 +13,7 @@
 
 services:
   qnop:
-    image: ghcr.io/qnophq/qnop:${QNOP_VERSION:-latest}
+    image: ghcr.io/qnophq/qnop-ce:${QNOP_VERSION:-latest}
     depends_on:
       postgres:
         condition: service_healthy

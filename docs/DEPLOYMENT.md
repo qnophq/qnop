@@ -1,6 +1,6 @@
 # Deploying qnop
 
-How to run the released qnop container (`ghcr.io/qnophq/qnop`, ADR-0040). One image serves the REST API **and** the embedded web UI on port `8080`.
+How to run the released qnop container (`ghcr.io/qnophq/qnop-ce`, ADR-0040). One image serves the REST API **and** the embedded web UI on port `8080`.
 
 The fastest start is [`deploy/docker-compose.yml`](../deploy/docker-compose.yml) — the released image plus PostgreSQL and MinIO on a single host:
 

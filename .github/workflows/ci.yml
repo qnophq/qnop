@@ -113,7 +113,7 @@ jobs:
 
   # Every green CI run on main publishes the current state as a snapshot
   # container image (ADR-0040): the moving `main` tag plus an immutable
-  # `sha-*` tag on ghcr.io/qnophq/qnop. `latest` and semver tags remain
+  # `sha-*` tag on ghcr.io/qnophq/qnop-ce. `latest` and semver tags remain
   # reserved for tag-driven releases (release.yml). Same build recipe as the
   # release: boot jar with the embedded SPA, copied into the runtime image.
   snapshot-image:
@@ -163,14 +163,14 @@ jobs:
         uses: docker/metadata-action@80c7e94dd9b9319bd5eb7a0e0fe9291e23a2a2e9 # v6
         with:
           images: |
-            ghcr.io/qnophq/qnop
+            ghcr.io/qnophq/qnop-ce
           tags: |
             type=ref,event=branch
             type=sha
           flavor: |
             latest=false
           labels: |
-            org.opencontainers.image.title=qnop
+            org.opencontainers.image.title=qnop-ce
             org.opencontainers.image.description=Qualified Notes on Papers — enterprise document review (Community edition, API + embedded web UI). Snapshot build of main.
             org.opencontainers.image.source=https://github.com/qnophq/qnop
             org.opencontainers.image.licenses=AGPL-3.0-only
