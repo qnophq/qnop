@@ -29,7 +29,7 @@ QNOP_S3_ACCESS_KEY=qnop \
 QNOP_S3_SECRET_KEY="$(openssl rand -base64 24)" \
 QNOP_AUTH_JWT_SECRET="$(openssl rand -base64 48)" \
 QNOP_AUTH_ENCRYPTION_KEY="$(openssl rand -base64 48)" \
-QNOP_AUTH_ENCRYPTION_SALT="$(openssl rand -base64 48)" \
+QNOP_AUTH_ENCRYPTION_SALT="$(openssl rand -hex 32)" \
 docker compose up -d
 ```
 
