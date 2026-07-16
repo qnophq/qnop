@@ -12,7 +12,7 @@ QNOP_S3_ACCESS_KEY=qnop \
 QNOP_S3_SECRET_KEY="$(openssl rand -base64 24)" \
 QNOP_AUTH_JWT_SECRET="$(openssl rand -base64 48)" \
 QNOP_AUTH_ENCRYPTION_KEY="$(openssl rand -base64 48)" \
-QNOP_AUTH_ENCRYPTION_SALT="$(openssl rand -base64 48)" \
+QNOP_AUTH_ENCRYPTION_SALT="$(openssl rand -hex 32)" \
 docker compose up -d
 ```
 
@@ -30,7 +30,7 @@ All configuration is `QNOP_`-prefixed. The server **fails fast at startup** when
 |----------|---------|
 | `QNOP_AUTH_JWT_SECRET` | HMAC secret for access tokens (≥ 32 chars) |
 | `QNOP_AUTH_ENCRYPTION_KEY` | Key material for at-rest encryption of stored secrets (≥ 32 chars) |
-| `QNOP_AUTH_ENCRYPTION_SALT` | Salt for the key derivation (≥ 32 chars) |
+| `QNOP_AUTH_ENCRYPTION_SALT` | Salt for the key derivation (**hex-encoded**, ≥ 16 chars — e.g. `openssl rand -hex 32`) |
 | `QNOP_DB_HOST` / `QNOP_DB_PORT` / `QNOP_DB_NAME` / `QNOP_DB_USERNAME` / `QNOP_DB_PASSWORD` | PostgreSQL connection (Liquibase migrates the schema on startup) |
 | `QNOP_S3_ENDPOINT` / `QNOP_S3_BUCKET` / `QNOP_S3_ACCESS_KEY` / `QNOP_S3_SECRET_KEY` | S3-compatible object storage for document binaries (leave `QNOP_S3_ENDPOINT` empty for AWS S3) |
 
