@@ -1,0 +1,158 @@
+# SPDX-License-Identifier: AGPL-3.0-only
+#
+# Operator-triggered release preparation (ADR-0040, ported from plugwerk).
+# Bumps VERSION to the release version, tags v<version>, bumps to the next
+# -SNAPSHOT, pushes, and watches the tag-triggered release.yml run so the
+# operator sees the whole chain green/red in one place.
+#
+# Requires the RELEASE_TOKEN repository secret (fine-grained PAT with
+# contents:write): tags pushed with the default GITHUB_TOKEN do NOT trigger
+# downstream workflows.
+
+name: Prepare Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      release_version:
+        description: 'Release version (e.g., 0.1.0 or 0.1.0-rc.1)'
+        required: true
+      next_version:
+        description: 'Next development version (e.g., 0.2.0-SNAPSHOT)'
+        required: true
+
+permissions:
+  contents: write
+
+jobs:
+  prepare:
+    name: Prepare Release
+    runs-on: ubuntu-latest
+    # Inputs flow into shell steps via env only (no inline ${{ }} in run:) —
+    # hardening against expression/shell injection.
+    env:
+      RELEASE_VERSION: ${{ inputs.release_version }}
+      NEXT_VERSION: ${{ inputs.next_version }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.RELEASE_TOKEN }}
+
+      - name: Verify release permissions
+        run: |
+          ROLE=$(gh api repos/${{ github.repository }}/collaborators/${{ github.actor }}/permission --jq .permission)
+          if [[ "$ROLE" != "admin" && "$ROLE" != "maintain" ]]; then
+            echo "::error::User ${{ github.actor }} has role '$ROLE' — admin or maintain required for releases"
+            exit 1
+          fi
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Validate inputs
+        run: |
+          if [[ "$RELEASE_VERSION" == *-SNAPSHOT ]]; then
+            echo "::error::Release version must not contain -SNAPSHOT: $RELEASE_VERSION"
+            exit 1
+          fi
+          if [[ "$NEXT_VERSION" != *-SNAPSHOT ]]; then
+            echo "::error::Next version must end with -SNAPSHOT: $NEXT_VERSION"
+            exit 1
+          fi
+          if ! [[ "$RELEASE_VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+(-[a-zA-Z0-9.]+)?$ ]]; then
+            echo "::error::Release version must match semver pattern: $RELEASE_VERSION"
+            exit 1
+          fi
+          BRANCH="${GITHUB_REF_NAME}"
+          if [[ "$BRANCH" != "main" ]]; then
+            echo "::error::Releases can only be prepared from main branch, currently on: $BRANCH"
+            exit 1
+          fi
+          if git rev-parse "v${RELEASE_VERSION}" >/dev/null 2>&1; then
+            echo "::error::Tag v${RELEASE_VERSION} already exists"
+            exit 1
+          fi
+          CURRENT_VERSION=$(cat VERSION | tr -d '[:space:]')
+          if [[ "$CURRENT_VERSION" != *-SNAPSHOT ]]; then
+            echo "::error::Current version is not a SNAPSHOT ($CURRENT_VERSION) — already in release state?"
+            exit 1
+          fi
+
+          echo "✅ All validations passed"
+          echo "  Current:  $CURRENT_VERSION"
+          echo "  Release:  $RELEASE_VERSION"
+          echo "  Next:     $NEXT_VERSION"
+
+      - name: Configure git
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+      - name: Bump to release version
+        run: |
+          echo "$RELEASE_VERSION" > VERSION
+          git add VERSION
+          git commit -m "chore: prepare release $RELEASE_VERSION"
+
+      - name: Create release tag
+        run: git tag "v$RELEASE_VERSION"
+
+      - name: Bump to next development version
+        run: |
+          echo "$NEXT_VERSION" > VERSION
+          git add VERSION
+          git commit -m "chore: prepare next development cycle $NEXT_VERSION"
+
+      - name: Push commits and tag
+        id: push
+        run: |
+          PUSH_TIME=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
+          echo "PUSH_TIME=$PUSH_TIME" >> "$GITHUB_OUTPUT"
+          git push origin main "v$RELEASE_VERSION"
+
+      - name: Wait for release workflow
+        # release.yml is triggered by the tag push above and owns the entire
+        # publish lifecycle (image + GitHub Release). We wait here so the
+        # operator sees the full chain in one place.
+        run: |
+          PUSH_TIME="${{ steps.push.outputs.PUSH_TIME }}"
+          TAG="v$RELEASE_VERSION"
+          echo "⏳ Waiting for release.yml triggered by tag $TAG (after $PUSH_TIME)..."
+
+          for i in $(seq 1 30); do
+            RUN_ID=$(gh run list \
+              --workflow=release.yml \
+              --json databaseId,headBranch,createdAt \
+              --jq "[.[] | select(.headBranch == \"$TAG\" and .createdAt > \"$PUSH_TIME\")] | first | .databaseId // empty" \
+            )
+            if [[ -n "$RUN_ID" ]]; then
+              break
+            fi
+            echo "  Waiting for workflow run to appear... ($i/30)"
+            sleep 10
+          done
+
+          if [[ -z "$RUN_ID" ]]; then
+            echo "::error::release.yml was not triggered within 5 minutes after push at $PUSH_TIME"
+            exit 1
+          fi
+
+          echo "📦 Found release workflow run: $RUN_ID"
+          echo "   https://github.com/${{ github.repository }}/actions/runs/$RUN_ID"
+          gh run watch "$RUN_ID" --exit-status
+          echo "✅ Release workflow completed successfully"
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Summary
+        run: |
+          echo "## 🚀 Release $RELEASE_VERSION" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "| Step | Status |" >> "$GITHUB_STEP_SUMMARY"
+          echo "|------|--------|" >> "$GITHUB_STEP_SUMMARY"
+          echo "| Version bump to \`$RELEASE_VERSION\` | ✅ |" >> "$GITHUB_STEP_SUMMARY"
+          echo "| Tag \`v$RELEASE_VERSION\` created | ✅ |" >> "$GITHUB_STEP_SUMMARY"
+          echo "| Next snapshot \`$NEXT_VERSION\` | ✅ |" >> "$GITHUB_STEP_SUMMARY"
+          echo "| Image + GitHub Release (release.yml) | ✅ |" >> "$GITHUB_STEP_SUMMARY"

@@ -7,6 +7,7 @@
 // Hosts the architecture-conformance tests. This module carries the Spring Boot
 // plugin and is the bootable server (Phase 1, ADR-0020).
 
+import org.gradle.language.jvm.tasks.ProcessResources
 import org.springframework.boot.gradle.tasks.run.BootRun
 
 plugins {
@@ -14,6 +15,38 @@ plugins {
     // Version comes from the root `plugins {}` block (declared there `apply false`
     // to keep a single shared plugin classloader — see the root build script).
     id("org.springframework.boot")
+}
+
+// Stamp build-info.properties into the jar so /api/v1/config reports the real
+// version (BuildProperties in ConfigController, issue #495).
+springBoot { buildInfo() }
+
+// SPA embedding (ADR-0040): with -PembedUi the boot jar carries the built
+// qnop-ui bundle under static/. Opt-in so developer builds and the test suite
+// stay Node-free; the release workflow and the deploy image always set it.
+val embedUi = providers.gradleProperty("embedUi").isPresent
+if (embedUi) {
+    val uiDir = rootProject.layout.projectDirectory.dir("qnop-ui")
+
+    val installUi = tasks.register<Exec>("installUi") {
+        workingDir = uiDir.asFile
+        commandLine("pnpm", "install", "--frozen-lockfile")
+    }
+
+    val buildUi = tasks.register<Exec>("buildUi") {
+        dependsOn(installUi)
+        workingDir = uiDir.asFile
+        commandLine("pnpm", "build")
+        inputs.dir(uiDir.dir("src"))
+        inputs.file(uiDir.file("package.json"))
+        inputs.file(uiDir.file("pnpm-lock.yaml"))
+        outputs.dir(uiDir.dir("dist"))
+    }
+
+    tasks.named<ProcessResources>("processResources") {
+        dependsOn(buildUi)
+        from(uiDir.dir("dist")) { into("static") }
+    }
 }
 
 // Local-dev convenience (issue #110): load the repo-root `.env` into bootRun's
