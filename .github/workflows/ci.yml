@@ -111,6 +111,82 @@ jobs:
         if: always()
         run: docker compose -f docker-compose.smoke.yml down -v
 
+  # Every green CI run on main publishes the current state as a snapshot
+  # container image (ADR-0040): the moving `main` tag plus an immutable
+  # `sha-*` tag on ghcr.io/qnophq/qnop. `latest` and semver tags remain
+  # reserved for tag-driven releases (release.yml). Same build recipe as the
+  # release: boot jar with the embedded SPA, copied into the runtime image.
+  snapshot-image:
+    name: Snapshot image (main)
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    needs: [backend, qnop-ui, smoke]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
+      - uses: actions/setup-java@0f481fcb613427c0f801b606911222b5b6f3083a # v5
+        with:
+          distribution: temurin
+          java-version: '21'
+      - uses: pnpm/action-setup@0ebf47130e4866e96fce0953f49152a61190b271 # v6
+        with:
+          package_json_file: qnop-ui/package.json
+      - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6
+        with:
+          node-version: '24'
+          cache: pnpm
+          cache-dependency-path: qnop-ui/pnpm-lock.yaml
+      - uses: gradle/actions/setup-gradle@3f131e8634966bd73d06cc69884922b02e6faf92 # v6
+      - name: Build boot jar with embedded SPA
+        run: |
+          ./gradlew --no-daemon -x test :qnop-app:bootJar -PembedUi
+          JAR="$(ls qnop-app/build/libs/*.jar | grep -v -- '-plain' | grep -v -- '-sources')"
+          # The image build context contains exactly one file: the jar.
+          mkdir -p deploy/context
+          cp "$JAR" deploy/context/app.jar
+          unzip -l deploy/context/app.jar | grep -q 'BOOT-INF/classes/static/index.html' \
+            || { echo "::error::SPA bundle missing from the boot jar"; exit 1; }
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@06116385d9baf250c9f4dcb4858b16962ea869c3 # v4
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@d7f5e7f509e45cec5c76c4d5afdd7de93d0b3df5 # v4
+      - name: Log in to GHCR
+        uses: docker/login-action@650006c6eb7dba73a995cc03b0b2d7f5ca915bee # v4.2.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Extract Docker image metadata
+        id: meta
+        uses: docker/metadata-action@80c7e94dd9b9319bd5eb7a0e0fe9291e23a2a2e9 # v6
+        with:
+          images: |
+            ghcr.io/qnophq/qnop
+          tags: |
+            type=ref,event=branch
+            type=sha
+          flavor: |
+            latest=false
+          labels: |
+            org.opencontainers.image.title=qnop
+            org.opencontainers.image.description=Qualified Notes on Papers — enterprise document review (Community edition, API + embedded web UI). Snapshot build of main.
+            org.opencontainers.image.source=https://github.com/qnophq/qnop
+            org.opencontainers.image.licenses=AGPL-3.0-only
+      - name: Build and push image
+        uses: docker/build-push-action@f9f3042f7e2789586610d6e8b85c8f03e5195baf # v7.2.0
+        with:
+          context: deploy/context
+          file: deploy/Dockerfile
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          provenance: false
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
   license-headers:
     name: License headers (SPDX)
     runs-on: ubuntu-latest

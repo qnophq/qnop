@@ -18,6 +18,8 @@ docker compose up -d
 
 In practice, put those values in an env file you keep out of version control and pass `--env-file`.
 
+Besides the release tags, every green CI build of `main` publishes a snapshot image under the moving `main` tag (immutable `sha-*` tags exist for pinning). Snapshots are for evaluation and pre-release testing — production deployments pin a release version.
+
 ## Environment contract
 
 All configuration is `QNOP_`-prefixed. The server **fails fast at startup** when a required secret is missing or still a placeholder (ADR-0022).
