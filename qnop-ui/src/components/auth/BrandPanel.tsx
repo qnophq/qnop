@@ -27,6 +27,7 @@ import { useConfig } from '../../api/hooks/useConfig';
 import { BrandLogo } from '../branding/BrandLogo';
 import { tokens } from '../../theme/tokens';
 import { ShowcasePlayerCard } from './ShowcasePlayerCard';
+import authBg from '../../assets/auth/auth-bg.webp';
 
 const FEATURES = [
   { icon: Highlighter, label: 'Line-precise annotations' },
@@ -57,10 +58,36 @@ export function BrandPanel() {
         position: 'relative',
         overflow: 'hidden',
         color: '#fff',
-        p: 7,
+        p: { md: 4.5, lg: 7 },
         background: `linear-gradient(155deg, ${tokens.brand.navy} 0%, ${tokens.brand.navy700} 60%, #034079 100%)`,
       }}
     >
+      {/* cinematic backdrop: floating annotated pages (generated brand imagery, #503) */}
+      <Box
+        aria-hidden
+        component="img"
+        src={authBg}
+        alt=""
+        sx={{
+          position: 'absolute',
+          inset: 0,
+          width: '100%',
+          height: '100%',
+          objectFit: 'cover',
+          objectPosition: 'right center',
+          opacity: 0.75,
+        }}
+      />
+      {/* contrast scrim: keeps the copy block and chips readable over the imagery */}
+      <Box
+        aria-hidden
+        sx={{
+          position: 'absolute',
+          inset: 0,
+          background: `linear-gradient(75deg, ${tokens.brand.navy} 6%, rgba(1,33,66,0.55) 38%, rgba(1,33,66,0.12) 68%, transparent 100%),
+            linear-gradient(to top, rgba(1,22,44,0.85) 0%, rgba(1,22,44,0.35) 26%, transparent 52%)`,
+        }}
+      />
       {/* subtle grid + glow atmosphere */}
       <Box
         aria-hidden
@@ -111,12 +138,11 @@ export function BrandPanel() {
           backgroundImage: GRAIN,
         }}
       />
-
       <Box sx={{ position: 'relative', zIndex: 1 }}>
         <BrandLogo
           url={logoUrl}
           alt="qnop"
-          sx={{ height: 64, maxWidth: 340 }}
+          sx={{ height: 80, maxWidth: 420 }}
           fallback={
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.75 }}>
               <Box
@@ -202,24 +228,26 @@ export function BrandPanel() {
           Annotate, discuss and approve documents together — with streaks, scoreboards and profiles
           that celebrate every closed review. And your data never leaves your own infrastructure.
         </Typography>
-        <Stack direction="row" sx={{ flexWrap: 'wrap', gap: 1.25, mt: 4 }}>
+        <Stack direction="row" sx={{ flexWrap: 'nowrap', gap: { md: 0.75, lg: 1.25 }, mt: 4 }}>
           {FEATURES.map(({ icon: Icon, label }) => (
             <Stack
               key={label}
               direction="row"
               sx={{
                 alignItems: 'center',
-                gap: 0.875,
-                px: 1.5,
+                gap: { md: 0.625, lg: 0.875 },
+                px: { md: 1, lg: 1.5 },
                 py: 0.875,
                 borderRadius: 999,
                 bgcolor: 'rgba(255,255,255,0.08)',
                 border: '1px solid rgba(255,255,255,0.12)',
-                fontSize: 12,
+                fontSize: { md: 10.5, lg: 12 },
                 color: '#C6E3FC',
+                whiteSpace: 'nowrap',
+                flexShrink: 0,
               }}
             >
-              <Icon size={14} />
+              <Icon size={13} />
               {label}
             </Stack>
           ))}

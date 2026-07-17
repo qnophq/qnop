@@ -22,11 +22,18 @@
 import type { ReactNode } from 'react';
 import Box from '@mui/material/Box';
 import Typography from '@mui/material/Typography';
-import { useTheme } from '@mui/material/styles';
+import { keyframes, useTheme } from '@mui/material/styles';
 import { ShieldCheck } from 'lucide-react';
 import { useConfig } from '../../api/hooks/useConfig';
 import { BrandLogo } from '../branding/BrandLogo';
 import { BrandPanel } from './BrandPanel';
+import authDocs from '../../assets/auth/auth-docs.svg';
+
+/** Slow bob for the corner document illustration (it carries its own tilt). */
+const floatDocs = keyframes`
+  from { transform: translateY(0); }
+  to   { transform: translateY(-12px); }
+`;
 
 interface AuthLayoutProps {
   title: string;
@@ -104,9 +111,29 @@ export function AuthLayout({ title, subtitle, headerSlot, children }: AuthLayout
           justifyContent: 'center',
           p: { xs: 3, sm: 5 },
           bgcolor: 'background.default',
+          position: 'relative',
+          overflow: 'hidden',
         }}
       >
-        <Box sx={{ width: '100%', maxWidth: 408 }}>
+        {/* decorative corner accent: the annotated-document motif from the logomark */}
+        <Box
+          aria-hidden
+          component="img"
+          src={authDocs}
+          alt=""
+          sx={{
+            display: { xs: 'none', md: 'block' },
+            position: 'absolute',
+            right: -40,
+            bottom: -54,
+            width: 200,
+            pointerEvents: 'none',
+            filter: 'drop-shadow(0 18px 30px rgba(0,0,0,0.30))',
+            animation: `${floatDocs} 7s ease-in-out 0.8s infinite alternate`,
+            '@media (prefers-reduced-motion: reduce)': { animation: 'none' },
+          }}
+        />
+        <Box sx={{ width: '100%', maxWidth: 408, position: 'relative', zIndex: 1 }}>
           <MobileBrandHeader />
           {headerSlot}
           <Typography
