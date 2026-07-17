@@ -20,18 +20,17 @@
  */
 
 import { useEffect, useMemo, useState } from 'react';
-import Autocomplete from '@mui/material/Autocomplete';
 import Box from '@mui/material/Box';
 import Button from '@mui/material/Button';
 import Chip from '@mui/material/Chip';
 import Divider from '@mui/material/Divider';
 import Paper from '@mui/material/Paper';
 import Stack from '@mui/material/Stack';
-import TextField from '@mui/material/TextField';
 import Typography from '@mui/material/Typography';
 import { alpha, useTheme } from '@mui/material/styles';
 import { Globe, LocateFixed } from 'lucide-react';
-import { buildTimezoneOptions, zoneOffsetLabel, type TimezoneOption } from './timezoneOptions';
+import { TimezonePicker } from '../TimezonePicker';
+import { zoneOffsetLabel } from '../../utils/timezoneOptions';
 
 const MONO = '"JetBrains Mono", ui-monospace, monospace';
 
@@ -73,10 +72,6 @@ export function TimezoneSetting({ value, isExplicit, saving, onChange }: Timezon
     return () => window.clearInterval(id);
   }, []);
 
-  const options = useMemo(() => buildTimezoneOptions(value), [value]);
-  // `value` is always folded into the options, so a match exists; the [0] guard keeps the type
-  // non-null for the (clear-disabled) Autocomplete.
-  const selected = options.find((option) => option.zone === value) ?? options[0];
   const device = deviceZone();
 
   const clock = useMemo(() => {
@@ -179,38 +174,7 @@ export function TimezoneSetting({ value, isExplicit, saving, onChange }: Timezon
         </Stack>
       </Box>
 
-      <Autocomplete<TimezoneOption, false, true, false>
-        options={options}
-        value={selected}
-        disabled={saving}
-        disableClearable
-        autoHighlight
-        onChange={(_event, option) => option && option.zone !== value && onChange(option.zone)}
-        getOptionLabel={(option) => option.label}
-        isOptionEqualToValue={(a, b) => a.zone === b.zone}
-        renderInput={(params) => (
-          <TextField {...params} label="Time zone" placeholder="Search a city or region…" />
-        )}
-        renderOption={(props, option) => {
-          const { key, ...rest } = props;
-          return (
-            <Box
-              component="li"
-              key={key}
-              {...rest}
-              sx={{ display: 'flex', justifyContent: 'space-between', gap: 2 }}
-            >
-              <span>{option.label}</span>
-              <Typography
-                component="span"
-                sx={{ fontFamily: MONO, fontSize: 12, color: 'text.secondary', flexShrink: 0 }}
-              >
-                {option.offset}
-              </Typography>
-            </Box>
-          );
-        }}
-      />
+      <TimezonePicker value={value} onChange={onChange} disabled={saving} />
 
       <Stack
         direction="row"
