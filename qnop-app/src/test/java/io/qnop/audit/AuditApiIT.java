@@ -147,7 +147,7 @@ class AuditApiIT extends SeededIntegrationTest {
         .andExpect(jsonPath("$.total").value(3))
         .andExpect(jsonPath("$.page").value(0))
         // Newest first: MEMBER's resolve leads, with the document and actor resolved to names.
-        .andExpect(jsonPath("$.items[0].type").value("annotation.resolved"))
+        .andExpect(jsonPath("$.items[0].eventType").value("annotation.resolved"))
         .andExpect(jsonPath("$.items[0].documentTitle").value("Master services agreement"))
         .andExpect(jsonPath("$.items[0].actorId").value(MEMBER_ID.toString()))
         .andExpect(jsonPath("$.items[0].actorDisplayName").value("Mia Member"))
@@ -163,7 +163,7 @@ class AuditApiIT extends SeededIntegrationTest {
         .perform(as(get(AUDIT).param("eventType", "annotation.created"), AUDITOR_ID))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.total").value(2))
-        .andExpect(jsonPath("$.items[*].type", everyItem(is("annotation.created"))));
+        .andExpect(jsonPath("$.items[*].eventType", everyItem(is("annotation.created"))));
   }
 
   @Test
@@ -223,7 +223,8 @@ class AuditApiIT extends SeededIntegrationTest {
         .andExpect(jsonPath("$.total").value(1))
         .andExpect(jsonPath("$.items[0].actorId").doesNotExist())
         .andExpect(jsonPath("$.items[0].actorDisplayName").value("System"))
-        .andExpect(jsonPath("$.items[0].detail").value("{\"reason\":\"BAD_PDF\"}"));
+        // PostgreSQL re-serialises jsonb, so the detail comes back with a space after the colon.
+        .andExpect(jsonPath("$.items[0].detail").value("{\"reason\": \"BAD_PDF\"}"));
   }
 
   @Test
