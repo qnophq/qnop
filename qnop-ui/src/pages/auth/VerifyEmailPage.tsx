@@ -58,7 +58,7 @@ export function VerifyEmailPage() {
       {status === 'success' && (
         <>
           <Alert severity="success" sx={{ mb: 2 }}>
-            Your email address is confirmed. You can sign in now.
+            Your email address is confirmed — your reviewer profile is ready. You can sign in now.
           </Alert>
           <Link component={RouterLink} to="/login" underline="hover">
             To sign in

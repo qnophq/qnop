@@ -22,13 +22,11 @@
 import AppBar from '@mui/material/AppBar';
 import Badge from '@mui/material/Badge';
 import Box from '@mui/material/Box';
-import Button from '@mui/material/Button';
 import IconButton from '@mui/material/IconButton';
 import InputBase from '@mui/material/InputBase';
 import Toolbar from '@mui/material/Toolbar';
 import Tooltip from '@mui/material/Tooltip';
-import { Bell, Menu as MenuIcon, Moon, PanelLeft, Plus, Search, Sun } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
+import { Bell, Menu as MenuIcon, Moon, PanelLeft, Search, Sun } from 'lucide-react';
 import { useUiStore } from '../../stores/uiStore';
 import { Breadcrumbs } from './Breadcrumbs';
 
@@ -41,7 +39,6 @@ interface TopBarProps {
 export function TopBar({ isMobile, onToggleSidebar }: TopBarProps) {
   const themeMode = useUiStore((s) => s.themeMode);
   const toggleTheme = useUiStore((s) => s.toggleTheme);
-  const navigate = useNavigate();
 
   return (
     <AppBar
@@ -104,16 +101,6 @@ export function TopBar({ isMobile, onToggleSidebar }: TopBarProps) {
             </Badge>
           </IconButton>
         </Tooltip>
-
-        <Button
-          variant="contained"
-          size="small"
-          startIcon={<Plus size={16} />}
-          onClick={() => navigate('/reviews')}
-          sx={{ display: { xs: 'none', sm: 'inline-flex' } }}
-        >
-          New review
-        </Button>
       </Toolbar>
     </AppBar>
   );

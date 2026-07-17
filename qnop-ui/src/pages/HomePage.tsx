@@ -20,15 +20,18 @@
  */
 
 import Box from '@mui/material/Box';
+import Button from '@mui/material/Button';
 import Chip from '@mui/material/Chip';
 import Skeleton from '@mui/material/Skeleton';
 import Stack from '@mui/material/Stack';
 import Typography from '@mui/material/Typography';
-import { CalendarClock, FileText, History, Inbox, Trophy, UserCheck } from 'lucide-react';
+import { CalendarClock, FileText, History, Inbox, Plus, Trophy, UserCheck } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useDashboard } from '../api/hooks/useDashboard';
 import { useReviews } from '../api/hooks/useReviews';
+import { PageHeader } from '../components/admin/layout/PageHeader';
 import { ActivityCard } from '../components/dashboard/ActivityCard';
+import { PlayerCard } from '../components/dashboard/PlayerCard';
 import {
   deadlines,
   dueUrgency,
@@ -58,8 +61,9 @@ const DATE_FORMAT = new Intl.DateTimeFormat('en-US', {
  * greeting masthead with the glance numbers, then the two hats side by side —
  * what the caller owes as a reviewer, what their own reviews are up to —
  * flanked by replies directed at them, the deadline rail and the recent
- * activity of their reviews. Renders from exactly two requests: the reviews
- * overview and the dashboard aggregates.
+ * activity of their reviews, and the caller's own player card. Renders from
+ * three cached requests: the reviews overview, the dashboard aggregates and
+ * the caller's public profile.
  */
 export function HomePage() {
   const navigate = useNavigate();
@@ -87,19 +91,27 @@ export function HomePage() {
 
   return (
     <Stack spacing={3}>
-      {/* Masthead: who, when, and the day's numbers. */}
-      <Box>
-        <Typography variant="h1">
-          {greeting(new Date().getHours())}
-          {firstName ? `, ${firstName}` : ''}.{' '}
-          <Box component="span" aria-hidden sx={{ fontSize: '0.8em' }}>
+      {/* Masthead: who, when, and the page's one command — start a review. Uses
+          the canonical PageHeader so the action sits exactly where it does on
+          the Reviews page. */}
+      <PageHeader
+        title={`${greeting(new Date().getHours())}${firstName ? `, ${firstName}` : ''}.`}
+        titleAdornment={
+          <Box component="span" aria-hidden sx={{ fontSize: 22 }}>
             {greetingEmoji(new Date().getHours())}
           </Box>
-        </Typography>
-        <Typography color="text.secondary" sx={{ mt: 0.5 }}>
-          {DATE_FORMAT.format(new Date())}
-        </Typography>
-      </Box>
+        }
+        description={DATE_FORMAT.format(new Date())}
+        action={
+          <Button
+            variant="contained"
+            startIcon={<Plus size={16} />}
+            onClick={() => navigate('/reviews/new')}
+          >
+            New review
+          </Button>
+        }
+      />
 
       {loading ? (
         <Stack spacing={2}>
@@ -152,38 +164,36 @@ export function HomePage() {
             </Stack>
           )}
 
-          {/* The two hats plus context — main column and rail. */}
+          {/* The two hats plus context — a row-paired grid so side-by-side cards
+              (Waiting on you | Deadlines, My reviews | Recent activity) always
+              share the same height; grid items stretch to their row. */}
           <Box
             sx={{
               display: 'grid',
               gap: 2.5,
               gridTemplateColumns: { xs: '1fr', lg: 'repeat(2, minmax(0, 1fr))' },
-              alignItems: 'start',
             }}
           >
-            <Stack spacing={2.5} sx={{ minWidth: 0 }}>
-              <ReviewListCard
-                icon={UserCheck}
-                title="Waiting on you"
-                description="Reviews you are asked to work through."
-                reviews={waiting}
-                emptyText="Nothing waits on you — enjoy the quiet."
-                celebrateEmpty
-              />
-              <ReviewListCard
-                icon={FileText}
-                title="My reviews"
-                description="Reviews you own, running ones first."
-                reviews={owned}
-                emptyText="You own no reviews yet."
-                ownerCues
-              />
-              <RepliesCard replies={dashboardQuery.data?.replies ?? []} />
-            </Stack>
-            <Stack spacing={2.5} sx={{ minWidth: 0 }}>
-              <DeadlinesCard reviews={due} />
-              <ActivityCard activity={dashboardQuery.data?.activity ?? []} />
-            </Stack>
+            <ReviewListCard
+              icon={UserCheck}
+              title="Waiting on you"
+              description="Reviews you are asked to work through."
+              reviews={waiting}
+              emptyText="Nothing waits on you — enjoy the quiet."
+              celebrateEmpty
+            />
+            <DeadlinesCard reviews={due} />
+            <ReviewListCard
+              icon={FileText}
+              title="My reviews"
+              description="Reviews you own, running ones first."
+              reviews={owned}
+              emptyText="You own no reviews yet."
+              ownerCues
+            />
+            <ActivityCard activity={dashboardQuery.data?.activity ?? []} />
+            <RepliesCard replies={dashboardQuery.data?.replies ?? []} />
+            {userId && <PlayerCard userId={userId} />}
           </Box>
         </>
       )}
