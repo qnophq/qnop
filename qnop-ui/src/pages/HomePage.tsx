@@ -20,11 +20,12 @@
  */
 
 import Box from '@mui/material/Box';
+import Button from '@mui/material/Button';
 import Chip from '@mui/material/Chip';
 import Skeleton from '@mui/material/Skeleton';
 import Stack from '@mui/material/Stack';
 import Typography from '@mui/material/Typography';
-import { CalendarClock, FileText, History, Inbox, Trophy, UserCheck } from 'lucide-react';
+import { CalendarClock, FileText, History, Inbox, Plus, Trophy, UserCheck } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useDashboard } from '../api/hooks/useDashboard';
 import { useReviews } from '../api/hooks/useReviews';
@@ -87,19 +88,32 @@ export function HomePage() {
 
   return (
     <Stack spacing={3}>
-      {/* Masthead: who, when, and the day's numbers. */}
-      <Box>
-        <Typography variant="h1">
-          {greeting(new Date().getHours())}
-          {firstName ? `, ${firstName}` : ''}.{' '}
-          <Box component="span" aria-hidden sx={{ fontSize: '0.8em' }}>
-            {greetingEmoji(new Date().getHours())}
-          </Box>
-        </Typography>
-        <Typography color="text.secondary" sx={{ mt: 0.5 }}>
-          {DATE_FORMAT.format(new Date())}
-        </Typography>
-      </Box>
+      {/* Masthead: who, when, and the page's one command — start a review. */}
+      <Stack
+        direction="row"
+        sx={{ alignItems: 'flex-start', justifyContent: 'space-between', gap: 2, flexWrap: 'wrap' }}
+      >
+        <Box>
+          <Typography variant="h1">
+            {greeting(new Date().getHours())}
+            {firstName ? `, ${firstName}` : ''}.{' '}
+            <Box component="span" aria-hidden sx={{ fontSize: '0.8em' }}>
+              {greetingEmoji(new Date().getHours())}
+            </Box>
+          </Typography>
+          <Typography color="text.secondary" sx={{ mt: 0.5 }}>
+            {DATE_FORMAT.format(new Date())}
+          </Typography>
+        </Box>
+        <Button
+          variant="contained"
+          startIcon={<Plus size={16} />}
+          onClick={() => navigate('/reviews/new')}
+          sx={{ mt: 0.75, flexShrink: 0 }}
+        >
+          New review
+        </Button>
+      </Stack>
 
       {loading ? (
         <Stack spacing={2}>
