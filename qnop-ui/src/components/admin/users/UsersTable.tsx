@@ -39,7 +39,7 @@ import Typography from '@mui/material/Typography';
 import { KeyRound, KeySquare, MoreVertical, SquarePen, Trash2 } from 'lucide-react';
 import type { AdminUserSummary } from '../../../api/generated';
 import { UserAvatar } from '../../shell/UserAvatar';
-import { formatDateTime, formatRelative } from '../../../utils/formatDate';
+import { useFormatters } from '../../../hooks/useFormatters';
 import { ToneBadge } from '../ToneBadge';
 import { UserRoleBadge, UserSourceBadge, UserStatusBadge } from './UserBadges';
 
@@ -77,6 +77,7 @@ export function UsersTable({
   onToggleEnabled,
   onDelete,
 }: UsersTableProps) {
+  const { formatDateTime, formatRelative } = useFormatters();
   const [anchorEl, setAnchorEl] = useState<HTMLElement | null>(null);
   const [active, setActive] = useState<AdminUserSummary | null>(null);
 

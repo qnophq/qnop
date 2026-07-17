@@ -34,6 +34,7 @@ import {
   PrincipalsApi,
   ReviewWorkflowApi,
   ServerConfigApi,
+  UserSettingsApi,
   UsersApi,
 } from './generated';
 import { performRefresh } from './refresh';
@@ -88,6 +89,7 @@ axiosInstance.interceptors.response.use(
 // here as endpoints are consumed (admin users, teams, settings — #104+).
 export const serverConfigApi = new ServerConfigApi(undefined, undefined, axiosInstance);
 export const usersApi = new UsersApi(undefined, undefined, axiosInstance);
+export const userSettingsApi = new UserSettingsApi(undefined, undefined, axiosInstance);
 export const authApi = new AuthApi(undefined, undefined, axiosInstance);
 export const authRegistrationApi = new AuthRegistrationApi(undefined, undefined, axiosInstance);
 export const authPasswordResetApi = new AuthPasswordResetApi(undefined, undefined, axiosInstance);

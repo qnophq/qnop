@@ -37,7 +37,7 @@ import Tooltip from '@mui/material/Tooltip';
 import Typography from '@mui/material/Typography';
 import { MoreVertical, SquarePen, Trash2 } from 'lucide-react';
 import type { OidcProviderDto } from '../../../api/generated';
-import { formatDateTime } from '../../../utils/formatDate';
+import { useFormatters } from '../../../hooks/useFormatters';
 import { ToneBadge } from '../ToneBadge';
 import { providerTypeLabel } from './oidcProviderTypes';
 
@@ -56,6 +56,7 @@ export function OidcProvidersTable({
   onToggleEnabled,
   onDelete,
 }: OidcProvidersTableProps) {
+  const { formatDateTime } = useFormatters();
   const [anchorEl, setAnchorEl] = useState<HTMLElement | null>(null);
   const [active, setActive] = useState<OidcProviderDto | null>(null);
 

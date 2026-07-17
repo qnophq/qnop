@@ -40,13 +40,14 @@ import { useMailTemplates } from '../../api/hooks/useMailTemplates';
 import { PageHeader } from '../../components/admin/layout/PageHeader';
 import { ToneBadge } from '../../components/admin/ToneBadge';
 import { SendTestEmailDialog } from '../../components/admin/mail/SendTestEmailDialog';
-import { formatRelative } from '../../utils/formatDate';
+import { useFormatters } from '../../hooks/useFormatters';
 import { localeDisplayName, localeShortCode } from '../../utils/locale';
 
 const COLUMNS = ['Template', 'Subject', 'Language', 'Source', 'Last edited', ''];
 
 /** A compact, navigable template row: name + key, subject, language, source and edit attribution. */
 function TemplateRow({ template, onOpen }: { template: MailTemplateResponse; onOpen: () => void }) {
+  const { formatRelative } = useFormatters();
   const customised = template.source === 'DATABASE';
   const onKeyDown = (event: KeyboardEvent<HTMLTableRowElement>) => {
     if (event.key === 'Enter' || event.key === ' ') {

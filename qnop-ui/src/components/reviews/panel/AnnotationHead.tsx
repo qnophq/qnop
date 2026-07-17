@@ -26,7 +26,7 @@ import { useTheme } from '@mui/material/styles';
 import type { AnnotationView } from '../../../api/generated';
 import { useComments } from '../../../api/hooks/useComments';
 import { useAuthStore } from '../../../stores/authStore';
-import { shortRelativeTime } from '../../../utils/relativeTime';
+import { useFormatters } from '../../../hooks/useFormatters';
 import { UserAvatar } from '../../shell/UserAvatar';
 import { isDocumentScoped } from '../annotationScope';
 import { AnnotationBadgeRow } from './AnnotationBadgeRow';
@@ -50,6 +50,7 @@ interface AnnotationHeadProps {
  */
 export function AnnotationHead({ annotation, unseen = false }: AnnotationHeadProps) {
   const theme = useTheme();
+  const { shortRelativeTime } = useFormatters();
   const userId = useAuthStore((state) => state.userId);
   const displayName = useAuthStore((state) => state.displayName);
   const avatarUrl = useAuthStore((state) => state.avatarUrl);

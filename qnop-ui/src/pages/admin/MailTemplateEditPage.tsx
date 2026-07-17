@@ -54,7 +54,7 @@ import {
   MustacheCodeEditor,
   type MustacheEditorHandle,
 } from '../../components/admin/mail/mustache/MustacheCodeEditor';
-import { formatRelative } from '../../utils/formatDate';
+import { useFormatters } from '../../hooks/useFormatters';
 import { apiErrorMessage } from '../../utils/apiError';
 
 /** Inserts text at the caret of a plain input, then restores focus and caret after re-render. */
@@ -118,6 +118,7 @@ function EditForm({
   const updateTemplate = useUpdateMailTemplate();
   const resetTemplate = useResetMailTemplate();
   const { toast, notify, clear } = useToast();
+  const { formatRelative } = useFormatters();
 
   const [subject, setSubject] = useState(template.subject);
   const [bodyPlain, setBodyPlain] = useState(template.bodyPlain);

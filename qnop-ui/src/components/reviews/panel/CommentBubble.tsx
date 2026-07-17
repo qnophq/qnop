@@ -23,7 +23,7 @@ import Box from '@mui/material/Box';
 import Stack from '@mui/material/Stack';
 import Typography from '@mui/material/Typography';
 import { useTheme } from '@mui/material/styles';
-import { shortRelativeTime } from '../../../utils/relativeTime';
+import { useFormatters } from '../../../hooks/useFormatters';
 import type { Notify } from '../../admin/layout/useToast';
 import { UserAvatar } from '../../shell/UserAvatar';
 import { CopyLinkButton } from '../permalink/CopyLinkButton';
@@ -71,6 +71,7 @@ export function CommentBubble({
   notify,
 }: CommentBubbleProps) {
   const theme = useTheme();
+  const { shortRelativeTime } = useFormatters();
   return (
     <Stack id={domId} direction="row" spacing={1} sx={{ alignItems: 'flex-start' }}>
       <Box sx={{ position: 'relative', zIndex: 1, pt: 0.25 }}>

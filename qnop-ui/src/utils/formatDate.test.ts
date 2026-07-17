@@ -36,6 +36,19 @@ describe('formatDateTime', () => {
     expect(formatted).not.toBe('—');
     expect(formatted).toMatch(/2026/);
   });
+
+  it('renders the same instant differently under different display zones (issue #465)', () => {
+    // 23:30 UTC is already the next calendar day in Tokyo (UTC+9 → 08:30).
+    const iso = '2026-07-12T23:30:00Z';
+    expect(formatDateTime(iso, 'UTC')).toMatch(/12 Jul 2026/);
+    expect(formatDateTime(iso, 'Asia/Tokyo')).toMatch(/13 Jul 2026/);
+    expect(formatDateTime(iso, 'UTC')).not.toBe(formatDateTime(iso, 'Asia/Tokyo'));
+  });
+
+  it('defaults to UTC when no zone is passed', () => {
+    const iso = '2026-07-12T23:30:00Z';
+    expect(formatDateTime(iso)).toBe(formatDateTime(iso, 'UTC'));
+  });
 });
 
 describe('formatRelative', () => {
