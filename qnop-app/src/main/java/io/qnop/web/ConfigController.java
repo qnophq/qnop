@@ -82,7 +82,11 @@ public class ConfigController implements ServerConfigApi {
         new ServerConfigResponse()
             .version(resolveVersion())
             .edition(Edition.COMMUNITY)
-            .general(new ServerConfigGeneral().siteName("qnop").defaultTimezone("UTC"))
+            .general(
+                new ServerConfigGeneral()
+                    .siteName("qnop")
+                    .defaultTimezone(
+                        settings.getString(ApplicationSettingKey.GENERAL_DEFAULT_TIMEZONE)))
             .auth(
                 new ServerConfigAuth()
                     .oidcProviders(enabledOidcProviders())

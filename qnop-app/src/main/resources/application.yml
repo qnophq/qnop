@@ -9,6 +9,16 @@
 spring:
   application:
     name: qnop
+  jackson:
+    datatype:
+      datetime:
+        # Timestamp L10n policy (issue #465, ADR-0039): every java.time value serializes as an
+        # ISO-8601 string with an explicit offset (Instant → ...Z), never epoch millis. This is
+        # the Jackson 3 default, pinned here so a future dependency bump cannot silently flip it.
+        # In Jackson 3 WRITE_DATES_AS_TIMESTAMPS is a DateTimeFeature (not SerializationFeature),
+        # bound by Spring Boot 4 under spring.jackson.datatype.datetime; the key must be the exact
+        # enum constant (relaxed kebab-case binding does not apply to tools.jackson enum keys).
+        WRITE_DATES_AS_TIMESTAMPS: false
   datasource:
     url: jdbc:postgresql://${QNOP_DB_HOST:localhost}:${QNOP_DB_PORT:5432}/${QNOP_DB_NAME:qnop}
     username: ${QNOP_DB_USERNAME:qnop}

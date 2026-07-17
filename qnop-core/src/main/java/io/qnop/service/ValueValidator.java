@@ -22,6 +22,8 @@ package io.qnop.service;
 
 import io.qnop.entity.SettingValueType;
 import java.net.URI;
+import java.time.DateTimeException;
+import java.time.ZoneId;
 import java.util.List;
 import java.util.regex.Pattern;
 
@@ -101,6 +103,7 @@ public final class ValueValidator {
       switch (constraints.format()) {
         case EMAIL -> requireEmail(keyForError, value);
         case URL -> requireHttpUrl(keyForError, value);
+        case TIMEZONE -> requireTimezone(keyForError, value);
       }
     }
   }
@@ -108,6 +111,19 @@ public final class ValueValidator {
   private static void requireEmail(String keyForError, String value) {
     if (!EMAIL_PATTERN.matcher(value.trim()).matches()) {
       throw new SettingValidationException(keyForError, "must be a valid email address");
+    }
+  }
+
+  /**
+   * Requires a valid IANA time-zone id ({@code ZoneId.of}). Fixed offsets like {@code +02:00} are
+   * accepted by {@code ZoneId} too, but a region id (e.g. {@code Europe/Berlin}) is the intended
+   * value; both round-trip correctly to {@code Intl.DateTimeFormat} on the frontend.
+   */
+  private static void requireTimezone(String keyForError, String value) {
+    try {
+      ZoneId.of(value.trim());
+    } catch (DateTimeException e) {
+      throw new SettingValidationException(keyForError, "must be a valid IANA timezone id");
     }
   }
 

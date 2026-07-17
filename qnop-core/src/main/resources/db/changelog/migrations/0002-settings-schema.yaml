@@ -124,6 +124,13 @@ databaseChangeLog:
         - insert:
             tableName: application_setting
             columns:
+              - column: { name: setting_key, value: "general.default_timezone" }
+              - column: { name: setting_value, value: "UTC" }
+              - column: { name: setting_desc, value: "Default display timezone (IANA id) used as the fallback for users without a personal preference." }
+              - column: { name: value_type, value: "STRING" }
+        - insert:
+            tableName: application_setting
+            columns:
               - column: { name: setting_key, value: "upload.max_file_size_mb" }
               - column: { name: setting_value, value: "25" }
               - column: { name: setting_desc, value: "Maximum document upload size in megabytes." }

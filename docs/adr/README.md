@@ -50,6 +50,7 @@ Important architecture decisions are recorded here as ADRs (see [ADR-0001](0001-
 | [0036](0036-object-storage-lifecycle-staging-and-reaper.md) | Object-storage lifecycle: staging registry + orphan reaper | Accepted |
 | [0037](0037-observability-actuator-health-and-prometheus.md) | Observability: Actuator health, job-queue health indicator, Prometheus metrics | Accepted |
 | [0038](0038-per-review-privacy.md) | Per-review privacy: anonymity & thread participation policy | Accepted |
+| [0039](0039-datetime-l10n-policy.md) | Date/time L10n: store UTC, transport ISO-with-offset, render in the user's zone | Accepted |
 
 ## Template
 

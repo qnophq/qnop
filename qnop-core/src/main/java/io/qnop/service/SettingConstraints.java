@@ -31,7 +31,8 @@ public record SettingConstraints(Integer min, Integer max, ValueFormat format) {
   /** A string format an {@code ENUM}-free value must match when non-blank. */
   public enum ValueFormat {
     EMAIL,
-    URL
+    URL,
+    TIMEZONE
   }
 
   /** No extra constraints beyond the declared type. */

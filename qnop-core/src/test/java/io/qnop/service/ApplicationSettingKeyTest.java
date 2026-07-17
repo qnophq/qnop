@@ -44,6 +44,7 @@ class ApplicationSettingKeyTest {
           "general.application_name",
           "general.base_url",
           "general.default_language",
+          "general.default_timezone",
           "upload.max_file_size_mb",
           "tracking.enabled",
           "tracking.provider",

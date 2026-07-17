@@ -53,6 +53,12 @@ public enum ApplicationSettingKey {
       SettingValueType.STRING,
       "en",
       "Default UI language (ISO 639-1)."),
+  GENERAL_DEFAULT_TIMEZONE(
+      "general.default_timezone",
+      SettingValueType.STRING,
+      "UTC",
+      "Default display timezone (IANA id, e.g. UTC, Europe/Berlin), used as the fallback for users"
+          + " without a personal preference."),
   UPLOAD_MAX_FILE_SIZE_MB(
       "upload.max_file_size_mb",
       SettingValueType.INTEGER,
@@ -132,7 +138,9 @@ public enum ApplicationSettingKey {
           AUTH_PASSWORD_RESET_TOKEN_TTL_MINUTES, SettingConstraints.range(1, 1440),
           SMTP_PORT, SettingConstraints.range(1, 65535),
           SMTP_FROM, SettingConstraints.format(SettingConstraints.ValueFormat.EMAIL),
-          GENERAL_BASE_URL, SettingConstraints.format(SettingConstraints.ValueFormat.URL));
+          GENERAL_BASE_URL, SettingConstraints.format(SettingConstraints.ValueFormat.URL),
+          GENERAL_DEFAULT_TIMEZONE,
+              SettingConstraints.format(SettingConstraints.ValueFormat.TIMEZONE));
 
   private final String key;
   private final SettingValueType type;
