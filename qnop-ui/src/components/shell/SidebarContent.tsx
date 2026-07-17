@@ -57,7 +57,7 @@ export function SidebarContent({ collapsed, onNavigate }: SidebarContentProps) {
   const fullLogoUrl =
     theme.palette.mode === 'dark' ? branding?.logoDark.url : branding?.logoLight.url;
 
-  // The brand-mark box, shared by the collapsed rail and the expanded fallback.
+  // The brand-mark fallback box, shared by the collapsed and expanded fallbacks.
   const markBoxSx: SxProps<Theme> = {
     width: 30,
     height: 30,
@@ -86,14 +86,16 @@ export function SidebarContent({ collapsed, onNavigate }: SidebarContentProps) {
         }}
       >
         {collapsed ? (
-          <Box sx={markBoxSx}>
-            <BrandLogo
-              url={logomarkUrl}
-              alt="qnop"
-              fallback={<ShieldCheck size={18} />}
-              sx={{ width: 20, height: 20 }}
-            />
-          </Box>
+          <BrandLogo
+            url={logomarkUrl}
+            alt="qnop"
+            fallback={
+              <Box sx={markBoxSx}>
+                <ShieldCheck size={18} />
+              </Box>
+            }
+            sx={{ width: 30, height: 30, borderRadius: 1.75, flexShrink: 0 }}
+          />
         ) : (
           <BrandLogo
             url={fullLogoUrl}

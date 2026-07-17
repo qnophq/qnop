@@ -1,0 +1,13 @@
+{
+  "name": "qnop-branding-tools",
+  "private": true,
+  "type": "module",
+  "description": "Regenerates the qnop brand assets (see README.md and issue #153)",
+  "scripts": {
+    "generate": "node generate-assets.mjs"
+  },
+  "devDependencies": {
+    "fontkit": "^2.0.4",
+    "sharp": "^0.34.5"
+  }
+}
