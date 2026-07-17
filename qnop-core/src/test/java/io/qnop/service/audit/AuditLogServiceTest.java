@@ -22,9 +22,9 @@ package io.qnop.service.audit;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.eq;
-import static org.mockito.ArgumentMatchers.isNull;
+import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
@@ -36,6 +36,10 @@ import io.qnop.repository.DocumentRepository;
 import io.qnop.repository.UserRepository;
 import io.qnop.service.audit.AuditLogService.AuditEventView;
 import io.qnop.service.audit.AuditLogService.AuditPage;
+import jakarta.persistence.criteria.CriteriaBuilder;
+import jakarta.persistence.criteria.CriteriaQuery;
+import jakarta.persistence.criteria.Predicate;
+import jakarta.persistence.criteria.Root;
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
@@ -51,6 +55,7 @@ import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
+import org.springframework.data.jpa.domain.Specification;
 
 /**
  * The audit-list mapping and paging rules (issue #466, ADR-0041): real actor/document resolution,
@@ -103,7 +108,7 @@ class AuditLogServiceTest {
   @DisplayName("a null actor renders as System and is not looked up")
   void systemActorRendersAsSystem() {
     AuditEvent systemEvent = new AuditEvent(documentId, "document.extraction.failed", null, null);
-    when(auditEvents.findFiltered(any(), any(), any(), any(), any(), any()))
+    when(auditEvents.findAll(any(Specification.class), any(Pageable.class)))
         .thenReturn(new PageImpl<>(List.of(systemEvent), PageRequest.of(0, 20), 1));
     when(documents.findAllById(List.of(documentId))).thenReturn(List.of());
 
@@ -119,7 +124,7 @@ class AuditLogServiceTest {
   @DisplayName("an unresolved actor or document yields null names, never a raw id")
   void unresolvedEntitiesYieldNulls() {
     AuditEvent event = new AuditEvent(documentId, "annotation.created", actorId, null);
-    when(auditEvents.findFiltered(any(), any(), any(), any(), any(), any()))
+    when(auditEvents.findAll(any(Specification.class), any(Pageable.class)))
         .thenReturn(new PageImpl<>(List.of(event), PageRequest.of(0, 20), 1));
     when(users.findDisplayNamesByIdIn(List.of(actorId))).thenReturn(List.of());
     when(documents.findAllById(List.of(documentId))).thenReturn(List.of());
@@ -135,13 +140,13 @@ class AuditLogServiceTest {
   @Test
   @DisplayName("clamps size to [1, MAX] and page to >= 0, sorted by createdAt DESC")
   void clampsPagingAndSorts() {
-    when(auditEvents.findFiltered(any(), any(), any(), any(), any(), any()))
+    when(auditEvents.findAll(any(Specification.class), any(Pageable.class)))
         .thenReturn(new PageImpl<>(List.of(), PageRequest.of(0, 100), 0));
 
     AuditPage page = service.list(null, null, null, null, null, -5, 500);
 
     ArgumentCaptor<Pageable> pageable = ArgumentCaptor.forClass(Pageable.class);
-    verify(auditEvents).findFiltered(any(), any(), any(), any(), any(), pageable.capture());
+    verify(auditEvents).findAll(any(Specification.class), pageable.capture());
     assertThat(pageable.getValue().getPageNumber()).isZero();
     assertThat(pageable.getValue().getPageSize()).isEqualTo(AuditLogService.MAX_PAGE_SIZE);
     assertThat(pageable.getValue().getSort().getOrderFor("createdAt").getDirection())
@@ -154,7 +159,7 @@ class AuditLogServiceTest {
   @Test
   @DisplayName("a null size falls back to the default page size")
   void nullSizeUsesDefault() {
-    when(auditEvents.findFiltered(any(), any(), any(), any(), any(), any()))
+    when(auditEvents.findAll(any(Specification.class), any(Pageable.class)))
         .thenReturn(new PageImpl<>(List.of(), PageRequest.of(0, 20), 0));
 
     AuditPage page = service.list(null, null, null, null, null, 0, null);
@@ -163,36 +168,46 @@ class AuditLogServiceTest {
   }
 
   @Test
-  @DisplayName("a blank event-type filter is treated as absent")
-  void blankEventTypeBecomesNull() {
-    when(auditEvents.findFiltered(isNull(), any(), any(), any(), any(), any()))
-        .thenReturn(new PageImpl<>(List.of(), PageRequest.of(0, 20), 0));
+  @DisplayName("the filter spec adds one predicate per non-null argument")
+  void filterAddsOnePredicatePerArgument() {
+    @SuppressWarnings("unchecked")
+    Root<AuditEvent> root = mock(Root.class);
+    CriteriaQuery<?> query = mock(CriteriaQuery.class);
+    CriteriaBuilder cb = mock(CriteriaBuilder.class);
 
-    service.list("   ", null, null, null, null, 0, 20);
+    AuditLogService.filter(
+            "annotation.resolved",
+            actorId,
+            documentId,
+            Instant.parse("2026-01-01T00:00:00Z"),
+            Instant.parse("2026-12-31T23:59:59Z"))
+        .toPredicate(root, query, cb);
 
-    verify(auditEvents).findFiltered(isNull(), any(), any(), any(), any(), any());
+    // any(Object.class) pins the equal(Expression, Object) overload the builder actually calls.
+    verify(cb, times(3)).equal(any(), any(Object.class)); // eventType, actorId, documentId
+    verify(cb).greaterThanOrEqualTo(any(), any(Instant.class)); // from
+    verify(cb).lessThanOrEqualTo(any(), any(Instant.class)); // to
+    verify(cb).and(any(Predicate[].class));
   }
 
   @Test
-  @DisplayName("passes concrete filters straight through to the query")
-  void passesFiltersThrough() {
-    Instant from = Instant.parse("2026-01-01T00:00:00Z");
-    Instant to = Instant.parse("2026-12-31T23:59:59Z");
-    when(auditEvents.findFiltered(
-            eq("annotation.resolved"), eq(actorId), eq(documentId), eq(from), eq(to), any()))
-        .thenReturn(new PageImpl<>(List.of(), PageRequest.of(0, 20), 0));
+  @DisplayName("an all-null filter restricts nothing (unrestricted conjunction)")
+  void emptyFilterRestrictsNothing() {
+    @SuppressWarnings("unchecked")
+    Root<AuditEvent> root = mock(Root.class);
+    CriteriaQuery<?> query = mock(CriteriaQuery.class);
+    CriteriaBuilder cb = mock(CriteriaBuilder.class);
 
-    service.list("annotation.resolved", actorId, documentId, from, to, 0, 20);
+    AuditLogService.filter(null, null, null, null, null).toPredicate(root, query, cb);
 
-    verify(auditEvents)
-        .findFiltered(
-            eq("annotation.resolved"), eq(actorId), eq(documentId), eq(from), eq(to), any());
+    verify(cb, never()).equal(any(), any(Object.class));
+    verify(cb).and(any(Predicate[].class));
   }
 
   @Test
   @DisplayName("an empty page does no enrichment lookups")
   void emptyPageSkipsLookups() {
-    when(auditEvents.findFiltered(any(), any(), any(), any(), any(), any()))
+    when(auditEvents.findAll(any(Specification.class), any(Pageable.class)))
         .thenReturn(new PageImpl<>(List.of(), PageRequest.of(0, 20), 0));
 
     AuditPage page = service.list(null, null, null, null, null, 0, 20);

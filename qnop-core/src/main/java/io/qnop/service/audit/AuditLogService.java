@@ -28,7 +28,9 @@ import io.qnop.repository.AuditEventRepository;
 import io.qnop.repository.DocumentRepository;
 import io.qnop.repository.UserDisplayName;
 import io.qnop.repository.UserRepository;
+import jakarta.persistence.criteria.Predicate;
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -36,6 +38,7 @@ import java.util.UUID;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
+import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -114,16 +117,41 @@ public class AuditLogService {
     String filterEventType = eventType == null || eventType.isBlank() ? null : eventType;
 
     Page<AuditEvent> result =
-        auditEvents.findFiltered(
-            filterEventType,
-            actorId,
-            documentId,
-            from,
-            to,
+        auditEvents.findAll(
+            filter(filterEventType, actorId, documentId, from, to),
             PageRequest.of(pageIndex, pageSize, Sort.by(Sort.Direction.DESC, "createdAt")));
 
     return new AuditPage(
         enrich(result.getContent()), result.getTotalElements(), pageIndex, pageSize);
+  }
+
+  /**
+   * The dynamic filter as a {@link Specification} — each non-null argument adds one equality/range
+   * predicate. Built with the Criteria API (not a JPQL {@code (:param IS NULL OR …)} query) so a
+   * null timestamp bound cannot trip PostgreSQL's "could not determine data type of parameter"
+   * error. An all-null filter yields an unrestricted conjunction (the full org-wide trail).
+   */
+  static Specification<AuditEvent> filter(
+      String eventType, UUID actorId, UUID documentId, Instant from, Instant to) {
+    return (root, query, cb) -> {
+      List<Predicate> predicates = new ArrayList<>();
+      if (eventType != null) {
+        predicates.add(cb.equal(root.get("eventType"), eventType));
+      }
+      if (actorId != null) {
+        predicates.add(cb.equal(root.get("actorId"), actorId));
+      }
+      if (documentId != null) {
+        predicates.add(cb.equal(root.get("documentId"), documentId));
+      }
+      if (from != null) {
+        predicates.add(cb.greaterThanOrEqualTo(root.<Instant>get("createdAt"), from));
+      }
+      if (to != null) {
+        predicates.add(cb.lessThanOrEqualTo(root.<Instant>get("createdAt"), to));
+      }
+      return cb.and(predicates.toArray(new Predicate[0]));
+    };
   }
 
   /** Batch-resolves actor names and document metadata for a page, then maps to views. */

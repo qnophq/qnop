@@ -227,12 +227,13 @@ class AuditApiIT extends SeededIntegrationTest {
   }
 
   @Test
-  @DisplayName("page size is bounded to the contract maximum")
+  @DisplayName("a page size beyond the contract maximum is rejected (bean validation)")
   void boundedPageSize() throws Exception {
-    seedTrail();
+    // The OpenAPI `maximum: 100` becomes @Max(100) on the endpoint, so an over-max size is a 400
+    // at the boundary — the same bound the admin list enforces. The service also clamps defensively
+    // for direct (non-HTTP) callers (see AuditLogServiceTest).
     mockMvc
         .perform(as(get(AUDIT).param("size", "500"), AUDITOR_ID))
-        .andExpect(status().isOk())
-        .andExpect(jsonPath("$.size").value(100));
+        .andExpect(status().isBadRequest());
   }
 }
