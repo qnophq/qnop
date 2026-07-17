@@ -26,6 +26,7 @@ import { ThemeProvider } from '@mui/material/styles';
 import type { DashboardResponse, DocumentSummary } from '../api/generated';
 import { useDashboard } from '../api/hooks/useDashboard';
 import { useReviews } from '../api/hooks/useReviews';
+import { useUserProfile } from '../api/hooks/useUsers';
 import { buildTheme } from '../theme/theme';
 import { useAuthStore } from '../stores/authStore';
 import { HomePage } from './HomePage';
@@ -37,6 +38,10 @@ vi.mock('../api/hooks/useReviews', async (importOriginal) => ({
 vi.mock('../api/hooks/useDashboard', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../api/hooks/useDashboard')>()),
   useDashboard: vi.fn(),
+}));
+vi.mock('../api/hooks/useUsers', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../api/hooks/useUsers')>()),
+  useUserProfile: vi.fn(),
 }));
 
 const ME = 'me';
@@ -73,6 +78,22 @@ function mockData(reviews: DocumentSummary[], dashboard?: Partial<DashboardRespo
       ...dashboard,
     },
   } as unknown as ReturnType<typeof useDashboard>);
+  vi.mocked(useUserProfile).mockReturnValue({
+    isPending: false,
+    isError: false,
+    data: {
+      id: ME,
+      slug: 'mia-member',
+      displayName: 'Mia Member',
+      stats: {
+        reviewsOwned: 3,
+        reviewsParticipating: 5,
+        annotationsRaised: 12,
+        annotationsResolved: 7,
+        commentsWritten: 4,
+      },
+    },
+  } as unknown as ReturnType<typeof useUserProfile>);
 }
 
 function renderPage() {
@@ -188,5 +209,18 @@ describe('HomePage dashboard (issue #454)', () => {
     expect(screen.getByTestId('empty-dashboard')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /Start your first review/ })).toBeInTheDocument();
     expect(screen.getByText('Three moves to your first review')).toBeInTheDocument();
+  });
+
+  it("shows the caller's reviewer card with the profile stats", () => {
+    mockData([review()]);
+    renderPage();
+
+    expect(screen.getByText('Your reviewer card')).toBeInTheDocument();
+    // The four contribution numbers from the public-profile aggregates.
+    expect(screen.getByText('12')).toBeInTheDocument();
+    expect(screen.getByText('Raised')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'View profile' })).toBeInTheDocument();
+    // Earned achievements render as unlocked stickers.
+    expect(screen.getByLabelText(/Liftoff: Started a review/)).toBeInTheDocument();
   });
 });

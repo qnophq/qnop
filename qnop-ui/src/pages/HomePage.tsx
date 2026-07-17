@@ -31,6 +31,7 @@ import { useDashboard } from '../api/hooks/useDashboard';
 import { useReviews } from '../api/hooks/useReviews';
 import { PageHeader } from '../components/admin/layout/PageHeader';
 import { ActivityCard } from '../components/dashboard/ActivityCard';
+import { PlayerCard } from '../components/dashboard/PlayerCard';
 import {
   deadlines,
   dueUrgency,
@@ -60,8 +61,9 @@ const DATE_FORMAT = new Intl.DateTimeFormat('en-US', {
  * greeting masthead with the glance numbers, then the two hats side by side —
  * what the caller owes as a reviewer, what their own reviews are up to —
  * flanked by replies directed at them, the deadline rail and the recent
- * activity of their reviews. Renders from exactly two requests: the reviews
- * overview and the dashboard aggregates.
+ * activity of their reviews, and the caller's own player card. Renders from
+ * three cached requests: the reviews overview, the dashboard aggregates and
+ * the caller's public profile.
  */
 export function HomePage() {
   const navigate = useNavigate();
@@ -191,6 +193,7 @@ export function HomePage() {
             />
             <ActivityCard activity={dashboardQuery.data?.activity ?? []} />
             <RepliesCard replies={dashboardQuery.data?.replies ?? []} />
+            {userId && <PlayerCard userId={userId} />}
           </Box>
         </>
       )}
