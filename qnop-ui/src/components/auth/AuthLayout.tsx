@@ -22,11 +22,13 @@
 import type { ReactNode } from 'react';
 import Box from '@mui/material/Box';
 import Typography from '@mui/material/Typography';
-import { keyframes, useTheme } from '@mui/material/styles';
+import { keyframes } from '@mui/material/styles';
 import { ShieldCheck } from 'lucide-react';
 import { useConfig } from '../../api/hooks/useConfig';
 import { BrandLogo } from '../branding/BrandLogo';
 import { BrandPanel } from './BrandPanel';
+import { tokens } from '../../theme/tokens';
+import authBg from '../../assets/auth/auth-bg.webp';
 import authDocs from '../../assets/auth/auth-docs.svg';
 
 /** Slow bob for the corner document illustration (it carries its own tilt). */
@@ -44,44 +46,112 @@ interface AuthLayoutProps {
 }
 
 /**
- * Compact brand header for viewports where the brand panel is hidden (below
- * `md`): the tenant logo (theme-appropriate variant) or the qnop mini wordmark,
- * so mobile users don't land on an unbranded form (#503).
+ * Full-bleed brand band for viewports where the brand panel is hidden (below
+ * `md`): the sovereign navy atmosphere with the calm document backdrop and a
+ * large tenant logo, so mobile users get the same brand moment as the desktop
+ * stage instead of an unbranded form (#503). The band is always navy, so it
+ * uses the dark-surface logo variant regardless of theme.
  */
-function MobileBrandHeader() {
-  const dark = useTheme().palette.mode === 'dark';
-  const branding = useConfig().data?.branding;
-  const logoUrl = dark ? branding?.logoDark.url : branding?.logoLight.url;
+function MobileBrandBand() {
+  const logoUrl = useConfig().data?.branding?.logoDark.url;
+  // The band's backgrounds fade out through a mask instead of ending on a hard
+  // edge, so the navy atmosphere dissolves into whatever the theme's page
+  // background is — no seam between brand band and form.
+  const fadeMask = 'linear-gradient(to bottom, #000 40%, transparent 96%)';
   return (
-    <Box sx={{ display: { xs: 'flex', md: 'none' }, justifyContent: 'center', mb: 4 }}>
-      <BrandLogo
-        url={logoUrl}
-        alt="qnop"
-        sx={{ height: 32, maxWidth: 200 }}
-        fallback={
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-            <Box
-              sx={{
-                width: 32,
-                height: 32,
-                borderRadius: 1.25,
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                color: 'primary.main',
-                bgcolor: (t) =>
-                  t.palette.mode === 'dark' ? 'rgba(18,144,239,0.16)' : 'rgba(18,144,239,0.10)',
-                border: '1px solid rgba(18,144,239,0.28)',
-              }}
-            >
-              <ShieldCheck size={19} />
+    <Box
+      sx={{
+        display: { xs: 'flex', md: 'none' },
+        position: 'relative',
+        overflow: 'hidden',
+        minHeight: { xs: 200, sm: 232 },
+        alignItems: 'center',
+        justifyContent: 'center',
+        color: '#fff',
+        pb: 4.5,
+      }}
+    >
+      <Box
+        aria-hidden
+        sx={{ position: 'absolute', inset: 0, maskImage: fadeMask, WebkitMaskImage: fadeMask }}
+      >
+        <Box
+          sx={{
+            position: 'absolute',
+            inset: 0,
+            background: `linear-gradient(155deg, ${tokens.brand.navy} 0%, ${tokens.brand.navy700} 60%, #034079 100%)`,
+          }}
+        />
+        <Box
+          component="img"
+          src={authBg}
+          alt=""
+          sx={{
+            position: 'absolute',
+            inset: 0,
+            width: '100%',
+            height: '100%',
+            objectFit: 'cover',
+            objectPosition: 'right center',
+            opacity: 0.65,
+          }}
+        />
+        <Box
+          sx={{
+            position: 'absolute',
+            inset: 0,
+            background: 'linear-gradient(to bottom, rgba(1,22,44,0.3) 0%, transparent 45%)',
+          }}
+        />
+      </Box>
+      <Box
+        sx={{
+          position: 'relative',
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          gap: 1.5,
+          px: 3,
+        }}
+      >
+        <BrandLogo
+          url={logoUrl}
+          alt="qnop"
+          sx={{ height: { xs: 56, sm: 64 }, maxWidth: 300 }}
+          fallback={
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+              <Box
+                sx={{
+                  width: 56,
+                  height: 56,
+                  borderRadius: 2,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  bgcolor: 'rgba(255,255,255,0.12)',
+                  border: '1px solid rgba(255,255,255,0.18)',
+                }}
+              >
+                <ShieldCheck size={32} />
+              </Box>
+              <Typography sx={{ fontWeight: 700, fontSize: 28, letterSpacing: '-0.02em' }}>
+                qnop
+              </Typography>
             </Box>
-            <Typography sx={{ fontWeight: 700, fontSize: 17, letterSpacing: '-0.02em' }}>
-              qnop
-            </Typography>
-          </Box>
-        }
-      />
+          }
+        />
+        <Typography
+          sx={{
+            fontSize: 11,
+            letterSpacing: '0.14em',
+            textTransform: 'uppercase',
+            color: '#9BCEFA',
+            fontWeight: 600,
+          }}
+        >
+          Sovereign document review
+        </Typography>
+      </Box>
     </Box>
   );
 }
@@ -107,14 +177,13 @@ export function AuthLayout({ title, subtitle, headerSlot, children }: AuthLayout
       <Box
         sx={{
           display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          p: { xs: 3, sm: 5 },
+          flexDirection: 'column',
           bgcolor: 'background.default',
           position: 'relative',
           overflow: 'hidden',
         }}
       >
+        <MobileBrandBand />
         {/* decorative corner accent: the annotated-document motif from the logomark */}
         <Box
           aria-hidden
@@ -122,38 +191,49 @@ export function AuthLayout({ title, subtitle, headerSlot, children }: AuthLayout
           src={authDocs}
           alt=""
           sx={{
-            display: { xs: 'none', md: 'block' },
             position: 'absolute',
-            right: -40,
-            bottom: -54,
-            width: 200,
+            right: { xs: -34, sm: -40 },
+            bottom: { xs: -56, sm: -54 },
+            width: { xs: 130, sm: 200 },
+            // On phones the form can reach into the corner (outlined buttons are
+            // transparent), so the accent steps back to a subtle watermark.
+            opacity: { xs: 0.45, sm: 1 },
             pointerEvents: 'none',
             filter: 'drop-shadow(0 18px 30px rgba(0,0,0,0.30))',
             animation: `${floatDocs} 7s ease-in-out 0.8s infinite alternate`,
             '@media (prefers-reduced-motion: reduce)': { animation: 'none' },
           }}
         />
-        <Box sx={{ width: '100%', maxWidth: 408, position: 'relative', zIndex: 1 }}>
-          <MobileBrandHeader />
-          {headerSlot}
-          <Typography
-            component="h1"
-            sx={{
-              fontWeight: 700,
-              fontSize: 26,
-              letterSpacing: '-0.02em',
-              lineHeight: 1.15,
-              mb: subtitle ? 0.75 : 3,
-            }}
-          >
-            {title}
-          </Typography>
-          {subtitle && (
-            <Typography color="text.secondary" sx={{ fontSize: 14.5, mb: 3 }}>
-              {subtitle}
+        <Box
+          sx={{
+            flex: 1,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            p: { xs: 3, sm: 5 },
+          }}
+        >
+          <Box sx={{ width: '100%', maxWidth: 408, position: 'relative', zIndex: 1 }}>
+            {headerSlot}
+            <Typography
+              component="h1"
+              sx={{
+                fontWeight: 700,
+                fontSize: 26,
+                letterSpacing: '-0.02em',
+                lineHeight: 1.15,
+                mb: subtitle ? 0.75 : 3,
+              }}
+            >
+              {title}
             </Typography>
-          )}
-          {children}
+            {subtitle && (
+              <Typography color="text.secondary" sx={{ fontSize: 14.5, mb: 3 }}>
+                {subtitle}
+              </Typography>
+            )}
+            {children}
+          </Box>
         </Box>
       </Box>
     </Box>
