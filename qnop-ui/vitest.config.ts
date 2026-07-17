@@ -41,6 +41,7 @@ export default defineConfig({
         'src/components/auth/ProtectedRoute.tsx',
         'src/components/auth/AdminRoute.tsx',
         'src/components/auth/RoleRoute.tsx',
+        'src/components/auth/TeamLeadRoute.tsx',
         'src/components/auth/AuthHydrationBoundary.tsx',
         'src/components/shell/navConfig.tsx',
         // Auth screens — the critical entry flow (issue #352, wave 1).
@@ -56,6 +57,11 @@ export default defineConfig({
         'src/pages/admin/SettingsPage.tsx',
         'src/pages/admin/BrandingPage.tsx',
         'src/pages/admin/OidcProvidersPage.tsx',
+        // Team-lead self-management surface (issue #470): the "My Teams" landing
+        // and detail pages own the orchestration/state; the add-member dialog
+        // stays on its own component test.
+        'src/pages/my-teams/MyTeamsPage.tsx',
+        'src/pages/my-teams/MyTeamDetailPage.tsx',
         // The viewer's pure anchor-building logic (#250) plus the document
         // surface (issue #352, wave 2): the pdf.js loader/canvas wiring and the
         // scrollable page stack with its scroll spy and rubber-band selection.

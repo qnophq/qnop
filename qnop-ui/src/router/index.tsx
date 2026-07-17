@@ -27,6 +27,7 @@ import { LazyBoundary } from '../components/errors/LazyBoundary';
 import { AdminRoute } from '../components/auth/AdminRoute';
 import { ProtectedRoute } from '../components/auth/ProtectedRoute';
 import { RoleRoute } from '../components/auth/RoleRoute';
+import { TeamLeadRoute } from '../components/auth/TeamLeadRoute';
 import { ComingSoonPage } from '../pages/ComingSoonPage';
 import { HomePage } from '../pages/HomePage';
 import { BrandingPage } from '../pages/admin/BrandingPage';
@@ -39,6 +40,8 @@ import { SettingsPage } from '../pages/admin/SettingsPage';
 import { UsersPage } from '../pages/admin/UsersPage';
 import { TeamsPage } from '../pages/admin/TeamsPage';
 import { TeamDetailPage } from '../pages/admin/TeamDetailPage';
+import { MyTeamsPage } from '../pages/my-teams/MyTeamsPage';
+import { MyTeamDetailPage } from '../pages/my-teams/MyTeamDetailPage';
 import { ChangePasswordPage } from '../pages/auth/ChangePasswordPage';
 import { ForgotPasswordPage } from '../pages/auth/ForgotPasswordPage';
 import { LoginPage } from '../pages/auth/LoginPage';
@@ -124,6 +127,22 @@ export const router = createBrowserRouter([
               <ReviewTasksPage />
             </LazyBoundary>
           </ReviewParamGate>
+        ),
+      },
+      {
+        path: 'my-teams',
+        element: (
+          <TeamLeadRoute>
+            <MyTeamsPage />
+          </TeamLeadRoute>
+        ),
+      },
+      {
+        path: 'my-teams/:id',
+        element: (
+          <TeamLeadRoute>
+            <MyTeamDetailPage />
+          </TeamLeadRoute>
         ),
       },
       {

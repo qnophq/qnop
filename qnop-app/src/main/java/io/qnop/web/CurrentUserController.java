@@ -29,6 +29,7 @@ import io.qnop.api.v1.model.PublicUserTeam;
 import io.qnop.api.v1.model.UserRole;
 import io.qnop.api.v1.model.UserSource;
 import io.qnop.service.PublicProfileService;
+import io.qnop.service.TeamService;
 import io.qnop.service.UserNotFoundException;
 import io.qnop.service.UserService;
 import io.qnop.service.UserService.UserProfileView;
@@ -51,12 +52,17 @@ public class CurrentUserController implements UsersApi {
   private final UserService users;
   private final PublicProfileService publicProfiles;
   private final AvatarService avatars;
+  private final TeamService teams;
 
   public CurrentUserController(
-      UserService users, AvatarService avatars, PublicProfileService publicProfiles) {
+      UserService users,
+      AvatarService avatars,
+      PublicProfileService publicProfiles,
+      TeamService teams) {
     this.users = users;
     this.avatars = avatars;
     this.publicProfiles = publicProfiles;
+    this.teams = teams;
   }
 
   @Override
@@ -70,7 +76,8 @@ public class CurrentUserController implements UsersApi {
             .email(profile.email())
             .role(UserRole.fromValue(profile.role()))
             .source(UserSource.fromValue(profile.source()))
-            .avatarUrl(AvatarUrls.forUser(userId, avatars.updatedAt(userId).orElse(null))));
+            .avatarUrl(AvatarUrls.forUser(userId, avatars.updatedAt(userId).orElse(null)))
+            .teamLead(teams.leadsAnyTeam(userId)));
   }
 
   @Override

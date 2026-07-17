@@ -34,6 +34,7 @@ import {
   PrincipalsApi,
   ReviewWorkflowApi,
   ServerConfigApi,
+  TeamsApi,
   UserSettingsApi,
   UsersApi,
   DashboardApi,
@@ -95,6 +96,7 @@ export const authRegistrationApi = new AuthRegistrationApi(undefined, undefined,
 export const authPasswordResetApi = new AuthPasswordResetApi(undefined, undefined, axiosInstance);
 export const adminUsersApi = new AdminUsersApi(undefined, undefined, axiosInstance);
 export const adminTeamsApi = new AdminTeamsApi(undefined, undefined, axiosInstance);
+export const teamsApi = new TeamsApi(undefined, undefined, axiosInstance);
 export const adminSettingsApi = new AdminSettingsApi(undefined, undefined, axiosInstance);
 export const adminOidcProvidersApi = new AdminOidcProvidersApi(undefined, undefined, axiosInstance);
 export const adminEmailApi = new AdminEmailApi(undefined, undefined, axiosInstance);

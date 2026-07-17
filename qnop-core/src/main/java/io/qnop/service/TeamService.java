@@ -28,6 +28,7 @@ import io.qnop.repository.TeamMemberCount;
 import io.qnop.repository.TeamMembershipRepository;
 import io.qnop.repository.TeamRepository;
 import io.qnop.repository.UserRepository;
+import io.qnop.repository.UserTeamProjection;
 import java.time.Instant;
 import java.util.List;
 import java.util.Locale;
@@ -181,6 +182,90 @@ public class TeamService {
     memberships.delete(membership);
   }
 
+  // ---------------------------------------------------------------------------
+  // Team-lead self-management (issue #470). A LEAD of a team may manage that
+  // team's membership without being a global ADMIN; an ADMIN passes for any
+  // team. Every mutation goes through the guard, and a team can never lose its
+  // last lead through this surface (which also blocks a sole lead's self-lockout).
+  // ---------------------------------------------------------------------------
+
+  /** The caller's own teams with the caller's role in each, ordered by name (issue #470). */
+  @Transactional(readOnly = true)
+  public List<MyTeamView> listMyTeams(UUID userId) {
+    return memberships.findTeamsOfUser(userId).stream()
+        .map(TeamService::toMyTeamView)
+        .collect(Collectors.toList());
+  }
+
+  /**
+   * Whether the user is a LEAD of at least one team — gates the "My Teams" surface (issue #470).
+   */
+  @Transactional(readOnly = true)
+  public boolean leadsAnyTeam(UUID userId) {
+    return memberships.existsByUserIdAndTeamRole(userId, TeamRole.LEAD);
+  }
+
+  /** Team detail for a lead of the team (or an admin); otherwise 403 (issue #470). */
+  @Transactional(readOnly = true)
+  public TeamDetailView getForLead(UUID teamId, UUID actorId, boolean admin) {
+    requireLeadOrAdmin(teamId, actorId, admin);
+    return get(teamId);
+  }
+
+  /** Add a member as a lead of the team (or an admin); otherwise 403 (issue #470). */
+  @Transactional
+  public TeamMemberView addMemberAsLead(
+      UUID teamId, UUID actorId, boolean admin, UUID userId, String teamRole) {
+    requireLeadOrAdmin(teamId, actorId, admin);
+    return addMember(teamId, userId, teamRole);
+  }
+
+  /** Change a member's role as a lead (or admin); refuses to demote the last lead (issue #470). */
+  @Transactional
+  public TeamMemberView setMemberRoleAsLead(
+      UUID teamId, UUID actorId, boolean admin, UUID userId, String teamRole) {
+    requireLeadOrAdmin(teamId, actorId, admin);
+    if (requireTeamRole(teamRole) == TeamRole.MEMBER) {
+      guardNotLastLead(teamId, userId);
+    }
+    return setMemberRole(teamId, userId, teamRole);
+  }
+
+  /** Remove a member as a lead (or admin); refuses to remove the last lead (issue #470). */
+  @Transactional
+  public void removeMemberAsLead(UUID teamId, UUID actorId, boolean admin, UUID userId) {
+    requireLeadOrAdmin(teamId, actorId, admin);
+    guardNotLastLead(teamId, userId);
+    removeMember(teamId, userId);
+  }
+
+  private void requireLeadOrAdmin(UUID teamId, UUID actorId, boolean admin) {
+    if (admin) {
+      return;
+    }
+    if (!memberships.existsByTeamIdAndUserIdAndTeamRole(teamId, actorId, TeamRole.LEAD)) {
+      throw new TeamAccessForbiddenException("Only a lead of this team may manage it.");
+    }
+  }
+
+  /**
+   * Blocks an operation that would strip the team's last remaining lead. Only fires when {@code
+   * userId} is currently a LEAD and no other lead remains — removing/demoting a MEMBER, or a LEAD
+   * with co-leads, is unaffected. This is the single place the "never zero leads" invariant lives
+   * for the self-management surface, and it is what prevents a sole lead's self-lockout.
+   */
+  private void guardNotLastLead(UUID teamId, UUID userId) {
+    boolean targetIsLead =
+        memberships.existsByTeamIdAndUserIdAndTeamRole(teamId, userId, TeamRole.LEAD);
+    if (targetIsLead && memberships.countByTeamIdAndTeamRole(teamId, TeamRole.LEAD) <= 1) {
+      throw new TeamConflictException("LAST_LEAD", "A team must keep at least one lead.");
+    }
+  }
+
+  private static MyTeamView toMyTeamView(UserTeamProjection p) {
+    return new MyTeamView(p.teamId(), p.teamName(), p.teamRole().name());
+  }
+
   private static TeamMemberView toMemberView(User user, TeamMembership membership) {
     return new TeamMemberView(
         user.getId(),
@@ -246,4 +331,7 @@ public class TeamService {
 
   /** One page of {@link TeamSummaryView}s plus the total count. */
   public record TeamPage(List<TeamSummaryView> items, long total, int page, int size) {}
+
+  /** A team the caller belongs to, with the caller's role there (issue #470). */
+  public record MyTeamView(UUID teamId, String name, String teamRole) {}
 }

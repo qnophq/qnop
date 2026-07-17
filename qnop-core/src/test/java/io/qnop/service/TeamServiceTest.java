@@ -35,7 +35,9 @@ import io.qnop.entity.User;
 import io.qnop.repository.TeamMembershipRepository;
 import io.qnop.repository.TeamRepository;
 import io.qnop.repository.UserRepository;
+import io.qnop.repository.UserTeamProjection;
 import io.qnop.service.TeamService.TeamMemberView;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 import org.junit.jupiter.api.DisplayName;
@@ -158,6 +160,134 @@ class TeamServiceTest {
 
     assertThat(membership.getTeamRole()).isEqualTo(TeamRole.LEAD);
     assertThat(view.teamRole()).isEqualTo("LEAD");
+  }
+
+  // --- Team-lead self-management (issue #470) -------------------------------
+
+  @Test
+  @DisplayName("leadsAnyTeam reflects the LEAD-membership existence check")
+  void leadsAnyTeam() {
+    UUID userId = UUID.randomUUID();
+    when(memberships.existsByUserIdAndTeamRole(userId, TeamRole.LEAD)).thenReturn(true);
+    assertThat(service.leadsAnyTeam(userId)).isTrue();
+    when(memberships.existsByUserIdAndTeamRole(userId, TeamRole.LEAD)).thenReturn(false);
+    assertThat(service.leadsAnyTeam(userId)).isFalse();
+  }
+
+  @Test
+  @DisplayName("listMyTeams maps the caller's affiliations with the team-role name")
+  void listMyTeams() {
+    UUID userId = UUID.randomUUID();
+    UUID teamId = UUID.randomUUID();
+    when(memberships.findTeamsOfUser(userId))
+        .thenReturn(List.of(new UserTeamProjection(teamId, "Core", TeamRole.LEAD)));
+
+    assertThat(service.listMyTeams(userId))
+        .singleElement()
+        .satisfies(
+            t -> {
+              assertThat(t.teamId()).isEqualTo(teamId);
+              assertThat(t.name()).isEqualTo("Core");
+              assertThat(t.teamRole()).isEqualTo("LEAD");
+            });
+  }
+
+  @Test
+  @DisplayName("a non-lead, non-admin caller is forbidden from managing a team")
+  void leadGuardForbidsNonLead() {
+    UUID teamId = UUID.randomUUID();
+    UUID actor = UUID.randomUUID();
+    UUID target = UUID.randomUUID();
+    when(memberships.existsByTeamIdAndUserIdAndTeamRole(teamId, actor, TeamRole.LEAD))
+        .thenReturn(false);
+
+    assertThatThrownBy(() -> service.getForLead(teamId, actor, false))
+        .isInstanceOf(TeamAccessForbiddenException.class);
+    assertThatThrownBy(() -> service.addMemberAsLead(teamId, actor, false, target, "MEMBER"))
+        .isInstanceOf(TeamAccessForbiddenException.class);
+    assertThatThrownBy(() -> service.setMemberRoleAsLead(teamId, actor, false, target, "LEAD"))
+        .isInstanceOf(TeamAccessForbiddenException.class);
+    assertThatThrownBy(() -> service.removeMemberAsLead(teamId, actor, false, target))
+        .isInstanceOf(TeamAccessForbiddenException.class);
+    verify(memberships, never()).save(any());
+    verify(memberships, never()).delete(any());
+  }
+
+  @Test
+  @DisplayName("a lead of the team may add a member; an admin passes without a lead check")
+  void leadOrAdminMayAdd() {
+    UUID teamId = UUID.randomUUID();
+    UUID lead = UUID.randomUUID();
+    UUID target = UUID.randomUUID();
+    when(teams.existsById(teamId)).thenReturn(true);
+    when(users.findById(target))
+        .thenReturn(Optional.of(User.internal("Al", "al@example.com", "al", "h")));
+    when(memberships.existsByTeamIdAndUserId(teamId, target)).thenReturn(false);
+    when(memberships.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+    when(memberships.existsByTeamIdAndUserIdAndTeamRole(teamId, lead, TeamRole.LEAD))
+        .thenReturn(true);
+    assertThat(service.addMemberAsLead(teamId, lead, false, target, "LEAD").teamRole())
+        .isEqualTo("LEAD");
+
+    // An admin passes for a team they are not a lead of.
+    UUID admin = UUID.randomUUID();
+    assertThat(service.addMemberAsLead(teamId, admin, true, target, "MEMBER").teamRole())
+        .isEqualTo("MEMBER");
+    verify(memberships, never()).existsByTeamIdAndUserIdAndTeamRole(teamId, admin, TeamRole.LEAD);
+  }
+
+  @Test
+  @DisplayName("demoting or removing the team's last lead is rejected with LAST_LEAD")
+  void lastLeadGuard() {
+    UUID teamId = UUID.randomUUID();
+    UUID lead = UUID.randomUUID(); // the sole lead, acting on themselves
+    when(memberships.existsByTeamIdAndUserIdAndTeamRole(teamId, lead, TeamRole.LEAD))
+        .thenReturn(true);
+    when(memberships.countByTeamIdAndTeamRole(teamId, TeamRole.LEAD)).thenReturn(1L);
+
+    assertThatThrownBy(() -> service.setMemberRoleAsLead(teamId, lead, false, lead, "MEMBER"))
+        .isInstanceOf(TeamConflictException.class)
+        .extracting("code")
+        .isEqualTo("LAST_LEAD");
+    assertThatThrownBy(() -> service.removeMemberAsLead(teamId, lead, false, lead))
+        .isInstanceOf(TeamConflictException.class)
+        .extracting("code")
+        .isEqualTo("LAST_LEAD");
+    verify(memberships, never()).delete(any());
+  }
+
+  @Test
+  @DisplayName("a lead with a co-lead may be demoted; a plain member is unaffected by the guard")
+  void guardSkipsWhenAnotherLeadRemains() {
+    UUID teamId = UUID.randomUUID();
+    UUID actor = UUID.randomUUID();
+    UUID coLead = UUID.randomUUID();
+    UUID member = UUID.randomUUID();
+    when(memberships.existsByTeamIdAndUserIdAndTeamRole(teamId, actor, TeamRole.LEAD))
+        .thenReturn(true);
+
+    // Demote a co-lead while two leads exist.
+    when(memberships.existsByTeamIdAndUserIdAndTeamRole(teamId, coLead, TeamRole.LEAD))
+        .thenReturn(true);
+    when(memberships.countByTeamIdAndTeamRole(teamId, TeamRole.LEAD)).thenReturn(2L);
+    TeamMembership coLeadMembership = TeamMembership.of(teamId, coLead, TeamRole.LEAD);
+    when(memberships.findByTeamIdAndUserId(teamId, coLead))
+        .thenReturn(Optional.of(coLeadMembership));
+    when(users.findById(coLead))
+        .thenReturn(Optional.of(User.internal("Bo", "bo@example.com", "bo", "h")));
+    assertThat(service.setMemberRoleAsLead(teamId, actor, false, coLead, "MEMBER").teamRole())
+        .isEqualTo("MEMBER");
+    assertThat(coLeadMembership.getTeamRole()).isEqualTo(TeamRole.MEMBER);
+
+    // Removing a plain member never trips the guard.
+    when(memberships.existsByTeamIdAndUserIdAndTeamRole(teamId, member, TeamRole.LEAD))
+        .thenReturn(false);
+    TeamMembership memberMembership = TeamMembership.of(teamId, member, TeamRole.MEMBER);
+    when(memberships.findByTeamIdAndUserId(teamId, member))
+        .thenReturn(Optional.of(memberMembership));
+    service.removeMemberAsLead(teamId, actor, false, member);
+    verify(memberships).delete(memberMembership);
   }
 
   private static Team teamWithId(UUID id, String name) {

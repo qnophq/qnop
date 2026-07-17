@@ -30,6 +30,7 @@ import {
   ShieldCheck,
   User,
   Users,
+  UsersRound,
   type LucideIcon,
 } from 'lucide-react';
 import type { UserRole } from '../../api/generated';
@@ -41,6 +42,12 @@ export interface NavItem {
   icon: LucideIcon;
   /** Roles allowed to see the item; omit for "any authenticated user". */
   roles?: UserRole[];
+  /**
+   * When set, the item shows only to a user who leads at least one team (#470) —
+   * a per-team signal the global {@link UserRole} cannot express. Takes precedence
+   * over {@link roles}.
+   */
+  requiresTeamLead?: boolean;
 }
 
 export interface NavGroup {
@@ -62,6 +69,13 @@ export const NAV_GROUPS: NavGroup[] = [
     items: [
       { id: 'dashboard', label: 'Dashboard', path: '/', icon: LayoutDashboard },
       { id: 'reviews', label: 'Reviews', path: '/reviews', icon: FileText },
+      {
+        id: 'my-teams',
+        label: 'My Teams',
+        path: '/my-teams',
+        icon: UsersRound,
+        requiresTeamLead: true,
+      },
     ],
   },
   {
@@ -115,8 +129,11 @@ export const NAV_GROUPS: NavGroup[] = [
   },
 ];
 
-/** Whether a nav item is visible to the given role. */
-export function isNavItemVisible(item: NavItem, role: UserRole | null): boolean {
+/** Whether a nav item is visible to the given role and team-lead status (#470). */
+export function isNavItemVisible(item: NavItem, role: UserRole | null, teamLead = false): boolean {
+  if (item.requiresTeamLead) {
+    return teamLead;
+  }
   if (!item.roles) {
     return true;
   }
@@ -124,10 +141,10 @@ export function isNavItemVisible(item: NavItem, role: UserRole | null): boolean 
 }
 
 /** The nav groups filtered for a role, dropping any group left with no items. */
-export function visibleNavGroups(role: UserRole | null): NavGroup[] {
+export function visibleNavGroups(role: UserRole | null, teamLead = false): NavGroup[] {
   return NAV_GROUPS.map((group) => ({
     ...group,
-    items: group.items.filter((item) => isNavItemVisible(item, role)),
+    items: group.items.filter((item) => isNavItemVisible(item, role, teamLead)),
   })).filter((group) => group.items.length > 0);
 }
 
