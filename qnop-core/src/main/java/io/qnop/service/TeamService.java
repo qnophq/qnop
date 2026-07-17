@@ -226,6 +226,7 @@ public class TeamService {
       UUID teamId, UUID actorId, boolean admin, UUID userId, String teamRole) {
     requireLeadOrAdmin(teamId, actorId, admin);
     if (requireTeamRole(teamRole) == TeamRole.MEMBER) {
+      lockTeam(teamId);
       guardNotLastLead(teamId, userId);
     }
     return setMemberRole(teamId, userId, teamRole);
@@ -235,8 +236,19 @@ public class TeamService {
   @Transactional
   public void removeMemberAsLead(UUID teamId, UUID actorId, boolean admin, UUID userId) {
     requireLeadOrAdmin(teamId, actorId, admin);
+    lockTeam(teamId);
     guardNotLastLead(teamId, userId);
     removeMember(teamId, userId);
+  }
+
+  /**
+   * Takes a pessimistic row lock on the team so the last-lead guard and its mutation run atomically
+   * against any concurrent demote/remove on the same team — closing the TOCTOU race that optimistic
+   * locking cannot (the racing requests touch different membership rows). A missing team is left
+   * for the downstream mutation to surface as a 404.
+   */
+  private void lockTeam(UUID teamId) {
+    teams.findByIdForUpdate(teamId);
   }
 
   private void requireLeadOrAdmin(UUID teamId, UUID actorId, boolean admin) {

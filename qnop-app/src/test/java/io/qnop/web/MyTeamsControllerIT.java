@@ -153,6 +153,20 @@ class MyTeamsControllerIT extends AbstractIntegrationTest {
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("{\"userId\":\"%s\",\"teamRole\":\"MEMBER\"}".formatted(outsider.getId())))
         .andExpect(status().isForbidden());
+    // The authz-critical mutations on another team are rejected before any
+    // membership lookup, so an arbitrary target id still yields 403 (not 404).
+    mockMvc
+        .perform(
+            patch("/api/v1/teams/{id}/members/{uid}", other, outsider.getId())
+                .header("Authorization", bearer(leadToken))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"teamRole\":\"LEAD\"}"))
+        .andExpect(status().isForbidden());
+    mockMvc
+        .perform(
+            delete("/api/v1/teams/{id}/members/{uid}", other, outsider.getId())
+                .header("Authorization", bearer(leadToken)))
+        .andExpect(status().isForbidden());
   }
 
   @Test

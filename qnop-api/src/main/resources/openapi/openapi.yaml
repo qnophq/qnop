@@ -1338,6 +1338,12 @@ paths:
       description: |
         Full detail of a team the caller leads (or any team for an ADMIN), issue
         #470. A caller who is not a LEAD of the team (and not an ADMIN) gets 403.
+
+        Note: this non-admin surface deliberately reuses the admin `AdminTeamDetail`
+        / `AdminTeamMember` schemas today (the fields are identical). Should an
+        admin-only field ever be added to those schemas, split out a non-admin
+        `TeamDetail`/`TeamMember` here so it does not leak to a plain LEAD — tracked
+        by issue #508.
       operationId: getMyTeam
       security:
         - bearerAuth: []
