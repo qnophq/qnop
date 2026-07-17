@@ -151,6 +151,12 @@ public class SecurityConfiguration {
                     .permitAll()
                     .requestMatchers("/api/v1/admin/**")
                     .hasRole("ADMIN")
+                    // The organisation-wide audit trail is the first — and for now only —
+                    // surface the AUDITOR role unlocks (issue #466, ADR-0041). ADMIN is named
+                    // explicitly: there is no RoleHierarchy, so one authority never implies
+                    // another.
+                    .requestMatchers("/api/v1/audit/**")
+                    .hasAnyRole("AUDITOR", "ADMIN")
                     .requestMatchers("/api/**", "/actuator/**")
                     .authenticated()
                     // Everything else is the embedded SPA (ADR-0040): index.html,
