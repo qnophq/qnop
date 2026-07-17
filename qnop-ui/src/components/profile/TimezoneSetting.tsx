@@ -83,9 +83,10 @@ function ClockPreview({ zone, now }: { zone: string; now: Date }) {
       spacing={1.25}
       title={`Current time in ${zone.replace(/_/g, ' ')}`}
       sx={{
-        flexShrink: 0,
+        flex: { sm: '1 1 0' },
+        minWidth: 0,
         alignItems: 'center',
-        alignSelf: { xs: 'flex-start', sm: 'center' },
+        alignSelf: { xs: 'flex-start', sm: 'stretch' },
         pl: { sm: 2 },
         borderLeft: { sm: `1px solid ${theme.palette.divider}` },
       }}
@@ -182,9 +183,9 @@ export function TimezoneSetting({ value, isExplicit, saving, onChange }: Timezon
       <Stack
         direction={{ xs: 'column', sm: 'row' }}
         spacing={2}
-        sx={{ alignItems: { sm: 'center' } }}
+        sx={{ alignItems: { sm: 'stretch' } }}
       >
-        <Box sx={{ flex: 1, minWidth: 0 }}>
+        <Box sx={{ flex: { sm: '1 1 0' }, minWidth: 0, alignSelf: 'center', width: '100%' }}>
           <TimezonePicker value={value} onChange={onChange} disabled={saving} />
         </Box>
         <ClockPreview zone={value} now={now} />
