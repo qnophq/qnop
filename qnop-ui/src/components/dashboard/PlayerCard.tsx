@@ -68,7 +68,7 @@ export function PlayerCard({ userId }: { userId: string }) {
           <Skeleton variant="rounded" height={74} />
         </Stack>
       ) : stats ? (
-        <Stack spacing={2.5}>
+        <Stack spacing={3}>
           <Box
             sx={{
               display: 'grid',
@@ -79,7 +79,7 @@ export function PlayerCard({ userId }: { userId: string }) {
           >
             {STAT_LABELS.map(([key, label]) => (
               <Box key={key}>
-                <Typography sx={{ fontWeight: 700, fontSize: 22, lineHeight: 1.2 }}>
+                <Typography sx={{ fontWeight: 700, fontSize: 26, lineHeight: 1.2 }}>
                   {stats[key]}
                 </Typography>
                 <Typography
@@ -96,7 +96,7 @@ export function PlayerCard({ userId }: { userId: string }) {
               </Box>
             ))}
           </Box>
-          <AchievementRow achievements={publicProfileAchievements(stats)} />
+          <AchievementRow achievements={publicProfileAchievements(stats)} size="large" spread />
         </Stack>
       ) : (
         <Typography color="text.secondary" sx={{ fontSize: 13.5 }}>

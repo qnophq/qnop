@@ -48,14 +48,27 @@ const BADGE_TONE: Record<string, 'blue' | 'warning' | 'success'> = {
   'sharp-eye': 'warning',
 };
 
+interface AchievementRowProps {
+  achievements: Achievement[];
+  /** `large` scales the stickers up for roomy surfaces (dashboard card). */
+  size?: 'medium' | 'large';
+  /** Distribute the stickers evenly across the full row width. */
+  spread?: boolean;
+}
+
 /**
  * The player card's achievement stickers (issue #469) — the launch pad's
  * sticker language, earned from real state: earned badges glow in their tone,
  * locked ones wait as dashed silhouettes whose tooltip says how to get them.
  */
-export function AchievementRow({ achievements }: { achievements: Achievement[] }) {
+export function AchievementRow({
+  achievements,
+  size = 'medium',
+  spread = false,
+}: AchievementRowProps) {
   const theme = useTheme();
   const dark = theme.qnop.mode === 'dark';
+  const large = size === 'large';
   const toneColor = (tone: 'blue' | 'warning' | 'success') =>
     tone === 'blue'
       ? theme.qnop.brand.blue
@@ -64,7 +77,12 @@ export function AchievementRow({ achievements }: { achievements: Achievement[] }
         : theme.palette.success.main;
 
   return (
-    <Stack direction="row" spacing={1.5} useFlexGap sx={{ flexWrap: 'wrap' }}>
+    <Stack
+      direction="row"
+      spacing={large ? 1 : 1.5}
+      useFlexGap
+      sx={{ flexWrap: 'wrap', ...(spread && { justifyContent: 'space-between' }) }}
+    >
       {achievements.map((achievement) => {
         const Icon = BADGE_ICONS[achievement.key] ?? Rocket;
         const color = toneColor(BADGE_TONE[achievement.key] ?? 'blue');
@@ -80,7 +98,8 @@ export function AchievementRow({ achievements }: { achievements: Achievement[] }
               aria-label={`${achievement.title}: ${achievement.caption}${achievement.earned ? '' : ' (locked)'}`}
               sx={{
                 alignItems: 'center',
-                width: 74,
+                width: large ? 'auto' : 74,
+                ...(spread && { flex: '1 1 0', minWidth: 64 }),
                 borderRadius: '12px',
                 outline: 'none',
                 '&:focus-visible': { boxShadow: theme.qnop.focusRing },
@@ -89,9 +108,9 @@ export function AchievementRow({ achievements }: { achievements: Achievement[] }
               <Box
                 aria-hidden
                 sx={{
-                  width: 46,
-                  height: 46,
-                  borderRadius: '14px',
+                  width: large ? 58 : 46,
+                  height: large ? 58 : 46,
+                  borderRadius: large ? '17px' : '14px',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
@@ -106,7 +125,7 @@ export function AchievementRow({ achievements }: { achievements: Achievement[] }
                   '@media (hover: hover)': { '&:hover': { transform: 'translateY(-2px)' } },
                 }}
               >
-                <Icon size={20} />
+                <Icon size={large ? 26 : 20} />
               </Box>
               <Typography
                 variant="caption"
