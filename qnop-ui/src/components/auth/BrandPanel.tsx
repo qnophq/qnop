@@ -226,7 +226,8 @@ export function BrandPanel() {
         </Typography>
         <Typography sx={{ color: '#B9C6D4', fontSize: 15.5, lineHeight: 1.65, maxWidth: 430 }}>
           Annotate, discuss and approve documents together — with streaks, scoreboards and profiles
-          that celebrate every closed review. And your data never leaves your own infrastructure.
+          that celebrate every closed review. And your data stays under your control — wherever qnop
+          runs.
         </Typography>
         <Stack direction="row" sx={{ flexWrap: 'nowrap', gap: { md: 0.75, lg: 1.25 }, mt: 4 }}>
           {FEATURES.map(({ icon: Icon, label }) => (
