@@ -29,6 +29,7 @@ import { CalendarClock, FileText, History, Inbox, Plus, Trophy, UserCheck } from
 import { useNavigate } from 'react-router-dom';
 import { useDashboard } from '../api/hooks/useDashboard';
 import { useReviews } from '../api/hooks/useReviews';
+import { PageHeader } from '../components/admin/layout/PageHeader';
 import { ActivityCard } from '../components/dashboard/ActivityCard';
 import {
   deadlines,
@@ -88,32 +89,27 @@ export function HomePage() {
 
   return (
     <Stack spacing={3}>
-      {/* Masthead: who, when, and the page's one command — start a review. */}
-      <Stack
-        direction="row"
-        sx={{ alignItems: 'flex-start', justifyContent: 'space-between', gap: 2, flexWrap: 'wrap' }}
-      >
-        <Box>
-          <Typography variant="h1">
-            {greeting(new Date().getHours())}
-            {firstName ? `, ${firstName}` : ''}.{' '}
-            <Box component="span" aria-hidden sx={{ fontSize: '0.8em' }}>
-              {greetingEmoji(new Date().getHours())}
-            </Box>
-          </Typography>
-          <Typography color="text.secondary" sx={{ mt: 0.5 }}>
-            {DATE_FORMAT.format(new Date())}
-          </Typography>
-        </Box>
-        <Button
-          variant="contained"
-          startIcon={<Plus size={16} />}
-          onClick={() => navigate('/reviews/new')}
-          sx={{ mt: 0.75, flexShrink: 0 }}
-        >
-          New review
-        </Button>
-      </Stack>
+      {/* Masthead: who, when, and the page's one command — start a review. Uses
+          the canonical PageHeader so the action sits exactly where it does on
+          the Reviews page. */}
+      <PageHeader
+        title={`${greeting(new Date().getHours())}${firstName ? `, ${firstName}` : ''}.`}
+        titleAdornment={
+          <Box component="span" aria-hidden sx={{ fontSize: 22 }}>
+            {greetingEmoji(new Date().getHours())}
+          </Box>
+        }
+        description={DATE_FORMAT.format(new Date())}
+        action={
+          <Button
+            variant="contained"
+            startIcon={<Plus size={16} />}
+            onClick={() => navigate('/reviews/new')}
+          >
+            New review
+          </Button>
+        }
+      />
 
       {loading ? (
         <Stack spacing={2}>
