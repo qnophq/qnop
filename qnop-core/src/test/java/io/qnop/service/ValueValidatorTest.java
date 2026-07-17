@@ -131,4 +131,16 @@ class ValueValidatorTest {
         () ->
             ValueValidator.validate(ApplicationSettingKey.GENERAL_DEFAULT_TIMEZONE, "not a zone"));
   }
+
+  @Test
+  void enforcesTimezoneFormatForPerUserSetting() {
+    assertDoesNotThrow(() -> ValueValidator.validate(UserSettingKey.TIMEZONE, "UTC"));
+    assertDoesNotThrow(() -> ValueValidator.validate(UserSettingKey.TIMEZONE, "Europe/Berlin"));
+    assertThrows(
+        SettingValidationException.class,
+        () -> ValueValidator.validate(UserSettingKey.TIMEZONE, "not a zone"));
+    assertThrows(
+        SettingValidationException.class,
+        () -> ValueValidator.validate(UserSettingKey.TIMEZONE, "Mars/Olympus_Mons"));
+  }
 }

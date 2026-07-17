@@ -31,10 +31,6 @@ import { UserAvatar } from '../../shell/UserAvatar';
 import { isDocumentScoped } from '../annotationScope';
 import { AnnotationBadgeRow } from './AnnotationBadgeRow';
 
-const DATE_FORMAT = new Intl.DateTimeFormat(undefined, {
-  dateStyle: 'medium',
-  timeStyle: 'short',
-});
 
 interface AnnotationHeadProps {
   annotation: AnnotationView;
@@ -50,7 +46,7 @@ interface AnnotationHeadProps {
  */
 export function AnnotationHead({ annotation, unseen = false }: AnnotationHeadProps) {
   const theme = useTheme();
-  const { shortRelativeTime } = useFormatters();
+  const { shortRelativeTime, formatDateTime } = useFormatters();
   const userId = useAuthStore((state) => state.userId);
   const displayName = useAuthStore((state) => state.displayName);
   const avatarUrl = useAuthStore((state) => state.avatarUrl);
@@ -121,7 +117,7 @@ export function AnnotationHead({ annotation, unseen = false }: AnnotationHeadPro
           variant="caption"
           color="text.secondary"
           noWrap
-          title={DATE_FORMAT.format(new Date(annotation.createdAt))}
+          title={formatDateTime(annotation.createdAt)}
         >
           {authorName} · {shortRelativeTime(annotation.createdAt)}
         </Typography>

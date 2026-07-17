@@ -44,6 +44,7 @@ public final class ValueValidator {
 
   public static void validate(UserSettingKey key, String value) {
     validate(key.getType(), key.getEnumOptions(), value, key.getKey());
+    validateConstraints(key.getConstraints(), value, key.getKey());
   }
 
   /** Core, key-agnostic validation shared by the application- and user-setting registries. */

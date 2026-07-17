@@ -30,11 +30,6 @@ import { CopyLinkButton } from '../permalink/CopyLinkButton';
 
 const AVATAR_SIZE = 26;
 
-const TIME_FORMAT = new Intl.DateTimeFormat(undefined, {
-  dateStyle: 'medium',
-  timeStyle: 'short',
-});
-
 interface CommentBubbleProps {
   /** The display name; the bubble prints "You" for the viewer's own. */
   name: string;
@@ -71,7 +66,7 @@ export function CommentBubble({
   notify,
 }: CommentBubbleProps) {
   const theme = useTheme();
-  const { shortRelativeTime } = useFormatters();
+  const { shortRelativeTime, formatDateTime } = useFormatters();
   return (
     <Stack id={domId} direction="row" spacing={1} sx={{ alignItems: 'flex-start' }}>
       <Box sx={{ position: 'relative', zIndex: 1, pt: 0.25 }}>
@@ -111,7 +106,7 @@ export function CommentBubble({
         <Stack direction="row" spacing={0.25} sx={{ alignItems: 'center', pl: 1.5, mt: 0.25 }}>
           <Typography
             variant="caption"
-            title={TIME_FORMAT.format(new Date(createdAt))}
+            title={formatDateTime(createdAt)}
             sx={{ fontWeight: 600, color: 'text.secondary' }}
           >
             {shortRelativeTime(createdAt)}

@@ -51,6 +51,15 @@ public enum UserSettingKey {
       Arrays.stream(values())
           .collect(Collectors.toUnmodifiableMap(UserSettingKey::getKey, Function.identity()));
 
+  /**
+   * Beyond-type value constraints per key (mirrors {@link ApplicationSettingKey}); {@link
+   * ValueValidator} enforces them at the setting boundary. The display timezone must be a real IANA
+   * zone id so a future backend consumer of the per-user zone (server-rendered export, scheduled
+   * mail) can trust it (issue #465, ADR-0039).
+   */
+  private static final Map<UserSettingKey, SettingConstraints> CONSTRAINTS =
+      Map.of(TIMEZONE, SettingConstraints.format(SettingConstraints.ValueFormat.TIMEZONE));
+
   private final String key;
   private final SettingValueType type;
   private final String defaultValue;
@@ -96,5 +105,13 @@ public enum UserSettingKey {
 
   public List<String> getEnumOptions() {
     return enumOptions;
+  }
+
+  /**
+   * Value constraints beyond the declared type (e.g. a valid IANA timezone); {@link
+   * SettingConstraints#NONE} if none.
+   */
+  public SettingConstraints getConstraints() {
+    return CONSTRAINTS.getOrDefault(this, SettingConstraints.NONE);
   }
 }
