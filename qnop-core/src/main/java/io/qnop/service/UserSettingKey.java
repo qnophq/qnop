@@ -45,7 +45,13 @@ public enum UserSettingKey {
       List.of("system", "light", "dark")),
   PREFERRED_LANGUAGE(
       "preferred_language", SettingValueType.STRING, "en", "Preferred UI language (ISO 639-1)."),
-  TIMEZONE("timezone", SettingValueType.STRING, "UTC", "Preferred display timezone (IANA id)."),
+  // Empty by default so an unset preference is distinguishable from an explicit choice: the
+  // frontend then falls back to the application default timezone, then UTC (issue #465, ADR-0041).
+  TIMEZONE(
+      "timezone",
+      SettingValueType.STRING,
+      "",
+      "Preferred display timezone (IANA id); empty follows the application default."),
   EMAIL_REVIEW_NOTIFICATIONS(
       "email_review_notifications",
       SettingValueType.BOOLEAN,
