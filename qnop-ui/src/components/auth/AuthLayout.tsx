@@ -21,18 +21,12 @@
 
 import type { ReactNode } from 'react';
 import Box from '@mui/material/Box';
-import Stack from '@mui/material/Stack';
 import Typography from '@mui/material/Typography';
-import { Fingerprint, Server, ShieldCheck } from 'lucide-react';
+import { useTheme } from '@mui/material/styles';
+import { ShieldCheck } from 'lucide-react';
 import { useConfig } from '../../api/hooks/useConfig';
 import { BrandLogo } from '../branding/BrandLogo';
-import { tokens } from '../../theme/tokens';
-
-const TRUST = [
-  { icon: Server, label: 'On-Premises · Frankfurt' },
-  { icon: ShieldCheck, label: 'BSI C5 · ISO 27001' },
-  { icon: Fingerprint, label: 'AES-256' },
-];
+import { BrandPanel } from './BrandPanel';
 
 interface AuthLayoutProps {
   title: string;
@@ -43,13 +37,55 @@ interface AuthLayoutProps {
 }
 
 /**
- * Two-column shell for the public auth screens (#103): a sovereign-themed brand
- * panel on the left (hidden below `md`) and the form card on the right, matching
- * the design prototype's "Sovereign document review" treatment.
+ * Compact brand header for viewports where the brand panel is hidden (below
+ * `md`): the tenant logo (theme-appropriate variant) or the qnop mini wordmark,
+ * so mobile users don't land on an unbranded form (#503).
+ */
+function MobileBrandHeader() {
+  const dark = useTheme().palette.mode === 'dark';
+  const branding = useConfig().data?.branding;
+  const logoUrl = dark ? branding?.logoDark.url : branding?.logoLight.url;
+  return (
+    <Box sx={{ display: { xs: 'flex', md: 'none' }, justifyContent: 'center', mb: 4 }}>
+      <BrandLogo
+        url={logoUrl}
+        alt="qnop"
+        sx={{ height: 32, maxWidth: 200 }}
+        fallback={
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+            <Box
+              sx={{
+                width: 32,
+                height: 32,
+                borderRadius: 1.25,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                color: 'primary.main',
+                bgcolor: (t) =>
+                  t.palette.mode === 'dark' ? 'rgba(18,144,239,0.16)' : 'rgba(18,144,239,0.10)',
+                border: '1px solid rgba(18,144,239,0.28)',
+              }}
+            >
+              <ShieldCheck size={19} />
+            </Box>
+            <Typography sx={{ fontWeight: 700, fontSize: 17, letterSpacing: '-0.02em' }}>
+              qnop
+            </Typography>
+          </Box>
+        }
+      />
+    </Box>
+  );
+}
+
+/**
+ * Two-column shell for the public auth screens (#103, #503): the sovereign
+ * brand panel with the player-card showcase on the left (hidden below `md`,
+ * replaced by a compact brand header above the form) and the form card on the
+ * right.
  */
 export function AuthLayout({ title, subtitle, headerSlot, children }: AuthLayoutProps) {
-  // The auth hero is always dark, so use the dark-surface (light) logo variant (issue #154).
-  const logoUrl = useConfig().data?.branding?.logoDark.url;
   return (
     <Box
       sx={{
@@ -58,147 +94,7 @@ export function AuthLayout({ title, subtitle, headerSlot, children }: AuthLayout
         gridTemplateColumns: { xs: '1fr', md: '1.05fr 1fr' },
       }}
     >
-      {/* Brand panel */}
-      <Box
-        sx={{
-          display: { xs: 'none', md: 'flex' },
-          flexDirection: 'column',
-          position: 'relative',
-          overflow: 'hidden',
-          color: '#fff',
-          p: 7,
-          background: `linear-gradient(155deg, ${tokens.brand.navy} 0%, ${tokens.brand.navy700} 60%, #034079 100%)`,
-        }}
-      >
-        {/* subtle grid + glow atmosphere */}
-        <Box
-          aria-hidden
-          sx={{
-            position: 'absolute',
-            inset: 0,
-            opacity: 0.5,
-            backgroundImage:
-              'linear-gradient(rgba(255,255,255,0.04) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.04) 1px, transparent 1px)',
-            backgroundSize: '48px 48px',
-            maskImage: 'radial-gradient(ellipse 80% 70% at 70% 30%, #000 40%, transparent 100%)',
-          }}
-        />
-        <Box
-          aria-hidden
-          sx={{
-            position: 'absolute',
-            width: 520,
-            height: 520,
-            borderRadius: '50%',
-            top: -120,
-            right: -140,
-            filter: 'blur(20px)',
-            background: 'radial-gradient(circle, rgba(18,144,239,0.35), transparent 65%)',
-          }}
-        />
-
-        <Box sx={{ position: 'relative', zIndex: 1 }}>
-          <BrandLogo
-            url={logoUrl}
-            alt="qnop"
-            sx={{ height: 38, maxWidth: 220 }}
-            fallback={
-              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.25 }}>
-                <Box
-                  sx={{
-                    width: 38,
-                    height: 38,
-                    borderRadius: 1.5,
-                    bgcolor: 'rgba(255,255,255,0.12)',
-                    border: '1px solid rgba(255,255,255,0.18)',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                  }}
-                >
-                  <ShieldCheck size={22} />
-                </Box>
-                <Box>
-                  <Typography
-                    sx={{ fontWeight: 700, fontSize: 17, letterSpacing: '-0.02em', lineHeight: 1 }}
-                  >
-                    qnop
-                  </Typography>
-                  <Typography
-                    sx={{
-                      fontSize: 10.5,
-                      letterSpacing: '0.1em',
-                      textTransform: 'uppercase',
-                      color: '#9BCEFA',
-                      mt: 0.4,
-                    }}
-                  >
-                    Quality Notes · Sovereign
-                  </Typography>
-                </Box>
-              </Box>
-            }
-          />
-        </Box>
-
-        <Box sx={{ position: 'relative', zIndex: 1, mt: 'auto', maxWidth: 460 }}>
-          <Typography
-            sx={{
-              fontSize: 12.5,
-              letterSpacing: '0.12em',
-              textTransform: 'uppercase',
-              color: '#61B5F6',
-              fontWeight: 600,
-              mb: 2.5,
-            }}
-          >
-            Sovereign document review
-          </Typography>
-          <Typography
-            component="h2"
-            sx={{
-              color: '#fff',
-              fontWeight: 700,
-              fontSize: { md: 34, lg: 41 },
-              lineHeight: 1.1,
-              letterSpacing: '-0.025em',
-              mb: 2.5,
-            }}
-          >
-            Review, approve, trust — all in one place.
-          </Typography>
-          <Typography sx={{ color: '#B9C6D4', fontSize: 16, lineHeight: 1.65, maxWidth: 430 }}>
-            Review contracts together, compare versions and coordinate reviews — while your data
-            stays entirely on your own infrastructure.
-          </Typography>
-          <Stack direction="row" sx={{ flexWrap: 'wrap', gap: 1.25, mt: 4 }}>
-            {TRUST.map(({ icon: Icon, label }) => (
-              <Stack
-                key={label}
-                direction="row"
-                sx={{
-                  alignItems: 'center',
-                  gap: 0.875,
-                  px: 1.5,
-                  py: 0.875,
-                  borderRadius: 999,
-                  bgcolor: 'rgba(255,255,255,0.08)',
-                  border: '1px solid rgba(255,255,255,0.12)',
-                  fontSize: 12,
-                  color: '#C6E3FC',
-                }}
-              >
-                <Icon size={14} />
-                {label}
-              </Stack>
-            ))}
-          </Stack>
-        </Box>
-
-        <Typography sx={{ position: 'relative', zIndex: 1, mt: 5, fontSize: 12, color: '#7A8BA0' }}>
-          © 2026 devtank42 GmbH · All data stays in the EU
-        </Typography>
-      </Box>
+      <BrandPanel />
 
       {/* Form panel */}
       <Box
@@ -211,6 +107,7 @@ export function AuthLayout({ title, subtitle, headerSlot, children }: AuthLayout
         }}
       >
         <Box sx={{ width: '100%', maxWidth: 408 }}>
+          <MobileBrandHeader />
           {headerSlot}
           <Typography
             component="h1"

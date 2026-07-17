@@ -79,10 +79,10 @@ export function RegisterPage() {
 
   if (done) {
     return (
-      <AuthLayout title="Almost there">
+      <AuthLayout title="Almost there" subtitle="One click left before your first review.">
         <Alert severity="success" sx={{ mb: 2 }}>
-          If the details are valid, we&apos;ve sent you a confirmation email. Please confirm your
-          address to finish signing up.
+          If the details are valid, we&apos;ve sent you a confirmation email. Confirm your address
+          to activate your reviewer profile.
         </Alert>
         <Link component={RouterLink} to="/login" underline="hover">
           To sign in
@@ -95,8 +95,8 @@ export function RegisterPage() {
 
   return (
     <AuthLayout
-      title="Create account"
-      subtitle="Ready in two minutes."
+      title="Create your reviewer profile"
+      subtitle="Two minutes to set up — your first review is waiting."
       headerSlot={<AuthModeSwitch active="register" />}
     >
       <Box component="form" onSubmit={onSubmit} noValidate>
