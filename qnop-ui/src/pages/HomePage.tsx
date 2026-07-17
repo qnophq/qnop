@@ -162,38 +162,35 @@ export function HomePage() {
             </Stack>
           )}
 
-          {/* The two hats plus context — main column and rail. */}
+          {/* The two hats plus context — a row-paired grid so side-by-side cards
+              (Waiting on you | Deadlines, My reviews | Recent activity) always
+              share the same height; grid items stretch to their row. */}
           <Box
             sx={{
               display: 'grid',
               gap: 2.5,
               gridTemplateColumns: { xs: '1fr', lg: 'repeat(2, minmax(0, 1fr))' },
-              alignItems: 'start',
             }}
           >
-            <Stack spacing={2.5} sx={{ minWidth: 0 }}>
-              <ReviewListCard
-                icon={UserCheck}
-                title="Waiting on you"
-                description="Reviews you are asked to work through."
-                reviews={waiting}
-                emptyText="Nothing waits on you — enjoy the quiet."
-                celebrateEmpty
-              />
-              <ReviewListCard
-                icon={FileText}
-                title="My reviews"
-                description="Reviews you own, running ones first."
-                reviews={owned}
-                emptyText="You own no reviews yet."
-                ownerCues
-              />
-              <RepliesCard replies={dashboardQuery.data?.replies ?? []} />
-            </Stack>
-            <Stack spacing={2.5} sx={{ minWidth: 0 }}>
-              <DeadlinesCard reviews={due} />
-              <ActivityCard activity={dashboardQuery.data?.activity ?? []} />
-            </Stack>
+            <ReviewListCard
+              icon={UserCheck}
+              title="Waiting on you"
+              description="Reviews you are asked to work through."
+              reviews={waiting}
+              emptyText="Nothing waits on you — enjoy the quiet."
+              celebrateEmpty
+            />
+            <DeadlinesCard reviews={due} />
+            <ReviewListCard
+              icon={FileText}
+              title="My reviews"
+              description="Reviews you own, running ones first."
+              reviews={owned}
+              emptyText="You own no reviews yet."
+              ownerCues
+            />
+            <ActivityCard activity={dashboardQuery.data?.activity ?? []} />
+            <RepliesCard replies={dashboardQuery.data?.replies ?? []} />
           </Box>
         </>
       )}
