@@ -20,11 +20,21 @@
  */
 
 import type { AnnotationView } from '../../../api/generated';
-import { AnnotationPriority, AnnotationStatus, AnnotationType } from '../../../api/generated';
+import {
+  AnnotationPriority,
+  AnnotationStatus,
+  AnnotationType,
+  PlacementStatus,
+} from '../../../api/generated';
+import { stripMarkdown } from '../../../utils/markdown';
+import { isDocumentScoped } from '../annotationScope';
+import { compareAnnotationsByPosition } from '../viewer/anchoring';
 
 /** The panel's filter facets (issue #403); `null`/`'all'`/`''` mean "any". */
 export interface AnnotationFilters {
   status: 'all' | 'open' | 'resolved';
+  /** Re-anchoring outcome (ADR-0009, issue #326); 'attention' = MOVED/ORPHANED/FAILED. */
+  placement: 'all' | 'attention' | 'moved' | 'orphaned';
   type: AnnotationType | null;
   priority: AnnotationPriority | null;
   /** The author's principal id. */
@@ -35,6 +45,7 @@ export interface AnnotationFilters {
 
 export const EMPTY_FILTERS: AnnotationFilters = {
   status: 'all',
+  placement: 'all',
   type: null,
   priority: null,
   author: null,
@@ -45,9 +56,26 @@ export const EMPTY_FILTERS: AnnotationFilters = {
 export function activeFacetCount(filters: AnnotationFilters): number {
   return (
     (filters.status !== 'all' ? 1 : 0) +
+    (filters.placement !== 'all' ? 1 : 0) +
     (filters.type !== null ? 1 : 0) +
     (filters.priority !== null ? 1 : 0) +
     (filters.author !== null ? 1 : 0)
+  );
+}
+
+/** The re-anchoring facet (issue #326): which placement outcomes pass. */
+function matchesPlacement(
+  annotation: AnnotationView,
+  placement: AnnotationFilters['placement'],
+): boolean {
+  if (placement === 'all') return true;
+  const status = annotation.placementStatus;
+  if (placement === 'moved') return status === PlacementStatus.Moved;
+  if (placement === 'orphaned') return status === PlacementStatus.Orphaned;
+  return (
+    status === PlacementStatus.Moved ||
+    status === PlacementStatus.Orphaned ||
+    status === PlacementStatus.Failed
   );
 }
 
@@ -59,14 +87,43 @@ export function matchesFilters(
 ): boolean {
   if (filters.status === 'open' && annotation.status !== AnnotationStatus.Open) return false;
   if (filters.status === 'resolved' && annotation.status === AnnotationStatus.Open) return false;
+  if (!matchesPlacement(annotation, filters.placement)) return false;
   if (filters.type !== null && annotation.type !== filters.type) return false;
   if (filters.priority !== null && annotation.priority !== filters.priority) return false;
   if (filters.author !== null && annotation.authorId !== filters.author) return false;
   const needle = filters.query.trim().toLowerCase();
   if (!needle) return true;
+  // The opening comment is Markdown (issue #427); match its stripped plain text
+  // so search hits words, not `**` and `[](…)` syntax. The quote is plain.
   return (
     (annotation.anchor?.textQuote?.quote ?? '').toLowerCase().includes(needle) ||
-    (annotation.firstComment ?? '').toLowerCase().includes(needle) ||
+    stripMarkdown(annotation.firstComment).toLowerCase().includes(needle) ||
     authorName.toLowerCase().includes(needle)
   );
+}
+
+/** What the current version's re-anchoring left for humans (issue #326). */
+export function reanchorSummary(annotations: AnnotationView[]) {
+  const moved = annotations.filter(
+    (annotation) => annotation.placementStatus === PlacementStatus.Moved,
+  ).length;
+  const orphaned = annotations.filter(
+    (annotation) =>
+      annotation.placementStatus === PlacementStatus.Orphaned ||
+      annotation.placementStatus === PlacementStatus.Failed,
+  ).length;
+  return { moved, orphaned, total: moved + orphaned };
+}
+
+/**
+ * The flat panel order (issue #481): document-scoped remarks lead — they have
+ * no position and read like a preface — oldest first, then anchored
+ * annotations by their document position (unchanged from the sectioned view).
+ */
+export function comparePanelOrder(a: AnnotationView, b: AnnotationView): number {
+  const aScoped = isDocumentScoped(a);
+  const bScoped = isDocumentScoped(b);
+  if (aScoped !== bScoped) return aScoped ? -1 : 1;
+  if (aScoped && bScoped) return a.createdAt.localeCompare(b.createdAt);
+  return compareAnnotationsByPosition(a, b);
 }

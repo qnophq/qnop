@@ -87,7 +87,7 @@ export function LoginPage() {
   return (
     <AuthLayout
       title="Welcome back"
-      subtitle="Sign in to continue with your reviews."
+      subtitle="Your reviews are waiting — pick up right where you left off."
       headerSlot={canRegister ? <AuthModeSwitch active="login" /> : undefined}
     >
       {error && (

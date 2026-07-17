@@ -1,4 +1,4 @@
-# ADR-0021: Identity & access model (schema level)
+# ADR-0023: Identity & access model (schema level)
 
 - **Status:** Accepted
 - **Date:** 2026-06-14

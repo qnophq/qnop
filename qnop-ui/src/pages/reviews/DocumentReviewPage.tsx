@@ -31,11 +31,15 @@ import Menu from '@mui/material/Menu';
 import MenuItem from '@mui/material/MenuItem';
 import Popper from '@mui/material/Popper';
 import Stack from '@mui/material/Stack';
-import { NotebookPen } from 'lucide-react';
-import type { Anchor, NormalizedBox } from '../../api/generated';
+import { Copy, NotebookPen } from 'lucide-react';
+import type { Anchor, AnnotationView, NormalizedBox } from '../../api/generated';
 import { ExtractionStatus } from '../../api/generated';
 import type { AnnotationPriority, AnnotationType } from '../../api/generated';
-import { useAnnotations, useCreateAnnotation } from '../../api/hooks/useAnnotations';
+import {
+  useAnnotations,
+  useCreateAnnotation,
+  useReattachPlacement,
+} from '../../api/hooks/useAnnotations';
 import {
   useDocument,
   useDocumentVersions,
@@ -43,6 +47,7 @@ import {
   useRenderedDocument,
 } from '../../api/hooks/useDocuments';
 import { AdminToast } from '../../components/admin/layout/AdminToast';
+import { copyToClipboard } from '../../utils/clipboard';
 import { PageHeader } from '../../components/admin/layout/PageHeader';
 import { useToast } from '../../components/admin/layout/useToast';
 import { BoundaryFallback } from '../../components/errors/BoundaryFallback';
@@ -69,10 +74,11 @@ import {
 } from '../../components/reviews/focus/spotlightModel';
 import { useAnchorElement } from '../../components/reviews/focus/useAnchorElement';
 import { useRecordVisit } from '../../api/hooks/useReviews';
-import { useViewMode } from '../../components/reviews/focus/useViewMode';
+import { useViewMode, type ReviewViewMode } from '../../components/reviews/focus/useViewMode';
 import { columnOf } from '../../components/reviews/tasks/tasksModel';
 import { NewTaskDialog } from '../../components/reviews/tasks/NewTaskDialog';
 import { Composer } from '../../components/reviews/panel/Composer';
+import { useCommentAttachmentUpload } from '../../components/reviews/markdown/useCommentAttachmentUpload';
 import { WorkflowBadge } from '../../components/reviews/WorkflowBadge';
 import { AnonymousBadge } from '../../components/reviews/AnonymousBadge';
 import type {
@@ -85,9 +91,12 @@ import { DocumentViewer } from '../../components/reviews/viewer/DocumentViewer';
 import { usePdfDocument } from '../../components/reviews/viewer/usePdfDocument';
 import type { ViewerTool } from '../../components/reviews/viewer/ViewerToolbar';
 import { ViewerToolbar } from '../../components/reviews/viewer/ViewerToolbar';
+import { ReattachHintBar } from '../../components/reviews/viewer/ReattachHintBar';
 import { isOpenWorkflowState } from '../../components/reviews/workflowMeta';
+import { recordRecentReview } from '../../components/dashboard/recentReviews';
 import { useAuthStore } from '../../stores/authStore';
 import { apiErrorCode } from '../../utils/apiError';
+import { revealInScroller } from '../../utils/revealInScroller';
 import { pdfFetchVersion, resolveEffectiveVersion } from './resolveEffectiveVersion';
 
 const PANEL_SPLIT_KEY = 'qnop-review-split';
@@ -108,6 +117,7 @@ export function DocumentReviewPage() {
   const documentId = useReviewDocumentId();
   const [searchParams, setSearchParams] = useSearchParams();
   const { toast, notify, clear } = useToast();
+  const uploadAttachment = useCommentAttachmentUpload(documentId, notify);
   const userId = useAuthStore((s) => s.userId);
 
   const documentQuery = useDocument(documentId);
@@ -146,6 +156,18 @@ export function DocumentReviewPage() {
   const [viewMode, setViewMode] = useViewMode();
   // The unseen-marker baseline (issue #307): the PREVIOUS visit, stamped once.
   const previousSeenAt = useRecordVisit(documentId);
+  // Feed the dashboard's "continue where you left off" (issue #454) —
+  // device-local by design, so a plain localStorage stamp per resolved doc.
+  const resolvedDocument = documentQuery.data;
+  useEffect(() => {
+    if (resolvedDocument) {
+      recordRecentReview({
+        id: resolvedDocument.id,
+        slug: resolvedDocument.slug ?? null,
+        title: resolvedDocument.title,
+      });
+    }
+  }, [resolvedDocument]);
   // The view tabs (issue #398) address the mode through the URL — ?view= wins
   // over (and updates) the stored preference; the param stays shareable.
   const urlView = searchParams.get('view');
@@ -156,6 +178,19 @@ export function DocumentReviewPage() {
     // setViewMode is a stable setter-like callback; syncing on param change only.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [urlView]);
+  // The toolbar's panel/focus switch (issue #403) goes through the URL, so the
+  // address stays shareable and the ?view= sync above remains the single path
+  // into the stored preference.
+  const switchViewMode = (mode: ReviewViewMode) => {
+    setSearchParams(
+      (params) => {
+        const next = new URLSearchParams(params);
+        next.set('view', mode);
+        return next;
+      },
+      { replace: true },
+    );
+  };
   const [listOpen, setListOpen] = useState(false);
   // The "new whole-document task" dialog (issue #395), reachable from the panel in both the
   // document and focus views — the same anchor-free create the tasks view offers.
@@ -212,6 +247,13 @@ export function DocumentReviewPage() {
     anchor: Anchor;
     menuPosition: { left: number; top: number } | null;
   } | null>(null);
+  // Re-attach mode (issue #457): while armed, the next text/region selection
+  // becomes the lost annotation's new anchor instead of a fresh mark.
+  const [reattaching, setReattaching] = useState<{
+    annotationId: string;
+    excerpt: string | null;
+  } | null>(null);
+  const reattachPlacement = useReattachPlacement(notify);
 
   const surfaces = renderedQuery.data?.surfaces;
   const annotations = useMemo(
@@ -264,6 +306,38 @@ export function DocumentReviewPage() {
     focusMode && composingPending ? 'pending-highlight' : null,
   );
 
+  // Escape leaves the re-attach mode without touching anything (issue #457).
+  useEffect(() => {
+    if (!reattaching) return;
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setReattaching(null);
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [reattaching]);
+
+  // Copy the drawn selection with the native gesture (issue #478): while a
+  // TEXT selection is pending, Cmd/Ctrl+C copies its quote — unless the user
+  // is in an input or made a real DOM selection somewhere (those keep native
+  // copy). Region selections carry no text and stay untouched.
+  const pendingQuote = pending?.anchor?.textQuote?.quote;
+  useEffect(() => {
+    if (!pendingQuote) return;
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (!(event.metaKey || event.ctrlKey) || event.key.toLowerCase() !== 'c') return;
+      const target = event.target as HTMLElement | null;
+      if (target?.closest('input, textarea, [contenteditable="true"]')) return;
+      const domSelection = window.getSelection();
+      if (domSelection && !domSelection.isCollapsed) return;
+      event.preventDefault();
+      void copyToClipboard(pendingQuote).then((ok) =>
+        notify(ok ? 'Text copied.' : 'Could not copy to the clipboard.', ok ? 'success' : 'error'),
+      );
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [pendingQuote, notify]);
+
   const closeFocusCard = () => {
     setActiveAnnotationId(null);
     activeMarkEl?.focus();
@@ -273,11 +347,35 @@ export function DocumentReviewPage() {
     setSearchParams({ version: String(version) });
     setActiveAnnotationId(null);
     setPending(null);
+    setReattaching(null);
   };
 
   const stagePending = (anchor: Anchor, at: ScreenPosition) => {
+    if (reattaching && versionNumber !== undefined) {
+      const { annotationId } = reattaching;
+      setReattaching(null);
+      reattachPlacement.mutate(
+        { annotationId, versionNumber, anchor },
+        // Land on the re-homed thread — except in focus mode, where activating
+        // would re-open the overlay the user just aimed past (issue #403).
+        { onSuccess: () => (focusMode ? undefined : setActiveAnnotationId(annotationId)) },
+      );
+      return;
+    }
     setPending({ anchor, menuPosition: at });
     setActiveAnnotationId(null);
+  };
+
+  // Arming (issue #457): mutually exclusive with drafting a new mark, and the
+  // focus overlay/drawer make way so the document is selectable.
+  const armReattach = (annotation: AnnotationView) => {
+    setPending(null);
+    setActiveAnnotationId(null);
+    setListOpen(false);
+    setReattaching({
+      annotationId: annotation.id,
+      excerpt: annotation.anchor?.textQuote?.quote ?? null,
+    });
   };
 
   const handleTextSelected = (
@@ -305,7 +403,12 @@ export function DocumentReviewPage() {
       {
         onSuccess: (created) => {
           setPending(null);
-          setActiveAnnotationId(created.id);
+          // In the panel the fresh annotation expands in place — helpful. In
+          // focus mode activating it would re-open the overlay on the spot the
+          // writer just left: the scrim (blur) stays up and the card's focus
+          // trap yanks the viewport to a mark that hasn't rendered yet (issue
+          // #403). Creating is a closing gesture there: page stays put, sharp.
+          if (!focusMode) setActiveAnnotationId(created.id);
           notify('Annotation created.');
         },
         onError: (error) =>
@@ -375,6 +478,8 @@ export function DocumentReviewPage() {
           <ReviewHubHead
             documentId={documentId}
             ownerId={document.ownerId}
+            ownerSlug={document.ownerSlug}
+            ownerDisplayName={document.ownerDisplayName}
             isOwner={document.ownerId === userId}
             ownUserId={userId}
             anonymous={document.anonymous ?? false}
@@ -388,7 +493,7 @@ export function DocumentReviewPage() {
       />
       <ReviewViewTabs
         documentId={routeSegment}
-        active={focusMode ? 'focus' : 'document'}
+        active="document"
         openTaskCount={annotations.filter((a) => columnOf(a) !== 'done').length}
         compareEnabled={
           (versionsQuery.data?.versions.filter(
@@ -420,7 +525,8 @@ export function DocumentReviewPage() {
               canAnnotate={canAnnotate}
               zoom={zoom}
               onZoomChange={setZoom}
-              focusMode={focusMode}
+              viewMode={viewMode}
+              onViewModeChange={switchViewMode}
               annotationCount={annotations.length}
               onOpenAnnotationList={() => setListOpen(true)}
             />
@@ -468,9 +574,17 @@ export function DocumentReviewPage() {
                   flex: 1,
                   minHeight: { xs: 480, md: 0 },
                   borderRadius: 1,
+                  // The re-attach hint pill anchors to this stage (issue #457).
+                  position: 'relative',
                   bgcolor: (theme) => theme.qnop.surface2,
                 }}
               >
+                {reattaching && (
+                  <ReattachHintBar
+                    excerpt={reattaching.excerpt}
+                    onCancel={() => setReattaching(null)}
+                  />
+                )}
                 {/* A crash in the pdf.js viewer must not take down the panel or the
                     page — scope it and let the reviewer retry (issue #331). */}
                 <ErrorBoundary
@@ -490,6 +604,22 @@ export function DocumentReviewPage() {
                     onSelectAnnotation={(id) => {
                       setActiveAnnotationId(id);
                       setPending(null);
+                      setReattaching(null);
+                      // Reveal the row's HEAD in the panel on EVERY mark
+                      // click (#491) — also when the annotation is already the
+                      // active one, where the panel's state-change effect
+                      // cannot fire. 'start' on purpose: the expanded card is
+                      // often taller than the panel, and 'nearest' treats a
+                      // partially visible card as in view. setTimeout(0) runs
+                      // after React committed the expansion.
+                      if (id) {
+                        setTimeout(() => {
+                          // window.document explicitly — the component scope
+                          // shadows `document` with the DocumentResponse.
+                          const el = window.document.getElementById(`annotation-item-${id}`);
+                          if (el) revealInScroller(el, 'start');
+                        }, 0);
+                      }
                     }}
                     onHoverAnnotation={setHoverAnnotationId}
                     onVisiblePageChange={setCurrentPage}
@@ -553,7 +683,10 @@ export function DocumentReviewPage() {
                   onCancelPending={() => setPending(null)}
                   canAnnotate={canAnnotate}
                   notify={notify}
+                  onUploadAttachment={uploadAttachment}
                   readOnly={!isLatestVersion}
+                  versionNumber={versionNumber}
+                  onArmReattach={armReattach}
                   reviewClosed={!isOpenWorkflowState(document.workflowState)}
                   previousSeenAt={previousSeenAt}
                   buildPermalink={buildPermalink}
@@ -591,6 +724,8 @@ export function DocumentReviewPage() {
               canAnnotate={canAnnotate}
               notify={notify}
               readOnly={!isLatestVersion}
+              versionNumber={versionNumber}
+              onArmReattach={armReattach}
               reviewClosed={!isOpenWorkflowState(document.workflowState)}
               previousSeenAt={previousSeenAt}
               buildPermalink={buildPermalink}
@@ -611,6 +746,8 @@ export function DocumentReviewPage() {
           userId={userId}
           notify={notify}
           readOnly={!isLatestVersion}
+          versionNumber={versionNumber}
+          onArmReattach={armReattach}
           reviewClosed={!isOpenWorkflowState(document.workflowState)}
           threadParticipation={document.threadParticipation ?? 'OPEN'}
           ownerId={document.ownerId}
@@ -625,11 +762,7 @@ export function DocumentReviewPage() {
           open={Boolean(pendingMarkEl)}
           anchorEl={pendingMarkEl}
           placement="right-start"
-          sx={(theme) => ({
-            zIndex: theme.zIndex.modal,
-            width: 380,
-            maxWidth: 'calc(100vw - 32px)',
-          })}
+          sx={(theme) => ({ zIndex: theme.zIndex.modal })}
           modifiers={[
             { name: 'offset', options: { offset: [0, 16] } },
             { name: 'flip', options: { fallbackPlacements: ['left-start', 'bottom', 'top'] } },
@@ -637,19 +770,49 @@ export function DocumentReviewPage() {
           ]}
         >
           {/* Same floating-surface treatment as the focus card: bordered
-              Paper under one soft ambient shadow. */}
+              Paper under one soft ambient shadow. The Composer's own Paper is
+              deliberately transparent (it normally sits on the panel), so this
+              wrapper supplies the opaque surface — floating over the document
+              it must never shine through (issue #403). */}
           <Box
-            sx={{
-              boxShadow: (theme) =>
-                theme.qnop.mode === 'dark' ? 'none' : '0 16px 48px rgba(1,32,66,0.14)',
+            sx={(theme) => ({
+              position: 'relative',
+              boxShadow: theme.qnop.mode === 'dark' ? 'none' : '0 16px 48px rgba(1,32,66,0.14)',
               borderRadius: '10px',
-            }}
+              bgcolor: 'background.paper',
+              overflow: 'hidden',
+              // Writer-resizable (issue #403), like the focus card — but only
+              // horizontally: height stays content-driven (the textarea grows
+              // as you type), so width is the axis worth grabbing.
+              resize: 'horizontal',
+              width: 380,
+              minWidth: 320,
+              maxWidth: 'min(720px, calc(100vw - 48px))',
+              // The inner outlined Paper draws the border; align its corners
+              // with this surface so the edge reads as ONE rounded frame.
+              '& > .MuiPaper-root': { borderRadius: '10px' },
+            })}
           >
             <Composer
               pendingAnchor={pending.anchor}
               creating={createAnnotation.isPending}
               onCreate={handleCreate}
               onCancel={() => setPending(null)}
+              onUploadAttachment={uploadAttachment}
+            />
+            {/* Discoverability for the native resize grip underneath. */}
+            <Box
+              aria-hidden
+              sx={(theme) => ({
+                position: 'absolute',
+                right: 2,
+                bottom: 2,
+                width: 11,
+                height: 11,
+                pointerEvents: 'none',
+                clipPath: 'polygon(100% 0, 100% 100%, 0 100%)',
+                background: `repeating-linear-gradient(135deg, transparent 0 2.5px, ${theme.palette.divider} 2.5px 4px)`,
+              })}
             />
           </Box>
         </Popper>
@@ -668,6 +831,24 @@ export function DocumentReviewPage() {
           </ListItemIcon>
           <ListItemText>Create annotation</ListItemText>
         </MenuItem>
+        {pendingQuote && (
+          <MenuItem
+            onClick={() => {
+              void copyToClipboard(pendingQuote).then((ok) =>
+                notify(
+                  ok ? 'Text copied.' : 'Could not copy to the clipboard.',
+                  ok ? 'success' : 'error',
+                ),
+              );
+              setPending(null);
+            }}
+          >
+            <ListItemIcon>
+              <Copy size={16} />
+            </ListItemIcon>
+            <ListItemText>Copy text</ListItemText>
+          </MenuItem>
+        )}
       </Menu>
       <NewTaskDialog
         open={newNoteOpen}

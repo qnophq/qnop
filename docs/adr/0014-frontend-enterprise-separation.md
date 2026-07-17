@@ -1,6 +1,6 @@
 # ADR-0014: Frontend enterprise separation
 
-- **Status:** Proposed
+- **Status:** Accepted — finalized by [ADR-0039](0039-enterprise-packaging-and-runtime-extensions.md)
 - **Date:** 2026-06-13
 - **Deciders:** qnop core team
 
@@ -17,3 +17,7 @@ AGPL-3.0 extends to the JavaScript bundle shipped to the browser. The open-core 
 ## Status note
 
 Recorded now because it's an easily-forgotten consequence of AGPL on shipped JS. No enterprise UI exists yet; the slot mechanism is designed when the first edition-specific component is needed. Include the frontend boundary in the IP-counsel review.
+
+## Amendment (2026-07-16)
+
+The private-npm-package bullet was finalized differently: enterprise UI plugs in via runtime ESM extensions per [ADR-0039](0039-enterprise-packaging-and-runtime-extensions.md) §3; build-time composition of a private npm package remains the documented fallback.

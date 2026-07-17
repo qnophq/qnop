@@ -66,6 +66,9 @@ public abstract class AbstractIntegrationTest {
     registry.add("qnop.auth.jwt-secret", () -> "integration-test-jwt-secret-0123456789");
     registry.add("qnop.auth.encryption-key", () -> "integration-test-encryption-key-0123456789");
     registry.add("qnop.auth.encryption-salt", () -> "0123456789abcdef0123456789abcdef");
+    // Review notifications dispatch synchronously in tests (issue #316): deterministic
+    // verification, and no async DB reader racing the per-test TRUNCATE cleanup.
+    registry.add("qnop.notifications.sync-dispatch", () -> "true");
     registry.add("qnop.cors.allowed-origins", () -> "http://localhost:5173");
     // Effectively disable the background job poller/reaper in tests (interval == initial delay ==
     // 1h): tests drive the queue via direct poll()/reap() calls, so a stray scheduled tick must not

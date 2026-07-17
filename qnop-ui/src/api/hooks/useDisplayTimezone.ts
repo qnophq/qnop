@@ -24,7 +24,7 @@ import { useConfig } from './useConfig';
 import { useUserSettingValue } from './useUserSettings';
 
 /**
- * The active display timezone (issue #465, ADR-0039): the user's profile
+ * The active display timezone (issue #465, ADR-0041): the user's profile
  * `timezone` preference, falling back to the application default
  * (`general.defaultTimezone` on `/config`), then to UTC. Rendering flows through
  * {@link useFormatters}, so components never call this directly for formatting.

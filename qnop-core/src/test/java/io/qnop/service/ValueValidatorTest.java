@@ -33,7 +33,8 @@ class ValueValidatorTest {
     assertDoesNotThrow(
         () -> ValueValidator.validate(ApplicationSettingKey.GENERAL_APPLICATION_NAME, "anything"));
     assertDoesNotThrow(
-        () -> ValueValidator.validate(ApplicationSettingKey.UPLOAD_MAX_FILE_SIZE_MB, "42"));
+        () ->
+            ValueValidator.validate(ApplicationSettingKey.UPLOAD_DOCUMENT_MAX_FILE_SIZE_MB, "42"));
     assertDoesNotThrow(() -> ValueValidator.validate(ApplicationSettingKey.SMTP_ENABLED, "false"));
     assertDoesNotThrow(() -> ValueValidator.validate(ApplicationSettingKey.SMTP_ENCRYPTION, "tls"));
     assertDoesNotThrow(
@@ -45,7 +46,8 @@ class ValueValidatorTest {
   void rejectsNonInteger() {
     assertThrows(
         SettingValidationException.class,
-        () -> ValueValidator.validate(ApplicationSettingKey.UPLOAD_MAX_FILE_SIZE_MB, "abc"));
+        () ->
+            ValueValidator.validate(ApplicationSettingKey.UPLOAD_DOCUMENT_MAX_FILE_SIZE_MB, "abc"));
   }
 
   @Test
@@ -84,7 +86,7 @@ class ValueValidatorTest {
         () -> ValueValidator.validate(ApplicationSettingKey.SMTP_PORT, "70000"));
     assertThrows(
         SettingValidationException.class,
-        () -> ValueValidator.validate(ApplicationSettingKey.UPLOAD_MAX_FILE_SIZE_MB, "0"));
+        () -> ValueValidator.validate(ApplicationSettingKey.UPLOAD_DOCUMENT_MAX_FILE_SIZE_MB, "0"));
   }
 
   @Test

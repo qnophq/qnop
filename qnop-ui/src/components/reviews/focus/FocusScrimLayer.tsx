@@ -33,15 +33,17 @@ interface FocusScrimLayerProps {
 }
 
 /**
- * The focus mode's per-page scrim (issue #291): the page dims under a soft
- * veil while the spotlit passage stays untouched — the hole is cut with a
- * clip-path, never a filter over the mark, so the anchored text keeps its
- * full contrast (the marks themselves paint on the layer above). The clipped
- * region is also transparent to pointer events, so the spotlit passage stays
- * selectable while the veil catches dismiss clicks. Moving the spotlight
- * (prev/next) morphs the clip smoothly — clip-path animates on the
- * compositor; `prefers-reduced-motion` snaps instead, and
- * `prefers-reduced-transparency` drops the blur.
+ * The focus mode's per-page scrim (issue #291): the page softens under a
+ * light blur — deliberately NO darkening (issue #403); sharpness alone
+ * separates the spotlit passage — while the spotlit region stays untouched.
+ * The hole is cut with a clip-path, never a filter over the mark, so the
+ * anchored text keeps its full contrast (the marks themselves paint on the
+ * layer above). The clipped region is also transparent to pointer events, so
+ * the spotlit passage stays selectable while the veil catches dismiss clicks.
+ * Moving the spotlight (prev/next) morphs the clip smoothly — clip-path
+ * animates on the compositor; `prefers-reduced-motion` snaps instead, and
+ * `prefers-reduced-transparency` swaps the blur for a whisper of tint so the
+ * spotlight keeps SOME cue.
  */
 export function FocusScrimLayer({ spotlight, onDismiss, surfaceIndex }: FocusScrimLayerProps) {
   return (
@@ -53,9 +55,14 @@ export function FocusScrimLayer({ spotlight, onDismiss, surfaceIndex }: FocusScr
         inset: 0,
         pointerEvents: 'auto',
         cursor: 'pointer',
-        bgcolor: 'rgba(1, 32, 66, 0.32)',
-        backdropFilter: 'blur(1.5px)',
-        '@media (prefers-reduced-transparency: reduce)': { backdropFilter: 'none' },
+        backdropFilter: 'blur(1px)',
+        '@media (prefers-reduced-transparency: reduce)': {
+          backdropFilter: 'none',
+          // Neutral veil per mode (issue #423): navy tint in light, plain
+          // white-alpha lift on the black-based dark surfaces.
+          bgcolor: (theme) =>
+            theme.palette.mode === 'light' ? 'rgba(1, 32, 66, 0.14)' : 'rgba(255, 255, 255, 0.10)',
+        },
         clipPath: spotlight ? holePolygon(spotlight) : undefined,
         transition: `clip-path ${tokens.motion.durSlow}ms ${tokens.motion.easeInOut}`,
         animation: 'qnopScrimIn 200ms ease-out',

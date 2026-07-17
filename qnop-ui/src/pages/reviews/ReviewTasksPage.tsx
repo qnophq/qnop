@@ -112,6 +112,7 @@ export function ReviewTasksPage() {
   const priorityParam = searchParams.get('priority');
   const facets: AnnotationFilters = {
     status: 'all',
+    placement: 'all',
     type: Object.values(AnnotationType).includes(typeParam as AnnotationType)
       ? (typeParam as AnnotationType)
       : null,
@@ -312,7 +313,6 @@ export function ReviewTasksPage() {
         annotation={openTask}
         previousSeenAt={previousSeenAt}
         taskKey={openTask ? taskKeyOf(openTask.id) : ''}
-        authorName={openTask ? authorNameOf(openTask.authorId) : ''}
         notify={notify}
         reviewClosed={!isOpenWorkflowState(document.workflowState)}
         threadParticipation={document.threadParticipation ?? 'OPEN'}

@@ -151,6 +151,14 @@ public class SecurityConfiguration {
                     .permitAll()
                     .requestMatchers("/api/v1/admin/**")
                     .hasRole("ADMIN")
+                    .requestMatchers("/api/**", "/actuator/**")
+                    .authenticated()
+                    // Everything else is the embedded SPA (ADR-0040): index.html,
+                    // hashed assets, and client-side routes that forward to
+                    // index.html. Static files carry no secrets — the app's
+                    // security lives entirely in the API rules above.
+                    .requestMatchers(HttpMethod.GET, "/**")
+                    .permitAll()
                     .anyRequest()
                     .authenticated())
         .oauth2ResourceServer(
@@ -168,10 +176,10 @@ public class SecurityConfiguration {
         .headers(
             headers ->
                 headers
-                    .contentSecurityPolicy(
-                        csp ->
-                            csp.policyDirectives(
-                                "default-src 'none'; frame-ancestors 'none'; base-uri 'none'"))
+                    // API and actuator responses keep the deny-all CSP; SPA
+                    // responses (ADR-0040) need a browser-app policy — see
+                    // PathAwareCspHeaderWriter.
+                    .addHeaderWriter(new PathAwareCspHeaderWriter())
                     .frameOptions(frame -> frame.deny())
                     .referrerPolicy(
                         referrer ->

@@ -22,7 +22,7 @@
 import { FALLBACK_TIME_ZONE } from './timezone';
 
 // Each Intl.DateTimeFormat is built once per resolved zone and reused, so switching a display zone
-// costs a Map lookup, not a fresh formatter on every render. The zone defaults to UTC (ADR-0039):
+// costs a Map lookup, not a fresh formatter on every render. The zone defaults to UTC (ADR-0041):
 // callers render through useFormatters(), which passes the user's resolved zone.
 const dateTimeCache = new Map<string, Intl.DateTimeFormat>();
 const dateOnlyCache = new Map<string, Intl.DateTimeFormat>();

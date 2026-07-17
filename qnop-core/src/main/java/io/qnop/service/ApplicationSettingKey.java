@@ -59,11 +59,16 @@ public enum ApplicationSettingKey {
       "UTC",
       "Default display timezone (IANA id, e.g. UTC, Europe/Berlin), used as the fallback for users"
           + " without a personal preference."),
-  UPLOAD_MAX_FILE_SIZE_MB(
-      "upload.max_file_size_mb",
+  UPLOAD_DOCUMENT_MAX_FILE_SIZE_MB(
+      "upload.document_max_file_size_mb",
       SettingValueType.INTEGER,
       "25",
       "Maximum document upload size in megabytes."),
+  UPLOAD_ATTACHMENT_MAX_FILE_SIZE_MB(
+      "upload.attachment_max_file_size_mb",
+      SettingValueType.INTEGER,
+      "10",
+      "Maximum comment attachment size in megabytes."),
   TRACKING_ENABLED(
       "tracking.enabled",
       SettingValueType.BOOLEAN,
@@ -120,7 +125,12 @@ public enum ApplicationSettingKey {
       "auth.password_reset_token_ttl_minutes",
       SettingValueType.INTEGER,
       "30",
-      "Validity window of a password-reset token, in minutes.");
+      "Validity window of a password-reset token, in minutes."),
+  NOTIFICATIONS_REVIEW_EMAILS_ENABLED(
+      "notifications.review_emails_enabled",
+      SettingValueType.BOOLEAN,
+      "true",
+      "Send email notifications for review activity (reviewer added, annotations, replies, status changes).");
 
   private static final Map<String, ApplicationSettingKey> BY_KEY =
       Arrays.stream(values())
@@ -134,7 +144,10 @@ public enum ApplicationSettingKey {
    */
   private static final Map<ApplicationSettingKey, SettingConstraints> CONSTRAINTS =
       Map.of(
-          UPLOAD_MAX_FILE_SIZE_MB, SettingConstraints.range(1, 1024),
+          UPLOAD_DOCUMENT_MAX_FILE_SIZE_MB, SettingConstraints.range(1, 1024),
+          // Capped below the container's multipart ceiling (QNOP_UPLOAD_MULTIPART_LIMIT_MB,
+          // default 55) so the service's clean 413 always fires first.
+          UPLOAD_ATTACHMENT_MAX_FILE_SIZE_MB, SettingConstraints.range(1, 50),
           AUTH_PASSWORD_RESET_TOKEN_TTL_MINUTES, SettingConstraints.range(1, 1440),
           SMTP_PORT, SettingConstraints.range(1, 65535),
           SMTP_FROM, SettingConstraints.format(SettingConstraints.ValueFormat.EMAIL),

@@ -125,7 +125,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/ServerConfigResponse'
               example:
-                version: "0.1.0-SNAPSHOT"
+                version: "1.0.0-SNAPSHOT"
                 edition: COMMUNITY
                 general:
                   siteName: qnop
@@ -647,6 +647,58 @@ paths:
                 $ref: '#/components/schemas/MailTemplatePreviewResponse'
         '400':
           description: Render error (e.g. a referenced variable is missing)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Unknown template key
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Caller is not a superadmin
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /admin/email/templates/{key}/test:
+    post:
+      tags:
+        - AdminEmail
+      summary: Send a template test email
+      description: |
+        Renders the template exactly like the preview (stored version, or the
+        supplied unsaved draft, with sample/override variables) and sends the
+        result to the given recipient. Superadmin only. Never returns a 5xx for
+        a delivery problem — the outcome is reported in the body `status`.
+      operationId: sendTemplateTestEmail
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/MailTemplateKeyParam'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TemplateTestEmailRequest'
+      responses:
+        '200':
+          description: Send attempt completed (see `status` for the outcome)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SendTestEmailResponse'
+        '400':
+          description: Invalid recipient or render error
           content:
             application/json:
               schema:
@@ -1503,6 +1555,77 @@ paths:
                 $ref: '#/components/schemas/ErrorResponse'
         '429':
           $ref: '#/components/responses/TooManyRequests'
+  /users/{userId}:
+    get:
+      tags:
+        - Users
+      summary: A user's workspace-public profile
+      description: |
+        The lean slice any signed-in user may see about a colleague (issue
+        #454): display name, avatar and tenure — no email, role or source.
+        Backs the profile links on dashboards and review surfaces.
+      operationId: getUserProfile
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: userId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: The user's public profile
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PublicUserProfile'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          description: Unknown user
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /users/by-slug/{slug}:
+    get:
+      tags:
+        - Users
+      summary: Resolve a user's public profile by its slug
+      description: |
+        Resolves a colleague's workspace-public profile by the immutable,
+        human-readable profile slug (issue #486), auto-derived from the display
+        name at account creation. Matching ignores case. Slugs never look like
+        UUIDs, so `/users/{userId}` and this route can share links safely.
+      operationId: getUserProfileBySlug
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: slug
+          in: path
+          required: true
+          description: The profile slug (kebab-case, 3-64 characters).
+          schema:
+            type: string
+            minLength: 3
+            maxLength: 64
+      responses:
+        '200':
+          description: The user's public profile
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PublicUserProfile'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          description: Unknown slug
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
   /users/me:
     get:
       tags:
@@ -1689,6 +1812,31 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
+  /dashboard:
+    get:
+      tags: [Dashboard]
+      summary: The caller's dashboard aggregates
+      description: |
+        The cross-review aggregates of the command-centre dashboard (issue
+        #454): the latest replies by others in threads the caller started or
+        joined, the recent activity of their reviews (from the audit trail),
+        and the weekly resolved count. Everything per-review (state, progress,
+        participants, due date) already travels on `GET /documents` — a client
+        renders the whole dashboard from those two calls. Names honour
+        per-review anonymity (issue #413); annotation activity of a
+        PRIVATE-participation review is shown only to its owner.
+      operationId: getDashboard
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: The dashboard aggregates
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DashboardResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
   /documents:
     get:
       tags:
@@ -2385,6 +2533,260 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
+  /annotations/{annotationId}/reactions/{emoji}:
+    parameters:
+      - $ref: '#/components/parameters/AnnotationIdParam'
+      - $ref: '#/components/parameters/EmojiParam'
+    put:
+      tags: [Annotations]
+      summary: Add the caller's emoji reaction to an annotation
+      description: |
+        Slack-style reaction (issue #410): adds the caller's `emoji` to the
+        annotation; repeating the call is a no-op, so the PUT/DELETE pair is
+        idempotent. A reaction is a lightweight signal, not a discussion
+        contribution — RESOLVED annotations stay reactable; only a
+        FINALIZED/CANCELLED review refuses (`REVIEW_CLOSED`, 409). One reaction
+        per user per emoji; several different emojis per user are fine.
+      operationId: reactToAnnotation
+      security:
+        - bearerAuth: []
+      responses:
+        '204':
+          description: The reaction is present (added now or already there)
+        '400':
+          description: The path segment is not a plausible emoji
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          description: Unknown annotation
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '409':
+          description: The review is FINALIZED/CANCELLED (`REVIEW_CLOSED`)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+    delete:
+      tags: [Annotations]
+      summary: Remove the caller's emoji reaction from an annotation
+      description: |
+        The inverse of `reactToAnnotation` (issue #410); removing an absent
+        reaction is a no-op.
+      operationId: unreactFromAnnotation
+      security:
+        - bearerAuth: []
+      responses:
+        '204':
+          description: The reaction is absent (removed now or never there)
+        '400':
+          description: The path segment is not a plausible emoji
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          description: Unknown annotation
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '409':
+          description: The review is FINALIZED/CANCELLED (`REVIEW_CLOSED`)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /comments/{commentId}/reactions/{emoji}:
+    parameters:
+      - $ref: '#/components/parameters/CommentIdParam'
+      - $ref: '#/components/parameters/EmojiParam'
+    put:
+      tags: [Annotations]
+      summary: Add the caller's emoji reaction to a comment
+      description: |
+        Slack-style reaction on a thread message (issue #410); the same
+        semantics as `reactToAnnotation`, keyed by the comment id.
+      operationId: reactToComment
+      security:
+        - bearerAuth: []
+      responses:
+        '204':
+          description: The reaction is present (added now or already there)
+        '400':
+          description: The path segment is not a plausible emoji
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          description: Unknown comment
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '409':
+          description: The review is FINALIZED/CANCELLED (`REVIEW_CLOSED`)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+    delete:
+      tags: [Annotations]
+      summary: Remove the caller's emoji reaction from a comment
+      description: |
+        The inverse of `reactToComment` (issue #410); removing an absent
+        reaction is a no-op.
+      operationId: unreactFromComment
+      security:
+        - bearerAuth: []
+      responses:
+        '204':
+          description: The reaction is absent (removed now or never there)
+        '400':
+          description: The path segment is not a plausible emoji
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          description: Unknown comment
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '409':
+          description: The review is FINALIZED/CANCELLED (`REVIEW_CLOSED`)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /annotations/{annotationId}/placements/{versionNumber}/confirm:
+    parameters:
+      - $ref: '#/components/parameters/AnnotationIdParam'
+      - name: versionNumber
+        in: path
+        required: true
+        schema:
+          type: integer
+    post:
+      tags: [Annotations]
+      summary: Confirm a MOVED placement after review (owner or author)
+      description: |
+        The human half of re-anchoring (ADR-0009, issue #326): a MOVED
+        placement means the anchor was relocated with a change worth checking.
+        Once the document owner or the annotation's author has verified the
+        highlight on that version, confirming flips the placement back to
+        PLACED, keeping the resolved anchor. Only MOVED placements confirm —
+        anything else answers 409 (`PLACEMENT_NOT_MOVED`); orphans are handled
+        by re-drawing or resolving instead.
+      operationId: confirmPlacement
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: The updated annotation with the confirmed placement
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AnnotationView'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          description: The caller is neither the document owner nor the annotation's author
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Unknown annotation, version, or no placement on that version
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '409':
+          description: The placement is not MOVED (`PLACEMENT_NOT_MOVED`)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /annotations/{annotationId}/placements/{versionNumber}/anchor:
+    parameters:
+      - $ref: '#/components/parameters/AnnotationIdParam'
+      - name: versionNumber
+        in: path
+        required: true
+        schema:
+          type: integer
+    put:
+      tags: [Annotations]
+      summary: Re-attach an annotation by replacing its anchor (owner or author)
+      description: |
+        The manual rescue for lost placements (ADR-0009, issue #457): the
+        document owner or the annotation's author picks a new passage on the
+        LATEST version and the placement takes that anchor, flipping to
+        PLACED — the discussion thread stays untouched. Allowed from ORPHANED,
+        FAILED and MOVED (a manual correction of a bad guess); a PLACED
+        placement answers 409 (`PLACEMENT_NOT_REATTACHABLE`) so nothing is
+        overwritten by accident. Older versions are a read-only record
+        (`VERSION_READ_ONLY`), closed reviews refuse (`REVIEW_CLOSED`).
+      operationId: reattachPlacement
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PlacementReattachRequest'
+      responses:
+        '200':
+          description: The updated annotation with the re-attached placement
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AnnotationView'
+        '400':
+          description: The anchor is missing or malformed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          description: The caller is neither the document owner nor the annotation's author
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Unknown annotation, version, or no placement on that version
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '409':
+          description: >-
+            The placement is PLACED (`PLACEMENT_NOT_REATTACHABLE`), the version
+            is not the latest (`VERSION_READ_ONLY`), or the review is closed
+            (`REVIEW_CLOSED`)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
   /annotations/{annotationId}/comments:
     parameters:
       - $ref: '#/components/parameters/AnnotationIdParam'
@@ -2571,6 +2973,24 @@ components:
       schema:
         type: string
         format: uuid
+    CommentIdParam:
+      name: commentId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    EmojiParam:
+      name: emoji
+      in: path
+      required: true
+      description: >-
+        The reaction emoji, URL-encoded — stored and grouped verbatim, so ZWJ
+        sequences and skin-tone variants are distinct reactions.
+      schema:
+        type: string
+        minLength: 1
+        maxLength: 32
     AnnotationIdParam:
       name: annotationId
       in: path
@@ -2788,7 +3208,7 @@ components:
         version:
           type: string
           description: |
-            Server version string (e.g. "0.1.0-SNAPSHOT"). Sourced from build
+            Server version string (e.g. "1.0.0-SNAPSHOT"). Sourced from build
             metadata at startup; "unknown" when build info is unavailable.
         edition:
           $ref: '#/components/schemas/Edition'
@@ -2968,6 +3388,33 @@ components:
         - accessToken
         - tokenType
         - expiresInSeconds
+    TemplateTestEmailRequest:
+      type: object
+      description: Send a rendered template to a recipient as a test (issue #316).
+      properties:
+        recipient:
+          type: string
+          format: email
+          description: Address the rendered template is sent to.
+        locale:
+          type: string
+          description: Locale to render; falls back to the default language when omitted.
+        subject:
+          type: string
+          description: Draft subject to render instead of the stored version.
+        bodyPlain:
+          type: string
+          description: Draft plain-text body; honoured only together with a draft subject.
+        bodyHtml:
+          type: string
+          description: Optional draft HTML alternative.
+        variables:
+          type: object
+          additionalProperties:
+            type: string
+          description: Template variables; representative sample data is used when omitted.
+      required:
+        - recipient
     SendTestEmailRequest:
       type: object
       description: Request to send a test email.
@@ -3196,6 +3643,89 @@ components:
       enum:
         - INTERNAL
         - EXTERNAL
+    PlacementReattachRequest:
+      type: object
+      description: The new home of a lost placement (issue #457).
+      required:
+        - anchor
+      properties:
+        anchor:
+          $ref: '#/components/schemas/Anchor'
+    PublicUserProfile:
+      type: object
+      description: The workspace-public slice of a user (issues #454, #473).
+      required:
+        - id
+        - displayName
+        - createdAt
+        - stats
+        - teams
+      properties:
+        id:
+          type: string
+          format: uuid
+        displayName:
+          type: string
+        slug:
+          type: string
+          nullable: true
+          description: >-
+            Immutable, human-readable profile slug (issue #486), auto-derived
+            from the display name at account creation. Null only for accounts
+            created before slugs existed.
+        avatarUrl:
+          type: string
+          nullable: true
+        createdAt:
+          type: string
+          format: date-time
+        stats:
+          $ref: '#/components/schemas/PublicUserStats'
+        teams:
+          type: array
+          description: Enabled teams the user belongs to, ordered by name.
+          items:
+            $ref: '#/components/schemas/PublicUserTeam'
+    PublicUserStats:
+      type: object
+      description: >-
+        Contribution aggregates for the public profile (issue #473). Activity
+        counters cover NON-anonymous reviews only (ADR-0038 — what anonymity
+        hides never feeds a public number); owned reviews count fully, since
+        ownership is structurally public.
+      required:
+        - reviewsOwned
+        - reviewsParticipating
+        - annotationsRaised
+        - annotationsResolved
+        - commentsWritten
+      properties:
+        reviewsOwned:
+          type: integer
+        reviewsParticipating:
+          type: integer
+        annotationsRaised:
+          type: integer
+        annotationsResolved:
+          type: integer
+        commentsWritten:
+          type: integer
+    PublicUserTeam:
+      type: object
+      description: A team membership shown on the public profile (issue #473).
+      required:
+        - id
+        - name
+        - role
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        role:
+          type: string
+          enum: [LEAD, MEMBER]
     CurrentUserResponse:
       type: object
       description: The authenticated user's own profile.
@@ -3233,6 +3763,10 @@ components:
         id:
           type: string
           format: uuid
+        slug:
+          type: string
+          nullable: true
+          description: The user's profile slug (issue #486); null for pre-slug accounts.
         displayName:
           type: string
           maxLength: 255
@@ -3837,6 +4371,136 @@ components:
       required:
         - field
         - message
+    DashboardReply:
+      type: object
+      description: >-
+        One reply by someone else in a thread the caller started or joined
+        (issue #454), newest first. `annotationExcerpt` is the thread's opening
+        line for context; `authorDisplayName` is resolved server-side,
+        honouring per-review anonymity (issue #413).
+      required:
+        - commentId
+        - annotationId
+        - documentId
+        - documentTitle
+        - body
+        - createdAt
+      properties:
+        commentId:
+          type: string
+          format: uuid
+        annotationId:
+          type: string
+          format: uuid
+        documentId:
+          type: string
+          format: uuid
+        documentTitle:
+          type: string
+        documentSlug:
+          type: string
+          nullable: true
+        authorId:
+          type: string
+          format: uuid
+          nullable: true
+          description: >-
+            The author's REAL user id — null when the review anonymises this
+            author towards the caller (issue #413); the client links and loads
+            avatars only when present.
+        authorSlug:
+          type: string
+          nullable: true
+          description: >-
+            The author's profile slug (issue #486) for pretty profile links —
+            null under the same anonymity rule as `authorId`.
+        authorAvatarUrl:
+          type: string
+          nullable: true
+          description: The author's avatar URL, when identifiable and uploaded.
+        authorDisplayName:
+          type: string
+          nullable: true
+        body:
+          type: string
+          description: The reply, excerpted for the card.
+        annotationExcerpt:
+          type: string
+          nullable: true
+        createdAt:
+          type: string
+          format: date-time
+    DashboardActivity:
+      type: object
+      description: >-
+        One feed entry from the audit trail of the caller's reviews (issue
+        #454) — the caller's own actions are excluded.
+      required:
+        - type
+        - documentId
+        - documentTitle
+        - createdAt
+      properties:
+        type:
+          type: string
+          description: >-
+            The audit event type — annotation.created, annotation.resolved,
+            annotation.reopened, workflow.transition or
+            document.due_date.changed.
+        documentId:
+          type: string
+          format: uuid
+        documentTitle:
+          type: string
+        documentSlug:
+          type: string
+          nullable: true
+        actorId:
+          type: string
+          format: uuid
+          nullable: true
+          description: The actor's REAL user id — null when anonymised (issue #413).
+        actorSlug:
+          type: string
+          nullable: true
+          description: >-
+            The actor's profile slug (issue #486) for pretty profile links —
+            null under the same anonymity rule as `actorId`.
+        actorAvatarUrl:
+          type: string
+          nullable: true
+          description: The actor's avatar URL, when identifiable and uploaded.
+        actorDisplayName:
+          type: string
+          nullable: true
+        createdAt:
+          type: string
+          format: date-time
+    DashboardStats:
+      type: object
+      required:
+        - resolvedThisWeek
+      properties:
+        resolvedThisWeek:
+          type: integer
+          description: Annotations resolved across the caller's reviews in the last 7 days.
+    DashboardResponse:
+      type: object
+      required:
+        - replies
+        - activity
+        - stats
+      properties:
+        replies:
+          type: array
+          items:
+            $ref: '#/components/schemas/DashboardReply'
+        activity:
+          type: array
+          items:
+            $ref: '#/components/schemas/DashboardActivity'
+        stats:
+          $ref: '#/components/schemas/DashboardStats'
     DocumentSummary:
       type: object
       description: One document in the caller's reviews overview (issue #292).
@@ -3867,6 +4531,15 @@ components:
         ownerId:
           type: string
           format: uuid
+        ownerSlug:
+          type: string
+          nullable: true
+          description: >-
+            The owner's profile slug (issue #486) — structurally public, also in
+            anonymous reviews (issue #472). Null for pre-slug accounts.
+        ownerDisplayName:
+          type: string
+          description: The owner's display name — structurally public, also in anonymous reviews.
         workflowState:
           type: string
           description: The review workflow state (open string set, ADR-0011).
@@ -3968,6 +4641,12 @@ components:
           type: string
           format: uuid
           description: The user's or team's id.
+        slug:
+          type: string
+          nullable: true
+          description: >-
+            The user's profile slug (issue #486) — null for teams and on
+            anonymised rosters (issue #422), where it would deanonymise.
         displayName:
           type: string
           description: The user's display name or the team's name.
@@ -4005,6 +4684,10 @@ components:
           format: uuid
         kind:
           $ref: '#/components/schemas/ParticipantKind'
+        slug:
+          type: string
+          nullable: true
+          description: The user's profile slug (issue #486); null for teams.
         displayName:
           type: string
         avatarUrl:
@@ -4058,6 +4741,19 @@ components:
         ownerId:
           type: string
           format: uuid
+        ownerSlug:
+          type: string
+          nullable: true
+          description: >-
+            The owner's profile slug (issue #486) — structurally public, also in
+            anonymous reviews (issue #472). Null for pre-slug accounts.
+        ownerDisplayName:
+          type: string
+          nullable: true
+          description: >-
+            The owner's display name — structurally public, also in anonymous
+            reviews (issue #472). Resolved here so clients never depend on the
+            size-capped principal directory for it.
         workflowState:
           type: string
           description: The review workflow state (state machine lands with #246).
@@ -4413,17 +5109,42 @@ components:
           $ref: '#/components/schemas/AnnotationType'
         priority:
           $ref: '#/components/schemas/AnnotationPriority'
+    ReactionGroup:
+      type: object
+      description: >-
+        One grouped emoji reaction on an annotation or comment (issue #410):
+        the chip's emoji, how many participants reacted with it, whether the
+        caller is among them, and the reactors' display names (resolved
+        server-side, honouring per-review anonymity, issue #413) in reaction
+        order.
+      required:
+        - emoji
+        - count
+        - reactedByMe
+        - reactors
+      properties:
+        emoji:
+          type: string
+        count:
+          type: integer
+        reactedByMe:
+          type: boolean
+        reactors:
+          type: array
+          items:
+            type: string
     AnnotationView:
       type: object
       description: |
         An annotation with, when a version was requested, its placement on that
-        version and the size of its comment thread.
+        version, the size of its comment thread and its reaction chips.
       required:
         - id
         - documentId
         - authorId
         - status
         - commentCount
+        - reactions
         - createdAt
         - updatedAt
       properties:
@@ -4440,6 +5161,12 @@ components:
             The author's id. In an anonymous review (issue #413) this is a stable
             per-document pseudonym token for non-self, non-owner authors — never
             the real user id — so authorship cannot be correlated to the roster.
+        authorSlug:
+          type: string
+          nullable: true
+          description: >-
+            The author's profile slug (issue #486) for pretty profile links —
+            null under the same anonymity rule as the real author id.
         authorDisplayName:
           type: string
           nullable: true
@@ -4473,6 +5200,11 @@ components:
         commentCount:
           type: integer
           description: Number of comments in the thread.
+        reactions:
+          type: array
+          description: The annotation's grouped emoji reactions (issue #410).
+          items:
+            $ref: '#/components/schemas/ReactionGroup'
         createdAt:
           type: string
           format: date-time
@@ -4513,6 +5245,7 @@ components:
         - annotationId
         - authorId
         - body
+        - reactions
         - createdAt
       properties:
         id:
@@ -4527,6 +5260,12 @@ components:
           description: >-
             The author's id — a stable per-document pseudonym token for foreign
             authors in an anonymous review (issue #413), never the real user id.
+        authorSlug:
+          type: string
+          nullable: true
+          description: >-
+            The author's profile slug (issue #486) for pretty profile links —
+            null under the same anonymity rule as the real author id.
         authorDisplayName:
           type: string
           nullable: true
@@ -4536,6 +5275,11 @@ components:
             authors in an anonymous review. Null only for a since-removed user.
         body:
           type: string
+        reactions:
+          type: array
+          description: The comment's grouped emoji reactions (issue #410).
+          items:
+            $ref: '#/components/schemas/ReactionGroup'
         createdAt:
           type: string
           format: date-time

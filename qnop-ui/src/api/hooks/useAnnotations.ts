@@ -20,8 +20,9 @@
  */
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import type { AnnotationCreateRequest, AnnotationListResponse } from '../generated';
+import type { Anchor, AnnotationCreateRequest, AnnotationListResponse } from '../generated';
 import { annotationsApi } from '../config';
+import type { Notify } from '../../components/admin/layout/useToast';
 import { commentKeys } from './useComments';
 import { documentKeys } from './useDocuments';
 
@@ -65,7 +66,10 @@ export function useCreateAnnotation(documentId: string) {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: annotationKeys.all });
       queryClient.invalidateQueries({ queryKey: ['reviews'] });
-      queryClient.invalidateQueries({ queryKey: documentKeys.all });
+      // Detail only (workflow chip / counts) — NEVER documentKeys.all: that
+      // sweeps in the rendered/original binaries and reloading the PDF
+      // remounts the viewer, snapping the scroll back to page 1 (issue #403).
+      queryClient.invalidateQueries({ queryKey: documentKeys.detail(documentId) });
     },
   });
 }
@@ -82,10 +86,12 @@ export function useReopenAnnotation() {
       const response = await annotationsApi.reopenAnnotation({ annotationId: vars.annotationId });
       return response.data;
     },
-    onSuccess: () => {
+    onSuccess: (updated) => {
       queryClient.invalidateQueries({ queryKey: annotationKeys.all });
       queryClient.invalidateQueries({ queryKey: ['reviews'] });
-      queryClient.invalidateQueries({ queryKey: documentKeys.all });
+      // Detail only — see useCreateAnnotation: touching documentKeys.all
+      // reloads the PDF and costs the reader their scroll position.
+      queryClient.invalidateQueries({ queryKey: documentKeys.detail(updated.documentId) });
     },
   });
 }
@@ -107,13 +113,59 @@ export function useResolveAnnotation() {
       });
       return response.data;
     },
-    onSuccess: () => {
+    onSuccess: (updated) => {
       queryClient.invalidateQueries({ queryKey: annotationKeys.all });
       queryClient.invalidateQueries({ queryKey: commentKeys.all });
       queryClient.invalidateQueries({ queryKey: ['reviews'] });
-      // The derived workflow pair (#405) surfaces on the document detail too
-      // (the header's status chip reads document.workflowState).
-      queryClient.invalidateQueries({ queryKey: documentKeys.all });
+      // The derived workflow pair (#405) surfaces on the document detail
+      // (the header's status chip reads document.workflowState) — detail
+      // only, so the PDF/rendered caches stay put (issue #403).
+      queryClient.invalidateQueries({ queryKey: documentKeys.detail(updated.documentId) });
     },
+  });
+}
+
+/**
+ * Confirms a reviewed MOVED placement back to PLACED (ADR-0009, issue #326) —
+ * the human half of re-anchoring, allowed for the owner or the annotation's
+ * author on the version whose highlight was verified.
+ */
+export function useConfirmPlacement(notify: Notify) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (input: { annotationId: string; versionNumber: number }) => {
+      const response = await annotationsApi.confirmPlacement(input);
+      return response.data;
+    },
+    onSuccess: () => {
+      notify('Placement confirmed.', 'success');
+      queryClient.invalidateQueries({ queryKey: annotationKeys.all });
+    },
+    onError: () => notify('Could not confirm the placement.', 'error'),
+  });
+}
+
+/**
+ * Gives a lost (ORPHANED/FAILED — or second-guessed MOVED) placement a new
+ * home on the version's canvas (issue #457): the owner or the annotation's
+ * author points at the new passage and the placement flips to PLACED with the
+ * thread untouched.
+ */
+export function useReattachPlacement(notify: Notify) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (input: { annotationId: string; versionNumber: number; anchor: Anchor }) => {
+      const response = await annotationsApi.reattachPlacement({
+        annotationId: input.annotationId,
+        versionNumber: input.versionNumber,
+        placementReattachRequest: { anchor: input.anchor },
+      });
+      return response.data;
+    },
+    onSuccess: () => {
+      notify('Annotation re-attached.', 'success');
+      queryClient.invalidateQueries({ queryKey: annotationKeys.all });
+    },
+    onError: () => notify('Could not re-attach the annotation.', 'error'),
   });
 }

@@ -31,7 +31,9 @@ import { useFormatters } from '../../../hooks/useFormatters';
 import { DueDateLabel } from '../DueDateLabel';
 import { WorkflowBadge } from '../WorkflowBadge';
 import { AnonymousBadge } from '../AnonymousBadge';
-import { DocumentIcon, ProgressBar, ReviewerStack, RoleBadge } from './ReviewListParts';
+import { ToneBadge } from '../../admin/ToneBadge';
+import { readyToFinalize } from '../../dashboard/dashboardModel';
+import { DocumentIcon, OwnerChip, ProgressBar, ReviewerStack, RoleBadge } from './ReviewListParts';
 import { progressOf, roleOf } from './reviewListModel';
 
 interface ReviewCardsProps {
@@ -73,7 +75,10 @@ export function ReviewCards({ reviews, userId, onOpen }: ReviewCardsProps) {
               '@media (prefers-reduced-motion: reduce)': { transition: 'none' },
               '&:hover': {
                 transform: 'translateY(-3px)',
-                boxShadow: '0 14px 36px -14px rgba(1, 32, 66, 0.22)',
+                boxShadow:
+                  theme.palette.mode === 'light'
+                    ? '0 14px 36px -14px rgba(1, 32, 66, 0.22)'
+                    : 'none',
                 borderColor: theme.palette.text.disabled,
               },
               '&:focus-visible': { boxShadow: theme.qnop.focusRing },
@@ -97,6 +102,9 @@ export function ReviewCards({ reviews, userId, onOpen }: ReviewCardsProps) {
             <Stack direction="row" spacing={1} sx={{ alignItems: 'center' }}>
               <WorkflowBadge state={review.workflowState} />
               {review.anonymous && <AnonymousBadge compact />}
+              {roleOf(review, userId) === 'owner' && readyToFinalize(review) && (
+                <ToneBadge tone="green" label="Ready to finalize" />
+              )}
               {progress && (
                 <Typography
                   variant="caption"
@@ -111,12 +119,21 @@ export function ReviewCards({ reviews, userId, onOpen }: ReviewCardsProps) {
               <ProgressBar
                 resolved={progress.resolved}
                 total={progress.total}
-                color={theme.qnop.brand.blue}
+                color={
+                  progress.resolved === progress.total
+                    ? theme.palette.success.main
+                    : theme.qnop.brand.blue
+                }
               />
             )}
             <Divider />
             <Stack direction="row" spacing={1.5} sx={{ alignItems: 'center' }}>
-              <ReviewerStack participants={review.participants} />
+              <OwnerChip
+                ownerId={review.ownerId}
+                slug={review.ownerSlug}
+                name={review.ownerDisplayName}
+              />
+              <ReviewerStack participants={review.participants} anonymous={review.anonymous} />
               <Box sx={{ flex: 1 }} />
               <Stack
                 direction="row"

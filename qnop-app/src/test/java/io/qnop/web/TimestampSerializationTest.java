@@ -31,7 +31,7 @@ import org.springframework.test.context.ContextConfiguration;
 import tools.jackson.databind.ObjectMapper;
 
 /**
- * Regression guard for the timestamp L10n policy (issue #465, ADR-0039, requirement 2): the running
+ * Regression guard for the timestamp L10n policy (issue #465, ADR-0041, requirement 2): the running
  * server's Jackson mapper must serialize every {@link Instant} as an ISO-8601 string carrying an
  * explicit offset ({@code ...Z}), never epoch millis and never a zone-less local string. This is
  * the Jackson 3 default, but it is pinned in {@code application.yml} ({@code

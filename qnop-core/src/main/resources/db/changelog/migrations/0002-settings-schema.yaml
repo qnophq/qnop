@@ -131,9 +131,16 @@ databaseChangeLog:
         - insert:
             tableName: application_setting
             columns:
-              - column: { name: setting_key, value: "upload.max_file_size_mb" }
+              - column: { name: setting_key, value: "upload.document_max_file_size_mb" }
               - column: { name: setting_value, value: "25" }
               - column: { name: setting_desc, value: "Maximum document upload size in megabytes." }
+              - column: { name: value_type, value: "INTEGER" }
+        - insert:
+            tableName: application_setting
+            columns:
+              - column: { name: setting_key, value: "upload.attachment_max_file_size_mb" }
+              - column: { name: setting_value, value: "10" }
+              - column: { name: setting_desc, value: "Maximum comment attachment size in megabytes." }
               - column: { name: value_type, value: "INTEGER" }
         - insert:
             tableName: application_setting
@@ -233,3 +240,10 @@ databaseChangeLog:
               - column: { name: setting_value, value: "30" }
               - column: { name: setting_desc, value: "Validity window of a password-reset token, in minutes." }
               - column: { name: value_type, value: "INTEGER" }
+        - insert:
+            tableName: application_setting
+            columns:
+              - column: { name: setting_key, value: "notifications.review_emails_enabled" }
+              - column: { name: setting_value, value: "true" }
+              - column: { name: setting_desc, value: "Send email notifications for review activity (reviewer added, annotations, replies, status changes)." }
+              - column: { name: value_type, value: "BOOLEAN" }

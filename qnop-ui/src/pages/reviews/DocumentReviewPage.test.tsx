@@ -21,6 +21,7 @@
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { fireEvent, render, screen } from '@testing-library/react';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { ThemeProvider } from '@mui/material/styles';
 import type { AnnotationView, RenderedSurface } from '../../api/generated';
@@ -39,6 +40,10 @@ import { useComments } from '../../api/hooks/useComments';
 import { usePdfDocument } from '../../components/reviews/viewer/usePdfDocument';
 import { useAuthStore } from '../../stores/authStore';
 
+// The reaction toggles (issue #410) reach for the query client; the data
+// hooks above stay mocked, so a bare client per file is all the tests need.
+const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+
 vi.mock('../../api/hooks/useDocuments', () => ({
   useDocument: vi.fn(),
   useDocumentVersions: vi.fn(),
@@ -46,6 +51,8 @@ vi.mock('../../api/hooks/useDocuments', () => ({
   useOriginalPdf: vi.fn(),
 }));
 vi.mock('../../api/hooks/useAnnotations', () => ({
+  useConfirmPlacement: vi.fn().mockReturnValue({ mutate: vi.fn(), isPending: false }),
+  useReattachPlacement: vi.fn().mockReturnValue({ mutate: vi.fn(), isPending: false }),
   useAnnotations: vi.fn(),
   useCreateAnnotation: vi.fn(),
   useResolveAnnotation: vi.fn().mockReturnValue({ mutate: vi.fn(), isPending: false }),
@@ -127,6 +134,7 @@ const ANNOTATIONS: AnnotationView[] = [
       textQuote: { quote: 'Hello' },
     },
     commentCount: 0,
+    reactions: [],
     createdAt: '2026-07-01T10:00:00Z',
     updatedAt: '2026-07-01T10:00:00Z',
   },
@@ -179,13 +187,15 @@ function seedHappyPath(extractionStatus: ExtractionStatus = ExtractionStatus.Rea
 
 function renderPage(initialEntry = '/reviews/doc-1') {
   render(
-    <ThemeProvider theme={buildTheme('light')}>
-      <MemoryRouter initialEntries={[initialEntry]}>
-        <Routes>
-          <Route path="/reviews/:documentId" element={<DocumentReviewPage />} />
-        </Routes>
-      </MemoryRouter>
-    </ThemeProvider>,
+    <QueryClientProvider client={queryClient}>
+      <ThemeProvider theme={buildTheme('light')}>
+        <MemoryRouter initialEntries={[initialEntry]}>
+          <Routes>
+            <Route path="/reviews/:documentId" element={<DocumentReviewPage />} />
+          </Routes>
+        </MemoryRouter>
+      </ThemeProvider>
+    </QueryClientProvider>,
   );
 }
 
@@ -343,16 +353,28 @@ describe('DocumentReviewPage focus mode', () => {
     expect(screen.getByText(/Annotations \(/)).toBeInTheDocument();
   });
 
-  it('switches back to panel mode via the Document view tab and stores it', () => {
+  it('switches back to panel mode via the toolbar switch and stores it', () => {
     localStorage.setItem('qnop-review-view-mode', 'focus');
     seedHappyPath();
     renderPage();
 
-    // The view tabs (issue #398) navigate — ?view=panel syncs into the mode.
-    fireEvent.click(screen.getByTestId('review-view-tab-document'));
+    // Panel vs. focus lives in the viewer toolbar now (issue #403); the switch
+    // routes through ?view=, which syncs into the stored preference.
+    fireEvent.click(screen.getByRole('button', { name: 'Panel view' }));
 
     expect(screen.getByRole('complementary', { name: 'Annotations' })).toBeInTheDocument();
     expect(localStorage.getItem('qnop-review-view-mode')).toBe('panel');
+  });
+
+  it('switches into focus mode via the toolbar switch', () => {
+    localStorage.setItem('qnop-review-view-mode', 'panel');
+    seedHappyPath();
+    renderPage();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Focus view' }));
+
+    expect(screen.queryByRole('complementary', { name: 'Annotations' })).not.toBeInTheDocument();
+    expect(localStorage.getItem('qnop-review-view-mode')).toBe('focus');
   });
 
   it('activates focus mode through the ?view= deep link', () => {

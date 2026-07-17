@@ -47,7 +47,9 @@ import {
   useTeamMembers,
 } from '../../../api/hooks/useReviews';
 import type { ToastSeverity } from '../../admin/layout/useToast';
+import { UserHoverCard } from '../../people/UserHoverCard';
 import { UserAvatar } from '../../shell/UserAvatar';
+import { avatarSrc } from '../../../utils/avatarUrl';
 import { apiErrorCode } from '../../../utils/apiError';
 
 /** Known participant conflicts — codes map to friendly text (never server prose). */
@@ -116,12 +118,20 @@ function TeamMemberList({ teamId }: { teamId: string }) {
       sx={{ ml: 3.25, pl: 1.75, my: 0.25, borderLeft: '2px solid', borderColor: 'divider' }}
     >
       {members.map((member) => (
-        <Stack key={member.id} direction="row" spacing={1} sx={{ alignItems: 'center', py: 0.25 }}>
-          <UserAvatar name={member.displayName} size={20} />
-          <Typography variant="body2" noWrap>
-            {member.displayName}
-          </Typography>
-        </Stack>
+        // Teams only unfold on non-anonymised rosters, so these are real ids.
+        <UserHoverCard
+          key={member.id}
+          userId={member.id}
+          slug={member.slug}
+          profileName={member.displayName}
+        >
+          <Stack direction="row" spacing={1} sx={{ alignItems: 'center', py: 0.25 }}>
+            <UserAvatar name={member.displayName} size={20} imageUrl={avatarSrc(member.id)} />
+            <Typography variant="body2" noWrap>
+              {member.displayName}
+            </Typography>
+          </Stack>
+        </UserHoverCard>
       ))}
     </Stack>
   );
@@ -220,18 +230,42 @@ export function ParticipantsDialog({
                         </IconButton>
                       ) : null}
                       {isTeam ? (
-                        <PrincipalIcon kind={participant.kind} size={28} />
+                        <>
+                          <PrincipalIcon kind={participant.kind} size={28} />
+                          <Box sx={{ flex: 1, minWidth: 0 }}>
+                            <Typography variant="body2" noWrap sx={{ fontWeight: 500 }}>
+                              {participant.displayName}
+                            </Typography>
+                            <Typography variant="caption" color="text.secondary">
+                              Team
+                            </Typography>
+                          </Box>
+                        </>
                       ) : (
-                        <UserAvatar name={participant.displayName} size={28} />
+                        // Avatar AND name trigger the card and link to the
+                        // profile. An anonymised roster carries synthetic ids
+                        // (issue #422) — neither card nor link there (#482).
+                        <UserHoverCard
+                          userId={anonymised ? null : participant.principalId}
+                          slug={participant.slug}
+                          profileName={participant.displayName}
+                          sx={{ flex: 1, alignItems: 'center', gap: 1.25 }}
+                        >
+                          <UserAvatar
+                            name={participant.displayName}
+                            size={28}
+                            imageUrl={avatarSrc(participant.principalId)}
+                          />
+                          <Box sx={{ flex: 1, minWidth: 0 }}>
+                            <Typography variant="body2" noWrap sx={{ fontWeight: 500 }}>
+                              {participant.displayName}
+                            </Typography>
+                            <Typography variant="caption" color="text.secondary">
+                              User
+                            </Typography>
+                          </Box>
+                        </UserHoverCard>
                       )}
-                      <Box sx={{ flex: 1, minWidth: 0 }}>
-                        <Typography variant="body2" noWrap sx={{ fontWeight: 500 }}>
-                          {participant.displayName}
-                        </Typography>
-                        <Typography variant="caption" color="text.secondary">
-                          {isTeam ? 'Team' : 'User'}
-                        </Typography>
-                      </Box>
                       {isOwner && (
                         <Tooltip title={`Remove ${participant.displayName}`}>
                           <IconButton
@@ -312,7 +346,11 @@ export function ParticipantsDialog({
                       {principal.kind === ParticipantKind.Team ? (
                         <PrincipalIcon kind={principal.kind} size={26} />
                       ) : (
-                        <UserAvatar name={principal.displayName} size={26} />
+                        <UserAvatar
+                          name={principal.displayName}
+                          size={26}
+                          imageUrl={avatarSrc(principal.id)}
+                        />
                       )}
                       <Box sx={{ flex: 1, minWidth: 0 }}>
                         <Typography variant="body2" noWrap>

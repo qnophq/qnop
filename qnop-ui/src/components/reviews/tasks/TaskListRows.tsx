@@ -31,6 +31,7 @@ import type { AnnotationView } from '../../../api/generated';
 import { AnnotationStatus } from '../../../api/generated';
 import { ToneBadge } from '../../admin/ToneBadge';
 import { UserAvatar } from '../../shell/UserAvatar';
+import { avatarSrc } from '../../../utils/avatarUrl';
 import { tokens } from '../../../theme/tokens';
 import { isDocumentScoped } from '../annotationScope';
 import { STATUS_CUES } from '../panel/statusCues';
@@ -151,7 +152,11 @@ export function TaskListRows({ annotations, taskKeyOf, authorNameOf, onOpen }: T
                   : statusCue.label
               }
             />
-            <UserAvatar name={authorNameOf(annotation.authorId)} size={22} />
+            <UserAvatar
+              name={authorNameOf(annotation.authorId)}
+              size={22}
+              imageUrl={avatarSrc(annotation.authorId)}
+            />
             <ChevronRight size={15} aria-hidden color={theme.palette.text.disabled} />
           </ButtonBase>
         );

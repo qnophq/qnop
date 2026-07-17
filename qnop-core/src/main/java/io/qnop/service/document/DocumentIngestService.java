@@ -34,6 +34,7 @@ import io.qnop.service.ApplicationSettingsService;
 import io.qnop.service.job.JobPayload;
 import io.qnop.service.job.JobPayloadCodec;
 import io.qnop.service.job.JobService;
+import io.qnop.service.review.ReviewEvent;
 import io.qnop.service.storage.StagedObject;
 import io.qnop.service.storage.StorageQuotaExceededException;
 import io.qnop.service.storage.StorageService;
@@ -48,6 +49,7 @@ import java.util.Optional;
 import java.util.UUID;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.PlatformTransactionManager;
@@ -93,6 +95,7 @@ public class DocumentIngestService {
   private final AnnotationRepository annotations;
   private final AnnotationPlacementRepository placements;
   private final TransactionTemplate transactionTemplate;
+  private final ApplicationEventPublisher events;
 
   public DocumentIngestService(
       DocumentRepository documents,
@@ -103,7 +106,8 @@ public class DocumentIngestService {
       DocumentAccessService access,
       AnnotationRepository annotations,
       AnnotationPlacementRepository placements,
-      PlatformTransactionManager transactionManager) {
+      PlatformTransactionManager transactionManager,
+      ApplicationEventPublisher events) {
     this.documents = documents;
     this.versions = versions;
     this.storage = storage;
@@ -113,6 +117,7 @@ public class DocumentIngestService {
     this.annotations = annotations;
     this.placements = placements;
     this.transactionTemplate = new TransactionTemplate(transactionManager);
+    this.events = events;
   }
 
   /**
@@ -204,6 +209,8 @@ public class DocumentIngestService {
                       + 1;
               DocumentVersion version = saveVersionAndEnqueue(documentId, next, staged, actor);
               seedPendingPlacements(documentId, version);
+              // Participants learn about the new version after commit (issue #316).
+              events.publishEvent(new ReviewEvent.VersionUploaded(documentId, actor, next));
               return new UploadResult(
                   documentId, version.getVersionNumber(), version.getExtractionStatus().name());
             });
@@ -322,7 +329,9 @@ public class DocumentIngestService {
   }
 
   private long maxUploadBytes() {
-    return settings.getInteger(ApplicationSettingKey.UPLOAD_MAX_FILE_SIZE_MB) * 1024L * 1024L;
+    return settings.getInteger(ApplicationSettingKey.UPLOAD_DOCUMENT_MAX_FILE_SIZE_MB)
+        * 1024L
+        * 1024L;
   }
 
   /**

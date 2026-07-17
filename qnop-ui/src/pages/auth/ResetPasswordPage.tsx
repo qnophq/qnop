@@ -61,7 +61,10 @@ export function ResetPasswordPage() {
   };
 
   return (
-    <AuthLayout title="Choose a new password">
+    <AuthLayout
+      title="Choose a new password"
+      subtitle="Strong and memorable — your reviews are waiting."
+    >
       {done ? (
         <>
           <Alert severity="success" sx={{ mb: 2 }}>

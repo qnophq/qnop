@@ -1,0 +1,27 @@
+# SPDX-License-Identifier: AGPL-3.0-only
+#
+# TEST FIXTURE for the enterprise schema seam (issue #254, ADR-0039). This file
+# stands in for a changelog an enterprise JAR would carry under
+# db/changelog/enterprise/ on its own classpath entry. It lives on the TEST
+# classpath only — the shipped community artifact contains no enterprise
+# changelogs, so the master changelog's includeAll is a no-op there.
+# EnterpriseLiquibaseSeamIT asserts this probe is applied and ordered after
+# every community migration.
+databaseChangeLog:
+  - changeSet:
+      id: e0001-seam-probe
+      author: qnop-enterprise
+      comment: Probe table proving the enterprise includeAll seam applies module changelogs.
+      changes:
+        - createTable:
+            tableName: enterprise_seam_probe
+            columns:
+              - column:
+                  name: id
+                  type: uuid
+                  constraints:
+                    primaryKey: true
+                    nullable: false
+      rollback:
+        - dropTable:
+            tableName: enterprise_seam_probe

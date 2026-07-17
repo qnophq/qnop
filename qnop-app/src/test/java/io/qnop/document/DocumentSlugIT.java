@@ -88,12 +88,14 @@ class DocumentSlugIT extends AbstractIntegrationTest {
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.slug").value("q3-contract-review"));
 
-    // Lookup ignores case too.
+    // Lookup ignores case too — and the metadata resolves the owner's identity
+    // itself (structurally public, #472), never via the principal directory.
     mockMvc
         .perform(get("/api/v1/documents/by-slug/{slug}", "Q3-CONTRACT-REVIEW").with(asUser(owner)))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.id").value(documentId.toString()))
-        .andExpect(jsonPath("$.slug").value("q3-contract-review"));
+        .andExpect(jsonPath("$.slug").value("q3-contract-review"))
+        .andExpect(jsonPath("$.ownerDisplayName", org.hamcrest.Matchers.startsWith("slug-")));
   }
 
   @Test

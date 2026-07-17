@@ -31,7 +31,8 @@ import type { ScreenPosition } from './anchoring';
 import { useComments } from '../../../api/hooks/useComments';
 import { useAuthStore } from '../../../stores/authStore';
 import { AnnotationBadgeRow } from '../panel/AnnotationBadgeRow';
-import { CommentBubble } from '../panel/CommentBubble';
+import { CommentMessage } from '../panel/CommentMessage';
+import { avatarSrc } from '../../../utils/avatarUrl';
 
 /** Hover intent: the preview appears only after the pointer settles on a mark. */
 const SHOW_DELAY_MS = 320;
@@ -104,7 +105,8 @@ export function AnnotationHoverCard({ annotation, getAnchorPosition }: Annotatio
             width: 320,
             borderRadius: 0.75,
             border: `1px solid ${theme.palette.divider}`,
-            boxShadow: '0 12px 32px -8px rgba(1, 32, 66, 0.25)',
+            boxShadow:
+              theme.palette.mode === 'light' ? '0 12px 32px -8px rgba(1, 32, 66, 0.25)' : 'none',
             overflow: 'hidden',
           },
         },
@@ -121,10 +123,10 @@ export function AnnotationHoverCard({ annotation, getAnchorPosition }: Annotatio
                 <Skeleton variant="text" width="65%" />
               </Stack>
             ) : (
-              <CommentBubble
+              <CommentMessage
                 name={authorName}
                 own={own}
-                avatarUrl={avatarUrl}
+                avatarUrl={own ? avatarUrl : avatarSrc(authorId)}
                 body={firstComment?.body ?? annotation.firstComment ?? ''}
                 createdAt={firstComment?.createdAt ?? annotation.createdAt}
                 clampLines={3}

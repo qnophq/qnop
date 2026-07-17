@@ -51,3 +51,7 @@ The review surface must show a document **faithfully** (legal/compliance documen
 - **A — Render the original in the client and derive anchoring there (PDF.js text layer live).** Rejected as the authority: format-specific (images/DOCX each need a bespoke client path), and re-anchoring would still need server-side text. We keep client rendering for *pixels only*.
 - **B — A canonical server-rendered representation the client displays (DOCX/PDF → unified HTML).** Rejected for the core: loses the original's exact layout, which is non-negotiable for the documents qnop reviews.
 - **Storing only text-quote anchors, no boxes.** Rejected: images have no quotes, and visually locating a highlight needs geometry; region/box anchoring must be a first-class, always-present layer.
+
+## Amendment (2026-07-16, shipped vs. planned extractors)
+
+Decision point 4 lists the intended Community extractor set; as of this date only the **PDF extractor** (`PdfBoxDocumentExtractor`) is shipped. The Markdown and DOCX extractors remain planned Community scope per [ADR-0010](0010-docx-representation-strategy.md). The **image** extractor's placement (Community vs. Enterprise) was re-opened by the PDF-first roadmap decision and is no longer settled by this ADR.

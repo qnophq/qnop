@@ -125,9 +125,13 @@ const SETTING_RULES: Record<string, { test: (value: string) => boolean; message:
     test: isHttpUrl,
     message: 'Enter a valid http(s) URL, e.g. https://qnop.example.',
   },
-  'upload.max_file_size_mb': {
+  'upload.document_max_file_size_mb': {
     test: (value) => isIntegerInRange(value, 1, 1024),
     message: 'Enter a whole number between 1 and 1024.',
+  },
+  'upload.attachment_max_file_size_mb': {
+    test: (value) => isIntegerInRange(value, 1, 50),
+    message: 'Enter a whole number between 1 and 50.',
   },
   'auth.password_reset_token_ttl_minutes': {
     test: (value) => isIntegerInRange(value, 1, 1440),

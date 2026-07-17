@@ -32,6 +32,7 @@ import { AnnotationStatus } from '../../../api/generated';
 import { ToneBadge } from '../../admin/ToneBadge';
 import { useAuthStore } from '../../../stores/authStore';
 import { UserAvatar } from '../../shell/UserAvatar';
+import { avatarSrc } from '../../../utils/avatarUrl';
 import { isUnseen } from '../newSince';
 import { isDocumentScoped } from '../annotationScope';
 import { WholeDocumentChip } from '../WholeDocumentChip';
@@ -198,7 +199,7 @@ export function TaskCard({
       )}
 
       <Stack direction="row" spacing={0.75} sx={{ alignItems: 'center' }}>
-        <UserAvatar name={authorName} size={20} />
+        <UserAvatar name={authorName} size={20} imageUrl={avatarSrc(annotation.authorId)} />
         <Typography variant="caption" color="text.secondary" noWrap sx={{ minWidth: 0 }}>
           {authorName}
         </Typography>

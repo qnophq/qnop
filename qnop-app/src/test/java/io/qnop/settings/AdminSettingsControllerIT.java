@@ -64,7 +64,8 @@ class AdminSettingsControllerIT extends AbstractIntegrationTest {
 
   @AfterEach
   void resetMutatedKeys() {
-    settings.update(Map.of(ApplicationSettingKey.UPLOAD_MAX_FILE_SIZE_MB.getKey(), "25"), null);
+    settings.update(
+        Map.of(ApplicationSettingKey.UPLOAD_DOCUMENT_MAX_FILE_SIZE_MB.getKey(), "25"), null);
   }
 
   @Test
@@ -74,7 +75,7 @@ class AdminSettingsControllerIT extends AbstractIntegrationTest {
         .perform(get("/api/v1/admin/settings"))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.settings").isArray())
-        .andExpect(jsonPath("$.settings.length()").value(18));
+        .andExpect(jsonPath("$.settings.length()").value(20));
   }
 
   @Test
@@ -95,10 +96,11 @@ class AdminSettingsControllerIT extends AbstractIntegrationTest {
         .perform(
             patch("/api/v1/admin/settings")
                 .contentType(MediaType.APPLICATION_JSON)
-                .content("{\"values\":{\"upload.max_file_size_mb\":\"40\"}}"))
+                .content("{\"values\":{\"upload.document_max_file_size_mb\":\"40\"}}"))
         .andExpect(status().isOk());
 
-    assertThat(settings.getInteger(ApplicationSettingKey.UPLOAD_MAX_FILE_SIZE_MB)).isEqualTo(40);
+    assertThat(settings.getInteger(ApplicationSettingKey.UPLOAD_DOCUMENT_MAX_FILE_SIZE_MB))
+        .isEqualTo(40);
   }
 
   @Test
@@ -108,10 +110,10 @@ class AdminSettingsControllerIT extends AbstractIntegrationTest {
         .perform(
             patch("/api/v1/admin/settings")
                 .contentType(MediaType.APPLICATION_JSON)
-                .content("{\"values\":{\"upload.max_file_size_mb\":\"abc\"}}"))
+                .content("{\"values\":{\"upload.document_max_file_size_mb\":\"abc\"}}"))
         .andExpect(status().isBadRequest())
         .andExpect(jsonPath("$.code").value("VALIDATION_ERROR"))
-        .andExpect(jsonPath("$.fieldErrors[0].field").value("upload.max_file_size_mb"))
+        .andExpect(jsonPath("$.fieldErrors[0].field").value("upload.document_max_file_size_mb"))
         .andExpect(jsonPath("$.fieldErrors[0].message").isNotEmpty());
   }
 

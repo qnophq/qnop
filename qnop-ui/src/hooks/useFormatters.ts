@@ -26,7 +26,7 @@ import { shortRelativeTime } from '../utils/relativeTime';
 
 /**
  * Date/time formatters bound to the viewer's active display zone (issue #465,
- * ADR-0039). This is the single seam through which components render timestamps:
+ * ADR-0041). This is the single seam through which components render timestamps:
  * every returned formatter carries the resolved timezone (user profile →
  * application default → UTC), so no component renders in the raw browser zone.
  *

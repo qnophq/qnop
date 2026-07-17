@@ -53,6 +53,14 @@ const PILL_SX = {
   '& .MuiChip-icon': { ml: 0.5, mr: -0.25 },
 } as const;
 
+/** The re-anchoring facet (ADR-0009, issue #326). */
+const PLACEMENT_OPTIONS: { value: AnnotationFilters['placement']; label: string }[] = [
+  { value: 'all', label: 'Any placement' },
+  { value: 'attention', label: 'Needs attention' },
+  { value: 'moved', label: 'Moved' },
+  { value: 'orphaned', label: 'Orphaned' },
+];
+
 const STATUS_OPTIONS: { value: AnnotationFilters['status']; label: string }[] = [
   { value: 'all', label: 'All' },
   { value: 'open', label: 'Open' },
@@ -130,6 +138,13 @@ export function PanelFilterBar({
               data-testid="active-filter-chips"
               sx={{ alignItems: 'center', flexShrink: 0, maxWidth: '60%', overflow: 'hidden' }}
             >
+              {filters.placement !== 'all' && (
+                <Chip
+                  size="small"
+                  label={PLACEMENT_OPTIONS.find((o) => o.value === filters.placement)?.label}
+                  onDelete={() => set({ placement: 'all' })}
+                />
+              )}
               {statusFacet && filters.status !== 'all' && (
                 <Chip
                   size="small"
@@ -240,6 +255,21 @@ export function PanelFilterBar({
               ))}
             </TextField>
           )}
+          <TextField
+            select
+            size="small"
+            label="Placement"
+            value={filters.placement}
+            onChange={(event) =>
+              set({ placement: event.target.value as AnnotationFilters['placement'] })
+            }
+          >
+            {PLACEMENT_OPTIONS.map((option) => (
+              <MenuItem key={option.value} value={option.value}>
+                {option.label}
+              </MenuItem>
+            ))}
+          </TextField>
           <TextField
             select
             size="small"

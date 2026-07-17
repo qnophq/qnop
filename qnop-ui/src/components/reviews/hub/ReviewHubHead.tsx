@@ -36,7 +36,6 @@ import { AnnotationStatus, ParticipantKind } from '../../../api/generated';
 import { useConfig } from '../../../api/hooks/useConfig';
 import {
   useParticipants,
-  usePrincipalSearch,
   useTransitionWorkflow,
   useUploadVersion,
   useWorkflow,
@@ -44,7 +43,9 @@ import {
 import { useAuthStore } from '../../../stores/authStore';
 import { ConfirmDialog } from '../../admin/ConfirmDialog';
 import type { Notify } from '../../admin/layout/useToast';
+import { UserHoverCard } from '../../people/UserHoverCard';
 import { UserAvatar } from '../../shell/UserAvatar';
+import { avatarSrc } from '../../../utils/avatarUrl';
 import { DueDateLabel } from '../DueDateLabel';
 import { ProgressBar } from '../list/ReviewListParts';
 import { workflowLabel } from '../workflowMeta';
@@ -66,6 +67,10 @@ interface ReviewHubHeadProps {
   documentId: string;
   /** The document owner — shown prominently in the header (issue #403). */
   ownerId: string;
+  /** The owner's profile slug (issue #486) — structurally public (#472). */
+  ownerSlug?: string | null;
+  /** The owner's display name, resolved on the document (structurally public, #472). */
+  ownerDisplayName?: string | null;
   isOwner: boolean;
   ownUserId: string | null;
   /** True for an anonymous review (issue #422) — the roster is anonymised for non-owners. */
@@ -89,6 +94,8 @@ interface ReviewHubHeadProps {
 export function ReviewHubHead({
   documentId,
   ownerId,
+  ownerSlug,
+  ownerDisplayName,
   isOwner,
   ownUserId,
   anonymous,
@@ -112,15 +119,13 @@ export function ReviewHubHead({
   const uploadVersion = useUploadVersion(documentId);
 
   const participants = participantsQuery.data?.participants ?? [];
-  // The owner never sits in the participant rows; the principal directory
-  // (names only, #292) resolves them — self by display name.
-  const principals = usePrincipalSearch('').data?.principals ?? [];
   const ownDisplayName = useAuthStore((state) => state.displayName);
   const ownAvatarUrl = useAuthStore((state) => state.avatarUrl);
+  // The owner never sits in the participant rows; their name travels on the
+  // document itself (structurally public, #472) — never resolved via the
+  // size-capped principal directory, which drops users in big workspaces.
   const ownerName =
-    ownerId === ownUserId
-      ? (ownDisplayName ?? 'You')
-      : (principals.find((principal) => principal.id === ownerId)?.displayName ?? 'Owner');
+    ownerId === ownUserId ? (ownDisplayName ?? 'You') : (ownerDisplayName ?? 'Owner');
   const transitions = workflowQuery.data?.allowedTransitions ?? [];
   const maxSizeMb = config?.upload.maxDocumentSizeMb ?? FALLBACK_MAX_SIZE_MB;
 
@@ -166,7 +171,10 @@ export function ReviewHubHead({
 
   return (
     <Stack direction="row" spacing={1.5} sx={{ alignItems: 'center', flexWrap: 'wrap' }}>
-      <Tooltip title="Review owner">
+      {/* The owner is structurally public (issue #472), so the hover card
+          (issue #482) may attach even in anonymous reviews — it replaces the
+          old "Review owner" tooltip, which the OWNER label already spells. */}
+      <UserHoverCard userId={ownerId} slug={ownerSlug} profileName={ownerName}>
         <Stack
           direction="row"
           spacing={0.75}
@@ -176,7 +184,7 @@ export function ReviewHubHead({
           <UserAvatar
             name={ownerName}
             size={24}
-            imageUrl={ownerId === ownUserId ? ownAvatarUrl : null}
+            imageUrl={ownerId === ownUserId ? ownAvatarUrl : avatarSrc(ownerId)}
           />
           <Box sx={{ minWidth: 0 }}>
             <Typography
@@ -196,7 +204,7 @@ export function ReviewHubHead({
             </Typography>
           </Box>
         </Stack>
-      </Tooltip>
+      </UserHoverCard>
       <Divider orientation="vertical" flexItem sx={{ my: 0.5 }} />
       {total > 0 && (
         <Tooltip
@@ -304,7 +312,11 @@ export function ReviewHubHead({
                       <Users size={12} aria-hidden />
                     </Box>
                   ) : (
-                    <UserAvatar name={participant.displayName} size={24} />
+                    <UserAvatar
+                      name={participant.displayName}
+                      size={24}
+                      imageUrl={avatarSrc(participant.principalId)}
+                    />
                   )}
                 </Box>
               ))}

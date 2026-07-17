@@ -69,6 +69,10 @@ export function UserAvatar({ name, size = 28, imageUrl }: UserAvatarProps) {
         flexShrink: 0,
         overflow: 'hidden',
         bgcolor: palette[idx],
+        // On the black-based dark surfaces (issue #423) the darkest palette
+        // tones sink below 3:1 against the page — a quiet ring keeps every
+        // avatar's boundary readable without touching the identity colours.
+        border: theme.qnop.mode === 'dark' ? `1px solid ${theme.palette.divider}` : 'none',
         color: '#fff',
         display: 'flex',
         alignItems: 'center',

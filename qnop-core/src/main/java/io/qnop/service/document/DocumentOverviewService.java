@@ -28,12 +28,18 @@ import io.qnop.repository.DocumentRepository;
 import io.qnop.repository.DocumentVersionRepository;
 import io.qnop.repository.ParticipantProjection;
 import io.qnop.repository.ReviewParticipantRepository;
+import io.qnop.repository.UserDisplayName;
+import io.qnop.repository.UserRepository;
+import io.qnop.repository.UserSlug;
 import io.qnop.service.document.ReviewParticipantService.ParticipantView;
 import io.qnop.service.review.ReviewIdentityResolver;
 import java.time.Instant;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Objects;
+import java.util.Set;
 import java.util.UUID;
 import java.util.function.Function;
 import java.util.stream.Collectors;
@@ -60,18 +66,21 @@ public class DocumentOverviewService {
   private final AnnotationRepository annotations;
   private final ReviewParticipantRepository participants;
   private final ReviewIdentityResolver identity;
+  private final UserRepository users;
 
   public DocumentOverviewService(
       DocumentRepository documents,
       DocumentVersionRepository versions,
       AnnotationRepository annotations,
       ReviewParticipantRepository participants,
-      ReviewIdentityResolver identity) {
+      ReviewIdentityResolver identity,
+      UserRepository users) {
     this.documents = documents;
     this.versions = versions;
     this.annotations = annotations;
     this.participants = participants;
     this.identity = identity;
+    this.users = users;
   }
 
   @Transactional(readOnly = true)
@@ -97,11 +106,33 @@ public class DocumentOverviewService {
             : annotations.countVisibleByDocumentIds(ids, actor).stream()
                 .collect(
                     Collectors.toMap(DocumentAnnotationCounts::documentId, Function.identity()));
+    // Owner names, batched (issue #469 polish): structurally public (#413).
+    Set<UUID> ownerIds =
+        result.getContent().stream().map(Document::getOwnerId).collect(Collectors.toSet());
+    Map<UUID, String> ownerNames =
+        ownerIds.isEmpty()
+            ? Map.of()
+            : users.findDisplayNamesByIdIn(ownerIds).stream()
+                .collect(Collectors.toMap(UserDisplayName::id, UserDisplayName::displayName));
     Map<UUID, List<ParticipantProjection>> participantsByDocument =
         ids.isEmpty()
             ? Map.of()
             : participants.findViewsByDocumentIds(ids).stream()
                 .collect(Collectors.groupingBy(ParticipantProjection::documentId));
+    // Profile slugs for pretty profile links (issue #486), one batch across
+    // the owners and every visible (non-anonymised) participant.
+    Set<UUID> slugCandidates = new HashSet<>(ownerIds);
+    participantsByDocument.values().stream()
+        .flatMap(List::stream)
+        .map(ParticipantProjection::userId)
+        .filter(Objects::nonNull)
+        .forEach(slugCandidates::add);
+    Map<UUID, String> slugById =
+        slugCandidates.isEmpty()
+            ? Map.of()
+            : users.findSlugsByIdIn(slugCandidates).stream()
+                .filter(row -> row.slug() != null)
+                .collect(Collectors.toMap(UserSlug::id, UserSlug::slug));
 
     List<DocumentSummaryView> items =
         result.getContent().stream()
@@ -115,6 +146,8 @@ public class DocumentOverviewService {
                       document.isAnonymous(),
                       document.getThreadParticipation().name(),
                       document.getOwnerId(),
+                      slugById.get(document.getOwnerId()),
+                      ownerNames.getOrDefault(document.getOwnerId(), ""),
                       document.getWorkflowState(),
                       maxVersions.getOrDefault(document.getId(), 0),
                       count == null ? 0 : Math.toIntExact(count.total()),
@@ -122,7 +155,8 @@ public class DocumentOverviewService {
                       rosterFor(
                           document,
                           actor,
-                          participantsByDocument.getOrDefault(document.getId(), List.of())),
+                          participantsByDocument.getOrDefault(document.getId(), List.of()),
+                          slugById),
                       document.getCreatedAt(),
                       document.getUpdatedAt(),
                       document.getDueAt());
@@ -136,9 +170,9 @@ public class DocumentOverviewService {
    * the caller is not its owner — so the overview never leaks the roster of an anonymous review.
    */
   private List<ParticipantView> rosterFor(
-      Document document, UUID actor, List<ParticipantProjection> rows) {
+      Document document, UUID actor, List<ParticipantProjection> rows, Map<UUID, String> slugById) {
     if (!document.isAnonymous() || document.getOwnerId().equals(actor)) {
-      return rows.stream().map(ParticipantView::of).toList();
+      return rows.stream().map(row -> ParticipantView.of(row, slugById.get(row.userId()))).toList();
     }
     return ReviewParticipantService.anonymiseRoster(
         document.getId(), rows, identity.forDocument(document.getId(), actor));
@@ -169,6 +203,8 @@ public class DocumentOverviewService {
       boolean anonymous,
       String threadParticipation,
       UUID ownerId,
+      String ownerSlug,
+      String ownerDisplayName,
       String workflowState,
       int latestVersionNumber,
       int annotationCount,

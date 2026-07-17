@@ -60,9 +60,15 @@ class AdminUserServiceTest {
   private final PasswordEncoder passwordEncoder = mock(PasswordEncoder.class);
   private final PasswordResetFlowService passwordResetFlow = mock(PasswordResetFlowService.class);
   private final RefreshTokenService refreshTokens = mock(RefreshTokenService.class);
+  // The mocked repository reports every slug candidate free, so the base slug wins (issue #486).
   private final AdminUserService service =
       new AdminUserService(
-          users, oidcIdentities, passwordEncoder, passwordResetFlow, refreshTokens);
+          users,
+          oidcIdentities,
+          passwordEncoder,
+          passwordResetFlow,
+          refreshTokens,
+          new UserSlugService(users));
 
   private void noClash() {
     when(users.existsByEmailIgnoreCaseAndSource(any(), any())).thenReturn(false);

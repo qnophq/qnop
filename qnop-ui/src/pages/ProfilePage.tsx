@@ -23,15 +23,26 @@ import { useState } from 'react';
 import Alert from '@mui/material/Alert';
 import Box from '@mui/material/Box';
 import Divider from '@mui/material/Divider';
+import FormControlLabel from '@mui/material/FormControlLabel';
 import Paper from '@mui/material/Paper';
 import Snackbar from '@mui/material/Snackbar';
 import Stack from '@mui/material/Stack';
+import Switch from '@mui/material/Switch';
 import Typography from '@mui/material/Typography';
+import { alpha, useTheme } from '@mui/material/styles';
 import { useAuthStore } from '../stores/authStore';
+import { useReviews } from '../api/hooks/useReviews';
 import { useUploadMyAvatar, useRemoveMyAvatar } from '../api/hooks/useAvatar';
+import { AchievementRow } from '../components/profile/AchievementRow';
+import { profileAchievements, profileStats } from '../components/profile/profileModel';
 import { UserAvatar } from '../components/shell/UserAvatar';
 import { UserRoleBadge, UserSourceBadge } from '../components/admin/users/UserBadges';
 import { AvatarUploader } from '../components/profile/AvatarUploader';
+import {
+  EMAIL_REVIEW_NOTIFICATIONS_KEY,
+  useUpdateUserSettings,
+  useUserSettings,
+} from '../api/hooks/useUserSettings';
 
 type Toast = { message: string; severity: 'success' | 'error' } | null;
 
@@ -51,6 +62,36 @@ export function ProfilePage() {
   const remove = useRemoveMyAvatar();
   const [toast, setToast] = useState<Toast>(null);
   const busy = upload.isPending || remove.isPending;
+
+  const theme = useTheme();
+  const userId = useAuthStore((s) => s.userId);
+  const reviewsQuery = useReviews({ page: 0, size: 100, sort: 'updatedAt,desc' });
+  const settingsQuery = useUserSettings();
+  const updateSettings = useUpdateUserSettings();
+  const reviewMailsSetting = settingsQuery.data?.settings.find(
+    (setting) => setting.key === EMAIL_REVIEW_NOTIFICATIONS_KEY,
+  );
+  // Absent value = registry default (true) — the toggle reflects what the server does.
+  const reviewMailsOn = reviewMailsSetting ? reviewMailsSetting.value !== 'false' : true;
+
+  const reviews = reviewsQuery.data?.items ?? [];
+  const stats = profileStats(reviews, userId);
+  const achievements = profileAchievements({
+    reviews,
+    userId,
+    hasAvatar: Boolean(avatarUrl),
+    notificationsOn: reviewMailsOn,
+  });
+  const earnedCount = achievements.filter((a) => a.earned).length;
+
+  const onToggleReviewMails = (checked: boolean) => {
+    updateSettings.mutate(
+      { [EMAIL_REVIEW_NOTIFICATIONS_KEY]: String(checked) },
+      {
+        onError: () => setToast({ message: 'The setting could not be saved.', severity: 'error' }),
+      },
+    );
+  };
 
   const onSelect = async (blob: Blob) => {
     try {
@@ -77,7 +118,7 @@ export function ProfilePage() {
   };
 
   return (
-    <Stack spacing={3} sx={{ maxWidth: 720 }}>
+    <Stack spacing={3}>
       <Box>
         <Typography variant="h1" sx={{ fontSize: 28 }}>
           Profile
@@ -87,22 +128,91 @@ export function ProfilePage() {
         </Typography>
       </Box>
 
-      <Paper variant="outlined" sx={{ p: { xs: 2.5, sm: 3 } }}>
-        <Stack direction="row" spacing={2.5} sx={{ alignItems: 'center' }}>
-          <UserAvatar name={displayName} size={72} imageUrl={avatarUrl} />
-          <Box sx={{ minWidth: 0 }}>
-            <Typography sx={{ fontSize: 22, fontWeight: 600, lineHeight: 1.2 }} noWrap>
-              {displayName ?? 'Unknown'}
-            </Typography>
-            <Typography color="text.secondary" noWrap>
-              {email}
-            </Typography>
-            <Stack direction="row" spacing={1} sx={{ mt: 1, flexWrap: 'wrap' }}>
-              {role && <UserRoleBadge role={role} />}
-              {source && <UserSourceBadge source={source} />}
-            </Stack>
-          </Box>
+      {/* The player card (issue #469): identity, the reviewer scoreboard and
+          the achievement stickers — the launch pad's language on the profile. */}
+      <Paper
+        variant="outlined"
+        sx={{
+          p: { xs: 2.5, sm: 3 },
+          borderRadius: '16px',
+          background: `
+            radial-gradient(50% 110% at 92% 0%, ${alpha(theme.qnop.brand.blue, theme.qnop.mode === 'dark' ? 0.16 : 0.08)} 0%, transparent 100%),
+            ${theme.palette.background.paper}
+          `,
+        }}
+      >
+        <Box
+          sx={{
+            display: 'grid',
+            gap: 2.5,
+            gridTemplateColumns: { xs: '1fr', md: 'minmax(0, 1fr) auto' },
+            alignItems: 'center',
+          }}
+        >
+          <Stack direction="row" spacing={2.5} sx={{ alignItems: 'center', minWidth: 0 }}>
+            <Box
+              sx={{
+                borderRadius: '50%',
+                p: '3px',
+                flexShrink: 0,
+                border: `2px solid ${alpha(theme.qnop.brand.blue, 0.45)}`,
+              }}
+            >
+              <UserAvatar name={displayName} size={72} imageUrl={avatarUrl} />
+            </Box>
+            <Box sx={{ minWidth: 0 }}>
+              <Typography sx={{ fontSize: 22, fontWeight: 600, lineHeight: 1.2 }} noWrap>
+                {displayName ?? 'Unknown'}
+              </Typography>
+              <Typography color="text.secondary" noWrap>
+                {email}
+              </Typography>
+              <Stack direction="row" spacing={1} sx={{ mt: 1, flexWrap: 'wrap' }}>
+                {role && <UserRoleBadge role={role} />}
+                {source && <UserSourceBadge source={source} />}
+              </Stack>
+            </Box>
+          </Stack>
+
+          {/* The reviewer scoreboard — the dashboard's numbers language. */}
+          <Stack direction="row" spacing={3} sx={{ pr: { md: 1 } }}>
+            {[
+              { label: 'Owned', value: stats.owned },
+              { label: 'Reviewing', value: stats.reviewing },
+              { label: 'Completed', value: stats.completed },
+            ].map(({ label, value }) => (
+              <Box key={label} sx={{ textAlign: 'center' }}>
+                <Typography
+                  sx={{
+                    fontSize: '1.4rem',
+                    fontWeight: 800,
+                    lineHeight: 1.2,
+                    fontVariantNumeric: 'tabular-nums',
+                    color: value > 0 ? 'text.primary' : 'text.disabled',
+                  }}
+                >
+                  {value}
+                </Typography>
+                <Typography variant="caption" color="text.secondary">
+                  {label}
+                </Typography>
+              </Box>
+            ))}
+          </Stack>
+        </Box>
+
+        <Divider sx={{ my: 2.5 }} />
+        <Stack
+          direction="row"
+          spacing={1}
+          sx={{ alignItems: 'baseline', justifyContent: 'space-between', mb: 1.5 }}
+        >
+          <Typography sx={{ fontSize: 14, fontWeight: 700 }}>Achievements</Typography>
+          <Typography variant="caption" color="text.secondary">
+            {earnedCount} of {achievements.length} earned
+          </Typography>
         </Stack>
+        <AchievementRow achievements={achievements} />
       </Paper>
 
       <Paper variant="outlined" sx={{ p: { xs: 2.5, sm: 3 } }}>
@@ -118,6 +228,26 @@ export function ProfilePage() {
           busy={busy}
           onSelect={onSelect}
           onRemove={onRemove}
+        />
+      </Paper>
+
+      <Paper variant="outlined" sx={{ p: { xs: 2.5, sm: 3 } }}>
+        <Typography sx={{ fontSize: 16, fontWeight: 600 }}>Notifications</Typography>
+        <Typography color="text.secondary" sx={{ fontSize: 14, mt: 0.5, mb: 2.5 }}>
+          Emails about reviews you are part of — being added as a reviewer, new annotations, replies
+          in your discussions, decisions, and status changes.
+        </Typography>
+        <Divider sx={{ mb: 1.5 }} />
+        <FormControlLabel
+          control={
+            <Switch
+              checked={reviewMailsOn}
+              onChange={(event) => onToggleReviewMails(event.target.checked)}
+              disabled={settingsQuery.isPending}
+              slotProps={{ input: { 'aria-label': 'Email me about review activity' } }}
+            />
+          }
+          label="Email me about review activity"
         />
       </Paper>
 

@@ -38,6 +38,7 @@ import Tooltip from '@mui/material/Tooltip';
 import Typography from '@mui/material/Typography';
 import { KeyRound, KeySquare, MoreVertical, SquarePen, Trash2 } from 'lucide-react';
 import type { AdminUserSummary } from '../../../api/generated';
+import { UserHoverCard } from '../../people/UserHoverCard';
 import { UserAvatar } from '../../shell/UserAvatar';
 import { useFormatters } from '../../../hooks/useFormatters';
 import { ToneBadge } from '../ToneBadge';
@@ -127,16 +128,20 @@ export function UsersTable({
             <TableRow key={user.id} hover>
               <TableCell>
                 <Stack direction="row" spacing={1.5} sx={{ alignItems: 'center' }}>
-                  <UserAvatar name={user.displayName} size={36} imageUrl={user.avatarUrl} />
+                  <UserHoverCard userId={user.id} slug={user.slug} profileName={user.displayName}>
+                    <UserAvatar name={user.displayName} size={36} imageUrl={user.avatarUrl} />
+                  </UserHoverCard>
                   <Box sx={{ minWidth: 0 }}>
                     <Stack
                       direction="row"
                       spacing={0.75}
                       sx={{ alignItems: 'center', flexWrap: 'wrap' }}
                     >
-                      <Typography sx={{ fontWeight: 600, lineHeight: 1.3 }} noWrap>
-                        {user.displayName}
-                      </Typography>
+                      <UserHoverCard userId={user.id} slug={user.slug}>
+                        <Typography sx={{ fontWeight: 600, lineHeight: 1.3 }} noWrap>
+                          {user.displayName}
+                        </Typography>
+                      </UserHoverCard>
                       {user.passwordChangeRequired && (
                         <ToneBadge tone="amber" label="Password change" />
                       )}

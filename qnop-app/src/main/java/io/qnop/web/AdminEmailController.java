@@ -29,6 +29,7 @@ import io.qnop.api.v1.model.PreviewMailTemplateRequest;
 import io.qnop.api.v1.model.SendStatus;
 import io.qnop.api.v1.model.SendTestEmailRequest;
 import io.qnop.api.v1.model.SendTestEmailResponse;
+import io.qnop.api.v1.model.TemplateTestEmailRequest;
 import io.qnop.api.v1.model.UpdateMailTemplateRequest;
 import io.qnop.service.mail.MailService;
 import io.qnop.service.mail.MailService.SendResult;
@@ -82,6 +83,43 @@ public class AdminEmailController implements AdminEmailApi {
           case SendResult.Failed failed -> response(SendStatus.FAILED, failed.reason());
         };
     return ResponseEntity.ok(body);
+  }
+
+  @Override
+  public ResponseEntity<SendTestEmailResponse> sendTemplateTestEmail(
+      String key, TemplateTestEmailRequest request) {
+    MailTemplateKey templateKey = resolveKey(key);
+    MailPreview preview;
+    try {
+      preview =
+          templates.preview(
+              templateKey, request.getLocale(), toVars(request.getVariables()), toDraft(request));
+    } catch (MailTemplateValidationException e) {
+      throw new ResponseStatusException(HttpStatus.BAD_REQUEST, e.getMessage());
+    } catch (RuntimeException e) {
+      throw new ResponseStatusException(
+          HttpStatus.BAD_REQUEST, "Template render failed: " + e.getMessage());
+    }
+    RenderedMail rendered = preview.rendered();
+    SendResult result =
+        mailService.sendMail(
+            request.getRecipient(), rendered.subject(), rendered.bodyPlain(), rendered.bodyHtml());
+    SendTestEmailResponse body =
+        switch (result) {
+          case SendResult.Sent sent -> response(SendStatus.SENT, "Sent to " + sent.recipient());
+          case SendResult.Skipped skipped -> response(SendStatus.SKIPPED, skipped.reason());
+          case SendResult.Failed failed -> response(SendStatus.FAILED, failed.reason());
+        };
+    return ResponseEntity.ok(body);
+  }
+
+  /** The template-test variant of {@link #toDraft(PreviewMailTemplateRequest)}. */
+  private MailTemplateService.MailTemplateDraft toDraft(TemplateTestEmailRequest request) {
+    if (request.getSubject() == null || request.getBodyPlain() == null) {
+      return null;
+    }
+    return new MailTemplateService.MailTemplateDraft(
+        request.getSubject(), request.getBodyPlain(), request.getBodyHtml());
   }
 
   @Override

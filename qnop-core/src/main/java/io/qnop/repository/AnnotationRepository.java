@@ -71,4 +71,17 @@ public interface AnnotationRepository extends JpaRepository<Annotation, UUID> {
           + " GROUP BY a.documentId")
   List<DocumentAnnotationCounts> countVisibleByDocumentIds(
       @Param("documentIds") Collection<UUID> documentIds, @Param("actor") UUID actor);
+
+  /** Annotations the user raised in NON-anonymous reviews (ADR-0038, issue #473). */
+  @Query(
+      "SELECT count(a) FROM Annotation a, Document d"
+          + " WHERE d.id = a.documentId AND a.authorId = :authorId AND d.anonymous = false")
+  long countPublicByAuthor(@Param("authorId") UUID authorId);
+
+  /** Resolved annotations the user authored in NON-anonymous reviews (issue #473). */
+  @Query(
+      "SELECT count(a) FROM Annotation a, Document d"
+          + " WHERE d.id = a.documentId AND a.authorId = :authorId AND d.anonymous = false"
+          + " AND a.status = io.qnop.entity.AnnotationStatus.RESOLVED")
+  long countPublicResolvedByAuthor(@Param("authorId") UUID authorId);
 }

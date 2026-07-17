@@ -42,7 +42,9 @@ class UserServiceTest {
 
   private final UserRepository users = mock(UserRepository.class);
   private final PasswordEncoder passwordEncoder = mock(PasswordEncoder.class);
-  private final UserService service = new UserService(users, passwordEncoder);
+  // The mocked repository reports every slug candidate free, so the base slug wins (issue #486).
+  private final UserService service =
+      new UserService(users, passwordEncoder, new UserSlugService(users));
 
   @Test
   @DisplayName("getProfile returns an entity-free view with role and source as names")

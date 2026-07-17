@@ -141,3 +141,171 @@ databaseChangeLog:
         - delete:
             tableName: mail_template
             where: "template_key = 'auth.admin_password_reset' AND locale = 'en'"
+
+  - changeSet:
+      id: 0003-seed-review-participant-added-en
+      author: qnop
+      comment: English default for the reviewer-added notification (issue #316).
+      changes:
+        - insert:
+            tableName: mail_template
+            columns:
+              - column: { name: id, valueComputed: gen_random_uuid() }
+              - column: { name: template_key, value: review.participant_added }
+              - column: { name: locale, value: en }
+              - column: { name: subject, value: "You were added as a reviewer on “{{documentTitle}}”" }
+              - column:
+                  name: body_plain
+                  value: |
+                    Hi {{recipientName}},
+
+                    {{actorName}} added you as a reviewer on "{{documentTitle}}" ({{siteName}}).
+
+                    Open the review to see the document and its discussion:
+
+                    {{actionUrl}}
+      rollback:
+        - delete:
+            tableName: mail_template
+            where: "template_key = 'review.participant_added' AND locale = 'en'"
+
+  - changeSet:
+      id: 0003-seed-review-annotation-created-en
+      author: qnop
+      comment: English default for the new-annotation notification (issue #316).
+      changes:
+        - insert:
+            tableName: mail_template
+            columns:
+              - column: { name: id, valueComputed: gen_random_uuid() }
+              - column: { name: template_key, value: review.annotation_created }
+              - column: { name: locale, value: en }
+              - column: { name: subject, value: "New annotation on “{{documentTitle}}”" }
+              - column:
+                  name: body_plain
+                  value: |
+                    Hi {{recipientName}},
+
+                    {{actorName}} raised a new annotation on "{{documentTitle}}" ({{siteName}}):
+
+                    "{{annotationExcerpt}}"
+
+                    Open the annotation:
+
+                    {{actionUrl}}
+      rollback:
+        - delete:
+            tableName: mail_template
+            where: "template_key = 'review.annotation_created' AND locale = 'en'"
+
+  - changeSet:
+      id: 0003-seed-review-annotation-decided-en
+      author: qnop
+      comment: English default for the annotation-decision notification (issue #316).
+      changes:
+        - insert:
+            tableName: mail_template
+            columns:
+              - column: { name: id, valueComputed: gen_random_uuid() }
+              - column: { name: template_key, value: review.annotation_decided }
+              - column: { name: locale, value: en }
+              - column: { name: subject, value: "An annotation on “{{documentTitle}}” was {{decision}}" }
+              - column:
+                  name: body_plain
+                  value: |
+                    Hi {{recipientName}},
+
+                    {{actorName}} {{decision}} an annotation on "{{documentTitle}}" ({{siteName}}):
+
+                    "{{annotationExcerpt}}"
+
+                    Open the annotation:
+
+                    {{actionUrl}}
+      rollback:
+        - delete:
+            tableName: mail_template
+            where: "template_key = 'review.annotation_decided' AND locale = 'en'"
+
+  - changeSet:
+      id: 0003-seed-review-comment-added-en
+      author: qnop
+      comment: English default for the thread-reply notification (issue #316).
+      changes:
+        - insert:
+            tableName: mail_template
+            columns:
+              - column: { name: id, valueComputed: gen_random_uuid() }
+              - column: { name: template_key, value: review.comment_added }
+              - column: { name: locale, value: en }
+              - column: { name: subject, value: "New reply on “{{documentTitle}}”" }
+              - column:
+                  name: body_plain
+                  value: |
+                    Hi {{recipientName}},
+
+                    {{actorName}} replied in a discussion you follow on "{{documentTitle}}" ({{siteName}}):
+
+                    "{{commentExcerpt}}"
+
+                    Open the reply:
+
+                    {{actionUrl}}
+      rollback:
+        - delete:
+            tableName: mail_template
+            where: "template_key = 'review.comment_added' AND locale = 'en'"
+
+  - changeSet:
+      id: 0003-seed-review-workflow-changed-en
+      author: qnop
+      comment: English default for the workflow-transition notification (issue #316).
+      changes:
+        - insert:
+            tableName: mail_template
+            columns:
+              - column: { name: id, valueComputed: gen_random_uuid() }
+              - column: { name: template_key, value: review.workflow_changed }
+              - column: { name: locale, value: en }
+              - column: { name: subject, value: "“{{documentTitle}}” moved to {{newState}}" }
+              - column:
+                  name: body_plain
+                  value: |
+                    Hi {{recipientName}},
+
+                    The review "{{documentTitle}}" ({{siteName}}) changed its status: {{oldState}} -> {{newState}}.
+
+                    Open the review:
+
+                    {{actionUrl}}
+      rollback:
+        - delete:
+            tableName: mail_template
+            where: "template_key = 'review.workflow_changed' AND locale = 'en'"
+
+  - changeSet:
+      id: 0003-seed-review-version-uploaded-en
+      author: qnop
+      comment: English default for the new-document-version notification (issue #316).
+      changes:
+        - insert:
+            tableName: mail_template
+            columns:
+              - column: { name: id, valueComputed: gen_random_uuid() }
+              - column: { name: template_key, value: review.version_uploaded }
+              - column: { name: locale, value: en }
+              - column: { name: subject, value: "New version of “{{documentTitle}}” — v{{versionNumber}}" }
+              - column:
+                  name: body_plain
+                  value: |
+                    Hi {{recipientName}},
+
+                    {{actorName}} uploaded version {{versionNumber}} of "{{documentTitle}}" ({{siteName}}).
+
+                    Existing annotations are being re-anchored onto the new text. Open the review to continue:
+
+                    {{actionUrl}}
+      rollback:
+        - delete:
+            tableName: mail_template
+            where: "template_key = 'review.version_uploaded' AND locale = 'en'"

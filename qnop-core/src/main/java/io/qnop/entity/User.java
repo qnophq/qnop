@@ -84,6 +84,15 @@ public class User {
   @Column(name = "last_login_at")
   private Instant lastLoginAt;
 
+  /**
+   * Immutable, human-readable profile slug (issue #486): kebab-case, globally unique
+   * case-insensitively, never UUID-shaped. Auto-derived from the display name at account creation
+   * ({@code io.qnop.service.UserSlugService}); null only for rows predating slugs. Format and
+   * uniqueness are pinned in Liquibase (migration 0001), not here (ADR-0020).
+   */
+  @Column(name = "slug", length = 64, updatable = false)
+  private String slug;
+
   @CreationTimestamp
   @Column(name = "created_at", nullable = false, updatable = false)
   private Instant createdAt;
@@ -141,6 +150,15 @@ public class User {
 
   public void setDisplayName(String displayName) {
     this.displayName = displayName;
+  }
+
+  public String getSlug() {
+    return slug;
+  }
+
+  /** Set once at account creation (the column is {@code updatable = false}). */
+  public void setSlug(String slug) {
+    this.slug = slug;
   }
 
   public String getEmail() {

@@ -20,12 +20,14 @@
  */
 
 import Box from '@mui/material/Box';
+import Button from '@mui/material/Button';
 import Stack from '@mui/material/Stack';
 import Tooltip from '@mui/material/Tooltip';
 import Typography from '@mui/material/Typography';
 import { useTheme } from '@mui/material/styles';
-import { MessageSquare } from 'lucide-react';
+import { Check, Crosshair, MessageSquare } from 'lucide-react';
 import type { AnnotationView } from '../../../api/generated';
+import { PlacementStatus } from '../../../api/generated';
 import { ToneBadge } from '../../admin/ToneBadge';
 import { isDocumentScoped } from '../annotationScope';
 import { WholeDocumentChip } from '../WholeDocumentChip';
@@ -37,6 +39,16 @@ interface AnnotationBadgeRowProps {
   annotation: AnnotationView;
   /** Adds the "New" badge (issue #307). */
   unseen?: boolean;
+  /**
+   * Confirms a reviewed MOVED placement (ADR-0009, issue #326) — its presence
+   * renders the "Looks right" affordance beside the Moved chip.
+   */
+  onConfirmPlacement?: () => void;
+  /**
+   * Arms re-attaching a lost placement (issue #457) — its presence renders the
+   * "Re-attach" affordance beside the Orphaned/Failed chip.
+   */
+  onReattachPlacement?: () => void;
 }
 
 /**
@@ -45,7 +57,12 @@ interface AnnotationBadgeRowProps {
  * panel's head card and the mark's hover preview stay pixel-identical
  * (issue #403).
  */
-export function AnnotationBadgeRow({ annotation, unseen = false }: AnnotationBadgeRowProps) {
+export function AnnotationBadgeRow({
+  annotation,
+  unseen = false,
+  onConfirmPlacement,
+  onReattachPlacement,
+}: AnnotationBadgeRowProps) {
   const theme = useTheme();
   const statusCue = STATUS_CUES[annotation.status];
   const typeCue = annotation.type ? TYPE_CUES[annotation.type] : null;
@@ -83,6 +100,38 @@ export function AnnotationBadgeRow({ annotation, unseen = false }: AnnotationBad
         </Tooltip>
       )}
       <PlacementStatusChip status={annotation.placementStatus} />
+      {onConfirmPlacement && annotation.placementStatus === PlacementStatus.Moved && (
+        <Button
+          size="small"
+          variant="text"
+          startIcon={<Check size={12} />}
+          onClick={(event) => {
+            // Sits inside clickable cards — confirming must not toggle them.
+            event.stopPropagation();
+            onConfirmPlacement();
+          }}
+          sx={{ py: 0, minHeight: 0, fontSize: 12 }}
+        >
+          Looks right
+        </Button>
+      )}
+      {onReattachPlacement &&
+        (annotation.placementStatus === PlacementStatus.Orphaned ||
+          annotation.placementStatus === PlacementStatus.Failed) && (
+          <Button
+            size="small"
+            variant="text"
+            startIcon={<Crosshair size={12} />}
+            onClick={(event) => {
+              // Sits inside clickable cards — arming must not toggle them.
+              event.stopPropagation();
+              onReattachPlacement();
+            }}
+            sx={{ py: 0, minHeight: 0, fontSize: 12 }}
+          >
+            Re-attach
+          </Button>
+        )}
       <Stack
         direction="row"
         spacing={1}

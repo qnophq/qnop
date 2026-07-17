@@ -82,6 +82,7 @@ public class PrincipalsController implements PrincipalsApi {
                         new PrincipalView()
                             .id(view.id())
                             .kind(view.team() ? ParticipantKind.TEAM : ParticipantKind.USER)
+                            .slug(view.slug())
                             .displayName(view.displayName())
                             .avatarUrl(
                                 view.team()

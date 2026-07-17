@@ -25,7 +25,7 @@ import { useUiStore } from '../stores/uiStore';
 
 /**
  * Resolves the active display timezone (user profile → application default → UTC,
- * issue #465, ADR-0039) and mirrors it into the UI store, so every component can
+ * issue #465, ADR-0041) and mirrors it into the UI store, so every component can
  * format timestamps via useFormatters() without each depending on a QueryClient.
  * Mounted once near the app root, inside the QueryClientProvider. Renders nothing.
  */

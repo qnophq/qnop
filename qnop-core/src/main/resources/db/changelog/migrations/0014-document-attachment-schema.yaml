@@ -1,0 +1,82 @@
+# SPDX-License-Identifier: AGPL-3.0-only
+#
+# Comment attachments (issue #446). A reviewer drops a file into the
+# discussion composer; the bytes land in object storage via the staging
+# registry (ADR-0036) and this table records the domain reference — document
+# scope, uploader, sniffed content type and the content-addressed storage key.
+# The stored type is a closed servable set: sniffed raster images (rendered
+# inline), sniffed PDF, and application/octet-stream for everything else — so
+# the served Content-Type can never smuggle an executable type like text/html.
+# Rows are immutable and die with their document (CASCADE); Markdown bodies
+# reference them by URL only. JPA runs ddl-auto=none, so the entity mapping
+# (io.qnop.entity.DocumentAttachment) must match these definitions exactly.
+databaseChangeLog:
+  - changeSet:
+      id: 0014-document-attachment
+      author: qnop
+      comment: Comment attachments — document-scoped, content-addressed (issue #446).
+      changes:
+        - createTable:
+            tableName: document_attachment
+            columns:
+              - column:
+                  name: id
+                  type: UUID
+                  constraints: { primaryKey: true, nullable: false }
+              - column:
+                  name: document_id
+                  type: UUID
+                  constraints: { nullable: false }
+              - column:
+                  name: uploader_id
+                  type: UUID
+                  constraints: { nullable: false }
+              - column:
+                  name: file_name
+                  type: VARCHAR(255)
+                  constraints: { nullable: false }
+              - column:
+                  name: content_type
+                  type: VARCHAR(128)
+                  constraints: { nullable: false }
+              - column:
+                  name: content_hash
+                  type: VARCHAR(128)
+                  constraints: { nullable: false }
+              - column:
+                  name: size_bytes
+                  type: BIGINT
+                  constraints: { nullable: false }
+              - column:
+                  name: storage_key
+                  type: VARCHAR(512)
+                  constraints: { nullable: false }
+              - column:
+                  name: created_at
+                  type: TIMESTAMP WITH TIME ZONE
+                  constraints: { nullable: false }
+        - addForeignKeyConstraint:
+            constraintName: fk_document_attachment_document
+            baseTableName: document_attachment
+            baseColumnNames: document_id
+            referencedTableName: document
+            referencedColumnNames: id
+            onDelete: CASCADE
+        - addForeignKeyConstraint:
+            constraintName: fk_document_attachment_uploader
+            baseTableName: document_attachment
+            baseColumnNames: uploader_id
+            referencedTableName: qnop_user
+            referencedColumnNames: id
+            onDelete: RESTRICT
+        - createIndex:
+            indexName: ix_document_attachment_document
+            tableName: document_attachment
+            columns:
+              - column: { name: document_id }
+        - sql:
+            comment: The served type is a closed set (sniffed server-side, issue #446).
+            sql: |
+              ALTER TABLE document_attachment ADD CONSTRAINT ck_document_attachment_content_type
+                CHECK (content_type IN ('image/png', 'image/jpeg', 'image/webp', 'image/gif',
+                                        'application/pdf', 'application/octet-stream'));

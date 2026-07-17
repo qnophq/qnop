@@ -10,7 +10,7 @@
 # intentionally not run here — the dedicated CI jobs own those gates; this image
 # only packages the runnable artifact (used by the smoke-test stack, issue #207).
 
-FROM eclipse-temurin:21.0.11_10-jdk@sha256:762d16be48b976c97801d198e5085b1f6facb13718a1e8fb67cb25d0b25337e1 AS build
+FROM eclipse-temurin:21.0.11_10-jdk@sha256:1eeacc8c295ed4805f6ffead2417b1936aad296b02ea9e56b457230befc9e98d AS build
 WORKDIR /workspace
 
 # The whole multi-module project is needed to configure the build (settings.gradle
@@ -23,7 +23,7 @@ COPY . .
 RUN ./gradlew --no-daemon -x test :qnop-app:bootJar \
     && cp "$(ls qnop-app/build/libs/*.jar | grep -v -- '-plain')" /workspace/app.jar
 
-FROM eclipse-temurin:21.0.11_10-jre@sha256:8ec353b20d3aab0758572236b81b967c7077c40c4d0819ce97f9a1329d684603 AS runtime
+FROM eclipse-temurin:21.0.11_10-jre@sha256:d2b9f8f12212cadcfdf889461531784e8fd097feade954d65b31ee7a71c473ec AS runtime
 WORKDIR /app
 
 # Run unprivileged.

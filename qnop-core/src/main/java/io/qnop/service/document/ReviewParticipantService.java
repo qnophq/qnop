@@ -29,6 +29,8 @@ import io.qnop.repository.ParticipantProjection;
 import io.qnop.repository.ReviewParticipantRepository;
 import io.qnop.repository.TeamRepository;
 import io.qnop.repository.UserRepository;
+import io.qnop.repository.UserSlug;
+import io.qnop.service.review.ReviewEvent;
 import io.qnop.service.review.ReviewIdentityResolver;
 import io.qnop.service.review.ReviewIdentityResolver.ReviewIdentities;
 import java.nio.charset.StandardCharsets;
@@ -36,7 +38,11 @@ import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
+import java.util.Map;
+import java.util.Objects;
 import java.util.UUID;
+import java.util.stream.Collectors;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -55,6 +61,7 @@ public class ReviewParticipantService {
   private final TeamRepository teams;
   private final DocumentAccessService access;
   private final ReviewIdentityResolver identity;
+  private final ApplicationEventPublisher events;
 
   public ReviewParticipantService(
       DocumentRepository documents,
@@ -62,13 +69,15 @@ public class ReviewParticipantService {
       UserRepository users,
       TeamRepository teams,
       DocumentAccessService access,
-      ReviewIdentityResolver identity) {
+      ReviewIdentityResolver identity,
+      ApplicationEventPublisher events) {
     this.documents = documents;
     this.participants = participants;
     this.users = users;
     this.teams = teams;
     this.access = access;
     this.identity = identity;
+    this.events = events;
   }
 
   /**
@@ -90,10 +99,23 @@ public class ReviewParticipantService {
     List<ParticipantProjection> rows = participants.findViewsByDocumentId(documentId);
     boolean anonymise = document.isAnonymous() && !admin && !document.getOwnerId().equals(actor);
     if (!anonymise) {
-      return rows.stream().map(ParticipantView::of).toList();
+      Map<UUID, String> slugById =
+          userSlugs(rows.stream().map(ParticipantProjection::userId).toList());
+      return rows.stream().map(row -> ParticipantView.of(row, slugById.get(row.userId()))).toList();
     }
 
     return anonymiseRoster(documentId, rows, identity.forDocument(documentId, actor));
+  }
+
+  /** Batch id→slug map for pretty profile links (issue #486); teams pass null ids through. */
+  private Map<UUID, String> userSlugs(List<UUID> candidateIds) {
+    List<UUID> ids = candidateIds.stream().filter(Objects::nonNull).distinct().toList();
+    if (ids.isEmpty()) {
+      return Map.of();
+    }
+    return users.findSlugsByIdIn(ids).stream()
+        .filter(row -> row.slug() != null)
+        .collect(Collectors.toMap(UserSlug::id, UserSlug::slug));
   }
 
   /**
@@ -120,6 +142,7 @@ public class ReviewParticipantService {
                 row.id(),
                 identities.exposedAuthorId(row.userId()),
                 false,
+                identities.slug(row.userId()),
                 identities.displayName(row.userId()),
                 row.createdAt()));
       } else {
@@ -127,7 +150,7 @@ public class ReviewParticipantService {
         UUID token =
             UUID.nameUUIDFromBytes(
                 (documentId + ":anonteam:" + teamIndex).getBytes(StandardCharsets.UTF_8));
-        out.add(new ParticipantView(row.id(), token, true, "Reviewer team", row.createdAt()));
+        out.add(new ParticipantView(row.id(), token, true, null, "Reviewer team", row.createdAt()));
       }
     }
     return out;
@@ -155,8 +178,14 @@ public class ReviewParticipantService {
         throw DocumentValidationException.duplicateParticipant("user is already a participant");
       }
       ReviewParticipant saved = participants.save(ReviewParticipant.forUser(documentId, userId));
+      events.publishEvent(new ReviewEvent.ParticipantAdded(documentId, actor, userId, null));
       return new ParticipantView(
-          saved.getId(), userId, false, user.getDisplayName(), saved.getCreatedAt());
+          saved.getId(),
+          userId,
+          false,
+          user.getSlug(),
+          user.getDisplayName(),
+          saved.getCreatedAt());
     }
     Team team =
         teams
@@ -168,7 +197,9 @@ public class ReviewParticipantService {
       throw DocumentValidationException.duplicateParticipant("team is already a participant");
     }
     ReviewParticipant saved = participants.save(ReviewParticipant.forTeam(documentId, teamId));
-    return new ParticipantView(saved.getId(), teamId, true, team.getName(), saved.getCreatedAt());
+    events.publishEvent(new ReviewEvent.ParticipantAdded(documentId, actor, null, teamId));
+    return new ParticipantView(
+        saved.getId(), teamId, true, null, team.getName(), saved.getCreatedAt());
   }
 
   /** Removes a reviewer (owner-only); a participant of another document reads as unknown. */
@@ -198,16 +229,20 @@ public class ReviewParticipantService {
     return document;
   }
 
-  /** A participant with its principal's display name. */
+  /**
+   * A participant with its principal's display name. {@code slug} (issue #486) is the user's
+   * profile slug — null for teams and on anonymised rosters, where a slug would deanonymise.
+   */
   public record ParticipantView(
-      UUID id, UUID principalId, boolean team, String displayName, Instant createdAt) {
+      UUID id, UUID principalId, boolean team, String slug, String displayName, Instant createdAt) {
 
-    static ParticipantView of(ParticipantProjection projection) {
+    static ParticipantView of(ParticipantProjection projection, String slug) {
       boolean team = projection.teamId() != null;
       return new ParticipantView(
           projection.id(),
           team ? projection.teamId() : projection.userId(),
           team,
+          team ? null : slug,
           projection.displayName(),
           projection.createdAt());
     }

@@ -37,7 +37,7 @@ export function isValidTimeZone(zone: string | null | undefined): zone is string
 }
 
 /**
- * Resolves the active display timezone (issue #465, ADR-0039): the user's profile
+ * Resolves the active display timezone (issue #465, ADR-0041): the user's profile
  * preference, else the application default, else UTC. Each candidate must be a
  * valid IANA id to be used; a blank or invalid value is skipped.
  */

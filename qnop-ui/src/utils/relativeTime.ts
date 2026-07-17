@@ -56,7 +56,7 @@ function monthDayYearFmt(timeZone: string): Intl.DateTimeFormat {
  * The compact relative timestamp of social feeds (issue #403): "now", "5m",
  * "3h", "6d", then the calendar date ("Jul 5", with the year once it
  * differs). Callers put the full timestamp in a tooltip for precision. The
- * calendar-date fallback renders in {@code timeZone} (ADR-0039; default UTC).
+ * calendar-date fallback renders in {@code timeZone} (ADR-0041; default UTC).
  */
 export function shortRelativeTime(
   iso: string,

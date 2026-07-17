@@ -141,7 +141,7 @@ class ArchitectureRulesTest {
 
   @Test
   void entityTimestampsAreStoredAsInstant() {
-    // Timestamp L10n policy (issue #465, ADR-0039): every persisted timestamp is a
+    // Timestamp L10n policy (issue #465, ADR-0041): every persisted timestamp is a
     // java.time.Instant — a zone-agnostic UTC epoch — never a zone-less/local temporal type.
     // This is what guarantees requirement 1 (no local wall-clock time is ever stored) and,
     // downstream, that the API always serializes an offset-bearing ISO-8601 value. A future

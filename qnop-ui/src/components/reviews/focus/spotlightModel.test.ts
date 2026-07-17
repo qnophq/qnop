@@ -35,6 +35,7 @@ const annotation = (id: string, surfaceIndex: number | null, y = 0.2): Annotatio
       ? undefined
       : { region: { surfaceIndex, box: { x: 0.1, y, width: 0.3, height: 0.02 } } },
   commentCount: 1,
+  reactions: [],
   createdAt: '2026-07-01T10:00:00Z',
   updatedAt: '2026-07-01T10:00:00Z',
 });

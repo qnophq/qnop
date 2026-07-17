@@ -27,7 +27,7 @@ E-signature is an **enterprise-only feature, layered *after* content finalizatio
 
 ## Consequences
 
-- **The community core needs zero signature-specific work.** The feature is fully additive over the generic enterprise seams. The only core prerequisites already exist (the version content-hash, read access to the finalized version and participants) **except** the generic enterprise-Liquibase seam, which does not exist yet and is tracked in **#254** (needed before any enterprise schema lands; not a blocker for the PDF slice).
+- **The community core needs zero signature-specific work.** The feature is fully additive over the generic enterprise seams. The only core prerequisites already exist (the version content-hash, read access to the finalized version and participants) **except** the generic enterprise-Liquibase seam, which does not exist yet and is tracked in **#254** *(shipped since — see [ADR-0039](0039-enterprise-packaging-and-runtime-extensions.md) §2 / issue #254)* (needed before any enterprise schema lands; not a blocker for the PDF slice).
 - DocuSign's proprietary SDK lives in `qnop-enterprise`, never in the AGPL core ([ADR-0007](0007-spdx-dco-license-scanning.md)).
 - Sovereignty is preserved: customers choose an EU/on-prem-capable provider.
 - "Legally binding" remains regulatorily deep — eIDAS levels, PAdES-LTV / long-term validation, Schrems-II data-transfer constraints, per-signature cost — a substantial enterprise module, deliberately out of community scope.

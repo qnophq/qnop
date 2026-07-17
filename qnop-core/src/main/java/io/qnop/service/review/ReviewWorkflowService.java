@@ -39,6 +39,7 @@ import io.qnop.service.review.ReviewWorkflowMachine.TransitionContext;
 import io.qnop.service.review.ReviewWorkflowMachine.TransitionResult;
 import java.util.List;
 import java.util.UUID;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -73,6 +74,7 @@ public class ReviewWorkflowService {
   private final CommentRepository comments;
   private final AuditEventRepository auditEvents;
   private final DocumentAccessService documentAccess;
+  private final ApplicationEventPublisher events;
 
   public ReviewWorkflowService(
       DocumentRepository documents,
@@ -81,7 +83,8 @@ public class ReviewWorkflowService {
       AnnotationPlacementRepository placements,
       CommentRepository comments,
       AuditEventRepository auditEvents,
-      DocumentAccessService documentAccess) {
+      DocumentAccessService documentAccess,
+      ApplicationEventPublisher events) {
     this.documents = documents;
     this.versions = versions;
     this.annotations = annotations;
@@ -89,6 +92,7 @@ public class ReviewWorkflowService {
     this.comments = comments;
     this.auditEvents = auditEvents;
     this.documentAccess = documentAccess;
+    this.events = events;
   }
 
   /**
@@ -166,6 +170,8 @@ public class ReviewWorkflowService {
             AUDIT_ANNOTATION_RESOLVED,
             actorId,
             "{\"annotationId\":\"" + annotationId + "\"}"));
+    events.publishEvent(
+        new ReviewEvent.AnnotationDecided(document.getId(), actorId, annotationId, false));
     rederiveWorkflow(document, actorId);
     return annotation;
   }
@@ -200,6 +206,8 @@ public class ReviewWorkflowService {
             AUDIT_ANNOTATION_REOPENED,
             actorId,
             "{\"annotationId\":\"" + annotationId + "\"}"));
+    events.publishEvent(
+        new ReviewEvent.AnnotationDecided(document.getId(), actorId, annotationId, true));
     rederiveWorkflow(document, actorId);
     return annotation;
   }
@@ -267,6 +275,8 @@ public class ReviewWorkflowService {
             AUDIT_WORKFLOW_TRANSITION,
             actorId,
             "{\"from\":\"" + from + "\",\"to\":\"" + target.name() + "\"}"));
+    events.publishEvent(
+        new ReviewEvent.WorkflowChanged(document.getId(), actorId, from, target.name(), manual));
   }
 
   private WorkflowStatus statusOf(Document document) {

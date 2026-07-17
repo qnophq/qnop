@@ -28,3 +28,7 @@ The application needs operator-configurable global settings (general, upload, tr
 - **DB-only definition (drop the registry, derive types from rows).** Rejected: defaults/validation/enum-options are behavior that belongs in code; a registry gives compile-time exhaustiveness.
 - **Per-request DB reads / a cache abstraction (Caffeine).** Rejected as premature: the settings set is tiny and changes rarely; an `AtomicReference` snapshot is simpler and allocation-free on reads.
 - **A native Postgres enum for `value_type`.** Rejected: a `VARCHAR` + `CHECK` (issue #13) matches the project's enum convention and avoids Postgres enum migration friction.
+
+## Amendment (2026-07-16, role naming)
+
+The guarding role named `SUPERADMIN` above landed as **`ADMIN`** within the global `ADMIN`/`MEMBER`/`AUDITOR` role model: there is no `SUPERADMIN` in the code, and `SecurityConfiguration` guards `/api/v1/admin/**` with `hasRole("ADMIN")`.

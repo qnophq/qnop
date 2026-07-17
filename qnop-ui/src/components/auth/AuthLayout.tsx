@@ -21,18 +21,21 @@
 
 import type { ReactNode } from 'react';
 import Box from '@mui/material/Box';
-import Stack from '@mui/material/Stack';
 import Typography from '@mui/material/Typography';
-import { Fingerprint, Server, ShieldCheck } from 'lucide-react';
+import { keyframes } from '@mui/material/styles';
+import { ShieldCheck } from 'lucide-react';
 import { useConfig } from '../../api/hooks/useConfig';
 import { BrandLogo } from '../branding/BrandLogo';
+import { BrandPanel } from './BrandPanel';
 import { tokens } from '../../theme/tokens';
+import authBg from '../../assets/auth/auth-bg.webp';
+import authDocs from '../../assets/auth/auth-docs.svg';
 
-const TRUST = [
-  { icon: Server, label: 'On-Premises · Frankfurt' },
-  { icon: ShieldCheck, label: 'BSI C5 · ISO 27001' },
-  { icon: Fingerprint, label: 'AES-256' },
-];
+/** Slow bob for the corner document illustration (it carries its own tilt). */
+const floatDocs = keyframes`
+  from { transform: translateY(0); }
+  to   { transform: translateY(-12px); }
+`;
 
 interface AuthLayoutProps {
   title: string;
@@ -43,13 +46,123 @@ interface AuthLayoutProps {
 }
 
 /**
- * Two-column shell for the public auth screens (#103): a sovereign-themed brand
- * panel on the left (hidden below `md`) and the form card on the right, matching
- * the design prototype's "Sovereign document review" treatment.
+ * Full-bleed brand band for viewports where the brand panel is hidden (below
+ * `md`): the sovereign navy atmosphere with the calm document backdrop and a
+ * large tenant logo, so mobile users get the same brand moment as the desktop
+ * stage instead of an unbranded form (#503). The band is always navy, so it
+ * uses the dark-surface logo variant regardless of theme.
+ */
+function MobileBrandBand() {
+  const logoUrl = useConfig().data?.branding?.logoDark.url;
+  // The band's backgrounds fade out through a mask instead of ending on a hard
+  // edge, so the navy atmosphere dissolves into whatever the theme's page
+  // background is — no seam between brand band and form.
+  const fadeMask = 'linear-gradient(to bottom, #000 40%, transparent 96%)';
+  return (
+    <Box
+      sx={{
+        display: { xs: 'flex', md: 'none' },
+        position: 'relative',
+        overflow: 'hidden',
+        minHeight: { xs: 200, sm: 232 },
+        alignItems: 'center',
+        justifyContent: 'center',
+        color: '#fff',
+        pb: 4.5,
+      }}
+    >
+      <Box
+        aria-hidden
+        sx={{ position: 'absolute', inset: 0, maskImage: fadeMask, WebkitMaskImage: fadeMask }}
+      >
+        <Box
+          sx={{
+            position: 'absolute',
+            inset: 0,
+            background: `linear-gradient(155deg, ${tokens.brand.navy} 0%, ${tokens.brand.navy700} 60%, #034079 100%)`,
+          }}
+        />
+        <Box
+          component="img"
+          src={authBg}
+          alt=""
+          sx={{
+            position: 'absolute',
+            inset: 0,
+            width: '100%',
+            height: '100%',
+            objectFit: 'cover',
+            objectPosition: 'right center',
+            opacity: 0.65,
+          }}
+        />
+        <Box
+          sx={{
+            position: 'absolute',
+            inset: 0,
+            background: 'linear-gradient(to bottom, rgba(1,22,44,0.3) 0%, transparent 45%)',
+          }}
+        />
+      </Box>
+      <Box
+        sx={{
+          position: 'relative',
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          gap: 1.5,
+          px: 3,
+        }}
+      >
+        <BrandLogo
+          url={logoUrl}
+          alt="qnop"
+          sx={{ height: { xs: 56, sm: 64 }, maxWidth: 300 }}
+          fallback={
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+              <Box
+                sx={{
+                  width: 56,
+                  height: 56,
+                  borderRadius: 2,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  bgcolor: 'rgba(255,255,255,0.12)',
+                  border: '1px solid rgba(255,255,255,0.18)',
+                }}
+              >
+                <ShieldCheck size={32} />
+              </Box>
+              <Typography sx={{ fontWeight: 700, fontSize: 28, letterSpacing: '-0.02em' }}>
+                qnop
+              </Typography>
+            </Box>
+          }
+        />
+        <Typography
+          sx={{
+            fontSize: 11,
+            letterSpacing: '0.14em',
+            textTransform: 'uppercase',
+            color: '#9BCEFA',
+            fontWeight: 600,
+          }}
+        >
+          Sovereign document review
+        </Typography>
+      </Box>
+    </Box>
+  );
+}
+
+/**
+ * Two-column shell for the public auth screens (#103, #503): the sovereign
+ * brand panel with the player-card showcase on the left (hidden below `md`,
+ * replaced by a compact brand header above the form) and the form card on the
+ * right.
  */
 export function AuthLayout({ title, subtitle, headerSlot, children }: AuthLayoutProps) {
-  // The auth hero is always dark, so use the dark-surface (light) logo variant (issue #154).
-  const logoUrl = useConfig().data?.branding?.logoDark.url;
   return (
     <Box
       sx={{
@@ -58,178 +171,69 @@ export function AuthLayout({ title, subtitle, headerSlot, children }: AuthLayout
         gridTemplateColumns: { xs: '1fr', md: '1.05fr 1fr' },
       }}
     >
-      {/* Brand panel */}
-      <Box
-        sx={{
-          display: { xs: 'none', md: 'flex' },
-          flexDirection: 'column',
-          position: 'relative',
-          overflow: 'hidden',
-          color: '#fff',
-          p: 7,
-          background: `linear-gradient(155deg, ${tokens.brand.navy} 0%, ${tokens.brand.navy700} 60%, #034079 100%)`,
-        }}
-      >
-        {/* subtle grid + glow atmosphere */}
-        <Box
-          aria-hidden
-          sx={{
-            position: 'absolute',
-            inset: 0,
-            opacity: 0.5,
-            backgroundImage:
-              'linear-gradient(rgba(255,255,255,0.04) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.04) 1px, transparent 1px)',
-            backgroundSize: '48px 48px',
-            maskImage: 'radial-gradient(ellipse 80% 70% at 70% 30%, #000 40%, transparent 100%)',
-          }}
-        />
-        <Box
-          aria-hidden
-          sx={{
-            position: 'absolute',
-            width: 520,
-            height: 520,
-            borderRadius: '50%',
-            top: -120,
-            right: -140,
-            filter: 'blur(20px)',
-            background: 'radial-gradient(circle, rgba(18,144,239,0.35), transparent 65%)',
-          }}
-        />
-
-        <Box sx={{ position: 'relative', zIndex: 1 }}>
-          <BrandLogo
-            url={logoUrl}
-            alt="qnop"
-            sx={{ height: 38, maxWidth: 220 }}
-            fallback={
-              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.25 }}>
-                <Box
-                  sx={{
-                    width: 38,
-                    height: 38,
-                    borderRadius: 1.5,
-                    bgcolor: 'rgba(255,255,255,0.12)',
-                    border: '1px solid rgba(255,255,255,0.18)',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                  }}
-                >
-                  <ShieldCheck size={22} />
-                </Box>
-                <Box>
-                  <Typography
-                    sx={{ fontWeight: 700, fontSize: 17, letterSpacing: '-0.02em', lineHeight: 1 }}
-                  >
-                    qnop
-                  </Typography>
-                  <Typography
-                    sx={{
-                      fontSize: 10.5,
-                      letterSpacing: '0.1em',
-                      textTransform: 'uppercase',
-                      color: '#9BCEFA',
-                      mt: 0.4,
-                    }}
-                  >
-                    Quality Notes · Sovereign
-                  </Typography>
-                </Box>
-              </Box>
-            }
-          />
-        </Box>
-
-        <Box sx={{ position: 'relative', zIndex: 1, mt: 'auto', maxWidth: 460 }}>
-          <Typography
-            sx={{
-              fontSize: 12.5,
-              letterSpacing: '0.12em',
-              textTransform: 'uppercase',
-              color: '#61B5F6',
-              fontWeight: 600,
-              mb: 2.5,
-            }}
-          >
-            Sovereign document review
-          </Typography>
-          <Typography
-            component="h2"
-            sx={{
-              color: '#fff',
-              fontWeight: 700,
-              fontSize: { md: 34, lg: 41 },
-              lineHeight: 1.1,
-              letterSpacing: '-0.025em',
-              mb: 2.5,
-            }}
-          >
-            Review, approve, trust — all in one place.
-          </Typography>
-          <Typography sx={{ color: '#B9C6D4', fontSize: 16, lineHeight: 1.65, maxWidth: 430 }}>
-            Review contracts together, compare versions and coordinate reviews — while your data
-            stays entirely on your own infrastructure.
-          </Typography>
-          <Stack direction="row" sx={{ flexWrap: 'wrap', gap: 1.25, mt: 4 }}>
-            {TRUST.map(({ icon: Icon, label }) => (
-              <Stack
-                key={label}
-                direction="row"
-                sx={{
-                  alignItems: 'center',
-                  gap: 0.875,
-                  px: 1.5,
-                  py: 0.875,
-                  borderRadius: 999,
-                  bgcolor: 'rgba(255,255,255,0.08)',
-                  border: '1px solid rgba(255,255,255,0.12)',
-                  fontSize: 12,
-                  color: '#C6E3FC',
-                }}
-              >
-                <Icon size={14} />
-                {label}
-              </Stack>
-            ))}
-          </Stack>
-        </Box>
-
-        <Typography sx={{ position: 'relative', zIndex: 1, mt: 5, fontSize: 12, color: '#7A8BA0' }}>
-          © 2026 devtank42 GmbH · All data stays in the EU
-        </Typography>
-      </Box>
+      <BrandPanel />
 
       {/* Form panel */}
       <Box
         sx={{
           display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          p: { xs: 3, sm: 5 },
+          flexDirection: 'column',
           bgcolor: 'background.default',
+          position: 'relative',
+          overflow: 'hidden',
         }}
       >
-        <Box sx={{ width: '100%', maxWidth: 408 }}>
-          {headerSlot}
-          <Typography
-            component="h1"
-            sx={{
-              fontWeight: 700,
-              fontSize: 26,
-              letterSpacing: '-0.02em',
-              lineHeight: 1.15,
-              mb: subtitle ? 0.75 : 3,
-            }}
-          >
-            {title}
-          </Typography>
-          {subtitle && (
-            <Typography color="text.secondary" sx={{ fontSize: 14.5, mb: 3 }}>
-              {subtitle}
+        <MobileBrandBand />
+        {/* decorative corner accent: the annotated-document motif from the logomark */}
+        <Box
+          aria-hidden
+          component="img"
+          src={authDocs}
+          alt=""
+          sx={{
+            position: 'absolute',
+            right: { xs: -34, sm: -40 },
+            bottom: { xs: -56, sm: -54 },
+            width: { xs: 130, sm: 200 },
+            // On phones the form can reach into the corner (outlined buttons are
+            // transparent), so the accent steps back to a subtle watermark.
+            opacity: { xs: 0.45, sm: 1 },
+            pointerEvents: 'none',
+            filter: 'drop-shadow(0 18px 30px rgba(0,0,0,0.30))',
+            animation: `${floatDocs} 7s ease-in-out 0.8s infinite alternate`,
+            '@media (prefers-reduced-motion: reduce)': { animation: 'none' },
+          }}
+        />
+        <Box
+          sx={{
+            flex: 1,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            p: { xs: 3, sm: 5 },
+          }}
+        >
+          <Box sx={{ width: '100%', maxWidth: 408, position: 'relative', zIndex: 1 }}>
+            {headerSlot}
+            <Typography
+              component="h1"
+              sx={{
+                fontWeight: 700,
+                fontSize: 26,
+                letterSpacing: '-0.02em',
+                lineHeight: 1.15,
+                mb: subtitle ? 0.75 : 3,
+              }}
+            >
+              {title}
             </Typography>
-          )}
-          {children}
+            {subtitle && (
+              <Typography color="text.secondary" sx={{ fontSize: 14.5, mb: 3 }}>
+                {subtitle}
+              </Typography>
+            )}
+            {children}
+          </Box>
         </Box>
       </Box>
     </Box>

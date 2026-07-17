@@ -1,6 +1,6 @@
 # ADR-0012: Edition vs. entitlements / license gating
 
-- **Status:** Proposed
+- **Status:** Accepted — finalized by [ADR-0039](0039-enterprise-packaging-and-runtime-extensions.md)
 - **Date:** 2026-06-13
 - **Deciders:** qnop core team
 
@@ -19,3 +19,7 @@ Beyond *which* edition is running (Community vs. Enterprise), the commercial edi
 ## Status note
 
 Recorded now to fix the gating approach before any commercial code exists. Implementation is out of scope until the enterprise repo and bootable server exist. Obtain IP-counsel review of the AGPL boundary before first commercial release.
+
+## Amendment (2026-07-16)
+
+The `/api/edition` endpoint sketched above materialized as `GET /api/v1/config`.

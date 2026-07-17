@@ -22,10 +22,14 @@ package io.qnop.service;
 
 import java.util.UUID;
 
-/** Thrown when a user lookup by id finds no matching {@code qnop_user} row. */
+/** Thrown when a user lookup by id or profile slug finds no matching {@code qnop_user} row. */
 public class UserNotFoundException extends RuntimeException {
 
   public UserNotFoundException(UUID id) {
     super("User not found: " + id);
+  }
+
+  public UserNotFoundException(String slug) {
+    super("User not found: slug=" + slug);
   }
 }

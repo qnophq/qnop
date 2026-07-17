@@ -45,7 +45,12 @@ public enum UserSettingKey {
       List.of("system", "light", "dark")),
   PREFERRED_LANGUAGE(
       "preferred_language", SettingValueType.STRING, "en", "Preferred UI language (ISO 639-1)."),
-  TIMEZONE("timezone", SettingValueType.STRING, "UTC", "Preferred display timezone (IANA id).");
+  TIMEZONE("timezone", SettingValueType.STRING, "UTC", "Preferred display timezone (IANA id)."),
+  EMAIL_REVIEW_NOTIFICATIONS(
+      "email_review_notifications",
+      SettingValueType.BOOLEAN,
+      "true",
+      "Receive email notifications for review activity (issue #316).");
 
   private static final Map<String, UserSettingKey> BY_KEY =
       Arrays.stream(values())
@@ -55,7 +60,7 @@ public enum UserSettingKey {
    * Beyond-type value constraints per key (mirrors {@link ApplicationSettingKey}); {@link
    * ValueValidator} enforces them at the setting boundary. The display timezone must be a real IANA
    * zone id so a future backend consumer of the per-user zone (server-rendered export, scheduled
-   * mail) can trust it (issue #465, ADR-0039).
+   * mail) can trust it (issue #465, ADR-0041).
    */
   private static final Map<UserSettingKey, SettingConstraints> CONSTRAINTS =
       Map.of(TIMEZONE, SettingConstraints.format(SettingConstraints.ValueFormat.TIMEZONE));

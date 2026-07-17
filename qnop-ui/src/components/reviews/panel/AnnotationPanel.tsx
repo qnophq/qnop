@@ -19,16 +19,13 @@
  * SPDX-License-Identifier: AGPL-3.0-only
  */
 
-import { useMemo, useState } from 'react';
-import type { ReactNode } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import Box from '@mui/material/Box';
 import Button from '@mui/material/Button';
-import ButtonBase from '@mui/material/ButtonBase';
 import Collapse from '@mui/material/Collapse';
 import Stack from '@mui/material/Stack';
 import Typography from '@mui/material/Typography';
-import { useTheme } from '@mui/material/styles';
-import { ChevronRight, FileText, Link2, NotebookPen, Plus } from 'lucide-react';
+import { NotebookPen, Plus } from 'lucide-react';
 import type {
   AnnotationPriority,
   AnnotationType,
@@ -36,21 +33,23 @@ import type {
   AnnotationView,
 } from '../../../api/generated';
 import { AnnotationStatus } from '../../../api/generated';
+import { revealInScroller } from '../../../utils/revealInScroller';
 import { useAuthStore } from '../../../stores/authStore';
 import type { Notify } from '../../admin/layout/useToast';
 import { SectionCard } from '../../admin/layout/SectionCard';
-import { compareAnnotationsByPosition } from '../viewer/anchoring';
+import { ToneBadge } from '../../admin/ToneBadge';
 import { isUnseen } from '../newSince';
-import { isDocumentScoped } from '../annotationScope';
 import type { BuildPermalink } from '../useReviewPermalink';
-import { CopyLinkButton } from '../permalink/CopyLinkButton';
+import { useConfirmPlacement } from '../../../api/hooks/useAnnotations';
 import { AnnotationListItem } from './AnnotationListItem';
+import type { UploadedAttachment } from '../markdown/useCommentAttachmentUpload';
 import { CommentThread } from './CommentThread';
 import { Composer } from './Composer';
 import type { FilterAuthor } from './PanelFilterBar';
 import { PanelFilterBar } from './PanelFilterBar';
+import { ReanchorBanner } from './ReanchorBanner';
 import type { AnnotationFilters } from './panelFilters';
-import { EMPTY_FILTERS, matchesFilters } from './panelFilters';
+import { EMPTY_FILTERS, matchesFilters, comparePanelOrder } from './panelFilters';
 import { ResolveBar } from './ResolveBar';
 import {
   mayReopenAnnotation,
@@ -78,8 +77,17 @@ interface AnnotationPanelProps {
   onCancelPending: () => void;
   canAnnotate: boolean;
   notify: Notify;
+  /** Uploads a local composer file (issue #446); built by the page, which owns the document id. */
+  onUploadAttachment?: (file: File) => Promise<UploadedAttachment>;
   /** True while an OLDER version is viewed (#306): threads readable, nothing writable. */
   readOnly?: boolean;
+  /** The viewed version — the scope of placement outcomes and their confirmation (issue #326). */
+  versionNumber?: number | null;
+  /**
+   * Arms re-attaching a lost placement (issue #457) — the page owns the
+   * viewer, so it turns the next selection into the new anchor.
+   */
+  onArmReattach?: (annotation: AnnotationView) => void;
   /** True once the review is FINALIZED/CANCELLED (issue #394): no reopening. */
   reviewClosed?: boolean;
   /** Drops the section's outer card frame — the focus drawer brings its own edge. */
@@ -101,110 +109,6 @@ interface AnnotationPanelProps {
 }
 
 /** A collapsible, counted group of annotation cards (prototype sidebar section). */
-function PanelSection({
-  title,
-  subtitle,
-  icon,
-  count,
-  newCount = 0,
-  defaultOpen = true,
-  children,
-}: {
-  title: string;
-  subtitle?: string;
-  icon: ReactNode;
-  count: number;
-  /** Unseen entries in this group (issue #307) — rendered as "· n new". */
-  newCount?: number;
-  defaultOpen?: boolean;
-  children: ReactNode;
-}) {
-  const theme = useTheme();
-  const [open, setOpen] = useState(defaultOpen);
-  return (
-    <Box>
-      <ButtonBase
-        onClick={() => setOpen((value) => !value)}
-        aria-expanded={open}
-        sx={{
-          width: '100%',
-          display: 'flex',
-          alignItems: 'center',
-          gap: 1,
-          textAlign: 'left',
-          borderRadius: 1,
-          px: 0.5,
-          py: 0.75,
-          '&:focus-visible': { boxShadow: theme.qnop.focusRing },
-        }}
-      >
-        <ChevronRight
-          size={14}
-          aria-hidden
-          style={{
-            color: theme.palette.text.secondary,
-            flexShrink: 0,
-            transform: open ? 'rotate(90deg)' : 'none',
-            transition: 'transform 150ms ease',
-          }}
-        />
-        <Box
-          aria-hidden
-          sx={{
-            width: 24,
-            height: 24,
-            borderRadius: 1,
-            display: 'grid',
-            placeItems: 'center',
-            bgcolor: theme.qnop.badge.blue.bg,
-            color: theme.qnop.brand.blue,
-            flexShrink: 0,
-          }}
-        >
-          {icon}
-        </Box>
-        <Box sx={{ minWidth: 0, flex: 1 }}>
-          <Typography variant="subtitle2" sx={{ lineHeight: 1.25 }}>
-            {title}
-          </Typography>
-          {subtitle && (
-            <Typography variant="caption" color="text.secondary">
-              {subtitle}
-            </Typography>
-          )}
-        </Box>
-        <Typography
-          variant="caption"
-          sx={{
-            color: 'text.secondary',
-            bgcolor: theme.qnop.surface2,
-            borderRadius: 99,
-            px: 0.75,
-            fontVariantNumeric: 'tabular-nums',
-            flexShrink: 0,
-          }}
-        >
-          {count}
-        </Typography>
-        {newCount > 0 && (
-          <Typography
-            variant="caption"
-            data-testid="section-new-count"
-            sx={{ color: theme.qnop.brand.blue, fontWeight: 600, flexShrink: 0 }}
-          >
-            · {newCount} new
-          </Typography>
-        )}
-      </ButtonBase>
-      <Collapse in={open} unmountOnExit>
-        <Stack spacing={1.5} sx={{ pt: 1 }}>
-          {children}
-        </Stack>
-      </Collapse>
-    </Box>
-  );
-}
-
 /**
  * The right-hand review panel: the composer for a pending mark, a status
  * filter, and the annotations of the viewed version grouped into collapsible
@@ -228,7 +132,10 @@ export function AnnotationPanel({
   onCancelPending,
   canAnnotate,
   notify,
+  onUploadAttachment,
   readOnly = false,
+  versionNumber = null,
+  onArmReattach,
   reviewClosed = false,
   frameless = false,
   previousSeenAt = null,
@@ -239,7 +146,17 @@ export function AnnotationPanel({
 }: AnnotationPanelProps) {
   const [filters, setFilters] = useState<AnnotationFilters>(EMPTY_FILTERS);
   const userId = useAuthStore((state) => state.userId);
+
+  // A newly selected annotation must be in view (issue #491) — in a long list
+  // it expands invisibly below the fold otherwise. 'nearest' keeps in-list
+  // clicks untouched: a row that is already visible does not move.
+  useEffect(() => {
+    if (!activeAnnotationId) return;
+    const el = document.getElementById(`annotation-item-${activeAnnotationId}`);
+    if (el) revealInScroller(el, 'nearest');
+  }, [activeAnnotationId]);
   const { resolveWith, isPending: resolving } = useResolveWithFeedback(notify);
+  const confirmPlacement = useConfirmPlacement(notify);
   const { reopenWith } = useReopenWithFeedback(notify);
 
   // Author names are resolved server-side and travel on the annotation itself
@@ -266,22 +183,19 @@ export function AnnotationPanel({
   // Sort + status-filter once per (annotations, filter) change, not on every
   // render (e.g. a hover or selection): the list can be large and the sort is
   // O(n log n) (issue #334).
-  const { located, documentScoped, hiddenByFilter } = useMemo(() => {
+  const { visible, hiddenByFilter } = useMemo(() => {
     const matches = (annotation: AnnotationView) =>
       matchesFilters(annotation, filters, authorNameOf(annotation));
-    const sorted = [...annotations].sort(compareAnnotationsByPosition);
-    // Located annotations anchor to a passage; document-scoped ones (issue #395) apply to the
-    // whole document — no anchor, never orphaned — and group on their own.
-    const locatedItems = sorted.filter((a) => !isDocumentScoped(a) && matches(a));
-    const documentScopedItems = sorted.filter((a) => isDocumentScoped(a) && matches(a));
+    // ONE flat list (issue #481): document-scoped remarks lead, then anchored
+    // ones by document position — each card carries its own scope marker.
+    const items = [...annotations].sort(comparePanelOrder).filter(matches);
     return {
-      located: locatedItems,
-      documentScoped: documentScopedItems,
-      hiddenByFilter:
-        annotations.length > 0 && locatedItems.length + documentScopedItems.length === 0,
+      visible: items,
+      hiddenByFilter: annotations.length > 0 && items.length === 0,
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps -- authorNameOf derives from the inputs below
   }, [annotations, filters, userId, displayName]);
+  const newCount = visible.filter((a) => isUnseen(a, previousSeenAt, userId)).length;
 
   // Under a non-OPEN policy (issue #413) only the annotation's author and the
   // owner may reply; the composer is suppressed for everyone else. (A PRIVATE
@@ -302,26 +216,37 @@ export function AnnotationPanel({
           linked={annotation.id === hoverAnnotationId}
           onSelect={onSelect}
           onHover={onHover}
+          permalinkUrl={buildPermalink?.(annotation.id)}
+          notify={notify}
+          onConfirmPlacement={
+            versionNumber != null &&
+            !readOnly &&
+            !reviewClosed &&
+            annotation.placementStatus === 'MOVED' &&
+            (userId === ownerId || userId === annotation.authorId)
+              ? () => confirmPlacement.mutate({ annotationId: annotation.id, versionNumber })
+              : undefined
+          }
+          onReattachPlacement={
+            onArmReattach != null &&
+            versionNumber != null &&
+            !readOnly &&
+            !reviewClosed &&
+            (annotation.placementStatus === 'ORPHANED' ||
+              annotation.placementStatus === 'FAILED') &&
+            (userId === ownerId || userId === annotation.authorId)
+              ? () => onArmReattach(annotation)
+              : undefined
+          }
         />
         <Collapse in={active} unmountOnExit>
-          {/* The annotation permalink (issue #412) — a quiet right-aligned link
-              under the head card; a sibling of the row's ButtonBase, never
-              nested inside it. */}
-          {buildPermalink && (
-            <Stack direction="row" sx={{ justifyContent: 'flex-end', pt: 0.5 }}>
-              <CopyLinkButton
-                url={buildPermalink(annotation.id)}
-                notify={notify}
-                label="Copy link to annotation"
-              />
-            </Stack>
-          )}
           {!readOnly && mayResolveAnnotation(annotation, userId) && (
             <ResolveBar disabled={resolving} onResolve={(note) => resolveWith(annotation, note)} />
           )}
           {/* The thread stays inside the unit's card. */}
           <CommentThread
             annotationId={annotation.id}
+            documentId={annotation.documentId}
             notify={notify}
             readOnly={readOnly}
             policyReadOnly={!mayComment(annotation)}
@@ -349,21 +274,49 @@ export function AnnotationPanel({
       description="Marks and their discussion on this version."
       frameless={frameless}
       action={
-        // Raise a whole-document task without a selection (issue #395) — a quiet peer to the
-        // text-selection gesture, offered while the latest version is open for review.
-        onNewDocumentNote && !readOnly && !reviewClosed ? (
-          <Button
-            size="small"
-            variant="outlined"
-            startIcon={<Plus size={15} />}
-            onClick={onNewDocumentNote}
-          >
-            Global annotation
-          </Button>
-        ) : undefined
+        <Stack direction="row" spacing={1} sx={{ alignItems: 'center' }}>
+          {newCount > 0 && (
+            // The header's fresh-arrivals cue (issue #481): the per-section
+            // "n new" counts collapse into one badge that breathes gently.
+            <Box
+              data-testid="panel-new-count"
+              sx={{
+                '@keyframes panelNewPulse': {
+                  '0%, 100%': { opacity: 1 },
+                  '50%': { opacity: 0.6 },
+                },
+                animation: 'panelNewPulse 2.4s ease-in-out infinite',
+                '@media (prefers-reduced-motion: reduce)': { animation: 'none' },
+              }}
+            >
+              <ToneBadge tone="blue" label={`${newCount} new`} />
+            </Box>
+          )}
+          {
+            // Raise a whole-document task without a selection (issue #395) — a quiet peer to the
+            // text-selection gesture, offered while the latest version is open for review.
+            onNewDocumentNote && !readOnly && !reviewClosed ? (
+              <Button
+                size="small"
+                variant="outlined"
+                startIcon={<Plus size={15} />}
+                onClick={onNewDocumentNote}
+              >
+                Global annotation
+              </Button>
+            ) : undefined
+          }
+        </Stack>
       }
     >
       <Stack spacing={1.5}>
+        {versionNumber != null && (
+          <ReanchorBanner
+            annotations={annotations}
+            versionNumber={versionNumber}
+            onReview={() => setFilters((current) => ({ ...current, placement: 'attention' }))}
+          />
+        )}
         {annotations.length > 0 && (
           <PanelFilterBar
             filters={filters}
@@ -378,6 +331,7 @@ export function AnnotationPanel({
             creating={creating}
             onCreate={onCreate}
             onCancel={onCancelPending}
+            onUploadAttachment={onUploadAttachment}
           />
         )}
         {annotations.length === 0 && !pendingAnchor && (
@@ -391,28 +345,7 @@ export function AnnotationPanel({
             No annotations match this filter.
           </Typography>
         )}
-        {documentScoped.length > 0 && (
-          <PanelSection
-            title="Whole document"
-            subtitle="General remarks — not pinned to a passage"
-            icon={<FileText size={13} aria-hidden />}
-            count={documentScoped.length}
-            newCount={documentScoped.filter((a) => isUnseen(a, previousSeenAt, userId)).length}
-          >
-            {documentScoped.map(renderItem)}
-          </PanelSection>
-        )}
-        {located.length > 0 && (
-          <PanelSection
-            title="Anchored to the document"
-            subtitle="Placed on this version"
-            icon={<Link2 size={13} aria-hidden />}
-            count={located.length}
-            newCount={located.filter((a) => isUnseen(a, previousSeenAt, userId)).length}
-          >
-            {located.map(renderItem)}
-          </PanelSection>
-        )}
+        {visible.map(renderItem)}
       </Stack>
     </SectionCard>
   );

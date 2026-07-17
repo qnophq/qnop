@@ -114,7 +114,7 @@ export function ChangePasswordPage() {
   return (
     <AuthLayout
       title="Change password"
-      subtitle={forced ? 'Please set a new password to continue.' : undefined}
+      subtitle={forced ? 'For your security, choose a fresh password before diving in.' : undefined}
     >
       {done ? (
         <>

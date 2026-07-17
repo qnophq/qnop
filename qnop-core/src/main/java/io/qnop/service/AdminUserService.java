@@ -73,18 +73,21 @@ public class AdminUserService {
   private final PasswordEncoder passwordEncoder;
   private final PasswordResetFlowService passwordResetFlow;
   private final RefreshTokenService refreshTokens;
+  private final UserSlugService slugs;
 
   public AdminUserService(
       UserRepository users,
       OidcIdentityRepository oidcIdentities,
       PasswordEncoder passwordEncoder,
       PasswordResetFlowService passwordResetFlow,
-      RefreshTokenService refreshTokens) {
+      RefreshTokenService refreshTokens,
+      UserSlugService slugs) {
     this.users = users;
     this.oidcIdentities = oidcIdentities;
     this.passwordEncoder = passwordEncoder;
     this.passwordResetFlow = passwordResetFlow;
     this.refreshTokens = refreshTokens;
+    this.slugs = slugs;
   }
 
   /** A paginated, optionally filtered/sorted slice of users for the admin list. */
@@ -132,6 +135,7 @@ public class AdminUserService {
     User user = User.internal(displayName, normalizedEmail, username, passwordHash);
     user.setRole(requireRole(roleName));
     user.setEnabled(true);
+    user.setSlug(slugs.allocate(displayName));
     // Invited users have not chosen a password yet; password-set users must rotate the admin-chosen
     // one on first login. Either way the account must change its password before normal use.
     user.setPasswordChangeRequired(true);
@@ -287,6 +291,7 @@ public class AdminUserService {
   private static AdminUserView toView(User u, String providerName) {
     return new AdminUserView(
         u.getId(),
+        u.getSlug(),
         u.getDisplayName(),
         u.getEmail(),
         u.getUsername(),
@@ -345,6 +350,7 @@ public class AdminUserService {
   /** A Spring-free, entity-free projection of a user for the admin surface. */
   public record AdminUserView(
       UUID id,
+      String slug,
       String displayName,
       String email,
       String username,

@@ -26,3 +26,7 @@ Issue #15 introduced the `application_asset` storage (one row per `BrandingSlot`
 - **A third-party SVG/HTML sanitizer.** Rejected: no well-maintained permissive-licensed pure-Java SVG sanitizer fits, and an allowlist over the JAXP parser is small, auditable, and dependency-free (keeps the AGPL/commercial boundary clean, ADR-0007).
 - **Object storage for branding bytes.** Already rejected in ADR-0024 (branding is config-like; keep it in Postgres).
 - **Generating the endpoints from OpenAPI.** Rejected for these two: multipart upload and binary ETag/304 responses are awkward to express and add no value to the JSON contract consumers.
+
+## Amendment (2026-07-16, role naming)
+
+The "superadmin" role named above landed as **`ADMIN`** — see the 2026-07-16 amendment to [ADR-0025](0025-application-settings-architecture.md).

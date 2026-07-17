@@ -30,6 +30,7 @@ import io.qnop.entity.AnnotationType;
 import io.qnop.entity.AuditEvent;
 import io.qnop.entity.Comment;
 import io.qnop.entity.DocumentVersion;
+import io.qnop.entity.PlacementStatus;
 import io.qnop.entity.ThreadParticipation;
 import io.qnop.repository.AnnotationCommentActivity;
 import io.qnop.repository.AnnotationCommentCount;
@@ -45,6 +46,7 @@ import java.time.Instant;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -62,6 +64,8 @@ public class AnnotationService {
 
   static final String AUDIT_ANNOTATION_CREATED = "annotation.created";
   static final String AUDIT_ANNOTATION_CLASSIFIED = "annotation.classified";
+  static final String AUDIT_PLACEMENT_CONFIRMED = "placement.confirmed";
+  static final String AUDIT_PLACEMENT_REATTACHED = "placement.reattached";
 
   /** Comments can be 20k chars; the view carries only what a card title needs (issue #393). */
   static final int FIRST_COMMENT_EXCERPT_CHARS = 300;
@@ -74,6 +78,8 @@ public class AnnotationService {
   private final DocumentAccessService documentAccess;
   private final ReviewWorkflowService workflow;
   private final ReviewIdentityResolver identity;
+  private final ApplicationEventPublisher events;
+  private final ReactionService reactions_;
 
   public AnnotationService(
       AnnotationRepository annotations,
@@ -83,7 +89,9 @@ public class AnnotationService {
       AuditEventRepository auditEvents,
       DocumentAccessService documentAccess,
       ReviewWorkflowService workflow,
-      ReviewIdentityResolver identity) {
+      ReviewIdentityResolver identity,
+      ReactionService reactions,
+      ApplicationEventPublisher events) {
     this.annotations = annotations;
     this.placements = placements;
     this.comments = comments;
@@ -92,6 +100,8 @@ public class AnnotationService {
     this.documentAccess = documentAccess;
     this.workflow = workflow;
     this.identity = identity;
+    this.reactions_ = reactions;
+    this.events = events;
   }
 
   /**
@@ -103,6 +113,7 @@ public class AnnotationService {
       UUID id,
       UUID documentId,
       UUID authorId,
+      String authorSlug,
       String authorDisplayName,
       String status,
       String type,
@@ -112,6 +123,7 @@ public class AnnotationService {
       String firstComment,
       int commentCount,
       Instant latestCommentFromOthersAt,
+      List<ReactionService.ReactionGroup> reactions,
       Instant createdAt,
       Instant updatedAt) {}
 
@@ -120,8 +132,10 @@ public class AnnotationService {
       UUID id,
       UUID annotationId,
       UUID authorId,
+      String authorSlug,
       String authorDisplayName,
       String body,
+      List<ReactionService.ReactionGroup> reactions,
       Instant createdAt) {}
 
   /**
@@ -189,12 +203,14 @@ public class AnnotationService {
     // The workflow reacts to the raise (issue #405): a closed review rolls this insert back
     // (REVIEW_CLOSED), an IN_REVIEW one derives CHANGES_REQUESTED — both under the document lock.
     workflow.annotationRaised(documentId, author);
+    events.publishEvent(new ReviewEvent.AnnotationCreated(documentId, author, annotation.getId()));
     return view(
         annotation,
         placement,
         excerpt(firstComment),
         commentCount,
         null,
+        List.of(),
         identity.forDocument(documentId, author));
   }
 
@@ -239,6 +255,10 @@ public class AnnotationService {
     Map<UUID, String> firstCommentByAnnotation = firstComments(documentAnnotations);
     Map<UUID, Instant> foreignActivityByAnnotation = foreignActivity(documentAnnotations, actor);
     ReviewIdentityResolver.ReviewIdentities identities = identity.forDocument(documentId, actor);
+    // Reaction chips, batched like the counts (issue #410).
+    Map<UUID, List<ReactionService.ReactionGroup>> reactionsByAnnotation =
+        reactions_.forAnnotations(
+            documentAnnotations.stream().map(Annotation::getId).toList(), actor, identities);
     return documentAnnotations.stream()
         .map(
             annotation ->
@@ -248,6 +268,7 @@ public class AnnotationService {
                     firstCommentByAnnotation.get(annotation.getId()),
                     threadSizeByAnnotation.getOrDefault(annotation.getId(), 0),
                     foreignActivityByAnnotation.get(annotation.getId()),
+                    reactionsByAnnotation.getOrDefault(annotation.getId(), List.of()),
                     identities))
         .filter(view -> placementStatus == null || placementStatus.equals(view.placementStatus()))
         .filter(view -> type == null || type.equals(view.type()))
@@ -283,13 +304,16 @@ public class AnnotationService {
             actor,
             "{\"annotationId\":\"%s\",\"type\":%s,\"priority\":%s}"
                 .formatted(annotationId, jsonString(type), jsonString(priority))));
+    ReviewIdentityResolver.ReviewIdentities identities =
+        identity.forDocument(annotation.getDocumentId(), actor);
     return view(
         annotation,
         null,
         firstComment(annotationId),
         threadSize(annotationId),
         foreignActivity(annotationId, actor),
-        identity.forDocument(annotation.getDocumentId(), actor));
+        annotationReactions(annotationId, actor, identities),
+        identities);
   }
 
   private static String jsonString(String value) {
@@ -315,13 +339,16 @@ public class AnnotationService {
       // A PRIVATE foreign thread is invisible — 404, like the document itself.
       throw DocumentValidationException.notFound("no such annotation: " + annotationId);
     }
+    ReviewIdentityResolver.ReviewIdentities identities =
+        identity.forDocument(annotation.getDocumentId(), actor);
     return view(
         annotation,
         null,
         firstComment(annotationId),
         threadSize(annotationId),
         foreignActivity(annotationId, actor),
-        identity.forDocument(annotation.getDocumentId(), actor));
+        annotationReactions(annotationId, actor, identities),
+        identities);
   }
 
   /**
@@ -332,13 +359,16 @@ public class AnnotationService {
   @Transactional
   public AnnotationView resolve(UUID annotationId, String note, UUID actor) {
     Annotation updated = workflow.resolveAnnotation(annotationId, note, actor);
+    ReviewIdentityResolver.ReviewIdentities identities =
+        identity.forDocument(updated.getDocumentId(), actor);
     return view(
         updated,
         null,
         firstComment(updated.getId()),
         threadSize(updated.getId()),
         foreignActivity(updated.getId(), actor),
-        identity.forDocument(updated.getDocumentId(), actor));
+        annotationReactions(updated.getId(), actor, identities),
+        identities);
   }
 
   /**
@@ -349,13 +379,153 @@ public class AnnotationService {
   @Transactional
   public AnnotationView reopen(UUID annotationId, UUID actor) {
     Annotation updated = workflow.reopenAnnotation(annotationId, actor);
+    ReviewIdentityResolver.ReviewIdentities identities =
+        identity.forDocument(updated.getDocumentId(), actor);
     return view(
         updated,
         null,
         firstComment(updated.getId()),
         threadSize(updated.getId()),
         foreignActivity(updated.getId(), actor),
-        identity.forDocument(updated.getDocumentId(), actor));
+        annotationReactions(updated.getId(), actor, identities),
+        identities);
+  }
+
+  /**
+   * Confirms a MOVED placement after human review (ADR-0009, issue #326): the document owner or the
+   * annotation's author verified the relocated highlight on {@code versionNumber}, so the placement
+   * flips back to PLACED, keeping the resolved anchor. Only MOVED confirms — anything else answers
+   * 409, so a stale client racing the re-anchoring job gets a stable signal.
+   */
+  @Transactional
+  public AnnotationView confirmPlacement(
+      UUID annotationId, int versionNumber, UUID actor, boolean admin) {
+    Annotation annotation = requireAnnotation(annotationId);
+    DocumentAccessService.DocumentView document =
+        documentAccess.getDocument(annotation.getDocumentId(), actor, admin);
+    if (!canSeeThread(document, annotation.getAuthorId(), actor, admin)) {
+      throw DocumentValidationException.notFound("no such annotation: " + annotationId);
+    }
+    if (!admin && !document.ownerId().equals(actor) && !annotation.getAuthorId().equals(actor)) {
+      throw new AnnotationActionForbiddenException(
+          "Only the document owner or the annotation's author may confirm a placement");
+    }
+    DocumentVersion version =
+        versions
+            .findByDocumentIdAndVersionNumber(annotation.getDocumentId(), versionNumber)
+            .orElseThrow(
+                () -> DocumentValidationException.notFound("no such version: " + versionNumber));
+    AnnotationPlacement placement =
+        placements
+            .findByAnnotationIdAndDocumentVersionId(annotationId, version.getId())
+            .orElseThrow(
+                () ->
+                    DocumentValidationException.notFound(
+                        "no placement on version " + versionNumber));
+    if (placement.getStatus() != PlacementStatus.MOVED) {
+      throw new WorkflowTransitionException(
+          WorkflowTransitionException.PLACEMENT_NOT_MOVED,
+          "placement is " + placement.getStatus() + "; only MOVED placements confirm");
+    }
+    placement.markPlaced(placement.getAnchor());
+    auditEvents.save(
+        new AuditEvent(
+            annotation.getDocumentId(),
+            AUDIT_PLACEMENT_CONFIRMED,
+            actor,
+            "{\"annotationId\":\"%s\",\"versionNumber\":%d}"
+                .formatted(annotationId, versionNumber)));
+    ReviewIdentityResolver.ReviewIdentities identities =
+        identity.forDocument(annotation.getDocumentId(), actor);
+    return view(
+        annotation,
+        placement,
+        firstComment(annotationId),
+        threadSize(annotationId),
+        foreignActivity(annotationId, actor),
+        annotationReactions(annotationId, actor, identities),
+        identities);
+  }
+
+  /**
+   * Re-attaches a lost placement by hand (ADR-0009, issue #457): the owner or the annotation's
+   * author picked a new passage on the LATEST version, so the placement takes that anchor and flips
+   * to PLACED — the thread stays untouched. Allowed from ORPHANED, FAILED and MOVED (a manual
+   * correction); PLACED refuses, so nothing is overwritten by accident.
+   */
+  @Transactional
+  public AnnotationView reattachPlacement(
+      UUID annotationId, int versionNumber, String anchorJson, UUID actor, boolean admin) {
+    if (anchorJson == null || anchorJson.isBlank()) {
+      throw DocumentValidationException.invalidRequest("anchor is required");
+    }
+    Annotation annotation = requireAnnotation(annotationId);
+    DocumentAccessService.DocumentView document =
+        documentAccess.getDocument(annotation.getDocumentId(), actor, admin);
+    if (!canSeeThread(document, annotation.getAuthorId(), actor, admin)) {
+      throw DocumentValidationException.notFound("no such annotation: " + annotationId);
+    }
+    if (!admin && !document.ownerId().equals(actor) && !annotation.getAuthorId().equals(actor)) {
+      throw new AnnotationActionForbiddenException(
+          "Only the document owner or the annotation's author may re-attach a placement");
+    }
+    if (isClosed(document.workflowState())) {
+      throw new WorkflowTransitionException(
+          WorkflowTransitionException.REVIEW_CLOSED,
+          "the review is " + document.workflowState() + "; placements can no longer change");
+    }
+    DocumentVersion version =
+        versions
+            .findByDocumentIdAndVersionNumber(annotation.getDocumentId(), versionNumber)
+            .orElseThrow(
+                () -> DocumentValidationException.notFound("no such version: " + versionNumber));
+    int latest =
+        versions
+            .findTopByDocumentIdOrderByVersionNumberDesc(annotation.getDocumentId())
+            .map(DocumentVersion::getVersionNumber)
+            .orElse(versionNumber);
+    if (versionNumber != latest) {
+      throw DocumentValidationException.versionReadOnly(
+          "placements are re-attached on the latest version (v%d), not v%d"
+              .formatted(latest, versionNumber));
+    }
+    AnnotationPlacement placement =
+        placements
+            .findByAnnotationIdAndDocumentVersionId(annotationId, version.getId())
+            .orElseThrow(
+                () ->
+                    DocumentValidationException.notFound(
+                        "no placement on version " + versionNumber));
+    if (placement.getStatus() == PlacementStatus.PLACED
+        || placement.getStatus() == PlacementStatus.PENDING) {
+      throw new WorkflowTransitionException(
+          WorkflowTransitionException.PLACEMENT_NOT_REATTACHABLE,
+          "placement is " + placement.getStatus() + "; re-attach rescues lost placements");
+    }
+    placement.markPlaced(anchorJson);
+    auditEvents.save(
+        new AuditEvent(
+            annotation.getDocumentId(),
+            AUDIT_PLACEMENT_REATTACHED,
+            actor,
+            "{\"annotationId\":\"%s\",\"versionNumber\":%d}"
+                .formatted(annotationId, versionNumber)));
+    ReviewIdentityResolver.ReviewIdentities identities =
+        identity.forDocument(annotation.getDocumentId(), actor);
+    return view(
+        annotation,
+        placement,
+        firstComment(annotationId),
+        threadSize(annotationId),
+        foreignActivity(annotationId, actor),
+        annotationReactions(annotationId, actor, identities),
+        identities);
+  }
+
+  /** FINALIZED/CANCELLED as strings — the column tolerates enterprise states (ADR-0011). */
+  private static boolean isClosed(String workflowState) {
+    return io.qnop.entity.WorkflowState.FINALIZED.name().equals(workflowState)
+        || io.qnop.entity.WorkflowState.CANCELLED.name().equals(workflowState);
   }
 
   /**
@@ -389,7 +559,10 @@ public class AnnotationService {
     }
     // saveAndFlush so @CreationTimestamp is populated on the returned comment before the view.
     Comment saved = comments.saveAndFlush(new Comment(annotationId, author, body));
-    return commentView(saved, identity.forDocument(annotation.getDocumentId(), author));
+    events.publishEvent(
+        new ReviewEvent.CommentAdded(
+            annotation.getDocumentId(), author, annotationId, saved.getId()));
+    return commentView(saved, List.of(), identity.forDocument(annotation.getDocumentId(), author));
   }
 
   /** An annotation's comment thread, oldest first; visible participants only. */
@@ -403,9 +576,26 @@ public class AnnotationService {
     }
     ReviewIdentityResolver.ReviewIdentities identities =
         identity.forDocument(annotation.getDocumentId(), actor);
-    return comments.findByAnnotationIdOrderByCreatedAtAsc(annotationId).stream()
-        .map(comment -> commentView(comment, identities))
+    List<Comment> thread = comments.findByAnnotationIdOrderByCreatedAtAsc(annotationId);
+    // Reaction chips per bubble, batched (issue #410).
+    Map<UUID, List<ReactionService.ReactionGroup>> reactionsByComment =
+        reactions_.forComments(thread.stream().map(Comment::getId).toList(), actor, identities);
+    return thread.stream()
+        .map(
+            comment ->
+                commentView(
+                    comment,
+                    reactionsByComment.getOrDefault(comment.getId(), List.of()),
+                    identities))
         .toList();
+  }
+
+  /** Reaction chips of one annotation (list uses the batched variant, issue #410). */
+  private List<ReactionService.ReactionGroup> annotationReactions(
+      UUID annotationId, UUID actor, ReviewIdentityResolver.ReviewIdentities identities) {
+    return reactions_
+        .forAnnotations(List.of(annotationId), actor, identities)
+        .getOrDefault(annotationId, List.of());
   }
 
   private Annotation requireAnnotation(UUID annotationId) {
@@ -476,7 +666,7 @@ public class AnnotationService {
    * (issue #413). Only PRIVATE hides a foreign thread (a caller who is neither its author nor the
    * owner); READ_ONLY and OPEN show every thread. Admins see everything.
    */
-  private static boolean canSeeThread(
+  static boolean canSeeThread(
       DocumentAccessService.DocumentView document, UUID authorId, UUID actor, boolean admin) {
     if (!ThreadParticipation.PRIVATE.name().equals(document.threadParticipation())) {
       return true;
@@ -504,12 +694,14 @@ public class AnnotationService {
       String firstComment,
       int commentCount,
       Instant latestCommentFromOthersAt,
+      List<ReactionService.ReactionGroup> reactions,
       ReviewIdentityResolver.ReviewIdentities identities) {
     UUID authorId = annotation.getAuthorId();
     return new AnnotationView(
         annotation.getId(),
         annotation.getDocumentId(),
         identities.exposedAuthorId(authorId),
+        identities.slug(authorId),
         identities.displayName(authorId),
         annotation.getStatus().name(),
         annotation.getType() == null ? null : annotation.getType().name(),
@@ -519,19 +711,24 @@ public class AnnotationService {
         firstComment,
         commentCount,
         latestCommentFromOthersAt,
+        reactions,
         annotation.getCreatedAt(),
         annotation.getUpdatedAt());
   }
 
   private static CommentView commentView(
-      Comment comment, ReviewIdentityResolver.ReviewIdentities identities) {
+      Comment comment,
+      List<ReactionService.ReactionGroup> reactions,
+      ReviewIdentityResolver.ReviewIdentities identities) {
     UUID authorId = comment.getAuthorId();
     return new CommentView(
         comment.getId(),
         comment.getAnnotationId(),
         identities.exposedAuthorId(authorId),
+        identities.slug(authorId),
         identities.displayName(authorId),
         comment.getBody(),
+        reactions,
         comment.getCreatedAt());
   }
 }

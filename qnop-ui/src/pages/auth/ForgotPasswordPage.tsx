@@ -55,11 +55,14 @@ export function ForgotPasswordPage() {
   };
 
   return (
-    <AuthLayout title="Reset password" subtitle="We'll send you a link to reset your password.">
+    <AuthLayout
+      title="Locked out? It happens."
+      subtitle="Enter your email and we'll send you a secure link to get back to your reviews."
+    >
       {done ? (
         <>
           <Alert severity="success" sx={{ mb: 2 }}>
-            If an account exists for this address, a reset link is on its way.
+            If an account exists for this address, a reset link is on its way — check your inbox.
           </Alert>
           <Link component={RouterLink} to="/login" underline="hover">
             Back to sign in

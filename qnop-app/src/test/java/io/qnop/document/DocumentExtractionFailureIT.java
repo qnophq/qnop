@@ -20,6 +20,7 @@
  */
 package io.qnop.document;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.jwt;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart;
@@ -29,8 +30,12 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import com.jayway.jsonpath.JsonPath;
 import io.qnop.bootstrap.AbstractIntegrationTest;
+import io.qnop.entity.AuditEvent;
+import io.qnop.entity.DocumentVersion;
 import io.qnop.entity.User;
+import io.qnop.repository.AuditEventRepository;
 import io.qnop.repository.DocumentRepository;
+import io.qnop.repository.DocumentVersionRepository;
 import io.qnop.repository.UserRepository;
 import io.qnop.service.job.JobQueuePoller;
 import java.io.ByteArrayOutputStream;
@@ -84,6 +89,8 @@ class DocumentExtractionFailureIT extends AbstractIntegrationTest {
   @Autowired MockMvc mockMvc;
   @Autowired UserRepository users;
   @Autowired DocumentRepository documents;
+  @Autowired DocumentVersionRepository versions;
+  @Autowired AuditEventRepository auditEvents;
   @Autowired PasswordEncoder passwordEncoder;
   @Autowired JobQueuePoller poller;
 
@@ -176,7 +183,44 @@ class DocumentExtractionFailureIT extends AbstractIntegrationTest {
         .andExpect(jsonPath("$.annotations[0].placementStatus").value("FAILED"));
   }
 
+  @Test
+  @DisplayName(
+      "extraction audits success and failure, and persists the failure reason (issue #325)")
+  void auditsOutcomesAndPersistsFailureReason() throws Exception {
+    UUID owner = createUser();
+    UUID documentId = upload(owner, "the original clause stands");
+    poller.poll(); // extract v1 → READY
+
+    addVersion(owner, documentId, CORRUPT_PDF);
+    poller.poll(); // extract v2 → FAILED
+
+    List<DocumentVersion> chain = versions.findByDocumentIdOrderByVersionNumberAsc(documentId);
+    UUID v1 = chain.get(0).getId();
+    DocumentVersion v2 = chain.get(1);
+
+    // The failure reason is persisted for operators — the corrupt PDF surfaces PDFBox's message.
+    assertThat(v2.getExtractionFailureReason()).contains("Unreadable PDF");
+
+    List<AuditEvent> trail = auditEvents.findByDocumentIdOrderByCreatedAtDesc(documentId);
+    // v1's extraction succeeded — system-generated (no actor), detail names the version.
+    AuditEvent succeeded = onlyEvent(trail, "extraction.succeeded");
+    assertThat(succeeded.getActorId()).isNull();
+    assertThat(succeeded.getDetail()).contains(v1.toString());
+    // v2's extraction failed — detail names the version and carries the reason.
+    AuditEvent failed = onlyEvent(trail, "extraction.failed");
+    assertThat(failed.getActorId()).isNull();
+    assertThat(failed.getDetail()).contains(v2.getId().toString()).contains("Unreadable PDF");
+  }
+
   // --- helpers ---------------------------------------------------------------
+
+  /** The single audit event of the given type in the trail (fails if absent or duplicated). */
+  private static AuditEvent onlyEvent(List<AuditEvent> trail, String eventType) {
+    List<AuditEvent> matches =
+        trail.stream().filter(e -> e.getEventType().equals(eventType)).toList();
+    assertThat(matches).as("exactly one %s event", eventType).hasSize(1);
+    return matches.get(0);
+  }
 
   /** The annotation drawn on v1: region + the quote with its real prefix/suffix context. */
   private static String annotationBody() {

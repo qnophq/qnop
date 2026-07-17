@@ -19,9 +19,9 @@
  * SPDX-License-Identifier: AGPL-3.0-only
  */
 
-import Box from '@mui/material/Box';
-import Drawer from '@mui/material/Drawer';
 import type { ReactNode } from 'react';
+import Box from '@mui/material/Box';
+import { ResizableDrawer } from '../ResizableDrawer';
 
 interface FocusDrawerProps {
   open: boolean;
@@ -33,16 +33,20 @@ interface FocusDrawerProps {
  * Focus mode's temporary home of the annotation list (issue #291): the full
  * panel — filters, sections, the orphaned group — slides in on demand and
  * disappears again, keeping the document at full width the rest of the time.
+ * Resizing and width persistence come from the shared {@link ResizableDrawer}
+ * (issue #403).
  */
 export function FocusDrawer({ open, onClose, children }: FocusDrawerProps) {
   return (
-    <Drawer
-      anchor="right"
+    <ResizableDrawer
       open={open}
       onClose={onClose}
-      slotProps={{ paper: { sx: { width: { xs: '100%', sm: 420 } } } }}
+      storageKey="qnop-focus-drawer-width"
+      defaultWidth={520}
+      handleAriaLabel="Resize the annotation drawer"
+      handleTestId="focus-drawer-resize-handle"
     >
-      <Box sx={{ p: 2, overflowY: 'auto' }}>{children}</Box>
-    </Drawer>
+      <Box sx={{ p: 2, overflowY: 'auto', height: '100%' }}>{children}</Box>
+    </ResizableDrawer>
   );
 }

@@ -47,6 +47,8 @@ vi.mock('../../api/hooks/useReviews', () => ({
   useParticipants: vi.fn(),
 }));
 vi.mock('../../api/hooks/useAnnotations', () => ({
+  useConfirmPlacement: vi.fn().mockReturnValue({ mutate: vi.fn(), isPending: false }),
+  useReattachPlacement: vi.fn().mockReturnValue({ mutate: vi.fn(), isPending: false }),
   useAnnotations: vi.fn().mockReturnValue({ data: undefined }),
 }));
 vi.mock('../../api/hooks/useVersionDiff', async (importOriginal) => ({

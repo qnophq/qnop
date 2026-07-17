@@ -45,7 +45,7 @@ interface UiState {
   setThemeMode: (mode: PaletteMode) => void;
   toggleTheme: () => void;
   /**
-   * The active display timezone (issue #465, ADR-0039). Held in the store — not read via a query
+   * The active display timezone (issue #465, ADR-0041). Held in the store — not read via a query
    * hook at each formatter call site — so every component can format through {@link useFormatters}
    * without depending on a QueryClient. TimezoneSync (mounted once, inside the provider) resolves
    * user profile → application default → UTC and pushes the result here.

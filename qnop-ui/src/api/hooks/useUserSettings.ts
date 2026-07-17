@@ -19,38 +19,74 @@
  * SPDX-License-Identifier: AGPL-3.0-only
  */
 
-import { useQuery } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import type { UserSettingsResponse } from '../generated';
 import { userSettingsApi } from '../config';
 import { useAuthStore } from '../../stores/authStore';
 
-export const userSettingsKeys = {
-  all: ['user', 'settings'] as const,
+/** The per-user opt-out for review activity mails (issue #316). */
+export const EMAIL_REVIEW_NOTIFICATIONS_KEY = 'email_review_notifications';
+
+export const userSettingKeys = {
+  all: ['user-settings'] as const,
 };
 
 /**
- * The current user's per-user settings (theme, preferred language, timezone).
- * Gated on authentication: the endpoint is behind auth, so anonymous surfaces
- * (login, registration) never fire it — consumers fall back to the application
- * default there. Settings change rarely, so the cache is kept fresh for the
- * session rather than refetched on every window focus.
+ * The caller's settings, stored values overlaid on registry defaults (issue #22).
+ * Gated on authentication so anonymous surfaces (login, registration) never fire
+ * it — consumers fall back to the registry/application default there.
  */
-export function useCurrentUserSettings() {
+export function useUserSettings() {
   const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
   return useQuery<UserSettingsResponse>({
-    queryKey: userSettingsKeys.all,
+    queryKey: userSettingKeys.all,
     queryFn: async () => {
       const response = await userSettingsApi.getCurrentUserSettings();
       return response.data;
     },
     enabled: isAuthenticated,
-    staleTime: Infinity,
-    refetchOnWindowFocus: false,
   });
 }
 
 /** The value of a single setting key, or {@code undefined} when unset/unloaded. */
 export function useUserSettingValue(key: string): string | undefined {
-  const { data } = useCurrentUserSettings();
+  const { data } = useUserSettings();
   return data?.settings.find((setting) => setting.key === key)?.value;
+}
+
+/**
+ * Applies a partial settings change optimistically — a toggle must not lag —
+ * and rolls back to the snapshot when the server refuses.
+ */
+export function useUpdateUserSettings() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (values: Record<string, string>) => {
+      const response = await userSettingsApi.updateCurrentUserSettings({
+        userSettingsUpdateRequest: { values },
+      });
+      return response.data;
+    },
+    onMutate: async (values) => {
+      await queryClient.cancelQueries({ queryKey: userSettingKeys.all });
+      const snapshot = queryClient.getQueryData<UserSettingsResponse>(userSettingKeys.all);
+      if (snapshot) {
+        queryClient.setQueryData<UserSettingsResponse>(userSettingKeys.all, {
+          ...snapshot,
+          settings: snapshot.settings.map((setting) =>
+            values[setting.key] !== undefined
+              ? { ...setting, value: values[setting.key] }
+              : setting,
+          ),
+        });
+      }
+      return { snapshot };
+    },
+    onError: (_error, _values, context) => {
+      if (context?.snapshot) {
+        queryClient.setQueryData(userSettingKeys.all, context.snapshot);
+      }
+    },
+    onSettled: () => queryClient.invalidateQueries({ queryKey: userSettingKeys.all }),
+  });
 }

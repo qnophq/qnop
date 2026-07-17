@@ -25,6 +25,7 @@ import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -89,4 +90,28 @@ public interface CommentRepository extends JpaRepository<Comment, UUID> {
           + " FROM Comment c WHERE c.annotationId IN :annotationIds GROUP BY c.annotationId")
   List<AnnotationCommentCount> countByAnnotationIdIn(
       @Param("annotationIds") Collection<UUID> annotationIds);
+
+  /**
+   * Replies directed at {@code viewer} for the dashboard (issue #454): comments by OTHERS on
+   * annotations the viewer authored, or later than the viewer's own comment in threads they joined.
+   * Newest first; the caller caps via {@code pageable}.
+   */
+  @Query(
+      "SELECT c FROM Comment c, Annotation a WHERE a.id = c.annotationId"
+          + " AND a.documentId IN :documentIds AND c.authorId <> :viewer"
+          + " AND (a.authorId = :viewer OR EXISTS (SELECT 1 FROM Comment mine"
+          + "   WHERE mine.annotationId = c.annotationId AND mine.authorId = :viewer"
+          + "   AND mine.createdAt < c.createdAt))"
+          + " ORDER BY c.createdAt DESC")
+  List<Comment> repliesToViewer(
+      @Param("documentIds") Collection<UUID> documentIds,
+      @Param("viewer") UUID viewer,
+      Pageable pageable);
+
+  /** Comments the user wrote in NON-anonymous reviews (ADR-0038, issue #473). */
+  @Query(
+      "SELECT count(c) FROM Comment c, Annotation a, Document d"
+          + " WHERE a.id = c.annotationId AND d.id = a.documentId"
+          + " AND c.authorId = :authorId AND d.anonymous = false")
+  long countPublicByAuthor(@Param("authorId") UUID authorId);
 }

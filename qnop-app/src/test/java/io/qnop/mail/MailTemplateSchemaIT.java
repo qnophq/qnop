@@ -56,6 +56,24 @@ class MailTemplateSchemaIT extends AbstractIntegrationTest {
     assertThat(templates.findByTemplateKeyAndLocale("auth.password_reset", "en"))
         .hasValueSatisfying(t -> assertThat(t.getBodyPlain()).contains("{{actionUrl}}"));
     assertThat(templates.findByTemplateKeyAndLocale("auth.admin_password_reset", "en")).isPresent();
+    // Review notification templates (issue #316) — seeded plain, HTML from the branded chrome.
+    for (String key :
+        new String[] {
+          "review.participant_added",
+          "review.annotation_created",
+          "review.annotation_decided",
+          "review.comment_added",
+          "review.workflow_changed",
+          "review.version_uploaded"
+        }) {
+      assertThat(templates.findByTemplateKeyAndLocale(key, "en"))
+          .hasValueSatisfying(
+              t -> {
+                assertThat(t.getBodyPlain()).contains("{{recipientName}}", "{{actionUrl}}");
+                assertThat(t.getSubject()).contains("{{documentTitle}}");
+                assertThat(t.getBodyHtml()).isNull();
+              });
+    }
   }
 
   @Test

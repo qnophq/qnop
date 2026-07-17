@@ -100,7 +100,8 @@ class DocumentIngestServiceTest {
         access,
         annotations,
         placements,
-        transactionManager);
+        transactionManager,
+        org.mockito.Mockito.mock(org.springframework.context.ApplicationEventPublisher.class));
   }
 
   // --- request validation (rejected before any storage or settings work) -----
@@ -214,7 +215,8 @@ class DocumentIngestServiceTest {
     @DisplayName("a declared size over the operator limit is 413 before the stream is opened")
     void declaredSizeOverLimitRejected() {
       service = newService();
-      when(settings.getInteger(ApplicationSettingKey.UPLOAD_MAX_FILE_SIZE_MB)).thenReturn(1);
+      when(settings.getInteger(ApplicationSettingKey.UPLOAD_DOCUMENT_MAX_FILE_SIZE_MB))
+          .thenReturn(1);
       UploadSource huge = upload(PDF_BYTES, 2L * 1024 * 1024);
 
       assertRejected(
@@ -226,7 +228,8 @@ class DocumentIngestServiceTest {
     @DisplayName("content without the %PDF- magic bytes is 415, never staged")
     void nonPdfMagicRejected() {
       service = newService();
-      when(settings.getInteger(ApplicationSettingKey.UPLOAD_MAX_FILE_SIZE_MB)).thenReturn(10);
+      when(settings.getInteger(ApplicationSettingKey.UPLOAD_DOCUMENT_MAX_FILE_SIZE_MB))
+          .thenReturn(10);
       UploadSource notPdf = upload("<html> not a pdf".getBytes(StandardCharsets.UTF_8), 16);
 
       assertRejected(
@@ -238,7 +241,8 @@ class DocumentIngestServiceTest {
     @DisplayName("an empty upload is 400")
     void emptyUploadRejected() {
       service = newService();
-      when(settings.getInteger(ApplicationSettingKey.UPLOAD_MAX_FILE_SIZE_MB)).thenReturn(10);
+      when(settings.getInteger(ApplicationSettingKey.UPLOAD_DOCUMENT_MAX_FILE_SIZE_MB))
+          .thenReturn(10);
 
       assertRejected(
           () ->
@@ -251,7 +255,8 @@ class DocumentIngestServiceTest {
     @DisplayName("an unreadable upload stream is 400")
     void unreadableUploadRejected() {
       service = newService();
-      when(settings.getInteger(ApplicationSettingKey.UPLOAD_MAX_FILE_SIZE_MB)).thenReturn(10);
+      when(settings.getInteger(ApplicationSettingKey.UPLOAD_DOCUMENT_MAX_FILE_SIZE_MB))
+          .thenReturn(10);
       UploadSource broken =
           new UploadSource() {
             @Override
@@ -276,7 +281,8 @@ class DocumentIngestServiceTest {
   @DisplayName("a valid upload stages, saves version 1, enqueues extraction, then commits storage")
   void createDocumentHappyPath() {
     service = newService();
-    when(settings.getInteger(ApplicationSettingKey.UPLOAD_MAX_FILE_SIZE_MB)).thenReturn(10);
+    when(settings.getInteger(ApplicationSettingKey.UPLOAD_DOCUMENT_MAX_FILE_SIZE_MB))
+        .thenReturn(10);
     StagedObject staged = new StagedObject("sha256/ab/" + "c".repeat(64), "hash", 123L);
     when(storage.stage(any(), eq(PDF_CONTENT_TYPE), anyLong())).thenReturn(staged);
     when(documents.save(any(Document.class)))
@@ -311,7 +317,8 @@ class DocumentIngestServiceTest {
   @DisplayName("a storage quota failure maps to 413 and never commits or enqueues")
   void createDocumentStageQuotaExceeded() {
     service = newService();
-    when(settings.getInteger(ApplicationSettingKey.UPLOAD_MAX_FILE_SIZE_MB)).thenReturn(10);
+    when(settings.getInteger(ApplicationSettingKey.UPLOAD_DOCUMENT_MAX_FILE_SIZE_MB))
+        .thenReturn(10);
     when(storage.stage(any(), eq(PDF_CONTENT_TYPE), anyLong()))
         .thenThrow(new StorageQuotaExceededException(5L * 1024 * 1024));
 
@@ -326,7 +333,8 @@ class DocumentIngestServiceTest {
   @DisplayName("a slug race lost to the unique index maps the constraint hit to 409 SLUG_TAKEN")
   void createDocumentSlugRaceMappedTo409() {
     service = newService();
-    when(settings.getInteger(ApplicationSettingKey.UPLOAD_MAX_FILE_SIZE_MB)).thenReturn(10);
+    when(settings.getInteger(ApplicationSettingKey.UPLOAD_DOCUMENT_MAX_FILE_SIZE_MB))
+        .thenReturn(10);
     when(documents.existsBySlugIgnoreCase("my-slug")).thenReturn(false);
     when(storage.stage(any(), eq(PDF_CONTENT_TYPE), anyLong()))
         .thenReturn(new StagedObject("sha256/ab/" + "c".repeat(64), "hash", 10L));
@@ -357,7 +365,8 @@ class DocumentIngestServiceTest {
     void ownerAppendsNextVersion() {
       service = newService();
       when(documents.findById(DOC)).thenReturn(Optional.of(new Document(OWNER, "Contract")));
-      when(settings.getInteger(ApplicationSettingKey.UPLOAD_MAX_FILE_SIZE_MB)).thenReturn(10);
+      when(settings.getInteger(ApplicationSettingKey.UPLOAD_DOCUMENT_MAX_FILE_SIZE_MB))
+          .thenReturn(10);
       StagedObject staged = new StagedObject("sha256/ab/" + "c".repeat(64), "hash", 55L);
       when(storage.stage(any(), eq(PDF_CONTENT_TYPE), anyLong())).thenReturn(staged);
       when(versions.findTopByDocumentIdOrderByVersionNumberDesc(DOC))

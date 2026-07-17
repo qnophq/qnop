@@ -35,7 +35,9 @@ import { useFormatters } from '../../../hooks/useFormatters';
 import { DueDateLabel } from '../DueDateLabel';
 import { WorkflowBadge } from '../WorkflowBadge';
 import { AnonymousBadge } from '../AnonymousBadge';
-import { DocumentIcon, ProgressBar, ReviewerStack, RoleBadge } from './ReviewListParts';
+import { ToneBadge } from '../../admin/ToneBadge';
+import { readyToFinalize } from '../../dashboard/dashboardModel';
+import { DocumentIcon, OwnerChip, ProgressBar, ReviewerStack, RoleBadge } from './ReviewListParts';
 import { progressOf, roleOf } from './reviewListModel';
 
 interface ReviewsTableProps {
@@ -54,23 +56,31 @@ export function ReviewsTable({ reviews, userId, onOpen }: ReviewsTableProps) {
         <Table size="small" sx={{ minWidth: 720 }}>
           <TableHead>
             <TableRow sx={{ bgcolor: theme.qnop.surface2 }}>
-              {['Document', 'Role', 'Status', 'Progress', 'Reviewers', 'Due', 'Updated', ''].map(
-                (header) => (
-                  <TableCell
-                    key={header}
-                    sx={{
-                      fontSize: 10.5,
-                      fontWeight: 500,
-                      textTransform: 'uppercase',
-                      letterSpacing: '0.06em',
-                      color: 'text.secondary',
-                      whiteSpace: 'nowrap',
-                    }}
-                  >
-                    {header}
-                  </TableCell>
-                ),
-              )}
+              {[
+                'Document',
+                'Role',
+                'Owner',
+                'Status',
+                'Progress',
+                'Reviewers',
+                'Due',
+                'Updated',
+                '',
+              ].map((header) => (
+                <TableCell
+                  key={header}
+                  sx={{
+                    fontSize: 10.5,
+                    fontWeight: 500,
+                    textTransform: 'uppercase',
+                    letterSpacing: '0.06em',
+                    color: 'text.secondary',
+                    whiteSpace: 'nowrap',
+                  }}
+                >
+                  {header}
+                </TableCell>
+              ))}
             </TableRow>
           </TableHead>
           <TableBody>
@@ -101,9 +111,24 @@ export function ReviewsTable({ reviews, userId, onOpen }: ReviewsTableProps) {
                     <RoleBadge role={roleOf(review, userId)} />
                   </TableCell>
                   <TableCell>
-                    <Stack direction="row" spacing={0.75} sx={{ alignItems: 'center' }}>
+                    <OwnerChip
+                      ownerId={review.ownerId}
+                      slug={review.ownerSlug}
+                      name={review.ownerDisplayName}
+                    />
+                  </TableCell>
+                  <TableCell>
+                    <Stack
+                      direction="row"
+                      spacing={0.75}
+                      useFlexGap
+                      sx={{ alignItems: 'center', flexWrap: 'wrap' }}
+                    >
                       <WorkflowBadge state={review.workflowState} />
                       {review.anonymous && <AnonymousBadge compact />}
+                      {roleOf(review, userId) === 'owner' && readyToFinalize(review) && (
+                        <ToneBadge tone="green" label="Ready to finalize" />
+                      )}
                     </Stack>
                   </TableCell>
                   <TableCell sx={{ minWidth: 120 }}>
@@ -111,7 +136,12 @@ export function ReviewsTable({ reviews, userId, onOpen }: ReviewsTableProps) {
                       <ProgressBar
                         resolved={progress.resolved}
                         total={progress.total}
-                        color={theme.qnop.brand.blue}
+                        // Fully settled reads as a win, not just a full bar.
+                        color={
+                          progress.resolved === progress.total
+                            ? theme.palette.success.main
+                            : theme.qnop.brand.blue
+                        }
                       />
                     ) : (
                       <Typography variant="caption" color="text.secondary">
@@ -120,7 +150,10 @@ export function ReviewsTable({ reviews, userId, onOpen }: ReviewsTableProps) {
                     )}
                   </TableCell>
                   <TableCell>
-                    <ReviewerStack participants={review.participants} />
+                    <ReviewerStack
+                      participants={review.participants}
+                      anonymous={review.anonymous}
+                    />
                   </TableCell>
                   <TableCell sx={{ whiteSpace: 'nowrap' }}>
                     {review.dueAt ? (

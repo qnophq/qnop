@@ -33,8 +33,11 @@ import io.qnop.api.v1.model.AnnotationView;
 import io.qnop.api.v1.model.CommentCreateRequest;
 import io.qnop.api.v1.model.CommentListResponse;
 import io.qnop.api.v1.model.CommentView;
+import io.qnop.api.v1.model.PlacementReattachRequest;
 import io.qnop.api.v1.model.PlacementStatus;
+import io.qnop.api.v1.model.ReactionGroup;
 import io.qnop.service.review.AnnotationService;
+import io.qnop.service.review.ReactionService;
 import java.time.ZoneOffset;
 import java.util.UUID;
 import org.springframework.http.HttpStatus;
@@ -53,6 +56,7 @@ import tools.jackson.databind.ObjectMapper;
 public class AnnotationController implements AnnotationsApi {
 
   private final AnnotationService annotations;
+  private final ReactionService reactions;
 
   /**
    * The framework-configured Jackson 3 mapper (issue #329): reusing Boot's MVC {@link ObjectMapper}
@@ -62,8 +66,10 @@ public class AnnotationController implements AnnotationsApi {
    */
   private final ObjectMapper mapper;
 
-  public AnnotationController(AnnotationService annotations, ObjectMapper mapper) {
+  public AnnotationController(
+      AnnotationService annotations, ReactionService reactions, ObjectMapper mapper) {
     this.annotations = annotations;
+    this.reactions = reactions;
     this.mapper = mapper;
   }
 
@@ -133,6 +139,27 @@ public class AnnotationController implements AnnotationsApi {
   }
 
   @Override
+  public ResponseEntity<AnnotationView> reattachPlacement(
+      UUID annotationId, Integer versionNumber, PlacementReattachRequest request) {
+    return ResponseEntity.ok(
+        toDto(
+            annotations.reattachPlacement(
+                annotationId,
+                versionNumber,
+                request.getAnchor() == null ? null : mapper.writeValueAsString(request.getAnchor()),
+                CurrentUser.requireUserId(),
+                CurrentUser.isAdmin())));
+  }
+
+  @Override
+  public ResponseEntity<AnnotationView> confirmPlacement(UUID annotationId, Integer versionNumber) {
+    return ResponseEntity.ok(
+        toDto(
+            annotations.confirmPlacement(
+                annotationId, versionNumber, CurrentUser.requireUserId(), CurrentUser.isAdmin())));
+  }
+
+  @Override
   public ResponseEntity<CommentView> addComment(UUID annotationId, CommentCreateRequest request) {
     AnnotationService.CommentView view =
         annotations.addComment(
@@ -148,11 +175,52 @@ public class AnnotationController implements AnnotationsApi {
         new CommentListResponse().comments(views.stream().map(this::toDto).toList()));
   }
 
+  @Override
+  public ResponseEntity<Void> reactToAnnotation(UUID annotationId, String emoji) {
+    reactions.reactToAnnotation(
+        annotationId, emoji, CurrentUser.requireUserId(), CurrentUser.isAdmin());
+    return ResponseEntity.noContent().build();
+  }
+
+  @Override
+  public ResponseEntity<Void> unreactFromAnnotation(UUID annotationId, String emoji) {
+    reactions.unreactFromAnnotation(
+        annotationId, emoji, CurrentUser.requireUserId(), CurrentUser.isAdmin());
+    return ResponseEntity.noContent().build();
+  }
+
+  @Override
+  public ResponseEntity<Void> reactToComment(UUID commentId, String emoji) {
+    reactions.reactToComment(commentId, emoji, CurrentUser.requireUserId(), CurrentUser.isAdmin());
+    return ResponseEntity.noContent().build();
+  }
+
+  @Override
+  public ResponseEntity<Void> unreactFromComment(UUID commentId, String emoji) {
+    reactions.unreactFromComment(
+        commentId, emoji, CurrentUser.requireUserId(), CurrentUser.isAdmin());
+    return ResponseEntity.noContent().build();
+  }
+
+  private static java.util.List<ReactionGroup> toReactionDtos(
+      java.util.List<ReactionService.ReactionGroup> groups) {
+    return groups.stream()
+        .map(
+            group ->
+                new ReactionGroup()
+                    .emoji(group.emoji())
+                    .count(group.count())
+                    .reactedByMe(group.reactedByMe())
+                    .reactors(group.reactors()))
+        .toList();
+  }
+
   private AnnotationView toDto(AnnotationService.AnnotationView view) {
     return new AnnotationView()
         .id(view.id())
         .documentId(view.documentId())
         .authorId(view.authorId())
+        .authorSlug(view.authorSlug())
         .authorDisplayName(view.authorDisplayName())
         .status(AnnotationStatus.fromValue(view.status()))
         .type(view.type() == null ? null : AnnotationType.fromValue(view.type()))
@@ -165,6 +233,7 @@ public class AnnotationController implements AnnotationsApi {
                 : PlacementStatus.fromValue(view.placementStatus()))
         .firstComment(view.firstComment())
         .commentCount(view.commentCount())
+        .reactions(toReactionDtos(view.reactions()))
         .latestCommentFromOthersAt(
             view.latestCommentFromOthersAt() == null
                 ? null
@@ -178,8 +247,10 @@ public class AnnotationController implements AnnotationsApi {
         .id(view.id())
         .annotationId(view.annotationId())
         .authorId(view.authorId())
+        .authorSlug(view.authorSlug())
         .authorDisplayName(view.authorDisplayName())
         .body(view.body())
+        .reactions(toReactionDtos(view.reactions()))
         .createdAt(view.createdAt().atOffset(ZoneOffset.UTC));
   }
 }

@@ -1,4 +1,4 @@
-# ADR-0039: Date/time localization — store UTC, transport ISO-with-offset, render in the user's zone
+# ADR-0041: Date/time localization — store UTC, transport ISO-with-offset, render in the user's zone
 
 - **Status:** Accepted
 - **Date:** 2026-07-17

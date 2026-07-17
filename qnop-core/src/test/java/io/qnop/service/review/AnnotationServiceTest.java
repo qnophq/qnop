@@ -67,6 +67,7 @@ class AnnotationServiceTest {
   private final DocumentAccessService documentAccess = mock(DocumentAccessService.class);
   private final ReviewWorkflowService workflow = mock(ReviewWorkflowService.class);
   private final ReviewIdentityResolver identity = mock(ReviewIdentityResolver.class);
+  private final ReactionService reactions = mock(ReactionService.class);
 
   private final AnnotationService service =
       new AnnotationService(
@@ -77,7 +78,9 @@ class AnnotationServiceTest {
           auditEvents,
           documentAccess,
           workflow,
-          identity);
+          identity,
+          reactions,
+          mock(org.springframework.context.ApplicationEventPublisher.class));
 
   private final UUID documentId = UUID.randomUUID();
   private final UUID author = UUID.randomUUID();
@@ -93,6 +96,8 @@ class AnnotationServiceTest {
         false,
         threadParticipation,
         ownerId,
+        null,
+        null,
         "IN_REVIEW",
         1,
         null,

@@ -21,8 +21,11 @@
 package io.qnop.repository;
 
 import io.qnop.entity.AuditEvent;
+import java.time.Instant;
+import java.util.Collection;
 import java.util.List;
 import java.util.UUID;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 
 /** Data access for the append-only per-document audit trail (issue #244, ADR-0011). */
@@ -30,4 +33,12 @@ public interface AuditEventRepository extends JpaRepository<AuditEvent, UUID> {
 
   /** A document's audit trail, most recent first. */
   List<AuditEvent> findByDocumentIdOrderByCreatedAtDesc(UUID documentId);
+
+  /** The newest events of the given types across a set of documents (issue #454). */
+  List<AuditEvent> findByDocumentIdInAndEventTypeInOrderByCreatedAtDesc(
+      Collection<UUID> documentIds, Collection<String> eventTypes, Pageable pageable);
+
+  /** How many events of one type landed after {@code since} (issue #454's weekly stat). */
+  long countByDocumentIdInAndEventTypeAndCreatedAtAfter(
+      Collection<UUID> documentIds, String eventType, Instant since);
 }

@@ -43,15 +43,34 @@ export function AppShell() {
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('md'));
   // The document review workspace (#250), the version comparison (#252) and
-  // the tasks board (#393) span the full width; every other surface keeps the
-  // centred reading container. /reviews/new also matches the dynamic segment
-  // but is a regular centred page (the wizard, #251).
+  // the tasks board (#393) manage their own scrolling and tight padding.
+  // /reviews/new also matches the dynamic segment but is a regular page (the
+  // wizard, #251).
   const reviewMatch = useMatch('/reviews/:documentId');
   const compareMatch = useMatch('/reviews/:documentId/compare');
   const tasksMatch = useMatch('/reviews/:documentId/tasks');
   const fullBleed = Boolean(
     (reviewMatch && reviewMatch.params.documentId !== 'new') || compareMatch || tasksMatch,
   );
+  // The work surfaces share one width language (issue #454 follow-up): the
+  // dashboard, the reviews overview, the admin surfaces and the profile span
+  // the full width like the review workspace (issues #316/#469 polish).
+  const dashboardMatch = useMatch('/');
+  const reviewsListMatch = useMatch('/reviews');
+  const adminMatch = useMatch('/admin/*');
+  const profileMatch = useMatch('/profile');
+  const userProfileMatch = useMatch('/users/:userId');
+  // The new-review wizard (#469 polish) spans the full width too — it lays out
+  // as form + launch-checklist rail.
+  const wizardMatch = Boolean(reviewMatch && reviewMatch.params.documentId === 'new');
+  const wide =
+    fullBleed ||
+    Boolean(dashboardMatch) ||
+    Boolean(reviewsListMatch) ||
+    Boolean(adminMatch) ||
+    Boolean(profileMatch) ||
+    Boolean(userProfileMatch) ||
+    wizardMatch;
   const [collapsed, setCollapsed] = useState<boolean>(() => {
     try {
       return localStorage.getItem(COLLAPSE_KEY) === '1';
@@ -129,7 +148,7 @@ export function AppShell() {
           }}
         >
           <Container
-            maxWidth={fullBleed ? false : 'lg'}
+            maxWidth={wide ? false : 'lg'}
             sx={{
               py: fullBleed ? 2 : { xs: 3, md: 4 },
               height: fullBleed ? { md: '100%' } : undefined,
