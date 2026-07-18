@@ -52,7 +52,7 @@ import { PageHeader } from '../../components/admin/layout/PageHeader';
 import { AdminToast } from '../../components/admin/layout/AdminToast';
 import { useToast } from '../../components/admin/layout/useToast';
 import { UserAvatar } from '../../components/shell/UserAvatar';
-import { formatDateTime } from '../../utils/formatDate';
+import { useFormatters } from '../../hooks/useFormatters';
 import { apiErrorMessage } from '../../utils/apiError';
 
 /**
@@ -66,6 +66,7 @@ export function MyTeamDetailPage() {
   const { data: team, isLoading, isError } = useMyTeam(id);
   const setRole = useSetMyTeamMemberRole();
   const removeMember = useRemoveMyTeamMember();
+  const { formatDateTime } = useFormatters();
   const { toast, notify, clear } = useToast();
 
   const [addOpen, setAddOpen] = useState(false);
