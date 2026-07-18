@@ -85,6 +85,8 @@ vi.mock('../../components/admin/teams/TeamFormDialog', () => ({
 const LEAD: AdminTeamMember = {
   userId: 'u1',
   displayName: 'Ada Lovelace',
+  slug: 'ada-lovelace',
+  avatarUrl: undefined,
   email: 'ada@example.com',
   teamRole: 'LEAD',
   joinedAt: '2026-01-01T10:00:00Z',
@@ -93,6 +95,8 @@ const LEAD: AdminTeamMember = {
 const MEMBER: AdminTeamMember = {
   userId: 'u2',
   displayName: 'Alan Turing',
+  slug: 'alan-turing',
+  avatarUrl: undefined,
   email: 'alan@example.com',
   teamRole: 'MEMBER',
   joinedAt: '2026-02-01T10:00:00Z',
@@ -158,10 +162,13 @@ describe('TeamDetailPage', () => {
 
     expect(screen.getByRole('heading', { name: 'Platform' })).toBeTruthy();
     expect(screen.getByText('Owns the ingest pipeline.')).toBeTruthy();
-    expect(screen.getByText('Ada Lovelace')).toBeTruthy();
-    expect(screen.getByText('ada@example.com')).toBeTruthy();
-    expect(screen.getByText('Alan Turing')).toBeTruthy();
-    expect(screen.getByText('alan@example.com')).toBeTruthy();
+    // Members render as profile links (avatar + name → the profile page).
+    expect(
+      screen.getByRole('link', { name: "View Ada Lovelace's profile" }).getAttribute('href'),
+    ).toBe('/users/ada-lovelace');
+    expect(
+      screen.getByRole('link', { name: "View Alan Turing's profile" }).getAttribute('href'),
+    ).toBe('/users/alan-turing');
   });
 
   it('renders the empty-state row when the team has no members', () => {

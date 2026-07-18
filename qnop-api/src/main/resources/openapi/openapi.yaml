@@ -4130,6 +4130,14 @@ components:
           format: uuid
         displayName:
           type: string
+        slug:
+          type: string
+          nullable: true
+          description: The member's profile slug (issue #486) for the profile link; null for pre-slug accounts.
+        avatarUrl:
+          type: string
+          nullable: true
+          description: The member's avatar URL (with a cache-busting `?v=`), or null when none is set.
         email:
           type: string
         teamRole:

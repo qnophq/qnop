@@ -21,7 +21,6 @@
 
 import { useState, type MouseEvent } from 'react';
 import Alert from '@mui/material/Alert';
-import Box from '@mui/material/Box';
 import Button from '@mui/material/Button';
 import IconButton from '@mui/material/IconButton';
 import Link from '@mui/material/Link';
@@ -46,7 +45,7 @@ import { TeamFormDialog } from '../../components/admin/teams/TeamFormDialog';
 import { TeamRoleBadge } from '../../components/admin/teams/TeamRoleBadge';
 import { ConfirmDialog } from '../../components/admin/ConfirmDialog';
 import { PageHeader } from '../../components/admin/layout/PageHeader';
-import { UserAvatar } from '../../components/shell/UserAvatar';
+import { PersonLink } from '../../components/dashboard/PersonLink';
 import { UserStatusBadge } from '../../components/admin/users/UserBadges';
 import { useFormatters } from '../../hooks/useFormatters';
 
@@ -141,17 +140,13 @@ export function TeamDetailPage() {
             {members.map((member) => (
               <TableRow key={member.userId} hover>
                 <TableCell>
-                  <Stack direction="row" spacing={1.5} sx={{ alignItems: 'center' }}>
-                    <UserAvatar name={member.displayName} size={36} />
-                    <Box sx={{ minWidth: 0 }}>
-                      <Typography sx={{ fontWeight: 600, lineHeight: 1.3 }} noWrap>
-                        {member.displayName}
-                      </Typography>
-                      <Typography sx={{ fontSize: 13, color: 'text.secondary' }} noWrap>
-                        {member.email}
-                      </Typography>
-                    </Box>
-                  </Stack>
+                  <PersonLink
+                    userId={member.userId}
+                    slug={member.slug}
+                    name={member.displayName}
+                    avatarUrl={member.avatarUrl}
+                    size={36}
+                  />
                 </TableCell>
                 <TableCell>
                   <TeamRoleBadge role={member.teamRole} />

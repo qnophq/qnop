@@ -39,9 +39,11 @@ import io.qnop.service.TeamService.TeamMemberView;
 import io.qnop.service.TeamService.TeamPage;
 import io.qnop.service.TeamService.TeamSummaryView;
 import io.qnop.service.UserNotFoundException;
+import io.qnop.service.avatar.AvatarService;
 import java.time.Instant;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
+import java.util.Map;
 import java.util.UUID;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -59,9 +61,11 @@ import org.springframework.web.bind.annotation.RestController;
 public class TeamController implements AdminTeamsApi {
 
   private final TeamService teams;
+  private final AvatarService avatars;
 
-  public TeamController(TeamService teams) {
+  public TeamController(TeamService teams, AvatarService avatars) {
     this.teams = teams;
+    this.avatars = avatars;
   }
 
   @Override
@@ -156,7 +160,11 @@ public class TeamController implements AdminTeamsApi {
         .updatedAt(toOffset(v.updatedAt()));
   }
 
-  private static AdminTeamDetail toDetail(TeamDetailView v) {
+  private AdminTeamDetail toDetail(TeamDetailView v) {
+    // One batched avatar-timestamp lookup for the whole roster (same pattern as
+    // the admin user list), so building URLs never streams image bytes per row.
+    Map<UUID, Instant> avatarTimestamps =
+        avatars.updatedAt(v.members().stream().map(TeamMemberView::userId).toList());
     return new AdminTeamDetail()
         .id(v.id())
         .name(v.name())
@@ -164,13 +172,20 @@ public class TeamController implements AdminTeamsApi {
         .enabled(v.enabled())
         .createdAt(toOffset(v.createdAt()))
         .updatedAt(toOffset(v.updatedAt()))
-        .members(v.members().stream().map(TeamController::toMember).toList());
+        .members(
+            v.members().stream().map(m -> toMember(m, avatarTimestamps.get(m.userId()))).toList());
   }
 
-  private static AdminTeamMember toMember(TeamMemberView v) {
+  private AdminTeamMember toMember(TeamMemberView v) {
+    return toMember(v, avatars.updatedAt(v.userId()).orElse(null));
+  }
+
+  private static AdminTeamMember toMember(TeamMemberView v, Instant avatarUpdatedAt) {
     return new AdminTeamMember()
         .userId(v.userId())
         .displayName(v.displayName())
+        .slug(v.slug())
+        .avatarUrl(AvatarUrls.forUser(v.userId(), avatarUpdatedAt))
         .email(v.email())
         .teamRole(TeamRole.fromValue(v.teamRole()))
         .joinedAt(toOffset(v.joinedAt()));
