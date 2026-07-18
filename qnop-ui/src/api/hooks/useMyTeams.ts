@@ -20,14 +20,16 @@
  */
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import type { AdminTeamDetail, MyTeamListResponse, TeamRole } from '../generated';
+import type { MyTeamListResponse, TeamDetail, TeamRole } from '../generated';
 import { teamsApi } from '../config';
 
 /**
- * Non-admin team-lead hooks (issue #470) — the "My Teams" self-management surface.
- * These mirror {@link useTeams} but call the `/teams/**` client (a LEAD of the
- * team, or an ADMIN) rather than the admin `/admin/teams/**` client, and live under
- * a separate query-key namespace so the two caches never collide.
+ * Non-admin "My Teams" hooks (issue #470). Every authenticated user reaches the
+ * surface: {@link useMyTeams} lists the teams they belong to, {@link useMyTeam}
+ * views one team's roster (read-only for a plain member, manageable for a LEAD —
+ * the detail's `viewerCanManage` flag says which). The mutations are LEAD-or-admin
+ * only, enforced server-side. Calls the `/teams/**` client, under a query-key
+ * namespace separate from the admin `/admin/teams/**` hooks.
  */
 export const myTeamKeys = {
   all: ['my', 'teams'] as const,
@@ -46,9 +48,9 @@ export function useMyTeams() {
   });
 }
 
-/** A single team the caller leads (or any team for an admin), with its members. */
+/** One team's roster, with the caller's role and whether they may manage it. */
 export function useMyTeam(id: string) {
-  return useQuery<AdminTeamDetail>({
+  return useQuery<TeamDetail>({
     queryKey: myTeamKeys.detail(id),
     queryFn: async () => {
       const response = await teamsApi.getMyTeam({ teamId: id });

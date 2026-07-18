@@ -41,7 +41,6 @@ export default defineConfig({
         'src/components/auth/ProtectedRoute.tsx',
         'src/components/auth/AdminRoute.tsx',
         'src/components/auth/RoleRoute.tsx',
-        'src/components/auth/TeamLeadRoute.tsx',
         'src/components/auth/AuthHydrationBoundary.tsx',
         'src/components/shell/navConfig.tsx',
         // Auth screens — the critical entry flow (issue #352, wave 1).

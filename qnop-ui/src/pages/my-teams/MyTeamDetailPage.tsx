@@ -21,7 +21,6 @@
 
 import { useState, type MouseEvent } from 'react';
 import Alert from '@mui/material/Alert';
-import Box from '@mui/material/Box';
 import Button from '@mui/material/Button';
 import IconButton from '@mui/material/IconButton';
 import Link from '@mui/material/Link';
@@ -39,7 +38,7 @@ import TableRow from '@mui/material/TableRow';
 import Typography from '@mui/material/Typography';
 import { ArrowLeftRight, MoreVertical, UserMinus, UserPlus } from 'lucide-react';
 import { Link as RouterLink, useParams } from 'react-router-dom';
-import type { AdminTeamMember } from '../../api/generated';
+import type { TeamMember, TeamRole } from '../../api/generated';
 import {
   useMyTeam,
   useRemoveMyTeamMember,
@@ -51,18 +50,19 @@ import { ConfirmDialog } from '../../components/admin/ConfirmDialog';
 import { PageHeader } from '../../components/admin/layout/PageHeader';
 import { AdminToast } from '../../components/admin/layout/AdminToast';
 import { useToast } from '../../components/admin/layout/useToast';
-import { UserAvatar } from '../../components/shell/UserAvatar';
+import { PersonLink } from '../../components/dashboard/PersonLink';
 import { useFormatters } from '../../hooks/useFormatters';
 import { useAuthStore } from '../../stores/authStore';
 import { apiErrorMessage } from '../../utils/apiError';
 
 /**
- * A lead's team detail (issue #470): add members, promote/demote leads and remove
- * members for a team the caller leads. The last-lead guardrail is enforced on the
- * server; a rejected demotion/removal surfaces as an error toast. A lead is never
- * offered "Remove from team" on their own row — leaving a team is an admin action
- * (the server rejects self-removal too). Renaming or deleting the team is not
- * offered here — that stays in the admin console.
+ * One team's roster on the "My Teams" surface (issue #470). Every member of the
+ * team can open it; the response's `viewerCanManage` flag decides the mode: a LEAD
+ * (or an admin) gets member management — add, promote/demote, remove — while a
+ * plain member gets a read-only roster. Members render as {@link PersonLink}
+ * everywhere (avatar, profile hover-card, click-through to the profile), like the
+ * rest of the app. A lead is never offered "Remove from team" on their own row;
+ * the server rejects self-removal too. The last-lead guardrail surfaces as a toast.
  */
 export function MyTeamDetailPage() {
   const { id = '' } = useParams();
@@ -76,13 +76,13 @@ export function MyTeamDetailPage() {
   const [addOpen, setAddOpen] = useState(false);
   const [addSeq, setAddSeq] = useState(0);
   const [anchorEl, setAnchorEl] = useState<HTMLElement | null>(null);
-  const [active, setActive] = useState<AdminTeamMember | null>(null);
-  const [removeTarget, setRemoveTarget] = useState<AdminTeamMember | null>(null);
+  const [active, setActive] = useState<TeamMember | null>(null);
+  const [removeTarget, setRemoveTarget] = useState<TeamMember | null>(null);
 
   if (isError) {
     return (
       <Alert severity="error">
-        This team could not be loaded, or you no longer lead it.{' '}
+        This team could not be loaded, or you are not a member of it.{' '}
         <Link component={RouterLink} to="/my-teams" underline="hover">
           Back to my teams
         </Link>
@@ -93,7 +93,10 @@ export function MyTeamDetailPage() {
     return <Typography color="text.secondary">Loading…</Typography>;
   }
 
-  const openMenu = (event: MouseEvent<HTMLElement>, member: AdminTeamMember) => {
+  const canManage = team.viewerCanManage;
+  const members = team.members ?? [];
+
+  const openMenu = (event: MouseEvent<HTMLElement>, member: TeamMember) => {
     setAnchorEl(event.currentTarget);
     setActive(member);
   };
@@ -102,27 +105,26 @@ export function MyTeamDetailPage() {
     setAddSeq((n) => n + 1);
   };
 
-  const toggleRole = (member: AdminTeamMember) => {
-    const next = member.teamRole === 'LEAD' ? 'MEMBER' : 'LEAD';
+  const toggleRole = (member: TeamMember) => {
+    const next: TeamRole = member.teamRole === 'LEAD' ? 'MEMBER' : 'LEAD';
     setRole.mutate(
       { teamId: id, userId: member.userId, teamRole: next },
-      {
-        onError: (error) => notify(apiErrorMessage(error, 'Could not change the role.'), 'error'),
-      },
+      { onError: (error) => notify(apiErrorMessage(error, 'Could not change the role.'), 'error') },
     );
   };
-
-  const members = team.members ?? [];
 
   return (
     <Stack spacing={3}>
       <PageHeader
         title={team.name}
+        titleAdornment={team.viewerRole ? <TeamRoleBadge role={team.viewerRole} /> : undefined}
         description={team.description || undefined}
         action={
-          <Button variant="contained" startIcon={<UserPlus size={18} />} onClick={openAdd}>
-            Add member
-          </Button>
+          canManage ? (
+            <Button variant="contained" startIcon={<UserPlus size={18} />} onClick={openAdd}>
+              Add member
+            </Button>
+          ) : undefined
         }
       />
 
@@ -133,15 +135,15 @@ export function MyTeamDetailPage() {
               <TableCell>Member</TableCell>
               <TableCell>Role</TableCell>
               <TableCell>Joined</TableCell>
-              <TableCell align="right">Actions</TableCell>
+              {canManage && <TableCell align="right">Actions</TableCell>}
             </TableRow>
           </TableHead>
           <TableBody>
             {members.length === 0 && (
               <TableRow>
-                <TableCell colSpan={4}>
+                <TableCell colSpan={canManage ? 4 : 3}>
                   <Typography color="text.secondary" sx={{ py: 4, textAlign: 'center' }}>
-                    No members yet. Add the first one.
+                    {canManage ? 'No members yet. Add the first one.' : 'This team has no members.'}
                   </Typography>
                 </TableCell>
               </TableRow>
@@ -149,17 +151,13 @@ export function MyTeamDetailPage() {
             {members.map((member) => (
               <TableRow key={member.userId} hover>
                 <TableCell>
-                  <Stack direction="row" spacing={1.5} sx={{ alignItems: 'center' }}>
-                    <UserAvatar name={member.displayName} size={36} />
-                    <Box sx={{ minWidth: 0 }}>
-                      <Typography sx={{ fontWeight: 600, lineHeight: 1.3 }} noWrap>
-                        {member.displayName}
-                      </Typography>
-                      <Typography sx={{ fontSize: 13, color: 'text.secondary' }} noWrap>
-                        {member.email}
-                      </Typography>
-                    </Box>
-                  </Stack>
+                  <PersonLink
+                    userId={member.userId}
+                    slug={member.slug}
+                    name={member.displayName}
+                    avatarUrl={member.avatarUrl}
+                    size={34}
+                  />
                 </TableCell>
                 <TableCell>
                   <TeamRoleBadge role={member.teamRole} />
@@ -169,78 +167,86 @@ export function MyTeamDetailPage() {
                     {formatDateTime(member.joinedAt)}
                   </Typography>
                 </TableCell>
-                <TableCell align="right">
-                  <IconButton
-                    size="small"
-                    aria-label={`Actions for ${member.displayName}`}
-                    onClick={(e) => openMenu(e, member)}
-                  >
-                    <MoreVertical size={18} />
-                  </IconButton>
-                </TableCell>
+                {canManage && (
+                  <TableCell align="right">
+                    <IconButton
+                      size="small"
+                      aria-label={`Actions for ${member.displayName}`}
+                      onClick={(e) => openMenu(e, member)}
+                    >
+                      <MoreVertical size={18} />
+                    </IconButton>
+                  </TableCell>
+                )}
               </TableRow>
             ))}
           </TableBody>
         </Table>
       </Paper>
 
-      <Menu anchorEl={anchorEl} open={Boolean(anchorEl)} onClose={() => setAnchorEl(null)}>
-        <MenuItem
-          onClick={() => {
-            setAnchorEl(null);
-            if (active) toggleRole(active);
-          }}
-        >
-          <ListItemIcon>
-            <ArrowLeftRight size={16} />
-          </ListItemIcon>
-          <ListItemText>{active?.teamRole === 'LEAD' ? 'Make member' : 'Make lead'}</ListItemText>
-        </MenuItem>
-        {active?.userId !== currentUserId && (
-          <MenuItem
-            onClick={() => {
-              setAnchorEl(null);
-              setRemoveTarget(active);
+      {canManage && (
+        <>
+          <Menu anchorEl={anchorEl} open={Boolean(anchorEl)} onClose={() => setAnchorEl(null)}>
+            <MenuItem
+              onClick={() => {
+                setAnchorEl(null);
+                if (active) toggleRole(active);
+              }}
+            >
+              <ListItemIcon>
+                <ArrowLeftRight size={16} />
+              </ListItemIcon>
+              <ListItemText>
+                {active?.teamRole === 'LEAD' ? 'Make member' : 'Make lead'}
+              </ListItemText>
+            </MenuItem>
+            {active?.userId !== currentUserId && (
+              <MenuItem
+                onClick={() => {
+                  setAnchorEl(null);
+                  setRemoveTarget(active);
+                }}
+              >
+                <ListItemIcon>
+                  <UserMinus size={16} />
+                </ListItemIcon>
+                <ListItemText>Remove from team</ListItemText>
+              </MenuItem>
+            )}
+          </Menu>
+
+          <AddMyTeamMemberDialog
+            key={`add-${addSeq}`}
+            open={addOpen}
+            teamId={id}
+            existingMemberIds={members.map((m) => m.userId)}
+            onClose={() => setAddOpen(false)}
+          />
+
+          <ConfirmDialog
+            open={removeTarget !== null}
+            title="Remove member"
+            message={`Remove ${removeTarget?.displayName} from this team?`}
+            confirmLabel="Remove"
+            destructive
+            onConfirm={() => {
+              if (removeTarget) {
+                removeMember.mutate(
+                  { teamId: id, userId: removeTarget.userId },
+                  {
+                    onError: (error) =>
+                      notify(apiErrorMessage(error, 'Could not remove the member.'), 'error'),
+                  },
+                );
+              }
+              setRemoveTarget(null);
             }}
-          >
-            <ListItemIcon>
-              <UserMinus size={16} />
-            </ListItemIcon>
-            <ListItemText>Remove from team</ListItemText>
-          </MenuItem>
-        )}
-      </Menu>
+            onClose={() => setRemoveTarget(null)}
+          />
 
-      <AddMyTeamMemberDialog
-        key={`add-${addSeq}`}
-        open={addOpen}
-        teamId={id}
-        existingMemberIds={members.map((m) => m.userId)}
-        onClose={() => setAddOpen(false)}
-      />
-
-      <ConfirmDialog
-        open={removeTarget !== null}
-        title="Remove member"
-        message={`Remove ${removeTarget?.displayName} from this team?`}
-        confirmLabel="Remove"
-        destructive
-        onConfirm={() => {
-          if (removeTarget) {
-            removeMember.mutate(
-              { teamId: id, userId: removeTarget.userId },
-              {
-                onError: (error) =>
-                  notify(apiErrorMessage(error, 'Could not remove the member.'), 'error'),
-              },
-            );
-          }
-          setRemoveTarget(null);
-        }}
-        onClose={() => setRemoveTarget(null)}
-      />
-
-      <AdminToast toast={toast} onClose={clear} />
+          <AdminToast toast={toast} onClose={clear} />
+        </>
+      )}
     </Stack>
   );
 }

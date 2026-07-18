@@ -23,7 +23,7 @@ import type { ReactNode } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { renderHook, waitFor } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import type { AdminTeamDetail, MyTeamListResponse } from '../generated';
+import type { MyTeamListResponse, TeamDetail } from '../generated';
 import {
   myTeamKeys,
   useAddMyTeamMember,
@@ -52,12 +52,11 @@ function wrapper({ children }: { children: ReactNode }) {
 const MINE: MyTeamListResponse = {
   items: [{ teamId: 't1', name: 'Core', teamRole: 'LEAD', memberCount: 4 }],
 };
-const TEAM: AdminTeamDetail = {
+const TEAM: TeamDetail = {
   id: 't1',
   name: 'Core',
-  enabled: true,
-  createdAt: '2026-01-01T00:00:00Z',
-  updatedAt: '2026-01-01T00:00:00Z',
+  viewerRole: 'LEAD',
+  viewerCanManage: true,
   members: [],
 };
 

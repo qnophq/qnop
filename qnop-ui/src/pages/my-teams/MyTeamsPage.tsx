@@ -28,7 +28,7 @@ import Stack from '@mui/material/Stack';
 import Tooltip from '@mui/material/Tooltip';
 import Typography from '@mui/material/Typography';
 import { keyframes } from '@mui/material/styles';
-import { ArrowRight, Crown, Lock, Trophy, UsersRound } from 'lucide-react';
+import { ArrowRight, Crown, Eye, Lock, Trophy, UsersRound } from 'lucide-react';
 import { Link as RouterLink } from 'react-router-dom';
 import type { MyTeam } from '../../api/generated';
 import { useMyTeams } from '../../api/hooks/useMyTeams';
@@ -57,11 +57,11 @@ function reveal(index: number) {
 }
 
 /**
- * The team-lead landing surface (issue #470), styled as a "Leadership HQ": a
- * banner with the caller's leadership rank, headline stats and achievements, then
- * the teams they lead as guild cards (crest, roster tier and progress), and the
- * teams they only belong to below. Purely derived motivation over the real team
- * data — no invented metrics. A LEAD reaches this without being a global admin.
+ * The "My Teams" surface (issue #470), open to every user. A "Leadership HQ"
+ * banner (rank, stats, achievements) crowns the teams the caller leads — shown as
+ * guild cards with a crest, roster tier and progress that open member management.
+ * Below, the teams they are only a member of open a read-only roster. Purely
+ * derived motivation over the real team data — no invented metrics.
  */
 export function MyTeamsPage() {
   const { data, isLoading, isError } = useMyTeams();
@@ -82,59 +82,64 @@ export function MyTeamsPage() {
     <Stack spacing={4}>
       <PageHeader
         title="My Teams"
-        description="Manage the teams you lead — add or remove members and hand over the lead role."
+        description="The teams you belong to — manage the ones you lead, and see the members of the rest."
       />
+
+      {data.items.length === 0 && (
+        <Paper variant="outlined" sx={{ p: 4, textAlign: 'center' }}>
+          <Typography color="text.secondary">You’re not in any team yet.</Typography>
+        </Paper>
+      )}
 
       {led.length > 0 && <LeadershipHero stats={stats} achievements={achievements} />}
 
-      <Box component="section">
-        <SectionLabel>{led.length === 1 ? 'Team you lead' : 'Teams you lead'}</SectionLabel>
-        {led.length === 0 ? (
-          <Paper variant="outlined" sx={{ p: 4, textAlign: 'center' }}>
-            <Typography color="text.secondary">You don’t lead any team yet.</Typography>
-          </Paper>
-        ) : (
-          <Box
-            sx={{
-              display: 'grid',
-              gridTemplateColumns: { xs: '1fr', sm: 'repeat(auto-fill, minmax(300px, 1fr))' },
-              gap: 2,
-            }}
-          >
-            {led.map((team, index) => (
-              <LedTeamCard key={team.teamId} team={team} index={index} />
-            ))}
-          </Box>
-        )}
-      </Box>
+      {led.length > 0 && (
+        <TeamSection
+          label={led.length === 1 ? 'Team you lead' : 'Teams you lead'}
+          teams={led}
+          canManage
+          startIndex={1}
+        />
+      )}
 
       {member.length > 0 && (
-        <Box component="section">
-          <SectionLabel>Also a member of</SectionLabel>
-          <Paper variant="outlined" sx={{ overflow: 'hidden' }}>
-            <Stack divider={<Box sx={{ borderTop: 1, borderColor: 'divider' }} />}>
-              {member.map((team) => (
-                <Stack
-                  key={team.teamId}
-                  direction="row"
-                  spacing={1.5}
-                  sx={{ alignItems: 'center', px: 2, py: 1.5 }}
-                >
-                  <TeamCrest name={team.name} size={30} />
-                  <Typography sx={{ flex: 1, fontWeight: 600, minWidth: 0 }} noWrap>
-                    {team.name}
-                  </Typography>
-                  <Typography sx={{ fontSize: 13, color: 'text.secondary', whiteSpace: 'nowrap' }}>
-                    {memberLabel(team.memberCount)}
-                  </Typography>
-                  <TeamRoleBadge role={team.teamRole} />
-                </Stack>
-              ))}
-            </Stack>
-          </Paper>
-        </Box>
+        <TeamSection
+          label={member.length === 1 ? "Team you're in" : "Teams you're in"}
+          teams={member}
+          canManage={false}
+          startIndex={led.length + 1}
+        />
       )}
     </Stack>
+  );
+}
+
+function TeamSection({
+  label,
+  teams,
+  canManage,
+  startIndex,
+}: {
+  label: string;
+  teams: MyTeam[];
+  canManage: boolean;
+  startIndex: number;
+}) {
+  return (
+    <Box component="section">
+      <SectionLabel>{label}</SectionLabel>
+      <Box
+        sx={{
+          display: 'grid',
+          gridTemplateColumns: { xs: '1fr', sm: 'repeat(auto-fill, minmax(300px, 1fr))' },
+          gap: 2,
+        }}
+      >
+        {teams.map((team, i) => (
+          <TeamCard key={team.teamId} team={team} index={startIndex + i} canManage={canManage} />
+        ))}
+      </Box>
+    </Box>
   );
 }
 
@@ -319,7 +324,7 @@ function AchievementPill({ achievement }: { achievement: Achievement }) {
   );
 }
 
-function LedTeamCard({ team, index }: { team: MyTeam; index: number }) {
+function TeamCard({ team, index, canManage }: { team: MyTeam; index: number; canManage: boolean }) {
   const tier = teamTier(team.memberCount);
   const nextTierName = tier.nextFloor === null ? null : teamTier(tier.nextFloor).name;
   const toNext = tier.nextFloor === null ? 0 : tier.nextFloor - team.memberCount;
@@ -328,7 +333,7 @@ function LedTeamCard({ team, index }: { team: MyTeam; index: number }) {
       variant="outlined"
       component={RouterLink}
       to={`/my-teams/${team.teamId}`}
-      aria-label={`Manage ${team.name}`}
+      aria-label={`${canManage ? 'Manage' : 'View'} ${team.name}`}
       sx={{
         display: 'flex',
         flexDirection: 'column',
@@ -392,8 +397,8 @@ function LedTeamCard({ team, index }: { team: MyTeam; index: number }) {
         spacing={0.5}
         sx={{ alignItems: 'center', color: 'primary.main', fontWeight: 600, fontSize: 13.5 }}
       >
-        <UsersRound size={15} />
-        <span>Manage members</span>
+        {canManage ? <UsersRound size={15} /> : <Eye size={15} />}
+        <span>{canManage ? 'Manage members' : 'View members'}</span>
         <ArrowRight size={16} />
       </Stack>
     </Paper>

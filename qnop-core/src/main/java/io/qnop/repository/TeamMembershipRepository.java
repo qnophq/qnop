@@ -40,9 +40,6 @@ public interface TeamMembershipRepository extends JpaRepository<TeamMembership, 
   /** Whether the user holds the given role in the team — the LEAD self-management guard (#470). */
   boolean existsByTeamIdAndUserIdAndTeamRole(UUID teamId, UUID userId, TeamRole teamRole);
 
-  /** Whether the user is a LEAD of any team — gates the "My Teams" surface (#470). */
-  boolean existsByUserIdAndTeamRole(UUID userId, TeamRole teamRole);
-
   /** How many members hold the given role in the team — the last-lead guardrail (#470). */
   long countByTeamIdAndTeamRole(UUID teamId, TeamRole teamRole);
 

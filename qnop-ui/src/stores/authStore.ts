@@ -35,8 +35,6 @@ interface AuthState {
   source: UserSource | null;
   /** URL of the current user's profile picture, or null for the initials avatar. */
   avatarUrl: string | null;
-  /** Whether the user leads at least one team — gates the "My Teams" surface (#470). */
-  teamLead: boolean;
   isAuthenticated: boolean;
   /** True while the initial refresh-on-load is in flight; gates the first render. */
   isHydrating: boolean;
@@ -64,7 +62,6 @@ const EMPTY_PROFILE = {
   role: null,
   source: null,
   avatarUrl: null,
-  teamLead: false,
 } as const;
 
 export const useAuthStore = create<AuthState>((set, get) => ({
@@ -113,7 +110,6 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         role: me.role,
         source: me.source,
         avatarUrl: me.avatarUrl ?? null,
-        teamLead: me.teamLead ?? false,
         isAuthenticated: true,
         passwordChangeRequired: false,
       });
@@ -171,9 +167,4 @@ export const useAuthStore = create<AuthState>((set, get) => ({
 /** Whether the current user has the global ADMIN role. */
 export function selectIsAdmin(state: AuthState): boolean {
   return state.role === 'ADMIN';
-}
-
-/** Whether the current user leads at least one team — gates the "My Teams" surface (#470). */
-export function selectLeadsAnyTeam(state: AuthState): boolean {
-  return state.teamLead;
 }

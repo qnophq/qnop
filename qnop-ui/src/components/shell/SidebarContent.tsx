@@ -49,8 +49,7 @@ interface SidebarContentProps {
  */
 export function SidebarContent({ collapsed, onNavigate }: SidebarContentProps) {
   const role = useAuthStore((s) => s.role);
-  const teamLead = useAuthStore((s) => s.teamLead);
-  const groups = visibleNavGroups(role, teamLead);
+  const groups = visibleNavGroups(role);
   const theme = useTheme();
   const branding = useConfig().data?.branding;
   const logomarkUrl = branding?.logomark.url;

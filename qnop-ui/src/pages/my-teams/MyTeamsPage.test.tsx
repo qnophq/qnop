@@ -68,21 +68,20 @@ describe('MyTeamsPage', () => {
     expect(manage.getAttribute('href')).toBe('/my-teams/t1');
   });
 
-  it('lists member-only teams informationally, without a management link', () => {
+  it('links member-only teams to a view-only roster (not a management action)', () => {
     renderPage();
 
-    expect(screen.getByText('Also a member of')).toBeTruthy();
-    expect(screen.getByText('Design Guild')).toBeTruthy();
+    expect(screen.getByText("Team you're in")).toBeTruthy();
+    const view = screen.getByRole('link', { name: 'View Design Guild' });
+    expect(view.getAttribute('href')).toBe('/my-teams/t2');
     expect(screen.queryByRole('link', { name: 'Manage Design Guild' })).toBeNull();
   });
 
-  it('shows an empty hint when the caller leads no team', () => {
-    myTeamsState.data = {
-      items: [{ teamId: 't2', name: 'Design Guild', teamRole: 'MEMBER', memberCount: 3 }],
-    };
+  it('shows an empty hint when the caller is in no team', () => {
+    myTeamsState.data = { items: [] };
     renderPage();
 
-    expect(screen.getByText('You don’t lead any team yet.')).toBeTruthy();
+    expect(screen.getByText('You’re not in any team yet.')).toBeTruthy();
   });
 
   it('surfaces a leadership rank and headline stats for the teams led', () => {

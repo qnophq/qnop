@@ -27,7 +27,6 @@ import { LazyBoundary } from '../components/errors/LazyBoundary';
 import { AdminRoute } from '../components/auth/AdminRoute';
 import { ProtectedRoute } from '../components/auth/ProtectedRoute';
 import { RoleRoute } from '../components/auth/RoleRoute';
-import { TeamLeadRoute } from '../components/auth/TeamLeadRoute';
 import { ComingSoonPage } from '../pages/ComingSoonPage';
 import { HomePage } from '../pages/HomePage';
 import { BrandingPage } from '../pages/admin/BrandingPage';
@@ -129,22 +128,8 @@ export const router = createBrowserRouter([
           </ReviewParamGate>
         ),
       },
-      {
-        path: 'my-teams',
-        element: (
-          <TeamLeadRoute>
-            <MyTeamsPage />
-          </TeamLeadRoute>
-        ),
-      },
-      {
-        path: 'my-teams/:id',
-        element: (
-          <TeamLeadRoute>
-            <MyTeamDetailPage />
-          </TeamLeadRoute>
-        ),
-      },
+      { path: 'my-teams', element: <MyTeamsPage /> },
+      { path: 'my-teams/:id', element: <MyTeamDetailPage /> },
       {
         path: 'compliance',
         element: (

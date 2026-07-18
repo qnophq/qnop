@@ -22,13 +22,13 @@
 import { describe, expect, it } from 'vitest';
 import { crumbsFor, visibleNavGroups } from './navConfig';
 
-function ids(role: 'ADMIN' | 'MEMBER' | 'AUDITOR' | null, teamLead = false): string[] {
-  return visibleNavGroups(role, teamLead).flatMap((g) => g.items.map((i) => i.id));
+function ids(role: 'ADMIN' | 'MEMBER' | 'AUDITOR' | null): string[] {
+  return visibleNavGroups(role).flatMap((g) => g.items.map((i) => i.id));
 }
 
 describe('visibleNavGroups', () => {
-  it('shows only dashboard + reviews for a MEMBER', () => {
-    expect(ids('MEMBER')).toEqual(['dashboard', 'reviews']);
+  it('shows dashboard + reviews + My Teams for a MEMBER (My Teams is for everyone)', () => {
+    expect(ids('MEMBER')).toEqual(['dashboard', 'reviews', 'my-teams']);
   });
 
   it('adds compliance for an AUDITOR but no admin items', () => {
@@ -42,6 +42,7 @@ describe('visibleNavGroups', () => {
     expect(ids('ADMIN')).toEqual([
       'dashboard',
       'reviews',
+      'my-teams',
       'compliance',
       'users',
       'teams',
@@ -58,22 +59,8 @@ describe('visibleNavGroups', () => {
     expect(groups.some((g) => g.label === 'Administration')).toBe(false);
   });
 
-  it('shows only the always-visible items when role is null', () => {
-    expect(ids(null)).toEqual(['dashboard', 'reviews']);
-  });
-
-  it('hides My Teams from a non-lead member', () => {
-    expect(ids('MEMBER', false)).not.toContain('my-teams');
-  });
-
-  it('shows My Teams to a member who leads a team, right after reviews', () => {
-    expect(ids('MEMBER', true)).toEqual(['dashboard', 'reviews', 'my-teams']);
-  });
-
-  it('shows My Teams to an admin who also leads a team', () => {
-    expect(ids('ADMIN', true)).toContain('my-teams');
-    // ...but not when the admin leads no team.
-    expect(ids('ADMIN', false)).not.toContain('my-teams');
+  it('shows My Teams to every authenticated role, including AUDITOR', () => {
+    expect(ids('AUDITOR')).toContain('my-teams');
   });
 });
 

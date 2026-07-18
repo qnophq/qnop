@@ -33,6 +33,7 @@ import java.time.Instant;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Optional;
 import java.util.UUID;
 import java.util.stream.Collectors;
 import org.springframework.data.domain.Page;
@@ -90,7 +91,12 @@ public class TeamService {
             .map(
                 p ->
                     new TeamMemberView(
-                        p.userId(), p.displayName(), p.email(), p.teamRole().name(), p.joinedAt()))
+                        p.userId(),
+                        p.displayName(),
+                        p.slug(),
+                        p.email(),
+                        p.teamRole().name(),
+                        p.joinedAt()))
             .toList();
     return new TeamDetailView(
         team.getId(),
@@ -213,18 +219,34 @@ public class TeamService {
   }
 
   /**
-   * Whether the user is a LEAD of at least one team — gates the "My Teams" surface (issue #470).
+   * A team with its members for any member of the team, or any team for an admin (issue #470). The
+   * result carries the caller's own role and whether they may manage the membership — a LEAD (or an
+   * admin) manages, a plain MEMBER may only view. A non-member, non-admin caller gets 403.
    */
   @Transactional(readOnly = true)
-  public boolean leadsAnyTeam(UUID userId) {
-    return memberships.existsByUserIdAndTeamRole(userId, TeamRole.LEAD);
-  }
-
-  /** Team detail for a lead of the team (or an admin); otherwise 403 (issue #470). */
-  @Transactional(readOnly = true)
-  public TeamDetailView getForLead(UUID teamId, UUID actorId, boolean admin) {
-    requireLeadOrAdmin(teamId, actorId, admin);
-    return get(teamId);
+  public MemberTeamView viewTeam(UUID teamId, UUID actorId, boolean admin) {
+    Optional<TeamMembership> membership = memberships.findByTeamIdAndUserId(teamId, actorId);
+    if (membership.isEmpty() && !admin) {
+      throw new TeamAccessForbiddenException("You are not a member of this team.");
+    }
+    Team team = teams.findById(teamId).orElseThrow(() -> TeamNotFoundException.team(teamId));
+    List<TeamMemberView> members =
+        memberships.findMembersByTeamId(teamId).stream()
+            .map(
+                p ->
+                    new TeamMemberView(
+                        p.userId(),
+                        p.displayName(),
+                        p.slug(),
+                        p.email(),
+                        p.teamRole().name(),
+                        p.joinedAt()))
+            .toList();
+    String viewerRole = membership.map(m -> m.getTeamRole().name()).orElse(null);
+    boolean canManage =
+        admin || membership.map(m -> m.getTeamRole() == TeamRole.LEAD).orElse(false);
+    return new MemberTeamView(
+        team.getId(), team.getName(), team.getDescription(), viewerRole, canManage, members);
   }
 
   /** Add a member as a lead of the team (or an admin); otherwise 403 (issue #470). */
@@ -302,6 +324,7 @@ public class TeamService {
     return new TeamMemberView(
         user.getId(),
         user.getDisplayName(),
+        user.getSlug(),
         user.getEmail(),
         membership.getTeamRole().name(),
         membership.getJoinedAt());
@@ -347,9 +370,14 @@ public class TeamService {
       Instant createdAt,
       Instant updatedAt) {}
 
-  /** A team member joined with their user identity. */
+  /** A team member joined with their user identity (slug for the profile link, issue #470/#486). */
   public record TeamMemberView(
-      UUID userId, String displayName, String email, String teamRole, Instant joinedAt) {}
+      UUID userId,
+      String displayName,
+      String slug,
+      String email,
+      String teamRole,
+      Instant joinedAt) {}
 
   /** Full team detail including its members. */
   public record TeamDetailView(
@@ -366,4 +394,17 @@ public class TeamService {
 
   /** A team the caller belongs to, with the caller's role and member count there (issue #470). */
   public record MyTeamView(UUID teamId, String name, String teamRole, long memberCount) {}
+
+  /**
+   * A team and its members as seen by a member (issue #470). {@code viewerRole} is the caller's
+   * role in the team ({@code null} for an admin who is not a member); {@code canManage} says
+   * whether the caller may manage the membership (a LEAD, or an admin).
+   */
+  public record MemberTeamView(
+      UUID id,
+      String name,
+      String description,
+      String viewerRole,
+      boolean canManage,
+      List<TeamMemberView> members) {}
 }

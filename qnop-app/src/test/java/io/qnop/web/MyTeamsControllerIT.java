@@ -170,7 +170,7 @@ class MyTeamsControllerIT extends AbstractIntegrationTest {
   }
 
   @Test
-  void plainMemberIsForbiddenFromManaging() throws Exception {
+  void plainMemberCanViewButNotManage() throws Exception {
     String admin = token(createUser("root", UserRole.ADMIN));
     User lead = createUser("lead", UserRole.MEMBER);
     User bob = createUser("bob", UserRole.MEMBER);
@@ -180,14 +180,23 @@ class MyTeamsControllerIT extends AbstractIntegrationTest {
 
     String bobToken = token("bob");
 
-    // Bob sees the team in their own list (as MEMBER) but cannot manage it.
+    // Bob sees the team in their own list (as MEMBER).
     mockMvc
         .perform(get("/api/v1/teams/mine").header("Authorization", bearer(bobToken)))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.items[0].teamRole").value("MEMBER"));
+
+    // Bob may VIEW the roster read-only — with the members' identity fields — but
+    // the response flags that he may not manage it.
     mockMvc
         .perform(get("/api/v1/teams/{id}", teamId).header("Authorization", bearer(bobToken)))
-        .andExpect(status().isForbidden());
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.viewerRole").value("MEMBER"))
+        .andExpect(jsonPath("$.viewerCanManage").value(false))
+        .andExpect(jsonPath("$.members").isArray())
+        .andExpect(jsonPath("$.members[?(@.displayName == 'lead')].slug").exists());
+
+    // ...and every management action is refused.
     mockMvc
         .perform(
             post("/api/v1/teams/{id}/members", teamId)
@@ -195,6 +204,20 @@ class MyTeamsControllerIT extends AbstractIntegrationTest {
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("{\"userId\":\"%s\",\"teamRole\":\"MEMBER\"}".formatted(bob.getId())))
         .andExpect(status().isForbidden());
+  }
+
+  @Test
+  void leadSeesViewerCanManage() throws Exception {
+    String admin = token(createUser("root", UserRole.ADMIN));
+    User lead = createUser("lead", UserRole.MEMBER);
+    String teamId = createTeam(admin, "Core");
+    addMember(admin, teamId, lead, "LEAD");
+
+    mockMvc
+        .perform(get("/api/v1/teams/{id}", teamId).header("Authorization", bearer(token("lead"))))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.viewerRole").value("LEAD"))
+        .andExpect(jsonPath("$.viewerCanManage").value(true));
   }
 
   @Test
@@ -270,25 +293,6 @@ class MyTeamsControllerIT extends AbstractIntegrationTest {
             delete("/api/v1/teams/{id}/members/{uid}", teamId, coLead.getId())
                 .header("Authorization", bearer(leadToken)))
         .andExpect(status().isNoContent());
-  }
-
-  @Test
-  void currentUserExposesTeamLeadFlag() throws Exception {
-    String admin = token(createUser("root", UserRole.ADMIN));
-    User lead = createUser("lead", UserRole.MEMBER);
-    User bob = createUser("bob", UserRole.MEMBER);
-    String teamId = createTeam(admin, "Core");
-    addMember(admin, teamId, lead, "LEAD");
-    addMember(admin, teamId, bob, "MEMBER");
-
-    mockMvc
-        .perform(get("/api/v1/users/me").header("Authorization", bearer(token("lead"))))
-        .andExpect(status().isOk())
-        .andExpect(jsonPath("$.teamLead").value(true));
-    mockMvc
-        .perform(get("/api/v1/users/me").header("Authorization", bearer(token("bob"))))
-        .andExpect(status().isOk())
-        .andExpect(jsonPath("$.teamLead").value(false));
   }
 
   private String createTeam(String token, String name) throws Exception {

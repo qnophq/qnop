@@ -32,11 +32,13 @@ import io.qnop.entity.Team;
 import io.qnop.entity.TeamMembership;
 import io.qnop.entity.TeamRole;
 import io.qnop.entity.User;
+import io.qnop.repository.TeamMemberProjection;
 import io.qnop.repository.TeamMembershipRepository;
 import io.qnop.repository.TeamRepository;
 import io.qnop.repository.UserRepository;
 import io.qnop.repository.UserTeamProjection;
 import io.qnop.service.TeamService.TeamMemberView;
+import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -165,13 +167,56 @@ class TeamServiceTest {
   // --- Team-lead self-management (issue #470) -------------------------------
 
   @Test
-  @DisplayName("leadsAnyTeam reflects the LEAD-membership existence check")
-  void leadsAnyTeam() {
-    UUID userId = UUID.randomUUID();
-    when(memberships.existsByUserIdAndTeamRole(userId, TeamRole.LEAD)).thenReturn(true);
-    assertThat(service.leadsAnyTeam(userId)).isTrue();
-    when(memberships.existsByUserIdAndTeamRole(userId, TeamRole.LEAD)).thenReturn(false);
-    assertThat(service.leadsAnyTeam(userId)).isFalse();
+  @DisplayName(
+      "viewTeam: a member views read-only, a lead may manage, an admin passes for any team")
+  void viewTeam() {
+    UUID teamId = UUID.randomUUID();
+    UUID actor = UUID.randomUUID();
+    Team team = teamWithId(teamId, "Core");
+    when(teams.findById(teamId)).thenReturn(Optional.of(team));
+    when(memberships.findMembersByTeamId(teamId))
+        .thenReturn(
+            List.of(
+                new TeamMemberProjection(
+                    UUID.randomUUID(),
+                    actor,
+                    "Ada",
+                    "ada",
+                    "ada@x",
+                    TeamRole.MEMBER,
+                    Instant.EPOCH)));
+
+    // A plain member can view but not manage, and the roster carries the slug.
+    when(memberships.findByTeamIdAndUserId(teamId, actor))
+        .thenReturn(Optional.of(TeamMembership.of(teamId, actor, TeamRole.MEMBER)));
+    var asMember = service.viewTeam(teamId, actor, false);
+    assertThat(asMember.canManage()).isFalse();
+    assertThat(asMember.viewerRole()).isEqualTo("MEMBER");
+    assertThat(asMember.members())
+        .singleElement()
+        .satisfies(m -> assertThat(m.slug()).isEqualTo("ada"));
+
+    // A lead of the team may manage.
+    when(memberships.findByTeamIdAndUserId(teamId, actor))
+        .thenReturn(Optional.of(TeamMembership.of(teamId, actor, TeamRole.LEAD)));
+    assertThat(service.viewTeam(teamId, actor, false).canManage()).isTrue();
+
+    // An admin who is not a member passes, manages, and has no viewer role.
+    UUID admin = UUID.randomUUID();
+    when(memberships.findByTeamIdAndUserId(teamId, admin)).thenReturn(Optional.empty());
+    var asAdmin = service.viewTeam(teamId, admin, true);
+    assertThat(asAdmin.canManage()).isTrue();
+    assertThat(asAdmin.viewerRole()).isNull();
+  }
+
+  @Test
+  @DisplayName("viewTeam forbids a non-member, non-admin caller")
+  void viewTeamForbidsOutsider() {
+    UUID teamId = UUID.randomUUID();
+    UUID outsider = UUID.randomUUID();
+    when(memberships.findByTeamIdAndUserId(teamId, outsider)).thenReturn(Optional.empty());
+    assertThatThrownBy(() -> service.viewTeam(teamId, outsider, false))
+        .isInstanceOf(TeamAccessForbiddenException.class);
   }
 
   @Test
@@ -205,8 +250,6 @@ class TeamServiceTest {
     when(memberships.existsByTeamIdAndUserIdAndTeamRole(teamId, actor, TeamRole.LEAD))
         .thenReturn(false);
 
-    assertThatThrownBy(() -> service.getForLead(teamId, actor, false))
-        .isInstanceOf(TeamAccessForbiddenException.class);
     assertThatThrownBy(() -> service.addMemberAsLead(teamId, actor, false, target, "MEMBER"))
         .isInstanceOf(TeamAccessForbiddenException.class);
     assertThatThrownBy(() -> service.setMemberRoleAsLead(teamId, actor, false, target, "LEAD"))

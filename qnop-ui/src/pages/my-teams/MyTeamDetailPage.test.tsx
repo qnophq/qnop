@@ -24,14 +24,14 @@ import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { ThemeProvider } from '@mui/material/styles';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
-import type { AdminTeamDetail, AdminTeamMember } from '../../api/generated';
+import type { TeamDetail, TeamMember } from '../../api/generated';
 import { buildTheme } from '../../theme/theme';
 import { useAuthStore } from '../../stores/authStore';
 import { MyTeamDetailPage } from './MyTeamDetailPage';
 
 const { teamState, setRoleMutate, removeMemberMutate } = vi.hoisted(() => ({
   teamState: { data: undefined, isLoading: false, isError: false } as {
-    data: AdminTeamDetail | undefined;
+    data: TeamDetail | undefined;
     isLoading: boolean;
     isError: boolean;
   },
@@ -45,8 +45,6 @@ vi.mock('../../api/hooks/useMyTeams', () => ({
   useRemoveMyTeamMember: () => ({ mutate: removeMemberMutate }),
 }));
 
-// The add-member dialog draws its own principal search; stub it to a marker that
-// exposes the props the page wires in, so this test stays focused on the page.
 vi.mock('../../components/my-teams/AddMyTeamMemberDialog', () => ({
   AddMyTeamMemberDialog: (props: {
     open: boolean;
@@ -65,30 +63,33 @@ vi.mock('../../components/my-teams/AddMyTeamMemberDialog', () => ({
     ) : null,
 }));
 
-const LEAD: AdminTeamMember = {
+const LEAD: TeamMember = {
   userId: 'u1',
   displayName: 'Ada Lovelace',
+  slug: 'ada-lovelace',
+  avatarUrl: undefined,
   email: 'ada@example.com',
   teamRole: 'LEAD',
   joinedAt: '2026-01-01T10:00:00Z',
 };
 
-const MEMBER: AdminTeamMember = {
+const MEMBER: TeamMember = {
   userId: 'u2',
   displayName: 'Alan Turing',
+  slug: 'alan-turing',
+  avatarUrl: undefined,
   email: 'alan@example.com',
   teamRole: 'MEMBER',
   joinedAt: '2026-02-01T10:00:00Z',
 };
 
-function makeTeam(overrides: Partial<AdminTeamDetail> = {}): AdminTeamDetail {
+function makeTeam(overrides: Partial<TeamDetail> = {}): TeamDetail {
   return {
     id: 't1',
     name: 'Platform',
     description: 'Owns the ingest pipeline.',
-    enabled: true,
-    createdAt: '2026-01-01T00:00:00Z',
-    updatedAt: '2026-03-01T00:00:00Z',
+    viewerRole: 'LEAD',
+    viewerCanManage: true,
     members: [LEAD, MEMBER],
     ...overrides,
   };
@@ -128,18 +129,17 @@ describe('MyTeamDetailPage', () => {
     expect(back.getAttribute('href')).toBe('/my-teams');
   });
 
-  it('renders the header, description and every member row', () => {
+  it('renders the header and every member with a link to their profile', () => {
     renderPage();
 
     expect(screen.getByRole('heading', { name: 'Platform' })).toBeTruthy();
-    expect(screen.getByText('Ada Lovelace')).toBeTruthy();
-    expect(screen.getByText('Alan Turing')).toBeTruthy();
-  });
-
-  it('does not offer team edit or delete (those stay admin-only)', () => {
-    renderPage();
-
-    expect(screen.queryByRole('button', { name: 'Edit' })).toBeNull();
+    // Members render as profile links (avatar + name → the profile page).
+    expect(
+      screen.getByRole('link', { name: "View Ada Lovelace's profile" }).getAttribute('href'),
+    ).toBe('/users/ada-lovelace');
+    expect(
+      screen.getByRole('link', { name: "View Alan Turing's profile" }).getAttribute('href'),
+    ).toBe('/users/alan-turing');
   });
 
   it('promotes a member to lead through the non-admin client', async () => {
@@ -166,16 +166,14 @@ describe('MyTeamDetailPage', () => {
     expect(removeMemberMutate.mock.calls[0][0]).toEqual({ teamId: 't1', userId: 'u1' });
   });
 
-  it('surfaces an error toast when a role change is rejected (last-lead guard)', async () => {
-    setRoleMutate.mockImplementation((_vars: unknown, opts?: { onError?: (e: unknown) => void }) =>
-      opts?.onError?.(new Error('rejected')),
-    );
+  it('never offers self-removal on the caller’s own row, but keeps the hand-over demote', async () => {
+    useAuthStore.setState({ userId: 'u1' }); // the caller is the lead Ada (u1)
     renderPage();
 
     fireEvent.click(screen.getByRole('button', { name: 'Actions for Ada Lovelace' }));
-    fireEvent.click(await screen.findByText('Make member'));
 
-    expect(await screen.findByText('Could not change the role.')).toBeTruthy();
+    expect(await screen.findByText('Make member')).toBeTruthy();
+    expect(screen.queryByText('Remove from team')).toBeNull();
   });
 
   it('surfaces an error toast when a removal is rejected (last-lead guard)', async () => {
@@ -192,25 +190,6 @@ describe('MyTeamDetailPage', () => {
     expect(await screen.findByText('Could not remove the member.')).toBeTruthy();
   });
 
-  it('never offers self-removal on the caller’s own row, but still allows a hand-over demote', async () => {
-    useAuthStore.setState({ userId: 'u1' }); // the caller is the lead Ada (u1)
-    renderPage();
-
-    fireEvent.click(screen.getByRole('button', { name: 'Actions for Ada Lovelace' }));
-
-    expect(await screen.findByText('Make member')).toBeTruthy();
-    expect(screen.queryByText('Remove from team')).toBeNull();
-  });
-
-  it('still offers removal on other members’ rows', async () => {
-    useAuthStore.setState({ userId: 'u1' });
-    renderPage();
-
-    fireEvent.click(screen.getByRole('button', { name: 'Actions for Alan Turing' }));
-
-    expect(await screen.findByText('Remove from team')).toBeTruthy();
-  });
-
   it('opens the add-member dialog wired with the team id and existing members', async () => {
     renderPage();
 
@@ -222,5 +201,17 @@ describe('MyTeamDetailPage', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'close-add' }));
     await waitFor(() => expect(screen.queryByTestId('add-member-dialog')).toBeNull());
+  });
+
+  it('renders a read-only roster with no management affordances for a plain member', () => {
+    teamState.data = makeTeam({ viewerRole: 'MEMBER', viewerCanManage: false });
+    renderPage();
+
+    // The members are still listed and linkable...
+    expect(screen.getByRole('link', { name: "View Ada Lovelace's profile" })).toBeTruthy();
+    // ...but nothing can be managed.
+    expect(screen.queryByRole('button', { name: 'Add member' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Actions for Ada Lovelace' })).toBeNull();
+    expect(screen.queryByRole('columnheader', { name: 'Actions' })).toBeNull();
   });
 });

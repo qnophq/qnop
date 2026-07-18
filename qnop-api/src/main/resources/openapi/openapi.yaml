@@ -1334,16 +1334,13 @@ paths:
     get:
       tags:
         - Teams
-      summary: Get a led team's detail with its members
+      summary: View a team's members
       description: |
-        Full detail of a team the caller leads (or any team for an ADMIN), issue
-        #470. A caller who is not a LEAD of the team (and not an ADMIN) gets 403.
-
-        Note: this non-admin surface deliberately reuses the admin `AdminTeamDetail`
-        / `AdminTeamMember` schemas today (the fields are identical). Should an
-        admin-only field ever be added to those schemas, split out a non-admin
-        `TeamDetail`/`TeamMember` here so it does not leak to a plain LEAD — tracked
-        by issue #508.
+        A team's detail with its members, for any **member** of the team (issue
+        #470). The response carries the caller's own role in the team and a
+        `viewerCanManage` flag — a LEAD (or an ADMIN) may manage the membership
+        via the mutation endpoints; a plain MEMBER may only view. A caller who is
+        not a member of the team (and not an ADMIN) gets 403.
       operationId: getMyTeam
       security:
         - bearerAuth: []
@@ -1355,7 +1352,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/AdminTeamDetail'
+                $ref: '#/components/schemas/TeamDetail'
         '404':
           description: Unknown team
           content:
@@ -1391,7 +1388,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/AdminTeamMember'
+                $ref: '#/components/schemas/TeamMember'
         '400':
           description: Invalid input
           content:
@@ -1442,7 +1439,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/AdminTeamMember'
+                $ref: '#/components/schemas/TeamMember'
         '404':
           description: The team has no such member
           content:
@@ -3947,19 +3944,12 @@ components:
           description: |
             URL of the user's profile picture (with a cache-busting `?v=` token),
             or null when none is set — the UI then renders the initials avatar.
-        teamLead:
-          type: boolean
-          description: |
-            Whether the user is the LEAD of at least one team (issue #470). Gates
-            the non-admin "My Teams" self-management surface in the SPA without a
-            separate round-trip.
       required:
         - id
         - displayName
         - email
         - role
         - source
-        - teamLead
     AdminUserSummary:
       type: object
       description: A user as shown in the admin user list.
@@ -4309,6 +4299,70 @@ components:
             $ref: '#/components/schemas/MyTeam'
       required:
         - items
+    TeamMember:
+      type: object
+      description: |
+        A team member on the non-admin "My Teams" surface (issue #470) — carries
+        the identity fields the UI needs to render the member like everywhere else:
+        avatar, profile hover-card and click-through to the profile.
+      properties:
+        userId:
+          type: string
+          format: uuid
+        displayName:
+          type: string
+        slug:
+          type: string
+          nullable: true
+          description: The member's profile slug (issue #486) for the profile link; null for pre-slug accounts.
+        avatarUrl:
+          type: string
+          nullable: true
+          description: The member's avatar URL (with a cache-busting `?v=`), or null when none is set.
+        email:
+          type: string
+        teamRole:
+          $ref: '#/components/schemas/TeamRole'
+        joinedAt:
+          type: string
+          format: date-time
+      required:
+        - userId
+        - displayName
+        - email
+        - teamRole
+        - joinedAt
+    TeamDetail:
+      type: object
+      description: |
+        A team with its members for any member of the team (issue #470). Carries the
+        caller's own role and whether they may manage the membership.
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        description:
+          type: string
+          nullable: true
+        viewerRole:
+          allOf:
+            - $ref: '#/components/schemas/TeamRole'
+          nullable: true
+          description: The caller's role in this team; null when the caller is an admin who is not a member.
+        viewerCanManage:
+          type: boolean
+          description: Whether the caller may manage this team's membership (a LEAD of the team, or an ADMIN).
+        members:
+          type: array
+          items:
+            $ref: '#/components/schemas/TeamMember'
+      required:
+        - id
+        - name
+        - viewerCanManage
+        - members
     RegisterRequest:
       type: object
       description: Self-registration details for a new local account.
