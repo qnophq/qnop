@@ -27,6 +27,7 @@ import {
   AdminTeamsApi,
   AdminUsersApi,
   AnnotationsApi,
+  AuditApi,
   AuthApi,
   AuthPasswordResetApi,
   AuthRegistrationApi,
@@ -100,6 +101,7 @@ export const adminOidcProvidersApi = new AdminOidcProvidersApi(undefined, undefi
 export const adminEmailApi = new AdminEmailApi(undefined, undefined, axiosInstance);
 export const documentsApi = new DocumentsApi(undefined, undefined, axiosInstance);
 export const dashboardApi = new DashboardApi(undefined, undefined, axiosInstance);
+export const auditApi = new AuditApi(undefined, undefined, axiosInstance);
 export const annotationsApi = new AnnotationsApi(undefined, undefined, axiosInstance);
 export const principalsApi = new PrincipalsApi(undefined, undefined, axiosInstance);
 export const reviewWorkflowApi = new ReviewWorkflowApi(undefined, undefined, axiosInstance);
