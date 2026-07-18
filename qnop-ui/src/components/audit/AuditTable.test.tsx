@@ -30,8 +30,10 @@ const userEvent: AuditEvent = {
   eventType: 'workflow.transition',
   documentId: 'doc-1',
   documentTitle: 'Master services agreement',
+  documentSlug: 'msa',
   actorId: 'actor-1',
   actorDisplayName: 'Avery Auditor',
+  actorSlug: 'avery-auditor',
   detail: '{"from":"DRAFT","to":"IN_REVIEW"}',
   createdAt: '2026-07-01T10:00:00Z',
 };
@@ -66,29 +68,41 @@ describe('AuditTable', () => {
     expect(screen.getByText('No audit events found.')).toBeInTheDocument();
   });
 
-  it('renders a human event label, readable detail and the resolved names', () => {
+  it('renders a human event label and readable detail', () => {
     renderTable([userEvent]);
     expect(screen.getByText('Status changed')).toBeInTheDocument();
     expect(screen.getByText('Draft → In review')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Avery Auditor' })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Master services agreement' })).toBeInTheDocument();
   });
 
-  it('renders the system actor as inert text, not a filter link', () => {
+  it('links the actor to their profile and the document to the review', () => {
+    renderTable([userEvent]);
+    expect(screen.getByRole('link', { name: "View Avery Auditor's profile" })).toHaveAttribute(
+      'href',
+      '/users/avery-auditor',
+    );
+    expect(screen.getByRole('link', { name: 'Master services agreement' })).toHaveAttribute(
+      'href',
+      '/reviews/msa',
+    );
+  });
+
+  it('renders the system actor as inert text — no profile link, no actor filter', () => {
     renderTable([systemEvent]);
     expect(screen.getByText('System')).toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: 'System' })).not.toBeInTheDocument();
+    // The system actor carries no profile link and no actor filter (the document still filters).
+    expect(screen.queryByRole('link', { name: /profile/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Filter by System' })).not.toBeInTheDocument();
   });
 
-  it('filters by actor when the actor is clicked', () => {
+  it('filters by actor from the dedicated filter button, separate from the profile link', () => {
     const { onFilterActor } = renderTable([userEvent]);
-    fireEvent.click(screen.getByRole('button', { name: 'Avery Auditor' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Filter by Avery Auditor' }));
     expect(onFilterActor).toHaveBeenCalledWith('actor-1', 'Avery Auditor');
   });
 
-  it('filters by document when the document is clicked', () => {
+  it('filters by document from the dedicated filter button, separate from the review link', () => {
     const { onFilterDocument } = renderTable([userEvent]);
-    fireEvent.click(screen.getByRole('button', { name: 'Master services agreement' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Filter by Master services agreement' }));
     expect(onFilterDocument).toHaveBeenCalledWith('doc-1', 'Master services agreement');
   });
 });

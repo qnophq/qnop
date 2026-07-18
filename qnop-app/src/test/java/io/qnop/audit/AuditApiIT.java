@@ -151,6 +151,7 @@ class AuditApiIT extends SeededIntegrationTest {
         .andExpect(jsonPath("$.items[0].documentTitle").value("Master services agreement"))
         .andExpect(jsonPath("$.items[0].actorId").value(MEMBER_ID.toString()))
         .andExpect(jsonPath("$.items[0].actorDisplayName").value("Mia Member"))
+        .andExpect(jsonPath("$.items[0].actorSlug").value("mia-member"))
         // Unlike the dashboard feed, the caller's OWN action is present in the audit trail.
         .andExpect(jsonPath("$.items[*].actorId", hasItem(AUDITOR_ID.toString())));
   }

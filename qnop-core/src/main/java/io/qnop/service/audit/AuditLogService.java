@@ -28,6 +28,7 @@ import io.qnop.repository.AuditEventRepository;
 import io.qnop.repository.DocumentRepository;
 import io.qnop.repository.UserDisplayName;
 import io.qnop.repository.UserRepository;
+import io.qnop.repository.UserSlug;
 import jakarta.persistence.criteria.Predicate;
 import java.time.Instant;
 import java.util.ArrayList;
@@ -92,6 +93,7 @@ public class AuditLogService {
       String documentSlug,
       UUID actorId,
       String actorDisplayName,
+      String actorSlug,
       String detail,
       Instant createdAt) {}
 
@@ -166,28 +168,43 @@ public class AuditLogService {
             ? Map.of()
             : users.findDisplayNamesByIdIn(actorIds).stream()
                 .collect(toMap(UserDisplayName::id, UserDisplayName::displayName));
+    Map<UUID, String> actorSlugs =
+        actorIds.isEmpty()
+            ? Map.of()
+            : users.findSlugsByIdIn(actorIds).stream()
+                .filter(row -> row.slug() != null)
+                .collect(toMap(UserSlug::id, UserSlug::slug));
     List<UUID> documentIds = events.stream().map(AuditEvent::getDocumentId).distinct().toList();
     Map<UUID, Document> documentById =
         documents.findAllById(documentIds).stream()
             .collect(toMap(Document::getId, document -> document));
-    return toViews(events, actorNames, documentById);
+    return toViews(events, actorNames, actorSlugs, documentById);
   }
 
   /**
-   * The pure mapping from persisted events to views, given the pre-resolved name and document
+   * The pure mapping from persisted events to views, given the pre-resolved name/slug and document
    * lookups — DB-free so the anonymity-bypass and system-actor rules are unit-testable in
    * isolation.
    */
   static List<AuditEventView> toViews(
-      List<AuditEvent> events, Map<UUID, String> actorNames, Map<UUID, Document> documentById) {
-    return events.stream().map(event -> toView(event, actorNames, documentById)).toList();
+      List<AuditEvent> events,
+      Map<UUID, String> actorNames,
+      Map<UUID, String> actorSlugs,
+      Map<UUID, Document> documentById) {
+    return events.stream()
+        .map(event -> toView(event, actorNames, actorSlugs, documentById))
+        .toList();
   }
 
   private static AuditEventView toView(
-      AuditEvent event, Map<UUID, String> actorNames, Map<UUID, Document> documentById) {
+      AuditEvent event,
+      Map<UUID, String> actorNames,
+      Map<UUID, String> actorSlugs,
+      Map<UUID, Document> documentById) {
     Document document = documentById.get(event.getDocumentId());
     UUID actorId = event.getActorId();
     String actorDisplayName = actorId == null ? SYSTEM_ACTOR_NAME : actorNames.get(actorId);
+    String actorSlug = actorId == null ? null : actorSlugs.get(actorId);
     return new AuditEventView(
         event.getId(),
         event.getEventType(),
@@ -196,6 +213,7 @@ public class AuditLogService {
         document == null ? null : document.getSlug(),
         actorId,
         actorDisplayName,
+        actorSlug,
         event.getDetail(),
         event.getCreatedAt());
   }

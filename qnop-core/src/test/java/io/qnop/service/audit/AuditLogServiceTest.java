@@ -80,7 +80,7 @@ class AuditLogServiceTest {
   }
 
   @Test
-  @DisplayName("resolves the real actor name and document title/slug, and passes the raw detail")
+  @DisplayName("resolves the real actor name, slug and document title/slug, and passes the detail")
   void mapsActorAndDocument() {
     // Exercises the pure mapping directly: a Document's id is DB-generated (null off-persistence),
     // so the id→document map is built explicitly rather than through findAllById here.
@@ -91,7 +91,10 @@ class AuditLogServiceTest {
 
     List<AuditEventView> views =
         AuditLogService.toViews(
-            List.of(event), Map.of(actorId, "Avery Auditor"), Map.of(documentId, doc));
+            List.of(event),
+            Map.of(actorId, "Avery Auditor"),
+            Map.of(actorId, "avery-auditor"),
+            Map.of(documentId, doc));
 
     assertThat(views).hasSize(1);
     AuditEventView view = views.get(0);
@@ -101,6 +104,7 @@ class AuditLogServiceTest {
     assertThat(view.documentSlug()).isEqualTo("msa");
     assertThat(view.actorId()).isEqualTo(actorId);
     assertThat(view.actorDisplayName()).isEqualTo("Avery Auditor");
+    assertThat(view.actorSlug()).isEqualTo("avery-auditor");
     assertThat(view.detail()).isEqualTo("{\"to\":\"IN_REVIEW\"}");
   }
 
@@ -127,12 +131,14 @@ class AuditLogServiceTest {
     when(auditEvents.findAll(any(Specification.class), any(Pageable.class)))
         .thenReturn(new PageImpl<>(List.of(event), PageRequest.of(0, 20), 1));
     when(users.findDisplayNamesByIdIn(List.of(actorId))).thenReturn(List.of());
+    when(users.findSlugsByIdIn(List.of(actorId))).thenReturn(List.of());
     when(documents.findAllById(List.of(documentId))).thenReturn(List.of());
 
     AuditEventView view = service.list(null, null, null, null, null, null, null).items().get(0);
 
     assertThat(view.actorId()).isEqualTo(actorId);
     assertThat(view.actorDisplayName()).isNull();
+    assertThat(view.actorSlug()).isNull();
     assertThat(view.documentTitle()).isNull();
     assertThat(view.documentSlug()).isNull();
   }

@@ -4004,6 +4004,18 @@ components:
           description: >-
             The acting user's real display name; "System" when the event has no
             actor, and null if the actor is no longer resolvable.
+        actorSlug:
+          type: string
+          nullable: true
+          description: >-
+            The acting user's profile slug (issue #486) for a pretty profile
+            link; null for the system actor or a user without a slug.
+        actorAvatarUrl:
+          type: string
+          nullable: true
+          description: >-
+            The acting user's avatar URL, when identifiable and uploaded; null
+            otherwise.
         detail:
           type: string
           nullable: true

@@ -24,8 +24,12 @@ import io.qnop.api.v1.endpoint.AuditApi;
 import io.qnop.api.v1.model.AuditEvent;
 import io.qnop.api.v1.model.AuditEventListResponse;
 import io.qnop.service.audit.AuditLogService;
+import io.qnop.service.avatar.AvatarService;
+import java.time.Instant;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
+import java.util.Map;
+import java.util.Objects;
 import java.util.UUID;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.RestController;
@@ -41,9 +45,11 @@ import org.springframework.web.bind.annotation.RestController;
 public class AuditController implements AuditApi {
 
   private final AuditLogService auditLog;
+  private final AvatarService avatars;
 
-  public AuditController(AuditLogService auditLog) {
+  public AuditController(AuditLogService auditLog, AvatarService avatars) {
     this.auditLog = auditLog;
+    this.avatars = avatars;
   }
 
   @Override
@@ -64,15 +70,25 @@ public class AuditController implements AuditApi {
             to == null ? null : to.toInstant(),
             page,
             size);
+    // One batched avatar-timestamp lookup for the whole page so building avatar URLs never
+    // streams image bytes (issue #179), mirroring the admin user list.
+    Map<UUID, Instant> avatarTimestamps =
+        avatars.updatedAt(
+            result.items().stream()
+                .map(AuditLogService.AuditEventView::actorId)
+                .filter(Objects::nonNull)
+                .distinct()
+                .toList());
     return ResponseEntity.ok(
         new AuditEventListResponse()
-            .items(result.items().stream().map(AuditController::toDto).toList())
+            .items(result.items().stream().map(view -> toDto(view, avatarTimestamps)).toList())
             .total(result.total())
             .page(result.page())
             .size(result.size()));
   }
 
-  private static AuditEvent toDto(AuditLogService.AuditEventView view) {
+  private static AuditEvent toDto(
+      AuditLogService.AuditEventView view, Map<UUID, Instant> avatarTimestamps) {
     return new AuditEvent()
         .id(view.id())
         .eventType(view.eventType())
@@ -81,7 +97,17 @@ public class AuditController implements AuditApi {
         .documentSlug(view.documentSlug())
         .actorId(view.actorId())
         .actorDisplayName(view.actorDisplayName())
+        .actorSlug(view.actorSlug())
+        .actorAvatarUrl(avatarUrlOf(view.actorId(), avatarTimestamps))
         .detail(view.detail())
         .createdAt(view.createdAt() == null ? null : view.createdAt().atOffset(ZoneOffset.UTC));
+  }
+
+  /** Null for the system actor and for users without an uploaded avatar. */
+  private static String avatarUrlOf(UUID actorId, Map<UUID, Instant> avatarTimestamps) {
+    if (actorId == null) {
+      return null;
+    }
+    return AvatarUrls.forUser(actorId, avatarTimestamps.get(actorId));
   }
 }
