@@ -35,6 +35,7 @@ import { useMyTeams } from '../../api/hooks/useMyTeams';
 import { TeamRoleBadge } from '../../components/admin/teams/TeamRoleBadge';
 import { TeamCrest } from '../../components/my-teams/TeamCrest';
 import { PageHeader } from '../../components/admin/layout/PageHeader';
+import { MyTeamsEmptyState } from './MyTeamsEmptyState';
 import {
   computeAchievements,
   leadershipStats,
@@ -85,11 +86,7 @@ export function MyTeamsPage() {
         description="The teams you belong to — manage the ones you lead, and see the members of the rest."
       />
 
-      {data.items.length === 0 && (
-        <Paper variant="outlined" sx={{ p: 4, textAlign: 'center' }}>
-          <Typography color="text.secondary">You’re not in any team yet.</Typography>
-        </Paper>
-      )}
+      {data.items.length === 0 && <MyTeamsEmptyState />}
 
       {led.length > 0 && <LeadershipHero stats={stats} achievements={achievements} />}
 

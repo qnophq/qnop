@@ -83,11 +83,13 @@ describe('MyTeamsPage', () => {
     expect(screen.queryByRole('link', { name: 'Manage Design Guild' })).toBeNull();
   });
 
-  it('shows an empty hint when the caller is in no team', () => {
+  it('shows the invitational empty state when the caller is in no team', () => {
     myTeamsState.data = { items: [] };
     renderPage();
 
-    expect(screen.getByText('You’re not in any team yet.')).toBeTruthy();
+    expect(screen.getByRole('heading', { name: 'Your seat is waiting' })).toBeTruthy();
+    expect(screen.getByRole('img', { name: 'An open seat waiting in a team' })).toBeTruthy();
+    expect(screen.getByText(/A team lead or an administrator can add you/)).toBeTruthy();
   });
 
   it('surfaces a leadership rank and headline stats for the teams led', () => {
