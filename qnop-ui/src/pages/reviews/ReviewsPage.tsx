@@ -33,7 +33,7 @@ import TextField from '@mui/material/TextField';
 import ToggleButton from '@mui/material/ToggleButton';
 import ToggleButtonGroup from '@mui/material/ToggleButtonGroup';
 import Typography from '@mui/material/Typography';
-import { FileText, LayoutGrid, Plus, Rows3, Search } from 'lucide-react';
+import { LayoutGrid, Plus, Rows3, Search } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import type { DocumentSummary } from '../../api/generated';
 import { useReviews } from '../../api/hooks/useReviews';
@@ -42,6 +42,7 @@ import { isOpenWorkflowState } from '../../components/reviews/workflowMeta';
 import { roleOf } from '../../components/reviews/list/reviewListModel';
 import { ReviewCards } from '../../components/reviews/list/ReviewCards';
 import { ReviewsTable } from '../../components/reviews/list/ReviewsTable';
+import { ReviewsEmptyState } from './ReviewsEmptyState';
 import { useAuthStore } from '../../stores/authStore';
 
 type RoleFilter = 'all' | 'owner' | 'reviewer';
@@ -228,20 +229,7 @@ export function ReviewsPage() {
       )}
 
       {data && items.length === 0 && (
-        <Paper variant="outlined" sx={{ py: 8, px: 3, textAlign: 'center' }}>
-          <Stack spacing={2} sx={{ alignItems: 'center' }}>
-            <FileText size={40} aria-hidden style={{ opacity: 0.4 }} />
-            <Box>
-              <Typography variant="h6" component="p" sx={{ fontWeight: 500 }}>
-                No reviews yet
-              </Typography>
-              <Typography color="text.secondary" sx={{ mt: 0.5 }}>
-                Upload a document to start your first review.
-              </Typography>
-            </Box>
-            {newReviewButton}
-          </Stack>
-        </Paper>
+        <ReviewsEmptyState onNewReview={() => navigate('/reviews/new')} />
       )}
 
       {data && items.length > 0 && (
