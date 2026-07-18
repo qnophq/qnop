@@ -86,7 +86,21 @@ beforeEach(() => {
 describe('AuditPage', () => {
   it('renders the page header', () => {
     renderWithProviders(<AuditPage />);
-    expect(screen.getByRole('heading', { name: 'Audit' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Audit trail' })).toBeInTheDocument();
+  });
+
+  it('reveals a plain-language event guide on demand', () => {
+    renderWithProviders(<AuditPage />);
+    // Collapsed by default: the guide's description text is not mounted.
+    expect(
+      screen.queryByText('The review moved to a new workflow status (e.g. Draft → In review).'),
+    ).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: 'What do these events mean?' }));
+
+    expect(
+      screen.getByText('The review moved to a new workflow status (e.g. Draft → In review).'),
+    ).toBeInTheDocument();
   });
 
   it('shows a loading placeholder while the first page loads', () => {
@@ -112,7 +126,7 @@ describe('AuditPage', () => {
     renderWithProviders(<AuditPage />);
 
     fireEvent.mouseDown(screen.getByRole('combobox', { name: 'Event type' }));
-    fireEvent.click(screen.getByRole('option', { name: 'workflow.transition' }));
+    fireEvent.click(screen.getByRole('option', { name: 'Status changed' }));
 
     expect(lastCall().eventType).toBe('workflow.transition');
     expect(lastCall().page).toBe(0);

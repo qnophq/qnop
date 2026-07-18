@@ -19,31 +19,53 @@
  * SPDX-License-Identifier: AGPL-3.0-only
  */
 
+import { humanizeToken, humanizeWorkflowState } from './auditEvents';
+
 const EM_DASH = '—';
 
-/** Renders a single JSON value compactly for the audit detail cell. */
+/** Renders a single JSON value compactly for the fallback detail rendering. */
 function formatValue(value: unknown): string {
   if (value === null || value === undefined) return EM_DASH;
   if (typeof value === 'object') return JSON.stringify(value);
   return String(value);
 }
 
+function transitionSide(value: unknown): string {
+  return value === null || value === undefined ? EM_DASH : humanizeWorkflowState(String(value));
+}
+
+function dueDateChange(from: unknown, to: unknown, formatDate: (iso: string) => string): string {
+  const before = from === null || from === undefined ? null : formatDate(String(from));
+  const after = to === null || to === undefined ? null : formatDate(String(to));
+  if (before === null && after === null) return EM_DASH;
+  if (before === null) return `Set to ${after}`;
+  if (after === null) return `Cleared (was ${before})`;
+  return `${before} → ${after}`;
+}
+
 /**
- * Renders the audit event's raw jsonb `detail` (a JSON string) readably for the
- * audit table (issue #466). `workflow.transition` gets the emphasised old→new
- * form (`{ from, to }`); any other object detail becomes a compact
- * `key: value` list; a non-JSON payload (e.g. a bare id) is shown verbatim; and
- * an absent detail is an em dash. Best-effort by design — the event vocabulary
- * is open (ADR-0041), so unknown shapes still render something sensible.
+ * Renders an audit event's raw jsonb `detail` as a short, plain-language phrase
+ * for the audit table (issue #466) — never a raw UUID (ADR-0042). Each known
+ * event type gets a purpose-built rendering: a workflow transition reads as
+ * `Draft → In review`, a placement as `On version 3`, a due-date change as
+ * `Set to <date>` / `<date> → <date>` (dates via the caller's zone-aware
+ * formatter), an extraction failure as its reason. Events whose meaning is fully
+ * carried by their label (a raised/resolved/reopened annotation, whose only
+ * payload is an internal id) render an em dash. Any unknown shape still degrades
+ * to a compact `key: value` list, since the vocabulary is open.
  */
-export function formatAuditDetail(eventType: string, detail: string | null | undefined): string {
+export function formatAuditDetail(
+  eventType: string,
+  detail: string | null | undefined,
+  formatDate: (iso: string) => string = (iso) => iso,
+): string {
   if (!detail) return EM_DASH;
 
   let parsed: unknown;
   try {
     parsed = JSON.parse(detail);
   } catch {
-    // Not JSON (e.g. a bare annotation id) — show it as-is.
+    // Not JSON (e.g. a bare id) — show it as-is.
     return detail;
   }
 
@@ -53,10 +75,43 @@ export function formatAuditDetail(eventType: string, detail: string | null | und
 
   const obj = parsed as Record<string, unknown>;
 
-  if (eventType === 'workflow.transition' && ('from' in obj || 'to' in obj)) {
-    return `${formatValue(obj.from)} → ${formatValue(obj.to)}`;
+  switch (eventType) {
+    case 'annotation.created':
+    case 'annotation.resolved':
+    case 'annotation.reopened':
+    case 'extraction.succeeded':
+      // The event label already conveys the meaning; the payload is only an
+      // internal id, which is never shown.
+      return EM_DASH;
+    case 'annotation.classified': {
+      const bits: string[] = [];
+      if (obj.type !== null && obj.type !== undefined) bits.push(humanizeToken(String(obj.type)));
+      if (obj.priority !== null && obj.priority !== undefined) {
+        bits.push(`${humanizeToken(String(obj.priority))} priority`);
+      }
+      return bits.length > 0 ? `As ${bits.join(' · ')}` : EM_DASH;
+    }
+    case 'placement.confirmed':
+    case 'placement.reattached':
+      return obj.versionNumber !== null && obj.versionNumber !== undefined
+        ? `On version ${formatValue(obj.versionNumber)}`
+        : EM_DASH;
+    case 'workflow.transition':
+      if ('from' in obj || 'to' in obj) {
+        return `${transitionSide(obj.from)} → ${transitionSide(obj.to)}`;
+      }
+      break;
+    case 'document.due_date.changed':
+      return dueDateChange(obj.from, obj.to, formatDate);
+    case 'extraction.failed':
+      return obj.reason !== null && obj.reason !== undefined
+        ? `Reason: ${formatValue(obj.reason)}`
+        : EM_DASH;
+    default:
+      break;
   }
 
+  // Open-vocabulary fallback: a compact key: value list.
   const parts = Object.entries(obj).map(([key, value]) => `${key}: ${formatValue(value)}`);
   return parts.length > 0 ? parts.join(', ') : EM_DASH;
 }

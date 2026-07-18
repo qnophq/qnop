@@ -22,7 +22,9 @@
 import { useState } from 'react';
 import Alert from '@mui/material/Alert';
 import Box from '@mui/material/Box';
+import Button from '@mui/material/Button';
 import Chip from '@mui/material/Chip';
+import Collapse from '@mui/material/Collapse';
 import LinearProgress from '@mui/material/LinearProgress';
 import MenuItem from '@mui/material/MenuItem';
 import Paper from '@mui/material/Paper';
@@ -30,22 +32,14 @@ import Stack from '@mui/material/Stack';
 import TablePagination from '@mui/material/TablePagination';
 import TextField from '@mui/material/TextField';
 import Typography from '@mui/material/Typography';
+import { ChevronDown, HelpCircle } from 'lucide-react';
 import { useAuditLog } from '../../api/hooks/useAuditLog';
 import { AuditTable } from '../../components/audit/AuditTable';
+import { AuditEventBadge } from '../../components/audit/AuditEventBadge';
 import { PageHeader } from '../../components/admin/layout/PageHeader';
+import { AUDIT_EVENT_META, AUDIT_EVENT_TYPES } from '../../utils/auditEvents';
 
 const PAGE_SIZE_OPTIONS = [10, 20, 50, 100];
-
-/** The document-review audit event vocabulary (ADR-0042), offered as a filter. */
-const EVENT_TYPES = [
-  'annotation.created',
-  'annotation.resolved',
-  'annotation.reopened',
-  'placement.confirmed',
-  'placement.reattached',
-  'workflow.transition',
-  'document.due_date.changed',
-];
 
 interface EntityFilter {
   id: string;
@@ -75,6 +69,7 @@ export function AuditPage() {
   const [document, setDocument] = useState<EntityFilter | null>(null);
   const [page, setPage] = useState(0);
   const [pageSize, setPageSize] = useState(20);
+  const [legendOpen, setLegendOpen] = useState(false);
 
   const { data, isLoading, isFetching, isError } = useAuditLog({
     eventType: eventType || undefined,
@@ -101,9 +96,70 @@ export function AuditPage() {
   return (
     <Stack spacing={3}>
       <PageHeader
-        title="Audit"
-        description="Browse the organisation-wide document review audit trail."
+        title="Audit trail"
+        description="Every recorded action across all document reviews — who did what, and when."
+        action={
+          <Button
+            color="inherit"
+            startIcon={<HelpCircle size={16} />}
+            endIcon={
+              <ChevronDown
+                size={15}
+                style={{
+                  transform: legendOpen ? 'rotate(180deg)' : 'none',
+                  transition: 'transform 150ms',
+                }}
+              />
+            }
+            onClick={() => setLegendOpen((open) => !open)}
+            aria-expanded={legendOpen}
+          >
+            What do these events mean?
+          </Button>
+        }
       />
+
+      <Collapse in={legendOpen} unmountOnExit>
+        <Paper variant="outlined" sx={{ p: { xs: 2, sm: 2.5 } }}>
+          <Typography
+            component="h2"
+            sx={{
+              fontSize: 12,
+              fontWeight: 600,
+              letterSpacing: '0.08em',
+              textTransform: 'uppercase',
+              color: 'text.disabled',
+              mb: 2,
+            }}
+          >
+            Event guide
+          </Typography>
+          <Box
+            sx={{
+              display: 'grid',
+              gridTemplateColumns: { xs: '1fr', md: 'repeat(2, minmax(0, 1fr))' },
+              columnGap: 4,
+              rowGap: 1.75,
+            }}
+          >
+            {AUDIT_EVENT_TYPES.map((type) => (
+              <Stack
+                key={type}
+                direction="row"
+                spacing={1.5}
+                sx={{ alignItems: 'baseline', minWidth: 0 }}
+              >
+                <Box sx={{ flexShrink: 0, pt: 0.25 }}>
+                  <AuditEventBadge eventType={type} />
+                </Box>
+                <Typography variant="body2" color="text.secondary" sx={{ lineHeight: 1.5 }}>
+                  {AUDIT_EVENT_META[type].description}
+                </Typography>
+              </Stack>
+            ))}
+          </Box>
+        </Paper>
+      </Collapse>
 
       <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1.5} sx={{ flexWrap: 'wrap' }}>
         <TextField
@@ -118,9 +174,9 @@ export function AuditPage() {
           sx={{ minWidth: 220 }}
         >
           <MenuItem value="">All events</MenuItem>
-          {EVENT_TYPES.map((type) => (
+          {AUDIT_EVENT_TYPES.map((type) => (
             <MenuItem key={type} value={type}>
-              {type}
+              {AUDIT_EVENT_META[type].label}
             </MenuItem>
           ))}
         </TextField>

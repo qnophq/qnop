@@ -23,24 +23,70 @@ import { describe, expect, it } from 'vitest';
 import { formatAuditDetail } from './auditDetail';
 
 describe('formatAuditDetail', () => {
-  it('renders a workflow transition as old → new', () => {
+  it('renders a workflow transition with human state labels', () => {
     expect(formatAuditDetail('workflow.transition', '{"from":"DRAFT","to":"IN_REVIEW"}')).toBe(
-      'DRAFT → IN_REVIEW',
+      'Draft → In review',
     );
   });
 
   it('fills a missing transition side with an em dash', () => {
-    expect(formatAuditDetail('workflow.transition', '{"to":"CANCELLED"}')).toBe('— → CANCELLED');
+    expect(formatAuditDetail('workflow.transition', '{"to":"CANCELLED"}')).toBe('— → Cancelled');
   });
 
-  it('renders a generic object as a compact key: value list', () => {
+  it('renders a placement on its version number, not the raw annotation id', () => {
     expect(
-      formatAuditDetail('document.extraction.failed', '{"versionId":"v1","reason":"BAD_PDF"}'),
-    ).toBe('versionId: v1, reason: BAD_PDF');
+      formatAuditDetail('placement.confirmed', '{"annotationId":"a1b2c3","versionNumber":3}'),
+    ).toBe('On version 3');
+    expect(
+      formatAuditDetail('placement.reattached', '{"annotationId":"a1b2c3","versionNumber":2}'),
+    ).toBe('On version 2');
+  });
+
+  it('renders a classification from its type and priority', () => {
+    expect(formatAuditDetail('annotation.classified', '{"type":"ISSUE","priority":"HIGH"}')).toBe(
+      'As Issue · High priority',
+    );
+  });
+
+  it('renders a due-date change with the caller’s date formatter', () => {
+    const fmt = (iso: string) => `[${iso}]`;
+    expect(
+      formatAuditDetail(
+        'document.due_date.changed',
+        '{"from":null,"to":"2026-08-01T00:00:00Z"}',
+        fmt,
+      ),
+    ).toBe('Set to [2026-08-01T00:00:00Z]');
+    expect(
+      formatAuditDetail(
+        'document.due_date.changed',
+        '{"from":"2026-08-01T00:00:00Z","to":"2026-08-08T00:00:00Z"}',
+        fmt,
+      ),
+    ).toBe('[2026-08-01T00:00:00Z] → [2026-08-08T00:00:00Z]');
+    expect(
+      formatAuditDetail(
+        'document.due_date.changed',
+        '{"from":"2026-08-01T00:00:00Z","to":null}',
+        fmt,
+      ),
+    ).toBe('Cleared (was [2026-08-01T00:00:00Z])');
+  });
+
+  it('renders an extraction failure by its reason', () => {
+    expect(formatAuditDetail('extraction.failed', '{"versionId":"v1","reason":"BAD_PDF"}')).toBe(
+      'Reason: BAD_PDF',
+    );
+  });
+
+  it('renders an em dash for events whose meaning is carried by the label alone', () => {
+    expect(formatAuditDetail('annotation.created', '{"annotationId":"a1"}')).toBe('—');
+    expect(formatAuditDetail('annotation.resolved', '{"annotationId":"a1"}')).toBe('—');
+    expect(formatAuditDetail('extraction.succeeded', '{"versionId":"v1"}')).toBe('—');
   });
 
   it('shows a non-JSON payload verbatim', () => {
-    expect(formatAuditDetail('annotation.resolved', 'a1b2c3')).toBe('a1b2c3');
+    expect(formatAuditDetail('annotation.resolved', 'not-json')).toBe('not-json');
   });
 
   it('renders an em dash for an absent detail', () => {
@@ -49,15 +95,8 @@ describe('formatAuditDetail', () => {
     expect(formatAuditDetail('annotation.created', '')).toBe('—');
   });
 
-  it('renders an empty object as an em dash', () => {
-    expect(formatAuditDetail('annotation.created', '{}')).toBe('—');
-  });
-
-  it('renders a primitive JSON value directly', () => {
-    expect(formatAuditDetail('some.event', '42')).toBe('42');
-  });
-
-  it('stringifies a nested object value', () => {
-    expect(formatAuditDetail('some.event', '{"meta":{"k":1}}')).toBe('meta: {"k":1}');
+  it('falls back to a compact key: value list for an unknown event shape', () => {
+    expect(formatAuditDetail('some.future.event', '{"meta":{"k":1}}')).toBe('meta: {"k":1}');
+    expect(formatAuditDetail('some.future.event', '42')).toBe('42');
   });
 });

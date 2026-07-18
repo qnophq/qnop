@@ -19,7 +19,6 @@
  * SPDX-License-Identifier: AGPL-3.0-only
  */
 
-import Chip from '@mui/material/Chip';
 import Link from '@mui/material/Link';
 import Table from '@mui/material/Table';
 import TableBody from '@mui/material/TableBody';
@@ -30,8 +29,9 @@ import Typography from '@mui/material/Typography';
 import type { AuditEvent } from '../../api/generated';
 import { useFormatters } from '../../hooks/useFormatters';
 import { formatAuditDetail } from '../../utils/auditDetail';
+import { AuditEventBadge } from './AuditEventBadge';
 
-const COLUMNS = ['Time', 'Actor', 'Event', 'Document', 'Detail'];
+const COLUMNS = ['Time', 'Actor', 'Event', 'Document', 'Details'];
 const EM_DASH = '—';
 
 interface AuditTableProps {
@@ -91,7 +91,7 @@ export function AuditTable({ events, onFilterActor, onFilterDocument }: AuditTab
                 )}
               </TableCell>
               <TableCell>
-                <Chip label={event.eventType} size="small" variant="outlined" />
+                <AuditEventBadge eventType={event.eventType} />
               </TableCell>
               <TableCell>
                 <Link
@@ -105,7 +105,7 @@ export function AuditTable({ events, onFilterActor, onFilterDocument }: AuditTab
               </TableCell>
               <TableCell>
                 <Typography variant="body2" color="text.secondary">
-                  {formatAuditDetail(event.eventType, event.detail)}
+                  {formatAuditDetail(event.eventType, event.detail, formatDateTime)}
                 </Typography>
               </TableCell>
             </TableRow>

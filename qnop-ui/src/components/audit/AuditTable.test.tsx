@@ -38,7 +38,7 @@ const userEvent: AuditEvent = {
 
 const systemEvent: AuditEvent = {
   id: 'e2',
-  eventType: 'document.extraction.failed',
+  eventType: 'extraction.failed',
   documentId: 'doc-2',
   documentTitle: 'Ingest report',
   actorId: undefined,
@@ -66,12 +66,12 @@ describe('AuditTable', () => {
     expect(screen.getByText('No audit events found.')).toBeInTheDocument();
   });
 
-  it('renders a readable detail and the resolved names', () => {
+  it('renders a human event label, readable detail and the resolved names', () => {
     renderTable([userEvent]);
-    expect(screen.getByText('DRAFT → IN_REVIEW')).toBeInTheDocument();
+    expect(screen.getByText('Status changed')).toBeInTheDocument();
+    expect(screen.getByText('Draft → In review')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Avery Auditor' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Master services agreement' })).toBeInTheDocument();
-    expect(screen.getByText('workflow.transition')).toBeInTheDocument();
   });
 
   it('renders the system actor as inert text, not a filter link', () => {
