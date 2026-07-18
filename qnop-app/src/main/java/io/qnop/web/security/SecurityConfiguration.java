@@ -152,7 +152,7 @@ public class SecurityConfiguration {
                     .requestMatchers("/api/v1/admin/**")
                     .hasRole("ADMIN")
                     // The organisation-wide audit trail is the first — and for now only —
-                    // surface the AUDITOR role unlocks (issue #466, ADR-0041). ADMIN is named
+                    // surface the AUDITOR role unlocks (issue #466, ADR-0042). ADMIN is named
                     // explicitly: there is no RoleHierarchy, so one authority never implies
                     // another.
                     .requestMatchers("/api/v1/audit/**")

@@ -43,7 +43,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * The organisation-wide audit list for the AUDITOR/ADMIN compliance view (issue #466, ADR-0041): a
+ * The organisation-wide audit list for the AUDITOR/ADMIN compliance view (issue #466, ADR-0042): a
  * paginated, newest-first, filterable read of the append-only {@code audit_event} trail across
  * every document. Authorization is enforced at the security chain ({@code /api/v1/audit/**}
  * requires {@code AUDITOR} or {@code ADMIN}) — this service is deliberately un-scoped by

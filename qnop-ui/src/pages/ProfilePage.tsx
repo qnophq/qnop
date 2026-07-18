@@ -38,11 +38,14 @@ import { profileAchievements, profileStats } from '../components/profile/profile
 import { UserAvatar } from '../components/shell/UserAvatar';
 import { UserRoleBadge, UserSourceBadge } from '../components/admin/users/UserBadges';
 import { AvatarUploader } from '../components/profile/AvatarUploader';
+import { TimezoneSetting } from '../components/profile/TimezoneSetting';
 import {
   EMAIL_REVIEW_NOTIFICATIONS_KEY,
   useUpdateUserSettings,
   useUserSettings,
 } from '../api/hooks/useUserSettings';
+import { useDisplayTimezone } from '../api/hooks/useDisplayTimezone';
+import { TIMEZONE_SETTING_KEY } from '../utils/timezone';
 
 type Toast = { message: string; severity: 'success' | 'error' } | null;
 
@@ -74,6 +77,13 @@ export function ProfilePage() {
   // Absent value = registry default (true) — the toggle reflects what the server does.
   const reviewMailsOn = reviewMailsSetting ? reviewMailsSetting.value !== 'false' : true;
 
+  // The zone actually applied (own preference → workspace default → UTC); an empty stored
+  // value means the user has made no explicit choice yet (issue #465).
+  const displayZone = useDisplayTimezone();
+  const timezoneExplicit = Boolean(
+    settingsQuery.data?.settings.find((setting) => setting.key === TIMEZONE_SETTING_KEY)?.value,
+  );
+
   const reviews = reviewsQuery.data?.items ?? [];
   const stats = profileStats(reviews, userId);
   const achievements = profileAchievements({
@@ -89,6 +99,17 @@ export function ProfilePage() {
       { [EMAIL_REVIEW_NOTIFICATIONS_KEY]: String(checked) },
       {
         onError: () => setToast({ message: 'The setting could not be saved.', severity: 'error' }),
+      },
+    );
+  };
+
+  const onChangeTimezone = (zone: string) => {
+    updateSettings.mutate(
+      { [TIMEZONE_SETTING_KEY]: zone },
+      {
+        onError: () =>
+          setToast({ message: 'The time zone could not be saved.', severity: 'error' }),
+        onSuccess: () => setToast({ message: 'Time zone updated.', severity: 'success' }),
       },
     );
   };
@@ -250,6 +271,13 @@ export function ProfilePage() {
           label="Email me about review activity"
         />
       </Paper>
+
+      <TimezoneSetting
+        value={displayZone}
+        isExplicit={timezoneExplicit}
+        saving={updateSettings.isPending}
+        onChange={onChangeTimezone}
+      />
 
       <Snackbar
         open={toast !== null}

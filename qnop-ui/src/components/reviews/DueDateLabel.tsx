@@ -22,7 +22,7 @@
 import Stack from '@mui/material/Stack';
 import Typography from '@mui/material/Typography';
 import { AlarmClock, CalendarClock } from 'lucide-react';
-import { formatDueDate, isPast } from '../../utils/formatDate';
+import { useFormatters } from '../../hooks/useFormatters';
 import { isOpenWorkflowState } from './workflowMeta';
 
 interface DueDateLabelProps {
@@ -40,6 +40,7 @@ interface DueDateLabelProps {
  * history — a passed deadline on a finished review is not a problem.
  */
 export function DueDateLabel({ dueAt, workflowState, variant = 'caption' }: DueDateLabelProps) {
+  const { formatDueDate, isPast } = useFormatters();
   if (!dueAt) return null;
   const overdue = isPast(dueAt) && isOpenWorkflowState(workflowState);
   const Icon = overdue ? AlarmClock : CalendarClock;

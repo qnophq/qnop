@@ -31,7 +31,7 @@ import Typography from '@mui/material/Typography';
 import { useTheme } from '@mui/material/styles';
 import { ChevronRight } from 'lucide-react';
 import type { DocumentSummary } from '../../../api/generated';
-import { formatRelative } from '../../../utils/formatDate';
+import { useFormatters } from '../../../hooks/useFormatters';
 import { DueDateLabel } from '../DueDateLabel';
 import { WorkflowBadge } from '../WorkflowBadge';
 import { AnonymousBadge } from '../AnonymousBadge';
@@ -49,6 +49,7 @@ interface ReviewsTableProps {
 /** The overview's table view (prototype `reviews.jsx`): dense, scannable rows. */
 export function ReviewsTable({ reviews, userId, onOpen }: ReviewsTableProps) {
   const theme = useTheme();
+  const { formatRelative } = useFormatters();
   return (
     <Paper variant="outlined" sx={{ overflow: 'hidden' }}>
       <Box sx={{ overflowX: 'auto' }}>

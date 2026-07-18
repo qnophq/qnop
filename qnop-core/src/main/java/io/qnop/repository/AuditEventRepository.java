@@ -33,7 +33,7 @@ import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
  * Data access for the append-only per-document audit trail (issue #244, ADR-0011).
  *
  * <p>Extends {@link JpaSpecificationExecutor} for the organisation-wide, optionally-filtered
- * AUDITOR/ADMIN audit list (issue #466, ADR-0041): the filters are built as a {@code Specification}
+ * AUDITOR/ADMIN audit list (issue #466, ADR-0042): the filters are built as a {@code Specification}
  * in the service rather than a JPQL {@code (:param IS NULL OR …)} query, which PostgreSQL rejects
  * for a null timestamp bind parameter (it cannot infer the type of a parameter used only in {@code
  * ? IS NULL}).

@@ -48,7 +48,7 @@ import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
 
 /**
- * The organisation-wide audit trail over the wire (issue #466, ADR-0041): the AUDITOR/ADMIN role
+ * The organisation-wide audit trail over the wire (issue #466, ADR-0042): the AUDITOR/ADMIN role
  * gate (a MEMBER is forbidden), the filters (event type, actor, document, created-at range) and
  * bounded paging, real actor/document name resolution — including the caller's OWN actions, which
  * this view keeps (unlike the dashboard feed) — and the system actor rendered as "System".

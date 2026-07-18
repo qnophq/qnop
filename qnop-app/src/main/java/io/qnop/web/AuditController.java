@@ -32,7 +32,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 /**
  * The organisation-wide audit trail ({@code GET /api/v1/audit/events}), implementing the generated
- * {@link AuditApi} contract (issue #466, ADR-0041) — a thin mapping over {@link AuditLogService}.
+ * {@link AuditApi} contract (issue #466, ADR-0042) — a thin mapping over {@link AuditLogService}.
  * Authorization is enforced centrally by the security chain ({@code /api/v1/audit/**} requires
  * {@code AUDITOR} or {@code ADMIN}); a {@code MEMBER} never reaches this method (403). The query is
  * org-wide by design, so no caller identity is needed here.

@@ -1,4 +1,4 @@
-# ADR-0041: Audit-trail exposure — the AUDITOR read surface and its boundary
+# ADR-0042: Audit-trail exposure — the AUDITOR read surface and its boundary
 
 - **Status:** Accepted
 - **Date:** 2026-07-17

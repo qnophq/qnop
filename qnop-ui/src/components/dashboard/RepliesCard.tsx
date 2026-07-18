@@ -27,7 +27,7 @@ import { alpha, useTheme } from '@mui/material/styles';
 import { MessagesSquare } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import type { DashboardReply } from '../../api/generated';
-import { shortRelativeTime } from '../../utils/relativeTime';
+import { useFormatters } from '../../hooks/useFormatters';
 import { SectionCard } from '../admin/layout/SectionCard';
 import { CardScroller } from './CardScroller';
 import { CountPill } from './CountPill';
@@ -46,6 +46,7 @@ interface RepliesCardProps {
 export function RepliesCard({ replies }: RepliesCardProps) {
   const theme = useTheme();
   const navigate = useNavigate();
+  const { shortRelativeTime } = useFormatters();
 
   return (
     <SectionCard

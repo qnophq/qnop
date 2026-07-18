@@ -27,7 +27,7 @@ import Typography from '@mui/material/Typography';
 import { useTheme } from '@mui/material/styles';
 import { History, MessageSquare } from 'lucide-react';
 import type { DocumentSummary } from '../../../api/generated';
-import { formatRelative } from '../../../utils/formatDate';
+import { useFormatters } from '../../../hooks/useFormatters';
 import { DueDateLabel } from '../DueDateLabel';
 import { WorkflowBadge } from '../WorkflowBadge';
 import { AnonymousBadge } from '../AnonymousBadge';
@@ -45,6 +45,7 @@ interface ReviewCardsProps {
 /** The overview's card view: hover-lift tiles (prototype `rv-card`). */
 export function ReviewCards({ reviews, userId, onOpen }: ReviewCardsProps) {
   const theme = useTheme();
+  const { formatRelative } = useFormatters();
   return (
     <Box
       sx={{

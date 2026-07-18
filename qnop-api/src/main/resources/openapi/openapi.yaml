@@ -103,7 +103,7 @@ tags:
   - name: Audit
     description: |
       The organisation-wide audit trail of the document-review core (issue
-      #466, ADR-0041): a paginated, filterable, newest-first view of the
+      #466, ADR-0042): a paginated, filterable, newest-first view of the
       append-only `audit_event` log across every document, gated to the
       `AUDITOR` and `ADMIN` roles — the first authorization surface that makes
       `AUDITOR` real. Actors and documents are resolved to their real
@@ -1856,7 +1856,7 @@ paths:
       summary: List audit events (AUDITOR/ADMIN)
       description: |
         A paginated, newest-first page of the organisation-wide document audit
-        trail (issue #466, ADR-0041), restricted to the `AUDITOR` and `ADMIN`
+        trail (issue #466, ADR-0042), restricted to the `AUDITOR` and `ADMIN`
         roles — a `MEMBER` receives 403. Optional filters narrow by exact event
         type, actor, document, and a `createdAt` from/to range (both inclusive);
         page size is bounded. Actor and document ids are resolved to their real
@@ -3965,7 +3965,7 @@ components:
     AuditEvent:
       type: object
       description: >-
-        One entry of the document-review audit trail (issue #466, ADR-0041),
+        One entry of the document-review audit trail (issue #466, ADR-0042),
         with the actor and document resolved to their real display names.
       required:
         - id

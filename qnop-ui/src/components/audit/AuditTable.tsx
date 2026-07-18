@@ -47,7 +47,7 @@ interface AuditTableProps {
  * a readable rendering of the jsonb detail. Actor and document cells are
  * click-to-filter; the system actor (no id) is inert plain text. No raw UUIDs
  * are ever shown — an unresolved actor/document falls back to an em dash
- * (ADR-0041). Timestamps use the shared formatter (user-timezone display lands
+ * (ADR-0042). Timestamps use the shared formatter (user-timezone display lands
  * centrally with #465).
  */
 export function AuditTable({ events, onFilterActor, onFilterDocument }: AuditTableProps) {

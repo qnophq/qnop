@@ -58,7 +58,7 @@ import org.springframework.data.domain.Sort;
 import org.springframework.data.jpa.domain.Specification;
 
 /**
- * The audit-list mapping and paging rules (issue #466, ADR-0041): real actor/document resolution,
+ * The audit-list mapping and paging rules (issue #466, ADR-0042): real actor/document resolution,
  * the system-actor label, unresolved-entity nulls, and the defensive page/size clamping — all in
  * isolation, with the three repositories mocked.
  */

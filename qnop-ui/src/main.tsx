@@ -36,6 +36,7 @@ import './index.css';
 import { queryClient } from './api/queryClient';
 import { AuthHydrationBoundary } from './components/auth/AuthHydrationBoundary';
 import { FaviconManager } from './components/branding/FaviconManager';
+import { TimezoneSync } from './components/TimezoneSync';
 import { router } from './router';
 import { buildTheme } from './theme/theme';
 import { useUiStore } from './stores/uiStore';
@@ -51,6 +52,7 @@ function Root() {
       <ThemeProvider theme={theme}>
         <CssBaseline />
         <FaviconManager />
+        <TimezoneSync />
         <AuthHydrationBoundary>
           <RouterProvider router={router} />
         </AuthHydrationBoundary>

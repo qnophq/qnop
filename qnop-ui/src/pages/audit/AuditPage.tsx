@@ -36,7 +36,7 @@ import { PageHeader } from '../../components/admin/layout/PageHeader';
 
 const PAGE_SIZE_OPTIONS = [10, 20, 50, 100];
 
-/** The document-review audit event vocabulary (ADR-0041), offered as a filter. */
+/** The document-review audit event vocabulary (ADR-0042), offered as a filter. */
 const EVENT_TYPES = [
   'annotation.created',
   'annotation.resolved',
@@ -60,7 +60,7 @@ function toIso(value: string): string | undefined {
 }
 
 /**
- * The organisation-wide audit trail (issue #466, ADR-0041), reachable only by an
+ * The organisation-wide audit trail (issue #466, ADR-0042), reachable only by an
  * AUDITOR or ADMIN (the sidebar hides it and the route guards it). Filter by
  * event type, a created-at range, and — by clicking a row — a single actor or
  * document; page through the results. Loading, error and empty states are all
