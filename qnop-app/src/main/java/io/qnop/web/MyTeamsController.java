@@ -144,7 +144,8 @@ public class MyTeamsController implements TeamsApi {
     return new MyTeam()
         .teamId(v.teamId())
         .name(v.name())
-        .teamRole(TeamRole.fromValue(v.teamRole()));
+        .teamRole(TeamRole.fromValue(v.teamRole()))
+        .memberCount(v.memberCount());
   }
 
   private static AdminTeamDetail toDetail(TeamDetailView v) {

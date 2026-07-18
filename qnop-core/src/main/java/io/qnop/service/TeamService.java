@@ -189,11 +189,26 @@ public class TeamService {
   // last lead through this surface (which also blocks a sole lead's self-lockout).
   // ---------------------------------------------------------------------------
 
-  /** The caller's own teams with the caller's role in each, ordered by name (issue #470). */
+  /**
+   * The caller's own teams with the caller's role and member count, ordered by name (issue #470).
+   */
   @Transactional(readOnly = true)
   public List<MyTeamView> listMyTeams(UUID userId) {
-    return memberships.findTeamsOfUser(userId).stream()
-        .map(TeamService::toMyTeamView)
+    List<UserTeamProjection> mine = memberships.findTeamsOfUser(userId);
+    List<UUID> ids = mine.stream().map(UserTeamProjection::teamId).toList();
+    Map<UUID, Long> counts =
+        ids.isEmpty()
+            ? Map.of()
+            : memberships.countMembersByTeamIds(ids).stream()
+                .collect(Collectors.toMap(TeamMemberCount::teamId, TeamMemberCount::count));
+    return mine.stream()
+        .map(
+            t ->
+                new MyTeamView(
+                    t.teamId(),
+                    t.teamName(),
+                    t.teamRole().name(),
+                    counts.getOrDefault(t.teamId(), 0L)))
         .collect(Collectors.toList());
   }
 
@@ -274,10 +289,6 @@ public class TeamService {
     }
   }
 
-  private static MyTeamView toMyTeamView(UserTeamProjection p) {
-    return new MyTeamView(p.teamId(), p.teamName(), p.teamRole().name());
-  }
-
   private static TeamMemberView toMemberView(User user, TeamMembership membership) {
     return new TeamMemberView(
         user.getId(),
@@ -344,6 +355,6 @@ public class TeamService {
   /** One page of {@link TeamSummaryView}s plus the total count. */
   public record TeamPage(List<TeamSummaryView> items, long total, int page, int size) {}
 
-  /** A team the caller belongs to, with the caller's role there (issue #470). */
-  public record MyTeamView(UUID teamId, String name, String teamRole) {}
+  /** A team the caller belongs to, with the caller's role and member count there (issue #470). */
+  public record MyTeamView(UUID teamId, String name, String teamRole, long memberCount) {}
 }

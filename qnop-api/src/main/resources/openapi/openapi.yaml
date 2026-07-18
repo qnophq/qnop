@@ -4286,10 +4286,15 @@ components:
           type: string
         teamRole:
           $ref: '#/components/schemas/TeamRole'
+        memberCount:
+          type: integer
+          format: int64
+          description: How many members the team has — drives the "My Teams" roster tier.
       required:
         - teamId
         - name
         - teamRole
+        - memberCount
     MyTeamListResponse:
       type: object
       description: The teams the caller belongs to (issue #470).

@@ -175,12 +175,15 @@ class TeamServiceTest {
   }
 
   @Test
-  @DisplayName("listMyTeams maps the caller's affiliations with the team-role name")
+  @DisplayName(
+      "listMyTeams maps the caller's affiliations with the team-role name and member count")
   void listMyTeams() {
     UUID userId = UUID.randomUUID();
     UUID teamId = UUID.randomUUID();
     when(memberships.findTeamsOfUser(userId))
         .thenReturn(List.of(new UserTeamProjection(teamId, "Core", TeamRole.LEAD)));
+    when(memberships.countMembersByTeamIds(List.of(teamId)))
+        .thenReturn(List.of(new io.qnop.repository.TeamMemberCount(teamId, 7L)));
 
     assertThat(service.listMyTeams(userId))
         .singleElement()
@@ -189,6 +192,7 @@ class TeamServiceTest {
               assertThat(t.teamId()).isEqualTo(teamId);
               assertThat(t.name()).isEqualTo("Core");
               assertThat(t.teamRole()).isEqualTo("LEAD");
+              assertThat(t.memberCount()).isEqualTo(7L);
             });
   }
 

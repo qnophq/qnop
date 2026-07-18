@@ -42,8 +42,8 @@ vi.mock('../../api/hooks/useMyTeams', () => ({
 beforeEach(() => {
   myTeamsState.data = {
     items: [
-      { teamId: 't1', name: 'Platform', teamRole: 'LEAD' },
-      { teamId: 't2', name: 'Design Guild', teamRole: 'MEMBER' },
+      { teamId: 't1', name: 'Platform', teamRole: 'LEAD', memberCount: 7 },
+      { teamId: 't2', name: 'Design Guild', teamRole: 'MEMBER', memberCount: 3 },
     ],
   };
   myTeamsState.isLoading = false;
@@ -77,9 +77,37 @@ describe('MyTeamsPage', () => {
   });
 
   it('shows an empty hint when the caller leads no team', () => {
-    myTeamsState.data = { items: [{ teamId: 't2', name: 'Design Guild', teamRole: 'MEMBER' }] };
+    myTeamsState.data = {
+      items: [{ teamId: 't2', name: 'Design Guild', teamRole: 'MEMBER', memberCount: 3 }],
+    };
     renderPage();
 
     expect(screen.getByText('You don’t lead any team yet.')).toBeTruthy();
+  });
+
+  it('surfaces a leadership rank and headline stats for the teams led', () => {
+    renderPage();
+
+    expect(screen.getByText('Team Lead')).toBeTruthy();
+    expect(screen.getByText('Teams led')).toBeTruthy();
+    expect(screen.getByText('Largest team')).toBeTruthy();
+  });
+
+  it("shows each led team's roster tier and an unlockable achievement", () => {
+    renderPage();
+
+    // 7 members → the Crew tier.
+    expect(screen.getByText('Crew')).toBeTruthy();
+    // The first-team achievement is earned once any team is led.
+    expect(screen.getByText('First team')).toBeTruthy();
+  });
+
+  it('hides the leadership banner entirely when no team is led', () => {
+    myTeamsState.data = {
+      items: [{ teamId: 't2', name: 'Design Guild', teamRole: 'MEMBER', memberCount: 3 }],
+    };
+    renderPage();
+
+    expect(screen.queryByText('Leadership HQ')).toBeNull();
   });
 });

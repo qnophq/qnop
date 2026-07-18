@@ -50,7 +50,7 @@ function wrapper({ children }: { children: ReactNode }) {
 }
 
 const MINE: MyTeamListResponse = {
-  items: [{ teamId: 't1', name: 'Core', teamRole: 'LEAD' }],
+  items: [{ teamId: 't1', name: 'Core', teamRole: 'LEAD', memberCount: 4 }],
 };
 const TEAM: AdminTeamDetail = {
   id: 't1',

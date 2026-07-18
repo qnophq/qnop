@@ -58,6 +58,8 @@ export function AppShell() {
   const dashboardMatch = useMatch('/');
   const reviewsListMatch = useMatch('/reviews');
   const adminMatch = useMatch('/admin/*');
+  const myTeamsMatch = useMatch('/my-teams');
+  const myTeamDetailMatch = useMatch('/my-teams/:id');
   const profileMatch = useMatch('/profile');
   const userProfileMatch = useMatch('/users/:userId');
   // The new-review wizard (#469 polish) spans the full width too — it lays out
@@ -68,6 +70,8 @@ export function AppShell() {
     Boolean(dashboardMatch) ||
     Boolean(reviewsListMatch) ||
     Boolean(adminMatch) ||
+    Boolean(myTeamsMatch) ||
+    Boolean(myTeamDetailMatch) ||
     Boolean(profileMatch) ||
     Boolean(userProfileMatch) ||
     wizardMatch;

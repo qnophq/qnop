@@ -19,23 +19,49 @@
  * SPDX-License-Identifier: AGPL-3.0-only
  */
 
+import type { ReactNode } from 'react';
 import Alert from '@mui/material/Alert';
 import Box from '@mui/material/Box';
+import LinearProgress from '@mui/material/LinearProgress';
 import Paper from '@mui/material/Paper';
 import Stack from '@mui/material/Stack';
+import Tooltip from '@mui/material/Tooltip';
 import Typography from '@mui/material/Typography';
-import { ArrowRight, UsersRound } from 'lucide-react';
+import { keyframes } from '@mui/material/styles';
+import { ArrowRight, Crown, Lock, Trophy, UsersRound } from 'lucide-react';
 import { Link as RouterLink } from 'react-router-dom';
 import type { MyTeam } from '../../api/generated';
 import { useMyTeams } from '../../api/hooks/useMyTeams';
 import { TeamRoleBadge } from '../../components/admin/teams/TeamRoleBadge';
+import { TeamCrest } from '../../components/my-teams/TeamCrest';
 import { PageHeader } from '../../components/admin/layout/PageHeader';
+import {
+  computeAchievements,
+  leadershipStats,
+  teamTier,
+  type Achievement,
+} from '../../utils/teamProgress';
+
+const revealUp = keyframes`
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: none; }
+`;
+
+/** A staggered fade-up entrance, disabled under reduced-motion. */
+function reveal(index: number) {
+  return {
+    animation: `${revealUp} 420ms cubic-bezier(0.16, 1, 0.3, 1) both`,
+    animationDelay: `${index * 55}ms`,
+    '@media (prefers-reduced-motion: reduce)': { animation: 'none' },
+  } as const;
+}
 
 /**
- * The team-lead landing surface (issue #470): the teams the caller belongs to,
- * split into the teams they lead — interactive cards that open member management —
- * and the teams where they are only a member (informational). A LEAD reaches this
- * without being a global admin; the admin team console stays separate.
+ * The team-lead landing surface (issue #470), styled as a "Leadership HQ": a
+ * banner with the caller's leadership rank, headline stats and achievements, then
+ * the teams they lead as guild cards (crest, roster tier and progress), and the
+ * teams they only belong to below. Purely derived motivation over the real team
+ * data — no invented metrics. A LEAD reaches this without being a global admin.
  */
 export function MyTeamsPage() {
   const { data, isLoading, isError } = useMyTeams();
@@ -49,6 +75,8 @@ export function MyTeamsPage() {
 
   const led = data.items.filter((t) => t.teamRole === 'LEAD');
   const member = data.items.filter((t) => t.teamRole === 'MEMBER');
+  const stats = leadershipStats(led);
+  const achievements = computeAchievements(led);
 
   return (
     <Stack spacing={4}>
@@ -56,6 +84,8 @@ export function MyTeamsPage() {
         title="My Teams"
         description="Manage the teams you lead — add or remove members and hand over the lead role."
       />
+
+      {led.length > 0 && <LeadershipHero stats={stats} achievements={achievements} />}
 
       <Box component="section">
         <SectionLabel>{led.length === 1 ? 'Team you lead' : 'Teams you lead'}</SectionLabel>
@@ -67,12 +97,12 @@ export function MyTeamsPage() {
           <Box
             sx={{
               display: 'grid',
-              gridTemplateColumns: { xs: '1fr', sm: 'repeat(auto-fill, minmax(280px, 1fr))' },
+              gridTemplateColumns: { xs: '1fr', sm: 'repeat(auto-fill, minmax(300px, 1fr))' },
               gap: 2,
             }}
           >
-            {led.map((team) => (
-              <LedTeamCard key={team.teamId} team={team} />
+            {led.map((team, index) => (
+              <LedTeamCard key={team.teamId} team={team} index={index} />
             ))}
           </Box>
         )}
@@ -90,11 +120,12 @@ export function MyTeamsPage() {
                   spacing={1.5}
                   sx={{ alignItems: 'center', px: 2, py: 1.5 }}
                 >
-                  <Box sx={{ color: 'text.disabled', display: 'flex' }}>
-                    <UsersRound size={18} />
-                  </Box>
-                  <Typography sx={{ flex: 1, fontWeight: 500 }} noWrap>
+                  <TeamCrest name={team.name} size={30} />
+                  <Typography sx={{ flex: 1, fontWeight: 600, minWidth: 0 }} noWrap>
                     {team.name}
+                  </Typography>
+                  <Typography sx={{ fontSize: 13, color: 'text.secondary', whiteSpace: 'nowrap' }}>
+                    {memberLabel(team.memberCount)}
                   </Typography>
                   <TeamRoleBadge role={team.teamRole} />
                 </Stack>
@@ -107,7 +138,11 @@ export function MyTeamsPage() {
   );
 }
 
-function SectionLabel({ children }: { children: React.ReactNode }) {
+function memberLabel(count: number): string {
+  return `${count} ${count === 1 ? 'member' : 'members'}`;
+}
+
+function SectionLabel({ children }: { children: ReactNode }) {
   return (
     <Typography
       component="h2"
@@ -125,7 +160,169 @@ function SectionLabel({ children }: { children: React.ReactNode }) {
   );
 }
 
-function LedTeamCard({ team }: { team: MyTeam }) {
+function LeadershipHero({
+  stats,
+  achievements,
+}: {
+  stats: ReturnType<typeof leadershipStats>;
+  achievements: Achievement[];
+}) {
+  return (
+    <Paper
+      variant="outlined"
+      sx={{
+        position: 'relative',
+        overflow: 'hidden',
+        p: { xs: 2.5, sm: 3 },
+        // A quiet brand-blue glow in the top-right gives atmosphere in both themes.
+        backgroundImage:
+          'radial-gradient(120% 140% at 100% 0%, rgba(18,144,239,0.10), transparent 60%)',
+        ...reveal(0),
+      }}
+    >
+      <Stack
+        direction={{ xs: 'column', md: 'row' }}
+        spacing={{ xs: 2.5, md: 3 }}
+        sx={{ justifyContent: 'space-between', alignItems: { md: 'center' } }}
+      >
+        <Stack direction="row" spacing={2} sx={{ alignItems: 'center', minWidth: 0 }}>
+          <Box
+            aria-hidden
+            sx={{
+              width: 54,
+              height: 54,
+              borderRadius: 2.5,
+              flexShrink: 0,
+              display: 'grid',
+              placeItems: 'center',
+              color: 'primary.main',
+              bgcolor: 'primary.light',
+              boxShadow: (t) => `inset 0 0 0 1px ${t.palette.primary.main}22`,
+            }}
+          >
+            <Crown size={26} strokeWidth={2} />
+          </Box>
+          <Box sx={{ minWidth: 0 }}>
+            <Typography
+              sx={{
+                fontSize: 11,
+                fontWeight: 600,
+                letterSpacing: '0.1em',
+                textTransform: 'uppercase',
+                color: 'text.disabled',
+              }}
+            >
+              Leadership HQ
+            </Typography>
+            <Typography sx={{ fontSize: 22, fontWeight: 800, lineHeight: 1.2 }} noWrap>
+              {stats.rank}
+            </Typography>
+            <Typography sx={{ fontSize: 14, color: 'text.secondary', mt: 0.25 }}>
+              You lead {stats.teamsLed} {stats.teamsLed === 1 ? 'team' : 'teams'} ·{' '}
+              {stats.totalTeammates} {stats.totalTeammates === 1 ? 'teammate' : 'teammates'} in
+              total
+            </Typography>
+          </Box>
+        </Stack>
+
+        <Stack direction="row" spacing={1.5} sx={{ flexShrink: 0 }}>
+          <StatTile value={stats.teamsLed} label="Teams led" />
+          <StatTile value={stats.totalTeammates} label="Teammates" />
+          <StatTile value={stats.largestTeam} label="Largest team" />
+        </Stack>
+      </Stack>
+
+      <Box
+        sx={{
+          mt: 2.5,
+          pt: 2.5,
+          borderTop: 1,
+          borderColor: 'divider',
+          display: 'flex',
+          flexWrap: 'wrap',
+          gap: 1,
+        }}
+      >
+        {achievements.map((achievement) => (
+          <AchievementPill key={achievement.id} achievement={achievement} />
+        ))}
+      </Box>
+    </Paper>
+  );
+}
+
+function StatTile({ value, label }: { value: number; label: string }) {
+  return (
+    <Box
+      sx={{
+        minWidth: 82,
+        px: 1.75,
+        py: 1.25,
+        borderRadius: 2,
+        textAlign: 'center',
+        bgcolor: (t) => t.qnop.surface2,
+        border: 1,
+        borderColor: 'divider',
+      }}
+    >
+      <Typography sx={{ fontSize: 24, fontWeight: 800, lineHeight: 1.1 }}>{value}</Typography>
+      <Typography
+        sx={{
+          fontSize: 10.5,
+          fontWeight: 600,
+          letterSpacing: '0.05em',
+          textTransform: 'uppercase',
+          color: 'text.disabled',
+          mt: 0.25,
+        }}
+      >
+        {label}
+      </Typography>
+    </Box>
+  );
+}
+
+function AchievementPill({ achievement }: { achievement: Achievement }) {
+  const { earned, label, hint } = achievement;
+  return (
+    <Tooltip title={earned ? `Unlocked · ${hint}` : `Locked · ${hint}`}>
+      <Box
+        component="span"
+        sx={{
+          display: 'inline-flex',
+          alignItems: 'center',
+          gap: 0.75,
+          px: 1.25,
+          py: 0.5,
+          borderRadius: 999,
+          fontSize: 12.5,
+          fontWeight: 600,
+          border: '1px solid',
+          ...(earned
+            ? {
+                color: (t) => t.qnop.badge.amber.fg,
+                bgcolor: (t) => t.qnop.badge.amber.bg,
+                borderColor: (t) => t.qnop.badge.amber.border,
+              }
+            : {
+                color: 'text.disabled',
+                bgcolor: 'transparent',
+                borderColor: 'divider',
+                borderStyle: 'dashed',
+              }),
+        }}
+      >
+        {earned ? <Trophy size={13} /> : <Lock size={12} />}
+        {label}
+      </Box>
+    </Tooltip>
+  );
+}
+
+function LedTeamCard({ team, index }: { team: MyTeam; index: number }) {
+  const tier = teamTier(team.memberCount);
+  const nextTierName = tier.nextFloor === null ? null : teamTier(tier.nextFloor).name;
+  const toNext = tier.nextFloor === null ? 0 : tier.nextFloor - team.memberCount;
   return (
     <Paper
       variant="outlined"
@@ -151,24 +348,11 @@ function LedTeamCard({ team }: { team: MyTeam }) {
           borderColor: 'primary.main',
           boxShadow: (t) => t.qnop.focusRing,
         },
+        ...reveal(index + 1),
       }}
     >
       <Stack direction="row" spacing={1.5} sx={{ alignItems: 'center' }}>
-        <Box
-          sx={{
-            width: 40,
-            height: 40,
-            borderRadius: 1.75,
-            bgcolor: 'primary.light',
-            color: 'primary.main',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            flexShrink: 0,
-          }}
-        >
-          <UsersRound size={20} />
-        </Box>
+        <TeamCrest name={team.name} size={44} />
         <Box sx={{ minWidth: 0, flex: 1 }}>
           <Typography sx={{ fontWeight: 700, lineHeight: 1.3 }} noWrap>
             {team.name}
@@ -178,11 +362,37 @@ function LedTeamCard({ team }: { team: MyTeam }) {
           </Box>
         </Box>
       </Stack>
+
+      <Box>
+        <Stack
+          direction="row"
+          sx={{ justifyContent: 'space-between', alignItems: 'baseline', mb: 0.75 }}
+        >
+          <Stack direction="row" spacing={0.75} sx={{ alignItems: 'center' }}>
+            <Typography sx={{ fontWeight: 700, fontSize: 13.5 }}>{tier.name}</Typography>
+            <Typography sx={{ fontSize: 12.5, color: 'text.disabled' }}>·</Typography>
+            <Typography sx={{ fontSize: 12.5, color: 'text.secondary' }}>
+              {memberLabel(team.memberCount)}
+            </Typography>
+          </Stack>
+          <Typography sx={{ fontSize: 11.5, color: 'text.disabled' }}>
+            {nextTierName ? `${toNext} to ${nextTierName}` : 'Top tier'}
+          </Typography>
+        </Stack>
+        <LinearProgress
+          variant="determinate"
+          value={Math.round(tier.progress * 100)}
+          aria-label={`${tier.name} tier progress`}
+          sx={{ height: 6, borderRadius: 999, bgcolor: (t) => t.qnop.surface2 }}
+        />
+      </Box>
+
       <Stack
         direction="row"
         spacing={0.5}
         sx={{ alignItems: 'center', color: 'primary.main', fontWeight: 600, fontSize: 13.5 }}
       >
+        <UsersRound size={15} />
         <span>Manage members</span>
         <ArrowRight size={16} />
       </Stack>
