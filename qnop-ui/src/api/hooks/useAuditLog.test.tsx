@@ -75,6 +75,7 @@ describe('useAuditLog', () => {
     expect(auditApi.listAuditEvents).toHaveBeenCalledWith({
       eventType: 'annotation.resolved',
       actorId: 'actor-1',
+      actorSystem: undefined,
       documentId: 'doc-1',
       from: '2026-01-01T00:00:00.000Z',
       to: '2026-12-31T00:00:00.000Z',
@@ -98,11 +99,27 @@ describe('useAuditLog', () => {
     expect(auditApi.listAuditEvents).toHaveBeenCalledWith({
       eventType: undefined,
       actorId: undefined,
+      actorSystem: undefined,
       documentId: undefined,
       from: undefined,
       to: undefined,
       page: 0,
       size: 20,
+    });
+  });
+
+  it('passes the system-actor filter through', async () => {
+    vi.mocked(auditApi.listAuditEvents).mockResolvedValue({ data: EMPTY_PAGE } as Awaited<
+      ReturnType<typeof auditApi.listAuditEvents>
+    >);
+
+    const { result } = renderHook(() => useAuditLog({ actorSystem: true, page: 0, size: 20 }), {
+      wrapper,
+    });
+
+    await waitFor(() => expect(result.current.isSuccess).toBe(true));
+    expect(vi.mocked(auditApi.listAuditEvents).mock.calls[0][0]).toMatchObject({
+      actorSystem: true,
     });
   });
 });

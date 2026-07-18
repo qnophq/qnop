@@ -229,6 +229,22 @@ class AuditApiIT extends SeededIntegrationTest {
   }
 
   @Test
+  @DisplayName("filters to system events (no actor) via actorSystem")
+  void filtersBySystemActor() throws Exception {
+    seedTrail(); // three human-actor events
+    UUID documentId = seedDocumentWithVersion("Ingest report");
+    auditEvents.save(
+        new AuditEvent(documentId, "document.extraction.failed", null, "{\"reason\":\"BAD_PDF\"}"));
+
+    mockMvc
+        .perform(as(get(AUDIT).param("actorSystem", "true"), AUDITOR_ID))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.total").value(1))
+        .andExpect(jsonPath("$.items[0].actorId").doesNotExist())
+        .andExpect(jsonPath("$.items[0].actorDisplayName").value("System"));
+  }
+
+  @Test
   @DisplayName("a page size beyond the contract maximum is rejected (bean validation)")
   void boundedPageSize() throws Exception {
     // The OpenAPI `maximum: 100` becomes @Max(100) on the endpoint, so an over-max size is a 400

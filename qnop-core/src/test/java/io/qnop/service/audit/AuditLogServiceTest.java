@@ -116,7 +116,8 @@ class AuditLogServiceTest {
         .thenReturn(new PageImpl<>(List.of(systemEvent), PageRequest.of(0, 20), 1));
     when(documents.findAllById(List.of(documentId))).thenReturn(List.of());
 
-    AuditEventView view = service.list(null, null, null, null, null, null, null).items().get(0);
+    AuditEventView view =
+        service.list(null, null, null, null, null, null, null, null).items().get(0);
 
     assertThat(view.actorId()).isNull();
     assertThat(view.actorDisplayName()).isEqualTo("System");
@@ -134,7 +135,8 @@ class AuditLogServiceTest {
     when(users.findSlugsByIdIn(List.of(actorId))).thenReturn(List.of());
     when(documents.findAllById(List.of(documentId))).thenReturn(List.of());
 
-    AuditEventView view = service.list(null, null, null, null, null, null, null).items().get(0);
+    AuditEventView view =
+        service.list(null, null, null, null, null, null, null, null).items().get(0);
 
     assertThat(view.actorId()).isEqualTo(actorId);
     assertThat(view.actorDisplayName()).isNull();
@@ -149,7 +151,7 @@ class AuditLogServiceTest {
     when(auditEvents.findAll(any(Specification.class), any(Pageable.class)))
         .thenReturn(new PageImpl<>(List.of(), PageRequest.of(0, 100), 0));
 
-    AuditPage page = service.list(null, null, null, null, null, -5, 500);
+    AuditPage page = service.list(null, null, null, null, null, null, -5, 500);
 
     ArgumentCaptor<Pageable> pageable = ArgumentCaptor.forClass(Pageable.class);
     verify(auditEvents).findAll(any(Specification.class), pageable.capture());
@@ -168,7 +170,7 @@ class AuditLogServiceTest {
     when(auditEvents.findAll(any(Specification.class), any(Pageable.class)))
         .thenReturn(new PageImpl<>(List.of(), PageRequest.of(0, 20), 0));
 
-    AuditPage page = service.list(null, null, null, null, null, 0, null);
+    AuditPage page = service.list(null, null, null, null, null, null, 0, null);
 
     assertThat(page.size()).isEqualTo(AuditLogService.DEFAULT_PAGE_SIZE);
   }
@@ -184,6 +186,7 @@ class AuditLogServiceTest {
     AuditLogService.filter(
             "annotation.resolved",
             actorId,
+            false,
             documentId,
             Instant.parse("2026-01-01T00:00:00Z"),
             Instant.parse("2026-12-31T23:59:59Z"))
@@ -197,14 +200,30 @@ class AuditLogServiceTest {
   }
 
   @Test
-  @DisplayName("an all-null filter restricts nothing (unrestricted conjunction)")
+  @DisplayName("actorSystem restricts to events with no actor and ignores actorId")
+  void actorSystemFiltersToNullActor() {
+    @SuppressWarnings("unchecked")
+    Root<AuditEvent> root = mock(Root.class);
+    CriteriaQuery<?> query = mock(CriteriaQuery.class);
+    CriteriaBuilder cb = mock(CriteriaBuilder.class);
+
+    AuditLogService.filter(null, actorId, true, null, null, null).toPredicate(root, query, cb);
+
+    verify(cb).isNull(any());
+    // actorSystem takes precedence — the actorId equality is never added.
+    verify(cb, never()).equal(any(), any(Object.class));
+    verify(cb).and(any(Predicate[].class));
+  }
+
+  @Test
+  @DisplayName("an all-empty filter restricts nothing (unrestricted conjunction)")
   void emptyFilterRestrictsNothing() {
     @SuppressWarnings("unchecked")
     Root<AuditEvent> root = mock(Root.class);
     CriteriaQuery<?> query = mock(CriteriaQuery.class);
     CriteriaBuilder cb = mock(CriteriaBuilder.class);
 
-    AuditLogService.filter(null, null, null, null, null).toPredicate(root, query, cb);
+    AuditLogService.filter(null, null, false, null, null, null).toPredicate(root, query, cb);
 
     verify(cb, never()).equal(any(), any(Object.class));
     verify(cb).and(any(Predicate[].class));
@@ -216,7 +235,7 @@ class AuditLogServiceTest {
     when(auditEvents.findAll(any(Specification.class), any(Pageable.class)))
         .thenReturn(new PageImpl<>(List.of(), PageRequest.of(0, 20), 0));
 
-    AuditPage page = service.list(null, null, null, null, null, 0, 20);
+    AuditPage page = service.list(null, null, null, null, null, null, 0, 20);
 
     assertThat(page.items()).isEmpty();
     verifyNoInteractions(users, documents);

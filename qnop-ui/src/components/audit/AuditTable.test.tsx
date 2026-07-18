@@ -51,15 +51,17 @@ const systemEvent: AuditEvent = {
 
 function renderTable(events: AuditEvent[]) {
   const onFilterActor = vi.fn();
+  const onFilterSystem = vi.fn();
   const onFilterDocument = vi.fn();
   renderWithProviders(
     <AuditTable
       events={events}
       onFilterActor={onFilterActor}
+      onFilterSystem={onFilterSystem}
       onFilterDocument={onFilterDocument}
     />,
   );
-  return { onFilterActor, onFilterDocument };
+  return { onFilterActor, onFilterSystem, onFilterDocument };
 }
 
 describe('AuditTable', () => {
@@ -86,12 +88,18 @@ describe('AuditTable', () => {
     );
   });
 
-  it('renders the system actor as inert text — no profile link, no actor filter', () => {
+  it('gives the system actor its own emblem and a system filter, but no profile link', () => {
     renderTable([systemEvent]);
     expect(screen.getByText('System')).toBeInTheDocument();
-    // The system actor carries no profile link and no actor filter (the document still filters).
+    // The system actor has no person profile, but it does get its own filter.
     expect(screen.queryByRole('link', { name: /profile/i })).not.toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: 'Filter by System' })).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Filter by System' })).toBeInTheDocument();
+  });
+
+  it('filters to system-only events from the system filter button', () => {
+    const { onFilterSystem } = renderTable([systemEvent]);
+    fireEvent.click(screen.getByRole('button', { name: 'Filter by System' }));
+    expect(onFilterSystem).toHaveBeenCalledTimes(1);
   });
 
   it('filters by actor from the dedicated filter button, separate from the profile link', () => {

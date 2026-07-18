@@ -27,6 +27,8 @@ import { auditApi } from '../config';
 export interface AuditLogParams {
   eventType?: string;
   actorId?: string;
+  /** Restrict to system-generated events (no human actor); precedes actorId. */
+  actorSystem?: boolean;
   documentId?: string;
   /** ISO-8601 lower/upper bounds on the event time (inclusive). */
   from?: string;
@@ -53,6 +55,7 @@ export function useAuditLog(params: AuditLogParams) {
       const response = await auditApi.listAuditEvents({
         eventType: params.eventType || undefined,
         actorId: params.actorId || undefined,
+        actorSystem: params.actorSystem || undefined,
         documentId: params.documentId || undefined,
         from: params.from || undefined,
         to: params.to || undefined,

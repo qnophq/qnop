@@ -48,15 +48,18 @@ vi.mock('../../components/audit/AuditTable', () => ({
   AuditTable: ({
     events,
     onFilterActor,
+    onFilterSystem,
     onFilterDocument,
   }: {
     events: AuditEvent[];
     onFilterActor: (id: string, label: string) => void;
+    onFilterSystem: () => void;
     onFilterDocument: (id: string, label: string) => void;
   }) => (
     <div data-testid="audit-table">
       <span data-testid="event-count">{events.length}</span>
       <button onClick={() => onFilterActor('actor-1', 'Avery Auditor')}>stub-filter-actor</button>
+      <button onClick={onFilterSystem}>stub-filter-system</button>
       <button onClick={() => onFilterDocument('doc-1', 'MSA')}>stub-filter-document</button>
     </div>
   ),
@@ -149,6 +152,17 @@ describe('AuditPage', () => {
     expect(lastCall().actorId).toBe('actor-1');
     const chip = screen.getByText('Actor: Avery Auditor');
     expect(chip).toBeInTheDocument();
+  });
+
+  it('filters to system events and shows a System chip', () => {
+    queryState.data = page({ items: [event], total: 1 });
+    renderWithProviders(<AuditPage />);
+
+    fireEvent.click(screen.getByText('stub-filter-system'));
+
+    expect(lastCall().actorSystem).toBe(true);
+    expect(lastCall().actorId).toBeUndefined();
+    expect(screen.getByText('Actor: System')).toBeInTheDocument();
   });
 
   it('filters by document from a row click', () => {

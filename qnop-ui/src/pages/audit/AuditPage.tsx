@@ -46,6 +46,9 @@ interface EntityFilter {
   label: string;
 }
 
+/** The actor filter is either a specific user or the system (no human actor). */
+type ActorFilter = { kind: 'user'; id: string; label: string } | { kind: 'system' };
+
 /** A datetime-local input value → an ISO instant, or undefined when blank. */
 function toIso(value: string): string | undefined {
   if (!value) return undefined;
@@ -65,7 +68,7 @@ export function AuditPage() {
   const [eventType, setEventType] = useState('');
   const [from, setFrom] = useState('');
   const [to, setTo] = useState('');
-  const [actor, setActor] = useState<EntityFilter | null>(null);
+  const [actor, setActor] = useState<ActorFilter | null>(null);
   const [document, setDocument] = useState<EntityFilter | null>(null);
   const [page, setPage] = useState(0);
   const [pageSize, setPageSize] = useState(20);
@@ -73,7 +76,8 @@ export function AuditPage() {
 
   const { data, isLoading, isFetching, isError } = useAuditLog({
     eventType: eventType || undefined,
-    actorId: actor?.id,
+    actorId: actor?.kind === 'user' ? actor.id : undefined,
+    actorSystem: actor?.kind === 'system' ? true : undefined,
     documentId: document?.id,
     from: toIso(from),
     to: toIso(to),
@@ -85,7 +89,11 @@ export function AuditPage() {
   const total = data?.total ?? 0;
 
   const onFilterActor = (id: string, label: string) => {
-    setActor({ id, label });
+    setActor({ kind: 'user', id, label });
+    setPage(0);
+  };
+  const onFilterSystem = () => {
+    setActor({ kind: 'system' });
     setPage(0);
   };
   const onFilterDocument = (id: string, label: string) => {
@@ -207,7 +215,11 @@ export function AuditPage() {
       {(actor || document) && (
         <Stack direction="row" spacing={1} sx={{ flexWrap: 'wrap' }}>
           {actor && (
-            <Chip label={`Actor: ${actor.label}`} onDelete={() => setActor(null)} size="small" />
+            <Chip
+              label={`Actor: ${actor.kind === 'user' ? actor.label : 'System'}`}
+              onDelete={() => setActor(null)}
+              size="small"
+            />
           )}
           {document && (
             <Chip
@@ -230,6 +242,7 @@ export function AuditPage() {
             <AuditTable
               events={events}
               onFilterActor={onFilterActor}
+              onFilterSystem={onFilterSystem}
               onFilterDocument={onFilterDocument}
             />
             <TablePagination

@@ -109,6 +109,7 @@ public class AuditLogService {
   public AuditPage list(
       String eventType,
       UUID actorId,
+      Boolean actorSystem,
       UUID documentId,
       Instant from,
       Instant to,
@@ -120,7 +121,8 @@ public class AuditLogService {
 
     Page<AuditEvent> result =
         auditEvents.findAll(
-            filter(filterEventType, actorId, documentId, from, to),
+            filter(
+                filterEventType, actorId, Boolean.TRUE.equals(actorSystem), documentId, from, to),
             PageRequest.of(pageIndex, pageSize, Sort.by(Sort.Direction.DESC, "createdAt")));
 
     return new AuditPage(
@@ -131,16 +133,25 @@ public class AuditLogService {
    * The dynamic filter as a {@link Specification} — each non-null argument adds one equality/range
    * predicate. Built with the Criteria API (not a JPQL {@code (:param IS NULL OR …)} query) so a
    * null timestamp bound cannot trip PostgreSQL's "could not determine data type of parameter"
-   * error. An all-null filter yields an unrestricted conjunction (the full org-wide trail).
+   * error. {@code actorSystem} restricts to system events (no actor) and takes precedence over
+   * {@code actorId}. An all-empty filter yields an unrestricted conjunction (the full org-wide
+   * trail).
    */
   static Specification<AuditEvent> filter(
-      String eventType, UUID actorId, UUID documentId, Instant from, Instant to) {
+      String eventType,
+      UUID actorId,
+      boolean actorSystem,
+      UUID documentId,
+      Instant from,
+      Instant to) {
     return (root, query, cb) -> {
       List<Predicate> predicates = new ArrayList<>();
       if (eventType != null) {
         predicates.add(cb.equal(root.get("eventType"), eventType));
       }
-      if (actorId != null) {
+      if (actorSystem) {
+        predicates.add(cb.isNull(root.get("actorId")));
+      } else if (actorId != null) {
         predicates.add(cb.equal(root.get("actorId"), actorId));
       }
       if (documentId != null) {

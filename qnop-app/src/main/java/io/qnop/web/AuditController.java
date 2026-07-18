@@ -56,6 +56,7 @@ public class AuditController implements AuditApi {
   public ResponseEntity<AuditEventListResponse> listAuditEvents(
       String eventType,
       UUID actorId,
+      Boolean actorSystem,
       UUID documentId,
       OffsetDateTime from,
       OffsetDateTime to,
@@ -65,6 +66,7 @@ public class AuditController implements AuditApi {
         auditLog.list(
             eventType,
             actorId,
+            actorSystem,
             documentId,
             from == null ? null : from.toInstant(),
             to == null ? null : to.toInstant(),

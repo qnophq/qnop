@@ -1882,6 +1882,14 @@ paths:
           schema:
             type: string
             format: uuid
+        - name: actorSystem
+          in: query
+          required: false
+          description: >-
+            When true, return only system-generated events (those with no
+            acting user). Takes precedence over `actorId`.
+          schema:
+            type: boolean
         - name: documentId
           in: query
           required: false

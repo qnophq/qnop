@@ -37,6 +37,7 @@ import { formatAuditDetail } from '../../utils/auditDetail';
 import { PersonLink } from '../dashboard/PersonLink';
 import { reviewPath } from '../dashboard/dashboardModel';
 import { AuditEventBadge } from './AuditEventBadge';
+import { SystemActor } from './SystemActor';
 
 const COLUMNS = ['Time', 'Actor', 'Event', 'Document', 'Details'];
 const EM_DASH = '—';
@@ -45,6 +46,8 @@ interface AuditTableProps {
   events: AuditEvent[];
   /** Narrow the list to one actor (id + resolved label for the filter chip). */
   onFilterActor: (actorId: string, label: string) => void;
+  /** Narrow the list to system-only events (those with no human actor). */
+  onFilterSystem: () => void;
   /** Narrow the list to one document (id + resolved title for the filter chip). */
   onFilterDocument: (documentId: string, label: string) => void;
 }
@@ -73,11 +76,18 @@ function FilterButton({ label, onClick }: { label: string; onClick: () => void }
  * {@link PersonLink} (avatar + name, profile hover card #482, click → profile)
  * for a user, a review link (click → the document) for a document — with a
  * separate "filter to this" button beside it, so navigating to the entity and
- * narrowing the list are distinct actions. The system actor (no id) is inert
- * plain text. No raw UUIDs are ever shown. Timestamps render in the viewer's
- * timezone through the shared {@link useFormatters} seam (issue #465).
+ * narrowing the list are distinct actions. The system actor (no id) carries its
+ * own distinct {@link SystemActor} emblem and a "filter to system events"
+ * button — no profile, since there is no person. No raw UUIDs are ever shown.
+ * Timestamps render in the viewer's timezone through the shared {@link
+ * useFormatters} seam (issue #465).
  */
-export function AuditTable({ events, onFilterActor, onFilterDocument }: AuditTableProps) {
+export function AuditTable({
+  events,
+  onFilterActor,
+  onFilterSystem,
+  onFilterDocument,
+}: AuditTableProps) {
   const { formatDateTime } = useFormatters();
   return (
     <Table size="small">
@@ -126,9 +136,14 @@ export function AuditTable({ events, onFilterActor, onFilterDocument }: AuditTab
                       />
                     </Stack>
                   ) : (
-                    <Typography component="span" color="text.secondary">
-                      {event.actorDisplayName ?? 'System'}
-                    </Typography>
+                    <Stack
+                      direction="row"
+                      spacing={0.25}
+                      sx={{ alignItems: 'center', minWidth: 0 }}
+                    >
+                      <SystemActor />
+                      <FilterButton label="Filter by System" onClick={onFilterSystem} />
+                    </Stack>
                   )}
                 </TableCell>
                 <TableCell>
