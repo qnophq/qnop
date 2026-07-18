@@ -47,7 +47,7 @@ import { useRailCollapsed } from '../../components/reviews/diff/useRailCollapsed
 import { useSyncScroll } from '../../components/reviews/diff/useSyncScroll';
 import { columnOf } from '../../components/reviews/tasks/tasksModel';
 import { usePdfDocument } from '../../components/reviews/viewer/usePdfDocument';
-import { formatDateTime } from '../../utils/formatDate';
+import { useFormatters } from '../../hooks/useFormatters';
 
 /**
  * The version comparison workspace (issue #252, ADR-0034): two panes render
@@ -62,6 +62,7 @@ export function VersionComparePage() {
   const { documentId: routeSegment = '' } = useParams();
   const documentId = useReviewDocumentId();
   const [searchParams, setSearchParams] = useSearchParams();
+  const { formatDateTime } = useFormatters();
 
   const documentQuery = useDocument(documentId);
   const versionsQuery = useDocumentVersions(documentId);

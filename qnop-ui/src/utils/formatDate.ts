@@ -19,12 +19,31 @@
  * SPDX-License-Identifier: AGPL-3.0-only
  */
 
-const DATE_TIME = new Intl.DateTimeFormat('en-GB', {
-  dateStyle: 'medium',
-  timeStyle: 'short',
-});
+import { FALLBACK_TIME_ZONE } from './timezone';
 
-const DATE_ONLY = new Intl.DateTimeFormat('en-GB', { dateStyle: 'medium' });
+// Each Intl.DateTimeFormat is built once per resolved zone and reused, so switching a display zone
+// costs a Map lookup, not a fresh formatter on every render. The zone defaults to UTC (ADR-0041):
+// callers render through useFormatters(), which passes the user's resolved zone.
+const dateTimeCache = new Map<string, Intl.DateTimeFormat>();
+const dateOnlyCache = new Map<string, Intl.DateTimeFormat>();
+
+function dateTimeFmt(timeZone: string): Intl.DateTimeFormat {
+  let fmt = dateTimeCache.get(timeZone);
+  if (!fmt) {
+    fmt = new Intl.DateTimeFormat('en-GB', { dateStyle: 'medium', timeStyle: 'short', timeZone });
+    dateTimeCache.set(timeZone, fmt);
+  }
+  return fmt;
+}
+
+function dateOnlyFmt(timeZone: string): Intl.DateTimeFormat {
+  let fmt = dateOnlyCache.get(timeZone);
+  if (!fmt) {
+    fmt = new Intl.DateTimeFormat('en-GB', { dateStyle: 'medium', timeZone });
+    dateOnlyCache.set(timeZone, fmt);
+  }
+  return fmt;
+}
 
 const RELATIVE = new Intl.RelativeTimeFormat('en', { numeric: 'auto' });
 
@@ -33,17 +52,23 @@ const HOUR_MS = 60 * MINUTE_MS;
 const DAY_MS = 24 * HOUR_MS;
 
 /** Formats an ISO timestamp as a localized date+time, or an em dash when absent/invalid. */
-export function formatDateTime(iso: string | null | undefined): string {
+export function formatDateTime(
+  iso: string | null | undefined,
+  timeZone: string = FALLBACK_TIME_ZONE,
+): string {
   if (!iso) return '—';
   const date = new Date(iso);
-  return Number.isNaN(date.getTime()) ? '—' : DATE_TIME.format(date);
+  return Number.isNaN(date.getTime()) ? '—' : dateTimeFmt(timeZone).format(date);
 }
 
 /**
  * Formats an ISO timestamp relative to now ("just now", "3 days ago"), falling
  * back to an absolute date beyond 30 days and to an em dash when absent/invalid.
  */
-export function formatRelative(iso: string | null | undefined): string {
+export function formatRelative(
+  iso: string | null | undefined,
+  timeZone: string = FALLBACK_TIME_ZONE,
+): string {
   if (!iso) return '—';
   const date = new Date(iso);
   if (Number.isNaN(date.getTime())) return '—';
@@ -53,7 +78,7 @@ export function formatRelative(iso: string | null | undefined): string {
   if (absMs < HOUR_MS) return RELATIVE.format(Math.round(diffMs / MINUTE_MS), 'minute');
   if (absMs < DAY_MS) return RELATIVE.format(Math.round(diffMs / HOUR_MS), 'hour');
   if (absMs < 30 * DAY_MS) return RELATIVE.format(Math.round(diffMs / DAY_MS), 'day');
-  return DATE_TIME.format(date);
+  return dateTimeFmt(timeZone).format(date);
 }
 
 /** Whether an ISO timestamp is in the past relative to {@code now} (default: now). */
@@ -68,13 +93,16 @@ export function isPast(iso: string | null | undefined, now: number = Date.now())
  * 2 days", falling back to an absolute date beyond 30 days ("due 5 Jan 2027" /
  * "was due 5 Jan 2020") and to an em dash when absent/invalid.
  */
-export function formatDueDate(iso: string | null | undefined): string {
+export function formatDueDate(
+  iso: string | null | undefined,
+  timeZone: string = FALLBACK_TIME_ZONE,
+): string {
   if (!iso) return '—';
   const date = new Date(iso);
   if (Number.isNaN(date.getTime())) return '—';
   const diffMs = date.getTime() - Date.now();
   if (Math.abs(diffMs) >= 30 * DAY_MS) {
-    return `${diffMs < 0 ? 'was due' : 'due'} ${DATE_ONLY.format(date)}`;
+    return `${diffMs < 0 ? 'was due' : 'due'} ${dateOnlyFmt(timeZone).format(date)}`;
   }
   const days = Math.round(diffMs / DAY_MS);
   if (days === 0) return 'due today';

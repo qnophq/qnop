@@ -67,6 +67,8 @@ class ConfigControllerTest {
     when(oidcProviders.enabledLoginViews()).thenReturn(List.of());
     when(settings.getBoolean(ApplicationSettingKey.AUTH_SELF_REGISTRATION_ENABLED))
         .thenReturn(false);
+    when(settings.getString(ApplicationSettingKey.GENERAL_DEFAULT_TIMEZONE))
+        .thenReturn("Europe/Berlin");
     // All slots on the factory default until something is uploaded.
     when(branding.statusAll())
         .thenReturn(
@@ -85,6 +87,7 @@ class ConfigControllerTest {
         .andExpect(jsonPath("$.edition").value("COMMUNITY"))
         .andExpect(jsonPath("$.version").exists())
         .andExpect(jsonPath("$.general.siteName").value("qnop"))
+        .andExpect(jsonPath("$.general.defaultTimezone").value("Europe/Berlin"))
         .andExpect(jsonPath("$.auth.selfRegistrationEnabled").value(false))
         .andExpect(jsonPath("$.auth.oidcProviders").isArray())
         .andExpect(jsonPath("$.auth.oidcProviders").isEmpty())

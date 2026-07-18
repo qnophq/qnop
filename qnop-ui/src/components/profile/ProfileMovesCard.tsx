@@ -37,7 +37,7 @@ import {
 import { Link as RouterLink } from 'react-router-dom';
 import type { DashboardActivity } from '../../api/generated';
 import { activityPhrase, reviewPath } from '../dashboard/dashboardModel';
-import { shortRelativeTime } from '../../utils/relativeTime';
+import { useFormatters } from '../../hooks/useFormatters';
 
 const TYPE_ICONS: Record<string, LucideIcon> = {
   'annotation.created': MessageSquarePlus,
@@ -63,6 +63,7 @@ export function ProfileMovesCard({ firstName, moves }: ProfileMovesCardProps) {
   const theme = useTheme();
   const blue = theme.qnop.brand.blue;
   const dark = theme.qnop.mode === 'dark';
+  const { shortRelativeTime } = useFormatters();
 
   return (
     <Paper

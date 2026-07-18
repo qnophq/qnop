@@ -21,6 +21,7 @@
 
 import { create } from 'zustand';
 import type { PaletteMode } from '@mui/material';
+import { FALLBACK_TIME_ZONE } from '../utils/timezone';
 
 const THEME_KEY = 'qnop-theme';
 
@@ -43,6 +44,14 @@ interface UiState {
   themeMode: PaletteMode;
   setThemeMode: (mode: PaletteMode) => void;
   toggleTheme: () => void;
+  /**
+   * The active display timezone (issue #465, ADR-0041). Held in the store — not read via a query
+   * hook at each formatter call site — so every component can format through {@link useFormatters}
+   * without depending on a QueryClient. TimezoneSync (mounted once, inside the provider) resolves
+   * user profile → application default → UTC and pushes the result here.
+   */
+  displayTimeZone: string;
+  setDisplayTimeZone: (zone: string) => void;
 }
 
 export const useUiStore = create<UiState>((set, get) => ({
@@ -56,4 +65,6 @@ export const useUiStore = create<UiState>((set, get) => ({
     set({ themeMode: mode });
   },
   toggleTheme: () => get().setThemeMode(get().themeMode === 'dark' ? 'light' : 'dark'),
+  displayTimeZone: FALLBACK_TIME_ZONE,
+  setDisplayTimeZone: (zone) => set({ displayTimeZone: zone }),
 }));

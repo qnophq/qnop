@@ -19,23 +19,50 @@
  * SPDX-License-Identifier: AGPL-3.0-only
  */
 
+import { FALLBACK_TIME_ZONE } from './timezone';
+
 const MINUTE = 60_000;
 const HOUR = 60 * MINUTE;
 const DAY = 24 * HOUR;
 
-const MONTH_DAY = new Intl.DateTimeFormat('en', { month: 'short', day: 'numeric' });
-const MONTH_DAY_YEAR = new Intl.DateTimeFormat('en', {
-  month: 'short',
-  day: 'numeric',
-  year: 'numeric',
-});
+// Built once per resolved zone and reused (see formatDate.ts for the rationale).
+const monthDayCache = new Map<string, Intl.DateTimeFormat>();
+const monthDayYearCache = new Map<string, Intl.DateTimeFormat>();
+
+function monthDayFmt(timeZone: string): Intl.DateTimeFormat {
+  let fmt = monthDayCache.get(timeZone);
+  if (!fmt) {
+    fmt = new Intl.DateTimeFormat('en', { month: 'short', day: 'numeric', timeZone });
+    monthDayCache.set(timeZone, fmt);
+  }
+  return fmt;
+}
+
+function monthDayYearFmt(timeZone: string): Intl.DateTimeFormat {
+  let fmt = monthDayYearCache.get(timeZone);
+  if (!fmt) {
+    fmt = new Intl.DateTimeFormat('en', {
+      month: 'short',
+      day: 'numeric',
+      year: 'numeric',
+      timeZone,
+    });
+    monthDayYearCache.set(timeZone, fmt);
+  }
+  return fmt;
+}
 
 /**
  * The compact relative timestamp of social feeds (issue #403): "now", "5m",
  * "3h", "6d", then the calendar date ("Jul 5", with the year once it
- * differs). Callers put the full timestamp in a tooltip for precision.
+ * differs). Callers put the full timestamp in a tooltip for precision. The
+ * calendar-date fallback renders in {@code timeZone} (ADR-0041; default UTC).
  */
-export function shortRelativeTime(iso: string, now: Date = new Date()): string {
+export function shortRelativeTime(
+  iso: string,
+  now: Date = new Date(),
+  timeZone: string = FALLBACK_TIME_ZONE,
+): string {
   const then = new Date(iso);
   const diff = now.getTime() - then.getTime();
   if (diff < MINUTE) return 'now';
@@ -43,6 +70,6 @@ export function shortRelativeTime(iso: string, now: Date = new Date()): string {
   if (diff < DAY) return `${Math.floor(diff / HOUR)}h`;
   if (diff < 7 * DAY) return `${Math.floor(diff / DAY)}d`;
   return then.getFullYear() === now.getFullYear()
-    ? MONTH_DAY.format(then)
-    : MONTH_DAY_YEAR.format(then);
+    ? monthDayFmt(timeZone).format(then)
+    : monthDayYearFmt(timeZone).format(then);
 }
