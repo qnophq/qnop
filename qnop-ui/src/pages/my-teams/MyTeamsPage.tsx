@@ -147,6 +147,11 @@ function memberLabel(count: number): string {
   return `${count} ${count === 1 ? 'member' : 'members'}`;
 }
 
+/** The My Teams detail path — the slug when one exists, the id otherwise (issue #470). */
+function teamPath(team: MyTeam): string {
+  return `/my-teams/${team.slug ?? team.teamId}`;
+}
+
 function SectionLabel({ children }: { children: ReactNode }) {
   return (
     <Typography
@@ -332,7 +337,7 @@ function TeamCard({ team, index, canManage }: { team: MyTeam; index: number; can
     <Paper
       variant="outlined"
       component={RouterLink}
-      to={`/my-teams/${team.teamId}`}
+      to={teamPath(team)}
       aria-label={`${canManage ? 'Manage' : 'View'} ${team.name}`}
       sx={{
         display: 'flex',

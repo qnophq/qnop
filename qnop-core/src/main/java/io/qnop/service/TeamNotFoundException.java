@@ -33,6 +33,11 @@ public class TeamNotFoundException extends RuntimeException {
     return new TeamNotFoundException("Team not found: " + id);
   }
 
+  /** For a slug-or-id reference that resolves to no team (issue #470). */
+  public static TeamNotFoundException ref(String ref) {
+    return new TeamNotFoundException("Team not found: " + ref);
+  }
+
   public static TeamNotFoundException membership(UUID teamId, UUID userId) {
     return new TeamNotFoundException("User " + userId + " is not a member of team " + teamId);
   }

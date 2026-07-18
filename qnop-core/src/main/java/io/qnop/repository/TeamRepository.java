@@ -40,6 +40,12 @@ public interface TeamRepository extends JpaRepository<Team, UUID> {
 
   boolean existsByNameIgnoreCase(String name);
 
+  /** A team by its slug, case-insensitive (issue #470) — resolves `/my-teams/{slug}`. */
+  Optional<Team> findBySlugIgnoreCase(String slug);
+
+  /** Whether the slug is already claimed, ignoring case — the slug-allocation probe (#470). */
+  boolean existsBySlugIgnoreCase(String slug);
+
   /**
    * Loads a team under a {@code PESSIMISTIC_WRITE} row lock (issue #470): serializes the team-lead
    * membership mutations so the "a team must keep at least one lead" guard cannot be bypassed by a

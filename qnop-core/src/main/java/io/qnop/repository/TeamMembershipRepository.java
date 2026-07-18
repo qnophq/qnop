@@ -59,7 +59,7 @@ public interface TeamMembershipRepository extends JpaRepository<TeamMembership, 
 
   /** The user's enabled teams with their role there, ordered by name (issue #473). */
   @Query(
-      "SELECT new io.qnop.repository.UserTeamProjection(t.id, t.name, m.teamRole)"
+      "SELECT new io.qnop.repository.UserTeamProjection(t.id, t.name, t.slug, m.teamRole)"
           + " FROM TeamMembership m, Team t"
           + " WHERE t.id = m.teamId AND m.userId = :userId AND t.enabled = true"
           + " ORDER BY t.name")

@@ -23,6 +23,7 @@ package io.qnop.service;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -51,12 +52,14 @@ class TeamServiceTest {
   private final TeamRepository teams = mock(TeamRepository.class);
   private final TeamMembershipRepository memberships = mock(TeamMembershipRepository.class);
   private final UserRepository users = mock(UserRepository.class);
-  private final TeamService service = new TeamService(teams, memberships, users);
+  private final TeamSlugService slugs = mock(TeamSlugService.class);
+  private final TeamService service = new TeamService(teams, memberships, users, slugs);
 
   @Test
   @DisplayName("create persists a new team and rejects a duplicate name")
   void create() {
     when(teams.existsByNameIgnoreCase("Core")).thenReturn(false);
+    when(slugs.allocate("Core")).thenReturn("core");
     when(teams.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
     var view = service.create("  Core  ", "The core team");
@@ -64,6 +67,8 @@ class TeamServiceTest {
     assertThat(view.name()).isEqualTo("Core");
     assertThat(view.enabled()).isTrue();
     assertThat(view.memberCount()).isZero();
+    // The team is persisted with the slug derived from its name.
+    verify(teams).save(argThat(t -> "core".equals(t.getSlug())));
 
     when(teams.existsByNameIgnoreCase("Core")).thenReturn(true);
     assertThatThrownBy(() -> service.create("Core", null))
@@ -189,7 +194,7 @@ class TeamServiceTest {
     // A plain member can view but not manage, and the roster carries the slug.
     when(memberships.findByTeamIdAndUserId(teamId, actor))
         .thenReturn(Optional.of(TeamMembership.of(teamId, actor, TeamRole.MEMBER)));
-    var asMember = service.viewTeam(teamId, actor, false);
+    var asMember = service.viewTeam(teamId.toString(), actor, false);
     assertThat(asMember.canManage()).isFalse();
     assertThat(asMember.viewerRole()).isEqualTo("MEMBER");
     assertThat(asMember.members())
@@ -199,14 +204,30 @@ class TeamServiceTest {
     // A lead of the team may manage.
     when(memberships.findByTeamIdAndUserId(teamId, actor))
         .thenReturn(Optional.of(TeamMembership.of(teamId, actor, TeamRole.LEAD)));
-    assertThat(service.viewTeam(teamId, actor, false).canManage()).isTrue();
+    assertThat(service.viewTeam(teamId.toString(), actor, false).canManage()).isTrue();
 
     // An admin who is not a member passes, manages, and has no viewer role.
     UUID admin = UUID.randomUUID();
     when(memberships.findByTeamIdAndUserId(teamId, admin)).thenReturn(Optional.empty());
-    var asAdmin = service.viewTeam(teamId, admin, true);
+    var asAdmin = service.viewTeam(teamId.toString(), admin, true);
     assertThat(asAdmin.canManage()).isTrue();
     assertThat(asAdmin.viewerRole()).isNull();
+  }
+
+  @Test
+  @DisplayName("viewTeam resolves a non-UUID ref as a slug")
+  void viewTeamResolvesBySlug() {
+    UUID teamId = UUID.randomUUID();
+    UUID actor = UUID.randomUUID();
+    when(teams.findBySlugIgnoreCase("core")).thenReturn(Optional.of(teamWithId(teamId, "Core")));
+    when(memberships.findMembersByTeamId(teamId)).thenReturn(List.of());
+    when(memberships.findByTeamIdAndUserId(teamId, actor))
+        .thenReturn(Optional.of(TeamMembership.of(teamId, actor, TeamRole.MEMBER)));
+
+    var view = service.viewTeam("core", actor, false);
+
+    assertThat(view.id()).isEqualTo(teamId);
+    assertThat(view.viewerRole()).isEqualTo("MEMBER");
   }
 
   @Test
@@ -214,9 +235,18 @@ class TeamServiceTest {
   void viewTeamForbidsOutsider() {
     UUID teamId = UUID.randomUUID();
     UUID outsider = UUID.randomUUID();
+    when(teams.findById(teamId)).thenReturn(Optional.of(teamWithId(teamId, "Core")));
     when(memberships.findByTeamIdAndUserId(teamId, outsider)).thenReturn(Optional.empty());
-    assertThatThrownBy(() -> service.viewTeam(teamId, outsider, false))
+    assertThatThrownBy(() -> service.viewTeam(teamId.toString(), outsider, false))
         .isInstanceOf(TeamAccessForbiddenException.class);
+  }
+
+  @Test
+  @DisplayName("viewTeam throws not-found for an unknown slug")
+  void viewTeamUnknownRef() {
+    when(teams.findBySlugIgnoreCase("nope")).thenReturn(Optional.empty());
+    assertThatThrownBy(() -> service.viewTeam("nope", UUID.randomUUID(), false))
+        .isInstanceOf(TeamNotFoundException.class);
   }
 
   @Test
@@ -226,7 +256,7 @@ class TeamServiceTest {
     UUID userId = UUID.randomUUID();
     UUID teamId = UUID.randomUUID();
     when(memberships.findTeamsOfUser(userId))
-        .thenReturn(List.of(new UserTeamProjection(teamId, "Core", TeamRole.LEAD)));
+        .thenReturn(List.of(new UserTeamProjection(teamId, "Core", "core", TeamRole.LEAD)));
     when(memberships.countMembersByTeamIds(List.of(teamId)))
         .thenReturn(List.of(new io.qnop.repository.TeamMemberCount(teamId, 7L)));
 
@@ -236,6 +266,7 @@ class TeamServiceTest {
             t -> {
               assertThat(t.teamId()).isEqualTo(teamId);
               assertThat(t.name()).isEqualTo("Core");
+              assertThat(t.slug()).isEqualTo("core");
               assertThat(t.teamRole()).isEqualTo("LEAD");
               assertThat(t.memberCount()).isEqualTo(7L);
             });

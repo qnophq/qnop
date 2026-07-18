@@ -87,6 +87,7 @@ function makeTeam(overrides: Partial<TeamDetail> = {}): TeamDetail {
   return {
     id: 't1',
     name: 'Platform',
+    slug: 'platform',
     description: 'Owns the ingest pipeline.',
     viewerRole: 'LEAD',
     viewerCanManage: true,
@@ -109,7 +110,9 @@ function renderPage() {
   return render(
     <QueryClientProvider client={queryClient}>
       <ThemeProvider theme={buildTheme('light')}>
-        <MemoryRouter initialEntries={['/my-teams/t1']}>
+        {/* Enter by the pretty slug; the page must key its mutations off the
+            canonical team.id ('t1'), not the URL segment. */}
+        <MemoryRouter initialEntries={['/my-teams/platform']}>
           <Routes>
             <Route path="/my-teams/:id" element={<MyTeamDetailPage />} />
           </Routes>

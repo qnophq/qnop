@@ -56,12 +56,17 @@ public class TeamService {
   private final TeamRepository teams;
   private final TeamMembershipRepository memberships;
   private final UserRepository users;
+  private final TeamSlugService slugs;
 
   public TeamService(
-      TeamRepository teams, TeamMembershipRepository memberships, UserRepository users) {
+      TeamRepository teams,
+      TeamMembershipRepository memberships,
+      UserRepository users,
+      TeamSlugService slugs) {
     this.teams = teams;
     this.memberships = memberships;
     this.users = users;
+    this.slugs = slugs;
   }
 
   @Transactional(readOnly = true)
@@ -114,7 +119,9 @@ public class TeamService {
     if (teams.existsByNameIgnoreCase(trimmed)) {
       throw new TeamConflictException("NAME_TAKEN", "A team with that name already exists.");
     }
-    Team saved = teams.save(Team.create(trimmed, blankToNull(description)));
+    Team team = Team.create(trimmed, blankToNull(description));
+    team.setSlug(slugs.allocate(trimmed)); // stable friendly URL, derived from the name (#470)
+    Team saved = teams.save(team);
     return toSummary(saved, 0L);
   }
 
@@ -213,6 +220,7 @@ public class TeamService {
                 new MyTeamView(
                     t.teamId(),
                     t.teamName(),
+                    t.slug(),
                     t.teamRole().name(),
                     counts.getOrDefault(t.teamId(), 0L)))
         .collect(Collectors.toList());
@@ -220,16 +228,19 @@ public class TeamService {
 
   /**
    * A team with its members for any member of the team, or any team for an admin (issue #470). The
-   * result carries the caller's own role and whether they may manage the membership — a LEAD (or an
-   * admin) manages, a plain MEMBER may only view. A non-member, non-admin caller gets 403.
+   * {@code teamRef} is the team's slug or its id — a friendly {@code /my-teams/{slug}} URL resolves
+   * here. The result carries the caller's own role and whether they may manage the membership — a
+   * LEAD (or an admin) manages, a plain MEMBER may only view. A non-member, non-admin caller gets
+   * 403.
    */
   @Transactional(readOnly = true)
-  public MemberTeamView viewTeam(UUID teamId, UUID actorId, boolean admin) {
+  public MemberTeamView viewTeam(String teamRef, UUID actorId, boolean admin) {
+    Team team = resolveTeam(teamRef);
+    UUID teamId = team.getId();
     Optional<TeamMembership> membership = memberships.findByTeamIdAndUserId(teamId, actorId);
     if (membership.isEmpty() && !admin) {
       throw new TeamAccessForbiddenException("You are not a member of this team.");
     }
-    Team team = teams.findById(teamId).orElseThrow(() -> TeamNotFoundException.team(teamId));
     List<TeamMemberView> members =
         memberships.findMembersByTeamId(teamId).stream()
             .map(
@@ -246,7 +257,33 @@ public class TeamService {
     boolean canManage =
         admin || membership.map(m -> m.getTeamRole() == TeamRole.LEAD).orElse(false);
     return new MemberTeamView(
-        team.getId(), team.getName(), team.getDescription(), viewerRole, canManage, members);
+        team.getId(),
+        team.getName(),
+        team.getSlug(),
+        team.getDescription(),
+        viewerRole,
+        canManage,
+        members);
+  }
+
+  /**
+   * Resolves a {@code /my-teams/{ref}} segment — a UUID-shaped ref is an id, anything else a slug.
+   */
+  private Team resolveTeam(String ref) {
+    UUID id = tryUuid(ref);
+    Optional<Team> team = id != null ? teams.findById(id) : teams.findBySlugIgnoreCase(ref);
+    return team.orElseThrow(() -> TeamNotFoundException.ref(ref));
+  }
+
+  private static UUID tryUuid(String ref) {
+    if (ref == null) {
+      return null;
+    }
+    try {
+      return UUID.fromString(ref);
+    } catch (IllegalArgumentException e) {
+      return null;
+    }
   }
 
   /** Add a member as a lead of the team (or an admin); otherwise 403 (issue #470). */
@@ -393,7 +430,8 @@ public class TeamService {
   public record TeamPage(List<TeamSummaryView> items, long total, int page, int size) {}
 
   /** A team the caller belongs to, with the caller's role and member count there (issue #470). */
-  public record MyTeamView(UUID teamId, String name, String teamRole, long memberCount) {}
+  public record MyTeamView(
+      UUID teamId, String name, String slug, String teamRole, long memberCount) {}
 
   /**
    * A team and its members as seen by a member (issue #470). {@code viewerRole} is the caller's
@@ -403,6 +441,7 @@ public class TeamService {
   public record MemberTeamView(
       UUID id,
       String name,
+      String slug,
       String description,
       String viewerRole,
       boolean canManage,

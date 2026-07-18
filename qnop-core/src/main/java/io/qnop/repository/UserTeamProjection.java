@@ -24,4 +24,4 @@ import io.qnop.entity.TeamRole;
 import java.util.UUID;
 
 /** One team a user belongs to, with their role — the public profile's affiliation row (#473). */
-public record UserTeamProjection(UUID teamId, String teamName, TeamRole teamRole) {}
+public record UserTeamProjection(UUID teamId, String teamName, String slug, TeamRole teamRole) {}

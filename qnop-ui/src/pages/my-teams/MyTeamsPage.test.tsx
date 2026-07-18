@@ -42,8 +42,14 @@ vi.mock('../../api/hooks/useMyTeams', () => ({
 beforeEach(() => {
   myTeamsState.data = {
     items: [
-      { teamId: 't1', name: 'Platform', teamRole: 'LEAD', memberCount: 7 },
-      { teamId: 't2', name: 'Design Guild', teamRole: 'MEMBER', memberCount: 3 },
+      { teamId: 't1', name: 'Platform', slug: 'platform', teamRole: 'LEAD', memberCount: 7 },
+      {
+        teamId: 't2',
+        name: 'Design Guild',
+        slug: 'design-guild',
+        teamRole: 'MEMBER',
+        memberCount: 3,
+      },
     ],
   };
   myTeamsState.isLoading = false;
@@ -65,7 +71,7 @@ describe('MyTeamsPage', () => {
     renderPage();
 
     const manage = screen.getByRole('link', { name: 'Manage Platform' });
-    expect(manage.getAttribute('href')).toBe('/my-teams/t1');
+    expect(manage.getAttribute('href')).toBe('/my-teams/platform');
   });
 
   it('links member-only teams to a view-only roster (not a management action)', () => {
@@ -73,7 +79,7 @@ describe('MyTeamsPage', () => {
 
     expect(screen.getByText("Team you're in")).toBeTruthy();
     const view = screen.getByRole('link', { name: 'View Design Guild' });
-    expect(view.getAttribute('href')).toBe('/my-teams/t2');
+    expect(view.getAttribute('href')).toBe('/my-teams/design-guild');
     expect(screen.queryByRole('link', { name: 'Manage Design Guild' })).toBeNull();
   });
 

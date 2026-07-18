@@ -76,7 +76,7 @@ public class MyTeamsController implements TeamsApi {
   }
 
   @Override
-  public ResponseEntity<TeamDetail> getMyTeam(UUID teamId) {
+  public ResponseEntity<TeamDetail> getMyTeam(String teamId) {
     MemberTeamView view =
         teams.viewTeam(teamId, CurrentUser.requireUserId(), CurrentUser.isAdmin());
     return ResponseEntity.ok(toDetail(view));
@@ -147,6 +147,7 @@ public class MyTeamsController implements TeamsApi {
     return new MyTeam()
         .teamId(v.teamId())
         .name(v.name())
+        .slug(v.slug())
         .teamRole(TeamRole.fromValue(v.teamRole()))
         .memberCount(v.memberCount());
   }
@@ -159,6 +160,7 @@ public class MyTeamsController implements TeamsApi {
     return new TeamDetail()
         .id(v.id())
         .name(v.name())
+        .slug(v.slug())
         .description(v.description())
         .viewerRole(v.viewerRole() == null ? null : TeamRole.fromValue(v.viewerRole()))
         .viewerCanManage(v.canManage())

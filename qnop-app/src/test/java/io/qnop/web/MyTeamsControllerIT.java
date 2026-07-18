@@ -83,11 +83,12 @@ class MyTeamsControllerIT extends AbstractIntegrationTest {
 
     String leadToken = token("lead");
 
-    // The lead sees the team in their own list, flagged LEAD.
+    // The lead sees the team in their own list, flagged LEAD, with its slug.
     mockMvc
         .perform(get("/api/v1/teams/mine").header("Authorization", bearer(leadToken)))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.items[0].name").value("Core"))
+        .andExpect(jsonPath("$.items[0].slug").value("core"))
         .andExpect(jsonPath("$.items[0].teamRole").value("LEAD"));
 
     // Detail is readable by the lead.
@@ -218,6 +219,23 @@ class MyTeamsControllerIT extends AbstractIntegrationTest {
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.viewerRole").value("LEAD"))
         .andExpect(jsonPath("$.viewerCanManage").value(true));
+  }
+
+  @Test
+  void resolvesTeamByItsSlug() throws Exception {
+    String admin = token(createUser("root", UserRole.ADMIN));
+    User lead = createUser("lead", UserRole.MEMBER);
+    String teamId = createTeam(admin, "Contract Review");
+    addMember(admin, teamId, lead, "LEAD");
+
+    // The friendly slug URL resolves to the same team and the detail echoes the slug.
+    mockMvc
+        .perform(
+            get("/api/v1/teams/{ref}", "contract-review")
+                .header("Authorization", bearer(token("lead"))))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.id").value(teamId))
+        .andExpect(jsonPath("$.slug").value("contract-review"));
   }
 
   @Test

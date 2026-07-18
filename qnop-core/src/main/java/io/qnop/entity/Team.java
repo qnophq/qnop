@@ -52,6 +52,14 @@ public class Team {
   @Column(name = "name", nullable = false)
   private String name;
 
+  /**
+   * URL slug derived from the name at creation (issue #470); the column is not updatable, so a
+   * rename keeps the friendly URL stable. Uniqueness (case-insensitive) and the kebab-case shape
+   * are pinned by a Postgres index + CHECK in Liquibase, mirroring the document/user slug.
+   */
+  @Column(name = "slug", length = 64, updatable = false)
+  private String slug;
+
   @Column(name = "description")
   private String description;
 
@@ -93,6 +101,15 @@ public class Team {
 
   public void setName(String name) {
     this.name = name;
+  }
+
+  public String getSlug() {
+    return slug;
+  }
+
+  /** Set once at creation (the column is not updatable); {@code null} means no friendly URL. */
+  public void setSlug(String slug) {
+    this.slug = slug;
   }
 
   public String getDescription() {

@@ -1345,7 +1345,12 @@ paths:
       security:
         - bearerAuth: []
       parameters:
-        - $ref: '#/components/parameters/TeamIdParam'
+        - name: teamId
+          in: path
+          required: true
+          description: The team's slug or its id (issue #470).
+          schema:
+            type: string
       responses:
         '200':
           description: The team with its members.
@@ -4278,6 +4283,10 @@ components:
           format: uuid
         name:
           type: string
+        slug:
+          type: string
+          nullable: true
+          description: The team's URL slug (issue #470) for the friendly `/my-teams/{slug}` link; null for pre-slug teams.
         teamRole:
           $ref: '#/components/schemas/TeamRole'
         memberCount:
@@ -4343,6 +4352,10 @@ components:
           format: uuid
         name:
           type: string
+        slug:
+          type: string
+          nullable: true
+          description: The team's URL slug (issue #470); null for pre-slug teams.
         description:
           type: string
           nullable: true

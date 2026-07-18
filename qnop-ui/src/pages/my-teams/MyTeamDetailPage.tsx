@@ -105,10 +105,13 @@ export function MyTeamDetailPage() {
     setAddSeq((n) => n + 1);
   };
 
+  // Mutations key off the canonical team id (the URL param may be a slug).
+  const teamId = team.id;
+
   const toggleRole = (member: TeamMember) => {
     const next: TeamRole = member.teamRole === 'LEAD' ? 'MEMBER' : 'LEAD';
     setRole.mutate(
-      { teamId: id, userId: member.userId, teamRole: next },
+      { teamId, userId: member.userId, teamRole: next },
       { onError: (error) => notify(apiErrorMessage(error, 'Could not change the role.'), 'error') },
     );
   };
@@ -218,7 +221,7 @@ export function MyTeamDetailPage() {
           <AddMyTeamMemberDialog
             key={`add-${addSeq}`}
             open={addOpen}
-            teamId={id}
+            teamId={teamId}
             existingMemberIds={members.map((m) => m.userId)}
             onClose={() => setAddOpen(false)}
           />
@@ -232,7 +235,7 @@ export function MyTeamDetailPage() {
             onConfirm={() => {
               if (removeTarget) {
                 removeMember.mutate(
-                  { teamId: id, userId: removeTarget.userId },
+                  { teamId, userId: removeTarget.userId },
                   {
                     onError: (error) =>
                       notify(apiErrorMessage(error, 'Could not remove the member.'), 'error'),
