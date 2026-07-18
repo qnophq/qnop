@@ -245,6 +245,34 @@ class MyTeamsControllerIT extends AbstractIntegrationTest {
   }
 
   @Test
+  void leadCannotRemoveThemselvesEvenWithACoLead() throws Exception {
+    String admin = token(createUser("root", UserRole.ADMIN));
+    User lead = createUser("lead", UserRole.MEMBER);
+    User coLead = createUser("colead", UserRole.MEMBER);
+    String teamId = createTeam(admin, "Core");
+    addMember(admin, teamId, lead, "LEAD");
+    addMember(admin, teamId, coLead, "LEAD");
+
+    String leadToken = token("lead");
+
+    // A co-lead remains, so the last-lead guard would allow it — but a lead may
+    // still never remove themselves through the self-management surface.
+    mockMvc
+        .perform(
+            delete("/api/v1/teams/{id}/members/{uid}", teamId, lead.getId())
+                .header("Authorization", bearer(leadToken)))
+        .andExpect(status().isConflict())
+        .andExpect(jsonPath("$.code").value("SELF_REMOVAL"));
+
+    // They may still remove a different member.
+    mockMvc
+        .perform(
+            delete("/api/v1/teams/{id}/members/{uid}", teamId, coLead.getId())
+                .header("Authorization", bearer(leadToken)))
+        .andExpect(status().isNoContent());
+  }
+
+  @Test
   void currentUserExposesTeamLeadFlag() throws Exception {
     String admin = token(createUser("root", UserRole.ADMIN));
     User lead = createUser("lead", UserRole.MEMBER);

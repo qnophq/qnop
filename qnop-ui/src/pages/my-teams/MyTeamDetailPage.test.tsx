@@ -26,6 +26,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import type { AdminTeamDetail, AdminTeamMember } from '../../api/generated';
 import { buildTheme } from '../../theme/theme';
+import { useAuthStore } from '../../stores/authStore';
 import { MyTeamDetailPage } from './MyTeamDetailPage';
 
 const { teamState, setRoleMutate, removeMemberMutate } = vi.hoisted(() => ({
@@ -99,6 +100,7 @@ beforeEach(() => {
   teamState.data = makeTeam();
   teamState.isLoading = false;
   teamState.isError = false;
+  useAuthStore.setState({ userId: null });
 });
 
 function renderPage() {
@@ -188,6 +190,25 @@ describe('MyTeamDetailPage', () => {
     fireEvent.click(await screen.findByRole('button', { name: 'Remove' }));
 
     expect(await screen.findByText('Could not remove the member.')).toBeTruthy();
+  });
+
+  it('never offers self-removal on the caller’s own row, but still allows a hand-over demote', async () => {
+    useAuthStore.setState({ userId: 'u1' }); // the caller is the lead Ada (u1)
+    renderPage();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Actions for Ada Lovelace' }));
+
+    expect(await screen.findByText('Make member')).toBeTruthy();
+    expect(screen.queryByText('Remove from team')).toBeNull();
+  });
+
+  it('still offers removal on other members’ rows', async () => {
+    useAuthStore.setState({ userId: 'u1' });
+    renderPage();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Actions for Alan Turing' }));
+
+    expect(await screen.findByText('Remove from team')).toBeTruthy();
   });
 
   it('opens the add-member dialog wired with the team id and existing members', async () => {

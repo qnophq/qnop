@@ -245,20 +245,42 @@ class TeamServiceTest {
   @DisplayName("demoting or removing the team's last lead is rejected with LAST_LEAD")
   void lastLeadGuard() {
     UUID teamId = UUID.randomUUID();
-    UUID lead = UUID.randomUUID(); // the sole lead, acting on themselves
+    UUID lead = UUID.randomUUID(); // the sole lead
+    UUID admin = UUID.randomUUID();
     when(memberships.existsByTeamIdAndUserIdAndTeamRole(teamId, lead, TeamRole.LEAD))
         .thenReturn(true);
     when(memberships.countByTeamIdAndTeamRole(teamId, TeamRole.LEAD)).thenReturn(1L);
 
+    // The sole lead cannot self-demote (last-lead) ...
     assertThatThrownBy(() -> service.setMemberRoleAsLead(teamId, lead, false, lead, "MEMBER"))
         .isInstanceOf(TeamConflictException.class)
         .extracting("code")
         .isEqualTo("LAST_LEAD");
-    assertThatThrownBy(() -> service.removeMemberAsLead(teamId, lead, false, lead))
+    // ... and an admin cannot remove the sole lead either (self-removal does not
+    // apply here — the actor is the admin, not the target).
+    assertThatThrownBy(() -> service.removeMemberAsLead(teamId, admin, true, lead))
         .isInstanceOf(TeamConflictException.class)
         .extracting("code")
         .isEqualTo("LAST_LEAD");
     verify(memberships, never()).delete(any());
+  }
+
+  @Test
+  @DisplayName("a lead cannot remove themselves through the self-management surface")
+  void leadCannotRemoveThemselves() {
+    UUID teamId = UUID.randomUUID();
+    UUID lead = UUID.randomUUID();
+    when(memberships.existsByTeamIdAndUserIdAndTeamRole(teamId, lead, TeamRole.LEAD))
+        .thenReturn(true);
+
+    assertThatThrownBy(() -> service.removeMemberAsLead(teamId, lead, false, lead))
+        .isInstanceOf(TeamConflictException.class)
+        .extracting("code")
+        .isEqualTo("SELF_REMOVAL");
+    verify(memberships, never()).delete(any());
+    // The self-check fires before the last-lead count is ever consulted, so it
+    // blocks self-removal even when co-leads remain.
+    verify(memberships, never()).countByTeamIdAndTeamRole(any(), any());
   }
 
   @Test

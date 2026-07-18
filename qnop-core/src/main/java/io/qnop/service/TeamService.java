@@ -247,10 +247,19 @@ public class TeamService {
     return setMemberRole(teamId, userId, teamRole);
   }
 
-  /** Remove a member as a lead (or admin); refuses to remove the last lead (issue #470). */
+  /**
+   * Remove a member as a lead (or admin); refuses to remove the last lead (issue #470). A caller
+   * may never remove themselves through this self-management surface — leaving a team is an
+   * administrator action ({@code /admin/teams}), so a lead cannot accidentally strip their own
+   * membership (or lead access) here.
+   */
   @Transactional
   public void removeMemberAsLead(UUID teamId, UUID actorId, boolean admin, UUID userId) {
     requireLeadOrAdmin(teamId, actorId, admin);
+    if (actorId.equals(userId)) {
+      throw new TeamConflictException(
+          "SELF_REMOVAL", "You cannot remove yourself from a team; ask an administrator.");
+    }
     lockTeam(teamId);
     guardNotLastLead(teamId, userId);
     removeMember(teamId, userId);

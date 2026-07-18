@@ -53,19 +53,23 @@ import { AdminToast } from '../../components/admin/layout/AdminToast';
 import { useToast } from '../../components/admin/layout/useToast';
 import { UserAvatar } from '../../components/shell/UserAvatar';
 import { useFormatters } from '../../hooks/useFormatters';
+import { useAuthStore } from '../../stores/authStore';
 import { apiErrorMessage } from '../../utils/apiError';
 
 /**
  * A lead's team detail (issue #470): add members, promote/demote leads and remove
  * members for a team the caller leads. The last-lead guardrail is enforced on the
- * server; a rejected demotion/removal surfaces as an error toast. Renaming or
- * deleting the team is not offered here — that stays in the admin console.
+ * server; a rejected demotion/removal surfaces as an error toast. A lead is never
+ * offered "Remove from team" on their own row — leaving a team is an admin action
+ * (the server rejects self-removal too). Renaming or deleting the team is not
+ * offered here — that stays in the admin console.
  */
 export function MyTeamDetailPage() {
   const { id = '' } = useParams();
   const { data: team, isLoading, isError } = useMyTeam(id);
   const setRole = useSetMyTeamMemberRole();
   const removeMember = useRemoveMyTeamMember();
+  const currentUserId = useAuthStore((s) => s.userId);
   const { formatDateTime } = useFormatters();
   const { toast, notify, clear } = useToast();
 
@@ -192,17 +196,19 @@ export function MyTeamDetailPage() {
           </ListItemIcon>
           <ListItemText>{active?.teamRole === 'LEAD' ? 'Make member' : 'Make lead'}</ListItemText>
         </MenuItem>
-        <MenuItem
-          onClick={() => {
-            setAnchorEl(null);
-            setRemoveTarget(active);
-          }}
-        >
-          <ListItemIcon>
-            <UserMinus size={16} />
-          </ListItemIcon>
-          <ListItemText>Remove from team</ListItemText>
-        </MenuItem>
+        {active?.userId !== currentUserId && (
+          <MenuItem
+            onClick={() => {
+              setAnchorEl(null);
+              setRemoveTarget(active);
+            }}
+          >
+            <ListItemIcon>
+              <UserMinus size={16} />
+            </ListItemIcon>
+            <ListItemText>Remove from team</ListItemText>
+          </MenuItem>
+        )}
       </Menu>
 
       <AddMyTeamMemberDialog
