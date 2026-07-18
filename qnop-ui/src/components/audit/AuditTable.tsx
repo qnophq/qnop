@@ -28,7 +28,7 @@ import TableHead from '@mui/material/TableHead';
 import TableRow from '@mui/material/TableRow';
 import Typography from '@mui/material/Typography';
 import type { AuditEvent } from '../../api/generated';
-import { formatDateTime } from '../../utils/formatDate';
+import { useFormatters } from '../../hooks/useFormatters';
 import { formatAuditDetail } from '../../utils/auditDetail';
 
 const COLUMNS = ['Time', 'Actor', 'Event', 'Document', 'Detail'];
@@ -47,10 +47,11 @@ interface AuditTableProps {
  * a readable rendering of the jsonb detail. Actor and document cells are
  * click-to-filter; the system actor (no id) is inert plain text. No raw UUIDs
  * are ever shown — an unresolved actor/document falls back to an em dash
- * (ADR-0042). Timestamps use the shared formatter (user-timezone display lands
- * centrally with #465).
+ * (ADR-0042). Timestamps render in the viewer's timezone through the shared
+ * {@link useFormatters} seam (issue #465, ADR-0041).
  */
 export function AuditTable({ events, onFilterActor, onFilterDocument }: AuditTableProps) {
+  const { formatDateTime } = useFormatters();
   return (
     <Table size="small">
       <TableHead>

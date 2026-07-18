@@ -64,8 +64,8 @@ function toIso(value: string): string | undefined {
  * AUDITOR or ADMIN (the sidebar hides it and the route guards it). Filter by
  * event type, a created-at range, and — by clicking a row — a single actor or
  * document; page through the results. Loading, error and empty states are all
- * handled. Timestamps use the shared formatter until user-timezone display
- * lands centrally (#465).
+ * handled. Timestamps render in the viewer's timezone via the AuditTable's
+ * useFormatters seam (issue #465, ADR-0041).
  */
 export function AuditPage() {
   const [eventType, setEventType] = useState('');
