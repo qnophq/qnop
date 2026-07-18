@@ -48,7 +48,7 @@ import { ConfirmDialog } from '../../components/admin/ConfirmDialog';
 import { PageHeader } from '../../components/admin/layout/PageHeader';
 import { UserAvatar } from '../../components/shell/UserAvatar';
 import { UserStatusBadge } from '../../components/admin/users/UserBadges';
-import { formatDateTime } from '../../utils/formatDate';
+import { useFormatters } from '../../hooks/useFormatters';
 
 /** Team detail with member management: add, change role, remove (#105). */
 export function TeamDetailPage() {
@@ -56,6 +56,7 @@ export function TeamDetailPage() {
   const { data: team, isLoading, isError } = useTeam(id);
   const setRole = useSetTeamMemberRole();
   const removeMember = useRemoveTeamMember();
+  const { formatDateTime } = useFormatters();
 
   const [editOpen, setEditOpen] = useState(false);
   const [editSeq, setEditSeq] = useState(0);

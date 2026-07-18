@@ -36,17 +36,12 @@ import { AddReactionButton } from '../reactions/AddReactionButton';
 import { ReactionBar } from '../reactions/ReactionBar';
 import { useToggleAnnotationReaction } from '../reactions/useReactions';
 import { useAuthStore } from '../../../stores/authStore';
-import { shortRelativeTime } from '../../../utils/relativeTime';
+import { useFormatters } from '../../../hooks/useFormatters';
 import { UserAvatar } from '../../shell/UserAvatar';
 import { avatarSrc } from '../../../utils/avatarUrl';
 import { isDocumentScoped } from '../annotationScope';
 import { Markdown } from '../markdown/Markdown';
 import { AnnotationBadgeRow } from './AnnotationBadgeRow';
-
-const DATE_FORMAT = new Intl.DateTimeFormat(undefined, {
-  dateStyle: 'medium',
-  timeStyle: 'short',
-});
 
 /** Larger than a reply's avatar (28) — the opener carries the thread. */
 const AUTHOR_AVATAR_SIZE = 36;
@@ -82,6 +77,7 @@ export function AnnotationHead({
   onReattachPlacement,
 }: AnnotationHeadProps) {
   const theme = useTheme();
+  const { shortRelativeTime, formatDateTime } = useFormatters();
   // Reactions on the opener (issue #410) — active wherever notify travels;
   // a closed review answers REVIEW_CLOSED and the optimistic flip rolls back.
   const toggleReaction = useToggleAnnotationReaction(annotation.id, notify ?? (() => undefined));
@@ -157,7 +153,7 @@ export function AnnotationHead({
               color="text.secondary"
               noWrap
               component="p"
-              title={DATE_FORMAT.format(new Date(annotation.createdAt))}
+              title={formatDateTime(annotation.createdAt)}
               sx={{ lineHeight: 1.4 }}
             >
               Started this discussion · {shortRelativeTime(annotation.createdAt)}

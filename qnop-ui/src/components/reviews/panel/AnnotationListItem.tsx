@@ -41,7 +41,7 @@ import { avatarSrc } from '../../../utils/avatarUrl';
 import { isDocumentScoped } from '../annotationScope';
 import { WholeDocumentChip } from '../WholeDocumentChip';
 import { tokens } from '../../../theme/tokens';
-import { shortRelativeTime } from '../../../utils/relativeTime';
+import { useFormatters } from '../../../hooks/useFormatters';
 import { hasNewComments, isUnseen } from '../newSince';
 import { PRIORITY_CUES, TYPE_CUES } from '../tasks/tasksModel';
 import { AnnotationHead } from './AnnotationHead';
@@ -52,11 +52,6 @@ const MAX_AVATARS = 3;
 
 /** Status tile + gap — the meta line indents to align under the title. */
 const TILE_INDENT = '34px';
-
-const DATE_FORMAT = new Intl.DateTimeFormat(undefined, {
-  dateStyle: 'medium',
-  timeStyle: 'short',
-});
 
 /**
  * One-line plain-text excerpt of a Markdown body (issue #403): a collapsed
@@ -181,6 +176,7 @@ function AnnotationListItemBase({
   onReattachPlacement,
 }: AnnotationListItemProps) {
   const theme = useTheme();
+  const { shortRelativeTime, formatDateTime } = useFormatters();
   const viewerId = useAuthStore((state) => state.userId);
   const unseen = isUnseen(annotation, previousSeenAt, viewerId);
   const freshComments = hasNewComments(annotation, previousSeenAt);
@@ -364,7 +360,7 @@ function AnnotationListItemBase({
             </UserHoverCard>
             <Typography
               variant="caption"
-              title={DATE_FORMAT.format(new Date(annotation.createdAt))}
+              title={formatDateTime(annotation.createdAt)}
               sx={{ flexShrink: 0, color: 'text.disabled' }}
             >
               {shortRelativeTime(annotation.createdAt)}

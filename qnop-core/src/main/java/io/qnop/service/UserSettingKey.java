@@ -45,7 +45,13 @@ public enum UserSettingKey {
       List.of("system", "light", "dark")),
   PREFERRED_LANGUAGE(
       "preferred_language", SettingValueType.STRING, "en", "Preferred UI language (ISO 639-1)."),
-  TIMEZONE("timezone", SettingValueType.STRING, "UTC", "Preferred display timezone (IANA id)."),
+  // Empty by default so an unset preference is distinguishable from an explicit choice: the
+  // frontend then falls back to the application default timezone, then UTC (issue #465, ADR-0041).
+  TIMEZONE(
+      "timezone",
+      SettingValueType.STRING,
+      "",
+      "Preferred display timezone (IANA id); empty follows the application default."),
   EMAIL_REVIEW_NOTIFICATIONS(
       "email_review_notifications",
       SettingValueType.BOOLEAN,
@@ -55,6 +61,15 @@ public enum UserSettingKey {
   private static final Map<String, UserSettingKey> BY_KEY =
       Arrays.stream(values())
           .collect(Collectors.toUnmodifiableMap(UserSettingKey::getKey, Function.identity()));
+
+  /**
+   * Beyond-type value constraints per key (mirrors {@link ApplicationSettingKey}); {@link
+   * ValueValidator} enforces them at the setting boundary. The display timezone must be a real IANA
+   * zone id so a future backend consumer of the per-user zone (server-rendered export, scheduled
+   * mail) can trust it (issue #465, ADR-0041).
+   */
+  private static final Map<UserSettingKey, SettingConstraints> CONSTRAINTS =
+      Map.of(TIMEZONE, SettingConstraints.format(SettingConstraints.ValueFormat.TIMEZONE));
 
   private final String key;
   private final SettingValueType type;
@@ -101,5 +116,13 @@ public enum UserSettingKey {
 
   public List<String> getEnumOptions() {
     return enumOptions;
+  }
+
+  /**
+   * Value constraints beyond the declared type (e.g. a valid IANA timezone); {@link
+   * SettingConstraints#NONE} if none.
+   */
+  public SettingConstraints getConstraints() {
+    return CONSTRAINTS.getOrDefault(this, SettingConstraints.NONE);
   }
 }

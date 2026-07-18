@@ -23,7 +23,7 @@ import Box from '@mui/material/Box';
 import Stack from '@mui/material/Stack';
 import Typography from '@mui/material/Typography';
 import type { ReactionGroup } from '../../../api/generated';
-import { shortRelativeTime } from '../../../utils/relativeTime';
+import { useFormatters } from '../../../hooks/useFormatters';
 import type { Notify } from '../../admin/layout/useToast';
 import { UserHoverCard } from '../../people/UserHoverCard';
 import { UserAvatar } from '../../shell/UserAvatar';
@@ -35,11 +35,6 @@ import { ReactionBar } from '../reactions/ReactionBar';
 
 /** Shared with the thread's rail and composer, so the columns stay aligned. */
 export const AVATAR_SIZE = 28;
-
-const TIME_FORMAT = new Intl.DateTimeFormat(undefined, {
-  dateStyle: 'medium',
-  timeStyle: 'short',
-});
 
 interface CommentMessageProps {
   /** The display name; the message prints "You" for the viewer's own. */
@@ -94,6 +89,7 @@ export function CommentMessage({
   hoverUserId,
   hoverUserSlug,
 }: CommentMessageProps) {
+  const { shortRelativeTime, formatDateTime } = useFormatters();
   return (
     <Stack
       id={domId}
@@ -132,7 +128,7 @@ export function CommentMessage({
           <Typography
             component="span"
             variant="caption"
-            title={TIME_FORMAT.format(new Date(createdAt))}
+            title={formatDateTime(createdAt)}
             sx={{ color: 'text.secondary', flexShrink: 0 }}
           >
             {shortRelativeTime(createdAt)}

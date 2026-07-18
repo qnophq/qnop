@@ -39,6 +39,13 @@ vi.mock('../config', () => ({
   },
 }));
 
+// useUserSettings is gated on authentication (issue #465): the query only fires
+// for a signed-in caller, so the tests run as one.
+vi.mock('../../stores/authStore', () => ({
+  useAuthStore: (selector: (s: { isAuthenticated: boolean }) => unknown) =>
+    selector({ isAuthenticated: true }),
+}));
+
 const mockedApi = vi.mocked(userSettingsApi);
 
 const response = (value: string) => ({

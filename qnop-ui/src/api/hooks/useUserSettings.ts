@@ -22,6 +22,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import type { UserSettingsResponse } from '../generated';
 import { userSettingsApi } from '../config';
+import { useAuthStore } from '../../stores/authStore';
 
 /** The per-user opt-out for review activity mails (issue #316). */
 export const EMAIL_REVIEW_NOTIFICATIONS_KEY = 'email_review_notifications';
@@ -30,15 +31,27 @@ export const userSettingKeys = {
   all: ['user-settings'] as const,
 };
 
-/** The caller's settings, stored values overlaid on registry defaults (issue #22). */
+/**
+ * The caller's settings, stored values overlaid on registry defaults (issue #22).
+ * Gated on authentication so anonymous surfaces (login, registration) never fire
+ * it — consumers fall back to the registry/application default there.
+ */
 export function useUserSettings() {
+  const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
   return useQuery<UserSettingsResponse>({
     queryKey: userSettingKeys.all,
     queryFn: async () => {
       const response = await userSettingsApi.getCurrentUserSettings();
       return response.data;
     },
+    enabled: isAuthenticated,
   });
+}
+
+/** The value of a single setting key, or {@code undefined} when unset/unloaded. */
+export function useUserSettingValue(key: string): string | undefined {
+  const { data } = useUserSettings();
+  return data?.settings.find((setting) => setting.key === key)?.value;
 }
 
 /**

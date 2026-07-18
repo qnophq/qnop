@@ -35,7 +35,7 @@ import {
 import { Link as RouterLink } from 'react-router-dom';
 import Link from '@mui/material/Link';
 import type { DashboardActivity } from '../../api/generated';
-import { shortRelativeTime } from '../../utils/relativeTime';
+import { useFormatters } from '../../hooks/useFormatters';
 import { SectionCard } from '../admin/layout/SectionCard';
 import { CardScroller } from './CardScroller';
 import { CountPill } from './CountPill';
@@ -61,6 +61,7 @@ interface ActivityCardProps {
  */
 export function ActivityCard({ activity }: ActivityCardProps) {
   const theme = useTheme();
+  const { shortRelativeTime } = useFormatters();
 
   return (
     <SectionCard

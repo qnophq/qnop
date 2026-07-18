@@ -34,6 +34,7 @@ import Typography from '@mui/material/Typography';
 import { BarChart3, Lock, SlidersHorizontal, Upload, type LucideIcon } from 'lucide-react';
 import type { AdminSetting } from '../../../api/generated';
 import { useSettings, useUpdateSettings } from '../../../api/hooks/useSettings';
+import { TimezonePicker } from '../../TimezonePicker';
 import { SectionCard } from '../layout/SectionCard';
 import { AdminToast } from '../layout/AdminToast';
 import { useToast } from '../layout/useToast';
@@ -59,7 +60,7 @@ const GROUP_ICONS: Record<string, LucideIcon> = {
 };
 
 const GROUP_DESCRIPTIONS: Record<string, string> = {
-  general: 'Workspace identity, base URL and default language.',
+  general: 'Workspace identity, base URL, default language and time zone.',
   upload: 'Constraints applied to document uploads.',
   tracking: 'Anonymous, privacy-friendly usage analytics.',
   auth: 'Self-registration and password-reset behaviour.',
@@ -377,6 +378,21 @@ function SettingField({ setting, value, error, onChange }: SettingFieldProps) {
           </Box>
         }
         sx={{ alignItems: 'flex-start', m: 0, gap: 1 }}
+      />
+    );
+  }
+
+  // The default display timezone is a searchable IANA dropdown, not free text —
+  // the same control the profile uses (issue #465).
+  if (setting.key === 'general.default_timezone') {
+    return (
+      <TimezonePicker
+        value={value}
+        onChange={onChange}
+        label={label}
+        helperText={error ?? setting.description}
+        error={Boolean(error)}
+        maxWidth={480}
       />
     );
   }
