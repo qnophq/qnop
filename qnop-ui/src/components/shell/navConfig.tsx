@@ -31,6 +31,7 @@ import {
   ShieldCheck,
   User,
   Users,
+  UsersRound,
   type LucideIcon,
 } from 'lucide-react';
 import type { UserRole } from '../../api/generated';
@@ -63,6 +64,7 @@ export const NAV_GROUPS: NavGroup[] = [
     items: [
       { id: 'dashboard', label: 'Dashboard', path: '/', icon: LayoutDashboard },
       { id: 'reviews', label: 'Reviews', path: '/reviews', icon: FileText },
+      { id: 'my-teams', label: 'My Teams', path: '/my-teams', icon: UsersRound },
     ],
   },
   {

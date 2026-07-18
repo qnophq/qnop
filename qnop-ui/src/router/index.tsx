@@ -40,6 +40,8 @@ import { SettingsPage } from '../pages/admin/SettingsPage';
 import { UsersPage } from '../pages/admin/UsersPage';
 import { TeamsPage } from '../pages/admin/TeamsPage';
 import { TeamDetailPage } from '../pages/admin/TeamDetailPage';
+import { MyTeamsPage } from '../pages/my-teams/MyTeamsPage';
+import { MyTeamDetailPage } from '../pages/my-teams/MyTeamDetailPage';
 import { ChangePasswordPage } from '../pages/auth/ChangePasswordPage';
 import { ForgotPasswordPage } from '../pages/auth/ForgotPasswordPage';
 import { LoginPage } from '../pages/auth/LoginPage';
@@ -127,6 +129,8 @@ export const router = createBrowserRouter([
           </ReviewParamGate>
         ),
       },
+      { path: 'my-teams', element: <MyTeamsPage /> },
+      { path: 'my-teams/:id', element: <MyTeamDetailPage /> },
       {
         path: 'compliance',
         element: (

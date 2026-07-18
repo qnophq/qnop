@@ -54,6 +54,14 @@ tags:
       Admin-only team management (issue #105): list/search teams with pagination,
       create / edit / delete teams, and manage memberships with a per-team role
       (LEAD / MEMBER). Teams group reviewers for the review workflow.
+  - name: Teams
+    description: |
+      Team self-management for team LEADs (issue #470): a LEAD may view and manage
+      the membership of the team(s) they lead — add/remove members and promote or
+      demote leads — without being a global ADMIN, gated per-team in the handler
+      (a MEMBER or non-lead gets 403; an ADMIN passes for any team). Creating,
+      renaming and deleting teams stays ADMIN-only under `/admin/teams`. A team can
+      never lose its last lead through this surface.
   - name: AdminOidcProviders
     description: |
       Superadmin-only management of DB-configured OIDC/OAuth2 login providers,
@@ -1303,6 +1311,197 @@ paths:
           description: Member removed
         '404':
           description: The team has no such member
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+  /teams/mine:
+    get:
+      tags:
+        - Teams
+      summary: List the teams the caller belongs to
+      description: |
+        The caller's own team affiliations, each flagged with the caller's role in
+        that team (issue #470). Drives the "My Teams" surface; the caller manages
+        only those where their `teamRole` is `LEAD`.
+      operationId: listMyTeams
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: The caller's teams, ordered by name.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MyTeamListResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+  /teams/{teamId}:
+    get:
+      tags:
+        - Teams
+      summary: View a team's members
+      description: |
+        A team's detail with its members, for any **member** of the team (issue
+        #470). The response carries the caller's own role in the team and a
+        `viewerCanManage` flag — a LEAD (or an ADMIN) may manage the membership
+        via the mutation endpoints; a plain MEMBER may only view. A caller who is
+        not a member of the team (and not an ADMIN) gets 403.
+      operationId: getMyTeam
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: teamId
+          in: path
+          required: true
+          description: The team's slug or its id (issue #470).
+          schema:
+            type: string
+      responses:
+        '200':
+          description: The team with its members.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TeamDetail'
+        '404':
+          description: Unknown team
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+  /teams/{teamId}/members:
+    post:
+      tags:
+        - Teams
+      summary: Add a member to a led team
+      description: |
+        A LEAD of the team (or an ADMIN) adds a member with a team role (issue
+        #470). Any other caller gets 403.
+      operationId: addMyTeamMember
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/TeamIdParam'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AdminTeamMemberRequest'
+      responses:
+        '201':
+          description: The added member
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TeamMember'
+        '400':
+          description: Invalid input
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Unknown team or user
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '409':
+          description: The user is already a member of the team
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+  /teams/{teamId}/members/{userId}:
+    patch:
+      tags:
+        - Teams
+      summary: Set a member's team role in a led team
+      description: |
+        A LEAD of the team (or an ADMIN) promotes a member to LEAD or demotes a
+        LEAD to MEMBER (issue #470). Demoting the team's last remaining LEAD is
+        rejected with 409 `LAST_LEAD`, which also prevents a sole lead from locking
+        themselves out. Any non-lead caller gets 403.
+      operationId: setMyTeamMemberRole
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/TeamIdParam'
+        - $ref: '#/components/parameters/UserIdParam'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AdminTeamMemberRoleUpdateRequest'
+      responses:
+        '200':
+          description: The updated member
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TeamMember'
+        '404':
+          description: The team has no such member
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '409':
+          description: The change would leave the team without a lead (`LAST_LEAD`)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+    delete:
+      tags:
+        - Teams
+      summary: Remove a member from a led team
+      description: |
+        A LEAD of the team (or an ADMIN) removes a member (issue #470). Removing
+        the team's last remaining LEAD is rejected with 409 `LAST_LEAD`, and a
+        caller may never remove themselves through this surface (409
+        `SELF_REMOVAL` — leaving a team is an admin action). Any non-lead caller
+        gets 403.
+      operationId: removeMyTeamMember
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/TeamIdParam'
+        - $ref: '#/components/parameters/UserIdParam'
+      responses:
+        '204':
+          description: Member removed
+        '404':
+          description: The team has no such member
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '409':
+          description: >-
+            The removal is refused — it would leave the team without a lead
+            (`LAST_LEAD`), or the caller is removing themselves (`SELF_REMOVAL`).
           content:
             application/json:
               schema:
@@ -4123,6 +4322,14 @@ components:
           format: uuid
         displayName:
           type: string
+        slug:
+          type: string
+          nullable: true
+          description: The member's profile slug (issue #486) for the profile link; null for pre-slug accounts.
+        avatarUrl:
+          type: string
+          nullable: true
+          description: The member's avatar URL (with a cache-busting `?v=`), or null when none is set.
         email:
           type: string
         teamRole:
@@ -4267,6 +4474,108 @@ components:
           $ref: '#/components/schemas/TeamRole'
       required:
         - teamRole
+    MyTeam:
+      type: object
+      description: A team the caller belongs to, with the caller's role there (issue #470).
+      properties:
+        teamId:
+          type: string
+          format: uuid
+        name:
+          type: string
+        slug:
+          type: string
+          nullable: true
+          description: The team's URL slug (issue #470) for the friendly `/my-teams/{slug}` link; null for pre-slug teams.
+        teamRole:
+          $ref: '#/components/schemas/TeamRole'
+        memberCount:
+          type: integer
+          format: int64
+          description: How many members the team has — drives the "My Teams" roster tier.
+      required:
+        - teamId
+        - name
+        - teamRole
+        - memberCount
+    MyTeamListResponse:
+      type: object
+      description: The teams the caller belongs to (issue #470).
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/MyTeam'
+      required:
+        - items
+    TeamMember:
+      type: object
+      description: |
+        A team member on the non-admin "My Teams" surface (issue #470) — carries
+        the identity fields the UI needs to render the member like everywhere else:
+        avatar, profile hover-card and click-through to the profile.
+      properties:
+        userId:
+          type: string
+          format: uuid
+        displayName:
+          type: string
+        slug:
+          type: string
+          nullable: true
+          description: The member's profile slug (issue #486) for the profile link; null for pre-slug accounts.
+        avatarUrl:
+          type: string
+          nullable: true
+          description: The member's avatar URL (with a cache-busting `?v=`), or null when none is set.
+        email:
+          type: string
+        teamRole:
+          $ref: '#/components/schemas/TeamRole'
+        joinedAt:
+          type: string
+          format: date-time
+      required:
+        - userId
+        - displayName
+        - email
+        - teamRole
+        - joinedAt
+    TeamDetail:
+      type: object
+      description: |
+        A team with its members for any member of the team (issue #470). Carries the
+        caller's own role and whether they may manage the membership.
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        slug:
+          type: string
+          nullable: true
+          description: The team's URL slug (issue #470); null for pre-slug teams.
+        description:
+          type: string
+          nullable: true
+        viewerRole:
+          allOf:
+            - $ref: '#/components/schemas/TeamRole'
+          nullable: true
+          description: The caller's role in this team; null when the caller is an admin who is not a member.
+        viewerCanManage:
+          type: boolean
+          description: Whether the caller may manage this team's membership (a LEAD of the team, or an ADMIN).
+        members:
+          type: array
+          items:
+            $ref: '#/components/schemas/TeamMember'
+      required:
+        - id
+        - name
+        - viewerCanManage
+        - members
     RegisterRequest:
       type: object
       description: Self-registration details for a new local account.

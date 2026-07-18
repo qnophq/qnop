@@ -20,6 +20,7 @@ databaseChangeLog:
                   name: name
                   type: VARCHAR(120)
                   constraints: { nullable: false }
+              - column: { name: slug, type: VARCHAR(64) }
               - column: { name: description, type: VARCHAR(1000) }
               - column:
                   name: enabled
@@ -40,9 +41,15 @@ databaseChangeLog:
                   defaultValueNumeric: 0
                   constraints: { nullable: false }
         - sql:
-            comment: Case-insensitive team-name uniqueness (functional index, not expressible in JPA).
+            comment: >-
+              Case-insensitive team-name uniqueness plus the slug rules (issue #470):
+              global case-insensitive slug uniqueness and the kebab-case format, none
+              of which are expressible in Liquibase primitives.
             sql: |
               CREATE UNIQUE INDEX ux_team_name_lower ON team (LOWER(name));
+              CREATE UNIQUE INDEX ux_team_slug_lower ON team (LOWER(slug)) WHERE slug IS NOT NULL;
+              ALTER TABLE team ADD CONSTRAINT ck_team_slug
+                CHECK (slug IS NULL OR (slug ~ '^[a-z0-9]+(-[a-z0-9]+)*$' AND length(slug) BETWEEN 3 AND 64));
 
   - changeSet:
       id: 0008-team-membership

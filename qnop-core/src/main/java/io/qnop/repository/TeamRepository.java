@@ -21,12 +21,14 @@
 package io.qnop.repository;
 
 import io.qnop.entity.Team;
+import jakarta.persistence.LockModeType;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
@@ -37,6 +39,24 @@ public interface TeamRepository extends JpaRepository<Team, UUID> {
   Optional<Team> findByNameIgnoreCase(String name);
 
   boolean existsByNameIgnoreCase(String name);
+
+  /** A team by its slug, case-insensitive (issue #470) — resolves `/my-teams/{slug}`. */
+  Optional<Team> findBySlugIgnoreCase(String slug);
+
+  /** Whether the slug is already claimed, ignoring case — the slug-allocation probe (#470). */
+  boolean existsBySlugIgnoreCase(String slug);
+
+  /**
+   * Loads a team under a {@code PESSIMISTIC_WRITE} row lock (issue #470): serializes the team-lead
+   * membership mutations so the "a team must keep at least one lead" guard cannot be bypassed by a
+   * TOCTOU race — two concurrent demote/remove requests on *different* membership rows would each
+   * read a stale lead count and both commit, leaving zero leads (optimistic {@code @Version} only
+   * guards the individual rows). Taking this lock before the count funnels all such mutations for a
+   * team through one at a time. Must be called inside a transaction.
+   */
+  @Lock(LockModeType.PESSIMISTIC_WRITE)
+  @Query("SELECT t FROM Team t WHERE t.id = :id")
+  Optional<Team> findByIdForUpdate(@Param("id") UUID id);
 
   /**
    * Paginated admin search (issue #105): an optional case-insensitive match on name or description.

@@ -21,6 +21,7 @@
 package io.qnop.repository;
 
 import io.qnop.entity.TeamMembership;
+import io.qnop.entity.TeamRole;
 import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
@@ -35,6 +36,12 @@ public interface TeamMembershipRepository extends JpaRepository<TeamMembership, 
   Optional<TeamMembership> findByTeamIdAndUserId(UUID teamId, UUID userId);
 
   boolean existsByTeamIdAndUserId(UUID teamId, UUID userId);
+
+  /** Whether the user holds the given role in the team — the LEAD self-management guard (#470). */
+  boolean existsByTeamIdAndUserIdAndTeamRole(UUID teamId, UUID userId, TeamRole teamRole);
+
+  /** How many members hold the given role in the team — the last-lead guardrail (#470). */
+  long countByTeamIdAndTeamRole(UUID teamId, TeamRole teamRole);
 
   /** The members of a team joined with their user identity, ordered by display name. */
   @Query(
@@ -52,7 +59,7 @@ public interface TeamMembershipRepository extends JpaRepository<TeamMembership, 
 
   /** The user's enabled teams with their role there, ordered by name (issue #473). */
   @Query(
-      "SELECT new io.qnop.repository.UserTeamProjection(t.id, t.name, m.teamRole)"
+      "SELECT new io.qnop.repository.UserTeamProjection(t.id, t.name, t.slug, m.teamRole)"
           + " FROM TeamMembership m, Team t"
           + " WHERE t.id = m.teamId AND m.userId = :userId AND t.enabled = true"
           + " ORDER BY t.name")

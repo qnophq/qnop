@@ -24,13 +24,14 @@ import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { ThemeProvider } from '@mui/material/styles';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
-import type { AdminTeamDetail, AdminTeamMember } from '../../api/generated';
+import type { TeamDetail, TeamMember } from '../../api/generated';
 import { buildTheme } from '../../theme/theme';
-import { TeamDetailPage } from './TeamDetailPage';
+import { useAuthStore } from '../../stores/authStore';
+import { MyTeamDetailPage } from './MyTeamDetailPage';
 
 const { teamState, setRoleMutate, removeMemberMutate } = vi.hoisted(() => ({
   teamState: { data: undefined, isLoading: false, isError: false } as {
-    data: AdminTeamDetail | undefined;
+    data: TeamDetail | undefined;
     isLoading: boolean;
     isError: boolean;
   },
@@ -38,16 +39,14 @@ const { teamState, setRoleMutate, removeMemberMutate } = vi.hoisted(() => ({
   removeMemberMutate: vi.fn(),
 }));
 
-vi.mock('../../api/hooks/useTeams', () => ({
-  useTeam: () => teamState,
-  useSetTeamMemberRole: () => ({ mutate: setRoleMutate }),
-  useRemoveTeamMember: () => ({ mutate: removeMemberMutate }),
+vi.mock('../../api/hooks/useMyTeams', () => ({
+  useMyTeam: () => teamState,
+  useSetMyTeamMemberRole: () => ({ mutate: setRoleMutate }),
+  useRemoveMyTeamMember: () => ({ mutate: removeMemberMutate }),
 }));
 
-// The heavy member/team dialogs pull in their own api hooks and search UI;
-// stub them down to markers that expose the props the page wires in.
-vi.mock('../../components/admin/teams/AddMemberDialog', () => ({
-  AddMemberDialog: (props: {
+vi.mock('../../components/my-teams/AddMyTeamMemberDialog', () => ({
+  AddMyTeamMemberDialog: (props: {
     open: boolean;
     teamId: string;
     existingMemberIds: string[];
@@ -64,25 +63,7 @@ vi.mock('../../components/admin/teams/AddMemberDialog', () => ({
     ) : null,
 }));
 
-vi.mock('../../components/admin/teams/TeamFormDialog', () => ({
-  TeamFormDialog: (props: {
-    open: boolean;
-    mode: string;
-    team?: { name: string };
-    onClose: () => void;
-  }) =>
-    props.open ? (
-      <div data-testid="team-form-dialog">
-        <span data-testid="edit-mode">{props.mode}</span>
-        <span data-testid="edit-name">{props.team?.name}</span>
-        <button type="button" onClick={props.onClose}>
-          close-edit
-        </button>
-      </div>
-    ) : null,
-}));
-
-const LEAD: AdminTeamMember = {
+const LEAD: TeamMember = {
   userId: 'u1',
   displayName: 'Ada Lovelace',
   slug: 'ada-lovelace',
@@ -92,7 +73,7 @@ const LEAD: AdminTeamMember = {
   joinedAt: '2026-01-01T10:00:00Z',
 };
 
-const MEMBER: AdminTeamMember = {
+const MEMBER: TeamMember = {
   userId: 'u2',
   displayName: 'Alan Turing',
   slug: 'alan-turing',
@@ -102,14 +83,14 @@ const MEMBER: AdminTeamMember = {
   joinedAt: '2026-02-01T10:00:00Z',
 };
 
-function makeTeam(overrides: Partial<AdminTeamDetail> = {}): AdminTeamDetail {
+function makeTeam(overrides: Partial<TeamDetail> = {}): TeamDetail {
   return {
     id: 't1',
     name: 'Platform',
+    slug: 'platform',
     description: 'Owns the ingest pipeline.',
-    enabled: true,
-    createdAt: '2026-01-01T00:00:00Z',
-    updatedAt: '2026-03-01T00:00:00Z',
+    viewerRole: 'LEAD',
+    viewerCanManage: true,
     members: [LEAD, MEMBER],
     ...overrides,
   };
@@ -121,6 +102,7 @@ beforeEach(() => {
   teamState.data = makeTeam();
   teamState.isLoading = false;
   teamState.isError = false;
+  useAuthStore.setState({ userId: null });
 });
 
 function renderPage() {
@@ -128,9 +110,11 @@ function renderPage() {
   return render(
     <QueryClientProvider client={queryClient}>
       <ThemeProvider theme={buildTheme('light')}>
-        <MemoryRouter initialEntries={['/admin/teams/t1']}>
+        {/* Enter by the pretty slug; the page must key its mutations off the
+            canonical team.id ('t1'), not the URL segment. */}
+        <MemoryRouter initialEntries={['/my-teams/platform']}>
           <Routes>
-            <Route path="/admin/teams/:id" element={<TeamDetailPage />} />
+            <Route path="/my-teams/:id" element={<MyTeamDetailPage />} />
           </Routes>
         </MemoryRouter>
       </ThemeProvider>
@@ -138,30 +122,20 @@ function renderPage() {
   );
 }
 
-describe('TeamDetailPage', () => {
-  it('shows the loading placeholder while the team query is in flight', () => {
-    teamState.data = undefined;
-    teamState.isLoading = true;
-    renderPage();
-
-    expect(screen.getByText('Loading…')).toBeTruthy();
-  });
-
-  it('renders an error alert with a way back to the team list on failure', () => {
+describe('MyTeamDetailPage', () => {
+  it('renders an error alert linking back to My Teams on failure', () => {
     teamState.data = undefined;
     teamState.isError = true;
     renderPage();
 
-    expect(screen.getByText(/This team could not be loaded\./)).toBeTruthy();
-    const back = screen.getByRole('link', { name: 'Back to teams' });
-    expect(back.getAttribute('href')).toBe('/admin/teams');
+    const back = screen.getByRole('link', { name: 'Back to my teams' });
+    expect(back.getAttribute('href')).toBe('/my-teams');
   });
 
-  it('renders the header, description and every member row', () => {
+  it('renders the header and every member with a link to their profile', () => {
     renderPage();
 
     expect(screen.getByRole('heading', { name: 'Platform' })).toBeTruthy();
-    expect(screen.getByText('Owns the ingest pipeline.')).toBeTruthy();
     // Members render as profile links (avatar + name → the profile page).
     expect(
       screen.getByRole('link', { name: "View Ada Lovelace's profile" }).getAttribute('href'),
@@ -171,62 +145,52 @@ describe('TeamDetailPage', () => {
     ).toBe('/users/alan-turing');
   });
 
-  it('renders the empty-state row when the team has no members', () => {
-    teamState.data = makeTeam({ members: [] });
-    renderPage();
-
-    expect(screen.getByText('No members yet. Add the first one.')).toBeTruthy();
-  });
-
-  it('demotes a lead to member through the row menu', async () => {
-    renderPage();
-
-    fireEvent.click(screen.getByRole('button', { name: 'Actions for Ada Lovelace' }));
-    fireEvent.click(await screen.findByText('Make member'));
-
-    expect(setRoleMutate).toHaveBeenCalledWith({
-      teamId: 't1',
-      userId: 'u1',
-      teamRole: 'MEMBER',
-    });
-  });
-
-  it('promotes a member to lead through the row menu', async () => {
+  it('promotes a member to lead through the non-admin client', async () => {
     renderPage();
 
     fireEvent.click(screen.getByRole('button', { name: 'Actions for Alan Turing' }));
     fireEvent.click(await screen.findByText('Make lead'));
 
-    expect(setRoleMutate).toHaveBeenCalledWith({
+    expect(setRoleMutate.mock.calls[0][0]).toEqual({
       teamId: 't1',
       userId: 'u2',
       teamRole: 'LEAD',
     });
   });
 
-  it('removes a member after confirming the destructive dialog', async () => {
+  it('removes a member after confirming, through the non-admin client', async () => {
     renderPage();
 
     fireEvent.click(screen.getByRole('button', { name: 'Actions for Ada Lovelace' }));
     fireEvent.click(await screen.findByText('Remove from team'));
-
     expect(await screen.findByText('Remove Ada Lovelace from this team?')).toBeTruthy();
     fireEvent.click(screen.getByRole('button', { name: 'Remove' }));
 
-    expect(removeMemberMutate).toHaveBeenCalledWith({ teamId: 't1', userId: 'u1' });
+    expect(removeMemberMutate.mock.calls[0][0]).toEqual({ teamId: 't1', userId: 'u1' });
   });
 
-  it('does not remove a member when the confirmation is cancelled', async () => {
+  it('never offers self-removal on the caller’s own row, but keeps the hand-over demote', async () => {
+    useAuthStore.setState({ userId: 'u1' }); // the caller is the lead Ada (u1)
     renderPage();
 
-    fireEvent.click(screen.getByRole('button', { name: 'Actions for Alan Turing' }));
-    fireEvent.click(await screen.findByText('Remove from team'));
-    fireEvent.click(await screen.findByRole('button', { name: 'Cancel' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Actions for Ada Lovelace' }));
 
-    await waitFor(() =>
-      expect(screen.queryByText('Remove Alan Turing from this team?')).toBeNull(),
+    expect(await screen.findByText('Make member')).toBeTruthy();
+    expect(screen.queryByText('Remove from team')).toBeNull();
+  });
+
+  it('surfaces an error toast when a removal is rejected (last-lead guard)', async () => {
+    removeMemberMutate.mockImplementation(
+      (_vars: unknown, opts?: { onError?: (e: unknown) => void }) =>
+        opts?.onError?.(new Error('rejected')),
     );
-    expect(removeMemberMutate).not.toHaveBeenCalled();
+    renderPage();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Actions for Ada Lovelace' }));
+    fireEvent.click(await screen.findByText('Remove from team'));
+    fireEvent.click(await screen.findByRole('button', { name: 'Remove' }));
+
+    expect(await screen.findByText('Could not remove the member.')).toBeTruthy();
   });
 
   it('opens the add-member dialog wired with the team id and existing members', async () => {
@@ -242,24 +206,15 @@ describe('TeamDetailPage', () => {
     await waitFor(() => expect(screen.queryByTestId('add-member-dialog')).toBeNull());
   });
 
-  it('opens the edit dialog in edit mode with the current team seeded', async () => {
+  it('renders a read-only roster with no management affordances for a plain member', () => {
+    teamState.data = makeTeam({ viewerRole: 'MEMBER', viewerCanManage: false });
     renderPage();
 
-    fireEvent.click(screen.getByRole('button', { name: 'Edit' }));
-
-    expect(await screen.findByTestId('team-form-dialog')).toBeTruthy();
-    expect(screen.getByTestId('edit-mode').textContent).toBe('edit');
-    expect(screen.getByTestId('edit-name').textContent).toBe('Platform');
-
-    fireEvent.click(screen.getByRole('button', { name: 'close-edit' }));
-    await waitFor(() => expect(screen.queryByTestId('team-form-dialog')).toBeNull());
-  });
-
-  it('renders a team with no description without crashing', () => {
-    teamState.data = makeTeam({ description: '' });
-    renderPage();
-
-    expect(screen.getByRole('heading', { name: 'Platform' })).toBeTruthy();
-    expect(screen.queryByText('Owns the ingest pipeline.')).toBeNull();
+    // The members are still listed and linkable...
+    expect(screen.getByRole('link', { name: "View Ada Lovelace's profile" })).toBeTruthy();
+    // ...but nothing can be managed.
+    expect(screen.queryByRole('button', { name: 'Add member' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Actions for Ada Lovelace' })).toBeNull();
+    expect(screen.queryByRole('columnheader', { name: 'Actions' })).toBeNull();
   });
 });

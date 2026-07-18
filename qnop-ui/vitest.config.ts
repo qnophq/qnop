@@ -56,6 +56,11 @@ export default defineConfig({
         'src/pages/admin/SettingsPage.tsx',
         'src/pages/admin/BrandingPage.tsx',
         'src/pages/admin/OidcProvidersPage.tsx',
+        // Team-lead self-management surface (issue #470): the "My Teams" landing
+        // and detail pages own the orchestration/state; the add-member dialog
+        // stays on its own component test.
+        'src/pages/my-teams/MyTeamsPage.tsx',
+        'src/pages/my-teams/MyTeamDetailPage.tsx',
         // The organisation-wide audit trail page (issue #466). The page owns the
         // filter/pagination orchestration; its presentational table stays on its
         // own component test.

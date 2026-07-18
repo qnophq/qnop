@@ -27,8 +27,8 @@ function ids(role: 'ADMIN' | 'MEMBER' | 'AUDITOR' | null): string[] {
 }
 
 describe('visibleNavGroups', () => {
-  it('shows only dashboard + reviews for a MEMBER', () => {
-    expect(ids('MEMBER')).toEqual(['dashboard', 'reviews']);
+  it('shows dashboard + reviews + My Teams for a MEMBER (My Teams is for everyone)', () => {
+    expect(ids('MEMBER')).toEqual(['dashboard', 'reviews', 'my-teams']);
   });
 
   it('adds compliance and audit for an AUDITOR but no admin items', () => {
@@ -43,6 +43,7 @@ describe('visibleNavGroups', () => {
     expect(ids('ADMIN')).toEqual([
       'dashboard',
       'reviews',
+      'my-teams',
       'compliance',
       'audit',
       'users',
@@ -60,8 +61,8 @@ describe('visibleNavGroups', () => {
     expect(groups.some((g) => g.label === 'Administration')).toBe(false);
   });
 
-  it('shows only the always-visible items when role is null', () => {
-    expect(ids(null)).toEqual(['dashboard', 'reviews']);
+  it('shows My Teams to every authenticated role, including AUDITOR', () => {
+    expect(ids('AUDITOR')).toContain('my-teams');
   });
 });
 
@@ -90,5 +91,10 @@ describe('crumbsFor', () => {
       { label: 'Administration' },
       { label: 'Teams', to: '/admin/teams' },
     ]);
+  });
+
+  it('resolves the My Teams surface and its detail path', () => {
+    expect(crumbsFor('/my-teams')).toEqual([{ label: 'My Teams' }]);
+    expect(crumbsFor('/my-teams/abc-123')).toEqual([{ label: 'My Teams', to: '/my-teams' }]);
   });
 });

@@ -20,24 +20,21 @@
  */
 package io.qnop.web;
 
-import io.qnop.api.v1.endpoint.AdminTeamsApi;
-import io.qnop.api.v1.model.AdminTeamCreateRequest;
-import io.qnop.api.v1.model.AdminTeamDetail;
-import io.qnop.api.v1.model.AdminTeamListResponse;
-import io.qnop.api.v1.model.AdminTeamMember;
+import io.qnop.api.v1.endpoint.TeamsApi;
 import io.qnop.api.v1.model.AdminTeamMemberRequest;
 import io.qnop.api.v1.model.AdminTeamMemberRoleUpdateRequest;
-import io.qnop.api.v1.model.AdminTeamSummary;
-import io.qnop.api.v1.model.AdminTeamUpdateRequest;
 import io.qnop.api.v1.model.ErrorResponse;
+import io.qnop.api.v1.model.MyTeam;
+import io.qnop.api.v1.model.MyTeamListResponse;
+import io.qnop.api.v1.model.TeamDetail;
+import io.qnop.api.v1.model.TeamMember;
 import io.qnop.api.v1.model.TeamRole;
+import io.qnop.service.TeamAccessForbiddenException;
 import io.qnop.service.TeamConflictException;
 import io.qnop.service.TeamNotFoundException;
 import io.qnop.service.TeamService;
-import io.qnop.service.TeamService.TeamDetailView;
+import io.qnop.service.TeamService.MemberTeamView;
 import io.qnop.service.TeamService.TeamMemberView;
-import io.qnop.service.TeamService.TeamPage;
-import io.qnop.service.TeamService.TeamSummaryView;
 import io.qnop.service.UserNotFoundException;
 import io.qnop.service.avatar.AvatarService;
 import java.time.Instant;
@@ -51,77 +48,74 @@ import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestController;
 
 /**
- * Admin-only team management ({@code /api/v1/admin/teams/**}), implementing the generated {@link
- * AdminTeamsApi} contract (issue #105). Authorization is enforced centrally by the security chain
- * ({@code /api/v1/admin/**} requires {@code ADMIN}). The entities never reach this layer — {@link
- * TeamService} returns entity-free views, mapped here to API DTOs (ADR-0004). Unknown teams/members
- * surface as 404, conflicts (duplicate name, already a member) as 409.
+ * The non-admin "My Teams" surface ({@code /api/v1/teams/**}), implementing the generated {@link
+ * TeamsApi} contract (issue #470). Every authenticated user reaches it; the per-team authorization
+ * is enforced in the service: viewing a team requires membership (an ADMIN sees any team), while
+ * managing the membership requires being a LEAD of that team (or an ADMIN) — else 403. Members are
+ * returned with the identity fields the UI renders like everywhere else (slug + avatar URL). The
+ * entities never reach this layer — {@link TeamService} returns entity-free views, mapped here to
+ * API DTOs (ADR-0004).
  */
 @RestController
-public class TeamController implements AdminTeamsApi {
+public class MyTeamsController implements TeamsApi {
 
   private final TeamService teams;
   private final AvatarService avatars;
 
-  public TeamController(TeamService teams, AvatarService avatars) {
+  public MyTeamsController(TeamService teams, AvatarService avatars) {
     this.teams = teams;
     this.avatars = avatars;
   }
 
   @Override
-  public ResponseEntity<AdminTeamListResponse> listTeams(String q, Integer page, Integer size) {
-    TeamPage result = teams.list(q, page, size);
+  public ResponseEntity<MyTeamListResponse> listMyTeams() {
+    UUID userId = CurrentUser.requireUserId();
     return ResponseEntity.ok(
-        new AdminTeamListResponse()
-            .items(result.items().stream().map(TeamController::toSummary).toList())
-            .total(result.total())
-            .page(result.page())
-            .size(result.size()));
+        new MyTeamListResponse()
+            .items(teams.listMyTeams(userId).stream().map(MyTeamsController::toMyTeam).toList()));
   }
 
   @Override
-  public ResponseEntity<AdminTeamSummary> createTeam(AdminTeamCreateRequest request) {
-    TeamSummaryView created = teams.create(request.getName(), request.getDescription());
-    return ResponseEntity.status(HttpStatus.CREATED).body(toSummary(created));
+  public ResponseEntity<TeamDetail> getMyTeam(String teamId) {
+    MemberTeamView view =
+        teams.viewTeam(teamId, CurrentUser.requireUserId(), CurrentUser.isAdmin());
+    return ResponseEntity.ok(toDetail(view));
   }
 
   @Override
-  public ResponseEntity<AdminTeamDetail> getTeam(UUID teamId) {
-    return ResponseEntity.ok(toDetail(teams.get(teamId)));
-  }
-
-  @Override
-  public ResponseEntity<AdminTeamSummary> updateTeam(UUID teamId, AdminTeamUpdateRequest request) {
-    TeamSummaryView updated =
-        teams.update(teamId, request.getName(), request.getDescription(), request.getEnabled());
-    return ResponseEntity.ok(toSummary(updated));
-  }
-
-  @Override
-  public ResponseEntity<Void> deleteTeam(UUID teamId) {
-    teams.delete(teamId);
-    return ResponseEntity.noContent().build();
-  }
-
-  @Override
-  public ResponseEntity<AdminTeamMember> addTeamMember(
-      UUID teamId, AdminTeamMemberRequest request) {
+  public ResponseEntity<TeamMember> addMyTeamMember(UUID teamId, AdminTeamMemberRequest request) {
     TeamMemberView member =
-        teams.addMember(teamId, request.getUserId(), request.getTeamRole().name());
+        teams.addMemberAsLead(
+            teamId,
+            CurrentUser.requireUserId(),
+            CurrentUser.isAdmin(),
+            request.getUserId(),
+            request.getTeamRole().name());
     return ResponseEntity.status(HttpStatus.CREATED).body(toMember(member));
   }
 
   @Override
-  public ResponseEntity<AdminTeamMember> setTeamMemberRole(
+  public ResponseEntity<TeamMember> setMyTeamMemberRole(
       UUID teamId, UUID userId, AdminTeamMemberRoleUpdateRequest request) {
-    TeamMemberView member = teams.setMemberRole(teamId, userId, request.getTeamRole().name());
+    TeamMemberView member =
+        teams.setMemberRoleAsLead(
+            teamId,
+            CurrentUser.requireUserId(),
+            CurrentUser.isAdmin(),
+            userId,
+            request.getTeamRole().name());
     return ResponseEntity.ok(toMember(member));
   }
 
   @Override
-  public ResponseEntity<Void> removeTeamMember(UUID teamId, UUID userId) {
-    teams.removeMember(teamId, userId);
+  public ResponseEntity<Void> removeMyTeamMember(UUID teamId, UUID userId) {
+    teams.removeMemberAsLead(teamId, CurrentUser.requireUserId(), CurrentUser.isAdmin(), userId);
     return ResponseEntity.noContent().build();
+  }
+
+  @ExceptionHandler(TeamAccessForbiddenException.class)
+  public ResponseEntity<ErrorResponse> onForbidden(TeamAccessForbiddenException ex) {
+    return error(HttpStatus.FORBIDDEN, "TEAM_ACCESS_FORBIDDEN", ex.getMessage());
   }
 
   @ExceptionHandler(TeamNotFoundException.class)
@@ -149,39 +143,37 @@ public class TeamController implements AdminTeamsApi {
                 .timestamp(OffsetDateTime.now(ZoneOffset.UTC)));
   }
 
-  private static AdminTeamSummary toSummary(TeamSummaryView v) {
-    return new AdminTeamSummary()
-        .id(v.id())
+  private static MyTeam toMyTeam(TeamService.MyTeamView v) {
+    return new MyTeam()
+        .teamId(v.teamId())
         .name(v.name())
-        .description(v.description())
-        .enabled(v.enabled())
-        .memberCount(v.memberCount())
-        .createdAt(toOffset(v.createdAt()))
-        .updatedAt(toOffset(v.updatedAt()));
+        .slug(v.slug())
+        .teamRole(TeamRole.fromValue(v.teamRole()))
+        .memberCount(v.memberCount());
   }
 
-  private AdminTeamDetail toDetail(TeamDetailView v) {
+  private TeamDetail toDetail(MemberTeamView v) {
     // One batched avatar-timestamp lookup for the whole roster (same pattern as
     // the admin user list), so building URLs never streams image bytes per row.
     Map<UUID, Instant> avatarTimestamps =
         avatars.updatedAt(v.members().stream().map(TeamMemberView::userId).toList());
-    return new AdminTeamDetail()
+    return new TeamDetail()
         .id(v.id())
         .name(v.name())
+        .slug(v.slug())
         .description(v.description())
-        .enabled(v.enabled())
-        .createdAt(toOffset(v.createdAt()))
-        .updatedAt(toOffset(v.updatedAt()))
+        .viewerRole(v.viewerRole() == null ? null : TeamRole.fromValue(v.viewerRole()))
+        .viewerCanManage(v.canManage())
         .members(
             v.members().stream().map(m -> toMember(m, avatarTimestamps.get(m.userId()))).toList());
   }
 
-  private AdminTeamMember toMember(TeamMemberView v) {
+  private TeamMember toMember(TeamMemberView v) {
     return toMember(v, avatars.updatedAt(v.userId()).orElse(null));
   }
 
-  private static AdminTeamMember toMember(TeamMemberView v, Instant avatarUpdatedAt) {
-    return new AdminTeamMember()
+  private static TeamMember toMember(TeamMemberView v, Instant avatarUpdatedAt) {
+    return new TeamMember()
         .userId(v.userId())
         .displayName(v.displayName())
         .slug(v.slug())

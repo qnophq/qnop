@@ -48,11 +48,11 @@ VALUES
 -- ---------------------------------------------------------------------------
 -- Teams + memberships.
 -- ---------------------------------------------------------------------------
-INSERT INTO team (id, name, description, enabled, created_at, updated_at, version)
+INSERT INTO team (id, name, slug, description, enabled, created_at, updated_at, version)
 VALUES
-  ('b0000000-0000-0000-0000-000000000001', 'Alpha', 'Primary review team', true,
+  ('b0000000-0000-0000-0000-000000000001', 'Alpha', 'alpha', 'Primary review team', true,
    TIMESTAMPTZ '2026-01-02 08:00:00+00', TIMESTAMPTZ '2026-01-02 08:00:00+00', 0),
-  ('b0000000-0000-0000-0000-000000000002', 'Beta', 'Secondary review team', true,
+  ('b0000000-0000-0000-0000-000000000002', 'Beta', 'beta', 'Secondary review team', true,
    TIMESTAMPTZ '2026-01-02 08:05:00+00', TIMESTAMPTZ '2026-01-02 08:05:00+00', 0);
 
 INSERT INTO team_membership (id, team_id, user_id, team_role, joined_at, version)
@@ -126,13 +126,13 @@ VALUES
 -- five crowd users deliberately teamless (emil, greta, oskar, julia, david).
 -- Alpha/Beta above stay untouched — SeededTeamIT pins their member counts.
 -- ---------------------------------------------------------------------------
-INSERT INTO team (id, name, description, enabled, created_at, updated_at, version)
+INSERT INTO team (id, name, slug, description, enabled, created_at, updated_at, version)
 VALUES
-  ('b0000000-0000-0000-0000-000000000003', 'Legal',       'Contract review',        true, TIMESTAMPTZ '2026-01-05 10:00:00+00', TIMESTAMPTZ '2026-01-05 10:00:00+00', 0),
-  ('b0000000-0000-0000-0000-000000000004', 'Compliance',  'Policy conformance',     true, TIMESTAMPTZ '2026-01-05 10:01:00+00', TIMESTAMPTZ '2026-01-05 10:01:00+00', 0),
-  ('b0000000-0000-0000-0000-000000000005', 'Finance',     'Commercial terms',       true, TIMESTAMPTZ '2026-01-05 10:02:00+00', TIMESTAMPTZ '2026-01-05 10:02:00+00', 0),
-  ('b0000000-0000-0000-0000-000000000006', 'Procurement', 'Supplier agreements',    true, TIMESTAMPTZ '2026-01-05 10:03:00+00', TIMESTAMPTZ '2026-01-05 10:03:00+00', 0),
-  ('b0000000-0000-0000-0000-000000000007', 'Engineering', 'Technical annexes',      true, TIMESTAMPTZ '2026-01-05 10:04:00+00', TIMESTAMPTZ '2026-01-05 10:04:00+00', 0);
+  ('b0000000-0000-0000-0000-000000000003', 'Legal',       'legal',       'Contract review',        true, TIMESTAMPTZ '2026-01-05 10:00:00+00', TIMESTAMPTZ '2026-01-05 10:00:00+00', 0),
+  ('b0000000-0000-0000-0000-000000000004', 'Compliance',  'compliance',  'Policy conformance',     true, TIMESTAMPTZ '2026-01-05 10:01:00+00', TIMESTAMPTZ '2026-01-05 10:01:00+00', 0),
+  ('b0000000-0000-0000-0000-000000000005', 'Finance',     'finance',     'Commercial terms',       true, TIMESTAMPTZ '2026-01-05 10:02:00+00', TIMESTAMPTZ '2026-01-05 10:02:00+00', 0),
+  ('b0000000-0000-0000-0000-000000000006', 'Procurement', 'procurement', 'Supplier agreements',    true, TIMESTAMPTZ '2026-01-05 10:03:00+00', TIMESTAMPTZ '2026-01-05 10:03:00+00', 0),
+  ('b0000000-0000-0000-0000-000000000007', 'Engineering', 'engineering', 'Technical annexes',      true, TIMESTAMPTZ '2026-01-05 10:04:00+00', TIMESTAMPTZ '2026-01-05 10:04:00+00', 0);
 
 INSERT INTO team_membership (id, team_id, user_id, team_role, joined_at, version)
 VALUES

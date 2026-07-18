@@ -18,10 +18,16 @@
  *
  * SPDX-License-Identifier: AGPL-3.0-only
  */
-package io.qnop.repository;
+package io.qnop.service;
 
-import io.qnop.entity.TeamRole;
-import java.util.UUID;
+/**
+ * The acting user may not manage this team — the non-admin team-lead surface (issue #470) is
+ * limited to a {@code LEAD} of the team (or a global {@code ADMIN}). A framework-light signal so
+ * the service layer stays free of {@code spring-security-web}; the web layer maps it to HTTP 403.
+ */
+public class TeamAccessForbiddenException extends RuntimeException {
 
-/** One team a user belongs to, with their role — the public profile's affiliation row (#473). */
-public record UserTeamProjection(UUID teamId, String teamName, String slug, TeamRole teamRole) {}
+  public TeamAccessForbiddenException(String message) {
+    super(message);
+  }
+}

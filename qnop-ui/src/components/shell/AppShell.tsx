@@ -58,6 +58,8 @@ export function AppShell() {
   const dashboardMatch = useMatch('/');
   const reviewsListMatch = useMatch('/reviews');
   const adminMatch = useMatch('/admin/*');
+  const myTeamsMatch = useMatch('/my-teams');
+  const myTeamDetailMatch = useMatch('/my-teams/:id');
   const auditMatch = useMatch('/audit');
   const profileMatch = useMatch('/profile');
   const userProfileMatch = useMatch('/users/:userId');
@@ -69,6 +71,8 @@ export function AppShell() {
     Boolean(dashboardMatch) ||
     Boolean(reviewsListMatch) ||
     Boolean(adminMatch) ||
+    Boolean(myTeamsMatch) ||
+    Boolean(myTeamDetailMatch) ||
     Boolean(auditMatch) ||
     Boolean(profileMatch) ||
     Boolean(userProfileMatch) ||

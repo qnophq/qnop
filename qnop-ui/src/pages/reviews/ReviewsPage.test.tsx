@@ -213,12 +213,29 @@ describe('ReviewsPage', () => {
     expect(screen.getByTestId('review-card-doc-1')).toBeInTheDocument();
   });
 
-  it('shows the hero empty state without any reviews', () => {
+  it('shows the invitational hero empty state without any reviews', () => {
     mockReviews({ data: { items: [], total: 0, page: 0, size: 100 } });
     renderPage();
 
-    expect(screen.getByText('No reviews yet')).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Start your first review' })).toBeInTheDocument();
+    expect(
+      screen.getByRole('img', { name: 'A fresh document waiting for its first review' }),
+    ).toBeInTheDocument();
+    // Both the header and the empty-state hero offer a way to start.
     expect(screen.getAllByRole('button', { name: /New review/ })).not.toHaveLength(0);
+  });
+
+  it('starts a new review from the empty-state action', () => {
+    mockReviews({ data: { items: [], total: 0, page: 0, size: 100 } });
+    renderPage();
+
+    // The hero's own CTA (not the header's) navigates to the wizard.
+    const heroButton = screen
+      .getByRole('heading', { name: 'Start your first review' })
+      .closest('.MuiPaper-root')!
+      .querySelector('button')!;
+    fireEvent.click(heroButton);
+    expect(screen.getByTestId('new-review-probe')).toBeInTheDocument();
   });
 
   it('shows a loading skeleton while pending', () => {

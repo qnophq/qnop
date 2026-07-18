@@ -28,10 +28,12 @@ import io.qnop.repository.TeamMemberCount;
 import io.qnop.repository.TeamMembershipRepository;
 import io.qnop.repository.TeamRepository;
 import io.qnop.repository.UserRepository;
+import io.qnop.repository.UserTeamProjection;
 import java.time.Instant;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Optional;
 import java.util.UUID;
 import java.util.stream.Collectors;
 import org.springframework.data.domain.Page;
@@ -54,12 +56,17 @@ public class TeamService {
   private final TeamRepository teams;
   private final TeamMembershipRepository memberships;
   private final UserRepository users;
+  private final TeamSlugService slugs;
 
   public TeamService(
-      TeamRepository teams, TeamMembershipRepository memberships, UserRepository users) {
+      TeamRepository teams,
+      TeamMembershipRepository memberships,
+      UserRepository users,
+      TeamSlugService slugs) {
     this.teams = teams;
     this.memberships = memberships;
     this.users = users;
+    this.slugs = slugs;
   }
 
   @Transactional(readOnly = true)
@@ -89,7 +96,12 @@ public class TeamService {
             .map(
                 p ->
                     new TeamMemberView(
-                        p.userId(), p.displayName(), p.email(), p.teamRole().name(), p.joinedAt()))
+                        p.userId(),
+                        p.displayName(),
+                        p.slug(),
+                        p.email(),
+                        p.teamRole().name(),
+                        p.joinedAt()))
             .toList();
     return new TeamDetailView(
         team.getId(),
@@ -107,7 +119,9 @@ public class TeamService {
     if (teams.existsByNameIgnoreCase(trimmed)) {
       throw new TeamConflictException("NAME_TAKEN", "A team with that name already exists.");
     }
-    Team saved = teams.save(Team.create(trimmed, blankToNull(description)));
+    Team team = Team.create(trimmed, blankToNull(description));
+    team.setSlug(slugs.allocate(trimmed)); // stable friendly URL, derived from the name (#470)
+    Team saved = teams.save(team);
     return toSummary(saved, 0L);
   }
 
@@ -181,10 +195,173 @@ public class TeamService {
     memberships.delete(membership);
   }
 
+  // ---------------------------------------------------------------------------
+  // Team-lead self-management (issue #470). A LEAD of a team may manage that
+  // team's membership without being a global ADMIN; an ADMIN passes for any
+  // team. Every mutation goes through the guard, and a team can never lose its
+  // last lead through this surface (which also blocks a sole lead's self-lockout).
+  // ---------------------------------------------------------------------------
+
+  /**
+   * The caller's own teams with the caller's role and member count, ordered by name (issue #470).
+   */
+  @Transactional(readOnly = true)
+  public List<MyTeamView> listMyTeams(UUID userId) {
+    List<UserTeamProjection> mine = memberships.findTeamsOfUser(userId);
+    List<UUID> ids = mine.stream().map(UserTeamProjection::teamId).toList();
+    Map<UUID, Long> counts =
+        ids.isEmpty()
+            ? Map.of()
+            : memberships.countMembersByTeamIds(ids).stream()
+                .collect(Collectors.toMap(TeamMemberCount::teamId, TeamMemberCount::count));
+    return mine.stream()
+        .map(
+            t ->
+                new MyTeamView(
+                    t.teamId(),
+                    t.teamName(),
+                    t.slug(),
+                    t.teamRole().name(),
+                    counts.getOrDefault(t.teamId(), 0L)))
+        .collect(Collectors.toList());
+  }
+
+  /**
+   * A team with its members for any member of the team, or any team for an admin (issue #470). The
+   * {@code teamRef} is the team's slug or its id — a friendly {@code /my-teams/{slug}} URL resolves
+   * here. The result carries the caller's own role and whether they may manage the membership — a
+   * LEAD (or an admin) manages, a plain MEMBER may only view. A non-member, non-admin caller gets
+   * 403.
+   */
+  @Transactional(readOnly = true)
+  public MemberTeamView viewTeam(String teamRef, UUID actorId, boolean admin) {
+    Team team = resolveTeam(teamRef);
+    UUID teamId = team.getId();
+    Optional<TeamMembership> membership = memberships.findByTeamIdAndUserId(teamId, actorId);
+    if (membership.isEmpty() && !admin) {
+      throw new TeamAccessForbiddenException("You are not a member of this team.");
+    }
+    List<TeamMemberView> members =
+        memberships.findMembersByTeamId(teamId).stream()
+            .map(
+                p ->
+                    new TeamMemberView(
+                        p.userId(),
+                        p.displayName(),
+                        p.slug(),
+                        p.email(),
+                        p.teamRole().name(),
+                        p.joinedAt()))
+            .toList();
+    String viewerRole = membership.map(m -> m.getTeamRole().name()).orElse(null);
+    boolean canManage =
+        admin || membership.map(m -> m.getTeamRole() == TeamRole.LEAD).orElse(false);
+    return new MemberTeamView(
+        team.getId(),
+        team.getName(),
+        team.getSlug(),
+        team.getDescription(),
+        viewerRole,
+        canManage,
+        members);
+  }
+
+  /**
+   * Resolves a {@code /my-teams/{ref}} segment — a UUID-shaped ref is an id, anything else a slug.
+   */
+  private Team resolveTeam(String ref) {
+    UUID id = tryUuid(ref);
+    Optional<Team> team = id != null ? teams.findById(id) : teams.findBySlugIgnoreCase(ref);
+    return team.orElseThrow(() -> TeamNotFoundException.ref(ref));
+  }
+
+  private static UUID tryUuid(String ref) {
+    if (ref == null) {
+      return null;
+    }
+    try {
+      return UUID.fromString(ref);
+    } catch (IllegalArgumentException e) {
+      return null;
+    }
+  }
+
+  /** Add a member as a lead of the team (or an admin); otherwise 403 (issue #470). */
+  @Transactional
+  public TeamMemberView addMemberAsLead(
+      UUID teamId, UUID actorId, boolean admin, UUID userId, String teamRole) {
+    requireLeadOrAdmin(teamId, actorId, admin);
+    return addMember(teamId, userId, teamRole);
+  }
+
+  /** Change a member's role as a lead (or admin); refuses to demote the last lead (issue #470). */
+  @Transactional
+  public TeamMemberView setMemberRoleAsLead(
+      UUID teamId, UUID actorId, boolean admin, UUID userId, String teamRole) {
+    requireLeadOrAdmin(teamId, actorId, admin);
+    if (requireTeamRole(teamRole) == TeamRole.MEMBER) {
+      lockTeam(teamId);
+      guardNotLastLead(teamId, userId);
+    }
+    return setMemberRole(teamId, userId, teamRole);
+  }
+
+  /**
+   * Remove a member as a lead (or admin); refuses to remove the last lead (issue #470). A caller
+   * may never remove themselves through this self-management surface — leaving a team is an
+   * administrator action ({@code /admin/teams}), so a lead cannot accidentally strip their own
+   * membership (or lead access) here.
+   */
+  @Transactional
+  public void removeMemberAsLead(UUID teamId, UUID actorId, boolean admin, UUID userId) {
+    requireLeadOrAdmin(teamId, actorId, admin);
+    if (actorId.equals(userId)) {
+      throw new TeamConflictException(
+          "SELF_REMOVAL", "You cannot remove yourself from a team; ask an administrator.");
+    }
+    lockTeam(teamId);
+    guardNotLastLead(teamId, userId);
+    removeMember(teamId, userId);
+  }
+
+  /**
+   * Takes a pessimistic row lock on the team so the last-lead guard and its mutation run atomically
+   * against any concurrent demote/remove on the same team — closing the TOCTOU race that optimistic
+   * locking cannot (the racing requests touch different membership rows). A missing team is left
+   * for the downstream mutation to surface as a 404.
+   */
+  private void lockTeam(UUID teamId) {
+    teams.findByIdForUpdate(teamId);
+  }
+
+  private void requireLeadOrAdmin(UUID teamId, UUID actorId, boolean admin) {
+    if (admin) {
+      return;
+    }
+    if (!memberships.existsByTeamIdAndUserIdAndTeamRole(teamId, actorId, TeamRole.LEAD)) {
+      throw new TeamAccessForbiddenException("Only a lead of this team may manage it.");
+    }
+  }
+
+  /**
+   * Blocks an operation that would strip the team's last remaining lead. Only fires when {@code
+   * userId} is currently a LEAD and no other lead remains — removing/demoting a MEMBER, or a LEAD
+   * with co-leads, is unaffected. This is the single place the "never zero leads" invariant lives
+   * for the self-management surface, and it is what prevents a sole lead's self-lockout.
+   */
+  private void guardNotLastLead(UUID teamId, UUID userId) {
+    boolean targetIsLead =
+        memberships.existsByTeamIdAndUserIdAndTeamRole(teamId, userId, TeamRole.LEAD);
+    if (targetIsLead && memberships.countByTeamIdAndTeamRole(teamId, TeamRole.LEAD) <= 1) {
+      throw new TeamConflictException("LAST_LEAD", "A team must keep at least one lead.");
+    }
+  }
+
   private static TeamMemberView toMemberView(User user, TeamMembership membership) {
     return new TeamMemberView(
         user.getId(),
         user.getDisplayName(),
+        user.getSlug(),
         user.getEmail(),
         membership.getTeamRole().name(),
         membership.getJoinedAt());
@@ -230,9 +407,14 @@ public class TeamService {
       Instant createdAt,
       Instant updatedAt) {}
 
-  /** A team member joined with their user identity. */
+  /** A team member joined with their user identity (slug for the profile link, issue #470/#486). */
   public record TeamMemberView(
-      UUID userId, String displayName, String email, String teamRole, Instant joinedAt) {}
+      UUID userId,
+      String displayName,
+      String slug,
+      String email,
+      String teamRole,
+      Instant joinedAt) {}
 
   /** Full team detail including its members. */
   public record TeamDetailView(
@@ -246,4 +428,22 @@ public class TeamService {
 
   /** One page of {@link TeamSummaryView}s plus the total count. */
   public record TeamPage(List<TeamSummaryView> items, long total, int page, int size) {}
+
+  /** A team the caller belongs to, with the caller's role and member count there (issue #470). */
+  public record MyTeamView(
+      UUID teamId, String name, String slug, String teamRole, long memberCount) {}
+
+  /**
+   * A team and its members as seen by a member (issue #470). {@code viewerRole} is the caller's
+   * role in the team ({@code null} for an admin who is not a member); {@code canManage} says
+   * whether the caller may manage the membership (a LEAD, or an admin).
+   */
+  public record MemberTeamView(
+      UUID id,
+      String name,
+      String slug,
+      String description,
+      String viewerRole,
+      boolean canManage,
+      List<TeamMemberView> members) {}
 }
