@@ -28,6 +28,7 @@ import { AdminRoute } from '../components/auth/AdminRoute';
 import { ProtectedRoute } from '../components/auth/ProtectedRoute';
 import { RoleRoute } from '../components/auth/RoleRoute';
 import { ComingSoonPage } from '../pages/ComingSoonPage';
+import { AuditPage } from '../pages/audit/AuditPage';
 import { HomePage } from '../pages/HomePage';
 import { BrandingPage } from '../pages/admin/BrandingPage';
 import { ProfilePage } from '../pages/ProfilePage';
@@ -139,6 +140,14 @@ export const router = createBrowserRouter([
               description="Audit trail and compliance reporting across all reviews."
               icon={ShieldCheck}
             />
+          </RoleRoute>
+        ),
+      },
+      {
+        path: 'audit',
+        element: (
+          <RoleRoute allow={['ADMIN', 'AUDITOR']}>
+            <AuditPage />
           </RoleRoute>
         ),
       },

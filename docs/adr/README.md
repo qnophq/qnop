@@ -58,6 +58,7 @@ Two refinement conventions (see the 2026-07-16 amendment to [ADR-0001](0001-reco
 | [0039](0039-enterprise-packaging-and-runtime-extensions.md) | Enterprise packaging and runtime UI extension model | Accepted |
 | [0040](0040-release-pipeline-and-spa-embedding.md) | Release pipeline & SPA embedding | Accepted |
 | [0041](0041-datetime-l10n-policy.md) | Date/time L10n: store UTC, transport ISO-with-offset, render in the user's zone | Accepted |
+| [0042](0042-audit-trail-exposure.md) | Audit-trail exposure: the AUDITOR read surface and its boundary | Accepted |
 
 ## Template
 

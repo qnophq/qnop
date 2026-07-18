@@ -53,13 +53,14 @@ export function AppShell() {
     (reviewMatch && reviewMatch.params.documentId !== 'new') || compareMatch || tasksMatch,
   );
   // The work surfaces share one width language (issue #454 follow-up): the
-  // dashboard, the reviews overview, the admin surfaces and the profile span
-  // the full width like the review workspace (issues #316/#469 polish).
+  // dashboard, the reviews overview, the admin surfaces, the audit trail and the
+  // profile span the full width like the review workspace (issues #316/#469/#466).
   const dashboardMatch = useMatch('/');
   const reviewsListMatch = useMatch('/reviews');
   const adminMatch = useMatch('/admin/*');
   const myTeamsMatch = useMatch('/my-teams');
   const myTeamDetailMatch = useMatch('/my-teams/:id');
+  const auditMatch = useMatch('/audit');
   const profileMatch = useMatch('/profile');
   const userProfileMatch = useMatch('/users/:userId');
   // The new-review wizard (#469 polish) spans the full width too — it lays out
@@ -72,6 +73,7 @@ export function AppShell() {
     Boolean(adminMatch) ||
     Boolean(myTeamsMatch) ||
     Boolean(myTeamDetailMatch) ||
+    Boolean(auditMatch) ||
     Boolean(profileMatch) ||
     Boolean(userProfileMatch) ||
     wizardMatch;

@@ -61,6 +61,10 @@ export default defineConfig({
         // stays on its own component test.
         'src/pages/my-teams/MyTeamsPage.tsx',
         'src/pages/my-teams/MyTeamDetailPage.tsx',
+        // The organisation-wide audit trail page (issue #466). The page owns the
+        // filter/pagination orchestration; its presentational table stays on its
+        // own component test.
+        'src/pages/audit/AuditPage.tsx',
         // The viewer's pure anchor-building logic (#250) plus the document
         // surface (issue #352, wave 2): the pdf.js loader/canvas wiring and the
         // scrollable page stack with its scroll spy and rubber-band selection.
