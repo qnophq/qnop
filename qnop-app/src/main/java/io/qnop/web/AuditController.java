@@ -93,6 +93,7 @@ public class AuditController implements AuditApi {
       AuditLogService.AuditEventView view, Map<UUID, Instant> avatarTimestamps) {
     return new AuditEvent()
         .id(view.id())
+        .scope(AuditEvent.ScopeEnum.fromValue(view.scope().name()))
         .eventType(view.eventType())
         .documentId(view.documentId())
         .documentTitle(view.documentTitle())

@@ -1,0 +1,69 @@
+# Copyright (c) 2026-present devtank42 GmbH
+#
+# This file is part of qnop (Qualified Notes on Papers).
+#
+# qnop is free software: you can redistribute it and/or modify it under the
+# terms of the GNU Affero General Public License as published by the Free
+# Software Foundation, either version 3 of the License, or (at your option)
+# any later version.
+#
+# qnop is distributed in the hope that it will be useful, but WITHOUT ANY
+# WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS
+# FOR A PARTICULAR PURPOSE. See the GNU Affero General Public License for more
+# details.
+#
+# You should have received a copy of the GNU Affero General Public License
+# along with qnop. If not, see <https://www.gnu.org/licenses/>.
+#
+# SPDX-License-Identifier: AGPL-3.0-only
+
+# Generalise the append-only audit_event trail into two coexisting scopes
+# (issue #524, ADR-0043): the original per-document review trail (ADR-0011) and
+# a new SYSTEM stream for org-level operator actions with no document (scheduler
+# toggles, run-now, ...). document_id becomes nullable, and an explicit `scope`
+# discriminator is added so a reader never has to infer intent from a null.
+#
+# 0011 already shipped in v1.0.0, so this is a new ALTER changeset (the fold-into-
+# existing rule applies only to unreleased schema).
+databaseChangeLog:
+  - changeSet:
+      id: 0016-audit-event-scope
+      author: qnop
+      comment: >-
+        audit_event: allow system-scoped rows (nullable document_id + scope
+        discriminator) so the trail carries operator actions, not only per-document
+        events (issue #524, ADR-0043).
+      changes:
+        # A discriminator with a DOCUMENT default so every pre-existing row (all
+        # of which are document-scoped) is backfilled correctly by the default.
+        - addColumn:
+            tableName: audit_event
+            columns:
+              - column:
+                  name: scope
+                  type: VARCHAR(16)
+                  defaultValue: DOCUMENT
+                  constraints: { nullable: false }
+        # document_id is now optional: SYSTEM rows carry none. The existing
+        # fk_audit_event_document (ON DELETE CASCADE) keeps document-scoped rows
+        # tied to their document; a null simply never participates in the cascade.
+        - dropNotNullConstraint:
+            tableName: audit_event
+            columnName: document_id
+            columnDataType: UUID
+        # A partial guard: a DOCUMENT row must have a document, a SYSTEM row must
+        # not — the discriminator and the fk can never disagree.
+        - sql:
+            sql: >-
+              ALTER TABLE audit_event ADD CONSTRAINT ck_audit_event_scope_document
+              CHECK ((scope = 'DOCUMENT' AND document_id IS NOT NULL)
+                  OR (scope = 'SYSTEM' AND document_id IS NULL))
+            rollback: ALTER TABLE audit_event DROP CONSTRAINT ck_audit_event_scope_document
+        # System rows are queried on their own; index the discriminator with the
+        # newest-first ordering the reader uses.
+        - createIndex:
+            tableName: audit_event
+            indexName: ix_audit_event_scope_created_at
+            columns:
+              - column: { name: scope }
+              - column: { name: created_at, descending: true }

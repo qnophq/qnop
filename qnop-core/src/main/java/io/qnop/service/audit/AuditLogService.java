@@ -23,6 +23,7 @@ package io.qnop.service.audit;
 import static java.util.stream.Collectors.toMap;
 
 import io.qnop.entity.AuditEvent;
+import io.qnop.entity.AuditScope;
 import io.qnop.entity.Document;
 import io.qnop.repository.AuditEventRepository;
 import io.qnop.repository.DocumentRepository;
@@ -87,6 +88,7 @@ public class AuditLogService {
    */
   public record AuditEventView(
       UUID id,
+      AuditScope scope,
       String eventType,
       UUID documentId,
       String documentTitle,
@@ -185,10 +187,13 @@ public class AuditLogService {
             : users.findSlugsByIdIn(actorIds).stream()
                 .filter(row -> row.slug() != null)
                 .collect(toMap(UserSlug::id, UserSlug::slug));
-    List<UUID> documentIds = events.stream().map(AuditEvent::getDocumentId).distinct().toList();
+    List<UUID> documentIds =
+        events.stream().map(AuditEvent::getDocumentId).filter(Objects::nonNull).distinct().toList();
     Map<UUID, Document> documentById =
-        documents.findAllById(documentIds).stream()
-            .collect(toMap(Document::getId, document -> document));
+        documentIds.isEmpty()
+            ? Map.of()
+            : documents.findAllById(documentIds).stream()
+                .collect(toMap(Document::getId, document -> document));
     return toViews(events, actorNames, actorSlugs, documentById);
   }
 
@@ -212,12 +217,16 @@ public class AuditLogService {
       Map<UUID, String> actorNames,
       Map<UUID, String> actorSlugs,
       Map<UUID, Document> documentById) {
-    Document document = documentById.get(event.getDocumentId());
+    // A SYSTEM-scoped event has no document id; never probe the map with a null key
+    // (an immutable Map.of() rejects it outright).
+    Document document =
+        event.getDocumentId() == null ? null : documentById.get(event.getDocumentId());
     UUID actorId = event.getActorId();
     String actorDisplayName = actorId == null ? SYSTEM_ACTOR_NAME : actorNames.get(actorId);
     String actorSlug = actorId == null ? null : actorSlugs.get(actorId);
     return new AuditEventView(
         event.getId(),
+        event.getScope(),
         event.getEventType(),
         event.getDocumentId(),
         document == null ? null : document.getTitle(),

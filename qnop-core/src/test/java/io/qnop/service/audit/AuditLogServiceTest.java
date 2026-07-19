@@ -30,9 +30,11 @@ import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 import io.qnop.entity.AuditEvent;
+import io.qnop.entity.AuditScope;
 import io.qnop.entity.Document;
 import io.qnop.repository.AuditEventRepository;
 import io.qnop.repository.DocumentRepository;
+import io.qnop.repository.UserDisplayName;
 import io.qnop.repository.UserRepository;
 import io.qnop.service.audit.AuditLogService.AuditEventView;
 import io.qnop.service.audit.AuditLogService.AuditPage;
@@ -106,6 +108,31 @@ class AuditLogServiceTest {
     assertThat(view.actorDisplayName()).isEqualTo("Avery Auditor");
     assertThat(view.actorSlug()).isEqualTo("avery-auditor");
     assertThat(view.detail()).isEqualTo("{\"to\":\"IN_REVIEW\"}");
+    assertThat(view.scope()).isEqualTo(AuditScope.DOCUMENT);
+  }
+
+  @Test
+  @DisplayName("a SYSTEM-scoped event carries no document and is never looked up as one")
+  void systemScopedEventHasNoDocument() {
+    // A scheduler toggle: SYSTEM scope, an acting admin, no document (issue #524, ADR-0043).
+    AuditEvent systemEvent =
+        AuditEvent.system("scheduler.job.enabled", actorId, "{\"job\":\"refreshTokenSweep\"}");
+    when(auditEvents.findAll(any(Specification.class), any(Pageable.class)))
+        .thenReturn(new PageImpl<>(List.of(systemEvent), PageRequest.of(0, 20), 1));
+    when(users.findDisplayNamesByIdIn(List.of(actorId)))
+        .thenReturn(List.of(new UserDisplayName(actorId, "Adele Admin")));
+    when(users.findSlugsByIdIn(List.of(actorId))).thenReturn(List.of());
+
+    AuditEventView view =
+        service.list(null, null, null, null, null, null, null, null).items().get(0);
+
+    assertThat(view.scope()).isEqualTo(AuditScope.SYSTEM);
+    assertThat(view.documentId()).isNull();
+    assertThat(view.documentTitle()).isNull();
+    assertThat(view.documentSlug()).isNull();
+    assertThat(view.actorDisplayName()).isEqualTo("Adele Admin");
+    // A null document id must never reach the document lookup.
+    verify(documents, never()).findAllById(any());
   }
 
   @Test
