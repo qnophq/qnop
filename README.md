@@ -20,7 +20,7 @@ qnop is open-core: this repository is the **AGPL-3.0 Community edition**; commer
 
 ## Installation
 
-The released image is **`ghcr.io/qnophq/qnop-ce`** (multi-arch: amd64/arm64). qnop needs PostgreSQL and an S3-compatible object storage — the repository ships a single-host [`deploy/docker-compose.yml`](deploy/docker-compose.yml) wiring all three:
+The released image is **[`qnophq/qnop-ce`](https://hub.docker.com/r/qnophq/qnop-ce)** on Docker Hub (multi-arch: amd64/arm64), mirrored to `ghcr.io/qnophq/qnop-ce`. qnop needs PostgreSQL and an S3-compatible object storage — the repository ships a single-host [`deploy/docker-compose.yml`](deploy/docker-compose.yml) wiring all three:
 
 ```bash
 curl -fsSLO https://raw.githubusercontent.com/qnophq/qnop/main/deploy/docker-compose.yml
@@ -44,7 +44,7 @@ docker compose logs qnop | tail -5
 
 Open `http://localhost:8080`, sign in, change the password.
 
-The full environment contract, TLS/reverse-proxy guidance, backups and upgrade notes live in the [deployment guide](docs/DEPLOYMENT.md). Rolling development builds of `main` are published as `ghcr.io/qnophq/qnop-ce:main` for evaluation — production deployments pin a release version.
+The full environment contract, TLS/reverse-proxy guidance, backups and upgrade notes live in the [deployment guide](docs/DEPLOYMENT.md). Rolling development builds of `main` are published to GHCR only, as `ghcr.io/qnophq/qnop-ce:main`, for evaluation — production deployments pin a release version.
 
 ## Developing
 

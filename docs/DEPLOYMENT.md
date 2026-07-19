@@ -1,6 +1,6 @@
 # Deploying qnop
 
-How to run the released qnop container (`ghcr.io/qnophq/qnop-ce`, ADR-0040). One image serves the REST API **and** the embedded web UI on port `8080`.
+How to run the released qnop container ([`qnophq/qnop-ce`](https://hub.docker.com/r/qnophq/qnop-ce) on Docker Hub, mirrored to `ghcr.io/qnophq/qnop-ce`; ADR-0040). One image serves the REST API **and** the embedded web UI on port `8080`.
 
 The fastest start is [`deploy/docker-compose.yml`](../deploy/docker-compose.yml) — the released image plus PostgreSQL and MinIO on a single host:
 
@@ -18,7 +18,7 @@ docker compose up -d
 
 In practice, put those values in an env file you keep out of version control and pass `--env-file`.
 
-Besides the release tags, every green CI build of `main` publishes a snapshot image under the moving `main` tag (immutable `sha-*` tags exist for pinning). Snapshots are for evaluation and pre-release testing — production deployments pin a release version.
+Besides the release tags, every green CI build of `main` publishes a snapshot image to GHCR only, under the moving `ghcr.io/qnophq/qnop-ce:main` tag (immutable `sha-*` tags exist for pinning) — to run one, point the compose `image:` at the GHCR path. Snapshots are for evaluation and pre-release testing — production deployments pin a release version.
 
 ## Environment contract
 
