@@ -44,6 +44,7 @@ describe('visibleNavGroups', () => {
       'reviews',
       'my-teams',
       'settings',
+      'configuration',
       'users',
       'teams',
       'branding',

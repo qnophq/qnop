@@ -35,6 +35,7 @@ import { EmailServerPage } from '../pages/admin/EmailServerPage';
 import { MailTemplatesListPage } from '../pages/admin/MailTemplatesListPage';
 import { OidcProvidersPage } from '../pages/admin/OidcProvidersPage';
 import { SettingsPage } from '../pages/admin/SettingsPage';
+import { ConfigurationPage } from '../pages/admin/ConfigurationPage';
 import { UsersPage } from '../pages/admin/UsersPage';
 import { TeamsPage } from '../pages/admin/TeamsPage';
 import { TeamDetailPage } from '../pages/admin/TeamDetailPage';
@@ -166,6 +167,14 @@ export const router = createBrowserRouter([
         element: (
           <AdminRoute>
             <SettingsPage />
+          </AdminRoute>
+        ),
+      },
+      {
+        path: 'admin/configuration',
+        element: (
+          <AdminRoute>
+            <ConfigurationPage />
           </AdminRoute>
         ),
       },

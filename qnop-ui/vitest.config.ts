@@ -54,6 +54,9 @@ export default defineConfig({
         'src/pages/admin/TeamsPage.tsx',
         'src/pages/admin/TeamDetailPage.tsx',
         'src/pages/admin/SettingsPage.tsx',
+        // Read-only effective-configuration surface (issue #522): the page owns the
+        // filter/render orchestration; its presentational table stays inline.
+        'src/pages/admin/ConfigurationPage.tsx',
         'src/pages/admin/BrandingPage.tsx',
         'src/pages/admin/OidcProvidersPage.tsx',
         // Team-lead self-management surface (issue #470): the "My Teams" landing
