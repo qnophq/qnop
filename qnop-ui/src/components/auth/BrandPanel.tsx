@@ -26,7 +26,7 @@ import { GitCompareArrows, Highlighter, ShieldCheck, Trophy } from 'lucide-react
 import { useConfig } from '../../api/hooks/useConfig';
 import { BrandLogo } from '../branding/BrandLogo';
 import { tokens } from '../../theme/tokens';
-import { ShowcasePlayerCard } from './ShowcasePlayerCard';
+import { ShowcaseReviewStage } from './ShowcaseReviewStage';
 import authBg from '../../assets/auth/auth-bg.webp';
 
 const FEATURES = [
@@ -41,10 +41,10 @@ const GRAIN =
 
 /**
  * The dark brand half of the auth screens (#103, redesigned in #503): the
- * sovereign navy atmosphere carries a decorative player-card collage — the
- * gamified review identity (#469) shown before the first sign-in — above the
- * marketing copy block and the compliance trust chips. Always dark regardless
- * of theme; hidden below `md` (the form column shows a compact brand header
+ * sovereign navy atmosphere carries a decorative review-stage collage — an
+ * annotated document being reviewed, shown before the first sign-in — above
+ * the marketing copy block and the feature chips. Always dark regardless of
+ * theme; hidden below `md` (the form column shows the mobile brand band
  * instead).
  */
 export function BrandPanel() {
@@ -182,7 +182,7 @@ export function BrandPanel() {
         />
       </Box>
 
-      {/* Product stage: the gamified reviewer identity, before the first login. */}
+      {/* Product stage: a document under review, before the first login. */}
       <Box
         sx={{
           position: 'relative',
@@ -195,7 +195,7 @@ export function BrandPanel() {
           minHeight: 0,
         }}
       >
-        <ShowcasePlayerCard />
+        <ShowcaseReviewStage />
       </Box>
 
       <Box sx={{ position: 'relative', zIndex: 1, maxWidth: 460 }}>

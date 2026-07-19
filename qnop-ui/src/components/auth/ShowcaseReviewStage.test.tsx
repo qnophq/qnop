@@ -21,26 +21,33 @@
 
 import { describe, expect, it } from 'vitest';
 import { render, screen } from '@testing-library/react';
-import { ShowcasePlayerCard } from './ShowcasePlayerCard';
+import { ShowcaseReviewStage } from './ShowcaseReviewStage';
 
-describe('ShowcasePlayerCard', () => {
-  it('renders the showcase content', () => {
-    render(<ShowcasePlayerCard />);
+describe('ShowcaseReviewStage', () => {
+  it('puts the reviewed document in focus with the user as reviewer', () => {
+    render(<ShowcaseReviewStage />);
+    // The document hero: title, version and both annotation markers.
+    expect(screen.getByText('Release notes')).toBeInTheDocument();
+    expect(screen.getByText('v4')).toBeInTheDocument();
+    // The background documents deepen the stack.
+    expect(screen.getByText('Master agreement')).toBeInTheDocument();
+    expect(screen.getByText('v2')).toBeInTheDocument();
+    expect(screen.getByText('Audit report')).toBeInTheDocument();
+    expect(screen.getByText('v1')).toBeInTheDocument();
+    expect(screen.getByText('1')).toBeInTheDocument();
+    expect(screen.getByText('2')).toBeInTheDocument();
+    // The user appears as the reviewer working the thread.
     expect(screen.getByText('Mira Novak')).toBeInTheDocument();
-    expect(screen.getByText('14-day review streak')).toBeInTheDocument();
+    expect(screen.getByText('Reviewer')).toBeInTheDocument();
+    expect(screen.getByText('Resolve')).toBeInTheDocument();
+    // The gamified satellite stays.
     expect(screen.getByText('Annotation resolved')).toBeInTheDocument();
   });
 
   it('is decorative: hidden from assistive tech and inert to pointers', () => {
-    const { container } = render(<ShowcasePlayerCard />);
+    const { container } = render(<ShowcaseReviewStage />);
     const root = container.firstElementChild as HTMLElement;
     expect(root).toHaveAttribute('aria-hidden', 'true');
     expect(root).toHaveStyle({ pointerEvents: 'none' });
-  });
-
-  it('needs no providers: static markup without queries or router', () => {
-    // Rendering without QueryClientProvider/Router IS the assertion — the
-    // showcase must never grow data dependencies (#503).
-    expect(() => render(<ShowcasePlayerCard />)).not.toThrow();
   });
 });
