@@ -158,7 +158,7 @@ function MobileBrandBand() {
 
 /**
  * Two-column shell for the public auth screens (#103, #503): the sovereign
- * brand panel with the player-card showcase on the left (hidden below `md`,
+ * brand panel with the review-stage showcase on the left (hidden below `md`,
  * replaced by a compact brand header above the form) and the form card on the
  * right.
  */
