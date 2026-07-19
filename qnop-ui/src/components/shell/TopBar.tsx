@@ -19,16 +19,66 @@
  * SPDX-License-Identifier: AGPL-3.0-only
  */
 
+import { useState } from 'react';
 import AppBar from '@mui/material/AppBar';
-import Badge from '@mui/material/Badge';
 import Box from '@mui/material/Box';
 import IconButton from '@mui/material/IconButton';
 import InputBase from '@mui/material/InputBase';
+import Popover from '@mui/material/Popover';
 import Toolbar from '@mui/material/Toolbar';
 import Tooltip from '@mui/material/Tooltip';
+import Typography from '@mui/material/Typography';
+import { alpha } from '@mui/material/styles';
 import { Bell, Menu as MenuIcon, Moon, PanelLeft, Search, Sun } from 'lucide-react';
 import { useUiStore } from '../../stores/uiStore';
 import { Breadcrumbs } from './Breadcrumbs';
+
+/**
+ * Placeholder notification center (#514): the bell opens a compact panel that
+ * announces the surface instead of pretending to be one — no unread dot, no
+ * fake items. Replaced by the real notification feed when it ships.
+ */
+function NotificationsPopover({
+  anchorEl,
+  onClose,
+}: {
+  anchorEl: HTMLElement | null;
+  onClose: () => void;
+}) {
+  return (
+    <Popover
+      open={!!anchorEl}
+      anchorEl={anchorEl}
+      onClose={onClose}
+      anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
+      transformOrigin={{ vertical: 'top', horizontal: 'right' }}
+      slotProps={{ paper: { sx: { mt: 1, width: 300, borderRadius: 2.5 } } }}
+    >
+      <Box sx={{ p: 3, textAlign: 'center' }}>
+        <Box
+          sx={{
+            width: 44,
+            height: 44,
+            mx: 'auto',
+            mb: 1.5,
+            borderRadius: '50%',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            color: 'primary.main',
+            bgcolor: (t) => alpha(t.palette.primary.main, t.palette.mode === 'dark' ? 0.16 : 0.1),
+          }}
+        >
+          <Bell size={20} />
+        </Box>
+        <Typography sx={{ fontWeight: 700, fontSize: 15, mb: 0.5 }}>Notifications</Typography>
+        <Typography sx={{ fontSize: 13, color: 'text.secondary', lineHeight: 1.55 }}>
+          Coming soon — mentions, replies and review updates will land here.
+        </Typography>
+      </Box>
+    </Popover>
+  );
+}
 
 interface TopBarProps {
   isMobile: boolean;
@@ -39,6 +89,7 @@ interface TopBarProps {
 export function TopBar({ isMobile, onToggleSidebar }: TopBarProps) {
   const themeMode = useUiStore((s) => s.themeMode);
   const toggleTheme = useUiStore((s) => s.toggleTheme);
+  const [notificationsAnchor, setNotificationsAnchor] = useState<HTMLElement | null>(null);
 
   return (
     <AppBar
@@ -95,12 +146,20 @@ export function TopBar({ isMobile, onToggleSidebar }: TopBarProps) {
         </Tooltip>
 
         <Tooltip title="Notifications">
-          <IconButton size="small" aria-label="Notifications">
-            <Badge color="primary" variant="dot">
-              <Bell size={18} />
-            </Badge>
+          <IconButton
+            size="small"
+            aria-label="Notifications"
+            aria-haspopup="dialog"
+            aria-expanded={notificationsAnchor ? true : undefined}
+            onClick={(event) => setNotificationsAnchor(event.currentTarget)}
+          >
+            <Bell size={18} />
           </IconButton>
         </Tooltip>
+        <NotificationsPopover
+          anchorEl={notificationsAnchor}
+          onClose={() => setNotificationsAnchor(null)}
+        />
       </Toolbar>
     </AppBar>
   );
