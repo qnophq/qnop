@@ -105,7 +105,15 @@ class ConfigurationControllerIT extends AbstractIntegrationTest {
                 .value(
                     org.hamcrest.Matchers.hasItem(
                         org.hamcrest.Matchers.containsString(
-                            "lifetime of a self-issued access token"))));
+                            "lifetime of a self-issued access token"))))
+        // A leaf of a nested @ConfigurationProperties record (Limit) is documented too, from the
+        // Limit record's own Javadoc — guards the nested-record harvest.
+        .andExpect(
+            jsonPath(
+                    "$.groups[*].entries[?(@.path == 'qnop.auth.rate-limit.login.max-attempts')].description")
+                .value(
+                    org.hamcrest.Matchers.hasItem(
+                        org.hamcrest.Matchers.containsString("burst capacity"))));
   }
 
   private User createUser(String username, UserRole role) {

@@ -42,6 +42,10 @@ import org.springframework.boot.context.properties.bind.DefaultValue;
  * @param refresh IP-keyed limit for {@code POST /api/v1/auth/refresh} (default 30 / 60s)
  * @param changePassword subject-keyed limit for {@code POST /api/v1/auth/change-password} (default
  *     5 / 300s)
+ * @param register IP-keyed limit for {@code POST /api/v1/auth/register} (default 5 / 3600s; the
+ *     endpoint itself arrives with issue #20)
+ * @param forgotPassword IP-keyed limit for the password-reset request endpoint (default 5 / 3600s;
+ *     the endpoint itself arrives with issue #20)
  * @param maxBuckets upper bound on the number of live token buckets held in memory (default
  *     100&nbsp;000). Bounds memory under a high-cardinality key space — e.g. a spoofable client IP
  *     when no trusted proxy is configured (issue #49).
@@ -71,6 +75,11 @@ public record RateLimitProperties(
   /**
    * A single bucket configuration: {@code maxAttempts} tokens, greedily refilled over {@code
    * windowSeconds}.
+   *
+   * @param maxAttempts requests allowed from one key before its bucket is empty and further
+   *     requests are rejected with 429 — the burst capacity
+   * @param windowSeconds length in seconds of the rolling window over which the bucket refills back
+   *     to {@code maxAttempts}
    */
   public record Limit(
       @DefaultValue("10") int maxAttempts, @DefaultValue("60") long windowSeconds) {}
