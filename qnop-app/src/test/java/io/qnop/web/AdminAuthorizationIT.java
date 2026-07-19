@@ -72,6 +72,7 @@ class AdminAuthorizationIT extends AbstractIntegrationTest {
   @ValueSource(
       strings = {
         "/api/v1/admin/settings",
+        "/api/v1/admin/configuration",
         "/api/v1/admin/oidc-providers",
         "/api/v1/admin/email/templates",
         "/api/v1/admin/users",

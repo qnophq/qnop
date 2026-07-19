@@ -14,6 +14,12 @@ plugins {
 dependencies {
     implementation(platform(libs.spring.boot.dependencies)) // BOM: manages versions
 
+    // Compile-time only: generates META-INF/spring-configuration-metadata.json from the
+    // Javadoc on the @ConfigurationProperties records, so the effective-configuration page
+    // (issue #522) can render a per-property description without a hand-kept text map.
+    annotationProcessor(platform(libs.spring.boot.dependencies))
+    annotationProcessor(libs.spring.boot.configuration.processor)
+
     implementation(project(":qnop-spi")) // implements the extension-point defaults
     // Maps entities to/from the published REST DTOs. Depends on the Spring-free
     // model only (not qnop-api-endpoint) — the service layer must not see the

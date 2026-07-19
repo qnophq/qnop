@@ -29,6 +29,15 @@ tags:
     description: |
       Superadmin-only administration of the global application settings
       (issue #16). Sensitive values are masked as `***`.
+  - name: AdminConfiguration
+    description: |
+      Superadmin-only, read-only view of the effective `qnop.*` configuration
+      the running server bound at startup from `application.yml` and the
+      `QNOP_*` environment variables (issue #522). Informational only — values
+      are changed in the deployment and require a restart. Secret values never
+      travel over the wire: a property whose terminal name token is `secret`,
+      `password`, `key`, `token` or `salt` is redacted server-side to a
+      configured / not-configured flag.
   - name: Auth
     description: |
       Authentication: local username/email + password login, refresh-token
@@ -159,6 +168,41 @@ paths:
                   - PDF
                   - DOCX
                   - MD
+  /admin/configuration:
+    get:
+      tags:
+        - AdminConfiguration
+      summary: Get the effective server configuration
+      description: |
+        Returns the effective `qnop.*` configuration the running server bound at
+        startup, grouped by top-level namespace (e.g. `auth`, `s3`). Each entry
+        carries its kebab-case property path, the best-effort `QNOP_*`
+        environment-variable name, a rendering hint, and the effective value.
+        Secret values are redacted server-side and never appear in the response —
+        a secret entry only reports whether a value is configured. Read-only and
+        superadmin only.
+      operationId: getAdminConfiguration
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: The effective, redacted server configuration
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ConfigurationResponse'
+        '401':
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Caller is not a superadmin
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
   /admin/settings:
     get:
       tags:
@@ -3640,6 +3684,75 @@ components:
           description: Map of setting key to new value.
       required:
         - values
+    ConfigurationResponse:
+      type: object
+      description: |
+        The effective `qnop.*` configuration the server bound at startup, grouped
+        by top-level namespace. Secret values are never included (issue #522).
+      properties:
+        groups:
+          type: array
+          items:
+            $ref: '#/components/schemas/ConfigurationGroup'
+      required:
+        - groups
+    ConfigurationGroup:
+      type: object
+      description: A top-level `qnop.*` namespace (e.g. `auth`) and its effective entries.
+      properties:
+        key:
+          type: string
+          description: The namespace key after the `qnop` prefix, e.g. `auth` or `s3`.
+        entries:
+          type: array
+          items:
+            $ref: '#/components/schemas/ConfigurationEntry'
+      required:
+        - key
+        - entries
+    ConfigurationEntry:
+      type: object
+      description: |
+        One bound configuration leaf. For a secret entry the value is omitted and
+        `configured` reports whether a non-blank value is set.
+      properties:
+        path:
+          type: string
+          description: The full kebab-case property path, e.g. `qnop.auth.access-token-ttl`.
+        envVar:
+          type: string
+          description: The best-effort environment-variable name, e.g. `QNOP_AUTH_ACCESS_TOKEN_TTL`.
+        valueType:
+          $ref: '#/components/schemas/ConfigurationValueType'
+        value:
+          type: string
+          nullable: true
+          description: The rendered value; `null` when unset or when the entry is a secret.
+        configured:
+          type: boolean
+          nullable: true
+          description: For a secret entry only — whether a non-blank value is configured.
+        description:
+          type: string
+          nullable: true
+          description: >-
+            Human-readable explanation of the property, harvested from its Javadoc via Spring's
+            configuration metadata; `null` when the property is not documented.
+      required:
+        - path
+        - envVar
+        - valueType
+    ConfigurationValueType:
+      type: string
+      description: A rendering hint for a configuration value.
+      enum:
+        - STRING
+        - BOOLEAN
+        - NUMBER
+        - DURATION
+        - LIST
+        - UNSET
+        - SECRET
     LoginRequest:
       type: object
       description: Local-login credentials (issue #17).
