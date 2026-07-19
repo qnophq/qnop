@@ -142,6 +142,10 @@ jobs:
 
       - name: Sync Docker Hub README
         if: steps.dockerhub.outputs.enabled == 'true'
+        # Non-blocking: Docker Hub's description API is picky about access
+        # tokens (it may require the account password) — a rejected README
+        # sync must not fail an otherwise successful release.
+        continue-on-error: true
         uses: peter-evans/dockerhub-description@1b9a80c056b620d92cedb9d9b5a223409c68ddfa # v5
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
