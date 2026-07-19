@@ -21,13 +21,11 @@
 
 import { lazy } from 'react';
 import { createBrowserRouter } from 'react-router-dom';
-import { ShieldCheck } from 'lucide-react';
 import { AppShell } from '../components/shell/AppShell';
 import { LazyBoundary } from '../components/errors/LazyBoundary';
 import { AdminRoute } from '../components/auth/AdminRoute';
 import { ProtectedRoute } from '../components/auth/ProtectedRoute';
 import { RoleRoute } from '../components/auth/RoleRoute';
-import { ComingSoonPage } from '../pages/ComingSoonPage';
 import { AuditPage } from '../pages/audit/AuditPage';
 import { HomePage } from '../pages/HomePage';
 import { BrandingPage } from '../pages/admin/BrandingPage';
@@ -131,18 +129,6 @@ export const router = createBrowserRouter([
       },
       { path: 'my-teams', element: <MyTeamsPage /> },
       { path: 'my-teams/:id', element: <MyTeamDetailPage /> },
-      {
-        path: 'compliance',
-        element: (
-          <RoleRoute allow={['ADMIN', 'AUDITOR']}>
-            <ComingSoonPage
-              title="Compliance"
-              description="Audit trail and compliance reporting across all reviews."
-              icon={ShieldCheck}
-            />
-          </RoleRoute>
-        ),
-      },
       {
         path: 'audit',
         element: (

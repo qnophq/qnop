@@ -19,16 +19,74 @@
  * SPDX-License-Identifier: AGPL-3.0-only
  */
 
+import { useState } from 'react';
 import AppBar from '@mui/material/AppBar';
-import Badge from '@mui/material/Badge';
 import Box from '@mui/material/Box';
+import ButtonBase from '@mui/material/ButtonBase';
 import IconButton from '@mui/material/IconButton';
-import InputBase from '@mui/material/InputBase';
+import Popover from '@mui/material/Popover';
 import Toolbar from '@mui/material/Toolbar';
 import Tooltip from '@mui/material/Tooltip';
+import Typography from '@mui/material/Typography';
+import { alpha } from '@mui/material/styles';
 import { Bell, Menu as MenuIcon, Moon, PanelLeft, Search, Sun } from 'lucide-react';
+import type { LucideIcon } from 'lucide-react';
 import { useUiStore } from '../../stores/uiStore';
 import { Breadcrumbs } from './Breadcrumbs';
+
+/**
+ * Placeholder panel for top-bar surfaces that are announced but not shipped
+ * yet (#514: notifications and global search): a compact coming-soon state in
+ * the design language instead of a control that pretends to work. Replaced by
+ * the real surface when it ships.
+ */
+function ComingSoonPopover({
+  anchorEl,
+  onClose,
+  icon: Icon,
+  title,
+  body,
+}: {
+  anchorEl: HTMLElement | null;
+  onClose: () => void;
+  icon: LucideIcon;
+  title: string;
+  body: string;
+}) {
+  return (
+    <Popover
+      open={!!anchorEl}
+      anchorEl={anchorEl}
+      onClose={onClose}
+      anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
+      transformOrigin={{ vertical: 'top', horizontal: 'right' }}
+      slotProps={{ paper: { sx: { mt: 1, width: 300, borderRadius: 2.5 } } }}
+    >
+      <Box sx={{ p: 3, textAlign: 'center' }}>
+        <Box
+          sx={{
+            width: 44,
+            height: 44,
+            mx: 'auto',
+            mb: 1.5,
+            borderRadius: '50%',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            color: 'primary.main',
+            bgcolor: (t) => alpha(t.palette.primary.main, t.palette.mode === 'dark' ? 0.16 : 0.1),
+          }}
+        >
+          <Icon size={20} />
+        </Box>
+        <Typography sx={{ fontWeight: 700, fontSize: 15, mb: 0.5 }}>{title}</Typography>
+        <Typography sx={{ fontSize: 13, color: 'text.secondary', lineHeight: 1.55 }}>
+          {body}
+        </Typography>
+      </Box>
+    </Popover>
+  );
+}
 
 interface TopBarProps {
   isMobile: boolean;
@@ -39,6 +97,8 @@ interface TopBarProps {
 export function TopBar({ isMobile, onToggleSidebar }: TopBarProps) {
   const themeMode = useUiStore((s) => s.themeMode);
   const toggleTheme = useUiStore((s) => s.toggleTheme);
+  const [notificationsAnchor, setNotificationsAnchor] = useState<HTMLElement | null>(null);
+  const [searchAnchor, setSearchAnchor] = useState<HTMLElement | null>(null);
 
   return (
     <AppBar
@@ -60,11 +120,15 @@ export function TopBar({ isMobile, onToggleSidebar }: TopBarProps) {
 
         <Box sx={{ flex: 1 }} />
 
-        {/* Search (visual for now; wired to global search later) */}
-        <Box
+        {/* Global search: a trigger (not a fake input) until the surface ships (#514). */}
+        <ButtonBase
+          aria-label="Search"
+          aria-haspopup="dialog"
+          aria-expanded={searchAnchor ? true : undefined}
+          onClick={(event) => setSearchAnchor(event.currentTarget)}
           sx={{
             display: { xs: 'none', md: 'flex' },
-            alignItems: 'center',
+            justifyContent: 'flex-start',
             gap: 1,
             width: 280,
             height: 34,
@@ -74,15 +138,22 @@ export function TopBar({ isMobile, onToggleSidebar }: TopBarProps) {
             borderColor: 'divider',
             bgcolor: (t) => t.qnop.surface2,
             color: 'text.disabled',
+            fontSize: 13,
+            fontFamily: 'inherit',
+            transition: 'border-color .15s',
+            '&:hover, &:focus-visible': { borderColor: 'text.disabled' },
           }}
         >
           <Search size={15} />
-          <InputBase
-            placeholder="Search…"
-            sx={{ fontSize: 13, flex: 1 }}
-            inputProps={{ 'aria-label': 'Search' }}
-          />
-        </Box>
+          Search…
+        </ButtonBase>
+        <ComingSoonPopover
+          anchorEl={searchAnchor}
+          onClose={() => setSearchAnchor(null)}
+          icon={Search}
+          title="Search"
+          body="Coming soon — jump to any review, document or teammate from here."
+        />
 
         <Tooltip title={themeMode === 'dark' ? 'Light mode' : 'Dark mode'}>
           <IconButton
@@ -95,12 +166,23 @@ export function TopBar({ isMobile, onToggleSidebar }: TopBarProps) {
         </Tooltip>
 
         <Tooltip title="Notifications">
-          <IconButton size="small" aria-label="Notifications">
-            <Badge color="primary" variant="dot">
-              <Bell size={18} />
-            </Badge>
+          <IconButton
+            size="small"
+            aria-label="Notifications"
+            aria-haspopup="dialog"
+            aria-expanded={notificationsAnchor ? true : undefined}
+            onClick={(event) => setNotificationsAnchor(event.currentTarget)}
+          >
+            <Bell size={18} />
           </IconButton>
         </Tooltip>
+        <ComingSoonPopover
+          anchorEl={notificationsAnchor}
+          onClose={() => setNotificationsAnchor(null)}
+          icon={Bell}
+          title="Notifications"
+          body="Coming soon — mentions, replies and review updates will land here."
+        />
       </Toolbar>
     </AppBar>
   );

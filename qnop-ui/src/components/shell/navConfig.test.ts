@@ -31,9 +31,8 @@ describe('visibleNavGroups', () => {
     expect(ids('MEMBER')).toEqual(['dashboard', 'reviews', 'my-teams']);
   });
 
-  it('adds compliance and audit for an AUDITOR but no admin items', () => {
+  it('adds audit for an AUDITOR but no admin items', () => {
     const items = ids('AUDITOR');
-    expect(items).toContain('compliance');
     expect(items).toContain('audit');
     expect(items).not.toContain('users');
     expect(items).not.toContain('settings');
@@ -44,15 +43,14 @@ describe('visibleNavGroups', () => {
       'dashboard',
       'reviews',
       'my-teams',
-      'compliance',
-      'audit',
+      'settings',
       'users',
       'teams',
-      'settings',
+      'branding',
       'oidc-providers',
       'email',
       'mail-templates',
-      'branding',
+      'audit',
     ]);
   });
 
