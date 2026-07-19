@@ -43,7 +43,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 /**
- * The scheduled bucket orphan reaper's guards (issue #523, ADR-0043): opt-in, dry-run, grace, cap.
+ * The scheduled bucket orphan reaper's guards (issue #523, ADR-0044): opt-in, dry-run, grace, cap.
  */
 @ExtendWith(MockitoExtension.class)
 class StorageOrphanReaperTest {

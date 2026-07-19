@@ -61,7 +61,7 @@ public interface StorageProvider {
   boolean delete(String key);
 
   /**
-   * Lists every object whose key starts with {@code prefix} (issue #523, ADR-0043), for the
+   * Lists every object whose key starts with {@code prefix} (issue #523, ADR-0044), for the
    * storage-consistency scan's orphan direction. The returned stream is <em>lazy</em> and may be
    * backed by a network connection: the caller must consume it inside a try-with-resources block so
    * it is closed. Order is unspecified.

@@ -45,7 +45,7 @@ import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
 
 /**
- * The admin storage-consistency dashboard over the wire (issue #523, ADR-0043) against a real
+ * The admin storage-consistency dashboard over the wire (issue #523, ADR-0044) against a real
  * MinIO: the ADMIN-only authorization gate, the scan surfacing orphaned + missing binaries, and
  * orphan deletion with its in-transaction re-check. Uses content-unique keys and CONTAINS
  * assertions so it stays isolated from whatever else shares the JVM's bucket.

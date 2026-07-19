@@ -65,7 +65,7 @@ tags:
       (LEAD / MEMBER). Teams group reviewers for the review workflow.
   - name: AdminStorageConsistency
     description: |
-      Admin-only storage-consistency dashboard (issue #523, ADR-0043): reconcile
+      Admin-only storage-consistency dashboard (issue #523, ADR-0044): reconcile
       the document binaries in object storage against the database. Reports
       missing binaries (a referenced object that is gone — data loss, report-only)
       and orphaned objects (a stored object no row references — cost/leak), and
@@ -1388,7 +1388,7 @@ paths:
       description: |
         Reconciles every referenced storage key (document versions, attachments,
         and the staging registry) against the bucket listing (issue #523,
-        ADR-0043). Returns missing binaries (referenced but absent — data loss,
+        ADR-0044). Returns missing binaries (referenced but absent — data loss,
         with document context) and orphaned objects (present but unreferenced —
         cost/leak, with size and age), plus totals. The scan is bounded: once it
         streams more than the configured limit it aborts with `409` so a
@@ -3588,7 +3588,7 @@ components:
   schemas:
     StorageConsistencyReport:
       type: object
-      description: The storage-consistency reconciliation report (issue #523, ADR-0043).
+      description: The storage-consistency reconciliation report (issue #523, ADR-0044).
       required:
         - summary
         - missing

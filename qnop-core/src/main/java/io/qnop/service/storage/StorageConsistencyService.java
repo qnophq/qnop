@@ -44,7 +44,7 @@ import org.springframework.stereotype.Service;
 
 /**
  * Reconciles the document binaries in object storage against the database for the admin
- * storage-consistency dashboard (issue #523, ADR-0043). It surfaces two finding classes:
+ * storage-consistency dashboard (issue #523, ADR-0044). It surfaces two finding classes:
  *
  * <ul>
  *   <li><b>Missing binaries</b> — a {@code document_version}/{@code document_attachment} row whose

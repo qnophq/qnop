@@ -43,7 +43,7 @@ import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestController;
 
 /**
- * Admin-only storage-consistency dashboard endpoints (issue #523, ADR-0043), implementing the
+ * Admin-only storage-consistency dashboard endpoints (issue #523, ADR-0044), implementing the
  * generated {@link AdminStorageConsistencyApi} — a thin mapping over the scan and remediation
  * services. Authorization is enforced centrally by the security chain ({@code /api/v1/admin/**}
  * requires {@code ADMIN}). The scan circuit-breaker surfaces as {@code 409}.

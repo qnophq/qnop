@@ -38,7 +38,7 @@ import org.springframework.transaction.TransactionDefinition;
 import org.springframework.transaction.support.TransactionTemplate;
 
 /**
- * Deletes orphaned storage objects for the admin dashboard (issue #523, ADR-0043). Each key is
+ * Deletes orphaned storage objects for the admin dashboard (issue #523, ADR-0044). Each key is
  * remediated in <em>its own</em> transaction: the references are re-checked against all three
  * sources immediately before deletion, so a key that became referenced since the scan (e.g. a new
  * upload reusing the same content, which registers a staging row) is skipped and reported back

@@ -40,7 +40,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 /**
- * The pure diff and mapping rules of the storage-consistency scan (issue #523, ADR-0043) —
+ * The pure diff and mapping rules of the storage-consistency scan (issue #523, ADR-0044) —
  * partitioning known/orphaned/missing, the circuit breaker, and missing-key enrichment — exercised
  * without a database or a live bucket.
  */

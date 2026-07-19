@@ -32,7 +32,7 @@ import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
 /**
- * Scheduled bucket-wide orphan reaper (issue #523, ADR-0043) — the automated complement to the
+ * Scheduled bucket-wide orphan reaper (issue #523, ADR-0044) — the automated complement to the
  * admin dashboard. Where the existing {@code StorageService} reaper only deletes uploaded-but-
  * uncommitted staging rows it can see in the registry, this one scans the whole bucket and reaps
  * <em>committed-namespace</em> orphans that no database row references at all (e.g. a version

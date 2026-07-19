@@ -37,7 +37,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.test.context.TestPropertySource;
 
 /**
- * The scan circuit breaker over the wire (issue #523, ADR-0043): with the object limit forced to 1,
+ * The scan circuit breaker over the wire (issue #523, ADR-0044): with the object limit forced to 1,
  * a bucket holding more than one object aborts the scan with HTTP 409 and the stable code, rather
  * than streaming forever.
  */
