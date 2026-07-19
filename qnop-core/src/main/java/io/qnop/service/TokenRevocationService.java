@@ -27,6 +27,8 @@ import io.qnop.entity.User;
 import io.qnop.repository.RevokedTokenRepository;
 import io.qnop.repository.UserRepository;
 import io.qnop.security.QnopProperties;
+import io.qnop.service.scheduler.SchedulerJobCatalog;
+import io.qnop.service.scheduler.SchedulerService;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
@@ -51,14 +53,17 @@ public class TokenRevocationService {
 
   private final RevokedTokenRepository revokedTokenRepository;
   private final UserRepository userRepository;
+  private final SchedulerService scheduler;
   private final Cache<String, Boolean> revokedJtiCache;
 
   public TokenRevocationService(
       RevokedTokenRepository revokedTokenRepository,
       UserRepository userRepository,
-      QnopProperties properties) {
+      QnopProperties properties,
+      SchedulerService scheduler) {
     this.revokedTokenRepository = revokedTokenRepository;
     this.userRepository = userRepository;
+    this.scheduler = scheduler;
     this.revokedJtiCache =
         Caffeine.newBuilder()
             .maximumSize(CACHE_MAX_SIZE)
@@ -118,9 +123,13 @@ public class TokenRevocationService {
    * {@code exp} validation regardless, so dropping its denylist row is safe.
    */
   @Scheduled(cron = "0 45 3 * * *")
-  @SchedulerLock(name = "revokedTokenSweep", lockAtMostFor = "PT5M")
-  @Transactional
+  @SchedulerLock(name = SchedulerJobCatalog.REVOKED_TOKEN_SWEEP, lockAtMostFor = "PT5M")
   public void sweepExpired() {
+    scheduler.runScheduled(SchedulerJobCatalog.REVOKED_TOKEN_SWEEP);
+  }
+
+  /** The raw purge, run inside the scheduler gate's transaction (issue #524). */
+  public void sweepExpiredOnce() {
     revokedTokenRepository.deleteExpiredBefore(Instant.now());
   }
 

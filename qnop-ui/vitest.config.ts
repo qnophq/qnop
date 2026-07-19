@@ -59,6 +59,10 @@ export default defineConfig({
         'src/pages/admin/ConfigurationPage.tsx',
         'src/pages/admin/BrandingPage.tsx',
         'src/pages/admin/OidcProvidersPage.tsx',
+        // The maintenance-scheduler dashboard (issue #524): the page owns the
+        // toggle/run-now orchestration and toasts; its presentational job card
+        // stays on its own component test.
+        'src/pages/admin/SchedulerPage.tsx',
         // Team-lead self-management surface (issue #470): the "My Teams" landing
         // and detail pages own the orchestration/state; the add-member dialog
         // stays on its own component test.

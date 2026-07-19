@@ -23,6 +23,8 @@ package io.qnop.service.auth;
 import io.qnop.entity.EmailVerificationToken;
 import io.qnop.entity.User;
 import io.qnop.repository.EmailVerificationTokenRepository;
+import io.qnop.service.scheduler.SchedulerJobCatalog;
+import io.qnop.service.scheduler.SchedulerService;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
@@ -52,9 +54,12 @@ public class EmailVerificationTokenService {
   private static final SecureRandom RANDOM = new SecureRandom();
 
   private final EmailVerificationTokenRepository tokens;
+  private final SchedulerService scheduler;
 
-  public EmailVerificationTokenService(EmailVerificationTokenRepository tokens) {
+  public EmailVerificationTokenService(
+      EmailVerificationTokenRepository tokens, SchedulerService scheduler) {
     this.tokens = tokens;
+    this.scheduler = scheduler;
   }
 
   /** Issues a fresh token for {@code user}, superseding any earlier unconsumed one. */
@@ -91,11 +96,19 @@ public class EmailVerificationTokenService {
     return user;
   }
 
-  /** Daily off-peak purge of expired rows so the table does not grow unbounded. */
+  /**
+   * Daily off-peak purge of expired rows so the table does not grow unbounded. Routed through the
+   * scheduler gate (issue #524) so an admin can disable it or trigger a run-now; the gate owns the
+   * transaction around {@link #sweepOnce()}.
+   */
   @Scheduled(cron = "0 30 3 * * *")
-  @SchedulerLock(name = "emailVerificationTokenSweep", lockAtMostFor = "PT5M")
-  @Transactional
+  @SchedulerLock(name = SchedulerJobCatalog.EMAIL_VERIFICATION_TOKEN_SWEEP, lockAtMostFor = "PT5M")
   public void sweep() {
+    scheduler.runScheduled(SchedulerJobCatalog.EMAIL_VERIFICATION_TOKEN_SWEEP);
+  }
+
+  /** The raw purge, run inside the scheduler gate's transaction (issue #524). */
+  public void sweepOnce() {
     tokens.deleteByExpiresAtBefore(Instant.now());
   }
 

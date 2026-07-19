@@ -24,6 +24,7 @@ import {
   AdminConfigurationApi,
   AdminEmailApi,
   AdminOidcProvidersApi,
+  AdminSchedulerApi,
   AdminSettingsApi,
   AdminTeamsApi,
   AdminUsersApi,
@@ -101,6 +102,7 @@ export const adminTeamsApi = new AdminTeamsApi(undefined, undefined, axiosInstan
 export const teamsApi = new TeamsApi(undefined, undefined, axiosInstance);
 export const adminSettingsApi = new AdminSettingsApi(undefined, undefined, axiosInstance);
 export const adminConfigurationApi = new AdminConfigurationApi(undefined, undefined, axiosInstance);
+export const adminSchedulerApi = new AdminSchedulerApi(undefined, undefined, axiosInstance);
 export const adminOidcProvidersApi = new AdminOidcProvidersApi(undefined, undefined, axiosInstance);
 export const adminEmailApi = new AdminEmailApi(undefined, undefined, axiosInstance);
 export const documentsApi = new DocumentsApi(undefined, undefined, axiosInstance);

@@ -23,6 +23,8 @@ package io.qnop.service.storage;
 import io.qnop.entity.StorageObject;
 import io.qnop.entity.StorageObjectStatus;
 import io.qnop.repository.StorageObjectRepository;
+import io.qnop.service.scheduler.SchedulerJobCatalog;
+import io.qnop.service.scheduler.SchedulerService;
 import io.qnop.spi.storage.StorageContent;
 import io.qnop.spi.storage.StorageException;
 import io.qnop.spi.storage.StorageProvider;
@@ -63,12 +65,17 @@ public class StorageService {
   private final StorageProvider provider;
   private final StorageObjectRepository repository;
   private final S3Properties properties;
+  private final SchedulerService scheduler;
 
   public StorageService(
-      StorageProvider provider, StorageObjectRepository repository, S3Properties properties) {
+      StorageProvider provider,
+      StorageObjectRepository repository,
+      S3Properties properties,
+      SchedulerService scheduler) {
     this.provider = provider;
     this.repository = repository;
     this.properties = properties;
+    this.scheduler = scheduler;
   }
 
   /**
@@ -155,23 +162,39 @@ public class StorageService {
 
   /**
    * Deletes objects left uploaded-but-uncommitted past the grace period (ADR-0036). Runs off-peak,
-   * single-instance via ShedLock (ADR-0029); tests invoke it directly. The object is removed before
-   * its row, so a crash mid-sweep simply retries next run (delete is idempotent).
+   * single-instance via ShedLock (ADR-0029). Routed through the scheduler gate (issue #524) so an
+   * admin can disable it, put it in dry-run, or trigger a run-now; the gate owns the transaction
+   * around {@link #reapOrphansOnce(boolean)}.
    */
   @Scheduled(cron = "${qnop.s3.reaper-cron:0 30 3 * * *}")
-  @SchedulerLock(name = "storageOrphanReaper", lockAtMostFor = "PT10M")
-  @Transactional
+  @SchedulerLock(name = SchedulerJobCatalog.STORAGE_ORPHAN_REAPER, lockAtMostFor = "PT10M")
   public void reapOrphans() {
+    scheduler.runScheduled(SchedulerJobCatalog.STORAGE_ORPHAN_REAPER);
+  }
+
+  /**
+   * The raw reaper pass, run inside the scheduler gate's transaction (issue #524). The object is
+   * removed before its row, so a crash mid-sweep simply retries next run (delete is idempotent). In
+   * {@code dryRun} mode it counts what would be deleted but deletes nothing — a safe operator
+   * probe.
+   */
+  public void reapOrphansOnce(boolean dryRun) {
     Instant cutoff = Instant.now().minus(properties.reaperGracePeriod());
     List<StorageObject> orphans =
         repository.findByStatusAndCreatedAtBefore(StorageObjectStatus.PENDING, cutoff);
+    if (orphans.isEmpty()) {
+      return;
+    }
+    if (dryRun) {
+      log.info(
+          "Storage orphan reaper (dry-run) would delete {} uncommitted object(s).", orphans.size());
+      return;
+    }
     for (StorageObject orphan : orphans) {
       provider.delete(orphan.getObjectKey());
       repository.delete(orphan);
     }
-    if (!orphans.isEmpty()) {
-      log.info("Storage orphan reaper deleted {} uncommitted object(s).", orphans.size());
-    }
+    log.info("Storage orphan reaper deleted {} uncommitted object(s).", orphans.size());
   }
 
   /**

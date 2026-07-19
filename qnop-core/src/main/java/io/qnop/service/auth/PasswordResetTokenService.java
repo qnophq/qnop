@@ -25,6 +25,8 @@ import io.qnop.entity.User;
 import io.qnop.repository.PasswordResetTokenRepository;
 import io.qnop.service.ApplicationSettingKey;
 import io.qnop.service.ApplicationSettingsService;
+import io.qnop.service.scheduler.SchedulerJobCatalog;
+import io.qnop.service.scheduler.SchedulerService;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
@@ -54,11 +56,15 @@ public class PasswordResetTokenService {
 
   private final PasswordResetTokenRepository tokens;
   private final ApplicationSettingsService settings;
+  private final SchedulerService scheduler;
 
   public PasswordResetTokenService(
-      PasswordResetTokenRepository tokens, ApplicationSettingsService settings) {
+      PasswordResetTokenRepository tokens,
+      ApplicationSettingsService settings,
+      SchedulerService scheduler) {
     this.tokens = tokens;
     this.settings = settings;
+    this.scheduler = scheduler;
   }
 
   /** Issues a fresh reset token for {@code user}, superseding any earlier unconsumed one. */
@@ -94,10 +100,19 @@ public class PasswordResetTokenService {
     return user;
   }
 
+  /**
+   * Daily off-peak purge of expired reset tokens, routed through the scheduler gate (issue #524) so
+   * an admin can disable it or trigger a run-now; the gate owns the transaction around {@link
+   * #sweepOnce()}.
+   */
   @Scheduled(cron = "0 35 3 * * *")
-  @SchedulerLock(name = "passwordResetTokenSweep", lockAtMostFor = "PT5M")
-  @Transactional
+  @SchedulerLock(name = SchedulerJobCatalog.PASSWORD_RESET_TOKEN_SWEEP, lockAtMostFor = "PT5M")
   public void sweep() {
+    scheduler.runScheduled(SchedulerJobCatalog.PASSWORD_RESET_TOKEN_SWEEP);
+  }
+
+  /** The raw purge, run inside the scheduler gate's transaction (issue #524). */
+  public void sweepOnce() {
     tokens.deleteByExpiresAtBefore(Instant.now());
   }
 

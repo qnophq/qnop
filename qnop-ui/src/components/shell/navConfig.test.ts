@@ -51,6 +51,7 @@ describe('visibleNavGroups', () => {
       'oidc-providers',
       'email',
       'mail-templates',
+      'scheduler',
       'audit',
     ]);
   });

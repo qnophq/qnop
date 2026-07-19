@@ -25,5 +25,9 @@ TRUNCATE TABLE annotation_placement, comment, annotation, audit_event,
 TRUNCATE TABLE team_membership, team, oidc_provider, user_setting, application_asset
                RESTART IDENTITY CASCADE;
 
+-- Scheduler-job operator state (issue #524): seeded at start-up and mutated by
+-- the dashboard, so reset it per test for deterministic assertions. No FK deps.
+TRUNCATE TABLE scheduler_job RESTART IDENTITY CASCADE;
+
 DELETE FROM user_avatar;
 DELETE FROM qnop_user;

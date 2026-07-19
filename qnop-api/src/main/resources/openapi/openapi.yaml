@@ -129,6 +129,15 @@ tags:
       (no user) renders as *System*. This is the document-review trail only —
       a system-level audit stream (logins, settings, user administration) is a
       separate, future effort.
+  - name: AdminScheduler
+    description: |
+      The maintenance-scheduler dashboard (issue #524, ADR-0045): the fixed set
+      of background sweeps (token purges, the storage orphan reaper) with their
+      cron, enabled state, dry-run setting, and last-run outcome. An admin can
+      enable/disable a sweep, toggle the reaper's dry-run mode, or trigger an
+      immediate run-now (an explicit override that runs regardless of the
+      enabled flag). Manual runs and setting changes are written to the SYSTEM
+      audit stream (ADR-0043). ADMIN only.
 paths:
   /config:
     get:
@@ -2184,6 +2193,124 @@ paths:
           $ref: '#/components/responses/Unauthorized'
         '403':
           $ref: '#/components/responses/Forbidden'
+  /admin/scheduler:
+    get:
+      tags:
+        - AdminScheduler
+      summary: List scheduled maintenance jobs (ADMIN)
+      description: |
+        Every catalogued maintenance sweep with its static metadata (display
+        name, description, cron, dry-run capability) and current operator state
+        (enabled, dry-run, and the outcome of the most recent run). ADMIN only.
+      operationId: listSchedulerJobs
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: The scheduler jobs
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SchedulerJobListResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+  /admin/scheduler/{jobId}:
+    parameters:
+      - name: jobId
+        in: path
+        required: true
+        description: The catalogued job id.
+        schema:
+          type: string
+          maxLength: 64
+    patch:
+      tags:
+        - AdminScheduler
+      summary: Update a scheduled job's operator settings (ADMIN)
+      description: |
+        Enables or disables the scheduled tick, and/or toggles dry-run mode. A
+        null field is left unchanged. Dry-run may only be set on a
+        dry-run-capable job (the storage reaper) — otherwise 400. ADMIN only.
+      operationId: updateSchedulerJob
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SchedulerJobUpdateRequest'
+      responses:
+        '200':
+          description: The updated job
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SchedulerJob'
+        '400':
+          description: Dry-run requested for a job that does not support it
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          description: Unknown job id
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /admin/scheduler/{jobId}/run:
+    parameters:
+      - name: jobId
+        in: path
+        required: true
+        description: The catalogued job id.
+        schema:
+          type: string
+          maxLength: 64
+    post:
+      tags:
+        - AdminScheduler
+      summary: Run a scheduled job now (ADMIN)
+      description: |
+        Triggers an immediate run of the sweep — an explicit override that runs
+        regardless of the enabled flag, under the job's distributed lock so it
+        never overlaps a scheduled run or another manual trigger. Returns the
+        job with its refreshed last-run outcome. The run itself never fails the
+        request: a work error is reported as a `FAILURE` outcome on the returned
+        job, not a 5xx. ADMIN only.
+      operationId: runSchedulerJob
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: The job after the run, with its refreshed outcome
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SchedulerJob'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          description: Unknown job id
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '409':
+          description: A run is already in progress
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
   /documents:
     get:
       tags:
@@ -4382,6 +4509,82 @@ components:
         - total
         - page
         - size
+    SchedulerJob:
+      type: object
+      description: |
+        One scheduled maintenance sweep (issue #524, ADR-0045): static catalogue
+        metadata joined with the current operator state and last-run outcome.
+      properties:
+        jobId:
+          type: string
+          description: The catalogued job id (also the distributed-lock name).
+        displayName:
+          type: string
+          description: Human label for the dashboard.
+        description:
+          type: string
+          description: One sentence on what the sweep does.
+        cron:
+          type: string
+          description: The cron expression the sweep fires on (informational).
+        supportsDryRun:
+          type: boolean
+          description: Whether the job honours a report-only dry-run mode.
+        enabled:
+          type: boolean
+          description: Whether the scheduled tick runs. A run-now ignores this.
+        dryRun:
+          type: boolean
+          description: Whether a dry-run-capable job runs report-only.
+        lastRunAt:
+          type: string
+          format: date-time
+          nullable: true
+          description: When the job last actually ran, or null if never.
+        lastOutcome:
+          type: string
+          nullable: true
+          description: Outcome of the last run — SUCCESS or FAILURE, or null.
+        lastTrigger:
+          type: string
+          nullable: true
+          description: What triggered the last run — SCHEDULED or MANUAL, or null.
+        lastDetail:
+          type: string
+          nullable: true
+          description: Short detail for the last run (e.g. "dry-run" or a failure summary).
+      required:
+        - jobId
+        - displayName
+        - description
+        - cron
+        - supportsDryRun
+        - enabled
+        - dryRun
+    SchedulerJobListResponse:
+      type: object
+      description: The full set of catalogued maintenance jobs, in a stable order.
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/SchedulerJob'
+      required:
+        - items
+    SchedulerJobUpdateRequest:
+      type: object
+      description: |
+        A partial change to a job's operator settings; a null field is left
+        unchanged. `dryRun` may only be set true for a dry-run-capable job.
+      properties:
+        enabled:
+          type: boolean
+          nullable: true
+          description: Enable or disable the scheduled tick.
+        dryRun:
+          type: boolean
+          nullable: true
+          description: Toggle report-only dry-run mode (dry-run-capable jobs only).
     AdminUserCreateRequest:
       type: object
       description: |
