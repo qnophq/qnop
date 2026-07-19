@@ -52,6 +52,7 @@ describe('visibleNavGroups', () => {
       'email',
       'mail-templates',
       'scheduler',
+      'storage-consistency',
       'audit',
     ]);
   });
