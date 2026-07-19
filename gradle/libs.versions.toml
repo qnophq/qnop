@@ -57,6 +57,10 @@ archunit-junit5 = { group = "com.tngtech.archunit", name = "archunit-junit5", ve
 
 # Spring Boot platform (BOM) — import via `platform(...)`; manages all versions below.
 spring-boot-dependencies = { group = "org.springframework.boot", name = "spring-boot-dependencies", version.ref = "springBoot" }
+# Annotation processor (compile-only): harvests the Javadoc on @ConfigurationProperties
+# fields into META-INF/spring-configuration-metadata.json. That metadata drives both IDE
+# autocomplete and the effective-configuration page's per-property tooltips (issue #522).
+spring-boot-configuration-processor = { module = "org.springframework.boot:spring-boot-configuration-processor" }
 spring-boot-starter-web = { module = "org.springframework.boot:spring-boot-starter-web" }
 spring-boot-starter-actuator = { module = "org.springframework.boot:spring-boot-starter-actuator" }
 # Prometheus scrape registry for Actuator metrics (issue #348, ADR-0013). Version via the BOM;

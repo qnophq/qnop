@@ -89,6 +89,25 @@ class ConfigurationControllerIT extends AbstractIntegrationTest {
     assertThat(body).doesNotContain(ENCRYPTION_SALT);
   }
 
+  @Test
+  void entriesCarryDescriptionsHarvestedFromTheConfigurationPropertiesJavadoc() throws Exception {
+    createUser("config-doc-admin", UserRole.ADMIN);
+    String token = token("config-doc-admin");
+
+    // The description is generated at compile time from QnopProperties.Auth's Javadoc and joined
+    // from the classpath metadata at runtime — a real end-to-end check of the metadata scan, which
+    // the pure builder/parser unit tests cannot cover.
+    mockMvc
+        .perform(get("/api/v1/admin/configuration").header("Authorization", "Bearer " + token))
+        .andExpect(status().isOk())
+        .andExpect(
+            jsonPath("$.groups[*].entries[?(@.path == 'qnop.auth.access-token-ttl')].description")
+                .value(
+                    org.hamcrest.Matchers.hasItem(
+                        org.hamcrest.Matchers.containsString(
+                            "lifetime of a self-issued access token"))));
+  }
+
   private User createUser(String username, UserRole role) {
     User user =
         User.internal(

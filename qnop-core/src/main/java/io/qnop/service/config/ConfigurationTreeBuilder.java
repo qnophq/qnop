@@ -76,34 +76,43 @@ public class ConfigurationTreeBuilder {
           .build();
 
   /**
-   * Builds the grouped, redacted effective-config response.
+   * Builds the grouped, redacted effective-config response, captioning each leaf with the
+   * description harvested from its {@code @ConfigurationProperties} Javadoc.
    *
    * @param rootsByPrefix each bound properties bean keyed by its {@code @ConfigurationProperties}
    *     prefix (e.g. {@code qnop}, {@code qnop.s3}); iteration order sets the within-group entry
    *     order, and the first-seen group order.
+   * @param descriptions property-path → description lookup from the compile-time configuration
+   *     metadata; a path without a documented description simply renders without a tooltip.
    */
-  public ConfigurationResponse build(SequencedMap<String, Object> rootsByPrefix) {
+  public ConfigurationResponse build(
+      SequencedMap<String, Object> rootsByPrefix, Map<String, String> descriptions) {
     List<ConfigurationEntry> entries = new ArrayList<>();
     for (Map.Entry<String, Object> root : rootsByPrefix.entrySet()) {
       JsonNode node = mapper.valueToTree(root.getValue());
-      walk(root.getKey(), node, entries);
+      walk(root.getKey(), node, descriptions, entries);
     }
     return group(entries);
   }
 
   /** Depth-first flatten: objects recurse, arrays become one list leaf, scalars become one leaf. */
-  private void walk(String path, JsonNode node, List<ConfigurationEntry> out) {
+  private void walk(
+      String path, JsonNode node, Map<String, String> descriptions, List<ConfigurationEntry> out) {
     if (node.isObject()) {
       for (Map.Entry<String, JsonNode> field : node.properties()) {
-        walk(path + "." + field.getKey(), field.getValue(), out);
+        walk(path + "." + field.getKey(), field.getValue(), descriptions, out);
       }
     } else {
-      out.add(leaf(path, node));
+      out.add(leaf(path, node, descriptions));
     }
   }
 
-  private ConfigurationEntry leaf(String path, JsonNode node) {
-    ConfigurationEntry entry = new ConfigurationEntry().path(path).envVar(toEnvVar(path));
+  private ConfigurationEntry leaf(String path, JsonNode node, Map<String, String> descriptions) {
+    ConfigurationEntry entry =
+        new ConfigurationEntry()
+            .path(path)
+            .envVar(toEnvVar(path))
+            .description(descriptions.get(path));
     if (isSecret(path)) {
       boolean configured = !node.isNull() && !node.asString().isBlank();
       return entry.valueType(ConfigurationValueType.SECRET).value(null).configured(configured);

@@ -35,6 +35,7 @@ import io.qnop.web.security.ratelimit.RateLimitProperties;
 import java.time.Duration;
 import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.SequencedMap;
 import org.junit.jupiter.api.Test;
 
@@ -53,6 +54,10 @@ class ConfigurationTreeBuilderTest {
   private static final String ENCRYPTION_SALT = "0123456789abcdef0123456789abcdef";
   private static final String S3_ACCESS_KEY = "SUPER-SECRET-access-value";
   private static final String S3_SECRET_KEY = "SUPER-SECRET-s3-value";
+
+  /** A representative slice of the compile-time metadata: one documented path, the rest absent. */
+  private static final Map<String, String> DESCRIPTIONS =
+      Map.of("qnop.auth.access-token-ttl", "lifetime of a self-issued access token");
 
   private final ConfigurationTreeBuilder builder = new ConfigurationTreeBuilder();
 
@@ -92,7 +97,7 @@ class ConfigurationTreeBuilderTest {
     roots.put("qnop.http-client", http);
     roots.put("qnop.reanchoring", reanchoring);
     roots.put("qnop.s3", s3);
-    return builder.build(roots);
+    return builder.build(roots, DESCRIPTIONS);
   }
 
   private ConfigurationEntry entry(ConfigurationResponse response, String path) {
@@ -180,6 +185,15 @@ class ConfigurationTreeBuilderTest {
         .isEqualTo("QNOP_AUTH_ACCESS_TOKEN_TTL");
     assertThat(entry(response, "qnop.s3.path-style-access").getEnvVar())
         .isEqualTo("QNOP_S3_PATH_STYLE_ACCESS");
+  }
+
+  @Test
+  void joinsDocumentedDescriptionsAndLeavesUndocumentedEntriesNull() {
+    ConfigurationResponse response = build(null);
+    assertThat(entry(response, "qnop.auth.access-token-ttl").getDescription())
+        .isEqualTo("lifetime of a self-issued access token");
+    // A path absent from the metadata renders without a tooltip rather than an empty string.
+    assertThat(entry(response, "qnop.s3.bucket").getDescription()).isNull();
   }
 
   @Test

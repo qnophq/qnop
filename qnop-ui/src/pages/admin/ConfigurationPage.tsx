@@ -31,9 +31,10 @@ import TableCell from '@mui/material/TableCell';
 import TableHead from '@mui/material/TableHead';
 import TableRow from '@mui/material/TableRow';
 import TextField from '@mui/material/TextField';
+import Tooltip from '@mui/material/Tooltip';
 import Typography from '@mui/material/Typography';
 import { useTheme } from '@mui/material/styles';
-import { Clock, Search, ServerCog } from 'lucide-react';
+import { Clock, Info, Search, ServerCog } from 'lucide-react';
 import type { ConfigurationEntry, ConfigurationGroup } from '../../api/generated';
 import { useAdminConfiguration } from '../../api/hooks/useAdminConfiguration';
 import { PageHeader } from '../../components/admin/layout/PageHeader';
@@ -74,6 +75,35 @@ function CodeCell({
         copiedMessage={`Copied ${text}`}
       />
     </Box>
+  );
+}
+
+/**
+ * A hover/focus tooltip explaining what a property is, from the description the backend harvested
+ * from its Javadoc. Renders nothing when the property is undocumented, so the column stays quiet.
+ */
+function PropertyInfo({ description }: { description?: string }) {
+  if (!description) {
+    return null;
+  }
+  return (
+    <Tooltip title={description} arrow placement="top" enterTouchDelay={0}>
+      <Box
+        component="span"
+        tabIndex={0}
+        role="note"
+        aria-label={description}
+        sx={{
+          display: 'inline-flex',
+          flexShrink: 0,
+          color: 'text.disabled',
+          cursor: 'help',
+          '&:hover, &:focus-visible': { color: 'text.secondary' },
+        }}
+      >
+        <Info size={14} aria-hidden />
+      </Box>
+    </Tooltip>
   );
 }
 
@@ -174,7 +204,14 @@ function GroupTable({
           {entries.map((entry) => (
             <TableRow key={entry.path} hover sx={{ '&:hover': { bgcolor: theme.qnop.surface2 } }}>
               <TableCell sx={{ verticalAlign: 'top' }}>
-                <CodeCell text={entry.path} copyLabel={`Copy path ${entry.path}`} notify={notify} />
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, minWidth: 0 }}>
+                  <CodeCell
+                    text={entry.path}
+                    copyLabel={`Copy path ${entry.path}`}
+                    notify={notify}
+                  />
+                  <PropertyInfo description={entry.description} />
+                </Box>
               </TableCell>
               <TableCell sx={{ verticalAlign: 'top' }}>
                 <CodeCell

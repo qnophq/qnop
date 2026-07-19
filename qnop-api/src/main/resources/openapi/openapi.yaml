@@ -3732,6 +3732,12 @@ components:
           type: boolean
           nullable: true
           description: For a secret entry only — whether a non-blank value is configured.
+        description:
+          type: string
+          nullable: true
+          description: >-
+            Human-readable explanation of the property, harvested from its Javadoc via Spring's
+            configuration metadata; `null` when the property is not documented.
       required:
         - path
         - envVar

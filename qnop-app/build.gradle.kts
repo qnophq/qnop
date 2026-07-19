@@ -75,6 +75,12 @@ tasks.named<BootRun>("bootRun") {
 dependencies {
     implementation(platform(libs.spring.boot.dependencies)) // BOM: manages versions
 
+    // Compile-time only: harvests Javadoc on this module's @ConfigurationProperties
+    // (RateLimitProperties) into spring-configuration-metadata.json, joined with qnop-core's
+    // at runtime to caption the effective-configuration page (issue #522).
+    annotationProcessor(platform(libs.spring.boot.dependencies))
+    annotationProcessor(libs.spring.boot.configuration.processor)
+
     implementation(project(":qnop-core"))
     implementation(project(":qnop-api:qnop-api-endpoint")) // generated Spring interfaces (+ DTOs transitively)
 

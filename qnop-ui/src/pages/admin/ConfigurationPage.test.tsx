@@ -40,6 +40,7 @@ const RESPONSE: ConfigurationResponse = {
           envVar: 'QNOP_AUTH_JWT_SECRET',
           valueType: 'SECRET',
           configured: true,
+          description: 'HMAC signing secret for JWTs',
         },
         {
           path: 'qnop.auth.access-token-ttl',
@@ -125,6 +126,16 @@ describe('ConfigurationPage', () => {
     expect(screen.getByText('true')).toBeInTheDocument();
     expect(screen.getByText('false')).toBeInTheDocument();
     expect(screen.getByText('none')).toBeInTheDocument();
+  });
+
+  it('exposes a description affordance only for documented properties', () => {
+    mockHook.mockReturnValue({ data: RESPONSE, isLoading: false, isError: false });
+    renderWithProviders(<ConfigurationPage />);
+
+    // The documented property surfaces its explanation as an accessible note (the tooltip trigger)…
+    expect(screen.getByLabelText('HMAC signing secret for JWTs')).toBeInTheDocument();
+    // …and it is the only one, since no other fixture entry carries a description.
+    expect(screen.getAllByRole('note')).toHaveLength(1);
   });
 
   it('renders a loading skeleton while the query is in flight', () => {

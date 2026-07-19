@@ -21,13 +21,22 @@
 package io.qnop.service.config;
 
 import io.qnop.api.v1.model.ConfigurationResponse;
+import java.io.IOException;
+import java.io.UncheckedIOException;
+import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
 import java.util.SequencedMap;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.context.ApplicationContext;
 import org.springframework.core.annotation.AnnotationUtils;
+import org.springframework.core.io.Resource;
+import org.springframework.core.io.support.PathMatchingResourcePatternResolver;
 import org.springframework.stereotype.Service;
+import org.springframework.util.StreamUtils;
 
 /**
  * Assembles the effective {@code qnop.*} configuration served under {@code GET
@@ -46,13 +55,24 @@ public class EffectiveConfigurationService {
 
   private static final String QNOP_PREFIX = "qnop";
 
+  /** Every module's compile-time metadata lands under this well-known classpath location. */
+  private static final String METADATA_LOCATION =
+      "classpath*:META-INF/spring-configuration-metadata.json";
+
   private final ApplicationContext context;
   private final ConfigurationTreeBuilder builder;
+
+  /**
+   * Property-path → description, loaded once at startup: the metadata is fixed for the running
+   * artifact, so there is nothing to reload and one scan keeps the endpoint allocation-free.
+   */
+  private final Map<String, String> descriptions;
 
   public EffectiveConfigurationService(
       ApplicationContext context, ConfigurationTreeBuilder builder) {
     this.context = context;
     this.builder = builder;
+    this.descriptions = ConfigurationMetadata.parse(loadMetadataDocuments(context));
   }
 
   /** The redacted, grouped snapshot of the effective {@code qnop.*} configuration. */
@@ -63,7 +83,29 @@ public class EffectiveConfigurationService {
         .filter(prefixed -> isQnopNamespace(prefixed.prefix()))
         .sorted(Comparator.comparing(PrefixedBean::prefix))
         .forEach(prefixed -> roots.put(prefixed.prefix(), prefixed.bean()));
-    return builder.build(roots);
+    return builder.build(roots, descriptions);
+  }
+
+  /**
+   * Reads every {@code spring-configuration-metadata.json} on the classpath (one per module that
+   * declares {@code @ConfigurationProperties}) into a raw-JSON list for {@link
+   * ConfigurationMetadata} to parse. A missing metadata resource is not an error — the page renders
+   * without descriptions rather than failing.
+   */
+  private static List<String> loadMetadataDocuments(ApplicationContext context) {
+    try {
+      Resource[] resources =
+          new PathMatchingResourcePatternResolver(context).getResources(METADATA_LOCATION);
+      List<String> documents = new ArrayList<>(resources.length);
+      for (Resource resource : resources) {
+        try (var input = resource.getInputStream()) {
+          documents.add(StreamUtils.copyToString(input, StandardCharsets.UTF_8));
+        }
+      }
+      return documents;
+    } catch (IOException scanFailed) {
+      throw new UncheckedIOException("Could not read configuration metadata", scanFailed);
+    }
   }
 
   private static boolean isQnopNamespace(String prefix) {
