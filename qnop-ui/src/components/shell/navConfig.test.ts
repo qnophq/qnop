@@ -43,14 +43,14 @@ describe('visibleNavGroups', () => {
       'dashboard',
       'reviews',
       'my-teams',
-      'audit',
+      'settings',
       'users',
       'teams',
-      'settings',
+      'branding',
       'oidc-providers',
       'email',
       'mail-templates',
-      'branding',
+      'audit',
     ]);
   });
 
