@@ -28,7 +28,6 @@ import {
   Palette,
   ScrollText,
   Settings,
-  ShieldCheck,
   User,
   Users,
   UsersRound,
@@ -54,9 +53,9 @@ export interface NavGroup {
 /**
  * The sidebar navigation, mirroring the design prototype (`app/shell.jsx`) but
  * scoped to qnop's actual surfaces and role model. Visibility is role-aware:
- * the Administration group is ADMIN-only; Compliance is for AUDITOR (and ADMIN).
- * Destinations that have no screen yet route to the shared "coming soon"
- * placeholder so navigation and role-gating are fully exercised (#102).
+ * the Administration group is ADMIN-only except Audit, which AUDITOR sees too.
+ * Enterprise features add their own entries at runtime via the UI extension
+ * slots (ADR-0039) — the Community shell carries no placeholders (#513).
  */
 export const NAV_GROUPS: NavGroup[] = [
   {
@@ -70,13 +69,6 @@ export const NAV_GROUPS: NavGroup[] = [
   {
     label: 'Administration',
     items: [
-      {
-        id: 'compliance',
-        label: 'Compliance',
-        path: '/compliance',
-        icon: ShieldCheck,
-        roles: ['ADMIN', 'AUDITOR'],
-      },
       {
         id: 'audit',
         label: 'Audit',
