@@ -56,4 +56,18 @@ describe('TopBar notifications placeholder (#514)', () => {
     const bell = screen.getByRole('button', { name: 'Notifications' });
     expect(bell.querySelector('.MuiBadge-dot')).toBeNull();
   });
+
+  it('opens the search coming-soon panel from the search trigger', async () => {
+    const user = userEvent.setup();
+    renderTopBar();
+
+    // The trigger is a button, not a fake text input.
+    expect(screen.queryByRole('textbox')).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: 'Search' }));
+    expect(await screen.findByText(/jump to any review/i)).toBeInTheDocument();
+
+    await user.keyboard('{Escape}');
+    expect(screen.queryByText(/jump to any review/i)).not.toBeInTheDocument();
+  });
 });
