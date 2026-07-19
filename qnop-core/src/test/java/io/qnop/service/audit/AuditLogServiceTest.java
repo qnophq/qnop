@@ -30,7 +30,6 @@ import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 import io.qnop.entity.AuditEvent;
-import io.qnop.entity.AuditScope;
 import io.qnop.entity.Document;
 import io.qnop.repository.AuditEventRepository;
 import io.qnop.repository.DocumentRepository;
@@ -108,7 +107,7 @@ class AuditLogServiceTest {
     assertThat(view.actorDisplayName()).isEqualTo("Avery Auditor");
     assertThat(view.actorSlug()).isEqualTo("avery-auditor");
     assertThat(view.detail()).isEqualTo("{\"to\":\"IN_REVIEW\"}");
-    assertThat(view.scope()).isEqualTo(AuditScope.DOCUMENT);
+    assertThat(view.scope()).isEqualTo("DOCUMENT");
   }
 
   @Test
@@ -126,7 +125,7 @@ class AuditLogServiceTest {
     AuditEventView view =
         service.list(null, null, null, null, null, null, null, null).items().get(0);
 
-    assertThat(view.scope()).isEqualTo(AuditScope.SYSTEM);
+    assertThat(view.scope()).isEqualTo("SYSTEM");
     assertThat(view.documentId()).isNull();
     assertThat(view.documentTitle()).isNull();
     assertThat(view.documentSlug()).isNull();

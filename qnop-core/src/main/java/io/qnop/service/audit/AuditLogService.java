@@ -23,7 +23,6 @@ package io.qnop.service.audit;
 import static java.util.stream.Collectors.toMap;
 
 import io.qnop.entity.AuditEvent;
-import io.qnop.entity.AuditScope;
 import io.qnop.entity.Document;
 import io.qnop.repository.AuditEventRepository;
 import io.qnop.repository.DocumentRepository;
@@ -88,7 +87,7 @@ public class AuditLogService {
    */
   public record AuditEventView(
       UUID id,
-      AuditScope scope,
+      String scope,
       String eventType,
       UUID documentId,
       String documentTitle,
@@ -226,7 +225,7 @@ public class AuditLogService {
     String actorSlug = actorId == null ? null : actorSlugs.get(actorId);
     return new AuditEventView(
         event.getId(),
-        event.getScope(),
+        event.getScope().name(),
         event.getEventType(),
         event.getDocumentId(),
         document == null ? null : document.getTitle(),

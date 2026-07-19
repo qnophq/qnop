@@ -27,6 +27,7 @@ import { AuditTable } from './AuditTable';
 
 const userEvent: AuditEvent = {
   id: 'e1',
+  scope: 'DOCUMENT',
   eventType: 'workflow.transition',
   documentId: 'doc-1',
   documentTitle: 'Master services agreement',
@@ -40,6 +41,7 @@ const userEvent: AuditEvent = {
 
 const systemEvent: AuditEvent = {
   id: 'e2',
+  scope: 'DOCUMENT',
   eventType: 'extraction.failed',
   documentId: 'doc-2',
   documentTitle: 'Ingest report',

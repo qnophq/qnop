@@ -150,21 +150,32 @@ export function AuditTable({
                   <AuditEventBadge eventType={event.eventType} />
                 </TableCell>
                 <TableCell>
-                  <Stack direction="row" spacing={0.25} sx={{ alignItems: 'center', minWidth: 0 }}>
-                    <Link
-                      component={RouterLink}
-                      to={reviewPath({ id: event.documentId, slug: event.documentSlug })}
-                      underline="hover"
-                      noWrap
-                      sx={{ fontWeight: 600, minWidth: 0 }}
+                  {event.documentId ? (
+                    <Stack
+                      direction="row"
+                      spacing={0.25}
+                      sx={{ alignItems: 'center', minWidth: 0 }}
                     >
-                      {documentTitle}
-                    </Link>
-                    <FilterButton
-                      label={`Filter by ${documentTitle}`}
-                      onClick={() => onFilterDocument(event.documentId, documentTitle)}
-                    />
-                  </Stack>
+                      <Link
+                        component={RouterLink}
+                        to={reviewPath({ id: event.documentId, slug: event.documentSlug })}
+                        underline="hover"
+                        noWrap
+                        sx={{ fontWeight: 600, minWidth: 0 }}
+                      >
+                        {documentTitle}
+                      </Link>
+                      <FilterButton
+                        label={`Filter by ${documentTitle}`}
+                        onClick={() => onFilterDocument(event.documentId!, documentTitle)}
+                      />
+                    </Stack>
+                  ) : (
+                    // A SYSTEM-scoped event (e.g. a scheduler action) has no document.
+                    <Typography color="text.secondary" aria-label="No document">
+                      —
+                    </Typography>
+                  )}
                 </TableCell>
                 <TableCell>
                   <Typography variant="body2" color="text.secondary">
