@@ -27,6 +27,7 @@ import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
 
 /** Data access for the object-storage staging registry (issue #243, ADR-0036). */
 public interface StorageObjectRepository extends JpaRepository<StorageObject, UUID> {
@@ -36,4 +37,12 @@ public interface StorageObjectRepository extends JpaRepository<StorageObject, UU
 
   /** Orphan-reaper query: rows in a given lifecycle state older than the cutoff. */
   List<StorageObject> findByStatusAndCreatedAtBefore(StorageObjectStatus status, Instant cutoff);
+
+  /**
+   * Every tracked object key (any lifecycle state), for the storage-consistency referenced set
+   * (issue #523). Including PENDING rows keeps an in-flight, not-yet-committed upload from ever
+   * looking like a bucket orphan.
+   */
+  @Query("SELECT s.objectKey FROM StorageObject s")
+  List<String> findAllObjectKeys();
 }

@@ -22,17 +22,20 @@ package io.qnop.service.storage;
 
 import io.qnop.spi.storage.StorageContent;
 import io.qnop.spi.storage.StorageException;
+import io.qnop.spi.storage.StorageListing;
 import io.qnop.spi.storage.StorageProvider;
 import java.io.InputStream;
 import java.util.Optional;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import java.util.stream.Stream;
 import software.amazon.awssdk.core.ResponseInputStream;
 import software.amazon.awssdk.core.sync.RequestBody;
 import software.amazon.awssdk.services.s3.S3Client;
 import software.amazon.awssdk.services.s3.model.GetObjectRequest;
 import software.amazon.awssdk.services.s3.model.GetObjectResponse;
 import software.amazon.awssdk.services.s3.model.HeadObjectRequest;
+import software.amazon.awssdk.services.s3.model.ListObjectsV2Request;
 import software.amazon.awssdk.services.s3.model.NoSuchKeyException;
 import software.amazon.awssdk.services.s3.model.PutObjectRequest;
 import software.amazon.awssdk.services.s3.model.S3Exception;
@@ -117,6 +120,28 @@ public class S3StorageProvider implements StorageProvider {
       return true;
     } catch (S3Exception e) {
       throw new StorageException("Failed to delete object " + key, e);
+    }
+  }
+
+  /**
+   * Lists the bucket under {@code prefix} for the consistency scan (issue #523). Deliberately does
+   * NOT run discovered keys through {@link #requireValidKey} — the scan's whole purpose is to find
+   * objects that do <em>not</em> match the canonical shape (out-of-band writes, leftovers). Uses
+   * the SDK's auto-paginating {@code ListObjectsV2} so the stream stays lazy (one page in memory at
+   * a time); the caller consumes it in a try-with-resources block. Iteration-time S3 failures
+   * surface as the SDK's {@link S3Exception}; the scan service maps them to a scan failure.
+   */
+  @Override
+  public Stream<StorageListing> list(String prefix) {
+    try {
+      return s3
+          .listObjectsV2Paginator(
+              ListObjectsV2Request.builder().bucket(bucket).prefix(prefix).build())
+          .contents()
+          .stream()
+          .map(object -> new StorageListing(object.key(), object.size(), object.lastModified()));
+    } catch (S3Exception e) {
+      throw new StorageException("Failed to list objects under prefix", e);
     }
   }
 
