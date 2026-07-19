@@ -170,6 +170,12 @@ function ValueCell({ entry }: { entry: ConfigurationEntry }) {
   }
 }
 
+/**
+ * Fixed column proportions shared by every group's table, so the Path / Env var / Value columns line
+ * up across all sections instead of each table sizing itself to its own content.
+ */
+const COLUMN_WIDTHS = ['38%', '37%', '25%'] as const;
+
 /** One namespace's table: Path | Env var | Value. */
 function GroupTable({
   entries,
@@ -181,7 +187,15 @@ function GroupTable({
   const theme = useTheme();
   return (
     <Box sx={{ overflowX: 'auto' }}>
-      <Table size="small" sx={{ '& td, & th': { borderColor: 'divider' } }}>
+      <Table
+        size="small"
+        sx={{ tableLayout: 'fixed', minWidth: 640, '& td, & th': { borderColor: 'divider' } }}
+      >
+        <colgroup>
+          {COLUMN_WIDTHS.map((width, index) => (
+            <col key={index} style={{ width }} />
+          ))}
+        </colgroup>
         <TableHead>
           <TableRow>
             {['Path', 'Environment variable', 'Value'].map((head) => (
