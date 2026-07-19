@@ -1,6 +1,17 @@
 # qnop — Qualified Notes on Papers
 
-**qnop** is a self-hosted enterprise document review system. Reviewers mark up lines and regions of documents (PDF today), comment, and run a coordinated review workflow — comments accepted or rejected, new document versions, finalized when no open annotations remain. This image is the AGPL **Community edition**: the REST API and the embedded web UI in a single container on port `8080`.
+**Document review your team actually wants to finish.**
+
+**qnop** is a self-hosted, enterprise-grade document review system: upload a document (PDF today), invite reviewers or whole teams, mark up exact lines and regions in the browser, discuss in threads, accept or reject — new document versions re-anchor existing annotations, and the review is finalized once nothing is left open. This image is the AGPL **Community edition**: the REST API and the embedded web UI in a single container on port `8080`.
+
+**Highlights**
+
+- Line-precise PDF annotations with Markdown discussion threads and reactions
+- Coordinated review workflow with versioning and annotation re-anchoring
+- Teams and roles (admin / member / auditor, team leads), optional anonymized reviews
+- Gamified review culture: streaks, scoreboards, achievements, player-card profiles
+- Full audit trail, e-mail notifications, runtime-configurable branding and SMTP
+- Local accounts or OIDC single sign-on; your documents stay on your infrastructure
 
 - 🏠 Source: https://github.com/qnophq/qnop
 - 📘 Deployment guide: https://github.com/qnophq/qnop/blob/main/docs/DEPLOYMENT.md
