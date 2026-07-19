@@ -85,7 +85,12 @@ class ConfigurationTreeBuilderTest {
             Boolean.FALSE,
             Duration.ofHours(1),
             Duration.ofSeconds(60),
-            Duration.ofSeconds(20));
+            Duration.ofSeconds(20),
+            1_000_000,
+            Boolean.FALSE,
+            Boolean.TRUE,
+            Duration.ofHours(24),
+            100);
     HttpClientProperties http = new HttpClientProperties(null, null, null, null, null);
     ReanchoringProperties reanchoring = ReanchoringProperties.defaults();
     RateLimitProperties rateLimit =
