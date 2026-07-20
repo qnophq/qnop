@@ -24,6 +24,7 @@ import Alert from '@mui/material/Alert';
 import Box from '@mui/material/Box';
 import Button from '@mui/material/Button';
 import Chip from '@mui/material/Chip';
+import IconButton from '@mui/material/IconButton';
 import InputAdornment from '@mui/material/InputAdornment';
 import MenuItem from '@mui/material/MenuItem';
 import Paper from '@mui/material/Paper';
@@ -33,7 +34,7 @@ import TextField from '@mui/material/TextField';
 import ToggleButton from '@mui/material/ToggleButton';
 import ToggleButtonGroup from '@mui/material/ToggleButtonGroup';
 import Typography from '@mui/material/Typography';
-import { LayoutGrid, Plus, Rows3, Search } from 'lucide-react';
+import { LayoutGrid, Plus, Rows3, Search, X } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import type { DocumentSummary } from '../../api/generated';
 import { useReviews } from '../../api/hooks/useReviews';
@@ -252,6 +253,18 @@ export function ReviewsPage() {
                       <Search size={16} />
                     </InputAdornment>
                   ),
+                  endAdornment: search ? (
+                    <InputAdornment position="end">
+                      <IconButton
+                        aria-label="Clear search"
+                        size="small"
+                        edge="end"
+                        onClick={() => setSearch('')}
+                      >
+                        <X size={16} />
+                      </IconButton>
+                    </InputAdornment>
+                  ) : undefined,
                 },
               }}
             />
