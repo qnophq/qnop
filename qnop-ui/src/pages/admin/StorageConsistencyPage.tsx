@@ -105,6 +105,26 @@ export function StorageConsistencyPage() {
     });
   };
 
+  const handleRescan = () => {
+    void refetch().then((result) => {
+      if (result.isError) {
+        notify(
+          isScanLimit(result.error)
+            ? 'Rescan stopped: the bucket holds more objects than the scan limit.'
+            : 'The storage-consistency scan could not be run.',
+          'error',
+        );
+        return;
+      }
+      const s = result.data?.summary;
+      notify(
+        s
+          ? `Rescan complete — ${s.missingCount} missing, ${s.orphanedCount} orphaned.`
+          : 'Rescan complete.',
+      );
+    });
+  };
+
   const tiles: StatTile[] = [
     { label: 'DB references', value: summary?.dbReferencedCount ?? 0, icon: Database },
     { label: 'Storage objects', value: summary?.storageObjectCount ?? 0, icon: HardDrive },
@@ -137,7 +157,7 @@ export function StorageConsistencyPage() {
                 style={isFetching ? { animation: 'qnop-spin 1s linear infinite' } : undefined}
               />
             }
-            onClick={() => refetch()}
+            onClick={handleRescan}
             disabled={isFetching}
           >
             {isFetching ? 'Scanning…' : 'Rescan'}

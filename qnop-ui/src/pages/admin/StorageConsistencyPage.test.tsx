@@ -93,6 +93,9 @@ beforeEach(() => {
   queryState.isFetching = false;
   queryState.isError = false;
   queryState.error = undefined;
+  queryState.refetch = vi
+    .fn()
+    .mockResolvedValue({ isError: false, error: undefined, data: undefined });
   deleteMutate.mockReset();
 });
 
@@ -167,5 +170,34 @@ describe('StorageConsistencyPage', () => {
 
     expect(deleteMutate).toHaveBeenCalledTimes(1);
     expect(deleteMutate.mock.calls[0][0]).toEqual(['only']);
+  });
+
+  it('notifies with a summary after a rescan completes', async () => {
+    queryState.data = report({ missingCount: 1, orphanedCount: 2 });
+    queryState.refetch = vi.fn().mockResolvedValue({
+      isError: false,
+      error: undefined,
+      data: report({ missingCount: 1, orphanedCount: 2 }),
+    });
+    renderWithProviders(<StorageConsistencyPage />);
+
+    fireEvent.click(screen.getByRole('button', { name: /rescan/i }));
+
+    expect(
+      await screen.findByText(/Rescan complete — 1 missing, 2 orphaned\./),
+    ).toBeInTheDocument();
+  });
+
+  it('notifies with an error when the rescan fails', async () => {
+    queryState.refetch = vi.fn().mockResolvedValue({
+      isError: true,
+      error: { response: { status: 409 } },
+      data: undefined,
+    });
+    renderWithProviders(<StorageConsistencyPage />);
+
+    fireEvent.click(screen.getByRole('button', { name: /rescan/i }));
+
+    expect(await screen.findByText(/Rescan stopped/i)).toBeInTheDocument();
   });
 });
