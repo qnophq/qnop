@@ -129,11 +129,23 @@ describe('AuditPage', () => {
     queryState.data = page({ items: [event], total: 1 });
     renderWithProviders(<AuditPage />);
 
-    fireEvent.mouseDown(screen.getByRole('combobox', { name: 'Event type' }));
+    const input = screen.getByRole('combobox', { name: 'Event type' });
+    fireEvent.change(input, { target: { value: 'Status' } });
     fireEvent.click(screen.getByRole('option', { name: 'Status changed' }));
 
     expect(lastCall().eventType).toBe('workflow.transition');
     expect(lastCall().page).toBe(0);
+  });
+
+  it('finds the storage-orphan event by searching the type filter', () => {
+    queryState.data = page({ items: [event], total: 1 });
+    renderWithProviders(<AuditPage />);
+
+    const input = screen.getByRole('combobox', { name: 'Event type' });
+    fireEvent.change(input, { target: { value: 'orphan' } });
+    fireEvent.click(screen.getByRole('option', { name: 'Orphaned object deleted' }));
+
+    expect(lastCall().eventType).toBe('storage.orphan.deleted');
   });
 
   it('passes a from-date filter as an ISO instant', () => {

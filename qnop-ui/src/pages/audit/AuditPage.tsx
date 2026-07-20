@@ -21,12 +21,12 @@
 
 import { useState } from 'react';
 import Alert from '@mui/material/Alert';
+import Autocomplete from '@mui/material/Autocomplete';
 import Box from '@mui/material/Box';
 import Button from '@mui/material/Button';
 import Chip from '@mui/material/Chip';
 import Collapse from '@mui/material/Collapse';
 import LinearProgress from '@mui/material/LinearProgress';
-import MenuItem from '@mui/material/MenuItem';
 import Paper from '@mui/material/Paper';
 import Stack from '@mui/material/Stack';
 import TablePagination from '@mui/material/TablePagination';
@@ -170,24 +170,20 @@ export function AuditPage() {
       </Collapse>
 
       <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1.5} sx={{ flexWrap: 'wrap' }}>
-        <TextField
-          select
-          label="Event type"
-          value={eventType}
-          onChange={(e) => {
-            setEventType(e.target.value);
+        <Autocomplete
+          options={AUDIT_EVENT_TYPES}
+          value={eventType || null}
+          onChange={(_, next) => {
+            setEventType(next ?? '');
             setPage(0);
           }}
+          getOptionLabel={(type) => AUDIT_EVENT_META[type]?.label ?? type}
           size="small"
-          sx={{ minWidth: 220 }}
-        >
-          <MenuItem value="">All events</MenuItem>
-          {AUDIT_EVENT_TYPES.map((type) => (
-            <MenuItem key={type} value={type}>
-              {AUDIT_EVENT_META[type].label}
-            </MenuItem>
-          ))}
-        </TextField>
+          sx={{ minWidth: 240 }}
+          renderInput={(params) => (
+            <TextField {...params} label="Event type" placeholder="All events" />
+          )}
+        />
         <TextField
           type="datetime-local"
           label="From"

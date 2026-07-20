@@ -32,13 +32,16 @@ export interface AuditEventMeta {
 }
 
 /**
- * The document-review audit vocabulary (ADR-0042), each mapped to a readable
- * label, a plain-language description and a semantic colour. This is the single
- * source the audit table, the event filter and the legend all read from, so the
+ * The audit vocabulary (ADR-0042), each mapped to a readable label, a
+ * plain-language description and a semantic colour. This is the single source
+ * the audit table, the event filter and the legend all read from, so the
  * machine event types (`annotation.created`, …) never reach a human unexplained.
+ * It spans both scopes: the per-document review trail and the SYSTEM-scope
+ * operator stream (issue #524, ADR-0043) — e.g. storage-orphan cleanup.
  *
- * Colour grouping: annotations blue, resolutions/successes green, re-work amber,
- * failures red, document-level changes neutral — so the trail is scannable by hue.
+ * Colour grouping: annotations blue, resolutions/successes green, re-work and
+ * destructive/system actions amber, failures red, document-level changes
+ * neutral — so the trail is scannable by hue.
  */
 export const AUDIT_EVENT_META: Record<string, AuditEventMeta> = {
   'annotation.created': {
@@ -92,6 +95,12 @@ export const AUDIT_EVENT_META: Record<string, AuditEventMeta> = {
     description:
       'Extracting the text from an uploaded version failed; the reason is shown in the details.',
     tone: 'red',
+  },
+  'storage.orphan.deleted': {
+    label: 'Orphaned object deleted',
+    description:
+      'An unreferenced object was deleted from storage during a consistency cleanup (issue #523); the object key is shown in the details.',
+    tone: 'amber',
   },
 };
 
