@@ -24,7 +24,6 @@ import Alert from '@mui/material/Alert';
 import Box from '@mui/material/Box';
 import Button from '@mui/material/Button';
 import IconButton from '@mui/material/IconButton';
-import InputAdornment from '@mui/material/InputAdornment';
 import LinearProgress from '@mui/material/LinearProgress';
 import ListItemIcon from '@mui/material/ListItemIcon';
 import ListItemText from '@mui/material/ListItemText';
@@ -38,9 +37,9 @@ import TableCell from '@mui/material/TableCell';
 import TableHead from '@mui/material/TableHead';
 import TablePagination from '@mui/material/TablePagination';
 import TableRow from '@mui/material/TableRow';
-import TextField from '@mui/material/TextField';
 import Typography from '@mui/material/Typography';
-import { MoreVertical, Search, SquarePen, Trash2, UsersRound, X } from 'lucide-react';
+import { MoreVertical, SquarePen, Trash2, UsersRound } from 'lucide-react';
+import { ClearableSearchField } from '../../components/ClearableSearchField';
 import { useNavigate } from 'react-router-dom';
 import type { AdminTeamSummary } from '../../api/generated';
 import { useDeleteTeam, useTeams } from '../../api/hooks/useTeams';
@@ -127,33 +126,11 @@ export function TeamsPage() {
         }
       />
 
-      <TextField
+      <ClearableSearchField
         value={search}
-        onChange={(e) => setSearch(e.target.value)}
+        onValueChange={setSearch}
         placeholder="Search by name or description"
-        size="small"
         sx={{ maxWidth: 420 }}
-        slotProps={{
-          input: {
-            startAdornment: (
-              <InputAdornment position="start">
-                <Search size={16} />
-              </InputAdornment>
-            ),
-            endAdornment: search ? (
-              <InputAdornment position="end">
-                <IconButton
-                  aria-label="Clear search"
-                  size="small"
-                  edge="end"
-                  onClick={() => setSearch('')}
-                >
-                  <X size={16} />
-                </IconButton>
-              </InputAdornment>
-            ) : undefined,
-          },
-        }}
       />
 
       <Paper variant="outlined" sx={{ overflow: 'hidden' }}>

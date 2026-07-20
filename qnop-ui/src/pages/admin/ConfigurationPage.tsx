@@ -22,8 +22,6 @@
 import { useMemo, useState } from 'react';
 import Alert from '@mui/material/Alert';
 import Box from '@mui/material/Box';
-import IconButton from '@mui/material/IconButton';
-import InputAdornment from '@mui/material/InputAdornment';
 import Skeleton from '@mui/material/Skeleton';
 import Stack from '@mui/material/Stack';
 import Table from '@mui/material/Table';
@@ -31,11 +29,11 @@ import TableBody from '@mui/material/TableBody';
 import TableCell from '@mui/material/TableCell';
 import TableHead from '@mui/material/TableHead';
 import TableRow from '@mui/material/TableRow';
-import TextField from '@mui/material/TextField';
 import Tooltip from '@mui/material/Tooltip';
 import Typography from '@mui/material/Typography';
 import { useTheme } from '@mui/material/styles';
-import { Clock, Info, Search, ServerCog, X } from 'lucide-react';
+import { Clock, Info, ServerCog } from 'lucide-react';
+import { ClearableSearchField } from '../../components/ClearableSearchField';
 import type { ConfigurationEntry, ConfigurationGroup } from '../../api/generated';
 import { useAdminConfiguration } from '../../api/hooks/useAdminConfiguration';
 import { PageHeader } from '../../components/admin/layout/PageHeader';
@@ -289,33 +287,12 @@ export function ConfigurationPage() {
         only whether they are configured.
       </Alert>
 
-      <TextField
+      <ClearableSearchField
         value={query}
-        onChange={(event) => setQuery(event.target.value)}
+        onValueChange={setQuery}
         placeholder="Filter by property path or environment variable…"
-        size="small"
+        clearLabel="Clear filter"
         fullWidth
-        slotProps={{
-          input: {
-            startAdornment: (
-              <InputAdornment position="start">
-                <Search size={16} aria-hidden />
-              </InputAdornment>
-            ),
-            endAdornment: query ? (
-              <InputAdornment position="end">
-                <IconButton
-                  aria-label="Clear filter"
-                  size="small"
-                  edge="end"
-                  onClick={() => setQuery('')}
-                >
-                  <X size={16} />
-                </IconButton>
-              </InputAdornment>
-            ) : undefined,
-          },
-        }}
         sx={{ maxWidth: 460 }}
       />
 
