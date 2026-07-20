@@ -51,6 +51,18 @@ describe('auditEventMeta', () => {
     );
   });
 
+  it('covers the SYSTEM-stream operator events (storage cleanup, scheduler)', () => {
+    expect(AUDIT_EVENT_TYPES).toEqual(
+      expect.arrayContaining([
+        'storage.orphan.deleted',
+        'scheduler.job.run',
+        'scheduler.job.updated',
+      ]),
+    );
+    expect(auditEventMeta('scheduler.job.run').label).toBe('Scheduler job run');
+    expect(auditEventMeta('scheduler.job.updated').label).toBe('Scheduler job updated');
+  });
+
   it('falls back to the raw type and a neutral tone for an unknown event', () => {
     const meta = auditEventMeta('some.future.event');
     expect(meta.label).toBe('some.future.event');

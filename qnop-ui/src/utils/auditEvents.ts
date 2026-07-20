@@ -102,6 +102,18 @@ export const AUDIT_EVENT_META: Record<string, AuditEventMeta> = {
       'An unreferenced object was deleted from storage during a consistency cleanup (issue #523); the object key is shown in the details.',
     tone: 'amber',
   },
+  'scheduler.job.run': {
+    label: 'Scheduler job run',
+    description:
+      'An administrator manually triggered a scheduled maintenance job (“Run now”, issue #524); the job and its outcome are shown in the details.',
+    tone: 'amber',
+  },
+  'scheduler.job.updated': {
+    label: 'Scheduler job updated',
+    description:
+      'An administrator changed a scheduled job’s settings — enabled or disabled it, or toggled its dry-run mode (issue #524).',
+    tone: 'neutral',
+  },
 };
 
 /** The event types in a sensible display order — drives the filter and the legend. */
