@@ -36,6 +36,7 @@ import { AuditPage } from './AuditPage';
  */
 const systemEvent: AuditEvent = {
   id: 'sys-1',
+  scope: 'DOCUMENT',
   eventType: 'document.extraction.failed',
   documentId: 'doc-1',
   documentTitle: 'Ingest report',
@@ -45,6 +46,7 @@ const systemEvent: AuditEvent = {
 
 const userEvent: AuditEvent = {
   id: 'usr-1',
+  scope: 'DOCUMENT',
   eventType: 'annotation.created',
   documentId: 'doc-2',
   documentTitle: 'Master services agreement',

@@ -4285,27 +4285,39 @@ components:
     AuditEvent:
       type: object
       description: >-
-        One entry of the document-review audit trail (issue #466, ADR-0042),
-        with the actor and document resolved to their real display names.
+        One entry of the audit trail (issue #466, ADR-0042), with the actor and
+        document resolved to their real display names. An entry is either
+        DOCUMENT-scoped (the per-document review trail) or SYSTEM-scoped
+        (org-level operator actions with no document; issue #524, ADR-0043).
       required:
         - id
+        - scope
         - eventType
-        - documentId
         - createdAt
       properties:
         id:
           type: string
           format: uuid
           description: The event's time-ordered identifier (UUIDv7).
+        scope:
+          type: string
+          enum: [DOCUMENT, SYSTEM]
+          description: >-
+            Which trail the event belongs to: DOCUMENT (per-document review
+            trail) or SYSTEM (org-level operator actions with no document, e.g.
+            scheduler changes; issue #524, ADR-0043).
         eventType:
           type: string
           description: >-
             The audit event type, e.g. annotation.created, annotation.resolved,
             annotation.reopened, placement.confirmed, placement.reattached,
-            workflow.transition or document.due_date.changed.
+            workflow.transition, document.due_date.changed, or the SYSTEM-scoped
+            scheduler.job.enabled / scheduler.job.dry_run / scheduler.job.run_now.
         documentId:
           type: string
           format: uuid
+          nullable: true
+          description: The event's document; null for a SYSTEM-scoped event.
         documentTitle:
           type: string
           nullable: true

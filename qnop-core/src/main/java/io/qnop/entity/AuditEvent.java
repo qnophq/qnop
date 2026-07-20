@@ -22,6 +22,8 @@ package io.qnop.entity;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
 import java.time.Instant;
@@ -40,6 +42,11 @@ import org.hibernate.type.SqlTypes;
  * enterprise-only ones — need no schema change. {@code actorId} is the acting user, or null for
  * system-generated events. {@code detail} is optional jsonb context. Rows are never updated;
  * deleting the document cascades its trail (enforced in Liquibase, ADR-0020).
+ *
+ * <p>The trail carries two coexisting {@link AuditScope scopes} (issue #524, ADR-0043): {@link
+ * AuditScope#DOCUMENT} rows (the original per-document trail) always carry a {@code documentId};
+ * {@link AuditScope#SYSTEM} rows (org-level operator actions, e.g. scheduler toggles) never do. Use
+ * {@link #system(String, UUID, String)} to record the latter.
  */
 @Entity
 @Table(name = "audit_event")
@@ -50,8 +57,16 @@ public class AuditEvent {
   @Column(name = "id", nullable = false, updatable = false)
   private UUID id;
 
-  @Column(name = "document_id", nullable = false, updatable = false)
+  /** The document this event belongs to, or null for {@link AuditScope#SYSTEM} events. */
+  @Column(name = "document_id", updatable = false)
   private UUID documentId;
+
+  /**
+   * Which stream the event belongs to; a DB check keeps it in lock-step with {@code documentId}.
+   */
+  @Enumerated(EnumType.STRING)
+  @Column(name = "scope", nullable = false, length = 16, updatable = false)
+  private AuditScope scope;
 
   @Column(name = "event_type", nullable = false, length = 64, updatable = false)
   private String eventType;
@@ -73,15 +88,38 @@ public class AuditEvent {
     // for JPA
   }
 
+  /** A per-document event ({@link AuditScope#DOCUMENT}); {@code documentId} is required. */
   public AuditEvent(UUID documentId, String eventType, UUID actorId, String detail) {
+    this.documentId = documentId;
+    this.scope = AuditScope.DOCUMENT;
+    this.eventType = eventType;
+    this.actorId = actorId;
+    this.detail = detail;
+  }
+
+  private AuditEvent(
+      AuditScope scope, UUID documentId, String eventType, UUID actorId, String detail) {
+    this.scope = scope;
     this.documentId = documentId;
     this.eventType = eventType;
     this.actorId = actorId;
     this.detail = detail;
   }
 
+  /**
+   * An org-level system event ({@link AuditScope#SYSTEM}) with no document — e.g. a scheduler
+   * toggle or run-now. {@code actorId} is the acting admin, or null for a machine-initiated event.
+   */
+  public static AuditEvent system(String eventType, UUID actorId, String detail) {
+    return new AuditEvent(AuditScope.SYSTEM, null, eventType, actorId, detail);
+  }
+
   public UUID getId() {
     return id;
+  }
+
+  public AuditScope getScope() {
+    return scope;
   }
 
   public UUID getDocumentId() {
