@@ -212,6 +212,35 @@ class AuditApiIT extends SeededIntegrationTest {
   }
 
   @Test
+  @DisplayName("filters by a case-insensitive substring of the detail JSON")
+  void filtersByDetailText() throws Exception {
+    UUID documentId = seedDocumentWithVersion("Ingest report");
+    auditEvents.save(
+        new AuditEvent(documentId, "document.extraction.failed", null, "{\"reason\":\"BAD_PDF\"}"));
+    auditEvents.save(
+        new AuditEvent(
+            documentId, "document.extraction.failed", null, "{\"reason\":\"TOO_LARGE\"}"));
+
+    // Case-insensitive substring over the raw jsonb text; the `_` matches literally (escaped).
+    mockMvc
+        .perform(as(get(AUDIT).param("detail", "bad_pdf"), AUDITOR_ID))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.total").value(1))
+        .andExpect(jsonPath("$.items[0].detail").value("{\"reason\": \"BAD_PDF\"}"));
+
+    mockMvc
+        .perform(as(get(AUDIT).param("detail", "no-such-text"), AUDITOR_ID))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.total").value(0));
+
+    // A LIKE wildcard in the input is literal — it must not match everything.
+    mockMvc
+        .perform(as(get(AUDIT).param("detail", "%"), AUDITOR_ID))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.total").value(0));
+  }
+
+  @Test
   @DisplayName("a system-generated event (no actor) renders as System")
   void systemActorRendersAsSystem() throws Exception {
     UUID documentId = seedDocumentWithVersion("Ingest report");

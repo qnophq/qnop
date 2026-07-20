@@ -22,6 +22,8 @@ package io.qnop.service.audit;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.RETURNS_DEEP_STUBS;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
@@ -123,7 +125,7 @@ class AuditLogServiceTest {
     when(users.findSlugsByIdIn(List.of(actorId))).thenReturn(List.of());
 
     AuditEventView view =
-        service.list(null, null, null, null, null, null, null, null).items().get(0);
+        service.list(null, null, null, null, null, null, null, null, null).items().get(0);
 
     assertThat(view.scope()).isEqualTo("SYSTEM");
     assertThat(view.documentId()).isNull();
@@ -143,7 +145,7 @@ class AuditLogServiceTest {
     when(documents.findAllById(List.of(documentId))).thenReturn(List.of());
 
     AuditEventView view =
-        service.list(null, null, null, null, null, null, null, null).items().get(0);
+        service.list(null, null, null, null, null, null, null, null, null).items().get(0);
 
     assertThat(view.actorId()).isNull();
     assertThat(view.actorDisplayName()).isEqualTo("System");
@@ -162,7 +164,7 @@ class AuditLogServiceTest {
     when(documents.findAllById(List.of(documentId))).thenReturn(List.of());
 
     AuditEventView view =
-        service.list(null, null, null, null, null, null, null, null).items().get(0);
+        service.list(null, null, null, null, null, null, null, null, null).items().get(0);
 
     assertThat(view.actorId()).isEqualTo(actorId);
     assertThat(view.actorDisplayName()).isNull();
@@ -177,7 +179,7 @@ class AuditLogServiceTest {
     when(auditEvents.findAll(any(Specification.class), any(Pageable.class)))
         .thenReturn(new PageImpl<>(List.of(), PageRequest.of(0, 100), 0));
 
-    AuditPage page = service.list(null, null, null, null, null, null, -5, 500);
+    AuditPage page = service.list(null, null, null, null, null, null, null, -5, 500);
 
     ArgumentCaptor<Pageable> pageable = ArgumentCaptor.forClass(Pageable.class);
     verify(auditEvents).findAll(any(Specification.class), pageable.capture());
@@ -196,7 +198,7 @@ class AuditLogServiceTest {
     when(auditEvents.findAll(any(Specification.class), any(Pageable.class)))
         .thenReturn(new PageImpl<>(List.of(), PageRequest.of(0, 20), 0));
 
-    AuditPage page = service.list(null, null, null, null, null, null, 0, null);
+    AuditPage page = service.list(null, null, null, null, null, null, null, 0, null);
 
     assertThat(page.size()).isEqualTo(AuditLogService.DEFAULT_PAGE_SIZE);
   }
@@ -214,6 +216,7 @@ class AuditLogServiceTest {
             actorId,
             false,
             documentId,
+            null,
             Instant.parse("2026-01-01T00:00:00Z"),
             Instant.parse("2026-12-31T23:59:59Z"))
         .toPredicate(root, query, cb);
@@ -233,12 +236,36 @@ class AuditLogServiceTest {
     CriteriaQuery<?> query = mock(CriteriaQuery.class);
     CriteriaBuilder cb = mock(CriteriaBuilder.class);
 
-    AuditLogService.filter(null, actorId, true, null, null, null).toPredicate(root, query, cb);
+    AuditLogService.filter(null, actorId, true, null, null, null, null)
+        .toPredicate(root, query, cb);
 
     verify(cb).isNull(any());
     // actorSystem takes precedence — the actorId equality is never added.
     verify(cb, never()).equal(any(), any(Object.class));
     verify(cb).and(any(Predicate[].class));
+  }
+
+  @Test
+  @DisplayName("a detail filter adds a case-insensitive LIKE with escaped wildcards")
+  void detailFilterAddsEscapedLikePredicate() {
+    @SuppressWarnings("unchecked")
+    Root<AuditEvent> root = mock(Root.class, RETURNS_DEEP_STUBS);
+    CriteriaQuery<?> query = mock(CriteriaQuery.class);
+    CriteriaBuilder cb = mock(CriteriaBuilder.class);
+
+    AuditLogService.filter(null, null, false, null, "Orphan_50%", null, null)
+        .toPredicate(root, query, cb);
+
+    // Lower-cased, wildcards escaped, wrapped in %…% for the substring match.
+    verify(cb).like(any(), eq("%orphan\\_50\\%%"), eq('\\'));
+    verify(cb).and(any(Predicate[].class));
+  }
+
+  @Test
+  @DisplayName("escapeLike makes %, _ and backslash match literally")
+  void escapeLikeEscapesWildcards() {
+    assertThat(AuditLogService.escapeLike("100%_\\done")).isEqualTo("100\\%\\_\\\\done");
+    assertThat(AuditLogService.escapeLike("plain")).isEqualTo("plain");
   }
 
   @Test
@@ -249,7 +276,7 @@ class AuditLogServiceTest {
     CriteriaQuery<?> query = mock(CriteriaQuery.class);
     CriteriaBuilder cb = mock(CriteriaBuilder.class);
 
-    AuditLogService.filter(null, null, false, null, null, null).toPredicate(root, query, cb);
+    AuditLogService.filter(null, null, false, null, null, null, null).toPredicate(root, query, cb);
 
     verify(cb, never()).equal(any(), any(Object.class));
     verify(cb).and(any(Predicate[].class));
@@ -261,7 +288,7 @@ class AuditLogServiceTest {
     when(auditEvents.findAll(any(Specification.class), any(Pageable.class)))
         .thenReturn(new PageImpl<>(List.of(), PageRequest.of(0, 20), 0));
 
-    AuditPage page = service.list(null, null, null, null, null, null, 0, 20);
+    AuditPage page = service.list(null, null, null, null, null, null, null, 0, 20);
 
     assertThat(page.items()).isEmpty();
     verifyNoInteractions(users, documents);
