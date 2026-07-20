@@ -90,11 +90,13 @@ export function AuditTable({
 }: AuditTableProps) {
   const { formatDateTime } = useFormatters();
   return (
-    <Table size="small">
+    <Table size="small" sx={{ '& th': { borderColor: 'divider' } }}>
       <TableHead>
         <TableRow>
           {COLUMNS.map((column) => (
-            <TableCell key={column}>{column}</TableCell>
+            <TableCell key={column} sx={{ fontSize: 12, color: 'text.secondary', fontWeight: 600 }}>
+              {column}
+            </TableCell>
           ))}
         </TableRow>
       </TableHead>
@@ -112,9 +114,9 @@ export function AuditTable({
             const actorName = event.actorDisplayName ?? 'Unknown user';
             const documentTitle = event.documentTitle ?? EM_DASH;
             return (
-              <TableRow key={event.id} hover>
+              <TableRow key={event.id} hover sx={{ '& td': { borderColor: 'divider' } }}>
                 <TableCell sx={{ whiteSpace: 'nowrap' }}>
-                  {formatDateTime(event.createdAt)}
+                  <Typography sx={{ fontSize: 13 }}>{formatDateTime(event.createdAt)}</Typography>
                 </TableCell>
                 <TableCell>
                   {event.actorId ? (
@@ -178,7 +180,7 @@ export function AuditTable({
                   )}
                 </TableCell>
                 <TableCell>
-                  <Typography variant="body2" color="text.secondary">
+                  <Typography sx={{ fontSize: 13 }} color="text.secondary">
                     {formatAuditDetail(event.eventType, event.detail, formatDateTime)}
                   </Typography>
                 </TableCell>
