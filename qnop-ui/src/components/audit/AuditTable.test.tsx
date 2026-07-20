@@ -115,4 +115,17 @@ describe('AuditTable', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Filter by Master services agreement' }));
     expect(onFilterDocument).toHaveBeenCalledWith('doc-1', 'Master services agreement');
   });
+
+  it('copies the detail text to the clipboard from the copy button', () => {
+    const writeText = vi.fn().mockResolvedValue(undefined);
+    Object.assign(navigator, { clipboard: { writeText } });
+    renderTable([userEvent]);
+    fireEvent.click(screen.getByRole('button', { name: 'Copy details' }));
+    expect(writeText).toHaveBeenCalledWith('Draft → In review');
+  });
+
+  it('shows no copy button when the event carries no readable detail', () => {
+    renderTable([{ ...userEvent, detail: undefined }]);
+    expect(screen.queryByRole('button', { name: 'Copy details' })).not.toBeInTheDocument();
+  });
 });

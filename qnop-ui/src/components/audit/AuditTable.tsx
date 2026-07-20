@@ -19,6 +19,7 @@
  * SPDX-License-Identifier: AGPL-3.0-only
  */
 
+import { useState } from 'react';
 import IconButton from '@mui/material/IconButton';
 import Link from '@mui/material/Link';
 import Stack from '@mui/material/Stack';
@@ -30,7 +31,7 @@ import TableRow from '@mui/material/TableRow';
 import Tooltip from '@mui/material/Tooltip';
 import Typography from '@mui/material/Typography';
 import { Link as RouterLink } from 'react-router-dom';
-import { ListFilter } from 'lucide-react';
+import { Check, Copy, ListFilter } from 'lucide-react';
 import type { AuditEvent } from '../../api/generated';
 import { useFormatters } from '../../hooks/useFormatters';
 import { formatAuditDetail } from '../../utils/auditDetail';
@@ -68,6 +69,32 @@ function FilterButton({ label, onClick }: { label: string; onClick: () => void }
   );
 }
 
+/** Copies a detail string to the clipboard, briefly confirming with a check. */
+function CopyDetailButton({ text }: { text: string }) {
+  const [copied, setCopied] = useState(false);
+  const onCopy = async () => {
+    try {
+      await navigator.clipboard.writeText(text);
+      setCopied(true);
+      window.setTimeout(() => setCopied(false), 1500);
+    } catch {
+      // Clipboard unavailable (e.g. an insecure context) — fail quietly.
+    }
+  };
+  return (
+    <Tooltip title={copied ? 'Copied' : 'Copy details'}>
+      <IconButton
+        size="small"
+        aria-label="Copy details"
+        onClick={onCopy}
+        sx={{ color: 'text.disabled', '&:hover': { color: 'text.secondary' } }}
+      >
+        {copied ? <Check size={14} /> : <Copy size={14} />}
+      </IconButton>
+    </Tooltip>
+  );
+}
+
 /**
  * The audit trail as a table (issue #466, ADR-0042): time, actor, event type,
  * document and a readable rendering of the jsonb detail.
@@ -90,7 +117,7 @@ export function AuditTable({
 }: AuditTableProps) {
   const { formatDateTime } = useFormatters();
   return (
-    <Table size="small">
+    <Table size="medium" sx={{ '& td, & th': { borderColor: 'divider' } }}>
       <TableHead>
         <TableRow>
           {COLUMNS.map((column) => (
@@ -111,6 +138,7 @@ export function AuditTable({
           events.map((event) => {
             const actorName = event.actorDisplayName ?? 'Unknown user';
             const documentTitle = event.documentTitle ?? EM_DASH;
+            const detailText = formatAuditDetail(event.eventType, event.detail, formatDateTime);
             return (
               <TableRow key={event.id} hover>
                 <TableCell sx={{ whiteSpace: 'nowrap' }}>
@@ -178,9 +206,12 @@ export function AuditTable({
                   )}
                 </TableCell>
                 <TableCell>
-                  <Typography variant="body2" color="text.secondary">
-                    {formatAuditDetail(event.eventType, event.detail, formatDateTime)}
-                  </Typography>
+                  <Stack direction="row" spacing={0.5} sx={{ alignItems: 'center', minWidth: 0 }}>
+                    <Typography variant="body2" color="text.secondary" sx={{ minWidth: 0 }}>
+                      {detailText}
+                    </Typography>
+                    {detailText !== EM_DASH && <CopyDetailButton text={detailText} />}
+                  </Stack>
                 </TableCell>
               </TableRow>
             );
