@@ -23,8 +23,6 @@ import { useEffect, useState } from 'react';
 import Alert from '@mui/material/Alert';
 import Box from '@mui/material/Box';
 import Button from '@mui/material/Button';
-import IconButton from '@mui/material/IconButton';
-import InputAdornment from '@mui/material/InputAdornment';
 import LinearProgress from '@mui/material/LinearProgress';
 import MenuItem from '@mui/material/MenuItem';
 import Paper from '@mui/material/Paper';
@@ -32,7 +30,8 @@ import Stack from '@mui/material/Stack';
 import TablePagination from '@mui/material/TablePagination';
 import TextField from '@mui/material/TextField';
 import Typography from '@mui/material/Typography';
-import { Search, UserPlus, X } from 'lucide-react';
+import { UserPlus } from 'lucide-react';
+import { ClearableSearchField } from '../../components/ClearableSearchField';
 import type { AdminUserSummary, UserRole } from '../../api/generated';
 import {
   useAdminUsers,
@@ -188,34 +187,12 @@ export function UsersPage() {
       />
 
       <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1.5} sx={{ flexWrap: 'wrap' }}>
-        <TextField
+        <ClearableSearchField
           value={search}
-          onChange={(e) => setSearch(e.target.value)}
+          onValueChange={setSearch}
           placeholder="Search by name, email or username"
-          size="small"
+          inputAriaLabel="Search users"
           sx={{ flex: 1, minWidth: 240, maxWidth: 420 }}
-          slotProps={{
-            input: {
-              'aria-label': 'Search users',
-              startAdornment: (
-                <InputAdornment position="start">
-                  <Search size={16} />
-                </InputAdornment>
-              ),
-              endAdornment: search ? (
-                <InputAdornment position="end">
-                  <IconButton
-                    aria-label="Clear search"
-                    size="small"
-                    edge="end"
-                    onClick={() => setSearch('')}
-                  >
-                    <X size={16} />
-                  </IconButton>
-                </InputAdornment>
-              ) : undefined,
-            },
-          }}
         />
         <TextField
           select
