@@ -7,7 +7,7 @@
     "generate": "node generate-assets.mjs"
   },
   "devDependencies": {
-    "fontkit": "^2.0.4",
-    "sharp": "^0.35.0"
+    "fontkit": "2.0.4",
+    "sharp": "0.35.3"
   }
 }
