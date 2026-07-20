@@ -50,7 +50,6 @@ describe('visibleNavGroups', () => {
       'branding',
       'oidc-providers',
       'email',
-      'mail-templates',
       'scheduler',
       'storage-consistency',
       'audit',
@@ -80,11 +79,15 @@ describe('crumbsFor', () => {
     expect(crumbsFor('/reviews')).toEqual([{ label: 'Reviews' }]);
   });
 
-  it('resolves the Email / SMTP admin path', () => {
-    expect(crumbsFor('/admin/email')).toEqual([
-      { label: 'Administration' },
-      { label: 'Email / SMTP' },
-    ]);
+  it('resolves the Email admin path', () => {
+    expect(crumbsFor('/admin/email')).toEqual([{ label: 'Administration' }, { label: 'Email' }]);
+  });
+
+  it('maps every nested email path to the section, linking back to the area (#525)', () => {
+    const expected = [{ label: 'Administration' }, { label: 'Email', to: '/admin/email' }];
+    expect(crumbsFor('/admin/email/server')).toEqual(expected);
+    expect(crumbsFor('/admin/email/templates')).toEqual(expected);
+    expect(crumbsFor('/admin/email/templates/auth.password_reset')).toEqual(expected);
   });
 
   it('maps a nested detail path to its section, linking back to the list', () => {

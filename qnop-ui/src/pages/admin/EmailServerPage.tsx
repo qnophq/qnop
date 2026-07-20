@@ -37,7 +37,6 @@ import { useSettings, useUpdateSettings } from '../../api/hooks/useSettings';
 import { useSendTestEmail } from '../../api/hooks/useMailTemplates';
 import { useAuthStore } from '../../stores/authStore';
 import { PasswordField } from '../../components/auth/PasswordField';
-import { PageHeader } from '../../components/admin/layout/PageHeader';
 import { SectionCard } from '../../components/admin/layout/SectionCard';
 import { AdminToast } from '../../components/admin/layout/AdminToast';
 import { useToast } from '../../components/admin/layout/useToast';
@@ -65,10 +64,11 @@ function baselineOf(setting: AdminSetting): string {
 }
 
 /**
- * Dedicated Email / SMTP administration (issue #142): outgoing-mail connection,
- * sender identity, and delivery status in three focused cards, with an inline
- * test-send. Only the changed keys are PATCHed; the encryption options come from
- * the API contract's `allowedValues`, rendered with curated labels and port hints.
+ * SMTP administration (issue #142), the Server tab of the email admin area
+ * (#525): outgoing-mail connection, sender identity, and delivery status in
+ * three focused cards, with an inline test-send. Only the changed keys are
+ * PATCHed; the encryption options come from the API contract's
+ * `allowedValues`, rendered with curated labels and port hints.
  */
 export function EmailServerPage() {
   const { data, isLoading, isError } = useSettings();
@@ -235,11 +235,6 @@ export function EmailServerPage() {
   return (
     <Box component="form" onSubmit={onSubmit} noValidate>
       <Stack spacing={3}>
-        <PageHeader
-          title="Email / SMTP"
-          description="Configure the outgoing-mail server: connection, sender identity, and delivery. Changes apply without a restart."
-        />
-
         <SectionCard
           icon={Server}
           title="Connection"
