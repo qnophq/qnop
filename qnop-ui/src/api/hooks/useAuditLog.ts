@@ -30,6 +30,8 @@ export interface AuditLogParams {
   /** Restrict to system-generated events (no human actor); precedes actorId. */
   actorSystem?: boolean;
   documentId?: string;
+  /** Case-insensitive substring match on the raw detail JSON (issue #536). */
+  detail?: string;
   /** ISO-8601 lower/upper bounds on the event time (inclusive). */
   from?: string;
   to?: string;
@@ -57,6 +59,7 @@ export function useAuditLog(params: AuditLogParams) {
         actorId: params.actorId || undefined,
         actorSystem: params.actorSystem || undefined,
         documentId: params.documentId || undefined,
+        detail: params.detail || undefined,
         from: params.from || undefined,
         to: params.to || undefined,
         page: params.page,

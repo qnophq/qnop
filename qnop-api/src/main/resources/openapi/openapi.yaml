@@ -2228,6 +2228,16 @@ paths:
           schema:
             type: string
             format: uuid
+        - name: detail
+          in: query
+          required: false
+          description: >-
+            Case-insensitive substring match on the event's raw detail JSON —
+            a free-text search over the Details column. SQL LIKE wildcards in
+            the input are matched literally.
+          schema:
+            type: string
+            maxLength: 256
         - name: from
           in: query
           required: false

@@ -30,6 +30,7 @@ import java.time.Instant;
 import java.util.Objects;
 import java.util.UUID;
 import org.hibernate.annotations.CreationTimestamp;
+import org.hibernate.annotations.Formula;
 import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.annotations.UuidGenerator;
 import org.hibernate.type.SqlTypes;
@@ -79,6 +80,14 @@ public class AuditEvent {
   @JdbcTypeCode(SqlTypes.JSON)
   @Column(name = "detail", updatable = false)
   private String detail;
+
+  /**
+   * Read-only text projection of the jsonb {@code detail} for the free-text LIKE filter (issue
+   * #536). Criteria cannot cast the column itself — Hibernate treats {@code as(String.class)} on
+   * the already-String-typed attribute as a no-op, so the SQL would hit {@code lower(jsonb)}.
+   */
+  @Formula("cast(detail as text)")
+  private String detailText;
 
   @CreationTimestamp
   @Column(name = "created_at", nullable = false, updatable = false)

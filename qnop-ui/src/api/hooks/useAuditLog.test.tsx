@@ -63,6 +63,7 @@ describe('useAuditLog', () => {
           eventType: 'annotation.resolved',
           actorId: 'actor-1',
           documentId: 'doc-1',
+          detail: 'BAD_PDF',
           from: '2026-01-01T00:00:00.000Z',
           to: '2026-12-31T00:00:00.000Z',
           page: 2,
@@ -77,6 +78,7 @@ describe('useAuditLog', () => {
       actorId: 'actor-1',
       actorSystem: undefined,
       documentId: 'doc-1',
+      detail: 'BAD_PDF',
       from: '2026-01-01T00:00:00.000Z',
       to: '2026-12-31T00:00:00.000Z',
       page: 2,
@@ -91,7 +93,7 @@ describe('useAuditLog', () => {
     >);
 
     const { result } = renderHook(
-      () => useAuditLog({ eventType: '', from: '', to: '', page: 0, size: 20 }),
+      () => useAuditLog({ eventType: '', detail: '', from: '', to: '', page: 0, size: 20 }),
       { wrapper },
     );
 
@@ -101,6 +103,7 @@ describe('useAuditLog', () => {
       actorId: undefined,
       actorSystem: undefined,
       documentId: undefined,
+      detail: undefined,
       from: undefined,
       to: undefined,
       page: 0,

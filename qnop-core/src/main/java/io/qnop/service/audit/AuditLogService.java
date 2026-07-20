@@ -33,6 +33,7 @@ import jakarta.persistence.criteria.Predicate;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.UUID;
@@ -104,7 +105,7 @@ public class AuditLogService {
    * A page of the org-wide audit trail, newest first. Every filter is optional; {@code page}/{@code
    * size} are clamped ({@code page} to {@code >= 0}, {@code size} to {@code [1, MAX_PAGE_SIZE]}),
    * so even a caller bypassing the OpenAPI bounds cannot request an unbounded page. A blank {@code
-   * eventType} is treated as absent.
+   * eventType} or {@code detail} is treated as absent.
    */
   @Transactional(readOnly = true)
   public AuditPage list(
@@ -112,6 +113,7 @@ public class AuditLogService {
       UUID actorId,
       Boolean actorSystem,
       UUID documentId,
+      String detail,
       Instant from,
       Instant to,
       Integer page,
@@ -119,11 +121,18 @@ public class AuditLogService {
     int pageIndex = page == null || page < 0 ? 0 : page;
     int pageSize = size == null ? DEFAULT_PAGE_SIZE : Math.min(Math.max(size, 1), MAX_PAGE_SIZE);
     String filterEventType = eventType == null || eventType.isBlank() ? null : eventType;
+    String filterDetail = detail == null || detail.isBlank() ? null : detail.trim();
 
     Page<AuditEvent> result =
         auditEvents.findAll(
             filter(
-                filterEventType, actorId, Boolean.TRUE.equals(actorSystem), documentId, from, to),
+                filterEventType,
+                actorId,
+                Boolean.TRUE.equals(actorSystem),
+                documentId,
+                filterDetail,
+                from,
+                to),
             PageRequest.of(pageIndex, pageSize, Sort.by(Sort.Direction.DESC, "createdAt")));
 
     return new AuditPage(
@@ -135,14 +144,16 @@ public class AuditLogService {
    * predicate. Built with the Criteria API (not a JPQL {@code (:param IS NULL OR …)} query) so a
    * null timestamp bound cannot trip PostgreSQL's "could not determine data type of parameter"
    * error. {@code actorSystem} restricts to system events (no actor) and takes precedence over
-   * {@code actorId}. An all-empty filter yields an unrestricted conjunction (the full org-wide
-   * trail).
+   * {@code actorId}. {@code detail} is a case-insensitive substring match on the raw detail JSON
+   * (the jsonb column is cast to text; LIKE wildcards in the input are escaped so they match
+   * literally). An all-empty filter yields an unrestricted conjunction (the full org-wide trail).
    */
   static Specification<AuditEvent> filter(
       String eventType,
       UUID actorId,
       boolean actorSystem,
       UUID documentId,
+      String detail,
       Instant from,
       Instant to) {
     return (root, query, cb) -> {
@@ -158,6 +169,15 @@ public class AuditLogService {
       if (documentId != null) {
         predicates.add(cb.equal(root.get("documentId"), documentId));
       }
+      if (detail != null) {
+        // detailText is the entity's read-only cast(detail as text) formula — lower() on the raw
+        // jsonb column would not compile in PostgreSQL.
+        predicates.add(
+            cb.like(
+                cb.lower(root.get("detailText")),
+                "%" + escapeLike(detail.toLowerCase(Locale.ROOT)) + "%",
+                '\\'));
+      }
       if (from != null) {
         predicates.add(cb.greaterThanOrEqualTo(root.<Instant>get("createdAt"), from));
       }
@@ -166,6 +186,13 @@ public class AuditLogService {
       }
       return cb.and(predicates.toArray(new Predicate[0]));
     };
+  }
+
+  /**
+   * Escapes the SQL LIKE wildcards ({@code %}, {@code _}, {@code \}) so input matches literally.
+   */
+  static String escapeLike(String input) {
+    return input.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_");
   }
 
   /** Batch-resolves actor names and document metadata for a page, then maps to views. */

@@ -19,20 +19,22 @@
  * SPDX-License-Identifier: AGPL-3.0-only
  */
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import Alert from '@mui/material/Alert';
 import Autocomplete from '@mui/material/Autocomplete';
 import Box from '@mui/material/Box';
 import Button from '@mui/material/Button';
 import Chip from '@mui/material/Chip';
 import Collapse from '@mui/material/Collapse';
+import IconButton from '@mui/material/IconButton';
+import InputAdornment from '@mui/material/InputAdornment';
 import LinearProgress from '@mui/material/LinearProgress';
 import Paper from '@mui/material/Paper';
 import Stack from '@mui/material/Stack';
 import TablePagination from '@mui/material/TablePagination';
 import TextField from '@mui/material/TextField';
 import Typography from '@mui/material/Typography';
-import { ChevronDown, HelpCircle } from 'lucide-react';
+import { ChevronDown, HelpCircle, X } from 'lucide-react';
 import { useAuditLog } from '../../api/hooks/useAuditLog';
 import { AuditTable } from '../../components/audit/AuditTable';
 import { AuditEventBadge } from '../../components/audit/AuditEventBadge';
@@ -66,6 +68,8 @@ function toIso(value: string): string | undefined {
  */
 export function AuditPage() {
   const [eventType, setEventType] = useState('');
+  const [detailSearch, setDetailSearch] = useState('');
+  const [debouncedDetail, setDebouncedDetail] = useState('');
   const [from, setFrom] = useState('');
   const [to, setTo] = useState('');
   const [actor, setActor] = useState<ActorFilter | null>(null);
@@ -74,11 +78,21 @@ export function AuditPage() {
   const [pageSize, setPageSize] = useState(20);
   const [legendOpen, setLegendOpen] = useState(false);
 
+  // Debounce the free-text search so paging only resets once typing settles (issue #536).
+  useEffect(() => {
+    const handle = setTimeout(() => {
+      setDebouncedDetail(detailSearch);
+      setPage(0);
+    }, 300);
+    return () => clearTimeout(handle);
+  }, [detailSearch]);
+
   const { data, isLoading, isFetching, isError } = useAuditLog({
     eventType: eventType || undefined,
     actorId: actor?.kind === 'user' ? actor.id : undefined,
     actorSystem: actor?.kind === 'system' ? true : undefined,
     documentId: document?.id,
+    detail: debouncedDetail.trim() || undefined,
     from: toIso(from),
     to: toIso(to),
     page,
@@ -183,6 +197,36 @@ export function AuditPage() {
           renderInput={(params) => (
             <TextField {...params} label="Event type" placeholder="All events" />
           )}
+        />
+        <TextField
+          label="Search details"
+          value={detailSearch}
+          onChange={(e) => setDetailSearch(e.target.value)}
+          placeholder="e.g. a storage key or workflow state"
+          size="small"
+          sx={{ minWidth: 240, flexGrow: 1, maxWidth: 360 }}
+          slotProps={{
+            htmlInput: { maxLength: 256 },
+            input: {
+              endAdornment: detailSearch ? (
+                <InputAdornment position="end">
+                  <IconButton
+                    size="small"
+                    edge="end"
+                    aria-label="Clear the details search"
+                    onClick={() => {
+                      // Skip the debounce on reset — the filter drops immediately.
+                      setDetailSearch('');
+                      setDebouncedDetail('');
+                      setPage(0);
+                    }}
+                  >
+                    <X size={16} />
+                  </IconButton>
+                </InputAdornment>
+              ) : undefined,
+            },
+          }}
         />
         <TextField
           type="datetime-local"
