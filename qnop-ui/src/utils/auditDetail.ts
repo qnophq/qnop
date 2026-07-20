@@ -49,10 +49,11 @@ function dueDateChange(from: unknown, to: unknown, formatDate: (iso: string) => 
  * event type gets a purpose-built rendering: a workflow transition reads as
  * `Draft → In review`, a placement as `On version 3`, a due-date change as
  * `Set to <date>` / `<date> → <date>` (dates via the caller's zone-aware
- * formatter), an extraction failure as its reason. Events whose meaning is fully
- * carried by their label (a raised/resolved/reopened annotation, whose only
- * payload is an internal id) render an em dash. Any unknown shape still degrades
- * to a compact `key: value` list, since the vocabulary is open.
+ * formatter), an extraction failure as its reason, a storage-orphan deletion as
+ * its object key. Events whose meaning is fully carried by their label (a
+ * raised/resolved/reopened annotation, whose only payload is an internal id)
+ * render an em dash. Any unknown shape still degrades to a compact `key: value`
+ * list, since the vocabulary is open.
  */
 export function formatAuditDetail(
   eventType: string,
@@ -107,6 +108,8 @@ export function formatAuditDetail(
       return obj.reason !== null && obj.reason !== undefined
         ? `Reason: ${formatValue(obj.reason)}`
         : EM_DASH;
+    case 'storage.orphan.deleted':
+      return obj.key !== null && obj.key !== undefined ? `Object ${formatValue(obj.key)}` : EM_DASH;
     default:
       break;
   }

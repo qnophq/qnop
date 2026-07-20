@@ -63,6 +63,14 @@ tags:
       Admin-only team management (issue #105): list/search teams with pagination,
       create / edit / delete teams, and manage memberships with a per-team role
       (LEAD / MEMBER). Teams group reviewers for the review workflow.
+  - name: AdminStorageConsistency
+    description: |
+      Admin-only storage-consistency dashboard (issue #523, ADR-0044): reconcile
+      the document binaries in object storage against the database. Reports
+      missing binaries (a referenced object that is gone — data loss, report-only)
+      and orphaned objects (a stored object no row references — cost/leak), and
+      lets an admin delete orphans with an in-transaction re-check. The scan is
+      bounded by a circuit breaker (HTTP 409 when the bucket is too large).
   - name: Teams
     description: |
       Team self-management for team LEADs (issue #470): a LEAD may view and manage
@@ -1364,6 +1372,77 @@ paths:
           description: Member removed
         '404':
           description: The team has no such member
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+  /admin/storage-consistency:
+    get:
+      tags:
+        - AdminStorageConsistency
+      summary: Scan object storage for missing binaries and orphaned objects
+      description: |
+        Reconciles every referenced storage key (document versions, attachments,
+        and the staging registry) against the bucket listing (issue #523,
+        ADR-0044). Returns missing binaries (referenced but absent — data loss,
+        with document context) and orphaned objects (present but unreferenced —
+        cost/leak, with size and age), plus totals. The scan is bounded: once it
+        streams more than the configured limit it aborts with `409` so a
+        pathological bucket fails fast instead of hanging.
+      operationId: scanStorageConsistency
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: The reconciliation report
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StorageConsistencyReport'
+        '409':
+          description: The scan exceeded its object limit (code STORAGE_SCAN_LIMIT)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+  /admin/storage-consistency/orphans/delete:
+    post:
+      tags:
+        - AdminStorageConsistency
+      summary: Delete orphaned storage objects
+      description: |
+        Deletes the given orphaned object keys (single or bulk). Each key is
+        re-checked against every reference source inside its own transaction
+        immediately before deletion, so a key that became referenced since the
+        scan is skipped and returned in `skipped` rather than deleted. Idempotent.
+        Missing binaries are never deletable here. Uses a request body (not a path
+        segment) because content-addressed keys contain slashes.
+      operationId: deleteOrphanedObjects
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/OrphanDeleteRequest'
+      responses:
+        '200':
+          description: The remediation outcome
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OrphanDeleteResponse'
+        '400':
+          description: Invalid input
           content:
             application/json:
               schema:
@@ -3507,6 +3586,138 @@ components:
           schema:
             $ref: '#/components/schemas/ErrorResponse'
   schemas:
+    StorageConsistencyReport:
+      type: object
+      description: The storage-consistency reconciliation report (issue #523, ADR-0044).
+      required:
+        - summary
+        - missing
+        - orphaned
+      properties:
+        summary:
+          $ref: '#/components/schemas/StorageConsistencySummary'
+        missing:
+          type: array
+          items:
+            $ref: '#/components/schemas/MissingBinary'
+        orphaned:
+          type: array
+          items:
+            $ref: '#/components/schemas/OrphanedObject'
+    StorageConsistencySummary:
+      type: object
+      required:
+        - dbReferencedCount
+        - storageObjectCount
+        - missingCount
+        - orphanedCount
+        - scannedAt
+      properties:
+        dbReferencedCount:
+          type: integer
+          format: int64
+          description: Document-binary references in the database (versions + attachments).
+        storageObjectCount:
+          type: integer
+          format: int64
+          description: Rows in the object-storage staging registry.
+        missingCount:
+          type: integer
+          format: int32
+        orphanedCount:
+          type: integer
+          format: int32
+        scannedAt:
+          type: string
+          format: date-time
+    MissingBinary:
+      type: object
+      description: A referenced binary whose object is gone (data loss); report-only.
+      required:
+        - storageKey
+        - kind
+        - documentId
+      properties:
+        storageKey:
+          type: string
+        kind:
+          type: string
+          description: Which kind of row references the missing binary.
+          enum:
+            - VERSION
+            - ATTACHMENT
+        documentId:
+          type: string
+          format: uuid
+        documentTitle:
+          type: string
+          nullable: true
+        documentSlug:
+          type: string
+          nullable: true
+        versionNumber:
+          type: integer
+          format: int32
+          nullable: true
+          description: Set when kind is VERSION.
+        attachmentName:
+          type: string
+          nullable: true
+          description: Set when kind is ATTACHMENT.
+    OrphanedObject:
+      type: object
+      description: A stored object no database row references (cost/leak).
+      required:
+        - storageKey
+        - size
+        - lastModified
+      properties:
+        storageKey:
+          type: string
+        size:
+          type: integer
+          format: int64
+          description: Object size in bytes.
+        lastModified:
+          type: string
+          format: date-time
+    OrphanDeleteRequest:
+      type: object
+      required:
+        - keys
+      properties:
+        keys:
+          type: array
+          description: The orphan object keys to delete (single or bulk).
+          minItems: 1
+          maxItems: 1000
+          items:
+            type: string
+    OrphanDeleteResponse:
+      type: object
+      required:
+        - deleted
+        - skipped
+      properties:
+        deleted:
+          type: array
+          items:
+            type: string
+        skipped:
+          type: array
+          items:
+            $ref: '#/components/schemas/SkippedOrphan'
+    SkippedOrphan:
+      type: object
+      description: An orphan key not deleted because it was referenced again since the scan.
+      required:
+        - storageKey
+        - reason
+      properties:
+        storageKey:
+          type: string
+        reason:
+          type: string
     WorkflowStatus:
       type: object
       description: |

@@ -47,6 +47,19 @@ import org.springframework.validation.annotation.Validated;
  *     hung extraction/serving job so it cannot pin a worker indefinitely (issue #314)
  * @param apiCallAttemptTimeout ceiling on a single HTTP attempt before the SDK retries it (default
  *     20s)
+ * @param consistencyScanMaxKeys circuit breaker for the storage-consistency scan (issue #523): the
+ *     scan aborts (HTTP 409) once it has streamed this many objects, so a pathological bucket fails
+ *     fast instead of hanging (default 1,000,000)
+ * @param orphanReaperEnabled whether the scheduled bucket-wide orphan reaper runs at all (issue
+ *     #523; default false — bucket-wide reaping is opt-in, the dashboard remediation is always
+ *     available)
+ * @param orphanReaperDryRun when the reaper runs, only log what it would delete instead of deleting
+ *     (default true — a safe default so enabling the reaper never deletes on the first tick)
+ * @param orphanReaperGracePeriod minimum age (by last-modified) before a bucket orphan is eligible
+ *     for reaping, sized well above the longest plausible ingest so an in-flight upload can never
+ *     look like an orphan (default 24h)
+ * @param orphanReaperMaxDeletes upper bound on deletions per reaper tick, so one run can never
+ *     cascade unbounded (default 100)
  */
 @ConfigurationProperties(prefix = "qnop.s3")
 @Validated
@@ -60,7 +73,12 @@ public record S3Properties(
     Boolean autoCreateBucket,
     Duration reaperGracePeriod,
     Duration apiCallTimeout,
-    Duration apiCallAttemptTimeout) {
+    Duration apiCallAttemptTimeout,
+    Integer consistencyScanMaxKeys,
+    Boolean orphanReaperEnabled,
+    Boolean orphanReaperDryRun,
+    Duration orphanReaperGracePeriod,
+    Integer orphanReaperMaxDeletes) {
 
   public S3Properties {
     endpoint = (endpoint == null || endpoint.isBlank()) ? null : endpoint.trim();
@@ -71,5 +89,11 @@ public record S3Properties(
     apiCallTimeout = apiCallTimeout == null ? Duration.ofSeconds(60) : apiCallTimeout;
     apiCallAttemptTimeout =
         apiCallAttemptTimeout == null ? Duration.ofSeconds(20) : apiCallAttemptTimeout;
+    consistencyScanMaxKeys = consistencyScanMaxKeys == null ? 1_000_000 : consistencyScanMaxKeys;
+    orphanReaperEnabled = orphanReaperEnabled == null ? Boolean.FALSE : orphanReaperEnabled;
+    orphanReaperDryRun = orphanReaperDryRun == null ? Boolean.TRUE : orphanReaperDryRun;
+    orphanReaperGracePeriod =
+        orphanReaperGracePeriod == null ? Duration.ofHours(24) : orphanReaperGracePeriod;
+    orphanReaperMaxDeletes = orphanReaperMaxDeletes == null ? 100 : orphanReaperMaxDeletes;
   }
 }

@@ -51,4 +51,16 @@ public interface DocumentVersionRepository extends JpaRepository<DocumentVersion
           + " FROM DocumentVersion v WHERE v.documentId IN :documentIds GROUP BY v.documentId")
   List<DocumentMaxVersion> findMaxVersionsByDocumentIds(
       @Param("documentIds") Collection<UUID> documentIds);
+
+  /**
+   * Every version's storage key, for the storage-consistency scan's referenced set (issue #523).
+   */
+  @Query("SELECT v.storageKey FROM DocumentVersion v")
+  List<String> findAllStorageKeys();
+
+  /** Maps missing storage keys back to their document + version, to explain a data-loss finding. */
+  @Query(
+      "SELECT new io.qnop.repository.VersionStorageRef(v.storageKey, v.documentId, v.versionNumber)"
+          + " FROM DocumentVersion v WHERE v.storageKey IN :keys")
+  List<VersionStorageRef> findVersionRefsByStorageKeyIn(@Param("keys") Collection<String> keys);
 }

@@ -29,6 +29,7 @@ import { RoleRoute } from '../components/auth/RoleRoute';
 import { AuditPage } from '../pages/audit/AuditPage';
 import { HomePage } from '../pages/HomePage';
 import { BrandingPage } from '../pages/admin/BrandingPage';
+import { StorageConsistencyPage } from '../pages/admin/StorageConsistencyPage';
 import { ProfilePage } from '../pages/ProfilePage';
 import { UserProfilePage } from '../pages/UserProfilePage';
 import { EmailServerPage } from '../pages/admin/EmailServerPage';
@@ -226,6 +227,14 @@ export const router = createBrowserRouter([
         element: (
           <AdminRoute>
             <BrandingPage />
+          </AdminRoute>
+        ),
+      },
+      {
+        path: 'admin/storage-consistency',
+        element: (
+          <AdminRoute>
+            <StorageConsistencyPage />
           </AdminRoute>
         ),
       },

@@ -63,6 +63,9 @@ export default defineConfig({
         // toggle/run-now orchestration and toasts; its presentational job card
         // stays on its own component test.
         'src/pages/admin/SchedulerPage.tsx',
+        // Storage-consistency dashboard (issue #523). The page owns the scan/
+        // selection/delete orchestration; its presentational tables have their own.
+        'src/pages/admin/StorageConsistencyPage.tsx',
         // Team-lead self-management surface (issue #470): the "My Teams" landing
         // and detail pages own the orchestration/state; the add-member dialog
         // stays on its own component test.

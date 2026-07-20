@@ -22,6 +22,7 @@
 import {
   CalendarClock,
   FileText,
+  HardDrive,
   KeyRound,
   LayoutDashboard,
   Mail,
@@ -120,6 +121,13 @@ export const NAV_GROUPS: NavGroup[] = [
         label: 'Scheduler',
         path: '/admin/scheduler',
         icon: CalendarClock,
+        roles: ['ADMIN'],
+      },
+      {
+        id: 'storage-consistency',
+        label: 'Storage consistency',
+        path: '/admin/storage-consistency',
+        icon: HardDrive,
         roles: ['ADMIN'],
       },
       {

@@ -22,6 +22,7 @@ package io.qnop.spi.storage;
 
 import java.io.InputStream;
 import java.util.Optional;
+import java.util.stream.Stream;
 
 /**
  * The object-storage extension point (ADR-0005): store, retrieve, probe and delete binary content
@@ -58,4 +59,22 @@ public interface StorageProvider {
    * @return {@code true} if an object existed and was deleted, {@code false} if there was none
    */
   boolean delete(String key);
+
+  /**
+   * Lists every object whose key starts with {@code prefix} (issue #523, ADR-0044), for the
+   * storage-consistency scan's orphan direction. The returned stream is <em>lazy</em> and may be
+   * backed by a network connection: the caller must consume it inside a try-with-resources block so
+   * it is closed. Order is unspecified.
+   *
+   * <p>This is an additive, backward-compatible extension to the contract (SemVer minor): it is a
+   * {@code default} method that throws {@link UnsupportedOperationException}, so a provider that
+   * cannot enumerate its backing store keeps compiling unchanged and the scan degrades gracefully.
+   * The S3/MinIO Community default overrides it via paginated {@code ListObjectsV2}.
+   *
+   * @param prefix the key prefix to scope the listing to (empty string lists the whole bucket)
+   * @return a lazy stream of the matching objects with their size and last-modified time
+   */
+  default Stream<StorageListing> list(String prefix) {
+    throw new UnsupportedOperationException("This StorageProvider does not support listing");
+  }
 }

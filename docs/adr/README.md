@@ -60,6 +60,7 @@ Two refinement conventions (see the 2026-07-16 amendment to [ADR-0001](0001-reco
 | [0041](0041-datetime-l10n-policy.md) | Date/time L10n: store UTC, transport ISO-with-offset, render in the user's zone | Accepted |
 | [0042](0042-audit-trail-exposure.md) | Audit-trail exposure: the AUDITOR read surface and its boundary | Accepted |
 | [0043](0043-system-audit-stream.md) | System-audit stream: generalising the audit trail beyond documents | Accepted |
+| [0044](0044-storage-consistency-scan-and-remediation.md) | Storage-consistency scan & remediation, and the StorageProvider.list SPI extension | Accepted |
 | [0045](0045-scheduler-jobs-dashboard.md) | Scheduler-jobs dashboard: an operator gate in front of the maintenance sweeps | Accepted |
 
 ## Template
