@@ -114,7 +114,7 @@ describe('MailTemplatesListPage', () => {
 
     fireEvent.click(screen.getByText('Password reset'));
 
-    expect(navigateMock).toHaveBeenCalledWith('/admin/mail-templates/auth.password_reset');
+    expect(navigateMock).toHaveBeenCalledWith('/admin/email/templates/auth.password_reset');
   });
 
   it('navigates to the editor when a focused row is activated with the keyboard', () => {
@@ -123,7 +123,7 @@ describe('MailTemplatesListPage', () => {
     fireEvent.keyDown(screen.getByText('Account verification').closest('tr')!, { key: 'Enter' });
 
     expect(navigateMock).toHaveBeenCalledWith(
-      '/admin/mail-templates/auth.registration_verification',
+      '/admin/email/templates/auth.registration_verification',
     );
   });
 });

@@ -19,13 +19,11 @@
  * SPDX-License-Identifier: AGPL-3.0-only
  */
 
-import { useState, type KeyboardEvent } from 'react';
+import type { KeyboardEvent } from 'react';
 import Alert from '@mui/material/Alert';
 import Box from '@mui/material/Box';
-import Button from '@mui/material/Button';
 import LinearProgress from '@mui/material/LinearProgress';
 import Paper from '@mui/material/Paper';
-import Stack from '@mui/material/Stack';
 import Table from '@mui/material/Table';
 import TableBody from '@mui/material/TableBody';
 import TableCell from '@mui/material/TableCell';
@@ -33,13 +31,11 @@ import TableHead from '@mui/material/TableHead';
 import TableRow from '@mui/material/TableRow';
 import Tooltip from '@mui/material/Tooltip';
 import Typography from '@mui/material/Typography';
-import { ChevronRight, MailCheck } from 'lucide-react';
+import { ChevronRight } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import type { MailTemplateResponse } from '../../api/generated';
 import { useMailTemplates } from '../../api/hooks/useMailTemplates';
-import { PageHeader } from '../../components/admin/layout/PageHeader';
 import { ToneBadge } from '../../components/admin/ToneBadge';
-import { SendTestEmailDialog } from '../../components/admin/mail/SendTestEmailDialog';
 import { useFormatters } from '../../hooks/useFormatters';
 import { localeDisplayName, localeShortCode } from '../../utils/locale';
 
@@ -135,85 +131,67 @@ function TemplateRow({ template, onOpen }: { template: MailTemplateResponse; onO
 }
 
 /**
- * Mail-templates list (issue #144): a compact, navigable table over the closed registry — no
- * "add" CTA. Templates are managed per language (today only the configured default locale exists);
- * the Language column anticipates the per-locale variants i18n will add. Customised templates carry
- * an edit attribution, built-ins read as factory defaults. Opening a row routes to its editor.
+ * Mail-templates list (issue #144), the Templates tab of the email admin area (#525): a compact,
+ * navigable table over the closed registry — no "add" CTA. Templates are managed per language
+ * (today only the configured default locale exists); the Language column anticipates the
+ * per-locale variants i18n will add. Customised templates carry an edit attribution, built-ins
+ * read as factory defaults. Opening a row routes to its editor.
  */
 export function MailTemplatesListPage() {
   const { data, isLoading, isFetching, isError } = useMailTemplates();
   const navigate = useNavigate();
-  const [testOpen, setTestOpen] = useState(false);
 
   const templates = data?.templates ?? [];
 
   return (
-    <Stack spacing={3}>
-      <PageHeader
-        title="Mail templates"
-        description="Edit the transactional emails qnop sends, per language. Customised templates override the built-in defaults."
-        action={
-          <Button
-            variant="outlined"
-            startIcon={<MailCheck size={18} />}
-            onClick={() => setTestOpen(true)}
-          >
-            Send test email
-          </Button>
-        }
-      />
-
-      <Paper variant="outlined" sx={{ overflow: 'hidden' }}>
-        <Box sx={{ height: 3 }}>{isFetching && <LinearProgress />}</Box>
-        {isError ? (
-          <Alert severity="error" sx={{ m: 2 }}>
-            The mail templates could not be loaded.
-          </Alert>
-        ) : (
-          <Table size="small" sx={{ '& th': { borderColor: 'divider' } }}>
-            <TableHead>
-              <TableRow>
-                {COLUMNS.map((col, index) => (
-                  <TableCell
-                    key={col || 'chevron'}
-                    align={index === COLUMNS.length - 1 ? 'right' : 'left'}
-                    sx={{ fontSize: 12, color: 'text.secondary', fontWeight: 600 }}
-                  >
-                    {col}
-                  </TableCell>
-                ))}
-              </TableRow>
-            </TableHead>
-            <TableBody>
-              {!isLoading && templates.length === 0 && (
-                <TableRow>
-                  <TableCell colSpan={COLUMNS.length}>
-                    <Typography color="text.secondary" sx={{ py: 4, textAlign: 'center' }}>
-                      No mail templates.
-                    </Typography>
-                  </TableCell>
-                </TableRow>
-              )}
-              {templates.map((template) => (
-                <TemplateRow
-                  key={template.key}
-                  template={template}
-                  onOpen={() =>
-                    navigate(`/admin/mail-templates/${encodeURIComponent(template.key)}`)
-                  }
-                />
+    <Paper variant="outlined" sx={{ overflow: 'hidden' }}>
+      <Box sx={{ height: 3 }}>{isFetching && <LinearProgress />}</Box>
+      {isError ? (
+        <Alert severity="error" sx={{ m: 2 }}>
+          The mail templates could not be loaded.
+        </Alert>
+      ) : (
+        <Table size="medium" sx={{ '& th': { borderColor: 'divider' } }}>
+          <TableHead>
+            <TableRow>
+              {COLUMNS.map((col, index) => (
+                <TableCell
+                  key={col || 'chevron'}
+                  align={index === COLUMNS.length - 1 ? 'right' : 'left'}
+                  sx={{ fontSize: 12, color: 'text.secondary', fontWeight: 600 }}
+                >
+                  {col}
+                </TableCell>
               ))}
-            </TableBody>
-          </Table>
-        )}
-        {isLoading && (
-          <Typography color="text.secondary" sx={{ p: 2, fontSize: 14 }}>
-            Loading…
-          </Typography>
-        )}
-      </Paper>
-
-      <SendTestEmailDialog open={testOpen} onClose={() => setTestOpen(false)} />
-    </Stack>
+            </TableRow>
+          </TableHead>
+          <TableBody>
+            {!isLoading && templates.length === 0 && (
+              <TableRow>
+                <TableCell colSpan={COLUMNS.length}>
+                  <Typography color="text.secondary" sx={{ py: 4, textAlign: 'center' }}>
+                    No mail templates.
+                  </Typography>
+                </TableCell>
+              </TableRow>
+            )}
+            {templates.map((template) => (
+              <TemplateRow
+                key={template.key}
+                template={template}
+                onOpen={() =>
+                  navigate(`/admin/email/templates/${encodeURIComponent(template.key)}`)
+                }
+              />
+            ))}
+          </TableBody>
+        </Table>
+      )}
+      {isLoading && (
+        <Typography color="text.secondary" sx={{ p: 2, fontSize: 14 }}>
+          Loading…
+        </Typography>
+      )}
+    </Paper>
   );
 }

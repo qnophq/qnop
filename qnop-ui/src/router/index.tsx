@@ -20,7 +20,7 @@
  */
 
 import { lazy } from 'react';
-import { createBrowserRouter } from 'react-router-dom';
+import { Navigate, createBrowserRouter } from 'react-router-dom';
 import { AppShell } from '../components/shell/AppShell';
 import { LazyBoundary } from '../components/errors/LazyBoundary';
 import { AdminRoute } from '../components/auth/AdminRoute';
@@ -32,7 +32,9 @@ import { BrandingPage } from '../pages/admin/BrandingPage';
 import { StorageConsistencyPage } from '../pages/admin/StorageConsistencyPage';
 import { ProfilePage } from '../pages/ProfilePage';
 import { UserProfilePage } from '../pages/UserProfilePage';
+import { EmailLayout } from '../pages/admin/EmailLayout';
 import { EmailServerPage } from '../pages/admin/EmailServerPage';
+import { MailTemplatesKeyRedirect } from '../pages/admin/MailTemplatesKeyRedirect';
 import { MailTemplatesListPage } from '../pages/admin/MailTemplatesListPage';
 import { OidcProvidersPage } from '../pages/admin/OidcProvidersPage';
 import { SettingsPage } from '../pages/admin/SettingsPage';
@@ -197,30 +199,36 @@ export const router = createBrowserRouter([
         ),
       },
       {
+        // The email admin area (#525): one tabbed shell over the SMTP
+        // server settings and the mail templates, guarded once here.
         path: 'admin/email',
         element: (
           <AdminRoute>
-            <EmailServerPage />
+            <EmailLayout />
           </AdminRoute>
         ),
+        children: [
+          { index: true, element: <Navigate to="/admin/email/server" replace /> },
+          { path: 'server', element: <EmailServerPage /> },
+          { path: 'templates', element: <MailTemplatesListPage /> },
+          {
+            path: 'templates/:key',
+            element: (
+              <LazyBoundary>
+                <MailTemplateEditPage />
+              </LazyBoundary>
+            ),
+          },
+        ],
       },
+      // Pre-#525 bookmarks; targets are guarded, so no AdminRoute here.
       {
         path: 'admin/mail-templates',
-        element: (
-          <AdminRoute>
-            <MailTemplatesListPage />
-          </AdminRoute>
-        ),
+        element: <Navigate to="/admin/email/templates" replace />,
       },
       {
         path: 'admin/mail-templates/:key',
-        element: (
-          <AdminRoute>
-            <LazyBoundary>
-              <MailTemplateEditPage />
-            </LazyBoundary>
-          </AdminRoute>
-        ),
+        element: <MailTemplatesKeyRedirect />,
       },
       {
         path: 'admin/branding',

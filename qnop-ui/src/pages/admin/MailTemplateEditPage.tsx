@@ -42,7 +42,6 @@ import {
   useUpdateMailTemplate,
 } from '../../api/hooks/useMailTemplates';
 import { useMailTemplatePreview } from '../../api/hooks/useMailTemplatePreview';
-import { PageHeader } from '../../components/admin/layout/PageHeader';
 import { SectionCard } from '../../components/admin/layout/SectionCard';
 import { adminEmailApi } from '../../api/config';
 import { useAuthStore } from '../../stores/authStore';
@@ -94,7 +93,7 @@ export function MailTemplateEditPage() {
     return (
       <Alert severity="error">
         This template could not be loaded.{' '}
-        <Link component={RouterLink} to="/admin/mail-templates" underline="hover">
+        <Link component={RouterLink} to="/admin/email/templates" underline="hover">
           Back to templates
         </Link>
       </Alert>
@@ -226,15 +225,18 @@ function EditForm({
   return (
     <Box component="form" onSubmit={onSave} noValidate>
       <Stack spacing={3}>
-        <PageHeader
-          title={template.friendlyName}
-          titleAdornment={
+        {/* An h2 below the email area's page-level h1 (the EmailLayout header stays visible). */}
+        <Box sx={{ minWidth: 0 }}>
+          <Stack direction="row" spacing={1.5} sx={{ alignItems: 'center' }}>
+            <Typography variant="h2" sx={{ fontSize: 22 }} noWrap>
+              {template.friendlyName}
+            </Typography>
             <ToneBadge
               tone={isCustomised ? 'blue' : 'neutral'}
               label={isCustomised ? 'Custom' : 'Default'}
             />
-          }
-          description={
+          </Stack>
+          <Typography color="text.secondary" sx={{ mt: 0.5 }}>
             <Box component="span" sx={{ fontFamily: 'monospace', fontSize: 13 }}>
               {template.key} · {template.locale}
               {isCustomised && (
@@ -244,8 +246,8 @@ function EditForm({
                 </Box>
               )}
             </Box>
-          }
-        />
+          </Typography>
+        </Box>
 
         <Box
           sx={{
