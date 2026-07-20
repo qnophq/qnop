@@ -84,4 +84,26 @@ describe('OrphanedObjectsTable', () => {
     expect(screen.getByRole('checkbox', { name: 'Select all orphaned objects' })).toBeDisabled();
     expect(screen.getByRole('button', { name: 'Delete sha256/ab/orphan-one' })).toBeDisabled();
   });
+
+  it('has no pagination for a short list', () => {
+    render(OBJECTS);
+    expect(screen.queryByLabelText('Objects per page')).not.toBeInTheDocument();
+  });
+
+  it('paginates a long list and reveals later rows on the next page', () => {
+    const many: OrphanedObject[] = Array.from({ length: 30 }, (_, i) => ({
+      storageKey: `sha256/xx/orphan-${String(i).padStart(2, '0')}`,
+      size: 1024,
+      lastModified: '2026-07-01T10:00:00Z',
+    }));
+    render(many);
+
+    // Default page size is 25: the first page shows 0..24, not the 26th row.
+    expect(screen.getByLabelText('Select sha256/xx/orphan-00')).toBeInTheDocument();
+    expect(screen.queryByLabelText('Select sha256/xx/orphan-25')).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: /next page/i }));
+    expect(screen.getByLabelText('Select sha256/xx/orphan-25')).toBeInTheDocument();
+    expect(screen.queryByLabelText('Select sha256/xx/orphan-00')).not.toBeInTheDocument();
+  });
 });

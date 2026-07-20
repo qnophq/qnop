@@ -19,12 +19,15 @@
  * SPDX-License-Identifier: AGPL-3.0-only
  */
 
+import { useState } from 'react';
 import Checkbox from '@mui/material/Checkbox';
 import IconButton from '@mui/material/IconButton';
 import Table from '@mui/material/Table';
 import TableBody from '@mui/material/TableBody';
 import TableCell from '@mui/material/TableCell';
+import TableFooter from '@mui/material/TableFooter';
 import TableHead from '@mui/material/TableHead';
+import TablePagination from '@mui/material/TablePagination';
 import TableRow from '@mui/material/TableRow';
 import Tooltip from '@mui/material/Tooltip';
 import Typography from '@mui/material/Typography';
@@ -33,6 +36,9 @@ import type { OrphanedObject } from '../../../api/generated';
 import { useFormatters } from '../../../hooks/useFormatters';
 import { formatBytes } from '../../../utils/formatBytes';
 import { StorageKey } from './StorageKey';
+
+/** Page sizes for the orphaned-objects table; the smallest is also the default. */
+const ROWS_PER_PAGE_OPTIONS = [25, 50, 100] as const;
 
 interface OrphanedObjectsTableProps {
   objects: OrphanedObject[];
@@ -49,6 +55,11 @@ interface OrphanedObjectsTableProps {
  * their size and age. Rows are selectable for a bulk delete, and each has a
  * single-delete action; both are locked while a deletion runs. Keys render
  * monospaced and copyable — never as bare truncated text.
+ *
+ * The list can grow large on a drifted bucket, so it is paginated client-side
+ * (the scan returns one atomic snapshot, so there is nothing to fetch per page).
+ * Selection lives with the parent and therefore persists across pages: the
+ * header checkbox selects/clears <em>every</em> orphan, not just the visible page.
  */
 export function OrphanedObjectsTable({
   objects,
@@ -61,6 +72,19 @@ export function OrphanedObjectsTable({
   const { formatDateTime, formatRelative } = useFormatters();
   const allSelected = objects.length > 0 && selected.size === objects.length;
   const someSelected = selected.size > 0 && !allSelected;
+
+  const [page, setPage] = useState(0);
+  const [rowsPerPage, setRowsPerPage] = useState<number>(ROWS_PER_PAGE_OPTIONS[0]);
+
+  // A delete + rescan can shrink the list past the current page. Clamp during
+  // render (rather than writing state back in an effect) so the slice — and the
+  // page prop MUI receives — always stay in range without an extra render.
+  const pageCount = Math.ceil(objects.length / rowsPerPage);
+  const safePage = Math.min(page, Math.max(0, pageCount - 1));
+
+  const start = safePage * rowsPerPage;
+  const visible = objects.slice(start, start + rowsPerPage);
+  const showPagination = objects.length > ROWS_PER_PAGE_OPTIONS[0];
 
   return (
     <Table size="small">
@@ -91,7 +115,7 @@ export function OrphanedObjectsTable({
             </TableCell>
           </TableRow>
         ) : (
-          objects.map((object) => {
+          visible.map((object) => {
             const key = object.storageKey;
             const checked = selected.has(key);
             return (
@@ -138,6 +162,26 @@ export function OrphanedObjectsTable({
           })
         )}
       </TableBody>
+      {showPagination && (
+        <TableFooter>
+          <TableRow>
+            <TablePagination
+              rowsPerPageOptions={[...ROWS_PER_PAGE_OPTIONS]}
+              count={objects.length}
+              rowsPerPage={rowsPerPage}
+              page={safePage}
+              colSpan={5}
+              labelRowsPerPage="Objects per page"
+              onPageChange={(_, next) => setPage(next)}
+              onRowsPerPageChange={(event) => {
+                setRowsPerPage(parseInt(event.target.value, 10));
+                setPage(0);
+              }}
+              slotProps={{ select: { 'aria-label': 'Objects per page' } }}
+            />
+          </TableRow>
+        </TableFooter>
+      )}
     </Table>
   );
 }
