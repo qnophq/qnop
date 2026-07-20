@@ -10,7 +10,7 @@
 # Extend JVM flags via JDK_JAVA_OPTS (picked up by the java launcher), e.g.
 #   JDK_JAVA_OPTS="-Xlog:gc* -XX:MaxRAMPercentage=60.0"
 
-FROM eclipse-temurin:21.0.11_10-jre@sha256:d2b9f8f12212cadcfdf889461531784e8fd097feade954d65b31ee7a71c473ec
+FROM eclipse-temurin:21.0.11_10-jre@sha256:273396ed5998598ed1091e8d72711c2d36980a0e65103859c55a4e977a41ffd3
 WORKDIR /app
 
 # Run unprivileged.
