@@ -23,6 +23,8 @@ package io.qnop.service;
 import io.qnop.entity.RefreshToken;
 import io.qnop.repository.RefreshTokenRepository;
 import io.qnop.security.QnopProperties;
+import io.qnop.service.scheduler.SchedulerJobCatalog;
+import io.qnop.service.scheduler.SchedulerService;
 import java.security.SecureRandom;
 import java.time.Duration;
 import java.time.Instant;
@@ -58,13 +60,18 @@ public class RefreshTokenService {
   private final RefreshTokenRepository repository;
   private final RefreshTokenHasher hasher;
   private final QnopProperties properties;
+  private final SchedulerService scheduler;
   private static final SecureRandom SECURE_RANDOM = new SecureRandom();
 
   public RefreshTokenService(
-      RefreshTokenRepository repository, RefreshTokenHasher hasher, QnopProperties properties) {
+      RefreshTokenRepository repository,
+      RefreshTokenHasher hasher,
+      QnopProperties properties,
+      SchedulerService scheduler) {
     this.repository = repository;
     this.hasher = hasher;
     this.properties = properties;
+    this.scheduler = scheduler;
   }
 
   /** Issues a fresh refresh token in a new family (initial login). */
@@ -120,9 +127,13 @@ public class RefreshTokenService {
    * security purpose (reuse detection) is moot after expiry.
    */
   @Scheduled(cron = "0 40 3 * * *")
-  @SchedulerLock(name = "refreshTokenSweep", lockAtMostFor = "PT5M")
-  @Transactional
+  @SchedulerLock(name = SchedulerJobCatalog.REFRESH_TOKEN_SWEEP, lockAtMostFor = "PT5M")
   public void sweepExpired() {
+    scheduler.runScheduled(SchedulerJobCatalog.REFRESH_TOKEN_SWEEP);
+  }
+
+  /** The raw purge, run inside the scheduler gate's transaction (issue #524). */
+  public void sweepExpiredOnce() {
     repository.deleteExpiredBefore(Instant.now());
   }
 

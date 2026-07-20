@@ -32,6 +32,7 @@ import static org.mockito.Mockito.when;
 
 import io.qnop.entity.StorageObject;
 import io.qnop.repository.StorageObjectRepository;
+import io.qnop.service.scheduler.SchedulerService;
 import io.qnop.spi.storage.StorageProvider;
 import java.io.ByteArrayInputStream;
 import java.io.InputStream;
@@ -52,7 +53,8 @@ class StorageServiceTest {
   private final StorageProvider provider = mock(StorageProvider.class);
   private final StorageObjectRepository repository = mock(StorageObjectRepository.class);
   private final StorageService storage =
-      new StorageService(provider, repository, mock(S3Properties.class));
+      new StorageService(
+          provider, repository, mock(S3Properties.class), mock(SchedulerService.class));
 
   private static InputStream content() {
     return new ByteArrayInputStream("some qnop document bytes".getBytes());

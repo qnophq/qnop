@@ -33,6 +33,7 @@ import io.qnop.repository.PasswordResetTokenRepository;
 import io.qnop.service.ApplicationSettingKey;
 import io.qnop.service.ApplicationSettingsService;
 import io.qnop.service.auth.PasswordResetTokenService.InvalidPasswordResetTokenException;
+import io.qnop.service.scheduler.SchedulerService;
 import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
@@ -48,12 +49,13 @@ class PasswordResetTokenServiceTest {
 
   @Mock private PasswordResetTokenRepository tokens;
   @Mock private ApplicationSettingsService settings;
+  @Mock private SchedulerService scheduler;
   private PasswordResetTokenService service;
   private final User user = User.internal("Jane", "jane@example.com", "jane", "hash");
 
   @BeforeEach
   void setUp() {
-    service = new PasswordResetTokenService(tokens, settings);
+    service = new PasswordResetTokenService(tokens, settings, scheduler);
   }
 
   @Test

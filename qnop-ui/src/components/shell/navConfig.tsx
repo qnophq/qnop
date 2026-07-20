@@ -20,6 +20,7 @@
  */
 
 import {
+  CalendarClock,
   FileText,
   KeyRound,
   LayoutDashboard,
@@ -112,6 +113,13 @@ export const NAV_GROUPS: NavGroup[] = [
         label: 'Mail templates',
         path: '/admin/mail-templates',
         icon: Mail,
+        roles: ['ADMIN'],
+      },
+      {
+        id: 'scheduler',
+        label: 'Scheduler',
+        path: '/admin/scheduler',
+        icon: CalendarClock,
         roles: ['ADMIN'],
       },
       {

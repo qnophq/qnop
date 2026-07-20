@@ -35,6 +35,7 @@ import io.qnop.entity.User;
 import io.qnop.repository.RevokedTokenRepository;
 import io.qnop.repository.UserRepository;
 import io.qnop.security.QnopProperties;
+import io.qnop.service.scheduler.SchedulerService;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
@@ -60,13 +61,14 @@ class TokenRevocationServiceTest {
 
   @Mock private RevokedTokenRepository revokedTokens;
   @Mock private UserRepository users;
+  @Mock private SchedulerService scheduler;
 
   private final UUID userId = UUID.randomUUID();
   private TokenRevocationService service;
 
   @BeforeEach
   void setUp() {
-    service = new TokenRevocationService(revokedTokens, users, properties());
+    service = new TokenRevocationService(revokedTokens, users, properties(), scheduler);
   }
 
   @Test

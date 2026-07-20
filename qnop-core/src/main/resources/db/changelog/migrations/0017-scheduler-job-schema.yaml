@@ -1,0 +1,66 @@
+# Copyright (c) 2026-present devtank42 GmbH
+#
+# This file is part of qnop (Qualified Notes on Papers).
+#
+# qnop is free software: you can redistribute it and/or modify it under the
+# terms of the GNU Affero General Public License as published by the Free
+# Software Foundation, either version 3 of the License, or (at your option)
+# any later version.
+#
+# qnop is distributed in the hope that it will be useful, but WITHOUT ANY
+# WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS
+# FOR A PARTICULAR PURPOSE. See the GNU Affero General Public License for more
+# details.
+#
+# You should have received a copy of the GNU Affero General Public License
+# along with qnop. If not, see <https://www.gnu.org/licenses/>.
+#
+# SPDX-License-Identifier: AGPL-3.0-only
+
+# Operator-controlled state for the scheduled maintenance sweeps (issue #524,
+# ADR-0045). The static catalogue (display name, cron, dry-run capability) lives
+# in code; this table holds only what an admin can change (enabled, dry_run) and
+# the outcome of the most recent run. One row per catalogued job, keyed by the
+# natural job_id (the ShedLock name), seeded idempotently at start-up. JPA runs
+# ddl-auto=none, so the entity mapping (io.qnop.entity.SchedulerJob) must match
+# these definitions exactly.
+databaseChangeLog:
+  - changeSet:
+      id: 0017-scheduler-job
+      author: qnop
+      comment: Scheduler-job operator state (enabled / dry-run / last-run outcome), issue #524.
+      changes:
+        - createTable:
+            tableName: scheduler_job
+            columns:
+              - column:
+                  name: job_id
+                  type: VARCHAR(64)
+                  constraints: { primaryKey: true, nullable: false }
+              - column:
+                  name: enabled
+                  type: BOOLEAN
+                  defaultValueBoolean: true
+                  constraints: { nullable: false }
+              - column:
+                  name: dry_run
+                  type: BOOLEAN
+                  defaultValueBoolean: false
+                  constraints: { nullable: false }
+              - column: { name: last_run_at, type: TIMESTAMP WITH TIME ZONE }
+              - column: { name: last_outcome, type: VARCHAR(16) }
+              - column: { name: last_trigger, type: VARCHAR(16) }
+              - column: { name: last_detail, type: VARCHAR(512) }
+              - column:
+                  name: version
+                  type: BIGINT
+                  defaultValueNumeric: 0
+                  constraints: { nullable: false }
+              - column:
+                  name: created_at
+                  type: TIMESTAMP WITH TIME ZONE
+                  constraints: { nullable: false }
+              - column:
+                  name: updated_at
+                  type: TIMESTAMP WITH TIME ZONE
+                  constraints: { nullable: false }

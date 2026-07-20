@@ -31,6 +31,7 @@ import io.qnop.entity.RefreshToken;
 import io.qnop.repository.RefreshTokenRepository;
 import io.qnop.security.JwtKeyService;
 import io.qnop.security.QnopProperties;
+import io.qnop.service.scheduler.SchedulerService;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.Optional;
@@ -46,6 +47,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 class RefreshTokenServiceTest {
 
   @Mock private RefreshTokenRepository repository;
+  @Mock private SchedulerService scheduler;
 
   private RefreshTokenService service;
 
@@ -64,7 +66,7 @@ class RefreshTokenServiceTest {
                 null),
             new QnopProperties.Cors(null));
     RefreshTokenHasher hasher = new RefreshTokenHasher(new JwtKeyService(properties));
-    service = new RefreshTokenService(repository, hasher, properties);
+    service = new RefreshTokenService(repository, hasher, properties, scheduler);
   }
 
   @Test

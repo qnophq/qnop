@@ -30,6 +30,7 @@ import io.qnop.entity.EmailVerificationToken;
 import io.qnop.entity.User;
 import io.qnop.repository.EmailVerificationTokenRepository;
 import io.qnop.service.auth.EmailVerificationTokenService.InvalidVerificationTokenException;
+import io.qnop.service.scheduler.SchedulerService;
 import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
@@ -44,12 +45,13 @@ import org.mockito.junit.jupiter.MockitoExtension;
 class EmailVerificationTokenServiceTest {
 
   @Mock private EmailVerificationTokenRepository tokens;
+  @Mock private SchedulerService scheduler;
   private EmailVerificationTokenService service;
   private final User user = User.internal("Jane", "jane@example.com", "jane", "hash");
 
   @BeforeEach
   void setUp() {
-    service = new EmailVerificationTokenService(tokens);
+    service = new EmailVerificationTokenService(tokens, scheduler);
   }
 
   @Test

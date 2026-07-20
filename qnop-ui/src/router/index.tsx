@@ -36,6 +36,7 @@ import { MailTemplatesListPage } from '../pages/admin/MailTemplatesListPage';
 import { OidcProvidersPage } from '../pages/admin/OidcProvidersPage';
 import { SettingsPage } from '../pages/admin/SettingsPage';
 import { ConfigurationPage } from '../pages/admin/ConfigurationPage';
+import { SchedulerPage } from '../pages/admin/SchedulerPage';
 import { UsersPage } from '../pages/admin/UsersPage';
 import { TeamsPage } from '../pages/admin/TeamsPage';
 import { TeamDetailPage } from '../pages/admin/TeamDetailPage';
@@ -175,6 +176,14 @@ export const router = createBrowserRouter([
         element: (
           <AdminRoute>
             <ConfigurationPage />
+          </AdminRoute>
+        ),
+      },
+      {
+        path: 'admin/scheduler',
+        element: (
+          <AdminRoute>
+            <SchedulerPage />
           </AdminRoute>
         ),
       },
