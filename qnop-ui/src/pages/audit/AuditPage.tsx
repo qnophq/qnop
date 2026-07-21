@@ -26,16 +26,15 @@ import Box from '@mui/material/Box';
 import Button from '@mui/material/Button';
 import Chip from '@mui/material/Chip';
 import Collapse from '@mui/material/Collapse';
-import IconButton from '@mui/material/IconButton';
-import InputAdornment from '@mui/material/InputAdornment';
 import LinearProgress from '@mui/material/LinearProgress';
 import Paper from '@mui/material/Paper';
 import Stack from '@mui/material/Stack';
 import TablePagination from '@mui/material/TablePagination';
 import TextField from '@mui/material/TextField';
 import Typography from '@mui/material/Typography';
-import { ChevronDown, HelpCircle, X } from 'lucide-react';
+import { ChevronDown, HelpCircle } from 'lucide-react';
 import { useAuditLog } from '../../api/hooks/useAuditLog';
+import { ClearableSearchField } from '../../components/ClearableSearchField';
 import { AuditTable } from '../../components/audit/AuditTable';
 import { AuditEventBadge } from '../../components/audit/AuditEventBadge';
 import { PageHeader } from '../../components/admin/layout/PageHeader';
@@ -198,35 +197,21 @@ export function AuditPage() {
             <TextField {...params} label="Event type" placeholder="All events" />
           )}
         />
-        <TextField
+        <ClearableSearchField
           label="Search details"
           value={detailSearch}
-          onChange={(e) => setDetailSearch(e.target.value)}
-          placeholder="e.g. a storage key or workflow state"
-          size="small"
-          sx={{ minWidth: 240, flexGrow: 1, maxWidth: 360 }}
-          slotProps={{
-            htmlInput: { maxLength: 256 },
-            input: {
-              endAdornment: detailSearch ? (
-                <InputAdornment position="end">
-                  <IconButton
-                    size="small"
-                    edge="end"
-                    aria-label="Clear the details search"
-                    onClick={() => {
-                      // Skip the debounce on reset — the filter drops immediately.
-                      setDetailSearch('');
-                      setDebouncedDetail('');
-                      setPage(0);
-                    }}
-                  >
-                    <X size={16} />
-                  </IconButton>
-                </InputAdornment>
-              ) : undefined,
-            },
+          onValueChange={setDetailSearch}
+          onClear={() => {
+            // Skip the debounce on reset — the filter drops immediately.
+            setDetailSearch('');
+            setDebouncedDetail('');
+            setPage(0);
           }}
+          clearLabel="Clear the details search"
+          hideSearchIcon
+          maxLength={256}
+          placeholder="e.g. a storage key or workflow state"
+          sx={{ minWidth: 240, flexGrow: 1, maxWidth: 360 }}
         />
         <TextField
           type="datetime-local"

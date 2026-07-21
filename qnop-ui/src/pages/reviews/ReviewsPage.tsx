@@ -24,8 +24,6 @@ import Alert from '@mui/material/Alert';
 import Box from '@mui/material/Box';
 import Button from '@mui/material/Button';
 import Chip from '@mui/material/Chip';
-import IconButton from '@mui/material/IconButton';
-import InputAdornment from '@mui/material/InputAdornment';
 import MenuItem from '@mui/material/MenuItem';
 import Paper from '@mui/material/Paper';
 import Skeleton from '@mui/material/Skeleton';
@@ -34,10 +32,11 @@ import TextField from '@mui/material/TextField';
 import ToggleButton from '@mui/material/ToggleButton';
 import ToggleButtonGroup from '@mui/material/ToggleButtonGroup';
 import Typography from '@mui/material/Typography';
-import { LayoutGrid, Plus, Rows3, Search, X } from 'lucide-react';
+import { LayoutGrid, Plus, Rows3 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import type { DocumentSummary } from '../../api/generated';
 import { useReviews } from '../../api/hooks/useReviews';
+import { ClearableSearchField } from '../../components/ClearableSearchField';
 import { PageHeader } from '../../components/admin/layout/PageHeader';
 import { isOpenWorkflowState } from '../../components/reviews/workflowMeta';
 import { roleOf } from '../../components/reviews/list/reviewListModel';
@@ -240,33 +239,11 @@ export function ReviewsPage() {
             spacing={2}
             sx={{ alignItems: { md: 'center' } }}
           >
-            <TextField
-              size="small"
+            <ClearableSearchField
               placeholder="Search reviews…"
               value={search}
-              onChange={(e) => setSearch(e.target.value)}
+              onValueChange={setSearch}
               sx={{ width: { xs: '100%', md: 280 } }}
-              slotProps={{
-                input: {
-                  startAdornment: (
-                    <InputAdornment position="start">
-                      <Search size={16} />
-                    </InputAdornment>
-                  ),
-                  endAdornment: search ? (
-                    <InputAdornment position="end">
-                      <IconButton
-                        aria-label="Clear search"
-                        size="small"
-                        edge="end"
-                        onClick={() => setSearch('')}
-                      >
-                        <X size={16} />
-                      </IconButton>
-                    </InputAdornment>
-                  ) : undefined,
-                },
-              }}
             />
             <Box sx={{ flex: 1 }} />
             <TextField
