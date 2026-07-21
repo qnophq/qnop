@@ -19,28 +19,18 @@ import com.github.jk1.license.render.JsonReportRenderer
 plugins {
     alias(libs.plugins.spring.boot) apply false
     alias(libs.plugins.openapi.generator) apply false
-    // OWASP Dependency-Check (issue #195): applied at the root so
-    // `dependencyCheckAggregate` scans every module against the NVD. It is NOT wired
-    // into `check`/`build`, so the local gate is unaffected; the CI `backend-audit`
-    // job invokes it only when an NVD API key secret is present (otherwise the NVD
-    // feed is heavily rate-limited).
-    alias(libs.plugins.dependency.check)
     // Dependency-license scanner (issue #498, ADR-0007): applied at the root so
     // `checkLicense` aggregates every module's shipped dependencies and fails on any
-    // license outside the permissive allowlist. Like the OWASP gate above it is NOT
-    // wired into `check`/`build`; the CI `license-scan` job invokes it explicitly.
+    // license outside the permissive allowlist. NOT wired into `check`/`build`; the
+    // CI `license-scan` job invokes it explicitly.
     alias(libs.plugins.license.report)
-}
-
-dependencyCheck {
-    // Fail on a high/critical advisory (CVSS >= 7.0) in any module's runtime deps.
-    failBuildOnCVSS = 7.0f
-    formats = listOf("HTML", "SARIF")
-    // NVD API key from the NVD_API_KEY env var (CI secret) or a -PnvdApiKey property;
-    // kept off the command line so it does not leak into build logs.
-    (findProperty("nvdApiKey") as String? ?: System.getenv("NVD_API_KEY"))
-        ?.takeIf { it.isNotBlank() }
-        ?.let { nvd.apiKey = it }
+    // CycloneDX SBOM generation (issue #496): declared here so the plugin loads
+    // once in the shared root classloader scope; qnop-app applies it (without a
+    // version) to emit a CycloneDX SBOM of its runtime classpath. The CI Trivy
+    // SBOM scan gates on that SBOM (CRITICAL fails, HIGH warns), replacing the
+    // OWASP Dependency-Check job that was a no-op without an NVD API key (issue
+    // #195, ADR-0007 amendment).
+    alias(libs.plugins.cyclonedx.bom) apply false
 }
 
 // Dependency-license policy (issue #498, ADR-0007). Scans only what we ship —

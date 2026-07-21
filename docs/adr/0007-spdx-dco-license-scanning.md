@@ -30,7 +30,7 @@ The full dependency-license scanner promised "once real dependencies land" (e.g.
 
 ## Amendment (2026-07-22, license scanner wired — issue #498)
 
-The dependency-license scanner is now in CI. The [jk1 `dependency-license-report`](https://github.com/jk1/Gradle-License-Report) Gradle plugin is applied at the root (like the OWASP gate, and likewise **not** wired into `check`/`build`); the CI `license-scan` job runs `checkLicense`, which fails on any dependency on a module's **`runtimeClasspath`** (i.e. what actually ships — test/compile-only licenses such as JUnit's EPL never gate the product) whose license falls outside the allowlist in `config/allowed-licenses.json`.
+The dependency-license scanner is now in CI. The [jk1 `dependency-license-report`](https://github.com/jk1/Gradle-License-Report) Gradle plugin is applied at the root (**not** wired into `check`/`build`); the CI `license-scan` job runs `checkLicense`, which fails on any dependency on a module's **`runtimeClasspath`** (i.e. what actually ships — test/compile-only licenses such as JUnit's EPL never gate the product) whose license falls outside the allowlist in `config/allowed-licenses.json`.
 
 **Policy encoded in the allowlist:**
 
@@ -40,3 +40,14 @@ The dependency-license scanner is now in CI. The [jk1 `dependency-license-report
 Because jk1 treats a dependency as compliant when **at least one** of its licenses is allowed, scoping every non-permissive license to a single module keeps the gate strict: a new copyleft dependency that is not explicitly listed fails CI and forces a conscious review. The jk1 task is run with `--no-configuration-cache --no-parallel` (it resolves cross-module configurations at execution time, incompatible with the repo's config cache / parallel execution); this affects only the `license-scan` job.
 
 Deeper provenance/SBOM tooling (ScanCode/ORT) remains a future option if a full SBOM or license-text audit is required; the CI gate here covers the contamination concern this ADR set out to address.
+
+## Amendment (2026-07-22, vulnerability scanning: Trivy SBOM replaces OWASP; issue #496)
+
+The **vulnerability** side of dependency scanning (distinct from the license side above) is now a dedicated `security.yml` workflow with two Trivy scans:
+
+- **Trivy filesystem scan** (`fs`, scanners `vuln,secret`) over the whole repo, reporting to the code-scanning (Security) tab via SARIF. Reporting only — it does not fail the build.
+- **Trivy CycloneDX-SBOM scan** — the active **backend CVE gate**. Trivy's filesystem scan cannot parse the Gradle Kotlin DSL to enumerate Java dependencies, so the build emits a CycloneDX SBOM of **qnop-app's resolved `runtimeClasspath`** (the `org.cyclonedx.bom` Gradle plugin, test configurations excluded so a test-tool CVE never gates a shipped artifact), which Trivy then scans: **a CRITICAL advisory fails the build; HIGH warns** (reported to the log and the Security tab).
+
+**NVD_API_KEY decision.** The former OWASP Dependency-Check CI job (`backend-audit`, issue #195) required a (free) NVD API key to hit the NVD feed without crippling rate-limiting; without the `NVD_API_KEY` secret it exited early, so the only active dependency gate was the frontend `pnpm audit`. Rather than take on the operational burden of provisioning and rotating an NVD key, we **drop OWASP Dependency-Check entirely** (job, Gradle plugin, and version-catalog entry) in favour of Trivy, whose self-maintained vulnerability DB needs **no API key** and is therefore always active. The frontend `pnpm audit` gate is unchanged.
+
+**Consequences.** The backend now has an always-on CVE gate with no secret to manage; newly-disclosed CVEs against unchanged code surface via a weekly scheduled run. Trivy's DB and OWASP's NVD-derived data can differ at the margins, and CVSS-7.0-but-not-CRITICAL advisories no longer hard-fail (they warn as HIGH) — an intentional trade to keep the gate actionable. Dependency-**license** scanning (the amendment above, issue #498) is a separate CI gate and is unaffected.

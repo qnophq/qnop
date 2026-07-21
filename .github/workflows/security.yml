@@ -1,0 +1,119 @@
+# SPDX-License-Identifier: AGPL-3.0-only
+name: Security
+
+# Security scanning (issue #496), split from ci.yml so it owns the
+# `security-events: write` permission the SARIF upload needs and can run on a
+# weekly schedule to catch newly-disclosed CVEs against unchanged code.
+on:
+  push:
+    branches: [main]
+  pull_request:
+  schedule:
+    # Weekly (Mon 05:27 UTC): re-scan main so a CVE disclosed after the last
+    # push still surfaces, without waiting for the next change.
+    - cron: '27 5 * * 1'
+
+concurrency:
+  group: security-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  trivy-fs:
+    name: Trivy filesystem scan (vuln + secret)
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      # Upload SARIF to the code-scanning (Security) tab.
+      security-events: write
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
+      # A repository-wide vulnerability + secret sweep. Reporting only — findings
+      # land in the Security tab (exit-code 0); the active CVE gate is the SBOM
+      # scan below. Trivy's own maintained DB needs no NVD API key.
+      - name: Trivy filesystem scan
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        with:
+          scan-type: fs
+          scan-ref: .
+          scanners: vuln,secret
+          format: sarif
+          output: trivy-fs.sarif
+          severity: MEDIUM,HIGH,CRITICAL
+          exit-code: '0'
+          hide-progress: 'true'
+      - name: Upload filesystem SARIF
+        # A fork PR carries a read-only token, so the upload would 403 — skip it
+        # there (the scan itself still ran); same-repo PRs and pushes upload.
+        if: >-
+          ${{ !cancelled()
+          && (github.event_name != 'pull_request'
+          || github.event.pull_request.head.repo.full_name == github.repository) }}
+        uses: github/codeql-action/upload-sarif@e58424170fb0262c8d7ed60a2e84b9bffe205c67 # codeql-bundle-v2.26.1
+        with:
+          sarif_file: trivy-fs.sarif
+          category: trivy-fs
+
+  trivy-sbom:
+    name: Trivy SBOM scan (backend runtime deps)
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      security-events: write
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
+      - uses: actions/setup-java@03ad4de0992f5dab5e18fcb136590ce7c4a0ac95 # v5
+        with:
+          distribution: temurin
+          java-version: '21'
+      - uses: gradle/actions/setup-gradle@3f131e8634966bd73d06cc69884922b02e6faf92 # v6
+      # Trivy's filesystem scan cannot parse the Gradle Kotlin DSL to enumerate
+      # Java dependencies, so scan a CycloneDX SBOM of the *resolved* runtime
+      # classpath instead (issue #496). Test-only configurations are excluded in
+      # the build script, so a CVE in a test tool never gates a shipped artifact.
+      - name: Generate CycloneDX SBOM (qnop-app runtime classpath)
+        run: ./gradlew :qnop-app:cyclonedxBom --stacktrace
+      # Report HIGH + CRITICAL advisories to the job log (HIGH warns, does not
+      # fail) so a reviewer sees them inline.
+      - name: SBOM vulnerability report (HIGH + CRITICAL)
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        with:
+          scan-type: sbom
+          scan-ref: qnop-app/build/reports/bom.json
+          format: table
+          severity: HIGH,CRITICAL
+          exit-code: '0'
+          hide-progress: 'true'
+      - name: SBOM SARIF
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        with:
+          scan-type: sbom
+          scan-ref: qnop-app/build/reports/bom.json
+          format: sarif
+          output: trivy-sbom.sarif
+          severity: HIGH,CRITICAL
+          exit-code: '0'
+          hide-progress: 'true'
+      - name: Upload SBOM SARIF
+        if: >-
+          ${{ !cancelled()
+          && (github.event_name != 'pull_request'
+          || github.event.pull_request.head.repo.full_name == github.repository) }}
+        uses: github/codeql-action/upload-sarif@e58424170fb0262c8d7ed60a2e84b9bffe205c67 # codeql-bundle-v2.26.1
+        with:
+          sarif_file: trivy-sbom.sarif
+          category: trivy-sbom
+      # The gate: a CRITICAL advisory in a shipped runtime dependency fails the
+      # build. Replaces the OWASP Dependency-Check job, which was a no-op without
+      # an NVD API key (issue #195, ADR-0007 amendment).
+      - name: Fail on a CRITICAL advisory
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        with:
+          scan-type: sbom
+          scan-ref: qnop-app/build/reports/bom.json
+          format: table
+          severity: CRITICAL
+          exit-code: '1'
+          hide-progress: 'true'
