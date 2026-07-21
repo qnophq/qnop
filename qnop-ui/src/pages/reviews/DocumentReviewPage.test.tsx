@@ -440,6 +440,54 @@ describe('DocumentReviewPage deep link', () => {
   });
 });
 
+// Issue #480: placement actions must not collapse the annotation they act on.
+// Arming re-attach clears the selection only in focus mode, where the floating
+// card must make way so the document is selectable.
+describe('DocumentReviewPage placement actions (#480)', () => {
+  afterEach(() => {
+    localStorage.removeItem('qnop-review-view-mode');
+  });
+
+  function seedOrphaned() {
+    seedHappyPath();
+    vi.mocked(useAnnotations).mockReturnValue(
+      asQuery({
+        data: { annotations: [{ ...ANNOTATIONS[0], placementStatus: PlacementStatus.Orphaned }] },
+      }),
+    );
+  }
+
+  it('keeps the annotation expanded when arming re-attach in panel mode', () => {
+    useAuthStore.setState({ userId: 'u1' });
+    seedOrphaned();
+    renderPage('/reviews/doc-1?annotation=a1');
+    expect(screen.getByTestId('annotation-item-a1')).toHaveAttribute('aria-expanded', 'true');
+
+    // Exact name: the expanded row is itself role="button" and its accessible
+    // name contains the action's text, so a substring match would be ambiguous.
+    fireEvent.click(screen.getByRole('button', { name: 'Re-attach' }));
+
+    expect(screen.getByTestId('reattach-hint')).toBeInTheDocument();
+    expect(screen.getByTestId('annotation-item-a1')).toHaveAttribute('aria-expanded', 'true');
+  });
+
+  it('still clears the selection and closes the drawer when arming re-attach in focus mode', () => {
+    useAuthStore.setState({ userId: 'u1' });
+    seedOrphaned();
+    renderPage('/reviews/doc-1?annotation=a1&view=focus');
+
+    fireEvent.click(screen.getByRole('button', { name: /Show annotations/ }));
+    expect(screen.getByTestId('annotation-item-a1')).toHaveAttribute('aria-expanded', 'true');
+
+    fireEvent.click(screen.getByRole('button', { name: 'Re-attach' }));
+    expect(screen.getByTestId('reattach-hint')).toBeInTheDocument();
+
+    // The selection is cleared so the focus overlay cannot spring back onto
+    // the thread (issue #403); the drawer closes, its content stays mounted.
+    expect(screen.getByTestId('annotation-item-a1')).toHaveAttribute('aria-expanded', 'false');
+  });
+});
+
 describe('DocumentReviewPage on an older version', () => {
   it('shows the read-only banner with a jump to the latest version', () => {
     seedHappyPath();

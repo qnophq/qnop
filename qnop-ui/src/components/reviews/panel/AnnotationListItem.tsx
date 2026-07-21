@@ -19,7 +19,7 @@
  * SPDX-License-Identifier: AGPL-3.0-only
  */
 
-import { memo } from 'react';
+import { memo, type MouseEvent } from 'react';
 import Box from '@mui/material/Box';
 import ButtonBase from '@mui/material/ButtonBase';
 import Stack from '@mui/material/Stack';
@@ -232,7 +232,16 @@ function AnnotationListItemBase({
       // Expanded, the card hosts real buttons (the head's copy-link) — a
       // <button> may not nest, so the active card is a div with button role.
       component={active ? 'div' : 'button'}
-      onClick={() => {
+      onClick={(event: MouseEvent<HTMLElement>) => {
+        // The expanded card hosts real interactive controls (placement
+        // actions, copy, reactions, profile links). Each stops propagation,
+        // but the row must not depend on every future control remembering to
+        // — a click originating on any interactive descendant never toggles
+        // the card (issue #480).
+        const interactive = (event.target as HTMLElement).closest(
+          'button, a, [role="button"], input, textarea, [contenteditable="true"]',
+        );
+        if (interactive && interactive !== event.currentTarget) return;
         // Selecting quote text inside the card ends with a click on it —
         // don't treat a live selection as a toggle (issue #478).
         const selection = window.getSelection();

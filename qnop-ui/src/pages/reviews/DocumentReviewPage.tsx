@@ -366,12 +366,16 @@ export function DocumentReviewPage() {
     setActiveAnnotationId(null);
   };
 
-  // Arming (issue #457): mutually exclusive with drafting a new mark, and the
-  // focus overlay/drawer make way so the document is selectable.
+  // Arming (issue #457): mutually exclusive with drafting a new mark. Only the
+  // focus overlay/drawer make way so the document is selectable — in panel
+  // mode the thread stays selected while the user picks the new passage
+  // (issue #480), mirroring the success-path guard in stagePending.
   const armReattach = (annotation: AnnotationView) => {
     setPending(null);
-    setActiveAnnotationId(null);
-    setListOpen(false);
+    if (focusMode) {
+      setActiveAnnotationId(null);
+      setListOpen(false);
+    }
     setReattaching({
       annotationId: annotation.id,
       excerpt: annotation.anchor?.textQuote?.quote ?? null,
