@@ -37,7 +37,8 @@ testdata/
 └── documents/                # review document payloads (issues #308, #370)
     ├── sample.pdf            # minimal valid single-page PDF, text "QNOP SMOKE TEST"
     ├── doc1/                 # multi-version dummy: test-dummy-v1..v5.pdf (1 page each)
-    └── doc2/                 # multi-version story: scifi-story-v1..v5.pdf (3 pages each)
+    ├── doc2/                 # multi-version story: scifi-story-v1..v5.pdf (3 pages each)
+    └── doc3/                 # placement lab: placement-lab-v1..v3.pdf (1 page each, issue #480)
 ```
 
 The `documents/sample.pdf` fixture backs the ingest smoke test: it is uploaded,
@@ -54,6 +55,14 @@ the smoke's multi-version/diff steps:
   Signal") with real word-level edits between versions; v1→v2 replaces
   *letzten* → *einsamen* in the Kalinda sentence, which the diff assertions
   pin down. Keep those anchor words stable when regenerating the fixtures.
+- **doc3** (`placement-lab-v1..v3.pdf`) — the placement lab for manually
+  exercising re-anchoring outcomes (issues #457/#480). Annotate the three
+  target sentences in v1 (sections 3–5: ALPHA, BRAVO, CHARLIE), then upload
+  v2: ALPHA keeps its wording but a section inserted before it shifts its
+  position → **MOVED**; the BRAVO and CHARLIE sentences vanish without a
+  near-duplicate → **ORPHANED**. v3 prepends a preamble that shifts the whole
+  document once more, so placed (and freshly re-attached) annotations go
+  MOVED again for a second round.
 
 The seed's role/state users (`admin`, `member`, `auditor`, …) are pinned by
 `SeededAdminUsersIT`/`SeededTeamIT` — keep their rows and the Alpha/Beta teams
