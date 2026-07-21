@@ -196,6 +196,23 @@ describe('FocusAnnotationCard', () => {
   });
 
   // Issue #412: the shared copy-link affordance rides the card header.
+  // Issue #562: the focus card also gates the free re-position — author under
+  // the operator switch (admins covered by the same predicate).
+  it('offers Re-position on a PLACED placement to the author under the switch (#562)', () => {
+    const onArmReattach = vi.fn();
+    renderCard({
+      annotation: { ...ANNOTATION, placementStatus: PlacementStatus.Placed },
+      versionNumber: 3,
+      onArmReattach,
+      freeReattachEnabled: true,
+    });
+
+    fireEvent.click(screen.getByRole('button', { name: 'Re-position' }));
+    expect(onArmReattach).toHaveBeenCalledWith(
+      expect.objectContaining({ id: ANNOTATION.id, placementStatus: PlacementStatus.Placed }),
+    );
+  });
+
   // Issue #479: the focus card is the third gate — a MOVED placement offers
   // both accepting the guessed spot and re-attaching it manually.
   it('offers both placement actions on a MOVED placement and arms re-attach (#479)', () => {

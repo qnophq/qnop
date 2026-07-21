@@ -115,6 +115,17 @@ class ConfigControllerTest {
   }
 
   @Test
+  @DisplayName("review.freeReattachEnabled reflects the application setting (#562)")
+  void getConfig_reflectsFreeReattachSetting() throws Exception {
+    when(settings.getBoolean(ApplicationSettingKey.REVIEW_FREE_REATTACH_ENABLED)).thenReturn(true);
+
+    mockMvc
+        .perform(get("/api/v1/config"))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.review.freeReattachEnabled").value(true));
+  }
+
+  @Test
   @DisplayName("enabled providers expose icon kind and account-switch affordances")
   void getConfig_mapsOidcLoginInfoFields() throws Exception {
     String googleLogin = "/oauth2/authorization/11111111-1111-1111-1111-111111111111";

@@ -40,6 +40,8 @@ import io.qnop.repository.AnnotationRepository;
 import io.qnop.repository.AuditEventRepository;
 import io.qnop.repository.CommentRepository;
 import io.qnop.repository.DocumentVersionRepository;
+import io.qnop.service.ApplicationSettingKey;
+import io.qnop.service.ApplicationSettingsService;
 import io.qnop.service.document.DocumentAccessService;
 import io.qnop.service.document.DocumentValidationException;
 import java.time.Instant;
@@ -66,6 +68,7 @@ public class AnnotationService {
   static final String AUDIT_ANNOTATION_CLASSIFIED = "annotation.classified";
   static final String AUDIT_PLACEMENT_CONFIRMED = "placement.confirmed";
   static final String AUDIT_PLACEMENT_REATTACHED = "placement.reattached";
+  static final String AUDIT_PLACEMENT_REPOSITIONED = "placement.repositioned";
 
   /** Comments can be 20k chars; the view carries only what a card title needs (issue #393). */
   static final int FIRST_COMMENT_EXCERPT_CHARS = 300;
@@ -79,6 +82,7 @@ public class AnnotationService {
   private final ReviewWorkflowService workflow;
   private final ReviewIdentityResolver identity;
   private final ApplicationEventPublisher events;
+  private final ApplicationSettingsService settings;
   private final ReactionService reactions_;
 
   public AnnotationService(
@@ -91,7 +95,8 @@ public class AnnotationService {
       ReviewWorkflowService workflow,
       ReviewIdentityResolver identity,
       ReactionService reactions,
-      ApplicationEventPublisher events) {
+      ApplicationEventPublisher events,
+      ApplicationSettingsService settings) {
     this.annotations = annotations;
     this.placements = placements;
     this.comments = comments;
@@ -102,6 +107,7 @@ public class AnnotationService {
     this.identity = identity;
     this.reactions_ = reactions;
     this.events = events;
+    this.settings = settings;
   }
 
   /**
@@ -448,10 +454,13 @@ public class AnnotationService {
   }
 
   /**
-   * Re-attaches a lost placement by hand (ADR-0009, issue #457): the owner or the annotation's
-   * author picked a new passage on the LATEST version, so the placement takes that anchor and flips
-   * to PLACED — the thread stays untouched. Allowed from ORPHANED, FAILED and MOVED (a manual
-   * correction); PLACED refuses, so nothing is overwritten by accident.
+   * Re-attaches a placement by hand (ADR-0009, issue #457): the actor picked a new passage on the
+   * LATEST version, so the placement takes that anchor and flips to PLACED — the thread stays
+   * untouched. Allowed from ORPHANED, FAILED and MOVED (a manual correction). A healthy PLACED
+   * placement may additionally be re-positioned by an admin at any time, and by the annotation's
+   * author when the operator enabled {@code review.free_reattach_enabled} (issue #562) — audited as
+   * {@code placement.repositioned} to keep it distinguishable from a rescue. PENDING always refuses
+   * (re-anchoring is in flight); see {@link PlacementReattachPolicy}.
    */
   @Transactional
   public AnnotationView reattachPlacement(
@@ -496,17 +505,25 @@ public class AnnotationService {
                 () ->
                     DocumentValidationException.notFound(
                         "no placement on version " + versionNumber));
-    if (placement.getStatus() == PlacementStatus.PLACED
-        || placement.getStatus() == PlacementStatus.PENDING) {
+    PlacementStatus before = placement.getStatus();
+    if (!PlacementReattachPolicy.reattachEligible(
+        before,
+        annotation.getAuthorId().equals(actor),
+        admin,
+        settings.getBoolean(ApplicationSettingKey.REVIEW_FREE_REATTACH_ENABLED))) {
       throw new WorkflowTransitionException(
           WorkflowTransitionException.PLACEMENT_NOT_REATTACHABLE,
-          "placement is " + placement.getStatus() + "; re-attach rescues lost placements");
+          "placement is " + before + "; re-attach is not available here");
     }
     placement.markPlaced(anchorJson);
     auditEvents.save(
         new AuditEvent(
             annotation.getDocumentId(),
-            AUDIT_PLACEMENT_REATTACHED,
+            // A free re-position of a healthy placement reads differently in the
+            // trail than the rescue of a lost one (#562).
+            before == PlacementStatus.PLACED
+                ? AUDIT_PLACEMENT_REPOSITIONED
+                : AUDIT_PLACEMENT_REATTACHED,
             actor,
             "{\"annotationId\":\"%s\",\"versionNumber\":%d}"
                 .formatted(annotationId, versionNumber)));

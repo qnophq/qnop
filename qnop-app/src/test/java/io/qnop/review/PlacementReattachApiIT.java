@@ -20,6 +20,7 @@
  */
 package io.qnop.review;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -32,11 +33,16 @@ import io.qnop.entity.DocumentVersion;
 import io.qnop.entity.ReviewParticipant;
 import io.qnop.entity.WorkflowState;
 import io.qnop.repository.AnnotationPlacementRepository;
+import io.qnop.repository.AuditEventRepository;
 import io.qnop.repository.DocumentRepository;
 import io.qnop.repository.DocumentVersionRepository;
 import io.qnop.repository.ReviewParticipantRepository;
+import io.qnop.service.ApplicationSettingKey;
+import io.qnop.service.ApplicationSettingsService;
 import io.qnop.testsupport.SeededIntegrationTest;
+import java.util.Map;
 import java.util.UUID;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -62,6 +68,13 @@ class PlacementReattachApiIT extends SeededIntegrationTest {
   @Autowired private DocumentVersionRepository versions;
   @Autowired private ReviewParticipantRepository participants;
   @Autowired private AnnotationPlacementRepository placements;
+  @Autowired private ApplicationSettingsService settings;
+  @Autowired private AuditEventRepository auditEvents;
+
+  @AfterEach
+  void resetFreeReattach() {
+    setFreeReattach(false);
+  }
 
   private UUID documentId;
   private UUID versionId;
@@ -120,6 +133,29 @@ class PlacementReattachApiIT extends SeededIntegrationTest {
         .content(NEW_ANCHOR_BODY);
   }
 
+  /** Creates an anchored annotation as AUDITOR; its v1 placement is PLACED immediately. */
+  private String placedAnnotation() throws Exception {
+    String json =
+        mockMvc
+            .perform(
+                as(post("/api/v1/documents/" + documentId + "/annotations"), AUDITOR_ID)
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content(
+                        "{\"versionNumber\":1,\"anchor\":" + ANCHOR + ",\"comment\":\"check\"}"))
+            .andExpect(status().isCreated())
+            .andReturn()
+            .getResponse()
+            .getContentAsString();
+    return JsonPath.read(json, "$.id");
+  }
+
+  private void setFreeReattach(boolean enabled) {
+    settings.update(
+        Map.of(
+            ApplicationSettingKey.REVIEW_FREE_REATTACH_ENABLED.getKey(), String.valueOf(enabled)),
+        null);
+  }
+
   @Test
   @DisplayName("the author re-attaches an orphan: new anchor, PLACED, thread untouched")
   void authorReattaches() throws Exception {
@@ -170,6 +206,92 @@ class PlacementReattachApiIT extends SeededIntegrationTest {
         .perform(reattach(annotationId, 1, AUDITOR_ID))
         .andExpect(status().isConflict())
         .andExpect(jsonPath("$.code").value("VERSION_READ_ONLY"));
+  }
+
+  // Free re-attach (issue #562): the operator switch opens PLACED for the
+  // author; admins bypass the switch; owners never get the PLACED path.
+
+  @Test
+  @DisplayName("setting on: the author re-positions a healthy placement; it is audited distinctly")
+  void freeReattachAuthorRepositions() throws Exception {
+    seedDocument();
+    String annotationId = placedAnnotation();
+    setFreeReattach(true);
+
+    mockMvc
+        .perform(reattach(annotationId, 1, AUDITOR_ID))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.placementStatus").value("PLACED"))
+        .andExpect(jsonPath("$.anchor.textQuote.quote").value("the relocated clause"));
+
+    assertThat(auditEvents.findAll())
+        .anyMatch(event -> "placement.repositioned".equals(event.getEventType()));
+  }
+
+  @Test
+  @DisplayName("setting on: a non-author owner still gets 409 on a healthy placement")
+  void freeReattachOwnerStillRefused() throws Exception {
+    seedDocument();
+    String annotationId = placedAnnotation();
+    setFreeReattach(true);
+
+    mockMvc
+        .perform(reattach(annotationId, 1, MEMBER_ID))
+        .andExpect(status().isConflict())
+        .andExpect(jsonPath("$.code").value("PLACEMENT_NOT_REATTACHABLE"));
+  }
+
+  @Test
+  @DisplayName("an admin re-positions a healthy placement even with the setting off")
+  void adminBypassesTheSetting() throws Exception {
+    seedDocument();
+    String annotationId = placedAnnotation();
+
+    mockMvc
+        .perform(reattach(annotationId, 1, ADMIN_ID))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.placementStatus").value("PLACED"))
+        .andExpect(jsonPath("$.anchor.textQuote.quote").value("the relocated clause"));
+
+    assertThat(auditEvents.findAll())
+        .anyMatch(event -> "placement.repositioned".equals(event.getEventType()));
+  }
+
+  @Test
+  @DisplayName("setting off: the author is refused on a healthy placement (regression)")
+  void settingOffKeepsPlacedRefusing() throws Exception {
+    seedDocument();
+    String annotationId = placedAnnotation();
+
+    mockMvc
+        .perform(reattach(annotationId, 1, AUDITOR_ID))
+        .andExpect(status().isConflict())
+        .andExpect(jsonPath("$.code").value("PLACEMENT_NOT_REATTACHABLE"));
+  }
+
+  @Test
+  @DisplayName("PENDING refuses for everyone, even admins with the setting on")
+  void pendingAlwaysRefuses() throws Exception {
+    seedDocument();
+    String annotationId = placedAnnotation();
+    setFreeReattach(true);
+    // PENDING has no mark method (it is the constructor state) — replace the
+    // placement with a freshly pending one, as the re-anchoring job would.
+    AnnotationPlacement placement =
+        placements
+            .findByAnnotationIdAndDocumentVersionId(UUID.fromString(annotationId), versionId)
+            .orElseThrow();
+    placements.delete(placement);
+    placements.save(new AnnotationPlacement(UUID.fromString(annotationId), versionId, ANCHOR));
+
+    mockMvc
+        .perform(reattach(annotationId, 1, ADMIN_ID))
+        .andExpect(status().isConflict())
+        .andExpect(jsonPath("$.code").value("PLACEMENT_NOT_REATTACHABLE"));
+    mockMvc
+        .perform(reattach(annotationId, 1, AUDITOR_ID))
+        .andExpect(status().isConflict())
+        .andExpect(jsonPath("$.code").value("PLACEMENT_NOT_REATTACHABLE"));
   }
 
   @Test

@@ -74,6 +74,7 @@ import {
 } from '../../components/reviews/focus/spotlightModel';
 import { useAnchorElement } from '../../components/reviews/focus/useAnchorElement';
 import { useRecordVisit } from '../../api/hooks/useReviews';
+import { useConfig } from '../../api/hooks/useConfig';
 import { useViewMode, type ReviewViewMode } from '../../components/reviews/focus/useViewMode';
 import { columnOf } from '../../components/reviews/tasks/tasksModel';
 import { NewTaskDialog } from '../../components/reviews/tasks/NewTaskDialog';
@@ -94,7 +95,7 @@ import { ViewerToolbar } from '../../components/reviews/viewer/ViewerToolbar';
 import { ReattachHintBar } from '../../components/reviews/viewer/ReattachHintBar';
 import { isOpenWorkflowState } from '../../components/reviews/workflowMeta';
 import { recordRecentReview } from '../../components/dashboard/recentReviews';
-import { useAuthStore } from '../../stores/authStore';
+import { selectIsAdmin, useAuthStore } from '../../stores/authStore';
 import { apiErrorCode } from '../../utils/apiError';
 import { revealInScroller } from '../../utils/revealInScroller';
 import { pdfFetchVersion, resolveEffectiveVersion } from './resolveEffectiveVersion';
@@ -119,6 +120,10 @@ export function DocumentReviewPage() {
   const { toast, notify, clear } = useToast();
   const uploadAttachment = useCommentAttachmentUpload(documentId, notify);
   const userId = useAuthStore((s) => s.userId);
+  const viewerIsAdmin = useAuthStore(selectIsAdmin);
+  // The operator's free-re-attach switch (#562); the server enforces it
+  // independently, this only gates the affordance.
+  const freeReattachEnabled = useConfig().data?.review?.freeReattachEnabled ?? false;
 
   const documentQuery = useDocument(documentId);
   const latestVersion = documentQuery.data?.latestVersionNumber ?? 0;
@@ -691,6 +696,8 @@ export function DocumentReviewPage() {
                   readOnly={!isLatestVersion}
                   versionNumber={versionNumber}
                   onArmReattach={armReattach}
+                  freeReattachEnabled={freeReattachEnabled}
+                  viewerIsAdmin={viewerIsAdmin}
                   reviewClosed={!isOpenWorkflowState(document.workflowState)}
                   previousSeenAt={previousSeenAt}
                   buildPermalink={buildPermalink}
@@ -730,6 +737,8 @@ export function DocumentReviewPage() {
               readOnly={!isLatestVersion}
               versionNumber={versionNumber}
               onArmReattach={armReattach}
+              freeReattachEnabled={freeReattachEnabled}
+              viewerIsAdmin={viewerIsAdmin}
               reviewClosed={!isOpenWorkflowState(document.workflowState)}
               previousSeenAt={previousSeenAt}
               buildPermalink={buildPermalink}
@@ -752,6 +761,8 @@ export function DocumentReviewPage() {
           readOnly={!isLatestVersion}
           versionNumber={versionNumber}
           onArmReattach={armReattach}
+          freeReattachEnabled={freeReattachEnabled}
+          viewerIsAdmin={viewerIsAdmin}
           reviewClosed={!isOpenWorkflowState(document.workflowState)}
           threadParticipation={document.threadParticipation ?? 'OPEN'}
           ownerId={document.ownerId}

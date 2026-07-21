@@ -29,6 +29,7 @@ import io.qnop.api.v1.model.ServerConfigBranding;
 import io.qnop.api.v1.model.ServerConfigBrandingSlot;
 import io.qnop.api.v1.model.ServerConfigGeneral;
 import io.qnop.api.v1.model.ServerConfigResponse;
+import io.qnop.api.v1.model.ServerConfigReview;
 import io.qnop.api.v1.model.ServerConfigUpload;
 import io.qnop.api.v1.model.SupportedFormat;
 import io.qnop.service.ApplicationSettingKey;
@@ -97,6 +98,10 @@ public class ConfigController implements ServerConfigApi {
                     .oidcProviders(enabledOidcProviders())
                     .selfRegistrationEnabled(
                         settings.getBoolean(ApplicationSettingKey.AUTH_SELF_REGISTRATION_ENABLED)))
+            .review(
+                new ServerConfigReview()
+                    .freeReattachEnabled(
+                        settings.getBoolean(ApplicationSettingKey.REVIEW_FREE_REATTACH_ENABLED)))
             .upload(new ServerConfigUpload().maxDocumentSizeMb(DEFAULT_MAX_DOCUMENT_SIZE_MB))
             // Report only the formats whose extractor actually ships, so a client never offers an
             // upload the ingest pipeline would reject with 415 (magic-byte sniffing, issue #345).

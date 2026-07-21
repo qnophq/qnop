@@ -1,0 +1,36 @@
+# Copyright (c) 2026-present devtank42 GmbH
+#
+# This file is part of qnop (Qualified Notes on Papers).
+#
+# qnop is free software: you can redistribute it and/or modify it under the
+# terms of the GNU Affero General Public License as published by the Free
+# Software Foundation, either version 3 of the License, or (at your option)
+# any later version.
+#
+# qnop is distributed in the hope that it will be useful, but WITHOUT ANY
+# WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS
+# FOR A PARTICULAR PURPOSE. See the GNU Affero General Public License for more
+# details.
+#
+# You should have received a copy of the GNU Affero General Public License
+# along with qnop. If not, see <https://www.gnu.org/licenses/>.
+#
+# SPDX-License-Identifier: AGPL-3.0-only
+
+# Seed row for the free-re-attach switch (issue #562). Additive changeset —
+# 1.0.0 installations have applied the original settings seed, so new keys land
+# in their own changeset from now on. The registry (ApplicationSettingKey)
+# stays authoritative per ADR-0025; this row mirrors its default.
+databaseChangeLog:
+  - changeSet:
+      id: 0018-free-reattach-setting
+      author: qnop
+      comment: Adds the review.free_reattach_enabled application setting (issue #562), default off.
+      changes:
+        - insert:
+            tableName: application_setting
+            columns:
+              - column: { name: setting_key, value: "review.free_reattach_enabled" }
+              - column: { name: setting_value, value: "false" }
+              - column: { name: setting_desc, value: "Let authors re-position their own annotations even when the placement is healthy (admins always may)." }
+              - column: { name: value_type, value: "BOOLEAN" }
