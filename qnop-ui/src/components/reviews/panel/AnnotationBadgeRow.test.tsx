@@ -78,13 +78,29 @@ describe('AnnotationBadgeRow placement affordances', () => {
     expect(screen.getByRole('button', { name: 'Re-attach' })).toBeInTheDocument();
   });
 
-  it('keeps Re-attach away from settled placements and Looks right on MOVED only', () => {
+  it('keeps both placement actions away from a settled (PLACED) placement', () => {
     renderRow(annotation({ placementStatus: PlacementStatus.Placed }), {
       onReattachPlacement: vi.fn(),
       onConfirmPlacement: vi.fn(),
     });
     expect(screen.queryByRole('button', { name: 'Re-attach' })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Looks right' })).not.toBeInTheDocument();
+  });
+
+  // Issue #479: a MOVED placement offers accepting the guessed spot AND fixing
+  // it manually — the same re-attach the lost placements already have.
+  it('offers both Looks right and Re-attach for a MOVED placement (#479)', () => {
+    const onConfirmPlacement = vi.fn();
+    const onReattachPlacement = vi.fn();
+    renderRow(annotation({ placementStatus: PlacementStatus.Moved }), {
+      onConfirmPlacement,
+      onReattachPlacement,
+    });
+
+    expect(screen.getByRole('button', { name: 'Looks right' })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Re-attach' }));
+    expect(onReattachPlacement).toHaveBeenCalled();
+    expect(onConfirmPlacement).not.toHaveBeenCalled();
   });
 
   it('hides Re-attach without a handler — read-only viewers see only the chip', () => {

@@ -101,36 +101,46 @@ export function AnnotationBadgeRow({
       )}
       <PlacementStatusChip status={annotation.placementStatus} />
       {onConfirmPlacement && annotation.placementStatus === PlacementStatus.Moved && (
-        <Button
-          size="small"
-          variant="text"
-          startIcon={<Check size={12} />}
-          onClick={(event) => {
-            // Sits inside clickable cards — confirming must not toggle them.
-            event.stopPropagation();
-            onConfirmPlacement();
-          }}
-          sx={{ py: 0, minHeight: 0, fontSize: 12 }}
+        <Tooltip
+          // describeChild: the title is a description — the visible text stays the accessible name.
+          title="Accept the relocated highlight"
+          describeChild
         >
-          Looks right
-        </Button>
-      )}
-      {onReattachPlacement &&
-        (annotation.placementStatus === PlacementStatus.Orphaned ||
-          annotation.placementStatus === PlacementStatus.Failed) && (
           <Button
             size="small"
             variant="text"
-            startIcon={<Crosshair size={12} />}
+            startIcon={<Check size={12} />}
             onClick={(event) => {
-              // Sits inside clickable cards — arming must not toggle them.
+              // Sits inside clickable cards — confirming must not toggle them.
               event.stopPropagation();
-              onReattachPlacement();
+              onConfirmPlacement();
             }}
             sx={{ py: 0, minHeight: 0, fontSize: 12 }}
           >
-            Re-attach
+            Looks right
           </Button>
+        </Tooltip>
+      )}
+      {onReattachPlacement &&
+        // MOVED offers the manual correction alongside "Looks right" (#479).
+        (annotation.placementStatus === PlacementStatus.Orphaned ||
+          annotation.placementStatus === PlacementStatus.Failed ||
+          annotation.placementStatus === PlacementStatus.Moved) && (
+          <Tooltip title="Pick the correct passage yourself" describeChild>
+            <Button
+              size="small"
+              variant="text"
+              startIcon={<Crosshair size={12} />}
+              onClick={(event) => {
+                // Sits inside clickable cards — arming must not toggle them.
+                event.stopPropagation();
+                onReattachPlacement();
+              }}
+              sx={{ py: 0, minHeight: 0, fontSize: 12 }}
+            >
+              Re-attach
+            </Button>
+          </Tooltip>
         )}
       <Stack
         direction="row"

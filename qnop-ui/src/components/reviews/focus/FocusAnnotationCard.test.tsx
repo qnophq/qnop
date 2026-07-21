@@ -196,6 +196,23 @@ describe('FocusAnnotationCard', () => {
   });
 
   // Issue #412: the shared copy-link affordance rides the card header.
+  // Issue #479: the focus card is the third gate — a MOVED placement offers
+  // both accepting the guessed spot and re-attaching it manually.
+  it('offers both placement actions on a MOVED placement and arms re-attach (#479)', () => {
+    const onArmReattach = vi.fn();
+    renderCard({
+      annotation: { ...ANNOTATION, placementStatus: PlacementStatus.Moved },
+      versionNumber: 3,
+      onArmReattach,
+    });
+
+    expect(screen.getByRole('button', { name: 'Looks right' })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Re-attach' }));
+    expect(onArmReattach).toHaveBeenCalledWith(
+      expect.objectContaining({ id: ANNOTATION.id, placementStatus: PlacementStatus.Moved }),
+    );
+  });
+
   it('offers a copy-link affordance in the header when a permalink builder is wired', () => {
     renderCard({ buildPermalink: (id) => `https://qnop.example/reviews/d?annotation=${id}` });
     expect(screen.getByRole('button', { name: 'Copy link to annotation' })).toBeInTheDocument();

@@ -233,7 +233,9 @@ export function AnnotationPanel({
             !readOnly &&
             !reviewClosed &&
             (annotation.placementStatus === 'ORPHANED' ||
-              annotation.placementStatus === 'FAILED') &&
+              annotation.placementStatus === 'FAILED' ||
+              // A second-guessed MOVED may be corrected manually (#479).
+              annotation.placementStatus === 'MOVED') &&
             (userId === ownerId || userId === annotation.authorId)
               ? () => onArmReattach(annotation)
               : undefined

@@ -238,6 +238,25 @@ describe('AnnotationPanel', () => {
     expect(props.onSelect).not.toHaveBeenCalled();
   });
 
+  // Issue #479: MOVED offers Re-attach alongside Looks right; #480's
+  // no-collapse guarantee must hold for it too.
+  it('arms re-attach on a MOVED placement without collapsing the row (#479)', () => {
+    useAuthStore.setState({ userId: 'u1' });
+    const onArmReattach = vi.fn();
+    const props = renderPanel({
+      annotations: [annotation('a1', { placementStatus: PlacementStatus.Moved })],
+      activeAnnotationId: 'a1',
+      versionNumber: 3,
+      onArmReattach,
+    });
+
+    expect(screen.getByRole('button', { name: 'Looks right' })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Re-attach' }));
+
+    expect(onArmReattach).toHaveBeenCalledWith(expect.objectContaining({ id: 'a1' }));
+    expect(props.onSelect).not.toHaveBeenCalled();
+  });
+
   it('keeps the row expanded when "Re-attach" arms re-attach mode (#480)', () => {
     useAuthStore.setState({ userId: 'u1' });
     const onArmReattach = vi.fn();
