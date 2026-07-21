@@ -23,13 +23,17 @@ import type { ReactNode } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { renderHook, waitFor } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import type { AnnotationListResponse } from '../generated';
+import type { AnnotationListResponse, AnnotationView } from '../generated';
+import { AnnotationStatus, PlacementStatus } from '../generated';
 import {
   annotationKeys,
+  hasPendingPlacement,
+  settledSince,
   useAnnotations,
   useCreateAnnotation,
   useResolveAnnotation,
 } from './useAnnotations';
+import { commentKeys } from './useComments';
 import { annotationsApi } from '../config';
 
 vi.mock('../config', () => ({
@@ -75,6 +79,95 @@ describe('useAnnotations', () => {
 
     expect(result.current.fetchStatus).toBe('idle');
     expect(annotationsApi.listAnnotations).not.toHaveBeenCalled();
+  });
+
+  // Live re-anchoring (issue #553): when the polled list shows a placement
+  // settling, the annotation's comment thread is refreshed alongside.
+  it('invalidates the comment thread of a placement that settled', async () => {
+    const pending: AnnotationListResponse = {
+      annotations: [
+        placement('a1', PlacementStatus.Pending),
+        placement('a2', PlacementStatus.Placed),
+      ],
+    };
+    const settled: AnnotationListResponse = {
+      annotations: [
+        placement('a1', PlacementStatus.Moved),
+        placement('a2', PlacementStatus.Placed),
+      ],
+    };
+    vi.mocked(annotationsApi.listAnnotations)
+      .mockResolvedValueOnce({ data: pending } as Awaited<
+        ReturnType<typeof annotationsApi.listAnnotations>
+      >)
+      .mockResolvedValueOnce({ data: settled } as Awaited<
+        ReturnType<typeof annotationsApi.listAnnotations>
+      >);
+
+    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    const invalidate = vi.spyOn(queryClient, 'invalidateQueries');
+    const localWrapper = ({ children }: { children: ReactNode }) => (
+      <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
+    );
+
+    const { result } = renderHook(() => useAnnotations(DOC_ID, 2), { wrapper: localWrapper });
+    await waitFor(() =>
+      expect(result.current.data?.annotations[0].placementStatus).toBe(PlacementStatus.Pending),
+    );
+
+    // A poll observes the settle — simulate it by refetching the query.
+    await result.current.refetch();
+    await waitFor(() =>
+      expect(result.current.data?.annotations[0].placementStatus).toBe(PlacementStatus.Moved),
+    );
+
+    await waitFor(() =>
+      expect(invalidate).toHaveBeenCalledWith({ queryKey: commentKeys.list('a1') }),
+    );
+    expect(invalidate).not.toHaveBeenCalledWith({ queryKey: commentKeys.list('a2') });
+  });
+});
+
+function placement(id: string, placementStatus: PlacementStatus): AnnotationView {
+  return {
+    id,
+    documentId: DOC_ID,
+    authorId: 'u1',
+    status: AnnotationStatus.Open,
+    placementStatus,
+    commentCount: 0,
+    reactions: [],
+    createdAt: '2026-07-01T10:00:00Z',
+    updatedAt: '2026-07-01T10:00:00Z',
+  };
+}
+
+describe('hasPendingPlacement', () => {
+  it('is true only while some placement is PENDING', () => {
+    expect(hasPendingPlacement(undefined)).toBe(false);
+    expect(hasPendingPlacement([placement('a1', PlacementStatus.Placed)])).toBe(false);
+    expect(
+      hasPendingPlacement([
+        placement('a1', PlacementStatus.Placed),
+        placement('a2', PlacementStatus.Pending),
+      ]),
+    ).toBe(true);
+  });
+});
+
+describe('settledSince', () => {
+  it('names exactly the previously pending placements that are no longer pending', () => {
+    const previous = new Set(['a1', 'a2']);
+    const now = [
+      placement('a1', PlacementStatus.Moved),
+      placement('a2', PlacementStatus.Pending),
+      placement('a3', PlacementStatus.Orphaned),
+    ];
+    expect(settledSince(previous, now)).toEqual(['a1']);
+  });
+
+  it('treats a vanished annotation as settled', () => {
+    expect(settledSince(new Set(['gone']), [])).toEqual(['gone']);
   });
 });
 

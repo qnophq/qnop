@@ -19,8 +19,15 @@
  * SPDX-License-Identifier: AGPL-3.0-only
  */
 
+import { useEffect, useRef } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import type { Anchor, AnnotationCreateRequest, AnnotationListResponse } from '../generated';
+import type {
+  Anchor,
+  AnnotationCreateRequest,
+  AnnotationListResponse,
+  AnnotationView,
+} from '../generated';
+import { PlacementStatus } from '../generated';
 import { annotationsApi } from '../config';
 import type { Notify } from '../../components/admin/layout/useToast';
 import { commentKeys } from './useComments';
@@ -32,20 +39,66 @@ export const annotationKeys = {
     [...annotationKeys.all, 'list', documentId, version] as const,
 };
 
+/** Poll cadence while the server is still re-anchoring placements (issue #553). */
+const REANCHOR_POLL_MS = 2500;
+
+/** Whether any placement on the viewed version is still being matched. */
+export function hasPendingPlacement(annotations: AnnotationView[] | undefined): boolean {
+  return (annotations ?? []).some((a) => a.placementStatus === PlacementStatus.Pending);
+}
+
+/** The ids of the previously pending placements that the current list shows settled. */
+export function settledSince(
+  previousPending: ReadonlySet<string>,
+  annotations: AnnotationView[] | undefined,
+): string[] {
+  const stillPending = new Set(
+    (annotations ?? [])
+      .filter((a) => a.placementStatus === PlacementStatus.Pending)
+      .map((a) => a.id),
+  );
+  return [...previousPending].filter((id) => !stillPending.has(id));
+}
+
 /**
  * The document's annotations with each placement (anchor + placement status)
  * resolved against the given 1-based version (ADR-0009: identity is
  * version-independent, physical location is per version).
+ *
+ * While any placement is PENDING after a version upload, the list polls
+ * (issue #553, mirroring the extraction polling of #300) — this one query
+ * feeds the panel chips and the document marks, so both settle live. When a
+ * poll observes a placement settling, that annotation's comment thread is
+ * invalidated too, so an open thread reflects activity that arrived while
+ * re-anchoring ran.
  */
 export function useAnnotations(documentId: string, version: number | undefined) {
-  return useQuery<AnnotationListResponse>({
+  const queryClient = useQueryClient();
+  const query = useQuery<AnnotationListResponse>({
     queryKey: annotationKeys.list(documentId, version),
     queryFn: async () => {
       const response = await annotationsApi.listAnnotations({ documentId, version });
       return response.data;
     },
     enabled: version !== undefined && version >= 1,
+    refetchInterval: (q) =>
+      hasPendingPlacement(q.state.data?.annotations) ? REANCHOR_POLL_MS : false,
   });
+
+  const pendingIds = useRef<ReadonlySet<string>>(new Set());
+  const annotations = query.data?.annotations;
+  useEffect(() => {
+    for (const id of settledSince(pendingIds.current, annotations)) {
+      queryClient.invalidateQueries({ queryKey: commentKeys.list(id) });
+    }
+    pendingIds.current = new Set(
+      (annotations ?? [])
+        .filter((a) => a.placementStatus === PlacementStatus.Pending)
+        .map((a) => a.id),
+    );
+  }, [annotations, queryClient]);
+
+  return query;
 }
 
 /**
