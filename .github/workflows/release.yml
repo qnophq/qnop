@@ -70,6 +70,20 @@ jobs:
             || { echo "::error::SPA bundle missing from the boot jar"; exit 1; }
           ls -lh deploy/context/app.jar
 
+      # Publish the Spring-free published contracts — qnop-spi and qnop-api
+      # (models + endpoints) — to GitHub Packages so the private qnop-enterprise
+      # repo can depend on this release (issue #497, ADR-0046). Only those three
+      # modules define a publication; -x test mirrors the release philosophy
+      # (ci.yml already gated the commit this tag points at). SIGNING_* is
+      # optional: the publication is signed only when the secret is configured.
+      - name: Publish qnop-spi and qnop-api to GitHub Packages
+        run: ./gradlew --no-daemon -x test publish
+        env:
+          GITHUB_ACTOR: ${{ github.actor }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          SIGNING_KEY: ${{ secrets.SIGNING_KEY }}
+          SIGNING_PASSWORD: ${{ secrets.SIGNING_PASSWORD }}
+
       - name: Set up QEMU
         uses: docker/setup-qemu-action@96fe6ef7f33517b61c61be40b68a1882f3264fb8 # v4
 

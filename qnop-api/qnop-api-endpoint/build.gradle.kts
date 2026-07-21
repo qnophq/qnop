@@ -11,6 +11,8 @@
 plugins {
     id("qnop.java-conventions")
     id("org.openapi.generator")
+    // Published to GitHub Packages for the qnop-enterprise repo (issue #497, ADR-0046).
+    id("qnop.publish-conventions")
 }
 
 description = "qnop-api-endpoint — generated Spring MVC interfaces for the qnop REST contract (ADR-0021)"
@@ -70,5 +72,11 @@ tasks.named("compileJava") {
 }
 
 tasks.named("sourcesJar") {
+    dependsOn(tasks.openApiGenerate)
+}
+
+// The javadoc jar (added by qnop.publish-conventions) documents the generated
+// sources, so they must exist first.
+tasks.named("javadoc") {
     dependsOn(tasks.openApiGenerate)
 }
