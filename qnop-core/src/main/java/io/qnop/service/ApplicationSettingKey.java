@@ -130,7 +130,12 @@ public enum ApplicationSettingKey {
       "notifications.review_emails_enabled",
       SettingValueType.BOOLEAN,
       "true",
-      "Send email notifications for review activity (reviewer added, annotations, replies, status changes).");
+      "Send email notifications for review activity (reviewer added, annotations, replies, status changes)."),
+  REVIEW_FREE_REATTACH_ENABLED(
+      "review.free_reattach_enabled",
+      SettingValueType.BOOLEAN,
+      "false",
+      "Let authors re-position their own annotations even when the placement is healthy (admins always may).");
 
   private static final Map<String, ApplicationSettingKey> BY_KEY =
       Arrays.stream(values())

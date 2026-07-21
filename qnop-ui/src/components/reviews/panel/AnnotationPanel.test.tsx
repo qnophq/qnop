@@ -238,6 +238,45 @@ describe('AnnotationPanel', () => {
     expect(props.onSelect).not.toHaveBeenCalled();
   });
 
+  // Issue #562: a healthy placement offers Re-position to the author under the
+  // operator switch, and to admins regardless of it.
+  it('offers Re-position on PLACED to the author when free re-attach is enabled (#562)', () => {
+    useAuthStore.setState({ userId: 'u1' });
+    const onArmReattach = vi.fn();
+    renderPanel({
+      annotations: [annotation('a1', { placementStatus: PlacementStatus.Placed })],
+      activeAnnotationId: 'a1',
+      versionNumber: 3,
+      onArmReattach,
+      freeReattachEnabled: true,
+    });
+
+    fireEvent.click(screen.getByRole('button', { name: 'Re-position' }));
+    expect(onArmReattach).toHaveBeenCalledWith(expect.objectContaining({ id: 'a1' }));
+  });
+
+  it('hides Re-position from the author while the switch is off, but admins always see it (#562)', () => {
+    useAuthStore.setState({ userId: 'u1' });
+    renderPanel({
+      annotations: [annotation('a1', { placementStatus: PlacementStatus.Placed })],
+      activeAnnotationId: 'a1',
+      versionNumber: 3,
+      onArmReattach: vi.fn(),
+    });
+    expect(screen.queryByRole('button', { name: 'Re-position' })).toBeNull();
+
+    cleanup();
+    useAuthStore.setState({ userId: 'someone-else' });
+    renderPanel({
+      annotations: [annotation('a1', { placementStatus: PlacementStatus.Placed })],
+      activeAnnotationId: 'a1',
+      versionNumber: 3,
+      onArmReattach: vi.fn(),
+      viewerIsAdmin: true,
+    });
+    expect(screen.getByRole('button', { name: 'Re-position' })).toBeInTheDocument();
+  });
+
   // Issue #479: MOVED offers Re-attach alongside Looks right; #480's
   // no-collapse guarantee must hold for it too.
   it('arms re-attach on a MOVED placement without collapsing the row (#479)', () => {

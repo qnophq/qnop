@@ -38,7 +38,7 @@ import org.junit.jupiter.api.Test;
  */
 class ApplicationSettingKeyTest {
 
-  /** The keys seeded by db/changelog/migrations/0002-settings-schema.yaml (issue #13). */
+  /** The keys seeded by the settings changesets (0002 + additive follow-ups, issue #13). */
   private static final Set<String> SEEDED_KEYS =
       Set.of(
           "general.application_name",
@@ -61,7 +61,8 @@ class ApplicationSettingKeyTest {
           "auth.self_registration_default_role",
           "auth.password_reset_enabled",
           "auth.password_reset_token_ttl_minutes",
-          "notifications.review_emails_enabled");
+          "notifications.review_emails_enabled",
+          "review.free_reattach_enabled");
 
   @Test
   void registryMatchesSeededKeys() {

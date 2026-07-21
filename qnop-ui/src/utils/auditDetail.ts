@@ -94,6 +94,7 @@ export function formatAuditDetail(
     }
     case 'placement.confirmed':
     case 'placement.reattached':
+    case 'placement.repositioned':
       return obj.versionNumber !== null && obj.versionNumber !== undefined
         ? `On version ${formatValue(obj.versionNumber)}`
         : EM_DASH;

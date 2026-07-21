@@ -88,6 +88,10 @@ interface AnnotationPanelProps {
    * viewer, so it turns the next selection into the new anchor.
    */
   onArmReattach?: (annotation: AnnotationView) => void;
+  /** Operator switch: authors may re-position their own healthy placements (issue #562). */
+  freeReattachEnabled?: boolean;
+  /** Admins may re-position healthy placements regardless of the switch (issue #562). */
+  viewerIsAdmin?: boolean;
   /** True once the review is FINALIZED/CANCELLED (issue #394): no reopening. */
   reviewClosed?: boolean;
   /** Drops the section's outer card frame — the focus drawer brings its own edge. */
@@ -136,6 +140,8 @@ export function AnnotationPanel({
   readOnly = false,
   versionNumber = null,
   onArmReattach,
+  freeReattachEnabled = false,
+  viewerIsAdmin = false,
   reviewClosed = false,
   frameless = false,
   previousSeenAt = null,
@@ -232,11 +238,15 @@ export function AnnotationPanel({
             versionNumber != null &&
             !readOnly &&
             !reviewClosed &&
-            (annotation.placementStatus === 'ORPHANED' ||
+            (((annotation.placementStatus === 'ORPHANED' ||
               annotation.placementStatus === 'FAILED' ||
               // A second-guessed MOVED may be corrected manually (#479).
               annotation.placementStatus === 'MOVED') &&
-            (userId === ownerId || userId === annotation.authorId)
+              (userId === ownerId || userId === annotation.authorId)) ||
+              // A healthy placement may be re-positioned by an admin at any
+              // time, or by the author under the operator switch (#562).
+              (annotation.placementStatus === 'PLACED' &&
+                (viewerIsAdmin || (freeReattachEnabled && userId === annotation.authorId))))
               ? () => onArmReattach(annotation)
               : undefined
           }

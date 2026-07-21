@@ -142,6 +142,26 @@ export function AnnotationBadgeRow({
             </Button>
           </Tooltip>
         )}
+      {onReattachPlacement && annotation.placementStatus === PlacementStatus.Placed && (
+        // Free re-position of a healthy placement (#562) — the caller decides
+        // who gets the handler (admins always, authors under the switch); the
+        // distinct label separates it from the lost-placement rescue.
+        <Tooltip title="Re-position this annotation" describeChild>
+          <Button
+            size="small"
+            variant="text"
+            startIcon={<Crosshair size={12} />}
+            onClick={(event) => {
+              // Sits inside clickable cards — arming must not toggle them.
+              event.stopPropagation();
+              onReattachPlacement();
+            }}
+            sx={{ py: 0, minHeight: 0, fontSize: 12 }}
+          >
+            Re-position
+          </Button>
+        </Tooltip>
+      )}
       <Stack
         direction="row"
         spacing={1}

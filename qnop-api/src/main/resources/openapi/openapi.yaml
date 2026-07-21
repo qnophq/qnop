@@ -3301,10 +3301,15 @@ paths:
         document owner or the annotation's author picks a new passage on the
         LATEST version and the placement takes that anchor, flipping to
         PLACED — the discussion thread stays untouched. Allowed from ORPHANED,
-        FAILED and MOVED (a manual correction of a bad guess); a PLACED
-        placement answers 409 (`PLACEMENT_NOT_REATTACHABLE`) so nothing is
-        overwritten by accident. Older versions are a read-only record
-        (`VERSION_READ_ONLY`), closed reviews refuse (`REVIEW_CLOSED`).
+        FAILED and MOVED (a manual correction of a bad guess). A healthy
+        PLACED placement may additionally be re-positioned by an admin at any
+        time, and by the annotation's author when the operator enabled
+        `review.free_reattach_enabled` (issue #562) — for everyone else (and
+        with the setting off) PLACED answers 409
+        (`PLACEMENT_NOT_REATTACHABLE`) so nothing is overwritten by accident.
+        PENDING always refuses (re-anchoring is in flight). Older versions are
+        a read-only record (`VERSION_READ_ONLY`), closed reviews refuse
+        (`REVIEW_CLOSED`).
       operationId: reattachPlacement
       security:
         - bearerAuth: []
@@ -3882,6 +3887,20 @@ components:
       required:
         - oidcProviders
         - selfRegistrationEnabled
+    ServerConfigReview:
+      type: object
+      description: Public review-related configuration.
+      properties:
+        freeReattachEnabled:
+          type: boolean
+          description: |
+            Whether the operator lets annotation authors re-position their own
+            annotations even when the placement is healthy (issue #562). Admins
+            may always re-position regardless of this flag. The backend
+            enforces the gate independently; flipping this client-side cannot
+            bypass the service check.
+      required:
+        - freeReattachEnabled
     ServerConfigUpload:
       type: object
       description: Upload-related public configuration.
@@ -3911,6 +3930,8 @@ components:
           $ref: '#/components/schemas/ServerConfigGeneral'
         auth:
           $ref: '#/components/schemas/ServerConfigAuth'
+        review:
+          $ref: '#/components/schemas/ServerConfigReview'
         upload:
           $ref: '#/components/schemas/ServerConfigUpload'
         supportedFormats:
@@ -4659,7 +4680,8 @@ components:
           description: >-
             The audit event type, e.g. annotation.created, annotation.resolved,
             annotation.reopened, placement.confirmed, placement.reattached,
-            workflow.transition, document.due_date.changed, or the SYSTEM-scoped
+            placement.repositioned, workflow.transition,
+            document.due_date.changed, or the SYSTEM-scoped
             scheduler.job.enabled / scheduler.job.dry_run / scheduler.job.run_now.
         documentId:
           type: string

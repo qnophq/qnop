@@ -75,6 +75,12 @@ export const AUDIT_EVENT_META: Record<string, AuditEventMeta> = {
       'An annotation was re-anchored to a new spot — e.g. after a new version shifted the text.',
     tone: 'amber',
   },
+  'placement.repositioned': {
+    label: 'Placement re-positioned',
+    description:
+      'A healthy annotation was deliberately moved to a different passage (free re-attach, issue #562).',
+    tone: 'amber',
+  },
   'workflow.transition': {
     label: 'Status changed',
     description: 'The review moved to a new workflow status (e.g. Draft → In review).',

@@ -78,12 +78,33 @@ describe('AnnotationBadgeRow placement affordances', () => {
     expect(screen.getByRole('button', { name: 'Re-attach' })).toBeInTheDocument();
   });
 
-  it('keeps both placement actions away from a settled (PLACED) placement', () => {
+  // Issue #562: a healthy placement offers the free re-position under a
+  // distinct label — the caller decides who gets the handler.
+  it('offers Re-position on a PLACED placement when the caller wires the handler (#562)', () => {
+    const onReattachPlacement = vi.fn();
     renderRow(annotation({ placementStatus: PlacementStatus.Placed }), {
+      onReattachPlacement,
+      onConfirmPlacement: vi.fn(),
+    });
+
+    expect(screen.queryByRole('button', { name: 'Re-attach' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Looks right' })).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Re-position' }));
+    expect(onReattachPlacement).toHaveBeenCalled();
+  });
+
+  it('keeps every placement action away from PLACED without a handler and from PENDING', () => {
+    renderRow(annotation({ placementStatus: PlacementStatus.Placed }), {
+      onConfirmPlacement: vi.fn(),
+    });
+    expect(screen.queryByRole('button', { name: 'Re-position' })).not.toBeInTheDocument();
+
+    renderRow(annotation({ placementStatus: PlacementStatus.Pending }), {
       onReattachPlacement: vi.fn(),
       onConfirmPlacement: vi.fn(),
     });
     expect(screen.queryByRole('button', { name: 'Re-attach' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Re-position' })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Looks right' })).not.toBeInTheDocument();
   });
 

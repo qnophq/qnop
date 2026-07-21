@@ -40,6 +40,9 @@ describe('formatAuditDetail', () => {
     expect(
       formatAuditDetail('placement.reattached', '{"annotationId":"a1b2c3","versionNumber":2}'),
     ).toBe('On version 2');
+    expect(
+      formatAuditDetail('placement.repositioned', '{"annotationId":"a1b2c3","versionNumber":2}'),
+    ).toBe('On version 2');
   });
 
   it('renders a classification from its type and priority', () => {

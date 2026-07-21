@@ -31,7 +31,14 @@ import Stack from '@mui/material/Stack';
 import Switch from '@mui/material/Switch';
 import TextField from '@mui/material/TextField';
 import Typography from '@mui/material/Typography';
-import { BarChart3, Lock, SlidersHorizontal, Upload, type LucideIcon } from 'lucide-react';
+import {
+  BarChart3,
+  FileText,
+  Lock,
+  SlidersHorizontal,
+  Upload,
+  type LucideIcon,
+} from 'lucide-react';
 import type { AdminSetting } from '../../../api/generated';
 import { useSettings, useUpdateSettings } from '../../../api/hooks/useSettings';
 import { TimezonePicker } from '../../TimezonePicker';
@@ -42,13 +49,14 @@ import { apiErrorMessage, apiFieldErrors } from '../../../utils/apiError';
 import { isHttpUrl, isInteger, isIntegerInRange } from '../../../utils/validation';
 
 /** Group prefixes in display order; unknown groups are appended alphabetically. */
-const GROUP_ORDER = ['general', 'upload', 'tracking', 'auth'] as const;
+const GROUP_ORDER = ['general', 'upload', 'tracking', 'auth', 'review'] as const;
 
 const GROUP_LABELS: Record<string, string> = {
   general: 'General',
   upload: 'Uploads',
   tracking: 'Usage tracking',
   auth: 'Authentication',
+  review: 'Review',
 };
 
 /** Brand-tint section icon per group, matching the Email / SMTP page's language. */
@@ -57,6 +65,7 @@ const GROUP_ICONS: Record<string, LucideIcon> = {
   upload: Upload,
   tracking: BarChart3,
   auth: Lock,
+  review: FileText,
 };
 
 const GROUP_DESCRIPTIONS: Record<string, string> = {
@@ -64,6 +73,7 @@ const GROUP_DESCRIPTIONS: Record<string, string> = {
   upload: 'Constraints applied to document uploads.',
   tracking: 'Anonymous, privacy-friendly usage analytics.',
   auth: 'Self-registration and password-reset behaviour.',
+  review: 'Behaviour of the document review workflow.',
 };
 
 /**
