@@ -55,14 +55,17 @@ vi.mock('../../../api/hooks/useComments', () => ({
   useComments: vi.fn().mockReturnValue({ isPending: false, isError: false, data: undefined }),
 }));
 
-const { resolveMutate } = vi.hoisted(() => ({ resolveMutate: vi.fn() }));
+const { resolveMutate, confirmMutate } = vi.hoisted(() => ({
+  resolveMutate: vi.fn(),
+  confirmMutate: vi.fn(),
+}));
 vi.mock('../../../api/hooks/useReviews', () => ({
   useParticipants: vi.fn().mockReturnValue({
     data: { participants: [{ principalId: 'other', displayName: 'Anna Weber' }] },
   }),
 }));
 vi.mock('../../../api/hooks/useAnnotations', () => ({
-  useConfirmPlacement: vi.fn().mockReturnValue({ mutate: vi.fn(), isPending: false }),
+  useConfirmPlacement: vi.fn().mockReturnValue({ mutate: confirmMutate, isPending: false }),
   useReattachPlacement: vi.fn().mockReturnValue({ mutate: vi.fn(), isPending: false }),
   useResolveAnnotation: () => ({ mutate: resolveMutate, isPending: false }),
   useReopenAnnotation: () => ({ mutate: vi.fn(), isPending: false }),
@@ -70,6 +73,7 @@ vi.mock('../../../api/hooks/useAnnotations', () => ({
 
 beforeEach(() => {
   resolveMutate.mockClear();
+  confirmMutate.mockClear();
   useAuthStore.setState({ userId: null });
 });
 
@@ -211,6 +215,43 @@ describe('AnnotationPanel', () => {
     expect(screen.getByTestId('thread-a1')).toBeInTheDocument();
     fireEvent.click(screen.getByTestId('annotation-item-a1'));
     expect(props.onSelect).toHaveBeenCalledWith(null);
+  });
+
+  // Issue #480: placement actions live inside the row's ButtonBase — acting on
+  // a placement must never toggle the card the reviewer is reading.
+  it('keeps the row expanded when "Looks right" confirms a MOVED placement (#480)', () => {
+    useAuthStore.setState({ userId: 'u1' });
+    const props = renderPanel({
+      annotations: [annotation('a1', { placementStatus: PlacementStatus.Moved })],
+      activeAnnotationId: 'a1',
+      versionNumber: 3,
+    });
+
+    // Exact name: the expanded row is itself role="button" and its accessible
+    // name contains the action's text, so a substring match would be ambiguous.
+    fireEvent.click(screen.getByRole('button', { name: 'Looks right' }));
+
+    expect(confirmMutate).toHaveBeenCalledWith({
+      annotationId: 'a1',
+      versionNumber: 3,
+    });
+    expect(props.onSelect).not.toHaveBeenCalled();
+  });
+
+  it('keeps the row expanded when "Re-attach" arms re-attach mode (#480)', () => {
+    useAuthStore.setState({ userId: 'u1' });
+    const onArmReattach = vi.fn();
+    const props = renderPanel({
+      annotations: [annotation('a1', { placementStatus: PlacementStatus.Orphaned })],
+      activeAnnotationId: 'a1',
+      versionNumber: 3,
+      onArmReattach,
+    });
+
+    fireEvent.click(screen.getByRole('button', { name: 'Re-attach' }));
+
+    expect(onArmReattach).toHaveBeenCalledWith(expect.objectContaining({ id: 'a1' }));
+    expect(props.onSelect).not.toHaveBeenCalled();
   });
 
   it('filters by status through the filter popover, with a removable chip', () => {
