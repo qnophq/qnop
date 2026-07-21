@@ -19,6 +19,7 @@
  * SPDX-License-Identifier: AGPL-3.0-only
  */
 
+import CircularProgress from '@mui/material/CircularProgress';
 import Tooltip from '@mui/material/Tooltip';
 import { PlacementStatus } from '../../../api/generated';
 import type { BadgeTone } from '../../admin/ToneBadge';
@@ -59,7 +60,24 @@ export function PlacementStatusChip({ status }: { status?: PlacementStatus }) {
   return (
     <Tooltip title={cue.hint}>
       <span>
-        <ToneBadge tone={cue.tone} label={cue.label} />
+        <ToneBadge
+          tone={cue.tone}
+          label={cue.label}
+          icon={
+            // Re-anchoring is actively running (issue #552) — a spinner in the
+            // badge's own foreground colour signals work-in-progress. The
+            // label carries the meaning, so the glyph is decorative.
+            status === PlacementStatus.Pending ? (
+              <CircularProgress
+                size={10}
+                thickness={5}
+                color="inherit"
+                aria-hidden
+                data-testid="placement-pending-spinner"
+              />
+            ) : undefined
+          }
+        />
       </span>
     </Tooltip>
   );
