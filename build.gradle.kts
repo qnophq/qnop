@@ -12,6 +12,10 @@
 //   - openapi-generator (ADR-0021): applied without a version by qnop-api-model
 //     and qnop-api-endpoint.
 
+import com.github.jk1.license.filter.LicenseBundleNormalizer
+import com.github.jk1.license.render.InventoryHtmlReportRenderer
+import com.github.jk1.license.render.JsonReportRenderer
+
 plugins {
     alias(libs.plugins.spring.boot) apply false
     alias(libs.plugins.openapi.generator) apply false
@@ -21,6 +25,11 @@ plugins {
     // job invokes it only when an NVD API key secret is present (otherwise the NVD
     // feed is heavily rate-limited).
     alias(libs.plugins.dependency.check)
+    // Dependency-license scanner (issue #498, ADR-0007): applied at the root so
+    // `checkLicense` aggregates every module's shipped dependencies and fails on any
+    // license outside the permissive allowlist. Like the OWASP gate above it is NOT
+    // wired into `check`/`build`; the CI `license-scan` job invokes it explicitly.
+    alias(libs.plugins.license.report)
 }
 
 dependencyCheck {
@@ -32,6 +41,21 @@ dependencyCheck {
     (findProperty("nvdApiKey") as String? ?: System.getenv("NVD_API_KEY"))
         ?.takeIf { it.isNotBlank() }
         ?.let { nvd.apiKey = it }
+}
+
+// Dependency-license policy (issue #498, ADR-0007). Scans only what we ship —
+// each module's `runtimeClasspath` — so test/compile-only licenses (e.g. JUnit's
+// EPL) never gate the product. The bundle normalizer collapses the many spellings
+// of each license to a canonical name before the allowlist in config/
+// allowed-licenses.json is applied by `checkLicense`.
+licenseReport {
+    configurations = arrayOf("runtimeClasspath")
+    filters = arrayOf(LicenseBundleNormalizer())
+    renderers = arrayOf(
+        InventoryHtmlReportRenderer("index.html", "qnop dependency licenses"),
+        JsonReportRenderer("licenses.json", false),
+    )
+    allowedLicensesFile = file("config/allowed-licenses.json")
 }
 
 tasks.register("buildAll") {
