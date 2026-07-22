@@ -48,3 +48,31 @@ export function workflowLabel(state: string): string {
 export function isOpenWorkflowState(state: string): boolean {
   return !CLOSED_STATES.has(state);
 }
+
+/**
+ * The review's milestone path (issue #568): Draft → In review → Finalized.
+ * The derived `IN_REVIEW ⇄ CHANGES_REQUESTED` pair (#405) is ONE live stage —
+ * it ping-pongs with the open-annotation count and never advances the path.
+ */
+export const WORKFLOW_MILESTONES = ['DRAFT', 'IN_REVIEW', 'FINALIZED'] as const;
+
+/**
+ * Where a state sits on the milestone path: the stage index, `'cancelled'` for
+ * the side exit, or `null` for a state this edition does not chart (an
+ * enterprise extension) — callers fall back to the flat badge then.
+ */
+export function milestoneIndex(state: string): number | 'cancelled' | null {
+  switch (state) {
+    case 'DRAFT':
+      return 0;
+    case 'IN_REVIEW':
+    case 'CHANGES_REQUESTED':
+      return 1;
+    case 'FINALIZED':
+      return 2;
+    case 'CANCELLED':
+      return 'cancelled';
+    default:
+      return null;
+  }
+}
