@@ -134,7 +134,15 @@ beforeEach(() => {
   vi.mocked(documentsApi.listParticipants).mockResolvedValue({
     data: PARTICIPANTS,
   } as Awaited<ReturnType<typeof documentsApi.listParticipants>>);
-  mockWorkflow({ state: 'IN_REVIEW', allowedTransitions: ['FINALIZED', 'CANCELLED'] });
+  mockWorkflow({
+    state: 'IN_REVIEW',
+    allowedTransitions: ['FINALIZED', 'CANCELLED'],
+    mayTransition: true,
+    transitions: [
+      { targetState: 'FINALIZED', available: true },
+      { targetState: 'CANCELLED', available: true },
+    ],
+  });
 });
 
 describe('ReviewHubHead — owner', () => {
@@ -174,7 +182,12 @@ describe('ReviewHubHead — progress & participants', () => {
 
 describe('ReviewHubHead — workflow transitions', () => {
   it('confirms and executes a transition from the allowed set', async () => {
-    const finalized: WorkflowStatus = { state: 'FINALIZED', allowedTransitions: [] };
+    const finalized: WorkflowStatus = {
+      state: 'FINALIZED',
+      allowedTransitions: [],
+      mayTransition: true,
+      transitions: [],
+    };
     vi.mocked(reviewWorkflowApi.transitionDocumentWorkflow).mockResolvedValue({
       data: finalized,
     } as Awaited<ReturnType<typeof reviewWorkflowApi.transitionDocumentWorkflow>>);
@@ -191,6 +204,49 @@ describe('ReviewHubHead — workflow transitions', () => {
       }),
     );
     await waitFor(() => expect(notify).toHaveBeenCalledWith('Review moved to Finalized.'));
+  });
+
+  // Issue #568: the capability is actor-scoped, and blocked targets explain
+  // themselves instead of silently disappearing.
+  it('hides the status button entirely from a caller without the capability', async () => {
+    mockWorkflow({
+      state: 'IN_REVIEW',
+      allowedTransitions: ['FINALIZED', 'CANCELLED'],
+      mayTransition: false,
+      transitions: [
+        { targetState: 'FINALIZED', available: true },
+        { targetState: 'CANCELLED', available: true },
+      ],
+    });
+    renderHub();
+
+    await screen.findByTestId('participants-button');
+    expect(screen.queryByRole('button', { name: /Change status/ })).not.toBeInTheDocument();
+  });
+
+  it('renders a blocked target disabled with its guard reason (#568)', async () => {
+    mockWorkflow({
+      state: 'IN_REVIEW',
+      allowedTransitions: ['FINALIZED', 'CANCELLED'],
+      mayTransition: true,
+      transitions: [
+        {
+          targetState: 'FINALIZED',
+          available: false,
+          blockedReason: 'cannot finalize: 3 open annotation(s) must be resolved first',
+        },
+        { targetState: 'CANCELLED', available: true },
+      ],
+    });
+    renderHub();
+
+    fireEvent.click(await screen.findByRole('button', { name: /Change status/ }));
+
+    const finalize = await screen.findByText('Move to Finalized');
+    expect(finalize.closest('li')).toHaveAttribute('aria-disabled', 'true');
+    expect(screen.getByText('Move to Cancelled').closest('li')).not.toHaveAttribute(
+      'aria-disabled',
+    );
   });
 
   it('surfaces a guard veto (409 INVALID_TRANSITION) as a mapped error toast', async () => {
@@ -215,7 +271,12 @@ describe('ReviewHubHead — workflow transitions', () => {
   });
 
   it('hides the status button when no transitions are offered', async () => {
-    mockWorkflow({ state: 'FINALIZED', allowedTransitions: [] });
+    mockWorkflow({
+      state: 'FINALIZED',
+      allowedTransitions: [],
+      mayTransition: true,
+      transitions: [],
+    });
     renderHub();
 
     await screen.findByTestId('participants-button');

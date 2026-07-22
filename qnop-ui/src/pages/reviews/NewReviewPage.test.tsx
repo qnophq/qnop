@@ -98,7 +98,12 @@ beforeEach(() => {
   vi.mocked(documentsApi.addParticipant).mockResolvedValue({ data: { id: 'p1' } } as Awaited<
     ReturnType<typeof documentsApi.addParticipant>
   >);
-  const started: WorkflowStatus = { state: 'IN_REVIEW', allowedTransitions: [] };
+  const started: WorkflowStatus = {
+    state: 'IN_REVIEW',
+    allowedTransitions: [],
+    mayTransition: true,
+    transitions: [],
+  };
   vi.mocked(reviewWorkflowApi.transitionDocumentWorkflow).mockResolvedValue({
     data: started,
   } as Awaited<ReturnType<typeof reviewWorkflowApi.transitionDocumentWorkflow>>);

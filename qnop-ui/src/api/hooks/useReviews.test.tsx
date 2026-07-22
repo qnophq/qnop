@@ -148,8 +148,18 @@ describe('usePrincipalSearch', () => {
 
 describe('useWorkflow / useTransitionWorkflow', () => {
   it('reads the state and posts a transition', async () => {
-    const draft: WorkflowStatus = { state: 'DRAFT', allowedTransitions: ['IN_REVIEW'] };
-    const inReview: WorkflowStatus = { state: 'IN_REVIEW', allowedTransitions: [] };
+    const draft: WorkflowStatus = {
+      state: 'DRAFT',
+      allowedTransitions: ['IN_REVIEW'],
+      mayTransition: true,
+      transitions: [],
+    };
+    const inReview: WorkflowStatus = {
+      state: 'IN_REVIEW',
+      allowedTransitions: [],
+      mayTransition: true,
+      transitions: [],
+    };
     vi.mocked(reviewWorkflowApi.getDocumentWorkflow).mockResolvedValue({ data: draft } as Awaited<
       ReturnType<typeof reviewWorkflowApi.getDocumentWorkflow>
     >);

@@ -196,6 +196,30 @@ public class ReviewWorkflowMachine {
         .orElse(List.of());
   }
 
+  /** One manual target with its read-time guard verdict — empty reason means "available". */
+  public record TransitionOption(WorkflowState target, Optional<String> blockedReason) {}
+
+  /**
+   * The manual targets from {@code currentRaw} with the guards pre-evaluated against {@code
+   * context} (issue #568), so a client can explain a blocked option instead of silently omitting
+   * it. Advisory only — the verdict can change at any moment; {@link #manualTransition} re-checks
+   * authoritatively. Empty for terminal or unknown states.
+   */
+  public List<TransitionOption> transitionOptions(String currentRaw, TransitionContext context) {
+    return WorkflowState.fromString(currentRaw)
+        .map(
+            state ->
+                MANUAL_EDGES.get(state).stream()
+                    .map(
+                        target ->
+                            new TransitionOption(
+                                target,
+                                Optional.ofNullable(GUARDS.get(target))
+                                    .flatMap(guard -> guard.veto(context))))
+                    .toList())
+        .orElse(List.of());
+  }
+
   // --- annotation sub-machine (ADR-0011, amended by #405) ----------------------
 
   /** Whether an annotation in {@code current} may still be resolved: only {@code OPEN} may. */

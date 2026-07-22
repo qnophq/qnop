@@ -126,7 +126,10 @@ export function ReviewHubHead({
   // size-capped principal directory, which drops users in big workspaces.
   const ownerName =
     ownerId === ownUserId ? (ownDisplayName ?? 'You') : (ownerDisplayName ?? 'Owner');
-  const transitions = workflowQuery.data?.allowedTransitions ?? [];
+  // Actor-scoped capability + guard-evaluated options (issue #568): reviewers
+  // never see the affordance; blocked targets explain themselves.
+  const mayTransition = workflowQuery.data?.mayTransition ?? false;
+  const transitionOptions = workflowQuery.data?.transitions ?? [];
   const maxSizeMb = config?.upload.maxDocumentSizeMb ?? FALLBACK_MAX_SIZE_MB;
 
   const total = annotations.length;
@@ -332,7 +335,7 @@ export function ReviewHubHead({
         </ButtonBase>
       </Tooltip>
 
-      {transitions.length > 0 && (
+      {mayTransition && transitionOptions.length > 0 && (
         <>
           <Button
             size="small"
@@ -349,16 +352,26 @@ export function ReviewHubHead({
             anchorEl={workflowMenuAnchor}
             onClose={() => setWorkflowMenuAnchor(null)}
           >
-            {transitions.map((target) => (
-              <MenuItem
-                key={target}
-                onClick={() => {
-                  setWorkflowMenuAnchor(null);
-                  setConfirmTarget(target);
-                }}
+            {transitionOptions.map((option) => (
+              // A blocked target stays visible and explains itself (issue
+              // #568) — a silently missing FINALIZED read as a bug.
+              <Tooltip
+                key={option.targetState}
+                title={option.available ? '' : (option.blockedReason ?? '')}
+                placement="left"
               >
-                Move to {workflowLabel(target)}
-              </MenuItem>
+                <span>
+                  <MenuItem
+                    disabled={!option.available}
+                    onClick={() => {
+                      setWorkflowMenuAnchor(null);
+                      setConfirmTarget(option.targetState);
+                    }}
+                  >
+                    Move to {workflowLabel(option.targetState)}
+                  </MenuItem>
+                </span>
+              </Tooltip>
             ))}
           </Menu>
         </>

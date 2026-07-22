@@ -172,6 +172,57 @@ class ReviewWorkflowControllerIT extends SeededIntegrationTest {
   // --- POST: refusals ---------------------------------------------------------------
 
   @Test
+  void adminMovesTheWorkflowAndIsAuditedAsThemselves() throws Exception {
+    // #568: admins may transition without being the owner.
+    Document document = draftOwnedByMember();
+
+    mockMvc
+        .perform(
+            post(workflowPath(document.getId()))
+                .header("Authorization", "Bearer " + token(ADMIN_ID))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"targetState\":\"IN_REVIEW\"}"))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.state").value("IN_REVIEW"));
+
+    assertThat(auditEvents.findByDocumentIdOrderByCreatedAtDesc(document.getId()))
+        .anySatisfy(
+            event -> {
+              assertThat(event.getEventType()).isEqualTo("workflow.transition");
+              assertThat(event.getActorId()).isEqualTo(ADMIN_ID);
+            });
+  }
+
+  @Test
+  void statusScopesTheCapabilityToOwnerAndAdmin() throws Exception {
+    // #568: mayTransition drives the client affordance; reviewers get false.
+    Document document = draftOwnedByMember();
+    participants.save(ReviewParticipant.forUser(document.getId(), MEMBER2_ID));
+
+    mockMvc
+        .perform(
+            get(workflowPath(document.getId()))
+                .header("Authorization", "Bearer " + token(MEMBER_ID)))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.mayTransition").value(true))
+        .andExpect(jsonPath("$.transitions[?(@.targetState=='IN_REVIEW')].available").value(true));
+
+    mockMvc
+        .perform(
+            get(workflowPath(document.getId()))
+                .header("Authorization", "Bearer " + token(MEMBER2_ID)))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.mayTransition").value(false));
+
+    mockMvc
+        .perform(
+            get(workflowPath(document.getId()))
+                .header("Authorization", "Bearer " + token(ADMIN_ID)))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.mayTransition").value(true));
+  }
+
+  @Test
   void nonOwnerIsRejectedWith403() throws Exception {
     Document document = draftOwnedByMember();
 
