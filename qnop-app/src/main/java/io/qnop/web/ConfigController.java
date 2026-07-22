@@ -101,7 +101,10 @@ public class ConfigController implements ServerConfigApi {
             .review(
                 new ServerConfigReview()
                     .freeReattachEnabled(
-                        settings.getBoolean(ApplicationSettingKey.REVIEW_FREE_REATTACH_ENABLED)))
+                        settings.getBoolean(ApplicationSettingKey.REVIEW_FREE_REATTACH_ENABLED))
+                    .finalizeWithOpenAnnotations(
+                        settings.getBoolean(
+                            ApplicationSettingKey.REVIEW_FINALIZE_WITH_OPEN_ANNOTATIONS)))
             .upload(new ServerConfigUpload().maxDocumentSizeMb(DEFAULT_MAX_DOCUMENT_SIZE_MB))
             // Report only the formats whose extractor actually ships, so a client never offers an
             // upload the ingest pipeline would reject with 415 (magic-byte sniffing, issue #345).

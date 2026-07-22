@@ -38,6 +38,7 @@ import io.qnop.repository.AuditEventRepository;
 import io.qnop.repository.CommentRepository;
 import io.qnop.repository.DocumentRepository;
 import io.qnop.repository.DocumentVersionRepository;
+import io.qnop.service.ApplicationSettingsService;
 import io.qnop.service.document.DocumentAccessService;
 import java.util.Optional;
 import java.util.UUID;
@@ -70,7 +71,8 @@ class ReviewWorkflowServiceLockTest {
           comments,
           auditEvents,
           documentAccess,
-          mock(org.springframework.context.ApplicationEventPublisher.class));
+          mock(org.springframework.context.ApplicationEventPublisher.class),
+          mock(ApplicationSettingsService.class));
 
   private final UUID documentId = UUID.randomUUID();
   private final UUID owner = UUID.randomUUID();

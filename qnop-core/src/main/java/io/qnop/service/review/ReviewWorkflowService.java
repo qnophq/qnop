@@ -34,6 +34,8 @@ import io.qnop.repository.AuditEventRepository;
 import io.qnop.repository.CommentRepository;
 import io.qnop.repository.DocumentRepository;
 import io.qnop.repository.DocumentVersionRepository;
+import io.qnop.service.ApplicationSettingKey;
+import io.qnop.service.ApplicationSettingsService;
 import io.qnop.service.document.DocumentAccessService;
 import io.qnop.service.review.ReviewWorkflowMachine.TransitionContext;
 import io.qnop.service.review.ReviewWorkflowMachine.TransitionResult;
@@ -65,6 +67,14 @@ public class ReviewWorkflowService {
   /** Audit event type for an annotation reopen; detail carries the annotation id. */
   static final String AUDIT_ANNOTATION_REOPENED = "annotation.reopened";
 
+  /** A terminal transition closed an open annotation automatically (issue #568). */
+  static final String AUDIT_ANNOTATION_AUTO_CLOSED = "annotation.auto_closed";
+
+  static final String AUTO_CLOSE_COMMENT_CANCELLED =
+      "Closed automatically: the review was cancelled.";
+  static final String AUTO_CLOSE_COMMENT_FINALIZED =
+      "Closed automatically: the review was finalized.";
+
   private final ReviewWorkflowMachine machine = new ReviewWorkflowMachine();
 
   private final DocumentRepository documents;
@@ -75,6 +85,7 @@ public class ReviewWorkflowService {
   private final AuditEventRepository auditEvents;
   private final DocumentAccessService documentAccess;
   private final ApplicationEventPublisher events;
+  private final ApplicationSettingsService settings;
 
   public ReviewWorkflowService(
       DocumentRepository documents,
@@ -84,7 +95,8 @@ public class ReviewWorkflowService {
       CommentRepository comments,
       AuditEventRepository auditEvents,
       DocumentAccessService documentAccess,
-      ApplicationEventPublisher events) {
+      ApplicationEventPublisher events,
+      ApplicationSettingsService settings) {
     this.documents = documents;
     this.versions = versions;
     this.annotations = annotations;
@@ -93,6 +105,7 @@ public class ReviewWorkflowService {
     this.auditEvents = auditEvents;
     this.documentAccess = documentAccess;
     this.events = events;
+    this.settings = settings;
   }
 
   /**
@@ -142,8 +155,46 @@ public class ReviewWorkflowService {
                     new WorkflowTransitionException(
                         WorkflowTransitionException.INVALID_TRANSITION,
                         "unknown target state '" + targetRaw + "'"));
+    // Terminal transitions settle the open annotations first (issue #568):
+    // cancelling always, finalizing only under the operator switch. Running
+    // before applyTransition is rollback-safe — a refused transition rolls
+    // the auto-close back with it — and lets the unchanged finalize guard see
+    // zero open annotations while still enforcing its other invariants.
+    if (target == WorkflowState.CANCELLED) {
+      autoCloseOpenAnnotations(document, actorId, "REVIEW_CANCELLED", AUTO_CLOSE_COMMENT_CANCELLED);
+    } else if (target == WorkflowState.FINALIZED && finalizeWithOpenAnnotations()) {
+      autoCloseOpenAnnotations(document, actorId, "REVIEW_FINALIZED", AUTO_CLOSE_COMMENT_FINALIZED);
+    }
     applyTransition(document, target, actorId, true);
     return statusOf(document, actorId, admin);
+  }
+
+  /**
+   * Closes every OPEN annotation of the document because a terminal transition ends the review
+   * (issue #568). Each annotation flips to RESOLVED, its thread receives one impersonal standard
+   * comment attributed to the document owner (structurally public, so it resolves even in anonymous
+   * reviews — ADR-0038), and an {@code annotation.auto_closed} audit event records the REAL
+   * transition actor and the reason. Deliberately does not re-derive the workflow (the terminal
+   * transition follows in the same transaction) and publishes no per-annotation review events — the
+   * transition's own WorkflowChanged event covers the notification.
+   */
+  private void autoCloseOpenAnnotations(
+      Document document, UUID actorId, String reason, String standardComment) {
+    for (Annotation annotation :
+        annotations.findByDocumentIdAndStatus(document.getId(), AnnotationStatus.OPEN)) {
+      comments.save(new Comment(annotation.getId(), document.getOwnerId(), standardComment));
+      annotation.resolve();
+      auditEvents.save(
+          new AuditEvent(
+              document.getId(),
+              AUDIT_ANNOTATION_AUTO_CLOSED,
+              actorId,
+              "{\"annotationId\":\"%s\",\"reason\":\"%s\"}".formatted(annotation.getId(), reason)));
+    }
+  }
+
+  private boolean finalizeWithOpenAnnotations() {
+    return settings.getBoolean(ApplicationSettingKey.REVIEW_FINALIZE_WITH_OPEN_ANNOTATIONS);
   }
 
   /**
@@ -284,9 +335,15 @@ public class ReviewWorkflowService {
 
   private WorkflowStatus statusOf(Document document, UUID actorId, boolean admin) {
     // The guard verdicts are advisory (they can change at any moment); the
-    // transition call re-checks authoritatively (issue #568).
+    // transition call re-checks authoritatively (issue #568). Under the
+    // finalize-with-open switch the open annotations no longer block (they
+    // would be auto-closed), so the options are evaluated as if none were.
+    TransitionContext context = contextOf(document);
+    if (finalizeWithOpenAnnotations()) {
+      context = new TransitionContext(0, context.pendingPlacements(), context.hasReadyVersion());
+    }
     List<TransitionOptionView> options =
-        machine.transitionOptions(document.getWorkflowState(), contextOf(document)).stream()
+        machine.transitionOptions(document.getWorkflowState(), context).stream()
             .map(
                 option ->
                     new TransitionOptionView(

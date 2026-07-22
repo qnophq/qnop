@@ -1,0 +1,35 @@
+# Copyright (c) 2026-present devtank42 GmbH
+#
+# This file is part of qnop (Qualified Notes on Papers).
+#
+# qnop is free software: you can redistribute it and/or modify it under the
+# terms of the GNU Affero General Public License as published by the Free
+# Software Foundation, either version 3 of the License, or (at your option)
+# any later version.
+#
+# qnop is distributed in the hope that it will be useful, but WITHOUT ANY
+# WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS
+# FOR A PARTICULAR PURPOSE. See the GNU Affero General Public License for more
+# details.
+#
+# You should have received a copy of the GNU Affero General Public License
+# along with qnop. If not, see <https://www.gnu.org/licenses/>.
+#
+# SPDX-License-Identifier: AGPL-3.0-only
+
+# Seed row for the finalize-with-open-annotations switch (issue #568).
+# Additive changeset (post-1.0.0 rule); the registry (ApplicationSettingKey)
+# stays authoritative per ADR-0025 and this row mirrors its default.
+databaseChangeLog:
+  - changeSet:
+      id: 0019-finalize-with-open-setting
+      author: qnop
+      comment: Adds the review.finalize_with_open_annotations application setting (issue #568), default off.
+      changes:
+        - insert:
+            tableName: application_setting
+            columns:
+              - column: { name: setting_key, value: "review.finalize_with_open_annotations" }
+              - column: { name: setting_value, value: "false" }
+              - column: { name: setting_desc, value: "Let the review be finalized while annotations are still open; they are closed automatically with a standard comment." }
+              - column: { name: value_type, value: "BOOLEAN" }

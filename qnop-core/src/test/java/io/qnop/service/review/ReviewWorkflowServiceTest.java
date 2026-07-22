@@ -34,6 +34,7 @@ import static org.mockito.Mockito.when;
 import io.qnop.entity.Annotation;
 import io.qnop.entity.AnnotationStatus;
 import io.qnop.entity.AuditEvent;
+import io.qnop.entity.Comment;
 import io.qnop.entity.Document;
 import io.qnop.entity.WorkflowState;
 import io.qnop.repository.AnnotationPlacementRepository;
@@ -42,6 +43,8 @@ import io.qnop.repository.AuditEventRepository;
 import io.qnop.repository.CommentRepository;
 import io.qnop.repository.DocumentRepository;
 import io.qnop.repository.DocumentVersionRepository;
+import io.qnop.service.ApplicationSettingKey;
+import io.qnop.service.ApplicationSettingsService;
 import io.qnop.service.document.DocumentAccessService;
 import java.util.Optional;
 import java.util.UUID;
@@ -67,6 +70,7 @@ class ReviewWorkflowServiceTest {
   private final CommentRepository comments = mock(CommentRepository.class);
   private final AuditEventRepository auditEvents = mock(AuditEventRepository.class);
   private final DocumentAccessService documentAccess = mock(DocumentAccessService.class);
+  private final ApplicationSettingsService settings = mock(ApplicationSettingsService.class);
 
   private final ReviewWorkflowService service =
       new ReviewWorkflowService(
@@ -77,7 +81,8 @@ class ReviewWorkflowServiceTest {
           comments,
           auditEvents,
           documentAccess,
-          mock(org.springframework.context.ApplicationEventPublisher.class));
+          mock(org.springframework.context.ApplicationEventPublisher.class),
+          settings);
 
   private final UUID documentId = UUID.randomUUID();
   private final UUID owner = UUID.randomUUID();
@@ -197,6 +202,94 @@ class ReviewWorkflowServiceTest {
     assertThat(audit.getEventType()).isEqualTo(ReviewWorkflowService.AUDIT_WORKFLOW_TRANSITION);
     assertThat(audit.getDetail()).contains("DRAFT").contains("IN_REVIEW");
     assertThat(audit.getActorId()).isEqualTo(owner);
+  }
+
+  // --- terminal auto-close (#568) --------------------------------------------
+
+  private Annotation openAnnotation(UUID authorId) {
+    return new Annotation(documentId, authorId);
+  }
+
+  @Test
+  @DisplayName("cancelling closes open annotations with an owner-attributed standard comment")
+  void cancelAutoClosesOpenAnnotations() {
+    Document inReview = document(WorkflowState.IN_REVIEW);
+    Annotation open = openAnnotation(stranger);
+    when(documents.findByIdForUpdate(documentId)).thenReturn(Optional.of(inReview));
+    when(annotations.findByDocumentIdAndStatus(any(), eq(AnnotationStatus.OPEN)))
+        .thenReturn(java.util.List.of(open));
+
+    service.transition(documentId, WorkflowState.CANCELLED.name(), owner, false);
+
+    assertThat(open.getStatus()).isEqualTo(AnnotationStatus.RESOLVED);
+    ArgumentCaptor<Comment> comment = ArgumentCaptor.forClass(Comment.class);
+    verify(comments).save(comment.capture());
+    assertThat(comment.getValue().getAuthorId()).isEqualTo(owner);
+    assertThat(comment.getValue().getBody())
+        .isEqualTo(ReviewWorkflowService.AUTO_CLOSE_COMMENT_CANCELLED);
+    assertThat(captureAudits().getAllValues())
+        .anySatisfy(
+            event -> {
+              assertThat(event.getEventType())
+                  .isEqualTo(ReviewWorkflowService.AUDIT_ANNOTATION_AUTO_CLOSED);
+              assertThat(event.getActorId()).isEqualTo(owner);
+              assertThat(event.getDetail()).contains("REVIEW_CANCELLED");
+            });
+  }
+
+  @Test
+  @DisplayName("finalize with the switch on closes open annotations, then passes the guard")
+  void finalizeWithSwitchOnAutoCloses() {
+    Document inReview = document(WorkflowState.IN_REVIEW);
+    Annotation open = openAnnotation(stranger);
+    when(documents.findByIdForUpdate(documentId)).thenReturn(Optional.of(inReview));
+    when(settings.getBoolean(ApplicationSettingKey.REVIEW_FINALIZE_WITH_OPEN_ANNOTATIONS))
+        .thenReturn(true);
+    when(annotations.findByDocumentIdAndStatus(any(), eq(AnnotationStatus.OPEN)))
+        .thenReturn(java.util.List.of(open));
+    // After the auto-close the guard recount must see zero open annotations.
+    when(annotations.countByDocumentIdAndStatus(any(), eq(AnnotationStatus.OPEN))).thenReturn(0L);
+    when(versions.existsByDocumentIdAndExtractionStatus(any(), any())).thenReturn(true);
+
+    service.transition(documentId, WorkflowState.FINALIZED.name(), owner, false);
+
+    assertThat(inReview.getWorkflowState()).isEqualTo(WorkflowState.FINALIZED.name());
+    assertThat(open.getStatus()).isEqualTo(AnnotationStatus.RESOLVED);
+    ArgumentCaptor<Comment> comment = ArgumentCaptor.forClass(Comment.class);
+    verify(comments).save(comment.capture());
+    assertThat(comment.getValue().getBody())
+        .isEqualTo(ReviewWorkflowService.AUTO_CLOSE_COMMENT_FINALIZED);
+  }
+
+  @Test
+  @DisplayName("finalize with the switch off keeps refusing open annotations untouched")
+  void finalizeWithSwitchOffStillRefuses() {
+    Document inReview = document(WorkflowState.IN_REVIEW);
+    when(documents.findByIdForUpdate(documentId)).thenReturn(Optional.of(inReview));
+    when(annotations.countByDocumentIdAndStatus(any(), eq(AnnotationStatus.OPEN))).thenReturn(2L);
+    when(versions.existsByDocumentIdAndExtractionStatus(any(), any())).thenReturn(true);
+
+    assertThatThrownBy(
+            () -> service.transition(documentId, WorkflowState.FINALIZED.name(), owner, false))
+        .isInstanceOf(WorkflowTransitionException.class);
+    verify(comments, never()).save(any());
+    verify(annotations, never()).findByDocumentIdAndStatus(any(), any());
+  }
+
+  @Test
+  @DisplayName("the switch never bypasses the pending-placement invariant")
+  void finalizeWithSwitchOnStillBlockedByPendingPlacements() {
+    Document inReview = document(WorkflowState.IN_REVIEW);
+    when(documents.findByIdForUpdate(documentId)).thenReturn(Optional.of(inReview));
+    when(settings.getBoolean(ApplicationSettingKey.REVIEW_FINALIZE_WITH_OPEN_ANNOTATIONS))
+        .thenReturn(true);
+    when(placements.countByDocumentIdAndStatus(any(), any())).thenReturn(1L);
+    when(versions.existsByDocumentIdAndExtractionStatus(any(), any())).thenReturn(true);
+
+    assertThatThrownBy(
+            () -> service.transition(documentId, WorkflowState.FINALIZED.name(), owner, false))
+        .isInstanceOf(WorkflowTransitionException.class);
+    assertThat(inReview.getWorkflowState()).isEqualTo(WorkflowState.IN_REVIEW.name());
   }
 
   // --- finalize guard --------------------------------------------------------

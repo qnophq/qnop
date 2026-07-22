@@ -249,6 +249,32 @@ describe('ReviewHubHead — workflow transitions', () => {
     );
   });
 
+  // Issue #568: cancelling settles open annotations automatically — the
+  // confirm dialog must spell the consequence out.
+  it('states the auto-close consequence when cancelling over open annotations', async () => {
+    renderHub({
+      annotations: [annotation(AnnotationStatus.Open), annotation(AnnotationStatus.Open)],
+    });
+
+    fireEvent.click(await screen.findByRole('button', { name: /Change status/ }));
+    fireEvent.click(await screen.findByText('Move to Cancelled'));
+
+    expect(
+      screen.getByText(/2 open annotations will be closed automatically with a standard comment/),
+    ).toBeInTheDocument();
+  });
+
+  it('omits the auto-close note for a finalize while the operator switch is off', async () => {
+    renderHub({
+      annotations: [annotation(AnnotationStatus.Open)],
+    });
+
+    fireEvent.click(await screen.findByRole('button', { name: /Change status/ }));
+    fireEvent.click(await screen.findByText('Move to Finalized'));
+
+    expect(screen.queryByText(/closed automatically/)).not.toBeInTheDocument();
+  });
+
   it('surfaces a guard veto (409 INVALID_TRANSITION) as a mapped error toast', async () => {
     const veto = new AxiosError('conflict');
     veto.response = {

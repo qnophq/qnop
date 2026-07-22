@@ -135,7 +135,12 @@ public enum ApplicationSettingKey {
       "review.free_reattach_enabled",
       SettingValueType.BOOLEAN,
       "false",
-      "Let authors re-position their own annotations even when the placement is healthy (admins always may).");
+      "Let authors re-position their own annotations even when the placement is healthy (admins always may)."),
+  REVIEW_FINALIZE_WITH_OPEN_ANNOTATIONS(
+      "review.finalize_with_open_annotations",
+      SettingValueType.BOOLEAN,
+      "false",
+      "Let the review be finalized while annotations are still open; they are closed automatically with a standard comment.");
 
   private static final Map<String, ApplicationSettingKey> BY_KEY =
       Arrays.stream(values())

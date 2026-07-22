@@ -62,7 +62,8 @@ class ApplicationSettingKeyTest {
           "auth.password_reset_enabled",
           "auth.password_reset_token_ttl_minutes",
           "notifications.review_emails_enabled",
-          "review.free_reattach_enabled");
+          "review.free_reattach_enabled",
+          "review.finalize_with_open_annotations");
 
   @Test
   void registryMatchesSeededKeys() {

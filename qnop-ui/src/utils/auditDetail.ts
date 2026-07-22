@@ -92,6 +92,10 @@ export function formatAuditDetail(
       }
       return bits.length > 0 ? `As ${bits.join(' · ')}` : EM_DASH;
     }
+    case 'annotation.auto_closed':
+      return typeof obj.reason === 'string'
+        ? `Reason: ${humanizeToken(String(obj.reason))}`
+        : EM_DASH;
     case 'placement.confirmed':
     case 'placement.reattached':
     case 'placement.repositioned':
