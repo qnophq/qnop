@@ -18,6 +18,8 @@ plugins {
     // Version comes from the root `plugins {}` block (apply false there) so the
     // generator loads once in the shared root classloader scope.
     id("org.openapi.generator")
+    // Published to GitHub Packages for the qnop-enterprise repo (issue #497, ADR-0046).
+    id("qnop.publish-conventions")
 }
 
 description = "qnop-api-model — generated, Spring-free REST DTOs (ADR-0021)"
@@ -83,5 +85,11 @@ tasks.named("compileJava") {
 }
 
 tasks.named("sourcesJar") {
+    dependsOn(tasks.openApiGenerate)
+}
+
+// The javadoc jar (added by qnop.publish-conventions) documents the generated
+// sources, so they must exist first.
+tasks.named("javadoc") {
     dependsOn(tasks.openApiGenerate)
 }

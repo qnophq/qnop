@@ -1,0 +1,78 @@
+# SPDX-License-Identifier: AGPL-3.0-only
+#
+# Publish -SNAPSHOT artifacts of the published contracts — qnop-spi and qnop-api
+# (models + endpoints) — to GitHub Packages on every push to main (issue #497,
+# ADR-0046), so the private qnop-enterprise repo can build against the latest
+# development contract without waiting for a tagged release. Tagged releases are
+# published by release.yml; this workflow only ever publishes SNAPSHOTs (it
+# skips itself on the brief non-SNAPSHOT commit prepare-release.yml creates).
+#
+# Tests are not run here — ci.yml already gates every commit on main; this only
+# re-publishes the artifacts ci.yml just proved.
+
+name: Publish snapshot
+
+on:
+  push:
+    branches:
+      - main
+    # Only the paths that can change the published jars — the contract sources,
+    # the OpenAPI spec, the build plumbing and the version.
+    paths:
+      - 'qnop-spi/**'
+      - 'qnop-api/**'
+      - 'build-logic/**'
+      - 'gradle/**'
+      - 'VERSION'
+      - 'settings.gradle.kts'
+      - 'build.gradle.kts'
+      - '.github/workflows/publish-snapshot.yml'
+
+permissions:
+  contents: read
+  packages: write
+
+# One publish at a time; a newer main supersedes an in-flight run (latest
+# SNAPSHOT wins anyway).
+concurrency:
+  group: publish-snapshot
+  cancel-in-progress: true
+
+jobs:
+  publish:
+    name: Publish snapshot to GitHub Packages
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+
+      - name: Guard — only publish SNAPSHOT versions
+        id: guard
+        run: |
+          VERSION=$(cat VERSION | tr -d '[:space:]')
+          if [[ "$VERSION" == *-SNAPSHOT ]]; then
+            echo "publish=true" >> "$GITHUB_OUTPUT"
+            echo "Publishing snapshot ${VERSION}"
+          else
+            echo "publish=false" >> "$GITHUB_OUTPUT"
+            echo "::notice::VERSION ${VERSION} is a release, not a SNAPSHOT — release.yml publishes tagged releases; skipping."
+          fi
+
+      - name: Set up JDK 21
+        if: steps.guard.outputs.publish == 'true'
+        uses: actions/setup-java@03ad4de0992f5dab5e18fcb136590ce7c4a0ac95 # v5.6.0
+        with:
+          distribution: temurin
+          java-version: 21
+
+      - name: Setup Gradle
+        if: steps.guard.outputs.publish == 'true'
+        uses: gradle/actions/setup-gradle@3f131e8634966bd73d06cc69884922b02e6faf92 # v6.2.0
+
+      - name: Publish qnop-spi and qnop-api snapshots to GitHub Packages
+        if: steps.guard.outputs.publish == 'true'
+        run: ./gradlew --no-daemon -x test publish
+        env:
+          GITHUB_ACTOR: ${{ github.actor }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

@@ -62,6 +62,7 @@ Two refinement conventions (see the 2026-07-16 amendment to [ADR-0001](0001-reco
 | [0043](0043-system-audit-stream.md) | System-audit stream: generalising the audit trail beyond documents | Accepted |
 | [0044](0044-storage-consistency-scan-and-remediation.md) | Storage-consistency scan & remediation, and the StorageProvider.list SPI extension | Accepted |
 | [0045](0045-scheduler-jobs-dashboard.md) | Scheduler-jobs dashboard: an operator gate in front of the maintenance sweeps | Accepted |
+| [0046](0046-publish-spi-and-api-to-github-packages.md) | Publish qnop-spi & qnop-api to GitHub Packages (maven-publish convention) | Accepted |
 
 ## Template
 

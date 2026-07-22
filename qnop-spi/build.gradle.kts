@@ -8,7 +8,11 @@
 
 plugins {
     id("qnop.java-conventions")
+    // Published to GitHub Packages for the qnop-enterprise repo (issue #497, ADR-0046).
+    id("qnop.publish-conventions")
 }
+
+description = "qnop-spi — the Spring-free extension-point contract for qnop add-ons (ADR-0003)"
 
 dependencies {
     testImplementation(platform(libs.junit.bom))
