@@ -20,13 +20,13 @@ We need to publish the Spring-free published contracts to a Maven repository the
 
 **4. Signing is opt-in and in-memory.** The `signing` block signs the publication **only** when an ASCII-armoured `SIGNING_KEY` is present in the environment (`isRequired = signingKey != null`); otherwise no signature task is wired. GitHub Packages does not mandate signatures, so a normal `build` and a SNAPSHOT publish stay frictionless, while a tagged release can attach signatures once a key is configured as a secret.
 
-**5. Wire publishing into the tag-triggered release (ADR-0040) first.** `release.yml` gains a `./gradlew publish` step (it already holds `packages: write`), so a `vX.Y.Z` tag publishes the matching release artifacts next to the container image. A **snapshot-publish workflow on `main`** — so `qnop-enterprise` can build against the latest `-SNAPSHOT` during development — is a deliberate follow-up, kept out of this change to keep it reviewable.
+**5. Publish on both a tagged release and every `main` push.** `release.yml` gains a `./gradlew publish` step (it already holds `packages: write`), so a `vX.Y.Z` tag publishes the matching release artifacts next to the container image. A separate `publish-snapshot.yml` publishes the `-SNAPSHOT` artifacts on every push to `main` (guarded so it skips the brief non-SNAPSHOT commit `prepare-release.yml` creates, and path-filtered to the contract sources / spec / build plumbing), so `qnop-enterprise` can build against the latest development contract without waiting for a release. Neither workflow runs tests — `ci.yml` already gates every commit on `main`.
 
 ## Consequences
 
 - **Easier:** `qnop-enterprise` can finally declare `io.qnop:qnop-spi` / `io.qnop:qnop-api-endpoint` dependencies and resolve them from GitHub Packages; the publication carries a correct, licence-bearing POM.
 - **Harder / accepted:** consumers must authenticate to GitHub Packages even for these AGPL artifacts (a GitHub-Packages limitation — anonymous read is not supported); a future mirror to Maven Central would remove that friction if broader public consumption is wanted.
-- **Deferred:** the `main` snapshot-publish workflow; signing is inert until a `SIGNING_KEY` secret is added; a Maven Central mirror.
+- **Deferred:** signing is inert until a `SIGNING_KEY` secret is added; a Maven Central mirror.
 
 ## Alternatives considered
 
