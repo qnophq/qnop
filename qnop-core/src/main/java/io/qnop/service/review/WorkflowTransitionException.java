@@ -44,6 +44,9 @@ public class WorkflowTransitionException extends RuntimeException {
   /** A reopen was requested on an annotation that is not RESOLVED (issue #394). */
   public static final String ANNOTATION_NOT_RESOLVED = "ANNOTATION_NOT_RESOLVED";
 
+  /** A dismissal was requested on an annotation that is no longer {@code OPEN} (issue #408). */
+  public static final String ANNOTATION_NOT_OPEN = "ANNOTATION_NOT_OPEN";
+
   private final String code;
 
   public WorkflowTransitionException(String code, String message) {

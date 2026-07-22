@@ -37,6 +37,7 @@ import io.qnop.repository.DocumentVersionRepository;
 import io.qnop.service.ApplicationSettingKey;
 import io.qnop.service.ApplicationSettingsService;
 import io.qnop.service.document.DocumentAccessService;
+import io.qnop.service.document.DocumentValidationException;
 import io.qnop.service.review.ReviewWorkflowMachine.TransitionContext;
 import io.qnop.service.review.ReviewWorkflowMachine.TransitionResult;
 import java.util.List;
@@ -69,6 +70,9 @@ public class ReviewWorkflowService {
 
   /** A terminal transition closed an open annotation automatically (issue #568). */
   static final String AUDIT_ANNOTATION_AUTO_CLOSED = "annotation.auto_closed";
+
+  /** The owner/admin dismissed an annotation (issue #408); detail carries the annotation id. */
+  static final String AUDIT_ANNOTATION_DISMISSED = "annotation.dismissed";
 
   static final String AUTO_CLOSE_COMMENT_CANCELLED =
       "Closed automatically: the review was cancelled.";
@@ -236,24 +240,72 @@ public class ReviewWorkflowService {
   }
 
   /**
-   * Reopens a resolved annotation — {@code RESOLVED → OPEN} (issue #394), permitted for the
-   * annotation's author alone and only while the review is still running: a {@code FINALIZED} or
-   * {@code CANCELLED} review is a closed record. The open-annotation count then re-derives the
-   * {@code IN_REVIEW ⇄ CHANGES_REQUESTED} pair — a reopened concern moves the review back to {@code
-   * CHANGES_REQUESTED}.
+   * Dismisses an open annotation over the author's head — {@code OPEN → DISMISSED} (issue #408),
+   * the per-annotation escape valve for the FINALIZED gate when an absent author cannot resolve
+   * their own concern. Permitted for the document owner and admins; the mandatory justification
+   * lands in the thread as a regular comment attributed to the owner (structurally public, so it
+   * resolves even in anonymous reviews — ADR-0038, mirroring {@link #autoCloseOpenAnnotations}),
+   * while the {@code annotation.dismissed} audit event records the REAL actor. The open-annotation
+   * count then re-derives the {@code IN_REVIEW ⇄ CHANGES_REQUESTED} pair exactly as on a
+   * resolution.
    */
   @Transactional
-  public Annotation reopenAnnotation(UUID annotationId, UUID actorId) {
+  public Annotation dismissAnnotation(
+      UUID annotationId, String justification, UUID actorId, boolean admin) {
     Annotation annotation =
         annotations
             .findById(annotationId)
             .orElseThrow(() -> new AnnotationNotFoundException(annotationId));
     Document document = loadForUpdate(annotation.getDocumentId());
-    if (!annotation.getAuthorId().equals(actorId)) {
-      throw new AnnotationActionForbiddenException("Only the annotation's author may reopen it");
+    requireOwnerOrAdmin(document, actorId, admin);
+    // Belt-and-suspenders: a closed review cannot hold OPEN annotations (terminal transitions
+    // auto-close them, issue #568), but the guard keeps dismiss symmetric with resolve/reopen.
+    requireReviewOpen(document);
+    if (justification == null || justification.isBlank()) {
+      throw DocumentValidationException.invalidRequest(
+          "a dismissal requires a justification for the annotation's author");
+    }
+    if (!ReviewWorkflowMachine.canDismiss(annotation.getStatus())) {
+      throw new WorkflowTransitionException(
+          WorkflowTransitionException.ANNOTATION_NOT_OPEN,
+          "annotation " + annotationId + " is " + annotation.getStatus() + "; only OPEN dismisses");
+    }
+    comments.save(new Comment(annotationId, document.getOwnerId(), justification.trim()));
+    annotation.dismiss();
+    auditEvents.save(
+        new AuditEvent(
+            document.getId(),
+            AUDIT_ANNOTATION_DISMISSED,
+            actorId,
+            "{\"annotationId\":\"" + annotationId + "\"}"));
+    events.publishEvent(
+        new ReviewEvent.AnnotationDismissed(document.getId(), actorId, annotationId));
+    rederiveWorkflow(document, actorId);
+    return annotation;
+  }
+
+  /**
+   * Reopens a settled annotation — {@code RESOLVED → OPEN} (issue #394) or {@code DISMISSED → OPEN}
+   * (issue #408) — only while the review is still running: a {@code FINALIZED} or {@code CANCELLED}
+   * review is a closed record. A RESOLVED annotation is reopened by its author or an admin; a
+   * DISMISSED one by its author (the objection right against the owner's dismissal — the owner may
+   * not reverse their own call) or an admin. The open-annotation count then re-derives the {@code
+   * IN_REVIEW ⇄ CHANGES_REQUESTED} pair — a reopened concern moves the review back to {@code
+   * CHANGES_REQUESTED}.
+   */
+  @Transactional
+  public Annotation reopenAnnotation(UUID annotationId, UUID actorId, boolean admin) {
+    Annotation annotation =
+        annotations
+            .findById(annotationId)
+            .orElseThrow(() -> new AnnotationNotFoundException(annotationId));
+    Document document = loadForUpdate(annotation.getDocumentId());
+    if (!admin && !annotation.getAuthorId().equals(actorId)) {
+      throw new AnnotationActionForbiddenException(
+          "Only the annotation's author or an admin may reopen it");
     }
     requireReviewOpen(document);
-    if (annotation.getStatus() != AnnotationStatus.RESOLVED) {
+    if (!ReviewWorkflowMachine.canReopen(annotation.getStatus())) {
       throw new WorkflowTransitionException(
           WorkflowTransitionException.ANNOTATION_NOT_RESOLVED,
           "annotation " + annotationId + " is " + annotation.getStatus() + "; nothing to reopen");

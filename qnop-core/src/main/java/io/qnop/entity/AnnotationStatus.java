@@ -21,13 +21,19 @@
 package io.qnop.entity;
 
 /**
- * The lifecycle of an {@link Annotation} (issue #244, ADR-0011 as amended by #405). A review is
- * finalizable once no annotation is still {@link #OPEN}. This is a closed set, pinned by a Postgres
- * {@code CHECK} in Liquibase (ADR-0020).
+ * The lifecycle of an {@link Annotation} (issue #244, ADR-0011 as amended by #405 and #408). A
+ * review is finalizable once no annotation is still {@link #OPEN}. This is a closed set, pinned by
+ * a Postgres {@code CHECK} in Liquibase (ADR-0020).
  */
 public enum AnnotationStatus {
   /** Raised by a reviewer and awaiting a response; the concern is not yet settled. */
   OPEN,
   /** The author considers their concern settled and closed the annotation (issue #405). */
-  RESOLVED
+  RESOLVED,
+  /**
+   * The document owner or an admin dismissed the concern with a justification (issue #408) — the
+   * per-annotation escape valve when an absent author blocks the FINALIZED gate. Settled like
+   * {@link #RESOLVED}, but reopenable by the author as their objection right.
+   */
+  DISMISSED
 }

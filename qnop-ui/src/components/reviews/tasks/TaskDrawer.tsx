@@ -27,17 +27,20 @@ import Typography from '@mui/material/Typography';
 import { ExternalLink, X } from 'lucide-react';
 import type { AnnotationView } from '../../../api/generated';
 import { AnnotationStatus } from '../../../api/generated';
-import { useAuthStore } from '../../../stores/authStore';
+import { selectIsAdmin, useAuthStore } from '../../../stores/authStore';
 import { tokens } from '../../../theme/tokens';
 import type { Notify } from '../../admin/layout/useToast';
 import type { BuildPermalink } from '../useReviewPermalink';
 import { ResizableDrawer } from '../ResizableDrawer';
 import { AnnotationHead } from '../panel/AnnotationHead';
 import { CommentThread } from '../panel/CommentThread';
+import { DismissControl } from '../panel/DismissControl';
 import { ResolveBar } from '../panel/ResolveBar';
 import {
+  mayDismissAnnotation,
   mayReopenAnnotation,
   mayResolveAnnotation,
+  useDismissWithFeedback,
   useReopenWithFeedback,
   useResolveWithFeedback,
 } from '../panel/resolve';
@@ -84,8 +87,10 @@ export function TaskDrawer({
   buildPermalink,
 }: TaskDrawerProps) {
   const userId = useAuthStore((state) => state.userId);
+  const viewerIsAdmin = useAuthStore(selectIsAdmin);
   const { resolveWith, isPending } = useResolveWithFeedback(notify);
   const { reopenWith } = useReopenWithFeedback(notify);
+  const { dismissWith, isPending: dismissing } = useDismissWithFeedback(notify);
 
   if (!annotation) return null;
   // READ_ONLY policy (issue #413): only the author and the owner may reply.
@@ -149,8 +154,9 @@ export function TaskDrawer({
             notify={notify}
             policyReadOnly={policyReadOnly}
             closed={annotation.status !== AnnotationStatus.Open}
+            dismissed={annotation.status === AnnotationStatus.Dismissed}
             onReopen={
-              !reviewClosed && mayReopenAnnotation(annotation, userId)
+              !reviewClosed && mayReopenAnnotation(annotation, userId, viewerIsAdmin)
                 ? () => reopenWith(annotation)
                 : undefined
             }
@@ -163,6 +169,16 @@ export function TaskDrawer({
         {mayResolveAnnotation(annotation, userId) && (
           <Box sx={{ borderTop: '1px solid', borderColor: 'divider', px: 1, py: 0.5 }}>
             <ResolveBar disabled={isPending} onResolve={(note) => resolveWith(annotation, note)} />
+          </Box>
+        )}
+        {!reviewClosed && mayDismissAnnotation(annotation, userId, ownerId, viewerIsAdmin) && (
+          // The owner/admin escape hatch (issue #408) — subordinate to the
+          // author's Resolve; never both, the author is excluded.
+          <Box sx={{ borderTop: '1px solid', borderColor: 'divider', px: 1, py: 0.5 }}>
+            <DismissControl
+              disabled={dismissing}
+              onDismiss={(justification) => dismissWith(annotation, justification)}
+            />
           </Box>
         )}
       </Stack>

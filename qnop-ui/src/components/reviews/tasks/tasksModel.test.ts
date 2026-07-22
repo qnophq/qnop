@@ -57,6 +57,10 @@ describe('columnOf', () => {
     );
     expect(columnOf(annotation({ status: AnnotationStatus.Resolved }))).toBe('done');
   });
+
+  it('places dismissed annotations in done — settled, though not by the author (#408)', () => {
+    expect(columnOf(annotation({ status: AnnotationStatus.Dismissed }))).toBe('done');
+  });
 });
 
 describe('parseTaskFilter', () => {

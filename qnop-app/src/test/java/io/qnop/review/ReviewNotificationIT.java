@@ -218,6 +218,31 @@ class ReviewNotificationIT extends SeededIntegrationTest {
   }
 
   @Test
+  @DisplayName("dismissing mails the absent author with the decision (#408)")
+  void dismissMailsTheAuthor() throws Exception {
+    seedDocument(false);
+    String annotationId = createAnnotation(AUDITOR_ID);
+
+    mockMvc
+        .perform(
+            as(post("/api/v1/annotations/" + annotationId + "/dismiss"), MEMBER_ID)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"justification\":\"Concern is stale.\"}"))
+        .andExpect(status().isOk());
+
+    // The author's reopen right (issue #408) only works if they hear of the dismissal.
+    @SuppressWarnings("unchecked")
+    ArgumentCaptor<Map<String, Object>> vars = ArgumentCaptor.forClass(Map.class);
+    verify(mail, timeout(5000))
+        .sendMailFromTemplate(
+            eq(MailTemplateKey.REVIEW_ANNOTATION_DECIDED),
+            eq(emailOf(AUDITOR_ID)),
+            vars.capture(),
+            isNull());
+    assertThat(vars.getValue()).containsEntry("decision", "dismissed");
+  }
+
+  @Test
   @DisplayName("a manual transition mails the participants — unless they opted out")
   void manualTransitionMailsParticipantsRespectingOptOut() throws Exception {
     seedDocument(false);

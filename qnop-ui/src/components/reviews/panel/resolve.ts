@@ -21,7 +21,11 @@
 
 import type { AnnotationView } from '../../../api/generated';
 import { AnnotationStatus } from '../../../api/generated';
-import { useReopenAnnotation, useResolveAnnotation } from '../../../api/hooks/useAnnotations';
+import {
+  useDismissAnnotation,
+  useReopenAnnotation,
+  useResolveAnnotation,
+} from '../../../api/hooks/useAnnotations';
 import { apiErrorCode } from '../../../utils/apiError';
 import type { Notify } from '../../admin/layout/useToast';
 
@@ -66,21 +70,44 @@ export function useResolveWithFeedback(notify: Notify) {
 }
 
 /**
- * Only the AUTHOR reopens their RESOLVED annotation (issue #394); the caller
- * additionally gates on the review still running (FINALIZED/CANCELLED are a
- * closed record). Mirrors the ReviewWorkflowService guard.
+ * The AUTHOR reopens their settled annotation — RESOLVED (issue #394) or
+ * DISMISSED, the objection right against the owner's dismissal (issue #408) —
+ * and so does an ADMIN. The owner deliberately may NOT reverse their own
+ * dismissal. The caller additionally gates on the review still running
+ * (FINALIZED/CANCELLED are a closed record). Mirrors the
+ * ReviewWorkflowService guard.
  */
-export function mayReopenAnnotation(annotation: AnnotationView, userId: string | null): boolean {
-  return (
-    annotation.status === AnnotationStatus.Resolved &&
-    userId !== null &&
-    annotation.authorId === userId
-  );
+export function mayReopenAnnotation(
+  annotation: AnnotationView,
+  userId: string | null,
+  isAdmin = false,
+): boolean {
+  const settled =
+    annotation.status === AnnotationStatus.Resolved ||
+    annotation.status === AnnotationStatus.Dismissed;
+  return settled && userId !== null && (isAdmin || annotation.authorId === userId);
+}
+
+/**
+ * The OWNER (or an admin) dismisses someone else's OPEN annotation with a
+ * justification (issue #408) — the escape hatch when an absent author blocks
+ * the FINALIZED gate. Never offered on the viewer's own annotation: the
+ * author's path is Resolve. Mirrors the ReviewWorkflowService guard.
+ */
+export function mayDismissAnnotation(
+  annotation: AnnotationView,
+  userId: string | null,
+  ownerId: string | undefined,
+  isAdmin: boolean,
+): boolean {
+  if (annotation.status !== AnnotationStatus.Open || userId === null) return false;
+  if (annotation.authorId === userId) return false;
+  return isAdmin || (ownerId !== undefined && ownerId === userId);
 }
 
 /** Known reopen conflicts (409) — mapped to friendly text, never server prose. */
 const REOPEN_CONFLICTS: Record<string, string> = {
-  REVIEW_CLOSED: 'The review is finalized — resolved annotations stay closed.',
+  REVIEW_CLOSED: 'The review is finalized — settled annotations stay closed.',
   ANNOTATION_NOT_RESOLVED: 'This annotation is already open.',
 };
 
@@ -101,4 +128,33 @@ export function useReopenWithFeedback(notify: Notify) {
     );
   };
   return { reopenWith, isPending: reopen.isPending };
+}
+
+/** Known dismiss conflicts (409) — mapped to friendly text, never server prose. */
+const DISMISS_CONFLICTS: Record<string, string> = {
+  ANNOTATION_NOT_OPEN: 'This annotation is already settled.',
+  REVIEW_CLOSED: 'The review is closed — nothing left to dismiss.',
+};
+
+/**
+ * The dismiss mutation with the shared toast feedback (issue #408). The
+ * mandatory justification travels along and lands in the thread.
+ */
+export function useDismissWithFeedback(notify: Notify) {
+  const dismiss = useDismissAnnotation();
+  const dismissWith = (annotation: AnnotationView, justification: string) => {
+    dismiss.mutate(
+      { annotationId: annotation.id, justification: justification.trim() },
+      {
+        onSuccess: () => notify('Annotation dismissed.'),
+        onError: (error) =>
+          notify(
+            DISMISS_CONFLICTS[apiErrorCode(error) ?? ''] ??
+              'The annotation could not be dismissed.',
+            'error',
+          ),
+      },
+    );
+  };
+  return { dismissWith, isPending: dismiss.isPending };
 }

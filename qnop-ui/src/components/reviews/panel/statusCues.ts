@@ -20,7 +20,7 @@
  */
 
 import type { LucideIcon } from 'lucide-react';
-import { CircleCheck, CircleDot } from 'lucide-react';
+import { CircleCheck, CircleDot, CircleSlash } from 'lucide-react';
 import type { Theme } from '@mui/material/styles';
 import { AnnotationStatus } from '../../../api/generated';
 import type { BadgeTone } from '../../admin/ToneBadge';
@@ -28,6 +28,9 @@ import type { BadgeTone } from '../../admin/ToneBadge';
 /**
  * Status → badge tone/label/icon/rail colour — shared by the panel's list
  * items and the focus overlay card (#291), so both surfaces read identically.
+ * DISMISSED (issue #408) is deliberately NOT the resolved green: the author
+ * did not settle this concern — the owner/admin closed it over their head,
+ * and every list must show the difference.
  */
 export const STATUS_CUES: Record<
   AnnotationStatus,
@@ -44,5 +47,11 @@ export const STATUS_CUES: Record<
     label: 'Resolved',
     icon: CircleCheck,
     color: (theme) => theme.palette.success.main,
+  },
+  [AnnotationStatus.Dismissed]: {
+    tone: 'amber',
+    label: 'Dismissed',
+    icon: CircleSlash,
+    color: (theme) => theme.palette.warning.main,
   },
 };

@@ -387,7 +387,7 @@ class ReviewWorkflowServiceTest {
     when(documents.findByIdForUpdate(documentId))
         .thenReturn(Optional.of(document(WorkflowState.IN_REVIEW)));
 
-    assertThatThrownBy(() -> service.reopenAnnotation(UUID.randomUUID(), owner))
+    assertThatThrownBy(() -> service.reopenAnnotation(UUID.randomUUID(), owner, false))
         .isInstanceOfSatisfying(
             WorkflowTransitionException.class,
             e ->
@@ -405,7 +405,7 @@ class ReviewWorkflowServiceTest {
         .thenReturn(Optional.of(document(WorkflowState.CHANGES_REQUESTED)));
     when(annotations.countByDocumentIdAndStatus(any(), any())).thenReturn(1L);
 
-    service.reopenAnnotation(UUID.randomUUID(), owner);
+    service.reopenAnnotation(UUID.randomUUID(), owner, false);
 
     assertThat(resolved.getStatus()).isEqualTo(AnnotationStatus.OPEN);
     assertThat(captureAudits().getAllValues())
@@ -413,5 +413,187 @@ class ReviewWorkflowServiceTest {
             e ->
                 assertThat(e.getEventType())
                     .isEqualTo(ReviewWorkflowService.AUDIT_ANNOTATION_REOPENED));
+  }
+
+  @Test
+  @DisplayName("an admin may reopen someone else's resolved annotation (#408)")
+  void reopenResolvedByAdmin() {
+    Annotation resolved = new Annotation(documentId, stranger);
+    resolved.resolve();
+    when(annotations.findById(any())).thenReturn(Optional.of(resolved));
+    when(documents.findByIdForUpdate(documentId))
+        .thenReturn(Optional.of(document(WorkflowState.IN_REVIEW)));
+
+    service.reopenAnnotation(UUID.randomUUID(), UUID.randomUUID(), true);
+
+    assertThat(resolved.getStatus()).isEqualTo(AnnotationStatus.OPEN);
+  }
+
+  // --- dismiss (#408) --------------------------------------------------------
+
+  @Test
+  @DisplayName("the owner dismisses with an owner-attributed justification; the audit names them")
+  void dismissClosesJustifiesAndAudits() {
+    Annotation open = new Annotation(documentId, stranger);
+    when(annotations.findById(any())).thenReturn(Optional.of(open));
+    when(documents.findByIdForUpdate(documentId))
+        .thenReturn(Optional.of(document(WorkflowState.IN_REVIEW)));
+
+    service.dismissAnnotation(UUID.randomUUID(), "  author left the project  ", owner, false);
+
+    assertThat(open.getStatus()).isEqualTo(AnnotationStatus.DISMISSED);
+    ArgumentCaptor<Comment> comment = ArgumentCaptor.forClass(Comment.class);
+    verify(comments).save(comment.capture());
+    assertThat(comment.getValue().getAuthorId()).isEqualTo(owner);
+    assertThat(comment.getValue().getBody()).isEqualTo("author left the project");
+    assertThat(captureAudits().getAllValues())
+        .anySatisfy(
+            event -> {
+              assertThat(event.getEventType())
+                  .isEqualTo(ReviewWorkflowService.AUDIT_ANNOTATION_DISMISSED);
+              assertThat(event.getActorId()).isEqualTo(owner);
+            });
+  }
+
+  @Test
+  @DisplayName("an admin dismisses without being the owner; the comment stays owner-attributed")
+  void dismissByAdminAuditsRealActor() {
+    UUID adminUser = UUID.randomUUID();
+    Annotation open = new Annotation(documentId, stranger);
+    when(annotations.findById(any())).thenReturn(Optional.of(open));
+    when(documents.findByIdForUpdate(documentId))
+        .thenReturn(Optional.of(document(WorkflowState.IN_REVIEW)));
+
+    service.dismissAnnotation(UUID.randomUUID(), "duplicate of #12", adminUser, true);
+
+    assertThat(open.getStatus()).isEqualTo(AnnotationStatus.DISMISSED);
+    ArgumentCaptor<Comment> comment = ArgumentCaptor.forClass(Comment.class);
+    verify(comments).save(comment.capture());
+    assertThat(comment.getValue().getAuthorId()).isEqualTo(owner);
+    assertThat(captureAudits().getAllValues())
+        .anySatisfy(
+            event -> {
+              assertThat(event.getEventType())
+                  .isEqualTo(ReviewWorkflowService.AUDIT_ANNOTATION_DISMISSED);
+              assertThat(event.getActorId()).isEqualTo(adminUser);
+            });
+  }
+
+  @Test
+  @DisplayName("a non-owner non-admin (the author included) cannot dismiss")
+  void dismissIsOwnerOrAdminOnly() {
+    Annotation open = new Annotation(documentId, stranger);
+    when(annotations.findById(any())).thenReturn(Optional.of(open));
+    when(documents.findByIdForUpdate(documentId))
+        .thenReturn(Optional.of(document(WorkflowState.IN_REVIEW)));
+
+    assertThatThrownBy(
+            () -> service.dismissAnnotation(UUID.randomUUID(), "justified", stranger, false))
+        .isInstanceOf(NotDocumentOwnerException.class);
+    assertThat(open.getStatus()).isEqualTo(AnnotationStatus.OPEN);
+    verify(comments, never()).save(any());
+  }
+
+  @Test
+  @DisplayName("a dismissal without a justification is a 400 and changes nothing")
+  void dismissRequiresJustification() {
+    Annotation open = new Annotation(documentId, stranger);
+    when(annotations.findById(any())).thenReturn(Optional.of(open));
+    when(documents.findByIdForUpdate(documentId))
+        .thenReturn(Optional.of(document(WorkflowState.IN_REVIEW)));
+
+    assertThatThrownBy(() -> service.dismissAnnotation(UUID.randomUUID(), "   ", owner, false))
+        .isInstanceOf(io.qnop.service.document.DocumentValidationException.class);
+    assertThat(open.getStatus()).isEqualTo(AnnotationStatus.OPEN);
+    verify(comments, never()).save(any());
+    verify(auditEvents, never()).save(any());
+  }
+
+  @Test
+  @DisplayName("dismissing a non-OPEN annotation is a 409 ANNOTATION_NOT_OPEN")
+  void dismissRejectsNonOpen() {
+    Annotation resolved = new Annotation(documentId, stranger);
+    resolved.resolve();
+    when(annotations.findById(any())).thenReturn(Optional.of(resolved));
+    when(documents.findByIdForUpdate(documentId))
+        .thenReturn(Optional.of(document(WorkflowState.IN_REVIEW)));
+
+    assertThatThrownBy(() -> service.dismissAnnotation(UUID.randomUUID(), "late", owner, false))
+        .isInstanceOfSatisfying(
+            WorkflowTransitionException.class,
+            e ->
+                assertThat(e.getCode()).isEqualTo(WorkflowTransitionException.ANNOTATION_NOT_OPEN));
+    verify(comments, never()).save(any());
+  }
+
+  @Test
+  @DisplayName("dismissing the last open annotation re-derives CHANGES_REQUESTED → IN_REVIEW")
+  void dismissRederivesWorkflow() {
+    Document changesRequested = document(WorkflowState.CHANGES_REQUESTED);
+    Annotation open = new Annotation(documentId, stranger);
+    when(annotations.findById(any())).thenReturn(Optional.of(open));
+    when(documents.findByIdForUpdate(documentId)).thenReturn(Optional.of(changesRequested));
+    // After the dismissal no annotation is OPEN — the derived pair flips back.
+    when(annotations.countByDocumentIdAndStatus(any(), eq(AnnotationStatus.OPEN))).thenReturn(0L);
+
+    service.dismissAnnotation(UUID.randomUUID(), "stale", owner, false);
+
+    assertThat(changesRequested.getWorkflowState()).isEqualTo(WorkflowState.IN_REVIEW.name());
+  }
+
+  @Test
+  @DisplayName("the author reopens their dismissed annotation (objection right, #408)")
+  void reopenDismissedByAuthor() {
+    Annotation dismissed = new Annotation(documentId, stranger);
+    dismissed.dismiss();
+    when(annotations.findById(any())).thenReturn(Optional.of(dismissed));
+    when(documents.findByIdForUpdate(documentId))
+        .thenReturn(Optional.of(document(WorkflowState.IN_REVIEW)));
+
+    service.reopenAnnotation(UUID.randomUUID(), stranger, false);
+
+    assertThat(dismissed.getStatus()).isEqualTo(AnnotationStatus.OPEN);
+  }
+
+  @Test
+  @DisplayName("the owner may not reverse their own dismissal — reopen stays author/admin")
+  void reopenDismissedByOwnerForbidden() {
+    Annotation dismissed = new Annotation(documentId, stranger);
+    dismissed.dismiss();
+    when(annotations.findById(any())).thenReturn(Optional.of(dismissed));
+    when(documents.findByIdForUpdate(documentId))
+        .thenReturn(Optional.of(document(WorkflowState.IN_REVIEW)));
+
+    assertThatThrownBy(() -> service.reopenAnnotation(UUID.randomUUID(), owner, false))
+        .isInstanceOf(AnnotationActionForbiddenException.class);
+    assertThat(dismissed.getStatus()).isEqualTo(AnnotationStatus.DISMISSED);
+  }
+
+  @Test
+  @DisplayName("an admin reopens a dismissed annotation")
+  void reopenDismissedByAdmin() {
+    Annotation dismissed = new Annotation(documentId, stranger);
+    dismissed.dismiss();
+    when(annotations.findById(any())).thenReturn(Optional.of(dismissed));
+    when(documents.findByIdForUpdate(documentId))
+        .thenReturn(Optional.of(document(WorkflowState.IN_REVIEW)));
+
+    service.reopenAnnotation(UUID.randomUUID(), UUID.randomUUID(), true);
+
+    assertThat(dismissed.getStatus()).isEqualTo(AnnotationStatus.OPEN);
+  }
+
+  @Test
+  @DisplayName("a closed review refuses a dismissal (REVIEW_CLOSED, defensive)")
+  void dismissRequiresOpenReview() {
+    Annotation open = new Annotation(documentId, stranger);
+    when(annotations.findById(any())).thenReturn(Optional.of(open));
+    when(documents.findByIdForUpdate(documentId))
+        .thenReturn(Optional.of(document(WorkflowState.CANCELLED)));
+
+    assertThatThrownBy(() -> service.dismissAnnotation(UUID.randomUUID(), "late", owner, false))
+        .isInstanceOfSatisfying(
+            WorkflowTransitionException.class,
+            e -> assertThat(e.getCode()).isEqualTo(WorkflowTransitionException.REVIEW_CLOSED));
   }
 }

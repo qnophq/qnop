@@ -378,13 +378,34 @@ public class AnnotationService {
   }
 
   /**
-   * Reopens the annotation as its author (issue #394) via the workflow choke-point (which enforces
-   * the authorization, the closed-review guard and the state re-derivation), and returns the
-   * updated annotation's view.
+   * Reopens the annotation as its author or an admin (issues #394/#408) via the workflow
+   * choke-point (which enforces the authorization, the closed-review guard and the state
+   * re-derivation), and returns the updated annotation's view.
    */
   @Transactional
-  public AnnotationView reopen(UUID annotationId, UUID actor) {
-    Annotation updated = workflow.reopenAnnotation(annotationId, actor);
+  public AnnotationView reopen(UUID annotationId, UUID actor, boolean admin) {
+    Annotation updated = workflow.reopenAnnotation(annotationId, actor, admin);
+    ReviewIdentityResolver.ReviewIdentities identities =
+        identity.forDocument(updated.getDocumentId(), actor);
+    return view(
+        updated,
+        null,
+        firstComment(updated.getId()),
+        threadSize(updated.getId()),
+        foreignActivity(updated.getId(), actor),
+        annotationReactions(updated.getId(), actor, identities),
+        identities);
+  }
+
+  /**
+   * Dismisses the annotation as the document owner or an admin (issue #408) via the workflow
+   * choke-point (which enforces the authorization, the mandatory justification, the audit trail and
+   * the state re-derivation), and returns the updated annotation's view.
+   */
+  @Transactional
+  public AnnotationView dismiss(
+      UUID annotationId, String justification, UUID actor, boolean admin) {
+    Annotation updated = workflow.dismissAnnotation(annotationId, justification, actor, admin);
     ReviewIdentityResolver.ReviewIdentities identities =
         identity.forDocument(updated.getDocumentId(), actor);
     return view(

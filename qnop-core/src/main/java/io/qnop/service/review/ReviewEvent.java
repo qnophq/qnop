@@ -47,6 +47,14 @@ public sealed interface ReviewEvent {
   record AnnotationDecided(UUID documentId, UUID actorId, UUID annotationId, boolean reopened)
       implements ReviewEvent {}
 
+  /**
+   * The owner/admin dismissed an annotation over the author's head (issue #408). Separate from
+   * {@link AnnotationDecided} so the mail can say "dismissed" — the absent author must learn of it
+   * to exercise their reopen right.
+   */
+  record AnnotationDismissed(UUID documentId, UUID actorId, UUID annotationId)
+      implements ReviewEvent {}
+
   /** A reply landed in an annotation's thread. */
   record CommentAdded(UUID documentId, UUID actorId, UUID annotationId, UUID commentId)
       implements ReviewEvent {}

@@ -116,6 +116,7 @@ public class ReviewNotificationService {
       case ReviewEvent.ParticipantAdded added -> participantAdded(document, added);
       case ReviewEvent.AnnotationCreated created -> annotationCreated(document, created);
       case ReviewEvent.AnnotationDecided decided -> annotationDecided(document, decided);
+      case ReviewEvent.AnnotationDismissed dismissed -> annotationDismissed(document, dismissed);
       case ReviewEvent.CommentAdded comment -> commentAdded(document, comment);
       case ReviewEvent.VersionUploaded uploaded -> versionUploaded(document, uploaded);
       case ReviewEvent.WorkflowChanged changed -> workflowChanged(document, changed);
@@ -161,20 +162,34 @@ public class ReviewNotificationService {
   }
 
   private void annotationDecided(Document document, ReviewEvent.AnnotationDecided event) {
-    Optional<Annotation> annotation = annotations.findById(event.annotationId());
+    annotationDecided(
+        document,
+        event.annotationId(),
+        event.actorId(),
+        event.reopened() ? "reopened" : "resolved");
+  }
+
+  private void annotationDismissed(Document document, ReviewEvent.AnnotationDismissed event) {
+    // The dismissed author is the one recipient who MUST hear of it (issue #408) —
+    // their reopen right is worthless unless they learn the concern was closed.
+    annotationDecided(document, event.annotationId(), event.actorId(), "dismissed");
+  }
+
+  private void annotationDecided(
+      Document document, UUID annotationId, UUID actorId, String decision) {
+    Optional<Annotation> annotation = annotations.findById(annotationId);
     if (annotation.isEmpty()) {
       return;
     }
     Set<UUID> recipients =
         new LinkedHashSet<>(List.of(document.getOwnerId(), annotation.get().getAuthorId()));
-    String excerpt = firstCommentExcerpt(event.annotationId());
-    String decision = event.reopened() ? "reopened" : "resolved";
-    for (User recipient : deliverable(recipients, event.actorId())) {
+    String excerpt = firstCommentExcerpt(annotationId);
+    for (User recipient : deliverable(recipients, actorId)) {
       Map<String, Object> vars = baseVars(document, recipient);
-      vars.put("actorName", actorNameFor(document, recipient, event.actorId()));
+      vars.put("actorName", actorNameFor(document, recipient, actorId));
       vars.put("annotationExcerpt", excerpt);
       vars.put("decision", decision);
-      vars.put("actionUrl", annotationUrl(document, event.annotationId()));
+      vars.put("actionUrl", annotationUrl(document, annotationId));
       mail.sendMailFromTemplate(
           MailTemplateKey.REVIEW_ANNOTATION_DECIDED, recipient.getEmail(), vars, null);
     }

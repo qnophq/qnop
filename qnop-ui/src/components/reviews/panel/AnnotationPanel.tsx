@@ -50,10 +50,13 @@ import { PanelFilterBar } from './PanelFilterBar';
 import { ReanchorBanner } from './ReanchorBanner';
 import type { AnnotationFilters } from './panelFilters';
 import { EMPTY_FILTERS, matchesFilters, comparePanelOrder } from './panelFilters';
+import { DismissControl } from './DismissControl';
 import { ResolveBar } from './ResolveBar';
 import {
+  mayDismissAnnotation,
   mayReopenAnnotation,
   mayResolveAnnotation,
+  useDismissWithFeedback,
   useReopenWithFeedback,
   useResolveWithFeedback,
 } from './resolve';
@@ -164,6 +167,7 @@ export function AnnotationPanel({
   const { resolveWith, isPending: resolving } = useResolveWithFeedback(notify);
   const confirmPlacement = useConfirmPlacement(notify);
   const { reopenWith } = useReopenWithFeedback(notify);
+  const { dismissWith, isPending: dismissing } = useDismissWithFeedback(notify);
 
   // Author names are resolved server-side and travel on the annotation itself
   // (issue #413), honouring per-review anonymity — the real name in a normal
@@ -255,6 +259,16 @@ export function AnnotationPanel({
           {!readOnly && mayResolveAnnotation(annotation, userId) && (
             <ResolveBar disabled={resolving} onResolve={(note) => resolveWith(annotation, note)} />
           )}
+          {!readOnly &&
+            !reviewClosed &&
+            mayDismissAnnotation(annotation, userId, ownerId, viewerIsAdmin) && (
+              // The owner/admin escape hatch (issue #408) — subordinate to the
+              // author's Resolve, never both at once (the author is excluded).
+              <DismissControl
+                disabled={dismissing}
+                onDismiss={(justification) => dismissWith(annotation, justification)}
+              />
+            )}
           {/* The thread stays inside the unit's card. */}
           <CommentThread
             annotationId={annotation.id}
@@ -263,8 +277,9 @@ export function AnnotationPanel({
             readOnly={readOnly}
             policyReadOnly={!mayComment(annotation)}
             closed={annotation.status !== AnnotationStatus.Open}
+            dismissed={annotation.status === AnnotationStatus.Dismissed}
             onReopen={
-              !readOnly && !reviewClosed && mayReopenAnnotation(annotation, userId)
+              !readOnly && !reviewClosed && mayReopenAnnotation(annotation, userId, viewerIsAdmin)
                 ? () => reopenWith(annotation)
                 : undefined
             }

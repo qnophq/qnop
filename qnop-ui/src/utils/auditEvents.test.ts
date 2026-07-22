@@ -42,6 +42,7 @@ describe('auditEventMeta', () => {
       expect.arrayContaining([
         'annotation.created',
         'annotation.classified',
+        'annotation.dismissed',
         'placement.reattached',
         'placement.repositioned',
         'annotation.auto_closed',

@@ -227,6 +227,16 @@ public class ReviewWorkflowMachine {
     return current == AnnotationStatus.OPEN;
   }
 
+  /** Whether an annotation in {@code current} may be dismissed (issue #408): only {@code OPEN}. */
+  public static boolean canDismiss(AnnotationStatus current) {
+    return current == AnnotationStatus.OPEN;
+  }
+
+  /** Whether an annotation in {@code current} is settled and may be reopened (issues #394/#408). */
+  public static boolean canReopen(AnnotationStatus current) {
+    return current == AnnotationStatus.RESOLVED || current == AnnotationStatus.DISMISSED;
+  }
+
   /**
    * The workflow transition the open-annotation count drives, if any (issue #405): the {@code
    * IN_REVIEW ⇄ CHANGES_REQUESTED} pair is derived — an open concern moves the review to {@code

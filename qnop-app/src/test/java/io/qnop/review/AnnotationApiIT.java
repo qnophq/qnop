@@ -686,4 +686,139 @@ class AnnotationApiIT extends SeededIntegrationTest {
       String annotationId, UUID actor) throws Exception {
     return mockMvc.perform(as(post("/api/v1/annotations/" + annotationId + "/resolve"), actor));
   }
+
+  private org.springframework.test.web.servlet.ResultActions dismiss(
+      String annotationId, UUID actor, String justification) throws Exception {
+    return mockMvc.perform(
+        as(post("/api/v1/annotations/" + annotationId + "/dismiss"), actor)
+            .contentType(MediaType.APPLICATION_JSON)
+            .content("{\"justification\":\"" + justification + "\"}"));
+  }
+
+  // --- dismiss (issue #408) --------------------------------------------------
+
+  @Test
+  void theOwnerDismissesWithAJustificationLandingInTheThread() throws Exception {
+    UUID documentId = seedDocumentWithVersion();
+    String annotationId = createAnnotation(documentId, AUDITOR_ID);
+
+    dismiss(annotationId, MEMBER_ID, "Author left the project; concern is stale.")
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.status").value("DISMISSED"))
+        .andExpect(jsonPath("$.commentCount").value(2));
+
+    // The justification is the thread's last comment, attributed to the owner
+    // (structurally public, ADR-0038); the audit event names the real actor.
+    mockMvc
+        .perform(as(get("/api/v1/annotations/" + annotationId + "/comments"), AUDITOR_ID))
+        .andExpect(status().isOk())
+        .andExpect(
+            jsonPath("$.comments[1].body").value("Author left the project; concern is stale."))
+        .andExpect(jsonPath("$.comments[1].authorId").value(MEMBER_ID.toString()));
+    assertThat(auditEvents.findByDocumentIdOrderByCreatedAtDesc(documentId))
+        .anySatisfy(
+            event -> {
+              assertThat(event.getEventType()).isEqualTo("annotation.dismissed");
+              assertThat(event.getActorId()).isEqualTo(MEMBER_ID);
+              assertThat(event.getDetail()).contains(annotationId);
+            });
+  }
+
+  @Test
+  void anAdminDismissesWithoutBeingTheOwner() throws Exception {
+    UUID documentId = seedDocumentWithVersion();
+    String annotationId = createAnnotation(documentId, AUDITOR_ID);
+
+    dismiss(annotationId, ADMIN_ID, "Duplicate of an already-settled concern.")
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.status").value("DISMISSED"));
+
+    assertThat(auditEvents.findByDocumentIdOrderByCreatedAtDesc(documentId))
+        .anySatisfy(
+            event -> {
+              assertThat(event.getEventType()).isEqualTo("annotation.dismissed");
+              assertThat(event.getActorId()).isEqualTo(ADMIN_ID);
+            });
+  }
+
+  @Test
+  void theAuthorAndOtherReviewersCannotDismiss() throws Exception {
+    UUID documentId = seedDocumentWithVersion();
+    String annotationId = createAnnotation(documentId, AUDITOR_ID);
+
+    // The author uses resolve; dismiss is the owner's (or an admin's) call alone.
+    dismiss(annotationId, AUDITOR_ID, "let me close my own").andExpect(status().isForbidden());
+    dismiss(annotationId, MEMBER2_ID, "not my call").andExpect(status().isForbidden());
+    assertThat(auditEvents.findByDocumentIdOrderByCreatedAtDesc(documentId))
+        .noneMatch(event -> "annotation.dismissed".equals(event.getEventType()));
+  }
+
+  @Test
+  void aDismissalWithoutAJustificationIsRejected() throws Exception {
+    UUID documentId = seedDocumentWithVersion();
+    String annotationId = createAnnotation(documentId, AUDITOR_ID);
+
+    dismiss(annotationId, MEMBER_ID, "   ").andExpect(status().isBadRequest());
+    mockMvc
+        .perform(
+            as(post("/api/v1/annotations/" + annotationId + "/dismiss"), MEMBER_ID)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{}"))
+        .andExpect(status().isBadRequest());
+    mockMvc
+        .perform(as(get("/api/v1/annotations/" + annotationId), MEMBER_ID))
+        .andExpect(jsonPath("$.status").value("OPEN"));
+  }
+
+  @Test
+  void dismissingANonOpenAnnotationIsConflict() throws Exception {
+    UUID documentId = seedDocumentWithVersion();
+    String annotationId = createAnnotation(documentId, AUDITOR_ID);
+    resolve(annotationId, AUDITOR_ID).andExpect(status().isOk());
+
+    dismiss(annotationId, MEMBER_ID, "too late")
+        .andExpect(status().isConflict())
+        .andExpect(jsonPath("$.code").value("ANNOTATION_NOT_OPEN"));
+  }
+
+  @Test
+  void aDismissedThreadRefusesNewCommentsButAcceptsAReopen() throws Exception {
+    UUID documentId = seedDocumentWithVersion();
+    String annotationId = createAnnotation(documentId, AUDITOR_ID);
+    dismiss(annotationId, MEMBER_ID, "stale").andExpect(status().isOk());
+
+    mockMvc
+        .perform(
+            as(post("/api/v1/annotations/" + annotationId + "/comments"), MEMBER2_ID)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"body\":\"objection!\"}"))
+        .andExpect(status().isConflict());
+
+    // The author's objection right (issue #408): reopen, then the thread lives again.
+    mockMvc
+        .perform(as(post("/api/v1/annotations/" + annotationId + "/reopen"), AUDITOR_ID))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.status").value("OPEN"));
+    mockMvc
+        .perform(
+            as(post("/api/v1/annotations/" + annotationId + "/comments"), MEMBER2_ID)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"body\":\"objection noted\"}"))
+        .andExpect(status().isCreated());
+  }
+
+  @Test
+  void theOwnerCannotReopenTheirOwnDismissalButAnAdminCan() throws Exception {
+    UUID documentId = seedDocumentWithVersion();
+    String annotationId = createAnnotation(documentId, AUDITOR_ID);
+    dismiss(annotationId, MEMBER_ID, "stale").andExpect(status().isOk());
+
+    mockMvc
+        .perform(as(post("/api/v1/annotations/" + annotationId + "/reopen"), MEMBER_ID))
+        .andExpect(status().isForbidden());
+    mockMvc
+        .perform(as(post("/api/v1/annotations/" + annotationId + "/reopen"), ADMIN_ID))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.status").value("OPEN"));
+  }
 }

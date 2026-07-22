@@ -28,7 +28,7 @@ import Stack from '@mui/material/Stack';
 import Tooltip from '@mui/material/Tooltip';
 import Typography from '@mui/material/Typography';
 import { alpha, useTheme } from '@mui/material/styles';
-import { CircleCheck, Lock, RotateCcw, SendHorizontal } from 'lucide-react';
+import { CircleCheck, CircleSlash, Lock, RotateCcw, SendHorizontal } from 'lucide-react';
 import { useAddComment, useComments } from '../../../api/hooks/useComments';
 import { useDocument } from '../../../api/hooks/useDocuments';
 import { realAuthorId } from '../../people/realAuthorId';
@@ -63,9 +63,11 @@ interface CommentThreadProps {
    * author nor the owner, so the composer gives way to a quiet "only author and owner" line.
    */
   policyReadOnly?: boolean;
-  /** True on a RESOLVED annotation (#403): the thread is a closed record. */
+  /** True on a settled (RESOLVED/DISMISSED) annotation (#403): the thread is a closed record. */
   closed?: boolean;
-  /** Reopens the annotation (issue #394) — set only when the viewer may. */
+  /** True when the settlement was a dismissal (issue #408) — the closing line says so. */
+  dismissed?: boolean;
+  /** Reopens the annotation (issues #394/#408) — set only when the viewer may. */
   onReopen?: () => void;
   /** The previous visit (issue #307) — enables the "new" divider inside the thread. */
   previousSeenAt?: string | null;
@@ -98,6 +100,7 @@ export function CommentThread({
   readOnly = false,
   policyReadOnly = false,
   closed = false,
+  dismissed = false,
   onReopen,
   previousSeenAt = null,
   skipOpener = false,
@@ -135,7 +138,7 @@ export function CommentThread({
         const code = apiErrorCode(error);
         notify(
           code === 'ANNOTATION_ALREADY_RESOLVED'
-            ? 'The annotation was resolved — its thread is closed.'
+            ? 'The annotation is settled — its thread is closed.'
             : code === 'THREAD_READ_ONLY'
               ? 'Only the author and the owner can reply in this review.'
               : 'Could not add the comment.',
@@ -311,8 +314,16 @@ export function CommentThread({
               minHeight: 26,
             }}
           >
-            <CircleCheck size={13} aria-hidden color={theme.palette.success.main} />
-            <Typography variant="caption">Resolved — this thread is closed.</Typography>
+            {dismissed ? (
+              <CircleSlash size={13} aria-hidden color={theme.palette.warning.main} />
+            ) : (
+              <CircleCheck size={13} aria-hidden color={theme.palette.success.main} />
+            )}
+            <Typography variant="caption">
+              {dismissed
+                ? 'Dismissed — this thread is closed.'
+                : 'Resolved — this thread is closed.'}
+            </Typography>
             {onReopen && (
               <Button
                 size="small"

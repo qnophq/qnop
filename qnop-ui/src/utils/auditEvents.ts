@@ -56,7 +56,13 @@ export const AUDIT_EVENT_META: Record<string, AuditEventMeta> = {
   },
   'annotation.reopened': {
     label: 'Annotation reopened',
-    description: 'A previously resolved annotation was reopened because it needed more work.',
+    description: 'A previously settled annotation was reopened because it needed more work.',
+    tone: 'amber',
+  },
+  'annotation.dismissed': {
+    label: 'Annotation dismissed',
+    description:
+      'The review owner or an admin dismissed an open annotation with a mandatory justification (issue #408); the author may reopen it.',
     tone: 'amber',
   },
   'annotation.classified': {

@@ -561,7 +561,7 @@ class ReviewWorkflowControllerIT extends SeededIntegrationTest {
     annotation.resolve();
     annotations.save(annotation);
 
-    workflow.reopenAnnotation(annotation.getId(), MEMBER2_ID);
+    workflow.reopenAnnotation(annotation.getId(), MEMBER2_ID, false);
 
     assertThat(annotations.findById(annotation.getId()).orElseThrow().getStatus())
         .isEqualTo(AnnotationStatus.OPEN);
@@ -585,5 +585,42 @@ class ReviewWorkflowControllerIT extends SeededIntegrationTest {
 
     assertThat(documents.findById(document.getId()).orElseThrow().getWorkflowState())
         .isEqualTo("CHANGES_REQUESTED");
+  }
+
+  @Test
+  void dismissingTheLastOpenAnnotationReturnsTheReviewToInReview() {
+    Document document = inReviewOwnedByMember();
+    document.setWorkflowState(WorkflowState.CHANGES_REQUESTED);
+    documents.save(document);
+    Annotation annotation = annotations.save(new Annotation(document.getId(), MEMBER2_ID));
+
+    workflow.dismissAnnotation(annotation.getId(), "author unavailable", MEMBER_ID, false);
+
+    assertThat(annotations.findById(annotation.getId()).orElseThrow().getStatus())
+        .isEqualTo(AnnotationStatus.DISMISSED);
+    assertThat(documents.findById(document.getId()).orElseThrow().getWorkflowState())
+        .isEqualTo("IN_REVIEW");
+    assertThat(
+            auditEvents.findByDocumentIdOrderByCreatedAtDesc(document.getId()).stream()
+                .map(AuditEvent::getEventType))
+        .contains("annotation.dismissed", "workflow.transition");
+  }
+
+  @Test
+  void aDismissedAnnotationNoLongerBlocksFinalize() throws Exception {
+    Document document = inReviewOwnedByMember();
+    readyVersionOn(document);
+    Annotation open = openAnnotationOn(document);
+
+    workflow.dismissAnnotation(open.getId(), "concern is stale", MEMBER_ID, false);
+
+    mockMvc
+        .perform(
+            post(workflowPath(document.getId()))
+                .header("Authorization", "Bearer " + token(MEMBER_ID))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"targetState\":\"FINALIZED\"}"))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.state").value("FINALIZED"));
   }
 }

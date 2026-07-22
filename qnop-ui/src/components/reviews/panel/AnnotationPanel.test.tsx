@@ -69,6 +69,7 @@ vi.mock('../../../api/hooks/useAnnotations', () => ({
   useReattachPlacement: vi.fn().mockReturnValue({ mutate: vi.fn(), isPending: false }),
   useResolveAnnotation: () => ({ mutate: resolveMutate, isPending: false }),
   useReopenAnnotation: () => ({ mutate: vi.fn(), isPending: false }),
+  useDismissAnnotation: () => ({ mutate: vi.fn(), isPending: false }),
 }));
 
 beforeEach(() => {

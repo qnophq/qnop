@@ -80,6 +80,7 @@ export function formatAuditDetail(
     case 'annotation.created':
     case 'annotation.resolved':
     case 'annotation.reopened':
+    case 'annotation.dismissed':
     case 'extraction.succeeded':
       // The event label already conveys the meaning; the payload is only an
       // internal id, which is never shown.

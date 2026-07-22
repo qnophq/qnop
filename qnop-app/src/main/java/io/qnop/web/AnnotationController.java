@@ -24,6 +24,7 @@ import io.qnop.api.v1.endpoint.AnnotationsApi;
 import io.qnop.api.v1.model.Anchor;
 import io.qnop.api.v1.model.AnnotationClassificationRequest;
 import io.qnop.api.v1.model.AnnotationCreateRequest;
+import io.qnop.api.v1.model.AnnotationDismissRequest;
 import io.qnop.api.v1.model.AnnotationListResponse;
 import io.qnop.api.v1.model.AnnotationPriority;
 import io.qnop.api.v1.model.AnnotationResolveRequest;
@@ -127,7 +128,21 @@ public class AnnotationController implements AnnotationsApi {
 
   @Override
   public ResponseEntity<AnnotationView> reopenAnnotation(UUID annotationId) {
-    return ResponseEntity.ok(toDto(annotations.reopen(annotationId, CurrentUser.requireUserId())));
+    return ResponseEntity.ok(
+        toDto(
+            annotations.reopen(annotationId, CurrentUser.requireUserId(), CurrentUser.isAdmin())));
+  }
+
+  @Override
+  public ResponseEntity<AnnotationView> dismissAnnotation(
+      UUID annotationId, AnnotationDismissRequest request) {
+    return ResponseEntity.ok(
+        toDto(
+            annotations.dismiss(
+                annotationId,
+                request.getJustification(),
+                CurrentUser.requireUserId(),
+                CurrentUser.isAdmin())));
   }
 
   @Override

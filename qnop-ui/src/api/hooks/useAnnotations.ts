@@ -179,6 +179,34 @@ export function useResolveAnnotation() {
 }
 
 /**
+ * Dismisses an open annotation as the document owner or an admin: OPEN ->
+ * DISMISSED, with a mandatory justification landing in the thread (issue
+ * #408). Dismissing the last open annotation returns the workflow to
+ * IN_REVIEW, so the workflow-bearing caches are invalidated alongside the
+ * annotation lists — and the comment threads, because of the justification.
+ */
+export function useDismissAnnotation() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (vars: { annotationId: string; justification: string }) => {
+      const response = await annotationsApi.dismissAnnotation({
+        annotationId: vars.annotationId,
+        annotationDismissRequest: { justification: vars.justification },
+      });
+      return response.data;
+    },
+    onSuccess: (updated) => {
+      queryClient.invalidateQueries({ queryKey: annotationKeys.all });
+      queryClient.invalidateQueries({ queryKey: commentKeys.all });
+      queryClient.invalidateQueries({ queryKey: ['reviews'] });
+      // Detail only — see useCreateAnnotation: touching documentKeys.all
+      // reloads the PDF and costs the reader their scroll position.
+      queryClient.invalidateQueries({ queryKey: documentKeys.detail(updated.documentId) });
+    },
+  });
+}
+
+/**
  * Confirms a reviewed MOVED placement back to PLACED (ADR-0009, issue #326) —
  * the human half of re-anchoring, allowed for the owner or the annotation's
  * author on the version whose highlight was verified.
