@@ -44,9 +44,11 @@ import org.junit.jupiter.api.Test;
 import org.springframework.dao.DataIntegrityViolationException;
 
 /**
- * DB-free unit tests for {@link StorageService#stage} dedup correctness (issue #289): only {@code
- * COMMITTED} rows are authoritative, and a {@code PENDING} row is (re-)uploaded when the object is
- * actually missing — so a failed earlier {@code put} can never poison the key.
+ * DB-free unit tests for {@link StorageService#stage} dedup correctness. A registry hit is only a
+ * dedup hint: the object's real existence is verified before the upload is skipped, and it is
+ * (re-)uploaded from the buffered bytes whenever it is missing — whether the row is a poisoned
+ * {@code PENDING} one (issue #289) or a {@code COMMITTED} one whose object vanished out of band
+ * (issue #575) — so a stale row can never leave a key pointing at nothing.
  */
 class StorageServiceTest {
 
@@ -94,14 +96,31 @@ class StorageServiceTest {
   }
 
   @Test
-  @DisplayName("a COMMITTED hit dedups without uploading or a HEAD check")
-  void committedRowIsAuthoritativeDedup() {
+  @DisplayName("a COMMITTED hit whose object exists dedups without uploading")
+  void committedRowWithExistingObjectDedups() {
     when(repository.findByObjectKey(anyString())).thenReturn(Optional.of(committedRow()));
+    when(provider.exists(anyString())).thenReturn(true);
 
     storage.stage(content(), "application/pdf");
 
+    // The object is verified present, then the upload is skipped and the row left untouched.
+    verify(provider).exists(anyString());
     verify(provider, never()).put(anyString(), any(), anyLong(), anyString());
-    verify(provider, never()).exists(anyString());
+    verify(repository, never()).save(any());
+  }
+
+  @Test
+  @DisplayName("a COMMITTED hit whose object vanished out of band re-uploads — the #575 fix")
+  void committedRowWithMissingObjectIsReuploaded() {
+    when(repository.findByObjectKey(anyString())).thenReturn(Optional.of(committedRow()));
+    when(provider.exists(anyString())).thenReturn(false);
+
+    storage.stage(content(), "application/pdf");
+
+    // The COMMITTED row is no longer trusted blindly: the absent object is re-materialized from
+    // the buffered bytes, and the row is not re-inserted (it already exists and stays COMMITTED).
+    verify(provider).exists(anyString());
+    verify(provider).put(anyString(), any(), anyLong(), eq("application/pdf"));
     verify(repository, never()).save(any());
   }
 
