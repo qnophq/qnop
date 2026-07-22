@@ -261,8 +261,13 @@ class MyTeamsControllerIT extends AbstractIntegrationTest {
   void lastLeadCannotBeDemotedOrRemoved() throws Exception {
     String admin = token(createUser("root", UserRole.ADMIN));
     User lead = createUser("lead", UserRole.MEMBER);
+    User member = createUser("member", UserRole.MEMBER);
     String teamId = createTeam(admin, "Core");
     addMember(admin, teamId, lead, "LEAD");
+    // A plain member remains, so removing/demoting the lead would strip the team's last
+    // lead while members remain — the guarded case (removing the *sole* member instead
+    // empties the team, which is allowed; issue #542).
+    addMember(admin, teamId, member, "MEMBER");
 
     String leadToken = token("lead");
 
