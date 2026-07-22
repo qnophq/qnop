@@ -33,7 +33,7 @@ import Popper from '@mui/material/Popper';
 import Stack from '@mui/material/Stack';
 import { Copy, NotebookPen } from 'lucide-react';
 import type { Anchor, AnnotationView, NormalizedBox } from '../../api/generated';
-import { ExtractionStatus } from '../../api/generated';
+import { AnnotationStatus, ExtractionStatus } from '../../api/generated';
 import type { AnnotationPriority, AnnotationType } from '../../api/generated';
 import {
   useAnnotations,
@@ -80,7 +80,7 @@ import { columnOf } from '../../components/reviews/tasks/tasksModel';
 import { NewTaskDialog } from '../../components/reviews/tasks/NewTaskDialog';
 import { Composer } from '../../components/reviews/panel/Composer';
 import { useCommentAttachmentUpload } from '../../components/reviews/markdown/useCommentAttachmentUpload';
-import { WorkflowBadge } from '../../components/reviews/WorkflowBadge';
+import { WorkflowMilestones } from '../../components/reviews/WorkflowMilestones';
 import { AnonymousBadge } from '../../components/reviews/AnonymousBadge';
 import type {
   ScreenPosition,
@@ -479,7 +479,11 @@ export function DocumentReviewPage() {
         title={document.title}
         titleAdornment={
           <>
-            <WorkflowBadge state={document.workflowState} />
+            <WorkflowMilestones
+              state={document.workflowState}
+              total={annotations.length}
+              resolved={annotations.filter((a) => a.status !== AnnotationStatus.Open).length}
+            />
             {document.anonymous && <AnonymousBadge />}
           </>
         }
