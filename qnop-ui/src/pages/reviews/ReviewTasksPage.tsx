@@ -34,6 +34,7 @@ import { useAnnotations } from '../../api/hooks/useAnnotations';
 import { useDocument, useDocumentVersions } from '../../api/hooks/useDocuments';
 import { useRecordVisit } from '../../api/hooks/useReviews';
 import { AdminToast } from '../../components/admin/layout/AdminToast';
+import { ReviewPageHeader } from '../../components/reviews/hub/ReviewPageHeader';
 import { ReviewViewTabs } from '../../components/reviews/hub/ReviewViewTabs';
 import { useReviewDocumentId } from '../../components/reviews/reviewDocumentId';
 import { useReviewPermalink } from '../../components/reviews/useReviewPermalink';
@@ -125,6 +126,10 @@ export function ReviewTasksPage() {
   const [openTaskId, setOpenTaskId] = useState<string | null>(null);
   const [newTaskOpen, setNewTaskOpen] = useState(false);
 
+  // A new version uploaded from this tab lands on its Document view (issue #571).
+  const goToNewVersion = (versionNumber: number) =>
+    navigate(`/reviews/${routeSegment}?version=${versionNumber}`);
+
   const { resolveWith } = useResolveWithFeedback(notify);
 
   const setParam = (key: string, value: string | null) => {
@@ -206,33 +211,16 @@ export function ReviewTasksPage() {
     );
   }
   if (documentQuery.isError || !document) {
-    return (
-      <PageHeader
-        title="This review is not available"
-        titleAdornment={<Chip size="small" variant="outlined" label="Tasks" />}
-      />
-    );
+    return <PageHeader title="This review is not available" />;
   }
 
   return (
     <Stack spacing={2.5} sx={{ height: { md: '100%' }, minHeight: { md: 480 } }}>
-      <PageHeader
-        title={document.title}
-        titleAdornment={<Chip size="small" variant="outlined" label="Tasks" />}
-        action={
-          // A document-scoped task (issue #395) needs no selection — offered while the review is
-          // open and has a version to author against; the server refuses a closed review anyway.
-          isOpenWorkflowState(document.workflowState) && latestVersion >= 1 ? (
-            <Button
-              variant="contained"
-              size="small"
-              startIcon={<Plus size={16} />}
-              onClick={() => setNewTaskOpen(true)}
-            >
-              Global annotation
-            </Button>
-          ) : undefined
-        }
+      <ReviewPageHeader
+        document={document}
+        annotations={annotations}
+        notify={notify}
+        onVersionUploaded={goToNewVersion}
       />
       <ReviewViewTabs
         documentId={routeSegment}
@@ -284,6 +272,18 @@ export function ReviewTasksPage() {
             searchLabel="Search tasks"
           />
         </Box>
+        {/* A document-scoped task (issue #395) needs no selection — offered while the review is
+            open and has a version to author against; the server refuses a closed review anyway. */}
+        {isOpenWorkflowState(document.workflowState) && latestVersion >= 1 && (
+          <Button
+            variant="contained"
+            size="small"
+            startIcon={<Plus size={16} />}
+            onClick={() => setNewTaskOpen(true)}
+          >
+            Global annotation
+          </Button>
+        )}
       </Stack>
 
       {annotationsQuery.isPending ? (

@@ -42,6 +42,11 @@ import { ReviewTasksPage } from './ReviewTasksPage';
 // hooks above stay mocked, so a bare client per file is all the tests need.
 const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
 
+vi.mock('../../components/reviews/hub/ReviewHubHead', () => ({
+  ReviewHubHead: ({ isOwner }: { isOwner: boolean }) => (
+    <div data-testid="review-hub-head" data-is-owner={String(isOwner)} />
+  ),
+}));
 vi.mock('../../api/hooks/useDocuments', () => ({
   useDocument: vi.fn(),
   useDocumentVersions: vi.fn(),
@@ -90,7 +95,13 @@ function mockData() {
   vi.mocked(useDocument).mockReturnValue({
     isPending: false,
     isError: false,
-    data: { id: 'd1', title: 'Supply Contract', ownerId: 'owner-1', latestVersionNumber: 2 },
+    data: {
+      id: 'd1',
+      title: 'Supply Contract',
+      ownerId: 'owner-1',
+      latestVersionNumber: 2,
+      workflowState: 'IN_REVIEW',
+    },
   } as never);
   vi.mocked(useDocumentVersions).mockReturnValue({
     data: { versions: [{ versionNumber: 1 }, { versionNumber: 2 }] },
@@ -212,6 +223,7 @@ describe('ReviewTasksPage', () => {
         ownerId: 'owner-1',
         latestVersionNumber: 2,
         anonymous: true,
+        workflowState: 'IN_REVIEW',
       },
     } as never);
     renderPage();

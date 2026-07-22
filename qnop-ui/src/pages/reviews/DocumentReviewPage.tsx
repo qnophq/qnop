@@ -33,7 +33,7 @@ import Popper from '@mui/material/Popper';
 import Stack from '@mui/material/Stack';
 import { Copy, NotebookPen } from 'lucide-react';
 import type { Anchor, AnnotationView, NormalizedBox } from '../../api/generated';
-import { AnnotationStatus, ExtractionStatus } from '../../api/generated';
+import { ExtractionStatus } from '../../api/generated';
 import type { AnnotationPriority, AnnotationType } from '../../api/generated';
 import {
   useAnnotations,
@@ -48,11 +48,10 @@ import {
 } from '../../api/hooks/useDocuments';
 import { AdminToast } from '../../components/admin/layout/AdminToast';
 import { copyToClipboard } from '../../utils/clipboard';
-import { PageHeader } from '../../components/admin/layout/PageHeader';
 import { useToast } from '../../components/admin/layout/useToast';
 import { BoundaryFallback } from '../../components/errors/BoundaryFallback';
 import { ErrorBoundary } from '../../components/errors/ErrorBoundary';
-import { ReviewHubHead } from '../../components/reviews/hub/ReviewHubHead';
+import { ReviewPageHeader } from '../../components/reviews/hub/ReviewPageHeader';
 import { ReviewViewTabs } from '../../components/reviews/hub/ReviewViewTabs';
 import { useReviewDocumentId } from '../../components/reviews/reviewDocumentId';
 import { useReviewPermalink } from '../../components/reviews/useReviewPermalink';
@@ -80,8 +79,6 @@ import { columnOf } from '../../components/reviews/tasks/tasksModel';
 import { NewTaskDialog } from '../../components/reviews/tasks/NewTaskDialog';
 import { Composer } from '../../components/reviews/panel/Composer';
 import { useCommentAttachmentUpload } from '../../components/reviews/markdown/useCommentAttachmentUpload';
-import { WorkflowMilestones } from '../../components/reviews/WorkflowMilestones';
-import { AnonymousBadge } from '../../components/reviews/AnonymousBadge';
 import type {
   ScreenPosition,
   TextSelectionOffsets,
@@ -475,34 +472,11 @@ export function DocumentReviewPage() {
     >
       {/* No description line: the version lives in the toolbar dropdown, and
           every saved pixel goes to the document and its annotations. */}
-      <PageHeader
-        title={document.title}
-        titleAdornment={
-          <>
-            <WorkflowMilestones
-              state={document.workflowState}
-              total={annotations.length}
-              resolved={annotations.filter((a) => a.status !== AnnotationStatus.Open).length}
-            />
-            {document.anonymous && <AnonymousBadge />}
-          </>
-        }
-        action={
-          <ReviewHubHead
-            documentId={documentId}
-            ownerId={document.ownerId}
-            ownerSlug={document.ownerSlug}
-            ownerDisplayName={document.ownerDisplayName}
-            isOwner={document.ownerId === userId}
-            ownUserId={userId}
-            anonymous={document.anonymous ?? false}
-            annotations={annotations}
-            dueAt={document.dueAt ?? null}
-            workflowState={document.workflowState}
-            notify={notify}
-            onVersionUploaded={handleVersionChange}
-          />
-        }
+      <ReviewPageHeader
+        document={document}
+        annotations={annotations}
+        notify={notify}
+        onVersionUploaded={handleVersionChange}
       />
       <ReviewViewTabs
         documentId={routeSegment}
