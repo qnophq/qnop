@@ -85,11 +85,14 @@ public class DocumentOverviewService {
   }
 
   @Transactional(readOnly = true)
-  public DocumentPage listVisible(UUID actor, String query, String sort, int page, int size) {
+  public DocumentPage listVisible(
+      UUID actor, String query, String sort, boolean archived, int page, int size) {
     String like =
         query == null || query.isBlank() ? null : "%" + query.trim().toLowerCase(Locale.ROOT) + "%";
+    // The default overview (archived=false) hides archived reviews (issue #576); the "Archived"
+    // view (archived=true) returns only them. Open/closed is a client-side facet over the result.
     Page<Document> result =
-        documents.findVisibleTo(actor, like, PageRequest.of(page, size, parseSort(sort)));
+        documents.findVisibleTo(actor, like, archived, PageRequest.of(page, size, parseSort(sort)));
 
     List<UUID> ids = result.getContent().stream().map(Document::getId).toList();
     Map<UUID, Integer> maxVersions =
@@ -170,7 +173,8 @@ public class DocumentOverviewService {
                           slugById),
                       document.getCreatedAt(),
                       document.getUpdatedAt(),
-                      document.getDueAt());
+                      document.getDueAt(),
+                      document.getArchivedAt());
                 })
             .toList();
     return new DocumentPage(items, result.getTotalElements(), page, size);
@@ -224,7 +228,8 @@ public class DocumentOverviewService {
       List<ParticipantView> participants,
       Instant createdAt,
       Instant updatedAt,
-      Instant dueAt) {}
+      Instant dueAt,
+      Instant archivedAt) {}
 
   /** A page of the caller's documents. */
   public record DocumentPage(List<DocumentSummaryView> items, long total, int page, int size) {}

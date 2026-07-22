@@ -61,4 +61,19 @@ public enum WorkflowState {
     }
     return Optional.empty();
   }
+
+  /**
+   * Whether this is a terminal/closed state: the review is an immutable record ({@link #FINALIZED}
+   * or {@link #CANCELLED}) that accepts no further changes. The closed-record guards and the
+   * auto-archive sweep (issue #576) share this predicate rather than re-deriving the two-state
+   * test.
+   */
+  public boolean isClosed() {
+    return this == FINALIZED || this == CANCELLED;
+  }
+
+  /** Convenience for the raw persisted string: a known closed state, else {@code false}. */
+  public static boolean isClosed(String value) {
+    return fromString(value).map(WorkflowState::isClosed).orElse(false);
+  }
 }

@@ -1,0 +1,51 @@
+# Copyright (c) 2026-present devtank42 GmbH
+# SPDX-License-Identifier: AGPL-3.0-only
+
+# Auto-archive of long-closed reviews (issue #576). Additive changeset — 1.0.0
+# has shipped, so this ALTERs the existing document table rather than folding
+# into 0011.
+#
+#  - closed_at:   the instant a review reached a terminal state (FINALIZED/
+#                 CANCELLED). Set going forward by the workflow service; the cheap
+#                 "closed since" predicate the archive sweep needs (the audit
+#                 trail is too expensive per row). Backfilled from updated_at for
+#                 already-closed rows (an accepted approximation — exact from now).
+#  - archived_at: when the review was archived out of the active lists (by the
+#                 reviewArchive job or a manual owner/admin archive). NULL = not
+#                 archived. Archiving is an orthogonal flag on a closed review,
+#                 not a workflow state (ADR-0011 amendment).
+databaseChangeLog:
+  - changeSet:
+      id: 0025-review-archive-columns
+      author: qnop
+      comment: Adds document.closed_at + document.archived_at for review auto-archiving (issue #576).
+      changes:
+        - addColumn:
+            tableName: document
+            columns:
+              - column:
+                  name: closed_at
+                  type: TIMESTAMP WITH TIME ZONE
+              - column:
+                  name: archived_at
+                  type: TIMESTAMP WITH TIME ZONE
+        # Backfill the terminal instant for reviews already closed before this
+        # feature existed. updated_at ≈ the terminal transition for a review left
+        # untouched since; exact for every transition from now on.
+        - update:
+            tableName: document
+            columns:
+              - column: { name: closed_at, valueComputed: updated_at }
+            where: workflow_state IN ('FINALIZED', 'CANCELLED')
+        # The sweep scans closed-but-unarchived rows by age; the list filter and
+        # the "Archived" view scan by archived_at.
+        - createIndex:
+            indexName: ix_document_closed_at
+            tableName: document
+            columns:
+              - column: { name: closed_at }
+        - createIndex:
+            indexName: ix_document_archived_at
+            tableName: document
+            columns:
+              - column: { name: archived_at }

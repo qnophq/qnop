@@ -2210,6 +2210,105 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
+  /documents/{documentId}/archive:
+    parameters:
+      - name: documentId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+    post:
+      tags: [Documents]
+      summary: Archive a closed review now (owner or admin)
+      description: |
+        Manually archives a finalized or cancelled review out of the active
+        lists (issue #576), without waiting for the retention window. Archiving
+        is an orthogonal flag: the terminal workflowState is preserved and the
+        review stays a readable, immutable record. Rejected with `409` when the
+        review is not yet closed or is already archived.
+      operationId: archiveDocument
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: The review, now archived.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DocumentResponse'
+        '401':
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: The caller is neither the document owner nor an admin
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Unknown document
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '409':
+          description: The review is not closed, or already archived
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /documents/{documentId}/unarchive:
+    parameters:
+      - name: documentId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+    post:
+      tags: [Documents]
+      summary: Restore an archived review to the active lists (owner or admin)
+      description: |
+        Clears the archived flag (issue #576), returning the review to the
+        default lists. Rejected with `409` when the review is not archived.
+      operationId: unarchiveDocument
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: The review, no longer archived.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DocumentResponse'
+        '401':
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: The caller is neither the document owner nor an admin
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Unknown document
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '409':
+          description: The review is not archived
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
   /dashboard:
     get:
       tags: [Dashboard]
@@ -2484,6 +2583,15 @@ paths:
           schema:
             type: string
             default: updatedAt,desc
+        - name: archived
+          in: query
+          required: false
+          description: |
+            When false (default) the list excludes archived reviews (issue #576);
+            when true it returns only archived reviews — the "Archived" view.
+          schema:
+            type: boolean
+            default: false
         - name: page
           in: query
           required: false
@@ -6046,6 +6154,14 @@ components:
             Optional, informational completion deadline (issue #295). Absent or
             null when none is set. No workflow-guard semantics — an overdue open
             review is only visually flagged.
+        archivedAt:
+          type: string
+          format: date-time
+          nullable: true
+          description: >-
+            When the review was archived out of the active lists (issue #576), or
+            null when not archived. The terminal workflowState is preserved, so
+            the UI can read "Archived · was Finalized".
       required:
         - id
         - title
@@ -6529,6 +6645,14 @@ components:
             Optional, informational completion deadline (issue #295). Absent or
             null when none is set. No workflow-guard semantics — an overdue open
             review is only visually flagged.
+        archivedAt:
+          type: string
+          format: date-time
+          nullable: true
+          description: >-
+            When the review was archived out of the active lists (issue #576), or
+            null when not archived. The terminal workflowState is preserved, so
+            the UI can read "Archived · was Finalized".
       required:
         - id
         - title

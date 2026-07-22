@@ -1,0 +1,20 @@
+# Copyright (c) 2026-present devtank42 GmbH
+# SPDX-License-Identifier: AGPL-3.0-only
+
+# Seed row for the review auto-archive retention (issue #576). Additive changeset
+# — new keys land in their own changeset (1.0.0 shipped the original seed). The
+# registry (ApplicationSettingKey) stays authoritative per ADR-0025; this row
+# mirrors its default. 0 disables auto-archiving.
+databaseChangeLog:
+  - changeSet:
+      id: 0026-review-archive-setting
+      author: qnop
+      comment: Adds the review.archive_after_days application setting (issue #576), default 90.
+      changes:
+        - insert:
+            tableName: application_setting
+            columns:
+              - column: { name: setting_key, value: "review.archive_after_days" }
+              - column: { name: setting_value, value: "90" }
+              - column: { name: setting_desc, value: "Days a completed review stays before it is archived out of the active lists (0 disables auto-archiving)." }
+              - column: { name: value_type, value: "INTEGER" }

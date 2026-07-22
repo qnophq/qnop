@@ -47,6 +47,15 @@ public class WorkflowTransitionException extends RuntimeException {
   /** A dismissal was requested on an annotation that is no longer {@code OPEN} (issue #408). */
   public static final String ANNOTATION_NOT_OPEN = "ANNOTATION_NOT_OPEN";
 
+  /** A manual archive was requested on a review that is not yet closed (issue #576). */
+  public static final String REVIEW_NOT_CLOSED = "REVIEW_NOT_CLOSED";
+
+  /** A manual archive was requested on a review that is already archived (issue #576). */
+  public static final String REVIEW_ALREADY_ARCHIVED = "REVIEW_ALREADY_ARCHIVED";
+
+  /** An unarchive was requested on a review that is not archived (issue #576). */
+  public static final String REVIEW_NOT_ARCHIVED = "REVIEW_NOT_ARCHIVED";
+
   private final String code;
 
   public WorkflowTransitionException(String code, String message) {

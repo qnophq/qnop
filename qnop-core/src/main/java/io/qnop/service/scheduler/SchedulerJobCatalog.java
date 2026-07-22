@@ -40,6 +40,7 @@ public final class SchedulerJobCatalog {
   public static final String REFRESH_TOKEN_SWEEP = "refreshTokenSweep";
   public static final String REVOKED_TOKEN_SWEEP = "revokedTokenSweep";
   public static final String STORAGE_ORPHAN_REAPER = "storageOrphanReaper";
+  public static final String REVIEW_ARCHIVE = "reviewArchive";
 
   private static final List<SchedulerJobDefinition> DEFINITIONS =
       List.of(
@@ -72,6 +73,13 @@ public final class SchedulerJobCatalog {
               "Storage orphan reaper",
               "Deletes uploaded-but-uncommitted storage objects older than the grace period.",
               "0 30 3 * * *",
+              true),
+          new SchedulerJobDefinition(
+              REVIEW_ARCHIVE,
+              "Review archive",
+              "Archives reviews closed (finalized/cancelled) longer than the retention window,"
+                  + " moving them out of the active lists.",
+              "0 50 3 * * *",
               true));
 
   private static final List<String> IDS =

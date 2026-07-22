@@ -40,6 +40,7 @@ import io.qnop.service.document.DocumentAccessService;
 import io.qnop.service.document.DocumentValidationException;
 import io.qnop.service.review.ReviewWorkflowMachine.TransitionContext;
 import io.qnop.service.review.ReviewWorkflowMachine.TransitionResult;
+import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
 import org.springframework.context.ApplicationEventPublisher;
@@ -370,7 +371,14 @@ public class ReviewWorkflowService {
             ? machine.manualTransition(from, target, context)
             : machine.transition(from, target, context);
     switch (result) {
-      case TransitionResult.Allowed allowed -> document.setWorkflowState(allowed.target());
+      case TransitionResult.Allowed allowed -> {
+        document.setWorkflowState(allowed.target());
+        // Record the terminal instant once, so the auto-archive sweep (issue #576) has a cheap
+        // "closed since" predicate. FINALIZED/CANCELLED are terminal, so this fires exactly once.
+        if (allowed.target().isClosed()) {
+          document.setClosedAt(Instant.now());
+        }
+      }
       case TransitionResult.Denied denied ->
           throw new WorkflowTransitionException(
               WorkflowTransitionException.INVALID_TRANSITION, denied.reason());
