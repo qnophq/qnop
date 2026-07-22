@@ -20,7 +20,7 @@
  */
 
 import { useEffect, useState } from 'react';
-import { useParams, useSearchParams } from 'react-router-dom';
+import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import Alert from '@mui/material/Alert';
 import Box from '@mui/material/Box';
 import Chip from '@mui/material/Chip';
@@ -37,7 +37,9 @@ import { useRenderedDocument } from '../../api/hooks/useDocuments';
 import { useParticipants } from '../../api/hooks/useReviews';
 import { useAnnotations } from '../../api/hooks/useAnnotations';
 import { useVersionDiff, versionDiffErrorCode } from '../../api/hooks/useVersionDiff';
-import { PageHeader } from '../../components/admin/layout/PageHeader';
+import { AdminToast } from '../../components/admin/layout/AdminToast';
+import { useToast } from '../../components/admin/layout/useToast';
+import { ReviewPageHeader } from '../../components/reviews/hub/ReviewPageHeader';
 import { ReviewViewTabs } from '../../components/reviews/hub/ReviewViewTabs';
 import { useReviewDocumentId } from '../../components/reviews/reviewDocumentId';
 import { ChangeSummaryPanel } from '../../components/reviews/diff/ChangeSummaryPanel';
@@ -60,6 +62,8 @@ export function VersionComparePage() {
   // The raw segment may be a slug (issue #411) — sibling links keep it, while
   // all data access below uses the canonical id resolved by the route gate.
   const { documentId: routeSegment = '' } = useParams();
+  const navigate = useNavigate();
+  const { toast, notify, clear } = useToast();
   const documentId = useReviewDocumentId();
   const [searchParams, setSearchParams] = useSearchParams();
   const { formatDateTime } = useFormatters();
@@ -100,9 +104,8 @@ export function VersionComparePage() {
   const diffQuery = useVersionDiff(documentId, from, to);
   // The tasks pill on the view tabs (issue #398) — cached alongside the other pages.
   const annotationsQuery = useAnnotations(documentId, readyNumbers.at(-1));
-  const openTaskCount = (annotationsQuery.data?.annotations ?? []).filter(
-    (annotation) => columnOf(annotation) !== 'done',
-  ).length;
+  const annotations = annotationsQuery.data?.annotations ?? [];
+  const openTaskCount = annotations.filter((annotation) => columnOf(annotation) !== 'done').length;
 
   const [activeChange, setActiveChange] = useState<number | null>(null);
   const [syncScroll, setSyncScroll] = useState(true);
@@ -159,9 +162,14 @@ export function VersionComparePage() {
 
   return (
     <Stack spacing={2.5} sx={{ height: { md: '100%' }, minHeight: { md: 480 } }}>
-      <PageHeader
-        title={document_.title}
-        titleAdornment={<Chip size="small" variant="outlined" label="Compare versions" />}
+      <ReviewPageHeader
+        document={document_}
+        annotations={annotations}
+        notify={notify}
+        onVersionUploaded={(versionNumber) =>
+          // A new version uploaded from this tab lands on its Document view (issue #571).
+          navigate(`/reviews/${routeSegment}?version=${versionNumber}`)
+        }
       />
       <ReviewViewTabs
         documentId={routeSegment}
@@ -302,6 +310,7 @@ export function VersionComparePage() {
           </Box>
         </>
       )}
+      <AdminToast toast={toast} onClose={clear} />
     </Stack>
   );
 }

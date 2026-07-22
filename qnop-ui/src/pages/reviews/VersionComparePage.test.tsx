@@ -37,6 +37,11 @@ import { useParticipants } from '../../api/hooks/useReviews';
 import { useVersionDiff } from '../../api/hooks/useVersionDiff';
 import { usePdfDocument } from '../../components/reviews/viewer/usePdfDocument';
 
+vi.mock('../../components/reviews/hub/ReviewHubHead', () => ({
+  ReviewHubHead: ({ isOwner }: { isOwner: boolean }) => (
+    <div data-testid="review-hub-head" data-is-owner={String(isOwner)} />
+  ),
+}));
 vi.mock('../../api/hooks/useDocuments', () => ({
   useDocument: vi.fn(),
   useDocumentVersions: vi.fn(),
