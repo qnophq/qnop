@@ -100,7 +100,14 @@ public class ReviewWorkflowService {
    * their names (kept as strings so the web layer maps them without depending on the entity enum,
    * ADR-0004, issue #315).
    */
-  public record WorkflowStatus(String state, List<String> allowedTransitions) {}
+  public record WorkflowStatus(
+      String state,
+      List<String> allowedTransitions,
+      boolean mayTransition,
+      List<TransitionOptionView> transitions) {}
+
+  /** One manual target with its read-time guard verdict (issue #568); reason null = available. */
+  public record TransitionOptionView(String targetState, boolean available, String blockedReason) {}
 
   /**
    * The current workflow status of a document, readable by anyone who may see the document — its
@@ -114,19 +121,20 @@ public class ReviewWorkflowService {
     if (!documentAccess.isVisible(documentId, actorId, admin)) {
       throw new DocumentNotFoundException(documentId);
     }
-    return statusOf(document);
+    return statusOf(document, actorId, admin);
   }
 
   /**
-   * Requests an explicit transition to {@code targetRaw}, owner-only. A target this edition does
-   * not know, an illegal edge, the derived {@code IN_REVIEW ⇄ CHANGES_REQUESTED} pair (issue #405),
-   * or a vetoing guard (the FINALIZED invariant) is rejected with {@link
+   * Requests an explicit transition to {@code targetRaw} — permitted for the document owner and for
+   * admins (issue #568); the audit event carries the real actor either way. A target this edition
+   * does not know, an illegal edge, the derived {@code IN_REVIEW ⇄ CHANGES_REQUESTED} pair (issue
+   * #405), or a vetoing guard (the FINALIZED invariant) is rejected with {@link
    * WorkflowTransitionException} (HTTP 409).
    */
   @Transactional
-  public WorkflowStatus transition(UUID documentId, String targetRaw, UUID actorId) {
+  public WorkflowStatus transition(UUID documentId, String targetRaw, UUID actorId, boolean admin) {
     Document document = loadForUpdate(documentId);
-    requireOwner(document, actorId);
+    requireOwnerOrAdmin(document, actorId, admin);
     WorkflowState target =
         WorkflowState.fromString(targetRaw)
             .orElseThrow(
@@ -135,7 +143,7 @@ public class ReviewWorkflowService {
                         WorkflowTransitionException.INVALID_TRANSITION,
                         "unknown target state '" + targetRaw + "'"));
     applyTransition(document, target, actorId, true);
-    return statusOf(document);
+    return statusOf(document, actorId, admin);
   }
 
   /**
@@ -253,12 +261,7 @@ public class ReviewWorkflowService {
   private void applyTransition(
       Document document, WorkflowState target, UUID actorId, boolean manual) {
     String from = document.getWorkflowState();
-    TransitionContext context =
-        new TransitionContext(
-            annotations.countByDocumentIdAndStatus(document.getId(), AnnotationStatus.OPEN),
-            placements.countByDocumentIdAndStatus(document.getId(), PlacementStatus.PENDING),
-            versions.existsByDocumentIdAndExtractionStatus(
-                document.getId(), ExtractionStatus.READY));
+    TransitionContext context = contextOf(document);
     TransitionResult result =
         manual
             ? machine.manualTransition(from, target, context)
@@ -279,12 +282,35 @@ public class ReviewWorkflowService {
         new ReviewEvent.WorkflowChanged(document.getId(), actorId, from, target.name(), manual));
   }
 
-  private WorkflowStatus statusOf(Document document) {
+  private WorkflowStatus statusOf(Document document, UUID actorId, boolean admin) {
+    // The guard verdicts are advisory (they can change at any moment); the
+    // transition call re-checks authoritatively (issue #568).
+    List<TransitionOptionView> options =
+        machine.transitionOptions(document.getWorkflowState(), contextOf(document)).stream()
+            .map(
+                option ->
+                    new TransitionOptionView(
+                        option.target().name(),
+                        option.blockedReason().isEmpty(),
+                        option.blockedReason().orElse(null)))
+            .toList();
     return new WorkflowStatus(
         document.getWorkflowState(),
         machine.allowedTransitions(document.getWorkflowState()).stream()
             .map(WorkflowState::name)
-            .toList());
+            .toList(),
+        admin || document.getOwnerId().equals(actorId),
+        options);
+  }
+
+  /**
+   * The document-derived guard facts, loaded fresh (open annotations, pending placements, READY).
+   */
+  private TransitionContext contextOf(Document document) {
+    return new TransitionContext(
+        annotations.countByDocumentIdAndStatus(document.getId(), AnnotationStatus.OPEN),
+        placements.countByDocumentIdAndStatus(document.getId(), PlacementStatus.PENDING),
+        versions.existsByDocumentIdAndExtractionStatus(document.getId(), ExtractionStatus.READY));
   }
 
   private Document load(UUID documentId) {
@@ -305,8 +331,8 @@ public class ReviewWorkflowService {
         .orElseThrow(() -> new DocumentNotFoundException(documentId));
   }
 
-  private static void requireOwner(Document document, UUID actorId) {
-    if (!document.getOwnerId().equals(actorId)) {
+  private static void requireOwnerOrAdmin(Document document, UUID actorId, boolean admin) {
+    if (!admin && !document.getOwnerId().equals(actorId)) {
       throw new NotDocumentOwnerException();
     }
   }

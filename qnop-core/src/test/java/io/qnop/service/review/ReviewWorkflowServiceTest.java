@@ -23,6 +23,8 @@ package io.qnop.service.review;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyBoolean;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.atLeastOnce;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
@@ -124,10 +126,50 @@ class ReviewWorkflowServiceTest {
     when(documents.findByIdForUpdate(documentId)).thenReturn(Optional.of(draft));
 
     assertThatThrownBy(
-            () -> service.transition(documentId, WorkflowState.IN_REVIEW.name(), stranger))
+            () -> service.transition(documentId, WorkflowState.IN_REVIEW.name(), stranger, false))
         .isInstanceOf(NotDocumentOwnerException.class);
     assertThat(draft.getWorkflowState()).isEqualTo(WorkflowState.DRAFT.name());
     verify(auditEvents, never()).save(any());
+  }
+
+  @Test
+  @DisplayName("an admin may transition without being the owner, audited as themselves (#568)")
+  void adminMayTransition() {
+    Document draft = document(WorkflowState.DRAFT);
+    when(documents.findByIdForUpdate(documentId)).thenReturn(Optional.of(draft));
+
+    service.transition(documentId, WorkflowState.IN_REVIEW.name(), stranger, true);
+
+    assertThat(draft.getWorkflowState()).isEqualTo(WorkflowState.IN_REVIEW.name());
+    assertThat(captureAudits().getValue().getActorId()).isEqualTo(stranger);
+  }
+
+  @Test
+  @DisplayName("status scopes the capability to owner/admin and pre-evaluates guards (#568)")
+  void statusCarriesCapabilityAndGuardVerdicts() {
+    when(documents.findById(documentId)).thenReturn(Optional.of(document(WorkflowState.IN_REVIEW)));
+    when(documentAccess.isVisible(eq(documentId), any(), anyBoolean())).thenReturn(true);
+    when(annotations.countByDocumentIdAndStatus(any(), any())).thenReturn(3L);
+    when(versions.existsByDocumentIdAndExtractionStatus(any(), any())).thenReturn(true);
+
+    ReviewWorkflowService.WorkflowStatus ownerView = service.status(documentId, owner, false);
+    assertThat(ownerView.mayTransition()).isTrue();
+    assertThat(ownerView.transitions())
+        .anySatisfy(
+            option -> {
+              assertThat(option.targetState()).isEqualTo(WorkflowState.FINALIZED.name());
+              assertThat(option.available()).isFalse();
+              assertThat(option.blockedReason()).contains("3 open annotation");
+            })
+        .anySatisfy(
+            option -> {
+              assertThat(option.targetState()).isEqualTo(WorkflowState.CANCELLED.name());
+              assertThat(option.available()).isTrue();
+              assertThat(option.blockedReason()).isNull();
+            });
+
+    assertThat(service.status(documentId, stranger, false).mayTransition()).isFalse();
+    assertThat(service.status(documentId, stranger, true).mayTransition()).isTrue();
   }
 
   @Test
@@ -136,7 +178,7 @@ class ReviewWorkflowServiceTest {
     when(documents.findByIdForUpdate(documentId))
         .thenReturn(Optional.of(document(WorkflowState.DRAFT)));
 
-    assertThatThrownBy(() -> service.transition(documentId, "NONSENSE", owner))
+    assertThatThrownBy(() -> service.transition(documentId, "NONSENSE", owner, false))
         .isInstanceOfSatisfying(
             WorkflowTransitionException.class,
             e -> assertThat(e.getCode()).isEqualTo(WorkflowTransitionException.INVALID_TRANSITION));
@@ -148,7 +190,7 @@ class ReviewWorkflowServiceTest {
     Document draft = document(WorkflowState.DRAFT);
     when(documents.findByIdForUpdate(documentId)).thenReturn(Optional.of(draft));
 
-    service.transition(documentId, WorkflowState.IN_REVIEW.name(), owner);
+    service.transition(documentId, WorkflowState.IN_REVIEW.name(), owner, false);
 
     assertThat(draft.getWorkflowState()).isEqualTo(WorkflowState.IN_REVIEW.name());
     AuditEvent audit = captureAudits().getValue();
@@ -167,7 +209,7 @@ class ReviewWorkflowServiceTest {
     // open annotations = 0 (default), pending placements = 0 (default), a READY version exists.
     when(versions.existsByDocumentIdAndExtractionStatus(any(), any())).thenReturn(true);
 
-    service.transition(documentId, WorkflowState.FINALIZED.name(), owner);
+    service.transition(documentId, WorkflowState.FINALIZED.name(), owner, false);
 
     assertThat(inReview.getWorkflowState()).isEqualTo(WorkflowState.FINALIZED.name());
     verify(auditEvents).save(any());
@@ -181,7 +223,8 @@ class ReviewWorkflowServiceTest {
     when(placements.countByDocumentIdAndStatus(any(), any())).thenReturn(1L);
     when(versions.existsByDocumentIdAndExtractionStatus(any(), any())).thenReturn(true);
 
-    assertThatThrownBy(() -> service.transition(documentId, WorkflowState.FINALIZED.name(), owner))
+    assertThatThrownBy(
+            () -> service.transition(documentId, WorkflowState.FINALIZED.name(), owner, false))
         .isInstanceOf(WorkflowTransitionException.class);
     assertThat(inReview.getWorkflowState()).isEqualTo(WorkflowState.IN_REVIEW.name());
     verify(auditEvents, never()).save(any());
@@ -194,7 +237,8 @@ class ReviewWorkflowServiceTest {
     when(documents.findByIdForUpdate(documentId)).thenReturn(Optional.of(inReview));
     // no counts stubbed: 0 open, 0 pending, but existsBy...READY defaults to false.
 
-    assertThatThrownBy(() -> service.transition(documentId, WorkflowState.FINALIZED.name(), owner))
+    assertThatThrownBy(
+            () -> service.transition(documentId, WorkflowState.FINALIZED.name(), owner, false))
         .isInstanceOf(WorkflowTransitionException.class);
     assertThat(inReview.getWorkflowState()).isEqualTo(WorkflowState.IN_REVIEW.name());
   }

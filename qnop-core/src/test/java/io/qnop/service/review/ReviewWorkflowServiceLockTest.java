@@ -81,7 +81,7 @@ class ReviewWorkflowServiceLockTest {
     Document document = new Document(owner, "Locked review"); // DRAFT, owned by the actor
     when(documents.findByIdForUpdate(documentId)).thenReturn(Optional.of(document));
 
-    service.transition(documentId, WorkflowState.CANCELLED.name(), owner);
+    service.transition(documentId, WorkflowState.CANCELLED.name(), owner, false);
 
     verify(documents).findByIdForUpdate(documentId);
     verify(documents, never()).findById(any());
@@ -137,7 +137,8 @@ class ReviewWorkflowServiceLockTest {
     when(documents.findByIdForUpdate(documentId)).thenReturn(Optional.of(inReview));
     when(annotations.countByDocumentIdAndStatus(any(), any())).thenReturn(1L); // an open annotation
 
-    assertThatThrownBy(() -> service.transition(documentId, WorkflowState.FINALIZED.name(), owner))
+    assertThatThrownBy(
+            () -> service.transition(documentId, WorkflowState.FINALIZED.name(), owner, false))
         .isInstanceOf(WorkflowTransitionException.class)
         .hasMessageContaining("open");
     verify(documents).findByIdForUpdate(documentId);

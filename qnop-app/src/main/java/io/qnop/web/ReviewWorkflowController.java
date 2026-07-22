@@ -22,6 +22,7 @@ package io.qnop.web;
 
 import io.qnop.api.v1.endpoint.ReviewWorkflowApi;
 import io.qnop.api.v1.model.WorkflowStatus;
+import io.qnop.api.v1.model.WorkflowTransitionOption;
 import io.qnop.api.v1.model.WorkflowTransitionRequest;
 import io.qnop.service.review.ReviewWorkflowService;
 import java.util.UUID;
@@ -54,12 +55,24 @@ public class ReviewWorkflowController implements ReviewWorkflowApi {
       UUID documentId, WorkflowTransitionRequest request) {
     UUID actor = CurrentUser.requireUserId();
     return ResponseEntity.ok(
-        toDto(workflow.transition(documentId, request.getTargetState(), actor)));
+        toDto(
+            workflow.transition(
+                documentId, request.getTargetState(), actor, CurrentUser.isAdmin())));
   }
 
   private static WorkflowStatus toDto(ReviewWorkflowService.WorkflowStatus status) {
     return new WorkflowStatus()
         .state(status.state())
-        .allowedTransitions(status.allowedTransitions());
+        .allowedTransitions(status.allowedTransitions())
+        .mayTransition(status.mayTransition())
+        .transitions(
+            status.transitions().stream()
+                .map(
+                    option ->
+                        new WorkflowTransitionOption()
+                            .targetState(option.targetState())
+                            .available(option.available())
+                            .blockedReason(option.blockedReason()))
+                .toList());
   }
 }

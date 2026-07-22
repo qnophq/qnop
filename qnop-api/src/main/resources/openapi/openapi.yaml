@@ -2106,15 +2106,17 @@ paths:
                 $ref: '#/components/schemas/ErrorResponse'
     post:
       tags: [ReviewWorkflow]
-      summary: Request a workflow transition (owner-only)
+      summary: Request a workflow transition (owner or admin)
       description: |
         Moves the review to `targetState` through the state-machine choke-point
-        (ADR-0011). Rejected with `409` when the edge is not in the transition
-        table, when it belongs to the derived `IN_REVIEW ⇄ CHANGES_REQUESTED`
-        pair (issue #405 — that pair follows the open-annotation count and is
-        never set by hand), when a guard vetoes it — finalization requires zero
-        OPEN annotations and zero PENDING placements (re-anchoring complete) —
-        or when the current or target state is not managed by this edition.
+        (ADR-0011). Permitted for the document owner and for admins (issue
+        #568) — every transition is audited with the real actor. Rejected with
+        `409` when the edge is not in the transition table, when it belongs to
+        the derived `IN_REVIEW ⇄ CHANGES_REQUESTED` pair (issue #405 — that
+        pair follows the open-annotation count and is never set by hand), when
+        a guard vetoes it — finalization requires zero OPEN annotations and
+        zero PENDING placements (re-anchoring complete) — or when the current
+        or target state is not managed by this edition.
       operationId: transitionDocumentWorkflow
       security:
         - bearerAuth: []
@@ -2138,7 +2140,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
         '403':
-          description: The caller is not the document owner
+          description: The caller is neither the document owner nor an admin
           content:
             application/json:
               schema:
@@ -3744,22 +3746,60 @@ components:
       required:
         - state
         - allowedTransitions
+        - mayTransition
+        - transitions
       properties:
         state:
           type: string
           description: The current workflow state (Community values or an enterprise extension).
           example: IN_REVIEW
-        allowedTransitions:
+        mayTransition:
+          type: boolean
+          description: |
+            Whether the CALLER may request explicit transitions — the document
+            owner or an admin (issue #568). Drives the client affordance only;
+            the transition endpoint enforces authorization independently.
+        transitions:
           type: array
           description: |
-            Target states the owner may request explicitly from `state` (manual
-            transition table only; guards are evaluated on the transition
-            request, and the derived `IN_REVIEW ⇄ CHANGES_REQUESTED` pair is
-            excluded, issue #405). Empty for terminal states and for states
-            this edition does not manage.
+            The manual targets reachable from `state`, with the domain guards
+            pre-evaluated at read time so a client can explain a blocked
+            option (issue #568). Advisory — a guard's verdict can change at
+            any moment; the transition request re-checks authoritatively. The
+            derived `IN_REVIEW ⇄ CHANGES_REQUESTED` pair is excluded (issue
+            #405). Empty for terminal states.
+          items:
+            $ref: '#/components/schemas/WorkflowTransitionOption'
+        allowedTransitions:
+          type: array
+          deprecated: true
+          description: |
+            Deprecated — superseded by `transitions` (issue #568); kept
+            populated for one release. The manual target names without guard
+            evaluation.
           items:
             type: string
           example: [FINALIZED, CANCELLED]
+    WorkflowTransitionOption:
+      type: object
+      description: One manual workflow target with its read-time guard verdict (issue #568).
+      required:
+        - targetState
+        - available
+      properties:
+        targetState:
+          type: string
+          description: The target workflow state.
+          example: FINALIZED
+        available:
+          type: boolean
+          description: True when no domain guard vetoes the transition right now.
+        blockedReason:
+          type: string
+          description: |
+            Human-readable guard veto, present when `available` is false —
+            e.g. "cannot finalize: 3 open annotation(s) must be resolved
+            first".
     WorkflowTransitionRequest:
       type: object
       description: A request to move the review to `targetState` (issue #246, ADR-0011).

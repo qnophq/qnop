@@ -113,6 +113,36 @@ class ReviewWorkflowMachineTest {
   }
 
   @Test
+  void transitionOptionsCarryReadTimeGuardVerdicts() {
+    // Blocked FINALIZED explains itself; CANCELLED is unguarded (#568).
+    var blocked =
+        machine.transitionOptions(
+            WorkflowState.IN_REVIEW.name(), new TransitionContext(3, 0, true));
+    assertThat(blocked)
+        .anySatisfy(
+            option -> {
+              assertThat(option.target()).isEqualTo(WorkflowState.FINALIZED);
+              assertThat(option.blockedReason())
+                  .hasValueSatisfying(reason -> assertThat(reason).contains("3 open annotation"));
+            })
+        .anySatisfy(
+            option -> {
+              assertThat(option.target()).isEqualTo(WorkflowState.CANCELLED);
+              assertThat(option.blockedReason()).isEmpty();
+            });
+
+    var clear =
+        machine.transitionOptions(
+            WorkflowState.IN_REVIEW.name(), new TransitionContext(0, 0, true));
+    assertThat(clear).allSatisfy(option -> assertThat(option.blockedReason()).isEmpty());
+
+    assertThat(
+            machine.transitionOptions(
+                WorkflowState.FINALIZED.name(), new TransitionContext(0, 0, true)))
+        .isEmpty();
+  }
+
+  @Test
   void finalizedAndCancelledAreTerminal() {
     for (WorkflowState terminal : EnumSet.of(WorkflowState.FINALIZED, WorkflowState.CANCELLED)) {
       assertThat(machine.allowedTransitions(terminal.name())).isEmpty();
