@@ -3939,8 +3939,16 @@ components:
             may always re-position regardless of this flag. The backend
             enforces the gate independently; flipping this client-side cannot
             bypass the service check.
+        finalizeWithOpenAnnotations:
+          type: boolean
+          description: |
+            Whether the operator lets a review be finalized while annotations
+            are still open (issue #568) — they are then closed automatically
+            with a standard comment. The backend enforces the finalize guard
+            independently.
       required:
         - freeReattachEnabled
+        - finalizeWithOpenAnnotations
     ServerConfigUpload:
       type: object
       description: Upload-related public configuration.
@@ -4719,8 +4727,8 @@ components:
           type: string
           description: >-
             The audit event type, e.g. annotation.created, annotation.resolved,
-            annotation.reopened, placement.confirmed, placement.reattached,
-            placement.repositioned, workflow.transition,
+            annotation.reopened, annotation.auto_closed, placement.confirmed,
+            placement.reattached, placement.repositioned, workflow.transition,
             document.due_date.changed, or the SYSTEM-scoped
             scheduler.job.enabled / scheduler.job.dry_run / scheduler.job.run_now.
         documentId:

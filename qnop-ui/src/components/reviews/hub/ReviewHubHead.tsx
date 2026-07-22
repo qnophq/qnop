@@ -134,6 +134,19 @@ export function ReviewHubHead({
 
   const total = annotations.length;
   const resolved = annotations.filter((a) => a.status !== AnnotationStatus.Open).length;
+  const openCount = total - resolved;
+
+  // Terminal transitions settle open annotations automatically (issue #568) —
+  // the confirm dialog must spell that consequence out.
+  const autoCloseNote = (target: string): string => {
+    if (openCount === 0) return '';
+    const applies =
+      target === 'CANCELLED' ||
+      (target === 'FINALIZED' && (config?.review?.finalizeWithOpenAnnotations ?? false));
+    if (!applies) return '';
+    const noun = openCount === 1 ? 'open annotation' : 'open annotations';
+    return ` ${openCount} ${noun} will be closed automatically with a standard comment.`;
+  };
   const inDiscussion = annotations.filter(
     (a) => a.status === AnnotationStatus.Open && a.commentCount > 1,
   ).length;
@@ -428,7 +441,7 @@ export function ReviewHubHead({
         title="Change review status"
         message={
           confirmTarget
-            ? `Move this review to "${workflowLabel(confirmTarget)}"? Reviewers will see the new status immediately.`
+            ? `Move this review to "${workflowLabel(confirmTarget)}"? Reviewers will see the new status immediately.${autoCloseNote(confirmTarget)}`
             : ''
         }
         confirmLabel="Change status"

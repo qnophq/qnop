@@ -115,6 +115,18 @@ class ConfigControllerTest {
   }
 
   @Test
+  @DisplayName("review.finalizeWithOpenAnnotations reflects the application setting (#568)")
+  void getConfig_reflectsFinalizeWithOpenSetting() throws Exception {
+    when(settings.getBoolean(ApplicationSettingKey.REVIEW_FINALIZE_WITH_OPEN_ANNOTATIONS))
+        .thenReturn(true);
+
+    mockMvc
+        .perform(get("/api/v1/config"))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.review.finalizeWithOpenAnnotations").value(true));
+  }
+
+  @Test
   @DisplayName("review.freeReattachEnabled reflects the application setting (#562)")
   void getConfig_reflectsFreeReattachSetting() throws Exception {
     when(settings.getBoolean(ApplicationSettingKey.REVIEW_FREE_REATTACH_ENABLED)).thenReturn(true);

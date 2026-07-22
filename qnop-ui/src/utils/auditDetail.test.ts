@@ -43,6 +43,12 @@ describe('formatAuditDetail', () => {
     expect(
       formatAuditDetail('placement.repositioned', '{"annotationId":"a1b2c3","versionNumber":2}'),
     ).toBe('On version 2');
+    expect(
+      formatAuditDetail(
+        'annotation.auto_closed',
+        '{"annotationId":"a1","reason":"REVIEW_CANCELLED"}',
+      ),
+    ).toBe('Reason: Review cancelled');
   });
 
   it('renders a classification from its type and priority', () => {

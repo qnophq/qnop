@@ -44,6 +44,7 @@ describe('auditEventMeta', () => {
         'annotation.classified',
         'placement.reattached',
         'placement.repositioned',
+        'annotation.auto_closed',
         'workflow.transition',
         'document.due_date.changed',
         'extraction.succeeded',

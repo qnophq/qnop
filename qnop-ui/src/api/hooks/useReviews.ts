@@ -30,6 +30,8 @@ import type {
   WorkflowStatus,
 } from '../generated';
 import { axiosInstance, documentsApi, principalsApi, reviewWorkflowApi } from '../config';
+import { annotationKeys } from './useAnnotations';
+import { commentKeys } from './useComments';
 import { documentKeys } from './useDocuments';
 
 export interface ReviewListParams {
@@ -161,6 +163,11 @@ export function useTransitionWorkflow(documentId: string) {
       queryClient.invalidateQueries({ queryKey: reviewKeys.workflow(documentId) });
       queryClient.invalidateQueries({ queryKey: documentKeys.detail(documentId) });
       queryClient.invalidateQueries({ queryKey: reviewKeys.all });
+      // A terminal transition auto-closes open annotations with a standard
+      // comment (issue #568) — the panel chips, cards and any open thread must
+      // reload. Invalidating unconditionally is harmless for the other edges.
+      queryClient.invalidateQueries({ queryKey: annotationKeys.all });
+      queryClient.invalidateQueries({ queryKey: commentKeys.all });
     },
   });
 }

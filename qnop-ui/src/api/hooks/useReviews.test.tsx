@@ -178,6 +178,34 @@ describe('useWorkflow / useTransitionWorkflow', () => {
       workflowTransitionRequest: { targetState: 'IN_REVIEW' },
     });
   });
+
+  // Issue #568: a terminal transition auto-closes open annotations with a
+  // standard comment — the review surface must reload annotations and threads.
+  it('invalidates annotations and comment threads after a transition', async () => {
+    const cancelled: WorkflowStatus = {
+      state: 'CANCELLED',
+      allowedTransitions: [],
+      mayTransition: true,
+      transitions: [],
+    };
+    vi.mocked(reviewWorkflowApi.transitionDocumentWorkflow).mockResolvedValue({
+      data: cancelled,
+    } as Awaited<ReturnType<typeof reviewWorkflowApi.transitionDocumentWorkflow>>);
+
+    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    const invalidate = vi.spyOn(queryClient, 'invalidateQueries');
+    const localWrapper = ({ children }: { children: ReactNode }) => (
+      <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
+    );
+
+    const { result } = renderHook(() => useTransitionWorkflow(DOC_ID), {
+      wrapper: localWrapper,
+    });
+    await result.current.mutateAsync('CANCELLED');
+
+    expect(invalidate).toHaveBeenCalledWith({ queryKey: ['annotations'] });
+    expect(invalidate).toHaveBeenCalledWith({ queryKey: ['comments'] });
+  });
 });
 
 describe('uploads', () => {

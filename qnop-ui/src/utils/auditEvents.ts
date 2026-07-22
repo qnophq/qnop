@@ -75,6 +75,12 @@ export const AUDIT_EVENT_META: Record<string, AuditEventMeta> = {
       'An annotation was re-anchored to a new spot — e.g. after a new version shifted the text.',
     tone: 'amber',
   },
+  'annotation.auto_closed': {
+    label: 'Annotation auto-closed',
+    description:
+      'A terminal review transition (cancelled/finalized) closed a still-open annotation automatically (issue #568).',
+    tone: 'amber',
+  },
   'placement.repositioned': {
     label: 'Placement re-positioned',
     description:

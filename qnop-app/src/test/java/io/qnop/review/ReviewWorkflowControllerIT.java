@@ -38,12 +38,16 @@ import io.qnop.entity.WorkflowState;
 import io.qnop.repository.AnnotationPlacementRepository;
 import io.qnop.repository.AnnotationRepository;
 import io.qnop.repository.AuditEventRepository;
+import io.qnop.repository.CommentRepository;
 import io.qnop.repository.DocumentRepository;
 import io.qnop.repository.DocumentVersionRepository;
 import io.qnop.repository.ReviewParticipantRepository;
+import io.qnop.service.ApplicationSettingKey;
+import io.qnop.service.ApplicationSettingsService;
 import io.qnop.service.review.ReviewWorkflowService;
 import io.qnop.service.review.WorkflowTransitionException;
 import io.qnop.testsupport.SeededIntegrationTest;
+import java.util.Map;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -65,6 +69,8 @@ class ReviewWorkflowControllerIT extends SeededIntegrationTest {
   @Autowired AuditEventRepository auditEvents;
   @Autowired ReviewParticipantRepository participants;
   @Autowired ReviewWorkflowService workflow;
+  @Autowired CommentRepository comments;
+  @Autowired ApplicationSettingsService settings;
 
   private Document draftOwnedByMember() {
     return documents.save(new Document(MEMBER_ID, "Quarterly report"));
@@ -220,6 +226,106 @@ class ReviewWorkflowControllerIT extends SeededIntegrationTest {
                 .header("Authorization", "Bearer " + token(ADMIN_ID)))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.mayTransition").value(true));
+  }
+
+  // --- terminal auto-close (#568) --------------------------------------------------
+
+  private Annotation openAnnotationOn(Document document) {
+    return annotations.save(new Annotation(document.getId(), MEMBER2_ID));
+  }
+
+  /** A READY version so the finalize guard's extraction invariant passes. */
+  private void readyVersionOn(Document document) {
+    DocumentVersion version =
+        new DocumentVersion(
+            document.getId(),
+            1,
+            "sha256/aa/deadbeef",
+            "deadbeef",
+            "application/pdf",
+            42L,
+            MEMBER_ID);
+    version.attachRenderedDocument("{\"surfaces\":[]}");
+    versions.save(version);
+  }
+
+  private void setFinalizeWithOpen(boolean enabled) {
+    settings.update(
+        Map.of(
+            ApplicationSettingKey.REVIEW_FINALIZE_WITH_OPEN_ANNOTATIONS.getKey(),
+            String.valueOf(enabled)),
+        null);
+  }
+
+  @Test
+  void cancellingClosesOpenAnnotationsWithAnOwnerAttributedStandardComment() throws Exception {
+    Document document = inReviewOwnedByMember();
+    Annotation open = openAnnotationOn(document);
+
+    mockMvc
+        .perform(
+            post(workflowPath(document.getId()))
+                .header("Authorization", "Bearer " + token(MEMBER_ID))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"targetState\":\"CANCELLED\"}"))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.state").value("CANCELLED"));
+
+    assertThat(annotations.findById(open.getId()).orElseThrow().getStatus())
+        .isEqualTo(AnnotationStatus.RESOLVED);
+    assertThat(comments.findByAnnotationIdOrderByCreatedAtAsc(open.getId()))
+        .anySatisfy(
+            comment -> {
+              assertThat(comment.getBody())
+                  .isEqualTo("Closed automatically: the review was cancelled.");
+              assertThat(comment.getAuthorId()).isEqualTo(MEMBER_ID);
+            });
+    assertThat(auditEvents.findByDocumentIdOrderByCreatedAtDesc(document.getId()))
+        .anySatisfy(
+            event -> {
+              assertThat(event.getEventType()).isEqualTo("annotation.auto_closed");
+              assertThat(event.getActorId()).isEqualTo(MEMBER_ID);
+              assertThat(event.getDetail()).contains("REVIEW_CANCELLED");
+            });
+  }
+
+  @Test
+  void finalizeOverOpenAnnotationsHonoursTheOperatorSwitch() throws Exception {
+    Document document = inReviewOwnedByMember();
+    readyVersionOn(document);
+    Annotation open = openAnnotationOn(document);
+    try {
+      // Switch off (default): the guard refuses as before.
+      mockMvc
+          .perform(
+              post(workflowPath(document.getId()))
+                  .header("Authorization", "Bearer " + token(MEMBER_ID))
+                  .contentType(MediaType.APPLICATION_JSON)
+                  .content("{\"targetState\":\"FINALIZED\"}"))
+          .andExpect(status().isConflict())
+          .andExpect(jsonPath("$.code").value("INVALID_TRANSITION"));
+
+      // Switch on: the open annotation is auto-closed and the review finalizes.
+      setFinalizeWithOpen(true);
+      mockMvc
+          .perform(
+              post(workflowPath(document.getId()))
+                  .header("Authorization", "Bearer " + token(MEMBER_ID))
+                  .contentType(MediaType.APPLICATION_JSON)
+                  .content("{\"targetState\":\"FINALIZED\"}"))
+          .andExpect(status().isOk())
+          .andExpect(jsonPath("$.state").value("FINALIZED"));
+
+      assertThat(annotations.findById(open.getId()).orElseThrow().getStatus())
+          .isEqualTo(AnnotationStatus.RESOLVED);
+      assertThat(comments.findByAnnotationIdOrderByCreatedAtAsc(open.getId()))
+          .anySatisfy(
+              comment ->
+                  assertThat(comment.getBody())
+                      .isEqualTo("Closed automatically: the review was finalized."));
+    } finally {
+      setFinalizeWithOpen(false);
+    }
   }
 
   @Test

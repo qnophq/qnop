@@ -75,7 +75,7 @@ class AdminSettingsControllerIT extends AbstractIntegrationTest {
         .perform(get("/api/v1/admin/settings"))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.settings").isArray())
-        .andExpect(jsonPath("$.settings.length()").value(22));
+        .andExpect(jsonPath("$.settings.length()").value(23));
   }
 
   @Test
