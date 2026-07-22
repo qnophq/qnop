@@ -8,15 +8,18 @@ archunit = "1.4.2"
 # NOTE: keep `spotless` in sync with build-logic/build.gradle.kts (precompiled
 # script plugins cannot read this catalog at plugin-resolution time).
 spotless = "8.7.0"
-# OWASP Dependency-Check — backend per-PR CVE gate (issue #195). Applied at the
-# root; the CI job runs dependencyCheckAggregate only when an NVD API key secret
-# is present.
-dependencyCheck = "12.1.0"
 # Dependency-license scanner (issue #498, ADR-0007). Applied at the root; the CI
 # `license-scan` job runs `checkLicense`, which fails on any runtime dependency
 # whose license is outside the permissive allowlist (Apache-2.0/MIT/BSD/MPL-2.0).
-# Not wired into `check`/`build`, mirroring the OWASP gate.
+# Not wired into `check`/`build`; the CI job invokes it explicitly.
 licenseReport = "2.9"
+# CycloneDX SBOM generation (issue #496). The `cyclonedxBom` task emits a
+# CycloneDX SBOM of qnop-app's resolved runtime classpath, which the CI Trivy
+# SBOM scan gates on (CRITICAL fails, HIGH warns) — closing the blind spot that
+# Trivy's filesystem scan cannot parse the Gradle Kotlin DSL to enumerate Java
+# dependencies. Replaces the OWASP Dependency-Check gate, which needed an NVD
+# API key to be effective and was a no-op without it (see ADR-0007 amendment).
+cyclonedx = "2.3.1"
 # Spring Boot plugin + BOM. The BOM (spring-boot-dependencies) manages the
 # versions of the Spring stack, JPA/Hibernate, the PostgreSQL driver, Liquibase
 # and Testcontainers — so those artifacts are declared below WITHOUT versions.
@@ -151,5 +154,5 @@ testcontainers-minio = { module = "org.testcontainers:testcontainers-minio" }
 spotless = { id = "com.diffplug.spotless", version.ref = "spotless" }
 spring-boot = { id = "org.springframework.boot", version.ref = "springBoot" }
 openapi-generator = { id = "org.openapi.generator", version.ref = "openapiGenerator" }
-dependency-check = { id = "org.owasp.dependencycheck", version.ref = "dependencyCheck" }
 license-report = { id = "com.github.jk1.dependency-license-report", version.ref = "licenseReport" }
+cyclonedx-bom = { id = "org.cyclonedx.bom", version.ref = "cyclonedx" }

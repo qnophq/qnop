@@ -80,4 +80,4 @@ A Vite + React + TypeScript + MaterialUI SPA (`qnop-ui/`) talking to the Spring 
 | Persistence | PostgreSQL + Liquibase; S3/MinIO object storage |
 | Frontend | Vite, React 19, TypeScript, MaterialUI |
 | Build/quality | Convention plugins, Spotless (google-java-format), ArchUnit, JUnit 5 |
-| CI | GitHub Actions (`.github/workflows/ci.yml`): backend build (ArchUnit + Spotless), OWASP dependency audit, frontend lint/format/test/build + audit, docker-compose smoke deploy (incl. OIDC login), SPDX scan |
+| CI | GitHub Actions (`.github/workflows/ci.yml`): backend build (ArchUnit + Spotless), frontend lint/format/test/build + audit, docker-compose smoke deploy (incl. OIDC login), SPDX scan. Security scanning (`security.yml`): Trivy filesystem scan (vuln + secret → Security tab) and a Trivy CycloneDX-SBOM scan of qnop-app's runtime classpath (CRITICAL fails, HIGH warns) — the backend CVE gate (issue #496, ADR-0007) |

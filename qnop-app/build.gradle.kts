@@ -15,11 +15,26 @@ plugins {
     // Version comes from the root `plugins {}` block (declared there `apply false`
     // to keep a single shared plugin classloader — see the root build script).
     id("org.springframework.boot")
+    // CycloneDX SBOM of this module's runtime classpath (issue #496) — the input
+    // to the CI Trivy SBOM scan (the backend CVE gate).
+    id("org.cyclonedx.bom")
 }
 
 // Stamp build-info.properties into the jar so /api/v1/config reports the real
 // version (BuildProperties in ConfigController, issue #495).
 springBoot { buildInfo() }
+
+// CycloneDX SBOM (issue #496): emit build/reports/bom.json for exactly the
+// runtime classpath — the deps that actually ship. Test-only configurations
+// (JUnit, Testcontainers, ArchUnit, …) are excluded so a CVE in a test tool
+// never gates a shipped artifact. This SBOM is the input to the CI Trivy scan.
+tasks.named<org.cyclonedx.gradle.CycloneDxTask>("cyclonedxBom") {
+    setIncludeConfigs(listOf("runtimeClasspath"))
+    setOutputFormat("json")
+    setOutputName("bom")
+    setProjectType("application")
+    setIncludeLicenseText(false)
+}
 
 // SPA embedding (ADR-0040): with -PembedUi the boot jar carries the built
 // qnop-ui bundle under static/. Opt-in so developer builds and the test suite
