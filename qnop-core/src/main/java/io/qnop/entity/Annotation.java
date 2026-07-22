@@ -99,9 +99,14 @@ public class Annotation {
     this.status = AnnotationStatus.RESOLVED;
   }
 
-  /** Reopens a previously resolved annotation (e.g. the concern resurfaced). */
+  /** Reopens a previously settled annotation (e.g. the concern resurfaced). */
   public void reopen() {
     this.status = AnnotationStatus.OPEN;
+  }
+
+  /** The owner/admin dismissed the concern over the author's head (issue #408). */
+  public void dismiss() {
+    this.status = AnnotationStatus.DISMISSED;
   }
 
   /** (Re)classifies the point — both facets optional, {@code null} clears (issue #392). */

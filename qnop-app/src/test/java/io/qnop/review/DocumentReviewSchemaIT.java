@@ -252,6 +252,23 @@ class DocumentReviewSchemaIT extends AbstractIntegrationTest {
   }
 
   @Test
+  @DisplayName("the widened closed set accepts DISMISSED (issue #408)")
+  void acceptsDismissedAnnotationStatus() {
+    Document doc = docWithOwner();
+    UUID authorId = newUser("A").getId();
+
+    int inserted =
+        jdbc.update(
+            "INSERT INTO annotation (id, document_id, author_id, status, created_at,"
+                + " updated_at, version) VALUES (?::uuid, ?::uuid, ?::uuid, 'DISMISSED', now(),"
+                + " now(), 0)",
+            UUID.randomUUID().toString(),
+            doc.getId().toString(),
+            authorId.toString());
+    assertThat(inserted).isEqualTo(1);
+  }
+
+  @Test
   @DisplayName("workflow_state has no closed check — an enterprise state persists")
   void workflowStateColumnIsOpenForEnterpriseStates() {
     User owner = newUser("Owner");

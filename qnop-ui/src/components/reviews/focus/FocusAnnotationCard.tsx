@@ -42,9 +42,12 @@ import { useConfirmPlacement } from '../../../api/hooks/useAnnotations';
 import { AnnotationHead } from '../panel/AnnotationHead';
 import { CommentThread } from '../panel/CommentThread';
 import { ResolveBar } from '../panel/ResolveBar';
+import { DismissControl } from '../panel/DismissControl';
 import {
+  mayDismissAnnotation,
   mayReopenAnnotation,
   mayResolveAnnotation,
+  useDismissWithFeedback,
   useReopenWithFeedback,
   useResolveWithFeedback,
 } from '../panel/resolve';
@@ -133,6 +136,7 @@ export function FocusAnnotationCard({
   const confirmPlacement = useConfirmPlacement(notify);
   const { resolveWith, isPending: resolving } = useResolveWithFeedback(notify);
   const { reopenWith } = useReopenWithFeedback(notify);
+  const { dismissWith, isPending: dismissing } = useDismissWithFeedback(notify);
 
   // The card is draggable by its header (issue #403): the offset rides on
   // top of the Popper's anchor position and resets when the walk moves to
@@ -386,6 +390,18 @@ export function FocusAnnotationCard({
                       />
                     </Box>
                   )}
+                  {!readOnly &&
+                    !reviewClosed &&
+                    mayDismissAnnotation(annotation, userId, ownerId, viewerIsAdmin) && (
+                      // The owner/admin escape hatch (issue #408) — subordinate
+                      // to the author's Resolve; the author is excluded anyway.
+                      <Box sx={{ pr: 2 }}>
+                        <DismissControl
+                          disabled={dismissing}
+                          onDismiss={(justification) => dismissWith(annotation, justification)}
+                        />
+                      </Box>
+                    )}
 
                   {/* Same breathing room at the bottom as the head keeps at the top. */}
                   <Box sx={{ pl: 0.5, pr: 2, pb: 1.25 }}>
@@ -396,8 +412,11 @@ export function FocusAnnotationCard({
                       readOnly={readOnly}
                       policyReadOnly={policyReadOnly}
                       closed={annotation.status !== AnnotationStatus.Open}
+                      dismissed={annotation.status === AnnotationStatus.Dismissed}
                       onReopen={
-                        !readOnly && !reviewClosed && mayReopenAnnotation(annotation, userId)
+                        !readOnly &&
+                        !reviewClosed &&
+                        mayReopenAnnotation(annotation, userId, viewerIsAdmin)
                           ? () => reopenWith(annotation)
                           : undefined
                       }

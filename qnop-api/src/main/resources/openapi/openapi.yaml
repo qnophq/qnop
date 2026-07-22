@@ -3058,14 +3058,17 @@ paths:
       - $ref: '#/components/parameters/AnnotationIdParam'
     post:
       tags: [Annotations]
-      summary: Reopen a resolved annotation (author only)
+      summary: Reopen a settled annotation
       description: |
-        Reverses a resolution, `RESOLVED → OPEN` (issue #394) — allowed for the
-        annotation's author alone, and only while the review is still running:
-        a FINALIZED or CANCELLED review is a closed record (`REVIEW_CLOSED`,
-        409). The thread stays intact and accepts comments again; the
-        open-annotation count re-derives the review state (a reopened concern
-        moves `IN_REVIEW` back to `CHANGES_REQUESTED`).
+        Reverses a settlement, `RESOLVED → OPEN` (issue #394) or `DISMISSED →
+        OPEN` (issue #408), and only while the review is still running: a
+        FINALIZED or CANCELLED review is a closed record (`REVIEW_CLOSED`,
+        409). A RESOLVED annotation is reopened by its author or an admin; a
+        DISMISSED one by its author (the objection right against the owner's
+        dismissal — the owner themselves may not reverse it) or an admin. The
+        thread stays intact and accepts comments again; the open-annotation
+        count re-derives the review state (a reopened concern moves
+        `IN_REVIEW` back to `CHANGES_REQUESTED`).
       operationId: reopenAnnotation
       security:
         - bearerAuth: []
@@ -3079,7 +3082,7 @@ paths:
         '401':
           $ref: '#/components/responses/Unauthorized'
         '403':
-          description: The caller is not the annotation's author
+          description: The caller may not reopen this annotation
           content:
             application/json:
               schema:
@@ -3092,8 +3095,70 @@ paths:
                 $ref: '#/components/schemas/ErrorResponse'
         '409':
           description: >-
-            The annotation is not RESOLVED (`ANNOTATION_NOT_RESOLVED`), or the
+            The annotation is not settled (`ANNOTATION_NOT_RESOLVED`), or the
             review is FINALIZED/CANCELLED (`REVIEW_CLOSED`)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /annotations/{annotationId}/dismiss:
+    parameters:
+      - $ref: '#/components/parameters/AnnotationIdParam'
+    post:
+      tags: [Annotations]
+      summary: Dismiss an open annotation (owner or admin)
+      description: |
+        Dismisses an open annotation, `OPEN → DISMISSED` (issue #408) — the
+        per-annotation escape valve for the FINALIZED gate when an author is
+        absent and cannot resolve their own concern. Allowed for the document
+        owner and admins; the mandatory justification lands in the thread as a
+        regular comment (attributed to the document owner, who is structurally
+        public even in anonymous reviews — ADR-0038; the audited
+        `annotation.dismissed` event records the real actor). A dismissed
+        annotation counts as settled for the FINALIZED gate and re-derives the
+        review state exactly like a resolution; the author may reopen it
+        (objection right). Rejected with `409` if the annotation is not OPEN
+        (`ANNOTATION_NOT_OPEN`).
+      operationId: dismissAnnotation
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AnnotationDismissRequest'
+      responses:
+        '200':
+          description: The updated annotation
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AnnotationView'
+        '400':
+          description: Missing or blank justification (`VALIDATION_ERROR`)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          description: The caller is neither the document owner nor an admin
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Unknown annotation
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '409':
+          description: >-
+            The annotation is not OPEN (`ANNOTATION_NOT_OPEN`), or the review
+            is FINALIZED/CANCELLED (`REVIEW_CLOSED`)
           content:
             application/json:
               schema:
@@ -4727,7 +4792,8 @@ components:
           type: string
           description: >-
             The audit event type, e.g. annotation.created, annotation.resolved,
-            annotation.reopened, annotation.auto_closed, placement.confirmed,
+            annotation.reopened, annotation.dismissed, annotation.auto_closed,
+            placement.confirmed,
             placement.reattached, placement.repositioned, workflow.transition,
             document.due_date.changed, or the SYSTEM-scoped
             scheduler.job.enabled / scheduler.job.dry_run / scheduler.job.run_now.
@@ -6138,12 +6204,16 @@ components:
     AnnotationStatus:
       type: string
       description: |
-        The lifecycle of an annotation (ADR-0011 as amended by issue #405):
-        raised by a reviewer, resolved by that same author once the concern is
-        settled.
+        The lifecycle of an annotation (ADR-0011 as amended by issues #405 and
+        #408): raised by a reviewer, resolved by that same author once the
+        concern is settled, or dismissed by the document owner or an admin with
+        a mandatory justification (issue #408). Both RESOLVED and DISMISSED
+        count as settled for the FINALIZED gate; a dismissed annotation may be
+        reopened by its author (objection right) or an admin.
       enum:
         - OPEN
         - RESOLVED
+        - DISMISSED
     PlacementStatus:
       type: string
       description: |
@@ -6348,6 +6418,19 @@ components:
       properties:
         note:
           type: string
+          maxLength: 20000
+    AnnotationDismissRequest:
+      type: object
+      description: |
+        The mandatory justification for a dismissal (issue #408) — appended to
+        the annotation's thread as a regular comment so the absent author finds
+        the reasoning where the discussion lives. Blank-only text is rejected.
+      required:
+        - justification
+      properties:
+        justification:
+          type: string
+          minLength: 1
           maxLength: 20000
     CommentCreateRequest:
       type: object

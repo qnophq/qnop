@@ -239,6 +239,19 @@ class ReviewWorkflowMachineTest {
   void onlyOpenAnnotationsCanBeResolved() {
     assertThat(ReviewWorkflowMachine.canResolve(AnnotationStatus.OPEN)).isTrue();
     assertThat(ReviewWorkflowMachine.canResolve(AnnotationStatus.RESOLVED)).isFalse();
+    assertThat(ReviewWorkflowMachine.canResolve(AnnotationStatus.DISMISSED)).isFalse();
+  }
+
+  @Test
+  @DisplayName("only OPEN annotations can be dismissed; both settled states can reopen (#408)")
+  void dismissAndReopenTruthTables() {
+    assertThat(ReviewWorkflowMachine.canDismiss(AnnotationStatus.OPEN)).isTrue();
+    assertThat(ReviewWorkflowMachine.canDismiss(AnnotationStatus.RESOLVED)).isFalse();
+    assertThat(ReviewWorkflowMachine.canDismiss(AnnotationStatus.DISMISSED)).isFalse();
+
+    assertThat(ReviewWorkflowMachine.canReopen(AnnotationStatus.OPEN)).isFalse();
+    assertThat(ReviewWorkflowMachine.canReopen(AnnotationStatus.RESOLVED)).isTrue();
+    assertThat(ReviewWorkflowMachine.canReopen(AnnotationStatus.DISMISSED)).isTrue();
   }
 
   @Test

@@ -262,6 +262,25 @@ describe('CommentThread', () => {
     expect(screen.queryByText('No replies yet.')).not.toBeInTheDocument();
   });
 
+  it('names a dismissal in the closing line — distinguishable from a resolution (#408)', () => {
+    vi.mocked(useComments).mockReturnValue({
+      isPending: false,
+      isError: false,
+      data: { comments: [] },
+    } as unknown as ReturnType<typeof useComments>);
+    render(
+      <QueryClientProvider client={queryClient}>
+        <ThemeProvider theme={buildTheme('light')}>
+          <CommentThread annotationId="a1" notify={vi.fn()} closed dismissed skipOpener />
+        </ThemeProvider>
+      </QueryClientProvider>,
+    );
+    expect(screen.getByTestId('thread-closed-note')).toHaveTextContent(
+      'Dismissed — this thread is closed.',
+    );
+    expect(screen.queryByText(/Resolved — /)).not.toBeInTheDocument();
+  });
+
   it('offers Reopen on a closed thread when wired, and forwards the click (#394)', () => {
     vi.mocked(useComments).mockReturnValue({
       isPending: false,
