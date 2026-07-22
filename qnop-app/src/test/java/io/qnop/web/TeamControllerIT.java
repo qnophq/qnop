@@ -36,6 +36,7 @@ import java.util.UUID;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
@@ -121,6 +122,7 @@ class TeamControllerIT extends AbstractIntegrationTest {
   void manageMembers() throws Exception {
     createUser("root", UserRole.ADMIN);
     User alice = createUser("alice", UserRole.MEMBER);
+    User bob = createUser("bob", UserRole.MEMBER);
     String token = token("root");
     String teamId = createTeam(token, "Core", null);
 
@@ -151,7 +153,16 @@ class TeamControllerIT extends AbstractIntegrationTest {
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.members[0].teamRole").value("LEAD"));
 
-    // Change the role.
+    // Add a second lead so demoting alice does not strip the team's last lead (#542).
+    mockMvc
+        .perform(
+            post("/api/v1/admin/teams/{id}/members", teamId)
+                .header("Authorization", bearer(token))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"userId\":\"%s\",\"teamRole\":\"LEAD\"}".formatted(bob.getId())))
+        .andExpect(status().isCreated());
+
+    // Change the role (allowed now that bob remains a lead).
     mockMvc
         .perform(
             patch("/api/v1/admin/teams/{id}/members/{uid}", teamId, alice.getId())
@@ -162,6 +173,59 @@ class TeamControllerIT extends AbstractIntegrationTest {
         .andExpect(jsonPath("$.teamRole").value("MEMBER"));
 
     // Remove the member.
+    mockMvc
+        .perform(
+            delete("/api/v1/admin/teams/{id}/members/{uid}", teamId, alice.getId())
+                .header("Authorization", bearer(token)))
+        .andExpect(status().isNoContent());
+  }
+
+  @Test
+  @DisplayName("the last lead cannot be demoted or removed while other members remain (#542)")
+  void lastLeadIsProtected() throws Exception {
+    createUser("root", UserRole.ADMIN);
+    User alice = createUser("alice", UserRole.MEMBER); // the sole lead
+    User bob = createUser("bob", UserRole.MEMBER); // a plain member
+    String token = token("root");
+    String teamId = createTeam(token, "Core", null);
+    addMember(token, teamId, alice.getId(), "LEAD");
+    addMember(token, teamId, bob.getId(), "MEMBER");
+
+    // Demoting the sole lead → 409 LAST_LEAD, unchanged.
+    mockMvc
+        .perform(
+            patch("/api/v1/admin/teams/{id}/members/{uid}", teamId, alice.getId())
+                .header("Authorization", bearer(token))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"teamRole\":\"MEMBER\"}"))
+        .andExpect(status().isConflict())
+        .andExpect(jsonPath("$.code").value("LAST_LEAD"));
+
+    // Removing the sole lead → 409 LAST_LEAD, unchanged.
+    mockMvc
+        .perform(
+            delete("/api/v1/admin/teams/{id}/members/{uid}", teamId, alice.getId())
+                .header("Authorization", bearer(token)))
+        .andExpect(status().isConflict())
+        .andExpect(jsonPath("$.code").value("LAST_LEAD"));
+
+    // Alice is still a LEAD.
+    mockMvc
+        .perform(get("/api/v1/admin/teams/{id}", teamId).header("Authorization", bearer(token)))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.members[?(@.displayName == 'alice')].teamRole").value("LEAD"));
+  }
+
+  @Test
+  @DisplayName("removing the sole member (the last lead) empties the team and is allowed (#542)")
+  void soleMemberCanBeRemoved() throws Exception {
+    createUser("root", UserRole.ADMIN);
+    User alice = createUser("alice", UserRole.MEMBER);
+    String token = token("root");
+    String teamId = createTeam(token, "Core", null);
+    addMember(token, teamId, alice.getId(), "LEAD");
+
+    // No other members remain, so removing the sole lead empties the team — allowed.
     mockMvc
         .perform(
             delete("/api/v1/admin/teams/{id}/members/{uid}", teamId, alice.getId())
@@ -236,6 +300,16 @@ class TeamControllerIT extends AbstractIntegrationTest {
     Matcher matcher = ID_FIELD.matcher(result.getResponse().getContentAsString());
     assertThat(matcher.find()).isTrue();
     return matcher.group(1);
+  }
+
+  private void addMember(String token, String teamId, UUID userId, String role) throws Exception {
+    mockMvc
+        .perform(
+            post("/api/v1/admin/teams/{id}/members", teamId)
+                .header("Authorization", bearer(token))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"userId\":\"%s\",\"teamRole\":\"%s\"}".formatted(userId, role)))
+        .andExpect(status().isCreated());
   }
 
   private static String bearer(String token) {

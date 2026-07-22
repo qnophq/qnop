@@ -177,21 +177,31 @@ public class TeamService {
 
   @Transactional
   public TeamMemberView setMemberRole(UUID teamId, UUID userId, String teamRole) {
+    TeamRole target = requireTeamRole(teamRole);
+    lockTeam(teamId);
     TeamMembership membership =
         memberships
             .findByTeamIdAndUserId(teamId, userId)
             .orElseThrow(() -> TeamNotFoundException.membership(teamId, userId));
-    membership.setTeamRole(requireTeamRole(teamRole));
+    if (target == TeamRole.MEMBER) {
+      // Demoting the team's last lead would leave the team with members and no lead.
+      guardKeepsALead(teamId, userId, false);
+    }
+    membership.setTeamRole(target);
     User user = users.findById(userId).orElseThrow(() -> new UserNotFoundException(userId));
     return toMemberView(user, membership);
   }
 
   @Transactional
   public void removeMember(UUID teamId, UUID userId) {
+    lockTeam(teamId);
     TeamMembership membership =
         memberships
             .findByTeamIdAndUserId(teamId, userId)
             .orElseThrow(() -> TeamNotFoundException.membership(teamId, userId));
+    // Removing the last lead is refused only while other members remain; removing the
+    // sole member (who is that lead) empties the team, which is allowed (issue #542).
+    guardKeepsALead(teamId, userId, true);
     memberships.delete(membership);
   }
 
@@ -299,10 +309,8 @@ public class TeamService {
   public TeamMemberView setMemberRoleAsLead(
       UUID teamId, UUID actorId, boolean admin, UUID userId, String teamRole) {
     requireLeadOrAdmin(teamId, actorId, admin);
-    if (requireTeamRole(teamRole) == TeamRole.MEMBER) {
-      lockTeam(teamId);
-      guardNotLastLead(teamId, userId);
-    }
+    // The last-lead guard and the team lock live in the base setMemberRole (issue #542),
+    // so this self-service path is covered by the same invariant as the admin path.
     return setMemberRole(teamId, userId, teamRole);
   }
 
@@ -319,8 +327,7 @@ public class TeamService {
       throw new TeamConflictException(
           "SELF_REMOVAL", "You cannot remove yourself from a team; ask an administrator.");
     }
-    lockTeam(teamId);
-    guardNotLastLead(teamId, userId);
+    // The last-lead guard and the team lock live in the base removeMember (issue #542).
     removeMember(teamId, userId);
   }
 
@@ -344,16 +351,26 @@ public class TeamService {
   }
 
   /**
-   * Blocks an operation that would strip the team's last remaining lead. Only fires when {@code
-   * userId} is currently a LEAD and no other lead remains — removing/demoting a MEMBER, or a LEAD
-   * with co-leads, is unaffected. This is the single place the "never zero leads" invariant lives
-   * for the self-management surface, and it is what prevents a sole lead's self-lockout.
+   * Blocks an operation that would leave the team with members but no lead — the "never zero leads"
+   * invariant (issue #542), enforced here so every entry point (admin and the #470 self-management
+   * surface) is covered, and a sole lead can never lock themselves (or everyone) out. Fires only
+   * when {@code userId} is currently the team's <em>last</em> LEAD and the operation would still
+   * leave at least one member behind: a demotion (which keeps the member) always would, a removal
+   * only when other members remain. Removing/demoting a plain MEMBER, or a LEAD with a co-lead, is
+   * unaffected; removing the sole member (who is the last lead) empties the team, which is allowed
+   * — the legitimate just-created state (delete the team to be rid of it entirely).
    */
-  private void guardNotLastLead(UUID teamId, UUID userId) {
+  private void guardKeepsALead(UUID teamId, UUID userId, boolean removal) {
     boolean targetIsLead =
         memberships.existsByTeamIdAndUserIdAndTeamRole(teamId, userId, TeamRole.LEAD);
-    if (targetIsLead && memberships.countByTeamIdAndTeamRole(teamId, TeamRole.LEAD) <= 1) {
-      throw new TeamConflictException("LAST_LEAD", "A team must keep at least one lead.");
+    if (!targetIsLead || memberships.countByTeamIdAndTeamRole(teamId, TeamRole.LEAD) > 1) {
+      return;
+    }
+    long membersAfter = memberships.countByTeamId(teamId) - (removal ? 1 : 0);
+    if (membersAfter >= 1) {
+      throw new TeamConflictException(
+          "LAST_LEAD",
+          "A team must keep at least one lead — promote another member to lead first.");
     }
   }
 

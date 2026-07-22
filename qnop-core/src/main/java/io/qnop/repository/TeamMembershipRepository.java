@@ -43,6 +43,12 @@ public interface TeamMembershipRepository extends JpaRepository<TeamMembership, 
   /** How many members hold the given role in the team — the last-lead guardrail (#470). */
   long countByTeamIdAndTeamRole(UUID teamId, TeamRole teamRole);
 
+  /**
+   * Total members of a team, regardless of role — lets the last-lead guard allow emptying a team
+   * (removing its sole member) while still blocking a lead-less team with members (issue #542).
+   */
+  long countByTeamId(UUID teamId);
+
   /** The members of a team joined with their user identity, ordered by display name. */
   @Query(
       "SELECT new io.qnop.repository.TeamMemberProjection("

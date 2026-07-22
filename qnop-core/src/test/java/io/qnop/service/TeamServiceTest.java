@@ -324,6 +324,11 @@ class TeamServiceTest {
     when(memberships.existsByTeamIdAndUserIdAndTeamRole(teamId, lead, TeamRole.LEAD))
         .thenReturn(true);
     when(memberships.countByTeamIdAndTeamRole(teamId, TeamRole.LEAD)).thenReturn(1L);
+    // The guard now lives in the base methods (issue #542), which resolve the membership
+    // and count the remaining members before deciding.
+    when(memberships.findByTeamIdAndUserId(teamId, lead))
+        .thenReturn(Optional.of(TeamMembership.of(teamId, lead, TeamRole.LEAD)));
+    when(memberships.countByTeamId(teamId)).thenReturn(2L); // another member remains
 
     // The sole lead cannot self-demote (last-lead) ...
     assertThatThrownBy(() -> service.setMemberRoleAsLead(teamId, lead, false, lead, "MEMBER"))
@@ -388,6 +393,48 @@ class TeamServiceTest {
         .thenReturn(Optional.of(memberMembership));
     service.removeMemberAsLead(teamId, actor, false, member);
     verify(memberships).delete(memberMembership);
+  }
+
+  @Test
+  @DisplayName(
+      "admin path: demoting or removing the last lead is rejected while members remain (#542)")
+  void adminPathLastLeadGuard() {
+    UUID teamId = UUID.randomUUID();
+    UUID lead = UUID.randomUUID();
+    when(memberships.existsByTeamIdAndUserIdAndTeamRole(teamId, lead, TeamRole.LEAD))
+        .thenReturn(true);
+    when(memberships.countByTeamIdAndTeamRole(teamId, TeamRole.LEAD)).thenReturn(1L);
+    when(memberships.findByTeamIdAndUserId(teamId, lead))
+        .thenReturn(Optional.of(TeamMembership.of(teamId, lead, TeamRole.LEAD)));
+    when(memberships.countByTeamId(teamId)).thenReturn(2L); // a second member remains
+
+    // The admin endpoints call the base methods directly — the guard must fire there too.
+    assertThatThrownBy(() -> service.setMemberRole(teamId, lead, "MEMBER"))
+        .isInstanceOf(TeamConflictException.class)
+        .extracting("code")
+        .isEqualTo("LAST_LEAD");
+    assertThatThrownBy(() -> service.removeMember(teamId, lead))
+        .isInstanceOf(TeamConflictException.class)
+        .extracting("code")
+        .isEqualTo("LAST_LEAD");
+    verify(memberships, never()).delete(any());
+  }
+
+  @Test
+  @DisplayName(
+      "admin path: removing the sole member (the last lead) empties the team and is allowed (#542)")
+  void adminPathEmptyTeamAllowed() {
+    UUID teamId = UUID.randomUUID();
+    UUID lead = UUID.randomUUID();
+    when(memberships.existsByTeamIdAndUserIdAndTeamRole(teamId, lead, TeamRole.LEAD))
+        .thenReturn(true);
+    when(memberships.countByTeamIdAndTeamRole(teamId, TeamRole.LEAD)).thenReturn(1L);
+    TeamMembership sole = TeamMembership.of(teamId, lead, TeamRole.LEAD);
+    when(memberships.findByTeamIdAndUserId(teamId, lead)).thenReturn(Optional.of(sole));
+    when(memberships.countByTeamId(teamId)).thenReturn(1L); // the sole member
+
+    service.removeMember(teamId, lead); // empties the team — allowed
+    verify(memberships).delete(sole);
   }
 
   private static Team teamWithId(UUID id, String name) {
