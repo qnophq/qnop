@@ -27,3 +27,16 @@ An open-core business under AGPL-3.0 depends on (a) being able to prove which co
 ## Amendment (2026-07-16, license scanner still pending)
 
 The full dependency-license scanner promised "once real dependencies land" (e.g. ScanCode/ORT or a Gradle license plugin) is still not wired into CI — the check in place remains the SPDX-header job. Tracked in issue #498.
+
+## Amendment (2026-07-22, license scanner wired — issue #498)
+
+The dependency-license scanner is now in CI. The [jk1 `dependency-license-report`](https://github.com/jk1/Gradle-License-Report) Gradle plugin is applied at the root (like the OWASP gate, and likewise **not** wired into `check`/`build`); the CI `license-scan` job runs `checkLicense`, which fails on any dependency on a module's **`runtimeClasspath`** (i.e. what actually ships — test/compile-only licenses such as JUnit's EPL never gate the product) whose license falls outside the allowlist in `config/allowed-licenses.json`.
+
+**Policy encoded in the allowlist:**
+
+- **Tier 1 — permissive, allowed for any module:** Apache-2.0, MIT (incl. MIT-0), BSD-2/3-Clause, MPL-2.0, and EDL-1.0 (the Eclipse Distribution License, which is verbatim BSD-3-Clause). This is ADR-0007's allowlist above.
+- **Tier 2 — reviewed per-module exceptions:** dependencies whose only licenses are copyleft but which are safe to ship under the AGPL/commercial split, each scoped to a single module and justified inline: the Jakarta spec APIs `jakarta.annotation-api` / `jakarta.transaction-api` (EPL-2.0 / GPL-2.0-**with-Classpath-Exception** — linking-neutral), `ch.qos.logback:logback-core`/`-classic` (dual EPL/LGPL logging library, used unmodified), `org.aspectj:aspectjweaver` (EPL-2.0, used unmodified), and `org.liquibase:liquibase-core` (FSL-1.1-ALv2 — source-available, converts to Apache-2.0; qnop uses it unmodified as a migration tool and is not a competing product, which the FSL permits).
+
+Because jk1 treats a dependency as compliant when **at least one** of its licenses is allowed, scoping every non-permissive license to a single module keeps the gate strict: a new copyleft dependency that is not explicitly listed fails CI and forces a conscious review. The jk1 task is run with `--no-configuration-cache --no-parallel` (it resolves cross-module configurations at execution time, incompatible with the repo's config cache / parallel execution); this affects only the `license-scan` job.
+
+Deeper provenance/SBOM tooling (ScanCode/ORT) remains a future option if a full SBOM or license-text audit is required; the CI gate here covers the contamination concern this ADR set out to address.

@@ -12,6 +12,11 @@ spotless = "8.7.0"
 # root; the CI job runs dependencyCheckAggregate only when an NVD API key secret
 # is present.
 dependencyCheck = "12.1.0"
+# Dependency-license scanner (issue #498, ADR-0007). Applied at the root; the CI
+# `license-scan` job runs `checkLicense`, which fails on any runtime dependency
+# whose license is outside the permissive allowlist (Apache-2.0/MIT/BSD/MPL-2.0).
+# Not wired into `check`/`build`, mirroring the OWASP gate.
+licenseReport = "2.9"
 # Spring Boot plugin + BOM. The BOM (spring-boot-dependencies) manages the
 # versions of the Spring stack, JPA/Hibernate, the PostgreSQL driver, Liquibase
 # and Testcontainers — so those artifacts are declared below WITHOUT versions.
@@ -147,3 +152,4 @@ spotless = { id = "com.diffplug.spotless", version.ref = "spotless" }
 spring-boot = { id = "org.springframework.boot", version.ref = "springBoot" }
 openapi-generator = { id = "org.openapi.generator", version.ref = "openapiGenerator" }
 dependency-check = { id = "org.owasp.dependencycheck", version.ref = "dependencyCheck" }
+license-report = { id = "com.github.jk1.dependency-license-report", version.ref = "licenseReport" }

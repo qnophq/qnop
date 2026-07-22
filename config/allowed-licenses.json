@@ -1,0 +1,33 @@
+{
+  "_comment": [
+    "Dependency-license allowlist for `checkLicense` (issue #498, ADR-0007). jk1 marks a",
+    "dependency compliant when AT LEAST ONE of its declared licenses is allowed here; a",
+    "dependency whose every license is absent fails the CI `license-scan` job. License",
+    "names are the canonical strings produced by the bundle normalizer (see build.gradle.kts).",
+    "",
+    "Tier 1 — permissive licenses allowed for ANY module (ADR-0007's allowlist:",
+    "Apache-2.0 / MIT / BSD / MPL-2.0, plus their exact spellings here). EDL-1.0 (the",
+    "Eclipse Distribution License) is verbatim BSD-3-Clause, so it belongs with BSD.",
+    "",
+    "Tier 2 — per-module exceptions: dependencies whose only licenses are copyleft but",
+    "which are safe to ship in an AGPL/commercial-add-on split, each justified inline.",
+    "Scoping every exception to one module keeps the gate strict — a NEW copyleft",
+    "dependency that is not listed here fails CI and forces a conscious review."
+  ],
+  "allowedLicenses": [
+    { "moduleLicense": "Apache License, Version 2.0" },
+    { "moduleLicense": "MIT License" },
+    { "moduleLicense": "MIT-0" },
+    { "moduleLicense": "The 2-Clause BSD License" },
+    { "moduleLicense": "The 3-Clause BSD License" },
+    { "moduleLicense": "Mozilla Public License, Version 2.0" },
+    { "moduleLicense": "Eclipse Distribution License - v 1.0", "_comment": "EDL-1.0 is verbatim BSD-3-Clause (permissive)." },
+
+    { "moduleName": "jakarta.annotation:jakarta.annotation-api", "moduleLicense": "Eclipse Public License - v 2.0", "_comment": "Jakarta spec API; EPL-2.0 / GPL-2.0-with-Classpath-Exception — the classpath exception makes linking license-neutral." },
+    { "moduleName": "jakarta.transaction:jakarta.transaction-api", "moduleLicense": "Eclipse Public License - v 2.0", "_comment": "Jakarta spec API; EPL-2.0 / GPL-2.0-with-Classpath-Exception (linking-safe spec)." },
+    { "moduleName": "ch.qos.logback:logback-classic", "moduleLicense": "Eclipse Public License - v 2.0", "_comment": "Logging library, dual EPL-1.0 / LGPL-2.1; used unmodified as a dynamically-linked runtime dependency." },
+    { "moduleName": "ch.qos.logback:logback-core", "moduleLicense": "Eclipse Public License - v 2.0", "_comment": "Logging library, dual EPL-1.0 / LGPL-2.1; used unmodified as a dynamically-linked runtime dependency." },
+    { "moduleName": "org.aspectj:aspectjweaver", "moduleLicense": "Eclipse Public License - v 2.0", "_comment": "AspectJ weaver (EPL-2.0), used unmodified as a library; no AspectJ source is modified or shipped." },
+    { "moduleName": "org.liquibase:liquibase-core", "moduleLicense": "FSL-1.1-ALv2", "_comment": "Liquibase 5.x is Functional Source License 1.1 (source-available, converts to Apache-2.0 after two years). qnop uses it unmodified as a schema-migration tool and is not a competing product, which the FSL permits. Reviewed acceptance — revisit on major Liquibase upgrades." }
+  ]
+}
