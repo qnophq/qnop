@@ -84,6 +84,7 @@ export function ReviewPageHeader({
           annotations={annotations}
           dueAt={document.dueAt ?? null}
           workflowState={document.workflowState}
+          archivedAt={document.archivedAt ?? null}
           notify={notify}
           onVersionUploaded={onVersionUploaded}
         />

@@ -100,7 +100,7 @@ export function ReviewCards({ reviews, userId, onOpen }: ReviewCardsProps) {
               </Typography>
             </Box>
             <Stack direction="row" spacing={1} sx={{ alignItems: 'center' }}>
-              <WorkflowBadge state={review.workflowState} />
+              <WorkflowBadge state={review.workflowState} archivedAt={review.archivedAt} />
               {review.anonymous && <AnonymousBadge compact />}
               {roleOf(review, userId) === 'owner' && readyToFinalize(review) && (
                 <ToneBadge tone="green" label="Ready to finalize" />

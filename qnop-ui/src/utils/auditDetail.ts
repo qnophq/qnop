@@ -116,6 +116,10 @@ export function formatAuditDetail(
         : EM_DASH;
     case 'storage.orphan.deleted':
       return obj.key !== null && obj.key !== undefined ? `Object ${formatValue(obj.key)}` : EM_DASH;
+    case 'review.archived':
+      return obj.outcome !== null && obj.outcome !== undefined
+        ? `Was ${humanizeWorkflowState(String(obj.outcome))}`
+        : EM_DASH;
     default:
       break;
   }

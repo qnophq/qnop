@@ -147,6 +147,22 @@ describe('ReviewsPage', () => {
     expect(screen.queryByText('Architecture handbook')).not.toBeInTheDocument();
   });
 
+  it('switches to the archived view via the Archived facet (issue #576)', () => {
+    renderPage();
+
+    // The default view queries active reviews only...
+    expect(vi.mocked(useReviews)).toHaveBeenLastCalledWith(
+      expect.objectContaining({ archived: false }),
+    );
+
+    fireEvent.click(screen.getByText('Archived'));
+
+    // ...selecting Archived refetches with archived=true (server-side, #576).
+    expect(vi.mocked(useReviews)).toHaveBeenLastCalledWith(
+      expect.objectContaining({ archived: true }),
+    );
+  });
+
   it('filters by role via the chip and shows counts', () => {
     renderPage();
 

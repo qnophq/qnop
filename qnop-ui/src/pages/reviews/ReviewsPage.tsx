@@ -33,7 +33,7 @@ import ToggleButton from '@mui/material/ToggleButton';
 import ToggleButtonGroup from '@mui/material/ToggleButtonGroup';
 import Typography from '@mui/material/Typography';
 import { LayoutGrid, Plus, Rows3 } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import type { DocumentSummary } from '../../api/generated';
 import { useReviews } from '../../api/hooks/useReviews';
 import { ClearableSearchField } from '../../components/ClearableSearchField';
@@ -46,7 +46,9 @@ import { ReviewsEmptyState } from './ReviewsEmptyState';
 import { useAuthStore } from '../../stores/authStore';
 
 type RoleFilter = 'all' | 'owner' | 'reviewer';
-type StatusFilter = 'all' | 'open' | 'closed';
+// 'archived' is a server-side mode (issue #576): it refetches archived reviews,
+// which the default 'all'/'open'/'closed' views exclude. The value is URL-persisted.
+type StatusFilter = 'all' | 'open' | 'closed' | 'archived';
 type SortBy = 'updated' | 'name' | 'due';
 type ViewMode = 'table' | 'cards';
 
@@ -69,8 +71,17 @@ function matchesRole(review: DocumentSummary, filter: RoleFilter, userId: string
 }
 
 function matchesStatus(review: DocumentSummary, filter: StatusFilter): boolean {
-  if (filter === 'all') return true;
+  // In 'archived' mode every fetched row is archived (server-filtered), so all
+  // match; open/closed are client facets over the active (non-archived) set.
+  if (filter === 'all' || filter === 'archived') return true;
   return isOpenWorkflowState(review.workflowState) === (filter === 'open');
+}
+
+const STATUS_FILTERS: readonly StatusFilter[] = ['all', 'open', 'closed', 'archived'];
+
+/** Parses the URL `status` param to a valid filter, defaulting to 'all' (issue #576). */
+function parseStatusParam(raw: string | null): StatusFilter {
+  return STATUS_FILTERS.includes(raw as StatusFilter) ? (raw as StatusFilter) : 'all';
 }
 
 function matchesSearch(review: DocumentSummary, query: string): boolean {
@@ -103,13 +114,13 @@ function FilterChip({
   onClick,
 }: {
   label: string;
-  count: number;
+  count?: number;
   selected: boolean;
   onClick: () => void;
 }) {
   return (
     <Chip
-      label={`${label} (${count})`}
+      label={count === undefined ? label : `${label} (${count})`}
       size="small"
       color={selected ? 'primary' : 'default'}
       variant={selected ? 'filled' : 'outlined'}
@@ -123,15 +134,32 @@ function FilterChip({
 export function ReviewsPage() {
   const navigate = useNavigate();
   const userId = useAuthStore((s) => s.userId);
+
+  // The status facet is URL-persisted (issue #576) so an "Archived" view is
+  // shareable and survives reloads. It also drives the server query below:
+  // 'archived' fetches archived reviews, every other value the active ones.
+  const [searchParams, setSearchParams] = useSearchParams();
+  const statusFilter = parseStatusParam(searchParams.get('status'));
+  const setStatusFilter = (next: StatusFilter) =>
+    setSearchParams(
+      (prev) => {
+        const p = new URLSearchParams(prev);
+        if (next === 'all') p.delete('status');
+        else p.set('status', next);
+        return p;
+      },
+      { replace: true },
+    );
+
   const { data, isPending, isError, refetch } = useReviews({
     page: 0,
     size: FETCH_SIZE,
     sort: 'updatedAt,desc',
+    archived: statusFilter === 'archived',
   });
 
   const [search, setSearch] = useState('');
   const [roleFilter, setRoleFilter] = useState<RoleFilter>('all');
-  const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
   const [sortBy, setSortBy] = useState<SortBy>('updated');
   const [view, setView] = useState<ViewMode>(readStoredView);
 
@@ -305,6 +333,12 @@ export function ReviewsPage() {
               count={statusCounts.closed}
               selected={statusFilter === 'closed'}
               onClick={() => setStatusFilter(statusFilter === 'closed' ? 'all' : 'closed')}
+            />
+            <FilterChip
+              label="Archived"
+              count={statusFilter === 'archived' ? statusCounts.all : undefined}
+              selected={statusFilter === 'archived'}
+              onClick={() => setStatusFilter(statusFilter === 'archived' ? 'all' : 'archived')}
             />
           </Stack>
 

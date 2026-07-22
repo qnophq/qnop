@@ -22,6 +22,20 @@
 import { ToneBadge } from '../admin/ToneBadge';
 import { WORKFLOW_TONES, workflowLabel } from './workflowMeta';
 
-export function WorkflowBadge({ state }: { state: string }) {
+/**
+ * The review's status badge. An archived review (issue #576) reads neutrally as
+ * "Archived · <outcome>" — the terminal workflowState is preserved, so the badge
+ * keeps showing whether it was finalized or cancelled underneath the archive.
+ */
+export function WorkflowBadge({
+  state,
+  archivedAt,
+}: {
+  state: string;
+  archivedAt?: string | null;
+}) {
+  if (archivedAt) {
+    return <ToneBadge tone="neutral" label={`Archived · ${workflowLabel(state)}`} />;
+  }
   return <ToneBadge tone={WORKFLOW_TONES[state] ?? 'neutral'} label={workflowLabel(state)} />;
 }

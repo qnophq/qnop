@@ -132,6 +132,17 @@ export const AUDIT_EVENT_META: Record<string, AuditEventMeta> = {
       'An administrator changed a scheduled job’s settings — enabled or disabled it, or toggled its dry-run mode (issue #524).',
     tone: 'neutral',
   },
+  'review.archived': {
+    label: 'Review archived',
+    description:
+      'A finalized or cancelled review passed the retention window (or an owner/admin archived it) and left the active lists (issue #576); the outcome it was archived from is shown in the details.',
+    tone: 'neutral',
+  },
+  'review.unarchived': {
+    label: 'Review unarchived',
+    description: 'An owner or admin restored an archived review to the active lists (issue #576).',
+    tone: 'blue',
+  },
 };
 
 /** The event types in a sensible display order — drives the filter and the legend. */
