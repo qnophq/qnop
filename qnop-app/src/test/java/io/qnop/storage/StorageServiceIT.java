@@ -111,6 +111,33 @@ class StorageServiceIT extends AbstractIntegrationTest {
   }
 
   @Test
+  void reStagingHealsACommittedRowWhoseObjectVanishedOutOfBand() {
+    // Reproduce the #575 loss: a COMMITTED row (the object was durable once) whose object was
+    // removed out of band — bucket wiped / restored without the object store. Delete only the
+    // object via the provider; the registry row survives and stays COMMITTED.
+    byte[] data = uniqueContent();
+    StagedObject staged = stage(data, "application/pdf");
+    storage.commit(staged.key());
+    provider.delete(staged.key());
+    assertThat(provider.exists(staged.key())).isFalse();
+    assertThat(repository.findByObjectKey(staged.key()))
+        .hasValueSatisfying(
+            row -> assertThat(row.getStatus()).isEqualTo(StorageObjectStatus.COMMITTED));
+
+    // Re-staging identical content must verify the vanished object and re-upload it, instead of
+    // trusting the COMMITTED row and returning a key that points at nothing.
+    StagedObject restaged = stage(data, "application/pdf");
+
+    assertThat(restaged.key()).isEqualTo(staged.key());
+    assertThat(provider.exists(staged.key())).isTrue();
+    // Healing never demotes the row — it is still, correctly, COMMITTED.
+    assertThat(repository.findByObjectKey(staged.key()))
+        .hasValueSatisfying(
+            row -> assertThat(row.getStatus()).isEqualTo(StorageObjectStatus.COMMITTED));
+    storage.delete(staged.key());
+  }
+
+  @Test
   void identicalContentDeduplicates() {
     byte[] data = uniqueContent();
 

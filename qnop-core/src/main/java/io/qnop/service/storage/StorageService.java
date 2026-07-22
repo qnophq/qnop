@@ -82,12 +82,16 @@ public class StorageService {
    * Buffers the content (to compute its hash and length), records a {@code PENDING} registry row,
    * and uploads it under a content-addressed key.
    *
-   * <p><strong>Dedup is authoritative only for {@code COMMITTED} rows</strong> (issue #289): a
-   * {@code PENDING} row can be <em>poisoned</em> — it is persisted before {@code put}, so a failed
-   * upload leaves a row with no object behind it. On a {@code PENDING} hit (or a lost concurrent
-   * insert race), the object's real existence is checked and it is (re-)uploaded when missing;
-   * {@code put} is idempotent for a content-addressed key + identical bytes, so this self-heals a
-   * failed earlier upload without ever returning a key that points at nothing.
+   * <p><strong>A registry hit is a dedup hint, never blind trust</strong> — the object's real
+   * existence is verified before the upload is skipped, and it is (re-)uploaded from the buffered
+   * bytes whenever it is actually absent. {@code put} is idempotent for a content-addressed key +
+   * identical bytes, so this self-heals without ever returning a key that points at nothing. Two
+   * ways the row can outlive its object: a {@code PENDING} row can be <em>poisoned</em> — it is
+   * persisted before {@code put}, so a failed upload leaves a row with no object (issue #289); and
+   * a {@code COMMITTED} row can be orphaned by <em>out-of-band</em> object loss — the bucket is
+   * wiped or an environment is restored without the object store, leaving the row pointing at
+   * nothing (issue #575). Both are healed here because {@code stage} demonstrably holds the full
+   * bytes.
    */
   public StagedObject stage(InputStream content, String contentType) {
     return stage(content, contentType, Long.MAX_VALUE);
@@ -109,7 +113,19 @@ public class StorageService {
 
       Optional<StorageObject> existing = repository.findByObjectKey(key);
       if (existing.map(o -> o.getStatus() == StorageObjectStatus.COMMITTED).orElse(false)) {
-        return new StagedObject(key, hash, size); // authoritative dedup: the object is durable
+        // Fast path: a COMMITTED row means the object was durable once. But it can still vanish
+        // out of band (bucket wiped, environment restored without the object store), and the row
+        // survives — so verify it, and re-materialize from the bytes we already buffered when it
+        // is gone, rather than returning a key that points at nothing (issue #575). One HEAD per
+        // dedup hit is negligible against an upload; the row stays COMMITTED (it still is).
+        if (!provider.exists(key)) {
+          log.warn(
+              "Committed storage object {} was missing from the provider — re-uploaded from "
+                  + "buffered content (out-of-band object loss)",
+              key);
+          uploadBuffered(buffer, key, size, contentType);
+        }
+        return new StagedObject(key, hash, size);
       }
       // Persist the PENDING row (in Spring Data's own transaction) BEFORE the upload, so a crash
       // between the two always leaves a row the reaper can reclaim. A concurrent stage of identical
