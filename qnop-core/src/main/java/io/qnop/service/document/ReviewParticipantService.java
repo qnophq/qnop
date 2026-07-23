@@ -101,7 +101,7 @@ public class ReviewParticipantService {
     if (!anonymise) {
       Map<UUID, String> slugById =
           userSlugs(rows.stream().map(ParticipantProjection::userId).toList());
-      return rows.stream().map(row -> ParticipantView.of(row, slugById.get(row.userId()))).toList();
+      return rows.stream().map(row -> ParticipantView.of(row, slugById)).toList();
     }
 
     return anonymiseRoster(documentId, rows, identity.forDocument(documentId, actor));
@@ -236,13 +236,18 @@ public class ReviewParticipantService {
   public record ParticipantView(
       UUID id, UUID principalId, boolean team, String slug, String displayName, Instant createdAt) {
 
-    static ParticipantView of(ParticipantProjection projection, String slug) {
+    /**
+     * Builds the view, looking the slug up itself so the null-guard lives in ONE place (issue
+     * #584): a team row has no user id, and the slug map degenerates to the JDK's immutable {@code
+     * Map.of()} on a team-only roster — whose {@code get(null)} throws, 500ing the whole list.
+     */
+    static ParticipantView of(ParticipantProjection projection, Map<UUID, String> slugById) {
       boolean team = projection.teamId() != null;
       return new ParticipantView(
           projection.id(),
           team ? projection.teamId() : projection.userId(),
           team,
-          team ? null : slug,
+          team ? null : slugById.get(projection.userId()),
           projection.displayName(),
           projection.createdAt());
     }

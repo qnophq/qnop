@@ -22,23 +22,23 @@
 import { useState } from 'react';
 import AppBar from '@mui/material/AppBar';
 import Box from '@mui/material/Box';
-import ButtonBase from '@mui/material/ButtonBase';
 import IconButton from '@mui/material/IconButton';
 import Popover from '@mui/material/Popover';
 import Toolbar from '@mui/material/Toolbar';
 import Tooltip from '@mui/material/Tooltip';
 import Typography from '@mui/material/Typography';
 import { alpha } from '@mui/material/styles';
-import { Bell, Menu as MenuIcon, Moon, PanelLeft, Search, Sun } from 'lucide-react';
+import { Bell, Menu as MenuIcon, Moon, PanelLeft, Sun } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { useUiStore } from '../../stores/uiStore';
 import { Breadcrumbs } from './Breadcrumbs';
+import { GlobalSearch } from './search/GlobalSearch';
 
 /**
  * Placeholder panel for top-bar surfaces that are announced but not shipped
- * yet (#514: notifications and global search): a compact coming-soon state in
- * the design language instead of a control that pretends to work. Replaced by
- * the real surface when it ships.
+ * yet (#514: notifications — search shipped with #540): a compact coming-soon
+ * state in the design language instead of a control that pretends to work.
+ * Replaced by the real surface when it ships.
  */
 function ComingSoonPopover({
   anchorEl,
@@ -98,7 +98,6 @@ export function TopBar({ isMobile, onToggleSidebar }: TopBarProps) {
   const themeMode = useUiStore((s) => s.themeMode);
   const toggleTheme = useUiStore((s) => s.toggleTheme);
   const [notificationsAnchor, setNotificationsAnchor] = useState<HTMLElement | null>(null);
-  const [searchAnchor, setSearchAnchor] = useState<HTMLElement | null>(null);
 
   return (
     <AppBar
@@ -120,40 +119,8 @@ export function TopBar({ isMobile, onToggleSidebar }: TopBarProps) {
 
         <Box sx={{ flex: 1 }} />
 
-        {/* Global search: a trigger (not a fake input) until the surface ships (#514). */}
-        <ButtonBase
-          aria-label="Search"
-          aria-haspopup="dialog"
-          aria-expanded={searchAnchor ? true : undefined}
-          onClick={(event) => setSearchAnchor(event.currentTarget)}
-          sx={{
-            display: { xs: 'none', md: 'flex' },
-            justifyContent: 'flex-start',
-            gap: 1,
-            width: 280,
-            height: 34,
-            px: 1.25,
-            borderRadius: 1.5,
-            border: 1,
-            borderColor: 'divider',
-            bgcolor: (t) => t.qnop.surface2,
-            color: 'text.disabled',
-            fontSize: 13,
-            fontFamily: 'inherit',
-            transition: 'border-color .15s',
-            '&:hover, &:focus-visible': { borderColor: 'text.disabled' },
-          }}
-        >
-          <Search size={15} />
-          Search…
-        </ButtonBase>
-        <ComingSoonPopover
-          anchorEl={searchAnchor}
-          onClose={() => setSearchAnchor(null)}
-          icon={Search}
-          title="Search"
-          body="Coming soon — jump to any review, document or teammate from here."
-        />
+        {/* The real global search (issue #540), replacing the #514 trigger. */}
+        <GlobalSearch />
 
         <Tooltip title={themeMode === 'dark' ? 'Light mode' : 'Dark mode'}>
           <IconButton

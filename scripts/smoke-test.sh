@@ -187,6 +187,46 @@ code="$(acode GET "/api/v1/documents/${doc_id}/annotations?version=1")"
 [ "$code" = "200" ] || fail "GET .../annotations?version=1 -> HTTP $code (expected 200)"
 log "GET .../annotations?version=1 -> 200"
 
+# 16b) Global search federation (#540, ADR-0047) against the real deploy: the
+#      uploaded review is found by title, a fresh annotation by its opening
+#      text and a reply by its body — each in its own group with deep-link
+#      facts — while short and anonymous queries stay dark.
+found="$(aget "/api/v1/search?q=smoke" | jq -r --arg id "$doc_id" '[.reviews.items[].id] | index($id)')"
+[ "$found" != "null" ] || fail "GET /api/v1/search?q=smoke does not list the uploaded review"
+
+ann_json="$(
+  curl -sf -X POST "${BASE_URL}/api/v1/documents/${doc_id}/annotations" \
+    -H "Authorization: Bearer ${TOKEN}" -H 'Content-Type: application/json' \
+    -d '{"versionNumber":1,"comment":"Zephyr clause needs rework."}'
+)"
+ann_id="$(echo "$ann_json" | jq -r '.id')"
+[ -n "$ann_id" ] && [ "$ann_id" != "null" ] || fail "annotation create did not return an id"
+curl -sf -X POST "${BASE_URL}/api/v1/annotations/${ann_id}/comments" \
+  -H "Authorization: Bearer ${TOKEN}" -H 'Content-Type: application/json' \
+  -d '{"body":"Zephyr wording agreed."}' >/dev/null
+
+sr="$(aget "/api/v1/search?q=zephyr")"
+[ "$(echo "$sr" | jq -r '.annotations.total')" = "1" ] ||
+  fail "search?q=zephyr annotations.total=$(echo "$sr" | jq -r '.annotations.total') (expected 1)"
+echo "$sr" | jq -r '.annotations.items[0].excerpt' | grep -q "Zephyr clause" ||
+  fail "annotation hit lacks its opening-text excerpt"
+[ "$(echo "$sr" | jq -r --arg id "$ann_id" '.annotations.items[0].annotationId == $id')" = "true" ] ||
+  fail "annotation hit does not carry the created annotation's deep-link id"
+[ "$(echo "$sr" | jq -r '.comments.total')" = "1" ] ||
+  fail "search?q=zephyr comments.total=$(echo "$sr" | jq -r '.comments.total') (expected 1)"
+
+users_total="$(aget "/api/v1/search?q=mia" | jq -r '.users.total')"
+[ "$users_total" -ge 1 ] 2>/dev/null || fail "search?q=mia users.total=${users_total} (expected >= 1 seeded)"
+alpha_viewable="$(aget "/api/v1/search/teams?q=alpha" | jq -r '.items[0].viewable')"
+[ "$alpha_viewable" = "true" ] || fail "admin sees team Alpha as viewable=${alpha_viewable} (expected true)"
+
+short_total="$(aget "/api/v1/search?q=a" |
+  jq -r '.reviews.total + .annotations.total + .comments.total + .users.total + .teams.total')"
+[ "$short_total" = "0" ] || fail "short query returned ${short_total} hits (expected 0)"
+code="$(curl -s -o /dev/null -w '%{http_code}' "${BASE_URL}/api/v1/search?q=smoke")"
+[ "$code" = "401" ] || fail "unauthenticated search -> HTTP $code (expected 401)"
+log "global search: review by title, annotation/comment by text, principals, short+anon dark"
+
 # 17) Multi-version fixtures (#370): five doc1 uploads all extract READY through
 #     the scheduled job, and every version keeps serving its own rendering.
 DOC1_DIR="testdata/documents/doc1"

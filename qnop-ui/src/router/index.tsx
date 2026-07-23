@@ -43,6 +43,7 @@ import { SchedulerPage } from '../pages/admin/SchedulerPage';
 import { UsersPage } from '../pages/admin/UsersPage';
 import { TeamsPage } from '../pages/admin/TeamsPage';
 import { TeamDetailPage } from '../pages/admin/TeamDetailPage';
+import { SearchPage } from '../pages/search/SearchPage';
 import { MyTeamsPage } from '../pages/my-teams/MyTeamsPage';
 import { MyTeamDetailPage } from '../pages/my-teams/MyTeamDetailPage';
 import { ChangePasswordPage } from '../pages/auth/ChangePasswordPage';
@@ -132,6 +133,7 @@ export const router = createBrowserRouter([
           </ReviewParamGate>
         ),
       },
+      { path: 'search', element: <SearchPage /> },
       { path: 'my-teams', element: <MyTeamsPage /> },
       { path: 'my-teams/:id', element: <MyTeamDetailPage /> },
       {

@@ -80,7 +80,7 @@ importers:
         specifier: 11.1.2
         version: 11.1.2(react@19.2.7)
       react-markdown:
-        specifier: ^10.1.0
+        specifier: 10.1.0
         version: 10.1.0(@types/react@19.2.17)(react@19.2.7)(supports-color@10.2.2)
       react-router-dom:
         specifier: 7.18.1
@@ -92,16 +92,16 @@ importers:
         specifier: 6.0.0
         version: 6.0.0
       remark:
-        specifier: ^15.0.1
+        specifier: 15.0.1
         version: 15.0.1(supports-color@10.2.2)
       remark-breaks:
-        specifier: ^4.0.0
+        specifier: 4.0.0
         version: 4.0.0
       remark-gfm:
-        specifier: ^4.0.1
+        specifier: 4.0.1
         version: 4.0.1(supports-color@10.2.2)
       strip-markdown:
-        specifier: ^6.0.0
+        specifier: 6.0.0
         version: 6.0.0
       zustand:
         specifier: 5.0.14

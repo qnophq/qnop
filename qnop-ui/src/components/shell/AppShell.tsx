@@ -61,6 +61,7 @@ export function AppShell() {
   const myTeamsMatch = useMatch('/my-teams');
   const myTeamDetailMatch = useMatch('/my-teams/:id');
   const auditMatch = useMatch('/audit');
+  const searchMatch = useMatch('/search');
   const profileMatch = useMatch('/profile');
   const userProfileMatch = useMatch('/users/:userId');
   // The new-review wizard (#469 polish) spans the full width too — it lays out
@@ -74,6 +75,7 @@ export function AppShell() {
     Boolean(myTeamsMatch) ||
     Boolean(myTeamDetailMatch) ||
     Boolean(auditMatch) ||
+    Boolean(searchMatch) ||
     Boolean(profileMatch) ||
     Boolean(userProfileMatch) ||
     wizardMatch;

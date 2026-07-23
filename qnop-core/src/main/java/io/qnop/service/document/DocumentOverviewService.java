@@ -172,7 +172,7 @@ public class DocumentOverviewService {
   private List<ParticipantView> rosterFor(
       Document document, UUID actor, List<ParticipantProjection> rows, Map<UUID, String> slugById) {
     if (!document.isAnonymous() || document.getOwnerId().equals(actor)) {
-      return rows.stream().map(row -> ParticipantView.of(row, slugById.get(row.userId()))).toList();
+      return rows.stream().map(row -> ParticipantView.of(row, slugById)).toList();
     }
     return ReviewParticipantService.anonymiseRoster(
         document.getId(), rows, identity.forDocument(document.getId(), actor));

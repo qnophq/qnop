@@ -118,6 +118,16 @@ tags:
       teams — for picking review participants (issue #292). Available to every
       authenticated user by deliberate Community decision; it exposes display
       names only (no emails, no roles).
+  - name: Search
+    description: |
+      Federated global search across reviews, users and teams (issue #540,
+      ADR-0047): each entity type is queried through its own already
+      authorization-scoped path and the results are merged — reviews via the
+      caller's visibility rule (title only, ADR-0038), users and teams via the
+      enabled-principals rule (names only, never email). Backed by the
+      SearchService port; the Community default federates the existing
+      Postgres LIKE queries (a later FTS/OpenSearch adapter is a swap, not a
+      rewrite).
   - name: Annotations
     description: |
       Annotations, their comment threads, and per-version placements (issue #247,
@@ -2681,6 +2691,165 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
+  /search:
+    get:
+      tags: [Search]
+      summary: Quick global search (grouped top hits)
+      description: |
+        The dropdown variant (issue #540): the top hits per entity type —
+        reviews (matched by title), annotations (thread openers), comments
+        (replies), users and teams — each group capped to a handful of items
+        and carrying the group's full match count, so a client can offer "see
+        all N". Results are authorization-scoped per type: reviews and
+        discussion texts through the caller's visibility rule (discussion
+        additionally only in threads the caller may see — ADR-0038), users
+        and teams through the enabled-principals rule (display name/username
+        and team name — never email). A query shorter than 2 characters
+        returns empty groups.
+      operationId: searchQuick
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/SearchQueryParam'
+      responses:
+        '200':
+          description: Grouped top hits per entity type
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GlobalSearchResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+  /search/reviews:
+    get:
+      tags: [Search]
+      summary: Search reviews (paged)
+      description: |
+        The full-results variant for reviews (issue #540): title matches among
+        the reviews the caller may see — owner, direct participant, or member
+        of a participant team; admins search their own reviews like anyone
+        else. Discussion matches live under /search/annotations and
+        /search/comments. A query shorter than 2 characters returns an empty
+        page.
+      operationId: searchReviews
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/SearchQueryParam'
+        - $ref: '#/components/parameters/SearchPageParam'
+        - $ref: '#/components/parameters/SearchSizeParam'
+      responses:
+        '200':
+          description: One page of matching reviews
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReviewSearchPage'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+  /search/annotations:
+    get:
+      tags: [Search]
+      summary: Search annotation texts (paged)
+      description: |
+        The full-results variant for annotations (issue #540): matches in the
+        OPENING text of annotation threads, within the caller's visible
+        reviews and visible threads (ADR-0038 — a PRIVATE review hides
+        foreign threads). Each hit deep-links into the review via
+        `?annotation=`. A query shorter than 2 characters returns an empty
+        page.
+      operationId: searchAnnotations
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/SearchQueryParam'
+        - $ref: '#/components/parameters/SearchPageParam'
+        - $ref: '#/components/parameters/SearchSizeParam'
+      responses:
+        '200':
+          description: One page of matching annotation openers
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DiscussionSearchPage'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+  /search/comments:
+    get:
+      tags: [Search]
+      summary: Search comment replies (paged)
+      description: |
+        The full-results variant for comments (issue #540): matches in the
+        REPLIES of annotation threads (everything after the opener), within
+        the caller's visible reviews and visible threads (ADR-0038). Each hit
+        deep-links into the thread via `?annotation=…&comment=…`. A query
+        shorter than 2 characters returns an empty page.
+      operationId: searchComments
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/SearchQueryParam'
+        - $ref: '#/components/parameters/SearchPageParam'
+        - $ref: '#/components/parameters/SearchSizeParam'
+      responses:
+        '200':
+          description: One page of matching reply comments
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DiscussionSearchPage'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+  /search/users:
+    get:
+      tags: [Search]
+      summary: Search users (paged)
+      description: |
+        The full-results variant for people (issue #540): enabled users
+        matched by display name or username — never by email (that stays an
+        admin capability under /admin/users). A query shorter than 2
+        characters returns an empty page.
+      operationId: searchUsers
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/SearchQueryParam'
+        - $ref: '#/components/parameters/SearchPageParam'
+        - $ref: '#/components/parameters/SearchSizeParam'
+      responses:
+        '200':
+          description: One page of matching users
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserSearchPage'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+  /search/teams:
+    get:
+      tags: [Search]
+      summary: Search teams (paged)
+      description: |
+        The full-results variant for teams (issue #540): enabled teams matched
+        by name. Every hit carries `viewable` — whether the caller may open
+        the team's roster (member or admin); non-viewable hits are listed but
+        not linked. A query shorter than 2 characters returns an empty page.
+      operationId: searchTeams
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/SearchQueryParam'
+        - $ref: '#/components/parameters/SearchPageParam'
+        - $ref: '#/components/parameters/SearchSizeParam'
+      responses:
+        '200':
+          description: One page of matching teams
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TeamSearchPage'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
   /documents/{documentId}:
     get:
       tags:
@@ -3658,6 +3827,38 @@ components:
       schema:
         type: string
         format: uuid
+    SearchQueryParam:
+      name: q
+      in: query
+      required: false
+      description: >-
+        The case-insensitive search text (issue #540). Fewer than 2 characters
+        (after trimming) yields empty results, never an error — a global box
+        firing per keystroke must not dump the whole workspace.
+      schema:
+        type: string
+        maxLength: 200
+    SearchPageParam:
+      name: page
+      in: query
+      required: false
+      description: Zero-based page index.
+      schema:
+        type: integer
+        format: int32
+        minimum: 0
+        default: 0
+    SearchSizeParam:
+      name: size
+      in: query
+      required: false
+      description: Page size.
+      schema:
+        type: integer
+        format: int32
+        minimum: 1
+        maximum: 100
+        default: 20
     EmojiParam:
       name: emoji
       in: path
@@ -5965,6 +6166,280 @@ components:
         - id
         - kind
         - displayName
+    ReviewSearchHit:
+      type: object
+      description: >-
+        A review matched by its title (issue #540) — a strict subset of what
+        the reviews list already exposes (ADR-0038: no author names).
+        Discussion matches surface in their own annotation/comment groups.
+      properties:
+        id:
+          type: string
+          format: uuid
+        slug:
+          type: string
+          nullable: true
+          description: The review's friendly URL segment; null for pre-slug documents.
+        title:
+          type: string
+        workflowState:
+          type: string
+          description: The review workflow state (ADR-0011), for the state cue on the hit.
+      required:
+        - id
+        - title
+        - workflowState
+    DiscussionSearchHit:
+      type: object
+      description: >-
+        A discussion text matched by the global search (issue #540): an
+        annotation (the thread's opening text) or a reply comment, from a
+        thread the caller may open (ADR-0038: a PRIVATE review hides foreign
+        threads — they neither match nor are quoted). No author name travels
+        on a hit; the deep link is `?annotation=` (plus `&comment=` for a
+        reply).
+      properties:
+        commentId:
+          type: string
+          format: uuid
+        annotationId:
+          type: string
+          format: uuid
+        documentId:
+          type: string
+          format: uuid
+        documentSlug:
+          type: string
+          nullable: true
+          description: The review's friendly URL segment; null for pre-slug documents.
+        documentTitle:
+          type: string
+          description: The review the thread belongs to, as the hit's context line.
+        annotationStatus:
+          $ref: '#/components/schemas/AnnotationStatus'
+        excerpt:
+          type: string
+          description: A short single-line snippet windowed around the match.
+      required:
+        - commentId
+        - annotationId
+        - documentId
+        - documentTitle
+        - annotationStatus
+        - excerpt
+    DiscussionSearchGroup:
+      type: object
+      description: A discussion group of a quick search — top hits plus the full match count.
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/DiscussionSearchHit'
+        total:
+          type: integer
+          format: int64
+      required:
+        - items
+        - total
+    DiscussionSearchPage:
+      type: object
+      description: One page of discussion search results (issue #540).
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/DiscussionSearchHit'
+        total:
+          type: integer
+          format: int64
+        page:
+          type: integer
+          format: int32
+        size:
+          type: integer
+          format: int32
+      required:
+        - items
+        - total
+        - page
+        - size
+    UserSearchHit:
+      type: object
+      description: >-
+        A person matched by the global search (issue #540) — the
+        enabled-principals rule; matched by display name or username, never by
+        email, and no email is returned.
+      properties:
+        userId:
+          type: string
+          format: uuid
+        displayName:
+          type: string
+        slug:
+          type: string
+          nullable: true
+          description: The user's profile slug (issue #486).
+        avatarUrl:
+          type: string
+          nullable: true
+          description: Profile picture URL (cache-busted); null without one.
+      required:
+        - userId
+        - displayName
+    TeamSearchHit:
+      type: object
+      description: >-
+        A team matched by the global search (issue #540). `viewable` says
+        whether the caller may open the team's roster (member or admin) — a
+        non-viewable hit is listed but not linked.
+      properties:
+        teamId:
+          type: string
+          format: uuid
+        name:
+          type: string
+        slug:
+          type: string
+          nullable: true
+          description: The team's URL slug (issue #470).
+        viewable:
+          type: boolean
+          description: Whether the caller may open /my-teams for this team.
+      required:
+        - teamId
+        - name
+        - viewable
+    ReviewSearchGroup:
+      type: object
+      description: The review group of a quick search — top hits plus the full match count.
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/ReviewSearchHit'
+        total:
+          type: integer
+          format: int64
+      required:
+        - items
+        - total
+    UserSearchGroup:
+      type: object
+      description: The people group of a quick search — top hits plus the full match count.
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/UserSearchHit'
+        total:
+          type: integer
+          format: int64
+      required:
+        - items
+        - total
+    TeamSearchGroup:
+      type: object
+      description: The team group of a quick search — top hits plus the full match count.
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/TeamSearchHit'
+        total:
+          type: integer
+          format: int64
+      required:
+        - items
+        - total
+    GlobalSearchResponse:
+      type: object
+      description: >-
+        Grouped top hits of a quick global search (issue #540): reviews (by
+        title), annotations (thread openers), comments (replies), users and
+        teams — each group capped and counted separately.
+      properties:
+        reviews:
+          $ref: '#/components/schemas/ReviewSearchGroup'
+        annotations:
+          $ref: '#/components/schemas/DiscussionSearchGroup'
+        comments:
+          $ref: '#/components/schemas/DiscussionSearchGroup'
+        users:
+          $ref: '#/components/schemas/UserSearchGroup'
+        teams:
+          $ref: '#/components/schemas/TeamSearchGroup'
+      required:
+        - reviews
+        - annotations
+        - comments
+        - users
+        - teams
+    ReviewSearchPage:
+      type: object
+      description: One page of review search results (issue #540).
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/ReviewSearchHit'
+        total:
+          type: integer
+          format: int64
+        page:
+          type: integer
+          format: int32
+        size:
+          type: integer
+          format: int32
+      required:
+        - items
+        - total
+        - page
+        - size
+    UserSearchPage:
+      type: object
+      description: One page of user search results (issue #540).
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/UserSearchHit'
+        total:
+          type: integer
+          format: int64
+        page:
+          type: integer
+          format: int32
+        size:
+          type: integer
+          format: int32
+      required:
+        - items
+        - total
+        - page
+        - size
+    TeamSearchPage:
+      type: object
+      description: One page of team search results (issue #540).
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/TeamSearchHit'
+        total:
+          type: integer
+          format: int64
+        page:
+          type: integer
+          format: int32
+        size:
+          type: integer
+          format: int32
+      required:
+        - items
+        - total
+        - page
+        - size
     PrincipalListResponse:
       type: object
       description: Principals matching a directory search.

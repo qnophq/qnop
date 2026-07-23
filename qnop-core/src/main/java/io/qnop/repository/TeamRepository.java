@@ -76,4 +76,17 @@ public interface TeamRepository extends JpaRepository<Team, UUID> {
       "SELECT t FROM Team t WHERE t.enabled = TRUE AND (:q IS NULL OR LOWER(t.name) LIKE :q)"
           + " ORDER BY LOWER(t.name)")
   List<Team> searchEnabledPrincipals(@Param("q") String q, Pageable pageable);
+
+  /**
+   * The same enabled-principals rule as a {@link Page} (issue #540): the global search needs the
+   * full match count for its "see all N" affordance, which the {@code List} variant cannot give.
+   */
+  @Query(
+      value =
+          "SELECT t FROM Team t WHERE t.enabled = TRUE AND (:q IS NULL OR LOWER(t.name) LIKE :q)"
+              + " ORDER BY LOWER(t.name)",
+      countQuery =
+          "SELECT COUNT(t) FROM Team t WHERE t.enabled = TRUE"
+              + " AND (:q IS NULL OR LOWER(t.name) LIKE :q)")
+  Page<Team> pageEnabledPrincipals(@Param("q") String q, Pageable pageable);
 }
