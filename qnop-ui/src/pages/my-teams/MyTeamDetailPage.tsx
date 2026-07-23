@@ -48,6 +48,7 @@ import { AddMyTeamMemberDialog } from '../../components/my-teams/AddMyTeamMember
 import { TeamRoleBadge } from '../../components/admin/teams/TeamRoleBadge';
 import { ConfirmDialog } from '../../components/admin/ConfirmDialog';
 import { PageHeader } from '../../components/admin/layout/PageHeader';
+import { TeamAvatar } from '../../components/shell/TeamAvatar';
 import { AdminToast } from '../../components/admin/layout/AdminToast';
 import { useToast } from '../../components/admin/layout/useToast';
 import { PersonLink } from '../../components/dashboard/PersonLink';
@@ -124,6 +125,7 @@ export function MyTeamDetailPage() {
     <Stack spacing={3}>
       <PageHeader
         title={team.name}
+        leading={<TeamAvatar name={team.name} imageUrl={team.avatarUrl} size={48} />}
         titleAdornment={team.viewerRole ? <TeamRoleBadge role={team.viewerRole} /> : undefined}
         description={team.description || undefined}
         action={

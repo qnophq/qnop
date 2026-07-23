@@ -33,7 +33,7 @@ import { Link as RouterLink } from 'react-router-dom';
 import type { MyTeam } from '../../api/generated';
 import { useMyTeams } from '../../api/hooks/useMyTeams';
 import { TeamRoleBadge } from '../../components/admin/teams/TeamRoleBadge';
-import { TeamCrest } from '../../components/my-teams/TeamCrest';
+import { TeamAvatar } from '../../components/shell/TeamAvatar';
 import { PageHeader } from '../../components/admin/layout/PageHeader';
 import { MyTeamsEmptyState } from './MyTeamsEmptyState';
 import {
@@ -359,7 +359,7 @@ function TeamCard({ team, index, canManage }: { team: MyTeam; index: number; can
       }}
     >
       <Stack direction="row" spacing={1.5} sx={{ alignItems: 'center' }}>
-        <TeamCrest name={team.name} size={44} />
+        <TeamAvatar name={team.name} imageUrl={team.avatarUrl} size={44} />
         <Box sx={{ minWidth: 0, flex: 1 }}>
           <Typography sx={{ fontWeight: 700, lineHeight: 1.3 }} noWrap>
             {team.name}

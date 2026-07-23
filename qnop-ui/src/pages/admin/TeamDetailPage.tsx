@@ -45,6 +45,7 @@ import { TeamFormDialog } from '../../components/admin/teams/TeamFormDialog';
 import { TeamRoleBadge } from '../../components/admin/teams/TeamRoleBadge';
 import { ConfirmDialog } from '../../components/admin/ConfirmDialog';
 import { PageHeader } from '../../components/admin/layout/PageHeader';
+import { TeamAvatar } from '../../components/shell/TeamAvatar';
 import { PersonLink } from '../../components/dashboard/PersonLink';
 import { UserStatusBadge } from '../../components/admin/users/UserBadges';
 import { useFormatters } from '../../hooks/useFormatters';
@@ -103,6 +104,7 @@ export function TeamDetailPage() {
     <Stack spacing={3}>
       <PageHeader
         title={team.name}
+        leading={<TeamAvatar name={team.name} imageUrl={team.avatarUrl} size={48} />}
         titleAdornment={<UserStatusBadge enabled={team.enabled} />}
         description={team.description || undefined}
         action={
