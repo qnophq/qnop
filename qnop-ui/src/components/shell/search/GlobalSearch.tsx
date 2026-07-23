@@ -33,8 +33,8 @@ import { Search } from 'lucide-react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { SEARCH_MIN_LENGTH, useSearchQuick } from '../../../api/hooks/useSearch';
 import { useAuthStore } from '../../../stores/authStore';
-import { SearchDropdownResults, searchOptionId } from './SearchDropdownResults';
-import { flattenSearchActions } from './searchPaths';
+import { SearchDropdownResults } from './SearchDropdownResults';
+import { flattenSearchActions, searchOptionId } from './searchPaths';
 
 /** Mirrors the admin lists' debounce (UsersPage) — one query per typing pause. */
 const DEBOUNCE_MS = 300;

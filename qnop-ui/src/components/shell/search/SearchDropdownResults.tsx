@@ -46,12 +46,7 @@ import { WorkflowStateIcon } from '../../reviews/WorkflowStateIcon';
 import { useEffect, useRef } from 'react';
 import { STATUS_CUES } from '../../reviews/panel/statusCues';
 import { UserAvatar } from '../UserAvatar';
-import { discussionHitPath } from './searchPaths';
-
-/** DOM id of a keyboard-reachable row, for aria-activedescendant. */
-export function searchOptionId(actionKey: string): string {
-  return `search-option-${actionKey.replace(/[^a-zA-Z0-9-]/g, '-')}`;
-}
+import { discussionHitPath, searchOptionId } from './searchPaths';
 
 /** The results page's type segment for a group's "see all" continuation. */
 type ResultType = 'reviews' | 'annotations' | 'comments' | 'users' | 'teams';

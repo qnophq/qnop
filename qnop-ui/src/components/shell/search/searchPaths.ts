@@ -30,6 +30,11 @@ export function discussionHitPath(hit: DiscussionSearchHit, reply: boolean): str
   return reply ? `${base}&comment=${hit.commentId}` : base;
 }
 
+/** DOM id of a keyboard-reachable row, for aria-activedescendant. */
+export function searchOptionId(actionKey: string): string {
+  return `search-option-${actionKey.replace(/[^a-zA-Z0-9-]/g, '-')}`;
+}
+
 /** One keyboard-reachable dropdown row: its stable key and where Enter goes. */
 export interface SearchAction {
   key: string;
