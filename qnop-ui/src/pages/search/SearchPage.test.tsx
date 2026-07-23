@@ -141,6 +141,8 @@ describe('SearchPage', () => {
     // Default type: reviews, milestone-tracked rows deep-linking to the review.
     const row = screen.getByTestId('search-row-review');
     expect(row).toHaveTextContent('Q3 report');
+    // The state travels as ONE compact glyph, not the wide milestone band.
+    expect(screen.getByTestId('workflow-state-icon')).toHaveAccessibleName('In review');
     expect(screen.getByRole('link', { name: 'Q3 report' })).toHaveAttribute(
       'href',
       '/reviews/q3-report',

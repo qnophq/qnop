@@ -52,7 +52,7 @@ import { PageHeader } from '../../components/admin/layout/PageHeader';
 import { SectionCard } from '../../components/admin/layout/SectionCard';
 import { PersonLink } from '../../components/dashboard/PersonLink';
 import { tokens } from '../../theme/tokens';
-import { WorkflowMilestones } from '../../components/reviews/WorkflowMilestones';
+import { WorkflowStateIcon } from '../../components/reviews/WorkflowStateIcon';
 import { StatusCueIcon } from '../../components/shell/search/SearchDropdownResults';
 import { discussionHitPath } from '../../components/shell/search/searchPaths';
 
@@ -265,7 +265,7 @@ export function SearchPage() {
                       data-testid="search-row-review"
                       sx={{ alignItems: 'center', py: 1.25, ...reveal(index) }}
                     >
-                      <WorkflowMilestones state={hit.workflowState} />
+                      <WorkflowStateIcon state={hit.workflowState} />
                       <Link
                         component={RouterLink}
                         to={`/reviews/${hit.slug ?? hit.id}`}
