@@ -19,7 +19,7 @@
  * SPDX-License-Identifier: AGPL-3.0-only
  */
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import Box from '@mui/material/Box';
 import ClickAwayListener from '@mui/material/ClickAwayListener';
 import Grow from '@mui/material/Grow';
@@ -32,7 +32,9 @@ import { alpha, useTheme } from '@mui/material/styles';
 import { Search } from 'lucide-react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { SEARCH_MIN_LENGTH, useSearchQuick } from '../../../api/hooks/useSearch';
-import { SearchDropdownResults } from './SearchDropdownResults';
+import { useAuthStore } from '../../../stores/authStore';
+import { SearchDropdownResults, searchOptionId } from './SearchDropdownResults';
+import { flattenSearchActions } from './searchPaths';
 
 /** Mirrors the admin lists' debounce (UsersPage) — one query per typing pause. */
 const DEBOUNCE_MS = 300;
@@ -68,6 +70,8 @@ export function GlobalSearch() {
   const [debounced, setDebounced] = useState('');
   const [open, setOpen] = useState(false);
   const [focused, setFocused] = useState(false);
+  const [highlight, setHighlight] = useState(-1);
+  const selfUserId = useAuthStore((s) => s.userId);
   const [anchorEl, setAnchorEl] = useState<HTMLDivElement | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -102,11 +106,23 @@ export function GlobalSearch() {
   const trimmed = value.trim();
   const showPanel = open && trimmed.length > 0;
   const belowMinimum = trimmed.length < SEARCH_MIN_LENGTH;
+
+  // The keyboard-reachable rows in render order (issue #540 roving): the
+  // arrow keys walk this flat list, Enter opens the highlighted one.
+  const actions = useMemo(
+    () =>
+      query.data && !belowMinimum ? flattenSearchActions(query.data, trimmed, selfUserId) : [],
+    [query.data, belowMinimum, trimmed, selfUserId],
+  );
+  const highlighted = highlight >= 0 && highlight < actions.length ? actions[highlight] : null;
   // Wide while the caret is in the box OR the panel is up (clicking a hit
   // blurs the input; shrinking mid-click would pull the target away).
   const grown = focused || showPanel;
 
-  const close = () => setOpen(false);
+  const close = () => {
+    setOpen(false);
+    setHighlight(-1);
+  };
   const submitToResultsPage = () => {
     if (trimmed.length >= SEARCH_MIN_LENGTH) {
       navigate(`/search?q=${encodeURIComponent(trimmed)}`);
@@ -149,6 +165,7 @@ export function GlobalSearch() {
             onChange={(event) => {
               setValue(event.target.value);
               setOpen(true);
+              setHighlight(-1);
             }}
             onFocus={() => {
               setFocused(true);
@@ -160,14 +177,36 @@ export function GlobalSearch() {
                 close();
                 inputRef.current?.blur();
               }
+              if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
+                event.preventDefault(); // the caret stays put; the highlight moves
+                if (!open && trimmed.length > 0) setOpen(true);
+                if (actions.length > 0) {
+                  setHighlight((current) =>
+                    event.key === 'ArrowDown'
+                      ? (current + 1) % actions.length
+                      : current <= 0
+                        ? actions.length - 1
+                        : current - 1,
+                  );
+                }
+              }
               if (event.key === 'Enter') {
-                submitToResultsPage();
+                if (highlighted) {
+                  navigate(highlighted.path);
+                } else {
+                  submitToResultsPage();
+                }
               }
             }}
             placeholder="Search…"
             inputProps={{
               'aria-label': 'Search reviews, people and teams',
               'aria-keyshortcuts': 'Meta+K Control+K',
+              role: 'combobox',
+              'aria-expanded': showPanel,
+              'aria-controls': 'global-search-listbox',
+              'aria-autocomplete': 'list',
+              'aria-activedescendant': highlighted ? searchOptionId(highlighted.key) : undefined,
             }}
             sx={{ flex: 1, fontSize: 13, color: 'text.primary' }}
           />
@@ -208,6 +247,7 @@ export function GlobalSearch() {
                 variant="outlined"
                 role="dialog"
                 aria-label="Search results"
+                id="global-search-listbox"
                 data-testid="global-search-dropdown"
                 sx={{
                   mt: 1,
@@ -228,7 +268,11 @@ export function GlobalSearch() {
                 ) : query.isError ? (
                   <Hint text="Search is unavailable right now." />
                 ) : query.data ? (
-                  <SearchDropdownResults query={trimmed} data={query.data} />
+                  <SearchDropdownResults
+                    query={trimmed}
+                    data={query.data}
+                    highlightKey={highlighted?.key ?? null}
+                  />
                 ) : null}
               </Paper>
             </Grow>

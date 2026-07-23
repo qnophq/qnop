@@ -43,9 +43,15 @@ import { AnnotationStatus } from '../../../api/generated';
 import { useAuthStore } from '../../../stores/authStore';
 import { ToneBadge } from '../../admin/ToneBadge';
 import { WorkflowStateIcon } from '../../reviews/WorkflowStateIcon';
+import { useEffect, useRef } from 'react';
 import { STATUS_CUES } from '../../reviews/panel/statusCues';
 import { UserAvatar } from '../UserAvatar';
 import { discussionHitPath } from './searchPaths';
+
+/** DOM id of a keyboard-reachable row, for aria-activedescendant. */
+export function searchOptionId(actionKey: string): string {
+  return `search-option-${actionKey.replace(/[^a-zA-Z0-9-]/g, '-')}`;
+}
 
 /** The results page's type segment for a group's "see all" continuation. */
 type ResultType = 'reviews' | 'annotations' | 'comments' | 'users' | 'teams';
@@ -61,9 +67,12 @@ type ResultType = 'reviews' | 'annotations' | 'comments' | 'users' | 'teams';
 export function SearchDropdownResults({
   query,
   data,
+  highlightKey = null,
 }: {
   query: string;
   data: GlobalSearchResponse;
+  /** The keyboard-highlighted row's action key (issue #540 roving). */
+  highlightKey?: string | null;
 }) {
   const theme = useTheme();
   const navigate = useNavigate();
@@ -96,6 +105,8 @@ export function SearchDropdownResults({
           {data.reviews.items.map((hit) => (
             <HitRow
               key={hit.id}
+              actionKey={`review:${hit.id}`}
+              highlighted={highlightKey === `review:${hit.id}`}
               testId="search-hit-review"
               onClick={() => navigate(`/reviews/${hit.slug ?? hit.id}`)}
               start={<WorkflowStateIcon state={hit.workflowState} size={14} />}
@@ -103,7 +114,12 @@ export function SearchDropdownResults({
             />
           ))}
           {data.reviews.total > data.reviews.items.length && (
-            <SeeAllRow total={data.reviews.total} onClick={() => seeAll('reviews')} />
+            <SeeAllRow
+              actionKey="seeall:reviews"
+              highlighted={highlightKey === 'seeall:reviews'}
+              total={data.reviews.total}
+              onClick={() => seeAll('reviews')}
+            />
           )}
         </Section>
       )}
@@ -112,6 +128,8 @@ export function SearchDropdownResults({
           {data.annotations.items.map((hit) => (
             <HitRow
               key={hit.commentId}
+              actionKey={`annotation:${hit.commentId}`}
+              highlighted={highlightKey === `annotation:${hit.commentId}`}
               testId="search-hit-annotation"
               onClick={() => navigate(discussionHitPath(hit, false))}
               start={<StatusCueIcon status={hit.annotationStatus} />}
@@ -120,7 +138,12 @@ export function SearchDropdownResults({
             />
           ))}
           {data.annotations.total > data.annotations.items.length && (
-            <SeeAllRow total={data.annotations.total} onClick={() => seeAll('annotations')} />
+            <SeeAllRow
+              actionKey="seeall:annotations"
+              highlighted={highlightKey === 'seeall:annotations'}
+              total={data.annotations.total}
+              onClick={() => seeAll('annotations')}
+            />
           )}
         </Section>
       )}
@@ -129,6 +152,8 @@ export function SearchDropdownResults({
           {data.comments.items.map((hit) => (
             <HitRow
               key={hit.commentId}
+              actionKey={`comment:${hit.commentId}`}
+              highlighted={highlightKey === `comment:${hit.commentId}`}
               testId="search-hit-comment"
               onClick={() => navigate(discussionHitPath(hit, true))}
               start={<StatusCueIcon status={hit.annotationStatus} />}
@@ -137,7 +162,12 @@ export function SearchDropdownResults({
             />
           ))}
           {data.comments.total > data.comments.items.length && (
-            <SeeAllRow total={data.comments.total} onClick={() => seeAll('comments')} />
+            <SeeAllRow
+              actionKey="seeall:comments"
+              highlighted={highlightKey === 'seeall:comments'}
+              total={data.comments.total}
+              onClick={() => seeAll('comments')}
+            />
           )}
         </Section>
       )}
@@ -146,6 +176,8 @@ export function SearchDropdownResults({
           {data.users.items.map((hit) => (
             <HitRow
               key={hit.userId}
+              actionKey={`user:${hit.userId}`}
+              highlighted={highlightKey === `user:${hit.userId}`}
               testId="search-hit-user"
               onClick={() =>
                 navigate(hit.userId === userId ? '/profile' : `/users/${hit.slug ?? hit.userId}`)
@@ -155,7 +187,12 @@ export function SearchDropdownResults({
             />
           ))}
           {data.users.total > data.users.items.length && (
-            <SeeAllRow total={data.users.total} onClick={() => seeAll('users')} />
+            <SeeAllRow
+              actionKey="seeall:users"
+              highlighted={highlightKey === 'seeall:users'}
+              total={data.users.total}
+              onClick={() => seeAll('users')}
+            />
           )}
         </Section>
       )}
@@ -165,6 +202,8 @@ export function SearchDropdownResults({
             hit.viewable ? (
               <HitRow
                 key={hit.teamId}
+                actionKey={`team:${hit.teamId}`}
+                highlighted={highlightKey === `team:${hit.teamId}`}
                 testId="search-hit-team"
                 onClick={() => navigate(`/my-teams/${hit.slug ?? hit.teamId}`)}
                 start={<UsersRound size={16} aria-hidden />}
@@ -189,7 +228,12 @@ export function SearchDropdownResults({
             ),
           )}
           {data.teams.total > data.teams.items.length && (
-            <SeeAllRow total={data.teams.total} onClick={() => seeAll('teams')} />
+            <SeeAllRow
+              actionKey="seeall:teams"
+              highlighted={highlightKey === 'seeall:teams'}
+              total={data.teams.total}
+              onClick={() => seeAll('teams')}
+            />
           )}
         </Section>
       )}
@@ -242,24 +286,41 @@ function Section({
   );
 }
 
+/** Keeps the keyboard-highlighted row inside the scrolling dropdown. */
+function useRevealWhenHighlighted(highlighted: boolean) {
+  const ref = useRef<HTMLButtonElement>(null);
+  useEffect(() => {
+    if (highlighted) ref.current?.scrollIntoView?.({ block: 'nearest' });
+  }, [highlighted]);
+  return ref;
+}
+
 /** One navigating hit row; `secondary` is the muted match excerpt (issue #540). */
 function HitRow({
+  actionKey,
+  highlighted,
   testId,
   onClick,
   start,
   primary,
   secondary,
 }: {
+  actionKey: string;
+  highlighted: boolean;
   testId: string;
   onClick: () => void;
   start: ReactNode;
   primary: string;
   secondary?: string;
 }) {
+  const ref = useRevealWhenHighlighted(highlighted);
   return (
     <ButtonBase
+      ref={ref}
+      id={searchOptionId(actionKey)}
       onClick={onClick}
       data-testid={testId}
+      data-highlighted={highlighted ? 'true' : undefined}
       sx={{
         display: 'flex',
         justifyContent: 'flex-start',
@@ -270,6 +331,7 @@ function HitRow({
         py: 0.75,
         textAlign: 'left',
         fontFamily: 'inherit',
+        ...(highlighted && { bgcolor: (t) => t.qnop.surface2 }),
         '&:hover, &:focus-visible': { bgcolor: (t) => t.qnop.surface2 },
       }}
     >
@@ -289,11 +351,25 @@ function HitRow({
 }
 
 /** The group's continuation onto the results page when the cap cut it short. */
-function SeeAllRow({ total, onClick }: { total: number; onClick: () => void }) {
+function SeeAllRow({
+  actionKey,
+  highlighted,
+  total,
+  onClick,
+}: {
+  actionKey: string;
+  highlighted: boolean;
+  total: number;
+  onClick: () => void;
+}) {
+  const ref = useRevealWhenHighlighted(highlighted);
   return (
     <ButtonBase
+      ref={ref}
+      id={searchOptionId(actionKey)}
       onClick={onClick}
       data-testid="search-see-all"
+      data-highlighted={highlighted ? 'true' : undefined}
       sx={{
         display: 'flex',
         justifyContent: 'flex-start',
@@ -305,6 +381,7 @@ function SeeAllRow({ total, onClick }: { total: number; onClick: () => void }) {
         color: 'primary.main',
         fontSize: 12.5,
         fontWeight: 600,
+        ...(highlighted && { bgcolor: (t) => t.qnop.surface2 }),
         '&:hover, &:focus-visible': { bgcolor: (t) => t.qnop.surface2 },
       }}
     >

@@ -223,6 +223,57 @@ describe('GlobalSearch', () => {
     expect(screen.getByTestId('location')).toHaveTextContent('/search?q=payment%20terms');
   });
 
+  it('walks the hits with the arrow keys and opens the highlighted one on Enter', async () => {
+    renderSearch();
+    fireEvent.change(input(), { target: { value: 'pay' } });
+    await screen.findByTestId('global-search-dropdown');
+
+    // ArrowDown highlights the first row without moving DOM focus.
+    fireEvent.keyDown(input(), { key: 'ArrowDown' });
+    expect(screen.getByTestId('search-hit-review')).toHaveAttribute('data-highlighted', 'true');
+    expect(input()).toHaveAttribute(
+      'aria-activedescendant',
+      screen.getByTestId('search-hit-review').getAttribute('id') as string,
+    );
+
+    // The next step moves on to the review group's "see all" continuation.
+    fireEvent.keyDown(input(), { key: 'ArrowDown' });
+    expect(screen.getAllByTestId('search-see-all')[0]).toHaveAttribute('data-highlighted', 'true');
+    expect(screen.getByTestId('search-hit-review')).not.toHaveAttribute('data-highlighted');
+
+    // Enter opens the highlighted row.
+    fireEvent.keyDown(input(), { key: 'Enter' });
+    expect(screen.getByTestId('location')).toHaveTextContent('/search?q=pay&type=reviews');
+  });
+
+  it('wraps upwards to the last reachable row — locked teams are skipped', async () => {
+    renderSearch();
+    fireEvent.change(input(), { target: { value: 'al' } });
+    await screen.findByTestId('global-search-dropdown');
+
+    // ArrowUp from rest lands on the LAST action: the viewable team Alpha —
+    // the locked Alchemy row is not keyboard-reachable, like it is unclickable.
+    fireEvent.keyDown(input(), { key: 'ArrowUp' });
+    expect(screen.getByTestId('search-hit-team')).toHaveAttribute('data-highlighted', 'true');
+    expect(screen.getByTestId('search-hit-team-locked')).not.toHaveAttribute('data-highlighted');
+
+    fireEvent.keyDown(input(), { key: 'Enter' });
+    expect(screen.getByTestId('location')).toHaveTextContent('/my-teams/alpha');
+  });
+
+  it('resets the highlight on typing — Enter then submits to the results page', async () => {
+    renderSearch();
+    fireEvent.change(input(), { target: { value: 'pay' } });
+    await screen.findByTestId('global-search-dropdown');
+    fireEvent.keyDown(input(), { key: 'ArrowDown' });
+
+    fireEvent.change(input(), { target: { value: 'payment' } });
+    expect(screen.queryByTestId('search-hit-review')).not.toHaveAttribute('data-highlighted');
+
+    fireEvent.keyDown(input(), { key: 'Enter' });
+    expect(screen.getByTestId('location')).toHaveTextContent('/search?q=payment');
+  });
+
   it('pulls focus on Cmd+K and Ctrl+K from anywhere', () => {
     renderSearch();
 
