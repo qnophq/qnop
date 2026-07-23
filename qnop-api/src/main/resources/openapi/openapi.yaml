@@ -1512,6 +1512,44 @@ paths:
           $ref: '#/components/responses/Unauthorized'
         '403':
           $ref: '#/components/responses/Forbidden'
+    patch:
+      tags:
+        - Teams
+      summary: Update a led team's description
+      description: |
+        A LEAD of the team (or an ADMIN) updates the team's description (issue
+        #509 follow-up) — the self-manage counterpart of the admin edit.
+        Deliberately narrow: the team's name, slug and enabled flag stay admin
+        concerns (`/admin/teams`); the avatar has its own endpoints
+        (`POST/DELETE /teams/{teamId}/avatar`). Any non-lead caller gets 403.
+      operationId: updateMyTeam
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/TeamIdParam'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/MyTeamUpdateRequest'
+      responses:
+        '200':
+          description: The updated team with its members.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TeamDetail'
+        '404':
+          description: Unknown team
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
   /teams/{teamId}/members:
     post:
       tags:
@@ -5156,6 +5194,17 @@ components:
           nullable: true
         enabled:
           type: boolean
+          nullable: true
+    MyTeamUpdateRequest:
+      type: object
+      description: >-
+        A lead's self-manage team update (issue #509 follow-up) — deliberately
+        only the description; name/slug/enabled stay admin concerns. A blank
+        or null description clears it.
+      properties:
+        description:
+          type: string
+          maxLength: 1000
           nullable: true
     AdminTeamMemberRequest:
       type: object

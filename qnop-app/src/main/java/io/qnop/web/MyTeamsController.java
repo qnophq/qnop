@@ -26,6 +26,7 @@ import io.qnop.api.v1.model.AdminTeamMemberRoleUpdateRequest;
 import io.qnop.api.v1.model.ErrorResponse;
 import io.qnop.api.v1.model.MyTeam;
 import io.qnop.api.v1.model.MyTeamListResponse;
+import io.qnop.api.v1.model.MyTeamUpdateRequest;
 import io.qnop.api.v1.model.TeamDetail;
 import io.qnop.api.v1.model.TeamMember;
 import io.qnop.api.v1.model.TeamRole;
@@ -93,6 +94,14 @@ public class MyTeamsController implements TeamsApi {
     MemberTeamView view =
         teams.viewTeam(teamId, CurrentUser.requireUserId(), CurrentUser.isAdmin());
     return ResponseEntity.ok(toDetail(view));
+  }
+
+  @Override
+  public ResponseEntity<TeamDetail> updateMyTeam(UUID teamId, MyTeamUpdateRequest request) {
+    UUID actor = CurrentUser.requireUserId();
+    boolean admin = CurrentUser.isAdmin();
+    teams.updateDescriptionAsLead(teamId, actor, admin, request.getDescription());
+    return ResponseEntity.ok(toDetail(teams.viewTeam(teamId.toString(), actor, admin)));
   }
 
   @Override

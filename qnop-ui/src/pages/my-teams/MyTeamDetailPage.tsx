@@ -36,7 +36,7 @@ import TableCell from '@mui/material/TableCell';
 import TableHead from '@mui/material/TableHead';
 import TableRow from '@mui/material/TableRow';
 import Typography from '@mui/material/Typography';
-import { ArrowLeftRight, MoreVertical, UserMinus, UserPlus } from 'lucide-react';
+import { ArrowLeftRight, MoreVertical, Pencil, UserMinus, UserPlus } from 'lucide-react';
 import { Link as RouterLink, useParams } from 'react-router-dom';
 import type { TeamMember, TeamRole } from '../../api/generated';
 import {
@@ -45,6 +45,7 @@ import {
   useSetMyTeamMemberRole,
 } from '../../api/hooks/useMyTeams';
 import { AddMyTeamMemberDialog } from '../../components/my-teams/AddMyTeamMemberDialog';
+import { EditMyTeamDialog } from '../../components/my-teams/EditMyTeamDialog';
 import { TeamRoleBadge } from '../../components/admin/teams/TeamRoleBadge';
 import { ConfirmDialog } from '../../components/admin/ConfirmDialog';
 import { PageHeader } from '../../components/admin/layout/PageHeader';
@@ -80,6 +81,8 @@ export function MyTeamDetailPage() {
 
   const [addOpen, setAddOpen] = useState(false);
   const [addSeq, setAddSeq] = useState(0);
+  const [editOpen, setEditOpen] = useState(false);
+  const [editSeq, setEditSeq] = useState(0);
   const [anchorEl, setAnchorEl] = useState<HTMLElement | null>(null);
   const [active, setActive] = useState<TeamMember | null>(null);
   const [removeTarget, setRemoveTarget] = useState<TeamMember | null>(null);
@@ -130,12 +133,35 @@ export function MyTeamDetailPage() {
         description={team.description || undefined}
         action={
           canManage ? (
-            <Button variant="contained" startIcon={<UserPlus size={18} />} onClick={openAdd}>
-              Add member
-            </Button>
+            <Stack direction="row" spacing={1}>
+              {/* A lead polishes their team's presentation — avatar + description
+                  (issue #509 follow-up); name/enabled stay admin concerns. */}
+              <Button
+                variant="outlined"
+                startIcon={<Pencil size={16} />}
+                onClick={() => {
+                  setEditOpen(true);
+                  setEditSeq((n) => n + 1);
+                }}
+              >
+                Edit team
+              </Button>
+              <Button variant="contained" startIcon={<UserPlus size={18} />} onClick={openAdd}>
+                Add member
+              </Button>
+            </Stack>
           ) : undefined
         }
       />
+
+      {canManage && editOpen && (
+        <EditMyTeamDialog
+          key={`edit-${editSeq}`}
+          open={editOpen}
+          team={team}
+          onClose={() => setEditOpen(false)}
+        />
+      )}
 
       <Paper variant="outlined" sx={{ overflow: 'hidden' }}>
         <Table size="medium" sx={{ '& td, & th': { borderColor: 'divider' } }}>
