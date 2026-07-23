@@ -49,8 +49,15 @@ public interface SearchService {
   /** The grouped top hits for the dropdown: each group capped, with the full match count. */
   GlobalSearchView quick(UUID actor, boolean admin, String query);
 
-  /** One page of review hits visible to {@code actor} (admin widens only thread visibility). */
-  PageView<ReviewHitView> reviews(UUID actor, boolean admin, String query, int page, int size);
+  /** One page of review hits (title matches) visible to {@code actor}. */
+  PageView<ReviewHitView> reviews(UUID actor, String query, int page, int size);
+
+  /** One page of annotation hits: matches in thread OPENERS the caller may see. */
+  PageView<DiscussionHitView> annotations(
+      UUID actor, boolean admin, String query, int page, int size);
+
+  /** One page of comment hits: matches in thread REPLIES the caller may see. */
+  PageView<DiscussionHitView> comments(UUID actor, boolean admin, String query, int page, int size);
 
   /** One page of enabled users matched by display name/username. */
   PageView<UserHitView> users(String query, int page, int size);
@@ -58,9 +65,11 @@ public interface SearchService {
   /** One page of enabled teams matched by name, each flagged with the caller's reach. */
   PageView<TeamHitView> teams(UUID actor, boolean admin, String query, int page, int size);
 
-  /** The three quick groups. */
+  /** The five quick groups. */
   record GlobalSearchView(
       GroupView<ReviewHitView> reviews,
+      GroupView<DiscussionHitView> annotations,
+      GroupView<DiscussionHitView> comments,
       GroupView<UserHitView> users,
       GroupView<TeamHitView> teams) {}
 
@@ -70,12 +79,22 @@ public interface SearchService {
   /** One page of hits with the standard envelope facts. */
   record PageView<T>(List<T> items, long total, int page, int size) {}
 
+  /** A review hit — a title match, a strict subset of the reviews-list row (ADR-0038). */
+  record ReviewHitView(UUID id, String slug, String title, String workflowState) {}
+
   /**
-   * A review hit (ADR-0038-safe): title, state, and — when the discussion matched — a short excerpt
-   * of the first matching comment from a thread the caller may open; null when the title itself
-   * matched. Never an author name.
+   * A discussion hit (ADR-0038-safe): an annotation opener or a reply from a thread the caller may
+   * open, with its review context, the annotation's status for the cue, and a windowed excerpt.
+   * Never an author name.
    */
-  record ReviewHitView(UUID id, String slug, String title, String workflowState, String excerpt) {}
+  record DiscussionHitView(
+      UUID commentId,
+      UUID annotationId,
+      UUID documentId,
+      String documentSlug,
+      String documentTitle,
+      String annotationStatus,
+      String excerpt) {}
 
   /** A person hit — names only; the web layer adds the avatar URL. */
   record UserHitView(UUID id, String displayName, String slug) {}

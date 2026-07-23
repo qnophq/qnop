@@ -2659,14 +2659,15 @@ paths:
       summary: Quick global search (grouped top hits)
       description: |
         The dropdown variant (issue #540): the top hits per entity type —
-        reviews, users, teams — each group capped to a handful of items and
-        carrying the group's full match count, so a client can offer "see all
-        N". Results are authorization-scoped per type: reviews through the
-        caller's visibility rule, matched by title or discussion text (the
-        latter only in threads the caller may see — ADR-0038), users and
-        teams through the enabled-principals rule (display name/username and
-        team name — never email). A query shorter than 2 characters returns
-        empty groups.
+        reviews (matched by title), annotations (thread openers), comments
+        (replies), users and teams — each group capped to a handful of items
+        and carrying the group's full match count, so a client can offer "see
+        all N". Results are authorization-scoped per type: reviews and
+        discussion texts through the caller's visibility rule (discussion
+        additionally only in threads the caller may see — ADR-0038), users
+        and teams through the enabled-principals rule (display name/username
+        and team name — never email). A query shorter than 2 characters
+        returns empty groups.
       operationId: searchQuick
       security:
         - bearerAuth: []
@@ -2686,12 +2687,12 @@ paths:
       tags: [Search]
       summary: Search reviews (paged)
       description: |
-        The full-results variant for reviews (issue #540): matches on the
-        title or the discussion (annotation/comment bodies, only in threads
-        the caller may see — ADR-0038) among the reviews the caller may see —
-        owner, direct participant, or member of a participant team; admins
-        search their own reviews like anyone else. A query shorter than 2
-        characters returns an empty page.
+        The full-results variant for reviews (issue #540): title matches among
+        the reviews the caller may see — owner, direct participant, or member
+        of a participant team; admins search their own reviews like anyone
+        else. Discussion matches live under /search/annotations and
+        /search/comments. A query shorter than 2 characters returns an empty
+        page.
       operationId: searchReviews
       security:
         - bearerAuth: []
@@ -2706,6 +2707,59 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ReviewSearchPage'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+  /search/annotations:
+    get:
+      tags: [Search]
+      summary: Search annotation texts (paged)
+      description: |
+        The full-results variant for annotations (issue #540): matches in the
+        OPENING text of annotation threads, within the caller's visible
+        reviews and visible threads (ADR-0038 — a PRIVATE review hides
+        foreign threads). Each hit deep-links into the review via
+        `?annotation=`. A query shorter than 2 characters returns an empty
+        page.
+      operationId: searchAnnotations
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/SearchQueryParam'
+        - $ref: '#/components/parameters/SearchPageParam'
+        - $ref: '#/components/parameters/SearchSizeParam'
+      responses:
+        '200':
+          description: One page of matching annotation openers
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DiscussionSearchPage'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+  /search/comments:
+    get:
+      tags: [Search]
+      summary: Search comment replies (paged)
+      description: |
+        The full-results variant for comments (issue #540): matches in the
+        REPLIES of annotation threads (everything after the opener), within
+        the caller's visible reviews and visible threads (ADR-0038). Each hit
+        deep-links into the thread via `?annotation=…&comment=…`. A query
+        shorter than 2 characters returns an empty page.
+      operationId: searchComments
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/SearchQueryParam'
+        - $ref: '#/components/parameters/SearchPageParam'
+        - $ref: '#/components/parameters/SearchSizeParam'
+      responses:
+        '200':
+          description: One page of matching reply comments
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DiscussionSearchPage'
         '401':
           $ref: '#/components/responses/Unauthorized'
   /search/users:
@@ -6042,10 +6096,9 @@ components:
     ReviewSearchHit:
       type: object
       description: >-
-        A review matched by the global search (issue #540) by its title or its
-        discussion. ADR-0038-safe: the excerpt only ever quotes a thread the
-        caller may open (a PRIVATE review hides foreign threads), and no
-        author name travels on a hit.
+        A review matched by its title (issue #540) — a strict subset of what
+        the reviews list already exposes (ADR-0038: no author names).
+        Discussion matches surface in their own annotation/comment groups.
       properties:
         id:
           type: string
@@ -6059,17 +6112,84 @@ components:
         workflowState:
           type: string
           description: The review workflow state (ADR-0011), for the state cue on the hit.
-        excerpt:
-          type: string
-          nullable: true
-          description: >-
-            A short single-line snippet of the first matching discussion
-            comment, from a thread visible to the caller; absent when the
-            title itself matched.
       required:
         - id
         - title
         - workflowState
+    DiscussionSearchHit:
+      type: object
+      description: >-
+        A discussion text matched by the global search (issue #540): an
+        annotation (the thread's opening text) or a reply comment, from a
+        thread the caller may open (ADR-0038: a PRIVATE review hides foreign
+        threads — they neither match nor are quoted). No author name travels
+        on a hit; the deep link is `?annotation=` (plus `&comment=` for a
+        reply).
+      properties:
+        commentId:
+          type: string
+          format: uuid
+        annotationId:
+          type: string
+          format: uuid
+        documentId:
+          type: string
+          format: uuid
+        documentSlug:
+          type: string
+          nullable: true
+          description: The review's friendly URL segment; null for pre-slug documents.
+        documentTitle:
+          type: string
+          description: The review the thread belongs to, as the hit's context line.
+        annotationStatus:
+          $ref: '#/components/schemas/AnnotationStatus'
+        excerpt:
+          type: string
+          description: A short single-line snippet windowed around the match.
+      required:
+        - commentId
+        - annotationId
+        - documentId
+        - documentTitle
+        - annotationStatus
+        - excerpt
+    DiscussionSearchGroup:
+      type: object
+      description: A discussion group of a quick search — top hits plus the full match count.
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/DiscussionSearchHit'
+        total:
+          type: integer
+          format: int64
+      required:
+        - items
+        - total
+    DiscussionSearchPage:
+      type: object
+      description: One page of discussion search results (issue #540).
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/DiscussionSearchHit'
+        total:
+          type: integer
+          format: int64
+        page:
+          type: integer
+          format: int32
+        size:
+          type: integer
+          format: int32
+      required:
+        - items
+        - total
+        - page
+        - size
     UserSearchHit:
       type: object
       description: >-
@@ -6160,16 +6280,25 @@ components:
         - total
     GlobalSearchResponse:
       type: object
-      description: Grouped top hits of a quick global search (issue #540).
+      description: >-
+        Grouped top hits of a quick global search (issue #540): reviews (by
+        title), annotations (thread openers), comments (replies), users and
+        teams — each group capped and counted separately.
       properties:
         reviews:
           $ref: '#/components/schemas/ReviewSearchGroup'
+        annotations:
+          $ref: '#/components/schemas/DiscussionSearchGroup'
+        comments:
+          $ref: '#/components/schemas/DiscussionSearchGroup'
         users:
           $ref: '#/components/schemas/UserSearchGroup'
         teams:
           $ref: '#/components/schemas/TeamSearchGroup'
       required:
         - reviews
+        - annotations
+        - comments
         - users
         - teams
     ReviewSearchPage:

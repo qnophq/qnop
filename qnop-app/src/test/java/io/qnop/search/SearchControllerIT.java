@@ -59,9 +59,10 @@ class SearchControllerIT extends SeededIntegrationTest {
     return documents.save(new Document(MEMBER_ID, title));
   }
 
-  private void annotationWithComment(UUID documentId, UUID author, String body) {
+  private Annotation annotationWithComment(UUID documentId, UUID author, String body) {
     Annotation annotation = annotations.save(new Annotation(documentId, author));
     comments.save(new Comment(annotation.getId(), author, body));
+    return annotation;
   }
 
   private org.springframework.test.web.servlet.RequestBuilder search(String path, UUID caller) {
@@ -160,30 +161,48 @@ class SearchControllerIT extends SeededIntegrationTest {
   }
 
   @Test
-  void discussionTextMatchesWithinVisibleReviewsAndCarriesAnExcerpt() throws Exception {
+  void openersAndRepliesLandInSeparateGroupsWithExcerptAndDeepLinkFacts() throws Exception {
     Document document = reviewOwnedByMember("Q3 report");
     participants.save(ReviewParticipant.forUser(document.getId(), MEMBER2_ID));
-    annotationWithComment(document.getId(), MEMBER2_ID, "Please rework the liability clause.");
+    Annotation annotation =
+        annotationWithComment(document.getId(), MEMBER2_ID, "Please rework the liability clause.");
+    comments.save(
+        new Comment(annotation.getId(), MEMBER_ID, "Agreed, the liability wording is off."));
 
-    // The owner finds the review by the comment text, with the excerpt quoted ...
+    // The opener lands in the annotations group, the reply in the comments group;
+    // the review group stays a pure title matcher (no title contains 'liability').
     mockMvc
         .perform(search("/api/v1/search?q=liability", MEMBER_ID))
         .andExpect(status().isOk())
-        .andExpect(jsonPath("$.reviews.total").value(1))
-        .andExpect(jsonPath("$.reviews.items[0].title").value("Q3 report"))
+        .andExpect(jsonPath("$.reviews.total").value(0))
+        .andExpect(jsonPath("$.annotations.total").value(1))
         .andExpect(
-            jsonPath("$.reviews.items[0].excerpt").value("Please rework the liability clause."));
+            jsonPath("$.annotations.items[0].excerpt").value("Please rework the liability clause."))
+        .andExpect(jsonPath("$.annotations.items[0].documentTitle").value("Q3 report"))
+        .andExpect(
+            jsonPath("$.annotations.items[0].annotationId").value(annotation.getId().toString()))
+        .andExpect(jsonPath("$.annotations.items[0].annotationStatus").value("OPEN"))
+        .andExpect(jsonPath("$.comments.total").value(1))
+        .andExpect(
+            jsonPath("$.comments.items[0].excerpt").value("Agreed, the liability wording is off."));
 
-    // ... a non-participant still finds nothing — content search never widens visibility.
+    // A non-participant finds neither — content search never widens visibility.
     mockMvc
         .perform(search("/api/v1/search?q=liability", AUDITOR_ID))
         .andExpect(status().isOk())
-        .andExpect(jsonPath("$.reviews.total").value(0));
+        .andExpect(jsonPath("$.annotations.total").value(0))
+        .andExpect(jsonPath("$.comments.total").value(0));
 
-    // A title match carries no excerpt.
+    // The paged variants answer the same split.
     mockMvc
-        .perform(search("/api/v1/search?q=report", MEMBER_ID))
-        .andExpect(jsonPath("$.reviews.items[0].excerpt").doesNotExist());
+        .perform(search("/api/v1/search/annotations?q=liability", MEMBER_ID))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.total").value(1))
+        .andExpect(jsonPath("$.items[0].commentId").isNotEmpty());
+    mockMvc
+        .perform(search("/api/v1/search/comments?q=liability", MEMBER_ID))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.total").value(1));
   }
 
   @Test
@@ -200,16 +219,18 @@ class SearchControllerIT extends SeededIntegrationTest {
     mockMvc
         .perform(search("/api/v1/search?q=severance", AUDITOR_ID))
         .andExpect(status().isOk())
-        .andExpect(jsonPath("$.reviews.total").value(0));
+        .andExpect(jsonPath("$.annotations.total").value(0))
+        .andExpect(jsonPath("$.comments.total").value(0));
 
     // The thread's author and the owner search it as they read it.
     mockMvc
         .perform(search("/api/v1/search?q=severance", MEMBER2_ID))
-        .andExpect(jsonPath("$.reviews.total").value(1));
+        .andExpect(jsonPath("$.annotations.total").value(1));
     mockMvc
         .perform(search("/api/v1/search?q=severance", MEMBER_ID))
-        .andExpect(jsonPath("$.reviews.total").value(1))
-        .andExpect(jsonPath("$.reviews.items[0].excerpt").value("The hidden severance figure."));
+        .andExpect(jsonPath("$.annotations.total").value(1))
+        .andExpect(
+            jsonPath("$.annotations.items[0].excerpt").value("The hidden severance figure."));
   }
 
   @Test

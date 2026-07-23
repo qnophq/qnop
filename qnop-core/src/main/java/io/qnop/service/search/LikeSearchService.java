@@ -23,17 +23,15 @@ package io.qnop.service.search;
 import io.qnop.entity.Document;
 import io.qnop.entity.Team;
 import io.qnop.entity.User;
-import io.qnop.repository.CommentMatchProjection;
 import io.qnop.repository.CommentRepository;
+import io.qnop.repository.DiscussionMatchProjection;
 import io.qnop.repository.DocumentRepository;
 import io.qnop.repository.TeamMembershipRepository;
 import io.qnop.repository.TeamRepository;
 import io.qnop.repository.UserRepository;
 import io.qnop.repository.UserTeamProjection;
-import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
-import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
@@ -90,34 +88,66 @@ public class LikeSearchService implements SearchService {
       return new GlobalSearchView(
           new GroupView<>(List.of(), 0),
           new GroupView<>(List.of(), 0),
+          new GroupView<>(List.of(), 0),
+          new GroupView<>(List.of(), 0),
           new GroupView<>(List.of(), 0));
     }
+    String term = termOf(like);
     Page<Document> reviewPage =
-        documents.findVisibleToMatchingContent(
-            actor, like, admin, PageRequest.of(0, QUICK_SIZE, REVIEW_SORT));
+        documents.findVisibleTo(actor, like, PageRequest.of(0, QUICK_SIZE, REVIEW_SORT));
+    Page<DiscussionMatchProjection> openerPage =
+        comments.searchAnnotationOpeners(like, actor, admin, PageRequest.of(0, QUICK_SIZE));
+    Page<DiscussionMatchProjection> replyPage =
+        comments.searchCommentReplies(like, actor, admin, PageRequest.of(0, QUICK_SIZE));
     Page<User> userPage = users.pageEnabledPrincipals(like, PageRequest.of(0, QUICK_SIZE));
     Page<Team> teamPage = teams.pageEnabledPrincipals(like, PageRequest.of(0, QUICK_SIZE));
     Set<UUID> reachable = reachableTeamIds(actor);
     return new GlobalSearchView(
-        new GroupView<>(
-            toReviewHits(reviewPage, like, actor, admin), reviewPage.getTotalElements()),
+        new GroupView<>(toReviewHits(reviewPage), reviewPage.getTotalElements()),
+        new GroupView<>(toDiscussionHits(openerPage, term), openerPage.getTotalElements()),
+        new GroupView<>(toDiscussionHits(replyPage, term), replyPage.getTotalElements()),
         new GroupView<>(toUserHits(userPage), userPage.getTotalElements()),
         new GroupView<>(toTeamHits(teamPage, reachable, admin), teamPage.getTotalElements()));
   }
 
   @Override
   @Transactional(readOnly = true)
-  public PageView<ReviewHitView> reviews(
-      UUID actor, boolean admin, String query, int page, int size) {
+  public PageView<ReviewHitView> reviews(UUID actor, String query, int page, int size) {
     String like = likeOf(query);
     if (like == null) {
       return new PageView<>(List.of(), 0, page, size);
     }
     Page<Document> result =
-        documents.findVisibleToMatchingContent(
-            actor, like, admin, PageRequest.of(page, size, REVIEW_SORT));
+        documents.findVisibleTo(actor, like, PageRequest.of(page, size, REVIEW_SORT));
+    return new PageView<>(toReviewHits(result), result.getTotalElements(), page, size);
+  }
+
+  @Override
+  @Transactional(readOnly = true)
+  public PageView<DiscussionHitView> annotations(
+      UUID actor, boolean admin, String query, int page, int size) {
+    String like = likeOf(query);
+    if (like == null) {
+      return new PageView<>(List.of(), 0, page, size);
+    }
+    Page<DiscussionMatchProjection> result =
+        comments.searchAnnotationOpeners(like, actor, admin, PageRequest.of(page, size));
     return new PageView<>(
-        toReviewHits(result, like, actor, admin), result.getTotalElements(), page, size);
+        toDiscussionHits(result, termOf(like)), result.getTotalElements(), page, size);
+  }
+
+  @Override
+  @Transactional(readOnly = true)
+  public PageView<DiscussionHitView> comments(
+      UUID actor, boolean admin, String query, int page, int size) {
+    String like = likeOf(query);
+    if (like == null) {
+      return new PageView<>(List.of(), 0, page, size);
+    }
+    Page<DiscussionMatchProjection> result =
+        comments.searchCommentReplies(like, actor, admin, PageRequest.of(page, size));
+    return new PageView<>(
+        toDiscussionHits(result, termOf(like)), result.getTotalElements(), page, size);
   }
 
   @Override
@@ -162,29 +192,25 @@ public class LikeSearchService implements SearchService {
         .collect(Collectors.toSet());
   }
 
-  /**
-   * Builds the review hits with their discussion excerpts: one batched query fetches the matching
-   * comment bodies for the whole page (thread-visibility applied in the query), the first match per
-   * document becomes the excerpt. A title-only hit carries none.
-   */
-  private List<ReviewHitView> toReviewHits(
-      Page<Document> page, String like, UUID actor, boolean admin) {
-    List<UUID> ids = page.getContent().stream().map(Document::getId).toList();
-    Map<UUID, String> excerptByDocument = new LinkedHashMap<>();
-    if (!ids.isEmpty()) {
-      for (CommentMatchProjection match : comments.findSearchMatches(ids, like, actor, admin)) {
-        excerptByDocument.putIfAbsent(match.documentId(), excerptOf(match.body(), termOf(like)));
-      }
-    }
+  private static List<ReviewHitView> toReviewHits(Page<Document> page) {
+    return page.getContent().stream()
+        .map(d -> new ReviewHitView(d.getId(), d.getSlug(), d.getTitle(), d.getWorkflowState()))
+        .toList();
+  }
+
+  private static List<DiscussionHitView> toDiscussionHits(
+      Page<DiscussionMatchProjection> page, String term) {
     return page.getContent().stream()
         .map(
-            d ->
-                new ReviewHitView(
-                    d.getId(),
-                    d.getSlug(),
-                    d.getTitle(),
-                    d.getWorkflowState(),
-                    excerptByDocument.get(d.getId())))
+            match ->
+                new DiscussionHitView(
+                    match.commentId(),
+                    match.annotationId(),
+                    match.documentId(),
+                    match.documentSlug(),
+                    match.documentTitle(),
+                    match.annotationStatus().name(),
+                    excerptOf(match.body(), term)))
         .toList();
   }
 

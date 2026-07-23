@@ -42,15 +42,37 @@ vi.mock('../../../api/hooks/useSearch', () => ({
 const RESPONSE: GlobalSearchResponse = {
   reviews: {
     items: [
+      { id: 'r1', slug: 'q3-report', title: 'Q3 payment report', workflowState: 'IN_REVIEW' },
+    ],
+    total: 7,
+  },
+  annotations: {
+    items: [
       {
-        id: 'r1',
-        slug: 'q3-report',
-        title: 'Q3 payment report',
-        workflowState: 'IN_REVIEW',
+        commentId: 'c1',
+        annotationId: 'a1',
+        documentId: 'd1',
+        documentSlug: 'q3-report',
+        documentTitle: 'Q3 payment report',
+        annotationStatus: 'OPEN',
         excerpt: '…rework the payment schedule…',
       },
     ],
-    total: 7,
+    total: 3,
+  },
+  comments: {
+    items: [
+      {
+        commentId: 'c2',
+        annotationId: 'a1',
+        documentId: 'd1',
+        documentSlug: 'q3-report',
+        documentTitle: 'Q3 payment report',
+        annotationStatus: 'RESOLVED',
+        excerpt: '…the payment reply…',
+      },
+    ],
+    total: 1,
   },
   users: {
     items: [{ userId: 'u1', displayName: 'Mia Member', slug: 'mia-member' }],
@@ -109,8 +131,11 @@ describe('GlobalSearch', () => {
     expect(screen.getByText('People')).toBeInTheDocument();
     expect(screen.getByText('Teams')).toBeInTheDocument();
     expect(screen.getByText('Q3 payment report')).toBeInTheDocument();
-    // A discussion match quotes its excerpt under the title.
+    // The discussion groups carry their matched excerpts and status cues.
+    expect(screen.getByText('Annotations')).toBeInTheDocument();
+    expect(screen.getByText('Comments')).toBeInTheDocument();
     expect(screen.getByText('…rework the payment schedule…')).toBeInTheDocument();
+    expect(screen.getByText('…the payment reply…')).toBeInTheDocument();
     // The #568 state language at row scale.
     expect(screen.getByTestId('milestone-dots')).toHaveAccessibleName('In review');
     // The review group was capped (1 of 7) — its continuation is offered.
@@ -126,6 +151,20 @@ describe('GlobalSearch', () => {
     expect(screen.getByTestId('location')).toHaveTextContent('/reviews/q3-report');
     await waitFor(() =>
       expect(screen.queryByTestId('global-search-dropdown')).not.toBeInTheDocument(),
+    );
+  });
+
+  it('deep-links discussion hits into the thread — replies with their comment anchor', async () => {
+    renderSearch();
+    fireEvent.change(input(), { target: { value: 'pay' } });
+
+    fireEvent.click(await screen.findByTestId('search-hit-annotation'));
+    expect(screen.getByTestId('location')).toHaveTextContent('/reviews/q3-report?annotation=a1');
+
+    fireEvent.change(input(), { target: { value: 'pay' } });
+    fireEvent.click(await screen.findByTestId('search-hit-comment'));
+    expect(screen.getByTestId('location')).toHaveTextContent(
+      '/reviews/q3-report?annotation=a1&comment=c2',
     );
   });
 
@@ -156,6 +195,8 @@ describe('GlobalSearch', () => {
 
     quickState.data = {
       reviews: { items: [], total: 0 },
+      annotations: { items: [], total: 0 },
+      comments: { items: [], total: 0 },
       users: { items: [], total: 0 },
       teams: { items: [], total: 0 },
     };

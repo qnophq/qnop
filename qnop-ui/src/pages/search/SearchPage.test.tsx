@@ -29,23 +29,37 @@ import { SearchPage } from './SearchPage';
 const quick = {
   data: {
     reviews: { items: [], total: 4 },
+    annotations: { items: [], total: 3 },
+    comments: { items: [], total: 5 },
     users: { items: [], total: 2 },
     teams: { items: [], total: 1 },
   },
   isPending: false,
   isError: false,
 };
-const reviews = {
+const discussions = {
   data: {
     items: [
       {
-        id: 'r1',
-        slug: 'q3-report',
-        title: 'Q3 report',
-        workflowState: 'IN_REVIEW',
+        commentId: 'c1',
+        annotationId: 'a1',
+        documentId: 'd1',
+        documentSlug: 'q3-report',
+        documentTitle: 'Q3 report',
+        annotationStatus: 'OPEN',
         excerpt: '…the liability clause…',
       },
     ],
+    total: 3,
+    page: 0,
+    size: 20,
+  },
+  isPending: false,
+  isError: false,
+};
+const reviews = {
+  data: {
+    items: [{ id: 'r1', slug: 'q3-report', title: 'Q3 report', workflowState: 'IN_REVIEW' }],
     total: 4,
     page: 0,
     size: 20,
@@ -81,6 +95,8 @@ vi.mock('../../api/hooks/useSearch', () => ({
   SEARCH_MIN_LENGTH: 2,
   useSearchQuick: () => quick,
   useSearchReviews: () => reviews,
+  useSearchAnnotations: () => discussions,
+  useSearchComments: () => discussions,
   useSearchUsers: () => users,
   useSearchTeams: () => teams,
 }));
@@ -129,7 +145,19 @@ describe('SearchPage', () => {
       'href',
       '/reviews/q3-report',
     );
-    expect(screen.getByTestId('search-row-excerpt')).toHaveTextContent('…the liability clause…');
+  });
+
+  it('lists discussion hits with their thread deep link under the annotation/comment types', () => {
+    renderPage('/search?q=liability&type=comments');
+
+    expect(screen.getByText('Annotations (3)')).toBeInTheDocument();
+    expect(screen.getByText('Comments (5)')).toBeInTheDocument();
+    const row = screen.getByTestId('search-row-comment');
+    expect(row).toHaveTextContent('in Q3 report');
+    expect(screen.getByRole('link', { name: '…the liability clause…' })).toHaveAttribute(
+      'href',
+      '/reviews/q3-report?annotation=a1&comment=c1',
+    );
   });
 
   it('switches the type through the URL', () => {

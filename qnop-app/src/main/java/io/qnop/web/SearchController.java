@@ -21,6 +21,10 @@
 package io.qnop.web;
 
 import io.qnop.api.v1.endpoint.SearchApi;
+import io.qnop.api.v1.model.AnnotationStatus;
+import io.qnop.api.v1.model.DiscussionSearchGroup;
+import io.qnop.api.v1.model.DiscussionSearchHit;
+import io.qnop.api.v1.model.DiscussionSearchPage;
 import io.qnop.api.v1.model.GlobalSearchResponse;
 import io.qnop.api.v1.model.ReviewSearchGroup;
 import io.qnop.api.v1.model.ReviewSearchHit;
@@ -68,6 +72,8 @@ public class SearchController implements SearchApi {
                 new ReviewSearchGroup()
                     .items(view.reviews().items().stream().map(SearchController::toReview).toList())
                     .total(view.reviews().total()))
+            .annotations(toDiscussionGroup(view.annotations()))
+            .comments(toDiscussionGroup(view.comments()))
             .users(
                 new UserSearchGroup()
                     .items(
@@ -84,14 +90,38 @@ public class SearchController implements SearchApi {
   @Override
   public ResponseEntity<ReviewSearchPage> searchReviews(String q, Integer page, Integer size) {
     SearchService.PageView<SearchService.ReviewHitView> result =
-        search.reviews(
-            CurrentUser.requireUserId(), CurrentUser.isAdmin(), q, pageOf(page), sizeOf(size));
+        search.reviews(CurrentUser.requireUserId(), q, pageOf(page), sizeOf(size));
     return ResponseEntity.ok(
         new ReviewSearchPage()
             .items(result.items().stream().map(SearchController::toReview).toList())
             .total(result.total())
             .page(result.page())
             .size(result.size()));
+  }
+
+  @Override
+  public ResponseEntity<DiscussionSearchPage> searchAnnotations(
+      String q, Integer page, Integer size) {
+    return ResponseEntity.ok(
+        toDiscussionPage(
+            search.annotations(
+                CurrentUser.requireUserId(),
+                CurrentUser.isAdmin(),
+                q,
+                pageOf(page),
+                sizeOf(size))));
+  }
+
+  @Override
+  public ResponseEntity<DiscussionSearchPage> searchComments(String q, Integer page, Integer size) {
+    return ResponseEntity.ok(
+        toDiscussionPage(
+            search.comments(
+                CurrentUser.requireUserId(),
+                CurrentUser.isAdmin(),
+                q,
+                pageOf(page),
+                sizeOf(size))));
   }
 
   @Override
@@ -138,7 +168,33 @@ public class SearchController implements SearchApi {
         .id(hit.id())
         .slug(hit.slug())
         .title(hit.title())
-        .workflowState(hit.workflowState())
+        .workflowState(hit.workflowState());
+  }
+
+  private static DiscussionSearchGroup toDiscussionGroup(
+      SearchService.GroupView<SearchService.DiscussionHitView> group) {
+    return new DiscussionSearchGroup()
+        .items(group.items().stream().map(SearchController::toDiscussion).toList())
+        .total(group.total());
+  }
+
+  private static DiscussionSearchPage toDiscussionPage(
+      SearchService.PageView<SearchService.DiscussionHitView> page) {
+    return new DiscussionSearchPage()
+        .items(page.items().stream().map(SearchController::toDiscussion).toList())
+        .total(page.total())
+        .page(page.page())
+        .size(page.size());
+  }
+
+  private static DiscussionSearchHit toDiscussion(SearchService.DiscussionHitView hit) {
+    return new DiscussionSearchHit()
+        .commentId(hit.commentId())
+        .annotationId(hit.annotationId())
+        .documentId(hit.documentId())
+        .documentSlug(hit.documentSlug())
+        .documentTitle(hit.documentTitle())
+        .annotationStatus(AnnotationStatus.fromValue(hit.annotationStatus()))
         .excerpt(hit.excerpt());
   }
 

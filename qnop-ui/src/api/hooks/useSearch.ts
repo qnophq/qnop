@@ -21,6 +21,7 @@
 
 import { keepPreviousData, useQuery } from '@tanstack/react-query';
 import type {
+  DiscussionSearchPage,
   GlobalSearchResponse,
   ReviewSearchPage,
   TeamSearchPage,
@@ -35,6 +36,8 @@ export const searchKeys = {
   all: ['search'] as const,
   quick: (q: string) => [...searchKeys.all, 'quick', q] as const,
   reviews: (q: string, page: number) => [...searchKeys.all, 'reviews', q, page] as const,
+  annotations: (q: string, page: number) => [...searchKeys.all, 'annotations', q, page] as const,
+  comments: (q: string, page: number) => [...searchKeys.all, 'comments', q, page] as const,
   users: (q: string, page: number) => [...searchKeys.all, 'users', q, page] as const,
   teams: (q: string, page: number) => [...searchKeys.all, 'teams', q, page] as const,
 };
@@ -60,6 +63,26 @@ export function useSearchReviews(q: string, page: number, enabled = true) {
   return useQuery<ReviewSearchPage>({
     queryKey: searchKeys.reviews(q, page),
     queryFn: async () => (await searchApi.searchReviews({ q, page })).data,
+    enabled: enabled && searchable(q),
+    placeholderData: keepPreviousData,
+  });
+}
+
+/** One page of annotation (thread-opener) hits for the results page. */
+export function useSearchAnnotations(q: string, page: number, enabled = true) {
+  return useQuery<DiscussionSearchPage>({
+    queryKey: searchKeys.annotations(q, page),
+    queryFn: async () => (await searchApi.searchAnnotations({ q, page })).data,
+    enabled: enabled && searchable(q),
+    placeholderData: keepPreviousData,
+  });
+}
+
+/** One page of comment (reply) hits for the results page. */
+export function useSearchComments(q: string, page: number, enabled = true) {
+  return useQuery<DiscussionSearchPage>({
+    queryKey: searchKeys.comments(q, page),
+    queryFn: async () => (await searchApi.searchComments({ q, page })).data,
     enabled: enabled && searchable(q),
     placeholderData: keepPreviousData,
   });

@@ -29,12 +29,13 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import io.qnop.entity.AnnotationStatus;
 import io.qnop.entity.Document;
 import io.qnop.entity.Team;
 import io.qnop.entity.TeamRole;
 import io.qnop.entity.User;
-import io.qnop.repository.CommentMatchProjection;
 import io.qnop.repository.CommentRepository;
+import io.qnop.repository.DiscussionMatchProjection;
 import io.qnop.repository.DocumentRepository;
 import io.qnop.repository.TeamMembershipRepository;
 import io.qnop.repository.TeamRepository;
@@ -92,12 +93,15 @@ class LikeSearchServiceTest {
 
     assertThat(view.reviews().items()).isEmpty();
     assertThat(view.reviews().total()).isZero();
+    assertThat(view.annotations().total()).isZero();
+    assertThat(view.comments().total()).isZero();
     assertThat(view.users().total()).isZero();
     assertThat(view.teams().total()).isZero();
-    verify(documents, never()).findVisibleToMatchingContent(any(), any(), anyBoolean(), any());
+    verify(documents, never()).findVisibleTo(any(), any(), any());
     verify(users, never()).pageEnabledPrincipals(any(), any());
 
-    assertThat(service.reviews(actor, false, "", 0, 20).items()).isEmpty();
+    assertThat(service.reviews(actor, "", 0, 20).items()).isEmpty();
+    assertThat(service.annotations(actor, false, "x", 0, 20).items()).isEmpty();
     assertThat(service.users(null, 0, 20).total()).isZero();
   }
 
@@ -105,11 +109,14 @@ class LikeSearchServiceTest {
   @DisplayName("quick builds the overview's LIKE pattern, caps each group and carries the totals")
   void quickFederatesWithCapsAndTotals() {
     Document document = new Document(actor, "Payment terms");
-    when(documents.findVisibleToMatchingContent(eq(actor), eq("%payment%"), eq(false), any()))
+    when(documents.findVisibleTo(eq(actor), eq("%payment%"), any()))
         .thenReturn(pageOf(List.of(document), 12));
     when(users.pageEnabledPrincipals(eq("%payment%"), any())).thenReturn(pageOf(List.of(), 0));
     when(teams.pageEnabledPrincipals(eq("%payment%"), any())).thenReturn(pageOf(List.of(), 0));
-    when(comments.findSearchMatches(any(), any(), any(), anyBoolean())).thenReturn(List.of());
+    when(comments.searchAnnotationOpeners(eq("%payment%"), eq(actor), eq(false), any()))
+        .thenReturn(pageOf(List.of(), 0));
+    when(comments.searchCommentReplies(eq("%payment%"), eq(actor), eq(false), any()))
+        .thenReturn(pageOf(List.of(), 0));
 
     SearchService.GlobalSearchView view = service.quick(actor, false, "  Payment ");
 
@@ -118,33 +125,50 @@ class LikeSearchServiceTest {
         .containsExactly("Payment terms");
     assertThat(view.reviews().total()).isEqualTo(12);
     ArgumentCaptor<Pageable> pageable = ArgumentCaptor.forClass(Pageable.class);
-    verify(documents)
-        .findVisibleToMatchingContent(eq(actor), eq("%payment%"), eq(false), pageable.capture());
+    verify(documents).findVisibleTo(eq(actor), eq("%payment%"), pageable.capture());
     assertThat(pageable.getValue().getPageSize()).isEqualTo(SearchService.QUICK_SIZE);
     assertThat(pageable.getValue().getPageNumber()).isZero();
   }
 
   @Test
-  @DisplayName("a discussion match carries the first matching comment as its excerpt")
-  void discussionMatchCarriesExcerpt() {
+  @DisplayName("openers and replies land in their own groups, each with a windowed excerpt")
+  void discussionGroupsSplitOpenersAndReplies() {
     UUID documentId = UUID.randomUUID();
-    Document document = new Document(actor, "Q3 report");
-    setId(document, documentId);
-    when(documents.findVisibleToMatchingContent(eq(actor), eq("%clause%"), eq(false), any()))
-        .thenReturn(pageOf(List.of(document), 1));
+    DiscussionMatchProjection opener =
+        new DiscussionMatchProjection(
+            UUID.randomUUID(),
+            UUID.randomUUID(),
+            documentId,
+            "q3-report",
+            "Q3 report",
+            AnnotationStatus.OPEN,
+            "Please rework the\nliability clause.");
+    DiscussionMatchProjection reply =
+        new DiscussionMatchProjection(
+            UUID.randomUUID(),
+            opener.annotationId(),
+            documentId,
+            "q3-report",
+            "Q3 report",
+            AnnotationStatus.RESOLVED,
+            "The clause again, later.");
+    when(documents.findVisibleTo(any(), any(), any())).thenReturn(pageOf(List.of(), 0));
     when(users.pageEnabledPrincipals(any(), any())).thenReturn(pageOf(List.of(), 0));
     when(teams.pageEnabledPrincipals(any(), any())).thenReturn(pageOf(List.of(), 0));
-    when(comments.findSearchMatches(eq(List.of(documentId)), eq("%clause%"), eq(actor), eq(false)))
-        .thenReturn(
-            List.of(
-                new CommentMatchProjection(documentId, "Please rework the\nliability clause."),
-                new CommentMatchProjection(documentId, "The clause again, later.")));
+    when(comments.searchAnnotationOpeners(eq("%clause%"), eq(actor), eq(false), any()))
+        .thenReturn(pageOf(List.of(opener), 7));
+    when(comments.searchCommentReplies(eq("%clause%"), eq(actor), eq(false), any()))
+        .thenReturn(pageOf(List.of(reply), 6));
 
     SearchService.GlobalSearchView view = service.quick(actor, false, "clause");
 
-    // The FIRST match wins, whitespace is flattened, nothing is quoted twice.
-    assertThat(view.reviews().items().get(0).excerpt())
+    assertThat(view.annotations().total()).isEqualTo(7);
+    assertThat(view.annotations().items().get(0).excerpt())
         .isEqualTo("Please rework the liability clause.");
+    assertThat(view.annotations().items().get(0).annotationStatus()).isEqualTo("OPEN");
+    assertThat(view.annotations().items().get(0).documentTitle()).isEqualTo("Q3 report");
+    assertThat(view.comments().total()).isEqualTo(6);
+    assertThat(view.comments().items().get(0).excerpt()).isEqualTo("The clause again, later.");
   }
 
   @Test
@@ -173,7 +197,10 @@ class LikeSearchServiceTest {
     when(teams.pageEnabledPrincipals(eq("%al%"), any()))
         .thenReturn(pageOf(List.of(myTeam, foreignTeam), 2));
     when(users.pageEnabledPrincipals(any(), any())).thenReturn(pageOf(List.of(), 0));
-    when(documents.findVisibleToMatchingContent(any(), any(), anyBoolean(), any()))
+    when(documents.findVisibleTo(any(), any(), any())).thenReturn(pageOf(List.of(), 0));
+    when(comments.searchAnnotationOpeners(any(), any(), anyBoolean(), any()))
+        .thenReturn(pageOf(List.of(), 0));
+    when(comments.searchCommentReplies(any(), any(), anyBoolean(), any()))
         .thenReturn(pageOf(List.of(), 0));
     when(memberships.findTeamsOfUser(actor))
         .thenReturn(List.of(new UserTeamProjection(mine, "Alpha", "alpha", TeamRole.MEMBER)));

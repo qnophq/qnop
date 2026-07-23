@@ -25,6 +25,7 @@ import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
+import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
@@ -66,26 +67,76 @@ public interface CommentRepository extends JpaRepository<Comment, UUID> {
   long countByAnnotationId(UUID annotationId);
 
   /**
-   * The matching comment bodies of a page of search-hit documents (issue #540), for the excerpt
-   * under a review hit — oldest first, so the excerpt is stable. Applies the same thread-visibility
-   * predicate as the search query itself (ADR-0038: a PRIVATE review hides foreign threads from
-   * anyone but the owner, the author, or an admin), so an excerpt never quotes a thread the caller
-   * cannot open. {@code q} pre-lowercased and {@code LIKE}-wrapped.
+   * The global search's clauses (issue #540), shared by the opener and reply queries: the LIKE
+   * match, the caller's review visibility (owner OR participant OR team-participant — the
+   * findVisibleTo rule), and the ADR-0038 thread-visibility predicate (a PRIVATE review hides
+   * foreign threads from anyone but the owner, the thread's author, or an admin) — so a discussion
+   * hit never names, matches, or quotes a thread the caller cannot open.
    */
-  @Query(
-      "SELECT new io.qnop.repository.CommentMatchProjection(a.documentId, c.body)"
-          + " FROM Comment c, Annotation a, Document d"
+  String SEARCH_MATCH_CLAUSES =
+      " FROM Comment c, Annotation a, Document d"
           + " WHERE c.annotationId = a.id AND a.documentId = d.id"
-          + " AND a.documentId IN :documentIds AND LOWER(c.body) LIKE :q"
+          + " AND LOWER(c.body) LIKE :q"
+          + " AND (d.ownerId = :actor"
+          + "   OR EXISTS (SELECT 1 FROM ReviewParticipant p"
+          + "     WHERE p.documentId = d.id AND p.userId = :actor)"
+          + "   OR EXISTS (SELECT 1 FROM ReviewParticipant pt, TeamMembership m"
+          + "     WHERE pt.documentId = d.id AND pt.teamId = m.teamId AND m.userId = :actor))"
           + " AND (:admin = TRUE"
           + "   OR d.threadParticipation <> io.qnop.entity.ThreadParticipation.PRIVATE"
-          + "   OR d.ownerId = :actor OR a.authorId = :actor)"
-          + " ORDER BY c.createdAt, c.id")
-  List<CommentMatchProjection> findSearchMatches(
-      @Param("documentIds") Collection<UUID> documentIds,
+          + "   OR d.ownerId = :actor OR a.authorId = :actor)";
+
+  /** A comment is its thread's OPENER when no earlier comment exists in the same thread. */
+  String IS_OPENER_CLAUSE =
+      " AND NOT EXISTS (SELECT 1 FROM Comment c2 WHERE c2.annotationId = c.annotationId"
+          + "   AND (c2.createdAt < c.createdAt"
+          + "     OR (c2.createdAt = c.createdAt AND c2.id < c.id)))";
+
+  String SEARCH_MATCH_PROJECTION =
+      "SELECT new io.qnop.repository.DiscussionMatchProjection("
+          + "c.id, a.id, d.id, d.slug, d.title, a.status, c.body)";
+
+  /**
+   * Annotation hits of the global search (issue #540): matches in the OPENING text of annotation
+   * threads — the annotation's own words (#301) — newest first. {@code q} pre-lowercased and {@code
+   * LIKE}-wrapped.
+   */
+  @Query(
+      value =
+          SEARCH_MATCH_PROJECTION
+              + SEARCH_MATCH_CLAUSES
+              + IS_OPENER_CLAUSE
+              + " ORDER BY c.createdAt DESC",
+      countQuery = "SELECT COUNT(c)" + SEARCH_MATCH_CLAUSES + IS_OPENER_CLAUSE)
+  Page<DiscussionMatchProjection> searchAnnotationOpeners(
       @Param("q") String q,
       @Param("actor") UUID actor,
-      @Param("admin") boolean admin);
+      @Param("admin") boolean admin,
+      Pageable pageable);
+
+  /**
+   * Comment hits of the global search (issue #540): matches in the REPLIES of annotation threads
+   * (everything after the opener), newest first.
+   */
+  @Query(
+      value =
+          SEARCH_MATCH_PROJECTION
+              + SEARCH_MATCH_CLAUSES
+              + " AND EXISTS (SELECT 1 FROM Comment c2 WHERE c2.annotationId = c.annotationId"
+              + "   AND (c2.createdAt < c.createdAt"
+              + "     OR (c2.createdAt = c.createdAt AND c2.id < c.id)))"
+              + " ORDER BY c.createdAt DESC",
+      countQuery =
+          "SELECT COUNT(c)"
+              + SEARCH_MATCH_CLAUSES
+              + " AND EXISTS (SELECT 1 FROM Comment c2 WHERE c2.annotationId = c.annotationId"
+              + "   AND (c2.createdAt < c.createdAt"
+              + "     OR (c2.createdAt = c.createdAt AND c2.id < c.id)))")
+  Page<DiscussionMatchProjection> searchCommentReplies(
+      @Param("q") String q,
+      @Param("actor") UUID actor,
+      @Param("admin") boolean admin,
+      Pageable pageable);
 
   /** The newest comment by someone other than {@code viewer} (issue #307), single annotation. */
   Optional<Comment> findFirstByAnnotationIdAndAuthorIdNotOrderByCreatedAtDesc(

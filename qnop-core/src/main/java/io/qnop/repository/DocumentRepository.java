@@ -68,31 +68,6 @@ public interface DocumentRepository extends JpaRepository<Document, UUID> {
           + "   WHERE pt.documentId = d.id AND pt.teamId = m.teamId AND m.userId = :actor))")
   Page<Document> findVisibleTo(@Param("actor") UUID actor, @Param("q") String q, Pageable pageable);
 
-  /**
-   * The global search's review query (issue #540): the same visibility rule as {@link
-   * #findVisibleTo}, but matching the title OR the discussion (annotation/comment bodies) — the
-   * latter only in threads the caller may see, mirroring {@code AnnotationService.canSeeThread}
-   * (ADR-0038): only a PRIVATE review hides a foreign thread from anyone but the owner, the
-   * thread's author, or an admin. {@code q} pre-lowercased and {@code LIKE}-wrapped, never null.
-   */
-  @Query(
-      "SELECT d FROM Document d WHERE (d.ownerId = :actor"
-          + " OR EXISTS (SELECT 1 FROM ReviewParticipant p"
-          + "   WHERE p.documentId = d.id AND p.userId = :actor)"
-          + " OR EXISTS (SELECT 1 FROM ReviewParticipant pt, TeamMembership m"
-          + "   WHERE pt.documentId = d.id AND pt.teamId = m.teamId AND m.userId = :actor))"
-          + " AND (LOWER(d.title) LIKE :q"
-          + " OR EXISTS (SELECT 1 FROM Annotation a, Comment c"
-          + "   WHERE a.documentId = d.id AND c.annotationId = a.id AND LOWER(c.body) LIKE :q"
-          + "   AND (:admin = TRUE"
-          + "     OR d.threadParticipation <> io.qnop.entity.ThreadParticipation.PRIVATE"
-          + "     OR d.ownerId = :actor OR a.authorId = :actor)))")
-  Page<Document> findVisibleToMatchingContent(
-      @Param("actor") UUID actor,
-      @Param("q") String q,
-      @Param("admin") boolean admin,
-      Pageable pageable);
-
   /** Reviews the user owns — ownership is structurally public, anonymous ones included (#473). */
   long countByOwnerId(UUID ownerId);
 }

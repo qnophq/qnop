@@ -30,6 +30,8 @@ import { Lock, SearchX, UsersRound } from 'lucide-react';
 import { Link as RouterLink, useSearchParams } from 'react-router-dom';
 import {
   SEARCH_MIN_LENGTH,
+  useSearchAnnotations,
+  useSearchComments,
   useSearchQuick,
   useSearchReviews,
   useSearchTeams,
@@ -40,9 +42,13 @@ import { PageHeader } from '../../components/admin/layout/PageHeader';
 import { SectionCard } from '../../components/admin/layout/SectionCard';
 import { PersonLink } from '../../components/dashboard/PersonLink';
 import { WorkflowMilestones } from '../../components/reviews/WorkflowMilestones';
+import {
+  StatusCueIcon,
+  discussionHitPath,
+} from '../../components/shell/search/SearchDropdownResults';
 
 /** The result types the page can list; kept in the URL as `type`. */
-const RESULT_TYPES = ['reviews', 'users', 'teams'] as const;
+const RESULT_TYPES = ['reviews', 'annotations', 'comments', 'users', 'teams'] as const;
 type ResultType = (typeof RESULT_TYPES)[number];
 
 function parseType(raw: string | null): ResultType {
@@ -109,9 +115,20 @@ export function SearchPage() {
 
   const quick = useSearchQuick(q);
   const reviews = useSearchReviews(q, page, type === 'reviews');
+  const annotations = useSearchAnnotations(q, page, type === 'annotations');
+  const commentHits = useSearchComments(q, page, type === 'comments');
   const users = useSearchUsers(q, page, type === 'users');
   const teams = useSearchTeams(q, page, type === 'teams');
-  const active = type === 'reviews' ? reviews : type === 'users' ? users : teams;
+  const active =
+    type === 'reviews'
+      ? reviews
+      : type === 'annotations'
+        ? annotations
+        : type === 'comments'
+          ? commentHits
+          : type === 'users'
+            ? users
+            : teams;
   const total = active.data?.total ?? 0;
   const size = active.data?.size ?? 20;
   const tooShort = q.trim().length < SEARCH_MIN_LENGTH;
@@ -143,6 +160,18 @@ export function SearchPage() {
               count={quick.data?.reviews.total}
               selected={type === 'reviews'}
               onClick={() => setType('reviews')}
+            />
+            <TypeChip
+              label="Annotations"
+              count={quick.data?.annotations.total}
+              selected={type === 'annotations'}
+              onClick={() => setType('annotations')}
+            />
+            <TypeChip
+              label="Comments"
+              count={quick.data?.comments.total}
+              selected={type === 'comments'}
+              onClick={() => setType('comments')}
             />
             <TypeChip
               label="People"
@@ -187,25 +216,42 @@ export function SearchPage() {
                       sx={{ alignItems: 'center', py: 1.25 }}
                     >
                       <WorkflowMilestones state={hit.workflowState} />
+                      <Link
+                        component={RouterLink}
+                        to={`/reviews/${hit.slug ?? hit.id}`}
+                        underline="hover"
+                        sx={{ fontWeight: 600, fontSize: 14, minWidth: 0 }}
+                        noWrap
+                      >
+                        {hit.title}
+                      </Link>
+                    </Stack>
+                  ))}
+                {(type === 'annotations' || type === 'comments') &&
+                  (type === 'annotations' ? annotations : commentHits).data?.items.map((hit) => (
+                    <Stack
+                      key={hit.commentId}
+                      direction="row"
+                      spacing={1.5}
+                      data-testid={`search-row-${type === 'annotations' ? 'annotation' : 'comment'}`}
+                      sx={{ alignItems: 'flex-start', py: 1.25 }}
+                    >
+                      <Box sx={{ pt: 0.3, display: 'flex' }}>
+                        <StatusCueIcon status={hit.annotationStatus} />
+                      </Box>
                       <Box sx={{ minWidth: 0 }}>
                         <Link
                           component={RouterLink}
-                          to={`/reviews/${hit.slug ?? hit.id}`}
+                          to={discussionHitPath(hit, type === 'comments')}
                           underline="hover"
                           sx={{ fontWeight: 600, fontSize: 14, display: 'block' }}
                           noWrap
                         >
-                          {hit.title}
+                          {hit.excerpt}
                         </Link>
-                        {hit.excerpt && (
-                          <Typography
-                            sx={{ fontSize: 12.5, color: 'text.secondary' }}
-                            noWrap
-                            data-testid="search-row-excerpt"
-                          >
-                            {hit.excerpt}
-                          </Typography>
-                        )}
+                        <Typography sx={{ fontSize: 12.5, color: 'text.secondary' }} noWrap>
+                          in {hit.documentTitle}
+                        </Typography>
                       </Box>
                     </Stack>
                   ))}

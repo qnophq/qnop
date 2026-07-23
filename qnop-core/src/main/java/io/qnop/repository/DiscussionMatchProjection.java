@@ -20,7 +20,18 @@
  */
 package io.qnop.repository;
 
+import io.qnop.entity.AnnotationStatus;
 import java.util.UUID;
 
-/** A comment body matched by the global search, keyed by its document (issue #540). */
-public record CommentMatchProjection(UUID documentId, String body) {}
+/**
+ * A discussion text matched by the global search (issue #540): the comment, its thread, and the
+ * review it lives in — enough for a deep-linking hit with a status cue, no author.
+ */
+public record DiscussionMatchProjection(
+    UUID commentId,
+    UUID annotationId,
+    UUID documentId,
+    String documentSlug,
+    String documentTitle,
+    AnnotationStatus annotationStatus,
+    String body) {}

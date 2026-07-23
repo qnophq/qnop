@@ -27,21 +27,39 @@ import Stack from '@mui/material/Stack';
 import Typography from '@mui/material/Typography';
 import { useTheme } from '@mui/material/styles';
 import type { LucideIcon } from 'lucide-react';
-import { ArrowRight, FileText, Lock, SearchX, Users, UsersRound } from 'lucide-react';
+import {
+  ArrowRight,
+  FileText,
+  Lock,
+  MessageSquareText,
+  NotebookPen,
+  SearchX,
+  Users,
+  UsersRound,
+} from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
-import type { GlobalSearchResponse } from '../../../api/generated';
+import type { DiscussionSearchHit, GlobalSearchResponse } from '../../../api/generated';
+import { AnnotationStatus } from '../../../api/generated';
 import { useAuthStore } from '../../../stores/authStore';
 import { ToneBadge } from '../../admin/ToneBadge';
 import { MilestoneDots } from '../../reviews/MilestoneDots';
+import { STATUS_CUES } from '../../reviews/panel/statusCues';
 import { UserAvatar } from '../UserAvatar';
 
 /** The results page's type segment for a group's "see all" continuation. */
-type ResultType = 'reviews' | 'users' | 'teams';
+type ResultType = 'reviews' | 'annotations' | 'comments' | 'users' | 'teams';
+
+/** The thread deep link of a discussion hit: `?annotation=` plus `&comment=` for a reply. */
+export function discussionHitPath(hit: DiscussionSearchHit, reply: boolean): string {
+  const base = `/reviews/${hit.documentSlug ?? hit.documentId}?annotation=${hit.annotationId}`;
+  return reply ? `${base}&comment=${hit.commentId}` : base;
+}
 
 /**
- * The quickview body of the global search (issue #540): three counted
+ * The quickview body of the global search (issue #540): five counted
  * sections — Reviews with their milestone track (the #568 state language at
- * row scale), People with their avatars, Teams with a lock on hits the caller
+ * row scale), Annotations and Comments with their status cue and matched
+ * excerpt, People with their avatars, Teams with a lock on hits the caller
  * cannot open. Every row is a real navigation; each group ends in a "see all
  * N" continuation onto the results page when the cap cut it short.
  */
@@ -57,6 +75,8 @@ export function SearchDropdownResults({
   const userId = useAuthStore((s) => s.userId);
   const empty =
     data.reviews.items.length === 0 &&
+    data.annotations.items.length === 0 &&
+    data.comments.items.length === 0 &&
     data.users.items.length === 0 &&
     data.teams.items.length === 0;
 
@@ -85,11 +105,44 @@ export function SearchDropdownResults({
               onClick={() => navigate(`/reviews/${hit.slug ?? hit.id}`)}
               start={<MilestoneDots state={hit.workflowState} />}
               primary={hit.title}
-              secondary={hit.excerpt ?? undefined}
             />
           ))}
           {data.reviews.total > data.reviews.items.length && (
             <SeeAllRow total={data.reviews.total} onClick={() => seeAll('reviews')} />
+          )}
+        </Section>
+      )}
+      {data.annotations.items.length > 0 && (
+        <Section icon={NotebookPen} label="Annotations" total={data.annotations.total}>
+          {data.annotations.items.map((hit) => (
+            <HitRow
+              key={hit.commentId}
+              testId="search-hit-annotation"
+              onClick={() => navigate(discussionHitPath(hit, false))}
+              start={<StatusCueIcon status={hit.annotationStatus} />}
+              primary={hit.excerpt}
+              secondary={`in ${hit.documentTitle}`}
+            />
+          ))}
+          {data.annotations.total > data.annotations.items.length && (
+            <SeeAllRow total={data.annotations.total} onClick={() => seeAll('annotations')} />
+          )}
+        </Section>
+      )}
+      {data.comments.items.length > 0 && (
+        <Section icon={MessageSquareText} label="Comments" total={data.comments.total}>
+          {data.comments.items.map((hit) => (
+            <HitRow
+              key={hit.commentId}
+              testId="search-hit-comment"
+              onClick={() => navigate(discussionHitPath(hit, true))}
+              start={<StatusCueIcon status={hit.annotationStatus} />}
+              primary={hit.excerpt}
+              secondary={`in ${hit.documentTitle}`}
+            />
+          ))}
+          {data.comments.total > data.comments.items.length && (
+            <SeeAllRow total={data.comments.total} onClick={() => seeAll('comments')} />
           )}
         </Section>
       )}
@@ -146,6 +199,16 @@ export function SearchDropdownResults({
         </Section>
       )}
     </Box>
+  );
+}
+
+/** The annotation-status cue of a discussion hit — the panel's #405 language at icon scale. */
+export function StatusCueIcon({ status }: { status: AnnotationStatus }) {
+  const theme = useTheme();
+  const cue = STATUS_CUES[status] ?? STATUS_CUES[AnnotationStatus.Open];
+  const Icon = cue.icon;
+  return (
+    <Icon size={14} aria-label={cue.label} style={{ color: cue.color(theme), flexShrink: 0 }} />
   );
 }
 
