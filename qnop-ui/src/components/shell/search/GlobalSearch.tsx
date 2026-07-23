@@ -37,6 +37,15 @@ import { SearchDropdownResults } from './SearchDropdownResults';
 /** Mirrors the admin lists' debounce (UsersPage) — one query per typing pause. */
 const DEBOUNCE_MS = 300;
 
+/** Resting and focused pill widths — the Docker-Hub-style grow-on-focus. */
+const WIDTH_RESTING = 280;
+const WIDTH_FOCUSED = 440;
+
+/** The platform's search-shortcut label: ⌘K on Apple hardware, Ctrl K elsewhere. */
+const IS_APPLE =
+  typeof navigator !== 'undefined' && /Mac|iPhone|iPad/.test(navigator.platform || '');
+const SHORTCUT_LABEL = IS_APPLE ? '⌘K' : 'Ctrl K';
+
 /**
  * The top-bar global search (issue #540, ADR-0047), replacing the #514
  * coming-soon trigger: a quiet pill that opens a grouped quickview of the top
@@ -44,6 +53,12 @@ const DEBOUNCE_MS = 300;
  * language), people and teams — each row a deep link, each group counted with
  * a "see all" continuation onto /search. Results are authorization-scoped
  * server-side; this component only renders what the caller may see.
+ *
+ * <p>⌘K / Ctrl+K focuses the box from anywhere (the pill advertises it with a
+ * kbd hint while resting); on focus the pill grows to reading width and the
+ * panel matches it. The width transition is a deliberate, single layout
+ * animation (the Docker Hub pattern) and is switched off under
+ * prefers-reduced-motion.
  */
 export function GlobalSearch() {
   const theme = useTheme();
@@ -52,6 +67,7 @@ export function GlobalSearch() {
   const [value, setValue] = useState('');
   const [debounced, setDebounced] = useState('');
   const [open, setOpen] = useState(false);
+  const [focused, setFocused] = useState(false);
   const [anchorEl, setAnchorEl] = useState<HTMLDivElement | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -59,6 +75,19 @@ export function GlobalSearch() {
     const handle = setTimeout(() => setDebounced(value), DEBOUNCE_MS);
     return () => clearTimeout(handle);
   }, [value]);
+
+  // ⌘K (Apple) / Ctrl+K pulls focus into the search from anywhere in the app.
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => {
+      if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'k') {
+        event.preventDefault();
+        inputRef.current?.focus();
+        inputRef.current?.select();
+      }
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, []);
 
   // Navigating away (a hit was clicked, or the user moved on) closes the
   // panel — the render-time derived-state pattern, as in FocusAnnotationCard.
@@ -73,6 +102,9 @@ export function GlobalSearch() {
   const trimmed = value.trim();
   const showPanel = open && trimmed.length > 0;
   const belowMinimum = trimmed.length < SEARCH_MIN_LENGTH;
+  // Wide while the caret is in the box OR the panel is up (clicking a hit
+  // blurs the input; shrinking mid-click would pull the target away).
+  const grown = focused || showPanel;
 
   const close = () => setOpen(false);
   const submitToResultsPage = () => {
@@ -86,11 +118,12 @@ export function GlobalSearch() {
       <Box sx={{ display: { xs: 'none', md: 'block' } }}>
         <Box
           ref={setAnchorEl}
+          data-expanded={grown ? 'true' : 'false'}
           sx={{
             display: 'flex',
             alignItems: 'center',
             gap: 1,
-            width: 280,
+            width: grown ? WIDTH_FOCUSED : WIDTH_RESTING,
             height: 34,
             px: 1.25,
             borderRadius: 1.5,
@@ -98,7 +131,10 @@ export function GlobalSearch() {
             borderColor: showPanel ? 'primary.main' : 'divider',
             bgcolor: theme.qnop.surface2,
             color: 'text.secondary',
-            transition: 'border-color .15s',
+            // The one deliberate layout animation (Docker Hub's grow-on-focus);
+            // off under reduced motion — the width then simply jumps.
+            transition: 'border-color .15s, width .2s ease',
+            '@media (prefers-reduced-motion: reduce)': { transition: 'border-color .15s' },
             '&:hover': { borderColor: 'text.disabled' },
             '&:focus-within': {
               borderColor: 'primary.main',
@@ -115,8 +151,10 @@ export function GlobalSearch() {
               setOpen(true);
             }}
             onFocus={() => {
+              setFocused(true);
               if (value.trim().length > 0) setOpen(true);
             }}
+            onBlur={() => setFocused(false)}
             onKeyDown={(event) => {
               if (event.key === 'Escape') {
                 close();
@@ -127,9 +165,34 @@ export function GlobalSearch() {
               }
             }}
             placeholder="Search…"
-            inputProps={{ 'aria-label': 'Search reviews, people and teams' }}
+            inputProps={{
+              'aria-label': 'Search reviews, people and teams',
+              'aria-keyshortcuts': 'Meta+K Control+K',
+            }}
             sx={{ flex: 1, fontSize: 13, color: 'text.primary' }}
           />
+          {!grown && (
+            <Box
+              component="kbd"
+              data-testid="search-shortcut-hint"
+              aria-hidden
+              sx={{
+                px: 0.75,
+                py: 0.125,
+                borderRadius: 1,
+                border: 1,
+                borderColor: 'divider',
+                bgcolor: 'background.paper',
+                fontFamily: 'inherit',
+                fontSize: 11,
+                lineHeight: '16px',
+                color: 'text.disabled',
+                flexShrink: 0,
+              }}
+            >
+              {SHORTCUT_LABEL}
+            </Box>
+          )}
         </Box>
 
         <Popper
@@ -146,7 +209,13 @@ export function GlobalSearch() {
                 role="dialog"
                 aria-label="Search results"
                 data-testid="global-search-dropdown"
-                sx={{ mt: 1, width: 360, maxHeight: '70vh', overflowY: 'auto', borderRadius: 2.5 }}
+                sx={{
+                  mt: 1,
+                  width: WIDTH_FOCUSED,
+                  maxHeight: '70vh',
+                  overflowY: 'auto',
+                  borderRadius: 2.5,
+                }}
               >
                 {belowMinimum ? (
                   <Hint text="Keep typing — at least 2 characters." />

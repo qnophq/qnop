@@ -173,4 +173,32 @@ describe('GlobalSearch', () => {
 
     expect(screen.getByTestId('location')).toHaveTextContent('/search?q=payment%20terms');
   });
+
+  it('pulls focus on Cmd+K and Ctrl+K from anywhere', () => {
+    renderSearch();
+
+    fireEvent.keyDown(window, { key: 'k', metaKey: true });
+    expect(input()).toHaveFocus();
+
+    (input() as HTMLElement).blur();
+    fireEvent.keyDown(window, { key: 'K', ctrlKey: true });
+    expect(input()).toHaveFocus();
+  });
+
+  it('advertises the shortcut while resting and grows on focus (Docker Hub pattern)', () => {
+    renderSearch();
+    const pill = () => screen.getByTestId('search-shortcut-hint').closest('[data-expanded]');
+
+    expect(screen.getByTestId('search-shortcut-hint')).toBeInTheDocument();
+    expect(pill()).toHaveAttribute('data-expanded', 'false');
+
+    fireEvent.focus(input());
+    const expanded = document.querySelector('[data-expanded]');
+    expect(expanded).toHaveAttribute('data-expanded', 'true');
+    // The kbd hint yields to the caret.
+    expect(screen.queryByTestId('search-shortcut-hint')).toBeNull();
+
+    fireEvent.blur(input());
+    expect(document.querySelector('[data-expanded]')).toHaveAttribute('data-expanded', 'false');
+  });
 });

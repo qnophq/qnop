@@ -23,11 +23,11 @@ The trap to avoid: a global search that builds its own query path becomes a seco
 
 **4. Contract: one quick + three typed paged operations** (`GET /search`, `/search/reviews|users|teams`) rather than a single polymorphic endpoint — one concrete schema per operation is the repo convention, and the generated TypeScript client handles it cleanly. Queries shorter than 2 characters (trimmed) answer **empty, never 400** — a box firing per keystroke must neither error nor dump the whole workspace.
 
-**5. Frontend:** the top-bar pill becomes a controlled, debounced input with a grouped quickview dropdown (reviews with their milestone track — the #568 state language at row scale —, people with avatars, teams with a lock on unreachable rosters) and a "see all N" continuation onto `/search?q=…`, where query, type and page live in the URL.
+**5. Frontend:** the top-bar pill becomes a controlled, debounced input with a grouped quickview dropdown (reviews with their milestone track — the #568 state language at row scale —, people with avatars, teams with a lock on unreachable rosters) and a "see all N" continuation onto `/search?q=…`, where query, type and page live in the URL. ⌘K/Ctrl+K focuses the box from anywhere (advertised by a kbd hint in the resting pill), which grows to reading width on focus — the Docker Hub pattern, and the one deliberate layout animation (off under reduced motion).
 
 ## Consequences
 
 - A later search upgrade (FTS ranking, typo tolerance, OpenSearch faceting) is an adapter swap behind `SearchService`; the contract and both UI surfaces are untouched.
 - `LIKE '%q%'` cannot use plain b-tree indexes; at Community scale (the same queries already back the overview and the directory) this is acceptable, and the port is exactly the seam to fix it when it is not.
 - The per-group `total` needed `Page`-returning variants of the principal searches; the `List` variants stay for the directory.
-- Deliberately deferred: ⌘K shortcut, arrow-key roving in the dropdown, a mobile entry point, fuzzy matching, and any body/author search (the ADR-0038 line).
+- Deliberately deferred: arrow-key roving in the dropdown, a mobile entry point, fuzzy matching, and any body/author search (the ADR-0038 line).
