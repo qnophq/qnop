@@ -92,7 +92,12 @@ export function buildTheme(mode: PaletteMode): Theme {
       primary: {
         main: tokens.brand.bluePress,
         dark: tokens.brand.blueDeep,
-        light: tokens.brand.blue50,
+        // Translucent, not blue50: `primary.light` tints surfaces (wizard
+        // pills, drop zone, active nav), and only a translucent brand tint
+        // composites correctly over light AND dark surfaces (issue #589 —
+        // the solid blue50 stayed light in dark mode and drowned the text).
+        // Over white it renders within ±1/channel of blue50.
+        light: tokens.badge.blue.bg,
         contrastText: '#FFFFFF',
       },
       secondary: { main: tokens.brand.navy, contrastText: '#FFFFFF' },
