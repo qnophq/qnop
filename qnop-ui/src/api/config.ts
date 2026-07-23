@@ -37,6 +37,7 @@ import {
   DocumentsApi,
   PrincipalsApi,
   ReviewWorkflowApi,
+  SearchApi,
   ServerConfigApi,
   TeamsApi,
   UserSettingsApi,
@@ -116,5 +117,6 @@ export const dashboardApi = new DashboardApi(undefined, undefined, axiosInstance
 export const auditApi = new AuditApi(undefined, undefined, axiosInstance);
 export const annotationsApi = new AnnotationsApi(undefined, undefined, axiosInstance);
 export const principalsApi = new PrincipalsApi(undefined, undefined, axiosInstance);
+export const searchApi = new SearchApi(undefined, undefined, axiosInstance);
 export const reviewWorkflowApi = new ReviewWorkflowApi(undefined, undefined, axiosInstance);
 export const userSettingsApi = new UserSettingsApi(undefined, undefined, axiosInstance);

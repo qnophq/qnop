@@ -130,4 +130,20 @@ public interface UserRepository extends JpaRepository<User, UUID> {
           + " OR (u.username IS NOT NULL AND LOWER(u.username) LIKE :q))"
           + " ORDER BY LOWER(u.displayName)")
   List<User> searchEnabledPrincipals(@Param("q") String q, Pageable pageable);
+
+  /**
+   * The same enabled-principals rule as a {@link Page} (issue #540): the global search needs the
+   * full match count for its "see all N" affordance, which the {@code List} variant cannot give.
+   */
+  @Query(
+      value =
+          "SELECT u FROM User u WHERE u.enabled = TRUE AND (:q IS NULL"
+              + " OR LOWER(u.displayName) LIKE :q"
+              + " OR (u.username IS NOT NULL AND LOWER(u.username) LIKE :q))"
+              + " ORDER BY LOWER(u.displayName)",
+      countQuery =
+          "SELECT COUNT(u) FROM User u WHERE u.enabled = TRUE AND (:q IS NULL"
+              + " OR LOWER(u.displayName) LIKE :q"
+              + " OR (u.username IS NOT NULL AND LOWER(u.username) LIKE :q))")
+  Page<User> pageEnabledPrincipals(@Param("q") String q, Pageable pageable);
 }
