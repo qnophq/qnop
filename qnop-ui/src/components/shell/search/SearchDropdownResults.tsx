@@ -85,6 +85,7 @@ export function SearchDropdownResults({
               onClick={() => navigate(`/reviews/${hit.slug ?? hit.id}`)}
               start={<MilestoneDots state={hit.workflowState} />}
               primary={hit.title}
+              secondary={hit.excerpt ?? undefined}
             />
           ))}
           {data.reviews.total > data.reviews.items.length && (
@@ -183,17 +184,19 @@ function Section({
   );
 }
 
-/** One navigating hit row. */
+/** One navigating hit row; `secondary` is the muted match excerpt (issue #540). */
 function HitRow({
   testId,
   onClick,
   start,
   primary,
+  secondary,
 }: {
   testId: string;
   onClick: () => void;
   start: ReactNode;
   primary: string;
+  secondary?: string;
 }) {
   return (
     <ButtonBase
@@ -202,6 +205,7 @@ function HitRow({
       sx={{
         display: 'flex',
         justifyContent: 'flex-start',
+        alignItems: secondary ? 'flex-start' : 'center',
         gap: 1,
         width: '100%',
         px: 2,
@@ -211,10 +215,17 @@ function HitRow({
         '&:hover, &:focus-visible': { bgcolor: (t) => t.qnop.surface2 },
       }}
     >
-      {start}
-      <Typography sx={{ fontSize: 13.5, flex: 1, minWidth: 0 }} noWrap>
-        {primary}
-      </Typography>
+      <Box sx={{ pt: secondary ? 0.4 : 0, display: 'flex', flexShrink: 0 }}>{start}</Box>
+      <Box sx={{ flex: 1, minWidth: 0 }}>
+        <Typography sx={{ fontSize: 13.5 }} noWrap>
+          {primary}
+        </Typography>
+        {secondary && (
+          <Typography sx={{ fontSize: 12, color: 'text.secondary' }} noWrap>
+            {secondary}
+          </Typography>
+        )}
+      </Box>
     </ButtonBase>
   );
 }

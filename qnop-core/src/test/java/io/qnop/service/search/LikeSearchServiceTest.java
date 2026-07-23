@@ -22,6 +22,7 @@ package io.qnop.service.search;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
@@ -32,6 +33,8 @@ import io.qnop.entity.Document;
 import io.qnop.entity.Team;
 import io.qnop.entity.TeamRole;
 import io.qnop.entity.User;
+import io.qnop.repository.CommentMatchProjection;
+import io.qnop.repository.CommentRepository;
 import io.qnop.repository.DocumentRepository;
 import io.qnop.repository.TeamMembershipRepository;
 import io.qnop.repository.TeamRepository;
@@ -60,9 +63,10 @@ class LikeSearchServiceTest {
   private final UserRepository users = mock(UserRepository.class);
   private final TeamRepository teams = mock(TeamRepository.class);
   private final TeamMembershipRepository memberships = mock(TeamMembershipRepository.class);
+  private final CommentRepository comments = mock(CommentRepository.class);
 
   private final LikeSearchService service =
-      new LikeSearchService(documents, users, teams, memberships);
+      new LikeSearchService(documents, users, teams, memberships, comments);
 
   private final UUID actor = UUID.randomUUID();
 
@@ -90,10 +94,10 @@ class LikeSearchServiceTest {
     assertThat(view.reviews().total()).isZero();
     assertThat(view.users().total()).isZero();
     assertThat(view.teams().total()).isZero();
-    verify(documents, never()).findVisibleTo(any(), any(), any());
+    verify(documents, never()).findVisibleToMatchingContent(any(), any(), anyBoolean(), any());
     verify(users, never()).pageEnabledPrincipals(any(), any());
 
-    assertThat(service.reviews(actor, "", 0, 20).items()).isEmpty();
+    assertThat(service.reviews(actor, false, "", 0, 20).items()).isEmpty();
     assertThat(service.users(null, 0, 20).total()).isZero();
   }
 
@@ -101,10 +105,11 @@ class LikeSearchServiceTest {
   @DisplayName("quick builds the overview's LIKE pattern, caps each group and carries the totals")
   void quickFederatesWithCapsAndTotals() {
     Document document = new Document(actor, "Payment terms");
-    when(documents.findVisibleTo(eq(actor), eq("%payment%"), any()))
+    when(documents.findVisibleToMatchingContent(eq(actor), eq("%payment%"), eq(false), any()))
         .thenReturn(pageOf(List.of(document), 12));
     when(users.pageEnabledPrincipals(eq("%payment%"), any())).thenReturn(pageOf(List.of(), 0));
     when(teams.pageEnabledPrincipals(eq("%payment%"), any())).thenReturn(pageOf(List.of(), 0));
+    when(comments.findSearchMatches(any(), any(), any(), anyBoolean())).thenReturn(List.of());
 
     SearchService.GlobalSearchView view = service.quick(actor, false, "  Payment ");
 
@@ -113,9 +118,47 @@ class LikeSearchServiceTest {
         .containsExactly("Payment terms");
     assertThat(view.reviews().total()).isEqualTo(12);
     ArgumentCaptor<Pageable> pageable = ArgumentCaptor.forClass(Pageable.class);
-    verify(documents).findVisibleTo(eq(actor), eq("%payment%"), pageable.capture());
+    verify(documents)
+        .findVisibleToMatchingContent(eq(actor), eq("%payment%"), eq(false), pageable.capture());
     assertThat(pageable.getValue().getPageSize()).isEqualTo(SearchService.QUICK_SIZE);
     assertThat(pageable.getValue().getPageNumber()).isZero();
+  }
+
+  @Test
+  @DisplayName("a discussion match carries the first matching comment as its excerpt")
+  void discussionMatchCarriesExcerpt() {
+    UUID documentId = UUID.randomUUID();
+    Document document = new Document(actor, "Q3 report");
+    setId(document, documentId);
+    when(documents.findVisibleToMatchingContent(eq(actor), eq("%clause%"), eq(false), any()))
+        .thenReturn(pageOf(List.of(document), 1));
+    when(users.pageEnabledPrincipals(any(), any())).thenReturn(pageOf(List.of(), 0));
+    when(teams.pageEnabledPrincipals(any(), any())).thenReturn(pageOf(List.of(), 0));
+    when(comments.findSearchMatches(eq(List.of(documentId)), eq("%clause%"), eq(actor), eq(false)))
+        .thenReturn(
+            List.of(
+                new CommentMatchProjection(documentId, "Please rework the\nliability clause."),
+                new CommentMatchProjection(documentId, "The clause again, later.")));
+
+    SearchService.GlobalSearchView view = service.quick(actor, false, "clause");
+
+    // The FIRST match wins, whitespace is flattened, nothing is quoted twice.
+    assertThat(view.reviews().items().get(0).excerpt())
+        .isEqualTo("Please rework the liability clause.");
+  }
+
+  @Test
+  @DisplayName("the excerpt windows around the match and marks clipped ends")
+  void excerptWindowing() {
+    String lead = "x".repeat(200);
+    assertThat(LikeSearchService.excerptOf(lead + " needle tail", "needle"))
+        .startsWith("…")
+        .contains("needle");
+    assertThat(LikeSearchService.excerptOf("short needle text", "needle"))
+        .isEqualTo("short needle text");
+    assertThat(LikeSearchService.excerptOf("needle " + "y".repeat(300), "needle"))
+        .endsWith("…")
+        .hasSizeLessThanOrEqualTo(LikeSearchService.EXCERPT_MAX + 2);
   }
 
   @Test
@@ -130,7 +173,8 @@ class LikeSearchServiceTest {
     when(teams.pageEnabledPrincipals(eq("%al%"), any()))
         .thenReturn(pageOf(List.of(myTeam, foreignTeam), 2));
     when(users.pageEnabledPrincipals(any(), any())).thenReturn(pageOf(List.of(), 0));
-    when(documents.findVisibleTo(any(), any(), any())).thenReturn(pageOf(List.of(), 0));
+    when(documents.findVisibleToMatchingContent(any(), any(), anyBoolean(), any()))
+        .thenReturn(pageOf(List.of(), 0));
     when(memberships.findTeamsOfUser(actor))
         .thenReturn(List.of(new UserTeamProjection(mine, "Alpha", "alpha", TeamRole.MEMBER)));
 

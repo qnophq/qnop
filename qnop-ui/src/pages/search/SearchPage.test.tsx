@@ -37,7 +37,15 @@ const quick = {
 };
 const reviews = {
   data: {
-    items: [{ id: 'r1', slug: 'q3-report', title: 'Q3 report', workflowState: 'IN_REVIEW' }],
+    items: [
+      {
+        id: 'r1',
+        slug: 'q3-report',
+        title: 'Q3 report',
+        workflowState: 'IN_REVIEW',
+        excerpt: '…the liability clause…',
+      },
+    ],
     total: 4,
     page: 0,
     size: 20,
@@ -121,6 +129,7 @@ describe('SearchPage', () => {
       'href',
       '/reviews/q3-report',
     );
+    expect(screen.getByTestId('search-row-excerpt')).toHaveTextContent('…the liability clause…');
   });
 
   it('switches the type through the URL', () => {

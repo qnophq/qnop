@@ -84,7 +84,8 @@ public class SearchController implements SearchApi {
   @Override
   public ResponseEntity<ReviewSearchPage> searchReviews(String q, Integer page, Integer size) {
     SearchService.PageView<SearchService.ReviewHitView> result =
-        search.reviews(CurrentUser.requireUserId(), q, pageOf(page), sizeOf(size));
+        search.reviews(
+            CurrentUser.requireUserId(), CurrentUser.isAdmin(), q, pageOf(page), sizeOf(size));
     return ResponseEntity.ok(
         new ReviewSearchPage()
             .items(result.items().stream().map(SearchController::toReview).toList())
@@ -137,7 +138,8 @@ public class SearchController implements SearchApi {
         .id(hit.id())
         .slug(hit.slug())
         .title(hit.title())
-        .workflowState(hit.workflowState());
+        .workflowState(hit.workflowState())
+        .excerpt(hit.excerpt());
   }
 
   private static UserSearchHit toUser(

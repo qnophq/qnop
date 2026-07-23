@@ -42,7 +42,13 @@ vi.mock('../../../api/hooks/useSearch', () => ({
 const RESPONSE: GlobalSearchResponse = {
   reviews: {
     items: [
-      { id: 'r1', slug: 'q3-report', title: 'Q3 payment report', workflowState: 'IN_REVIEW' },
+      {
+        id: 'r1',
+        slug: 'q3-report',
+        title: 'Q3 payment report',
+        workflowState: 'IN_REVIEW',
+        excerpt: '…rework the payment schedule…',
+      },
     ],
     total: 7,
   },
@@ -103,6 +109,8 @@ describe('GlobalSearch', () => {
     expect(screen.getByText('People')).toBeInTheDocument();
     expect(screen.getByText('Teams')).toBeInTheDocument();
     expect(screen.getByText('Q3 payment report')).toBeInTheDocument();
+    // A discussion match quotes its excerpt under the title.
+    expect(screen.getByText('…rework the payment schedule…')).toBeInTheDocument();
     // The #568 state language at row scale.
     expect(screen.getByTestId('milestone-dots')).toHaveAccessibleName('In review');
     // The review group was capped (1 of 7) — its continuation is offered.

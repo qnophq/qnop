@@ -24,9 +24,14 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import io.qnop.entity.Annotation;
+import io.qnop.entity.Comment;
 import io.qnop.entity.Document;
 import io.qnop.entity.ReviewParticipant;
 import io.qnop.entity.Team;
+import io.qnop.entity.ThreadParticipation;
+import io.qnop.repository.AnnotationRepository;
+import io.qnop.repository.CommentRepository;
 import io.qnop.repository.DocumentRepository;
 import io.qnop.repository.ReviewParticipantRepository;
 import io.qnop.repository.TeamRepository;
@@ -47,9 +52,16 @@ class SearchControllerIT extends SeededIntegrationTest {
   @Autowired DocumentRepository documents;
   @Autowired ReviewParticipantRepository participants;
   @Autowired TeamRepository teams;
+  @Autowired AnnotationRepository annotations;
+  @Autowired CommentRepository comments;
 
   private Document reviewOwnedByMember(String title) {
     return documents.save(new Document(MEMBER_ID, title));
+  }
+
+  private void annotationWithComment(UUID documentId, UUID author, String body) {
+    Annotation annotation = annotations.save(new Annotation(documentId, author));
+    comments.save(new Comment(annotation.getId(), author, body));
   }
 
   private org.springframework.test.web.servlet.RequestBuilder search(String path, UUID caller) {
@@ -145,6 +157,59 @@ class SearchControllerIT extends SeededIntegrationTest {
     mockMvc
         .perform(search("/api/v1/search?q=Alpha", ADMIN_ID))
         .andExpect(jsonPath("$.teams.items[0].viewable").value(true));
+  }
+
+  @Test
+  void discussionTextMatchesWithinVisibleReviewsAndCarriesAnExcerpt() throws Exception {
+    Document document = reviewOwnedByMember("Q3 report");
+    participants.save(ReviewParticipant.forUser(document.getId(), MEMBER2_ID));
+    annotationWithComment(document.getId(), MEMBER2_ID, "Please rework the liability clause.");
+
+    // The owner finds the review by the comment text, with the excerpt quoted ...
+    mockMvc
+        .perform(search("/api/v1/search?q=liability", MEMBER_ID))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.reviews.total").value(1))
+        .andExpect(jsonPath("$.reviews.items[0].title").value("Q3 report"))
+        .andExpect(
+            jsonPath("$.reviews.items[0].excerpt").value("Please rework the liability clause."));
+
+    // ... a non-participant still finds nothing — content search never widens visibility.
+    mockMvc
+        .perform(search("/api/v1/search?q=liability", AUDITOR_ID))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.reviews.total").value(0));
+
+    // A title match carries no excerpt.
+    mockMvc
+        .perform(search("/api/v1/search?q=report", MEMBER_ID))
+        .andExpect(jsonPath("$.reviews.items[0].excerpt").doesNotExist());
+  }
+
+  @Test
+  void privateThreadsNeitherMatchNorLeakForForeignReviewers() throws Exception {
+    // thread_participation is write-once (updatable = false): set before the INSERT.
+    Document unsaved = new Document(MEMBER_ID, "Board minutes");
+    unsaved.setThreadParticipation(ThreadParticipation.PRIVATE);
+    Document document = documents.save(unsaved);
+    participants.save(ReviewParticipant.forUser(document.getId(), MEMBER2_ID));
+    participants.save(ReviewParticipant.forUser(document.getId(), AUDITOR_ID));
+    annotationWithComment(document.getId(), MEMBER2_ID, "The hidden severance figure.");
+
+    // A fellow participant who cannot open the thread cannot find (or quote) it either.
+    mockMvc
+        .perform(search("/api/v1/search?q=severance", AUDITOR_ID))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.reviews.total").value(0));
+
+    // The thread's author and the owner search it as they read it.
+    mockMvc
+        .perform(search("/api/v1/search?q=severance", MEMBER2_ID))
+        .andExpect(jsonPath("$.reviews.total").value(1));
+    mockMvc
+        .perform(search("/api/v1/search?q=severance", MEMBER_ID))
+        .andExpect(jsonPath("$.reviews.total").value(1))
+        .andExpect(jsonPath("$.reviews.items[0].excerpt").value("The hidden severance figure."));
   }
 
   @Test

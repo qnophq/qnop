@@ -30,11 +30,13 @@ import java.util.UUID;
  * LikeSearchService}) federates the existing Postgres {@code LIKE} queries; a later Postgres-FTS or
  * OpenSearch implementation replaces the adapter, not the callers (the ADR-0013 stance).
  *
- * <p>Scoping per type, non-negotiable: reviews through the caller's visibility rule (title only —
- * never annotation/comment content or author names, ADR-0038); users and teams through the
+ * <p>Scoping per type, non-negotiable: reviews through the caller's visibility rule, matching the
+ * title or the discussion — the latter only in threads the caller may see (ADR-0038: a PRIVATE
+ * review hides foreign threads), and never by author name; users and teams through the
  * enabled-principals rule (display name/username and team name — never email, which stays an admin
  * capability). Admins search their own reviews like anyone else (mirroring the reviews overview);
- * their reach shows only in team hits being universally {@code viewable}.
+ * their reach shows in team hits being universally {@code viewable} and in the thread-visibility
+ * predicate.
  */
 public interface SearchService {
 
@@ -47,8 +49,8 @@ public interface SearchService {
   /** The grouped top hits for the dropdown: each group capped, with the full match count. */
   GlobalSearchView quick(UUID actor, boolean admin, String query);
 
-  /** One page of review hits visible to {@code actor}. */
-  PageView<ReviewHitView> reviews(UUID actor, String query, int page, int size);
+  /** One page of review hits visible to {@code actor} (admin widens only thread visibility). */
+  PageView<ReviewHitView> reviews(UUID actor, boolean admin, String query, int page, int size);
 
   /** One page of enabled users matched by display name/username. */
   PageView<UserHitView> users(String query, int page, int size);
@@ -68,8 +70,12 @@ public interface SearchService {
   /** One page of hits with the standard envelope facts. */
   record PageView<T>(List<T> items, long total, int page, int size) {}
 
-  /** A review hit — a strict subset of the reviews-list row (ADR-0038). */
-  record ReviewHitView(UUID id, String slug, String title, String workflowState) {}
+  /**
+   * A review hit (ADR-0038-safe): title, state, and — when the discussion matched — a short excerpt
+   * of the first matching comment from a thread the caller may open; null when the title itself
+   * matched. Never an author name.
+   */
+  record ReviewHitView(UUID id, String slug, String title, String workflowState, String excerpt) {}
 
   /** A person hit — names only; the web layer adds the avatar URL. */
   record UserHitView(UUID id, String displayName, String slug) {}

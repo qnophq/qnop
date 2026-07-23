@@ -187,15 +187,26 @@ export function SearchPage() {
                       sx={{ alignItems: 'center', py: 1.25 }}
                     >
                       <WorkflowMilestones state={hit.workflowState} />
-                      <Link
-                        component={RouterLink}
-                        to={`/reviews/${hit.slug ?? hit.id}`}
-                        underline="hover"
-                        sx={{ fontWeight: 600, fontSize: 14, minWidth: 0 }}
-                        noWrap
-                      >
-                        {hit.title}
-                      </Link>
+                      <Box sx={{ minWidth: 0 }}>
+                        <Link
+                          component={RouterLink}
+                          to={`/reviews/${hit.slug ?? hit.id}`}
+                          underline="hover"
+                          sx={{ fontWeight: 600, fontSize: 14, display: 'block' }}
+                          noWrap
+                        >
+                          {hit.title}
+                        </Link>
+                        {hit.excerpt && (
+                          <Typography
+                            sx={{ fontSize: 12.5, color: 'text.secondary' }}
+                            noWrap
+                            data-testid="search-row-excerpt"
+                          >
+                            {hit.excerpt}
+                          </Typography>
+                        )}
+                      </Box>
                     </Stack>
                   ))}
                 {type === 'users' &&

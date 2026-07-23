@@ -65,6 +65,28 @@ public interface CommentRepository extends JpaRepository<Comment, UUID> {
   /** The size of an annotation's thread (issue #247). */
   long countByAnnotationId(UUID annotationId);
 
+  /**
+   * The matching comment bodies of a page of search-hit documents (issue #540), for the excerpt
+   * under a review hit — oldest first, so the excerpt is stable. Applies the same thread-visibility
+   * predicate as the search query itself (ADR-0038: a PRIVATE review hides foreign threads from
+   * anyone but the owner, the author, or an admin), so an excerpt never quotes a thread the caller
+   * cannot open. {@code q} pre-lowercased and {@code LIKE}-wrapped.
+   */
+  @Query(
+      "SELECT new io.qnop.repository.CommentMatchProjection(a.documentId, c.body)"
+          + " FROM Comment c, Annotation a, Document d"
+          + " WHERE c.annotationId = a.id AND a.documentId = d.id"
+          + " AND a.documentId IN :documentIds AND LOWER(c.body) LIKE :q"
+          + " AND (:admin = TRUE"
+          + "   OR d.threadParticipation <> io.qnop.entity.ThreadParticipation.PRIVATE"
+          + "   OR d.ownerId = :actor OR a.authorId = :actor)"
+          + " ORDER BY c.createdAt, c.id")
+  List<CommentMatchProjection> findSearchMatches(
+      @Param("documentIds") Collection<UUID> documentIds,
+      @Param("q") String q,
+      @Param("actor") UUID actor,
+      @Param("admin") boolean admin);
+
   /** The newest comment by someone other than {@code viewer} (issue #307), single annotation. */
   Optional<Comment> findFirstByAnnotationIdAndAuthorIdNotOrderByCreatedAtDesc(
       UUID annotationId, UUID viewer);

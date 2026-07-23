@@ -23,13 +23,17 @@ package io.qnop.service.search;
 import io.qnop.entity.Document;
 import io.qnop.entity.Team;
 import io.qnop.entity.User;
+import io.qnop.repository.CommentMatchProjection;
+import io.qnop.repository.CommentRepository;
 import io.qnop.repository.DocumentRepository;
 import io.qnop.repository.TeamMembershipRepository;
 import io.qnop.repository.TeamRepository;
 import io.qnop.repository.UserRepository;
 import io.qnop.repository.UserTeamProjection;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
@@ -41,10 +45,11 @@ import org.springframework.transaction.annotation.Transactional;
 
 /**
  * The Community {@link SearchService} adapter (issue #540, ADR-0047): a Postgres {@code LOWER …
- * LIKE} federation over the very queries the reviews overview and the principal directory already
- * use — {@code DocumentRepository.findVisibleTo} (owner OR participant OR team-participant, title
- * only, no admin bypass) and the enabled-principals searches (names only, never email). The {@code
- * like} pattern is built exactly as those services build it, so a hit here is always a hit there.
+ * LIKE} federation over the very scoping rules the reviews overview and the principal directory
+ * already use — review visibility (owner OR participant OR team-participant, no admin bypass) with
+ * the ADR-0038 thread-visibility predicate on discussion matches, and the enabled-principals
+ * searches (names only, never email). The {@code like} pattern is built exactly as those services
+ * build it, so a hit here is always a hit there.
  */
 @Service
 public class LikeSearchService implements SearchService {
@@ -52,20 +57,29 @@ public class LikeSearchService implements SearchService {
   /** Review hits arrive freshest-first — the review you touched yesterday outranks 2024's. */
   private static final Sort REVIEW_SORT = Sort.by(Sort.Direction.DESC, "updatedAt");
 
+  /** A discussion excerpt shows at most this many characters around the match. */
+  static final int EXCERPT_MAX = 120;
+
+  /** Characters of context kept before the match inside the excerpt window. */
+  private static final int EXCERPT_LEAD = 32;
+
   private final DocumentRepository documents;
   private final UserRepository users;
   private final TeamRepository teams;
   private final TeamMembershipRepository memberships;
+  private final CommentRepository comments;
 
   public LikeSearchService(
       DocumentRepository documents,
       UserRepository users,
       TeamRepository teams,
-      TeamMembershipRepository memberships) {
+      TeamMembershipRepository memberships,
+      CommentRepository comments) {
     this.documents = documents;
     this.users = users;
     this.teams = teams;
     this.memberships = memberships;
+    this.comments = comments;
   }
 
   @Override
@@ -79,26 +93,31 @@ public class LikeSearchService implements SearchService {
           new GroupView<>(List.of(), 0));
     }
     Page<Document> reviewPage =
-        documents.findVisibleTo(actor, like, PageRequest.of(0, QUICK_SIZE, REVIEW_SORT));
+        documents.findVisibleToMatchingContent(
+            actor, like, admin, PageRequest.of(0, QUICK_SIZE, REVIEW_SORT));
     Page<User> userPage = users.pageEnabledPrincipals(like, PageRequest.of(0, QUICK_SIZE));
     Page<Team> teamPage = teams.pageEnabledPrincipals(like, PageRequest.of(0, QUICK_SIZE));
     Set<UUID> reachable = reachableTeamIds(actor);
     return new GlobalSearchView(
-        new GroupView<>(toReviewHits(reviewPage), reviewPage.getTotalElements()),
+        new GroupView<>(
+            toReviewHits(reviewPage, like, actor, admin), reviewPage.getTotalElements()),
         new GroupView<>(toUserHits(userPage), userPage.getTotalElements()),
         new GroupView<>(toTeamHits(teamPage, reachable, admin), teamPage.getTotalElements()));
   }
 
   @Override
   @Transactional(readOnly = true)
-  public PageView<ReviewHitView> reviews(UUID actor, String query, int page, int size) {
+  public PageView<ReviewHitView> reviews(
+      UUID actor, boolean admin, String query, int page, int size) {
     String like = likeOf(query);
     if (like == null) {
       return new PageView<>(List.of(), 0, page, size);
     }
     Page<Document> result =
-        documents.findVisibleTo(actor, like, PageRequest.of(page, size, REVIEW_SORT));
-    return new PageView<>(toReviewHits(result), result.getTotalElements(), page, size);
+        documents.findVisibleToMatchingContent(
+            actor, like, admin, PageRequest.of(page, size, REVIEW_SORT));
+    return new PageView<>(
+        toReviewHits(result, like, actor, admin), result.getTotalElements(), page, size);
   }
 
   @Override
@@ -143,10 +162,51 @@ public class LikeSearchService implements SearchService {
         .collect(Collectors.toSet());
   }
 
-  private static List<ReviewHitView> toReviewHits(Page<Document> page) {
+  /**
+   * Builds the review hits with their discussion excerpts: one batched query fetches the matching
+   * comment bodies for the whole page (thread-visibility applied in the query), the first match per
+   * document becomes the excerpt. A title-only hit carries none.
+   */
+  private List<ReviewHitView> toReviewHits(
+      Page<Document> page, String like, UUID actor, boolean admin) {
+    List<UUID> ids = page.getContent().stream().map(Document::getId).toList();
+    Map<UUID, String> excerptByDocument = new LinkedHashMap<>();
+    if (!ids.isEmpty()) {
+      for (CommentMatchProjection match : comments.findSearchMatches(ids, like, actor, admin)) {
+        excerptByDocument.putIfAbsent(match.documentId(), excerptOf(match.body(), termOf(like)));
+      }
+    }
     return page.getContent().stream()
-        .map(d -> new ReviewHitView(d.getId(), d.getSlug(), d.getTitle(), d.getWorkflowState()))
+        .map(
+            d ->
+                new ReviewHitView(
+                    d.getId(),
+                    d.getSlug(),
+                    d.getTitle(),
+                    d.getWorkflowState(),
+                    excerptByDocument.get(d.getId())))
         .toList();
+  }
+
+  /** The raw lowercased search term inside a {@code %term%} pattern. */
+  private static String termOf(String like) {
+    return like.substring(1, like.length() - 1);
+  }
+
+  /**
+   * A single-line window of at most {@link #EXCERPT_MAX} characters around the first occurrence of
+   * {@code term} (case-insensitive), whitespace flattened, clipped ends marked with an ellipsis.
+   */
+  static String excerptOf(String body, String term) {
+    String flat = body.replaceAll("\\s+", " ").trim();
+    int index = flat.toLowerCase(Locale.ROOT).indexOf(term);
+    if (index < 0) {
+      index = 0; // defensive: the query matched, so this should not happen
+    }
+    int start = Math.max(0, index - EXCERPT_LEAD);
+    int end = Math.min(flat.length(), start + EXCERPT_MAX);
+    String window = flat.substring(start, end);
+    return (start > 0 ? "…" : "") + window + (end < flat.length() ? "…" : "");
   }
 
   private static List<UserHitView> toUserHits(Page<User> page) {
