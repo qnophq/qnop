@@ -33,7 +33,6 @@ const TEAM: ParticipantView = {
   id: 'p1',
   kind: ParticipantKind.Team,
   principalId: 'b0000000-0000-0000-0000-000000000001',
-  slug: null,
   displayName: 'Alpha',
 };
 
