@@ -261,16 +261,20 @@ class MyTeamsControllerIT extends AbstractIntegrationTest {
   void lastLeadCannotBeDemotedOrRemoved() throws Exception {
     String admin = token(createUser("root", UserRole.ADMIN));
     User lead = createUser("lead", UserRole.MEMBER);
+    User member = createUser("member", UserRole.MEMBER);
     String teamId = createTeam(admin, "Core");
     addMember(admin, teamId, lead, "LEAD");
+    // A plain member remains, so removing/demoting the lead would strip the team's last
+    // lead while members remain — the guarded case (removing the *sole* member instead
+    // empties the team, which is allowed; issue #542).
+    addMember(admin, teamId, member, "MEMBER");
 
-    String leadToken = token("lead");
-
-    // The sole lead cannot demote themselves (self-lockout) ...
+    // The sole lead cannot be demoted — exercised via the admin, since a lead's
+    // self-demotion is already refused earlier as SELF_ROLE_CHANGE (#542 follow-up) ...
     mockMvc
         .perform(
             patch("/api/v1/teams/{id}/members/{uid}", teamId, lead.getId())
-                .header("Authorization", bearer(leadToken))
+                .header("Authorization", bearer(admin))
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("{\"teamRole\":\"MEMBER\"}"))
         .andExpect(status().isConflict())
@@ -283,6 +287,37 @@ class MyTeamsControllerIT extends AbstractIntegrationTest {
                 .header("Authorization", bearer(admin)))
         .andExpect(status().isConflict())
         .andExpect(jsonPath("$.code").value("LAST_LEAD"));
+  }
+
+  @Test
+  void leadCannotChangeTheirOwnRoleButAnotherLeadMay() throws Exception {
+    String admin = token(createUser("root", UserRole.ADMIN));
+    User lead = createUser("lead", UserRole.MEMBER);
+    User coLead = createUser("colead", UserRole.MEMBER);
+    String teamId = createTeam(admin, "Core");
+    addMember(admin, teamId, lead, "LEAD");
+    addMember(admin, teamId, coLead, "LEAD");
+
+    // A co-lead remains, so the last-lead guard would allow it — but demoting a
+    // lead is another lead's or an admin's call, never their own (#542 follow-up).
+    mockMvc
+        .perform(
+            patch("/api/v1/teams/{id}/members/{uid}", teamId, lead.getId())
+                .header("Authorization", bearer(token("lead")))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"teamRole\":\"MEMBER\"}"))
+        .andExpect(status().isConflict())
+        .andExpect(jsonPath("$.code").value("SELF_ROLE_CHANGE"));
+
+    // The other lead may demote them.
+    mockMvc
+        .perform(
+            patch("/api/v1/teams/{id}/members/{uid}", teamId, lead.getId())
+                .header("Authorization", bearer(token("colead")))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"teamRole\":\"MEMBER\"}"))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.teamRole").value("MEMBER"));
   }
 
   @Test

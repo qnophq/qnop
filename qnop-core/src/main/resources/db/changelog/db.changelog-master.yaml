@@ -71,6 +71,9 @@ databaseChangeLog:
   - include:
       file: migrations/0020-annotation-dismissed-status.yaml
       relativeToChangelogFile: true
+  - include:
+      file: migrations/0021-team-slug-backfill.yaml
+      relativeToChangelogFile: true
   # Enterprise schema seam (issue #254, ADR-0039): a separately-licensed module
   # (ADR-0002) contributes its changelogs under db/changelog/enterprise/ on its
   # OWN classpath entry; without enterprise JARs this is a no-op. Enterprise

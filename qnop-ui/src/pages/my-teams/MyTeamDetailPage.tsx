@@ -61,8 +61,12 @@ import { apiErrorMessage } from '../../utils/apiError';
  * (or an admin) gets member management — add, promote/demote, remove — while a
  * plain member gets a read-only roster. Members render as {@link PersonLink}
  * everywhere (avatar, profile hover-card, click-through to the profile), like the
- * rest of the app. A lead is never offered "Remove from team" on their own row;
- * the server rejects self-removal too. The last-lead guardrail surfaces as a toast.
+ * rest of the app. Nobody manages their own membership here (issue #542
+ * follow-up, mirroring SELF_REMOVAL): the caller's own row carries no actions
+ * menu at all — no self-removal, no self-role-change; demoting a lead is
+ * another lead's or an admin's call, and one's own role changes via the admin
+ * console. The server rejects both anyway; the last-lead guardrail surfaces
+ * as a toast.
  */
 export function MyTeamDetailPage() {
   const { id = '' } = useParams();
@@ -172,13 +176,18 @@ export function MyTeamDetailPage() {
                 </TableCell>
                 {canManage && (
                   <TableCell align="right">
-                    <IconButton
-                      size="small"
-                      aria-label={`Actions for ${member.displayName}`}
-                      onClick={(e) => openMenu(e, member)}
-                    >
-                      <MoreVertical size={18} />
-                    </IconButton>
+                    {/* Nobody manages their own membership here: no self-removal,
+                        no self-role-change (#542 follow-up) — so the own row
+                        carries no actions menu at all. */}
+                    {member.userId !== currentUserId && (
+                      <IconButton
+                        size="small"
+                        aria-label={`Actions for ${member.displayName}`}
+                        onClick={(e) => openMenu(e, member)}
+                      >
+                        <MoreVertical size={18} />
+                      </IconButton>
+                    )}
                   </TableCell>
                 )}
               </TableRow>
@@ -203,19 +212,17 @@ export function MyTeamDetailPage() {
                 {active?.teamRole === 'LEAD' ? 'Make member' : 'Make lead'}
               </ListItemText>
             </MenuItem>
-            {active?.userId !== currentUserId && (
-              <MenuItem
-                onClick={() => {
-                  setAnchorEl(null);
-                  setRemoveTarget(active);
-                }}
-              >
-                <ListItemIcon>
-                  <UserMinus size={16} />
-                </ListItemIcon>
-                <ListItemText>Remove from team</ListItemText>
-              </MenuItem>
-            )}
+            <MenuItem
+              onClick={() => {
+                setAnchorEl(null);
+                setRemoveTarget(active);
+              }}
+            >
+              <ListItemIcon>
+                <UserMinus size={16} />
+              </ListItemIcon>
+              <ListItemText>Remove from team</ListItemText>
+            </MenuItem>
           </Menu>
 
           <AddMyTeamMemberDialog
