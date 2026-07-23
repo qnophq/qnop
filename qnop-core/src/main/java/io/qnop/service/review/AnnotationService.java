@@ -84,6 +84,7 @@ public class AnnotationService {
   private final ApplicationEventPublisher events;
   private final ApplicationSettingsService settings;
   private final ReactionService reactions_;
+  private final CommentMentionService mentions;
 
   public AnnotationService(
       AnnotationRepository annotations,
@@ -96,7 +97,8 @@ public class AnnotationService {
       ReviewIdentityResolver identity,
       ReactionService reactions,
       ApplicationEventPublisher events,
-      ApplicationSettingsService settings) {
+      ApplicationSettingsService settings,
+      CommentMentionService mentions) {
     this.annotations = annotations;
     this.placements = placements;
     this.comments = comments;
@@ -108,6 +110,7 @@ public class AnnotationService {
     this.reactions_ = reactions;
     this.events = events;
     this.settings = settings;
+    this.mentions = mentions;
   }
 
   /**
@@ -198,7 +201,12 @@ public class AnnotationService {
       placements.save(placement);
     }
 
-    comments.save(new Comment(annotation.getId(), author, firstComment));
+    Comment opening = new Comment(annotation.getId(), author, firstComment);
+    comments.save(opening); // @UuidGenerator assigns opening.id on the instance before INSERT
+    // Resolve @mentions in the opening comment against the document roster (no-op in anonymous
+    // reviews). Persisted here so the AnnotationCreated notification can target mentioned users
+    // without re-parsing the body (issue #462).
+    mentions.resolveAndPersist(opening.getId(), documentId, firstComment);
     int commentCount = 1;
     auditEvents.save(
         new AuditEvent(
@@ -597,6 +605,9 @@ public class AnnotationService {
     }
     // saveAndFlush so @CreationTimestamp is populated on the returned comment before the view.
     Comment saved = comments.saveAndFlush(new Comment(annotationId, author, body));
+    // Resolve @mentions against the document roster (no-op in anonymous reviews) so the
+    // CommentAdded notification can target them without re-parsing the body (issue #462).
+    mentions.resolveAndPersist(saved.getId(), annotation.getDocumentId(), body);
     events.publishEvent(
         new ReviewEvent.CommentAdded(
             annotation.getDocumentId(), author, annotationId, saved.getId()));
