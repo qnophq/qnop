@@ -24,11 +24,12 @@ import ButtonBase from '@mui/material/ButtonBase';
 import Stack from '@mui/material/Stack';
 import Typography from '@mui/material/Typography';
 import { alpha, useTheme } from '@mui/material/styles';
-import { MessagesSquare } from 'lucide-react';
+import { MessageCircleDashed, MessagesSquare } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import type { DashboardReply } from '../../api/generated';
 import { useFormatters } from '../../hooks/useFormatters';
 import { SectionCard } from '../admin/layout/SectionCard';
+import { CardEmptyState } from './CardEmptyState';
 import { CardScroller } from './CardScroller';
 import { CountPill } from './CountPill';
 import { PersonLink } from './PersonLink';
@@ -56,9 +57,11 @@ export function RepliesCard({ replies }: RepliesCardProps) {
       action={<CountPill value={replies.length} />}
     >
       {replies.length === 0 ? (
-        <Typography variant="body2" color="text.secondary">
-          No new replies — your threads are quiet.
-        </Typography>
+        <CardEmptyState
+          icon={MessageCircleDashed}
+          title="No replies yet"
+          text="Answers in discussions you started or joined land here."
+        />
       ) : (
         <CardScroller>
           <Stack spacing={0.5}>
