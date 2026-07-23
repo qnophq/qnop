@@ -151,6 +151,7 @@ function seedHappyPath(extractionStatus: ExtractionStatus = ExtractionStatus.Rea
       data: {
         id: 'doc-1',
         title: 'Supply Contract',
+        contentType: 'application/pdf',
         ownerId: 'u1',
         workflowState: 'IN_REVIEW',
         latestVersionNumber: 2,
@@ -258,6 +259,8 @@ describe('DocumentReviewPage', () => {
     renderPage();
 
     expect(screen.getByRole('heading', { level: 1, name: 'Supply Contract' })).toBeInTheDocument();
+    // The typed document icon leads the header (issue #509 follow-up).
+    expect(screen.getByRole('img', { name: 'PDF document' })).toBeInTheDocument();
     expect(screen.getByText('In review')).toBeInTheDocument();
     expect(screen.getByTestId('document-viewer')).toHaveAttribute('data-annotation-count', '1');
     expect(screen.getByText('Annotations (1)')).toBeInTheDocument();

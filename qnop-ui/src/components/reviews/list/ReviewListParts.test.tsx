@@ -20,14 +20,14 @@
  */
 
 import { describe, expect, it } from 'vitest';
-import { render } from '@testing-library/react';
+import { render, screen } from '@testing-library/react';
 import { ThemeProvider } from '@mui/material/styles';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { MemoryRouter } from 'react-router-dom';
 import type { ParticipantView } from '../../../api/generated';
 import { ParticipantKind } from '../../../api/generated';
 import { buildTheme } from '../../../theme/theme';
-import { ReviewerStack } from './ReviewListParts';
+import { DocumentIcon, ReviewerStack } from './ReviewListParts';
 
 const TEAM: ParticipantView = {
   id: 'p1',
@@ -66,5 +66,41 @@ describe('ReviewerStack team avatars (#509)', () => {
     );
 
     expect(container.querySelector('img')).toBeNull();
+  });
+});
+
+function renderIcon(contentType?: string | null) {
+  return render(
+    <ThemeProvider theme={buildTheme('light')}>
+      <DocumentIcon contentType={contentType} />
+    </ThemeProvider>,
+  );
+}
+
+describe('DocumentIcon typed sheet (#509)', () => {
+  it('stamps a known MIME type with its format label', () => {
+    renderIcon('application/pdf');
+
+    const sheet = screen.getByTestId('document-icon');
+    expect(sheet).toHaveTextContent('PDF');
+    expect(sheet).toHaveAccessibleName('PDF document');
+  });
+
+  it('ignores MIME parameters when resolving the format', () => {
+    renderIcon('text/markdown; charset=utf-8');
+
+    expect(screen.getByTestId('document-icon')).toHaveTextContent('MD');
+  });
+
+  it('falls back to the neutral glyph for an unknown or missing type', () => {
+    const { container } = renderIcon('application/octet-stream');
+
+    const sheet = screen.getByTestId('document-icon');
+    expect(sheet).toHaveTextContent('');
+    expect(sheet).toHaveAttribute('aria-hidden', 'true');
+    expect(container.querySelector('svg')).not.toBeNull();
+
+    const { container: absent } = renderIcon(undefined);
+    expect(absent.querySelector('svg')).not.toBeNull();
   });
 });

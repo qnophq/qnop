@@ -5976,6 +5976,14 @@ components:
         title:
           type: string
           maxLength: 500
+        contentType:
+          type: string
+          nullable: true
+          description: >-
+            The MIME type of the document's latest version (issue #509
+            follow-up), e.g. application/pdf — drives the typed document icon
+            in list views. Null only when no version exists (defensive; ingest
+            always creates version 1).
         slug:
           type: string
           nullable: true
@@ -6468,6 +6476,14 @@ components:
           description: >-
             Optional human-readable identifier chosen at creation (issue #411):
             kebab-case, unique ignoring case, immutable. Null when none was set.
+        contentType:
+          type: string
+          nullable: true
+          description: >-
+            The MIME type of the document's latest version (issue #509
+            follow-up), e.g. application/pdf — drives the typed document icon.
+            Null only when no version exists (defensive; ingest always creates
+            version 1).
         anonymous:
           type: boolean
           description: >-

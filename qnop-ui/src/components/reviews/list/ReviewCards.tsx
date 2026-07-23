@@ -88,7 +88,7 @@ export function ReviewCards({ reviews, userId, onOpen }: ReviewCardsProps) {
               direction="row"
               sx={{ justifyContent: 'space-between', alignItems: 'flex-start' }}
             >
-              <DocumentIcon size={38} />
+              <DocumentIcon size={38} contentType={review.contentType} />
               <RoleBadge role={roleOf(review, userId)} />
             </Stack>
             <Box>

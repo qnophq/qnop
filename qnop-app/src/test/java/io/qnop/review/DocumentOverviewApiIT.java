@@ -100,8 +100,23 @@ class DocumentOverviewApiIT extends SeededIntegrationTest {
           .andExpect(jsonPath("$.items[0].id").value(documentId.toString()))
           .andExpect(jsonPath("$.items[0].workflowState").value("DRAFT"))
           .andExpect(jsonPath("$.items[0].ownerDisplayName").value("Mia Member"))
-          .andExpect(jsonPath("$.items[0].latestVersionNumber").value(1));
+          .andExpect(jsonPath("$.items[0].latestVersionNumber").value(1))
+          .andExpect(jsonPath("$.items[0].contentType").value("application/pdf"));
     }
+  }
+
+  @Test
+  void overviewContentTypeFollowsTheLatestVersion() throws Exception {
+    UUID documentId = seedReview("Overview content type agreement");
+    versions.save(
+        new DocumentVersion(
+            documentId, 2, "sha256/bb/deadbeef", "deadbeef", "text/markdown", 7L, MEMBER_ID));
+
+    mockMvc
+        .perform(as(get("/api/v1/documents?q=Overview content type"), MEMBER_ID))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.items[0].latestVersionNumber").value(2))
+        .andExpect(jsonPath("$.items[0].contentType").value("text/markdown"));
   }
 
   @Test

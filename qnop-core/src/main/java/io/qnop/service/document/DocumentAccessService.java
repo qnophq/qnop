@@ -82,16 +82,14 @@ public class DocumentAccessService {
   @Transactional(readOnly = true)
   public DocumentView getDocument(UUID documentId, UUID actor, boolean admin) {
     Document document = requireVisible(documentId, actor, admin);
-    int latest =
-        versions
-            .findTopByDocumentIdOrderByVersionNumberDesc(documentId)
-            .map(DocumentVersion::getVersionNumber)
-            .orElse(0);
+    Optional<DocumentVersion> latest =
+        versions.findTopByDocumentIdOrderByVersionNumberDesc(documentId);
     Optional<User> owner = users.findById(document.getOwnerId());
     return new DocumentView(
         document.getId(),
         document.getTitle(),
         document.getSlug(),
+        latest.map(DocumentVersion::getContentType).orElse(null),
         document.isAnonymous(),
         document.getThreadParticipation().name(),
         document.getOwnerId(),
@@ -101,7 +99,7 @@ public class DocumentAccessService {
         owner.map(User::getSlug).orElse(null),
         owner.map(User::getDisplayName).orElse(null),
         document.getWorkflowState(),
-        latest,
+        latest.map(DocumentVersion::getVersionNumber).orElse(0),
         document.getCreatedAt(),
         document.getUpdatedAt(),
         document.getDueAt());
@@ -233,6 +231,7 @@ public class DocumentAccessService {
       UUID id,
       String title,
       String slug,
+      String contentType,
       boolean anonymous,
       String threadParticipation,
       UUID ownerId,

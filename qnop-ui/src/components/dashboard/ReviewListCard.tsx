@@ -32,7 +32,7 @@ import { SectionCard } from '../admin/layout/SectionCard';
 import { CardScroller } from './CardScroller';
 import { CountPill } from './CountPill';
 import { DueDateLabel } from '../reviews/DueDateLabel';
-import { ProgressBar, ReviewerStack } from '../reviews/list/ReviewListParts';
+import { DocumentIcon, ProgressBar, ReviewerStack } from '../reviews/list/ReviewListParts';
 import { progressOf } from '../reviews/list/reviewListModel';
 import { WORKFLOW_TONES, workflowLabel } from '../reviews/workflowMeta';
 import { readyToFinalize, reviewPath } from './dashboardModel';
@@ -120,50 +120,59 @@ export function ReviewListCard({
                     '&:hover': { bgcolor: alpha(theme.qnop.brand.blue, 0.05) },
                   }}
                 >
-                  <Stack direction="row" spacing={1} sx={{ alignItems: 'center', minWidth: 0 }}>
-                    <Typography noWrap sx={{ fontWeight: 600, fontSize: '0.875rem', flex: 1 }}>
-                      {review.title}
-                    </Typography>
-                    {ownerCues && readyToFinalize(review) ? (
-                      <ToneBadge
-                        tone="green"
-                        label="Ready to finalize"
-                        icon={<CircleCheck size={11} aria-hidden />}
-                      />
-                    ) : (
-                      <ToneBadge
-                        tone={WORKFLOW_TONES[review.workflowState] ?? 'neutral'}
-                        label={workflowLabel(review.workflowState)}
-                      />
-                    )}
-                  </Stack>
-                  <Stack
-                    direction="row"
-                    spacing={1.25}
-                    sx={{ alignItems: 'center', mt: 0.5, minWidth: 0 }}
-                  >
-                    {progress ? (
-                      <>
-                        <ProgressBar
-                          resolved={progress.resolved}
-                          total={progress.total}
-                          color={theme.qnop.brand.blue}
-                        />
-                        <Typography variant="caption" color="text.secondary" sx={{ flexShrink: 0 }}>
-                          {progress.resolved}/{progress.total} resolved
+                  <Stack direction="row" spacing={1.25} sx={{ alignItems: 'center', minWidth: 0 }}>
+                    <DocumentIcon size={26} contentType={review.contentType} />
+                    <Box sx={{ flex: 1, minWidth: 0 }}>
+                      <Stack direction="row" spacing={1} sx={{ alignItems: 'center', minWidth: 0 }}>
+                        <Typography noWrap sx={{ fontWeight: 600, fontSize: '0.875rem', flex: 1 }}>
+                          {review.title}
                         </Typography>
-                      </>
-                    ) : (
-                      <Typography variant="caption" color="text.secondary">
-                        No annotations yet
-                      </Typography>
-                    )}
-                    <Box sx={{ flex: 1 }} />
-                    <ReviewerStack
-                      participants={review.participants ?? []}
-                      anonymous={review.anonymous}
-                    />
-                    <DueDateLabel dueAt={review.dueAt} workflowState={review.workflowState} />
+                        {ownerCues && readyToFinalize(review) ? (
+                          <ToneBadge
+                            tone="green"
+                            label="Ready to finalize"
+                            icon={<CircleCheck size={11} aria-hidden />}
+                          />
+                        ) : (
+                          <ToneBadge
+                            tone={WORKFLOW_TONES[review.workflowState] ?? 'neutral'}
+                            label={workflowLabel(review.workflowState)}
+                          />
+                        )}
+                      </Stack>
+                      <Stack
+                        direction="row"
+                        spacing={1.25}
+                        sx={{ alignItems: 'center', mt: 0.5, minWidth: 0 }}
+                      >
+                        {progress ? (
+                          <>
+                            <ProgressBar
+                              resolved={progress.resolved}
+                              total={progress.total}
+                              color={theme.qnop.brand.blue}
+                            />
+                            <Typography
+                              variant="caption"
+                              color="text.secondary"
+                              sx={{ flexShrink: 0 }}
+                            >
+                              {progress.resolved}/{progress.total} resolved
+                            </Typography>
+                          </>
+                        ) : (
+                          <Typography variant="caption" color="text.secondary">
+                            No annotations yet
+                          </Typography>
+                        )}
+                        <Box sx={{ flex: 1 }} />
+                        <ReviewerStack
+                          participants={review.participants ?? []}
+                          anonymous={review.anonymous}
+                        />
+                        <DueDateLabel dueAt={review.dueAt} workflowState={review.workflowState} />
+                      </Stack>
+                    </Box>
                   </Stack>
                 </ButtonBase>
               );
