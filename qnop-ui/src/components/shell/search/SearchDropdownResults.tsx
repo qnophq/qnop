@@ -38,22 +38,17 @@ import {
   UsersRound,
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
-import type { DiscussionSearchHit, GlobalSearchResponse } from '../../../api/generated';
+import type { GlobalSearchResponse } from '../../../api/generated';
 import { AnnotationStatus } from '../../../api/generated';
 import { useAuthStore } from '../../../stores/authStore';
 import { ToneBadge } from '../../admin/ToneBadge';
 import { MilestoneDots } from '../../reviews/MilestoneDots';
 import { STATUS_CUES } from '../../reviews/panel/statusCues';
 import { UserAvatar } from '../UserAvatar';
+import { discussionHitPath } from './searchPaths';
 
 /** The results page's type segment for a group's "see all" continuation. */
 type ResultType = 'reviews' | 'annotations' | 'comments' | 'users' | 'teams';
-
-/** The thread deep link of a discussion hit: `?annotation=` plus `&comment=` for a reply. */
-export function discussionHitPath(hit: DiscussionSearchHit, reply: boolean): string {
-  const base = `/reviews/${hit.documentSlug ?? hit.documentId}?annotation=${hit.annotationId}`;
-  return reply ? `${base}&comment=${hit.commentId}` : base;
-}
 
 /**
  * The quickview body of the global search (issue #540): five counted

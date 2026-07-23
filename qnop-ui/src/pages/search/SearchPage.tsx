@@ -42,10 +42,8 @@ import { PageHeader } from '../../components/admin/layout/PageHeader';
 import { SectionCard } from '../../components/admin/layout/SectionCard';
 import { PersonLink } from '../../components/dashboard/PersonLink';
 import { WorkflowMilestones } from '../../components/reviews/WorkflowMilestones';
-import {
-  StatusCueIcon,
-  discussionHitPath,
-} from '../../components/shell/search/SearchDropdownResults';
+import { StatusCueIcon } from '../../components/shell/search/SearchDropdownResults';
+import { discussionHitPath } from '../../components/shell/search/searchPaths';
 
 /** The result types the page can list; kept in the URL as `type`. */
 const RESULT_TYPES = ['reviews', 'annotations', 'comments', 'users', 'teams'] as const;
