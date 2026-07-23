@@ -37,9 +37,11 @@ import io.qnop.service.TeamService.MemberTeamView;
 import io.qnop.service.TeamService.TeamMemberView;
 import io.qnop.service.UserNotFoundException;
 import io.qnop.service.avatar.AvatarService;
+import io.qnop.service.avatar.TeamAvatarService;
 import java.time.Instant;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
+import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import org.springframework.http.HttpStatus;
@@ -61,18 +63,29 @@ public class MyTeamsController implements TeamsApi {
 
   private final TeamService teams;
   private final AvatarService avatars;
+  private final TeamAvatarService teamAvatars;
 
-  public MyTeamsController(TeamService teams, AvatarService avatars) {
+  public MyTeamsController(
+      TeamService teams, AvatarService avatars, TeamAvatarService teamAvatars) {
     this.teams = teams;
     this.avatars = avatars;
+    this.teamAvatars = teamAvatars;
   }
 
   @Override
   public ResponseEntity<MyTeamListResponse> listMyTeams() {
     UUID userId = CurrentUser.requireUserId();
+    List<TeamService.MyTeamView> mine = teams.listMyTeams(userId);
+    // One batched team-avatar lookup for the whole list so building URLs never streams bytes
+    // (#509).
+    Map<UUID, Instant> avatarTs =
+        teamAvatars.updatedAt(mine.stream().map(TeamService.MyTeamView::teamId).toList());
     return ResponseEntity.ok(
         new MyTeamListResponse()
-            .items(teams.listMyTeams(userId).stream().map(MyTeamsController::toMyTeam).toList()));
+            .items(
+                mine.stream()
+                    .map(v -> toMyTeam(v, AvatarUrls.forTeam(v.teamId(), avatarTs.get(v.teamId()))))
+                    .toList()));
   }
 
   @Override
@@ -143,13 +156,14 @@ public class MyTeamsController implements TeamsApi {
                 .timestamp(OffsetDateTime.now(ZoneOffset.UTC)));
   }
 
-  private static MyTeam toMyTeam(TeamService.MyTeamView v) {
+  private static MyTeam toMyTeam(TeamService.MyTeamView v, String avatarUrl) {
     return new MyTeam()
         .teamId(v.teamId())
         .name(v.name())
         .slug(v.slug())
         .teamRole(TeamRole.fromValue(v.teamRole()))
-        .memberCount(v.memberCount());
+        .memberCount(v.memberCount())
+        .avatarUrl(avatarUrl);
   }
 
   private TeamDetail toDetail(MemberTeamView v) {
@@ -162,6 +176,7 @@ public class MyTeamsController implements TeamsApi {
         .name(v.name())
         .slug(v.slug())
         .description(v.description())
+        .avatarUrl(AvatarUrls.forTeam(v.id(), teamAvatars.updatedAt(v.id()).orElse(null)))
         .viewerRole(v.viewerRole() == null ? null : TeamRole.fromValue(v.viewerRole()))
         .viewerCanManage(v.canManage())
         .members(

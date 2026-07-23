@@ -5050,6 +5050,12 @@ components:
         memberCount:
           type: integer
           format: int64
+        avatarUrl:
+          type: string
+          nullable: true
+          description: >-
+            The team's avatar URL with a cache-buster (issue #509), or null when
+            none is set so the SPA renders the initials crest.
         createdAt:
           type: string
           format: date-time
@@ -5077,6 +5083,12 @@ components:
           nullable: true
         enabled:
           type: boolean
+        avatarUrl:
+          type: string
+          nullable: true
+          description: >-
+            The team's avatar URL with a cache-buster (issue #509), or null when
+            none is set so the SPA renders the initials crest.
         createdAt:
           type: string
           format: date-time
@@ -5183,6 +5195,12 @@ components:
           type: integer
           format: int64
           description: How many members the team has — drives the "My Teams" roster tier.
+        avatarUrl:
+          type: string
+          nullable: true
+          description: >-
+            The team's avatar URL with a cache-buster (issue #509), or null when
+            none is set so the SPA renders the initials crest.
       required:
         - teamId
         - name
@@ -5249,6 +5267,12 @@ components:
         description:
           type: string
           nullable: true
+        avatarUrl:
+          type: string
+          nullable: true
+          description: >-
+            The team's avatar URL with a cache-buster (issue #509), or null when
+            none is set so the SPA renders the initials crest.
         viewerRole:
           allOf:
             - $ref: '#/components/schemas/TeamRole'
