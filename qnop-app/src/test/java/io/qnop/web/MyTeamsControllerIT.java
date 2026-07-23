@@ -348,6 +348,41 @@ class MyTeamsControllerIT extends AbstractIntegrationTest {
         .andExpect(status().isNoContent());
   }
 
+  @Test
+  void leadUpdatesTheTeamDescriptionButAPlainMemberCannot() throws Exception {
+    String admin = token(createUser("root", UserRole.ADMIN));
+    User lead = createUser("lead", UserRole.MEMBER);
+    User member = createUser("member", UserRole.MEMBER);
+    String teamId = createTeam(admin, "Core");
+    addMember(admin, teamId, lead, "LEAD");
+    addMember(admin, teamId, member, "MEMBER");
+
+    // The lead polishes the presentation (issue #509 follow-up) ...
+    mockMvc
+        .perform(
+            patch("/api/v1/teams/{id}", teamId)
+                .header("Authorization", bearer(token("lead")))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"description\":\"Contract review crew\"}"))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.description").value("Contract review crew"));
+
+    // ... the change is durable ...
+    mockMvc
+        .perform(get("/api/v1/teams/{id}", teamId).header("Authorization", bearer(token("member"))))
+        .andExpect(jsonPath("$.description").value("Contract review crew"));
+
+    // ... and a plain member may not touch it.
+    mockMvc
+        .perform(
+            patch("/api/v1/teams/{id}", teamId)
+                .header("Authorization", bearer(token("member")))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"description\":\"mine now\"}"))
+        .andExpect(status().isForbidden())
+        .andExpect(jsonPath("$.code").value("TEAM_ACCESS_FORBIDDEN"));
+  }
+
   private String createTeam(String token, String name) throws Exception {
     MvcResult result =
         mockMvc

@@ -43,4 +43,16 @@ final class AvatarUrls {
         + "/avatar?v="
         + updatedAt.toEpochMilli();
   }
+
+  /** The team counterpart (issue #509); {@code null} when the team has no avatar. */
+  static String forTeam(UUID teamId, Instant updatedAt) {
+    if (updatedAt == null) {
+      return null;
+    }
+    return ApiPathConfig.API_V1_PREFIX
+        + "/teams/"
+        + teamId
+        + "/avatar?v="
+        + updatedAt.toEpochMilli();
+  }
 }

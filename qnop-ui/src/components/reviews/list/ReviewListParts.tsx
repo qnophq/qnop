@@ -29,7 +29,8 @@ import type { ParticipantView } from '../../../api/generated';
 import { ToneBadge } from '../../admin/ToneBadge';
 import { UserHoverCard } from '../../people/UserHoverCard';
 import { UserAvatar } from '../../shell/UserAvatar';
-import { avatarSrc } from '../../../utils/avatarUrl';
+import { TeamAvatar } from '../../shell/TeamAvatar';
+import { avatarSrc, teamAvatarSrc } from '../../../utils/avatarUrl';
 
 /** Shared bits of the reviews overview: role badge, doc icon, progress, reviewer stack. */
 
@@ -158,16 +159,23 @@ export function ReviewerStack({
               zIndex: shown.length - index,
             }}
           >
-            <UserAvatar
-              name={participant.displayName}
-              size={24}
-              // Public read path (ADR-0031); a 404 quietly falls back to initials.
-              imageUrl={
-                participant.kind === 'USER'
-                  ? `/api/v1/users/${participant.principalId}/avatar`
-                  : null
-              }
-            />
+            {participant.kind === 'TEAM' ? (
+              // Team picture (issue #509); an anonymised roster carries a
+              // synthetic token instead of the team id, so no URL is built —
+              // the initials fallback keeps the pseudonym airtight.
+              <TeamAvatar
+                name={participant.displayName}
+                size={24}
+                imageUrl={anonymous ? null : teamAvatarSrc(participant.principalId)}
+              />
+            ) : (
+              <UserAvatar
+                name={participant.displayName}
+                size={24}
+                // Public read path (ADR-0031); a 404 quietly falls back to initials.
+                imageUrl={avatarSrc(participant.principalId)}
+              />
+            )}
           </Box>
         );
         return (

@@ -296,6 +296,20 @@ public class TeamService {
     }
   }
 
+  /**
+   * Update the team's description as one of its leads (or an admin) — the self-manage counterpart
+   * of the admin edit (issue #509 follow-up). Deliberately narrow: the name, slug and enabled flag
+   * stay admin concerns, so a lead can polish their team's presentation but never rename or disable
+   * it. A blank description clears it.
+   */
+  @Transactional
+  public void updateDescriptionAsLead(
+      UUID teamId, UUID actorId, boolean admin, String description) {
+    requireLeadOrAdmin(teamId, actorId, admin);
+    Team team = teams.findById(teamId).orElseThrow(() -> TeamNotFoundException.team(teamId));
+    team.setDescription(blankToNull(description));
+  }
+
   /** Add a member as a lead of the team (or an admin); otherwise 403 (issue #470). */
   @Transactional
   public TeamMemberView addMemberAsLead(

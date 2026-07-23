@@ -22,6 +22,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import type { MyTeamListResponse, TeamDetail, TeamRole } from '../generated';
 import { teamsApi } from '../config';
+import { teamKeys } from './useTeams';
 
 /**
  * Non-admin "My Teams" hooks (issue #470). Every authenticated user reaches the
@@ -55,6 +56,28 @@ export function useMyTeam(id: string) {
     queryFn: async () => {
       const response = await teamsApi.getMyTeam({ teamId: id });
       return response.data;
+    },
+  });
+}
+
+/**
+ * A lead's (or admin's) self-manage team update (issue #509 follow-up):
+ * currently only the description. Refreshes both team cache families so the
+ * new text shows on My Teams and the admin surfaces alike.
+ */
+export function useUpdateMyTeam() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (vars: { teamId: string; description: string | null }) => {
+      const response = await teamsApi.updateMyTeam({
+        teamId: vars.teamId,
+        myTeamUpdateRequest: { description: vars.description ?? undefined },
+      });
+      return response.data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: myTeamKeys.all });
+      queryClient.invalidateQueries({ queryKey: teamKeys.all });
     },
   });
 }

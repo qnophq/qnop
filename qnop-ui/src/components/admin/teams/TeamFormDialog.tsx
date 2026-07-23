@@ -33,6 +33,8 @@ import Switch from '@mui/material/Switch';
 import TextField from '@mui/material/TextField';
 import type { AdminTeamSummary } from '../../../api/generated';
 import { useCreateTeam, useUpdateTeam } from '../../../api/hooks/useTeams';
+import { useRemoveTeamAvatar, useUploadTeamAvatar } from '../../../api/hooks/useTeamAvatar';
+import { AvatarUploader } from '../../profile/AvatarUploader';
 import { apiErrorCode, apiErrorMessage, apiFieldErrors } from '../../../utils/apiError';
 
 interface TeamFormDialogProps {
@@ -50,6 +52,8 @@ interface TeamFormDialogProps {
 export function TeamFormDialog({ open, mode, team, onClose }: TeamFormDialogProps) {
   const createTeam = useCreateTeam();
   const updateTeam = useUpdateTeam();
+  const uploadAvatar = useUploadTeamAvatar();
+  const removeAvatar = useRemoveTeamAvatar();
 
   const editing = mode === 'edit' && team;
   const [name, setName] = useState(editing ? team.name : '');
@@ -59,8 +63,37 @@ export function TeamFormDialog({ open, mode, team, onClose }: TeamFormDialogProp
   const [submitAttempted, setSubmitAttempted] = useState(false);
   const [serverErrors, setServerErrors] = useState<Record<string, string>>({});
 
-  const submitting = createTeam.isPending || updateTeam.isPending;
+  // Avatar: in edit mode we upload/remove immediately against the existing team; in create mode we
+  // hold the chosen image and upload it to the new team after it's created (create-then-upload).
+  const [avatarUrl, setAvatarUrl] = useState<string | null>(
+    editing ? (team.avatarUrl ?? null) : null,
+  );
+  const [pendingAvatar, setPendingAvatar] = useState<Blob | null>(null);
+
   const isEdit = mode === 'edit';
+  const avatarBusy = uploadAvatar.isPending || removeAvatar.isPending;
+  const submitting = createTeam.isPending || updateTeam.isPending || avatarBusy;
+
+  const onSelectAvatar = (blob: Blob) => {
+    if (isEdit && team) {
+      uploadAvatar.mutate(
+        { teamId: team.id, file: blob },
+        { onSuccess: (res) => setAvatarUrl(res.avatarUrl ?? null) },
+      );
+    } else {
+      setPendingAvatar(blob);
+      setAvatarUrl(URL.createObjectURL(blob));
+    }
+  };
+
+  const onRemoveAvatar = () => {
+    if (isEdit && team) {
+      removeAvatar.mutate(team.id, { onSuccess: () => setAvatarUrl(null) });
+    } else {
+      setPendingAvatar(null);
+      setAvatarUrl(null);
+    }
+  };
 
   const clientErrors: Record<string, string> = {};
   if (name.trim().length === 0) {
@@ -89,7 +122,14 @@ export function TeamFormDialog({ open, mode, team, onClose }: TeamFormDialogProp
       if (isEdit && team) {
         await updateTeam.mutateAsync({ id: team.id, request: { name, description, enabled } });
       } else {
-        await createTeam.mutateAsync({ name, description: description || undefined });
+        const created = await createTeam.mutateAsync({
+          name,
+          description: description || undefined,
+        });
+        // Create-then-upload: the team now has an id, so set the chosen picture on it.
+        if (pendingAvatar) {
+          await uploadAvatar.mutateAsync({ teamId: created.id, file: pendingAvatar });
+        }
       }
       onClose();
     } catch (err) {
@@ -112,6 +152,13 @@ export function TeamFormDialog({ open, mode, team, onClose }: TeamFormDialogProp
         <DialogTitle>{isEdit ? 'Edit team' : 'Create team'}</DialogTitle>
         <DialogContent>
           <Stack spacing={2.5} sx={{ mt: 1 }}>
+            <AvatarUploader
+              name={name || 'Team'}
+              imageUrl={avatarUrl}
+              busy={avatarBusy}
+              onSelect={onSelectAvatar}
+              onRemove={onRemoveAvatar}
+            />
             <TextField
               label="Name"
               value={name}

@@ -21,14 +21,43 @@
 
 import MuiBreadcrumbs from '@mui/material/Breadcrumbs';
 import Link from '@mui/material/Link';
+import Stack from '@mui/material/Stack';
 import Typography from '@mui/material/Typography';
 import { ChevronRight } from 'lucide-react';
 import { Link as RouterLink, useLocation } from 'react-router-dom';
+import { useTeam } from '../../api/hooks/useTeams';
+import { useMyTeam } from '../../api/hooks/useMyTeams';
+import { TeamAvatar } from './TeamAvatar';
 import { crumbsFor } from './navConfig';
+
+/** The final breadcrumb on a team-detail page: the team's avatar + name (issue #509). */
+function TeamCrumbInner({ name, avatarUrl }: { name: string; avatarUrl?: string | null }) {
+  return (
+    <Stack direction="row" spacing={0.75} sx={{ alignItems: 'center' }}>
+      <TeamAvatar name={name} imageUrl={avatarUrl} size={18} />
+      <Typography sx={{ fontSize: 13, color: 'text.primary', fontWeight: 500 }}>{name}</Typography>
+    </Stack>
+  );
+}
+
+/** Resolves the admin team (by id) so the /admin/teams/:id crumb shows its name + avatar. */
+function AdminTeamCrumb({ id }: { id: string }) {
+  const { data } = useTeam(id);
+  return data ? <TeamCrumbInner name={data.name} avatarUrl={data.avatarUrl} /> : null;
+}
+
+/** Resolves a My-Teams team (by id or slug) so its detail crumb shows its name + avatar. */
+function MyTeamCrumb({ id }: { id: string }) {
+  const { data } = useMyTeam(id);
+  return data ? <TeamCrumbInner name={data.name} avatarUrl={data.avatarUrl} /> : null;
+}
 
 export function Breadcrumbs() {
   const { pathname } = useLocation();
   const crumbs = crumbsFor(pathname);
+  // A team-detail page appends a resolved crumb (name + avatar) after the "Teams" link (issue #509).
+  const adminTeam = pathname.match(/^\/admin\/teams\/([^/]+)$/);
+  const myTeam = pathname.match(/^\/my-teams\/([^/]+)$/);
 
   return (
     <MuiBreadcrumbs
@@ -66,6 +95,8 @@ export function Breadcrumbs() {
           </Typography>
         );
       })}
+      {adminTeam ? <AdminTeamCrumb key="team" id={adminTeam[1]} /> : null}
+      {myTeam ? <MyTeamCrumb key="team" id={myTeam[1]} /> : null}
     </MuiBreadcrumbs>
   );
 }

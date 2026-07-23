@@ -144,6 +144,10 @@ public class SecurityConfiguration {
                     // and delete stay authenticated/admin via the matchers below.
                     .requestMatchers(HttpMethod.GET, "/api/v1/users/*/avatar")
                     .permitAll()
+                    // Team avatars are public for display too (issue #509); writes stay
+                    // admin (/admin/teams/**) or authenticated+lead-gated (/teams/*/avatar).
+                    .requestMatchers(HttpMethod.GET, "/api/v1/teams/*/avatar")
+                    .permitAll()
                     // The SPA needs the public server config before authentication
                     // (enabled OIDC providers, self-registration, edition). OpenAPI
                     // declares GET /config as security: [] — honour that here.

@@ -292,6 +292,29 @@ class TeamServiceTest {
   }
 
   @Test
+  @DisplayName("a lead (or admin) updates the description; anyone else is refused (#509)")
+  void leadUpdatesTheDescription() {
+    UUID teamId = UUID.randomUUID();
+    UUID lead = UUID.randomUUID();
+    UUID stranger = UUID.randomUUID();
+    Team team = Team.create("Alpha", "old text");
+    when(teams.findById(teamId)).thenReturn(Optional.of(team));
+    when(memberships.existsByTeamIdAndUserIdAndTeamRole(teamId, lead, TeamRole.LEAD))
+        .thenReturn(true);
+
+    service.updateDescriptionAsLead(teamId, lead, false, "Contract review crew");
+    assertThat(team.getDescription()).isEqualTo("Contract review crew");
+
+    // A blank description clears it; an admin needs no membership.
+    service.updateDescriptionAsLead(teamId, UUID.randomUUID(), true, "   ");
+    assertThat(team.getDescription()).isNull();
+
+    assertThatThrownBy(() -> service.updateDescriptionAsLead(teamId, stranger, false, "nope"))
+        .isInstanceOf(TeamAccessForbiddenException.class);
+    assertThat(team.getDescription()).isNull();
+  }
+
+  @Test
   @DisplayName("a lead of the team may add a member; an admin passes without a lead check")
   void leadOrAdminMayAdd() {
     UUID teamId = UUID.randomUUID();

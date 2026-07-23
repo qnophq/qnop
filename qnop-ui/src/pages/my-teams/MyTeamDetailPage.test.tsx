@@ -45,6 +45,18 @@ vi.mock('../../api/hooks/useMyTeams', () => ({
   useRemoveMyTeamMember: () => ({ mutate: removeMemberMutate }),
 }));
 
+vi.mock('../../components/my-teams/EditMyTeamDialog', () => ({
+  EditMyTeamDialog: (props: { open: boolean; team: TeamDetail; onClose: () => void }) =>
+    props.open ? (
+      <div data-testid="edit-team-dialog">
+        <span data-testid="edit-team-name">{props.team.name}</span>
+        <button type="button" onClick={props.onClose}>
+          close-edit
+        </button>
+      </div>
+    ) : null,
+}));
+
 vi.mock('../../components/my-teams/AddMyTeamMemberDialog', () => ({
   AddMyTeamMemberDialog: (props: {
     open: boolean;
@@ -215,6 +227,18 @@ describe('MyTeamDetailPage', () => {
     await waitFor(() => expect(screen.queryByTestId('add-member-dialog')).toBeNull());
   });
 
+  it('lets a lead edit the team presentation — avatar + description (#509)', async () => {
+    renderPage();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Edit team' }));
+
+    expect(await screen.findByTestId('edit-team-dialog')).toBeTruthy();
+    expect(screen.getByTestId('edit-team-name').textContent).toBe('Platform');
+
+    fireEvent.click(screen.getByRole('button', { name: 'close-edit' }));
+    await waitFor(() => expect(screen.queryByTestId('edit-team-dialog')).toBeNull());
+  });
+
   it('renders a read-only roster with no management affordances for a plain member', () => {
     teamState.data = makeTeam({ viewerRole: 'MEMBER', viewerCanManage: false });
     renderPage();
@@ -223,6 +247,7 @@ describe('MyTeamDetailPage', () => {
     expect(screen.getByRole('link', { name: "View Ada Lovelace's profile" })).toBeTruthy();
     // ...but nothing can be managed.
     expect(screen.queryByRole('button', { name: 'Add member' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Edit team' })).toBeNull();
     expect(screen.queryByRole('button', { name: 'Actions for Ada Lovelace' })).toBeNull();
     expect(screen.queryByRole('columnheader', { name: 'Actions' })).toBeNull();
   });
