@@ -59,6 +59,10 @@ public class AvatarValidationException extends RuntimeException {
     return new AvatarValidationException(404, "USER_NOT_FOUND", detail);
   }
 
+  public static AvatarValidationException teamNotFound(String detail) {
+    return new AvatarValidationException(404, "TEAM_NOT_FOUND", detail);
+  }
+
   public static AvatarValidationException notFound(String detail) {
     return new AvatarValidationException(404, "NOT_FOUND", detail);
   }

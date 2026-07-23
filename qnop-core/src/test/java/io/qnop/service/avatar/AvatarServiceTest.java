@@ -54,7 +54,9 @@ class AvatarServiceTest {
   void setUp() {
     storage = mock(AvatarStorage.class);
     users = mock(UserRepository.class);
-    service = new AvatarService(storage, users);
+    // The image validation lives in AvatarImageValidator now (issue #509); a real one keeps the
+    // sniff/dimension/hash assertions in this suite exercising the same logic.
+    service = new AvatarService(storage, users, new AvatarImageValidator());
     when(users.existsById(userId)).thenReturn(true);
     when(storage.findUpdatedAt(userId))
         .thenReturn(Optional.of(Instant.parse("2026-06-26T00:00:00Z")));
