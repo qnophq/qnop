@@ -266,4 +266,68 @@ class SearchControllerIT extends SeededIntegrationTest {
   void anonymousIsUnauthorized() throws Exception {
     mockMvc.perform(get("/api/v1/search?q=alpha")).andExpect(status().isUnauthorized());
   }
+
+  @Test
+  void teamParticipantsFindTheReviewThroughTheirTeam() throws Exception {
+    // Beta = Mia (LEAD) + Max (MEMBER); the review joins the TEAM, not the users.
+    Document document = documents.save(new Document(ADMIN_ID, "Velvet quarterly numbers"));
+    participants.save(ReviewParticipant.forTeam(document.getId(), TEAM_BETA_ID));
+
+    // The third findVisibleTo branch: visible through team membership alone.
+    mockMvc
+        .perform(search("/api/v1/search?q=velvet", MEMBER2_ID))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.reviews.total").value(1));
+
+    // Avery is in Alpha, not Beta — the team path does not leak sideways.
+    mockMvc
+        .perform(search("/api/v1/search?q=velvet", AUDITOR_ID))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.reviews.total").value(0));
+  }
+
+  @Test
+  void pagedTeamsCarryViewableAndTheEnvelope() throws Exception {
+    // Max is not in Alpha: listed, locked — through the PAGED variant.
+    mockMvc
+        .perform(search("/api/v1/search/teams?q=Alpha&page=0&size=5", MEMBER2_ID))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.total").value(1))
+        .andExpect(jsonPath("$.page").value(0))
+        .andExpect(jsonPath("$.size").value(5))
+        .andExpect(jsonPath("$.items[0].name").value("Alpha"))
+        .andExpect(jsonPath("$.items[0].viewable").value(false));
+
+    // Mia is an Alpha member — same endpoint, reachable roster.
+    mockMvc
+        .perform(search("/api/v1/search/teams?q=Alpha", MEMBER_ID))
+        .andExpect(jsonPath("$.items[0].viewable").value(true));
+  }
+
+  @Test
+  void pagedUsersFindByNameWithTheirProfileFacts() throws Exception {
+    mockMvc
+        .perform(search("/api/v1/search/users?q=Mia", MEMBER2_ID))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.total").value(1))
+        .andExpect(jsonPath("$.items[0].displayName").value("Mia Member"))
+        .andExpect(jsonPath("$.items[0].slug").value("mia-member"));
+  }
+
+  @Test
+  void typedEndpointsAnswerShortQueriesEmptyToo() throws Exception {
+    mockMvc
+        .perform(search("/api/v1/search/annotations?q=a", MEMBER_ID))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.total").value(0))
+        .andExpect(jsonPath("$.items.length()").value(0));
+    mockMvc
+        .perform(search("/api/v1/search/comments?q=a", MEMBER_ID))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.total").value(0));
+    mockMvc
+        .perform(search("/api/v1/search/teams?q=a", MEMBER_ID))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.total").value(0));
+  }
 }
