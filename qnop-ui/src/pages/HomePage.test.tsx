@@ -146,6 +146,13 @@ describe('HomePage dashboard (issue #454)', () => {
     expect(screen.getByText('Ready to finalize')).toBeInTheDocument();
   });
 
+  it('leads each review row with the typed document icon', () => {
+    mockData([review({ id: 'w1', title: 'A pdf review', contentType: 'application/pdf' })]);
+    renderPage();
+
+    expect(screen.getByRole('img', { name: 'PDF document' })).toBeInTheDocument();
+  });
+
   it('lists deadlines with the urgency label and links replies into the thread', () => {
     mockData([review({ id: 'd-due', title: 'Due thing', dueAt: '2020-01-01T00:00:00Z' })], {
       replies: [

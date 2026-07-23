@@ -25,6 +25,7 @@ import { PageHeader } from '../../admin/layout/PageHeader';
 import type { Notify } from '../../admin/layout/useToast';
 import { useAuthStore } from '../../../stores/authStore';
 import { AnonymousBadge } from '../AnonymousBadge';
+import { DocumentIcon } from '../list/ReviewListParts';
 import { WorkflowMilestones } from '../WorkflowMilestones';
 import { useReviewDocumentId } from '../reviewDocumentId';
 import { ReviewHubHead } from './ReviewHubHead';
@@ -60,6 +61,7 @@ export function ReviewPageHeader({
   return (
     <PageHeader
       title={document.title}
+      leading={<DocumentIcon size={34} contentType={document.contentType} />}
       titleAdornment={
         <>
           <WorkflowMilestones

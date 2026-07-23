@@ -82,16 +82,14 @@ public class DocumentUpdateService {
           new AuditEvent(
               document.getId(), AUDIT_DUE_DATE_CHANGED, actor, changeDetail(previous, dueAt)));
     }
-    int latest =
-        versions
-            .findTopByDocumentIdOrderByVersionNumberDesc(documentId)
-            .map(DocumentVersion::getVersionNumber)
-            .orElse(0);
+    java.util.Optional<DocumentVersion> latest =
+        versions.findTopByDocumentIdOrderByVersionNumberDesc(documentId);
     java.util.Optional<User> owner = users.findById(document.getOwnerId());
     return new DocumentView(
         document.getId(),
         document.getTitle(),
         document.getSlug(),
+        latest.map(DocumentVersion::getContentType).orElse(null),
         document.isAnonymous(),
         document.getThreadParticipation().name(),
         document.getOwnerId(),
@@ -99,7 +97,7 @@ public class DocumentUpdateService {
         owner.map(User::getSlug).orElse(null),
         owner.map(User::getDisplayName).orElse(null),
         document.getWorkflowState(),
-        latest,
+        latest.map(DocumentVersion::getVersionNumber).orElse(0),
         document.getCreatedAt(),
         document.getUpdatedAt(),
         document.getDueAt());

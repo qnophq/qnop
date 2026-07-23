@@ -96,6 +96,7 @@ class AnnotationServiceTest {
         documentId,
         "Doc",
         null,
+        "application/pdf",
         false,
         threadParticipation,
         ownerId,
