@@ -28,20 +28,20 @@ import java.util.regex.Pattern;
 
 /**
  * Extracts mentioned user ids from a comment body (issue #462). The composer inserts a canonical,
- * id-based token — {@code @[Display Name](mention:<uuid>)} — rather than {@code @username}, because
- * OIDC users may have no username while every roster member has an id. The token is shaped like a
- * Markdown link, so an un-enhanced renderer still shows the name; qnop's renderer special-cases the
- * {@code mention:} scheme into a highlighted profile link.
+ * id-based token — {@code [@Display Name](mention:<uuid>)} — rather than {@code @username}, because
+ * OIDC users may have no username while every roster member has an id. The token is a Markdown link
+ * whose text starts with {@code @}, so an un-enhanced renderer still shows "@Name"; qnop's renderer
+ * special-cases the {@code mention:} scheme into a highlighted profile pill.
  *
  * <p>Pure and DB-free: this only pulls the ids out of the text. Access-scoping (keep only ids on
  * the document roster) and anonymity handling live in {@link CommentMentionService}.
  */
 public final class MentionParser {
 
-  /** {@code @[label](mention:<uuid>)} — the label is free text, the id is a canonical UUID. */
+  /** {@code [@label](mention:<uuid>)} — the label starts with @, the id is a canonical UUID. */
   private static final Pattern MENTION =
       Pattern.compile(
-          "@\\[[^\\]]*]\\(mention:"
+          "\\[@[^\\]]*]\\(mention:"
               + "([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12})\\)");
 
   private MentionParser() {}

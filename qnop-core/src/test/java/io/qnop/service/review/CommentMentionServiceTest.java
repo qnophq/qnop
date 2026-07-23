@@ -62,7 +62,7 @@ class CommentMentionServiceTest {
   }
 
   private static String token(UUID id) {
-    return "@[Someone](mention:" + id + ")";
+    return "[@Someone](mention:" + id + ")";
   }
 
   @Test

@@ -32,7 +32,7 @@ class MentionParserTest {
   private static final UUID BOB = UUID.fromString("018f5a3e-0000-7000-8000-000000000002");
 
   private static String token(String label, UUID id) {
-    return "@[" + label + "](mention:" + id + ")";
+    return "[@" + label + "](mention:" + id + ")";
   }
 
   @Test
