@@ -57,4 +57,13 @@ describe('TeamAvatar', () => {
     renderAvatar(null);
     expect(screen.getByText('?')).toBeInTheDocument();
   });
+
+  it('carries the group marker in both crest and photo mode (#509 follow-up)', () => {
+    const first = renderAvatar('Alpha');
+    expect(first.container.querySelector('[data-testid="team-avatar-marker"]')).not.toBeNull();
+    first.unmount();
+
+    const second = renderAvatar('Alpha', '/api/v1/teams/t1/avatar');
+    expect(second.container.querySelector('[data-testid="team-avatar-marker"]')).not.toBeNull();
+  });
 });
