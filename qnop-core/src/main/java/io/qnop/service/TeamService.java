@@ -304,11 +304,22 @@ public class TeamService {
     return addMember(teamId, userId, teamRole);
   }
 
-  /** Change a member's role as a lead (or admin); refuses to demote the last lead (issue #470). */
+  /**
+   * Change a member's role as a lead (or admin); refuses to demote the last lead (issue #470). A
+   * non-admin lead may never change their OWN role here (issue #542 follow-up): demoting a lead is
+   * another lead's or an admin's call — otherwise a lead could quietly slip out of their
+   * responsibility (and self-promotion is meaningless, since only leads reach this path). Admins
+   * are exempt, in line with the admin-may-do-everything direction.
+   */
   @Transactional
   public TeamMemberView setMemberRoleAsLead(
       UUID teamId, UUID actorId, boolean admin, UUID userId, String teamRole) {
     requireLeadOrAdmin(teamId, actorId, admin);
+    if (!admin && actorId.equals(userId)) {
+      throw new TeamConflictException(
+          "SELF_ROLE_CHANGE",
+          "You cannot change your own role — ask another lead or an administrator.");
+    }
     // The last-lead guard and the team lock live in the base setMemberRole (issue #542),
     // so this self-service path is covered by the same invariant as the admin path.
     return setMemberRole(teamId, userId, teamRole);

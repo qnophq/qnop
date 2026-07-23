@@ -1569,7 +1569,9 @@ paths:
         A LEAD of the team (or an ADMIN) promotes a member to LEAD or demotes a
         LEAD to MEMBER (issue #470). Demoting the team's last remaining LEAD is
         rejected with 409 `LAST_LEAD`, which also prevents a sole lead from locking
-        themselves out. Any non-lead caller gets 403.
+        themselves out. A lead may not change their OWN role (409
+        `SELF_ROLE_CHANGE`) — demoting a lead is another lead's or an admin's
+        call; admins are exempt. Any non-lead caller gets 403.
       operationId: setMyTeamMemberRole
       security:
         - bearerAuth: []
@@ -1596,7 +1598,9 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
         '409':
-          description: The change would leave the team without a lead (`LAST_LEAD`)
+          description: >-
+            The change would leave the team without a lead (`LAST_LEAD`), or a
+            non-admin caller is changing their own role (`SELF_ROLE_CHANGE`)
           content:
             application/json:
               schema:

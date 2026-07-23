@@ -102,7 +102,7 @@ beforeEach(() => {
   teamState.data = makeTeam();
   teamState.isLoading = false;
   teamState.isError = false;
-  useAuthStore.setState({ userId: null });
+  useAuthStore.setState({ userId: null, role: null });
 });
 
 function renderPage() {
@@ -169,8 +169,19 @@ describe('MyTeamDetailPage', () => {
     expect(removeMemberMutate.mock.calls[0][0]).toEqual({ teamId: 't1', userId: 'u1' });
   });
 
-  it('never offers self-removal on the caller’s own row, but keeps the hand-over demote', async () => {
+  it('offers no actions at all on a non-admin lead’s own row (#542 follow-up)', () => {
     useAuthStore.setState({ userId: 'u1' }); // the caller is the lead Ada (u1)
+    renderPage();
+
+    // Demoting yourself is another lead's or an admin's call, and self-removal
+    // was already off the table — so the own row carries no actions menu at all.
+    expect(screen.queryByRole('button', { name: 'Actions for Ada Lovelace' })).toBeNull();
+    // Other rows keep their menu.
+    expect(screen.getByRole('button', { name: 'Actions for Alan Turing' })).toBeTruthy();
+  });
+
+  it('keeps the role change on an admin’s own row, but never self-removal', async () => {
+    useAuthStore.setState({ userId: 'u1', role: 'ADMIN' });
     renderPage();
 
     fireEvent.click(screen.getByRole('button', { name: 'Actions for Ada Lovelace' }));

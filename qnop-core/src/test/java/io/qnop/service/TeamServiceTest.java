@@ -330,8 +330,9 @@ class TeamServiceTest {
         .thenReturn(Optional.of(TeamMembership.of(teamId, lead, TeamRole.LEAD)));
     when(memberships.countByTeamId(teamId)).thenReturn(2L); // another member remains
 
-    // The sole lead cannot self-demote (last-lead) ...
-    assertThatThrownBy(() -> service.setMemberRoleAsLead(teamId, lead, false, lead, "MEMBER"))
+    // Even an admin cannot demote the sole lead (the admin actor also skips the
+    // self-role-change check, so this exercises the last-lead guard in isolation) ...
+    assertThatThrownBy(() -> service.setMemberRoleAsLead(teamId, admin, true, lead, "MEMBER"))
         .isInstanceOf(TeamConflictException.class)
         .extracting("code")
         .isEqualTo("LAST_LEAD");
@@ -342,6 +343,36 @@ class TeamServiceTest {
         .extracting("code")
         .isEqualTo("LAST_LEAD");
     verify(memberships, never()).delete(any());
+  }
+
+  @Test
+  @DisplayName("a lead cannot change their own role — another lead or an admin must (#542)")
+  void leadCannotChangeOwnRole() {
+    UUID teamId = UUID.randomUUID();
+    UUID lead = UUID.randomUUID();
+    when(memberships.existsByTeamIdAndUserIdAndTeamRole(teamId, lead, TeamRole.LEAD))
+        .thenReturn(true);
+
+    assertThatThrownBy(() -> service.setMemberRoleAsLead(teamId, lead, false, lead, "MEMBER"))
+        .isInstanceOf(TeamConflictException.class)
+        .extracting("code")
+        .isEqualTo("SELF_ROLE_CHANGE");
+    // The self-check fires before the membership is ever resolved, so it blocks
+    // self-demotion even when co-leads remain.
+    verify(memberships, never()).findByTeamIdAndUserId(any(), any());
+
+    // An admin changing their own role is exempt (admin-may-do-everything); the
+    // last-lead guard still applies and passes here because a co-lead remains.
+    UUID admin = UUID.randomUUID();
+    when(memberships.existsByTeamIdAndUserIdAndTeamRole(teamId, admin, TeamRole.LEAD))
+        .thenReturn(true);
+    when(memberships.countByTeamIdAndTeamRole(teamId, TeamRole.LEAD)).thenReturn(2L);
+    when(memberships.findByTeamIdAndUserId(teamId, admin))
+        .thenReturn(Optional.of(TeamMembership.of(teamId, admin, TeamRole.LEAD)));
+    when(users.findById(admin))
+        .thenReturn(Optional.of(User.internal("Ad", "ad@example.com", "ad", "h")));
+    assertThat(service.setMemberRoleAsLead(teamId, admin, true, admin, "MEMBER").teamRole())
+        .isEqualTo("MEMBER");
   }
 
   @Test
