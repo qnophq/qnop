@@ -346,7 +346,7 @@ class TeamServiceTest {
   }
 
   @Test
-  @DisplayName("a lead cannot change their own role — another lead or an admin must (#542)")
+  @DisplayName("nobody changes their own role through the self-management surface (#542)")
   void leadCannotChangeOwnRole() {
     UUID teamId = UUID.randomUUID();
     UUID lead = UUID.randomUUID();
@@ -357,22 +357,17 @@ class TeamServiceTest {
         .isInstanceOf(TeamConflictException.class)
         .extracting("code")
         .isEqualTo("SELF_ROLE_CHANGE");
+
+    // Admins included — mirroring SELF_REMOVAL: one's own role changes via the
+    // admin console, never through this surface.
+    UUID admin = UUID.randomUUID();
+    assertThatThrownBy(() -> service.setMemberRoleAsLead(teamId, admin, true, admin, "MEMBER"))
+        .isInstanceOf(TeamConflictException.class)
+        .extracting("code")
+        .isEqualTo("SELF_ROLE_CHANGE");
     // The self-check fires before the membership is ever resolved, so it blocks
     // self-demotion even when co-leads remain.
     verify(memberships, never()).findByTeamIdAndUserId(any(), any());
-
-    // An admin changing their own role is exempt (admin-may-do-everything); the
-    // last-lead guard still applies and passes here because a co-lead remains.
-    UUID admin = UUID.randomUUID();
-    when(memberships.existsByTeamIdAndUserIdAndTeamRole(teamId, admin, TeamRole.LEAD))
-        .thenReturn(true);
-    when(memberships.countByTeamIdAndTeamRole(teamId, TeamRole.LEAD)).thenReturn(2L);
-    when(memberships.findByTeamIdAndUserId(teamId, admin))
-        .thenReturn(Optional.of(TeamMembership.of(teamId, admin, TeamRole.LEAD)));
-    when(users.findById(admin))
-        .thenReturn(Optional.of(User.internal("Ad", "ad@example.com", "ad", "h")));
-    assertThat(service.setMemberRoleAsLead(teamId, admin, true, admin, "MEMBER").teamRole())
-        .isEqualTo("MEMBER");
   }
 
   @Test

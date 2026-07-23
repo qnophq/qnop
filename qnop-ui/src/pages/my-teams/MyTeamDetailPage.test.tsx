@@ -169,7 +169,7 @@ describe('MyTeamDetailPage', () => {
     expect(removeMemberMutate.mock.calls[0][0]).toEqual({ teamId: 't1', userId: 'u1' });
   });
 
-  it('offers no actions at all on a non-admin lead’s own row (#542 follow-up)', () => {
+  it('offers no actions at all on the caller’s own row (#542 follow-up)', () => {
     useAuthStore.setState({ userId: 'u1' }); // the caller is the lead Ada (u1)
     renderPage();
 
@@ -180,14 +180,12 @@ describe('MyTeamDetailPage', () => {
     expect(screen.getByRole('button', { name: 'Actions for Alan Turing' })).toBeTruthy();
   });
 
-  it('keeps the role change on an admin’s own row, but never self-removal', async () => {
+  it('hides the own-row actions for admins too — one’s own role changes in the admin console', () => {
     useAuthStore.setState({ userId: 'u1', role: 'ADMIN' });
     renderPage();
 
-    fireEvent.click(screen.getByRole('button', { name: 'Actions for Ada Lovelace' }));
-
-    expect(await screen.findByText('Make member')).toBeTruthy();
-    expect(screen.queryByText('Remove from team')).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Actions for Ada Lovelace' })).toBeNull();
+    expect(screen.getByRole('button', { name: 'Actions for Alan Turing' })).toBeTruthy();
   });
 
   it('surfaces an error toast when a removal is rejected (last-lead guard)', async () => {
