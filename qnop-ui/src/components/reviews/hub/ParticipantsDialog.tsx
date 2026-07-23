@@ -36,7 +36,7 @@ import TextField from '@mui/material/TextField';
 import Tooltip from '@mui/material/Tooltip';
 import Typography from '@mui/material/Typography';
 import { useTheme } from '@mui/material/styles';
-import { ChevronRight, Plus, Search, Users, X } from 'lucide-react';
+import { ChevronRight, Plus, Search, X } from 'lucide-react';
 import type { ParticipantView, PrincipalView } from '../../../api/generated';
 import { ParticipantKind } from '../../../api/generated';
 import {
@@ -49,7 +49,8 @@ import {
 import type { ToastSeverity } from '../../admin/layout/useToast';
 import { UserHoverCard } from '../../people/UserHoverCard';
 import { UserAvatar } from '../../shell/UserAvatar';
-import { avatarSrc } from '../../../utils/avatarUrl';
+import { avatarSrc, teamAvatarSrc } from '../../../utils/avatarUrl';
+import { TeamAvatar } from '../../shell/TeamAvatar';
 import { apiErrorCode } from '../../../utils/apiError';
 
 /** Known participant conflicts — codes map to friendly text (never server prose). */
@@ -70,26 +71,19 @@ interface ParticipantsDialogProps {
   notify: (message: string, severity?: ToastSeverity) => void;
 }
 
-function PrincipalIcon({ kind, size }: { kind: ParticipantKind; size: number }) {
-  const theme = useTheme();
+function PrincipalIcon({
+  kind,
+  size,
+  name,
+  imageUrl,
+}: {
+  kind: ParticipantKind;
+  size: number;
+  name: string;
+  imageUrl?: string | null;
+}) {
   if (kind !== ParticipantKind.Team) return null;
-  return (
-    <Box
-      sx={{
-        width: size,
-        height: size,
-        borderRadius: '50%',
-        bgcolor: theme.qnop.surface2,
-        color: 'text.secondary',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        flexShrink: 0,
-      }}
-    >
-      <Users size={Math.round(size / 2)} aria-hidden />
-    </Box>
-  );
+  return <TeamAvatar name={name} size={size} imageUrl={imageUrl} />;
 }
 
 /** View & (owner-only) manage the reviewers of one document. */
@@ -231,7 +225,12 @@ export function ParticipantsDialog({
                       ) : null}
                       {isTeam ? (
                         <>
-                          <PrincipalIcon kind={participant.kind} size={28} />
+                          <PrincipalIcon
+                            kind={participant.kind}
+                            size={28}
+                            name={participant.displayName}
+                            imageUrl={teamAvatarSrc(participant.principalId)}
+                          />
                           <Box sx={{ flex: 1, minWidth: 0 }}>
                             <Typography variant="body2" noWrap sx={{ fontWeight: 500 }}>
                               {participant.displayName}
@@ -344,7 +343,12 @@ export function ParticipantsDialog({
                       }}
                     >
                       {principal.kind === ParticipantKind.Team ? (
-                        <PrincipalIcon kind={principal.kind} size={26} />
+                        <PrincipalIcon
+                          kind={principal.kind}
+                          size={26}
+                          name={principal.displayName}
+                          imageUrl={principal.avatarUrl}
+                        />
                       ) : (
                         <UserAvatar
                           name={principal.displayName}

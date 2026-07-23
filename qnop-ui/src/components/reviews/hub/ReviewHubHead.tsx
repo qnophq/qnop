@@ -30,7 +30,7 @@ import Stack from '@mui/material/Stack';
 import Tooltip from '@mui/material/Tooltip';
 import Typography from '@mui/material/Typography';
 import { useTheme } from '@mui/material/styles';
-import { CalendarClock, ChevronDown, Upload, UserPlus, Users } from 'lucide-react';
+import { CalendarClock, ChevronDown, Upload, UserPlus } from 'lucide-react';
 import type { AnnotationView } from '../../../api/generated';
 import { AnnotationStatus, ParticipantKind } from '../../../api/generated';
 import { useConfig } from '../../../api/hooks/useConfig';
@@ -45,7 +45,8 @@ import { ConfirmDialog } from '../../admin/ConfirmDialog';
 import type { Notify } from '../../admin/layout/useToast';
 import { UserHoverCard } from '../../people/UserHoverCard';
 import { UserAvatar } from '../../shell/UserAvatar';
-import { avatarSrc } from '../../../utils/avatarUrl';
+import { avatarSrc, teamAvatarSrc } from '../../../utils/avatarUrl';
+import { TeamAvatar } from '../../shell/TeamAvatar';
 import { DueDateLabel } from '../DueDateLabel';
 import { ProgressBar } from '../list/ReviewListParts';
 import { workflowLabel } from '../workflowMeta';
@@ -313,20 +314,11 @@ export function ReviewHubHead({
                   }}
                 >
                   {participant.kind === ParticipantKind.Team ? (
-                    <Box
-                      sx={{
-                        width: 24,
-                        height: 24,
-                        borderRadius: '50%',
-                        bgcolor: theme.qnop.surface2,
-                        color: 'text.secondary',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                      }}
-                    >
-                      <Users size={12} aria-hidden />
-                    </Box>
+                    <TeamAvatar
+                      name={participant.displayName}
+                      size={24}
+                      imageUrl={teamAvatarSrc(participant.principalId)}
+                    />
                   ) : (
                     <UserAvatar
                       name={participant.displayName}

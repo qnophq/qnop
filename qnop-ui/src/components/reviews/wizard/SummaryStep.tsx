@@ -27,7 +27,7 @@ import Switch from '@mui/material/Switch';
 import TextField from '@mui/material/TextField';
 import Typography from '@mui/material/Typography';
 import { useTheme } from '@mui/material/styles';
-import { EyeOff, FileText, Play, Users } from 'lucide-react';
+import { EyeOff, FileText, Play } from 'lucide-react';
 import type { PrincipalView } from '../../../api/generated';
 import { ParticipantKind, ThreadParticipation } from '../../../api/generated';
 
@@ -51,6 +51,7 @@ const PARTICIPATION_OPTIONS: { value: ThreadParticipation; label: string; hint: 
 ];
 import { DueDatePicker } from '../DueDatePicker';
 import { UserAvatar } from '../../shell/UserAvatar';
+import { TeamAvatar } from '../../shell/TeamAvatar';
 import { formatFileSize } from './wizardModel';
 
 export type SubmitPhase = 'idle' | 'uploading' | 'finalizing';
@@ -154,21 +155,7 @@ export function SummaryStep({
                 }}
               >
                 {reviewer.kind === ParticipantKind.Team ? (
-                  <Box
-                    sx={{
-                      width: 22,
-                      height: 22,
-                      borderRadius: '50%',
-                      bgcolor: theme.palette.background.paper,
-                      color: 'text.secondary',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      flexShrink: 0,
-                    }}
-                  >
-                    <Users size={12} aria-hidden />
-                  </Box>
+                  <TeamAvatar name={reviewer.displayName} size={22} imageUrl={reviewer.avatarUrl} />
                 ) : (
                   <UserAvatar name={reviewer.displayName} size={22} imageUrl={reviewer.avatarUrl} />
                 )}
