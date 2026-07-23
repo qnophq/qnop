@@ -136,8 +136,8 @@ describe('GlobalSearch', () => {
     expect(screen.getByText('Comments')).toBeInTheDocument();
     expect(screen.getByText('…rework the payment schedule…')).toBeInTheDocument();
     expect(screen.getByText('…the payment reply…')).toBeInTheDocument();
-    // The #568 state language at row scale.
-    expect(screen.getByTestId('milestone-dots')).toHaveAccessibleName('In review');
+    // The #568 state language at icon scale — same glyph as the results page.
+    expect(screen.getByTestId('workflow-state-icon')).toHaveAccessibleName('In review');
     // The review group was capped (1 of 7) — its continuation is offered.
     expect(screen.getByText('See all 7 results')).toBeInTheDocument();
   });

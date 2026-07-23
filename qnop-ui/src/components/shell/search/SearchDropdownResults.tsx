@@ -42,7 +42,7 @@ import type { GlobalSearchResponse } from '../../../api/generated';
 import { AnnotationStatus } from '../../../api/generated';
 import { useAuthStore } from '../../../stores/authStore';
 import { ToneBadge } from '../../admin/ToneBadge';
-import { MilestoneDots } from '../../reviews/MilestoneDots';
+import { WorkflowStateIcon } from '../../reviews/WorkflowStateIcon';
 import { STATUS_CUES } from '../../reviews/panel/statusCues';
 import { UserAvatar } from '../UserAvatar';
 import { discussionHitPath } from './searchPaths';
@@ -52,8 +52,8 @@ type ResultType = 'reviews' | 'annotations' | 'comments' | 'users' | 'teams';
 
 /**
  * The quickview body of the global search (issue #540): five counted
- * sections — Reviews with their milestone track (the #568 state language at
- * row scale), Annotations and Comments with their status cue and matched
+ * sections — Reviews with their workflow state glyph (the #568 language at
+ * icon scale), Annotations and Comments with their status cue and matched
  * excerpt, People with their avatars, Teams with a lock on hits the caller
  * cannot open. Every row is a real navigation; each group ends in a "see all
  * N" continuation onto the results page when the cap cut it short.
@@ -98,7 +98,7 @@ export function SearchDropdownResults({
               key={hit.id}
               testId="search-hit-review"
               onClick={() => navigate(`/reviews/${hit.slug ?? hit.id}`)}
-              start={<MilestoneDots state={hit.workflowState} />}
+              start={<WorkflowStateIcon state={hit.workflowState} size={14} />}
               primary={hit.title}
             />
           ))}
