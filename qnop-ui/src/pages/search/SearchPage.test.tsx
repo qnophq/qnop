@@ -135,9 +135,9 @@ describe('SearchPage', () => {
     renderPage();
 
     expect(screen.getByLabelText('Search reviews, people and teams')).toHaveValue('alpha');
-    expect(screen.getByText('Reviews (4)')).toBeInTheDocument();
-    expect(screen.getByText('People (2)')).toBeInTheDocument();
-    expect(screen.getByText('Teams (1)')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Reviews (4)' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'People (2)' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Teams (1)' })).toBeInTheDocument();
     // Default type: reviews, milestone-tracked rows deep-linking to the review.
     const row = screen.getByTestId('search-row-review');
     expect(row).toHaveTextContent('Q3 report');
@@ -150,8 +150,8 @@ describe('SearchPage', () => {
   it('lists discussion hits with their thread deep link under the annotation/comment types', () => {
     renderPage('/search?q=liability&type=comments');
 
-    expect(screen.getByText('Annotations (3)')).toBeInTheDocument();
-    expect(screen.getByText('Comments (5)')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Annotations (3)' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Comments (5)' })).toBeInTheDocument();
     const row = screen.getByTestId('search-row-comment');
     expect(row).toHaveTextContent('in Q3 report');
     expect(screen.getByRole('link', { name: '…the liability clause…' })).toHaveAttribute(
@@ -163,7 +163,7 @@ describe('SearchPage', () => {
   it('switches the type through the URL', () => {
     renderPage();
 
-    fireEvent.click(screen.getByText('People (2)'));
+    fireEvent.click(screen.getByRole('button', { name: 'People (2)' }));
 
     expect(screen.getByTestId('location')).toHaveTextContent('type=users');
     expect(screen.getByTestId('search-row-user')).toHaveTextContent('Mia Member');

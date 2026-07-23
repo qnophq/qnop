@@ -21,12 +21,22 @@
 
 import { useEffect, useState } from 'react';
 import Box from '@mui/material/Box';
-import Chip from '@mui/material/Chip';
+import ButtonBase from '@mui/material/ButtonBase';
 import Link from '@mui/material/Link';
 import Stack from '@mui/material/Stack';
 import TablePagination from '@mui/material/TablePagination';
 import Typography from '@mui/material/Typography';
-import { Lock, SearchX, UsersRound } from 'lucide-react';
+import { alpha, useTheme } from '@mui/material/styles';
+import type { LucideIcon } from 'lucide-react';
+import {
+  FileText,
+  Lock,
+  MessageSquareText,
+  NotebookPen,
+  SearchX,
+  Users,
+  UsersRound,
+} from 'lucide-react';
 import { Link as RouterLink, useSearchParams } from 'react-router-dom';
 import {
   SEARCH_MIN_LENGTH,
@@ -41,6 +51,7 @@ import { ClearableSearchField } from '../../components/ClearableSearchField';
 import { PageHeader } from '../../components/admin/layout/PageHeader';
 import { SectionCard } from '../../components/admin/layout/SectionCard';
 import { PersonLink } from '../../components/dashboard/PersonLink';
+import { tokens } from '../../theme/tokens';
 import { WorkflowMilestones } from '../../components/reviews/WorkflowMilestones';
 import { StatusCueIcon } from '../../components/shell/search/SearchDropdownResults';
 import { discussionHitPath } from '../../components/shell/search/searchPaths';
@@ -54,13 +65,15 @@ function parseType(raw: string | null): ResultType {
 }
 
 /**
- * The full global-search results (issue #540, ADR-0047): the query, the
- * active type and the page all live in the URL, so a result set is shareable.
- * The type chips are counted from the quick search — a chip's number always
- * predicts what clicking it shows; the list itself pages through the typed
- * endpoint. Review hits carry their milestone path (the #568 state language),
- * people render as the app-wide PersonLink, team hits are linked only when
- * the caller may open the roster.
+ * The full global-search results (issue #540, ADR-0047), full width like the
+ * other work surfaces: a sticky match scoreboard on the left — the five
+ * result types as counted score cards, the #568 gamified language — drives
+ * the list on the right. Query, active type and page live in the URL, so a
+ * result set is shareable; a card's number always predicts what clicking it
+ * shows. Review hits carry their milestone path, discussion hits their
+ * status cue and excerpt, people render as the app-wide PersonLink, team
+ * hits are linked only when the caller may open the roster. Rows reveal with
+ * one staged rise (compositor-only, off under reduced motion).
  */
 export function SearchPage() {
   const [params, setParams] = useSearchParams();
@@ -131,6 +144,18 @@ export function SearchPage() {
   const size = active.data?.size ?? 20;
   const tooShort = q.trim().length < SEARCH_MIN_LENGTH;
 
+  // The one deliberate motion moment: result rows rise in with a short
+  // stagger. Compositor-only (transform/opacity), off under reduced motion.
+  const reveal = (index: number) => ({
+    '@keyframes qnopSearchReveal': {
+      from: { opacity: 0, transform: 'translateY(6px)' },
+      to: { opacity: 1, transform: 'none' },
+    },
+    animation: 'qnopSearchReveal .26s ease both',
+    animationDelay: `${Math.min(index, 12) * 28}ms`,
+    '@media (prefers-reduced-motion: reduce)': { animation: 'none' },
+  });
+
   return (
     <Stack spacing={3}>
       <PageHeader
@@ -143,7 +168,7 @@ export function SearchPage() {
         onValueChange={setInput}
         placeholder="Search reviews, people and teams…"
         inputAriaLabel="Search reviews, people and teams"
-        sx={{ maxWidth: 520 }}
+        sx={{ maxWidth: 680 }}
       />
 
       {tooShort ? (
@@ -151,39 +176,63 @@ export function SearchPage() {
           Type at least {SEARCH_MIN_LENGTH} characters to search.
         </Typography>
       ) : (
-        <>
-          <Stack direction="row" spacing={1}>
-            <TypeChip
+        <Box
+          sx={{
+            display: 'grid',
+            gap: 3,
+            gridTemplateColumns: { xs: '1fr', lg: '280px minmax(0, 1fr)' },
+            alignItems: 'start',
+          }}
+        >
+          {/* The match scoreboard: every result type keeps its score in view;
+              the active card drives the list (issue #540 gamified facets). */}
+          <Box
+            sx={{
+              display: 'flex',
+              flexDirection: { xs: 'row', lg: 'column' },
+              gap: 1,
+              overflowX: { xs: 'auto', lg: 'visible' },
+              position: { lg: 'sticky' },
+              top: { lg: 88 },
+              pb: { xs: 0.5, lg: 0 },
+            }}
+          >
+            <ScoreCard
+              icon={FileText}
               label="Reviews"
               count={quick.data?.reviews.total}
               selected={type === 'reviews'}
               onClick={() => setType('reviews')}
             />
-            <TypeChip
+            <ScoreCard
+              icon={NotebookPen}
               label="Annotations"
               count={quick.data?.annotations.total}
               selected={type === 'annotations'}
               onClick={() => setType('annotations')}
             />
-            <TypeChip
+            <ScoreCard
+              icon={MessageSquareText}
               label="Comments"
               count={quick.data?.comments.total}
               selected={type === 'comments'}
               onClick={() => setType('comments')}
             />
-            <TypeChip
+            <ScoreCard
+              icon={Users}
               label="People"
               count={quick.data?.users.total}
               selected={type === 'users'}
               onClick={() => setType('users')}
             />
-            <TypeChip
+            <ScoreCard
+              icon={UsersRound}
               label="Teams"
               count={quick.data?.teams.total}
               selected={type === 'teams'}
               onClick={() => setType('teams')}
             />
-          </Stack>
+          </Box>
 
           <SectionCard
             title={`Results for “${q.trim()}”`}
@@ -203,15 +252,18 @@ export function SearchPage() {
                 <Typography color="text.secondary">No matches in this group.</Typography>
               </Stack>
             ) : (
-              <Stack divider={<Box sx={{ borderBottom: 1, borderColor: 'divider' }} />}>
+              <Stack
+                key={`${type}:${q.trim()}:${page}`}
+                divider={<Box sx={{ borderBottom: 1, borderColor: 'divider' }} />}
+              >
                 {type === 'reviews' &&
-                  reviews.data?.items.map((hit) => (
+                  reviews.data?.items.map((hit, index) => (
                     <Stack
                       key={hit.id}
                       direction="row"
                       spacing={1.5}
                       data-testid="search-row-review"
-                      sx={{ alignItems: 'center', py: 1.25 }}
+                      sx={{ alignItems: 'center', py: 1.25, ...reveal(index) }}
                     >
                       <WorkflowMilestones state={hit.workflowState} />
                       <Link
@@ -226,36 +278,42 @@ export function SearchPage() {
                     </Stack>
                   ))}
                 {(type === 'annotations' || type === 'comments') &&
-                  (type === 'annotations' ? annotations : commentHits).data?.items.map((hit) => (
-                    <Stack
-                      key={hit.commentId}
-                      direction="row"
-                      spacing={1.5}
-                      data-testid={`search-row-${type === 'annotations' ? 'annotation' : 'comment'}`}
-                      sx={{ alignItems: 'flex-start', py: 1.25 }}
-                    >
-                      <Box sx={{ pt: 0.3, display: 'flex' }}>
-                        <StatusCueIcon status={hit.annotationStatus} />
-                      </Box>
-                      <Box sx={{ minWidth: 0 }}>
-                        <Link
-                          component={RouterLink}
-                          to={discussionHitPath(hit, type === 'comments')}
-                          underline="hover"
-                          sx={{ fontWeight: 600, fontSize: 14, display: 'block' }}
-                          noWrap
-                        >
-                          {hit.excerpt}
-                        </Link>
-                        <Typography sx={{ fontSize: 12.5, color: 'text.secondary' }} noWrap>
-                          in {hit.documentTitle}
-                        </Typography>
-                      </Box>
-                    </Stack>
-                  ))}
+                  (type === 'annotations' ? annotations : commentHits).data?.items.map(
+                    (hit, index) => (
+                      <Stack
+                        key={hit.commentId}
+                        direction="row"
+                        spacing={1.5}
+                        data-testid={`search-row-${type === 'annotations' ? 'annotation' : 'comment'}`}
+                        sx={{ alignItems: 'flex-start', py: 1.25, ...reveal(index) }}
+                      >
+                        <Box sx={{ pt: 0.3, display: 'flex' }}>
+                          <StatusCueIcon status={hit.annotationStatus} />
+                        </Box>
+                        <Box sx={{ minWidth: 0 }}>
+                          <Link
+                            component={RouterLink}
+                            to={discussionHitPath(hit, type === 'comments')}
+                            underline="hover"
+                            sx={{ fontWeight: 600, fontSize: 14, display: 'block' }}
+                            noWrap
+                          >
+                            {hit.excerpt}
+                          </Link>
+                          <Typography sx={{ fontSize: 12.5, color: 'text.secondary' }} noWrap>
+                            in {hit.documentTitle}
+                          </Typography>
+                        </Box>
+                      </Stack>
+                    ),
+                  )}
                 {type === 'users' &&
-                  users.data?.items.map((hit) => (
-                    <Box key={hit.userId} data-testid="search-row-user" sx={{ py: 1.25 }}>
+                  users.data?.items.map((hit, index) => (
+                    <Box
+                      key={hit.userId}
+                      data-testid="search-row-user"
+                      sx={{ py: 1.25, ...reveal(index) }}
+                    >
                       <PersonLink
                         userId={hit.userId}
                         slug={hit.slug}
@@ -266,13 +324,13 @@ export function SearchPage() {
                     </Box>
                   ))}
                 {type === 'teams' &&
-                  teams.data?.items.map((hit) => (
+                  teams.data?.items.map((hit, index) => (
                     <Stack
                       key={hit.teamId}
                       direction="row"
                       spacing={1.5}
                       data-testid="search-row-team"
-                      sx={{ alignItems: 'center', py: 1.25 }}
+                      sx={{ alignItems: 'center', py: 1.25, ...reveal(index) }}
                     >
                       <UsersRound size={18} aria-hidden />
                       {hit.viewable ? (
@@ -312,32 +370,79 @@ export function SearchPage() {
               />
             )}
           </SectionCard>
-        </>
+        </Box>
       )}
     </Stack>
   );
 }
 
-/** A counted type facet — the number always predicts what clicking shows. */
-function TypeChip({
+/**
+ * A scoreboard facet (issue #540): icon, label and the group's match count in
+ * the mono score type — the number always predicts what clicking shows. The
+ * active card carries the brand accent; color stays semantic, not decorative.
+ */
+function ScoreCard({
+  icon: Icon,
   label,
   count,
   selected,
   onClick,
 }: {
+  icon: LucideIcon;
   label: string;
   count: number | undefined;
   selected: boolean;
   onClick: () => void;
 }) {
+  const theme = useTheme();
   return (
-    <Chip
-      label={count === undefined ? label : `${label} (${count})`}
-      size="small"
-      color={selected ? 'primary' : 'default'}
-      variant={selected ? 'filled' : 'outlined'}
+    <ButtonBase
       onClick={onClick}
-      sx={{ fontWeight: selected ? 600 : 400 }}
-    />
+      aria-pressed={selected}
+      aria-label={`${label} (${count ?? 0})`}
+      sx={{
+        display: 'flex',
+        alignItems: 'center',
+        gap: 1.25,
+        minWidth: { xs: 150, lg: 'auto' },
+        width: { lg: '100%' },
+        px: 1.75,
+        py: 1.25,
+        borderRadius: 2.5,
+        border: '1px solid',
+        borderColor: selected ? 'primary.main' : 'divider',
+        bgcolor: selected
+          ? alpha(theme.palette.primary.main, theme.palette.mode === 'dark' ? 0.16 : 0.08)
+          : 'background.paper',
+        textAlign: 'left',
+        fontFamily: 'inherit',
+        transition: 'border-color .15s, background-color .15s',
+        '&:hover': { borderColor: selected ? 'primary.main' : 'text.disabled' },
+        '&:focus-visible': { boxShadow: theme.qnop.focusRing },
+      }}
+    >
+      <Icon
+        size={16}
+        aria-hidden
+        style={{
+          color: selected ? theme.palette.primary.main : theme.palette.text.secondary,
+          flexShrink: 0,
+        }}
+      />
+      <Typography sx={{ flex: 1, fontSize: 13.5, fontWeight: selected ? 700 : 500 }}>
+        {label}
+      </Typography>
+      <Typography
+        component="span"
+        sx={{
+          fontFamily: tokens.font.mono,
+          fontSize: 15,
+          fontWeight: 700,
+          color: selected ? 'primary.main' : 'text.secondary',
+        }}
+      >
+        {count ?? '–'}
+      </Typography>
+    </ButtonBase>
   );
 }
