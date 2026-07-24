@@ -38,8 +38,18 @@ export function useMentionRoster(documentId: string | null | undefined): Mention
   const participantsQuery = useParticipants(documentId ?? '', Boolean(documentId));
   return useMemo(() => {
     if (!review || review.anonymous) return [];
-    return (participantsQuery.data?.participants ?? [])
+    const roster = (participantsQuery.data?.participants ?? [])
       .filter((participant) => participant.kind === ParticipantKind.User)
       .map((participant) => ({ id: participant.principalId, name: participant.displayName }));
+    // The owner is mentionable too (the server's access rule names them first)
+    // but is rarely on the reviewer roster — lead with them, deduped by id.
+    if (
+      review.ownerId &&
+      review.ownerDisplayName &&
+      !roster.some((candidate) => candidate.id === review.ownerId)
+    ) {
+      roster.unshift({ id: review.ownerId, name: review.ownerDisplayName });
+    }
+    return roster;
   }, [participantsQuery.data, review]);
 }

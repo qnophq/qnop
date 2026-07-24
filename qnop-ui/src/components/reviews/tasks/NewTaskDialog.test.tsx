@@ -38,9 +38,18 @@ vi.mock('../../../api/hooks/useReviews', async (importOriginal) => ({
   useParticipants: vi.fn(),
 }));
 
-function mockRoster(anonymous: boolean) {
+const ALICE_ID = '018f5a3e-0000-7000-8000-000000000001';
+const OWNER_ID = '018f5a3e-0000-7000-8000-00000000000f';
+
+function mockRoster(anonymous: boolean, overrides: { ownerId?: string } = {}) {
   vi.mocked(useDocument).mockReturnValue({
-    data: { id: 'd1', title: 'Doc', anonymous },
+    data: {
+      id: 'd1',
+      title: 'Doc',
+      anonymous,
+      ownerId: overrides.ownerId ?? OWNER_ID,
+      ownerDisplayName: overrides.ownerId ? 'Alice' : 'Olivia Owner',
+    },
   } as unknown as ReturnType<typeof useDocument>);
   vi.mocked(useParticipants).mockReturnValue({
     data: {
@@ -48,7 +57,7 @@ function mockRoster(anonymous: boolean) {
         {
           id: 'p1',
           kind: ParticipantKind.User,
-          principalId: '018f5a3e-0000-7000-8000-000000000001',
+          principalId: ALICE_ID,
           displayName: 'Alice',
         },
       ],
@@ -66,12 +75,12 @@ function renderDialog() {
   );
 }
 
-function typeMentionQuery() {
+function typeMentionQuery(query = '@Al') {
   const ta = screen.getByLabelText('Annotation comment') as HTMLTextAreaElement;
   ta.focus();
-  fireEvent.change(ta, { target: { value: '@Al' } });
-  ta.setSelectionRange(3, 3);
-  fireEvent.keyUp(ta, { key: 'l' });
+  fireEvent.change(ta, { target: { value: query } });
+  ta.setSelectionRange(query.length, query.length);
+  fireEvent.keyUp(ta, { key: query.slice(-1) });
 }
 
 beforeEach(() => {
@@ -95,5 +104,21 @@ describe('NewTaskDialog mentions', () => {
 
     typeMentionQuery();
     expect(screen.queryByText('Alice')).not.toBeInTheDocument();
+  });
+
+  it('offers the review owner even though they are no participant', () => {
+    mockRoster(false);
+    renderDialog();
+
+    typeMentionQuery('@Ol');
+    expect(screen.getByText('Olivia Owner')).toBeInTheDocument();
+  });
+
+  it('does not duplicate an owner who also reviews', () => {
+    mockRoster(false, { ownerId: ALICE_ID });
+    renderDialog();
+
+    typeMentionQuery();
+    expect(screen.getAllByText('Alice')).toHaveLength(1);
   });
 });
