@@ -54,7 +54,7 @@ awsSdk = "2.31.6"
 javaDiffUtils = "4.15"
 
 # --- Pinned for later phases (NOT yet applied) -------------------------
-pdfbox = "3.0.5"            # PDF text extraction with glyph positions
+pdfbox = "3.0.8"            # PDF text extraction with glyph positions
 poi = "5.4.1"              # .docx structural extraction (XWPF)
 
 [libraries]
