@@ -34,6 +34,7 @@ import { submitShortcutLabel } from '../../../utils/platform';
 import { PRIORITY_CUES, TYPE_CUES } from '../tasks/tasksModel';
 import { FullscreenComposerDialog } from '../markdown/FullscreenComposerDialog';
 import { MarkdownComposer } from '../markdown/MarkdownComposer';
+import type { MentionCandidate } from '../markdown/mentionToken';
 import type { UploadedAttachment } from '../markdown/useCommentAttachmentUpload';
 
 /**
@@ -52,6 +53,7 @@ export function Composer({
   onCancel,
   frameless = false,
   onUploadAttachment,
+  mentionCandidates,
 }: {
   /** The drawn region, or null for a document-scoped annotation (issue #395). */
   pendingAnchor: Anchor | null;
@@ -62,6 +64,8 @@ export function Composer({
   frameless?: boolean;
   /** Enables attaching local files (issue #446); built by the host, which owns the document id. */
   onUploadAttachment?: (file: File) => Promise<UploadedAttachment>;
+  /** The document roster the @-picker offers (issue #462); empty in anonymous reviews. */
+  mentionCandidates?: MentionCandidate[];
 }) {
   const theme = useTheme();
   const [comment, setComment] = useState('');
@@ -192,6 +196,7 @@ export function Composer({
           disabled={creating}
           onUploadAttachment={onUploadAttachment}
           onToggleFullscreen={() => setWritingFullscreen(true)}
+          mentionCandidates={mentionCandidates}
         />
         {/* Optional classification (issue #392) in the system's task language. */}
         {classificationRow(false)}
@@ -242,6 +247,7 @@ export function Composer({
           bare
           disabled={creating}
           onUploadAttachment={onUploadAttachment}
+          mentionCandidates={mentionCandidates}
           fullscreen
           onToggleFullscreen={() => setWritingFullscreen(false)}
           actions={

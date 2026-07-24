@@ -70,6 +70,7 @@ class AnnotationServiceTest {
   private final ReactionService reactions = mock(ReactionService.class);
   private final io.qnop.service.ApplicationSettingsService settings =
       mock(io.qnop.service.ApplicationSettingsService.class);
+  private final CommentMentionService mentions = mock(CommentMentionService.class);
 
   private final AnnotationService service =
       new AnnotationService(
@@ -83,7 +84,8 @@ class AnnotationServiceTest {
           identity,
           reactions,
           mock(org.springframework.context.ApplicationEventPublisher.class),
-          settings);
+          settings,
+          mentions);
 
   private final UUID documentId = UUID.randomUUID();
   private final UUID author = UUID.randomUUID();

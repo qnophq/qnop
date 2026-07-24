@@ -72,7 +72,9 @@ import {
   walkPosition,
 } from '../../components/reviews/focus/spotlightModel';
 import { useAnchorElement } from '../../components/reviews/focus/useAnchorElement';
-import { useRecordVisit } from '../../api/hooks/useReviews';
+import { useParticipants, useRecordVisit } from '../../api/hooks/useReviews';
+import { ParticipantKind } from '../../api/generated';
+import type { MentionCandidate } from '../../components/reviews/markdown/mentionToken';
 import { useConfig } from '../../api/hooks/useConfig';
 import { useViewMode, type ReviewViewMode } from '../../components/reviews/focus/useViewMode';
 import { columnOf } from '../../components/reviews/tasks/tasksModel';
@@ -124,6 +126,15 @@ export function DocumentReviewPage() {
 
   const documentQuery = useDocument(documentId);
   const latestVersion = documentQuery.data?.latestVersionNumber ?? 0;
+  // The @-mention roster for the composers (issue #462): the review's user participants. Empty in
+  // anonymous reviews, which disables the picker so no real identity is offered where it is hidden.
+  const participantsQuery = useParticipants(documentId, Boolean(documentId));
+  const mentionCandidates = useMemo<MentionCandidate[]>(() => {
+    if (documentQuery.data?.anonymous) return [];
+    return (participantsQuery.data?.participants ?? [])
+      .filter((participant) => participant.kind === ParticipantKind.User)
+      .map((participant) => ({ id: participant.principalId, name: participant.displayName }));
+  }, [participantsQuery.data, documentQuery.data?.anonymous]);
   const requestedVersion = Number(searchParams.get('version'));
 
   // Watch the URL's version even when the cached list does not know it yet —
@@ -792,6 +803,7 @@ export function DocumentReviewPage() {
               onCreate={handleCreate}
               onCancel={() => setPending(null)}
               onUploadAttachment={uploadAttachment}
+              mentionCandidates={mentionCandidates}
             />
             {/* Discoverability for the native resize grip underneath. */}
             <Box

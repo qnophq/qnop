@@ -21,6 +21,7 @@
 
 import { describe, expect, it, vi } from 'vitest';
 import { render, waitFor } from '@testing-library/react';
+import { MemoryRouter } from 'react-router-dom';
 import { ThemeProvider } from '@mui/material/styles';
 import { buildTheme } from '../../../theme/theme';
 import { axiosInstance } from '../../../api/config';
@@ -54,6 +55,21 @@ describe('Markdown render (#427)', () => {
     expect(container.querySelectorAll('li')).toHaveLength(2);
     expect(container.querySelector('blockquote')).toHaveTextContent('quoted');
     expect(container.querySelector('table')).toBeInTheDocument();
+  });
+
+  it('renders a resolved @mention as an in-app profile link, not an external anchor (#462)', () => {
+    const id = '018f5a3e-0000-7000-8000-000000000001';
+    const { getByTestId } = render(
+      <MemoryRouter>
+        <ThemeProvider theme={buildTheme('light')}>
+          <Markdown>{`hey [@Alice](mention:${id}) look`}</Markdown>
+        </ThemeProvider>
+      </MemoryRouter>,
+    );
+    const mention = getByTestId('mention-link');
+    expect(mention).toHaveTextContent('@Alice');
+    // Links into the app to the profile — the mention: scheme never reaches the DOM as an href.
+    expect(mention).toHaveAttribute('href', `/users/${id}`);
   });
 
   it('renders a fenced code block', () => {
