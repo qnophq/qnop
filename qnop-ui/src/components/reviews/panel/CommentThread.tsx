@@ -31,9 +31,7 @@ import { alpha, useTheme } from '@mui/material/styles';
 import { CircleCheck, CircleSlash, Lock, RotateCcw, SendHorizontal } from 'lucide-react';
 import { useAddComment, useComments } from '../../../api/hooks/useComments';
 import { useDocument } from '../../../api/hooks/useDocuments';
-import { useParticipants } from '../../../api/hooks/useReviews';
-import { ParticipantKind } from '../../../api/generated';
-import type { MentionCandidate } from '../markdown/mentionToken';
+import { useMentionRoster } from '../markdown/useMentionRoster';
 import { realAuthorId } from '../../people/realAuthorId';
 import { apiErrorCode } from '../../../utils/apiError';
 import { submitShortcutLabel } from '../../../utils/platform';
@@ -120,15 +118,8 @@ export function CommentThread({
   // review's flags from the already-cached document. No document, no cards —
   // realAuthorId treats a missing review as "expose nothing".
   const review = useDocument(documentId ?? '').data;
-  // The @-mention roster for the reply composer (issue #462): user participants, empty in anonymous
-  // reviews so the picker is disabled where identities are hidden.
-  const participantsQuery = useParticipants(documentId ?? '', Boolean(documentId));
-  const mentionCandidates = useMemo<MentionCandidate[]>(() => {
-    if (!review || review.anonymous) return [];
-    return (participantsQuery.data?.participants ?? [])
-      .filter((participant) => participant.kind === ParticipantKind.User)
-      .map((participant) => ({ id: participant.principalId, name: participant.displayName }));
-  }, [participantsQuery.data, review]);
+  // The @-mention roster for the reply composers (issue #462).
+  const mentionCandidates = useMentionRoster(documentId);
   const addComment = useAddComment(annotationId);
   const toggleReaction = useToggleCommentReaction(annotationId, notify);
   const uploadAttachment = useCommentAttachmentUpload(documentId, notify);

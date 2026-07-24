@@ -42,6 +42,7 @@ import { isUnseen } from '../newSince';
 import type { BuildPermalink } from '../useReviewPermalink';
 import { useConfirmPlacement } from '../../../api/hooks/useAnnotations';
 import { AnnotationListItem } from './AnnotationListItem';
+import type { MentionCandidate } from '../markdown/mentionToken';
 import type { UploadedAttachment } from '../markdown/useCommentAttachmentUpload';
 import { CommentThread } from './CommentThread';
 import { Composer } from './Composer';
@@ -82,6 +83,8 @@ interface AnnotationPanelProps {
   notify: Notify;
   /** Uploads a local composer file (issue #446); built by the page, which owns the document id. */
   onUploadAttachment?: (file: File) => Promise<UploadedAttachment>;
+  /** The @-mention roster for the annotation composer (issue #462); empty disables the picker. */
+  mentionCandidates?: MentionCandidate[];
   /** True while an OLDER version is viewed (#306): threads readable, nothing writable. */
   readOnly?: boolean;
   /** The viewed version — the scope of placement outcomes and their confirmation (issue #326). */
@@ -140,6 +143,7 @@ export function AnnotationPanel({
   canAnnotate,
   notify,
   onUploadAttachment,
+  mentionCandidates,
   readOnly = false,
   versionNumber = null,
   onArmReattach,
@@ -359,6 +363,7 @@ export function AnnotationPanel({
             onCreate={onCreate}
             onCancel={onCancelPending}
             onUploadAttachment={onUploadAttachment}
+            mentionCandidates={mentionCandidates}
           />
         )}
         {annotations.length === 0 && !pendingAnchor && (

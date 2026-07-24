@@ -1,0 +1,99 @@
+/*
+ * Copyright (c) 2026-present devtank42 GmbH
+ *
+ * This file is part of qnop (Qualified Notes on Papers).
+ *
+ * qnop is free software: you can redistribute it and/or modify it under the
+ * terms of the GNU Affero General Public License as published by the Free
+ * Software Foundation, either version 3 of the License, or (at your option)
+ * any later version.
+ *
+ * qnop is distributed in the hope that it will be useful, but WITHOUT ANY
+ * WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS
+ * FOR A PARTICULAR PURPOSE. See the GNU Affero General Public License for more
+ * details.
+ *
+ * You should have received a copy of the GNU Affero General Public License
+ * along with qnop. If not, see <https://www.gnu.org/licenses/>.
+ *
+ * SPDX-License-Identifier: AGPL-3.0-only
+ */
+
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { fireEvent, render, screen } from '@testing-library/react';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { ThemeProvider } from '@mui/material/styles';
+import { ParticipantKind } from '../../../api/generated';
+import { useDocument } from '../../../api/hooks/useDocuments';
+import { useParticipants } from '../../../api/hooks/useReviews';
+import { buildTheme } from '../../../theme/theme';
+import { NewTaskDialog } from './NewTaskDialog';
+
+vi.mock('../../../api/hooks/useDocuments', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../../api/hooks/useDocuments')>()),
+  useDocument: vi.fn(),
+}));
+vi.mock('../../../api/hooks/useReviews', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../../api/hooks/useReviews')>()),
+  useParticipants: vi.fn(),
+}));
+
+function mockRoster(anonymous: boolean) {
+  vi.mocked(useDocument).mockReturnValue({
+    data: { id: 'd1', title: 'Doc', anonymous },
+  } as unknown as ReturnType<typeof useDocument>);
+  vi.mocked(useParticipants).mockReturnValue({
+    data: {
+      participants: [
+        {
+          id: 'p1',
+          kind: ParticipantKind.User,
+          principalId: '018f5a3e-0000-7000-8000-000000000001',
+          displayName: 'Alice',
+        },
+      ],
+    },
+  } as unknown as ReturnType<typeof useParticipants>);
+}
+
+function renderDialog() {
+  render(
+    <QueryClientProvider client={new QueryClient()}>
+      <ThemeProvider theme={buildTheme('light')}>
+        <NewTaskDialog open documentId="d1" versionNumber={1} notify={vi.fn()} onClose={vi.fn()} />
+      </ThemeProvider>
+    </QueryClientProvider>,
+  );
+}
+
+function typeMentionQuery() {
+  const ta = screen.getByLabelText('Annotation comment') as HTMLTextAreaElement;
+  ta.focus();
+  fireEvent.change(ta, { target: { value: '@Al' } });
+  ta.setSelectionRange(3, 3);
+  fireEvent.keyUp(ta, { key: 'l' });
+}
+
+beforeEach(() => {
+  vi.clearAllMocks();
+});
+
+// Issue #462 follow-up: mentions must work when creating a global annotation,
+// not only in comment threads — the dialog wires the roster itself.
+describe('NewTaskDialog mentions', () => {
+  it('offers the review roster on @', () => {
+    mockRoster(false);
+    renderDialog();
+
+    typeMentionQuery();
+    expect(screen.getByText('Alice')).toBeInTheDocument();
+  });
+
+  it('offers no picker in an anonymous review', () => {
+    mockRoster(true);
+    renderDialog();
+
+    typeMentionQuery();
+    expect(screen.queryByText('Alice')).not.toBeInTheDocument();
+  });
+});

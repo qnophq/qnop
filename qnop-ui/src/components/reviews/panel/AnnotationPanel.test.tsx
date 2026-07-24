@@ -586,4 +586,21 @@ describe('AnnotationPanel', () => {
       screen.queryByRole('button', { name: 'Copy link to annotation' }),
     ).not.toBeInTheDocument();
   });
+
+  // Issue #462 follow-up: mentioning must work when CREATING an annotation,
+  // not only in the comment threads — the roster reaches the composer.
+  it('offers the @-mention roster in the annotation composer', () => {
+    renderPanel({
+      pendingAnchor: annotation('a1').anchor!,
+      mentionCandidates: [{ id: '018f5a3e-0000-7000-8000-000000000001', name: 'Alice' }],
+    });
+
+    const ta = screen.getByLabelText('Annotation comment') as HTMLTextAreaElement;
+    ta.focus();
+    fireEvent.change(ta, { target: { value: '@Al' } });
+    ta.setSelectionRange(3, 3);
+    fireEvent.keyUp(ta, { key: 'l' });
+
+    expect(screen.getByText('Alice')).toBeInTheDocument();
+  });
 });
