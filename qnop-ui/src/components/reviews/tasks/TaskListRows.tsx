@@ -34,6 +34,8 @@ import { UserAvatar } from '../../shell/UserAvatar';
 import { avatarSrc } from '../../../utils/avatarUrl';
 import { tokens } from '../../../theme/tokens';
 import { isDocumentScoped } from '../annotationScope';
+import { useMentionNames } from '../markdown/useMentionNames';
+import { useReviewDocumentId } from '../reviewDocumentId';
 import { STATUS_CUES } from '../panel/statusCues';
 import { PRIORITY_CUES, TYPE_CUES, columnOf, taskTitle } from './tasksModel';
 
@@ -52,6 +54,8 @@ interface TaskListRowsProps {
  */
 export function TaskListRows({ annotations, taskKeyOf, authorNameOf, onOpen }: TaskListRowsProps) {
   const theme = useTheme();
+  // The title is plain text — mention tokens read as names there too (issue #462).
+  const resolveMentions = useMentionNames(useReviewDocumentId());
   return (
     <Paper variant="outlined" sx={{ overflow: 'hidden', width: '100%' }}>
       {annotations.map((annotation, index) => {
@@ -122,7 +126,7 @@ export function TaskListRows({ annotations, taskKeyOf, authorNameOf, onOpen }: T
             </Stack>
             <Box sx={{ flex: 1, minWidth: 0 }}>
               <Typography variant="body2" noWrap sx={{ fontWeight: 500 }}>
-                {taskTitle(annotation)}
+                {taskTitle(annotation, resolveMentions)}
               </Typography>
               <Typography variant="caption" color="text.secondary" noWrap sx={{ display: 'block' }}>
                 {isDocumentScoped(annotation)

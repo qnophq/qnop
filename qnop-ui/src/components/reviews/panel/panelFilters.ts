@@ -84,6 +84,8 @@ export function matchesFilters(
   annotation: AnnotationView,
   filters: AnnotationFilters,
   authorName: string,
+  /** The roster's mention resolver (issue #462) — search then hits mentioned names, not just raw @slugs. */
+  resolveMentions: (text: string) => string = (text) => text,
 ): boolean {
   if (filters.status === 'open' && annotation.status !== AnnotationStatus.Open) return false;
   if (filters.status === 'resolved' && annotation.status === AnnotationStatus.Open) return false;
@@ -95,9 +97,14 @@ export function matchesFilters(
   if (!needle) return true;
   // The opening comment is Markdown (issue #427); match its stripped plain text
   // so search hits words, not `**` and `[](…)` syntax. The quote is plain.
+  // Mentions match both ways (issue #462): as the display name the excerpt
+  // shows AND as the raw @slug the source text carries.
   return (
     (annotation.anchor?.textQuote?.quote ?? '').toLowerCase().includes(needle) ||
     stripMarkdown(annotation.firstComment).toLowerCase().includes(needle) ||
+    stripMarkdown(resolveMentions(annotation.firstComment ?? ''))
+      .toLowerCase()
+      .includes(needle) ||
     authorName.toLowerCase().includes(needle)
   );
 }

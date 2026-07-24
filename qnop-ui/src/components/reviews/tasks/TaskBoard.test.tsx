@@ -34,6 +34,12 @@ import { buildTheme } from '../../../theme/theme';
 import { TaskBoard } from './TaskBoard';
 import { TASK_DRAG_TYPE } from './TaskCard';
 
+// TaskCard resolves mention tokens through the review roster (issue #462);
+// these tests run without a query client, so the resolver stays identity.
+vi.mock('../markdown/useMentionNames', () => ({
+  useMentionNames: () => (text: string) => text,
+}));
+
 const annotation = (id: string, overrides: Partial<AnnotationView> = {}): AnnotationView => ({
   id,
   documentId: 'd1',

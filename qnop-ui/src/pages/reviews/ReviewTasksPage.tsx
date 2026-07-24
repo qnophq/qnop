@@ -44,6 +44,7 @@ import type { FilterAuthor } from '../../components/reviews/panel/PanelFilterBar
 import { PanelFilterBar } from '../../components/reviews/panel/PanelFilterBar';
 import type { AnnotationFilters } from '../../components/reviews/panel/panelFilters';
 import { matchesFilters } from '../../components/reviews/panel/panelFilters';
+import { useMentionNames } from '../../components/reviews/markdown/useMentionNames';
 import {
   mayResolveAnnotation,
   useResolveWithFeedback,
@@ -106,6 +107,8 @@ export function ReviewTasksPage() {
   const [view, setView] = useTasksViewMode();
   // The unseen-marker baseline (issue #307): the PREVIOUS visit, stamped once.
   const previousSeenAt = useRecordVisit(documentId);
+  // The search needle must hit mentioned names too (issue #462).
+  const resolveMentions = useMentionNames(documentId);
   const filter = parseTaskFilter(searchParams.get('filter'));
   // The facet filters share the panel's model (#403) and live in the URL like
   // everything else on this page.
@@ -184,7 +187,9 @@ export function ReviewTasksPage() {
 
   const visible = annotations
     .filter((annotation) => filter === 'all' || columnOf(annotation) === filter)
-    .filter((annotation) => matchesFilters(annotation, facets, authorNameOf(annotation.authorId)));
+    .filter((annotation) =>
+      matchesFilters(annotation, facets, authorNameOf(annotation.authorId), resolveMentions),
+    );
 
   const openTask = annotations.find((annotation) => annotation.id === openTaskId) ?? null;
   const keyByAnnotation = taskKeys(annotations);

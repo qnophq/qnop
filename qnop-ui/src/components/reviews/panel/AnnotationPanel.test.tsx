@@ -385,6 +385,33 @@ describe('AnnotationPanel', () => {
     expect(row).not.toHaveTextContent('@ben-roth');
   });
 
+  it('finds an annotation by the name its mention resolves to (#462)', () => {
+    vi.mocked(useParticipants).mockReturnValue({
+      data: {
+        participants: [
+          {
+            principalId: 'u9',
+            displayName: 'Ben Roth',
+            slug: 'ben-roth',
+            kind: ParticipantKind.User,
+          },
+        ],
+      },
+    } as never);
+    renderPanel({
+      annotations: [
+        annotation('a-mention', { anchor: undefined, firstComment: 'ping @ben-roth please' }),
+        annotation('a-other', { anchor: undefined, firstComment: 'something else' }),
+      ],
+    });
+
+    fireEvent.change(screen.getByLabelText('Search annotations'), {
+      target: { value: 'Ben Roth' },
+    });
+    expect(screen.getByTestId('annotation-item-a-mention')).toBeInTheDocument();
+    expect(screen.queryByTestId('annotation-item-a-other')).not.toBeInTheDocument();
+  });
+
   it('filters by author using the server-resolved display name (issue #413)', () => {
     renderPanel({
       annotations: [

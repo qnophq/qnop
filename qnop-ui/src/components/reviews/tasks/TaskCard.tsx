@@ -37,6 +37,8 @@ import { isUnseen } from '../newSince';
 import { isDocumentScoped } from '../annotationScope';
 import { WholeDocumentChip } from '../WholeDocumentChip';
 import { tokens } from '../../../theme/tokens';
+import { useMentionNames } from '../markdown/useMentionNames';
+import { useReviewDocumentId } from '../reviewDocumentId';
 import { STATUS_CUES } from '../panel/statusCues';
 import { PRIORITY_CUES, TYPE_CUES, taskTitle } from './tasksModel';
 
@@ -71,6 +73,8 @@ export function TaskCard({
 }: TaskCardProps) {
   const theme = useTheme();
   const viewerId = useAuthStore((state) => state.userId);
+  // The title is plain text — mention tokens read as names there too (issue #462).
+  const resolveMentions = useMentionNames(useReviewDocumentId());
   const unseen = isUnseen(annotation, previousSeenAt, viewerId);
   const type = annotation.type ? TYPE_CUES[annotation.type] : null;
   const priority = annotation.priority ? PRIORITY_CUES[annotation.priority] : null;
@@ -186,7 +190,7 @@ export function TaskCard({
           overflow: 'hidden',
         }}
       >
-        {taskTitle(annotation)}
+        {taskTitle(annotation, resolveMentions)}
       </Typography>
       {quote && (
         <Typography

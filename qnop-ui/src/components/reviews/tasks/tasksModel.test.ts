@@ -87,6 +87,17 @@ describe('taskTitle', () => {
       taskTitle(annotation({ firstComment: '**Unify** _terminology_ across the [contract](/x)' })),
     ).toBe('Unify terminology across the contract');
   });
+
+  it('resolves mention tokens to names through the provided resolver (#462)', () => {
+    const resolve = (text: string) => text.replace('@ben-roth', 'Ben Roth');
+    expect(taskTitle(annotation({ firstComment: 'ping @ben-roth please' }), resolve)).toBe(
+      'ping Ben Roth please',
+    );
+    // Without a resolver the raw token stays readable.
+    expect(taskTitle(annotation({ firstComment: 'ping @ben-roth please' }))).toBe(
+      'ping @ben-roth please',
+    );
+  });
 });
 
 describe('taskKeys', () => {
