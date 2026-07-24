@@ -28,11 +28,12 @@ import Stack from '@mui/material/Stack';
 import TextField from '@mui/material/TextField';
 import Typography from '@mui/material/Typography';
 import { useTheme } from '@mui/material/styles';
-import { Plus, Search, Users, X } from 'lucide-react';
+import { Plus, Search, X } from 'lucide-react';
 import type { PrincipalView } from '../../../api/generated';
 import { ParticipantKind } from '../../../api/generated';
 import { usePrincipalSearch } from '../../../api/hooks/useReviews';
 import { UserAvatar } from '../../shell/UserAvatar';
+import { TeamAvatar } from '../../shell/TeamAvatar';
 
 interface ReviewerStepProps {
   selected: PrincipalView[];
@@ -87,20 +88,11 @@ export function ReviewerStep({ selected, ownUserId, onAdd, onRemove }: ReviewerS
                 }}
               >
                 {principal.kind === ParticipantKind.Team ? (
-                  <Box
-                    sx={{
-                      width: 22,
-                      height: 22,
-                      borderRadius: '50%',
-                      bgcolor: theme.qnop.surface2,
-                      color: 'text.secondary',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                    }}
-                  >
-                    <Users size={12} aria-hidden />
-                  </Box>
+                  <TeamAvatar
+                    name={principal.displayName}
+                    size={22}
+                    imageUrl={principal.avatarUrl}
+                  />
                 ) : (
                   <UserAvatar
                     name={principal.displayName}
@@ -179,21 +171,11 @@ export function ReviewerStep({ selected, ownUserId, onAdd, onRemove }: ReviewerS
                 }}
               >
                 {principal.kind === ParticipantKind.Team ? (
-                  <Box
-                    sx={{
-                      width: 28,
-                      height: 28,
-                      borderRadius: '50%',
-                      bgcolor: theme.qnop.surface2,
-                      color: 'text.secondary',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      flexShrink: 0,
-                    }}
-                  >
-                    <Users size={14} aria-hidden />
-                  </Box>
+                  <TeamAvatar
+                    name={principal.displayName}
+                    size={28}
+                    imageUrl={principal.avatarUrl}
+                  />
                 ) : (
                   <UserAvatar
                     name={principal.displayName}

@@ -96,7 +96,7 @@ export function ReviewsTable({ reviews, userId, onOpen }: ReviewsTableProps) {
                 >
                   <TableCell sx={{ py: 1.5 }}>
                     <Stack direction="row" spacing={1.5} sx={{ alignItems: 'center' }}>
-                      <DocumentIcon />
+                      <DocumentIcon contentType={review.contentType} />
                       <Box sx={{ minWidth: 0 }}>
                         <Typography variant="body2" noWrap sx={{ fontWeight: 500, maxWidth: 320 }}>
                           {review.title}

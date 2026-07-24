@@ -7,7 +7,7 @@
 # mentions; deleting the user cascades theirs.
 databaseChangeLog:
   - changeSet:
-      id: 0022-comment-mention-schema
+      id: 0023-comment-mention-schema
       author: qnop
       comment: Resolved @mentions on comments (issue #462).
       changes:

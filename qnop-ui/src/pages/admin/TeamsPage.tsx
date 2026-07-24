@@ -40,6 +40,7 @@ import TableRow from '@mui/material/TableRow';
 import Typography from '@mui/material/Typography';
 import { MoreVertical, SquarePen, Trash2, UsersRound } from 'lucide-react';
 import { ClearableSearchField } from '../../components/ClearableSearchField';
+import { TeamAvatar } from '../../components/shell/TeamAvatar';
 import { useNavigate } from 'react-router-dom';
 import type { AdminTeamSummary } from '../../api/generated';
 import { useDeleteTeam, useTeams } from '../../api/hooks/useTeams';
@@ -168,7 +169,12 @@ export function TeamsPage() {
                     sx={{ cursor: 'pointer' }}
                     onClick={() => navigate(`/admin/teams/${team.id}`)}
                   >
-                    <TableCell sx={{ fontWeight: 600 }}>{team.name}</TableCell>
+                    <TableCell sx={{ fontWeight: 600 }}>
+                      <Stack direction="row" spacing={1.5} sx={{ alignItems: 'center' }}>
+                        <TeamAvatar name={team.name} imageUrl={team.avatarUrl} size={28} />
+                        <span>{team.name}</span>
+                      </Stack>
+                    </TableCell>
                     <TableCell sx={{ color: 'text.secondary', maxWidth: 320 }}>
                       <Typography noWrap sx={{ fontSize: 14 }}>
                         {team.description || '—'}

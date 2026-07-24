@@ -28,3 +28,12 @@
 export function avatarSrc(userId: string | null | undefined): string | null {
   return userId ? `/api/v1/users/${userId}/avatar` : null;
 }
+
+/**
+ * The public avatar read path for a team id (issue #509). Like {@link avatarSrc}: a team without a
+ * picture answers 404 and {@code TeamAvatar} falls back to its initials crest. Used where only the
+ * team id is known (the committed review participants) rather than a DTO-carried avatar URL.
+ */
+export function teamAvatarSrc(teamId: string | null | undefined): string | null {
+  return teamId ? `/api/v1/teams/${teamId}/avatar` : null;
+}

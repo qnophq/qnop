@@ -1,0 +1,292 @@
+/*
+ * Copyright (c) 2026-present devtank42 GmbH
+ *
+ * This file is part of qnop (Qualified Notes on Papers).
+ *
+ * qnop is free software: you can redistribute it and/or modify it under the
+ * terms of the GNU Affero General Public License as published by the Free
+ * Software Foundation, either version 3 of the License, or (at your option)
+ * any later version.
+ *
+ * qnop is distributed in the hope that it will be useful, but WITHOUT ANY
+ * WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS
+ * FOR A PARTICULAR PURPOSE. See the GNU Affero General Public License for more
+ * details.
+ *
+ * You should have received a copy of the GNU Affero General Public License
+ * along with qnop. If not, see <https://www.gnu.org/licenses/>.
+ *
+ * SPDX-License-Identifier: AGPL-3.0-only
+ */
+
+import { useEffect, useMemo, useRef, useState } from 'react';
+import Box from '@mui/material/Box';
+import ClickAwayListener from '@mui/material/ClickAwayListener';
+import Grow from '@mui/material/Grow';
+import InputBase from '@mui/material/InputBase';
+import Paper from '@mui/material/Paper';
+import Popper from '@mui/material/Popper';
+import Skeleton from '@mui/material/Skeleton';
+import Typography from '@mui/material/Typography';
+import { alpha, useTheme } from '@mui/material/styles';
+import { Search } from 'lucide-react';
+import { useLocation, useNavigate } from 'react-router-dom';
+import { SEARCH_MIN_LENGTH, useSearchQuick } from '../../../api/hooks/useSearch';
+import { useAuthStore } from '../../../stores/authStore';
+import { SearchDropdownResults } from './SearchDropdownResults';
+import { flattenSearchActions, searchOptionId } from './searchPaths';
+
+/** Mirrors the admin lists' debounce (UsersPage) — one query per typing pause. */
+const DEBOUNCE_MS = 300;
+
+/** Resting and focused pill widths — the Docker-Hub-style grow-on-focus. */
+const WIDTH_RESTING = 280;
+const WIDTH_FOCUSED = 440;
+
+/** The platform's search-shortcut label: ⌘K on Apple hardware, Ctrl K elsewhere. */
+const IS_APPLE =
+  typeof navigator !== 'undefined' && /Mac|iPhone|iPad/.test(navigator.platform || '');
+const SHORTCUT_LABEL = IS_APPLE ? '⌘K' : 'Ctrl K';
+
+/**
+ * The top-bar global search (issue #540, ADR-0047), replacing the #514
+ * coming-soon trigger: a quiet pill that opens a grouped quickview of the top
+ * hits — reviews (with their milestone track, the #568 gamified state
+ * language), people and teams — each row a deep link, each group counted with
+ * a "see all" continuation onto /search. Results are authorization-scoped
+ * server-side; this component only renders what the caller may see.
+ *
+ * <p>⌘K / Ctrl+K focuses the box from anywhere (the pill advertises it with a
+ * kbd hint while resting); on focus the pill grows to reading width and the
+ * panel matches it. The width transition is a deliberate, single layout
+ * animation (the Docker Hub pattern) and is switched off under
+ * prefers-reduced-motion.
+ */
+export function GlobalSearch() {
+  const theme = useTheme();
+  const navigate = useNavigate();
+  const location = useLocation();
+  const [value, setValue] = useState('');
+  const [debounced, setDebounced] = useState('');
+  const [open, setOpen] = useState(false);
+  const [focused, setFocused] = useState(false);
+  const [highlight, setHighlight] = useState(-1);
+  const selfUserId = useAuthStore((s) => s.userId);
+  const [anchorEl, setAnchorEl] = useState<HTMLDivElement | null>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    const handle = setTimeout(() => setDebounced(value), DEBOUNCE_MS);
+    return () => clearTimeout(handle);
+  }, [value]);
+
+  // ⌘K (Apple) / Ctrl+K pulls focus into the search from anywhere in the app.
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => {
+      if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'k') {
+        event.preventDefault();
+        inputRef.current?.focus();
+        inputRef.current?.select();
+      }
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, []);
+
+  // Navigating away (a hit was clicked, or the user moved on) closes the
+  // panel — the render-time derived-state pattern, as in FocusAnnotationCard.
+  const locationKey = location.pathname + location.search;
+  const [lastLocationKey, setLastLocationKey] = useState(locationKey);
+  if (locationKey !== lastLocationKey) {
+    setLastLocationKey(locationKey);
+    setOpen(false);
+  }
+
+  const query = useSearchQuick(debounced);
+  const trimmed = value.trim();
+  const showPanel = open && trimmed.length > 0;
+  const belowMinimum = trimmed.length < SEARCH_MIN_LENGTH;
+
+  // The keyboard-reachable rows in render order (issue #540 roving): the
+  // arrow keys walk this flat list, Enter opens the highlighted one.
+  const actions = useMemo(
+    () =>
+      query.data && !belowMinimum ? flattenSearchActions(query.data, trimmed, selfUserId) : [],
+    [query.data, belowMinimum, trimmed, selfUserId],
+  );
+  const highlighted = highlight >= 0 && highlight < actions.length ? actions[highlight] : null;
+  // Wide while the caret is in the box OR the panel is up (clicking a hit
+  // blurs the input; shrinking mid-click would pull the target away).
+  const grown = focused || showPanel;
+
+  const close = () => {
+    setOpen(false);
+    setHighlight(-1);
+  };
+  const submitToResultsPage = () => {
+    if (trimmed.length >= SEARCH_MIN_LENGTH) {
+      navigate(`/search?q=${encodeURIComponent(trimmed)}`);
+    }
+  };
+
+  return (
+    <ClickAwayListener onClickAway={close}>
+      <Box sx={{ display: { xs: 'none', md: 'block' } }}>
+        <Box
+          ref={setAnchorEl}
+          data-expanded={grown ? 'true' : 'false'}
+          sx={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: 1,
+            width: grown ? WIDTH_FOCUSED : WIDTH_RESTING,
+            height: 34,
+            px: 1.25,
+            borderRadius: 1.5,
+            border: 1,
+            borderColor: showPanel ? 'primary.main' : 'divider',
+            bgcolor: theme.qnop.surface2,
+            color: 'text.secondary',
+            // The one deliberate layout animation (Docker Hub's grow-on-focus);
+            // off under reduced motion — the width then simply jumps.
+            transition: 'border-color .15s, width .2s ease',
+            '@media (prefers-reduced-motion: reduce)': { transition: 'border-color .15s' },
+            '&:hover': { borderColor: 'text.disabled' },
+            '&:focus-within': {
+              borderColor: 'primary.main',
+              boxShadow: `0 0 0 2px ${alpha(theme.palette.primary.main, 0.15)}`,
+            },
+          }}
+        >
+          <Search size={15} aria-hidden style={{ flexShrink: 0 }} />
+          <InputBase
+            inputRef={inputRef}
+            value={value}
+            onChange={(event) => {
+              setValue(event.target.value);
+              setOpen(true);
+              setHighlight(-1);
+            }}
+            onFocus={() => {
+              setFocused(true);
+              if (value.trim().length > 0) setOpen(true);
+            }}
+            onBlur={() => setFocused(false)}
+            onKeyDown={(event) => {
+              if (event.key === 'Escape') {
+                close();
+                inputRef.current?.blur();
+              }
+              if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
+                event.preventDefault(); // the caret stays put; the highlight moves
+                if (!open && trimmed.length > 0) setOpen(true);
+                if (actions.length > 0) {
+                  setHighlight((current) =>
+                    event.key === 'ArrowDown'
+                      ? (current + 1) % actions.length
+                      : current <= 0
+                        ? actions.length - 1
+                        : current - 1,
+                  );
+                }
+              }
+              if (event.key === 'Enter') {
+                if (highlighted) {
+                  navigate(highlighted.path);
+                } else {
+                  submitToResultsPage();
+                }
+              }
+            }}
+            placeholder="Search…"
+            inputProps={{
+              'aria-label': 'Search reviews, people and teams',
+              'aria-keyshortcuts': 'Meta+K Control+K',
+              role: 'combobox',
+              'aria-expanded': showPanel,
+              'aria-controls': 'global-search-listbox',
+              'aria-autocomplete': 'list',
+              'aria-activedescendant': highlighted ? searchOptionId(highlighted.key) : undefined,
+            }}
+            sx={{ flex: 1, fontSize: 13, color: 'text.primary' }}
+          />
+          {!grown && (
+            <Box
+              component="kbd"
+              data-testid="search-shortcut-hint"
+              aria-hidden
+              sx={{
+                px: 0.75,
+                py: 0.125,
+                borderRadius: 1,
+                border: 1,
+                borderColor: 'divider',
+                bgcolor: 'background.paper',
+                fontFamily: 'inherit',
+                fontSize: 11,
+                lineHeight: '16px',
+                color: 'text.disabled',
+                flexShrink: 0,
+              }}
+            >
+              {SHORTCUT_LABEL}
+            </Box>
+          )}
+        </Box>
+
+        <Popper
+          open={showPanel}
+          anchorEl={anchorEl}
+          placement="bottom-end"
+          transition
+          sx={{ zIndex: theme.zIndex.appBar + 1 }}
+        >
+          {({ TransitionProps }) => (
+            <Grow {...TransitionProps} timeout={140} style={{ transformOrigin: 'top right' }}>
+              <Paper
+                variant="outlined"
+                role="dialog"
+                aria-label="Search results"
+                id="global-search-listbox"
+                data-testid="global-search-dropdown"
+                sx={{
+                  mt: 1,
+                  width: WIDTH_FOCUSED,
+                  maxHeight: '70vh',
+                  overflowY: 'auto',
+                  borderRadius: 2.5,
+                }}
+              >
+                {belowMinimum ? (
+                  <Hint text="Keep typing — at least 2 characters." />
+                ) : query.isPending ? (
+                  <Box sx={{ p: 2 }} data-testid="global-search-loading">
+                    {[0, 1, 2].map((row) => (
+                      <Skeleton key={row} height={30} sx={{ my: 0.5 }} />
+                    ))}
+                  </Box>
+                ) : query.isError ? (
+                  <Hint text="Search is unavailable right now." />
+                ) : query.data ? (
+                  <SearchDropdownResults
+                    query={trimmed}
+                    data={query.data}
+                    highlightKey={highlighted?.key ?? null}
+                  />
+                ) : null}
+              </Paper>
+            </Grow>
+          )}
+        </Popper>
+      </Box>
+    </ClickAwayListener>
+  );
+}
+
+function Hint({ text }: { text: string }) {
+  return (
+    <Typography sx={{ p: 2, fontSize: 13, color: 'text.secondary', textAlign: 'center' }}>
+      {text}
+    </Typography>
+  );
+}

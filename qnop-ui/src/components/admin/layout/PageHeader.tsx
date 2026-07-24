@@ -31,6 +31,8 @@ interface PageHeaderProps {
   description?: ReactNode;
   /** An inline element next to the title, e.g. a status badge on a detail page. */
   titleAdornment?: ReactNode;
+  /** A leading element before the title, e.g. a team avatar on a detail page (issue #509). */
+  leading?: ReactNode;
   /** Primary action(s) pinned to the top-right (top on mobile). */
   action?: ReactNode;
 }
@@ -42,26 +44,35 @@ interface PageHeaderProps {
  * Centralising this guarantees the heading hierarchy and rhythm stay identical
  * across Settings, Email, Users, Teams, OIDC, Branding and Mail templates.
  */
-export function PageHeader({ title, description, titleAdornment, action }: PageHeaderProps) {
+export function PageHeader({
+  title,
+  description,
+  titleAdornment,
+  leading,
+  action,
+}: PageHeaderProps) {
   return (
     <Stack
       direction={{ xs: 'column', sm: 'row' }}
       spacing={2}
       sx={{ justifyContent: 'space-between', alignItems: { sm: 'center' } }}
     >
-      <Box sx={{ minWidth: 0 }}>
-        <Stack direction="row" spacing={1.5} sx={{ alignItems: 'center' }}>
-          <Typography variant="h1" sx={{ fontSize: 28 }} noWrap={Boolean(titleAdornment)}>
-            {title}
-          </Typography>
-          {titleAdornment}
-        </Stack>
-        {description && (
-          <Typography color="text.secondary" sx={{ mt: 0.5 }}>
-            {description}
-          </Typography>
-        )}
-      </Box>
+      <Stack direction="row" spacing={1.5} sx={{ minWidth: 0, alignItems: 'center' }}>
+        {leading && <Box sx={{ flexShrink: 0 }}>{leading}</Box>}
+        <Box sx={{ minWidth: 0 }}>
+          <Stack direction="row" spacing={1.5} sx={{ alignItems: 'center' }}>
+            <Typography variant="h1" sx={{ fontSize: 28 }} noWrap={Boolean(titleAdornment)}>
+              {title}
+            </Typography>
+            {titleAdornment}
+          </Stack>
+          {description && (
+            <Typography color="text.secondary" sx={{ mt: 0.5 }}>
+              {description}
+            </Typography>
+          )}
+        </Box>
+      </Stack>
       {action && <Box sx={{ flexShrink: 0 }}>{action}</Box>}
     </Stack>
   );

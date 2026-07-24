@@ -28,6 +28,7 @@ import io.qnop.api.v1.model.PrincipalView;
 import io.qnop.service.PrincipalDirectoryService;
 import io.qnop.service.TeamNotFoundException;
 import io.qnop.service.avatar.AvatarService;
+import io.qnop.service.avatar.TeamAvatarService;
 import java.time.Instant;
 import java.time.OffsetDateTime;
 import java.util.List;
@@ -47,10 +48,13 @@ public class PrincipalsController implements PrincipalsApi {
 
   private final PrincipalDirectoryService directory;
   private final AvatarService avatars;
+  private final TeamAvatarService teamAvatars;
 
-  public PrincipalsController(PrincipalDirectoryService directory, AvatarService avatars) {
+  public PrincipalsController(
+      PrincipalDirectoryService directory, AvatarService avatars, TeamAvatarService teamAvatars) {
     this.directory = directory;
     this.avatars = avatars;
+    this.teamAvatars = teamAvatars;
   }
 
   @Override
@@ -74,6 +78,14 @@ public class PrincipalsController implements PrincipalsApi {
                 .filter(view -> !view.team())
                 .map(PrincipalDirectoryService.PrincipalView::id)
                 .toList());
+    // The team counterpart (issue #509): one batched team-avatar lookup so a team principal renders
+    // its picture instead of always falling back to the initials crest.
+    Map<UUID, Instant> teamAvatarTimestamps =
+        teamAvatars.updatedAt(
+            views.stream()
+                .filter(PrincipalDirectoryService.PrincipalView::team)
+                .map(PrincipalDirectoryService.PrincipalView::id)
+                .toList());
     return new PrincipalListResponse()
         .principals(
             views.stream()
@@ -86,7 +98,8 @@ public class PrincipalsController implements PrincipalsApi {
                             .displayName(view.displayName())
                             .avatarUrl(
                                 view.team()
-                                    ? null
+                                    ? AvatarUrls.forTeam(
+                                        view.id(), teamAvatarTimestamps.get(view.id()))
                                     : AvatarUrls.forUser(
                                         view.id(), avatarTimestamps.get(view.id()))))
                 .toList());

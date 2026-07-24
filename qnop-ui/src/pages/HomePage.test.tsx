@@ -146,6 +146,26 @@ describe('HomePage dashboard (issue #454)', () => {
     expect(screen.getByText('Ready to finalize')).toBeInTheDocument();
   });
 
+  it('treats emptiness as a designed state in every box (#588)', () => {
+    // One closed foreign review: the dashboard renders (not the brand-new
+    // empty page), yet every box is empty.
+    mockData([review({ workflowState: 'FINALIZED', ownerId: 'someone-else' })]);
+    renderPage();
+
+    expect(screen.getByText('All caught up!')).toBeInTheDocument();
+    expect(screen.getByText('Nothing on the clock')).toBeInTheDocument();
+    expect(screen.getByText('No reviews yet')).toBeInTheDocument();
+    expect(screen.getByText('All quiet')).toBeInTheDocument();
+    expect(screen.getByText('No replies yet')).toBeInTheDocument();
+  });
+
+  it('leads each review row with the typed document icon', () => {
+    mockData([review({ id: 'w1', title: 'A pdf review', contentType: 'application/pdf' })]);
+    renderPage();
+
+    expect(screen.getByRole('img', { name: 'PDF document' })).toBeInTheDocument();
+  });
+
   it('lists deadlines with the urgency label and links replies into the thread', () => {
     mockData([review({ id: 'd-due', title: 'Due thing', dueAt: '2020-01-01T00:00:00Z' })], {
       replies: [

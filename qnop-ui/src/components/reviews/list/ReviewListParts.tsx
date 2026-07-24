@@ -24,12 +24,15 @@ import Stack from '@mui/material/Stack';
 import Tooltip from '@mui/material/Tooltip';
 import Typography from '@mui/material/Typography';
 import { useTheme } from '@mui/material/styles';
-import { Eye, FileText, User } from 'lucide-react';
+import type { Theme } from '@mui/material/styles';
+import { Eye, User } from 'lucide-react';
 import type { ParticipantView } from '../../../api/generated';
 import { ToneBadge } from '../../admin/ToneBadge';
 import { UserHoverCard } from '../../people/UserHoverCard';
 import { UserAvatar } from '../../shell/UserAvatar';
-import { avatarSrc } from '../../../utils/avatarUrl';
+import { TeamAvatar } from '../../shell/TeamAvatar';
+import { avatarSrc, teamAvatarSrc } from '../../../utils/avatarUrl';
+import { tokens } from '../../../theme/tokens';
 
 /** Shared bits of the reviews overview: role badge, doc icon, progress, reviewer stack. */
 
@@ -45,28 +48,114 @@ export function RoleIcon({ role }: { role: 'owner' | 'reviewer' }) {
   return role === 'owner' ? <User size={12} aria-hidden /> : <Eye size={12} aria-hidden />;
 }
 
-/** The little document sheet icon leading every row/card (prototype). */
-export function DocumentIcon({ size = 30 }: { size?: number }) {
+/** Known document MIME types and their ribbon label + tone (issue #509 follow-up). */
+const DOC_TYPE_META: Record<string, { label: string; tone: 'red' | 'blue' | 'neutral' }> = {
+  'application/pdf': { label: 'PDF', tone: 'red' },
+  'application/vnd.openxmlformats-officedocument.wordprocessingml.document': {
+    label: 'DOCX',
+    tone: 'blue',
+  },
+  'application/msword': { label: 'DOC', tone: 'blue' },
+  'text/markdown': { label: 'MD', tone: 'neutral' },
+};
+
+/** Ribbon fill/text plus the dog-ear tint for one format family. */
+function ribbonColorsFor(tone: 'red' | 'blue' | 'neutral', theme: Theme) {
+  if (tone === 'neutral') {
+    const fill = theme.palette.grey[theme.palette.mode === 'dark' ? 400 : 600];
+    return { fill, text: theme.palette.getContrastText(fill), tint: theme.qnop.surface2 };
+  }
+  const badge = theme.qnop.badge[tone];
+  const fill = theme.palette.mode === 'dark' ? badge.fgDark : badge.fg;
+  return { fill, text: theme.palette.getContrastText(fill), tint: badge.bg };
+}
+
+/**
+ * The document sheet leading every row/card, drawn as a real file icon: a
+ * page with a tone-tinted dog-ear fold, faint text lines, and — for known
+ * MIME types — a format ribbon that wraps the left edge (PDF red, Word blue,
+ * Markdown neutral). Unknown types keep the plain sheet, so future formats
+ * degrade gracefully (ADR-0010).
+ */
+export function DocumentIcon({
+  size = 30,
+  contentType,
+}: {
+  size?: number;
+  contentType?: string | null;
+}) {
   const theme = useTheme();
-  return (
+  // MIME parameters (e.g. "; charset=utf-8") never change the format family.
+  const normalized = contentType?.split(';')[0].trim().toLowerCase() ?? '';
+  const meta = DOC_TYPE_META[normalized];
+  const ribbon = meta ? ribbonColorsFor(meta.tone, theme) : null;
+  const sheetFill =
+    theme.palette.mode === 'dark' ? theme.qnop.surface2 : theme.palette.background.paper;
+  const stroke = theme.palette.divider;
+  // The ribbon covers the lower band, so the plain sheet gets the longer ramp.
+  const textLines: Array<[number, number]> = meta
+    ? [
+        [17.5, 17],
+        [22.5, 12],
+      ]
+    : [
+        [17.5, 17],
+        [22.5, 12],
+        [27.5, 18],
+        [32.5, 9],
+      ];
+  const sheet = (
     <Box
-      aria-hidden
-      sx={{
-        width: size,
-        height: Math.round(size * 1.2),
-        borderRadius: '5px',
-        bgcolor: theme.qnop.surface2,
-        border: `1px solid ${theme.palette.divider}`,
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        flexShrink: 0,
-        color: 'text.secondary',
-      }}
+      component="svg"
+      viewBox="0 0 40 48"
+      role={meta ? 'img' : undefined}
+      aria-label={meta ? `${meta.label} document` : undefined}
+      aria-hidden={!meta}
+      data-testid="document-icon"
+      sx={{ width: size, height: size * 1.2, display: 'block', flexShrink: 0 }}
     >
-      <FileText size={Math.round(size / 2)} />
+      {/* Page with the top-right corner cut for the fold. */}
+      <path
+        d="M8 2h17l11 11v29a4 4 0 0 1-4 4H8a4 4 0 0 1-4-4V6a4 4 0 0 1 4-4Z"
+        fill={sheetFill}
+        stroke={stroke}
+        strokeWidth="1.5"
+      />
+      {/* Dog-ear flap, tinted in the format tone. */}
+      <path
+        d="M25 2l11 11h-7a4 4 0 0 1-4-4Z"
+        fill={ribbon ? ribbon.tint : theme.qnop.surface2}
+        stroke={stroke}
+        strokeWidth="1.5"
+        strokeLinejoin="round"
+      />
+      {textLines.map(([y, width]) => (
+        <rect key={y} x="9" y={y} width={width} height="2.5" rx="1.25" fill={stroke} />
+      ))}
+      {meta && ribbon && (
+        <>
+          {/* Fold-back under the overhang — the depth cue of a wrapped ribbon. */}
+          <path d="M1 41l3 3v-3Z" fill={ribbon.fill} />
+          <path d="M1 41l3 3v-3Z" fill="#000" opacity="0.35" />
+          <rect x="1" y="29" width="31" height="12" rx="3" fill={ribbon.fill} />
+          <text
+            x="16.5"
+            y="35"
+            textAnchor="middle"
+            dominantBaseline="central"
+            fontFamily={tokens.font.mono}
+            fontWeight="700"
+            fontSize={meta.label.length > 3 ? 8 : 9.5}
+            letterSpacing="0.5"
+            fill={ribbon.text}
+          >
+            {meta.label}
+          </text>
+        </>
+      )}
     </Box>
   );
+  return meta ? <Tooltip title={`${meta.label} document`}>{sheet}</Tooltip> : sheet;
 }
 
 /**
@@ -158,16 +247,23 @@ export function ReviewerStack({
               zIndex: shown.length - index,
             }}
           >
-            <UserAvatar
-              name={participant.displayName}
-              size={24}
-              // Public read path (ADR-0031); a 404 quietly falls back to initials.
-              imageUrl={
-                participant.kind === 'USER'
-                  ? `/api/v1/users/${participant.principalId}/avatar`
-                  : null
-              }
-            />
+            {participant.kind === 'TEAM' ? (
+              // Team picture (issue #509); an anonymised roster carries a
+              // synthetic token instead of the team id, so no URL is built —
+              // the initials fallback keeps the pseudonym airtight.
+              <TeamAvatar
+                name={participant.displayName}
+                size={24}
+                imageUrl={anonymous ? null : teamAvatarSrc(participant.principalId)}
+              />
+            ) : (
+              <UserAvatar
+                name={participant.displayName}
+                size={24}
+                // Public read path (ADR-0031); a 404 quietly falls back to initials.
+                imageUrl={avatarSrc(participant.principalId)}
+              />
+            )}
           </Box>
         );
         return (

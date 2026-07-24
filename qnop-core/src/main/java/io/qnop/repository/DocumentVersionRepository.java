@@ -52,6 +52,15 @@ public interface DocumentVersionRepository extends JpaRepository<DocumentVersion
   List<DocumentMaxVersion> findMaxVersionsByDocumentIds(
       @Param("documentIds") Collection<UUID> documentIds);
 
+  /** Batched latest-version MIME types for the overview's typed document icon (issue #509). */
+  @Query(
+      "SELECT new io.qnop.repository.DocumentLatestContentType(v.documentId, v.contentType)"
+          + " FROM DocumentVersion v WHERE v.documentId IN :documentIds"
+          + " AND v.versionNumber = (SELECT MAX(v2.versionNumber) FROM DocumentVersion v2"
+          + "   WHERE v2.documentId = v.documentId)")
+  List<DocumentLatestContentType> findLatestContentTypesByDocumentIds(
+      @Param("documentIds") Collection<UUID> documentIds);
+
   /**
    * Every version's storage key, for the storage-consistency scan's referenced set (issue #523).
    */

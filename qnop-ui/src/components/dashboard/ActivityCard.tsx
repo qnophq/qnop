@@ -29,6 +29,7 @@ import {
   CircleCheck,
   MessageSquarePlus,
   RotateCcw,
+  Sparkles,
   Workflow,
   type LucideIcon,
 } from 'lucide-react';
@@ -37,6 +38,7 @@ import Link from '@mui/material/Link';
 import type { DashboardActivity } from '../../api/generated';
 import { useFormatters } from '../../hooks/useFormatters';
 import { SectionCard } from '../admin/layout/SectionCard';
+import { CardEmptyState } from './CardEmptyState';
 import { CardScroller } from './CardScroller';
 import { CountPill } from './CountPill';
 import { UserHoverCard } from '../people/UserHoverCard';
@@ -71,9 +73,12 @@ export function ActivityCard({ activity }: ActivityCardProps) {
       action={<CountPill value={activity.length} />}
     >
       {activity.length === 0 ? (
-        <Typography variant="body2" color="text.secondary">
-          Nothing new — you are all caught up.
-        </Typography>
+        <CardEmptyState
+          icon={Sparkles}
+          tone="amber"
+          title="All quiet"
+          text="When teammates act on your reviews, it shows up here."
+        />
       ) : (
         <CardScroller>
           <Stack spacing={1.25}>

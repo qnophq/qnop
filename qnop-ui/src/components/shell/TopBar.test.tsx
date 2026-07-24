@@ -27,6 +27,13 @@ import { ThemeProvider } from '@mui/material/styles';
 import { buildTheme } from '../../theme/theme';
 import { TopBar } from './TopBar';
 
+// The embedded GlobalSearch (#540) queries through TanStack Query; the bar's
+// own tests only need the input to exist, so the hook is stubbed idle.
+vi.mock('../../api/hooks/useSearch', () => ({
+  SEARCH_MIN_LENGTH: 2,
+  useSearchQuick: () => ({ data: undefined, isPending: false, isError: false }),
+}));
+
 function renderTopBar() {
   return render(
     <ThemeProvider theme={buildTheme('light')}>
@@ -57,17 +64,10 @@ describe('TopBar notifications placeholder (#514)', () => {
     expect(bell.querySelector('.MuiBadge-dot')).toBeNull();
   });
 
-  it('opens the search coming-soon panel from the search trigger', async () => {
-    const user = userEvent.setup();
+  it('carries the real global search input (#540) instead of the old trigger', () => {
     renderTopBar();
 
-    // The trigger is a button, not a fake text input.
-    expect(screen.queryByRole('textbox')).not.toBeInTheDocument();
-
-    await user.click(screen.getByRole('button', { name: 'Search' }));
-    expect(await screen.findByText(/jump to any review/i)).toBeInTheDocument();
-
-    await user.keyboard('{Escape}');
+    expect(screen.getByLabelText('Search reviews, people and teams')).toBeInTheDocument();
     expect(screen.queryByText(/jump to any review/i)).not.toBeInTheDocument();
   });
 });

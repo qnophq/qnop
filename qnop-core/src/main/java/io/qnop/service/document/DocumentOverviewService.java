@@ -23,6 +23,7 @@ package io.qnop.service.document;
 import io.qnop.entity.Document;
 import io.qnop.repository.AnnotationRepository;
 import io.qnop.repository.DocumentAnnotationCounts;
+import io.qnop.repository.DocumentLatestContentType;
 import io.qnop.repository.DocumentMaxVersion;
 import io.qnop.repository.DocumentRepository;
 import io.qnop.repository.DocumentVersionRepository;
@@ -98,6 +99,15 @@ public class DocumentOverviewService {
                 .collect(
                     Collectors.toMap(
                         DocumentMaxVersion::documentId, DocumentMaxVersion::maxVersion));
+    // Latest-version MIME types for the typed document icon (issue #509).
+    Map<UUID, String> contentTypes =
+        ids.isEmpty()
+            ? Map.of()
+            : versions.findLatestContentTypesByDocumentIds(ids).stream()
+                .collect(
+                    Collectors.toMap(
+                        DocumentLatestContentType::documentId,
+                        DocumentLatestContentType::contentType));
     // Visibility-scoped (issue #413): under PRIVATE the overview counts follow
     // what the caller can actually see, not the true (possibly larger) set.
     Map<UUID, DocumentAnnotationCounts> counts =
@@ -143,6 +153,7 @@ public class DocumentOverviewService {
                       document.getId(),
                       document.getTitle(),
                       document.getSlug(),
+                      contentTypes.get(document.getId()),
                       document.isAnonymous(),
                       document.getThreadParticipation().name(),
                       document.getOwnerId(),
@@ -172,7 +183,7 @@ public class DocumentOverviewService {
   private List<ParticipantView> rosterFor(
       Document document, UUID actor, List<ParticipantProjection> rows, Map<UUID, String> slugById) {
     if (!document.isAnonymous() || document.getOwnerId().equals(actor)) {
-      return rows.stream().map(row -> ParticipantView.of(row, slugById.get(row.userId()))).toList();
+      return rows.stream().map(row -> ParticipantView.of(row, slugById)).toList();
     }
     return ReviewParticipantService.anonymiseRoster(
         document.getId(), rows, identity.forDocument(document.getId(), actor));
@@ -200,6 +211,7 @@ public class DocumentOverviewService {
       UUID id,
       String title,
       String slug,
+      String contentType,
       boolean anonymous,
       String threadParticipation,
       UUID ownerId,

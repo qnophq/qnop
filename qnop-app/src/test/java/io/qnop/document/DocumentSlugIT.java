@@ -86,7 +86,10 @@ class DocumentSlugIT extends AbstractIntegrationTest {
     mockMvc
         .perform(get("/api/v1/documents/{id}", documentId).with(asUser(owner)))
         .andExpect(status().isOk())
-        .andExpect(jsonPath("$.slug").value("q3-contract-review"));
+        .andExpect(jsonPath("$.slug").value("q3-contract-review"))
+        // The detail metadata carries the latest version's MIME type for the
+        // typed document icon (issue #509 follow-up).
+        .andExpect(jsonPath("$.contentType").value("application/pdf"));
 
     // Lookup ignores case too — and the metadata resolves the owner's identity
     // itself (structurally public, #472), never via the principal directory.

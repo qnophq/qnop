@@ -40,6 +40,7 @@ import io.qnop.service.TeamService.TeamPage;
 import io.qnop.service.TeamService.TeamSummaryView;
 import io.qnop.service.UserNotFoundException;
 import io.qnop.service.avatar.AvatarService;
+import io.qnop.service.avatar.TeamAvatarService;
 import java.time.Instant;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
@@ -62,18 +63,27 @@ public class TeamController implements AdminTeamsApi {
 
   private final TeamService teams;
   private final AvatarService avatars;
+  private final TeamAvatarService teamAvatars;
 
-  public TeamController(TeamService teams, AvatarService avatars) {
+  public TeamController(TeamService teams, AvatarService avatars, TeamAvatarService teamAvatars) {
     this.teams = teams;
     this.avatars = avatars;
+    this.teamAvatars = teamAvatars;
   }
 
   @Override
   public ResponseEntity<AdminTeamListResponse> listTeams(String q, Integer page, Integer size) {
     TeamPage result = teams.list(q, page, size);
+    // One batched team-avatar lookup for the whole page so building URLs never streams bytes
+    // (#509).
+    Map<UUID, Instant> avatarTs =
+        teamAvatars.updatedAt(result.items().stream().map(TeamSummaryView::id).toList());
     return ResponseEntity.ok(
         new AdminTeamListResponse()
-            .items(result.items().stream().map(TeamController::toSummary).toList())
+            .items(
+                result.items().stream()
+                    .map(v -> toSummary(v, AvatarUrls.forTeam(v.id(), avatarTs.get(v.id()))))
+                    .toList())
             .total(result.total())
             .page(result.page())
             .size(result.size()));
@@ -82,7 +92,8 @@ public class TeamController implements AdminTeamsApi {
   @Override
   public ResponseEntity<AdminTeamSummary> createTeam(AdminTeamCreateRequest request) {
     TeamSummaryView created = teams.create(request.getName(), request.getDescription());
-    return ResponseEntity.status(HttpStatus.CREATED).body(toSummary(created));
+    return ResponseEntity.status(HttpStatus.CREATED)
+        .body(toSummary(created, teamAvatarUrl(created.id())));
   }
 
   @Override
@@ -94,7 +105,12 @@ public class TeamController implements AdminTeamsApi {
   public ResponseEntity<AdminTeamSummary> updateTeam(UUID teamId, AdminTeamUpdateRequest request) {
     TeamSummaryView updated =
         teams.update(teamId, request.getName(), request.getDescription(), request.getEnabled());
-    return ResponseEntity.ok(toSummary(updated));
+    return ResponseEntity.ok(toSummary(updated, teamAvatarUrl(updated.id())));
+  }
+
+  /** The team's own avatar URL (cache-busted), or null when it has none (issue #509). */
+  private String teamAvatarUrl(UUID teamId) {
+    return AvatarUrls.forTeam(teamId, teamAvatars.updatedAt(teamId).orElse(null));
   }
 
   @Override
@@ -149,13 +165,14 @@ public class TeamController implements AdminTeamsApi {
                 .timestamp(OffsetDateTime.now(ZoneOffset.UTC)));
   }
 
-  private static AdminTeamSummary toSummary(TeamSummaryView v) {
+  private static AdminTeamSummary toSummary(TeamSummaryView v, String avatarUrl) {
     return new AdminTeamSummary()
         .id(v.id())
         .name(v.name())
         .description(v.description())
         .enabled(v.enabled())
         .memberCount(v.memberCount())
+        .avatarUrl(avatarUrl)
         .createdAt(toOffset(v.createdAt()))
         .updatedAt(toOffset(v.updatedAt()));
   }
@@ -170,6 +187,7 @@ public class TeamController implements AdminTeamsApi {
         .name(v.name())
         .description(v.description())
         .enabled(v.enabled())
+        .avatarUrl(teamAvatarUrl(v.id()))
         .createdAt(toOffset(v.createdAt()))
         .updatedAt(toOffset(v.updatedAt()))
         .members(

@@ -75,7 +75,10 @@ databaseChangeLog:
       file: migrations/0021-team-slug-backfill.yaml
       relativeToChangelogFile: true
   - include:
-      file: migrations/0022-comment-mention-schema.yaml
+      file: migrations/0022-team-avatar-schema.yaml
+      relativeToChangelogFile: true
+  - include:
+      file: migrations/0023-comment-mention-schema.yaml
       relativeToChangelogFile: true
   # Enterprise schema seam (issue #254, ADR-0039): a separately-licensed module
   # (ADR-0002) contributes its changelogs under db/changelog/enterprise/ on its
