@@ -65,6 +65,7 @@ Two refinement conventions (see the 2026-07-16 amendment to [ADR-0001](0001-reco
 | [0046](0046-publish-spi-and-api-to-github-packages.md) | Publish qnop-spi & qnop-api to GitHub Packages (maven-publish convention) | Accepted |
 | [0047](0047-federated-global-search.md) | Federated global search behind a SearchService port | Accepted |
 | [0048](0048-cross-namespace-slug-uniqueness.md) | Cross-namespace slug uniqueness (users and teams) | Accepted |
+| [0049](0049-extension-plugin-packaging-model.md) | Extension packaging model — boot-time SPI plugins, not a runtime plugin framework | Proposed |
 
 ## Template
 
