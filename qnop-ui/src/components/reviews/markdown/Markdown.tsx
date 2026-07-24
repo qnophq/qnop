@@ -32,14 +32,15 @@ import { AttachmentImage } from './AttachmentImage';
 import { AttachmentLink } from './AttachmentLink';
 import { isAppAttachmentUrl } from './attachmentSources';
 import { MentionLink } from './MentionLink';
+import { remarkMentions } from './remarkMentions';
 
-/** The canonical @mention href scheme (issue #462): `mention:<userId>`. */
+/** The canonical @mention href scheme (issue #462): `mention:<slug>`. */
 const MENTION_HREF = 'mention:';
 
 // react-markdown's default urlTransform sanitises hrefs to a small protocol allowlist (http/https/
 // mailto/…) and would blank out our custom `mention:` scheme before it ever reaches the renderer.
-// Preserve mention hrefs (they carry only a user id, rendered by MentionLink) and defer everything
-// else to the default sanitiser (issue #462).
+// Preserve mention hrefs (they carry only a profile slug, rendered by MentionLink) and defer
+// everything else to the default sanitiser (issue #462).
 const urlTransform = (url: string) =>
   url.startsWith(MENTION_HREF) ? url : defaultUrlTransform(url);
 
@@ -55,11 +56,10 @@ const urlTransform = (url: string) =>
  */
 const components: Components = {
   a: ({ node: _node, children, ...props }) => {
-    // A resolved mention (issue #462): the server-side token @[Name](mention:<id>) renders as an
-    // in-app profile pill rather than an external link. Parsed as a Markdown link, so an un-enhanced
-    // Markdown viewer still shows the name; only qnop's renderer promotes it to a link.
+    // A mention (issue #462): remarkMentions promotes the plain @slug token to a mention: link,
+    // rendered as an in-app profile pill rather than an external anchor.
     if (props.href?.startsWith(MENTION_HREF)) {
-      return <MentionLink userId={props.href.slice(MENTION_HREF.length)}>{children}</MentionLink>;
+      return <MentionLink slug={props.href.slice(MENTION_HREF.length)}>{children}</MentionLink>;
     }
     return isAppAttachmentUrl(props.href) ? (
       <AttachmentLink href={props.href}>{children}</AttachmentLink>
@@ -90,8 +90,8 @@ const components: Components = {
 // explicitly tagged fences highlight (no auto-detection guesswork).
 // Allow the custom `mention:` href protocol through the sanitiser (issue #462); without this the
 // default schema (http/https/mailto only) would strip the mention href and the pill could not link.
-// The scheme carries only a user id — no markup, no script — and is rendered by MentionLink, never
-// as a raw navigable anchor.
+// The scheme carries only a profile slug — no markup, no script — and is rendered by MentionLink,
+// never as a raw navigable anchor.
 const sanitizeSchema = {
   ...defaultSchema,
   protocols: {
@@ -100,7 +100,7 @@ const sanitizeSchema = {
   },
 };
 
-const remarkPlugins = [remarkGfm, remarkBreaks];
+const remarkPlugins = [remarkGfm, remarkBreaks, remarkMentions];
 const rehypePlugins = [
   [rehypeSanitize, sanitizeSchema],
   [rehypeHighlight, { detect: false }],

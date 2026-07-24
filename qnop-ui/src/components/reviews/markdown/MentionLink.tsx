@@ -23,19 +23,15 @@ import type { ReactNode } from 'react';
 import Box from '@mui/material/Box';
 import { alpha, useTheme } from '@mui/material/styles';
 import { Link as RouterLink } from 'react-router-dom';
-import { useAuthStore } from '../../../stores/authStore';
 
 /**
- * A resolved @mention rendered inline in a comment/annotation body (issue #462): a highlighted pill
- * carrying the "@Name" link text, pointing at the mentioned person's profile — `/profile` for
- * yourself, `/users/{id}` otherwise (the route resolves by id or slug). Only appears in non-anonymous
- * reviews: mentions are never resolved server-side for anonymous ones, so no `mention:` token ever
- * reaches here to link a hidden identity.
+ * A GitHub-style @mention rendered inline in a comment/annotation body (issue #462): a highlighted
+ * pill carrying the "@slug" text, pointing at the mentioned person's public profile (the route
+ * resolves the slug case-insensitively; an unknown slug lands on the anti-enumeration 404).
  */
-export function MentionLink({ userId, children }: { userId: string; children: ReactNode }) {
+export function MentionLink({ slug, children }: { slug: string; children: ReactNode }) {
   const theme = useTheme();
-  const selfId = useAuthStore((s) => s.userId);
-  const to = userId === selfId ? '/profile' : `/users/${userId}`;
+  const to = `/users/${slug}`;
   return (
     <Box
       component={RouterLink}

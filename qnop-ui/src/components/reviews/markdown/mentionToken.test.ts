@@ -23,10 +23,14 @@ import { describe, expect, it } from 'vitest';
 import { activeMentionQuery, mentionToken } from './mentionToken';
 
 describe('mentionToken (#462)', () => {
-  it('builds the canonical id-based token with the @ inside the link text', () => {
-    expect(mentionToken({ id: 'abc-123', name: 'Alice Smith' })).toBe(
-      '[@Alice Smith](mention:abc-123)',
+  it('builds the GitHub-style slug token', () => {
+    expect(mentionToken({ id: 'abc-123', name: 'Alice Smith', slug: 'alice-smith' })).toBe(
+      '@alice-smith',
     );
+  });
+
+  it('keeps the query alive across slug hyphens', () => {
+    expect(activeMentionQuery('hi @anna-kr', 11)).toEqual({ query: 'anna-kr', start: 3 });
   });
 
   it('detects an @query that starts the text or follows whitespace', () => {

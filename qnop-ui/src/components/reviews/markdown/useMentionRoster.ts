@@ -38,17 +38,24 @@ export function useMentionRoster(documentId: string | null | undefined): Mention
   const participantsQuery = useParticipants(documentId ?? '', Boolean(documentId));
   return useMemo(() => {
     if (!review || review.anonymous) return [];
+    // The token is the profile slug (issue #486), so a slug-less account
+    // (predating slugs) cannot be offered.
     const roster = (participantsQuery.data?.participants ?? [])
-      .filter((participant) => participant.kind === ParticipantKind.User)
-      .map((participant) => ({ id: participant.principalId, name: participant.displayName }));
+      .filter((participant) => participant.kind === ParticipantKind.User && participant.slug)
+      .map((participant) => ({
+        id: participant.principalId,
+        name: participant.displayName,
+        slug: participant.slug as string,
+      }));
     // The owner is mentionable too (the server's access rule names them first)
     // but is rarely on the reviewer roster — lead with them, deduped by id.
     if (
       review.ownerId &&
       review.ownerDisplayName &&
+      review.ownerSlug &&
       !roster.some((candidate) => candidate.id === review.ownerId)
     ) {
-      roster.unshift({ id: review.ownerId, name: review.ownerDisplayName });
+      roster.unshift({ id: review.ownerId, name: review.ownerDisplayName, slug: review.ownerSlug });
     }
     return roster;
   }, [participantsQuery.data, review]);

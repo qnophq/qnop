@@ -94,9 +94,9 @@ class MentionNotificationIT extends SeededIntegrationTest {
     return users.findById(userId).map(User::getEmail).orElseThrow();
   }
 
-  /** A canonical mention token; the free-text label is irrelevant, resolution is by the id. */
-  private static String mention(UUID userId) {
-    return "[@somebody](mention:" + userId + ")";
+  /** The GitHub-style mention token: {@code @<slug>}, resolved through the profile slug. */
+  private String mention(UUID userId) {
+    return "@" + users.findById(userId).map(User::getSlug).orElseThrow();
   }
 
   private String createAnnotation(UUID author, String comment) throws Exception {

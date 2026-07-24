@@ -23,29 +23,31 @@
 export interface MentionCandidate {
   id: string;
   name: string;
+  /** The immutable profile slug (issue #486) — the mention token IS this slug. */
+  slug: string;
 }
 
 /**
- * The canonical, id-based mention token the composer inserts and the server resolves:
- * {@code [@Display Name](mention:<uuid>)}. Id-based (not @username) because OIDC users may have no
- * username; the @ lives inside the link text so the whole "@Name" renders as one pill.
+ * The GitHub-style mention token the composer inserts and the server resolves: {@code @<slug>}.
+ * Slug-based because the profile slug (issue #486) is unique, immutable and human-readable — the
+ * raw text stays legible and the reference survives display-name changes.
  */
 export function mentionToken(candidate: MentionCandidate): string {
-  return `[@${candidate.name}](mention:${candidate.id})`;
+  return `@${candidate.slug}`;
 }
 
 /**
  * The active {@code @query} immediately before the caret, or {@code null} when the caret is not in a
  * mention. A query starts at an {@code @} that follows whitespace or the start of the text, and runs
- * to the caret across word characters only — so "email a@b" or a completed token never re-triggers
- * the picker. Returns the query text and the index of the {@code @} (where insertion replaces from).
+ * to the caret across slug characters (word chars and hyphens) — so "email a@b" never triggers the
+ * picker. Returns the query text and the index of the {@code @} (where insertion replaces from).
  */
 export function activeMentionQuery(
   text: string,
   caret: number,
 ): { query: string; start: number } | null {
   const before = text.slice(0, caret);
-  const match = /(?:^|\s)@(\w*)$/.exec(before);
+  const match = /(?:^|\s)@([\w-]*)$/.exec(before);
   if (!match) {
     return null;
   }

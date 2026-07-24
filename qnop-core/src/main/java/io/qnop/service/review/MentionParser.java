@@ -21,49 +21,45 @@
 package io.qnop.service.review;
 
 import java.util.LinkedHashSet;
+import java.util.Locale;
 import java.util.Set;
-import java.util.UUID;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 /**
- * Extracts mentioned user ids from a comment body (issue #462). The composer inserts a canonical,
- * id-based token — {@code [@Display Name](mention:<uuid>)} — rather than {@code @username}, because
- * OIDC users may have no username while every roster member has an id. The token is a Markdown link
- * whose text starts with {@code @}, so an un-enhanced renderer still shows "@Name"; qnop's renderer
- * special-cases the {@code mention:} scheme into a highlighted profile pill.
+ * Extracts mentioned profile slugs from a comment body (issue #462). The mention token is plain
+ * GitHub-style text — {@code @<slug>} — using the immutable, unique profile slug every account
+ * carries (issue #486), so the raw text stays human-readable and the reference survives
+ * display-name changes. A token only counts at a word boundary ({@code a@b.com} is not a mention),
+ * and matching ignores case like every slug lookup.
  *
- * <p>Pure and DB-free: this only pulls the ids out of the text. Access-scoping (keep only ids on
- * the document roster) and anonymity handling live in {@link CommentMentionService}.
+ * <p>Pure and DB-free: this only pulls the slugs out of the text. Resolution to users,
+ * access-scoping and the anonymity policy live in {@link CommentMentionService}.
  */
 public final class MentionParser {
 
-  /** {@code [@label](mention:<uuid>)} — the label starts with @, the id is a canonical UUID. */
+  /**
+   * {@code @slug} after start/whitespace/bracket — slug shape per issue #486: letters, digits and
+   * inner hyphens, 3–64 chars, never hyphen-terminated (a trailing hyphen stays outside the token).
+   */
   private static final Pattern MENTION =
-      Pattern.compile(
-          "\\[@[^\\]]*]\\(mention:"
-              + "([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12})\\)");
+      Pattern.compile("(?:^|[\\s(\\[{>])@([A-Za-z0-9][A-Za-z0-9-]{1,62}[A-Za-z0-9])(?![\\w-])");
 
   private MentionParser() {}
 
   /**
-   * The distinct user ids mentioned in {@code body}, in first-seen order. A malformed or empty body
-   * yields an empty set; duplicate mentions of the same id collapse to one.
+   * The distinct slugs mentioned in {@code body}, lower-cased, in first-seen order. A null, blank
+   * or tokenless body yields an empty set; duplicate mentions of the same slug collapse to one.
    */
-  public static Set<UUID> extractUserIds(String body) {
+  public static Set<String> extractSlugs(String body) {
     if (body == null || body.isBlank()) {
       return Set.of();
     }
-    Set<UUID> ids = new LinkedHashSet<>();
+    Set<String> slugs = new LinkedHashSet<>();
     Matcher matcher = MENTION.matcher(body);
     while (matcher.find()) {
-      // The capture group is already a well-formed UUID by the pattern; guard defensively anyway.
-      try {
-        ids.add(UUID.fromString(matcher.group(1)));
-      } catch (IllegalArgumentException ignored) {
-        // not a parseable UUID — treat the token as plain text
-      }
+      slugs.add(matcher.group(1).toLowerCase(Locale.ROOT));
     }
-    return ids;
+    return slugs;
   }
 }

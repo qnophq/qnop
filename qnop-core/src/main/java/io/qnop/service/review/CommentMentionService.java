@@ -22,10 +22,14 @@ package io.qnop.service.review;
 
 import io.qnop.entity.CommentMention;
 import io.qnop.entity.Document;
+import io.qnop.entity.User;
 import io.qnop.repository.CommentMentionRepository;
 import io.qnop.repository.DocumentRepository;
 import io.qnop.repository.ReviewParticipantRepository;
+import io.qnop.repository.UserRepository;
+import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 import org.springframework.stereotype.Service;
@@ -52,26 +56,30 @@ public class CommentMentionService {
   private final CommentMentionRepository mentions;
   private final DocumentRepository documents;
   private final ReviewParticipantRepository participants;
+  private final UserRepository users;
 
   public CommentMentionService(
       CommentMentionRepository mentions,
       DocumentRepository documents,
-      ReviewParticipantRepository participants) {
+      ReviewParticipantRepository participants,
+      UserRepository users) {
     this.mentions = mentions;
     this.documents = documents;
     this.participants = participants;
+    this.users = users;
   }
 
   /**
-   * Parses {@code body}, keeps only mentions of users with access to {@code documentId}, and
-   * persists a row per surviving mention. Returns the mentioned user ids that were persisted (for
-   * the notification path to target); empty when the review is anonymous, the body has no tokens,
-   * or none resolve to a roster member.
+   * Parses the {@code @slug} tokens of {@code body}, keeps only mentions of users with access to
+   * {@code documentId}, and persists a row per surviving mention. Returns the mentioned user ids
+   * that were persisted (for the notification path to target); empty when the review is anonymous,
+   * the body has no tokens, or none resolve to a user on the roster — an unknown slug stays plain
+   * text, exactly like a slug without access.
    */
   @Transactional
   public List<UUID> resolveAndPersist(UUID commentId, UUID documentId, String body) {
-    Set<UUID> candidates = MentionParser.extractUserIds(body);
-    if (candidates.isEmpty()) {
+    Set<String> slugs = MentionParser.extractSlugs(body);
+    if (slugs.isEmpty()) {
       return List.of();
     }
     Document document = documents.findById(documentId).orElse(null);
@@ -79,11 +87,15 @@ public class CommentMentionService {
       return List.of(); // anonymous reviews: mentions stay plain text (ADR-0038)
     }
     UUID owner = document.getOwnerId();
+    Set<UUID> mentionedIds = new LinkedHashSet<>();
+    for (String slug : slugs) {
+      Optional<User> user = users.findBySlugIgnoreCase(slug);
+      user.map(User::getId)
+          .filter(id -> hasAccess(documentId, owner, id))
+          .ifPresent(mentionedIds::add);
+    }
     List<CommentMention> rows =
-        candidates.stream()
-            .filter(userId -> hasAccess(documentId, owner, userId))
-            .map(userId -> new CommentMention(commentId, userId))
-            .toList();
+        mentionedIds.stream().map(userId -> new CommentMention(commentId, userId)).toList();
     if (rows.isEmpty()) {
       return List.of();
     }

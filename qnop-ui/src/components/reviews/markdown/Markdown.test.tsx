@@ -57,19 +57,29 @@ describe('Markdown render (#427)', () => {
     expect(container.querySelector('table')).toBeInTheDocument();
   });
 
-  it('renders a resolved @mention as an in-app profile link, not an external anchor (#462)', () => {
-    const id = '018f5a3e-0000-7000-8000-000000000001';
+  it('renders a GitHub-style @slug mention as an in-app profile pill (#462)', () => {
     const { getByTestId } = render(
       <MemoryRouter>
         <ThemeProvider theme={buildTheme('light')}>
-          <Markdown>{`hey [@Alice](mention:${id}) look`}</Markdown>
+          <Markdown>{'hey @anna-krause look'}</Markdown>
         </ThemeProvider>
       </MemoryRouter>,
     );
     const mention = getByTestId('mention-link');
-    expect(mention).toHaveTextContent('@Alice');
+    expect(mention).toHaveTextContent('@anna-krause');
     // Links into the app to the profile — the mention: scheme never reaches the DOM as an href.
-    expect(mention).toHaveAttribute('href', `/users/${id}`);
+    expect(mention).toHaveAttribute('href', '/users/anna-krause');
+  });
+
+  it('leaves emails and code spans alone (#462)', () => {
+    const { queryByTestId } = render(
+      <MemoryRouter>
+        <ThemeProvider theme={buildTheme('light')}>
+          <Markdown>{'mail a@b-example.org or `@anna-krause` in code'}</Markdown>
+        </ThemeProvider>
+      </MemoryRouter>,
+    );
+    expect(queryByTestId('mention-link')).not.toBeInTheDocument();
   });
 
   it('renders a fenced code block', () => {

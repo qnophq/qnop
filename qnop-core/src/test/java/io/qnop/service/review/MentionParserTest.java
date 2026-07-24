@@ -22,44 +22,38 @@ package io.qnop.service.review;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import java.util.UUID;
 import org.junit.jupiter.api.Test;
 
-/** Unit tests for the canonical {@code @[label](mention:uuid)} token parsing (issue #462). */
+/** Unit tests for the GitHub-style {@code @slug} token parsing (issue #462). */
 class MentionParserTest {
 
-  private static final UUID ALICE = UUID.fromString("018f5a3e-0000-7000-8000-000000000001");
-  private static final UUID BOB = UUID.fromString("018f5a3e-0000-7000-8000-000000000002");
+  @Test
+  void extractsSlugsInFirstSeenOrderLowercasedAndDeduplicated() {
+    String body = "Hi @anna-krause and @Ben-Roth — again @ANNA-KRAUSE";
 
-  private static String token(String label, UUID id) {
-    return "[@" + label + "](mention:" + id + ")";
+    assertThat(MentionParser.extractSlugs(body)).containsExactly("anna-krause", "ben-roth");
   }
 
   @Test
-  void extractsIdsInFirstSeenOrderAndDeduplicates() {
-    String body =
-        "Hi "
-            + token("Alice", ALICE)
-            + " and "
-            + token("Bob", BOB)
-            + " — again "
-            + token("A", ALICE);
+  void requiresAWordBoundaryBeforeTheAt() {
+    // An email address and an @ glued to a word are not mentions; one after a bracket is.
+    String body = "mail a@b-example.org or foo@bar-baz but (@anna-krause) counts";
 
-    assertThat(MentionParser.extractUserIds(body)).containsExactly(ALICE, BOB);
+    assertThat(MentionParser.extractSlugs(body)).containsExactly("anna-krause");
   }
 
   @Test
-  void ignoresPlainAtTextAndBareUuids() {
-    // A plain "@alice", an email, and a naked mention: scheme without the @[..](..) shape are text.
-    String body = "email me @alice or a@b.com — mention:" + ALICE + " is not a token";
+  void respectsTheSlugShape() {
+    // Too short, hyphen-terminated, underscored and hyphen-led tokens are not slugs.
+    String body = "@ab @cde- @under_score @-lead @abc @okay-slug";
 
-    assertThat(MentionParser.extractUserIds(body)).isEmpty();
+    assertThat(MentionParser.extractSlugs(body)).containsExactly("abc", "okay-slug");
   }
 
   @Test
   void handlesNullBlankAndTokenlessBodies() {
-    assertThat(MentionParser.extractUserIds(null)).isEmpty();
-    assertThat(MentionParser.extractUserIds("   ")).isEmpty();
-    assertThat(MentionParser.extractUserIds("no mentions here")).isEmpty();
+    assertThat(MentionParser.extractSlugs(null)).isEmpty();
+    assertThat(MentionParser.extractSlugs("   ")).isEmpty();
+    assertThat(MentionParser.extractSlugs("no mentions here")).isEmpty();
   }
 }

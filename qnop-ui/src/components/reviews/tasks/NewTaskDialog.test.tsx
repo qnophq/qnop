@@ -49,6 +49,7 @@ function mockRoster(anonymous: boolean, overrides: { ownerId?: string } = {}) {
       anonymous,
       ownerId: overrides.ownerId ?? OWNER_ID,
       ownerDisplayName: overrides.ownerId ? 'Alice' : 'Olivia Owner',
+      ownerSlug: overrides.ownerId ? 'alice-smith' : 'olivia-owner',
     },
   } as unknown as ReturnType<typeof useDocument>);
   vi.mocked(useParticipants).mockReturnValue({
@@ -59,6 +60,7 @@ function mockRoster(anonymous: boolean, overrides: { ownerId?: string } = {}) {
           kind: ParticipantKind.User,
           principalId: ALICE_ID,
           displayName: 'Alice',
+          slug: 'alice-smith',
         },
       ],
     },

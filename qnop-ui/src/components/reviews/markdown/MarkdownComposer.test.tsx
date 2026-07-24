@@ -39,7 +39,7 @@ function Host({
   onUploadAttachment?: (file: File) => Promise<UploadedAttachment>;
   onToggleFullscreen?: () => void;
   initial?: string;
-  mentionCandidates?: { id: string; name: string }[];
+  mentionCandidates?: { id: string; name: string; slug: string }[];
 }) {
   const [value, setValue] = useState(initial);
   return (
@@ -66,8 +66,8 @@ describe('MarkdownComposer', () => {
     render(
       <Host
         mentionCandidates={[
-          { id: '018f5a3e-0000-7000-8000-000000000001', name: 'Alice' },
-          { id: '018f5a3e-0000-7000-8000-000000000002', name: 'Bob' },
+          { id: '018f5a3e-0000-7000-8000-000000000001', name: 'Alice', slug: 'alice-smith' },
+          { id: '018f5a3e-0000-7000-8000-000000000002', name: 'Bob', slug: 'bob-jones' },
         ]}
       />,
     );
@@ -83,7 +83,7 @@ describe('MarkdownComposer', () => {
     expect(screen.queryByText('Bob')).not.toBeInTheDocument();
 
     fireEvent.mouseDown(option); // mousedown selects without blurring the field
-    expect(ta.value).toContain('[@Alice](mention:018f5a3e-0000-7000-8000-000000000001)');
+    expect(ta.value).toContain('@alice-smith');
   });
 
   it('offers no @ picker without a roster (e.g. anonymous reviews) (#462)', () => {

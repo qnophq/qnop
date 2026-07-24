@@ -173,7 +173,11 @@ export function MarkdownComposer({
     if (!mention || !mentionCandidates?.length) return [];
     const needle = mention.query.toLowerCase();
     return mentionCandidates
-      .filter((candidate) => candidate.name.toLowerCase().includes(needle))
+      .filter(
+        (candidate) =>
+          candidate.name.toLowerCase().includes(needle) ||
+          candidate.slug.toLowerCase().includes(needle),
+      )
       .slice(0, MENTION_LIMIT);
   }, [mention, mentionCandidates]);
   const mentionOpen = mentionMatches.length > 0;
@@ -589,6 +593,9 @@ export function MarkdownComposer({
               >
                 <Typography noWrap sx={{ fontSize: '0.85rem' }}>
                   {candidate.name}
+                </Typography>
+                <Typography noWrap color="text.secondary" sx={{ fontSize: '0.75rem', ml: 0.75 }}>
+                  @{candidate.slug}
                 </Typography>
               </MenuItem>
             ))}

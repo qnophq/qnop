@@ -592,7 +592,9 @@ describe('AnnotationPanel', () => {
   it('offers the @-mention roster in the annotation composer', () => {
     renderPanel({
       pendingAnchor: annotation('a1').anchor!,
-      mentionCandidates: [{ id: '018f5a3e-0000-7000-8000-000000000001', name: 'Alice' }],
+      mentionCandidates: [
+        { id: '018f5a3e-0000-7000-8000-000000000001', name: 'Alice', slug: 'alice-smith' },
+      ],
     });
 
     const ta = screen.getByLabelText('Annotation comment') as HTMLTextAreaElement;
