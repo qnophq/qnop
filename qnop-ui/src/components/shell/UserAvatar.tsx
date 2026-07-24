@@ -28,6 +28,8 @@ interface UserAvatarProps {
   size?: number;
   /** Uploaded profile picture; falls back to the initials avatar when absent or it fails to load. */
   imageUrl?: string | null;
+  /** Root element — pass 'span' when the avatar sits in phrasing content (e.g. inline in a paragraph). */
+  component?: 'div' | 'span';
 }
 
 function initials(name: string): string {
@@ -42,7 +44,7 @@ function initials(name: string): string {
  * avatar with a deterministic colour from the brand palette (issue #117). A broken
  * or expired image URL falls back to the initials too.
  */
-export function UserAvatar({ name, size = 28, imageUrl }: UserAvatarProps) {
+export function UserAvatar({ name, size = 28, imageUrl, component = 'div' }: UserAvatarProps) {
   const theme = useTheme();
   const safe = name ?? '?';
   const palette = theme.qnop.avatarPalette;
@@ -62,6 +64,7 @@ export function UserAvatar({ name, size = 28, imageUrl }: UserAvatarProps) {
   return (
     <Box
       aria-hidden
+      component={component}
       sx={{
         width: size,
         height: size,
