@@ -23,6 +23,7 @@ import { useMemo } from 'react';
 import { ParticipantKind } from '../../../api/generated';
 import { useDocument } from '../../../api/hooks/useDocuments';
 import { useParticipants } from '../../../api/hooks/useReviews';
+import { useAuthStore } from '../../../stores/authStore';
 import type { MentionCandidate } from './mentionToken';
 
 /**
@@ -36,12 +37,19 @@ import type { MentionCandidate } from './mentionToken';
 export function useMentionRoster(documentId: string | null | undefined): MentionCandidate[] {
   const review = useDocument(documentId ?? '').data;
   const participantsQuery = useParticipants(documentId ?? '', Boolean(documentId));
+  const selfId = useAuthStore((s) => s.userId);
   return useMemo(() => {
     if (!review || review.anonymous) return [];
     // The token is the profile slug (issue #486), so a slug-less account
-    // (predating slugs) cannot be offered.
+    // (predating slugs) cannot be offered. You never ping yourself, so the
+    // caller's own row stays out of the picker.
     const roster = (participantsQuery.data?.participants ?? [])
-      .filter((participant) => participant.kind === ParticipantKind.User && participant.slug)
+      .filter(
+        (participant) =>
+          participant.kind === ParticipantKind.User &&
+          participant.slug &&
+          participant.principalId !== selfId,
+      )
       .map((participant) => ({
         id: participant.principalId,
         name: participant.displayName,
@@ -51,6 +59,7 @@ export function useMentionRoster(documentId: string | null | undefined): Mention
     // but is rarely on the reviewer roster — lead with them, deduped by id.
     if (
       review.ownerId &&
+      review.ownerId !== selfId &&
       review.ownerDisplayName &&
       review.ownerSlug &&
       !roster.some((candidate) => candidate.id === review.ownerId)
@@ -58,5 +67,5 @@ export function useMentionRoster(documentId: string | null | undefined): Mention
       roster.unshift({ id: review.ownerId, name: review.ownerDisplayName, slug: review.ownerSlug });
     }
     return roster;
-  }, [participantsQuery.data, review]);
+  }, [participantsQuery.data, review, selfId]);
 }

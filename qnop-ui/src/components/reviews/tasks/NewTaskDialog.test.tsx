@@ -26,6 +26,7 @@ import { ThemeProvider } from '@mui/material/styles';
 import { ParticipantKind } from '../../../api/generated';
 import { useDocument } from '../../../api/hooks/useDocuments';
 import { useParticipants } from '../../../api/hooks/useReviews';
+import { useAuthStore } from '../../../stores/authStore';
 import { buildTheme } from '../../../theme/theme';
 import { NewTaskDialog } from './NewTaskDialog';
 
@@ -87,6 +88,7 @@ function typeMentionQuery(query = '@Al') {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  useAuthStore.setState({ userId: null });
 });
 
 // Issue #462 follow-up: mentions must work when creating a global annotation,
@@ -122,5 +124,18 @@ describe('NewTaskDialog mentions', () => {
 
     typeMentionQuery();
     expect(screen.getAllByText('Alice')).toHaveLength(1);
+  });
+
+  it('never offers the caller themselves — neither as participant nor as owner', () => {
+    useAuthStore.setState({ userId: ALICE_ID });
+    mockRoster(false);
+    renderDialog();
+
+    typeMentionQuery();
+    expect(screen.queryByText('Alice')).not.toBeInTheDocument();
+
+    useAuthStore.setState({ userId: OWNER_ID });
+    typeMentionQuery('@Ol');
+    expect(screen.queryByText('Olivia Owner')).not.toBeInTheDocument();
   });
 });
