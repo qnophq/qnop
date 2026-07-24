@@ -37,6 +37,30 @@ export function mentionToken(candidate: MentionCandidate): string {
 }
 
 /**
+ * `@slug` after start/whitespace/bracket — the same word-boundary and slug-shape rule as the
+ * server's MentionParser (letters, digits, inner hyphens, 3–64 chars), so what the server resolves
+ * is exactly what the client highlights. Shared by the Markdown renderer (remarkMentions) and the
+ * plain-text excerpt surfaces. Group 1 is the boundary prefix, group 2 the slug.
+ */
+export const MENTION_TOKEN = /(^|[\s([{>])@([A-Za-z0-9][A-Za-z0-9-]{1,62}[A-Za-z0-9])(?![\w-])/g;
+
+/**
+ * Replaces every {@code @slug} mention token in a plain/Markdown text with whatever {@code resolve}
+ * returns for the slug — a token whose slug does not resolve stays as-is, mirroring the renderer's
+ * raw-@slug fallback. Used by one-line excerpt surfaces that cannot host the full mention pill.
+ */
+export function replaceMentionTokens(
+  text: string,
+  resolve: (slug: string) => string | null | undefined,
+): string {
+  return text.replace(
+    MENTION_TOKEN,
+    (token, prefix: string, slug: string) =>
+      `${prefix}${resolve(slug) ?? token.slice(prefix.length)}`,
+  );
+}
+
+/**
  * The active {@code @query} immediately before the caret, or {@code null} when the caret is not in a
  * mention. A query starts at an {@code @} that follows whitespace or the start of the text, and runs
  * to the caret across slug characters (word chars and hyphens) — so "email a@b" never triggers the

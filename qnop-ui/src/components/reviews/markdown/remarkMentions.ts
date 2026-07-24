@@ -19,6 +19,8 @@
  * SPDX-License-Identifier: AGPL-3.0-only
  */
 
+import { MENTION_TOKEN } from './mentionToken';
+
 /** The mdast surface this plugin touches — kept local, no @types/mdast dependency. */
 interface MdNode {
   type: string;
@@ -27,12 +29,8 @@ interface MdNode {
   children?: MdNode[];
 }
 
-/**
- * `@slug` after start/whitespace/bracket — the same word-boundary and slug-shape
- * rule as the server's MentionParser (letters, digits, inner hyphens, 3–64
- * chars), so what the server resolves is exactly what the client highlights.
- */
-const MENTION = /(^|[\s([{>])@([A-Za-z0-9][A-Za-z0-9-]{1,62}[A-Za-z0-9])(?![\w-])/g;
+/** The shared word-boundary + slug-shape rule (see {@link MENTION_TOKEN}). */
+const MENTION = MENTION_TOKEN;
 
 /** Splits one text node around its `@slug` tokens into text + `mention:` link nodes. */
 function splitTextNode(node: MdNode): MdNode[] | null {
