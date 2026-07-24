@@ -24,6 +24,7 @@ import Box from '@mui/material/Box';
 import { alpha, useTheme } from '@mui/material/styles';
 import { Link as RouterLink } from 'react-router-dom';
 import { useUserProfile } from '../../../api/hooks/useUsers';
+import { UserHoverCard } from '../../people/UserHoverCard';
 import { UserAvatar } from '../../shell/UserAvatar';
 
 /** Inline avatar size, tuned to the 0.875rem body text of the comment bubbles. */
@@ -34,13 +35,14 @@ const AVATAR_SIZE = 16;
  * pointing at the mentioned person's public profile (the route resolves the slug
  * case-insensitively; an unknown slug lands on the anti-enumeration 404). The raw Markdown keeps
  * the immutable @slug token; for display the slug resolves — through the profile cache shared
- * with the profile page and hover card — into the person's avatar and current display name.
+ * with the profile page and hover card — into the person's avatar and current display name, and
+ * hovering the pill shows the player card (issue #482), exactly as on every other name in the app.
  * Until it resolves, or for a slug the workspace cannot resolve, the raw @slug stays readable.
  */
 export function MentionLink({ slug, children }: { slug: string; children: ReactNode }) {
   const theme = useTheme();
   const profile = useUserProfile(slug).data;
-  return (
+  const pill = (
     <Box
       component={RouterLink}
       to={`/users/${slug}`}
@@ -79,5 +81,14 @@ export function MentionLink({ slug, children }: { slug: string; children: ReactN
         children
       )}
     </Box>
+  );
+  // The pill is itself the anchor, so the hover card must not render a second
+  // one (link={false}); before the slug resolves there is no user id and the
+  // card wrapper drops away entirely. display:inline keeps the wrapper out of
+  // the paragraph's text flow — the pill alone shapes the line.
+  return (
+    <UserHoverCard userId={profile?.id ?? null} slug={slug} link={false} sx={{ display: 'inline' }}>
+      {pill}
+    </UserHoverCard>
   );
 }

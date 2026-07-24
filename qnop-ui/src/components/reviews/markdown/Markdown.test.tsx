@@ -20,7 +20,7 @@
  */
 
 import { describe, expect, it, vi } from 'vitest';
-import { render, waitFor } from '@testing-library/react';
+import { fireEvent, render, waitFor } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { ThemeProvider } from '@mui/material/styles';
@@ -73,38 +73,53 @@ describe('Markdown render (#427)', () => {
     expect(container.querySelector('table')).toBeInTheDocument();
   });
 
-  it('renders a mention as the person — avatar + display name, no @ (#462)', async () => {
-    vi.mocked(usersApi.getUserProfileBySlug).mockResolvedValue({
-      data: {
-        id: 'a0000000-0000-0000-0000-000000000013',
-        displayName: 'Anna Krause',
-        slug: 'anna-krause',
-        avatarUrl: null,
-        createdAt: '2026-01-01T00:00:00Z',
-        stats: {
-          reviewsOwned: 0,
-          reviewsParticipating: 0,
-          annotationsRaised: 0,
-          annotationsResolved: 0,
-          commentsWritten: 0,
-        },
-        teams: [],
+  const annaProfile = {
+    data: {
+      id: 'a0000000-0000-0000-0000-000000000013',
+      displayName: 'Anna Krause',
+      slug: 'anna-krause',
+      avatarUrl: null,
+      createdAt: '2026-01-01T00:00:00Z',
+      stats: {
+        reviewsOwned: 0,
+        reviewsParticipating: 0,
+        annotationsRaised: 0,
+        annotationsResolved: 0,
+        commentsWritten: 0,
       },
-    } as never);
+      teams: [],
+    },
+  };
+
+  it('renders a mention as the person — avatar + display name, no @ (#462)', async () => {
+    vi.mocked(usersApi.getUserProfileBySlug).mockResolvedValue(annaProfile as never);
     const { getByTestId, findByText } = renderMdWithMentions('hey @anna-krause look');
 
+    // Until the slug resolves the raw token stays readable…
+    expect(getByTestId('mention-link')).toHaveTextContent('@anna-krause');
+    // …then the pill shows the person: initials avatar + current display name, no @-sign.
+    // (Re-query: the resolved pill re-mounts inside its hover-card wrapper.)
+    await findByText('Anna Krause');
     const mention = getByTestId('mention-link');
     // Links into the app to the profile — the mention: scheme never reaches the DOM as an href.
     expect(mention).toHaveAttribute('href', '/users/anna-krause');
-    // Until the slug resolves the raw token stays readable…
-    expect(mention).toHaveTextContent('@anna-krause');
-    // …then the pill shows the person: initials avatar + current display name, no @-sign.
-    await findByText('Anna Krause');
     expect(mention).not.toHaveTextContent('@anna-krause');
     expect(mention).toHaveTextContent('AK');
     expect(vi.mocked(usersApi.getUserProfileBySlug)).toHaveBeenCalledWith({
       slug: 'anna-krause',
     });
+  });
+
+  it('shows the player hover card on mouseover of a resolved mention (#482)', async () => {
+    vi.mocked(usersApi.getUserProfileBySlug).mockResolvedValue(annaProfile as never);
+    // The popover itself resolves by the real user id — same profile, id route.
+    vi.mocked(usersApi.getUserProfile).mockResolvedValue(annaProfile as never);
+    const { getByTestId, findByTestId, findByText } = renderMdWithMentions('hey @anna-krause look');
+    await findByText('Anna Krause');
+
+    // The hover trigger is the card's wrapper around the pill anchor.
+    fireEvent.mouseEnter(getByTestId('mention-link').parentElement as HTMLElement);
+    expect(await findByTestId('user-hover-card', {}, { timeout: 2000 })).toBeInTheDocument();
   });
 
   it('keeps the raw @slug readable when the slug cannot be resolved (#462)', async () => {
