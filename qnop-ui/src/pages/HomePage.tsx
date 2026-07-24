@@ -25,7 +25,16 @@ import Chip from '@mui/material/Chip';
 import Skeleton from '@mui/material/Skeleton';
 import Stack from '@mui/material/Stack';
 import Typography from '@mui/material/Typography';
-import { CalendarClock, FileText, History, Inbox, Plus, Trophy, UserCheck } from 'lucide-react';
+import {
+  CalendarClock,
+  FileText,
+  History,
+  Inbox,
+  Plus,
+  Rocket,
+  Trophy,
+  UserCheck,
+} from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useDashboard } from '../api/hooks/useDashboard';
 import { useReviews } from '../api/hooks/useReviews';
@@ -188,7 +197,9 @@ export function HomePage() {
               title="My reviews"
               description="Reviews you own, running ones first."
               reviews={owned}
-              emptyText="You own no reviews yet."
+              emptyTitle="No reviews yet"
+              emptyText="Start your first one with “New review”."
+              emptyIcon={Rocket}
               ownerCues
             />
             <ActivityCard activity={dashboardQuery.data?.activity ?? []} />

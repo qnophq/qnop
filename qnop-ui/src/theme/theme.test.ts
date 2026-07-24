@@ -43,6 +43,13 @@ describe('buildTheme', () => {
     expect(theme.palette.text.primary).toBe(tokens.dark.fg);
   });
 
+  it('tints primary.light translucently so it composites in both modes (#589)', () => {
+    // A solid blue50 stayed light in dark mode and drowned the text on the
+    // wizard pills and toggle rows — the tint must be translucent brand blue.
+    expect(buildTheme('light').palette.primary.light).toBe(tokens.badge.blue.bg);
+    expect(buildTheme('dark').palette.primary.light).toBe(tokens.badge.blue.bg);
+  });
+
   it('maps the semantic colours (AA-strong tones for white-on-colour buttons)', () => {
     const theme = buildTheme('light');
     expect(theme.palette.success.main).toBe(tokens.semantic.successStrong);

@@ -24,11 +24,12 @@ import ButtonBase from '@mui/material/ButtonBase';
 import Stack from '@mui/material/Stack';
 import Typography from '@mui/material/Typography';
 import { alpha, useTheme } from '@mui/material/styles';
-import { CircleCheck, PartyPopper, type LucideIcon } from 'lucide-react';
+import { CircleCheck, Inbox, PartyPopper, type LucideIcon } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import type { DocumentSummary } from '../../api/generated';
 import { ToneBadge } from '../admin/ToneBadge';
 import { SectionCard } from '../admin/layout/SectionCard';
+import { CardEmptyState } from './CardEmptyState';
 import { CardScroller } from './CardScroller';
 import { CountPill } from './CountPill';
 import { DueDateLabel } from '../reviews/DueDateLabel';
@@ -43,6 +44,10 @@ interface ReviewListCardProps {
   description: string;
   reviews: DocumentSummary[];
   emptyText: string;
+  /** Headline over `emptyText` in the designed empty state (issue #588). */
+  emptyTitle?: string;
+  /** Medallion glyph of the designed empty state (issue #588). */
+  emptyIcon?: LucideIcon;
   /** Shows the owner's "Ready to finalize" cue on settled reviews. */
   ownerCues?: boolean;
   /** Turns the empty state into a small celebration — earned quiet, not absence. */
@@ -60,6 +65,8 @@ export function ReviewListCard({
   description,
   reviews,
   emptyText,
+  emptyTitle = 'Nothing here yet',
+  emptyIcon = Inbox,
   ownerCues = false,
   celebrateEmpty = false,
 }: ReviewListCardProps) {
@@ -76,31 +83,9 @@ export function ReviewListCard({
     >
       {visible.length === 0 ? (
         celebrateEmpty ? (
-          <Stack spacing={1} sx={{ alignItems: 'center', py: 2 }}>
-            <Box
-              aria-hidden
-              sx={{
-                width: 44,
-                height: 44,
-                borderRadius: '50%',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                color: theme.palette.success.main,
-                bgcolor: alpha(theme.palette.success.main, 0.12),
-              }}
-            >
-              <PartyPopper size={20} />
-            </Box>
-            <Typography sx={{ fontWeight: 700 }}>All caught up!</Typography>
-            <Typography variant="body2" color="text.secondary">
-              {emptyText}
-            </Typography>
-          </Stack>
+          <CardEmptyState icon={PartyPopper} tone="green" title="All caught up!" text={emptyText} />
         ) : (
-          <Typography variant="body2" color="text.secondary">
-            {emptyText}
-          </Typography>
+          <CardEmptyState icon={emptyIcon} title={emptyTitle} text={emptyText} />
         )
       ) : (
         <CardScroller>

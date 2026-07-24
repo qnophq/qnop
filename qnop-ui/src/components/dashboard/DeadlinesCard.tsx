@@ -24,10 +24,11 @@ import ButtonBase from '@mui/material/ButtonBase';
 import Stack from '@mui/material/Stack';
 import Typography from '@mui/material/Typography';
 import { alpha, useTheme } from '@mui/material/styles';
-import { CalendarClock } from 'lucide-react';
+import { CalendarClock, Hourglass } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import type { DocumentSummary } from '../../api/generated';
 import { SectionCard } from '../admin/layout/SectionCard';
+import { CardEmptyState } from './CardEmptyState';
 import { CardScroller } from './CardScroller';
 import { CountPill } from './CountPill';
 import { dueUrgency, reviewPath } from './dashboardModel';
@@ -62,9 +63,11 @@ export function DeadlinesCard({ reviews }: DeadlinesCardProps) {
       action={<CountPill value={reviews.length} />}
     >
       {reviews.length === 0 ? (
-        <Typography variant="body2" color="text.secondary">
-          No deadlines — nothing is due.
-        </Typography>
+        <CardEmptyState
+          icon={Hourglass}
+          title="Nothing on the clock"
+          text="Due dates from your open reviews land here."
+        />
       ) : (
         <CardScroller>
           <Stack spacing={0.5}>
