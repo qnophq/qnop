@@ -48,6 +48,7 @@ import { EmojiPickerButton } from './EmojiPickerButton';
 import { Markdown } from './Markdown';
 import { MarkdownHint } from './MarkdownHint';
 import { MarkdownToolbar } from './MarkdownToolbar';
+import { caretViewportRect } from './caretRect';
 import { activeMentionQuery, mentionToken, type MentionCandidate } from './mentionToken';
 import type { UploadedAttachment } from './useCommentAttachmentUpload';
 
@@ -176,6 +177,15 @@ export function MarkdownComposer({
       .slice(0, MENTION_LIMIT);
   }, [mention, mentionCandidates]);
   const mentionOpen = mentionMatches.length > 0;
+  // The picker anchors to the CARET, not the field: a virtual element at the
+  // active "@" keeps the popover reachable even when the textarea fills the
+  // screen (fullscreen stage), where a field-anchored popover rendered below
+  // the viewport and could not be clicked.
+  const mentionCaretAnchor = useMemo(() => {
+    if (!mention || !mentionAnchor) return null;
+    const rect = caretViewportRect(mentionAnchor as HTMLTextAreaElement, mention.start);
+    return { getBoundingClientRect: () => rect };
+  }, [mention, mentionAnchor]);
   // Write/Preview (issue #445 follow-up) — GitHub's comment-box anatomy.
   const [previewing, setPreviewing] = useState(false);
 
@@ -560,8 +570,8 @@ export function MarkdownComposer({
       {/* @-mention picker (issue #462): the document roster, filtered by the active @query and
           driven by the keyboard in handleKeyDown. onMouseDown selects without blurring the field. */}
       <Popper
-        open={mentionOpen && mentionAnchor !== null}
-        anchorEl={mentionAnchor}
+        open={mentionOpen && mentionCaretAnchor !== null}
+        anchorEl={mentionCaretAnchor}
         placement="bottom-start"
         style={{ zIndex: theme.zIndex.modal }}
       >
