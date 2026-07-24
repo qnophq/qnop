@@ -20,22 +20,23 @@
  */
 package io.qnop.service;
 
-import io.qnop.repository.TeamRepository;
 import org.springframework.stereotype.Service;
 
 /**
  * Allocates a free team slug at team creation (issue #470): the {@link TeamSlugs}-derived base, or
- * the first free {@code base-n} candidate on collision. Mirrors {@link UserSlugService}. The
- * check-then-save window is racy in theory; {@code ux_team_slug_lower} backstops it, so two
- * simultaneous creates of the same name can fail one request but never produce a duplicate slug.
+ * the first free {@code base-n} candidate on collision. Mirrors {@link UserSlugService}.
+ *
+ * <p>Candidates are probed through the flat {@link SlugNamespace} (issue #595, ADR-0048): a slug
+ * must be free among teams AND users, and the namespace's advisory lock closes the check-then-save
+ * race that the per-table unique indexes cannot guard across tables.
  */
 @Service
 public class TeamSlugService {
 
-  private final TeamRepository teams;
+  private final SlugNamespace namespace;
 
-  public TeamSlugService(TeamRepository teams) {
-    this.teams = teams;
+  public TeamSlugService(SlugNamespace namespace) {
+    this.namespace = namespace;
   }
 
   /** The first free slug for a team name (participates in the caller's transaction). */
@@ -43,7 +44,7 @@ public class TeamSlugService {
     String base = TeamSlugs.derive(name);
     for (int attempt = 1; ; attempt++) {
       String candidate = TeamSlugs.candidate(base, attempt);
-      if (!teams.existsBySlugIgnoreCase(candidate)) {
+      if (namespace.lockAndCheckFree(candidate)) {
         return candidate;
       }
     }

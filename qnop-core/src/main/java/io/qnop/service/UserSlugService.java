@@ -20,7 +20,6 @@
  */
 package io.qnop.service;
 
-import io.qnop.repository.UserRepository;
 import org.springframework.stereotype.Service;
 
 /**
@@ -29,17 +28,17 @@ import org.springframework.stereotype.Service;
  * (self-registration, OIDC provisioning, bootstrap admin, admin create) allocates through here so
  * derivation and collision handling never drift apart.
  *
- * <p>The check-then-save window is racy in theory; {@code ux_qnop_user_slug_lower} backstops it, so
- * two simultaneous registrations of the same display name can fail one request but never produce a
- * duplicate slug.
+ * <p>Candidates are probed through the flat {@link SlugNamespace} (issue #595, ADR-0048): a slug
+ * must be free among users AND teams, and the namespace's advisory lock closes the check-then-save
+ * race that the per-table unique indexes cannot guard across tables.
  */
 @Service
 public class UserSlugService {
 
-  private final UserRepository users;
+  private final SlugNamespace namespace;
 
-  public UserSlugService(UserRepository users) {
-    this.users = users;
+  public UserSlugService(SlugNamespace namespace) {
+    this.namespace = namespace;
   }
 
   /** The first free slug for a display name (participates in the caller's transaction). */
@@ -47,7 +46,7 @@ public class UserSlugService {
     String base = UserSlugs.derive(displayName);
     for (int attempt = 1; ; attempt++) {
       String candidate = UserSlugs.candidate(base, attempt);
-      if (!users.existsBySlugIgnoreCase(candidate)) {
+      if (namespace.lockAndCheckFree(candidate)) {
         return candidate;
       }
     }

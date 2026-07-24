@@ -1,0 +1,37 @@
+# Copyright (c) 2026-present devtank42 GmbH
+#
+# This file is part of qnop (Qualified Notes on Papers).
+#
+# qnop is free software: you can redistribute it and/or modify it under the
+# terms of the GNU Affero General Public License as published by the Free
+# Software Foundation, either version 3 of the License, or (at your option)
+# any later version.
+#
+# qnop is distributed in the hope that it will be useful, but WITHOUT ANY
+# WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS
+# FOR A PARTICULAR PURPOSE. See the GNU Affero General Public License for more
+# details.
+#
+# You should have received a copy of the GNU Affero General Public License
+# along with qnop. If not, see <https://www.gnu.org/licenses/>.
+#
+# SPDX-License-Identifier: AGPL-3.0-only
+
+# Cross-namespace slug uniqueness (issue #595, ADR-0048): from now on a slug
+# identifies exactly one principal — user OR team — so @mention tokens (#462,
+# #596) resolve unambiguously. Allocation enforces this going forward
+# (SlugNamespace); this one-time pass resolves collisions that predate the
+# rule. Teams yield (see the .sql for the rationale). Additive (post-1.0.0
+# rule); a no-op on databases without cross-namespace collisions. The body
+# lives in a sqlFile so the migration integration test executes the exact
+# same statement against a manufactured collision.
+databaseChangeLog:
+  - changeSet:
+      id: 0024-cross-namespace-slug-collisions
+      author: qnop
+      comment: Re-slugs teams colliding case-insensitively with a user slug (issue #595).
+      changes:
+        - sqlFile:
+            path: 0024-cross-namespace-slug-collisions.sql
+            relativeToChangelogFile: true
+            splitStatements: false

@@ -32,6 +32,7 @@ import static org.mockito.Mockito.when;
 import io.qnop.entity.User;
 import io.qnop.entity.UserRole;
 import io.qnop.repository.OidcIdentityRepository;
+import io.qnop.repository.TeamRepository;
 import io.qnop.repository.UserRepository;
 import io.qnop.service.AdminUserService.AdminUserPage;
 import io.qnop.service.AdminUserService.AdminUserView;
@@ -60,7 +61,8 @@ class AdminUserServiceTest {
   private final PasswordEncoder passwordEncoder = mock(PasswordEncoder.class);
   private final PasswordResetFlowService passwordResetFlow = mock(PasswordResetFlowService.class);
   private final RefreshTokenService refreshTokens = mock(RefreshTokenService.class);
-  // The mocked repository reports every slug candidate free, so the base slug wins (issue #486).
+  // The mocked repositories report every slug candidate free in both namespaces (issue #595), so
+  // the base slug wins (issue #486).
   private final AdminUserService service =
       new AdminUserService(
           users,
@@ -68,7 +70,7 @@ class AdminUserServiceTest {
           passwordEncoder,
           passwordResetFlow,
           refreshTokens,
-          new UserSlugService(users));
+          new UserSlugService(new SlugNamespace(users, mock(TeamRepository.class))));
 
   private void noClash() {
     when(users.existsByEmailIgnoreCaseAndSource(any(), any())).thenReturn(false);
