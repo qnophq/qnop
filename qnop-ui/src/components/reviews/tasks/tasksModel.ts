@@ -53,10 +53,17 @@ export function parseTaskFilter(raw: string | null): TaskFilter {
  * The card's title: the thread's opening comment; quote/fallback otherwise. The
  * opener is Markdown (issue #427), so it is stripped to plain text — a title is
  * a one-liner, never `**bold**`. The quoted passage is already plain text.
+ * Callers inside a review pass the roster's mention resolver (issue #462) so
+ * `@slug` tokens read as display names here too.
  */
-export function taskTitle(annotation: AnnotationView): string {
+export function taskTitle(
+  annotation: AnnotationView,
+  resolveMentions: (text: string) => string = (text) => text,
+): string {
   return (
-    stripMarkdown(annotation.firstComment) || annotation.anchor?.textQuote?.quote || 'Annotation'
+    stripMarkdown(resolveMentions(annotation.firstComment ?? '')) ||
+    annotation.anchor?.textQuote?.quote ||
+    'Annotation'
   );
 }
 

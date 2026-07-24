@@ -21,6 +21,7 @@
 
 import {
   useLayoutEffect,
+  useMemo,
   useRef,
   useState,
   type ClipboardEvent,
@@ -32,18 +33,29 @@ import Box from '@mui/material/Box';
 import ButtonBase from '@mui/material/ButtonBase';
 import IconButton from '@mui/material/IconButton';
 import InputBase from '@mui/material/InputBase';
+import MenuItem from '@mui/material/MenuItem';
+import MenuList from '@mui/material/MenuList';
+import Paper from '@mui/material/Paper';
+import Popper from '@mui/material/Popper';
 import Stack from '@mui/material/Stack';
 import Tooltip from '@mui/material/Tooltip';
 import Typography from '@mui/material/Typography';
 import { alpha, useTheme, type Theme } from '@mui/material/styles';
 import { Maximize2, Minimize2, Paperclip } from 'lucide-react';
 import { isSubmitShortcut } from '../../../utils/platform';
+import { avatarSrc } from '../../../utils/avatarUrl';
+import { UserAvatar } from '../../shell/UserAvatar';
 import { applyMarkdownAction, type MarkdownAction } from './markdownFormatting';
 import { EmojiPickerButton } from './EmojiPickerButton';
 import { Markdown } from './Markdown';
 import { MarkdownHint } from './MarkdownHint';
 import { MarkdownToolbar } from './MarkdownToolbar';
+import { caretViewportRect } from './caretRect';
+import { activeMentionQuery, mentionToken, type MentionCandidate } from './mentionToken';
 import type { UploadedAttachment } from './useCommentAttachmentUpload';
+
+/** How many roster matches the @-picker offers at once. */
+const MENTION_LIMIT = 6;
 
 /** Matches the API's `CommentBody.body` maxLength. */
 const BODY_MAX_LENGTH = 20000;
@@ -92,6 +104,12 @@ interface MarkdownComposerProps {
   /** Right side of the footer row — the send / create actions. */
   actions?: ReactNode;
   /**
+   * The document roster the {@code @}-picker offers (issue #462). Absent or empty disables the
+   * picker entirely — which is exactly how anonymous reviews opt out (the host passes no candidates),
+   * so no roster ever surfaces where identities are hidden.
+   */
+  mentionCandidates?: MentionCandidate[];
+  /**
    * Offered by hosts that can stage the composer full screen (issue #403
    * follow-up): renders the expand/collapse affordance in the mode row.
    */
@@ -132,6 +150,7 @@ export function MarkdownComposer({
   roomy = false,
   bare = false,
   actions,
+  mentionCandidates,
 }: MarkdownComposerProps) {
   const theme = useTheme();
   // The full-screen stage reads larger; both the input and the preview's
@@ -145,6 +164,34 @@ export function MarkdownComposer({
   // Drag depth — dragenter/dragleave fire per child, so a plain boolean flickers.
   const dragDepth = useRef(0);
   const [dragActive, setDragActive] = useState(false);
+  // The active @-mention query (issue #462): its text + the index of the `@`, or null when the caret
+  // is not in a mention. `mentionIndex` is the highlighted match for keyboard selection.
+  const [mention, setMention] = useState<{ query: string; start: number } | null>(null);
+  const [mentionIndex, setMentionIndex] = useState(0);
+  // The textarea node the picker anchors to — captured on interaction, never read from the ref
+  // during render.
+  const [mentionAnchor, setMentionAnchor] = useState<HTMLElement | null>(null);
+  const mentionMatches = useMemo(() => {
+    if (!mention || !mentionCandidates?.length) return [];
+    const needle = mention.query.toLowerCase();
+    return mentionCandidates
+      .filter(
+        (candidate) =>
+          candidate.name.toLowerCase().includes(needle) ||
+          candidate.slug.toLowerCase().includes(needle),
+      )
+      .slice(0, MENTION_LIMIT);
+  }, [mention, mentionCandidates]);
+  const mentionOpen = mentionMatches.length > 0;
+  // The picker anchors to the CARET, not the field: a virtual element at the
+  // active "@" keeps the popover reachable even when the textarea fills the
+  // screen (fullscreen stage), where a field-anchored popover rendered below
+  // the viewport and could not be clicked.
+  const mentionCaretAnchor = useMemo(() => {
+    if (!mention || !mentionAnchor) return null;
+    const rect = caretViewportRect(mentionAnchor as HTMLTextAreaElement, mention.start);
+    return { getBoundingClientRect: () => rect };
+  }, [mention, mentionAnchor]);
   // Write/Preview (issue #445 follow-up) — GitHub's comment-box anatomy.
   const [previewing, setPreviewing] = useState(false);
 
@@ -214,6 +261,35 @@ export function MarkdownComposer({
     const end = el.selectionEnd ?? start;
     const caret = start + emoji.length;
     splice(start, end, emoji, caret, caret, el.value.slice(0, start) + emoji + el.value.slice(end));
+  };
+
+  /** Recompute the active @-mention query from the caret; skipped when no roster is offered. */
+  const refreshMention = () => {
+    const el = inputRef.current;
+    if (!el || !mentionCandidates?.length) {
+      setMention(null);
+      return;
+    }
+    setMentionAnchor(el);
+    setMention(activeMentionQuery(el.value, el.selectionStart ?? el.value.length));
+  };
+
+  /** Replaces the active `@query` with the canonical mention token and a trailing space. */
+  const insertMentionCandidate = (candidate: MentionCandidate) => {
+    const el = inputRef.current;
+    if (!el || !mention) return;
+    const token = `${mentionToken(candidate)} `;
+    const end = el.selectionStart ?? el.value.length; // caret sits at the end of the @query
+    const caret = mention.start + token.length;
+    splice(
+      mention.start,
+      end,
+      token,
+      caret,
+      caret,
+      el.value.slice(0, mention.start) + token + el.value.slice(end),
+    );
+    setMention(null);
   };
 
   /** Replaces the first occurrence of `search` in the CURRENT field value. */
@@ -312,6 +388,30 @@ export function MarkdownComposer({
   };
 
   const handleKeyDown = (event: KeyboardEvent<HTMLTextAreaElement | HTMLInputElement>) => {
+    // While the @-picker is open it owns the arrows, Enter/Tab (select) and Escape (issue #462),
+    // ahead of submit and formatting shortcuts.
+    if (mentionOpen) {
+      if (event.key === 'ArrowDown') {
+        event.preventDefault();
+        setMentionIndex((index) => (index + 1) % mentionMatches.length);
+        return;
+      }
+      if (event.key === 'ArrowUp') {
+        event.preventDefault();
+        setMentionIndex((index) => (index - 1 + mentionMatches.length) % mentionMatches.length);
+        return;
+      }
+      if (event.key === 'Enter' || event.key === 'Tab') {
+        event.preventDefault();
+        insertMentionCandidate(mentionMatches[Math.min(mentionIndex, mentionMatches.length - 1)]);
+        return;
+      }
+      if (event.key === 'Escape') {
+        event.preventDefault();
+        setMention(null);
+        return;
+      }
+    }
     if (isSubmitShortcut(event)) {
       event.preventDefault();
       onSubmit?.();
@@ -444,7 +544,14 @@ export function MarkdownComposer({
           value={value}
           disabled={disabled}
           inputRef={inputRef}
-          onChange={(event) => onChange(event.target.value)}
+          onChange={(event) => {
+            onChange(event.target.value);
+            setMentionIndex(0);
+            refreshMention();
+          }}
+          onKeyUp={refreshMention}
+          onClick={refreshMention}
+          onBlur={() => setMention(null)}
           onKeyDown={handleKeyDown}
           onPaste={handlePaste}
           inputProps={{ maxLength: BODY_MAX_LENGTH, 'aria-label': inputAriaLabel }}
@@ -466,6 +573,44 @@ export function MarkdownComposer({
           }
         />
       )}
+      {/* @-mention picker (issue #462): the document roster, filtered by the active @query and
+          driven by the keyboard in handleKeyDown. onMouseDown selects without blurring the field. */}
+      <Popper
+        open={mentionOpen && mentionCaretAnchor !== null}
+        anchorEl={mentionCaretAnchor}
+        placement="bottom-start"
+        style={{ zIndex: theme.zIndex.modal }}
+      >
+        <Paper elevation={6} sx={{ mt: 0.5, minWidth: 240, maxHeight: 240, overflowY: 'auto' }}>
+          <MenuList dense aria-label="Mention a participant">
+            {mentionMatches.map((candidate, index) => (
+              <MenuItem
+                key={candidate.id}
+                data-testid="mention-option"
+                selected={index === Math.min(mentionIndex, mentionMatches.length - 1)}
+                onMouseDown={(event) => {
+                  event.preventDefault();
+                  insertMentionCandidate(candidate);
+                }}
+              >
+                {/* The person, not just a string (issue #462): the same avatar recipe as the
+                    search dropdown and the participant stacks — uploaded picture with the
+                    deterministic initials fallback — so picking a person reads identically
+                    everywhere in the app. */}
+                <Box sx={{ display: 'flex', flexShrink: 0, mr: 1 }}>
+                  <UserAvatar name={candidate.name} size={22} imageUrl={avatarSrc(candidate.id)} />
+                </Box>
+                <Typography noWrap sx={{ fontSize: '0.85rem', fontWeight: 500 }}>
+                  {candidate.name}
+                </Typography>
+                <Typography noWrap color="text.secondary" sx={{ fontSize: '0.75rem', ml: 0.75 }}>
+                  @{candidate.slug}
+                </Typography>
+              </MenuItem>
+            ))}
+          </MenuList>
+        </Paper>
+      </Popper>
       <Stack
         direction="row"
         spacing={1}

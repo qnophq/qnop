@@ -24,7 +24,8 @@ import { cleanup, fireEvent, render, screen, within } from '@testing-library/rea
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { ThemeProvider } from '@mui/material/styles';
 import type { AnnotationView } from '../../../api/generated';
-import { AnnotationStatus, PlacementStatus } from '../../../api/generated';
+import { AnnotationStatus, ParticipantKind, PlacementStatus } from '../../../api/generated';
+import { useParticipants } from '../../../api/hooks/useReviews';
 import { buildTheme } from '../../../theme/theme';
 import { useAuthStore } from '../../../stores/authStore';
 import { AnnotationPanel } from './AnnotationPanel';
@@ -60,9 +61,7 @@ const { resolveMutate, confirmMutate } = vi.hoisted(() => ({
   confirmMutate: vi.fn(),
 }));
 vi.mock('../../../api/hooks/useReviews', () => ({
-  useParticipants: vi.fn().mockReturnValue({
-    data: { participants: [{ principalId: 'other', displayName: 'Anna Weber' }] },
-  }),
+  useParticipants: vi.fn(),
 }));
 vi.mock('../../../api/hooks/useAnnotations', () => ({
   useConfirmPlacement: vi.fn().mockReturnValue({ mutate: confirmMutate, isPending: false }),
@@ -75,6 +74,9 @@ vi.mock('../../../api/hooks/useAnnotations', () => ({
 beforeEach(() => {
   resolveMutate.mockClear();
   confirmMutate.mockClear();
+  vi.mocked(useParticipants).mockReturnValue({
+    data: { participants: [{ principalId: 'other', displayName: 'Anna Weber' }] },
+  } as never);
   useAuthStore.setState({ userId: null });
 });
 
@@ -359,6 +361,57 @@ describe('AnnotationPanel', () => {
     expect(screen.queryByTestId('annotation-item-a-other')).not.toBeInTheDocument();
   });
 
+  it('shows mention tokens as display names in the collapsed excerpt (#462)', () => {
+    vi.mocked(useParticipants).mockReturnValue({
+      data: {
+        participants: [
+          {
+            principalId: 'u9',
+            displayName: 'Ben Roth',
+            slug: 'ben-roth',
+            kind: ParticipantKind.User,
+          },
+        ],
+      },
+    } as never);
+    renderPanel({
+      annotations: [
+        annotation('a-doc', { anchor: undefined, firstComment: 'ping @ben-roth please' }),
+      ],
+    });
+
+    const row = screen.getByTestId('annotation-item-a-doc');
+    expect(row).toHaveTextContent('ping Ben Roth please');
+    expect(row).not.toHaveTextContent('@ben-roth');
+  });
+
+  it('finds an annotation by the name its mention resolves to (#462)', () => {
+    vi.mocked(useParticipants).mockReturnValue({
+      data: {
+        participants: [
+          {
+            principalId: 'u9',
+            displayName: 'Ben Roth',
+            slug: 'ben-roth',
+            kind: ParticipantKind.User,
+          },
+        ],
+      },
+    } as never);
+    renderPanel({
+      annotations: [
+        annotation('a-mention', { anchor: undefined, firstComment: 'ping @ben-roth please' }),
+        annotation('a-other', { anchor: undefined, firstComment: 'something else' }),
+      ],
+    });
+
+    fireEvent.change(screen.getByLabelText('Search annotations'), {
+      target: { value: 'Ben Roth' },
+    });
+    expect(screen.getByTestId('annotation-item-a-mention')).toBeInTheDocument();
+    expect(screen.queryByTestId('annotation-item-a-other')).not.toBeInTheDocument();
+  });
+
   it('filters by author using the server-resolved display name (issue #413)', () => {
     renderPanel({
       annotations: [
@@ -585,5 +638,24 @@ describe('AnnotationPanel', () => {
     expect(
       screen.queryByRole('button', { name: 'Copy link to annotation' }),
     ).not.toBeInTheDocument();
+  });
+
+  // Issue #462 follow-up: mentioning must work when CREATING an annotation,
+  // not only in the comment threads — the roster reaches the composer.
+  it('offers the @-mention roster in the annotation composer', () => {
+    renderPanel({
+      pendingAnchor: annotation('a1').anchor!,
+      mentionCandidates: [
+        { id: '018f5a3e-0000-7000-8000-000000000001', name: 'Alice', slug: 'alice-smith' },
+      ],
+    });
+
+    const ta = screen.getByLabelText('Annotation comment') as HTMLTextAreaElement;
+    ta.focus();
+    fireEvent.change(ta, { target: { value: '@Al' } });
+    ta.setSelectionRange(3, 3);
+    fireEvent.keyUp(ta, { key: 'l' });
+
+    expect(screen.getByText('Alice')).toBeInTheDocument();
   });
 });

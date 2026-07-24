@@ -73,6 +73,7 @@ import {
 } from '../../components/reviews/focus/spotlightModel';
 import { useAnchorElement } from '../../components/reviews/focus/useAnchorElement';
 import { useRecordVisit } from '../../api/hooks/useReviews';
+import { useMentionRoster } from '../../components/reviews/markdown/useMentionRoster';
 import { useConfig } from '../../api/hooks/useConfig';
 import { useViewMode, type ReviewViewMode } from '../../components/reviews/focus/useViewMode';
 import { columnOf } from '../../components/reviews/tasks/tasksModel';
@@ -124,6 +125,8 @@ export function DocumentReviewPage() {
 
   const documentQuery = useDocument(documentId);
   const latestVersion = documentQuery.data?.latestVersionNumber ?? 0;
+  // The @-mention roster for every composer on this page (issue #462).
+  const mentionCandidates = useMentionRoster(documentId);
   const requestedVersion = Number(searchParams.get('version'));
 
   // Watch the URL's version even when the cached list does not know it yet —
@@ -667,6 +670,7 @@ export function DocumentReviewPage() {
                   pendingAnchor={pending && !pending.menuPosition ? pending.anchor : null}
                   creating={createAnnotation.isPending}
                   onCreate={handleCreate}
+                  mentionCandidates={mentionCandidates}
                   onCancelPending={() => setPending(null)}
                   canAnnotate={canAnnotate}
                   notify={notify}
@@ -709,6 +713,7 @@ export function DocumentReviewPage() {
               pendingAnchor={null}
               creating={createAnnotation.isPending}
               onCreate={handleCreate}
+              mentionCandidates={mentionCandidates}
               onCancelPending={() => setPending(null)}
               canAnnotate={canAnnotate}
               notify={notify}
@@ -792,6 +797,7 @@ export function DocumentReviewPage() {
               onCreate={handleCreate}
               onCancel={() => setPending(null)}
               onUploadAttachment={uploadAttachment}
+              mentionCandidates={mentionCandidates}
             />
             {/* Discoverability for the native resize grip underneath. */}
             <Box

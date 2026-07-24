@@ -31,6 +31,7 @@ import { alpha, useTheme } from '@mui/material/styles';
 import { CircleCheck, CircleSlash, Lock, RotateCcw, SendHorizontal } from 'lucide-react';
 import { useAddComment, useComments } from '../../../api/hooks/useComments';
 import { useDocument } from '../../../api/hooks/useDocuments';
+import { useMentionRoster } from '../markdown/useMentionRoster';
 import { realAuthorId } from '../../people/realAuthorId';
 import { apiErrorCode } from '../../../utils/apiError';
 import { submitShortcutLabel } from '../../../utils/platform';
@@ -117,6 +118,8 @@ export function CommentThread({
   // review's flags from the already-cached document. No document, no cards —
   // realAuthorId treats a missing review as "expose nothing".
   const review = useDocument(documentId ?? '').data;
+  // The @-mention roster for the reply composers (issue #462).
+  const mentionCandidates = useMentionRoster(documentId);
   const addComment = useAddComment(annotationId);
   const toggleReaction = useToggleCommentReaction(annotationId, notify);
   const uploadAttachment = useCommentAttachmentUpload(documentId, notify);
@@ -378,6 +381,7 @@ export function CommentThread({
                 onUploadAttachment={uploadAttachment}
                 onToggleFullscreen={() => setWritingFullscreen(true)}
                 actions={sendAction()}
+                mentionCandidates={mentionCandidates}
               />
             </Box>
           </Stack>
@@ -413,6 +417,7 @@ export function CommentThread({
           onUploadAttachment={uploadAttachment}
           fullscreen
           onToggleFullscreen={() => setWritingFullscreen(false)}
+          mentionCandidates={mentionCandidates}
           actions={
             <Button
               size="small"

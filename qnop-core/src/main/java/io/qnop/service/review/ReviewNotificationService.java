@@ -22,10 +22,12 @@ package io.qnop.service.review;
 
 import io.qnop.entity.Annotation;
 import io.qnop.entity.Comment;
+import io.qnop.entity.CommentMention;
 import io.qnop.entity.Document;
 import io.qnop.entity.ReviewParticipant;
 import io.qnop.entity.User;
 import io.qnop.repository.AnnotationRepository;
+import io.qnop.repository.CommentMentionRepository;
 import io.qnop.repository.CommentRepository;
 import io.qnop.repository.DocumentRepository;
 import io.qnop.repository.ReviewParticipantRepository;
@@ -45,6 +47,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
+import java.util.stream.Collectors;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
@@ -70,6 +73,7 @@ public class ReviewNotificationService {
   private final DocumentRepository documents;
   private final AnnotationRepository annotations;
   private final CommentRepository comments;
+  private final CommentMentionRepository commentMentions;
   private final ReviewParticipantRepository participants;
   private final TeamMembershipRepository teamMembers;
   private final UserRepository users;
@@ -82,6 +86,7 @@ public class ReviewNotificationService {
       DocumentRepository documents,
       AnnotationRepository annotations,
       CommentRepository comments,
+      CommentMentionRepository commentMentions,
       ReviewParticipantRepository participants,
       TeamMembershipRepository teamMembers,
       UserRepository users,
@@ -92,6 +97,7 @@ public class ReviewNotificationService {
     this.documents = documents;
     this.annotations = annotations;
     this.comments = comments;
+    this.commentMentions = commentMentions;
     this.participants = participants;
     this.teamMembers = teamMembers;
     this.users = users;
@@ -150,8 +156,26 @@ public class ReviewNotificationService {
     if (annotations.findById(event.annotationId()).isEmpty()) {
       return;
     }
-    String excerpt = firstCommentExcerpt(event.annotationId());
+    Comment opening =
+        comments.findByAnnotationIdOrderByCreatedAtAsc(event.annotationId()).stream()
+            .findFirst()
+            .orElse(null);
+    String excerpt = opening == null ? "" : excerpt(opening.getBody());
+    // Mentions in the opening comment get the mention mail; the owner gets the annotation-created
+    // mail unless they were themselves mentioned (then the mention mail only) — issue #462.
+    Set<UUID> mentioned =
+        opening == null
+            ? Set.of()
+            : notifyMentions(
+                document,
+                opening.getId(),
+                event.actorId(),
+                excerpt,
+                annotationUrl(document, event.annotationId()) + "&comment=" + opening.getId());
     for (User recipient : deliverable(Set.of(document.getOwnerId()), event.actorId())) {
+      if (mentioned.contains(recipient.getId())) {
+        continue;
+      }
       Map<String, Object> vars = baseVars(document, recipient);
       vars.put("actorName", actorNameFor(document, recipient, event.actorId()));
       vars.put("annotationExcerpt", excerpt);
@@ -211,13 +235,20 @@ public class ReviewNotificationService {
             .findFirst()
             .map(comment -> excerpt(comment.getBody()))
             .orElse("");
+    String actionUrl =
+        annotationUrl(document, event.annotationId()) + "&comment=" + event.commentId();
+    // Mentioned users get the higher-ranked mention mail; everyone else on the thread gets the
+    // reply mail — so a mentioned follower receives exactly one mail, not two (issue #462).
+    Set<UUID> mentioned =
+        notifyMentions(document, event.commentId(), event.actorId(), excerpt, actionUrl);
     for (User recipient : deliverable(recipients, event.actorId())) {
+      if (mentioned.contains(recipient.getId())) {
+        continue;
+      }
       Map<String, Object> vars = baseVars(document, recipient);
       vars.put("actorName", actorNameFor(document, recipient, event.actorId()));
       vars.put("commentExcerpt", excerpt);
-      vars.put(
-          "actionUrl",
-          annotationUrl(document, event.annotationId()) + "&comment=" + event.commentId());
+      vars.put("actionUrl", actionUrl);
       mail.sendMailFromTemplate(
           MailTemplateKey.REVIEW_COMMENT_ADDED, recipient.getEmail(), vars, null);
     }
@@ -295,6 +326,55 @@ public class ReviewNotificationService {
   private boolean optedOut(UUID userId) {
     return userSettings
         .findByUserIdAndSettingKey(userId, UserSettingKey.EMAIL_REVIEW_NOTIFICATIONS.getKey())
+        .map(setting -> "false".equalsIgnoreCase(setting.getSettingValue()))
+        .orElse(false);
+  }
+
+  /**
+   * Sends the mention mail for one comment and returns the ids it went to (so the caller skips them
+   * in the lower-ranked thread/annotation mail — a mentioned follower gets one mail, not two).
+   * Mentions are resolved at write time and never persisted for anonymous reviews, so nothing here
+   * can leak an identity. The mention mail obeys its own opt-out ({@link
+   * UserSettingKey#EMAIL_MENTIONS}).
+   */
+  private Set<UUID> notifyMentions(
+      Document document, UUID commentId, UUID actorId, String excerpt, String actionUrl) {
+    Set<UUID> mentioned =
+        commentMentions.findByCommentId(commentId).stream()
+            .map(CommentMention::getMentionedUserId)
+            .collect(Collectors.toCollection(LinkedHashSet::new));
+    if (mentioned.isEmpty()) {
+      return Set.of();
+    }
+    Set<UUID> mailed = new LinkedHashSet<>();
+    for (User recipient : deliverableMentions(mentioned, actorId)) {
+      Map<String, Object> vars = baseVars(document, recipient);
+      vars.put("actorName", actorNameFor(document, recipient, actorId));
+      vars.put("commentExcerpt", excerpt);
+      vars.put("actionUrl", actionUrl);
+      mail.sendMailFromTemplate(MailTemplateKey.REVIEW_MENTION, recipient.getEmail(), vars, null);
+      mailed.add(recipient.getId());
+    }
+    return mailed;
+  }
+
+  /** Like {@link #deliverable} but gated by the separate mention opt-out (issue #462). */
+  private List<User> deliverableMentions(Set<UUID> candidates, UUID actorId) {
+    Set<UUID> ids = new LinkedHashSet<>(candidates);
+    ids.remove(actorId);
+    if (ids.isEmpty()) {
+      return List.of();
+    }
+    return users.findAllById(ids).stream()
+        .filter(User::isEnabled)
+        .filter(user -> user.getEmail() != null && !user.getEmail().isBlank())
+        .filter(user -> !optedOutMentions(user.getId()))
+        .toList();
+  }
+
+  private boolean optedOutMentions(UUID userId) {
+    return userSettings
+        .findByUserIdAndSettingKey(userId, UserSettingKey.EMAIL_MENTIONS.getKey())
         .map(setting -> "false".equalsIgnoreCase(setting.getSettingValue()))
         .orElse(false);
   }

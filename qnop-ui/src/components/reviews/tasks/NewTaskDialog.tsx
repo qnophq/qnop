@@ -30,6 +30,7 @@ import { useCreateAnnotation } from '../../../api/hooks/useAnnotations';
 import { apiErrorCode } from '../../../utils/apiError';
 import type { Notify } from '../../admin/layout/useToast';
 import { useCommentAttachmentUpload } from '../markdown/useCommentAttachmentUpload';
+import { useMentionRoster } from '../markdown/useMentionRoster';
 import { Composer } from '../panel/Composer';
 
 interface NewTaskDialogProps {
@@ -58,6 +59,7 @@ export function NewTaskDialog({
 }: NewTaskDialogProps) {
   const createAnnotation = useCreateAnnotation(documentId);
   const uploadAttachment = useCommentAttachmentUpload(documentId, notify);
+  const mentionCandidates = useMentionRoster(documentId);
 
   const handleCreate = (comment: string, type?: AnnotationType, priority?: AnnotationPriority) => {
     // No anchor → the server creates no placement: a document-scoped annotation (issue #395).
@@ -99,6 +101,7 @@ export function NewTaskDialog({
           creating={createAnnotation.isPending}
           onCreate={handleCreate}
           onCancel={onClose}
+          mentionCandidates={mentionCandidates}
         />
       </DialogContent>
     </Dialog>

@@ -33,11 +33,13 @@ function Host({
   onUploadAttachment,
   onToggleFullscreen,
   initial = '',
+  mentionCandidates,
 }: {
   onSubmit?: () => void;
   onUploadAttachment?: (file: File) => Promise<UploadedAttachment>;
   onToggleFullscreen?: () => void;
   initial?: string;
+  mentionCandidates?: { id: string; name: string; slug: string }[];
 }) {
   const [value, setValue] = useState(initial);
   return (
@@ -49,6 +51,7 @@ function Host({
         onUploadAttachment={onUploadAttachment}
         onToggleFullscreen={onToggleFullscreen}
         inputAriaLabel="Test comment"
+        mentionCandidates={mentionCandidates}
       />
     </ThemeProvider>
   );
@@ -59,6 +62,45 @@ function textarea(): HTMLTextAreaElement {
 }
 
 describe('MarkdownComposer', () => {
+  it('offers the roster on @ and inserts the canonical mention token on pick (#462)', () => {
+    render(
+      <Host
+        mentionCandidates={[
+          { id: '018f5a3e-0000-7000-8000-000000000001', name: 'Alice', slug: 'alice-smith' },
+          { id: '018f5a3e-0000-7000-8000-000000000002', name: 'Bob', slug: 'bob-jones' },
+        ]}
+      />,
+    );
+    const ta = textarea();
+    ta.focus();
+    fireEvent.change(ta, { target: { value: 'hi @Al' } });
+    ta.setSelectionRange(6, 6);
+    fireEvent.keyUp(ta, { key: 'l' });
+
+    // The picker offers only the roster match for the "@Al" query.
+    const option = screen.getByText('Alice');
+    expect(option).toBeInTheDocument();
+    expect(screen.queryByText('Bob')).not.toBeInTheDocument();
+    // Each row leads with the person's avatar (uploaded picture, initials fallback).
+    expect(
+      screen.getByTestId('mention-option').querySelector('img[src$="/avatar"]'),
+    ).toBeInTheDocument();
+
+    fireEvent.mouseDown(option); // mousedown selects without blurring the field
+    expect(ta.value).toContain('@alice-smith');
+  });
+
+  it('offers no @ picker without a roster (e.g. anonymous reviews) (#462)', () => {
+    render(<Host />);
+    const ta = textarea();
+    ta.focus();
+    fireEvent.change(ta, { target: { value: 'hi @Al' } });
+    ta.setSelectionRange(6, 6);
+    fireEvent.keyUp(ta, { key: 'l' });
+
+    expect(screen.queryByTestId('mention-option')).not.toBeInTheDocument();
+  });
+
   it('renders the Slack formatting set, the emoji affordance and the Markdown hint', () => {
     render(<Host />);
 

@@ -1,0 +1,56 @@
+# SPDX-License-Identifier: AGPL-3.0-only
+#
+# @mentions resolved out of a comment body (issue #462). One row per comment ×
+# mentioned user; only users with access to the document (owner, direct
+# participants, team members) are resolved on create, so rendering and mail
+# notifications never re-parse the text. Deleting the comment cascades its
+# mentions; deleting the user cascades theirs.
+databaseChangeLog:
+  - changeSet:
+      id: 0023-comment-mention-schema
+      author: qnop
+      comment: Resolved @mentions on comments (issue #462).
+      changes:
+        - createTable:
+            tableName: comment_mention
+            columns:
+              - column:
+                  name: id
+                  type: UUID
+                  constraints: { primaryKey: true, nullable: false }
+              - column:
+                  name: comment_id
+                  type: UUID
+                  constraints: { nullable: false }
+              - column:
+                  name: mentioned_user_id
+                  type: UUID
+                  constraints: { nullable: false }
+              - column:
+                  name: created_at
+                  type: TIMESTAMP WITH TIME ZONE
+                  constraints: { nullable: false }
+        - addForeignKeyConstraint:
+            constraintName: fk_comment_mention_comment
+            baseTableName: comment_mention
+            baseColumnNames: comment_id
+            referencedTableName: comment
+            referencedColumnNames: id
+            onDelete: CASCADE
+        - addForeignKeyConstraint:
+            constraintName: fk_comment_mention_user
+            baseTableName: comment_mention
+            baseColumnNames: mentioned_user_id
+            referencedTableName: qnop_user
+            referencedColumnNames: id
+            onDelete: CASCADE
+        - sql:
+            comment: One mention per user per comment — a repeated @token is a no-op.
+            sql: |
+              CREATE UNIQUE INDEX ux_comment_mention_comment_user
+                ON comment_mention (comment_id, mentioned_user_id);
+        - createIndex:
+            indexName: ix_comment_mention_user
+            tableName: comment_mention
+            columns:
+              - column: { name: mentioned_user_id }

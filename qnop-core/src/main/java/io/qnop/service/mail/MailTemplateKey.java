@@ -288,6 +288,36 @@ public enum MailTemplateKey {
       "actorName",
       "documentTitle",
       "versionNumber",
+      "actionUrl"),
+  REVIEW_MENTION(
+      "review.mention",
+      "You were mentioned",
+      "{{actorName}} mentioned you on “{{documentTitle}}”",
+      """
+      Hi {{recipientName}},
+
+      {{actorName}} mentioned you in a discussion on "{{documentTitle}}" ({{siteName}}):
+
+      "{{commentExcerpt}}"
+
+      Open the comment to respond:
+
+      {{actionUrl}}
+      """,
+      """
+      <h1 style="margin:0 0 14px;color:#18191f;font-size:22px;font-weight:700;letter-spacing:-0.01em;line-height:1.3;">You were mentioned</h1>
+      <p style="margin:0 0 14px;">Hi {{recipientName}},</p>
+      <p style="margin:0 0 14px;"><strong style="color:#18191f;">{{actorName}}</strong> mentioned you in a discussion on <strong style="color:#18191f;">&#8220;{{documentTitle}}&#8221;</strong>:</p>
+      <p style="margin:0 0 14px;padding:10px 14px;border-left:3px solid #d5d9e0;color:#5a5f6a;">{{commentExcerpt}}</p>
+      <p style="margin:0;color:#9a9ea8;font-size:13px;">Open the comment to respond.</p>
+      """,
+      "Open comment",
+      "{{actorName}} mentioned you on “{{documentTitle}}”.",
+      "siteName",
+      "recipientName",
+      "actorName",
+      "documentTitle",
+      "commentExcerpt",
       "actionUrl");
 
   /**

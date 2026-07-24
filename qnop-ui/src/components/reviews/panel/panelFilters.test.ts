@@ -110,6 +110,14 @@ describe('matchesFilters', () => {
     expect(matchesFilters(a, { ...EMPTY_FILTERS, query: 'liability' }, 'Paul')).toBe(true);
     expect(matchesFilters(a, { ...EMPTY_FILTERS, query: '_liability_' }, 'Paul')).toBe(false);
   });
+
+  it('matches a mention both as its resolved name and as the raw @slug (#462)', () => {
+    const a = annotation({ firstComment: 'ping @ben-roth please' });
+    const resolve = (text: string) => text.replace('@ben-roth', 'Ben Roth');
+    expect(matchesFilters(a, { ...EMPTY_FILTERS, query: 'ben roth' }, 'Paul', resolve)).toBe(true);
+    expect(matchesFilters(a, { ...EMPTY_FILTERS, query: 'ben-roth' }, 'Paul', resolve)).toBe(true);
+    expect(matchesFilters(a, { ...EMPTY_FILTERS, query: 'anna' }, 'Paul', resolve)).toBe(false);
+  });
 });
 
 describe('activeFacetCount', () => {

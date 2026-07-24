@@ -42,7 +42,10 @@ import { isUnseen } from '../newSince';
 import type { BuildPermalink } from '../useReviewPermalink';
 import { useConfirmPlacement } from '../../../api/hooks/useAnnotations';
 import { AnnotationListItem } from './AnnotationListItem';
+import type { MentionCandidate } from '../markdown/mentionToken';
+import { useMentionNames } from '../markdown/useMentionNames';
 import type { UploadedAttachment } from '../markdown/useCommentAttachmentUpload';
+import { useReviewDocumentId } from '../reviewDocumentId';
 import { CommentThread } from './CommentThread';
 import { Composer } from './Composer';
 import type { FilterAuthor } from './PanelFilterBar';
@@ -82,6 +85,8 @@ interface AnnotationPanelProps {
   notify: Notify;
   /** Uploads a local composer file (issue #446); built by the page, which owns the document id. */
   onUploadAttachment?: (file: File) => Promise<UploadedAttachment>;
+  /** The @-mention roster for the annotation composer (issue #462); empty disables the picker. */
+  mentionCandidates?: MentionCandidate[];
   /** True while an OLDER version is viewed (#306): threads readable, nothing writable. */
   readOnly?: boolean;
   /** The viewed version — the scope of placement outcomes and their confirmation (issue #326). */
@@ -140,6 +145,7 @@ export function AnnotationPanel({
   canAnnotate,
   notify,
   onUploadAttachment,
+  mentionCandidates,
   readOnly = false,
   versionNumber = null,
   onArmReattach,
@@ -190,12 +196,14 @@ export function AnnotationPanel({
     // eslint-disable-next-line react-hooks/exhaustive-deps -- names derive from the inputs below
   }, [annotations, anonymous, userId, displayName]);
 
+  // The search needle must hit mentioned names too (issue #462).
+  const resolveMentions = useMentionNames(useReviewDocumentId());
   // Sort + status-filter once per (annotations, filter) change, not on every
   // render (e.g. a hover or selection): the list can be large and the sort is
   // O(n log n) (issue #334).
   const { visible, hiddenByFilter } = useMemo(() => {
     const matches = (annotation: AnnotationView) =>
-      matchesFilters(annotation, filters, authorNameOf(annotation));
+      matchesFilters(annotation, filters, authorNameOf(annotation), resolveMentions);
     // ONE flat list (issue #481): document-scoped remarks lead, then anchored
     // ones by document position — each card carries its own scope marker.
     const items = [...annotations].sort(comparePanelOrder).filter(matches);
@@ -204,7 +212,7 @@ export function AnnotationPanel({
       hiddenByFilter: annotations.length > 0 && items.length === 0,
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps -- authorNameOf derives from the inputs below
-  }, [annotations, filters, userId, displayName]);
+  }, [annotations, filters, userId, displayName, resolveMentions]);
   const newCount = visible.filter((a) => isUnseen(a, previousSeenAt, userId)).length;
 
   // Under a non-OPEN policy (issue #413) only the annotation's author and the
@@ -359,6 +367,7 @@ export function AnnotationPanel({
             onCreate={onCreate}
             onCancel={onCancelPending}
             onUploadAttachment={onUploadAttachment}
+            mentionCandidates={mentionCandidates}
           />
         )}
         {annotations.length === 0 && !pendingAnchor && (

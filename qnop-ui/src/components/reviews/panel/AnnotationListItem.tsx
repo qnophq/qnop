@@ -35,6 +35,7 @@ import type { Notify } from '../../admin/layout/useToast';
 import { useDocument } from '../../../api/hooks/useDocuments';
 import { realAuthorId } from '../../people/realAuthorId';
 import { UserHoverCard } from '../../people/UserHoverCard';
+import { useMentionNames } from '../markdown/useMentionNames';
 import { useReviewDocumentId } from '../reviewDocumentId';
 import { UserAvatar } from '../../shell/UserAvatar';
 import { avatarSrc } from '../../../utils/avatarUrl';
@@ -197,8 +198,11 @@ function AnnotationListItemBase({
   const priorityCue = annotation.priority ? PRIORITY_CUES[annotation.priority] : null;
   const viewerAvatarUrl = useAuthStore((state) => state.avatarUrl);
   const viewerName = useAuthStore((state) => state.displayName);
+  const documentId = useReviewDocumentId();
   // Hover-card anonymity gate (issue #482): read from the cached document.
-  const review = useDocument(useReviewDocumentId()).data;
+  const review = useDocument(documentId).data;
+  // The collapsed excerpt is plain text — mention tokens read as names there too (issue #462).
+  const resolveMentions = useMentionNames(documentId);
   const hoverUserId = realAuthorId(review, viewerId, annotation.authorId);
   const authorName =
     annotation.authorId === viewerId
@@ -338,7 +342,9 @@ function AnnotationListItemBase({
                 fontStyle: quote ? 'italic' : 'normal',
               }}
             >
-              {quote ? `“${quote}”` : plainExcerpt(annotation.firstComment ?? '') || fallbackLabel}
+              {quote
+                ? `“${quote}”`
+                : plainExcerpt(resolveMentions(annotation.firstComment ?? '')) || fallbackLabel}
             </Typography>
             <ParticipantAvatars participants={participants} review={review} />
           </Stack>

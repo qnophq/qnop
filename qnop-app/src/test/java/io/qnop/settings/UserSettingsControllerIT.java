@@ -72,7 +72,8 @@ class UserSettingsControllerIT extends AbstractIntegrationTest {
             get("/api/v1/users/me/settings").with(jwt().jwt(j -> j.subject(userId.toString()))))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.settings").isArray())
-        .andExpect(jsonPath("$.settings.length()").value(4));
+        // theme, preferred_language, timezone, email_review_notifications, email_mentions (#462).
+        .andExpect(jsonPath("$.settings.length()").value(5));
   }
 
   @Test

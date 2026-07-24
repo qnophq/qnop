@@ -56,7 +56,15 @@ public enum UserSettingKey {
       "email_review_notifications",
       SettingValueType.BOOLEAN,
       "true",
-      "Receive email notifications for review activity (issue #316).");
+      "Receive email notifications for review activity (issue #316)."),
+  // Separate from the general review-activity toggle: a mention is a direct "you are needed here"
+  // signal, so it carries its own opt-out and is not silenced by turning off general thread mail
+  // (issue #462).
+  EMAIL_MENTIONS(
+      "email_mentions",
+      SettingValueType.BOOLEAN,
+      "true",
+      "Receive an email when someone @mentions you in a review (issue #462).");
 
   private static final Map<String, UserSettingKey> BY_KEY =
       Arrays.stream(values())

@@ -26,6 +26,7 @@ import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 import io.qnop.repository.AnnotationRepository;
+import io.qnop.repository.CommentMentionRepository;
 import io.qnop.repository.CommentRepository;
 import io.qnop.repository.DocumentRepository;
 import io.qnop.repository.ReviewParticipantRepository;
@@ -53,6 +54,7 @@ class ReviewNotificationServiceTest {
   @Mock private DocumentRepository documents;
   @Mock private AnnotationRepository annotations;
   @Mock private CommentRepository comments;
+  @Mock private CommentMentionRepository commentMentions;
   @Mock private ReviewParticipantRepository participants;
   @Mock private TeamMembershipRepository teamMembers;
   @Mock private UserRepository users;
@@ -66,6 +68,7 @@ class ReviewNotificationServiceTest {
         documents,
         annotations,
         comments,
+        commentMentions,
         participants,
         teamMembers,
         users,
