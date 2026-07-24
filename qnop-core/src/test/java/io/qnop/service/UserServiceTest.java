@@ -29,6 +29,7 @@ import static org.mockito.Mockito.when;
 import io.qnop.entity.User;
 import io.qnop.entity.UserRole;
 import io.qnop.entity.UserSource;
+import io.qnop.repository.TeamRepository;
 import io.qnop.repository.UserRepository;
 import io.qnop.service.UserService.UserProfileView;
 import java.util.Optional;
@@ -42,9 +43,13 @@ class UserServiceTest {
 
   private final UserRepository users = mock(UserRepository.class);
   private final PasswordEncoder passwordEncoder = mock(PasswordEncoder.class);
-  // The mocked repository reports every slug candidate free, so the base slug wins (issue #486).
+  // The mocked repositories report every slug candidate free in both namespaces (issue #595), so
+  // the base slug wins (issue #486).
   private final UserService service =
-      new UserService(users, passwordEncoder, new UserSlugService(users));
+      new UserService(
+          users,
+          passwordEncoder,
+          new UserSlugService(new SlugNamespace(users, mock(TeamRepository.class))));
 
   @Test
   @DisplayName("getProfile returns an entity-free view with role and source as names")

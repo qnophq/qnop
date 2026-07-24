@@ -65,6 +65,20 @@ public interface UserRepository extends JpaRepository<User, UUID> {
   boolean existsBySlugIgnoreCase(String slug);
 
   /**
+   * Serializes slug allocation across the flat user⟷team namespace (issue #595, ADR-0048): a
+   * transaction-scoped Postgres advisory lock on the lowercased candidate. The per-table unique
+   * indexes cannot guard a collision ACROSS tables, so concurrent allocations of the same candidate
+   * queue here; the lock releases with the transaction. A {@code hashtext} collision between two
+   * different slugs merely serializes two unrelated allocations, never corrupts one. The subselect
+   * exists so the statement yields an integer — {@code pg_advisory_xact_lock} itself returns the
+   * SQL {@code void} type, which JDBC cannot map.
+   */
+  @Query(
+      value = "SELECT 1 FROM (SELECT pg_advisory_xact_lock(hashtext(:slugLower))) AS lock_taken",
+      nativeQuery = true)
+  Long acquireSlugAllocationLock(@Param("slugLower") String slugLower);
+
+  /**
    * Paginated admin search (issues #104/#124): an optional case-insensitive match on display name,
    * email or username, plus optional role and enabled-status filters. {@code q} must be passed
    * pre-lowercased and {@code LIKE}-wrapped (e.g. {@code %alice%}); a {@code null} {@code q}/{@code
