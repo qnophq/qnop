@@ -81,6 +81,10 @@ describe('MarkdownComposer', () => {
     const option = screen.getByText('Alice');
     expect(option).toBeInTheDocument();
     expect(screen.queryByText('Bob')).not.toBeInTheDocument();
+    // Each row leads with the person's avatar (uploaded picture, initials fallback).
+    expect(
+      screen.getByTestId('mention-option').querySelector('img[src$="/avatar"]'),
+    ).toBeInTheDocument();
 
     fireEvent.mouseDown(option); // mousedown selects without blurring the field
     expect(ta.value).toContain('@alice-smith');

@@ -43,6 +43,8 @@ import Typography from '@mui/material/Typography';
 import { alpha, useTheme, type Theme } from '@mui/material/styles';
 import { Maximize2, Minimize2, Paperclip } from 'lucide-react';
 import { isSubmitShortcut } from '../../../utils/platform';
+import { avatarSrc } from '../../../utils/avatarUrl';
+import { UserAvatar } from '../../shell/UserAvatar';
 import { applyMarkdownAction, type MarkdownAction } from './markdownFormatting';
 import { EmojiPickerButton } from './EmojiPickerButton';
 import { Markdown } from './Markdown';
@@ -579,7 +581,7 @@ export function MarkdownComposer({
         placement="bottom-start"
         style={{ zIndex: theme.zIndex.modal }}
       >
-        <Paper elevation={6} sx={{ mt: 0.5, minWidth: 220, maxHeight: 240, overflowY: 'auto' }}>
+        <Paper elevation={6} sx={{ mt: 0.5, minWidth: 240, maxHeight: 240, overflowY: 'auto' }}>
           <MenuList dense aria-label="Mention a participant">
             {mentionMatches.map((candidate, index) => (
               <MenuItem
@@ -591,7 +593,14 @@ export function MarkdownComposer({
                   insertMentionCandidate(candidate);
                 }}
               >
-                <Typography noWrap sx={{ fontSize: '0.85rem' }}>
+                {/* The person, not just a string (issue #462): the same avatar recipe as the
+                    search dropdown and the participant stacks — uploaded picture with the
+                    deterministic initials fallback — so picking a person reads identically
+                    everywhere in the app. */}
+                <Box sx={{ display: 'flex', flexShrink: 0, mr: 1 }}>
+                  <UserAvatar name={candidate.name} size={22} imageUrl={avatarSrc(candidate.id)} />
+                </Box>
+                <Typography noWrap sx={{ fontSize: '0.85rem', fontWeight: 500 }}>
                   {candidate.name}
                 </Typography>
                 <Typography noWrap color="text.secondary" sx={{ fontSize: '0.75rem', ml: 0.75 }}>
