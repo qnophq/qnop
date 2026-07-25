@@ -52,11 +52,12 @@ import { useAuthStore } from '../../stores/authStore';
 type RoleFilter = 'all' | 'owner' | 'reviewer';
 // Client facets over ONE scope=all fetch (issue #576 follow-up), so every chip
 // carries a count without a refetch. Archiving is a retention flag, not a
-// workflow state (#576): 'all' spans every workflow STATE but stops at the
-// archive line, and the records are reachable only through the explicit
-// 'archived' facet (issue #578 — cold records never mix into living work).
+// workflow state (#576): the default 'active' facet spans every workflow state
+// but stops at the archive line (issue #578 — a fresh visit never surfaces cold
+// records), while 'all' ("Every state") and 'archived' are the two explicit
+// ways in — 'all' truly shows everything at once, archive included.
 // All facets are URL-persisted; no param means the default, archived hidden.
-type StatusFilter = 'all' | 'open' | 'closed' | 'archived';
+type StatusFilter = 'active' | 'all' | 'open' | 'closed' | 'archived';
 type DueFilter = 'any' | 'overdue' | 'soon' | 'none';
 type FormatFilter = 'any' | 'pdf' | 'docx' | 'md';
 type SortBy = 'updated' | 'name' | 'due';
@@ -82,11 +83,13 @@ function matchesRole(review: DocumentSummary, filter: RoleFilter, userId: string
 
 function matchesStatus(review: DocumentSummary, filter: StatusFilter): boolean {
   const archived = Boolean(review.archivedAt);
-  // 'archived' is the ONLY facet that surfaces a record (issue #578); every
-  // other one — including the default 'all' — stays on this side of the line.
+  // Only the explicit facets cross the archive line (issue #578): 'all' spans
+  // everything at once, 'archived' shows only the records; the default
+  // 'active' and the open/closed slices stay on this side of it.
+  if (filter === 'all') return true;
   if (filter === 'archived') return archived;
   if (archived) return false;
-  if (filter === 'all') return true;
+  if (filter === 'active') return true;
   return isOpenWorkflowState(review.workflowState) === (filter === 'open');
 }
 
@@ -117,7 +120,7 @@ function matchesDue(review: DocumentSummary, filter: DueFilter, now: number): bo
   return due >= now && due <= now + DUE_SOON_DAYS * 24 * 60 * 60 * 1000;
 }
 
-const STATUS_FILTERS: readonly StatusFilter[] = ['all', 'open', 'closed', 'archived'];
+const STATUS_FILTERS: readonly StatusFilter[] = ['active', 'all', 'open', 'closed', 'archived'];
 const ROLE_FILTERS: readonly RoleFilter[] = ['all', 'owner', 'reviewer'];
 const DUE_FILTERS: readonly DueFilter[] = ['any', 'overdue', 'soon', 'none'];
 // The fine-grained workflow facet (open string set, ADR-0011 — the known states).
@@ -314,13 +317,13 @@ export function ReviewsPage() {
       },
       { replace: true },
     );
-  const statusFilter = parseParam(searchParams.get('status'), STATUS_FILTERS, 'all');
+  const statusFilter = parseParam(searchParams.get('status'), STATUS_FILTERS, 'active');
   const roleFilter = parseParam(searchParams.get('role'), ROLE_FILTERS, 'all');
   const dueFilter = parseParam(searchParams.get('due'), DUE_FILTERS, 'any');
   const formatFilter = parseParam(searchParams.get('format'), FORMAT_FILTERS, 'any');
   const stateFilter = parseParam(searchParams.get('state'), STATE_FILTERS, 'any');
   const ownerFilter = searchParams.get('owner');
-  const setStatusFilter = (next: StatusFilter) => setParam('status', next, 'all');
+  const setStatusFilter = (next: StatusFilter) => setParam('status', next, 'active');
   const setRoleFilter = (next: RoleFilter) => setParam('role', next, 'all');
 
   const { data, isPending, isError, refetch } = useReviews({
@@ -369,9 +372,10 @@ export function ReviewsPage() {
   const statusCounts = (() => {
     const base = searched.filter((r) => matchesRole(r, roleFilter, userId));
     // Every count goes through the SAME predicate the list uses, so a chip's
-    // number keeps predicting what clicking it shows — the archived records sit
-    // outside 'all'/'open'/'closed' and are counted only by their own chip.
+    // number keeps predicting what clicking it shows — 'all' counts the archive
+    // in, the default 'active' and open/closed stop at the archive line.
     return {
+      active: base.filter((r) => matchesStatus(r, 'active')).length,
       all: base.filter((r) => matchesStatus(r, 'all')).length,
       open: base.filter((r) => matchesStatus(r, 'open')).length,
       closed: base.filter((r) => matchesStatus(r, 'closed')).length,
@@ -389,7 +393,10 @@ export function ReviewsPage() {
   // and none can be cleared — so the archive gets named and offered instead
   // (issue #578); the opt-in stays a deliberate click either way.
   const onlyArchivedLeft =
-    visible.length === 0 && statusFilter !== 'archived' && statusCounts.archived > 0;
+    visible.length === 0 &&
+    statusFilter !== 'archived' &&
+    statusFilter !== 'all' &&
+    statusCounts.archived > 0;
 
   // The owner facet offers everyone who owns a loaded review, alphabetically.
   const owners = (() => {
@@ -401,7 +408,7 @@ export function ReviewsPage() {
   })();
 
   const hasActiveFilters =
-    query !== '' || roleFilter !== 'all' || statusFilter !== 'all' || advancedCount > 0;
+    query !== '' || roleFilter !== 'all' || statusFilter !== 'active' || advancedCount > 0;
 
   const changeView = (next: ViewMode | null) => {
     if (!next) return;
@@ -535,28 +542,34 @@ export function ReviewsPage() {
             />
             <Box sx={{ width: 8 }} />
             <FilterChip
-              label="Every state"
-              count={statusCounts.all}
-              selected={statusFilter === 'all'}
-              onClick={() => setStatusFilter('all')}
+              label="Active"
+              count={statusCounts.active}
+              selected={statusFilter === 'active'}
+              onClick={() => setStatusFilter('active')}
             />
             <FilterChip
               label="Open"
               count={statusCounts.open}
               selected={statusFilter === 'open'}
-              onClick={() => setStatusFilter(statusFilter === 'open' ? 'all' : 'open')}
+              onClick={() => setStatusFilter(statusFilter === 'open' ? 'active' : 'open')}
             />
             <FilterChip
               label="Closed"
               count={statusCounts.closed}
               selected={statusFilter === 'closed'}
-              onClick={() => setStatusFilter(statusFilter === 'closed' ? 'all' : 'closed')}
+              onClick={() => setStatusFilter(statusFilter === 'closed' ? 'active' : 'closed')}
             />
             <FilterChip
               label="Archived"
               count={statusCounts.archived}
               selected={statusFilter === 'archived'}
-              onClick={() => setStatusFilter(statusFilter === 'archived' ? 'all' : 'archived')}
+              onClick={() => setStatusFilter(statusFilter === 'archived' ? 'active' : 'archived')}
+            />
+            <FilterChip
+              label="Every state"
+              count={statusCounts.all}
+              selected={statusFilter === 'all'}
+              onClick={() => setStatusFilter(statusFilter === 'all' ? 'active' : 'all')}
             />
             {hasActiveFilters && (
               <Chip

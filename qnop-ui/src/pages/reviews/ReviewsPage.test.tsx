@@ -173,9 +173,10 @@ describe('ReviewsPage', () => {
     expect(screen.queryByText('Old supplier terms')).not.toBeInTheDocument();
     expect(screen.getByText('NDA Acme Corp')).toBeInTheDocument();
 
-    // The counters agree: 'Every state' stops at the archive line, and the
-    // record is counted by its own chip only.
-    expect(screen.getByText('Every state (3)')).toBeInTheDocument();
+    // The counters agree: the default 'Active' facet stops at the archive
+    // line, while 'Every state' counts the record in.
+    expect(screen.getByText('Active (3)')).toBeInTheDocument();
+    expect(screen.getByText('Every state (4)')).toBeInTheDocument();
     expect(screen.getByText('Archived (1)')).toBeInTheDocument();
 
     // The explicit opt-in brings the records in — and only the records, each
@@ -187,6 +188,22 @@ describe('ReviewsPage', () => {
 
     // Toggling it off hides them again.
     fireEvent.click(screen.getByText('Archived (1)'));
+    expect(screen.queryByText('Old supplier terms')).not.toBeInTheDocument();
+    expect(screen.getByText('NDA Acme Corp')).toBeInTheDocument();
+  });
+
+  it('spans every state at once — archive included — via Every state (#578)', () => {
+    renderPage();
+
+    // The widest lens is an explicit click, never the default: live work and
+    // the archived record side by side.
+    fireEvent.click(screen.getByText('Every state (4)'));
+    expect(screen.getByText('NDA Acme Corp')).toBeInTheDocument();
+    expect(screen.getByText('Final contract')).toBeInTheDocument();
+    expect(screen.getByText('Old supplier terms')).toBeInTheDocument();
+
+    // Deselecting falls back to the default, archived hidden again.
+    fireEvent.click(screen.getByText('Every state (4)'));
     expect(screen.queryByText('Old supplier terms')).not.toBeInTheDocument();
     expect(screen.getByText('NDA Acme Corp')).toBeInTheDocument();
   });
@@ -216,7 +233,7 @@ describe('ReviewsPage', () => {
     renderPage('/reviews?status=bogus');
 
     expect(screen.queryByText('Old supplier terms')).not.toBeInTheDocument();
-    expect(screen.getByText('Every state (3)')).toBeInTheDocument();
+    expect(screen.getByText('Active (3)')).toBeInTheDocument();
   });
 
   it('names the archive instead of blaming filters when only records are left (#578)', () => {
