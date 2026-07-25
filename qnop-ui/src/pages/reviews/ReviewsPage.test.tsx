@@ -105,10 +105,10 @@ function mockReviews(value: Queryish) {
   } as unknown as ReturnType<typeof useReviews>);
 }
 
-function renderPage() {
+function renderPage(entry = '/reviews') {
   return render(
     <ThemeProvider theme={buildTheme('light')}>
-      <MemoryRouter initialEntries={['/reviews']}>
+      <MemoryRouter initialEntries={[entry]}>
         <Routes>
           <Route path="/reviews" element={<ReviewsPage />} />
           <Route path="/reviews/new" element={<div data-testid="new-review-probe" />} />
@@ -134,8 +134,9 @@ describe('ReviewsPage', () => {
     expect(screen.getByText('Architecture handbook')).toBeInTheDocument();
     expect(screen.getByText('Final contract')).toBeInTheDocument();
     expect(screen.getAllByText('Owner').length).toBeGreaterThanOrEqual(1);
-    // Three foreign-owned rows now: the draft, the closed and the archived one.
-    expect(screen.getAllByText('Reviewer')).toHaveLength(3);
+    // Two foreign-owned rows are live work: the draft and the closed one — the
+    // archived record is not among them by default (issue #578).
+    expect(screen.getAllByText('Reviewer')).toHaveLength(2);
     expect(screen.getByText('In review')).toBeInTheDocument();
     expect(screen.getAllByText('Finalized').length).toBeGreaterThanOrEqual(1);
   });
@@ -160,26 +161,106 @@ describe('ReviewsPage', () => {
     expect(screen.queryByText('Architecture handbook')).not.toBeInTheDocument();
   });
 
-  it('spans every state at once and slices to the records via Archived (#576)', () => {
+  // Issue #578: archived reviews are cold records — invisible until asked for.
+  it('hides archived reviews by default and reveals them only via Archived (#578)', () => {
     renderPage();
 
-    // ONE scope=all fetch backs every facet — no refetch on chip clicks.
+    // ONE scope=all fetch backs every facet — no refetch on chip clicks. The
+    // archived record IS loaded; the default facet just does not show it.
     expect(vi.mocked(useReviews)).toHaveBeenLastCalledWith(
       expect.objectContaining({ scope: 'all' }),
     );
-    // "Every state" shows active work AND the archived record together.
-    expect(screen.getByText('Every state (4)')).toBeInTheDocument();
-    expect(screen.getByText('Old supplier terms')).toBeInTheDocument();
+    expect(screen.queryByText('Old supplier terms')).not.toBeInTheDocument();
     expect(screen.getByText('NDA Acme Corp')).toBeInTheDocument();
 
+    // The counters agree: the default 'Active' facet stops at the archive
+    // line, while 'Every state' counts the record in.
+    expect(screen.getByText('Active (3)')).toBeInTheDocument();
+    expect(screen.getByText('Every state (4)')).toBeInTheDocument();
+    expect(screen.getByText('Archived (1)')).toBeInTheDocument();
+
+    // The explicit opt-in brings the records in — and only the records, each
+    // badged as a record rather than as live work (#576's neutral tone).
     fireEvent.click(screen.getByText('Archived (1)'));
     expect(screen.getByText('Old supplier terms')).toBeInTheDocument();
     expect(screen.queryByText('NDA Acme Corp')).not.toBeInTheDocument();
+    expect(screen.getByText('Archived · Finalized')).toBeInTheDocument();
 
-    // Closed excludes the archived record — archived is its own slice.
+    // Toggling it off hides them again.
+    fireEvent.click(screen.getByText('Archived (1)'));
+    expect(screen.queryByText('Old supplier terms')).not.toBeInTheDocument();
+    expect(screen.getByText('NDA Acme Corp')).toBeInTheDocument();
+  });
+
+  it('spans every state at once — archive included — via Every state (#578)', () => {
+    renderPage();
+
+    // The widest lens is an explicit click, never the default: live work and
+    // the archived record side by side.
+    fireEvent.click(screen.getByText('Every state (4)'));
+    expect(screen.getByText('NDA Acme Corp')).toBeInTheDocument();
+    expect(screen.getByText('Final contract')).toBeInTheDocument();
+    expect(screen.getByText('Old supplier terms')).toBeInTheDocument();
+
+    // Deselecting falls back to the default, archived hidden again.
+    fireEvent.click(screen.getByText('Every state (4)'));
+    expect(screen.queryByText('Old supplier terms')).not.toBeInTheDocument();
+    expect(screen.getByText('NDA Acme Corp')).toBeInTheDocument();
+  });
+
+  it('keeps archived out of the Open and Closed slices too (#578)', () => {
+    renderPage();
+
     fireEvent.click(screen.getByText('Closed (1)'));
     expect(screen.getByText('Final contract')).toBeInTheDocument();
     expect(screen.queryByText('Old supplier terms')).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByText('Open (2)'));
+    expect(screen.getByText('NDA Acme Corp')).toBeInTheDocument();
+    expect(screen.queryByText('Old supplier terms')).not.toBeInTheDocument();
+  });
+
+  it('round-trips the archived facet through the URL (#578)', () => {
+    // A shared link carrying the facet opens on the records…
+    renderPage('/reviews?status=archived');
+    expect(screen.getByText('Old supplier terms')).toBeInTheDocument();
+    expect(screen.queryByText('NDA Acme Corp')).not.toBeInTheDocument();
+  });
+
+  it('treats a URL without the facet — and an unknown value — as hidden (#578)', () => {
+    // …while the bare URL, and any value outside the facet set, mean the
+    // default: no param can ever surface a record implicitly.
+    renderPage('/reviews?status=bogus');
+
+    expect(screen.queryByText('Old supplier terms')).not.toBeInTheDocument();
+    expect(screen.getByText('Active (3)')).toBeInTheDocument();
+  });
+
+  it('explains a facet chip on hover', async () => {
+    renderPage();
+
+    fireEvent.mouseOver(screen.getByText('Every state (4)'));
+    expect(
+      await screen.findByRole('tooltip', {
+        name: 'Everything at once — every workflow state, archived records included',
+      }),
+    ).toBeInTheDocument();
+  });
+
+  it('names the archive instead of blaming filters when only records are left (#578)', () => {
+    mockReviews({
+      data: { items: [REVIEWS[3]], total: 1, page: 0, size: 100 },
+    });
+    renderPage();
+
+    // No filter is set, so "nothing matches your filters" would be a dead end.
+    expect(
+      screen.getByText('No active reviews — everything here has been archived.'),
+    ).toBeVisible();
+    expect(screen.queryByText('Clear filters')).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Show archived (1)' }));
+    expect(screen.getByText('Old supplier terms')).toBeInTheDocument();
   });
 
   it('searches by owner name and filters via the advanced menu (#576 follow-up)', () => {
