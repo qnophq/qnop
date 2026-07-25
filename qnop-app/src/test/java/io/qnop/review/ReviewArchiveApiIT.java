@@ -238,7 +238,7 @@ class ReviewArchiveApiIT extends SeededIntegrationTest {
         .andExpect(jsonPath("$.items[0].archivedAt").doesNotExist());
 
     mockMvc
-        .perform(as(get("/api/v1/documents?q=Archive facet&archived=true"), MEMBER_ID))
+        .perform(as(get("/api/v1/documents?q=Archive facet&scope=archived"), MEMBER_ID))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.total").value(1))
         .andExpect(jsonPath("$.items[0].id").value(archived.getId().toString()))

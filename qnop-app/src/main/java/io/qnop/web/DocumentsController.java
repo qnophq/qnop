@@ -94,13 +94,17 @@ public class DocumentsController implements DocumentsApi {
 
   @Override
   public ResponseEntity<DocumentListResponse> listDocuments(
-      String q, String sort, Boolean archived, Integer page, Integer size) {
+      String q, String sort, String scope, Integer page, Integer size) {
+    // The retention slice (issue #576): active (default) / archived / all.
+    boolean includeArchived = "archived".equals(scope) || "all".equals(scope);
+    boolean includeActive = !"archived".equals(scope);
     DocumentOverviewService.DocumentPage result =
         overview.listVisible(
             CurrentUser.requireUserId(),
             q,
             sort,
-            Boolean.TRUE.equals(archived),
+            includeActive,
+            includeArchived,
             page == null ? 0 : page,
             size == null ? 20 : size);
     return ResponseEntity.ok(

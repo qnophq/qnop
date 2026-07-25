@@ -38,7 +38,7 @@ export interface ReviewListParams {
   q?: string;
   sort?: string;
   /** When true, return only archived reviews (the "Archived" view); default excludes them (#576). */
-  archived?: boolean;
+  scope?: 'active' | 'archived' | 'all';
   page: number;
   size: number;
 }
@@ -60,7 +60,7 @@ export function useReviews(params: ReviewListParams) {
       const response = await documentsApi.listDocuments({
         q: params.q || undefined,
         sort: params.sort,
-        archived: params.archived,
+        scope: params.scope,
         page: params.page,
         size: params.size,
       });

@@ -86,15 +86,26 @@ public class DocumentOverviewService {
 
   @Transactional(readOnly = true)
   public DocumentPage listVisible(
-      UUID actor, String query, String sort, boolean archived, int page, int size) {
+      UUID actor,
+      String query,
+      String sort,
+      boolean includeActive,
+      boolean includeArchived,
+      int page,
+      int size) {
     String like =
         query == null || query.isBlank() ? null : "%" + query.trim().toLowerCase(Locale.ROOT) + "%";
-    // The default overview (archived=false) hides archived reviews (issue #576); the "Archived"
-    // view (archived=true) returns only them — the two slices are mutually exclusive here, so the
-    // flags are inverses. Open/closed is a client-side facet over the result.
+    // The retention slice (issue #576): the caller picks any combination — the
+    // overview's "All" facet spans active AND archived at once, the default
+    // hides the records, the Archived view shows only them. Open/closed stays
+    // a client-side facet over the result.
     Page<Document> result =
         documents.findVisibleTo(
-            actor, like, !archived, archived, PageRequest.of(page, size, parseSort(sort)));
+            actor,
+            like,
+            includeActive,
+            includeArchived,
+            PageRequest.of(page, size, parseSort(sort)));
 
     List<UUID> ids = result.getContent().stream().map(Document::getId).toList();
     Map<UUID, Integer> maxVersions =
