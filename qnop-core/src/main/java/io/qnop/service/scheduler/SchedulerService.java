@@ -60,11 +60,20 @@ import org.springframework.transaction.support.TransactionTemplate;
  * record — and no Spring self-invocation caveat applies, since the work {@link SchedulerWork}
  * runnable is supplied by the owning service and invoked inside the gate's own transaction.
  *
- * <h2>Fail-open</h2>
+ * <p>A job declared {@link SchedulerJobDefinition#selfTransactional} is the one exception (issue
+ * #577): it is invoked with <em>no</em> enclosing transaction, because it needs to commit in
+ * independent units the gate cannot know about. The review purge deletes one review per transaction
+ * and touches object storage only after each commit; wrapping it would defer every commit to the
+ * end of the run, so a crash mid-run would roll back reviews whose binaries are already gone. Such
+ * a job takes on the duty the gate otherwise discharges: it must open its own transactions.
+ *
+ * <h2>Fail-open — to the catalogue's default, not to "on"</h2>
  *
  * <p>If the state read fails (a broken {@code scheduler_job} table, a transient DB error), the gate
  * runs the job anyway. Maintenance sweeps keep the system healthy; a stuck control table must never
- * silently stop them.
+ * silently stop them. "Anyway" means the catalogued {@link SchedulerJobDefinition#enabledByDefault}
+ * though — a job that destroys data irreversibly stays off when its state is unknown, since failing
+ * open into an irreversible delete is not fail-safe.
  */
 @Service
 public class SchedulerService {
@@ -168,7 +177,9 @@ public class SchedulerService {
     SchedulerJob saved =
         tx.execute(
             status -> {
-              SchedulerJob job = jobs.findById(jobId).orElseGet(() -> SchedulerJob.seed(jobId));
+              SchedulerJob job =
+                  jobs.findById(jobId)
+                      .orElseGet(() -> SchedulerJob.seed(jobId, enabledByDefault(jobId)));
               job.updateSettings(enabled, dryRun);
               SchedulerJob persisted = jobs.save(job);
               auditEvents.save(
@@ -218,7 +229,15 @@ public class SchedulerService {
     }
     boolean dryRun = state.dryRun() && supportsDryRun(jobId);
     try {
-      tx.executeWithoutResult(status -> work.run(dryRun));
+      if (isSelfTransactional(jobId)) {
+        // The job commits in independent units of its own choosing (issue #577), so it must NOT run
+        // inside the gate's transaction: an enclosing transaction would defer every one of those
+        // commits to the end of the run and defeat the point. The outcome is still recorded in its
+        // own transaction below, exactly as for a wrapped job.
+        work.run(dryRun);
+      } else {
+        tx.executeWithoutResult(status -> work.run(dryRun));
+      }
     } catch (RuntimeException e) {
       log.error("Scheduler job {} ({}) failed", jobId, trigger, e);
       recordOutcome(jobId, RunOutcome.FAILURE, trigger, summarize(e), actorId);
@@ -228,19 +247,27 @@ public class SchedulerService {
     return RunOutcome.SUCCESS;
   }
 
-  /** Reads the enabled/dry-run state; fails open (run the job) on any read error. */
+  /**
+   * Reads the enabled/dry-run state; fails open (run the job) on any read error.
+   *
+   * <p>"Fails open" means the <em>catalogue's</em> default, not an unconditional yes: a job
+   * declared {@code enabledByDefault=false} because it destroys data irreversibly (issue #577) must
+   * stay off while its row is missing or unreadable, or a broken control table would silently arm
+   * it.
+   */
   private JobState readState(String jobId) {
+    JobState fallback = new JobState(enabledByDefault(jobId), false);
     try {
       JobState state =
           tx.execute(
               status ->
                   jobs.findById(jobId)
                       .map(job -> new JobState(job.isEnabled(), job.isDryRun()))
-                      .orElse(new JobState(true, false)));
-      return state == null ? new JobState(true, false) : state;
+                      .orElse(fallback));
+      return state == null ? fallback : state;
     } catch (RuntimeException e) {
-      log.warn("Could not read scheduler state for {}; failing open (running)", jobId, e);
-      return new JobState(true, false);
+      log.warn("Could not read scheduler state for {}; falling back to its default", jobId, e);
+      return fallback;
     }
   }
 
@@ -254,7 +281,9 @@ public class SchedulerService {
     try {
       tx.executeWithoutResult(
           status -> {
-            SchedulerJob job = jobs.findById(jobId).orElseGet(() -> SchedulerJob.seed(jobId));
+            SchedulerJob job =
+                jobs.findById(jobId)
+                    .orElseGet(() -> SchedulerJob.seed(jobId, enabledByDefault(jobId)));
             job.recordRun(Instant.now(), outcome.name(), trigger.name(), detail);
             jobs.save(job);
             if (trigger == RunTrigger.MANUAL) {
@@ -282,6 +311,20 @@ public class SchedulerService {
         .orElse(false);
   }
 
+  /** Whether the job runs without the gate's enclosing transaction (issue #577). */
+  private boolean isSelfTransactional(String jobId) {
+    return SchedulerJobCatalog.find(jobId)
+        .map(SchedulerJobDefinition::selfTransactional)
+        .orElse(false);
+  }
+
+  /** The catalogue's enabled default, used wherever no {@code scheduler_job} row exists yet. */
+  private static boolean enabledByDefault(String jobId) {
+    return SchedulerJobCatalog.find(jobId)
+        .map(SchedulerJobDefinition::enabledByDefault)
+        .orElse(true);
+  }
+
   private SchedulerJobDefinition requireDefinition(String jobId) {
     return SchedulerJobCatalog.find(jobId)
         .orElseThrow(() -> new SchedulerJobNotFoundException(jobId));
@@ -305,7 +348,9 @@ public class SchedulerService {
         definition.description(),
         definition.cron(),
         definition.supportsDryRun(),
-        row == null || row.isEnabled(),
+        // No row yet → the catalogue's default, so a disabled-by-default job (issue #577) reads as
+        // disabled on the dashboard instead of advertising a state it does not have.
+        row == null ? definition.enabledByDefault() : row.isEnabled(),
         row != null && row.isDryRun(),
         row == null ? null : row.getLastRunAt(),
         row == null ? null : row.getLastOutcome(),

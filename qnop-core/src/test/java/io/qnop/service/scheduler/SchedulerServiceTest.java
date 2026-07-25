@@ -24,6 +24,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.reset;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -79,7 +81,7 @@ class SchedulerServiceTest {
   @DisplayName(
       "a scheduled run of an enabled job runs the work and records SUCCESS without auditing")
   void scheduledRunEnabled() {
-    SchedulerJob job = SchedulerJob.seed(TOKEN_JOB);
+    SchedulerJob job = SchedulerJob.seed(TOKEN_JOB, true);
     when(jobs.findById(TOKEN_JOB)).thenReturn(Optional.of(job));
     AtomicInteger runs = new AtomicInteger();
     scheduler.register(TOKEN_JOB, dryRun -> runs.incrementAndGet());
@@ -97,7 +99,7 @@ class SchedulerServiceTest {
   @Test
   @DisplayName("a scheduled run of a disabled job is skipped: no work, no record")
   void scheduledRunDisabled() {
-    SchedulerJob job = SchedulerJob.seed(TOKEN_JOB);
+    SchedulerJob job = SchedulerJob.seed(TOKEN_JOB, true);
     job.updateSettings(false, null);
     when(jobs.findById(TOKEN_JOB)).thenReturn(Optional.of(job));
     AtomicInteger runs = new AtomicInteger();
@@ -113,7 +115,7 @@ class SchedulerServiceTest {
   @Test
   @DisplayName("a failing work records FAILURE and returns FAILURE without throwing")
   void workFailureIsRecordedNotThrown() {
-    SchedulerJob job = SchedulerJob.seed(TOKEN_JOB);
+    SchedulerJob job = SchedulerJob.seed(TOKEN_JOB, true);
     when(jobs.findById(TOKEN_JOB)).thenReturn(Optional.of(job));
     scheduler.register(
         TOKEN_JOB,
@@ -146,7 +148,7 @@ class SchedulerServiceTest {
   @Test
   @DisplayName("run-now runs a disabled job (explicit override), audits, and unlocks")
   void runNowOverridesDisabledAndAudits() {
-    SchedulerJob job = SchedulerJob.seed(TOKEN_JOB);
+    SchedulerJob job = SchedulerJob.seed(TOKEN_JOB, true);
     job.updateSettings(false, null);
     when(jobs.findById(TOKEN_JOB)).thenReturn(Optional.of(job));
     SimpleLock lock = org.mockito.Mockito.mock(SimpleLock.class);
@@ -195,7 +197,7 @@ class SchedulerServiceTest {
   @Test
   @DisplayName("update persists settings and audits the change")
   void updatePersistsAndAudits() {
-    SchedulerJob job = SchedulerJob.seed(REAPER_JOB);
+    SchedulerJob job = SchedulerJob.seed(REAPER_JOB, true);
     when(jobs.findById(REAPER_JOB)).thenReturn(Optional.of(job));
     when(jobs.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
     UUID actor = UUID.randomUUID();
@@ -213,7 +215,7 @@ class SchedulerServiceTest {
   @Test
   @DisplayName("list joins the static catalogue with the persisted rows")
   void listJoinsCatalogueAndRows() {
-    SchedulerJob reaper = SchedulerJob.seed(REAPER_JOB);
+    SchedulerJob reaper = SchedulerJob.seed(REAPER_JOB, true);
     reaper.updateSettings(false, true);
     when(jobs.findAllById(any())).thenReturn(List.of(reaper));
 
@@ -225,10 +227,11 @@ class SchedulerServiceTest {
     assertThat(reaperView.enabled()).isFalse();
     assertThat(reaperView.dryRun()).isTrue();
     assertThat(reaperView.supportsDryRun()).isTrue();
-    // A job with no row defaults to enabled, not dry-run.
+    // A job with no row defaults to its catalogued enabledByDefault, not dry-run.
     SchedulerService.SchedulerJobView tokenView =
         views.stream().filter(v -> v.jobId().equals(TOKEN_JOB)).findFirst().orElseThrow();
     assertThat(tokenView.enabled()).isTrue();
     assertThat(tokenView.dryRun()).isFalse();
   }
+
 }

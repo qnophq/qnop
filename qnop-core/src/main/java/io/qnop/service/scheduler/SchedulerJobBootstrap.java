@@ -31,9 +31,10 @@ import org.springframework.stereotype.Component;
 /**
  * Seeds a {@code scheduler_job} row for every catalogued job at start-up (issue #524, ADR-0045).
  * Idempotent: an existing row (with its operator settings and last-run history) is left untouched,
- * so a restart never resets an admin's toggles. A fresh install gets every job enabled and not in
- * dry-run. Missing rows are harmless anyway — the gate fails open — but seeding means the dashboard
- * shows the full set immediately.
+ * so a restart never resets an admin's toggles. A fresh install gets each job at its catalogued
+ * {@code enabledByDefault} — every maintenance sweep on, the irreversible review purge off (issue
+ * #577) — and none in dry-run. Missing rows are harmless anyway (the gate falls back to the same
+ * default), but seeding means the dashboard shows the full set immediately.
  */
 @Component
 public class SchedulerJobBootstrap implements ApplicationRunner {
@@ -49,9 +50,9 @@ public class SchedulerJobBootstrap implements ApplicationRunner {
   @Override
   public void run(ApplicationArguments args) {
     int seeded = 0;
-    for (String jobId : SchedulerJobCatalog.jobIds()) {
-      if (!jobs.existsById(jobId)) {
-        jobs.save(SchedulerJob.seed(jobId));
+    for (SchedulerJobDefinition definition : SchedulerJobCatalog.definitions()) {
+      if (!jobs.existsById(definition.jobId())) {
+        jobs.save(SchedulerJob.seed(definition.jobId(), definition.enabledByDefault()));
         seeded++;
       }
     }

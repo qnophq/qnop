@@ -38,6 +38,15 @@ Authorization is the existing central rule: `/api/v1/admin/**` requires `ADMIN`.
 - **Neutral.** The dashboard shows each job's **default** cron; an operator who overrides `qnop.s3.reaper-cron` sees the default string, not the override. Acceptable — the cron is informational, and the effective-configuration page (issue #522) is the authority on overrides.
 - **Negative / deferred.** There is no per-job run **history** (only the most recent outcome) and no scheduled-run auditing; if compliance later needs a full run log, it is an additive table, not a redesign. Editing a cron from the UI is out of scope — crons stay in configuration.
 
+## Amendment (issue #577, 2026-07-25) — two catalogue flags
+
+Adding the irreversible review purge (ADR-0050) needed the catalogue to express two things it could not:
+
+- **`SchedulerJobDefinition.enabledByDefault`.** All six original jobs are `true`; the purge is `false`, so destroying data is a deliberate operator act. This also **corrects "fail-open" above**: the gate now falls open to the catalogue's default rather than to an unconditional yes, in every place that assumed "no row ⇒ enabled" — `readState`, `SchedulerJob.seed`, `SchedulerJobBootstrap`, and the dashboard's `viewOf` (which would otherwise advertise a disabled job as enabled). Failing open into an irreversible delete is not fail-safe.
+- **`SchedulerJobDefinition.selfTransactional`.** All six original jobs are `false` and keep running inside the gate's transaction. A `true` job is invoked with **no** enclosing transaction and owns its own — the purge commits one review per transaction and touches object storage only after each commit, which an enclosing transaction would defeat by deferring every commit to the end of the run. Such a job takes on the duty the gate otherwise discharges.
+
+The gate's other properties are unchanged: the outcome is still recorded in its own transaction, so a self-transactional job's failure record survives a failed run too.
+
 ## Alternatives considered
 
 - **`@Transactional` on the gate + `REQUIRES_NEW` for the outcome.** Rejected: the sweep methods calling their own gate would hit the Spring self-invocation trap, and `REQUIRES_NEW` self-calls silently don't start a new transaction. The programmatic `TransactionTemplate` sidesteps both.

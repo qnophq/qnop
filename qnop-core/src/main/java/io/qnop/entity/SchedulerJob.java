@@ -99,9 +99,12 @@ public class SchedulerJob {
     this.dryRun = dryRun;
   }
 
-  /** A freshly seeded job row: enabled, not in dry-run, never run yet. */
-  public static SchedulerJob seed(String jobId) {
-    return new SchedulerJob(jobId, true, false);
+  /**
+   * A freshly seeded job row: not in dry-run, never run yet, and enabled per the catalogue's {@code
+   * enabledByDefault} — a job that destroys data irreversibly seeds disabled (issue #577).
+   */
+  public static SchedulerJob seed(String jobId, boolean enabled) {
+    return new SchedulerJob(jobId, enabled, false);
   }
 
   /** Applies operator settings; a null argument leaves that setting unchanged. */

@@ -29,6 +29,19 @@ package io.qnop.service.scheduler;
  * @param description one sentence on what the sweep does and why
  * @param cron the default cron expression the sweep fires on (informational for the dashboard)
  * @param supportsDryRun whether the job honours a report-only dry-run mode (only the reaper does)
+ * @param enabledByDefault whether the scheduled tick fires before an admin has ever touched the
+ *     job. Maintenance sweeps are on; a job that destroys data irreversibly ships <em>off</em>, so
+ *     enabling it is a deliberate operator act (issue #577)
+ * @param selfTransactional whether the job manages its own transactions. The gate normally wraps
+ *     the work in one transaction; a job that must commit in independent units — e.g. the purge,
+ *     which deletes one review per transaction and touches object storage only after each commit —
+ *     opts out and is invoked with no enclosing transaction (issue #577)
  */
 public record SchedulerJobDefinition(
-    String jobId, String displayName, String description, String cron, boolean supportsDryRun) {}
+    String jobId,
+    String displayName,
+    String description,
+    String cron,
+    boolean supportsDryRun,
+    boolean enabledByDefault,
+    boolean selfTransactional) {}
