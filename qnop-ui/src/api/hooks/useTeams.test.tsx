@@ -60,6 +60,8 @@ const TEAM: AdminTeamDetail = {
   id: 't1',
   name: 'Core',
   enabled: true,
+  profileShowMembers: false,
+  profileShowReviews: false,
   createdAt: '2026-01-01T00:00:00Z',
   updatedAt: '2026-01-01T00:00:00Z',
   members: [],

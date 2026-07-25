@@ -59,6 +59,9 @@ export function TeamFormDialog({ open, mode, team, onClose }: TeamFormDialogProp
   const [name, setName] = useState(editing ? team.name : '');
   const [description, setDescription] = useState(editing ? (team.description ?? '') : '');
   const [enabled, setEnabled] = useState(editing ? team.enabled : true);
+  // Public-profile visibility (issue #586); create mode keeps the conservative server defaults.
+  const [showMembers, setShowMembers] = useState(editing ? team.profileShowMembers : false);
+  const [showReviews, setShowReviews] = useState(editing ? team.profileShowReviews : false);
   const [error, setError] = useState<string | null>(null);
   const [submitAttempted, setSubmitAttempted] = useState(false);
   const [serverErrors, setServerErrors] = useState<Record<string, string>>({});
@@ -120,7 +123,16 @@ export function TeamFormDialog({ open, mode, team, onClose }: TeamFormDialogProp
     }
     try {
       if (isEdit && team) {
-        await updateTeam.mutateAsync({ id: team.id, request: { name, description, enabled } });
+        await updateTeam.mutateAsync({
+          id: team.id,
+          request: {
+            name,
+            description,
+            enabled,
+            profileShowMembers: showMembers,
+            profileShowReviews: showReviews,
+          },
+        });
       } else {
         const created = await createTeam.mutateAsync({
           name,
@@ -186,6 +198,32 @@ export function TeamFormDialog({ open, mode, team, onClose }: TeamFormDialogProp
                 }
                 label={enabled ? 'Team active' : 'Team disabled'}
               />
+            )}
+            {isEdit && (
+              <Stack spacing={0}>
+                <FormControlLabel
+                  control={
+                    <Switch
+                      checked={showMembers}
+                      onChange={(e) => setShowMembers(e.target.checked)}
+                      slotProps={{ input: { 'aria-label': 'Show members on the public profile' } }}
+                    />
+                  }
+                  label="Public profile: show members"
+                />
+                <FormControlLabel
+                  control={
+                    <Switch
+                      checked={showReviews}
+                      onChange={(e) => setShowReviews(e.target.checked)}
+                      slotProps={{
+                        input: { 'aria-label': 'Show review participation on the public profile' },
+                      }}
+                    />
+                  }
+                  label="Public profile: show review participation"
+                />
+              </Stack>
             )}
             {error && <Alert severity="error">{error}</Alert>}
           </Stack>

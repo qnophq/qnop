@@ -30,7 +30,6 @@ import type { LucideIcon } from 'lucide-react';
 import {
   ArrowRight,
   FileText,
-  Lock,
   MessageSquareText,
   NotebookPen,
   SearchX,
@@ -193,35 +192,21 @@ export function SearchDropdownResults({
       )}
       {data.teams.items.length > 0 && (
         <Section icon={UsersRound} label="Teams" total={data.teams.total}>
-          {data.teams.items.map((hit) =>
-            hit.viewable ? (
-              <HitRow
-                key={hit.teamId}
-                actionKey={`team:${hit.teamId}`}
-                highlighted={highlightKey === `team:${hit.teamId}`}
-                testId="search-hit-team"
-                onClick={() => navigate(`/my-teams/${hit.slug ?? hit.teamId}`)}
-                start={<UsersRound size={16} aria-hidden />}
-                primary={hit.name}
-              />
-            ) : (
-              // A stranger's team hit is listed, not linked — the roster is
-              // member-or-admin-only (issue #470), so no dead 403 clicks.
-              <Stack
-                key={hit.teamId}
-                direction="row"
-                spacing={1}
-                data-testid="search-hit-team-locked"
-                sx={{ alignItems: 'center', px: 2, py: 0.75, color: 'text.disabled' }}
-              >
-                <UsersRound size={16} aria-hidden />
-                <Typography sx={{ fontSize: 13.5, flex: 1 }} noWrap>
-                  {hit.name}
-                </Typography>
-                <Lock size={12} aria-label="Not a member" />
-              </Stack>
-            ),
-          )}
+          {data.teams.items.map((hit) => (
+            // Every team hit links to the public team profile (issue #586) —
+            // members reach the roster from there; non-members see exactly
+            // what the team exposes. The pre-#586 locked row is gone: there
+            // is a legitimate destination for everyone now.
+            <HitRow
+              key={hit.teamId}
+              actionKey={`team:${hit.teamId}`}
+              highlighted={highlightKey === `team:${hit.teamId}`}
+              testId="search-hit-team"
+              onClick={() => navigate(`/teams/${hit.slug ?? hit.teamId}`)}
+              start={<UsersRound size={16} aria-hidden />}
+              primary={hit.name}
+            />
+          ))}
           {data.teams.total > data.teams.items.length && (
             <SeeAllRow
               actionKey="seeall:teams"

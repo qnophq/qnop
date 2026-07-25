@@ -169,6 +169,40 @@ function HoverCard({
   profileName?: string;
   sx?: SxProps<Theme>;
 }) {
+  return (
+    <HoverCardShell
+      to={to}
+      profileName={profileName}
+      sx={sx}
+      popover={(anchorEl, open) => (
+        <HoverCardPopover userId={userId} anchorEl={anchorEl} open={open} />
+      )}
+    >
+      {children}
+    </HoverCardShell>
+  );
+}
+
+/**
+ * The generic hover-intent shell shared by the person and team hover cards (issues #482/#586):
+ * link-or-span trigger, the settle delay, Escape to dismiss, and the popover mounted only once
+ * hovered — a list of fifty rows carries no query instances until the pointer actually arrives.
+ */
+export function HoverCardShell({
+  to,
+  children,
+  profileName,
+  sx,
+  popover,
+}: {
+  /** The profile link target; undefined when the caller renders its own anchor. */
+  to?: string;
+  children: ReactNode;
+  profileName?: string;
+  sx?: SxProps<Theme>;
+  /** Renders the card once hovered; mounting IS the hover, so the cache warms during the delay. */
+  popover: (anchorEl: HTMLElement, open: boolean) => ReactNode;
+}) {
   const [anchorEl, setAnchorEl] = useState<HTMLElement | null>(null);
   const [open, setOpen] = useState(false);
 
@@ -205,9 +239,7 @@ function HoverCard({
       >
         {children}
       </TriggerFrame>
-      {/* Mounted only once hovered: a list of fifty people carries no query
-          instances until the pointer actually arrives somewhere. */}
-      {anchorEl && <HoverCardPopover userId={userId} anchorEl={anchorEl} open={open} />}
+      {anchorEl && popover(anchorEl, open)}
     </>
   );
 }

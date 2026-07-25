@@ -21,13 +21,17 @@
 
 import { useState } from 'react';
 import Alert from '@mui/material/Alert';
+import Box from '@mui/material/Box';
 import Button from '@mui/material/Button';
 import Dialog from '@mui/material/Dialog';
 import DialogActions from '@mui/material/DialogActions';
 import DialogContent from '@mui/material/DialogContent';
 import DialogTitle from '@mui/material/DialogTitle';
+import FormControlLabel from '@mui/material/FormControlLabel';
 import Stack from '@mui/material/Stack';
+import Switch from '@mui/material/Switch';
 import TextField from '@mui/material/TextField';
+import Typography from '@mui/material/Typography';
 import type { TeamDetail } from '../../api/generated';
 import { useUpdateMyTeam } from '../../api/hooks/useMyTeams';
 import { useRemoveMyTeamAvatar, useUploadMyTeamAvatar } from '../../api/hooks/useTeamAvatar';
@@ -54,6 +58,10 @@ export function EditMyTeamDialog({
   const removeAvatar = useRemoveMyTeamAvatar();
 
   const [description, setDescription] = useState(team.description ?? '');
+  // Public-profile visibility (issue #586): what /teams/<slug> exposes to
+  // non-members. Conservative defaults — exposing is an explicit decision.
+  const [showMembers, setShowMembers] = useState(team.profileShowMembers);
+  const [showReviews, setShowReviews] = useState(team.profileShowReviews);
   // The avatar applies immediately (like the admin edit dialog); the preview
   // follows the mutation's fresh URL rather than waiting for a refetch.
   const [avatarUrl, setAvatarUrl] = useState<string | null>(team.avatarUrl ?? null);
@@ -79,7 +87,12 @@ export function EditMyTeamDialog({
   const onSave = async () => {
     setError(null);
     try {
-      await updateTeam.mutateAsync({ teamId: team.id, description: description.trim() || null });
+      await updateTeam.mutateAsync({
+        teamId: team.id,
+        description: description.trim() || null,
+        profileShowMembers: showMembers,
+        profileShowReviews: showReviews,
+      });
       onClose();
     } catch (err) {
       setError(apiErrorMessage(err, 'Could not save the team.'));
@@ -108,6 +121,37 @@ export function EditMyTeamDialog({
             slotProps={{ htmlInput: { maxLength: 1000 } }}
             helperText="What this team reviews — shown wherever the team appears."
           />
+          <Box>
+            <Typography variant="subtitle2" sx={{ mb: 0.5 }}>
+              Public profile
+            </Typography>
+            <Typography variant="caption" color="text.secondary" component="p" sx={{ mb: 1 }}>
+              Name, crest and description are always visible on the team&apos;s profile page. Choose
+              what non-members may see beyond that.
+            </Typography>
+            <FormControlLabel
+              control={
+                <Switch
+                  checked={showMembers}
+                  onChange={(e) => setShowMembers(e.target.checked)}
+                  slotProps={{ input: { 'aria-label': 'Show members on the public profile' } }}
+                />
+              }
+              label="Show members"
+            />
+            <FormControlLabel
+              control={
+                <Switch
+                  checked={showReviews}
+                  onChange={(e) => setShowReviews(e.target.checked)}
+                  slotProps={{
+                    input: { 'aria-label': 'Show review participation on the public profile' },
+                  }}
+                />
+              }
+              label="Show review participation"
+            />
+          </Box>
         </Stack>
       </DialogContent>
       <DialogActions>

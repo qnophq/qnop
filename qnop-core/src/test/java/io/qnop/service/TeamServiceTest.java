@@ -88,14 +88,14 @@ class TeamServiceTest {
     // Another team already owns "Platform".
     when(teams.findByNameIgnoreCase("Platform"))
         .thenReturn(Optional.of(teamWithId(UUID.randomUUID(), "Platform")));
-    assertThatThrownBy(() -> service.update(id, "Platform", null, null))
+    assertThatThrownBy(() -> service.update(id, "Platform", null, null, null, null))
         .isInstanceOf(TeamConflictException.class)
         .extracting("code")
         .isEqualTo("NAME_TAKEN");
 
     // Renaming to a name owned by the same team is allowed.
     when(teams.findByNameIgnoreCase("Core")).thenReturn(Optional.of(team));
-    var view = service.update(id, "Core", "desc", false);
+    var view = service.update(id, "Core", "desc", false, null, null);
     assertThat(view.name()).isEqualTo("Core");
     assertThat(view.enabled()).isFalse();
   }
@@ -302,14 +302,15 @@ class TeamServiceTest {
     when(memberships.existsByTeamIdAndUserIdAndTeamRole(teamId, lead, TeamRole.LEAD))
         .thenReturn(true);
 
-    service.updateDescriptionAsLead(teamId, lead, false, "Contract review crew");
+    service.updateMyTeamAsLead(teamId, lead, false, "Contract review crew", null, null);
     assertThat(team.getDescription()).isEqualTo("Contract review crew");
 
     // A blank description clears it; an admin needs no membership.
-    service.updateDescriptionAsLead(teamId, UUID.randomUUID(), true, "   ");
+    service.updateMyTeamAsLead(teamId, UUID.randomUUID(), true, "   ", null, null);
     assertThat(team.getDescription()).isNull();
 
-    assertThatThrownBy(() -> service.updateDescriptionAsLead(teamId, stranger, false, "nope"))
+    assertThatThrownBy(
+            () -> service.updateMyTeamAsLead(teamId, stranger, false, "nope", null, null))
         .isInstanceOf(TeamAccessForbiddenException.class);
     assertThat(team.getDescription()).isNull();
   }

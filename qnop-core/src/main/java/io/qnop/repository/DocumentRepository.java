@@ -68,6 +68,24 @@ public interface DocumentRepository extends JpaRepository<Document, UUID> {
           + "   WHERE pt.documentId = d.id AND pt.teamId = m.teamId AND m.userId = :actor))")
   Page<Document> findVisibleTo(@Param("actor") UUID actor, @Param("q") String q, Pageable pageable);
 
+  /**
+   * Reviews the given team participates in AND the actor may see (issue #586). The public team
+   * profile's participation list is this intersection by construction, so it can never leak a
+   * review the caller cannot reach (ADR-0038) — same visibility predicate as {@link
+   * #findVisibleTo}, narrowed to the team's participations.
+   */
+  @Query(
+      "SELECT d FROM Document d WHERE EXISTS (SELECT 1 FROM ReviewParticipant tp"
+          + "   WHERE tp.documentId = d.id AND tp.teamId = :teamId)"
+          + " AND (d.ownerId = :actor"
+          + " OR EXISTS (SELECT 1 FROM ReviewParticipant p"
+          + "   WHERE p.documentId = d.id AND p.userId = :actor)"
+          + " OR EXISTS (SELECT 1 FROM ReviewParticipant pt, TeamMembership m"
+          + "   WHERE pt.documentId = d.id AND pt.teamId = m.teamId AND m.userId = :actor))"
+          + " ORDER BY d.updatedAt DESC")
+  List<Document> findTeamParticipationsVisibleTo(
+      @Param("teamId") UUID teamId, @Param("actor") UUID actor);
+
   /** Reviews the user owns — ownership is structurally public, anonymous ones included (#473). */
   long countByOwnerId(UUID ownerId);
 }

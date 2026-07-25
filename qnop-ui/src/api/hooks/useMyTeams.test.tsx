@@ -57,6 +57,8 @@ const TEAM: TeamDetail = {
   name: 'Core',
   viewerRole: 'LEAD',
   viewerCanManage: true,
+  profileShowMembers: false,
+  profileShowReviews: false,
   members: [],
 };
 

@@ -216,6 +216,8 @@ export function TeamDetailPage() {
           description: team.description,
           enabled: team.enabled,
           memberCount: members.length,
+          profileShowMembers: team.profileShowMembers,
+          profileShowReviews: team.profileShowReviews,
           createdAt: team.createdAt,
           updatedAt: team.updatedAt,
         }}

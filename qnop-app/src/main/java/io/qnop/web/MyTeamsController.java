@@ -27,9 +27,13 @@ import io.qnop.api.v1.model.ErrorResponse;
 import io.qnop.api.v1.model.MyTeam;
 import io.qnop.api.v1.model.MyTeamListResponse;
 import io.qnop.api.v1.model.MyTeamUpdateRequest;
+import io.qnop.api.v1.model.PublicTeamProfile;
+import io.qnop.api.v1.model.PublicTeamProfileMember;
+import io.qnop.api.v1.model.PublicTeamReview;
 import io.qnop.api.v1.model.TeamDetail;
 import io.qnop.api.v1.model.TeamMember;
 import io.qnop.api.v1.model.TeamRole;
+import io.qnop.service.PublicTeamProfileService;
 import io.qnop.service.TeamAccessForbiddenException;
 import io.qnop.service.TeamConflictException;
 import io.qnop.service.TeamNotFoundException;
@@ -63,12 +67,17 @@ import org.springframework.web.bind.annotation.RestController;
 public class MyTeamsController implements TeamsApi {
 
   private final TeamService teams;
+  private final PublicTeamProfileService publicProfiles;
   private final AvatarService avatars;
   private final TeamAvatarService teamAvatars;
 
   public MyTeamsController(
-      TeamService teams, AvatarService avatars, TeamAvatarService teamAvatars) {
+      TeamService teams,
+      PublicTeamProfileService publicProfiles,
+      AvatarService avatars,
+      TeamAvatarService teamAvatars) {
     this.teams = teams;
+    this.publicProfiles = publicProfiles;
     this.avatars = avatars;
     this.teamAvatars = teamAvatars;
   }
@@ -100,8 +109,29 @@ public class MyTeamsController implements TeamsApi {
   public ResponseEntity<TeamDetail> updateMyTeam(UUID teamId, MyTeamUpdateRequest request) {
     UUID actor = CurrentUser.requireUserId();
     boolean admin = CurrentUser.isAdmin();
-    teams.updateDescriptionAsLead(teamId, actor, admin, request.getDescription());
+    teams.updateMyTeamAsLead(
+        teamId,
+        actor,
+        admin,
+        request.getDescription(),
+        request.getProfileShowMembers(),
+        request.getProfileShowReviews());
     return ResponseEntity.ok(toDetail(teams.viewTeam(teamId.toString(), actor, admin)));
+  }
+
+  @Override
+  public ResponseEntity<PublicTeamProfile> getTeamProfile(UUID teamId) {
+    return ResponseEntity.ok(
+        toPublicProfile(
+            publicProfiles.getProfile(teamId, CurrentUser.requireUserId(), CurrentUser.isAdmin())));
+  }
+
+  @Override
+  public ResponseEntity<PublicTeamProfile> getTeamProfileBySlug(String slug) {
+    return ResponseEntity.ok(
+        toPublicProfile(
+            publicProfiles.getProfileBySlug(
+                slug, CurrentUser.requireUserId(), CurrentUser.isAdmin())));
   }
 
   @Override
@@ -188,8 +218,64 @@ public class MyTeamsController implements TeamsApi {
         .avatarUrl(AvatarUrls.forTeam(v.id(), teamAvatars.updatedAt(v.id()).orElse(null)))
         .viewerRole(v.viewerRole() == null ? null : TeamRole.fromValue(v.viewerRole()))
         .viewerCanManage(v.canManage())
+        .profileShowMembers(v.profileShowMembers())
+        .profileShowReviews(v.profileShowReviews())
         .members(
             v.members().stream().map(m -> toMember(m, avatarTimestamps.get(m.userId()))).toList());
+  }
+
+  /**
+   * The workspace-public profile slice (issue #586). Hidden sections arrive as {@code null} from
+   * the service and serialize as JSON {@code null} — never as an empty list — so the client tells
+   * "hidden" from "empty".
+   */
+  private PublicTeamProfile toPublicProfile(PublicTeamProfileService.PublicTeamProfileView v) {
+    PublicTeamProfile profile =
+        new PublicTeamProfile()
+            .id(v.id())
+            .name(v.name())
+            .slug(v.slug())
+            .description(v.description())
+            .avatarUrl(AvatarUrls.forTeam(v.id(), teamAvatars.updatedAt(v.id()).orElse(null)))
+            .viewerIsMember(v.viewerIsMember())
+            .createdAt(v.createdAt().atOffset(ZoneOffset.UTC));
+    // The generated model defaults arrays to empty lists; hidden must be null, not [].
+    profile.setMembers(null);
+    profile.setReviews(null);
+    if (v.members() != null) {
+      // One batched avatar-timestamp lookup for the roster, as in toDetail (#509).
+      Map<UUID, Instant> avatarTimestamps =
+          avatars.updatedAt(
+              v.members().stream()
+                  .map(PublicTeamProfileService.PublicTeamMemberView::userId)
+                  .toList());
+      profile.setMembers(
+          v.members().stream()
+              .map(
+                  m ->
+                      new PublicTeamProfileMember()
+                          .id(m.userId())
+                          .displayName(m.displayName())
+                          .slug(m.slug())
+                          .avatarUrl(
+                              AvatarUrls.forUser(m.userId(), avatarTimestamps.get(m.userId())))
+                          .role(TeamRole.fromValue(m.role())))
+              .toList());
+    }
+    if (v.reviews() != null) {
+      profile.setReviews(
+          v.reviews().stream()
+              .map(
+                  r ->
+                      new PublicTeamReview()
+                          .id(r.id())
+                          .title(r.title())
+                          .slug(r.slug())
+                          .workflowState(r.workflowState())
+                          .updatedAt(r.updatedAt().atOffset(ZoneOffset.UTC)))
+              .toList());
+    }
+    return profile;
   }
 
   private TeamMember toMember(TeamMemberView v) {

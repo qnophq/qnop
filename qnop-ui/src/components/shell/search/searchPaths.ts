@@ -81,10 +81,10 @@ export function flattenSearchActions(
   if (data.users.total > data.users.items.length) {
     actions.push({ key: 'seeall:users', path: seeAll('users') });
   }
+  // Every team hit is actionable (issue #586): it leads to the public team
+  // profile, which shows exactly what the team exposes to this caller.
   for (const hit of data.teams.items) {
-    if (hit.viewable) {
-      actions.push({ key: `team:${hit.teamId}`, path: `/my-teams/${hit.slug ?? hit.teamId}` });
-    }
+    actions.push({ key: `team:${hit.teamId}`, path: `/teams/${hit.slug ?? hit.teamId}` });
   }
   if (data.teams.total > data.teams.items.length) {
     actions.push({ key: 'seeall:teams', path: seeAll('teams') });

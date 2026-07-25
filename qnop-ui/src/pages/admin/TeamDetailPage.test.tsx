@@ -108,6 +108,8 @@ function makeTeam(overrides: Partial<AdminTeamDetail> = {}): AdminTeamDetail {
     name: 'Platform',
     description: 'Owns the ingest pipeline.',
     enabled: true,
+    profileShowMembers: false,
+    profileShowReviews: false,
     createdAt: '2026-01-01T00:00:00Z',
     updatedAt: '2026-03-01T00:00:00Z',
     members: [LEAD, MEMBER],

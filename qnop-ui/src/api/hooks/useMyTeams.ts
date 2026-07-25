@@ -68,10 +68,19 @@ export function useMyTeam(id: string) {
 export function useUpdateMyTeam() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: async (vars: { teamId: string; description: string | null }) => {
+    mutationFn: async (vars: {
+      teamId: string;
+      description: string | null;
+      profileShowMembers?: boolean;
+      profileShowReviews?: boolean;
+    }) => {
       const response = await teamsApi.updateMyTeam({
         teamId: vars.teamId,
-        myTeamUpdateRequest: { description: vars.description ?? undefined },
+        myTeamUpdateRequest: {
+          description: vars.description ?? undefined,
+          profileShowMembers: vars.profileShowMembers,
+          profileShowReviews: vars.profileShowReviews,
+        },
       });
       return response.data;
     },
