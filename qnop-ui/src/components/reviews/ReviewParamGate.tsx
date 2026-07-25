@@ -20,12 +20,12 @@
  */
 
 import type { ReactNode } from 'react';
-import Button from '@mui/material/Button';
 import CircularProgress from '@mui/material/CircularProgress';
 import Stack from '@mui/material/Stack';
-import Typography from '@mui/material/Typography';
-import { Link as RouterLink, useParams } from 'react-router';
+import { useParams } from 'react-router';
 import { useDocumentBySlug } from '../../api/hooks/useDocuments';
+import { ErrorState } from '../../pages/errors/ErrorState';
+import { NotFoundIllustration } from '../../pages/errors/illustrations';
 import { ReviewDocumentIdContext } from './reviewDocumentId';
 
 const UUID_SHAPE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -52,16 +52,19 @@ export function ReviewParamGate({ children }: { children: ReactNode }) {
   }
 
   if (bySlug.isError || !bySlug.data?.id) {
+    // The branded not-found shell (issue #611): same voice as the full-page
+    // 404 - playful about the page, never the user, always a way onward.
+    // Anti-enumeration: an unknown slug and one the caller may not see read
+    // identically here, exactly like the server's 404 (issue #411).
     return (
-      <Stack spacing={1} sx={{ alignItems: 'center', py: 10 }}>
-        <Typography variant="h6">Review not found</Typography>
-        <Typography variant="body2" color="text.secondary">
-          No review answers to “{segment}”. The link may be outdated.
-        </Typography>
-        <Button component={RouterLink} to="/reviews" sx={{ mt: 1 }}>
-          Back to reviews
-        </Button>
-      </Stack>
+      <ErrorState
+        code="404"
+        title="This review folded itself into a paper plane"
+        message={`No review answers to “${segment}” — the link may be outdated, or the review moved on. Your other quests are waiting.`}
+        illustration={<NotFoundIllustration />}
+        primaryAction={{ label: 'Back to reviews', to: '/reviews' }}
+        secondaryAction={{ label: 'Back to dashboard', to: '/' }}
+      />
     );
   }
 

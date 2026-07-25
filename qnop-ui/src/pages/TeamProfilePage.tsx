@@ -19,7 +19,6 @@
  * SPDX-License-Identifier: AGPL-3.0-only
  */
 
-import Alert from '@mui/material/Alert';
 import Box from '@mui/material/Box';
 import Chip from '@mui/material/Chip';
 import Paper from '@mui/material/Paper';
@@ -47,6 +46,8 @@ import { TeamAvatar } from '../components/shell/TeamAvatar';
 import { UserAvatar } from '../components/shell/UserAvatar';
 import { avatarSrc } from '../utils/avatarUrl';
 import { useFormatters } from '../hooks/useFormatters';
+import { ErrorState } from './errors/ErrorState';
+import { NotFoundIllustration } from './errors/illustrations';
 
 const SINCE_FORMAT = new Intl.DateTimeFormat('en-US', { month: 'long', year: 'numeric' });
 
@@ -122,7 +123,18 @@ export function TeamProfilePage() {
     );
   }
   if (profileQuery.isError || !profileQuery.data) {
-    return <Alert severity="error">This team does not exist.</Alert>;
+    // The branded not-found shell (issue #611); unknown and disabled teams
+    // read identically (anti-enumeration, mirroring the server's 404).
+    return (
+      <ErrorState
+        code="404"
+        title="This team packed up its crest"
+        message="No team answers to this address — the link may be outdated, or the team moved on. The guild hall is back on the dashboard."
+        illustration={<NotFoundIllustration />}
+        primaryAction={{ label: 'Back to dashboard', to: '/' }}
+        secondaryAction={{ label: 'My teams', to: '/my-teams' }}
+      />
+    );
   }
 
   const profile = profileQuery.data;

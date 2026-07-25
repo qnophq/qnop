@@ -20,13 +20,17 @@
  */
 
 import { ErrorState } from './ErrorState';
+import { ForbiddenIllustration } from './illustrations';
 
+/** 403 - a boundary, not an accusation (issue #611). */
 export function ForbiddenPage() {
   return (
     <ErrorState
       code="403"
-      title="No access"
-      message="You don't have permission to view this area."
+      title="This binder is locked"
+      message="Your account doesn't have access to this area. If your quest leads through here, an administrator can hand you the key."
+      illustration={<ForbiddenIllustration />}
+      primaryAction={{ label: 'Back to dashboard', to: '/' }}
     />
   );
 }

@@ -22,6 +22,8 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import { MemoryRouter, Route, Routes } from 'react-router';
+import { ThemeProvider } from '@mui/material/styles';
+import { buildTheme } from '../../theme/theme';
 import { useDocumentBySlug } from '../../api/hooks/useDocuments';
 import { ReviewParamGate } from './ReviewParamGate';
 import { useReviewDocumentId } from './reviewDocumentId';
@@ -38,18 +40,20 @@ function Probe() {
 
 function renderGate(segment: string) {
   render(
-    <MemoryRouter initialEntries={[`/reviews/${segment}`]}>
-      <Routes>
-        <Route
-          path="/reviews/:documentId"
-          element={
-            <ReviewParamGate>
-              <Probe />
-            </ReviewParamGate>
-          }
-        />
-      </Routes>
-    </MemoryRouter>,
+    <ThemeProvider theme={buildTheme('light')}>
+      <MemoryRouter initialEntries={[`/reviews/${segment}`]}>
+        <Routes>
+          <Route
+            path="/reviews/:documentId"
+            element={
+              <ReviewParamGate>
+                <Probe />
+              </ReviewParamGate>
+            }
+          />
+        </Routes>
+      </MemoryRouter>
+    </ThemeProvider>,
   );
 }
 
@@ -93,7 +97,11 @@ describe('ReviewParamGate', () => {
       data: undefined,
     } as never);
     renderGate('no-such-review');
-    expect(screen.getByText('Review not found')).toBeInTheDocument();
+    expect(screen.getByText(/folded itself into a paper plane/)).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Back to reviews' })).toHaveAttribute(
+      'href',
+      '/reviews',
+    );
     expect(screen.getByRole('link', { name: 'Back to reviews' })).toHaveAttribute(
       'href',
       '/reviews',

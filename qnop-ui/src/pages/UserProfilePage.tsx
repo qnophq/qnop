@@ -19,7 +19,6 @@
  * SPDX-License-Identifier: AGPL-3.0-only
  */
 
-import Alert from '@mui/material/Alert';
 import Box from '@mui/material/Box';
 import Chip from '@mui/material/Chip';
 import Paper from '@mui/material/Paper';
@@ -56,6 +55,8 @@ import {
   sharedReviewsWith,
 } from '../components/profile/profileModel';
 import { UserAvatar } from '../components/shell/UserAvatar';
+import { ErrorState } from './errors/ErrorState';
+import { NotFoundIllustration } from './errors/illustrations';
 
 const SINCE_FORMAT = new Intl.DateTimeFormat('en-US', { month: 'long', year: 'numeric' });
 
@@ -137,7 +138,17 @@ export function UserProfilePage() {
     );
   }
   if (profileQuery.isError || !profileQuery.data) {
-    return <Alert severity="error">This user does not exist.</Alert>;
+    // The branded not-found shell (issue #611); unknown and inaccessible
+    // slugs read identically (anti-enumeration, as on the server).
+    return (
+      <ErrorState
+        code="404"
+        title="This player card went for a walk"
+        message="No profile answers to this address — the link may be outdated. The rest of the roster is right where you left it."
+        illustration={<NotFoundIllustration />}
+        primaryAction={{ label: 'Back to dashboard', to: '/' }}
+      />
+    );
   }
 
   const profile = profileQuery.data;

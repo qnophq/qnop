@@ -144,6 +144,7 @@ describe('TeamProfilePage (#586)', () => {
     );
     renderPage('/teams/ghost-team');
 
-    expect(await screen.findByText('This team does not exist.')).toBeInTheDocument();
+    expect(await screen.findByText('This team packed up its crest')).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Back to dashboard' })).toBeInTheDocument();
   });
 });
