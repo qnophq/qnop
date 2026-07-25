@@ -54,13 +54,28 @@ public class SchedulerJobBinding {
       ReviewPurgeService reviewPurge) {
     scheduler.register(
         SchedulerJobCatalog.EMAIL_VERIFICATION_TOKEN_SWEEP,
-        dryRun -> emailVerificationTokens.sweepOnce());
+        dryRun -> {
+          emailVerificationTokens.sweepOnce();
+          return null;
+        });
     scheduler.register(
-        SchedulerJobCatalog.PASSWORD_RESET_TOKEN_SWEEP, dryRun -> passwordResetTokens.sweepOnce());
+        SchedulerJobCatalog.PASSWORD_RESET_TOKEN_SWEEP,
+        dryRun -> {
+          passwordResetTokens.sweepOnce();
+          return null;
+        });
     scheduler.register(
-        SchedulerJobCatalog.REFRESH_TOKEN_SWEEP, dryRun -> refreshTokens.sweepExpiredOnce());
+        SchedulerJobCatalog.REFRESH_TOKEN_SWEEP,
+        dryRun -> {
+          refreshTokens.sweepExpiredOnce();
+          return null;
+        });
     scheduler.register(
-        SchedulerJobCatalog.REVOKED_TOKEN_SWEEP, dryRun -> revokedTokens.sweepExpiredOnce());
+        SchedulerJobCatalog.REVOKED_TOKEN_SWEEP,
+        dryRun -> {
+          revokedTokens.sweepExpiredOnce();
+          return null;
+        });
     scheduler.register(SchedulerJobCatalog.STORAGE_ORPHAN_REAPER, storage::reapOrphansOnce);
     scheduler.register(SchedulerJobCatalog.REVIEW_ARCHIVE, reviewArchive::archiveOnce);
     scheduler.register(SchedulerJobCatalog.REVIEW_PURGE, reviewPurge::purgeOnce);

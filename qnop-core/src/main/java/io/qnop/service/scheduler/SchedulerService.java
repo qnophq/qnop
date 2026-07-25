@@ -228,23 +228,32 @@ public class SchedulerService {
       return RunOutcome.SKIPPED_DISABLED;
     }
     boolean dryRun = state.dryRun() && supportsDryRun(jobId);
+    String summary;
     try {
       if (isSelfTransactional(jobId)) {
         // The job commits in independent units of its own choosing (issue #577), so it must NOT run
         // inside the gate's transaction: an enclosing transaction would defer every one of those
         // commits to the end of the run and defeat the point. The outcome is still recorded in its
         // own transaction below, exactly as for a wrapped job.
-        work.run(dryRun);
+        summary = work.run(dryRun);
       } else {
-        tx.executeWithoutResult(status -> work.run(dryRun));
+        summary = tx.execute(status -> work.run(dryRun));
       }
     } catch (RuntimeException e) {
       log.error("Scheduler job {} ({}) failed", jobId, trigger, e);
-      recordOutcome(jobId, RunOutcome.FAILURE, trigger, summarize(e), actorId);
+      recordOutcome(jobId, RunOutcome.FAILURE, trigger, summarize(e), dryRun, actorId);
       return RunOutcome.FAILURE;
     }
-    recordOutcome(jobId, RunOutcome.SUCCESS, trigger, dryRun ? "dry-run" : null, actorId);
+    // The job's own summary becomes the dashboard's last-run detail; a job with
+    // nothing to say still leaves a marker for a dry run.
+    String detail = summary != null ? clamp(summary) : (dryRun ? "Dry run" : null);
+    recordOutcome(jobId, RunOutcome.SUCCESS, trigger, detail, dryRun, actorId);
     return RunOutcome.SUCCESS;
+  }
+
+  /** Clamps a job-supplied summary to the {@code last_detail} column, like {@link #summarize}. */
+  private static String clamp(String detail) {
+    return detail.length() <= MAX_DETAIL_LENGTH ? detail : detail.substring(0, MAX_DETAIL_LENGTH);
   }
 
   /**
@@ -277,7 +286,12 @@ public class SchedulerService {
    * logged but never masks the run itself.
    */
   private void recordOutcome(
-      String jobId, RunOutcome outcome, RunTrigger trigger, String detail, UUID actorId) {
+      String jobId,
+      RunOutcome outcome,
+      RunTrigger trigger,
+      String detail,
+      boolean dryRun,
+      UUID actorId) {
     try {
       tx.executeWithoutResult(
           status -> {
@@ -296,7 +310,7 @@ public class SchedulerService {
                           + "\",\"outcome\":\""
                           + outcome.name()
                           + "\",\"dryRun\":"
-                          + "dry-run".equals(detail)
+                          + dryRun
                           + "}"));
             }
           });

@@ -84,6 +84,18 @@ describe('SchedulerJobCard', () => {
     expect(screen.getByText('IllegalStateException: boom')).toBeTruthy();
   });
 
+  it('surfaces the run summary for a successful run too (#577 follow-up)', () => {
+    renderCard({
+      ...BASE,
+      lastOutcome: 'SUCCESS',
+      lastRunAt: '2026-01-01T00:00:00Z',
+      lastDetail: 'Would purge 2 review(s) and 2 storage object(s); nothing was changed',
+    });
+    expect(
+      screen.getByText('— Would purge 2 review(s) and 2 storage object(s); nothing was changed'),
+    ).toBeTruthy();
+  });
+
   it('shows "Never run" when the job has no history', () => {
     renderCard(BASE);
     expect(screen.getByText('Never run')).toBeTruthy();

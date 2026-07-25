@@ -146,16 +146,15 @@ public class ReviewPurgeService {
    * self-transactional), so this method opens one transaction per review. In {@code dryRun} mode it
    * reports what it would destroy and changes nothing at all.
    */
-  public void purgeOnce(boolean dryRun) {
+  public String purgeOnce(boolean dryRun) {
     int retentionDays = settings.getInteger(ApplicationSettingKey.REVIEW_PURGE_ARCHIVED_AFTER_DAYS);
     if (retentionDays <= 0) {
       log.info("Review purging is disabled (review.purge_archived_after_days={}).", retentionDays);
-      return;
+      return "Purging is disabled (review.purge_archived_after_days=" + retentionDays + ")";
     }
     Instant cutoff = Instant.now().minus(Duration.ofDays(retentionDays));
     if (dryRun) {
-      reportDryRun(cutoff);
-      return;
+      return reportDryRun(cutoff);
     }
 
     List<UUID> eligible =
@@ -165,7 +164,7 @@ public class ReviewPurgeService {
                     .map(Document::getId)
                     .toList());
     if (eligible == null || eligible.isEmpty()) {
-      return;
+      return "No reviews eligible to purge";
     }
 
     List<PurgedReview> purged = new ArrayList<>();
@@ -183,7 +182,7 @@ public class ReviewPurgeService {
     }
 
     if (purged.isEmpty()) {
-      return;
+      return "No reviews eligible to purge";
     }
     auditRun(purged, objectsDeleted);
     log.info(
@@ -191,6 +190,7 @@ public class ReviewPurgeService {
         purged.size(),
         cutoff,
         objectsDeleted);
+    return "Purged " + purged.size() + " review(s) and " + objectsDeleted + " storage object(s)";
   }
 
   /**
@@ -260,7 +260,7 @@ public class ReviewPurgeService {
   /**
    * Logs what a real run would destroy: reviews, and the objects that would become unreferenced.
    */
-  private void reportDryRun(Instant cutoff) {
+  private String reportDryRun(Instant cutoff) {
     DryRunReport report =
         tx.execute(
             status -> {
@@ -283,6 +283,11 @@ public class ReviewPurgeService {
         result.reviews(),
         cutoff,
         result.storageObjects());
+    return "Would purge "
+        + result.reviews()
+        + " review(s) and "
+        + result.storageObjects()
+        + " storage object(s); nothing was changed";
   }
 
   /**

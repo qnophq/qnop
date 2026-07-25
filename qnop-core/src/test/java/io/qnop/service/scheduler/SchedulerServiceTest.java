@@ -85,7 +85,12 @@ class SchedulerServiceTest {
     SchedulerJob job = SchedulerJob.seed(TOKEN_JOB, true);
     when(jobs.findById(TOKEN_JOB)).thenReturn(Optional.of(job));
     AtomicInteger runs = new AtomicInteger();
-    scheduler.register(TOKEN_JOB, dryRun -> runs.incrementAndGet());
+    scheduler.register(
+        TOKEN_JOB,
+        dryRun -> {
+          runs.incrementAndGet();
+          return null;
+        });
 
     RunOutcome outcome = scheduler.runScheduled(TOKEN_JOB);
 
@@ -104,13 +109,44 @@ class SchedulerServiceTest {
     job.updateSettings(false, null);
     when(jobs.findById(TOKEN_JOB)).thenReturn(Optional.of(job));
     AtomicInteger runs = new AtomicInteger();
-    scheduler.register(TOKEN_JOB, dryRun -> runs.incrementAndGet());
+    scheduler.register(
+        TOKEN_JOB,
+        dryRun -> {
+          runs.incrementAndGet();
+          return null;
+        });
 
     RunOutcome outcome = scheduler.runScheduled(TOKEN_JOB);
 
     assertThat(outcome).isEqualTo(RunOutcome.SKIPPED_DISABLED);
     assertThat(runs).hasValue(0);
     verify(jobs, never()).save(any());
+  }
+
+  @Test
+  @DisplayName("the work's summary is recorded as the run's detail (#577 follow-up)")
+  void workSummaryBecomesLastDetail() {
+    SchedulerJob job = SchedulerJob.seed(TOKEN_JOB, true);
+    when(jobs.findById(TOKEN_JOB)).thenReturn(Optional.of(job));
+    scheduler.register(TOKEN_JOB, dryRun -> "Purged 2 review(s) and 1 storage object(s)");
+
+    RunOutcome outcome = scheduler.runScheduled(TOKEN_JOB);
+
+    assertThat(outcome).isEqualTo(RunOutcome.SUCCESS);
+    assertThat(job.getLastDetail()).isEqualTo("Purged 2 review(s) and 1 storage object(s)");
+  }
+
+  @Test
+  @DisplayName("a summary-less dry run still leaves a marker as the detail")
+  void summarylessDryRunLeavesMarker() {
+    SchedulerJob job = SchedulerJob.seed(REAPER_JOB, true);
+    job.updateSettings(null, true);
+    when(jobs.findById(REAPER_JOB)).thenReturn(Optional.of(job));
+    scheduler.register(REAPER_JOB, dryRun -> null);
+
+    scheduler.runScheduled(REAPER_JOB);
+
+    assertThat(job.getLastDetail()).isEqualTo("Dry run");
   }
 
   @Test
@@ -138,7 +174,12 @@ class SchedulerServiceTest {
         .thenThrow(new RuntimeException("db down"))
         .thenReturn(Optional.empty()); // recordOutcome's own read
     AtomicInteger runs = new AtomicInteger();
-    scheduler.register(TOKEN_JOB, dryRun -> runs.incrementAndGet());
+    scheduler.register(
+        TOKEN_JOB,
+        dryRun -> {
+          runs.incrementAndGet();
+          return null;
+        });
 
     RunOutcome outcome = scheduler.runScheduled(TOKEN_JOB);
 
@@ -155,7 +196,12 @@ class SchedulerServiceTest {
     SimpleLock lock = org.mockito.Mockito.mock(SimpleLock.class);
     when(lockProvider.lock(any())).thenReturn(Optional.of(lock));
     AtomicInteger runs = new AtomicInteger();
-    scheduler.register(TOKEN_JOB, dryRun -> runs.incrementAndGet());
+    scheduler.register(
+        TOKEN_JOB,
+        dryRun -> {
+          runs.incrementAndGet();
+          return null;
+        });
     UUID actor = UUID.randomUUID();
 
     SchedulerService.SchedulerJobView view = scheduler.runNow(actor, TOKEN_JOB);
@@ -246,7 +292,12 @@ class SchedulerServiceTest {
   void disabledByDefaultJobIsSkippedWhenUnseeded() {
     when(jobs.findById(PURGE_JOB)).thenReturn(Optional.empty());
     AtomicInteger runs = new AtomicInteger();
-    scheduler.register(PURGE_JOB, dryRun -> runs.incrementAndGet());
+    scheduler.register(
+        PURGE_JOB,
+        dryRun -> {
+          runs.incrementAndGet();
+          return null;
+        });
 
     RunOutcome outcome = scheduler.runScheduled(PURGE_JOB);
 
@@ -261,7 +312,12 @@ class SchedulerServiceTest {
   void failOpenRespectsDisabledByDefault() {
     when(jobs.findById(PURGE_JOB)).thenThrow(new IllegalStateException("scheduler_job unreadable"));
     AtomicInteger runs = new AtomicInteger();
-    scheduler.register(PURGE_JOB, dryRun -> runs.incrementAndGet());
+    scheduler.register(
+        PURGE_JOB,
+        dryRun -> {
+          runs.incrementAndGet();
+          return null;
+        });
 
     assertThat(scheduler.runScheduled(PURGE_JOB)).isEqualTo(RunOutcome.SKIPPED_DISABLED);
     assertThat(runs).hasValue(0);
@@ -273,7 +329,12 @@ class SchedulerServiceTest {
     when(jobs.findById(PURGE_JOB)).thenReturn(Optional.empty());
     when(jobs.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
     AtomicInteger runs = new AtomicInteger();
-    scheduler.register(PURGE_JOB, dryRun -> runs.incrementAndGet());
+    scheduler.register(
+        PURGE_JOB,
+        dryRun -> {
+          runs.incrementAndGet();
+          return null;
+        });
 
     SchedulerService.SchedulerJobView enabled =
         scheduler.updateSettings(UUID.randomUUID(), PURGE_JOB, true, null);
@@ -289,8 +350,8 @@ class SchedulerServiceTest {
   void selfTransactionalJobIsNotWrapped() {
     when(jobs.findById(TOKEN_JOB)).thenReturn(Optional.of(SchedulerJob.seed(TOKEN_JOB, true)));
     when(jobs.findById(PURGE_JOB)).thenReturn(Optional.of(SchedulerJob.seed(PURGE_JOB, true)));
-    scheduler.register(TOKEN_JOB, dryRun -> {});
-    scheduler.register(PURGE_JOB, dryRun -> {});
+    scheduler.register(TOKEN_JOB, dryRun -> null);
+    scheduler.register(PURGE_JOB, dryRun -> null);
 
     scheduler.runScheduled(TOKEN_JOB);
     // A wrapped job costs three transactions: read state, run work, record outcome.

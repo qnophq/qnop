@@ -23,11 +23,19 @@ package io.qnop.service.scheduler;
 /**
  * The unit of work a maintenance job performs, registered with {@link SchedulerService} by the
  * owning service (issue #524, ADR-0045). It is called <em>inside</em> a fresh transaction the
- * scheduler owns, so implementations do their raw repository work and need no transaction of their
- * own. The {@code dryRun} flag is honoured only by dry-run-capable jobs (the storage reaper); the
+ * scheduler owns (unless the job is self-transactional, issue #577), so implementations do their
+ * raw repository work and need no transaction of their own. The {@code dryRun} flag is honoured
+ * only by dry-run-capable jobs (the storage reaper, the review archive and the review purge); the
  * token sweeps ignore it.
  */
 @FunctionalInterface
 public interface SchedulerWork {
-  void run(boolean dryRun);
+
+  /**
+   * Performs one run and returns a short human-readable summary of what happened (or, under {@code
+   * dryRun}, what would have happened) — e.g. {@code "Purged 2 review(s) and 1 storage object(s)"}.
+   * The scheduler records it as the job's last-run detail, surfaced on the dashboard (issue #577
+   * follow-up). {@code null} means the job has nothing to report.
+   */
+  String run(boolean dryRun);
 }

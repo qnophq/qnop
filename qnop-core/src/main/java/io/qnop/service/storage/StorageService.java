@@ -194,23 +194,24 @@ public class StorageService {
    * {@code dryRun} mode it counts what would be deleted but deletes nothing — a safe operator
    * probe.
    */
-  public void reapOrphansOnce(boolean dryRun) {
+  public String reapOrphansOnce(boolean dryRun) {
     Instant cutoff = Instant.now().minus(properties.reaperGracePeriod());
     List<StorageObject> orphans =
         repository.findByStatusAndCreatedAtBefore(StorageObjectStatus.PENDING, cutoff);
     if (orphans.isEmpty()) {
-      return;
+      return "No orphaned uploads to reap";
     }
     if (dryRun) {
       log.info(
           "Storage orphan reaper (dry-run) would delete {} uncommitted object(s).", orphans.size());
-      return;
+      return "Would delete " + orphans.size() + " uncommitted object(s); nothing was changed";
     }
     for (StorageObject orphan : orphans) {
       provider.delete(orphan.getObjectKey());
       repository.delete(orphan);
     }
     log.info("Storage orphan reaper deleted {} uncommitted object(s).", orphans.size());
+    return "Deleted " + orphans.size() + " uncommitted object(s)";
   }
 
   /**

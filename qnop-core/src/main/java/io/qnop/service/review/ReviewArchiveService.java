@@ -102,11 +102,11 @@ public class ReviewArchiveService {
    * retention window are flagged archived (bounded batch). A retention of {@code 0} disables
    * auto-archiving. In {@code dryRun} mode it counts what it would archive but changes nothing.
    */
-  public void archiveOnce(boolean dryRun) {
+  public String archiveOnce(boolean dryRun) {
     int retentionDays = settings.getInteger(ApplicationSettingKey.REVIEW_ARCHIVE_AFTER_DAYS);
     if (retentionDays <= 0) {
       log.info("Review auto-archive is disabled (review.archive_after_days={}).", retentionDays);
-      return;
+      return "Auto-archiving is disabled (review.archive_after_days=" + retentionDays + ")";
     }
     Instant cutoff = Instant.now().minus(Duration.ofDays(retentionDays));
     if (dryRun) {
@@ -115,12 +115,12 @@ public class ReviewArchiveService {
           "Review auto-archive dry-run: would archive {} review(s) closed before {}.",
           count,
           cutoff);
-      return;
+      return "Would archive " + count + " review(s); nothing was changed";
     }
     List<Document> eligible =
         documents.findByArchivedAtIsNullAndClosedAtBefore(cutoff, PageRequest.of(0, MAX_PER_RUN));
     if (eligible.isEmpty()) {
-      return;
+      return "No reviews eligible to archive";
     }
     Instant now = Instant.now();
     for (Document document : eligible) {
@@ -131,6 +131,7 @@ public class ReviewArchiveService {
     documents.saveAll(eligible);
     log.info(
         "Review auto-archive: archived {} review(s) closed before {}.", eligible.size(), cutoff);
+    return "Archived " + eligible.size() + " review(s)";
   }
 
   /**

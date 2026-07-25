@@ -127,13 +127,18 @@ export function SchedulerJobCard({
                 {formatRelative(job.lastRunAt)}
               </Typography>
             )}
-            {job.lastOutcome === 'FAILURE' && job.lastDetail && (
+            {job.lastDetail && (
+              // The run's own report (issue #577 follow-up): an error summary in
+              // red mono, a success summary ("Purged 2 review(s)…") as prose.
               <Typography
-                color="error.main"
-                sx={{ fontSize: 12.5, fontFamily: 'ui-monospace, monospace' }}
+                color={job.lastOutcome === 'FAILURE' ? 'error.main' : 'text.secondary'}
+                sx={{
+                  fontSize: 12.5,
+                  fontFamily: job.lastOutcome === 'FAILURE' ? 'ui-monospace, monospace' : undefined,
+                }}
                 title={job.lastDetail}
               >
-                {job.lastDetail}
+                {job.lastOutcome === 'FAILURE' ? job.lastDetail : `— ${job.lastDetail}`}
               </Typography>
             )}
           </Stack>
