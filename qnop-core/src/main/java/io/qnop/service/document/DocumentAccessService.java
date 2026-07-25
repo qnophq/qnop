@@ -102,7 +102,8 @@ public class DocumentAccessService {
         latest.map(DocumentVersion::getVersionNumber).orElse(0),
         document.getCreatedAt(),
         document.getUpdatedAt(),
-        document.getDueAt());
+        document.getDueAt(),
+        document.getArchivedAt());
   }
 
   /**
@@ -241,7 +242,8 @@ public class DocumentAccessService {
       int latestVersionNumber,
       Instant createdAt,
       Instant updatedAt,
-      Instant dueAt) {}
+      Instant dueAt,
+      Instant archivedAt) {}
 
   /** Entity-free version metadata for the web layer. */
   public record DocumentVersionView(

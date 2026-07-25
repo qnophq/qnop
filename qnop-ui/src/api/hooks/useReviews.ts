@@ -37,6 +37,8 @@ import { documentKeys } from './useDocuments';
 export interface ReviewListParams {
   q?: string;
   sort?: string;
+  /** When true, return only archived reviews (the "Archived" view); default excludes them (#576). */
+  scope?: 'active' | 'archived' | 'all';
   page: number;
   size: number;
 }
@@ -58,6 +60,7 @@ export function useReviews(params: ReviewListParams) {
       const response = await documentsApi.listDocuments({
         q: params.q || undefined,
         sort: params.sort,
+        scope: params.scope,
         page: params.page,
         size: params.size,
       });
@@ -170,6 +173,28 @@ export function useTransitionWorkflow(documentId: string) {
       queryClient.invalidateQueries({ queryKey: commentKeys.all });
     },
   });
+}
+
+/**
+ * Manually archives (owner/admin) a closed review out of the active lists, or
+ * restores it (issue #576). Invalidates the review lists and this review's detail
+ * so the badge and the Archived facet reflect the change.
+ */
+export function useArchiveReview(documentId: string) {
+  const queryClient = useQueryClient();
+  const invalidate = () => {
+    queryClient.invalidateQueries({ queryKey: documentKeys.detail(documentId) });
+    queryClient.invalidateQueries({ queryKey: reviewKeys.all });
+  };
+  const archive = useMutation({
+    mutationFn: async () => (await documentsApi.archiveDocument({ documentId })).data,
+    onSuccess: invalidate,
+  });
+  const unarchive = useMutation({
+    mutationFn: async () => (await documentsApi.unarchiveDocument({ documentId })).data,
+    onSuccess: invalidate,
+  });
+  return { archive, unarchive };
 }
 
 export interface UploadResult {

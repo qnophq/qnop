@@ -90,6 +90,24 @@ public class Document {
   private Instant dueAt;
 
   /**
+   * The instant the review reached a terminal state (FINALIZED/CANCELLED), or {@code null} while
+   * still open (issue #576). Set once by the workflow service on the terminal transition; it is the
+   * cheap "closed since" predicate the auto-archive sweep needs (the audit trail is too expensive
+   * to consult per row).
+   */
+  @Column(name = "closed_at")
+  private Instant closedAt;
+
+  /**
+   * The instant the review was archived out of the active lists (issue #576), or {@code null} when
+   * not archived. Set by the {@code reviewArchive} scheduler job once a review has been closed
+   * longer than the retention window, or by a manual owner/admin archive; archiving is an
+   * orthogonal retention flag on a closed review, not a workflow state (ADR-0011 amendment).
+   */
+  @Column(name = "archived_at")
+  private Instant archivedAt;
+
+  /**
    * Optional friendly URL slug (issue #411): kebab-case, globally unique case-insensitively, never
    * UUID-shaped — the format and uniqueness are pinned in Liquibase; normalisation and the
    * UUID-shape guard live in the service.
@@ -207,6 +225,28 @@ public class Document {
   /** Sets or clears ({@code null}) the optional completion deadline (issue #295). */
   public void setDueAt(Instant dueAt) {
     this.dueAt = dueAt;
+  }
+
+  /** The instant the review became FINALIZED/CANCELLED, or {@code null} while open (issue #576). */
+  public Instant getClosedAt() {
+    return closedAt;
+  }
+
+  /** Set once by the workflow service on the terminal transition (issue #576). */
+  public void setClosedAt(Instant closedAt) {
+    this.closedAt = closedAt;
+  }
+
+  /** The instant the review was archived, or {@code null} when not archived (issue #576). */
+  public Instant getArchivedAt() {
+    return archivedAt;
+  }
+
+  /**
+   * Sets ({@code now}) or clears ({@code null}, i.e. unarchive) the archived marker (issue #576).
+   */
+  public void setArchivedAt(Instant archivedAt) {
+    this.archivedAt = archivedAt;
   }
 
   @Override

@@ -140,7 +140,12 @@ public enum ApplicationSettingKey {
       "review.finalize_with_open_annotations",
       SettingValueType.BOOLEAN,
       "false",
-      "Let the review be finalized while annotations are still open; they are closed automatically with a standard comment.");
+      "Let the review be finalized while annotations are still open; they are closed automatically with a standard comment."),
+  REVIEW_ARCHIVE_AFTER_DAYS(
+      "review.archive_after_days",
+      SettingValueType.INTEGER,
+      "90",
+      "Days a completed review stays before it is archived out of the active lists (0 disables auto-archiving).");
 
   private static final Map<String, ApplicationSettingKey> BY_KEY =
       Arrays.stream(values())
@@ -159,6 +164,8 @@ public enum ApplicationSettingKey {
           // default 55) so the service's clean 413 always fires first.
           UPLOAD_ATTACHMENT_MAX_FILE_SIZE_MB, SettingConstraints.range(1, 50),
           AUTH_PASSWORD_RESET_TOKEN_TTL_MINUTES, SettingConstraints.range(1, 1440),
+          // 0 disables auto-archiving; the upper bound (~10 years) is a sanity cap.
+          REVIEW_ARCHIVE_AFTER_DAYS, SettingConstraints.range(0, 3650),
           SMTP_PORT, SettingConstraints.range(1, 65535),
           SMTP_FROM, SettingConstraints.format(SettingConstraints.ValueFormat.EMAIL),
           GENERAL_BASE_URL, SettingConstraints.format(SettingConstraints.ValueFormat.URL),

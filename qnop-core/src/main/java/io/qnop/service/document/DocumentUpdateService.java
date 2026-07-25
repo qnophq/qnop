@@ -100,7 +100,8 @@ public class DocumentUpdateService {
         latest.map(DocumentVersion::getVersionNumber).orElse(0),
         document.getCreatedAt(),
         document.getUpdatedAt(),
-        document.getDueAt());
+        document.getDueAt(),
+        document.getArchivedAt());
   }
 
   private Document requireOwned(UUID documentId, UUID actor, boolean admin) {

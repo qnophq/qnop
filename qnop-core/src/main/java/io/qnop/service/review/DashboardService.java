@@ -139,9 +139,12 @@ public class DashboardService {
 
   @Transactional(readOnly = true)
   public DashboardView overview(UUID actor) {
+    // Active reviews only — archived ones are closed records and stay out of the
+    // counts/rails (issue #576).
     List<Document> visible =
         documents
-            .findVisibleTo(actor, null, PageRequest.of(0, MAX_DOCUMENTS, Sort.by("updatedAt")))
+            .findVisibleTo(
+                actor, null, true, false, PageRequest.of(0, MAX_DOCUMENTS, Sort.by("updatedAt")))
             .getContent();
     if (visible.isEmpty()) {
       return new DashboardView(List.of(), List.of(), 0);

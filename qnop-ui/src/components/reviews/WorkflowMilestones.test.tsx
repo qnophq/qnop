@@ -102,4 +102,20 @@ describe('WorkflowMilestones', () => {
     expect(screen.queryByTestId('workflow-milestones')).toBeNull();
     expect(screen.getByText('Legal hold')).toBeInTheDocument();
   });
+
+  it('retires the path for an archived review, keeping the terminal outcome', () => {
+    // Archiving is a flag, not a state (issue #576): the track would otherwise
+    // re-run its celebratory FINALIZED arrival for what is now a record.
+    renderStrip({ state: 'FINALIZED', archivedAt: '2026-01-04T10:00:00Z' });
+
+    expect(screen.queryByTestId('workflow-milestones')).toBeNull();
+    expect(screen.getByText('Archived · Finalized')).toBeInTheDocument();
+  });
+
+  it('retires the path for an archived cancelled review too', () => {
+    renderStrip({ state: 'CANCELLED', archivedAt: '2026-01-04T10:00:00Z', total: 4, resolved: 1 });
+
+    expect(screen.queryByTestId('workflow-milestones')).toBeNull();
+    expect(screen.getByText('Archived · Cancelled')).toBeInTheDocument();
+  });
 });

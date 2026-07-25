@@ -33,6 +33,8 @@ interface WorkflowMilestonesProps {
   /** Annotation counts feeding the live stage's progress; omit when unknown. */
   total?: number;
   resolved?: number;
+  /** When set, the review is an archived record (issue #576) and the path is retired. */
+  archivedAt?: string | null;
 }
 
 const DOT = 9;
@@ -46,10 +48,24 @@ const DOT = 9;
  * informational — reviewers and owners read the same path. The pulse on the
  * live stage is compositor-only and stops under prefers-reduced-motion;
  * unknown (enterprise) states render the plain badge instead of guessing.
+ *
+ * <p>An archived review (issue #576) retires the path deliberately: archiving is
+ * an orthogonal retention flag, so `state` still reads FINALIZED/CANCELLED and
+ * the track would otherwise re-run its celebratory arrival for what is now a
+ * record. It falls back to the flat neutral "Archived · <outcome>" badge, which
+ * carries the terminal outcome without implying live work.
  */
-export function WorkflowMilestones({ state, total = 0, resolved = 0 }: WorkflowMilestonesProps) {
+export function WorkflowMilestones({
+  state,
+  total = 0,
+  resolved = 0,
+  archivedAt,
+}: WorkflowMilestonesProps) {
   const theme = useTheme();
   const position = milestoneIndex(state);
+  if (archivedAt) {
+    return <WorkflowBadge state={state} archivedAt={archivedAt} />;
+  }
   if (position === null) {
     return <WorkflowBadge state={state} />;
   }

@@ -22,6 +22,7 @@ package io.qnop.repository;
 
 import io.qnop.entity.Document;
 import jakarta.persistence.LockModeType;
+import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -58,15 +59,29 @@ public interface DocumentRepository extends JpaRepository<Document, UUID> {
    * The documents visible to a user for the reviews overview (issue #292): owned, joined as a
    * direct participant, or joined through membership in a participating team. {@code q} must be
    * passed pre-lowercased and {@code LIKE}-wrapped; {@code null} disables the title filter.
+   *
+   * <p>The two archive flags (issue #576) select the retention slice explicitly rather than through
+   * one either/or boolean, because the callers need all three combinations: the overview shows the
+   * active reviews ({@code true, false}), its Archived facet shows only the records ({@code false,
+   * true}), and global search spans both ({@code true, true}) so an archived review stays findable.
+   * Two plain booleans also keep the predicate free of a nullable parameter, which would need an
+   * explicit {@code CAST} to compare against {@code NULL} on PostgreSQL.
    */
   @Query(
       "SELECT d FROM Document d WHERE (:q IS NULL OR LOWER(d.title) LIKE :q)"
+          + " AND ((:includeActive = TRUE AND d.archivedAt IS NULL)"
+          + "   OR (:includeArchived = TRUE AND d.archivedAt IS NOT NULL))"
           + " AND (d.ownerId = :actor"
           + " OR EXISTS (SELECT 1 FROM ReviewParticipant p"
           + "   WHERE p.documentId = d.id AND p.userId = :actor)"
           + " OR EXISTS (SELECT 1 FROM ReviewParticipant pt, TeamMembership m"
           + "   WHERE pt.documentId = d.id AND pt.teamId = m.teamId AND m.userId = :actor))")
-  Page<Document> findVisibleTo(@Param("actor") UUID actor, @Param("q") String q, Pageable pageable);
+  Page<Document> findVisibleTo(
+      @Param("actor") UUID actor,
+      @Param("q") String q,
+      @Param("includeActive") boolean includeActive,
+      @Param("includeArchived") boolean includeArchived,
+      Pageable pageable);
 
   /**
    * Reviews the given team participates in AND the actor may see (issue #586). The public team
@@ -88,4 +103,17 @@ public interface DocumentRepository extends JpaRepository<Document, UUID> {
 
   /** Reviews the user owns — ownership is structurally public, anonymous ones included (#473). */
   long countByOwnerId(UUID ownerId);
+
+  /**
+   * Closed-but-unarchived reviews whose terminal instant predates {@code cutoff} — the auto-archive
+   * sweep's eligibility set (issue #576). Bounded by {@code Pageable} so one run can never load an
+   * unbounded batch. {@code closed_at} is only ever set for FINALIZED/CANCELLED, so it doubles as
+   * the closed-state predicate.
+   */
+  List<Document> findByArchivedAtIsNullAndClosedAtBefore(Instant cutoff, Pageable pageable);
+
+  /**
+   * How many reviews the sweep would archive at {@code cutoff} — the dry-run count (issue #576).
+   */
+  long countByArchivedAtIsNullAndClosedAtBefore(Instant cutoff);
 }

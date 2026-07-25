@@ -22,7 +22,7 @@
 import Tooltip from '@mui/material/Tooltip';
 import { useTheme } from '@mui/material/styles';
 import type { LucideIcon } from 'lucide-react';
-import { Ban, Circle, CircleCheckBig, CircleDashed, CircleDot } from 'lucide-react';
+import { Archive, Ban, Circle, CircleCheckBig, CircleDashed, CircleDot } from 'lucide-react';
 import { workflowLabel } from './workflowMeta';
 
 /**
@@ -33,9 +33,36 @@ import { workflowLabel } from './workflowMeta';
  * FINALIZED as the green arrival check, CANCELLED as the red side exit,
  * DRAFT as a dashed not-yet. Unknown (enterprise) states render a neutral
  * circle. The state name travels in the tooltip and the accessible label.
+ *
+ * An archived review (issue #576) takes the muted archive box instead: global
+ * search deliberately spans archived reviews, and a record must not read as
+ * live work. The terminal outcome stays in the tooltip ("Archived · Finalized").
  */
-export function WorkflowStateIcon({ state, size = 16 }: { state: string; size?: number }) {
+export function WorkflowStateIcon({
+  state,
+  size = 16,
+  archived = false,
+}: {
+  state: string;
+  size?: number;
+  archived?: boolean;
+}) {
   const theme = useTheme();
+
+  if (archived) {
+    const archivedLabel = `Archived · ${workflowLabel(state)}`;
+    return (
+      <Tooltip title={archivedLabel} describeChild>
+        <Archive
+          size={size}
+          role="img"
+          aria-label={archivedLabel}
+          data-testid="workflow-state-icon"
+          style={{ color: theme.palette.text.disabled, flexShrink: 0 }}
+        />
+      </Tooltip>
+    );
+  }
 
   let Icon: LucideIcon;
   let color: string;

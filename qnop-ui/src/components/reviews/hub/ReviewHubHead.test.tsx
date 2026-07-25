@@ -105,6 +105,7 @@ function renderHub({
   annotations = [] as AnnotationView[],
   dueAt = null as string | null,
   workflowState = 'IN_REVIEW',
+  archivedAt = null as string | null,
 } = {}) {
   return render(
     <ReviewHubHead
@@ -116,6 +117,7 @@ function renderHub({
       annotations={annotations}
       dueAt={dueAt}
       workflowState={workflowState}
+      archivedAt={archivedAt}
       notify={notify}
       onVersionUploaded={onVersionUploaded}
     />,

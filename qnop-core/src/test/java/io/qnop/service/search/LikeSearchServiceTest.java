@@ -42,6 +42,7 @@ import io.qnop.repository.TeamRepository;
 import io.qnop.repository.UserRepository;
 import io.qnop.repository.UserTeamProjection;
 import java.lang.reflect.Field;
+import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.DisplayName;
@@ -97,7 +98,7 @@ class LikeSearchServiceTest {
     assertThat(view.comments().total()).isZero();
     assertThat(view.users().total()).isZero();
     assertThat(view.teams().total()).isZero();
-    verify(documents, never()).findVisibleTo(any(), any(), any());
+    verify(documents, never()).findVisibleTo(any(), any(), anyBoolean(), anyBoolean(), any());
     verify(users, never()).pageEnabledPrincipals(any(), any());
 
     assertThat(service.reviews(actor, "", 0, 20).items()).isEmpty();
@@ -109,7 +110,7 @@ class LikeSearchServiceTest {
   @DisplayName("quick builds the overview's LIKE pattern, caps each group and carries the totals")
   void quickFederatesWithCapsAndTotals() {
     Document document = new Document(actor, "Payment terms");
-    when(documents.findVisibleTo(eq(actor), eq("%payment%"), any()))
+    when(documents.findVisibleTo(eq(actor), eq("%payment%"), eq(true), eq(true), any()))
         .thenReturn(pageOf(List.of(document), 12));
     when(users.pageEnabledPrincipals(eq("%payment%"), any())).thenReturn(pageOf(List.of(), 0));
     when(teams.pageEnabledPrincipals(eq("%payment%"), any())).thenReturn(pageOf(List.of(), 0));
@@ -125,9 +126,31 @@ class LikeSearchServiceTest {
         .containsExactly("Payment terms");
     assertThat(view.reviews().total()).isEqualTo(12);
     ArgumentCaptor<Pageable> pageable = ArgumentCaptor.forClass(Pageable.class);
-    verify(documents).findVisibleTo(eq(actor), eq("%payment%"), pageable.capture());
+    verify(documents)
+        .findVisibleTo(eq(actor), eq("%payment%"), eq(true), eq(true), pageable.capture());
     assertThat(pageable.getValue().getPageSize()).isEqualTo(SearchService.QUICK_SIZE);
     assertThat(pageable.getValue().getPageNumber()).isZero();
+  }
+
+  @Test
+  @DisplayName("search spans both retention slices and flags an archived review as a record")
+  void searchSpansArchivedReviewsAndFlagsThem() {
+    Document active = new Document(actor, "Payment terms 2026");
+    Document archived = new Document(actor, "Payment terms 2023");
+    archived.setArchivedAt(Instant.now());
+    when(documents.findVisibleTo(eq(actor), eq("%payment%"), eq(true), eq(true), any()))
+        .thenReturn(pageOf(List.of(active, archived), 2));
+
+    SearchService.PageView<SearchService.ReviewHitView> page =
+        service.reviews(actor, "Payment", 0, 20);
+
+    // Both flags true: an archived review has left the overview but stays findable (issue #576).
+    assertThat(page.items())
+        .extracting(SearchService.ReviewHitView::title)
+        .containsExactly("Payment terms 2026", "Payment terms 2023");
+    assertThat(page.items())
+        .extracting(SearchService.ReviewHitView::archived)
+        .containsExactly(false, true);
   }
 
   @Test
@@ -152,7 +175,8 @@ class LikeSearchServiceTest {
             "Q3 report",
             AnnotationStatus.RESOLVED,
             "The clause again, later.");
-    when(documents.findVisibleTo(any(), any(), any())).thenReturn(pageOf(List.of(), 0));
+    when(documents.findVisibleTo(any(), any(), anyBoolean(), anyBoolean(), any()))
+        .thenReturn(pageOf(List.of(), 0));
     when(users.pageEnabledPrincipals(any(), any())).thenReturn(pageOf(List.of(), 0));
     when(teams.pageEnabledPrincipals(any(), any())).thenReturn(pageOf(List.of(), 0));
     when(comments.searchAnnotationOpeners(eq("%clause%"), eq(actor), eq(false), any()))
@@ -197,7 +221,8 @@ class LikeSearchServiceTest {
     when(teams.pageEnabledPrincipals(eq("%al%"), any()))
         .thenReturn(pageOf(List.of(myTeam, foreignTeam), 2));
     when(users.pageEnabledPrincipals(any(), any())).thenReturn(pageOf(List.of(), 0));
-    when(documents.findVisibleTo(any(), any(), any())).thenReturn(pageOf(List.of(), 0));
+    when(documents.findVisibleTo(any(), any(), anyBoolean(), anyBoolean(), any()))
+        .thenReturn(pageOf(List.of(), 0));
     when(comments.searchAnnotationOpeners(any(), any(), anyBoolean(), any()))
         .thenReturn(pageOf(List.of(), 0));
     when(comments.searchCommentReplies(any(), any(), anyBoolean(), any()))

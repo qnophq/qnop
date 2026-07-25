@@ -47,6 +47,7 @@ import io.qnop.service.document.DocumentAccessService.DocumentView;
 import io.qnop.service.document.DocumentOverviewService;
 import io.qnop.service.document.DocumentUpdateService;
 import io.qnop.service.document.ReviewParticipantService;
+import io.qnop.service.review.ReviewArchiveService;
 import io.qnop.service.review.ReviewVisitService;
 import java.time.Instant;
 import java.time.OffsetDateTime;
@@ -72,6 +73,7 @@ public class DocumentsController implements DocumentsApi {
   private final ReviewParticipantService participants;
   private final DocumentUpdateService updates;
   private final ReviewVisitService visits;
+  private final ReviewArchiveService archive;
 
   public DocumentsController(
       DocumentAccessService documents,
@@ -79,23 +81,30 @@ public class DocumentsController implements DocumentsApi {
       DocumentOverviewService overview,
       ReviewParticipantService participants,
       DocumentUpdateService updates,
-      ReviewVisitService visits) {
+      ReviewVisitService visits,
+      ReviewArchiveService archive) {
     this.documents = documents;
     this.diffs = diffs;
     this.overview = overview;
     this.participants = participants;
     this.updates = updates;
     this.visits = visits;
+    this.archive = archive;
   }
 
   @Override
   public ResponseEntity<DocumentListResponse> listDocuments(
-      String q, String sort, Integer page, Integer size) {
+      String q, String sort, String scope, Integer page, Integer size) {
+    // The retention slice (issue #576): active (default) / archived / all.
+    boolean includeArchived = "archived".equals(scope) || "all".equals(scope);
+    boolean includeActive = !"archived".equals(scope);
     DocumentOverviewService.DocumentPage result =
         overview.listVisible(
             CurrentUser.requireUserId(),
             q,
             sort,
+            includeActive,
+            includeArchived,
             page == null ? 0 : page,
             size == null ? 20 : size);
     return ResponseEntity.ok(
@@ -156,7 +165,8 @@ public class DocumentsController implements DocumentsApi {
         .participants(view.participants().stream().map(DocumentsController::toParticipant).toList())
         .createdAt(view.createdAt().atOffset(ZoneOffset.UTC))
         .updatedAt(view.updatedAt().atOffset(ZoneOffset.UTC))
-        .dueAt(atUtc(view.dueAt()));
+        .dueAt(atUtc(view.dueAt()))
+        .archivedAt(atUtc(view.archivedAt()));
   }
 
   /** Nullable {@link Instant} → {@link OffsetDateTime} at UTC for the wire model (#295). */
@@ -260,7 +270,28 @@ public class DocumentsController implements DocumentsApi {
         .latestVersionNumber(view.latestVersionNumber())
         .createdAt(view.createdAt().atOffset(ZoneOffset.UTC))
         .updatedAt(view.updatedAt().atOffset(ZoneOffset.UTC))
-        .dueAt(atUtc(view.dueAt()));
+        .dueAt(atUtc(view.dueAt()))
+        .archivedAt(atUtc(view.archivedAt()));
+  }
+
+  @Override
+  public ResponseEntity<DocumentResponse> archiveDocument(UUID documentId) {
+    archive.archive(documentId, CurrentUser.requireUserId(), CurrentUser.isAdmin());
+    return ResponseEntity.ok(reload(documentId));
+  }
+
+  @Override
+  public ResponseEntity<DocumentResponse> unarchiveDocument(UUID documentId) {
+    archive.unarchive(documentId, CurrentUser.requireUserId(), CurrentUser.isAdmin());
+    return ResponseEntity.ok(reload(documentId));
+  }
+
+  /**
+   * Re-reads the full review view after a mutation so the response carries the assembled roster.
+   */
+  private DocumentResponse reload(UUID documentId) {
+    return toResponse(
+        documents.getDocument(documentId, CurrentUser.requireUserId(), CurrentUser.isAdmin()));
   }
 
   @Override

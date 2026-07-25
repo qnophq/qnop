@@ -30,11 +30,12 @@ import Stack from '@mui/material/Stack';
 import Tooltip from '@mui/material/Tooltip';
 import Typography from '@mui/material/Typography';
 import { useTheme } from '@mui/material/styles';
-import { CalendarClock, ChevronDown, Upload, UserPlus } from 'lucide-react';
+import { Archive, CalendarClock, ChevronDown, Upload, UserPlus } from 'lucide-react';
 import type { AnnotationView } from '../../../api/generated';
 import { AnnotationStatus, ParticipantKind } from '../../../api/generated';
 import { useConfig } from '../../../api/hooks/useConfig';
 import {
+  useArchiveReview,
   useParticipants,
   useTransitionWorkflow,
   useUploadVersion,
@@ -49,7 +50,7 @@ import { avatarSrc, teamAvatarSrc } from '../../../utils/avatarUrl';
 import { TeamAvatar } from '../../shell/TeamAvatar';
 import { DueDateLabel } from '../DueDateLabel';
 import { ProgressBar } from '../list/ReviewListParts';
-import { workflowLabel } from '../workflowMeta';
+import { isOpenWorkflowState, workflowLabel } from '../workflowMeta';
 import { validateDocumentFile } from '../wizard/wizardModel';
 import { apiErrorCode, apiErrorMessage } from '../../../utils/apiError';
 import { DueDateDialog } from './DueDateDialog';
@@ -81,6 +82,8 @@ interface ReviewHubHeadProps {
   dueAt: string | null;
   /** The workflow state, so an overdue deadline is only flagged while open. */
   workflowState: string;
+  /** When the review was archived (issue #576), or null — drives the Archive/Unarchive action. */
+  archivedAt: string | null;
   notify: Notify;
   /** Called with the new version number after a successful re-upload. */
   onVersionUploaded: (versionNumber: number) => void;
@@ -103,6 +106,7 @@ export function ReviewHubHead({
   annotations,
   dueAt,
   workflowState,
+  archivedAt,
   notify,
   onVersionUploaded,
 }: ReviewHubHeadProps) {
@@ -117,6 +121,10 @@ export function ReviewHubHead({
   const participantsQuery = useParticipants(documentId);
   const workflowQuery = useWorkflow(documentId);
   const transition = useTransitionWorkflow(documentId);
+  const { archive, unarchive } = useArchiveReview(documentId);
+  // A closed review (FINALIZED/CANCELLED) can be archived out of the active lists,
+  // or restored if already archived (issue #576) — owner action.
+  const isClosed = !isOpenWorkflowState(workflowState);
   const uploadVersion = useUploadVersion(documentId);
 
   const participants = participantsQuery.data?.participants ?? [];
@@ -380,6 +388,29 @@ export function ReviewHubHead({
             ))}
           </Menu>
         </>
+      )}
+
+      {isOwner && isClosed && (
+        <Button
+          size="small"
+          variant="outlined"
+          color="inherit"
+          startIcon={<Archive size={14} />}
+          disabled={archive.isPending || unarchive.isPending}
+          onClick={() =>
+            archivedAt
+              ? unarchive.mutate(undefined, {
+                  onSuccess: () => notify('Review restored to the active lists.'),
+                  onError: () => notify('The review could not be unarchived.', 'error'),
+                })
+              : archive.mutate(undefined, {
+                  onSuccess: () => notify('Review archived.'),
+                  onError: () => notify('The review could not be archived.', 'error'),
+                })
+          }
+        >
+          {archivedAt ? 'Unarchive' : 'Archive'}
+        </Button>
       )}
 
       {isOwner && (

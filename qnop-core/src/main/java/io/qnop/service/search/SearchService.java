@@ -79,8 +79,12 @@ public interface SearchService {
   /** One page of hits with the standard envelope facts. */
   record PageView<T>(List<T> items, long total, int page, int size) {}
 
-  /** A review hit — a title match, a strict subset of the reviews-list row (ADR-0038). */
-  record ReviewHitView(UUID id, String slug, String title, String workflowState) {}
+  /**
+   * A review hit — a title match, a strict subset of the reviews-list row (ADR-0038). {@code
+   * archived} marks a closed record (issue #576), which search returns alongside active reviews.
+   */
+  record ReviewHitView(
+      UUID id, String slug, String title, String workflowState, boolean archived) {}
 
   /**
    * A discussion hit (ADR-0038-safe): an annotation opener or a reply from a thread the caller may

@@ -124,7 +124,7 @@ export function ReviewsTable({ reviews, userId, onOpen }: ReviewsTableProps) {
                       useFlexGap
                       sx={{ alignItems: 'center', flexWrap: 'wrap' }}
                     >
-                      <WorkflowBadge state={review.workflowState} />
+                      <WorkflowBadge state={review.workflowState} archivedAt={review.archivedAt} />
                       {review.anonymous && <AnonymousBadge compact />}
                       {roleOf(review, userId) === 'owner' && readyToFinalize(review) && (
                         <ToneBadge tone="green" label="Ready to finalize" />

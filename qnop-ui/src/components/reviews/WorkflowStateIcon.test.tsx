@@ -25,10 +25,10 @@ import { ThemeProvider } from '@mui/material/styles';
 import { buildTheme } from '../../theme/theme';
 import { WorkflowStateIcon } from './WorkflowStateIcon';
 
-function renderIcon(state: string) {
+function renderIcon(state: string, archived = false) {
   return render(
     <ThemeProvider theme={buildTheme('light')}>
-      <WorkflowStateIcon state={state} />
+      <WorkflowStateIcon state={state} archived={archived} />
     </ThemeProvider>,
   );
 }
@@ -50,5 +50,12 @@ describe('WorkflowStateIcon', () => {
   it('degrades an unknown (enterprise) state to a labelled neutral glyph', () => {
     renderIcon('LEGAL_HOLD');
     expect(screen.getByRole('img', { name: 'Legal hold' })).toBeInTheDocument();
+  });
+
+  it('marks an archived review as a record while keeping its terminal outcome', () => {
+    // Search spans archived reviews (issue #576), so the glyph must not read as live work.
+    renderIcon('FINALIZED', true);
+    expect(screen.getByRole('img', { name: 'Archived · Finalized' })).toBeInTheDocument();
+    expect(screen.queryByRole('img', { name: 'Finalized' })).not.toBeInTheDocument();
   });
 });

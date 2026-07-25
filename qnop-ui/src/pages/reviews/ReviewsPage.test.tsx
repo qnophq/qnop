@@ -20,7 +20,7 @@
  */
 
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { fireEvent, render, screen } from '@testing-library/react';
+import { fireEvent, render, screen, within } from '@testing-library/react';
 import { MemoryRouter, Route, Routes } from 'react-router';
 import { ThemeProvider } from '@mui/material/styles';
 import type { DocumentSummary } from '../../api/generated';
@@ -42,6 +42,7 @@ function summary(overrides: Partial<DocumentSummary>): DocumentSummary {
     id: 'doc-x',
     title: 'Untitled',
     ownerId: ME,
+    ownerDisplayName: 'Me Myself',
     workflowState: 'DRAFT',
     latestVersionNumber: 1,
     annotationCount: 0,
@@ -69,6 +70,7 @@ const REVIEWS: DocumentSummary[] = [
     id: 'doc-2',
     title: 'Architecture handbook',
     ownerId: OTHER,
+    ownerDisplayName: 'Someone Else',
     workflowState: 'DRAFT',
     updatedAt: '2026-07-01T09:00:00Z',
   }),
@@ -76,10 +78,20 @@ const REVIEWS: DocumentSummary[] = [
     id: 'doc-3',
     title: 'Final contract',
     ownerId: OTHER,
+    ownerDisplayName: 'Someone Else',
     workflowState: 'FINALIZED',
     annotationCount: 2,
     openAnnotationCount: 0,
     updatedAt: '2026-06-20T08:00:00Z',
+  }),
+  summary({
+    id: 'doc-4',
+    title: 'Old supplier terms',
+    ownerId: OTHER,
+    ownerDisplayName: 'Someone Else',
+    workflowState: 'FINALIZED',
+    archivedAt: '2026-04-01T08:00:00Z',
+    updatedAt: '2026-03-20T08:00:00Z',
   }),
 ];
 
@@ -122,9 +134,10 @@ describe('ReviewsPage', () => {
     expect(screen.getByText('Architecture handbook')).toBeInTheDocument();
     expect(screen.getByText('Final contract')).toBeInTheDocument();
     expect(screen.getAllByText('Owner').length).toBeGreaterThanOrEqual(1);
-    expect(screen.getAllByText('Reviewer')).toHaveLength(2);
+    // Three foreign-owned rows now: the draft, the closed and the archived one.
+    expect(screen.getAllByText('Reviewer')).toHaveLength(3);
     expect(screen.getByText('In review')).toBeInTheDocument();
-    expect(screen.getByText('Finalized')).toBeInTheDocument();
+    expect(screen.getAllByText('Finalized').length).toBeGreaterThanOrEqual(1);
   });
 
   it('shows resolved/total progress for reviews with annotations', () => {
@@ -139,12 +152,53 @@ describe('ReviewsPage', () => {
   it('filters by title search', () => {
     renderPage();
 
-    fireEvent.change(screen.getByPlaceholderText('Search reviews…'), {
+    fireEvent.change(screen.getByPlaceholderText('Search by title or owner…'), {
       target: { value: 'nda' },
     });
 
     expect(screen.getByText('NDA Acme Corp')).toBeInTheDocument();
     expect(screen.queryByText('Architecture handbook')).not.toBeInTheDocument();
+  });
+
+  it('spans every state at once and slices to the records via Archived (#576)', () => {
+    renderPage();
+
+    // ONE scope=all fetch backs every facet — no refetch on chip clicks.
+    expect(vi.mocked(useReviews)).toHaveBeenLastCalledWith(
+      expect.objectContaining({ scope: 'all' }),
+    );
+    // "Every state" shows active work AND the archived record together.
+    expect(screen.getByText('Every state (4)')).toBeInTheDocument();
+    expect(screen.getByText('Old supplier terms')).toBeInTheDocument();
+    expect(screen.getByText('NDA Acme Corp')).toBeInTheDocument();
+
+    fireEvent.click(screen.getByText('Archived (1)'));
+    expect(screen.getByText('Old supplier terms')).toBeInTheDocument();
+    expect(screen.queryByText('NDA Acme Corp')).not.toBeInTheDocument();
+
+    // Closed excludes the archived record — archived is its own slice.
+    fireEvent.click(screen.getByText('Closed (1)'));
+    expect(screen.getByText('Final contract')).toBeInTheDocument();
+    expect(screen.queryByText('Old supplier terms')).not.toBeInTheDocument();
+  });
+
+  it('searches by owner name and filters via the advanced menu (#576 follow-up)', () => {
+    renderPage();
+
+    // Owner-name search: every review owned by "Someone Else" (fixture OTHER).
+    fireEvent.change(screen.getByPlaceholderText('Search by title or owner…'), {
+      target: { value: 'else' },
+    });
+    expect(screen.queryByText('NDA Acme Corp')).not.toBeInTheDocument();
+    fireEvent.change(screen.getByPlaceholderText('Search by title or owner…'), {
+      target: { value: '' },
+    });
+
+    // The advanced menu: workflow-state facet narrows to Draft.
+    fireEvent.click(screen.getByLabelText('Filter reviews'));
+    fireEvent.click(within(screen.getByRole('menu')).getByText('Draft'));
+    expect(screen.getByText('Architecture handbook')).toBeInTheDocument();
+    expect(screen.queryByText('NDA Acme Corp')).not.toBeInTheDocument();
   });
 
   it('filters by role via the chip and shows counts', () => {
@@ -171,12 +225,13 @@ describe('ReviewsPage', () => {
   it('offers to clear filters when nothing matches', () => {
     renderPage();
 
-    fireEvent.change(screen.getByPlaceholderText('Search reviews…'), {
+    fireEvent.change(screen.getByPlaceholderText('Search by title or owner…'), {
       target: { value: 'does-not-exist' },
     });
     expect(screen.getByText('No reviews match your filters.')).toBeInTheDocument();
 
-    fireEvent.click(screen.getByText('Clear filters'));
+    // Both the chip-row affordance and the empty-state button offer the reset.
+    fireEvent.click(screen.getAllByText('Clear filters')[0]);
     expect(screen.getByText('NDA Acme Corp')).toBeInTheDocument();
   });
 

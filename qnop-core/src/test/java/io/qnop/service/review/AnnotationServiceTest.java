@@ -108,6 +108,7 @@ class AnnotationServiceTest {
         1,
         null,
         null,
+        null,
         null);
   }
 

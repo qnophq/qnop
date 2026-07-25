@@ -24,6 +24,7 @@ import io.qnop.service.RefreshTokenService;
 import io.qnop.service.TokenRevocationService;
 import io.qnop.service.auth.EmailVerificationTokenService;
 import io.qnop.service.auth.PasswordResetTokenService;
+import io.qnop.service.review.ReviewArchiveService;
 import io.qnop.service.storage.StorageService;
 import org.springframework.stereotype.Component;
 
@@ -45,7 +46,8 @@ public class SchedulerJobBinding {
       PasswordResetTokenService passwordResetTokens,
       RefreshTokenService refreshTokens,
       TokenRevocationService revokedTokens,
-      StorageService storage) {
+      StorageService storage,
+      ReviewArchiveService reviewArchive) {
     scheduler.register(
         SchedulerJobCatalog.EMAIL_VERIFICATION_TOKEN_SWEEP,
         dryRun -> emailVerificationTokens.sweepOnce());
@@ -56,5 +58,6 @@ public class SchedulerJobBinding {
     scheduler.register(
         SchedulerJobCatalog.REVOKED_TOKEN_SWEEP, dryRun -> revokedTokens.sweepExpiredOnce());
     scheduler.register(SchedulerJobCatalog.STORAGE_ORPHAN_REAPER, storage::reapOrphansOnce);
+    scheduler.register(SchedulerJobCatalog.REVIEW_ARCHIVE, reviewArchive::archiveOnce);
   }
 }

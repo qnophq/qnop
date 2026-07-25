@@ -42,7 +42,13 @@ vi.mock('../../../api/hooks/useSearch', () => ({
 const RESPONSE: GlobalSearchResponse = {
   reviews: {
     items: [
-      { id: 'r1', slug: 'q3-report', title: 'Q3 payment report', workflowState: 'IN_REVIEW' },
+      {
+        id: 'r1',
+        slug: 'q3-report',
+        title: 'Q3 payment report',
+        workflowState: 'IN_REVIEW',
+        archived: false,
+      },
     ],
     total: 7,
   },

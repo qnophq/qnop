@@ -68,6 +68,7 @@ export function ReviewPageHeader({
             state={document.workflowState}
             total={annotations.length}
             resolved={annotations.filter((a) => a.status !== AnnotationStatus.Open).length}
+            archivedAt={document.archivedAt ?? null}
           />
           {document.anonymous && <AnonymousBadge />}
         </>
@@ -84,6 +85,7 @@ export function ReviewPageHeader({
           annotations={annotations}
           dueAt={document.dueAt ?? null}
           workflowState={document.workflowState}
+          archivedAt={document.archivedAt ?? null}
           notify={notify}
           onVersionUploaded={onVersionUploaded}
         />
