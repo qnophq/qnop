@@ -19,19 +19,21 @@
  * SPDX-License-Identifier: AGPL-3.0-only
  */
 
+import { useNavigate } from 'react-router';
 import { ErrorState } from './ErrorState';
-import { NotFoundIllustration } from './illustrations';
+import { MaintenanceIllustration } from './illustrations';
 
-/** 404 - the page went for a walk; the user did nothing wrong (issue #611). */
-export function NotFoundPage() {
+/** 503 - the boss is patching itself; reassuring, back shortly (issue #611). */
+export function MaintenancePage() {
+  const navigate = useNavigate();
   return (
     <ErrorState
-      code="404"
-      title="This page folded itself into a paper plane"
-      message="Wherever it landed, it isn't at this address. Head back to the dashboard and pick up your quest from there."
-      illustration={<NotFoundIllustration />}
-      primaryAction={{ label: 'Back to dashboard', to: '/' }}
-      secondaryAction={{ label: 'My reviews', to: '/reviews' }}
+      code="503"
+      title="Out to lunch - back shortly"
+      message="qnop is patching itself up. Your reviews are safe in the cabinet; give it a moment and try again."
+      illustration={<MaintenanceIllustration />}
+      tone="alert"
+      primaryAction={{ label: 'Retry', onClick: () => navigate(0) }}
     />
   );
 }

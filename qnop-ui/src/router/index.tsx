@@ -53,8 +53,14 @@ import { LoginPage } from '../pages/auth/LoginPage';
 import { RegisterPage } from '../pages/auth/RegisterPage';
 import { ResetPasswordPage } from '../pages/auth/ResetPasswordPage';
 import { VerifyEmailPage } from '../pages/auth/VerifyEmailPage';
+import { ConflictPage } from '../pages/errors/ConflictPage';
 import { ForbiddenPage } from '../pages/errors/ForbiddenPage';
+import { MaintenancePage } from '../pages/errors/MaintenancePage';
 import { NotFoundPage } from '../pages/errors/NotFoundPage';
+import { OfflinePage } from '../pages/errors/OfflinePage';
+import { RateLimitPage } from '../pages/errors/RateLimitPage';
+import { RouteErrorPage } from '../pages/errors/RouteErrorPage';
+import { ServerErrorPage } from '../pages/errors/ServerErrorPage';
 import { NewReviewPage } from '../pages/reviews/NewReviewPage';
 import { ReviewsPage } from '../pages/reviews/ReviewsPage';
 import { ReviewParamGate } from '../components/reviews/ReviewParamGate';
@@ -90,7 +96,15 @@ export const router = createBrowserRouter([
   { path: '/reset-password', element: <ResetPasswordPage /> },
   { path: '/verify-email', element: <VerifyEmailPage /> },
   { path: '/change-password', element: <ChangePasswordPage /> },
+  // The branded full-page states (issue #611). They live outside the shell so
+  // 503/offline also work when nothing else does; the in-app catch-all below
+  // keeps 404 inside the shell for signed-in users.
   { path: '/403', element: <ForbiddenPage /> },
+  { path: '/409', element: <ConflictPage /> },
+  { path: '/500', element: <ServerErrorPage /> },
+  { path: '/503', element: <MaintenancePage /> },
+  { path: '/429', element: <RateLimitPage /> },
+  { path: '/offline', element: <OfflinePage /> },
   {
     path: '/',
     element: (
@@ -98,6 +112,9 @@ export const router = createBrowserRouter([
         <AppShell />
       </ProtectedRoute>
     ),
+    // A throw during navigation lands on the branded shell, not the router's
+    // default screen (issue #611); pane render errors stay with #331.
+    errorElement: <RouteErrorPage />,
     children: [
       { index: true, element: <HomePage /> },
       { path: 'profile', element: <ProfilePage /> },

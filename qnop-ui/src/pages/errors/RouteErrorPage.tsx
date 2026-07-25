@@ -19,19 +19,20 @@
  * SPDX-License-Identifier: AGPL-3.0-only
  */
 
-import { ErrorState } from './ErrorState';
-import { NotFoundIllustration } from './illustrations';
+import { isRouteErrorResponse, useRouteError } from 'react-router';
+import { NotFoundPage } from './NotFoundPage';
+import { ServerErrorPage } from './ServerErrorPage';
 
-/** 404 - the page went for a walk; the user did nothing wrong (issue #611). */
-export function NotFoundPage() {
-  return (
-    <ErrorState
-      code="404"
-      title="This page folded itself into a paper plane"
-      message="Wherever it landed, it isn't at this address. Head back to the dashboard and pick up your quest from there."
-      illustration={<NotFoundIllustration />}
-      primaryAction={{ label: 'Back to dashboard', to: '/' }}
-      secondaryAction={{ label: 'My reviews', to: '/reviews' }}
-    />
-  );
+/**
+ * The router-level catch (issue #611): a throw during navigation lands on the
+ * branded shell instead of React Router's default screen. A 404 response
+ * renders the not-found page; everything else is, honestly, a 500 of ours.
+ * Pane-level render errors stay with ErrorBoundary/BoundaryFallback (#331).
+ */
+export function RouteErrorPage() {
+  const error = useRouteError();
+  if (isRouteErrorResponse(error) && error.status === 404) {
+    return <NotFoundPage />;
+  }
+  return <ServerErrorPage />;
 }
