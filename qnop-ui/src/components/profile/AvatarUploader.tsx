@@ -49,9 +49,9 @@ interface AvatarUploaderProps {
   onRemove: () => void;
   /**
    * Whose picture this is (issue #586 follow-up): 'team' previews with the
-   * rounded-square TeamAvatar crest and crops with a rect mask, so what the
-   * upload promises is exactly what every team surface renders. Default
-   * 'user' keeps the circular person recipe.
+   * TeamAvatar (round, with the group badge), so the preview shows exactly
+   * what every team surface renders. Default 'user' previews the person
+   * avatar. Both silhouettes are circular, matching the round crop mask.
    */
   variant?: 'user' | 'team';
 }
@@ -140,9 +140,7 @@ export function AvatarUploader({
               sx={{
                 position: 'absolute',
                 inset: 0,
-                // Match the preview's silhouette: circle for people, the
-                // 30%-radius crest for teams (issue #586 follow-up).
-                borderRadius: variant === 'team' ? `${Math.round(96 * 0.3)}px` : '50%',
+                borderRadius: '50%',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
@@ -235,7 +233,6 @@ export function AvatarUploader({
 
       {cropSrc && (
         <AvatarCropDialog
-          cropShape={variant === 'team' ? 'rect' : 'round'}
           open
           imageSrc={cropSrc}
           busy={busy}
