@@ -110,14 +110,20 @@ function renderPanel(props: Partial<Parameters<typeof AnnotationPanel>[0]> = {})
     notify: vi.fn(),
   };
   const merged = { ...defaults, ...props };
-  render(
+  const wrap = (current: Parameters<typeof AnnotationPanel>[0]) => (
     <QueryClientProvider client={queryClient}>
       <ThemeProvider theme={buildTheme('light')}>
-        <AnnotationPanel {...merged} />
+        <AnnotationPanel {...current} />
       </ThemeProvider>
-    </QueryClientProvider>,
+    </QueryClientProvider>
   );
-  return merged;
+  const { rerender } = render(wrap(merged));
+  return {
+    ...merged,
+    /** Re-renders the same panel with patched props — the panel keeps its own state. */
+    update: (patch: Partial<Parameters<typeof AnnotationPanel>[0]>) =>
+      rerender(wrap({ ...merged, ...patch })),
+  };
 }
 
 describe('AnnotationPanel', () => {
@@ -239,6 +245,88 @@ describe('AnnotationPanel', () => {
       versionNumber: 3,
     });
     expect(props.onSelect).not.toHaveBeenCalled();
+  });
+
+  // Issue #548: reaching an annotation through the banner narrows the list to
+  // "needs attention" — confirming the placement then settles it out of that
+  // facet, and the expanded card the reviewer is reading must not vanish.
+  it('keeps the active annotation listed after "Looks right" settles it out of the attention facet (#548)', () => {
+    useAuthStore.setState({ userId: 'u1' });
+    const panel = renderPanel({
+      annotations: [
+        annotation('a1', { placementStatus: PlacementStatus.Moved }),
+        annotation('a2', { placementStatus: PlacementStatus.Orphaned }),
+      ],
+      activeAnnotationId: null,
+      versionNumber: 3,
+    });
+
+    // The banner's "Review" action sets the placement facet.
+    fireEvent.click(
+      within(screen.getByTestId('reanchor-banner')).getByRole('button', {
+        name: 'Review',
+      }),
+    );
+    expect(screen.getByTestId('annotation-item-a1')).toBeInTheDocument();
+
+    // The reviewer opens the moved annotation and confirms its placement; the
+    // refetch flips it MOVED → PLACED, which no longer matches "attention".
+    panel.update({ activeAnnotationId: 'a1' });
+    fireEvent.click(screen.getByRole('button', { name: 'Looks right' }));
+    panel.update({
+      activeAnnotationId: 'a1',
+      annotations: [
+        annotation('a1', { placementStatus: PlacementStatus.Placed }),
+        annotation('a2', { placementStatus: PlacementStatus.Orphaned }),
+      ],
+    });
+
+    // Still listed, still expanded — and the untouched orphan still matches.
+    expect(screen.getByTestId('annotation-item-a1')).toBeInTheDocument();
+    expect(screen.getByTestId('thread-a1')).toBeInTheDocument();
+    expect(screen.getByTestId('annotation-item-a2')).toBeInTheDocument();
+  });
+
+  it('explains the empty list when the pinned annotation is all that is left (#548)', () => {
+    useAuthStore.setState({ userId: 'u1' });
+    const panel = renderPanel({
+      annotations: [annotation('a1', { placementStatus: PlacementStatus.Moved })],
+      activeAnnotationId: null,
+      versionNumber: 3,
+    });
+
+    // Filter first, then open the annotation — the order the banner produces.
+    fireEvent.click(
+      within(screen.getByTestId('reanchor-banner')).getByRole('button', { name: 'Review' }),
+    );
+    panel.update({
+      activeAnnotationId: 'a1',
+      annotations: [annotation('a1', { placementStatus: PlacementStatus.Moved })],
+    });
+    panel.update({
+      activeAnnotationId: 'a1',
+      annotations: [annotation('a1', { placementStatus: PlacementStatus.Placed })],
+    });
+
+    expect(screen.getByTestId('annotation-item-a1')).toBeInTheDocument();
+    expect(screen.getByText(/the one you have open stays until you select another/)).toBeVisible();
+  });
+
+  it('still drops the active annotation when the reviewer re-filters themselves (#548)', () => {
+    renderPanel({
+      annotations: [
+        annotation('a1', { placementStatus: PlacementStatus.Placed }),
+        annotation('a2', { placementStatus: PlacementStatus.Orphaned }),
+      ],
+      activeAnnotationId: 'a1',
+    });
+
+    fireEvent.click(screen.getByRole('button', { name: 'Filter annotations' }));
+    fireEvent.mouseDown(screen.getByLabelText('Placement'));
+    fireEvent.click(screen.getByRole('option', { name: 'Needs attention' }));
+
+    expect(screen.queryByTestId('annotation-item-a1')).not.toBeInTheDocument();
+    expect(screen.getByTestId('annotation-item-a2')).toBeInTheDocument();
   });
 
   // Issue #562: a healthy placement offers Re-position to the author under the
