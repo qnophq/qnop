@@ -22,7 +22,7 @@
 import type { ReactNode } from 'react';
 import { describe, expect, it } from 'vitest';
 import { renderHook } from '@testing-library/react';
-import { MemoryRouter, Route, Routes } from 'react-router-dom';
+import { MemoryRouter, Route, Routes } from 'react-router';
 import { useReviewPermalink, type PermalinkView } from './useReviewPermalink';
 
 function wrapperFor(entry: string) {

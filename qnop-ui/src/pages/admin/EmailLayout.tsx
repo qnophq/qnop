@@ -22,7 +22,7 @@
 import Stack from '@mui/material/Stack';
 import Tab from '@mui/material/Tab';
 import Tabs from '@mui/material/Tabs';
-import { Link as RouterLink, Outlet, useLocation } from 'react-router-dom';
+import { Link as RouterLink, Outlet, useLocation } from 'react-router';
 import { PageHeader } from '../../components/admin/layout/PageHeader';
 
 const EMAIL_TABS = [

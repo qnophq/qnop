@@ -67,8 +67,8 @@ vi.mock('../../api/hooks/useMailTemplates', () => ({
   useSendTestEmail: () => ({ mutateAsync: vi.fn(), isPending: false }),
 }));
 
-vi.mock('react-router-dom', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('react-router-dom')>()),
+vi.mock('react-router', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('react-router')>()),
   useNavigate: () => navigateMock,
 }));
 

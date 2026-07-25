@@ -19,7 +19,7 @@
  * SPDX-License-Identifier: AGPL-3.0-only
  */
 
-import { Navigate, useParams } from 'react-router-dom';
+import { Navigate, useParams } from 'react-router';
 
 /**
  * Legacy redirect for pre-#525 bookmarks: `/admin/mail-templates/:key` →

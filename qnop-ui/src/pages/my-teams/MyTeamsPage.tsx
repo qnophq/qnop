@@ -29,7 +29,7 @@ import Tooltip from '@mui/material/Tooltip';
 import Typography from '@mui/material/Typography';
 import { keyframes } from '@mui/material/styles';
 import { ArrowRight, Crown, Eye, Lock, Trophy, UsersRound } from 'lucide-react';
-import { Link as RouterLink } from 'react-router-dom';
+import { Link as RouterLink } from 'react-router';
 import type { MyTeam } from '../../api/generated';
 import { useMyTeams } from '../../api/hooks/useMyTeams';
 import { TeamRoleBadge } from '../../components/admin/teams/TeamRoleBadge';

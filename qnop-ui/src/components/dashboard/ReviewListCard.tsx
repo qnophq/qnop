@@ -25,7 +25,7 @@ import Stack from '@mui/material/Stack';
 import Typography from '@mui/material/Typography';
 import { alpha, useTheme } from '@mui/material/styles';
 import { CircleCheck, Inbox, PartyPopper, type LucideIcon } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate } from 'react-router';
 import type { DocumentSummary } from '../../api/generated';
 import { ToneBadge } from '../admin/ToneBadge';
 import { SectionCard } from '../admin/layout/SectionCard';

@@ -21,7 +21,7 @@
 
 import { describe, expect, it } from 'vitest';
 import { render, screen } from '@testing-library/react';
-import { MemoryRouter, Route, Routes, useParams } from 'react-router-dom';
+import { MemoryRouter, Route, Routes, useParams } from 'react-router';
 import { MailTemplatesKeyRedirect } from './MailTemplatesKeyRedirect';
 
 /** Echoes the key the target route received, so the tests can assert it survived the redirect. */

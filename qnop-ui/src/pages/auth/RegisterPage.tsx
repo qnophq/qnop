@@ -32,7 +32,7 @@ import Stack from '@mui/material/Stack';
 import TextField from '@mui/material/TextField';
 import Typography from '@mui/material/Typography';
 import { ArrowRight, AtSign, Mail, User } from 'lucide-react';
-import { Link as RouterLink, Navigate } from 'react-router-dom';
+import { Link as RouterLink, Navigate } from 'react-router';
 import { AuthLayout } from '../../components/auth/AuthLayout';
 import { AuthModeSwitch } from '../../components/auth/AuthModeSwitch';
 import { OidcButtons } from '../../components/auth/OidcButtons';
