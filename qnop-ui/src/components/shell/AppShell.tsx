@@ -64,6 +64,7 @@ export function AppShell() {
   const searchMatch = useMatch('/search');
   const profileMatch = useMatch('/profile');
   const userProfileMatch = useMatch('/users/:userId');
+  const teamProfileMatch = useMatch('/teams/:teamId');
   // The new-review wizard (#469 polish) spans the full width too — it lays out
   // as form + launch-checklist rail.
   const wizardMatch = Boolean(reviewMatch && reviewMatch.params.documentId === 'new');
@@ -78,6 +79,7 @@ export function AppShell() {
     Boolean(searchMatch) ||
     Boolean(profileMatch) ||
     Boolean(userProfileMatch) ||
+    Boolean(teamProfileMatch) ||
     wizardMatch;
   const [collapsed, setCollapsed] = useState<boolean>(() => {
     try {
