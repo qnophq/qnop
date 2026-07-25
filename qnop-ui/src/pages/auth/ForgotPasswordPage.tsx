@@ -28,7 +28,7 @@ import Link from '@mui/material/Link';
 import Stack from '@mui/material/Stack';
 import TextField from '@mui/material/TextField';
 import { Mail } from 'lucide-react';
-import { Link as RouterLink } from 'react-router-dom';
+import { Link as RouterLink } from 'react-router';
 import { AuthLayout } from '../../components/auth/AuthLayout';
 import { forgotPassword } from '../../api/auth';
 import { apiErrorMessage } from '../../utils/apiError';

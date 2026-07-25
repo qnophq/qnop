@@ -33,7 +33,7 @@ import {
   Workflow,
   type LucideIcon,
 } from 'lucide-react';
-import { Link as RouterLink } from 'react-router-dom';
+import { Link as RouterLink } from 'react-router';
 import Link from '@mui/material/Link';
 import type { DashboardActivity } from '../../api/generated';
 import { useFormatters } from '../../hooks/useFormatters';

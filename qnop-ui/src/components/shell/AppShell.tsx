@@ -25,7 +25,7 @@ import Container from '@mui/material/Container';
 import Drawer from '@mui/material/Drawer';
 import useMediaQuery from '@mui/material/useMediaQuery';
 import { useTheme } from '@mui/material/styles';
-import { Outlet, useMatch } from 'react-router-dom';
+import { Outlet, useMatch } from 'react-router';
 import { SidebarContent } from './SidebarContent';
 import { TopBar } from './TopBar';
 

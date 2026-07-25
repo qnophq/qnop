@@ -21,7 +21,7 @@
 
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { fireEvent, screen } from '@testing-library/react';
-import { Route, Routes } from 'react-router-dom';
+import { Route, Routes } from 'react-router';
 import { AxiosError, type AxiosResponse } from 'axios';
 import { axe } from 'vitest-axe';
 import { renderWithProviders } from '../../test/renderWithProviders';

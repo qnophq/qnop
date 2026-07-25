@@ -30,7 +30,7 @@ import Tooltip from '@mui/material/Tooltip';
 import Typography from '@mui/material/Typography';
 import type { SxProps, Theme } from '@mui/material/styles';
 import { alpha, useTheme } from '@mui/material/styles';
-import { Link as RouterLink } from 'react-router-dom';
+import { Link as RouterLink } from 'react-router';
 import { CalendarDays, Crown, Users } from 'lucide-react';
 import type { PublicUserProfile } from '../../api/generated';
 import { useUserProfile } from '../../api/hooks/useUsers';

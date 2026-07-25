@@ -27,7 +27,7 @@ import Menu from '@mui/material/Menu';
 import MenuItem from '@mui/material/MenuItem';
 import Typography from '@mui/material/Typography';
 import { KeyRound, LogOut, UserRound } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate } from 'react-router';
 import { useAuthStore } from '../../stores/authStore';
 import { UserAvatar } from './UserAvatar';
 

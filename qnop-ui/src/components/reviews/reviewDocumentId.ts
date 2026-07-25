@@ -20,7 +20,7 @@
  */
 
 import { createContext, useContext } from 'react';
-import { useParams } from 'react-router-dom';
+import { useParams } from 'react-router';
 
 /** Provided by {@code ReviewParamGate} once a slug URL resolved (issue #411). */
 export const ReviewDocumentIdContext = createContext<string | null>(null);

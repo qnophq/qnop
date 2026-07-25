@@ -31,7 +31,7 @@ An enterprise feature ships as a single JAR carrying everything it needs:
 There is exactly **one** frontend build — the AGPL `qnop-ui` in this repository. Enterprise UI is loaded at runtime:
 
 - `qnop-ui` defines **slots** (examples: review panel tabs, admin navigation sections, dashboard cards, whole routes with nav entries) and publishes a small versioned npm package **`qnop-ui-spi`** — the frontend analogue of `qnop-spi`: TypeScript types for slots + the extension registry contract, nothing else.
-- The host app exposes its singletons (`react`, `react-dom`, `react-router-dom`, MUI core, the `qnop-ui-spi` runtime) through an **import map** in `index.html` — browser-standard ESM, no module-federation tooling.
+- The host app exposes its singletons (`react`, `react-dom`, `react-router`, MUI core, the `qnop-ui-spi` runtime) through an **import map** in `index.html` — browser-standard ESM, no module-federation tooling.
 - An enterprise JAR serves its UI as a prebuilt, hash-versioned **ESM bundle** (built in `qnop-enterprise` against `qnop-ui-spi`, with the shared singletons declared external) under `/enterprise/ui/…`.
 - `/config` advertises edition, entitlements ([ADR-0012](0012-edition-vs-entitlements.md)) and the list of extension entry URLs **plus the `qnop-ui-spi` contract version** they were built against. The host dynamically `import()`s compatible entries and mounts what they register into the slots; on a major-version mismatch the extension is skipped and reported instead of breaking the app.
 - Entitlement checks in the UI are convenience only — the server remains the authority on every enterprise endpoint.

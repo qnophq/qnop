@@ -30,7 +30,7 @@ import Skeleton from '@mui/material/Skeleton';
 import Typography from '@mui/material/Typography';
 import { alpha, useTheme } from '@mui/material/styles';
 import { Search } from 'lucide-react';
-import { useLocation, useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router';
 import { SEARCH_MIN_LENGTH, useSearchQuick } from '../../../api/hooks/useSearch';
 import { useAuthStore } from '../../../stores/authStore';
 import { SearchDropdownResults } from './SearchDropdownResults';

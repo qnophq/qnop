@@ -37,7 +37,7 @@ import {
   Users,
   UsersRound,
 } from 'lucide-react';
-import { Link as RouterLink, useSearchParams } from 'react-router-dom';
+import { Link as RouterLink, useSearchParams } from 'react-router';
 import {
   SEARCH_MIN_LENGTH,
   useSearchAnnotations,

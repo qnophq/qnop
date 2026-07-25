@@ -28,7 +28,7 @@ import Stack from '@mui/material/Stack';
 import Typography from '@mui/material/Typography';
 import { useQueryClient } from '@tanstack/react-query';
 import { ChevronLeft, ChevronRight, Rocket } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate } from 'react-router';
 import type { PrincipalView } from '../../api/generated';
 import { ParticipantKind, ThreadParticipation } from '../../api/generated';
 import { documentsApi, reviewWorkflowApi } from '../../api/config';

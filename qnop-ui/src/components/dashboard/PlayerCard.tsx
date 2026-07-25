@@ -25,7 +25,7 @@ import Skeleton from '@mui/material/Skeleton';
 import Stack from '@mui/material/Stack';
 import Typography from '@mui/material/Typography';
 import { Medal } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate } from 'react-router';
 import { useUserProfile } from '../../api/hooks/useUsers';
 import { AchievementRow } from '../profile/AchievementRow';
 import { publicProfileAchievements } from '../profile/profileModel';

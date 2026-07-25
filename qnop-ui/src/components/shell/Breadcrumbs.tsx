@@ -24,7 +24,7 @@ import Link from '@mui/material/Link';
 import Stack from '@mui/material/Stack';
 import Typography from '@mui/material/Typography';
 import { ChevronRight } from 'lucide-react';
-import { Link as RouterLink, useLocation } from 'react-router-dom';
+import { Link as RouterLink, useLocation } from 'react-router';
 import { useTeam } from '../../api/hooks/useTeams';
 import { useMyTeam } from '../../api/hooks/useMyTeams';
 import { TeamAvatar } from './TeamAvatar';

@@ -25,7 +25,7 @@ import Stack from '@mui/material/Stack';
 import Typography from '@mui/material/Typography';
 import { alpha, useTheme } from '@mui/material/styles';
 import { Crown, Telescope, UserCheck } from 'lucide-react';
-import { Link as RouterLink } from 'react-router-dom';
+import { Link as RouterLink } from 'react-router';
 import type { DocumentSummary } from '../../api/generated';
 import { reviewPath } from '../dashboard/dashboardModel';
 import { ToneBadge } from '../admin/ToneBadge';

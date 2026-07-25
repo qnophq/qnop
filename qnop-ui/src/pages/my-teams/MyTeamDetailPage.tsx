@@ -37,7 +37,7 @@ import TableHead from '@mui/material/TableHead';
 import TableRow from '@mui/material/TableRow';
 import Typography from '@mui/material/Typography';
 import { ArrowLeftRight, MoreVertical, Pencil, UserMinus, UserPlus } from 'lucide-react';
-import { Link as RouterLink, useParams } from 'react-router-dom';
+import { Link as RouterLink, useParams } from 'react-router';
 import type { TeamMember, TeamRole } from '../../api/generated';
 import {
   useMyTeam,

@@ -29,7 +29,7 @@ import Link from '@mui/material/Link';
 import Stack from '@mui/material/Stack';
 import TextField from '@mui/material/TextField';
 import { ArrowRight, AtSign } from 'lucide-react';
-import { Link as RouterLink, useNavigate, useSearchParams } from 'react-router-dom';
+import { Link as RouterLink, useNavigate, useSearchParams } from 'react-router';
 import { AuthLayout } from '../../components/auth/AuthLayout';
 import { AuthModeSwitch } from '../../components/auth/AuthModeSwitch';
 import { OidcButtons } from '../../components/auth/OidcButtons';

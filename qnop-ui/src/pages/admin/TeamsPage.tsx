@@ -41,7 +41,7 @@ import Typography from '@mui/material/Typography';
 import { MoreVertical, SquarePen, Trash2, UsersRound } from 'lucide-react';
 import { ClearableSearchField } from '../../components/ClearableSearchField';
 import { TeamAvatar } from '../../components/shell/TeamAvatar';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate } from 'react-router';
 import type { AdminTeamSummary } from '../../api/generated';
 import { useDeleteTeam, useTeams } from '../../api/hooks/useTeams';
 import { TeamFormDialog } from '../../components/admin/teams/TeamFormDialog';

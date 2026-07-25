@@ -20,7 +20,7 @@
  */
 
 import { lazy } from 'react';
-import { Navigate, createBrowserRouter } from 'react-router-dom';
+import { Navigate, createBrowserRouter } from 'react-router';
 import { AppShell } from '../components/shell/AppShell';
 import { LazyBoundary } from '../components/errors/LazyBoundary';
 import { AdminRoute } from '../components/auth/AdminRoute';
