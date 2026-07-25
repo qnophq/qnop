@@ -215,6 +215,7 @@ export function TeamDetailPage() {
           name: team.name,
           description: team.description,
           enabled: team.enabled,
+          avatarUrl: team.avatarUrl,
           memberCount: members.length,
           profileShowMembers: team.profileShowMembers,
           profileShowReviews: team.profileShowReviews,

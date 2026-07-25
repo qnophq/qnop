@@ -257,11 +257,14 @@ export function TeamFormDialog({ open, mode, team, onClose }: TeamFormDialogProp
                 )}
               />
             )}
-            <FormControlLabel
-              control={<Switch checked={enabled} onChange={(e) => setEnabled(e.target.checked)} />}
-              label={enabled ? 'Team active' : 'Team disabled'}
-            />
-            <Stack spacing={0}>
+            {/* One tight, left-aligned column - the three toggles read as one group. */}
+            <Stack spacing={0} sx={{ alignItems: 'flex-start' }}>
+              <FormControlLabel
+                control={
+                  <Switch checked={enabled} onChange={(e) => setEnabled(e.target.checked)} />
+                }
+                label={enabled ? 'Team active' : 'Team disabled'}
+              />
               <FormControlLabel
                 control={
                   <Switch
