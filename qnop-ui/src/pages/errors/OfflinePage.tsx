@@ -19,19 +19,20 @@
  * SPDX-License-Identifier: AGPL-3.0-only
  */
 
+import { useNavigate } from 'react-router';
 import { ErrorState } from './ErrorState';
-import { NotFoundIllustration } from './illustrations';
+import { OfflineIllustration } from './illustrations';
 
-/** 404 - the page went for a walk; the user did nothing wrong (issue #611). */
-export function NotFoundPage() {
+/** Offline - calm, not alarming; the string will be re-tied (issue #611). */
+export function OfflinePage() {
+  const navigate = useNavigate();
   return (
     <ErrorState
-      code="404"
-      title="This page folded itself into a paper plane"
-      message="Wherever it landed, it isn't at this address. Head back to the dashboard and pick up your quest from there."
-      illustration={<NotFoundIllustration />}
-      primaryAction={{ label: 'Back to dashboard', to: '/' }}
-      secondaryAction={{ label: 'My reviews', to: '/reviews' }}
+      title="The string between our paper cups snapped"
+      message="You seem to be offline. Nothing is lost - once the connection is back, everything picks up where it stopped."
+      illustration={<OfflineIllustration />}
+      tone="alert"
+      primaryAction={{ label: 'Retry connection', onClick: () => navigate(0) }}
     />
   );
 }

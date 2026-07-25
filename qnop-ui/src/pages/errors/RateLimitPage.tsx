@@ -19,19 +19,22 @@
  * SPDX-License-Identifier: AGPL-3.0-only
  */
 
+import { useNavigate } from 'react-router';
 import { ErrorState } from './ErrorState';
-import { NotFoundIllustration } from './illustrations';
+import { RateLimitIllustration } from './illustrations';
 
-/** 404 - the page went for a walk; the user did nothing wrong (issue #611). */
-export function NotFoundPage() {
+/** 429 - easy there; the rate limit (ADR-0027) asked for a breather (issue #611). */
+export function RateLimitPage() {
+  const navigate = useNavigate();
   return (
     <ErrorState
-      code="404"
-      title="This page folded itself into a paper plane"
-      message="Wherever it landed, it isn't at this address. Head back to the dashboard and pick up your quest from there."
-      illustration={<NotFoundIllustration />}
-      primaryAction={{ label: 'Back to dashboard', to: '/' }}
-      secondaryAction={{ label: 'My reviews', to: '/reviews' }}
+      code="429"
+      title="Easy there, stamp champion"
+      message="That was a lot of requests in a very short time. Take a breath - a moment from now everything works again."
+      illustration={<RateLimitIllustration />}
+      tone="alert"
+      primaryAction={{ label: 'Try again', onClick: () => navigate(0) }}
+      secondaryAction={{ label: 'Back to dashboard', to: '/' }}
     />
   );
 }

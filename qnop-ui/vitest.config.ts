@@ -43,6 +43,8 @@ export default defineConfig({
         'src/components/auth/RoleRoute.tsx',
         'src/components/auth/AuthHydrationBoundary.tsx',
         'src/components/shell/navConfig.tsx',
+        // The branded error pages (issue #611): shell, pages, router catch.
+        'src/pages/errors/**/*.tsx',
         // Auth screens — the critical entry flow (issue #352, wave 1).
         'src/pages/auth/**/*.tsx',
         // Admin screens — users, teams, settings, branding and OIDC (issue

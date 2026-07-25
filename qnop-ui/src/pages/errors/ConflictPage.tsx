@@ -19,19 +19,26 @@
  * SPDX-License-Identifier: AGPL-3.0-only
  */
 
+import { useNavigate } from 'react-router';
 import { ErrorState } from './ErrorState';
-import { NotFoundIllustration } from './illustrations';
+import { ConflictIllustration } from './illustrations';
 
-/** 404 - the page went for a walk; the user did nothing wrong (issue #611). */
-export function NotFoundPage() {
+/**
+ * 409, full-page variant only (issue #611): the navigation target changed
+ * under the user (e.g. an optimistic-concurrency clash, ADR-0030). Routine
+ * in-page conflicts stay inline where they are handled today.
+ */
+export function ConflictPage() {
+  const navigate = useNavigate();
   return (
     <ErrorState
-      code="404"
-      title="This page folded itself into a paper plane"
-      message="Wherever it landed, it isn't at this address. Head back to the dashboard and pick up your quest from there."
-      illustration={<NotFoundIllustration />}
-      primaryAction={{ label: 'Back to dashboard', to: '/' }}
-      secondaryAction={{ label: 'My reviews', to: '/reviews' }}
+      code="409"
+      title="Two pins landed on the same line"
+      message="Someone changed this while you were on your way to it. Reload to see the current state - nothing of yours was lost."
+      illustration={<ConflictIllustration />}
+      tone="alert"
+      primaryAction={{ label: 'Reload this page', onClick: () => navigate(0) }}
+      secondaryAction={{ label: 'Back to dashboard', to: '/' }}
     />
   );
 }
