@@ -115,16 +115,33 @@ public class TeamService {
         members);
   }
 
+  /**
+   * Creates a team with its initial LEAD (issue #586 follow-up) — no team is ever created
+   * ownerless. An unknown lead fails the whole creation (404) before anything persists. {@code
+   * enabled}/visibility flags are optional; {@code null} keeps the defaults (enabled, both
+   * public-profile toggles hidden).
+   */
   @Transactional
-  public TeamSummaryView create(String name, String description) {
+  public TeamSummaryView create(
+      String name,
+      String description,
+      UUID leadUserId,
+      Boolean enabled,
+      Boolean profileShowMembers,
+      Boolean profileShowReviews) {
     String trimmed = requireName(name);
     if (teams.existsByNameIgnoreCase(trimmed)) {
       throw new TeamConflictException("NAME_TAKEN", "A team with that name already exists.");
     }
     Team team = Team.create(trimmed, blankToNull(description));
     team.setSlug(slugs.allocate(trimmed)); // stable friendly URL, derived from the name (#470)
+    if (enabled != null) {
+      team.setEnabled(enabled);
+    }
+    applyProfileVisibility(team, profileShowMembers, profileShowReviews);
     Team saved = teams.save(team);
-    return toSummary(saved, 0L);
+    addMember(saved.getId(), leadUserId, TeamRole.LEAD.name());
+    return toSummary(saved, 1L);
   }
 
   @Transactional

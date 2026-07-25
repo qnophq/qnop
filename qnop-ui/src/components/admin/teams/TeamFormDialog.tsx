@@ -19,7 +19,7 @@
  * SPDX-License-Identifier: AGPL-3.0-only
  */
 
-import { useState, type FormEvent } from 'react';
+import { useEffect, useState, type FormEvent } from 'react';
 import Alert from '@mui/material/Alert';
 import Box from '@mui/material/Box';
 import Button from '@mui/material/Button';
@@ -27,11 +27,15 @@ import Dialog from '@mui/material/Dialog';
 import DialogActions from '@mui/material/DialogActions';
 import DialogContent from '@mui/material/DialogContent';
 import DialogTitle from '@mui/material/DialogTitle';
+import Autocomplete from '@mui/material/Autocomplete';
 import FormControlLabel from '@mui/material/FormControlLabel';
 import Stack from '@mui/material/Stack';
 import Switch from '@mui/material/Switch';
 import TextField from '@mui/material/TextField';
-import type { AdminTeamSummary } from '../../../api/generated';
+import Typography from '@mui/material/Typography';
+import type { AdminTeamSummary, PrincipalView } from '../../../api/generated';
+import { usePrincipalSearch } from '../../../api/hooks/useReviews';
+import { UserAvatar } from '../../shell/UserAvatar';
 import { useCreateTeam, useUpdateTeam } from '../../../api/hooks/useTeams';
 import { useRemoveTeamAvatar, useUploadTeamAvatar } from '../../../api/hooks/useTeamAvatar';
 import { AvatarUploader } from '../../profile/AvatarUploader';
@@ -59,9 +63,20 @@ export function TeamFormDialog({ open, mode, team, onClose }: TeamFormDialogProp
   const [name, setName] = useState(editing ? team.name : '');
   const [description, setDescription] = useState(editing ? (team.description ?? '') : '');
   const [enabled, setEnabled] = useState(editing ? team.enabled : true);
-  // Public-profile visibility (issue #586); create mode keeps the conservative server defaults.
+  // Public-profile visibility (issue #586); create defaults stay conservative.
   const [showMembers, setShowMembers] = useState(editing ? team.profileShowMembers : false);
   const [showReviews, setShowReviews] = useState(editing ? team.profileShowReviews : false);
+  // The mandatory initial lead (issue #586 follow-up) — create mode only; the
+  // roster (and with it the lead role) is managed on the team pages afterwards.
+  const [lead, setLead] = useState<PrincipalView | null>(null);
+  const [leadSearch, setLeadSearch] = useState('');
+  const [debouncedLeadSearch, setDebouncedLeadSearch] = useState('');
+  useEffect(() => {
+    const handle = setTimeout(() => setDebouncedLeadSearch(leadSearch), 300);
+    return () => clearTimeout(handle);
+  }, [leadSearch]);
+  const leadOptionsQuery = usePrincipalSearch(mode === 'edit' ? '' : debouncedLeadSearch);
+  const leadOptions = (leadOptionsQuery.data?.principals ?? []).filter((p) => p.kind === 'USER');
   const [error, setError] = useState<string | null>(null);
   const [submitAttempted, setSubmitAttempted] = useState(false);
   const [serverErrors, setServerErrors] = useState<Record<string, string>>({});
@@ -102,6 +117,9 @@ export function TeamFormDialog({ open, mode, team, onClose }: TeamFormDialogProp
   if (name.trim().length === 0) {
     clientErrors.name = 'A team name is required.';
   }
+  if (!isEdit && lead === null) {
+    clientErrors.leadUserId = 'Every team needs a lead — pick one.';
+  }
 
   const fieldError = (field: string): string | undefined =>
     serverErrors[field] ?? (submitAttempted ? clientErrors[field] : undefined);
@@ -137,6 +155,11 @@ export function TeamFormDialog({ open, mode, team, onClose }: TeamFormDialogProp
         const created = await createTeam.mutateAsync({
           name,
           description: description || undefined,
+          // Validated above - the submit never runs without a lead.
+          leadUserId: (lead as PrincipalView).id,
+          enabled,
+          profileShowMembers: showMembers,
+          profileShowReviews: showReviews,
         });
         // Create-then-upload: the team now has an id, so set the chosen picture on it.
         if (pendingAvatar) {
@@ -191,40 +214,76 @@ export function TeamFormDialog({ open, mode, team, onClose }: TeamFormDialogProp
               multiline
               minRows={2}
             />
-            {isEdit && (
-              <FormControlLabel
-                control={
-                  <Switch checked={enabled} onChange={(e) => setEnabled(e.target.checked)} />
-                }
-                label={enabled ? 'Team active' : 'Team disabled'}
+            {!isEdit && (
+              <Autocomplete
+                options={leadOptions}
+                loading={leadOptionsQuery.isFetching}
+                value={lead}
+                onChange={(_, value) => {
+                  setLead(value);
+                  clearServer('leadUserId');
+                }}
+                onInputChange={(_, value) => setLeadSearch(value)}
+                getOptionLabel={(u) => u.displayName}
+                isOptionEqualToValue={(a, b) => a.id === b.id}
+                filterOptions={(x) => x}
+                noOptionsText="No matching users"
+                // The person, not just a string - the app-wide picker recipe
+                // (avatar + name), as in the review wizard's reviewer step.
+                renderOption={({ key, ...optionProps }, option) => (
+                  <Box
+                    component="li"
+                    key={key}
+                    {...optionProps}
+                    sx={{ display: 'flex', alignItems: 'center', gap: 1.25 }}
+                  >
+                    <UserAvatar name={option.displayName} size={22} imageUrl={option.avatarUrl} />
+                    <Typography variant="body2">{option.displayName}</Typography>
+                  </Box>
+                )}
+                renderInput={(params) => (
+                  <TextField
+                    {...params}
+                    label="Team lead"
+                    placeholder="Search by name"
+                    required
+                    error={Boolean(fieldError('leadUserId'))}
+                    helperText={
+                      fieldError('leadUserId') ??
+                      'Added as the team\u2019s LEAD - every team starts with one.'
+                    }
+                  />
+                )}
               />
             )}
-            {isEdit && (
-              <Stack spacing={0}>
-                <FormControlLabel
-                  control={
-                    <Switch
-                      checked={showMembers}
-                      onChange={(e) => setShowMembers(e.target.checked)}
-                      slotProps={{ input: { 'aria-label': 'Show members on the public profile' } }}
-                    />
-                  }
-                  label="Public profile: show members"
-                />
-                <FormControlLabel
-                  control={
-                    <Switch
-                      checked={showReviews}
-                      onChange={(e) => setShowReviews(e.target.checked)}
-                      slotProps={{
-                        input: { 'aria-label': 'Show review participation on the public profile' },
-                      }}
-                    />
-                  }
-                  label="Public profile: show review participation"
-                />
-              </Stack>
-            )}
+            <FormControlLabel
+              control={<Switch checked={enabled} onChange={(e) => setEnabled(e.target.checked)} />}
+              label={enabled ? 'Team active' : 'Team disabled'}
+            />
+            <Stack spacing={0}>
+              <FormControlLabel
+                control={
+                  <Switch
+                    checked={showMembers}
+                    onChange={(e) => setShowMembers(e.target.checked)}
+                    slotProps={{ input: { 'aria-label': 'Show members on the public profile' } }}
+                  />
+                }
+                label="Public profile: show members"
+              />
+              <FormControlLabel
+                control={
+                  <Switch
+                    checked={showReviews}
+                    onChange={(e) => setShowReviews(e.target.checked)}
+                    slotProps={{
+                      input: { 'aria-label': 'Show review participation on the public profile' },
+                    }}
+                  />
+                }
+                label="Public profile: show review participation"
+              />
+            </Stack>
             {error && <Alert severity="error">{error}</Alert>}
           </Stack>
         </DialogContent>

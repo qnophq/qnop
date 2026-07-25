@@ -91,7 +91,14 @@ public class TeamController implements AdminTeamsApi {
 
   @Override
   public ResponseEntity<AdminTeamSummary> createTeam(AdminTeamCreateRequest request) {
-    TeamSummaryView created = teams.create(request.getName(), request.getDescription());
+    TeamSummaryView created =
+        teams.create(
+            request.getName(),
+            request.getDescription(),
+            request.getLeadUserId(),
+            request.getEnabled(),
+            request.getProfileShowMembers(),
+            request.getProfileShowReviews());
     return ResponseEntity.status(HttpStatus.CREATED)
         .body(toSummary(created, teamAvatarUrl(created.id())));
   }

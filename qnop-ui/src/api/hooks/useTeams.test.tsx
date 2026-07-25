@@ -121,9 +121,9 @@ describe('team mutations', () => {
     >);
 
     const create = renderHook(() => useCreateTeam(), { wrapper });
-    await create.result.current.mutateAsync({ name: 'Core' });
+    await create.result.current.mutateAsync({ name: 'Core', leadUserId: 'u-lead' });
     expect(adminTeamsApi.createTeam).toHaveBeenCalledWith({
-      adminTeamCreateRequest: { name: 'Core' },
+      adminTeamCreateRequest: { name: 'Core', leadUserId: 'u-lead' },
     });
 
     const update = renderHook(() => useUpdateTeam(), { wrapper });

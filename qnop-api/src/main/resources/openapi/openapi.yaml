@@ -5563,6 +5563,12 @@ components:
         - size
     AdminTeamCreateRequest:
       type: object
+      description: >-
+        Creates a team (issue #470). Every team starts with a lead (issue #586
+        follow-up): leadUserId becomes the initial LEAD membership, so no team
+        is ever created ownerless. The enabled flag and the public-profile
+        visibility toggles (issue #586) are optional — absent values default to
+        enabled and both toggles hidden.
       properties:
         name:
           type: string
@@ -5572,8 +5578,22 @@ components:
           type: string
           maxLength: 1000
           nullable: true
+        leadUserId:
+          type: string
+          format: uuid
+          description: The initial team lead, added as a LEAD member at creation.
+        enabled:
+          type: boolean
+          nullable: true
+        profileShowMembers:
+          type: boolean
+          nullable: true
+        profileShowReviews:
+          type: boolean
+          nullable: true
       required:
         - name
+        - leadUserId
     AdminTeamUpdateRequest:
       type: object
       description: Partial update; only provided fields change.
