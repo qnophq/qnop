@@ -158,4 +158,15 @@ describe('UserProfilePage slug URLs (issue #486)', () => {
     expect(usersApi.getUserProfile).not.toHaveBeenCalled();
     expect(usersApi.getUserProfileBySlug).not.toHaveBeenCalled();
   });
+
+  it('shows the branded not-found shell for an unknown slug (#611)', async () => {
+    vi.mocked(usersApi.getUserProfileBySlug).mockReturnValue(
+      Promise.reject(new Error('404')) as never,
+    );
+    renderPage('ghost-user');
+
+    expect(await screen.findByText('This player card went for a walk')).toBeInTheDocument();
+    expect(screen.getByText('404')).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Back to dashboard' })).toHaveAttribute('href', '/');
+  });
 });
