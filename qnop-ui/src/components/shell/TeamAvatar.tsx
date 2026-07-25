@@ -40,19 +40,19 @@ function crestInitials(name: string): string {
 
 /**
  * A team's identity avatar (issue #509): the uploaded team picture when set, else the
- * initials crest — a rounded emblem with a deterministic colour from the brand palette
- * (the #470 "guild" treatment), so a team without a picture still reads as its own. The
- * shape stays a rounded square (vs. the circular {@link UserAvatar}), and a small
- * people-glyph marker rides the bottom-right corner — with an uploaded photo the shape
- * alone gets subtle, so every team avatar says "this is a group" at a glance. A
- * broken/expired image URL falls back to the crest.
+ * initials crest — a circular emblem with a deterministic colour from the brand palette,
+ * so a team without a picture still reads as its own. The silhouette is a circle like
+ * {@link UserAvatar} (issue #586 follow-up: one round identity language, matching the
+ * round upload crop); the small people-glyph marker riding the bottom-right corner is
+ * what says "this is a group" at a glance. A broken/expired image URL falls back to the
+ * crest.
  */
 export function TeamAvatar({ name, size = 44, imageUrl }: TeamAvatarProps) {
   const theme = useTheme();
   const palette = theme.qnop.avatarPalette;
   const safe = name?.trim() || '?';
   const color = palette[(safe.charCodeAt(0) + safe.charCodeAt(safe.length - 1)) % palette.length];
-  const radius = `${Math.round(size * 0.3)}px`;
+  const radius = '50%';
 
   // The marker scales with the avatar but never below legibility; it hangs
   // slightly over the corner so it reads as a badge, not a sticker.

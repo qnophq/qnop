@@ -24,7 +24,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { ThemeProvider } from '@mui/material/styles';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { MemoryRouter } from 'react-router-dom';
+import { MemoryRouter } from 'react-router';
 import type { AdminTeamListResponse, AdminTeamSummary } from '../../api/generated';
 import { buildTheme } from '../../theme/theme';
 import { TeamsPage } from './TeamsPage';
@@ -55,6 +55,8 @@ const TEAMS: AdminTeamSummary[] = [
     name: 'Alpha',
     description: 'First team',
     enabled: true,
+    profileShowMembers: false,
+    profileShowReviews: false,
     memberCount: 3,
     createdAt: '2026-01-01T00:00:00Z',
     updatedAt: '2026-01-02T00:00:00Z',
@@ -64,6 +66,8 @@ const TEAMS: AdminTeamSummary[] = [
     name: 'Beta',
     description: '',
     enabled: false,
+    profileShowMembers: false,
+    profileShowReviews: false,
     memberCount: 0,
     createdAt: '2026-01-01T00:00:00Z',
     updatedAt: '2026-01-02T00:00:00Z',
@@ -81,8 +85,8 @@ vi.mock('../../api/hooks/useTeams', () => ({
   useDeleteTeam: () => ({ mutateAsync: deleteMutate, isPending: false }),
 }));
 
-vi.mock('react-router-dom', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('react-router-dom')>()),
+vi.mock('react-router', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('react-router')>()),
   useNavigate: () => navigateSpy,
 }));
 

@@ -24,6 +24,7 @@ import Alert from '@mui/material/Alert';
 import Box from '@mui/material/Box';
 import Button from '@mui/material/Button';
 import IconButton from '@mui/material/IconButton';
+import Link from '@mui/material/Link';
 import LinearProgress from '@mui/material/LinearProgress';
 import ListItemIcon from '@mui/material/ListItemIcon';
 import ListItemText from '@mui/material/ListItemText';
@@ -41,7 +42,7 @@ import Typography from '@mui/material/Typography';
 import { MoreVertical, SquarePen, Trash2, UsersRound } from 'lucide-react';
 import { ClearableSearchField } from '../../components/ClearableSearchField';
 import { TeamAvatar } from '../../components/shell/TeamAvatar';
-import { useNavigate } from 'react-router-dom';
+import { Link as RouterLink, useNavigate } from 'react-router';
 import type { AdminTeamSummary } from '../../api/generated';
 import { useDeleteTeam, useTeams } from '../../api/hooks/useTeams';
 import { TeamFormDialog } from '../../components/admin/teams/TeamFormDialog';
@@ -172,7 +173,16 @@ export function TeamsPage() {
                     <TableCell sx={{ fontWeight: 600 }}>
                       <Stack direction="row" spacing={1.5} sx={{ alignItems: 'center' }}>
                         <TeamAvatar name={team.name} imageUrl={team.avatarUrl} size={28} />
-                        <span>{team.name}</span>
+                        {/* Links to the public team profile (issue #586); an id
+                            visit canonicalises to the slug URL. */}
+                        <Link
+                          component={RouterLink}
+                          to={`/teams/${team.id}`}
+                          underline="hover"
+                          color="inherit"
+                        >
+                          {team.name}
+                        </Link>
                       </Stack>
                     </TableCell>
                     <TableCell sx={{ color: 'text.secondary', maxWidth: 320 }}>

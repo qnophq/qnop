@@ -29,7 +29,7 @@ import Tooltip from '@mui/material/Tooltip';
 import Typography from '@mui/material/Typography';
 import { useTheme, type SxProps, type Theme } from '@mui/material/styles';
 import { ShieldCheck } from 'lucide-react';
-import { NavLink } from 'react-router-dom';
+import { NavLink } from 'react-router';
 import { useConfig } from '../../api/hooks/useConfig';
 import { useAuthStore } from '../../stores/authStore';
 import { BrandLogo } from '../branding/BrandLogo';

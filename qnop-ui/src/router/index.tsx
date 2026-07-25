@@ -20,7 +20,7 @@
  */
 
 import { lazy } from 'react';
-import { Navigate, createBrowserRouter } from 'react-router-dom';
+import { Navigate, createBrowserRouter } from 'react-router';
 import { AppShell } from '../components/shell/AppShell';
 import { LazyBoundary } from '../components/errors/LazyBoundary';
 import { AdminRoute } from '../components/auth/AdminRoute';
@@ -32,6 +32,7 @@ import { BrandingPage } from '../pages/admin/BrandingPage';
 import { StorageConsistencyPage } from '../pages/admin/StorageConsistencyPage';
 import { ProfilePage } from '../pages/ProfilePage';
 import { UserProfilePage } from '../pages/UserProfilePage';
+import { TeamProfilePage } from '../pages/TeamProfilePage';
 import { EmailLayout } from '../pages/admin/EmailLayout';
 import { EmailServerPage } from '../pages/admin/EmailServerPage';
 import { MailTemplatesKeyRedirect } from '../pages/admin/MailTemplatesKeyRedirect';
@@ -101,6 +102,7 @@ export const router = createBrowserRouter([
       { index: true, element: <HomePage /> },
       { path: 'profile', element: <ProfilePage /> },
       { path: 'users/:userId', element: <UserProfilePage /> },
+      { path: 'teams/:teamId', element: <TeamProfilePage /> },
       { path: 'reviews', element: <ReviewsPage /> },
       { path: 'reviews/new', element: <NewReviewPage /> },
       {

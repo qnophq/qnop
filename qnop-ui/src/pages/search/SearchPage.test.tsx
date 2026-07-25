@@ -22,7 +22,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { fireEvent, render, screen } from '@testing-library/react';
 import { ThemeProvider } from '@mui/material/styles';
-import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom';
+import { MemoryRouter, Route, Routes, useLocation } from 'react-router';
 import { buildTheme } from '../../theme/theme';
 import { SearchPage } from './SearchPage';
 
@@ -171,15 +171,14 @@ describe('SearchPage', () => {
     expect(screen.getByTestId('search-row-user')).toHaveTextContent('Mia Member');
   });
 
-  it('honours the type from the URL and locks unreachable teams', () => {
+  it('honours the type from the URL and links every team to its public profile (#586)', () => {
     renderPage('/search?q=alpha&type=teams');
 
     const rows = screen.getAllByTestId('search-row-team');
     expect(rows[0]).toHaveTextContent('Alpha');
-    expect(screen.getByRole('link', { name: 'Alpha' })).toHaveAttribute('href', '/my-teams/alpha');
-    expect(rows[1]).toHaveTextContent('Alchemy');
-    expect(rows[1]).toHaveTextContent('Not a member');
-    expect(screen.queryByRole('link', { name: 'Alchemy' })).toBeNull();
+    expect(screen.getByRole('link', { name: 'Alpha' })).toHaveAttribute('href', '/teams/alpha');
+    // Non-member teams link too now — the profile shows what the team exposes.
+    expect(screen.getByRole('link', { name: 'Alchemy' })).toHaveAttribute('href', '/teams/alchemy');
   });
 
   it('asks for more input below the minimum query length', () => {

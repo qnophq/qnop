@@ -16,7 +16,7 @@
 #                 not a workflow state (ADR-0011 amendment).
 databaseChangeLog:
   - changeSet:
-      id: 0025-review-archive-columns
+      id: 0026-review-archive-columns
       author: qnop
       comment: Adds document.closed_at + document.archived_at for review auto-archiving (issue #576).
       changes:

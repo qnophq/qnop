@@ -36,8 +36,8 @@ import TableCell from '@mui/material/TableCell';
 import TableHead from '@mui/material/TableHead';
 import TableRow from '@mui/material/TableRow';
 import Typography from '@mui/material/Typography';
-import { ArrowLeftRight, MoreVertical, Pencil, UserMinus, UserPlus } from 'lucide-react';
-import { Link as RouterLink, useParams } from 'react-router-dom';
+import { ArrowLeftRight, Globe, MoreVertical, Pencil, UserMinus, UserPlus } from 'lucide-react';
+import { Link as RouterLink, useParams } from 'react-router';
 import type { TeamMember, TeamRole } from '../../api/generated';
 import {
   useMyTeam,
@@ -132,25 +132,36 @@ export function MyTeamDetailPage() {
         titleAdornment={team.viewerRole ? <TeamRoleBadge role={team.viewerRole} /> : undefined}
         description={team.description || undefined}
         action={
-          canManage ? (
-            <Stack direction="row" spacing={1}>
-              {/* A lead polishes their team's presentation — avatar + description
-                  (issue #509 follow-up); name/enabled stay admin concerns. */}
-              <Button
-                variant="outlined"
-                startIcon={<Pencil size={16} />}
-                onClick={() => {
-                  setEditOpen(true);
-                  setEditSeq((n) => n + 1);
-                }}
-              >
-                Edit team
-              </Button>
-              <Button variant="contained" startIcon={<UserPlus size={18} />} onClick={openAdd}>
-                Add member
-              </Button>
-            </Stack>
-          ) : undefined
+          <Stack direction="row" spacing={1}>
+            {/* What the workspace sees (issue #586) — every member may check. */}
+            <Button
+              variant="text"
+              component={RouterLink}
+              to={`/teams/${team.slug ?? team.id}`}
+              startIcon={<Globe size={16} />}
+            >
+              Public profile
+            </Button>
+            {canManage && (
+              <>
+                {/* A lead polishes their team's presentation — avatar + description
+                    (issue #509 follow-up); name/enabled stay admin concerns. */}
+                <Button
+                  variant="outlined"
+                  startIcon={<Pencil size={16} />}
+                  onClick={() => {
+                    setEditOpen(true);
+                    setEditSeq((n) => n + 1);
+                  }}
+                >
+                  Edit team
+                </Button>
+                <Button variant="contained" startIcon={<UserPlus size={18} />} onClick={openAdd}>
+                  Add member
+                </Button>
+              </>
+            )}
+          </Stack>
         }
       />
 

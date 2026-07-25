@@ -108,25 +108,50 @@ public class TeamService {
         team.getName(),
         team.getDescription(),
         team.isEnabled(),
+        team.isProfileShowMembers(),
+        team.isProfileShowReviews(),
         team.getCreatedAt(),
         team.getUpdatedAt(),
         members);
   }
 
+  /**
+   * Creates a team with its initial LEAD (issue #586 follow-up) — no team is ever created
+   * ownerless. An unknown lead fails the whole creation (404) before anything persists. {@code
+   * enabled}/visibility flags are optional; {@code null} keeps the defaults (enabled, both
+   * public-profile toggles hidden).
+   */
   @Transactional
-  public TeamSummaryView create(String name, String description) {
+  public TeamSummaryView create(
+      String name,
+      String description,
+      UUID leadUserId,
+      Boolean enabled,
+      Boolean profileShowMembers,
+      Boolean profileShowReviews) {
     String trimmed = requireName(name);
     if (teams.existsByNameIgnoreCase(trimmed)) {
       throw new TeamConflictException("NAME_TAKEN", "A team with that name already exists.");
     }
     Team team = Team.create(trimmed, blankToNull(description));
     team.setSlug(slugs.allocate(trimmed)); // stable friendly URL, derived from the name (#470)
+    if (enabled != null) {
+      team.setEnabled(enabled);
+    }
+    applyProfileVisibility(team, profileShowMembers, profileShowReviews);
     Team saved = teams.save(team);
-    return toSummary(saved, 0L);
+    addMember(saved.getId(), leadUserId, TeamRole.LEAD.name());
+    return toSummary(saved, 1L);
   }
 
   @Transactional
-  public TeamSummaryView update(UUID id, String name, String description, Boolean enabled) {
+  public TeamSummaryView update(
+      UUID id,
+      String name,
+      String description,
+      Boolean enabled,
+      Boolean profileShowMembers,
+      Boolean profileShowReviews) {
     Team team = teams.findById(id).orElseThrow(() -> TeamNotFoundException.team(id));
     if (name != null) {
       String trimmed = requireName(name);
@@ -146,6 +171,7 @@ public class TeamService {
     if (enabled != null) {
       team.setEnabled(enabled);
     }
+    applyProfileVisibility(team, profileShowMembers, profileShowReviews);
     long count =
         memberships.countMembersByTeamIds(List.of(id)).stream()
             .findFirst()
@@ -273,6 +299,8 @@ public class TeamService {
         team.getDescription(),
         viewerRole,
         canManage,
+        team.isProfileShowMembers(),
+        team.isProfileShowReviews(),
         members);
   }
 
@@ -297,17 +325,35 @@ public class TeamService {
   }
 
   /**
-   * Update the team's description as one of its leads (or an admin) — the self-manage counterpart
-   * of the admin edit (issue #509 follow-up). Deliberately narrow: the name, slug and enabled flag
-   * stay admin concerns, so a lead can polish their team's presentation but never rename or disable
-   * it. A blank description clears it.
+   * Update the team's presentation as one of its leads (or an admin) — the self-manage counterpart
+   * of the admin edit (issue #509 follow-up): the description plus the public-profile visibility
+   * toggles (issue #586). Deliberately narrow: the name, slug and enabled flag stay admin concerns,
+   * so a lead can polish their team's presentation but never rename or disable it. A blank
+   * description clears it; {@code null} toggles leave the configuration unchanged.
    */
   @Transactional
-  public void updateDescriptionAsLead(
-      UUID teamId, UUID actorId, boolean admin, String description) {
+  public void updateMyTeamAsLead(
+      UUID teamId,
+      UUID actorId,
+      boolean admin,
+      String description,
+      Boolean profileShowMembers,
+      Boolean profileShowReviews) {
     requireLeadOrAdmin(teamId, actorId, admin);
     Team team = teams.findById(teamId).orElseThrow(() -> TeamNotFoundException.team(teamId));
     team.setDescription(blankToNull(description));
+    applyProfileVisibility(team, profileShowMembers, profileShowReviews);
+  }
+
+  /** Applies the tri-state visibility toggles (issue #586): {@code null} = unchanged. */
+  private static void applyProfileVisibility(
+      Team team, Boolean profileShowMembers, Boolean profileShowReviews) {
+    if (profileShowMembers != null) {
+      team.setProfileShowMembers(profileShowMembers);
+    }
+    if (profileShowReviews != null) {
+      team.setProfileShowReviews(profileShowReviews);
+    }
   }
 
   /** Add a member as a lead of the team (or an admin); otherwise 403 (issue #470). */
@@ -417,6 +463,8 @@ public class TeamService {
         team.getDescription(),
         team.isEnabled(),
         memberCount,
+        team.isProfileShowMembers(),
+        team.isProfileShowReviews(),
         team.getCreatedAt(),
         team.getUpdatedAt());
   }
@@ -447,6 +495,8 @@ public class TeamService {
       String description,
       boolean enabled,
       long memberCount,
+      boolean profileShowMembers,
+      boolean profileShowReviews,
       Instant createdAt,
       Instant updatedAt) {}
 
@@ -465,6 +515,8 @@ public class TeamService {
       String name,
       String description,
       boolean enabled,
+      boolean profileShowMembers,
+      boolean profileShowReviews,
       Instant createdAt,
       Instant updatedAt,
       List<TeamMemberView> members) {}
@@ -488,5 +540,7 @@ public class TeamService {
       String description,
       String viewerRole,
       boolean canManage,
+      boolean profileShowMembers,
+      boolean profileShowReviews,
       List<TeamMemberView> members) {}
 }

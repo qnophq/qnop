@@ -24,7 +24,7 @@ import { createRoot } from 'react-dom/client';
 import CssBaseline from '@mui/material/CssBaseline';
 import { ThemeProvider } from '@mui/material/styles';
 import { QueryClientProvider } from '@tanstack/react-query';
-import { RouterProvider } from 'react-router-dom';
+import { RouterProvider } from 'react-router/dom';
 import '@fontsource/outfit/300.css';
 import '@fontsource/outfit/400.css';
 import '@fontsource/outfit/500.css';

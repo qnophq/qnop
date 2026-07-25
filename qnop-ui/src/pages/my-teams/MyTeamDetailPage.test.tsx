@@ -23,7 +23,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { ThemeProvider } from '@mui/material/styles';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { MemoryRouter, Route, Routes } from 'react-router-dom';
+import { MemoryRouter, Route, Routes } from 'react-router';
 import type { TeamDetail, TeamMember } from '../../api/generated';
 import { buildTheme } from '../../theme/theme';
 import { useAuthStore } from '../../stores/authStore';
@@ -103,6 +103,8 @@ function makeTeam(overrides: Partial<TeamDetail> = {}): TeamDetail {
     description: 'Owns the ingest pipeline.',
     viewerRole: 'LEAD',
     viewerCanManage: true,
+    profileShowMembers: false,
+    profileShowReviews: false,
     members: [LEAD, MEMBER],
     ...overrides,
   };

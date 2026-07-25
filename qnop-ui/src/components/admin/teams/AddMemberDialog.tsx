@@ -31,6 +31,8 @@ import DialogTitle from '@mui/material/DialogTitle';
 import MenuItem from '@mui/material/MenuItem';
 import Stack from '@mui/material/Stack';
 import TextField from '@mui/material/TextField';
+import Typography from '@mui/material/Typography';
+import { UserAvatar } from '../../shell/UserAvatar';
 import type { AdminUserSummary, TeamRole } from '../../../api/generated';
 import { useAdminUsers } from '../../../api/hooks/useAdminUsers';
 import { useAddTeamMember } from '../../../api/hooks/useTeams';
@@ -108,6 +110,26 @@ export function AddMemberDialog({
               isOptionEqualToValue={(a, b) => a.id === b.id}
               filterOptions={(x) => x}
               noOptionsText="No matching users"
+              // The person, not just a string - the app-wide picker recipe
+              // (avatar + name), as in the review wizard and the lead picker.
+              renderOption={({ key, ...optionProps }, option) => (
+                <Box
+                  component="li"
+                  key={key}
+                  {...optionProps}
+                  sx={{ display: 'flex', alignItems: 'center', gap: 1.25 }}
+                >
+                  <UserAvatar name={option.displayName} size={22} imageUrl={option.avatarUrl} />
+                  <Box sx={{ minWidth: 0 }}>
+                    <Typography variant="body2" noWrap>
+                      {option.displayName}
+                    </Typography>
+                    <Typography variant="caption" color="text.secondary" noWrap component="p">
+                      {option.email}
+                    </Typography>
+                  </Box>
+                </Box>
+              )}
               renderInput={(params) => (
                 <TextField {...params} label="Users" placeholder="Search by name or email" />
               )}

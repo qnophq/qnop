@@ -36,7 +36,7 @@ import {
   UserCheck,
   Users,
 } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate } from 'react-router';
 
 /** The quest path — the three moves from empty workspace to running review. */
 const STEPS: { icon: LucideIcon; title: string; hint: string }[] = [

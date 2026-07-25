@@ -20,7 +20,7 @@
  */
 
 import { useCallback } from 'react';
-import { useParams } from 'react-router-dom';
+import { useParams } from 'react-router';
 
 /** The document view a permalink should reopen in (issue #412). */
 export type PermalinkView = 'panel' | 'focus';

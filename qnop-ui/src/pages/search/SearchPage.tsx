@@ -28,16 +28,8 @@ import TablePagination from '@mui/material/TablePagination';
 import Typography from '@mui/material/Typography';
 import { alpha, useTheme } from '@mui/material/styles';
 import type { LucideIcon } from 'lucide-react';
-import {
-  FileText,
-  Lock,
-  MessageSquareText,
-  NotebookPen,
-  SearchX,
-  Users,
-  UsersRound,
-} from 'lucide-react';
-import { Link as RouterLink, useSearchParams } from 'react-router-dom';
+import { FileText, MessageSquareText, NotebookPen, SearchX, Users, UsersRound } from 'lucide-react';
+import { Link as RouterLink, useSearchParams } from 'react-router';
 import {
   SEARCH_MIN_LENGTH,
   useSearchAnnotations,
@@ -333,28 +325,16 @@ export function SearchPage() {
                       sx={{ alignItems: 'center', py: 1.25, ...reveal(index) }}
                     >
                       <UsersRound size={18} aria-hidden />
-                      {hit.viewable ? (
-                        <Link
-                          component={RouterLink}
-                          to={`/my-teams/${hit.slug ?? hit.teamId}`}
-                          underline="hover"
-                          sx={{ fontWeight: 600, fontSize: 14 }}
-                        >
-                          {hit.name}
-                        </Link>
-                      ) : (
-                        <>
-                          <Typography sx={{ fontWeight: 600, fontSize: 14 }}>{hit.name}</Typography>
-                          <Stack
-                            direction="row"
-                            spacing={0.5}
-                            sx={{ alignItems: 'center', color: 'text.disabled' }}
-                          >
-                            <Lock size={12} aria-hidden />
-                            <Typography sx={{ fontSize: 12 }}>Not a member</Typography>
-                          </Stack>
-                        </>
-                      )}
+                      {/* Every team links to its public profile (issue #586) —
+                          what it shows there is the team's own visibility call. */}
+                      <Link
+                        component={RouterLink}
+                        to={`/teams/${hit.slug ?? hit.teamId}`}
+                        underline="hover"
+                        sx={{ fontWeight: 600, fontSize: 14 }}
+                      >
+                        {hit.name}
+                      </Link>
                     </Stack>
                   ))}
               </Stack>

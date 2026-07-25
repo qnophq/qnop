@@ -58,7 +58,7 @@ import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilde
  *
  * <p>Complements the DB-free {@code ReviewArchiveServiceTest}: what is exercised here is precisely
  * what a unit test cannot reach — the {@code findVisibleTo} JPQL retention branch, the nullable
- * {@code archived_at}/{@code closed_at} columns of changeset 0025, and the HTTP surface.
+ * {@code archived_at}/{@code closed_at} columns of changeset 0026, and the HTTP surface.
  */
 class ReviewArchiveApiIT extends SeededIntegrationTest {
 

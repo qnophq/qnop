@@ -91,7 +91,14 @@ public class TeamController implements AdminTeamsApi {
 
   @Override
   public ResponseEntity<AdminTeamSummary> createTeam(AdminTeamCreateRequest request) {
-    TeamSummaryView created = teams.create(request.getName(), request.getDescription());
+    TeamSummaryView created =
+        teams.create(
+            request.getName(),
+            request.getDescription(),
+            request.getLeadUserId(),
+            request.getEnabled(),
+            request.getProfileShowMembers(),
+            request.getProfileShowReviews());
     return ResponseEntity.status(HttpStatus.CREATED)
         .body(toSummary(created, teamAvatarUrl(created.id())));
   }
@@ -104,7 +111,13 @@ public class TeamController implements AdminTeamsApi {
   @Override
   public ResponseEntity<AdminTeamSummary> updateTeam(UUID teamId, AdminTeamUpdateRequest request) {
     TeamSummaryView updated =
-        teams.update(teamId, request.getName(), request.getDescription(), request.getEnabled());
+        teams.update(
+            teamId,
+            request.getName(),
+            request.getDescription(),
+            request.getEnabled(),
+            request.getProfileShowMembers(),
+            request.getProfileShowReviews());
     return ResponseEntity.ok(toSummary(updated, teamAvatarUrl(updated.id())));
   }
 
@@ -173,6 +186,8 @@ public class TeamController implements AdminTeamsApi {
         .enabled(v.enabled())
         .memberCount(v.memberCount())
         .avatarUrl(avatarUrl)
+        .profileShowMembers(v.profileShowMembers())
+        .profileShowReviews(v.profileShowReviews())
         .createdAt(toOffset(v.createdAt()))
         .updatedAt(toOffset(v.updatedAt()));
   }
@@ -188,6 +203,8 @@ public class TeamController implements AdminTeamsApi {
         .description(v.description())
         .enabled(v.enabled())
         .avatarUrl(teamAvatarUrl(v.id()))
+        .profileShowMembers(v.profileShowMembers())
+        .profileShowReviews(v.profileShowReviews())
         .createdAt(toOffset(v.createdAt()))
         .updatedAt(toOffset(v.updatedAt()))
         .members(

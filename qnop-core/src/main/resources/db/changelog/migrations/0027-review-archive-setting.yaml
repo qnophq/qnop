@@ -7,7 +7,7 @@
 # mirrors its default. 0 disables auto-archiving.
 databaseChangeLog:
   - changeSet:
-      id: 0026-review-archive-setting
+      id: 0027-review-archive-setting
       author: qnop
       comment: Adds the review.archive_after_days application setting (issue #576), default 90.
       changes:

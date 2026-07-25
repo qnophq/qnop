@@ -35,7 +35,7 @@ import {
   Trophy,
   UserCheck,
 } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate } from 'react-router';
 import { useDashboard } from '../api/hooks/useDashboard';
 import { useReviews } from '../api/hooks/useReviews';
 import { PageHeader } from '../components/admin/layout/PageHeader';

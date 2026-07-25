@@ -20,7 +20,7 @@
  */
 
 import type { ReactNode } from 'react';
-import { Navigate } from 'react-router-dom';
+import { Navigate } from 'react-router';
 import type { UserRole } from '../../api/generated';
 import { useAuthStore } from '../../stores/authStore';
 import { ProtectedRoute } from './ProtectedRoute';

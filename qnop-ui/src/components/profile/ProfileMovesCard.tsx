@@ -34,7 +34,7 @@ import {
   Sparkles,
   Workflow,
 } from 'lucide-react';
-import { Link as RouterLink } from 'react-router-dom';
+import { Link as RouterLink } from 'react-router';
 import type { DashboardActivity } from '../../api/generated';
 import { activityPhrase, reviewPath } from '../dashboard/dashboardModel';
 import { useFormatters } from '../../hooks/useFormatters';

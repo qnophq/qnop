@@ -23,7 +23,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { ThemeProvider } from '@mui/material/styles';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { MemoryRouter, Route, Routes } from 'react-router-dom';
+import { MemoryRouter, Route, Routes } from 'react-router';
 import type { AdminTeamDetail, AdminTeamMember } from '../../api/generated';
 import { buildTheme } from '../../theme/theme';
 import { TeamDetailPage } from './TeamDetailPage';
@@ -108,6 +108,8 @@ function makeTeam(overrides: Partial<AdminTeamDetail> = {}): AdminTeamDetail {
     name: 'Platform',
     description: 'Owns the ingest pipeline.',
     enabled: true,
+    profileShowMembers: false,
+    profileShowReviews: false,
     createdAt: '2026-01-01T00:00:00Z',
     updatedAt: '2026-03-01T00:00:00Z',
     members: [LEAD, MEMBER],

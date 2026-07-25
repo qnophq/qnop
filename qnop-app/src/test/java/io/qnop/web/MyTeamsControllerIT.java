@@ -77,8 +77,7 @@ class MyTeamsControllerIT extends AbstractIntegrationTest {
     User lead = createUser("lead", UserRole.MEMBER);
     User bob = createUser("bob", UserRole.MEMBER);
     User carol = createUser("carol", UserRole.MEMBER);
-    String teamId = createTeam(admin, "Core");
-    addMember(admin, teamId, lead, "LEAD");
+    String teamId = createTeam(admin, "Core", lead);
     addMember(admin, teamId, bob, "MEMBER");
 
     String leadToken = token("lead");
@@ -138,8 +137,7 @@ class MyTeamsControllerIT extends AbstractIntegrationTest {
     String admin = token(createUser("root", UserRole.ADMIN));
     User lead = createUser("lead", UserRole.MEMBER);
     User outsider = createUser("outsider", UserRole.MEMBER);
-    String own = createTeam(admin, "Own");
-    addMember(admin, own, lead, "LEAD");
+    String own = createTeam(admin, "Own", lead);
     String other = createTeam(admin, "Other");
 
     String leadToken = token("lead");
@@ -175,8 +173,7 @@ class MyTeamsControllerIT extends AbstractIntegrationTest {
     String admin = token(createUser("root", UserRole.ADMIN));
     User lead = createUser("lead", UserRole.MEMBER);
     User bob = createUser("bob", UserRole.MEMBER);
-    String teamId = createTeam(admin, "Core");
-    addMember(admin, teamId, lead, "LEAD");
+    String teamId = createTeam(admin, "Core", lead);
     addMember(admin, teamId, bob, "MEMBER");
 
     String bobToken = token("bob");
@@ -211,8 +208,7 @@ class MyTeamsControllerIT extends AbstractIntegrationTest {
   void leadSeesViewerCanManage() throws Exception {
     String admin = token(createUser("root", UserRole.ADMIN));
     User lead = createUser("lead", UserRole.MEMBER);
-    String teamId = createTeam(admin, "Core");
-    addMember(admin, teamId, lead, "LEAD");
+    String teamId = createTeam(admin, "Core", lead);
 
     mockMvc
         .perform(get("/api/v1/teams/{id}", teamId).header("Authorization", bearer(token("lead"))))
@@ -225,8 +221,7 @@ class MyTeamsControllerIT extends AbstractIntegrationTest {
   void resolvesTeamByItsSlug() throws Exception {
     String admin = token(createUser("root", UserRole.ADMIN));
     User lead = createUser("lead", UserRole.MEMBER);
-    String teamId = createTeam(admin, "Contract Review");
-    addMember(admin, teamId, lead, "LEAD");
+    String teamId = createTeam(admin, "Contract Review", lead);
 
     // The friendly slug URL resolves to the same team and the detail echoes the slug.
     mockMvc
@@ -262,8 +257,7 @@ class MyTeamsControllerIT extends AbstractIntegrationTest {
     String admin = token(createUser("root", UserRole.ADMIN));
     User lead = createUser("lead", UserRole.MEMBER);
     User member = createUser("member", UserRole.MEMBER);
-    String teamId = createTeam(admin, "Core");
-    addMember(admin, teamId, lead, "LEAD");
+    String teamId = createTeam(admin, "Core", lead);
     // A plain member remains, so removing/demoting the lead would strip the team's last
     // lead while members remain — the guarded case (removing the *sole* member instead
     // empties the team, which is allowed; issue #542).
@@ -294,8 +288,7 @@ class MyTeamsControllerIT extends AbstractIntegrationTest {
     String admin = token(createUser("root", UserRole.ADMIN));
     User lead = createUser("lead", UserRole.MEMBER);
     User coLead = createUser("colead", UserRole.MEMBER);
-    String teamId = createTeam(admin, "Core");
-    addMember(admin, teamId, lead, "LEAD");
+    String teamId = createTeam(admin, "Core", lead);
     addMember(admin, teamId, coLead, "LEAD");
 
     // A co-lead remains, so the last-lead guard would allow it — but demoting a
@@ -325,8 +318,7 @@ class MyTeamsControllerIT extends AbstractIntegrationTest {
     String admin = token(createUser("root", UserRole.ADMIN));
     User lead = createUser("lead", UserRole.MEMBER);
     User coLead = createUser("colead", UserRole.MEMBER);
-    String teamId = createTeam(admin, "Core");
-    addMember(admin, teamId, lead, "LEAD");
+    String teamId = createTeam(admin, "Core", lead);
     addMember(admin, teamId, coLead, "LEAD");
 
     String leadToken = token("lead");
@@ -353,8 +345,7 @@ class MyTeamsControllerIT extends AbstractIntegrationTest {
     String admin = token(createUser("root", UserRole.ADMIN));
     User lead = createUser("lead", UserRole.MEMBER);
     User member = createUser("member", UserRole.MEMBER);
-    String teamId = createTeam(admin, "Core");
-    addMember(admin, teamId, lead, "LEAD");
+    String teamId = createTeam(admin, "Core", lead);
     addMember(admin, teamId, member, "MEMBER");
 
     // The lead polishes the presentation (issue #509 follow-up) ...
@@ -384,13 +375,20 @@ class MyTeamsControllerIT extends AbstractIntegrationTest {
   }
 
   private String createTeam(String token, String name) throws Exception {
+    // Every team starts with a LEAD (issue #586 follow-up) - mint a fresh one
+    // for tests that do not care who leads.
+    return createTeam(token, name, createUser("lead" + IP_SEQ.incrementAndGet(), UserRole.MEMBER));
+  }
+
+  private String createTeam(String token, String name, User lead) throws Exception {
     MvcResult result =
         mockMvc
             .perform(
                 post("/api/v1/admin/teams")
                     .header("Authorization", bearer(token))
                     .contentType(MediaType.APPLICATION_JSON)
-                    .content("{\"name\":\"%s\"}".formatted(name)))
+                    .content(
+                        "{\"name\":\"%s\",\"leadUserId\":\"%s\"}".formatted(name, lead.getId())))
             .andExpect(status().isCreated())
             .andReturn();
     Matcher matcher = ID_FIELD.matcher(result.getResponse().getContentAsString());

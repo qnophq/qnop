@@ -20,7 +20,7 @@
  */
 
 import Box from '@mui/material/Box';
-import { Link as RouterLink } from 'react-router-dom';
+import { Link as RouterLink } from 'react-router';
 
 type Mode = 'login' | 'register';
 
