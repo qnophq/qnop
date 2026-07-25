@@ -17,6 +17,12 @@ dependencies {
     // Compile-time only: generates META-INF/spring-configuration-metadata.json from the
     // Javadoc on the @ConfigurationProperties records, so the effective-configuration page
     // (issue #522) can render a per-property description without a hand-kept text map.
+    //
+    // Caveat (issue #610): on an INCREMENTAL compile the processor rewrites that file for the
+    // whole module but only reads the Javadoc of the sources javac actually recompiled, so every
+    // untouched property loses its description until the next full compile. Locally that means
+    // /admin/configuration can render without tooltips; ConfigurationControllerIT is written to
+    // stay honest under both modes (see its class Javadoc).
     annotationProcessor(platform(libs.spring.boot.dependencies))
     annotationProcessor(libs.spring.boot.configuration.processor)
 
