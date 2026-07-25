@@ -90,9 +90,11 @@ public class DocumentOverviewService {
     String like =
         query == null || query.isBlank() ? null : "%" + query.trim().toLowerCase(Locale.ROOT) + "%";
     // The default overview (archived=false) hides archived reviews (issue #576); the "Archived"
-    // view (archived=true) returns only them. Open/closed is a client-side facet over the result.
+    // view (archived=true) returns only them — the two slices are mutually exclusive here, so the
+    // flags are inverses. Open/closed is a client-side facet over the result.
     Page<Document> result =
-        documents.findVisibleTo(actor, like, archived, PageRequest.of(page, size, parseSort(sort)));
+        documents.findVisibleTo(
+            actor, like, !archived, archived, PageRequest.of(page, size, parseSort(sort)));
 
     List<UUID> ids = result.getContent().stream().map(Document::getId).toList();
     Map<UUID, Integer> maxVersions =

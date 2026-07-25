@@ -6309,10 +6309,17 @@ components:
         workflowState:
           type: string
           description: The review workflow state (ADR-0011), for the state cue on the hit.
+        archived:
+          type: boolean
+          description: >-
+            True when the review has been archived (issue #576). Search deliberately spans
+            archived reviews so a closed record stays findable; this flag lets the hit render
+            it as a record instead of as live work.
       required:
         - id
         - title
         - workflowState
+        - archived
     DiscussionSearchHit:
       type: object
       description: >-

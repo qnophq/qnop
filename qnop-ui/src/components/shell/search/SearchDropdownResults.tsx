@@ -104,7 +104,9 @@ export function SearchDropdownResults({
               highlighted={highlightKey === `review:${hit.id}`}
               testId="search-hit-review"
               onClick={() => navigate(`/reviews/${hit.slug ?? hit.id}`)}
-              start={<WorkflowStateIcon state={hit.workflowState} size={14} />}
+              start={
+                <WorkflowStateIcon state={hit.workflowState} size={14} archived={hit.archived} />
+              }
               primary={hit.title}
             />
           ))}

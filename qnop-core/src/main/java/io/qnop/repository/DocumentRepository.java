@@ -59,11 +59,18 @@ public interface DocumentRepository extends JpaRepository<Document, UUID> {
    * The documents visible to a user for the reviews overview (issue #292): owned, joined as a
    * direct participant, or joined through membership in a participating team. {@code q} must be
    * passed pre-lowercased and {@code LIKE}-wrapped; {@code null} disables the title filter.
+   *
+   * <p>The two archive flags (issue #576) select the retention slice explicitly rather than through
+   * one either/or boolean, because the callers need all three combinations: the overview shows the
+   * active reviews ({@code true, false}), its Archived facet shows only the records ({@code false,
+   * true}), and global search spans both ({@code true, true}) so an archived review stays findable.
+   * Two plain booleans also keep the predicate free of a nullable parameter, which would need an
+   * explicit {@code CAST} to compare against {@code NULL} on PostgreSQL.
    */
   @Query(
       "SELECT d FROM Document d WHERE (:q IS NULL OR LOWER(d.title) LIKE :q)"
-          + " AND ((:archived = FALSE AND d.archivedAt IS NULL)"
-          + "   OR (:archived = TRUE AND d.archivedAt IS NOT NULL))"
+          + " AND ((:includeActive = TRUE AND d.archivedAt IS NULL)"
+          + "   OR (:includeArchived = TRUE AND d.archivedAt IS NOT NULL))"
           + " AND (d.ownerId = :actor"
           + " OR EXISTS (SELECT 1 FROM ReviewParticipant p"
           + "   WHERE p.documentId = d.id AND p.userId = :actor)"
@@ -72,7 +79,8 @@ public interface DocumentRepository extends JpaRepository<Document, UUID> {
   Page<Document> findVisibleTo(
       @Param("actor") UUID actor,
       @Param("q") String q,
-      @Param("archived") boolean archived,
+      @Param("includeActive") boolean includeActive,
+      @Param("includeArchived") boolean includeArchived,
       Pageable pageable);
 
   /** Reviews the user owns — ownership is structurally public, anonymous ones included (#473). */

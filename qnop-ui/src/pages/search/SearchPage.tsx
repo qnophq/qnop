@@ -265,7 +265,7 @@ export function SearchPage() {
                       data-testid="search-row-review"
                       sx={{ alignItems: 'center', py: 1.25, ...reveal(index) }}
                     >
-                      <WorkflowStateIcon state={hit.workflowState} />
+                      <WorkflowStateIcon state={hit.workflowState} archived={hit.archived} />
                       <Link
                         component={RouterLink}
                         to={`/reviews/${hit.slug ?? hit.id}`}

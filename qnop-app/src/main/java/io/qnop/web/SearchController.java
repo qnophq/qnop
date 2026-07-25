@@ -168,7 +168,8 @@ public class SearchController implements SearchApi {
         .id(hit.id())
         .slug(hit.slug())
         .title(hit.title())
-        .workflowState(hit.workflowState());
+        .workflowState(hit.workflowState())
+        .archived(hit.archived());
   }
 
   private static DiscussionSearchGroup toDiscussionGroup(

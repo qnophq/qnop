@@ -93,8 +93,12 @@ public class LikeSearchService implements SearchService {
           new GroupView<>(List.of(), 0));
     }
     String term = termOf(like);
+    // Search spans both retention slices (issue #576): an archived review has left the default
+    // overview but stays a readable record, and search is the path that keeps it reachable. The
+    // hit carries its archived flag so a record is never presented as live work.
     Page<Document> reviewPage =
-        documents.findVisibleTo(actor, like, PageRequest.of(0, QUICK_SIZE, REVIEW_SORT));
+        documents.findVisibleTo(
+            actor, like, true, true, PageRequest.of(0, QUICK_SIZE, REVIEW_SORT));
     Page<DiscussionMatchProjection> openerPage =
         comments.searchAnnotationOpeners(like, actor, admin, PageRequest.of(0, QUICK_SIZE));
     Page<DiscussionMatchProjection> replyPage =
@@ -118,7 +122,7 @@ public class LikeSearchService implements SearchService {
       return new PageView<>(List.of(), 0, page, size);
     }
     Page<Document> result =
-        documents.findVisibleTo(actor, like, PageRequest.of(page, size, REVIEW_SORT));
+        documents.findVisibleTo(actor, like, true, true, PageRequest.of(page, size, REVIEW_SORT));
     return new PageView<>(toReviewHits(result), result.getTotalElements(), page, size);
   }
 
@@ -194,7 +198,14 @@ public class LikeSearchService implements SearchService {
 
   private static List<ReviewHitView> toReviewHits(Page<Document> page) {
     return page.getContent().stream()
-        .map(d -> new ReviewHitView(d.getId(), d.getSlug(), d.getTitle(), d.getWorkflowState()))
+        .map(
+            d ->
+                new ReviewHitView(
+                    d.getId(),
+                    d.getSlug(),
+                    d.getTitle(),
+                    d.getWorkflowState(),
+                    d.getArchivedAt() != null))
         .toList();
   }
 
