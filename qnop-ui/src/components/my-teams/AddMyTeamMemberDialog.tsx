@@ -31,8 +31,10 @@ import DialogTitle from '@mui/material/DialogTitle';
 import MenuItem from '@mui/material/MenuItem';
 import Stack from '@mui/material/Stack';
 import TextField from '@mui/material/TextField';
+import Typography from '@mui/material/Typography';
 import type { PrincipalView, TeamRole } from '../../api/generated';
 import { usePrincipalSearch } from '../../api/hooks/useReviews';
+import { UserAvatar } from '../shell/UserAvatar';
 import { useAddMyTeamMember } from '../../api/hooks/useMyTeams';
 import { apiErrorMessage } from '../../utils/apiError';
 
@@ -118,6 +120,19 @@ export function AddMyTeamMemberDialog({
               isOptionEqualToValue={(a, b) => a.id === b.id}
               filterOptions={(x) => x}
               noOptionsText="No matching users"
+              // The person, not just a string - the app-wide picker recipe
+              // (avatar + name), as in the review wizard and the lead picker.
+              renderOption={({ key, ...optionProps }, option) => (
+                <Box
+                  component="li"
+                  key={key}
+                  {...optionProps}
+                  sx={{ display: 'flex', alignItems: 'center', gap: 1.25 }}
+                >
+                  <UserAvatar name={option.displayName} size={22} imageUrl={option.avatarUrl} />
+                  <Typography variant="body2">{option.displayName}</Typography>
+                </Box>
+              )}
               renderInput={(params) => (
                 <TextField {...params} label="Users" placeholder="Search by name" />
               )}
