@@ -160,6 +160,23 @@ export function AnnotationPanel({
   onNewDocumentNote,
 }: AnnotationPanelProps) {
   const [filters, setFilters] = useState<AnnotationFilters>(EMPTY_FILTERS);
+  // The card the reviewer has open must never be yanked out of the list by an
+  // action taken ON it (issue #548): confirming a moved placement flips the
+  // annotation out of the `attention` facet, resolving flips it out of `open` —
+  // and the expanded card being read would vanish once the mutation settles.
+  // So the active annotation is pinned into the visible list. Re-narrowing the
+  // list is still the reviewer's call: touching a facet or the search field
+  // drops the pin, because that IS an explicit request to re-filter.
+  const [pinnedId, setPinnedId] = useState<string | null>(activeAnnotationId);
+  const [pinnedFor, setPinnedFor] = useState<string | null>(activeAnnotationId);
+  if (activeAnnotationId !== pinnedFor) {
+    setPinnedFor(activeAnnotationId);
+    setPinnedId(activeAnnotationId);
+  }
+  const changeFilters = (next: AnnotationFilters) => {
+    setFilters(next);
+    setPinnedId(null);
+  };
   const userId = useAuthStore((state) => state.userId);
 
   // A newly selected annotation must be in view (issue #491) — in a long list
@@ -201,18 +218,28 @@ export function AnnotationPanel({
   // Sort + status-filter once per (annotations, filter) change, not on every
   // render (e.g. a hover or selection): the list can be large and the sort is
   // O(n log n) (issue #334).
-  const { visible, hiddenByFilter } = useMemo(() => {
+  const { visible, hiddenByFilter, pinnedOut } = useMemo(() => {
     const matches = (annotation: AnnotationView) =>
       matchesFilters(annotation, filters, authorNameOf(annotation), resolveMentions);
     // ONE flat list (issue #481): document-scoped remarks lead, then anchored
     // ones by document position — each card carries its own scope marker.
-    const items = [...annotations].sort(comparePanelOrder).filter(matches);
+    const items = [...annotations].sort(comparePanelOrder);
+    const matching = items.filter(matches);
+    // The pinned card keeps its place in the order (issue #548) — it must not
+    // jump to the top just because it stopped matching.
+    const matched = new Set(matching.map((annotation) => annotation.id));
+    const pinnedDropped = pinnedId != null && !matched.has(pinnedId);
     return {
-      visible: items,
-      hiddenByFilter: annotations.length > 0 && items.length === 0,
+      visible: pinnedDropped
+        ? items.filter((annotation) => matched.has(annotation.id) || annotation.id === pinnedId)
+        : matching,
+      // The facet counts stay honest: "nothing matches" is about the filter,
+      // not about what the pin keeps on screen.
+      hiddenByFilter: annotations.length > 0 && matching.length === 0,
+      pinnedOut: pinnedDropped,
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps -- authorNameOf derives from the inputs below
-  }, [annotations, filters, userId, displayName, resolveMentions]);
+  }, [annotations, filters, pinnedId, userId, displayName, resolveMentions]);
   const newCount = visible.filter((a) => isUnseen(a, previousSeenAt, userId)).length;
 
   // Under a non-OPEN policy (issue #413) only the annotation's author and the
@@ -349,13 +376,13 @@ export function AnnotationPanel({
           <ReanchorBanner
             annotations={annotations}
             versionNumber={versionNumber}
-            onReview={() => setFilters((current) => ({ ...current, placement: 'attention' }))}
+            onReview={() => changeFilters({ ...filters, placement: 'attention' })}
           />
         )}
         {annotations.length > 0 && (
           <PanelFilterBar
             filters={filters}
-            onChange={setFilters}
+            onChange={changeFilters}
             authors={authors}
             authorFacet={!anonymous}
           />
@@ -378,7 +405,11 @@ export function AnnotationPanel({
         )}
         {hiddenByFilter && (
           <Typography variant="body2" color="text.secondary">
-            No annotations match this filter.
+            {pinnedOut
+              ? // The one card left on screen is the one being read (issue #548) —
+                // say so, or the filter would look broken.
+                'No annotations match this filter — the one you have open stays until you select another.'
+              : 'No annotations match this filter.'}
           </Typography>
         )}
         {visible.map(renderItem)}
