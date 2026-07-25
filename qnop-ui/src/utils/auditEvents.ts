@@ -143,6 +143,12 @@ export const AUDIT_EVENT_META: Record<string, AuditEventMeta> = {
     description: 'An owner or admin restored an archived review to the active lists (issue #576).',
     tone: 'blue',
   },
+  'review.purged': {
+    label: 'Reviews purged',
+    description:
+      'Archived reviews passed the purge retention window and were deleted permanently, including storage objects no other document referenced (issue #577). This is the only surviving record of them — their own audit trail was deleted with them; the details list what went.',
+    tone: 'red',
+  },
 };
 
 /** The event types in a sensible display order — drives the filter and the legend. */
