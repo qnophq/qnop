@@ -236,6 +236,17 @@ describe('ReviewsPage', () => {
     expect(screen.getByText('Active (3)')).toBeInTheDocument();
   });
 
+  it('explains a facet chip on hover', async () => {
+    renderPage();
+
+    fireEvent.mouseOver(screen.getByText('Every state (4)'));
+    expect(
+      await screen.findByRole('tooltip', {
+        name: 'Everything at once — every workflow state, archived records included',
+      }),
+    ).toBeInTheDocument();
+  });
+
   it('names the archive instead of blaming filters when only records are left (#578)', () => {
     mockReviews({
       data: { items: [REVIEWS[3]], total: 1, page: 0, size: 100 },

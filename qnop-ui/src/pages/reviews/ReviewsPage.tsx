@@ -35,6 +35,7 @@ import Stack from '@mui/material/Stack';
 import TextField from '@mui/material/TextField';
 import ToggleButton from '@mui/material/ToggleButton';
 import ToggleButtonGroup from '@mui/material/ToggleButtonGroup';
+import Tooltip from '@mui/material/Tooltip';
 import Typography from '@mui/material/Typography';
 import { LayoutGrid, ListFilter, Plus, Rows3 } from 'lucide-react';
 import { useNavigate, useSearchParams } from 'react-router';
@@ -171,23 +172,28 @@ function sortReviews(reviews: DocumentSummary[], sortBy: SortBy): DocumentSummar
 function FilterChip({
   label,
   count,
+  hint,
   selected,
   onClick,
 }: {
   label: string;
   count?: number;
+  /** One-line explanation of what the facet shows, surfaced on hover. */
+  hint: string;
   selected: boolean;
   onClick: () => void;
 }) {
   return (
-    <Chip
-      label={count === undefined ? label : `${label} (${count})`}
-      size="small"
-      color={selected ? 'primary' : 'default'}
-      variant={selected ? 'filled' : 'outlined'}
-      onClick={onClick}
-      sx={{ fontWeight: selected ? 600 : 400 }}
-    />
+    <Tooltip title={hint} arrow>
+      <Chip
+        label={count === undefined ? label : `${label} (${count})`}
+        size="small"
+        color={selected ? 'primary' : 'default'}
+        variant={selected ? 'filled' : 'outlined'}
+        onClick={onClick}
+        sx={{ fontWeight: selected ? 600 : 400 }}
+      />
+    </Tooltip>
   );
 }
 
@@ -524,18 +530,21 @@ export function ReviewsPage() {
           <Stack direction="row" spacing={1} sx={{ flexWrap: 'wrap', rowGap: 1 }}>
             <FilterChip
               label="All"
+              hint="Every review you can see, whatever your part in it"
               count={roleCounts.all}
               selected={roleFilter === 'all'}
               onClick={() => setRoleFilter('all')}
             />
             <FilterChip
               label="Owned by me"
+              hint="Reviews you own and steer"
               count={roleCounts.owner}
               selected={roleFilter === 'owner'}
               onClick={() => setRoleFilter('owner')}
             />
             <FilterChip
               label="Reviewing"
+              hint="Reviews where you are on the reviewer roster"
               count={roleCounts.reviewer}
               selected={roleFilter === 'reviewer'}
               onClick={() => setRoleFilter('reviewer')}
@@ -543,30 +552,35 @@ export function ReviewsPage() {
             <Box sx={{ width: 8 }} />
             <FilterChip
               label="Active"
+              hint="All live work — every workflow state except archived records (the default)"
               count={statusCounts.active}
               selected={statusFilter === 'active'}
               onClick={() => setStatusFilter('active')}
             />
             <FilterChip
               label="Open"
+              hint="Live reviews the workflow has not closed yet"
               count={statusCounts.open}
               selected={statusFilter === 'open'}
               onClick={() => setStatusFilter(statusFilter === 'open' ? 'active' : 'open')}
             />
             <FilterChip
               label="Closed"
+              hint="Finalized or cancelled reviews that are not archived yet"
               count={statusCounts.closed}
               selected={statusFilter === 'closed'}
               onClick={() => setStatusFilter(statusFilter === 'closed' ? 'active' : 'closed')}
             />
             <FilterChip
               label="Archived"
+              hint="Only the records archived out of the active lists"
               count={statusCounts.archived}
               selected={statusFilter === 'archived'}
               onClick={() => setStatusFilter(statusFilter === 'archived' ? 'active' : 'archived')}
             />
             <FilterChip
               label="Every state"
+              hint="Everything at once — every workflow state, archived records included"
               count={statusCounts.all}
               selected={statusFilter === 'all'}
               onClick={() => setStatusFilter(statusFilter === 'all' ? 'active' : 'all')}
