@@ -67,6 +67,13 @@ public interface DocumentVersionRepository extends JpaRepository<DocumentVersion
   @Query("SELECT v.storageKey FROM DocumentVersion v")
   List<String> findAllStorageKeys();
 
+  /**
+   * The storage keys one document's versions reference — collected before a purge deletes the
+   * aggregate, so the purge knows which keys to re-check for other referrers (issue #577).
+   */
+  @Query("SELECT v.storageKey FROM DocumentVersion v WHERE v.documentId = :documentId")
+  List<String> findStorageKeysByDocumentId(@Param("documentId") UUID documentId);
+
   /** Maps missing storage keys back to their document + version, to explain a data-loss finding. */
   @Query(
       "SELECT new io.qnop.repository.VersionStorageRef(v.storageKey, v.documentId, v.versionNumber)"

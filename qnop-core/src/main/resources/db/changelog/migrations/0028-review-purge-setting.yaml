@@ -1,0 +1,23 @@
+# Copyright (c) 2026-present devtank42 GmbH
+# SPDX-License-Identifier: AGPL-3.0-only
+
+# Seed row for the archived-review purge retention (issue #577). Additive changeset
+# — new keys land in their own changeset (1.0.0 shipped the original seed). The
+# registry (ApplicationSettingKey) stays authoritative per ADR-0025; this row
+# mirrors its default. 0 disables purging.
+#
+# The default of 180 alone purges nothing: the reviewPurge scheduler job ships
+# DISABLED (ADR-0050), so irreversible deletion needs a second, deliberate act.
+databaseChangeLog:
+  - changeSet:
+      id: 0028-review-purge-setting
+      author: qnop
+      comment: Adds the review.purge_archived_after_days application setting (issue #577), default 180.
+      changes:
+        - insert:
+            tableName: application_setting
+            columns:
+              - column: { name: setting_key, value: "review.purge_archived_after_days" }
+              - column: { name: setting_value, value: "180" }
+              - column: { name: setting_desc, value: "Days an archived review is kept before it is deleted permanently, including storage objects no other document references (0 disables purging). Irreversible — the Review purge job must be enabled as well." }
+              - column: { name: value_type, value: "INTEGER" }

@@ -66,6 +66,15 @@ describe('auditEventMeta', () => {
     expect(auditEventMeta('scheduler.job.updated').label).toBe('Scheduler job updated');
   });
 
+  it('knows the review lifecycle, and flags the irreversible purge in red', () => {
+    expect(AUDIT_EVENT_TYPES).toEqual(
+      expect.arrayContaining(['review.archived', 'review.unarchived', 'review.purged']),
+    );
+    // The purge destroys data irreversibly (issue #577), so it must not read as routine upkeep.
+    expect(auditEventMeta('review.purged').tone).toBe('red');
+    expect(auditEventMeta('review.archived').tone).toBe('neutral');
+  });
+
   it('falls back to the raw type and a neutral tone for an unknown event', () => {
     const meta = auditEventMeta('some.future.event');
     expect(meta.label).toBe('some.future.event');

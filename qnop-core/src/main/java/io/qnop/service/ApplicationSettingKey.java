@@ -145,7 +145,12 @@ public enum ApplicationSettingKey {
       "review.archive_after_days",
       SettingValueType.INTEGER,
       "90",
-      "Days a completed review stays before it is archived out of the active lists (0 disables auto-archiving).");
+      "Days a completed review stays before it is archived out of the active lists (0 disables auto-archiving)."),
+  REVIEW_PURGE_ARCHIVED_AFTER_DAYS(
+      "review.purge_archived_after_days",
+      SettingValueType.INTEGER,
+      "180",
+      "Days an archived review is kept before it is deleted permanently, including storage objects no other document references (0 disables purging). Irreversible — the Review purge job must be enabled as well.");
 
   private static final Map<String, ApplicationSettingKey> BY_KEY =
       Arrays.stream(values())
@@ -166,6 +171,8 @@ public enum ApplicationSettingKey {
           AUTH_PASSWORD_RESET_TOKEN_TTL_MINUTES, SettingConstraints.range(1, 1440),
           // 0 disables auto-archiving; the upper bound (~10 years) is a sanity cap.
           REVIEW_ARCHIVE_AFTER_DAYS, SettingConstraints.range(0, 3650),
+          // 0 disables purging; same ~10-year sanity cap as the archive window.
+          REVIEW_PURGE_ARCHIVED_AFTER_DAYS, SettingConstraints.range(0, 3650),
           SMTP_PORT, SettingConstraints.range(1, 65535),
           SMTP_FROM, SettingConstraints.format(SettingConstraints.ValueFormat.EMAIL),
           GENERAL_BASE_URL, SettingConstraints.format(SettingConstraints.ValueFormat.URL),

@@ -116,4 +116,14 @@ public interface DocumentRepository extends JpaRepository<Document, UUID> {
    * How many reviews the sweep would archive at {@code cutoff} — the dry-run count (issue #576).
    */
   long countByArchivedAtIsNullAndClosedAtBefore(Instant cutoff);
+
+  /**
+   * Reviews archived before {@code cutoff} — the purge sweep's eligibility set (issue #577).
+   * Bounded by {@code Pageable}: a purge batch is far more expensive than an archive batch (a
+   * cascading delete plus object-storage work per review), so the bound matters more here.
+   */
+  List<Document> findByArchivedAtBefore(Instant cutoff, Pageable pageable);
+
+  /** How many reviews the purge would delete at {@code cutoff} — the dry-run count (issue #577). */
+  long countByArchivedAtBefore(Instant cutoff);
 }

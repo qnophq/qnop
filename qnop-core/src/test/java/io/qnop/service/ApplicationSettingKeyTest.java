@@ -64,7 +64,8 @@ class ApplicationSettingKeyTest {
           "notifications.review_emails_enabled",
           "review.free_reattach_enabled",
           "review.finalize_with_open_annotations",
-          "review.archive_after_days");
+          "review.archive_after_days",
+          "review.purge_archived_after_days");
 
   @Test
   void registryMatchesSeededKeys() {

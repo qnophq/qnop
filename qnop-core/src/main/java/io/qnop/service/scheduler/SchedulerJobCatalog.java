@@ -41,6 +41,7 @@ public final class SchedulerJobCatalog {
   public static final String REVOKED_TOKEN_SWEEP = "revokedTokenSweep";
   public static final String STORAGE_ORPHAN_REAPER = "storageOrphanReaper";
   public static final String REVIEW_ARCHIVE = "reviewArchive";
+  public static final String REVIEW_PURGE = "reviewPurge";
 
   private static final List<SchedulerJobDefinition> DEFINITIONS =
       List.of(
@@ -49,37 +50,61 @@ public final class SchedulerJobCatalog {
               "Email-verification token sweep",
               "Purges expired e-mail verification tokens so the table does not grow unbounded.",
               "0 30 3 * * *",
+              false,
+              true,
               false),
           new SchedulerJobDefinition(
               PASSWORD_RESET_TOKEN_SWEEP,
               "Password-reset token sweep",
               "Purges expired password-reset tokens once they can no longer be redeemed.",
               "0 35 3 * * *",
+              false,
+              true,
               false),
           new SchedulerJobDefinition(
               REFRESH_TOKEN_SWEEP,
               "Refresh token sweep",
               "Deletes expired refresh tokens; reuse-detection is moot once a token has expired.",
               "0 40 3 * * *",
+              false,
+              true,
               false),
           new SchedulerJobDefinition(
               REVOKED_TOKEN_SWEEP,
               "Revoked access-token sweep",
               "Drops revoked access-token denylist rows once their own expiry has passed.",
               "0 45 3 * * *",
+              false,
+              true,
               false),
           new SchedulerJobDefinition(
               STORAGE_ORPHAN_REAPER,
               "Storage orphan reaper",
               "Deletes uploaded-but-uncommitted storage objects older than the grace period.",
               "0 30 3 * * *",
-              true),
+              true,
+              true,
+              false),
           new SchedulerJobDefinition(
               REVIEW_ARCHIVE,
               "Review archive",
               "Archives reviews closed (finalized/cancelled) longer than the retention window,"
                   + " moving them out of the active lists.",
               "0 50 3 * * *",
+              true,
+              true,
+              false),
+          // Irreversible, so it ships DISABLED (issue #577): purging needs a deliberate
+          // operator act on top of the retention setting. Self-transactional, because it
+          // commits one review per transaction and deletes storage only after each commit.
+          new SchedulerJobDefinition(
+              REVIEW_PURGE,
+              "Review purge",
+              "Permanently deletes reviews archived longer than the purge retention window,"
+                  + " including storage objects no surviving document references.",
+              "0 55 3 * * *",
+              true,
+              false,
               true));
 
   private static final List<String> IDS =

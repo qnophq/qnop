@@ -34,6 +34,35 @@ function transitionSide(value: unknown): string {
   return value === null || value === undefined ? EM_DASH : humanizeWorkflowState(String(value));
 }
 
+/**
+ * Renders a purge run (issue #577): the counts, then the titles that went. This
+ * is the only surviving trace of those reviews — their own audit trail was
+ * deleted with them — so the titles are shown, not just how many.
+ */
+function purgeSummary(obj: Record<string, unknown>): string {
+  const reviews = typeof obj.reviews === 'number' ? obj.reviews : null;
+  const objects = typeof obj.storageObjects === 'number' ? obj.storageObjects : null;
+  const titles = Array.isArray(obj.purged)
+    ? obj.purged
+        .map((entry) =>
+          entry !== null && typeof entry === 'object'
+            ? (entry as Record<string, unknown>).title
+            : null,
+        )
+        .filter((title): title is string => typeof title === 'string' && title.length > 0)
+    : [];
+
+  const bits: string[] = [];
+  if (reviews !== null) bits.push(`${reviews} review${reviews === 1 ? '' : 's'}`);
+  if (objects !== null) bits.push(`${objects} storage object${objects === 1 ? '' : 's'}`);
+  const truncated = typeof obj.truncated === 'number' ? obj.truncated : 0;
+  if (titles.length > 0) {
+    const listed = titles.join(', ');
+    bits.push(truncated > 0 ? `${listed} +${truncated} more` : listed);
+  }
+  return bits.length > 0 ? bits.join(' · ') : EM_DASH;
+}
+
 function dueDateChange(from: unknown, to: unknown, formatDate: (iso: string) => string): string {
   const before = from === null || from === undefined ? null : formatDate(String(from));
   const after = to === null || to === undefined ? null : formatDate(String(to));
@@ -120,6 +149,8 @@ export function formatAuditDetail(
       return obj.outcome !== null && obj.outcome !== undefined
         ? `Was ${humanizeWorkflowState(String(obj.outcome))}`
         : EM_DASH;
+    case 'review.purged':
+      return purgeSummary(obj);
     default:
       break;
   }

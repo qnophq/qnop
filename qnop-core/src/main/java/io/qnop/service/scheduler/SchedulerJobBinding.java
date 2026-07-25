@@ -25,6 +25,7 @@ import io.qnop.service.TokenRevocationService;
 import io.qnop.service.auth.EmailVerificationTokenService;
 import io.qnop.service.auth.PasswordResetTokenService;
 import io.qnop.service.review.ReviewArchiveService;
+import io.qnop.service.review.ReviewPurgeService;
 import io.qnop.service.storage.StorageService;
 import org.springframework.stereotype.Component;
 
@@ -35,7 +36,9 @@ import org.springframework.stereotype.Component;
  * of scheduler plumbing. Constructor-time registration completes before any cron tick or run-now
  * can fire.
  *
- * <p>The token sweeps ignore the dry-run flag; only the storage reaper honours it.
+ * <p>The token sweeps ignore the dry-run flag; the storage reaper, the review archive and the
+ * review purge honour it. The purge is also the one {@code selfTransactional} job (issue #577) —
+ * the gate hands it no transaction, and it opens one per review itself.
  */
 @Component
 public class SchedulerJobBinding {
@@ -47,17 +50,34 @@ public class SchedulerJobBinding {
       RefreshTokenService refreshTokens,
       TokenRevocationService revokedTokens,
       StorageService storage,
-      ReviewArchiveService reviewArchive) {
+      ReviewArchiveService reviewArchive,
+      ReviewPurgeService reviewPurge) {
     scheduler.register(
         SchedulerJobCatalog.EMAIL_VERIFICATION_TOKEN_SWEEP,
-        dryRun -> emailVerificationTokens.sweepOnce());
+        dryRun -> {
+          emailVerificationTokens.sweepOnce();
+          return null;
+        });
     scheduler.register(
-        SchedulerJobCatalog.PASSWORD_RESET_TOKEN_SWEEP, dryRun -> passwordResetTokens.sweepOnce());
+        SchedulerJobCatalog.PASSWORD_RESET_TOKEN_SWEEP,
+        dryRun -> {
+          passwordResetTokens.sweepOnce();
+          return null;
+        });
     scheduler.register(
-        SchedulerJobCatalog.REFRESH_TOKEN_SWEEP, dryRun -> refreshTokens.sweepExpiredOnce());
+        SchedulerJobCatalog.REFRESH_TOKEN_SWEEP,
+        dryRun -> {
+          refreshTokens.sweepExpiredOnce();
+          return null;
+        });
     scheduler.register(
-        SchedulerJobCatalog.REVOKED_TOKEN_SWEEP, dryRun -> revokedTokens.sweepExpiredOnce());
+        SchedulerJobCatalog.REVOKED_TOKEN_SWEEP,
+        dryRun -> {
+          revokedTokens.sweepExpiredOnce();
+          return null;
+        });
     scheduler.register(SchedulerJobCatalog.STORAGE_ORPHAN_REAPER, storage::reapOrphansOnce);
     scheduler.register(SchedulerJobCatalog.REVIEW_ARCHIVE, reviewArchive::archiveOnce);
+    scheduler.register(SchedulerJobCatalog.REVIEW_PURGE, reviewPurge::purgeOnce);
   }
 }

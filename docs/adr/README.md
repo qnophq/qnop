@@ -66,6 +66,7 @@ Two refinement conventions (see the 2026-07-16 amendment to [ADR-0001](0001-reco
 | [0047](0047-federated-global-search.md) | Federated global search behind a SearchService port | Accepted |
 | [0048](0048-cross-namespace-slug-uniqueness.md) | Cross-namespace slug uniqueness (users and teams) | Accepted |
 | [0049](0049-extension-plugin-packaging-model.md) | Extension packaging model — boot-time SPI plugins, not a runtime plugin framework | Proposed |
+| [0050](0050-purging-archived-reviews.md) | Purging archived reviews: irreversible deletion with a shared-object guard | Accepted |
 
 ## Template
 

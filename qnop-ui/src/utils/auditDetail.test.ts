@@ -104,6 +104,41 @@ describe('formatAuditDetail', () => {
     expect(formatAuditDetail('annotation.created', '')).toBe('—');
   });
 
+  it('renders a purge run with its counts and the titles that went', () => {
+    // The purged reviews' own audit trail died with them (issue #577), so this row is the only
+    // surviving trace — it must name them, not just count them.
+    expect(
+      formatAuditDetail(
+        'review.purged',
+        '{"reviews":2,"storageObjects":3,"purged":[{"id":"d1","title":"Q3 report"},{"id":"d2","title":"Terms 2024"}]}',
+      ),
+    ).toBe('2 reviews · 3 storage objects · Q3 report, Terms 2024');
+  });
+
+  it('singularises a one-review purge and reports a truncated title list', () => {
+    expect(
+      formatAuditDetail(
+        'review.purged',
+        '{"reviews":1,"storageObjects":1,"purged":[{"id":"d1","title":"Q3 report"}]}',
+      ),
+    ).toBe('1 review · 1 storage object · Q3 report');
+
+    expect(
+      formatAuditDetail(
+        'review.purged',
+        '{"reviews":60,"storageObjects":4,"purged":[{"id":"d1","title":"Q3 report"}],"truncated":59}',
+      ),
+    ).toBe('60 reviews · 4 storage objects · Q3 report +59 more');
+  });
+
+  it('renders a purge that deleted no storage object, and survives a titleless payload', () => {
+    // A review whose binaries are all shared with survivors purges 0 objects — still a real run.
+    expect(formatAuditDetail('review.purged', '{"reviews":1,"storageObjects":0,"purged":[]}')).toBe(
+      '1 review · 0 storage objects',
+    );
+    expect(formatAuditDetail('review.purged', '{}')).toBe('—');
+  });
+
   it('falls back to a compact key: value list for an unknown event shape', () => {
     expect(formatAuditDetail('some.future.event', '{"meta":{"k":1}}')).toBe('meta: {"k":1}');
     expect(formatAuditDetail('some.future.event', '42')).toBe('42');
