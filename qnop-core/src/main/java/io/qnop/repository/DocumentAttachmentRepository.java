@@ -40,6 +40,13 @@ public interface DocumentAttachmentRepository extends JpaRepository<DocumentAtta
   List<String> findAllStorageKeys();
 
   /**
+   * The storage keys one document's attachments reference — collected before a purge deletes the
+   * aggregate, so the purge knows which keys to re-check for other referrers (issue #577).
+   */
+  @Query("SELECT a.storageKey FROM DocumentAttachment a WHERE a.documentId = :documentId")
+  List<String> findStorageKeysByDocumentId(@Param("documentId") UUID documentId);
+
+  /**
    * Maps missing storage keys back to their document + file name, to explain a data-loss finding.
    */
   @Query(

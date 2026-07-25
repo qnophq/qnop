@@ -41,6 +41,7 @@ public final class SchedulerJobCatalog {
   public static final String REVOKED_TOKEN_SWEEP = "revokedTokenSweep";
   public static final String STORAGE_ORPHAN_REAPER = "storageOrphanReaper";
   public static final String REVIEW_ARCHIVE = "reviewArchive";
+  public static final String REVIEW_PURGE = "reviewPurge";
 
   private static final List<SchedulerJobDefinition> DEFINITIONS =
       List.of(
@@ -92,7 +93,19 @@ public final class SchedulerJobCatalog {
               "0 50 3 * * *",
               true,
               true,
-              false));
+              false),
+          // Irreversible, so it ships DISABLED (issue #577): purging needs a deliberate
+          // operator act on top of the retention setting. Self-transactional, because it
+          // commits one review per transaction and deletes storage only after each commit.
+          new SchedulerJobDefinition(
+              REVIEW_PURGE,
+              "Review purge",
+              "Permanently deletes reviews archived longer than the purge retention window,"
+                  + " including storage objects no surviving document references.",
+              "0 55 3 * * *",
+              true,
+              false,
+              true));
 
   private static final List<String> IDS =
       DEFINITIONS.stream().map(SchedulerJobDefinition::jobId).toList();

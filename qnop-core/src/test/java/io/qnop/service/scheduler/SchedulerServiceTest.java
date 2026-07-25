@@ -63,6 +63,7 @@ class SchedulerServiceTest {
 
   private static final String TOKEN_JOB = SchedulerJobCatalog.REFRESH_TOKEN_SWEEP;
   private static final String REAPER_JOB = SchedulerJobCatalog.STORAGE_ORPHAN_REAPER;
+  private static final String PURGE_JOB = SchedulerJobCatalog.REVIEW_PURGE;
 
   @Mock private SchedulerJobRepository jobs;
   @Mock private AuditEventRepository auditEvents;
@@ -232,6 +233,75 @@ class SchedulerServiceTest {
         views.stream().filter(v -> v.jobId().equals(TOKEN_JOB)).findFirst().orElseThrow();
     assertThat(tokenView.enabled()).isTrue();
     assertThat(tokenView.dryRun()).isFalse();
+    // …and a disabled-by-default job must not advertise itself as enabled (issue #577).
+    SchedulerService.SchedulerJobView purgeView =
+        views.stream().filter(v -> v.jobId().equals(PURGE_JOB)).findFirst().orElseThrow();
+    assertThat(purgeView.enabled()).isFalse();
   }
 
+  // --- the two catalogue flags of issue #577 -------------------------------
+
+  @Test
+  @DisplayName("a disabled-by-default job with no row is skipped, not run")
+  void disabledByDefaultJobIsSkippedWhenUnseeded() {
+    when(jobs.findById(PURGE_JOB)).thenReturn(Optional.empty());
+    AtomicInteger runs = new AtomicInteger();
+    scheduler.register(PURGE_JOB, dryRun -> runs.incrementAndGet());
+
+    RunOutcome outcome = scheduler.runScheduled(PURGE_JOB);
+
+    // The old "no row ⇒ enabled" fallback would have armed an irreversible purge here.
+    assertThat(outcome).isEqualTo(RunOutcome.SKIPPED_DISABLED);
+    assertThat(runs).hasValue(0);
+  }
+
+  @Test
+  @DisplayName(
+      "fail-open honours the catalogued default: the purge stays off if state is unreadable")
+  void failOpenRespectsDisabledByDefault() {
+    when(jobs.findById(PURGE_JOB)).thenThrow(new IllegalStateException("scheduler_job unreadable"));
+    AtomicInteger runs = new AtomicInteger();
+    scheduler.register(PURGE_JOB, dryRun -> runs.incrementAndGet());
+
+    assertThat(scheduler.runScheduled(PURGE_JOB)).isEqualTo(RunOutcome.SKIPPED_DISABLED);
+    assertThat(runs).hasValue(0);
+  }
+
+  @Test
+  @DisplayName("an admin can enable a disabled-by-default job, and run-now overrides regardless")
+  void disabledByDefaultCanBeEnabledAndRunNow() {
+    when(jobs.findById(PURGE_JOB)).thenReturn(Optional.empty());
+    when(jobs.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
+    AtomicInteger runs = new AtomicInteger();
+    scheduler.register(PURGE_JOB, dryRun -> runs.incrementAndGet());
+
+    SchedulerService.SchedulerJobView enabled =
+        scheduler.updateSettings(UUID.randomUUID(), PURGE_JOB, true, null);
+    assertThat(enabled.enabled()).isTrue();
+
+    when(lockProvider.lock(any())).thenReturn(Optional.of(() -> {}));
+    scheduler.runNow(UUID.randomUUID(), PURGE_JOB);
+    assertThat(runs).hasValue(1);
+  }
+
+  @Test
+  @DisplayName("a self-transactional job runs outside the gate's transaction")
+  void selfTransactionalJobIsNotWrapped() {
+    when(jobs.findById(TOKEN_JOB)).thenReturn(Optional.of(SchedulerJob.seed(TOKEN_JOB, true)));
+    when(jobs.findById(PURGE_JOB)).thenReturn(Optional.of(SchedulerJob.seed(PURGE_JOB, true)));
+    scheduler.register(TOKEN_JOB, dryRun -> {});
+    scheduler.register(PURGE_JOB, dryRun -> {});
+
+    scheduler.runScheduled(TOKEN_JOB);
+    // A wrapped job costs three transactions: read state, run work, record outcome.
+    verify(transactionManager, times(3)).getTransaction(any());
+
+    reset(transactionManager);
+    when(transactionManager.getTransaction(any())).thenReturn(new SimpleTransactionStatus());
+
+    scheduler.runScheduled(PURGE_JOB);
+    // The purge costs two — the work itself is invoked with no enclosing transaction (issue #577),
+    // so it can commit per review and delete storage objects between those commits.
+    verify(transactionManager, times(2)).getTransaction(any());
+  }
 }
