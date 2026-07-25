@@ -30,7 +30,7 @@ import TableHead from '@mui/material/TableHead';
 import TableRow from '@mui/material/TableRow';
 import Tooltip from '@mui/material/Tooltip';
 import Typography from '@mui/material/Typography';
-import { Link as RouterLink } from 'react-router-dom';
+import { Link as RouterLink } from 'react-router';
 import { Check, Copy, ListFilter } from 'lucide-react';
 import type { AuditEvent } from '../../api/generated';
 import { useFormatters } from '../../hooks/useFormatters';

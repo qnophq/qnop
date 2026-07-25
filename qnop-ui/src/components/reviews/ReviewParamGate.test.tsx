@@ -21,7 +21,7 @@
 
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { render, screen } from '@testing-library/react';
-import { MemoryRouter, Route, Routes } from 'react-router-dom';
+import { MemoryRouter, Route, Routes } from 'react-router';
 import { useDocumentBySlug } from '../../api/hooks/useDocuments';
 import { ReviewParamGate } from './ReviewParamGate';
 import { useReviewDocumentId } from './reviewDocumentId';

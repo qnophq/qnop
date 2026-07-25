@@ -36,7 +36,7 @@ import {
   Users,
   UsersRound,
 } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate } from 'react-router';
 import type { GlobalSearchResponse } from '../../../api/generated';
 import { AnnotationStatus } from '../../../api/generated';
 import { useAuthStore } from '../../../stores/authStore';

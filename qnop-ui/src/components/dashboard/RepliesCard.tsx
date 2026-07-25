@@ -25,7 +25,7 @@ import Stack from '@mui/material/Stack';
 import Typography from '@mui/material/Typography';
 import { alpha, useTheme } from '@mui/material/styles';
 import { MessageCircleDashed, MessagesSquare } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate } from 'react-router';
 import type { DashboardReply } from '../../api/generated';
 import { useFormatters } from '../../hooks/useFormatters';
 import { SectionCard } from '../admin/layout/SectionCard';

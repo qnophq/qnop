@@ -24,7 +24,7 @@ import Button from '@mui/material/Button';
 import CircularProgress from '@mui/material/CircularProgress';
 import Stack from '@mui/material/Stack';
 import Typography from '@mui/material/Typography';
-import { Link as RouterLink, useParams } from 'react-router-dom';
+import { Link as RouterLink, useParams } from 'react-router';
 import { useDocumentBySlug } from '../../api/hooks/useDocuments';
 import { ReviewDocumentIdContext } from './reviewDocumentId';
 

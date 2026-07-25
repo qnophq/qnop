@@ -26,7 +26,7 @@ import TableCell from '@mui/material/TableCell';
 import TableHead from '@mui/material/TableHead';
 import TableRow from '@mui/material/TableRow';
 import Typography from '@mui/material/Typography';
-import { Link as RouterLink } from 'react-router-dom';
+import { Link as RouterLink } from 'react-router';
 import type { MissingBinary } from '../../../api/generated';
 import { reviewPath } from '../../dashboard/dashboardModel';
 import { ToneBadge } from '../ToneBadge';

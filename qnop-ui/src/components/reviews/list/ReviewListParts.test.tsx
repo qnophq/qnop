@@ -23,7 +23,7 @@ import { describe, expect, it } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import { ThemeProvider } from '@mui/material/styles';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { MemoryRouter } from 'react-router-dom';
+import { MemoryRouter } from 'react-router';
 import type { ParticipantView } from '../../../api/generated';
 import { ParticipantKind } from '../../../api/generated';
 import { buildTheme } from '../../../theme/theme';

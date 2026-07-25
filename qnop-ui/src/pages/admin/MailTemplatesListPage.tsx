@@ -32,7 +32,7 @@ import TableRow from '@mui/material/TableRow';
 import Tooltip from '@mui/material/Tooltip';
 import Typography from '@mui/material/Typography';
 import { ChevronRight } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate } from 'react-router';
 import type { MailTemplateResponse } from '../../api/generated';
 import { useMailTemplates } from '../../api/hooks/useMailTemplates';
 import { ToneBadge } from '../../components/admin/ToneBadge';

@@ -40,7 +40,7 @@ import {
   Users,
 } from 'lucide-react';
 import { useEffect } from 'react';
-import { Navigate, useNavigate, useParams } from 'react-router-dom';
+import { Navigate, useNavigate, useParams } from 'react-router';
 import { useQueryClient } from '@tanstack/react-query';
 import type { PublicUserProfile } from '../api/generated';
 import { useDashboard } from '../api/hooks/useDashboard';

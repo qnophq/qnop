@@ -31,7 +31,7 @@ import { alpha, useTheme } from '@mui/material/styles';
 import type { LucideIcon } from 'lucide-react';
 import { CalendarDays, CheckCircle2, Crown, FileText, Lock, Users } from 'lucide-react';
 import { useEffect } from 'react';
-import { Link as RouterLink, useNavigate, useParams } from 'react-router-dom';
+import { Link as RouterLink, useNavigate, useParams } from 'react-router';
 import { useQueryClient } from '@tanstack/react-query';
 import type { PublicTeamProfileMember, PublicTeamReview } from '../api/generated';
 import { teamProfileKeys, useTeamProfile } from '../api/hooks/useTeamProfile';

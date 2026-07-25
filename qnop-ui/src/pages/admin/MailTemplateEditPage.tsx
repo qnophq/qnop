@@ -34,7 +34,7 @@ import Switch from '@mui/material/Switch';
 import TextField from '@mui/material/TextField';
 import Typography from '@mui/material/Typography';
 import { Send, Eye, RotateCcw, Variable } from 'lucide-react';
-import { Link as RouterLink, useParams } from 'react-router-dom';
+import { Link as RouterLink, useParams } from 'react-router';
 import type { MailTemplateResponse } from '../../api/generated';
 import {
   useMailTemplate,

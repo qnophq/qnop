@@ -37,7 +37,7 @@ import TableHead from '@mui/material/TableHead';
 import TableRow from '@mui/material/TableRow';
 import Typography from '@mui/material/Typography';
 import { ArrowLeftRight, MoreVertical, SquarePen, UserMinus, UserPlus } from 'lucide-react';
-import { Link as RouterLink, useParams } from 'react-router-dom';
+import { Link as RouterLink, useParams } from 'react-router';
 import type { AdminTeamMember } from '../../api/generated';
 import { useRemoveTeamMember, useSetTeamMemberRole, useTeam } from '../../api/hooks/useTeams';
 import { AddMemberDialog } from '../../components/admin/teams/AddMemberDialog';

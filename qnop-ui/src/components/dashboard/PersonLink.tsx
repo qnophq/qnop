@@ -22,7 +22,7 @@
 import Stack from '@mui/material/Stack';
 import Typography from '@mui/material/Typography';
 import { alpha, useTheme } from '@mui/material/styles';
-import { Link as RouterLink } from 'react-router-dom';
+import { Link as RouterLink } from 'react-router';
 import { useAuthStore } from '../../stores/authStore';
 import { UserHoverCard } from '../people/UserHoverCard';
 import { UserAvatar } from '../shell/UserAvatar';

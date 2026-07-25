@@ -29,7 +29,7 @@ import Typography from '@mui/material/Typography';
 import { alpha, useTheme } from '@mui/material/styles';
 import type { LucideIcon } from 'lucide-react';
 import { FileText, MessageSquareText, NotebookPen, SearchX, Users, UsersRound } from 'lucide-react';
-import { Link as RouterLink, useSearchParams } from 'react-router-dom';
+import { Link as RouterLink, useSearchParams } from 'react-router';
 import {
   SEARCH_MIN_LENGTH,
   useSearchAnnotations,

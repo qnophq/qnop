@@ -22,7 +22,7 @@
 import { forwardRef, useImperativeHandle, type ReactNode } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
-import { MemoryRouter } from 'react-router-dom';
+import { MemoryRouter } from 'react-router';
 import { ThemeProvider } from '@mui/material/styles';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import type { MailTemplateResponse } from '../../api/generated';
@@ -60,8 +60,8 @@ vi.mock('../../api/hooks/useMailTemplatePreview', () => ({
   useMailTemplatePreview: () => ({ status: 'idle', data: null, error: null, refresh: vi.fn() }),
 }));
 
-vi.mock('react-router-dom', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('react-router-dom')>()),
+vi.mock('react-router', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('react-router')>()),
   useParams: () => ({ key: 'auth.password_reset' }),
 }));
 
