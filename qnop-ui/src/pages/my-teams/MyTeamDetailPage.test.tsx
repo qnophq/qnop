@@ -103,6 +103,8 @@ function makeTeam(overrides: Partial<TeamDetail> = {}): TeamDetail {
     description: 'Owns the ingest pipeline.',
     viewerRole: 'LEAD',
     viewerCanManage: true,
+    profileShowMembers: false,
+    profileShowReviews: false,
     members: [LEAD, MEMBER],
     ...overrides,
   };

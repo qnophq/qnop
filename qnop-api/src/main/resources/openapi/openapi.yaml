@@ -1560,6 +1560,83 @@ paths:
           $ref: '#/components/responses/Unauthorized'
         '403':
           $ref: '#/components/responses/Forbidden'
+  /teams/{teamId}/profile:
+    get:
+      tags:
+        - Teams
+      summary: Get a team's public profile
+      description: |
+        The workspace-public slice of a team (issue #586): crest, name and
+        description always; the member roster and the review participation only
+        when the team's visibility configuration exposes them — or when the
+        caller is a member of the team or an admin, who always see their own
+        team in full. Hidden sections are null, never empty. The review
+        participation is computed against the CALLER's review visibility, so a
+        non-participant never learns about reviews they cannot see (ADR-0038).
+        Disabled and unknown teams both answer the same 404.
+      operationId: getTeamProfile
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: teamId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: The team's public profile
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PublicTeamProfile'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          description: Unknown or disabled team
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /teams/by-slug/{slug}:
+    get:
+      tags:
+        - Teams
+      summary: Resolve a team's public profile by its slug
+      description: |
+        Resolves a team's workspace-public profile by the immutable team slug
+        (issue #470), mirroring `/users/by-slug/{slug}`. Matching ignores case.
+        Slugs never look like UUIDs, so this route and the id-based profile can
+        share links safely. Unknown, disabled and pre-slug teams all answer the
+        same anti-enumeration 404.
+      operationId: getTeamProfileBySlug
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: slug
+          in: path
+          required: true
+          description: The team slug (kebab-case, 3-64 characters).
+          schema:
+            type: string
+            minLength: 3
+            maxLength: 64
+      responses:
+        '200':
+          description: The team's public profile
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PublicTeamProfile'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          description: Unknown slug
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
   /teams/{teamId}/members:
     post:
       tags:
@@ -4868,6 +4945,113 @@ components:
         role:
           type: string
           enum: [LEAD, MEMBER]
+    PublicTeamProfile:
+      type: object
+      description: >-
+        The workspace-public slice of a team (issue #586). The members and
+        reviews sections appear only when the team's visibility configuration
+        exposes them or the caller is a member of the team / an admin; hidden
+        sections are null, never empty. Reviews list only what the CALLER
+        may see (ADR-0038).
+      required:
+        - id
+        - name
+        - viewerIsMember
+        - createdAt
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        slug:
+          type: string
+          nullable: true
+          description: The team's immutable URL slug (issue #470); null for pre-slug teams.
+        description:
+          type: string
+          nullable: true
+        avatarUrl:
+          type: string
+          nullable: true
+          description: >-
+            The team's crest URL with a cache-buster (issue #509), or null when
+            none is set so the SPA renders the initials crest.
+        viewerIsMember:
+          type: boolean
+          description: Whether the caller is a member of this team (drives the My Teams link).
+        createdAt:
+          type: string
+          format: date-time
+        members:
+          type: array
+          nullable: true
+          description: >-
+            The roster — null when the team hides it from non-members (never an
+            empty list for "hidden", so the client can tell hidden from empty).
+          items:
+            $ref: '#/components/schemas/PublicTeamProfileMember'
+        reviews:
+          type: array
+          nullable: true
+          description: >-
+            The team's review participation, restricted to reviews the caller
+            may see — null when the team hides it from non-members (never an
+            empty list for "hidden").
+          items:
+            $ref: '#/components/schemas/PublicTeamReview'
+    PublicTeamProfileMember:
+      type: object
+      description: One roster row of the public team profile (issue #586).
+      required:
+        - id
+        - displayName
+        - role
+      properties:
+        id:
+          type: string
+          format: uuid
+        displayName:
+          type: string
+        slug:
+          type: string
+          nullable: true
+          description: The member's profile slug (issue #486) for the profile link; null for pre-slug accounts.
+        avatarUrl:
+          type: string
+          nullable: true
+        role:
+          $ref: '#/components/schemas/TeamRole'
+    PublicTeamReview:
+      type: object
+      description: One review the team participates in, as far as the caller may see it (issue #586).
+      required:
+        - id
+        - title
+        - workflowState
+        - updatedAt
+      properties:
+        id:
+          type: string
+          format: uuid
+        title:
+          type: string
+        contentType:
+          type: string
+          nullable: true
+          description: >-
+            The MIME type of the review's latest version, for the document-type
+            icon — same source as the reviews overview (issue #509 follow-up).
+        slug:
+          type: string
+          nullable: true
+          description: The review slug (issue #411) for the pretty link; null when unset.
+        workflowState:
+          type: string
+          description: The review workflow state (open string set, ADR-0011).
+        updatedAt:
+          type: string
+          format: date-time
     CurrentUserResponse:
       type: object
       description: The authenticated user's own profile.
@@ -5295,6 +5479,12 @@ components:
           description: >-
             The team's avatar URL with a cache-buster (issue #509), or null when
             none is set so the SPA renders the initials crest.
+        profileShowMembers:
+          type: boolean
+          description: Whether the public team profile (issue #586) exposes the roster to non-members.
+        profileShowReviews:
+          type: boolean
+          description: Whether the public team profile (issue #586) exposes the review participation to non-members.
         createdAt:
           type: string
           format: date-time
@@ -5306,6 +5496,8 @@ components:
         - name
         - enabled
         - memberCount
+        - profileShowMembers
+        - profileShowReviews
         - createdAt
         - updatedAt
     AdminTeamDetail:
@@ -5328,6 +5520,12 @@ components:
           description: >-
             The team's avatar URL with a cache-buster (issue #509), or null when
             none is set so the SPA renders the initials crest.
+        profileShowMembers:
+          type: boolean
+          description: Whether the public team profile (issue #586) exposes the roster to non-members.
+        profileShowReviews:
+          type: boolean
+          description: Whether the public team profile (issue #586) exposes the review participation to non-members.
         createdAt:
           type: string
           format: date-time
@@ -5342,6 +5540,8 @@ components:
         - id
         - name
         - enabled
+        - profileShowMembers
+        - profileShowReviews
         - createdAt
         - updatedAt
         - members
@@ -5369,6 +5569,12 @@ components:
         - size
     AdminTeamCreateRequest:
       type: object
+      description: >-
+        Creates a team (issue #470). Every team starts with a lead (issue #586
+        follow-up): leadUserId becomes the initial LEAD membership, so no team
+        is ever created ownerless. The enabled flag and the public-profile
+        visibility toggles (issue #586) are optional — absent values default to
+        enabled and both toggles hidden.
       properties:
         name:
           type: string
@@ -5378,8 +5584,22 @@ components:
           type: string
           maxLength: 1000
           nullable: true
+        leadUserId:
+          type: string
+          format: uuid
+          description: The initial team lead, added as a LEAD member at creation.
+        enabled:
+          type: boolean
+          nullable: true
+        profileShowMembers:
+          type: boolean
+          nullable: true
+        profileShowReviews:
+          type: boolean
+          nullable: true
       required:
         - name
+        - leadUserId
     AdminTeamUpdateRequest:
       type: object
       description: Partial update; only provided fields change.
@@ -5396,16 +5616,31 @@ components:
         enabled:
           type: boolean
           nullable: true
+        profileShowMembers:
+          type: boolean
+          nullable: true
+          description: Public-profile visibility of the roster (issue #586); absent/null leaves it unchanged.
+        profileShowReviews:
+          type: boolean
+          nullable: true
+          description: Public-profile visibility of the review participation (issue #586); absent/null leaves it unchanged.
     MyTeamUpdateRequest:
       type: object
       description: >-
-        A lead's self-manage team update (issue #509 follow-up) — deliberately
-        only the description; name/slug/enabled stay admin concerns. A blank
-        or null description clears it.
+        A lead's self-manage team update (issue #509 follow-up) — the
+        description plus the public-profile visibility toggles (issue #586);
+        name/slug/enabled stay admin concerns. A blank or null description
+        clears it; absent/null toggles leave the configuration unchanged.
       properties:
         description:
           type: string
           maxLength: 1000
+          nullable: true
+        profileShowMembers:
+          type: boolean
+          nullable: true
+        profileShowReviews:
+          type: boolean
           nullable: true
     AdminTeamMemberRequest:
       type: object
@@ -5531,6 +5766,12 @@ components:
         viewerCanManage:
           type: boolean
           description: Whether the caller may manage this team's membership (a LEAD of the team, or an ADMIN).
+        profileShowMembers:
+          type: boolean
+          description: Whether the public team profile (issue #586) exposes the roster to non-members.
+        profileShowReviews:
+          type: boolean
+          description: Whether the public team profile (issue #586) exposes the review participation to non-members.
         members:
           type: array
           items:
@@ -5539,6 +5780,8 @@ components:
         - id
         - name
         - viewerCanManage
+        - profileShowMembers
+        - profileShowReviews
         - members
     RegisterRequest:
       type: object

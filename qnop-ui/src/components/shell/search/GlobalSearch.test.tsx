@@ -168,15 +168,18 @@ describe('GlobalSearch', () => {
     );
   });
 
-  it('locks a team hit the caller may not open, links the reachable one', async () => {
+  it('links every team hit to the public team profile (#586)', async () => {
     renderSearch();
     fireEvent.change(input(), { target: { value: 'al' } });
 
-    expect(await screen.findByTestId('search-hit-team')).toHaveTextContent('Alpha');
-    expect(screen.getByTestId('search-hit-team-locked')).toHaveTextContent('Alchemy');
+    // Both hits are rows now — the pre-#586 locked variant is gone, because
+    // the public team profile is a legitimate destination for everyone.
+    const hits = await screen.findAllByTestId('search-hit-team');
+    expect(hits[0]).toHaveTextContent('Alpha');
+    expect(hits[1]).toHaveTextContent('Alchemy');
 
-    fireEvent.click(screen.getByTestId('search-hit-team'));
-    expect(screen.getByTestId('location')).toHaveTextContent('/my-teams/alpha');
+    fireEvent.click(hits[0]);
+    expect(screen.getByTestId('location')).toHaveTextContent('/teams/alpha');
   });
 
   it('routes "see all" onto the results page with query and type', async () => {
@@ -246,19 +249,19 @@ describe('GlobalSearch', () => {
     expect(screen.getByTestId('location')).toHaveTextContent('/search?q=pay&type=reviews');
   });
 
-  it('wraps upwards to the last reachable row — locked teams are skipped', async () => {
+  it('wraps upwards to the last row — every team hit is reachable (#586)', async () => {
     renderSearch();
     fireEvent.change(input(), { target: { value: 'al' } });
     await screen.findByTestId('global-search-dropdown');
 
-    // ArrowUp from rest lands on the LAST action: the viewable team Alpha —
-    // the locked Alchemy row is not keyboard-reachable, like it is unclickable.
+    // ArrowUp from rest lands on the LAST action — the second team hit, which
+    // is a real row now that team hits link to the public profile.
     fireEvent.keyDown(input(), { key: 'ArrowUp' });
-    expect(screen.getByTestId('search-hit-team')).toHaveAttribute('data-highlighted', 'true');
-    expect(screen.getByTestId('search-hit-team-locked')).not.toHaveAttribute('data-highlighted');
+    const hits = screen.getAllByTestId('search-hit-team');
+    expect(hits[1]).toHaveAttribute('data-highlighted', 'true');
 
     fireEvent.keyDown(input(), { key: 'Enter' });
-    expect(screen.getByTestId('location')).toHaveTextContent('/my-teams/alpha');
+    expect(screen.getByTestId('location')).toHaveTextContent('/teams/alchemy');
   });
 
   it('resets the highlight on typing — Enter then submits to the results page', async () => {

@@ -28,6 +28,7 @@ import type { Theme } from '@mui/material/styles';
 import { Eye, User } from 'lucide-react';
 import type { ParticipantView } from '../../../api/generated';
 import { ToneBadge } from '../../admin/ToneBadge';
+import { TeamHoverCard } from '../../people/TeamHoverCard';
 import { UserHoverCard } from '../../people/UserHoverCard';
 import { UserAvatar } from '../../shell/UserAvatar';
 import { TeamAvatar } from '../../shell/TeamAvatar';
@@ -266,6 +267,21 @@ export function ReviewerStack({
             )}
           </Box>
         );
+        if (participant.kind === 'TEAM') {
+          // Teams link to their public profile (issue #586) — except anonymised
+          // rosters, whose synthetic tokens must stay unlinked (issue #422).
+          const cardTeamId = anonymous ? null : participant.principalId;
+          return (
+            <TeamHoverCard
+              key={participant.id}
+              teamId={cardTeamId}
+              slug={participant.slug}
+              profileName={participant.displayName}
+            >
+              {cardTeamId ? avatar : <Tooltip title={participant.displayName}>{avatar}</Tooltip>}
+            </TeamHoverCard>
+          );
+        }
         return (
           <UserHoverCard
             key={participant.id}
@@ -274,7 +290,7 @@ export function ReviewerStack({
             profileName={participant.displayName}
           >
             {/* The card names the person already — the tooltip only steps in
-                where no card may attach (teams, anonymised rosters). */}
+                where no card may attach (anonymised rosters). */}
             {cardUserId ? avatar : <Tooltip title={participant.displayName}>{avatar}</Tooltip>}
           </UserHoverCard>
         );

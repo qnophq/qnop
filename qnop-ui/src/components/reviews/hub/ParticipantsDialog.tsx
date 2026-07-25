@@ -47,6 +47,7 @@ import {
   useTeamMembers,
 } from '../../../api/hooks/useReviews';
 import type { ToastSeverity } from '../../admin/layout/useToast';
+import { TeamHoverCard } from '../../people/TeamHoverCard';
 import { UserHoverCard } from '../../people/UserHoverCard';
 import { UserAvatar } from '../../shell/UserAvatar';
 import { avatarSrc, teamAvatarSrc } from '../../../utils/avatarUrl';
@@ -224,7 +225,16 @@ export function ParticipantsDialog({
                         </IconButton>
                       ) : null}
                       {isTeam ? (
-                        <>
+                        // Crest AND name trigger the team card and link to the
+                        // public team profile (issue #586). Anonymised rosters
+                        // carry synthetic ids (issue #422) — neither card nor
+                        // link there, exactly like anonymised users.
+                        <TeamHoverCard
+                          teamId={anonymised ? null : participant.principalId}
+                          slug={participant.slug}
+                          profileName={participant.displayName}
+                          sx={{ flex: 1, alignItems: 'center', gap: 1.25 }}
+                        >
                           <PrincipalIcon
                             kind={participant.kind}
                             size={28}
@@ -239,7 +249,7 @@ export function ParticipantsDialog({
                               Team
                             </Typography>
                           </Box>
-                        </>
+                        </TeamHoverCard>
                       ) : (
                         // Avatar AND name trigger the card and link to the
                         // profile. An anonymised roster carries synthetic ids

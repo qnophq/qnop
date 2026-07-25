@@ -92,14 +92,16 @@ class TeamControllerIT extends AbstractIntegrationTest {
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.total").value(1))
         .andExpect(jsonPath("$.items[0].name").value("Core"))
-        .andExpect(jsonPath("$.items[0].memberCount").value(0));
+        .andExpect(jsonPath("$.items[0].memberCount").value(1));
 
     mockMvc
         .perform(get("/api/v1/admin/teams/{id}", teamId).header("Authorization", bearer(token)))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.name").value("Core"))
         .andExpect(jsonPath("$.members").isArray())
-        .andExpect(jsonPath("$.members").isEmpty());
+        // The initial LEAD is on the roster from creation (issue #586 follow-up).
+        .andExpect(jsonPath("$.members.length()").value(1))
+        .andExpect(jsonPath("$.members[0].teamRole").value("LEAD"));
   }
 
   @Test
@@ -113,7 +115,9 @@ class TeamControllerIT extends AbstractIntegrationTest {
             post("/api/v1/admin/teams")
                 .header("Authorization", bearer(token))
                 .contentType(MediaType.APPLICATION_JSON)
-                .content("{\"name\":\"core\"}"))
+                .content(
+                    "{\"name\":\"core\",\"leadUserId\":\"%s\"}"
+                        .formatted(createUser("lead-dup", UserRole.MEMBER).getId())))
         .andExpect(status().isConflict())
         .andExpect(jsonPath("$.code").value("NAME_TAKEN"));
   }
@@ -187,8 +191,8 @@ class TeamControllerIT extends AbstractIntegrationTest {
     User alice = createUser("alice", UserRole.MEMBER); // the sole lead
     User bob = createUser("bob", UserRole.MEMBER); // a plain member
     String token = token("root");
-    String teamId = createTeam(token, "Core", null);
-    addMember(token, teamId, alice.getId(), "LEAD");
+    // Alice becomes the initial (and only) LEAD at creation (issue #586 follow-up).
+    String teamId = createTeam(token, "Core", null, alice.getId());
     addMember(token, teamId, bob.getId(), "MEMBER");
 
     // Demoting the sole lead → 409 LAST_LEAD, unchanged.
@@ -284,10 +288,18 @@ class TeamControllerIT extends AbstractIntegrationTest {
   }
 
   private String createTeam(String token, String name, String description) throws Exception {
+    // Every team starts with a LEAD (issue #586 follow-up) - mint a fresh one per team.
+    User lead = createUser("lead" + IP_SEQ.incrementAndGet(), UserRole.MEMBER);
+    return createTeam(token, name, description, lead.getId());
+  }
+
+  private String createTeam(String token, String name, String description, UUID leadUserId)
+      throws Exception {
     String body =
         description == null
-            ? "{\"name\":\"%s\"}".formatted(name)
-            : "{\"name\":\"%s\",\"description\":\"%s\"}".formatted(name, description);
+            ? "{\"name\":\"%s\",\"leadUserId\":\"%s\"}".formatted(name, leadUserId)
+            : "{\"name\":\"%s\",\"description\":\"%s\",\"leadUserId\":\"%s\"}"
+                .formatted(name, description, leadUserId);
     MvcResult result =
         mockMvc
             .perform(

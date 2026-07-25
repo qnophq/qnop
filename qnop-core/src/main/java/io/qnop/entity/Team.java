@@ -66,6 +66,15 @@ public class Team {
   @Column(name = "enabled", nullable = false)
   private boolean enabled = true;
 
+  // Public-profile visibility toggles (issue #586): what the workspace-public
+  // team profile exposes to NON-members. Conservative defaults — exposing the
+  // roster or the review participation is an explicit lead/admin decision.
+  @Column(name = "profile_show_members", nullable = false)
+  private boolean profileShowMembers = false;
+
+  @Column(name = "profile_show_reviews", nullable = false)
+  private boolean profileShowReviews = false;
+
   @CreationTimestamp
   @Column(name = "created_at", nullable = false, updatable = false)
   private Instant createdAt;
@@ -110,6 +119,22 @@ public class Team {
   /** Set once at creation (the column is not updatable); {@code null} means no friendly URL. */
   public void setSlug(String slug) {
     this.slug = slug;
+  }
+
+  public boolean isProfileShowMembers() {
+    return profileShowMembers;
+  }
+
+  public void setProfileShowMembers(boolean profileShowMembers) {
+    this.profileShowMembers = profileShowMembers;
+  }
+
+  public boolean isProfileShowReviews() {
+    return profileShowReviews;
+  }
+
+  public void setProfileShowReviews(boolean profileShowReviews) {
+    this.profileShowReviews = profileShowReviews;
   }
 
   public String getDescription() {

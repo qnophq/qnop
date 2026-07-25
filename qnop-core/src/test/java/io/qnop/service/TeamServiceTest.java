@@ -56,25 +56,83 @@ class TeamServiceTest {
   private final TeamService service = new TeamService(teams, memberships, users, slugs);
 
   @Test
-  @DisplayName("create persists a new team and rejects a duplicate name")
+  @DisplayName("create persists a new team with its initial LEAD and rejects a duplicate name")
   void create() {
+    UUID teamId = UUID.randomUUID();
+    UUID leadId = UUID.randomUUID();
     when(teams.existsByNameIgnoreCase("Core")).thenReturn(false);
     when(slugs.allocate("Core")).thenReturn("core");
-    when(teams.save(any())).thenAnswer(inv -> inv.getArgument(0));
+    when(teams.save(any())).thenAnswer(inv -> withId(inv.getArgument(0), teamId));
+    when(teams.existsById(teamId)).thenReturn(true);
+    when(users.findById(leadId))
+        .thenReturn(Optional.of(User.external("Lena Lead", "lena@example.com")));
+    when(memberships.existsByTeamIdAndUserId(teamId, leadId)).thenReturn(false);
+    when(memberships.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
-    var view = service.create("  Core  ", "The core team");
+    var view = service.create("  Core  ", "The core team", leadId, null, null, null);
 
     assertThat(view.name()).isEqualTo("Core");
     assertThat(view.enabled()).isTrue();
-    assertThat(view.memberCount()).isZero();
+    assertThat(view.memberCount()).isEqualTo(1);
     // The team is persisted with the slug derived from its name.
     verify(teams).save(argThat(t -> "core".equals(t.getSlug())));
+    // No team is ever created ownerless (issue #586 follow-up): the chosen
+    // user lands as a LEAD membership in the same transaction.
+    verify(memberships)
+        .save(argThat(m -> m.getTeamRole() == TeamRole.LEAD && leadId.equals(m.getUserId())));
 
     when(teams.existsByNameIgnoreCase("Core")).thenReturn(true);
-    assertThatThrownBy(() -> service.create("Core", null))
+    assertThatThrownBy(() -> service.create("Core", null, leadId, null, null, null))
         .isInstanceOf(TeamConflictException.class)
         .extracting("code")
         .isEqualTo("NAME_TAKEN");
+  }
+
+  @Test
+  @DisplayName("create applies the enabled and public-profile flags (issue #586)")
+  void createAppliesFlags() {
+    UUID teamId = UUID.randomUUID();
+    UUID leadId = UUID.randomUUID();
+    when(teams.existsByNameIgnoreCase("Ops")).thenReturn(false);
+    when(slugs.allocate("Ops")).thenReturn("ops");
+    when(teams.save(any())).thenAnswer(inv -> withId(inv.getArgument(0), teamId));
+    when(teams.existsById(teamId)).thenReturn(true);
+    when(users.findById(leadId))
+        .thenReturn(Optional.of(User.external("Lena Lead", "lena@example.com")));
+    when(memberships.existsByTeamIdAndUserId(teamId, leadId)).thenReturn(false);
+    when(memberships.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+    var view = service.create("Ops", null, leadId, false, true, true);
+
+    assertThat(view.enabled()).isFalse();
+    assertThat(view.profileShowMembers()).isTrue();
+    assertThat(view.profileShowReviews()).isTrue();
+  }
+
+  @Test
+  @DisplayName("create fails whole when the lead does not exist - nothing half-made")
+  void createRejectsUnknownLead() {
+    UUID teamId = UUID.randomUUID();
+    UUID leadId = UUID.randomUUID();
+    when(teams.existsByNameIgnoreCase("Core")).thenReturn(false);
+    when(slugs.allocate("Core")).thenReturn("core");
+    when(teams.save(any())).thenAnswer(inv -> withId(inv.getArgument(0), teamId));
+    when(teams.existsById(teamId)).thenReturn(true);
+    when(users.findById(leadId)).thenReturn(Optional.empty());
+
+    assertThatThrownBy(() -> service.create("Core", null, leadId, null, null, null))
+        .isInstanceOf(UserNotFoundException.class);
+  }
+
+  private static Team withId(Team team, UUID id) {
+    try {
+      var field = Team.class.getDeclaredField("id");
+      field.setAccessible(true);
+      field.set(team, id);
+    } catch (ReflectiveOperationException e) {
+      throw new IllegalStateException(e);
+    }
+    return team;
   }
 
   @Test
@@ -88,14 +146,14 @@ class TeamServiceTest {
     // Another team already owns "Platform".
     when(teams.findByNameIgnoreCase("Platform"))
         .thenReturn(Optional.of(teamWithId(UUID.randomUUID(), "Platform")));
-    assertThatThrownBy(() -> service.update(id, "Platform", null, null))
+    assertThatThrownBy(() -> service.update(id, "Platform", null, null, null, null))
         .isInstanceOf(TeamConflictException.class)
         .extracting("code")
         .isEqualTo("NAME_TAKEN");
 
     // Renaming to a name owned by the same team is allowed.
     when(teams.findByNameIgnoreCase("Core")).thenReturn(Optional.of(team));
-    var view = service.update(id, "Core", "desc", false);
+    var view = service.update(id, "Core", "desc", false, null, null);
     assertThat(view.name()).isEqualTo("Core");
     assertThat(view.enabled()).isFalse();
   }
@@ -302,14 +360,15 @@ class TeamServiceTest {
     when(memberships.existsByTeamIdAndUserIdAndTeamRole(teamId, lead, TeamRole.LEAD))
         .thenReturn(true);
 
-    service.updateDescriptionAsLead(teamId, lead, false, "Contract review crew");
+    service.updateMyTeamAsLead(teamId, lead, false, "Contract review crew", null, null);
     assertThat(team.getDescription()).isEqualTo("Contract review crew");
 
     // A blank description clears it; an admin needs no membership.
-    service.updateDescriptionAsLead(teamId, UUID.randomUUID(), true, "   ");
+    service.updateMyTeamAsLead(teamId, UUID.randomUUID(), true, "   ", null, null);
     assertThat(team.getDescription()).isNull();
 
-    assertThatThrownBy(() -> service.updateDescriptionAsLead(teamId, stranger, false, "nope"))
+    assertThatThrownBy(
+            () -> service.updateMyTeamAsLead(teamId, stranger, false, "nope", null, null))
         .isInstanceOf(TeamAccessForbiddenException.class);
     assertThat(team.getDescription()).isNull();
   }

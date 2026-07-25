@@ -57,11 +57,14 @@ class SeededTeamIT extends SeededIntegrationTest {
         .perform(
             asAdmin(post(TEAMS))
                 .contentType(MediaType.APPLICATION_JSON)
-                .content("{\"name\":\"Gamma\",\"description\":\"A third team\"}"))
+                .content(
+                    "{\"name\":\"Gamma\",\"description\":\"A third team\",\"leadUserId\":\"%s\"}"
+                        .formatted(MEMBER2_ID)))
         .andExpect(status().isCreated())
         .andExpect(jsonPath("$.name").value("Gamma"))
         .andExpect(jsonPath("$.enabled").value(true))
-        .andExpect(jsonPath("$.memberCount").value(0));
+        // The initial LEAD is on the roster from creation (issue #586 follow-up).
+        .andExpect(jsonPath("$.memberCount").value(1));
   }
 
   @Test
@@ -70,7 +73,7 @@ class SeededTeamIT extends SeededIntegrationTest {
         .perform(
             asAdmin(post(TEAMS))
                 .contentType(MediaType.APPLICATION_JSON)
-                .content("{\"name\":\"Alpha\"}"))
+                .content("{\"name\":\"Alpha\",\"leadUserId\":\"%s\"}".formatted(MEMBER2_ID)))
         .andExpect(status().isConflict())
         .andExpect(jsonPath("$.code").value("NAME_TAKEN"));
   }
