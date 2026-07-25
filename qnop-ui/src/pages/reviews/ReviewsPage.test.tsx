@@ -300,12 +300,15 @@ describe('ReviewsPage', () => {
     expect(screen.getByTestId('reviews-loading')).toBeInTheDocument();
   });
 
-  it('shows an error with retry', () => {
+  it('shows the branded failure shell with a working retry (#611)', () => {
     const refetch = vi.fn();
     mockReviews({ isError: true, refetch });
     renderPage();
 
-    fireEvent.click(screen.getByRole('button', { name: 'Retry' }));
+    // The load failure speaks the error pages' voice - ours, with a way onward.
+    expect(screen.getByRole('alert')).toBeInTheDocument();
+    expect(screen.getByText(/didn't make it to the desk/i)).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Try again' }));
     expect(refetch).toHaveBeenCalled();
   });
 

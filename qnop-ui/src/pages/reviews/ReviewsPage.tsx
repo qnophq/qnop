@@ -40,6 +40,8 @@ import { LayoutGrid, ListFilter, Plus, Rows3 } from 'lucide-react';
 import { useNavigate, useSearchParams } from 'react-router';
 import type { DocumentSummary } from '../../api/generated';
 import { useReviews } from '../../api/hooks/useReviews';
+import { ErrorState } from '../errors/ErrorState';
+import { ServerErrorIllustration } from '../errors/illustrations';
 import { ClearableSearchField } from '../../components/ClearableSearchField';
 import { PageHeader } from '../../components/admin/layout/PageHeader';
 import { isOpenWorkflowState, workflowLabel } from '../../components/reviews/workflowMeta';
@@ -424,16 +426,16 @@ export function ReviewsPage() {
       />
 
       {isError && (
-        <Alert
-          severity="error"
-          action={
-            <Button color="inherit" size="small" onClick={() => refetch()}>
-              Retry
-            </Button>
-          }
-        >
-          Reviews could not be loaded.
-        </Alert>
+        // The branded failure shell (issue #611) instead of a bare alert -
+        // same voice as the full-page states: our fault, with a way onward.
+        <ErrorState
+          title="Your reviews didn't make it to the desk"
+          message="Loading failed on our side - not your doing. Give it another try; if it keeps happening, your admin will want to know."
+          illustration={<ServerErrorIllustration />}
+          tone="alert"
+          primaryAction={{ label: 'Try again', onClick: () => refetch() }}
+          secondaryAction={{ label: 'Back to dashboard', to: '/' }}
+        />
       )}
 
       {isPending && !isError && (
