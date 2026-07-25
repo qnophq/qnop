@@ -50,9 +50,12 @@ import { ReviewsEmptyState } from './ReviewsEmptyState';
 import { useAuthStore } from '../../stores/authStore';
 
 type RoleFilter = 'all' | 'owner' | 'reviewer';
-// Client facets over ONE scope=all fetch (issue #576 follow-up): 'all' truly
-// spans every state at once — active work and archived records together —
-// while open/closed/archived slice it. All facets are URL-persisted.
+// Client facets over ONE scope=all fetch (issue #576 follow-up), so every chip
+// carries a count without a refetch. Archiving is a retention flag, not a
+// workflow state (#576): 'all' spans every workflow STATE but stops at the
+// archive line, and the records are reachable only through the explicit
+// 'archived' facet (issue #578 — cold records never mix into living work).
+// All facets are URL-persisted; no param means the default, archived hidden.
 type StatusFilter = 'all' | 'open' | 'closed' | 'archived';
 type DueFilter = 'any' | 'overdue' | 'soon' | 'none';
 type FormatFilter = 'any' | 'pdf' | 'docx' | 'md';
@@ -79,9 +82,11 @@ function matchesRole(review: DocumentSummary, filter: RoleFilter, userId: string
 
 function matchesStatus(review: DocumentSummary, filter: StatusFilter): boolean {
   const archived = Boolean(review.archivedAt);
-  if (filter === 'all') return true;
+  // 'archived' is the ONLY facet that surfaces a record (issue #578); every
+  // other one — including the default 'all' — stays on this side of the line.
   if (filter === 'archived') return archived;
   if (archived) return false;
+  if (filter === 'all') return true;
   return isOpenWorkflowState(review.workflowState) === (filter === 'open');
 }
 
@@ -363,11 +368,14 @@ export function ReviewsPage() {
   })();
   const statusCounts = (() => {
     const base = searched.filter((r) => matchesRole(r, roleFilter, userId));
+    // Every count goes through the SAME predicate the list uses, so a chip's
+    // number keeps predicting what clicking it shows — the archived records sit
+    // outside 'all'/'open'/'closed' and are counted only by their own chip.
     return {
-      all: base.length,
+      all: base.filter((r) => matchesStatus(r, 'all')).length,
       open: base.filter((r) => matchesStatus(r, 'open')).length,
       closed: base.filter((r) => matchesStatus(r, 'closed')).length,
-      archived: base.filter((r) => Boolean(r.archivedAt)).length,
+      archived: base.filter((r) => matchesStatus(r, 'archived')).length,
     };
   })();
 
@@ -375,6 +383,13 @@ export function ReviewsPage() {
     searched.filter((r) => matchesRole(r, roleFilter, userId) && matchesStatus(r, statusFilter)),
     sortBy,
   );
+
+  // A workspace whose living work is all done holds nothing but records. Saying
+  // "nothing matches your filters" there would be a dead end — no filter is set
+  // and none can be cleared — so the archive gets named and offered instead
+  // (issue #578); the opt-in stays a deliberate click either way.
+  const onlyArchivedLeft =
+    visible.length === 0 && statusFilter !== 'archived' && statusCounts.archived > 0;
 
   // The owner facet offers everyone who owns a loaded review, alphabetically.
   const owners = (() => {
@@ -557,9 +572,22 @@ export function ReviewsPage() {
 
           {visible.length === 0 ? (
             <Paper variant="outlined" sx={{ py: 6, px: 3, textAlign: 'center' }}>
-              <Typography color="text.secondary">No reviews match your filters.</Typography>
+              <Typography color="text.secondary">
+                {onlyArchivedLeft
+                  ? 'No active reviews — everything here has been archived.'
+                  : 'No reviews match your filters.'}
+              </Typography>
+              {onlyArchivedLeft && (
+                <Button
+                  size="small"
+                  onClick={() => setStatusFilter('archived')}
+                  sx={{ mt: 1.5, mx: 0.5 }}
+                >
+                  Show archived ({statusCounts.archived})
+                </Button>
+              )}
               {hasActiveFilters && (
-                <Button size="small" onClick={clearFilters} sx={{ mt: 1.5 }}>
+                <Button size="small" onClick={clearFilters} sx={{ mt: 1.5, mx: 0.5 }}>
                   Clear filters
                 </Button>
               )}
