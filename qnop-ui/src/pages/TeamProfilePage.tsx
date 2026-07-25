@@ -36,6 +36,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import type { PublicTeamProfileMember, PublicTeamReview } from '../api/generated';
 import { teamProfileKeys, useTeamProfile } from '../api/hooks/useTeamProfile';
 import { ToneBadge } from '../components/admin/ToneBadge';
+import { DocumentIcon } from '../components/reviews/list/ReviewListParts';
 import { UserHoverCard } from '../components/people/UserHoverCard';
 import {
   WORKFLOW_TONES,
@@ -361,6 +362,8 @@ export function TeamProfilePage() {
                   '&:focus-visible': { outline: 'none', boxShadow: theme.qnop.focusRing },
                 }}
               >
+                {/* The document-type sheet, exactly as on /reviews (issue #509 follow-up). */}
+                <DocumentIcon size={22} contentType={review.contentType} />
                 <Typography noWrap sx={{ fontWeight: 500, fontSize: '0.9rem', flex: 1 }}>
                   {review.title}
                 </Typography>

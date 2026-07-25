@@ -29,6 +29,7 @@ import static org.mockito.Mockito.when;
 
 import io.qnop.entity.Team;
 import io.qnop.repository.DocumentRepository;
+import io.qnop.repository.DocumentVersionRepository;
 import io.qnop.repository.TeamMembershipRepository;
 import io.qnop.repository.TeamRepository;
 import java.util.List;
@@ -48,6 +49,7 @@ class PublicTeamProfileServiceTest {
   @Mock private TeamRepository teams;
   @Mock private TeamMembershipRepository memberships;
   @Mock private DocumentRepository documents;
+  @Mock private DocumentVersionRepository versions;
 
   private PublicTeamProfileService service;
   private final UUID teamId = UUID.randomUUID();
@@ -56,7 +58,7 @@ class PublicTeamProfileServiceTest {
 
   @BeforeEach
   void setUp() {
-    service = new PublicTeamProfileService(teams, memberships, documents);
+    service = new PublicTeamProfileService(teams, memberships, documents, versions);
     team = teamWithId(teamId, "Alpha", "Primary review team");
     when(teams.findById(teamId)).thenReturn(Optional.of(team));
   }

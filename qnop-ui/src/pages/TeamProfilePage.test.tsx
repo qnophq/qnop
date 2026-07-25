@@ -101,6 +101,7 @@ describe('TeamProfilePage (#586)', () => {
               id: 'e0000000-0000-0000-0000-000000000001',
               title: 'Supplier contract',
               slug: 'supplier-contract',
+              contentType: 'application/pdf',
               workflowState: 'IN_REVIEW',
               updatedAt: '2026-07-20T10:00:00Z',
             },
@@ -119,6 +120,9 @@ describe('TeamProfilePage (#586)', () => {
     expect(await screen.findByTestId('team-profile-roster')).toBeInTheDocument();
     expect(screen.getByText('Ada Admin')).toBeInTheDocument();
     expect(screen.getByLabelText('Team lead')).toBeInTheDocument();
+    // Each mission leads with the document-type sheet, as on /reviews.
+    expect(screen.getAllByTestId('document-icon').length).toBeGreaterThanOrEqual(2);
+    expect(screen.getByRole('img', { name: 'PDF document' })).toBeInTheDocument();
     // Review missions link to the review (slug preferred, id fallback).
     const mission = screen.getByText('Supplier contract').closest('a');
     expect(mission).toHaveAttribute('href', '/reviews/supplier-contract');

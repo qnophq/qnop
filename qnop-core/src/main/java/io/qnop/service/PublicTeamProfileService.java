@@ -22,12 +22,16 @@ package io.qnop.service;
 
 import io.qnop.entity.Document;
 import io.qnop.entity.Team;
+import io.qnop.repository.DocumentLatestContentType;
 import io.qnop.repository.DocumentRepository;
+import io.qnop.repository.DocumentVersionRepository;
 import io.qnop.repository.TeamMembershipRepository;
 import io.qnop.repository.TeamRepository;
 import java.time.Instant;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
+import java.util.stream.Collectors;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -55,12 +59,17 @@ public class PublicTeamProfileService {
   private final TeamRepository teams;
   private final TeamMembershipRepository memberships;
   private final DocumentRepository documents;
+  private final DocumentVersionRepository versions;
 
   public PublicTeamProfileService(
-      TeamRepository teams, TeamMembershipRepository memberships, DocumentRepository documents) {
+      TeamRepository teams,
+      TeamMembershipRepository memberships,
+      DocumentRepository documents,
+      DocumentVersionRepository versions) {
     this.teams = teams;
     this.memberships = memberships;
     this.documents = documents;
+    this.versions = versions;
   }
 
   @Transactional(readOnly = true)
@@ -100,11 +109,7 @@ public class PublicTeamProfileService {
             : null;
 
     List<TeamReviewView> reviews =
-        insider || team.isProfileShowReviews()
-            ? documents.findTeamParticipationsVisibleTo(teamId, actorId).stream()
-                .map(this::toReview)
-                .toList()
-            : null;
+        insider || team.isProfileShowReviews() ? loadReviews(teamId, actorId) : null;
 
     return new PublicTeamProfileView(
         teamId,
@@ -117,13 +122,31 @@ public class PublicTeamProfileService {
         reviews);
   }
 
-  private TeamReviewView toReview(Document document) {
-    return new TeamReviewView(
-        document.getId(),
-        document.getTitle(),
-        document.getSlug(),
-        document.getWorkflowState(),
-        document.getUpdatedAt());
+  private List<TeamReviewView> loadReviews(UUID teamId, UUID actorId) {
+    List<Document> visible = documents.findTeamParticipationsVisibleTo(teamId, actorId);
+    // Latest-version MIME types in one batch (the reviews overview's recipe) —
+    // the document-type icon needs them, and a profile must not go N+1.
+    Map<UUID, String> contentTypes =
+        visible.isEmpty()
+            ? Map.of()
+            : versions
+                .findLatestContentTypesByDocumentIds(visible.stream().map(Document::getId).toList())
+                .stream()
+                .collect(
+                    Collectors.toMap(
+                        DocumentLatestContentType::documentId,
+                        DocumentLatestContentType::contentType));
+    return visible.stream()
+        .map(
+            document ->
+                new TeamReviewView(
+                    document.getId(),
+                    document.getTitle(),
+                    document.getSlug(),
+                    contentTypes.get(document.getId()),
+                    document.getWorkflowState(),
+                    document.getUpdatedAt()))
+        .toList();
   }
 
   /**
@@ -146,5 +169,10 @@ public class PublicTeamProfileService {
 
   /** One review the team participates in, as far as the caller may see it. */
   public record TeamReviewView(
-      UUID id, String title, String slug, String workflowState, Instant updatedAt) {}
+      UUID id,
+      String title,
+      String slug,
+      String contentType,
+      String workflowState,
+      Instant updatedAt) {}
 }

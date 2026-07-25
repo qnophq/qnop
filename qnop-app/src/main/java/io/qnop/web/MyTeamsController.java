@@ -271,6 +271,7 @@ public class MyTeamsController implements TeamsApi {
                           .id(r.id())
                           .title(r.title())
                           .slug(r.slug())
+                          .contentType(r.contentType())
                           .workflowState(r.workflowState())
                           .updatedAt(r.updatedAt().atOffset(ZoneOffset.UTC)))
               .toList());

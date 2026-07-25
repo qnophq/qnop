@@ -5036,6 +5036,12 @@ components:
           format: uuid
         title:
           type: string
+        contentType:
+          type: string
+          nullable: true
+          description: >-
+            The MIME type of the review's latest version, for the document-type
+            icon — same source as the reviews overview (issue #509 follow-up).
         slug:
           type: string
           nullable: true
