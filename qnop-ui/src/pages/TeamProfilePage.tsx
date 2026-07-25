@@ -165,7 +165,10 @@ export function TeamProfilePage() {
             <Box
               sx={{
                 display: 'inline-flex',
-                borderRadius: '50%',
+                // The ring follows the crest, not the person circle: concentric
+                // radii (crest 30% radius + padding + border), so the guild
+                // crest nests cleanly instead of poking out of a circle.
+                borderRadius: `${Math.round(84 * 0.3) + 5}px`,
                 p: '3px',
                 bgcolor: 'background.paper',
                 border: `2px solid ${alpha(blue, 0.45)}`,

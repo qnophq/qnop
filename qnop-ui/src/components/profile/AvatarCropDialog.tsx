@@ -34,6 +34,12 @@ import { ZoomIn } from 'lucide-react';
 import { getCroppedAvatarBlob } from '../../utils/cropImage';
 
 interface AvatarCropDialogProps {
+  /**
+   * Mask shape while cropping: 'round' for the circular person avatar,
+   * 'rect' for the rounded-square team crest (issue #586 follow-up) — the
+   * exported bitmap is the full square either way.
+   */
+  cropShape?: 'round' | 'rect';
   open: boolean;
   imageSrc: string;
   busy?: boolean;
@@ -54,6 +60,7 @@ export function AvatarCropDialog({
   busy,
   onCancel,
   onCropped,
+  cropShape = 'round',
 }: AvatarCropDialogProps) {
   const [crop, setCrop] = useState({ x: 0, y: 0 });
   const [zoom, setZoom] = useState(1);
@@ -93,7 +100,7 @@ export function AvatarCropDialog({
             crop={crop}
             zoom={zoom}
             aspect={1}
-            cropShape="round"
+            cropShape={cropShape}
             showGrid={false}
             onCropChange={setCrop}
             onZoomChange={setZoom}

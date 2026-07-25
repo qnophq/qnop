@@ -106,6 +106,7 @@ export function EditMyTeamDialog({
         <Stack spacing={2.5} sx={{ pt: 1 }}>
           {error && <Alert severity="error">{error}</Alert>}
           <AvatarUploader
+            variant="team"
             name={team.name}
             imageUrl={avatarUrl}
             busy={avatarBusy}

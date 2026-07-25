@@ -27,6 +27,7 @@ import CircularProgress from '@mui/material/CircularProgress';
 import Stack from '@mui/material/Stack';
 import Typography from '@mui/material/Typography';
 import { ImagePlus, Trash2 } from 'lucide-react';
+import { TeamAvatar } from '../shell/TeamAvatar';
 import { UserAvatar } from '../shell/UserAvatar';
 import { ConfirmDialog } from '../admin/ConfirmDialog';
 import { AvatarCropDialog } from './AvatarCropDialog';
@@ -46,6 +47,13 @@ interface AvatarUploaderProps {
   onSelect: (blob: Blob) => void;
   /** Called to remove the current picture. */
   onRemove: () => void;
+  /**
+   * Whose picture this is (issue #586 follow-up): 'team' previews with the
+   * rounded-square TeamAvatar crest and crops with a rect mask, so what the
+   * upload promises is exactly what every team surface renders. Default
+   * 'user' keeps the circular person recipe.
+   */
+  variant?: 'user' | 'team';
 }
 
 /**
@@ -54,7 +62,14 @@ interface AvatarUploaderProps {
  * Presentational — the parent owns the upload/remove mutations, so the same control serves the
  * self-service profile screen and the admin user dialog.
  */
-export function AvatarUploader({ name, imageUrl, busy, onSelect, onRemove }: AvatarUploaderProps) {
+export function AvatarUploader({
+  name,
+  imageUrl,
+  busy,
+  onSelect,
+  onRemove,
+  variant = 'user',
+}: AvatarUploaderProps) {
   const inputRef = useRef<HTMLInputElement>(null);
   const [error, setError] = useState<string | null>(null);
   const [dragOver, setDragOver] = useState(false);
@@ -115,13 +130,19 @@ export function AvatarUploader({ name, imageUrl, busy, onSelect, onRemove }: Ava
         <Box
           sx={{ position: 'relative', flexShrink: 0, alignSelf: { xs: 'flex-start', sm: 'auto' } }}
         >
-          <UserAvatar name={name} size={96} imageUrl={imageUrl} />
+          {variant === 'team' ? (
+            <TeamAvatar name={name} size={96} imageUrl={imageUrl} />
+          ) : (
+            <UserAvatar name={name} size={96} imageUrl={imageUrl} />
+          )}
           {busy && (
             <Box
               sx={{
                 position: 'absolute',
                 inset: 0,
-                borderRadius: '50%',
+                // Match the preview's silhouette: circle for people, the
+                // 30%-radius crest for teams (issue #586 follow-up).
+                borderRadius: variant === 'team' ? `${Math.round(96 * 0.3)}px` : '50%',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
@@ -214,6 +235,7 @@ export function AvatarUploader({ name, imageUrl, busy, onSelect, onRemove }: Ava
 
       {cropSrc && (
         <AvatarCropDialog
+          cropShape={variant === 'team' ? 'rect' : 'round'}
           open
           imageSrc={cropSrc}
           busy={busy}

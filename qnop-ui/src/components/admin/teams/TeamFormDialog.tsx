@@ -188,6 +188,7 @@ export function TeamFormDialog({ open, mode, team, onClose }: TeamFormDialogProp
         <DialogContent>
           <Stack spacing={2.5} sx={{ mt: 1 }}>
             <AvatarUploader
+              variant="team"
               name={name || 'Team'}
               imageUrl={avatarUrl}
               busy={avatarBusy}

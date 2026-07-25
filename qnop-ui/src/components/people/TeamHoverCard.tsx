@@ -144,7 +144,9 @@ function TeamHoverCardPopover({
                 <Box
                   sx={{
                     display: 'inline-flex',
-                    borderRadius: '50%',
+                    // Concentric with the crest's 30% radius — never a circle
+                    // around the rounded-square team identity.
+                    borderRadius: `${Math.round(CREST_SIZE * 0.3) + 4}px`,
                     p: '2px',
                     bgcolor: 'background.paper',
                     border: `2px solid ${alpha(blue, 0.45)}`,
