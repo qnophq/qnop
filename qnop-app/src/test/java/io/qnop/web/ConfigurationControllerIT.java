@@ -21,6 +21,7 @@
 package io.qnop.web;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assumptions.assumeTrue;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -30,16 +31,25 @@ import io.qnop.bootstrap.AbstractIntegrationTest;
 import io.qnop.entity.User;
 import io.qnop.entity.UserRole;
 import io.qnop.repository.UserRepository;
+import java.io.IOException;
+import java.nio.charset.StandardCharsets;
+import java.util.LinkedHashMap;
+import java.util.Map;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
+import org.springframework.core.io.Resource;
+import org.springframework.core.io.support.PathMatchingResourcePatternResolver;
 import org.springframework.http.MediaType;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.util.StreamUtils;
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.json.JsonMapper;
 
 /**
  * End-to-end guard for the effective-configuration endpoint (issue #522). Proves — through the real
@@ -47,6 +57,19 @@ import org.springframework.transaction.annotation.Transactional;
  * grouped, redacted tree and that <em>no</em> secret value ever reaches the wire. The secret values
  * asserted absent are exactly the ones {@link AbstractIntegrationTest} binds into the test context,
  * so a regression that leaked a bound secret would fail here.
+ *
+ * <p><strong>Incremental-compilation caveat (issue #610).</strong> Property descriptions are
+ * harvested from Javadoc by {@code spring-boot-configuration-processor} at <em>compile time</em>.
+ * On an incremental compile the processor rewrites {@code
+ * META-INF/spring-configuration-metadata.json} for the whole module but can only read the Javadoc
+ * of the sources javac actually recompiled, so every property whose declaring file was untouched
+ * comes back with {@code description: null} — touching one unrelated file in {@code qnop-core} is
+ * enough to drop all 35. (The same caveat applies to a locally-run {@code bootRun}: the tooltips on
+ * /admin/configuration are only complete after a full compile.) The description assertions below
+ * are therefore written against <em>what this compile actually harvested</em> rather than against a
+ * fixed expectation, so they stay honest under a full build (always the case in CI, which compiles
+ * a fresh checkout) without turning every incremental local {@code ./gradlew build} into a false
+ * positive.
  */
 @AutoConfigureMockMvc
 @Transactional
@@ -55,6 +78,12 @@ class ConfigurationControllerIT extends AbstractIntegrationTest {
   private static final String PASSWORD = "correct horse battery";
   private static final Pattern ACCESS_TOKEN =
       Pattern.compile("\"accessToken\"\\s*:\\s*\"([^\"]+)\"");
+  private static final JsonMapper JSON = JsonMapper.builder().build();
+
+  /** A property of the top-level auth record, and one of a nested record (Limit). */
+  private static final String ACCESS_TOKEN_TTL = "qnop.auth.access-token-ttl";
+
+  private static final String LOGIN_MAX_ATTEMPTS = "qnop.auth.rate-limit.login.max-attempts";
 
   // The exact secret material AbstractIntegrationTest binds — none of it may appear in the
   // response.
@@ -90,30 +119,91 @@ class ConfigurationControllerIT extends AbstractIntegrationTest {
   }
 
   @Test
-  void entriesCarryDescriptionsHarvestedFromTheConfigurationPropertiesJavadoc() throws Exception {
+  void everyDescriptionThisCompileHarvestedReachesTheWire() throws Exception {
     createUser("config-doc-admin", UserRole.ADMIN);
-    String token = token("config-doc-admin");
+    Map<String, String> served = servedDescriptions(token("config-doc-admin"));
 
-    // The description is generated at compile time from QnopProperties.Auth's Javadoc and joined
-    // from the classpath metadata at runtime — a real end-to-end check of the metadata scan, which
-    // the pure builder/parser unit tests cannot cover.
-    mockMvc
-        .perform(get("/api/v1/admin/configuration").header("Authorization", "Bearer " + token))
-        .andExpect(status().isOk())
-        .andExpect(
-            jsonPath("$.groups[*].entries[?(@.path == 'qnop.auth.access-token-ttl')].description")
-                .value(
-                    org.hamcrest.Matchers.hasItem(
-                        org.hamcrest.Matchers.containsString(
-                            "lifetime of a self-issued access token"))))
-        // A leaf of a nested @ConfigurationProperties record (Limit) is documented too, from the
-        // Limit record's own Javadoc — guards the nested-record harvest.
-        .andExpect(
-            jsonPath(
-                    "$.groups[*].entries[?(@.path == 'qnop.auth.rate-limit.login.max-attempts')].description")
-                .value(
-                    org.hamcrest.Matchers.hasItem(
-                        org.hamcrest.Matchers.containsString("burst capacity"))));
+    // Structural, build-mode independent: both documented paths are leaves of the served tree —
+    // the nested @ConfigurationProperties record (Limit) among them.
+    assertThat(served).containsKeys(ACCESS_TOKEN_TTL, LOGIN_MAX_ATTEMPTS);
+
+    // The end-to-end part this IT uniquely covers: compile-time Javadoc → classpath metadata →
+    // response, joined by property path. Asserted for whatever this compile harvested, which is
+    // every qnop property after a full build and a subset (possibly empty) after an incremental
+    // one — the path→description join itself is pinned build-independently by
+    // ConfigurationTreeBuilderTest.
+    Map<String, String> harvested = harvestedDescriptions();
+    assertThat(harvested.keySet())
+        .allSatisfy(
+            path ->
+                assertThat(served)
+                    .as("a harvested description must not be dropped on the way out: %s", path)
+                    .doesNotContainEntry(path, null));
+  }
+
+  @Test
+  void authPropertyDescriptionsReadAsTheirJavadoc() throws Exception {
+    Map<String, String> harvested = harvestedDescriptions();
+    assumeTrue(
+        harvested.containsKey(ACCESS_TOKEN_TTL) && harvested.containsKey(LOGIN_MAX_ATTEMPTS),
+        """
+        No compile-time descriptions for the asserted properties — this is an incremental compile \
+        that did not recompile QnopProperties/RateLimitProperties (see the class Javadoc, issue \
+        #610). Run ./gradlew :qnop-core:compileJava :qnop-app:compileJava --rerun-tasks to assert \
+        the content.""");
+
+    createUser("config-javadoc-admin", UserRole.ADMIN);
+    Map<String, String> served = servedDescriptions(token("config-javadoc-admin"));
+
+    assertThat(served.get(ACCESS_TOKEN_TTL)).contains("lifetime of a self-issued access token");
+    // A leaf of a nested @ConfigurationProperties record (Limit), documented from the Limit
+    // record's own Javadoc — guards the nested-record harvest.
+    assertThat(served.get(LOGIN_MAX_ATTEMPTS)).contains("burst capacity");
+  }
+
+  /** Property path → description as the endpoint serves it; a missing description maps to null. */
+  private Map<String, String> servedDescriptions(String token) throws Exception {
+    MvcResult result =
+        mockMvc
+            .perform(get("/api/v1/admin/configuration").header("Authorization", "Bearer " + token))
+            .andExpect(status().isOk())
+            .andReturn();
+    Map<String, String> descriptions = new LinkedHashMap<>();
+    JsonNode groups = JSON.readTree(result.getResponse().getContentAsString()).path("groups");
+    for (JsonNode group : groups) {
+      for (JsonNode entry : group.path("entries")) {
+        descriptions.put(entry.path("path").asString(), entry.path("description").asString(null));
+      }
+    }
+    return descriptions;
+  }
+
+  /**
+   * Property path → description as <em>this compile</em> wrote it into the classpath metadata,
+   * limited to the {@code qnop} namespace (dependencies ship their own metadata documents, and the
+   * endpoint serves only our own properties). Parsed here independently of the production {@code
+   * ConfigurationMetadata} parser so the expectation is derived from the file, not from the code
+   * under test.
+   */
+  private static Map<String, String> harvestedDescriptions() throws IOException {
+    Map<String, String> descriptions = new LinkedHashMap<>();
+    Resource[] resources =
+        new PathMatchingResourcePatternResolver()
+            .getResources("classpath*:META-INF/spring-configuration-metadata.json");
+    for (Resource resource : resources) {
+      String document;
+      try (var input = resource.getInputStream()) {
+        document = StreamUtils.copyToString(input, StandardCharsets.UTF_8);
+      }
+      for (JsonNode property : JSON.readTree(document).path("properties")) {
+        String name = property.path("name").asString(null);
+        String description = property.path("description").asString(null);
+        if (name != null && name.startsWith("qnop.") && description != null) {
+          descriptions.putIfAbsent(name, description);
+        }
+      }
+    }
+    return descriptions;
   }
 
   private User createUser(String username, UserRole role) {
