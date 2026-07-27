@@ -93,8 +93,14 @@ publishing {
 // signing is not required and no signature tasks are wired — GitHub Packages
 // does not mandate signatures, so an unsigned SNAPSHOT publish stays frictionless.
 signing {
-    val signingKey = providers.environmentVariable("SIGNING_KEY").orNull
-    val signingPassword = providers.environmentVariable("SIGNING_PASSWORD").orNull
+    // "No key configured" means BLANK, not null (issue #624): GitHub Actions
+    // always defines an env var it maps from a secret, so an undefined secret
+    // arrives as the empty string — never as an absent variable. Deciding on
+    // null alone armed signing with an unusable key on a release without the
+    // secret and failed the run with "Could not read PGP secret key".
+    val signingKey = providers.environmentVariable("SIGNING_KEY").orNull?.takeIf { it.isNotBlank() }
+    val signingPassword =
+        providers.environmentVariable("SIGNING_PASSWORD").orNull?.takeIf { it.isNotBlank() }
     isRequired = signingKey != null
     if (signingKey != null) {
         useInMemoryPgpKeys(signingKey, signingPassword)
