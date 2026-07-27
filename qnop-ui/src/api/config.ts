@@ -40,6 +40,7 @@ import {
   SearchApi,
   ServerConfigApi,
   TeamsApi,
+  NotificationsApi,
   UserSettingsApi,
   UsersApi,
   DashboardApi,
@@ -120,3 +121,4 @@ export const principalsApi = new PrincipalsApi(undefined, undefined, axiosInstan
 export const searchApi = new SearchApi(undefined, undefined, axiosInstance);
 export const reviewWorkflowApi = new ReviewWorkflowApi(undefined, undefined, axiosInstance);
 export const userSettingsApi = new UserSettingsApi(undefined, undefined, axiosInstance);
+export const notificationsApi = new NotificationsApi(undefined, undefined, axiosInstance);

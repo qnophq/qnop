@@ -45,6 +45,10 @@ export default defineConfig({
         'src/components/shell/navConfig.tsx',
         // The branded error pages (issue #611): shell, pages, router catch.
         'src/pages/errors/**/*.tsx',
+        // The in-app notification inbox (issue #538): the pages own the
+        // orchestration, the row is the shared presentational unit.
+        'src/pages/messages/**/*.tsx',
+        'src/components/notifications/**/*.tsx',
         // Auth screens — the critical entry flow (issue #352, wave 1).
         'src/pages/auth/**/*.tsx',
         // Admin screens — users, teams, settings, branding and OIDC (issue

@@ -28,7 +28,7 @@ function ids(role: 'ADMIN' | 'MEMBER' | 'AUDITOR' | null): string[] {
 
 describe('visibleNavGroups', () => {
   it('shows dashboard + reviews + My Teams for a MEMBER (My Teams is for everyone)', () => {
-    expect(ids('MEMBER')).toEqual(['dashboard', 'reviews', 'my-teams']);
+    expect(ids('MEMBER')).toEqual(['dashboard', 'reviews', 'my-teams', 'messages']);
   });
 
   it('adds audit for an AUDITOR but no admin items', () => {
@@ -43,6 +43,7 @@ describe('visibleNavGroups', () => {
       'dashboard',
       'reviews',
       'my-teams',
+      'messages',
       'settings',
       'configuration',
       'users',

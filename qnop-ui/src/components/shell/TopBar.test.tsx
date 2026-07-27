@@ -34,6 +34,31 @@ vi.mock('../../api/hooks/useSearch', () => ({
   useSearchQuick: () => ({ data: undefined, isPending: false, isError: false }),
 }));
 
+const unreadCount = vi.fn(() => 0);
+vi.mock('../../api/hooks/useNotifications', () => ({
+  useUnreadCount: () => ({ data: unreadCount() }),
+  useNotifications: () => ({
+    data: {
+      items: [
+        {
+          id: 'n1',
+          type: 'MENTION',
+          title: 'Ada mentioned you',
+          documentTitle: 'NDA Acme Corp',
+          accessible: true,
+          createdAt: '2026-07-01T10:00:00Z',
+        },
+      ],
+      total: 1,
+      page: 0,
+      size: 6,
+      unreadTotal: unreadCount(),
+    },
+    isPending: false,
+  }),
+  useMarkAllNotificationsRead: () => ({ mutate: vi.fn(), isPending: false }),
+}));
+
 function renderTopBar() {
   return render(
     <ThemeProvider theme={buildTheme('light')}>
@@ -44,24 +69,37 @@ function renderTopBar() {
   );
 }
 
-describe('TopBar notifications placeholder (#514)', () => {
-  it('opens the coming-soon panel on bell click and closes it again', async () => {
+describe('TopBar notifications (#538)', () => {
+  it('opens the notification quickview on bell click and closes it again', async () => {
     const user = userEvent.setup();
+    unreadCount.mockReturnValue(1);
     renderTopBar();
 
-    expect(screen.queryByText(/coming soon/i)).not.toBeInTheDocument();
+    expect(screen.queryByText('Ada mentioned you')).not.toBeInTheDocument();
 
-    await user.click(screen.getByRole('button', { name: 'Notifications' }));
-    expect(await screen.findByText(/coming soon/i)).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: /Notifications/ }));
+    expect(await screen.findByText('Ada mentioned you')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'See all messages' })).toBeInTheDocument();
 
     await user.keyboard('{Escape}');
-    expect(screen.queryByText(/coming soon/i)).not.toBeInTheDocument();
+    expect(screen.queryByText('Ada mentioned you')).not.toBeInTheDocument();
   });
 
-  it('shows no fake unread indicator on the bell', () => {
+  it('carries the real unread count on the bell, and announces it', () => {
+    unreadCount.mockReturnValue(3);
     renderTopBar();
+
+    // The badge is a number now, not the decorative dot it used to be (#514).
+    expect(screen.getByRole('button', { name: 'Notifications, 3 unread' })).toBeInTheDocument();
+    expect(screen.getByText('3')).toBeInTheDocument();
+  });
+
+  it('shows no badge when nothing is unread', () => {
+    unreadCount.mockReturnValue(0);
+    renderTopBar();
+
     const bell = screen.getByRole('button', { name: 'Notifications' });
-    expect(bell.querySelector('.MuiBadge-dot')).toBeNull();
+    expect(bell.textContent).not.toMatch(/\d/);
   });
 
   it('carries the real global search input (#540) instead of the old trigger', () => {

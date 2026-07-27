@@ -1,0 +1,89 @@
+# Copyright (c) 2026-present devtank42 GmbH
+# SPDX-License-Identifier: AGPL-3.0-only
+
+# The in-app notification inbox (issue #538, ADR-0051). Fan-out on write: one
+# row per recipient per event, written after the review transaction commits by
+# the in-app sink that shares its recipient resolution with the mail path.
+#
+# What the row does NOT hold is as deliberate as what it does:
+#
+#  - No display names. Only ids (actor/recipient/document/annotation/comment).
+#    A name is a property of a (review, viewer) pair under per-review anonymity
+#    (ADR-0038), and a review's privacy can change after the row was written, so
+#    the actor's name is resolved when the notification is READ. Snapshotting it
+#    would let an old row leak a name the recipient may no longer see.
+#  - But it DOES hold the non-identity context — excerpt, decision, version,
+#    state transition — snapshotted at write time. Those describe what happened
+#    *then*; re-deriving them on read would quote an edited comment's current
+#    text, or fail outright once the comment is gone.
+#
+# Both foreign keys CASCADE, and document_id must: the review purge (ADR-0050)
+# deletes a document and relies entirely on DB cascades to take its aggregate
+# with it — a RESTRICTing notification row would fail the purge.
+databaseChangeLog:
+  - changeSet:
+      id: 0029-notification-schema
+      author: qnop
+      comment: Adds the notification table for the in-app inbox (issue #538, ADR-0051).
+      changes:
+        - createTable:
+            tableName: notification
+            columns:
+              - column:
+                  name: id
+                  type: UUID
+                  constraints: { primaryKey: true, nullable: false }
+              - column:
+                  name: recipient_id
+                  type: UUID
+                  constraints: { nullable: false }
+              - column:
+                  name: type
+                  type: VARCHAR(32)
+                  constraints: { nullable: false }
+              - column:
+                  name: actor_id
+                  type: UUID
+              # Nullable by design: it leaves room for notifications that are
+              # not about a review (system/admin broadcasts) without a schema
+              # change. Nothing writes such a row yet.
+              - column: { name: document_id, type: UUID }
+              - column: { name: annotation_id, type: UUID }
+              - column: { name: comment_id, type: UUID }
+              # Non-identity context, snapshotted at write time.
+              - column: { name: excerpt, type: VARCHAR(200) }
+              - column: { name: decision, type: VARCHAR(32) }
+              - column: { name: version_number, type: INT }
+              - column: { name: from_state, type: VARCHAR(32) }
+              - column: { name: to_state, type: VARCHAR(32) }
+              # NULL = unread. The badge counts these.
+              - column: { name: read_at, type: TIMESTAMP WITH TIME ZONE }
+              - column:
+                  name: created_at
+                  type: TIMESTAMP WITH TIME ZONE
+                  constraints: { nullable: false }
+        - addForeignKeyConstraint:
+            baseTableName: notification
+            baseColumnNames: recipient_id
+            referencedTableName: qnop_user
+            referencedColumnNames: id
+            constraintName: fk_notification_recipient
+            onDelete: CASCADE
+        # See the header: the purge (ADR-0050) deletes documents and depends on
+        # this cascade. Do not weaken it.
+        - addForeignKeyConstraint:
+            baseTableName: notification
+            baseColumnNames: document_id
+            referencedTableName: document
+            referencedColumnNames: id
+            constraintName: fk_notification_document
+            onDelete: CASCADE
+        # The inbox reads "my notifications, newest first" and the badge reads
+        # "my unread count" — both are served by this one index.
+        - createIndex:
+            indexName: ix_notification_recipient_read_created
+            tableName: notification
+            columns:
+              - column: { name: recipient_id }
+              - column: { name: read_at }
+              - column: { name: created_at, descending: true }
