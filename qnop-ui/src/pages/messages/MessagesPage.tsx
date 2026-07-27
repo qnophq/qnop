@@ -27,11 +27,12 @@ import Paper from '@mui/material/Paper';
 import Skeleton from '@mui/material/Skeleton';
 import Stack from '@mui/material/Stack';
 import Typography from '@mui/material/Typography';
-import { BellOff, CheckCheck } from 'lucide-react';
+import { CheckCheck, MailOpen } from 'lucide-react';
 import { useNavigate, useSearchParams } from 'react-router';
 import { useMarkAllNotificationsRead, useNotifications } from '../../api/hooks/useNotifications';
 import { PageHeader } from '../../components/admin/layout/PageHeader';
 import { NotificationRow } from '../../components/notifications/NotificationRow';
+import { AllCaughtUpState, MessagesEmptyState } from './MessagesEmptyState';
 import { ErrorState } from '../errors/ErrorState';
 import { ServerErrorIllustration } from '../errors/illustrations';
 
@@ -80,6 +81,10 @@ export function MessagesPage() {
   const total = data?.total ?? 0;
   const unreadTotal = data?.unreadTotal ?? 0;
   const pageCount = Math.max(1, Math.ceil(total / PAGE_SIZE));
+  // Nothing has EVER landed here — a cold start, not a filter that came up
+  // empty. It replaces the facets and the list rather than sitting inside them:
+  // filtering an inbox that has never received anything is busywork.
+  const neverReceivedAnything = !isPending && filter === 'all' && total === 0;
 
   if (isError) {
     return (
@@ -115,72 +120,83 @@ export function MessagesPage() {
         }
       />
 
-      <Stack direction="row" spacing={1} sx={{ flexWrap: 'wrap', rowGap: 1 }}>
-        <Chip
-          label={`All${total > 0 && filter === 'all' ? ` (${total})` : ''}`}
-          size="small"
-          color={filter === 'all' ? 'primary' : 'default'}
-          variant={filter === 'all' ? 'filled' : 'outlined'}
-          onClick={() => setParam('filter', 'all', 'all')}
-          sx={{ fontWeight: filter === 'all' ? 600 : 400 }}
-        />
-        <Chip
-          label={`Unread${unreadTotal > 0 ? ` (${unreadTotal})` : ''}`}
-          size="small"
-          color={filter === 'unread' ? 'primary' : 'default'}
-          variant={filter === 'unread' ? 'filled' : 'outlined'}
-          onClick={() => setParam('filter', 'unread', 'all')}
-          sx={{ fontWeight: filter === 'unread' ? 600 : 400 }}
-        />
-        <Chip
-          label="Read"
-          size="small"
-          color={filter === 'read' ? 'primary' : 'default'}
-          variant={filter === 'read' ? 'filled' : 'outlined'}
-          onClick={() => setParam('filter', 'read', 'all')}
-          sx={{ fontWeight: filter === 'read' ? 600 : 400 }}
-        />
-      </Stack>
-
-      <Paper variant="outlined" sx={{ borderRadius: '14px', overflow: 'hidden' }}>
-        {isPending ? (
-          <Box sx={{ p: 2.5 }}>
-            {[0, 1, 2, 3].map((row) => (
-              <Skeleton key={row} height={54} sx={{ mb: 1 }} />
-            ))}
-          </Box>
-        ) : items.length === 0 ? (
-          <Stack sx={{ alignItems: 'center', textAlign: 'center', px: 3, py: 8 }} spacing={1.5}>
-            <BellOff size={28} aria-hidden />
-            <Typography sx={{ fontWeight: 600 }}>
-              {filter === 'unread' ? 'Nothing unread' : 'No messages yet'}
-            </Typography>
-            <Typography sx={{ fontSize: 13.5, color: 'text.secondary', maxWidth: 420 }}>
-              {filter === 'unread'
-                ? 'You are all caught up.'
-                : 'When someone mentions you, replies to your annotations or moves one of your reviews along, it lands here.'}
-            </Typography>
-          </Stack>
-        ) : (
-          items.map((notification) => (
-            <NotificationRow
-              key={notification.id}
-              notification={notification}
-              onOpen={() => navigate(`/messages/${notification.id}`)}
+      {neverReceivedAnything ? (
+        <MessagesEmptyState />
+      ) : (
+        <>
+          <Stack direction="row" spacing={1} sx={{ flexWrap: 'wrap', rowGap: 1 }}>
+            <Chip
+              label={`All${total > 0 && filter === 'all' ? ` (${total})` : ''}`}
+              size="small"
+              color={filter === 'all' ? 'primary' : 'default'}
+              variant={filter === 'all' ? 'filled' : 'outlined'}
+              onClick={() => setParam('filter', 'all', 'all')}
+              sx={{ fontWeight: filter === 'all' ? 600 : 400 }}
             />
-          ))
-        )}
-      </Paper>
+            <Chip
+              label={`Unread${unreadTotal > 0 ? ` (${unreadTotal})` : ''}`}
+              size="small"
+              color={filter === 'unread' ? 'primary' : 'default'}
+              variant={filter === 'unread' ? 'filled' : 'outlined'}
+              onClick={() => setParam('filter', 'unread', 'all')}
+              sx={{ fontWeight: filter === 'unread' ? 600 : 400 }}
+            />
+            <Chip
+              label="Read"
+              size="small"
+              color={filter === 'read' ? 'primary' : 'default'}
+              variant={filter === 'read' ? 'filled' : 'outlined'}
+              onClick={() => setParam('filter', 'read', 'all')}
+              sx={{ fontWeight: filter === 'read' ? 600 : 400 }}
+            />
+          </Stack>
 
-      {pageCount > 1 && (
-        <Stack sx={{ alignItems: 'center' }}>
-          <Pagination
-            count={pageCount}
-            page={page + 1}
-            onChange={(_event, next) => setParam('page', String(next - 1), '0')}
-            shape="rounded"
-          />
-        </Stack>
+          <Paper variant="outlined" sx={{ borderRadius: '14px', overflow: 'hidden' }}>
+            {isPending ? (
+              <Box sx={{ p: 2.5 }}>
+                {[0, 1, 2, 3].map((row) => (
+                  <Skeleton key={row} height={54} sx={{ mb: 1 }} />
+                ))}
+              </Box>
+            ) : items.length === 0 ? (
+              // A facet that came up empty. "Nothing unread" is an achievement and
+              // says so; "nothing read" is just a fact and stays quiet.
+              filter === 'unread' ? (
+                <AllCaughtUpState />
+              ) : (
+                <Stack
+                  sx={{ alignItems: 'center', textAlign: 'center', px: 3, py: 8 }}
+                  spacing={1.25}
+                >
+                  <MailOpen size={26} aria-hidden />
+                  <Typography sx={{ fontWeight: 600 }}>Nothing read yet</Typography>
+                  <Typography sx={{ fontSize: 13.5, color: 'text.secondary', maxWidth: 420 }}>
+                    Everything in your inbox is still waiting for you.
+                  </Typography>
+                </Stack>
+              )
+            ) : (
+              items.map((notification) => (
+                <NotificationRow
+                  key={notification.id}
+                  notification={notification}
+                  onOpen={() => navigate(`/messages/${notification.id}`)}
+                />
+              ))
+            )}
+          </Paper>
+
+          {pageCount > 1 && (
+            <Stack sx={{ alignItems: 'center' }}>
+              <Pagination
+                count={pageCount}
+                page={page + 1}
+                onChange={(_event, next) => setParam('page', String(next - 1), '0')}
+                shape="rounded"
+              />
+            </Stack>
+          )}
+        </>
       )}
     </Stack>
   );

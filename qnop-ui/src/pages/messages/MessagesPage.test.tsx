@@ -145,19 +145,33 @@ describe('MessagesPage', () => {
     );
   });
 
-  it('says something useful when the inbox is empty', () => {
+  it('greets a never-used inbox with the launchpad instead of the list chrome', () => {
     mockList([], 0);
     renderPage();
 
-    expect(screen.getByText('No messages yet')).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Your inbox is listening' })).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: /Go to your reviews/ })).toBeInTheDocument();
+    // Facets over an inbox that never received anything would be busywork.
+    expect(screen.queryByRole('button', { name: 'Read' })).not.toBeInTheDocument();
   });
 
-  it('distinguishes "nothing unread" from "no messages at all"', () => {
+  it('celebrates an emptied unread facet rather than calling it empty', () => {
     mockList([], 0);
     renderPage('/messages?filter=unread');
 
-    expect(screen.getByText('Nothing unread')).toBeInTheDocument();
-    expect(screen.getByText('You are all caught up.')).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Inbox zero' })).toBeInTheDocument();
+    // …and the facets stay, because the inbox itself is not empty.
+    expect(screen.getByRole('button', { name: 'Read' })).toBeInTheDocument();
+    expect(
+      screen.queryByRole('heading', { name: 'Your inbox is listening' }),
+    ).not.toBeInTheDocument();
+  });
+
+  it('states the read facet plainly when nothing has been read', () => {
+    mockList([], 0);
+    renderPage('/messages?filter=read');
+
+    expect(screen.getByText('Nothing read yet')).toBeInTheDocument();
   });
 
   it('switches facets through the chips and restarts paging', () => {
