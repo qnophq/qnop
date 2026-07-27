@@ -36,6 +36,18 @@ import { useFormatters } from '../../hooks/useFormatters';
 import { ErrorState } from '../errors/ErrorState';
 import { NotFoundIllustration } from '../errors/illustrations';
 
+/** One labelled fact in the context rail. */
+function RailFact({ label, value }: { label: string; value: string }) {
+  return (
+    <Box>
+      <Typography sx={{ fontSize: 12, color: 'text.secondary' }}>{label}</Typography>
+      <Typography sx={{ fontSize: 14, fontWeight: 600, wordBreak: 'break-word' }}>
+        {value}
+      </Typography>
+    </Box>
+  );
+}
+
 /**
  * One notification in full (issue #538): the formatted message, the excerpt it
  * quotes, and the way back to what it is about.
@@ -98,87 +110,121 @@ export function MessageDetailPage() {
       </Box>
 
       {/*
-        The shell gives this route the full width so navigating in from the
-        inbox does not jump a container width — but prose needs a measure, so
-        the card keeps a reading column instead of stretching to the monitor.
+        The card takes the full width the shell gives this route, and then uses
+        it: the message reads on the left, its context and the way onward sit in
+        a rail on the right — the same "content + rail" composition the
+        new-review wizard uses, rather than one paragraph stretched across a
+        monitor.
       */}
-      <Paper
-        variant="outlined"
-        sx={{ borderRadius: '14px', p: { xs: 2.5, sm: 3.5 }, maxWidth: 860 }}
-      >
-        <Stack direction="row" spacing={2} sx={{ alignItems: 'flex-start' }}>
+      <Paper variant="outlined" sx={{ borderRadius: '14px', p: { xs: 2.5, sm: 3.5 } }}>
+        <Stack
+          direction={{ xs: 'column', md: 'row' }}
+          spacing={{ xs: 3, md: 4 }}
+          sx={{ alignItems: 'stretch' }}
+        >
+          {/* the message itself */}
+          <Box sx={{ flex: 1, minWidth: 0 }}>
+            <Stack direction="row" spacing={2} sx={{ alignItems: 'flex-start' }}>
+              <Box
+                sx={{
+                  width: 42,
+                  height: 42,
+                  flexShrink: 0,
+                  borderRadius: '50%',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  color: 'primary.main',
+                  bgcolor: (t) =>
+                    alpha(t.palette.primary.main, t.palette.mode === 'dark' ? 0.16 : 0.1),
+                }}
+              >
+                <NotificationTypeIcon type={data.type} size={20} />
+              </Box>
+              <Box sx={{ minWidth: 0, flex: 1 }}>
+                <Typography variant="h1" sx={{ fontSize: 22, lineHeight: 1.3 }}>
+                  {data.title}
+                </Typography>
+                {!data.accessible && (
+                  <Chip
+                    label="No longer available"
+                    size="small"
+                    variant="outlined"
+                    sx={{ mt: 0.75 }}
+                  />
+                )}
+              </Box>
+            </Stack>
+
+            {/* prose keeps a measure even when the card is very wide */}
+            <Typography sx={{ mt: 2.5, fontSize: 15, lineHeight: 1.65, maxWidth: '68ch' }}>
+              {data.body}
+            </Typography>
+
+            {data.preview && (
+              <Box
+                sx={{
+                  mt: 2,
+                  px: 2,
+                  py: 1.5,
+                  maxWidth: '68ch',
+                  borderLeft: '3px solid',
+                  borderColor: 'primary.main',
+                  borderRadius: '0 8px 8px 0',
+                  bgcolor: (t) =>
+                    alpha(t.palette.primary.main, t.palette.mode === 'dark' ? 0.08 : 0.04),
+                }}
+              >
+                <Typography sx={{ fontSize: 14, fontStyle: 'italic', color: 'text.secondary' }}>
+                  “{data.preview}”
+                </Typography>
+              </Box>
+            )}
+          </Box>
+
+          {/* the context rail: what this is about, and where it leads */}
           <Box
             sx={{
-              width: 42,
-              height: 42,
+              width: { xs: '100%', md: 300 },
               flexShrink: 0,
-              borderRadius: '50%',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              color: 'primary.main',
-              bgcolor: (t) => alpha(t.palette.primary.main, t.palette.mode === 'dark' ? 0.16 : 0.1),
+              pt: { xs: 2.5, md: 0 },
+              pl: { md: 4 },
+              borderTop: { xs: '1px solid', md: 'none' },
+              borderLeft: { md: '1px solid' },
+              borderColor: { xs: 'divider', md: 'divider' },
             }}
           >
-            <NotificationTypeIcon type={data.type} size={20} />
-          </Box>
-          <Box sx={{ minWidth: 0, flex: 1 }}>
-            <Typography variant="h1" sx={{ fontSize: 22, lineHeight: 1.3 }}>
-              {data.title}
-            </Typography>
-            <Stack
-              direction="row"
-              spacing={1}
-              sx={{ mt: 0.75, alignItems: 'center', flexWrap: 'wrap', rowGap: 0.5 }}
+            <Typography
+              sx={{
+                fontSize: 11,
+                fontWeight: 700,
+                letterSpacing: '0.12em',
+                textTransform: 'uppercase',
+                color: 'text.disabled',
+              }}
             >
-              <Typography sx={{ fontSize: 12.5, color: 'text.secondary' }}>
-                {formatDateTime(data.createdAt)}
-              </Typography>
-              {!data.accessible && (
-                <Chip label="No longer available" size="small" variant="outlined" />
-              )}
+              Context
+            </Typography>
+
+            <Stack spacing={1.75} sx={{ mt: 1.75 }}>
+              {data.documentTitle && <RailFact label="Review" value={data.documentTitle} />}
+              {data.actorName && <RailFact label="From" value={data.actorName} />}
+              <RailFact label="Received" value={formatDateTime(data.createdAt)} />
             </Stack>
+
+            {data.actionPath && (
+              <Button
+                fullWidth
+                variant="contained"
+                endIcon={<ArrowRight size={16} />}
+                onClick={() => navigate(data.actionPath as string)}
+                sx={{ mt: 3 }}
+              >
+                {data.actionLabel ?? 'Open review'}
+              </Button>
+            )}
           </Box>
         </Stack>
-
-        <Typography sx={{ mt: 2.5, fontSize: 15, lineHeight: 1.65 }}>{data.body}</Typography>
-
-        {data.preview && (
-          <Box
-            sx={{
-              mt: 2,
-              px: 2,
-              py: 1.5,
-              borderLeft: '3px solid',
-              borderColor: 'primary.main',
-              borderRadius: '0 8px 8px 0',
-              bgcolor: (t) =>
-                alpha(t.palette.primary.main, t.palette.mode === 'dark' ? 0.08 : 0.04),
-            }}
-          >
-            <Typography sx={{ fontSize: 14, fontStyle: 'italic', color: 'text.secondary' }}>
-              “{data.preview}”
-            </Typography>
-          </Box>
-        )}
-
-        {data.documentTitle && (
-          <Typography sx={{ mt: 2, fontSize: 13, color: 'text.secondary' }}>
-            Review: <strong>{data.documentTitle}</strong>
-          </Typography>
-        )}
-
-        {data.actionPath && (
-          <Box sx={{ mt: 3 }}>
-            <Button
-              variant="contained"
-              endIcon={<ArrowRight size={16} />}
-              onClick={() => navigate(data.actionPath as string)}
-            >
-              {data.actionLabel ?? 'Open review'}
-            </Button>
-          </Box>
-        )}
       </Paper>
     </Stack>
   );
