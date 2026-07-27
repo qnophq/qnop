@@ -65,6 +65,10 @@ export function AppShell() {
   const profileMatch = useMatch('/profile');
   const userProfileMatch = useMatch('/users/:userId');
   const teamProfileMatch = useMatch('/teams/:teamId');
+  // The inbox and one message (issue #538) — both, so opening a notification
+  // does not make the whole page jump a container width.
+  const messagesMatch = useMatch('/messages');
+  const messageDetailMatch = useMatch('/messages/:notificationId');
   // The new-review wizard (#469 polish) spans the full width too — it lays out
   // as form + launch-checklist rail.
   const wizardMatch = Boolean(reviewMatch && reviewMatch.params.documentId === 'new');
@@ -80,6 +84,8 @@ export function AppShell() {
     Boolean(profileMatch) ||
     Boolean(userProfileMatch) ||
     Boolean(teamProfileMatch) ||
+    Boolean(messagesMatch) ||
+    Boolean(messageDetailMatch) ||
     wizardMatch;
   const [collapsed, setCollapsed] = useState<boolean>(() => {
     try {

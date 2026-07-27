@@ -97,7 +97,15 @@ export function MessageDetailPage() {
         </Button>
       </Box>
 
-      <Paper variant="outlined" sx={{ borderRadius: '14px', p: { xs: 2.5, sm: 3.5 } }}>
+      {/*
+        The shell gives this route the full width so navigating in from the
+        inbox does not jump a container width — but prose needs a measure, so
+        the card keeps a reading column instead of stretching to the monitor.
+      */}
+      <Paper
+        variant="outlined"
+        sx={{ borderRadius: '14px', p: { xs: 2.5, sm: 3.5 }, maxWidth: 860 }}
+      >
         <Stack direction="row" spacing={2} sx={{ alignItems: 'flex-start' }}>
           <Box
             sx={{
