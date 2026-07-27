@@ -50,6 +50,7 @@ function detail(overrides: DetailOverrides = {}): NotificationDetail {
     title: 'Ada mentioned you',
     body: 'Ada mentioned you in a comment on “NDA Acme Corp”.',
     preview: 'can you confirm the cap?',
+    actorName: 'Ada Admin',
     documentTitle: 'NDA Acme Corp',
     actionPath: '/reviews/nda-acme?annotation=a1',
     actionLabel: 'Open annotation',
@@ -99,6 +100,22 @@ describe('MessageDetailPage', () => {
       screen.getByText('Ada mentioned you in a comment on “NDA Acme Corp”.'),
     ).toBeInTheDocument();
     expect(screen.getByText('“can you confirm the cap?”')).toBeInTheDocument();
+  });
+
+  it('wears its type as a crest so the kind is legible before the words', () => {
+    renderPage();
+
+    // The type label is the eyebrow above the headline; the icon carries the
+    // same identity in colour (asserted in notificationMeta.test).
+    expect(screen.getByText('Mention')).toBeInTheDocument();
+  });
+
+  it('shows the sender with a face, not just a name', () => {
+    renderPage();
+
+    // Initials only — under an anonymous review the name IS the pseudonym, so
+    // the avatar must never reach for a real profile picture.
+    expect(screen.getByText('AA')).toBeInTheDocument();
   });
 
   it('marks an unread notification read when it is opened', () => {
