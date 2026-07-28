@@ -22,7 +22,6 @@
 import { useState } from 'react';
 import { useNavigate, useParams, useSearchParams } from 'react-router';
 import Box from '@mui/material/Box';
-import Button from '@mui/material/Button';
 import Chip from '@mui/material/Chip';
 import CircularProgress from '@mui/material/CircularProgress';
 import Divider from '@mui/material/Divider';
@@ -35,6 +34,7 @@ import { useDocument, useDocumentVersions } from '../../api/hooks/useDocuments';
 import { useRecordVisit } from '../../api/hooks/useReviews';
 import { AdminToast } from '../../components/admin/layout/AdminToast';
 import { ExportAnnotationsButton } from '../../components/reviews/ExportAnnotationsButton';
+import { ToolbarIconButton } from '../../components/reviews/ToolbarIconButton';
 import { ReviewPageHeader } from '../../components/reviews/hub/ReviewPageHeader';
 import { ReviewViewTabs } from '../../components/reviews/hub/ReviewViewTabs';
 import { useReviewDocumentId } from '../../components/reviews/reviewDocumentId';
@@ -294,15 +294,12 @@ export function ReviewTasksPage() {
         {/* A document-scoped task (issue #395) needs no selection — offered while the review is
             open and has a version to author against; the server refuses a closed review anyway. */}
         {isOpenWorkflowState(document.workflowState) && latestVersion >= 1 && (
-          <Button
+          <ToolbarIconButton
+            label="Global annotation"
+            icon={<Plus size={16} />}
             variant="contained"
-            size="small"
-            startIcon={<Plus size={16} />}
             onClick={() => setNewTaskOpen(true)}
-            sx={{ flexShrink: 0 }}
-          >
-            Global annotation
-          </Button>
+          />
         )}
       </Stack>
 

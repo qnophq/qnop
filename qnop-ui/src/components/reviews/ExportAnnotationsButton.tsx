@@ -20,11 +20,9 @@
  */
 
 import { useState } from 'react';
-import Button from '@mui/material/Button';
-import CircularProgress from '@mui/material/CircularProgress';
-import Tooltip from '@mui/material/Tooltip';
 import { FileDown } from 'lucide-react';
 import { downloadAnnotationExport } from '../../api/annotationExport';
+import { ToolbarIconButton } from './ToolbarIconButton';
 
 /**
  * Downloads the review's annotations as a spreadsheet (issue #547).
@@ -39,13 +37,10 @@ export function ExportAnnotationsButton({
   documentId,
   version,
   onError,
-  /** Icon-only, for toolbars that are already dense. */
-  compact = false,
 }: {
   documentId: string;
   version?: number;
   onError?: (message: string) => void;
-  compact?: boolean;
 }) {
   const [exporting, setExporting] = useState(false);
 
@@ -62,37 +57,12 @@ export function ExportAnnotationsButton({
     }
   };
 
-  const spinner = <CircularProgress size={14} color="inherit" />;
-
-  if (compact) {
-    return (
-      <Tooltip title="Export to Excel">
-        <span>
-          <Button
-            size="small"
-            variant="outlined"
-            disabled={exporting}
-            onClick={run}
-            aria-label="Export to Excel"
-            sx={{ minWidth: 36, px: 1 }}
-          >
-            {exporting ? spinner : <FileDown size={15} />}
-          </Button>
-        </span>
-      </Tooltip>
-    );
-  }
-
   return (
-    <Button
-      size="small"
-      variant="outlined"
-      startIcon={exporting ? spinner : <FileDown size={16} />}
-      disabled={exporting}
+    <ToolbarIconButton
+      label="Export to Excel"
+      icon={<FileDown size={16} />}
       onClick={run}
-      sx={{ flexShrink: 0 }}
-    >
-      Export to Excel
-    </Button>
+      busy={exporting}
+    />
   );
 }

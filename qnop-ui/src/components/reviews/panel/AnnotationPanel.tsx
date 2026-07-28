@@ -21,7 +21,6 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import Box from '@mui/material/Box';
-import Button from '@mui/material/Button';
 import Collapse from '@mui/material/Collapse';
 import Stack from '@mui/material/Stack';
 import Typography from '@mui/material/Typography';
@@ -39,6 +38,7 @@ import type { Notify } from '../../admin/layout/useToast';
 import { SectionCard } from '../../admin/layout/SectionCard';
 import { ToneBadge } from '../../admin/ToneBadge';
 import { ExportAnnotationsButton } from '../ExportAnnotationsButton';
+import { ToolbarIconButton } from '../ToolbarIconButton';
 import { isUnseen } from '../newSince';
 import type { BuildPermalink } from '../useReviewPermalink';
 import { useConfirmPlacement } from '../../../api/hooks/useAnnotations';
@@ -369,7 +369,6 @@ export function AnnotationPanel({
                 documentId={documentId}
                 version={versionNumber ?? undefined}
                 onError={(message) => notify?.(message, 'error')}
-                compact
               />
             ) : undefined
           }
@@ -377,14 +376,11 @@ export function AnnotationPanel({
             // Raise a whole-document task without a selection (issue #395) — a quiet peer to the
             // text-selection gesture, offered while the latest version is open for review.
             onNewDocumentNote && !readOnly && !reviewClosed ? (
-              <Button
-                size="small"
-                variant="outlined"
-                startIcon={<Plus size={15} />}
+              <ToolbarIconButton
+                label="Global annotation"
+                icon={<Plus size={15} />}
                 onClick={onNewDocumentNote}
-              >
-                Global annotation
-              </Button>
+              />
             ) : undefined
           }
         </Stack>
