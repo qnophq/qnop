@@ -31,9 +31,10 @@ testdata/
 │   └── not-an-image.txt      # plain text — must be rejected as an unsupported type (415)
 ├── db/                       # deterministic SQL fixtures (issue #163)
 │   ├── clean.sql             # wipes the seeded tables to a known-empty slate
-│   └── seed.sql              # the shared seeded dataset (users, teams, OIDC provider,
-│                             # Mailpit SMTP settings; issue #401 adds a 20-user crowd
-│                             # and 5 department teams for manual testing)
+│   ├── seed.sql              # the shared seeded dataset (users, teams, OIDC provider,
+│   │                         # Mailpit SMTP settings; issue #401 adds a 20-user crowd
+│   │                         # and 5 department teams for manual testing)
+│   └── demo-notifications.sql # OPTIONAL, dev-only: fills the in-app inboxes (issue #633)
 └── documents/                # review document payloads (issues #308, #370)
     ├── sample.pdf            # minimal valid single-page PDF, text "QNOP SMOKE TEST"
     ├── doc1/                 # multi-version dummy: test-dummy-v1..v5.pdf (1 page each)
@@ -63,6 +64,39 @@ the smoke's multi-version/diff steps:
   near-duplicate → **ORPHANED**. v3 prepends a preamble that shifts the whole
   document once more, so placed (and freshly re-attached) annotations go
   MOVED again for a second round.
+
+### `demo-notifications.sql` — dev only, never loaded by tests
+
+The in-app inbox (issue #538) cannot be judged on three rows: row density, the
+read/unread balance, paging and the relative timestamps only show their problems
+once an inbox holds a realistic backlog. This script produces one — roughly 130
+notifications per eligible inbox, spread over twelve weeks.
+
+It is deliberately **not** part of `seed.sql`. The seeded integration tests load
+that file on every test and assert exact counts, so hundreds of extra rows would
+both slow the suite and break those assertions. Run it by hand against a seeded
+dev database:
+
+```bash
+PGPASSWORD=qnop psql -h 127.0.0.1 -U qnop -d qnop -f testdata/db/demo-notifications.sql
+```
+
+It is additive and repeatable — each run appends another batch; `DELETE FROM
+notification;` starts over. Two properties are what make the output usable
+rather than merely numerous, and both are easy to lose when editing it:
+
+- **Every row points at a review its recipient may really see** (owner, direct
+  participant, or via a team — the three paths `DocumentAccessService` uses).
+  The detail view re-checks visibility and renders a tombstone otherwise, so a
+  naive cross join yields an inbox of *"A review you no longer have access to"*.
+- **Annotation- and comment-shaped types reuse the real annotation and comment
+  ids** of their document, so the deep links land somewhere.
+
+Everything stays inside the default retention window (`notifications.retain_days`
+= 90, issue #626) so the `notificationSweep` job does not quietly eat the demo
+data on its next run. Users with no visible review are skipped rather than being
+added to review circles to manufacture visibility — silently rewriting the
+seeded participation would corrupt other manual test scenarios.
 
 The seed's role/state users (`admin`, `member`, `auditor`, …) are pinned by
 `SeededAdminUsersIT`/`SeededTeamIT` — keep their rows and the Alpha/Beta teams
