@@ -41,7 +41,7 @@ function filenameFrom(disposition: string | undefined, fallback: string): string
 export async function downloadAnnotationExport(
   documentId: string,
   version?: number,
-  options?: { fields?: string[]; scope?: string },
+  options?: { fields?: string[]; scope?: string; comments?: boolean },
 ): Promise<void> {
   const response = await axiosInstance.get(`/documents/${documentId}/annotations/export`, {
     params: {
@@ -51,6 +51,7 @@ export async function downloadAnnotationExport(
       // thing to escape if that ever changes.
       ...(options?.fields?.length ? { fields: options.fields } : {}),
       ...(options?.scope && options.scope !== 'all' ? { scope: options.scope } : {}),
+      ...(options?.comments ? { comments: true } : {}),
     },
     paramsSerializer: { indexes: null },
     responseType: 'blob',

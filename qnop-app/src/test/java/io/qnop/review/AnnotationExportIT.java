@@ -151,6 +151,32 @@ class AnnotationExportIT extends SeededIntegrationTest {
     return workbook.getSheetAt(0);
   }
 
+  /** Downloads with the comment sheet switched on and returns that second sheet. */
+  private Sheet downloadComments(UUID actor) throws Exception {
+    byte[] body =
+        mockMvc
+            .perform(
+                as(
+                    get("/api/v1/documents/" + documentId + "/annotations/export")
+                        .param("comments", "true"),
+                    actor))
+            .andExpect(status().isOk())
+            .andReturn()
+            .getResponse()
+            .getContentAsByteArray();
+    Workbook workbook = new XSSFWorkbook(new ByteArrayInputStream(body));
+    return workbook.getSheet("Comments");
+  }
+
+  private void reply(String annotationId, UUID author, String body) throws Exception {
+    mockMvc
+        .perform(
+            as(post("/api/v1/annotations/" + annotationId + "/comments"), author)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"body\":\"" + body + "\"}"))
+        .andExpect(status().isCreated());
+  }
+
   private static List<String> column(Sheet sheet, int index) {
     List<String> values = new ArrayList<>();
     for (int row = 1; row <= sheet.getLastRowNum(); row++) {
@@ -273,13 +299,8 @@ class AnnotationExportIT extends SeededIntegrationTest {
     seedDocument(false);
     String quiet = createAnnotationReturningId(MEMBER_ID, 0, 0.1, 0.1, "Nobody answered this");
     String discussed = createAnnotationReturningId(MEMBER_ID, 0, 0.1, 0.5, "This got answers");
-    for (String reply : List.of("First answer", "Second answer")) {
-      mockMvc
-          .perform(
-              as(post("/api/v1/annotations/" + discussed + "/comments"), AUDITOR_ID)
-                  .contentType(MediaType.APPLICATION_JSON)
-                  .content("{\"body\":\"" + reply + "\"}"))
-          .andExpect(status().isCreated());
+    for (String answer : List.of("First answer", "Second answer")) {
+      reply(discussed, AUDITOR_ID, answer);
     }
     assertThat(quiet).isNotBlank();
 
@@ -342,6 +363,60 @@ class AnnotationExportIT extends SeededIntegrationTest {
     // T-2, not T-1: the key numbers the review, not the filtered slice, so it
     // still matches what the board shows.
     assertThat(column(sheet, 0)).containsExactly("T-2");
+  }
+
+  @Test
+  @DisplayName("the comment sheet carries every comment's text under its annotation's task key")
+  void commentSheetCarriesTheThreads() throws Exception {
+    seedDocument(false);
+    String first = createAnnotationReturningId(MEMBER_ID, 0, 0.1, 0.1, "The opening remark");
+    String second = createAnnotationReturningId(MEMBER_ID, 0, 0.1, 0.5, "A second finding");
+    reply(first, AUDITOR_ID, "Answering the first");
+    reply(first, MEMBER_ID, "And once more");
+
+    Sheet sheet = downloadComments(MEMBER_ID);
+
+    Row header = sheet.getRow(0);
+    assertThat(header.getCell(0).getStringCellValue()).isEqualTo("#");
+    assertThat(header.getCell(3).getStringCellValue()).isEqualTo("Comment");
+    // The opening comment is part of the thread: the annotation body is the
+    // first thing said about it, so leaving it out would lose the context every
+    // reply is answering.
+    assertThat(column(sheet, 3))
+        .containsExactly(
+            "The opening remark", "Answering the first", "And once more", "A second finding");
+    assertThat(column(sheet, 0)).containsExactly("T-1", "T-1", "T-1", "T-2");
+    assertThat(second).isNotBlank();
+  }
+
+  @Test
+  @DisplayName("the comment sheet is left out unless it was asked for")
+  void commentSheetIsOptional() throws Exception {
+    seedDocument(false);
+    annotate(MEMBER_ID, 0, 0.1, 0.1, "No second sheet wanted");
+
+    // It costs a query round per annotation, so a plain export must not pay it.
+    assertThat(download(MEMBER_ID).getWorkbook().getSheet("Comments")).isNull();
+  }
+
+  @Test
+  @DisplayName("an anonymous review pseudonymises the comment sheet's authors too (ADR-0038)")
+  void anonymousReviewPseudonymisesComments() throws Exception {
+    seedDocument(true);
+    String annotationId = createAnnotationReturningId(AUDITOR_ID, 0, 0.1, 0.1, "Opened by a peer");
+    reply(annotationId, MEMBER_ID, "The owner answers");
+    reply(annotationId, AUDITOR_ID, "And the peer again");
+
+    // MEMBER2 is a peer participant: the second sheet must not become the hole
+    // through which a foreign reviewer's real name leaks out of the review.
+    List<String> authors = column(downloadComments(MEMBER2_ID), 1);
+
+    assertThat(authors).hasSize(3);
+    assertThat(authors.get(0)).startsWith("Participant");
+    assertThat(authors.get(2)).startsWith("Participant");
+    // MEMBER owns the document, and the owner is the one identity anonymity does
+    // not cover — it is their review, and everybody already knows that.
+    assertThat(authors.get(1)).doesNotStartWith("Participant");
   }
 
   @Test

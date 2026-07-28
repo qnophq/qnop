@@ -79,6 +79,30 @@ describe('ExportAnnotationsButton', () => {
     expect(options?.scope).toBe('all');
     // All eleven columns, because everything starts selected.
     expect(options?.fields).toHaveLength(11);
+    expect(options?.comments).toBe(true);
+  });
+
+  it('can leave the comment threads out', async () => {
+    const user = userEvent.setup();
+    renderButton();
+    await openWizard(user);
+    await user.click(screen.getByRole('button', { name: /Next/ }));
+
+    await user.click(screen.getByRole('switch', { name: /Comment threads/ }));
+    await user.click(screen.getByRole('button', { name: /^Export$/ }));
+
+    await waitFor(() => expect(downloadAnnotationExport).toHaveBeenCalled());
+    expect(vi.mocked(downloadAnnotationExport).mock.calls[0][2]?.comments).toBe(false);
+  });
+
+  it('says on the summary line that the threads are coming along', async () => {
+    const user = userEvent.setup();
+    renderButton();
+    await openWizard(user);
+
+    // The threads land on a second sheet, which is invisible until the file is
+    // open — so the wizard says so while there is still a choice to make.
+    expect(screen.getByText(/with comment threads/)).toBeInTheDocument();
   });
 
   it('narrows the export to the chosen scope', async () => {

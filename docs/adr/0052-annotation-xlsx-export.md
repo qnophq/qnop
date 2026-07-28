@@ -38,6 +38,14 @@ The `#` column carries the `T-1`, `T-2`, … shorthand people use to talk about 
 
 Two columns from the original proposal were dropped rather than duplicated further: a *Board column* (`Open`/`In discussion`/`Resolved`) is a pure derivation of two columns already in the sheet and Excel can filter it itself, and a *Position* ordinal would be identical to the row number while the sheet is in its default order and misleading the moment the user re-sorts.
 
+### Comment threads become a second sheet, off the wire unless asked for
+
+An annotation's thread has no fixed length, so it cannot become columns on the annotation row, and folding a whole conversation into one cell would be neither sortable nor readable. The threads therefore go on their own `Comments` sheet, one row per comment (`#`, `Author`, `Written`, `Comment`), keyed back to the annotation by the same `T-N` shorthand — a relational shape is what a spreadsheet is actually good at.
+
+The rows are read through `AnnotationService.listComments`, for the same reason the annotation rows go through `list`: it applies the PRIVATE-thread visibility check and resolves every author through `ReviewIdentityResolver`, so a pseudonymised reviewer stays pseudonymised in the export by construction. The owner is the one identity that stays real — anonymity never covered them, since it is their review.
+
+That costs one query round per annotation. It is accepted rather than batched: an export is a rare, deliberate action, and re-implementing the visibility rules to avoid the round trips would trade a bounded cost for an unbounded correctness risk. The sheet is opt-in on the wire (`?comments=true`) so an export that does not want it does not pay for it — but the wizard defaults it on, because someone exporting a review usually wants what was said, not just that something was said.
+
 ### A plain controller, not the generated contract
 
 `GET /api/v1/documents/{documentId}/annotations/export` mirrors the existing binary downloads: a hand-written `@RestController`, `Content-Disposition: attachment`, deliberately absent from `openapi.yaml` (ADR-0028/0021). Unlike a version download it carries no ETag — annotations change constantly and there is no content hash to hang one on.
@@ -46,7 +54,7 @@ Two columns from the original proposal were dropped rather than duplicated furth
 
 **Positive.** One canonical, authorized, privacy-correct artifact. The export cannot show more than its caller may see, and an anonymous review cannot leak a real name into a file that gets e-mailed onward. Cells are typed (numbers as numbers, timestamps as Excel dates) with a frozen header and auto-filter, so Excel's own sorting works without any post-processing.
 
-**Negative.** `poi-ooxml` enters the runtime classpath of `qnop-core` — the first Office-format dependency, previously only pinned. The `T-N` rule now lives in two places. Generation is synchronous: a review with very many annotations occupies a request thread for the duration, mitigated by the streaming `SXSSFWorkbook` but not eliminated; an async job would be the answer if that ever becomes real.
+**Negative.** The comment sheet is N+1 by construction (see above). `poi-ooxml` enters the runtime classpath of `qnop-core` — the first Office-format dependency, previously only pinned. The `T-N` rule now lives in two places. Generation is synchronous: a review with very many annotations occupies a request thread for the duration, mitigated by the streaming `SXSSFWorkbook` but not eliminated; an async job would be the answer if that ever becomes real.
 
 **Neutral.** The endpoint is invisible to the generated client, so the frontend calls it through the shared axios instance by hand — a bare `<a href>` would carry no bearer token.
 

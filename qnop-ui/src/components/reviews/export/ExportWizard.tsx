@@ -31,12 +31,13 @@ import DialogTitle from '@mui/material/DialogTitle';
 import Divider from '@mui/material/Divider';
 import FormControlLabel from '@mui/material/FormControlLabel';
 import Stack from '@mui/material/Stack';
+import Switch from '@mui/material/Switch';
 import Step from '@mui/material/Step';
 import StepLabel from '@mui/material/StepLabel';
 import Stepper from '@mui/material/Stepper';
 import Typography from '@mui/material/Typography';
 import { alpha } from '@mui/material/styles';
-import { ArrowLeft, ArrowRight, Check, Download } from 'lucide-react';
+import { ArrowLeft, ArrowRight, Check, Download, MessagesSquare } from 'lucide-react';
 import { ToneBadge } from '../../admin/ToneBadge';
 import {
   EXPORT_FIELDS,
@@ -313,6 +314,52 @@ export function ExportWizard({
                 </Box>
               </Box>
             ))}
+
+            <Divider />
+
+            {/* Deliberately not a twelfth checkbox: a thread has no fixed length,
+                so it cannot be a column. It becomes its own sheet, and saying so
+                here is cheaper than a support question about the second tab. */}
+            <Box
+              sx={{
+                px: 1.5,
+                py: 1,
+                borderRadius: 2,
+                border: '1px solid',
+                borderColor: settings.includeComments ? 'primary.main' : 'divider',
+                bgcolor: (t) =>
+                  settings.includeComments ? alpha(t.palette.primary.main, 0.06) : 'transparent',
+                transition: 'border-color 150ms, background-color 150ms',
+              }}
+            >
+              <FormControlLabel
+                sx={{ m: 0, width: '100%', alignItems: 'flex-start' }}
+                control={
+                  <Switch
+                    size="small"
+                    sx={{ mt: 0.25, mr: 1 }}
+                    checked={settings.includeComments}
+                    onChange={(event) =>
+                      setSettings((c) => ({ ...c, includeComments: event.target.checked }))
+                    }
+                  />
+                }
+                label={
+                  <Box>
+                    <Stack direction="row" spacing={0.75} sx={{ alignItems: 'center' }}>
+                      <MessagesSquare size={14} />
+                      <Typography sx={{ fontSize: 13.5, fontWeight: 700 }}>
+                        Comment threads
+                      </Typography>
+                    </Stack>
+                    <Typography sx={{ fontSize: 12, color: 'text.secondary' }}>
+                      A second sheet with the full text of every comment and who wrote it. In an
+                      anonymous review the authors stay pseudonymous here too.
+                    </Typography>
+                  </Box>
+                }
+              />
+            </Box>
           </Stack>
         )}
       </DialogContent>
@@ -323,6 +370,7 @@ export function ExportWizard({
         <Typography sx={{ fontSize: 12.5, color: 'text.secondary' }}>
           {format?.label} {format?.extension} · {selected.length} of {EXPORT_FIELDS.length} columns
           {rows !== null && ` · ${rows} annotation${rows === 1 ? '' : 's'}`}
+          {settings.includeComments && ' · with comment threads'}
         </Typography>
       </Box>
       <Divider />

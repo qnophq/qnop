@@ -58,6 +58,7 @@ export function ExportAnnotationsButton({
       await downloadAnnotationExport(documentId, version, {
         fields: settings.fields,
         scope: settings.scope,
+        comments: settings.includeComments,
       });
       // Closing only after it succeeded keeps the configuration on screen when
       // it did not — the user retries instead of rebuilding their selection.

@@ -24,7 +24,9 @@ import io.qnop.entity.Document;
 import io.qnop.entity.DocumentVersion;
 import io.qnop.repository.DocumentRepository;
 import io.qnop.repository.DocumentVersionRepository;
+import io.qnop.service.document.DocumentValidationException;
 import io.qnop.service.review.AnnotationService.AnnotationView;
+import io.qnop.service.review.AnnotationService.CommentView;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.time.Instant;
@@ -45,6 +47,8 @@ import org.apache.poi.ss.usermodel.Sheet;
 import org.apache.poi.ss.usermodel.Workbook;
 import org.apache.poi.ss.util.CellRangeAddress;
 import org.apache.poi.xssf.streaming.SXSSFWorkbook;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -63,8 +67,16 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 public class AnnotationExportService {
 
+  private static final Logger log = LoggerFactory.getLogger(AnnotationExportService.class);
+
   /** Excel's own hard ceiling is 32767; a shorter cap keeps the sheet readable. */
   private static final int SUMMARY_MAX = 500;
+
+  /** Headers of the optional second sheet — one row per comment, not per annotation. */
+  private static final List<String> COMMENT_HEADERS = List.of("#", "Author", "Written", "Comment");
+
+  /** Excel's own hard per-cell ceiling, minus room for the ellipsis. */
+  private static final int BODY_MAX = 32_000;
 
   private final AnnotationService annotations;
   private final DocumentRepository documents;
@@ -82,10 +94,10 @@ public class AnnotationExportService {
   /** The finished workbook plus the title the download filename is built from. */
   public record Export(byte[] workbook, String documentTitle) {}
 
-  /** What the wizard asked for: which columns, and which slice of the review. */
-  public record ExportRequest(List<String> columnIds, String scope) {
+  /** What the wizard asked for: which columns, which slice, and whether threads come along. */
+  public record ExportRequest(List<String> columnIds, String scope, boolean includeComments) {
     public static ExportRequest everything() {
-      return new ExportRequest(List.of(), "all");
+      return new ExportRequest(List.of(), "all", false);
     }
   }
 
@@ -141,7 +153,8 @@ public class AnnotationExportService {
                     .thenComparing(o -> o.view().id()))
             .toList();
 
-    return new Export(write(ordered, taskKeys, columns), title);
+    return new Export(
+        write(ordered, taskKeys, columns, request.includeComments(), actor, admin), title);
   }
 
   /** Whether an annotation belongs in the requested slice; anything unknown means "all". */
@@ -172,7 +185,12 @@ public class AnnotationExportService {
   }
 
   private byte[] write(
-      List<Ordered> rows, Map<UUID, String> taskKeys, List<AnnotationExportColumn> columns) {
+      List<Ordered> rows,
+      Map<UUID, String> taskKeys,
+      List<AnnotationExportColumn> columns,
+      boolean includeComments,
+      UUID actor,
+      boolean admin) {
     // Streaming workbook: a review with thousands of annotations must not have to
     // fit in memory as a DOM.
     try (SXSSFWorkbook workbook = new SXSSFWorkbook(200);
@@ -202,12 +220,89 @@ public class AnnotationExportService {
         sheet.setColumnWidth(index, columnWidth(columns.get(index)));
       }
 
+      if (includeComments) {
+        writeComments(workbook, rows, taskKeys, dateStyle, headerStyle, actor, admin);
+      }
+
       workbook.write(out);
       workbook.dispose(); // drops the streaming temp files
       return out.toByteArray();
     } catch (IOException e) {
       throw new AnnotationExportException(documentIdOf(rows), e);
     }
+  }
+
+  /**
+   * The optional second sheet: one row per comment, keyed back to its annotation by task key.
+   *
+   * <p>A thread has no fixed length, so it cannot become columns on the annotation row, and pasting
+   * a whole conversation into one cell would be neither sortable nor readable. A relational second
+   * sheet is what a spreadsheet is actually good at.
+   *
+   * <p>It reads through {@link AnnotationService#listComments}, which applies the PRIVATE-thread
+   * check and resolves each author through {@link ReviewIdentityResolver} — so a pseudonymised
+   * author stays pseudonymised here too (ADR-0038). That costs a query round per annotation; an
+   * export is a rare, deliberate action, and re-implementing the visibility rules to batch it is a
+   * far worse trade than the round trips.
+   */
+  private void writeComments(
+      Workbook workbook,
+      List<Ordered> rows,
+      Map<UUID, String> taskKeys,
+      CellStyle dateStyle,
+      CellStyle headerStyle,
+      UUID actor,
+      boolean admin) {
+    Sheet sheet = workbook.createSheet("Comments");
+    Row header = sheet.createRow(0);
+    for (int index = 0; index < COMMENT_HEADERS.size(); index++) {
+      Cell cell = header.createCell(index);
+      cell.setCellValue(COMMENT_HEADERS.get(index));
+      cell.setCellStyle(headerStyle);
+    }
+
+    int rowIndex = 1;
+    for (Ordered ordered : rows) {
+      UUID annotationId = ordered.view().id();
+      List<CommentView> thread;
+      try {
+        thread = annotations.listComments(annotationId, actor, admin);
+      } catch (DocumentValidationException e) {
+        // Only the not-found case is tolerated, and only because the two reads are
+        // not one snapshot: an annotation deleted mid-export must not take the whole
+        // download down with it. Anything else propagates.
+        log.warn("Annotation {} disappeared while exporting its comments", annotationId, e);
+        continue;
+      }
+      for (CommentView comment : thread) {
+        Row row = sheet.createRow(rowIndex++);
+        row.createCell(0).setCellValue(taskKeys.getOrDefault(annotationId, ""));
+        row.createCell(1)
+            .setCellValue(comment.authorDisplayName() == null ? "" : comment.authorDisplayName());
+        writeDate(row, 2, comment.createdAt(), dateStyle);
+        row.createCell(3).setCellValue(body(comment.body()));
+      }
+    }
+
+    sheet.createFreezePane(0, 1);
+    sheet.setAutoFilter(
+        new CellRangeAddress(0, Math.max(rowIndex - 1, 1), 0, COMMENT_HEADERS.size() - 1));
+    sheet.setColumnWidth(0, 12 * 256);
+    sheet.setColumnWidth(1, 22 * 256);
+    sheet.setColumnWidth(2, 20 * 256);
+    sheet.setColumnWidth(3, 90 * 256);
+  }
+
+  /**
+   * A comment's full text for the thread sheet — unlike the annotation row's {@code summary} this
+   * is not an excerpt, because the point of the sheet is to carry what was actually said. Only
+   * Excel's own per-cell ceiling truncates it.
+   */
+  static String body(String raw) {
+    if (raw == null) {
+      return "";
+    }
+    return raw.length() <= BODY_MAX ? raw : raw.substring(0, BODY_MAX - 1) + "…";
   }
 
   private void writeRow(

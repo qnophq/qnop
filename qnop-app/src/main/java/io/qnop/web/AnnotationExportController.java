@@ -66,12 +66,16 @@ public class AnnotationExportController {
       @RequestParam(value = "version", required = false) Integer version,
       // Repeated or comma-separated; empty means every column (the wizard's default).
       @RequestParam(value = "fields", required = false) List<String> fields,
-      @RequestParam(value = "scope", required = false, defaultValue = "all") String scope) {
+      @RequestParam(value = "scope", required = false, defaultValue = "all") String scope,
+      // Off unless asked for: the comment sheet costs a query round per annotation.
+      @RequestParam(value = "comments", required = false, defaultValue = "false")
+          boolean includeComments) {
     AnnotationExportService.Export export =
         exports.export(
             documentId,
             version,
-            new AnnotationExportService.ExportRequest(fields == null ? List.of() : fields, scope),
+            new AnnotationExportService.ExportRequest(
+                fields == null ? List.of() : fields, scope, includeComments),
             CurrentUser.requireUserId(),
             CurrentUser.isAdmin());
 

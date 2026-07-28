@@ -95,11 +95,18 @@ export interface ExportSettings {
   format: string;
   scope: ExportScope;
   fields: string[];
+  /** Adds a second sheet with the full text of every comment, one row each. */
+  includeComments: boolean;
 }
 
 /** Everything on, everything in — the state the wizard opens in the first time. */
 export function defaultSettings(): ExportSettings {
-  return { format: 'xlsx', scope: 'all', fields: EXPORT_FIELDS.map((field) => field.id) };
+  return {
+    format: 'xlsx',
+    scope: 'all',
+    fields: EXPORT_FIELDS.map((field) => field.id),
+    includeComments: true,
+  };
 }
 
 const STORAGE_KEY = 'qnop-export-settings';
@@ -126,6 +133,7 @@ export function loadSettings(): ExportSettings {
         ? (parsed.scope as ExportScope)
         : fallback.scope,
       fields: fields.length > 0 ? fields : fallback.fields,
+      includeComments: parsed.includeComments ?? fallback.includeComments,
     };
   } catch {
     return fallback;
