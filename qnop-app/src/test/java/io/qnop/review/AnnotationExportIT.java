@@ -268,6 +268,30 @@ class AnnotationExportIT extends SeededIntegrationTest {
   }
 
   @Test
+  @DisplayName("Replies counts answers, not the annotation's own opening comment")
+  void repliesExcludeTheOpeningComment() throws Exception {
+    seedDocument(false);
+    String quiet = createAnnotationReturningId(MEMBER_ID, 0, 0.1, 0.1, "Nobody answered this");
+    String discussed = createAnnotationReturningId(MEMBER_ID, 0, 0.1, 0.5, "This got answers");
+    for (String reply : List.of("First answer", "Second answer")) {
+      mockMvc
+          .perform(
+              as(post("/api/v1/annotations/" + discussed + "/comments"), AUDITOR_ID)
+                  .contentType(MediaType.APPLICATION_JSON)
+                  .content("{\"body\":\"" + reply + "\"}"))
+          .andExpect(status().isCreated());
+    }
+    assertThat(quiet).isNotBlank();
+
+    Sheet sheet = download(MEMBER_ID);
+
+    // The opening comment IS the annotation, so an unanswered one reads 0 —
+    // not 1, which is what the raw commentCount would have shown.
+    assertThat(sheet.getRow(0).getCell(7).getStringCellValue()).isEqualTo("Replies");
+    assertThat(column(sheet, 7)).containsExactly("0", "2");
+  }
+
+  @Test
   @DisplayName("an unknown field is ignored rather than failing the export")
   void unknownFieldsAreIgnored() throws Exception {
     seedDocument(false);

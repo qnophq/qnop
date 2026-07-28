@@ -79,7 +79,7 @@ export const EXPORT_FIELDS: ExportField[] = [
   { id: 'priority', label: 'Priority', group: 'Classification' },
   { id: 'placement', label: 'Placement state', group: 'Classification' },
   { id: 'summary', label: 'Summary', group: 'Content' },
-  { id: 'comments', label: 'Comment count', group: 'Content' },
+  { id: 'replies', label: 'Replies', group: 'Content' },
   { id: 'created', label: 'Created', group: 'History' },
   { id: 'updated', label: 'Updated', group: 'History' },
 ];

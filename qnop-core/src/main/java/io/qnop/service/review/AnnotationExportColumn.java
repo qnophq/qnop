@@ -47,7 +47,7 @@ public enum AnnotationExportColumn {
   PRIORITY("priority", "Priority"),
   SUMMARY("summary", "Summary"),
   AUTHOR("author", "Author"),
-  COMMENTS("comments", "Comments"),
+  REPLIES("replies", "Replies"),
   PLACEMENT("placement", "Placement"),
   CREATED("created", "Created"),
   UPDATED("updated", "Updated");

@@ -234,7 +234,11 @@ public class AnnotationExportService {
         case AUTHOR ->
             row.createCell(index)
                 .setCellValue(view.authorDisplayName() == null ? "" : view.authorDisplayName());
-        case COMMENTS -> row.createCell(index).setCellValue(view.commentCount());
+        case REPLIES ->
+            // commentCount includes the opening comment, which IS the annotation
+            // — a fresh one would otherwise read as "1 comment" when nobody has
+            // answered yet. The column counts answers.
+            row.createCell(index).setCellValue(Math.max(0, view.commentCount() - 1));
         case PLACEMENT -> row.createCell(index).setCellValue(humanize(view.placementStatus()));
         case CREATED -> writeDate(row, index, view.createdAt(), dateStyle);
         case UPDATED -> writeDate(row, index, view.updatedAt(), dateStyle);
