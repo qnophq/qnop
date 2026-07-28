@@ -41,9 +41,18 @@ function filenameFrom(disposition: string | undefined, fallback: string): string
 export async function downloadAnnotationExport(
   documentId: string,
   version?: number,
+  options?: { fields?: string[]; scope?: string },
 ): Promise<void> {
   const response = await axiosInstance.get(`/documents/${documentId}/annotations/export`, {
-    params: version ? { version } : undefined,
+    params: {
+      ...(version ? { version } : {}),
+      // Repeated params rather than one comma-joined value: a column id is a
+      // plain identifier today, but the list format should not become a second
+      // thing to escape if that ever changes.
+      ...(options?.fields?.length ? { fields: options.fields } : {}),
+      ...(options?.scope && options.scope !== 'all' ? { scope: options.scope } : {}),
+    },
+    paramsSerializer: { indexes: null },
     responseType: 'blob',
   });
 

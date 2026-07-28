@@ -49,10 +49,13 @@ describe('downloadAnnotationExport', () => {
     await downloadAnnotationExport('doc-1', 3);
 
     // A bare <a href> or window.open would carry no bearer token and simply 401.
-    expect(axiosInstance.get).toHaveBeenCalledWith('/documents/doc-1/annotations/export', {
-      params: { version: 3 },
-      responseType: 'blob',
-    });
+    expect(axiosInstance.get).toHaveBeenCalledWith(
+      '/documents/doc-1/annotations/export',
+      expect.objectContaining({
+        params: { version: 3 },
+        responseType: 'blob',
+      }),
+    );
   });
 
   it('omits the version when there is none, letting the server pick the latest', async () => {
@@ -62,7 +65,32 @@ describe('downloadAnnotationExport', () => {
 
     expect(axiosInstance.get).toHaveBeenCalledWith(
       '/documents/doc-1/annotations/export',
-      expect.objectContaining({ params: undefined }),
+      expect.objectContaining({ params: {} }),
+    );
+  });
+
+  it('passes the wizard field selection and scope', async () => {
+    respond();
+
+    await downloadAnnotationExport('doc-1', 2, { fields: ['taskKey', 'status'], scope: 'open' });
+
+    expect(axiosInstance.get).toHaveBeenCalledWith(
+      '/documents/doc-1/annotations/export',
+      expect.objectContaining({
+        params: { version: 2, fields: ['taskKey', 'status'], scope: 'open' },
+      }),
+    );
+  });
+
+  it('leaves the default scope off the wire', async () => {
+    respond();
+
+    await downloadAnnotationExport('doc-1', 1, { fields: [], scope: 'all' });
+
+    // "all" is the server's default; sending it would only make links noisier.
+    expect(axiosInstance.get).toHaveBeenCalledWith(
+      '/documents/doc-1/annotations/export',
+      expect.objectContaining({ params: { version: 1 } }),
     );
   });
 

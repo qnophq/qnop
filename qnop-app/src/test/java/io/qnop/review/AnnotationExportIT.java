@@ -101,6 +101,35 @@ class AnnotationExportIT extends SeededIntegrationTest {
         .andExpect(status().isCreated());
   }
 
+  /** Creates an annotation and returns its id, for tests that need to act on it. */
+  private String createAnnotationReturningId(
+      UUID author, int surface, double x, double y, String comment) throws Exception {
+    String anchor =
+        "{\"region\":{\"surfaceIndex\":"
+            + surface
+            + ",\"box\":{\"x\":"
+            + x
+            + ",\"y\":"
+            + y
+            + ",\"width\":0.3,\"height\":0.05}},\"textQuote\":{\"quote\":\"the clause\"}}";
+    String json =
+        mockMvc
+            .perform(
+                as(post("/api/v1/documents/" + documentId + "/annotations"), author)
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content(
+                        "{\"versionNumber\":1,\"anchor\":"
+                            + anchor
+                            + ",\"comment\":\""
+                            + comment
+                            + "\"}"))
+            .andExpect(status().isCreated())
+            .andReturn()
+            .getResponse()
+            .getContentAsString();
+    return com.jayway.jsonpath.JsonPath.read(json, "$.id");
+  }
+
   private Sheet download(UUID actor) throws Exception {
     byte[] body =
         mockMvc
@@ -208,6 +237,87 @@ class AnnotationExportIT extends SeededIntegrationTest {
     mockMvc
         .perform(as(get("/api/v1/documents/" + documentId + "/annotations/export"), EXTERNAL_ID))
         .andExpect(status().isNotFound());
+  }
+
+  @Test
+  @DisplayName("the wizard's field selection decides the columns, in the fixed order")
+  void selectedFieldsDecideTheColumns() throws Exception {
+    seedDocument(false);
+    annotate(MEMBER_ID, 0, 0.1, 0.1, "Only a few columns wanted");
+
+    // Deliberately requested out of order — the sheet's column order is the
+    // server's, so two exports of the same review stay comparable.
+    byte[] body =
+        mockMvc
+            .perform(
+                as(
+                    get("/api/v1/documents/" + documentId + "/annotations/export")
+                        .param("fields", "status")
+                        .param("fields", "taskKey"),
+                    MEMBER_ID))
+            .andExpect(status().isOk())
+            .andReturn()
+            .getResponse()
+            .getContentAsByteArray();
+    Sheet sheet = new XSSFWorkbook(new ByteArrayInputStream(body)).getSheetAt(0);
+
+    Row header = sheet.getRow(0);
+    assertThat(header.getCell(0).getStringCellValue()).isEqualTo("#");
+    assertThat(header.getCell(1).getStringCellValue()).isEqualTo("Status");
+    assertThat(header.getCell(2)).isNull();
+  }
+
+  @Test
+  @DisplayName("an unknown field is ignored rather than failing the export")
+  void unknownFieldsAreIgnored() throws Exception {
+    seedDocument(false);
+    annotate(MEMBER_ID, 0, 0.1, 0.1, "Still exports");
+
+    // A client one release ahead must get a file, not a 400.
+    byte[] body =
+        mockMvc
+            .perform(
+                as(
+                    get("/api/v1/documents/" + documentId + "/annotations/export")
+                        .param("fields", "status")
+                        .param("fields", "somethingNew"),
+                    MEMBER_ID))
+            .andExpect(status().isOk())
+            .andReturn()
+            .getResponse()
+            .getContentAsByteArray();
+    Sheet sheet = new XSSFWorkbook(new ByteArrayInputStream(body)).getSheetAt(0);
+
+    assertThat(sheet.getRow(0).getCell(0).getStringCellValue()).isEqualTo("Status");
+  }
+
+  @Test
+  @DisplayName("the scope narrows the rows, and task keys keep their whole-review numbering")
+  void scopeNarrowsTheRows() throws Exception {
+    seedDocument(false);
+    annotate(MEMBER_ID, 0, 0.1, 0.1, "Stays open");
+    String resolvedId = createAnnotationReturningId(MEMBER_ID, 0, 0.1, 0.5, "Gets resolved");
+    mockMvc
+        .perform(as(post("/api/v1/annotations/" + resolvedId + "/resolve"), MEMBER_ID))
+        .andExpect(status().isOk());
+
+    byte[] body =
+        mockMvc
+            .perform(
+                as(
+                    get("/api/v1/documents/" + documentId + "/annotations/export")
+                        .param("scope", "resolved"),
+                    MEMBER_ID))
+            .andExpect(status().isOk())
+            .andReturn()
+            .getResponse()
+            .getContentAsByteArray();
+    Sheet sheet = new XSSFWorkbook(new ByteArrayInputStream(body)).getSheetAt(0);
+
+    assertThat(column(sheet, 5)).containsExactly("Gets resolved");
+    // T-2, not T-1: the key numbers the review, not the filtered slice, so it
+    // still matches what the board shows.
+    assertThat(column(sheet, 0)).containsExactly("T-2");
   }
 
   @Test

@@ -63,23 +63,6 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 public class AnnotationExportService {
 
-  /** Columns, left to right. The order is the contract the acceptance criteria describe. */
-  private static final List<String> HEADERS =
-      List.of(
-          "#",
-          "Page",
-          "Status",
-          "Type",
-          "Priority",
-          "Summary",
-          "Author",
-          "Comments",
-          "Placement",
-          "Created",
-          "Updated");
-
-  private static final int SUMMARY_COLUMN = 5;
-
   /** Excel's own hard ceiling is 32767; a shorter cap keeps the sheet readable. */
   private static final int SUMMARY_MAX = 500;
 
@@ -99,6 +82,13 @@ public class AnnotationExportService {
   /** The finished workbook plus the title the download filename is built from. */
   public record Export(byte[] workbook, String documentTitle) {}
 
+  /** What the wizard asked for: which columns, and which slice of the review. */
+  public record ExportRequest(List<String> columnIds, String scope) {
+    public static ExportRequest everything() {
+      return new ExportRequest(List.of(), "all");
+    }
+  }
+
   /**
    * Builds the workbook for one review, containing exactly the annotations {@code actor} may see.
    *
@@ -106,6 +96,16 @@ public class AnnotationExportService {
    */
   @Transactional(readOnly = true)
   public Export export(UUID documentId, Integer versionNumber, UUID actor, boolean admin) {
+    return export(documentId, versionNumber, ExportRequest.everything(), actor, admin);
+  }
+
+  /**
+   * Builds the workbook for one review, containing exactly the annotations {@code actor} may see,
+   * narrowed to the requested columns and scope.
+   */
+  @Transactional(readOnly = true)
+  public Export export(
+      UUID documentId, Integer versionNumber, ExportRequest request, UUID actor, boolean admin) {
     // The version must be resolved, not left null: list() only loads placements for
     // a concrete version, and without them every anchor is empty and the whole
     // reading order collapses back to creation order. The Tasks page passes the
@@ -122,12 +122,14 @@ public class AnnotationExportService {
     // review gets the same refusal the Tasks page would give them.
     List<AnnotationView> views = annotations.list(documentId, version, null, null, actor, admin);
 
-    String title = documents.findById(documentId).map(Document::getTitle).orElse("annotations");
-
-    // Task keys are assigned in creation order — the same rule the board shows as
-    // "T-1, T-2, …" — and must NOT follow the export's reading order, or the export
-    // would disagree with every screen the user has seen.
+    // Task keys number the WHOLE review, so T-7 stays T-7 in an export narrowed
+    // to the open items — a key that renumbers per filter would be worthless
+    // for talking about an annotation.
     Map<UUID, String> taskKeys = taskKeys(views);
+    views = views.stream().filter(view -> matchesScope(view, request.scope())).toList();
+    List<AnnotationExportColumn> columns = AnnotationExportColumn.resolve(request.columnIds());
+
+    String title = documents.findById(documentId).map(Document::getTitle).orElse("annotations");
 
     List<Ordered> ordered =
         views.stream()
@@ -139,7 +141,16 @@ public class AnnotationExportService {
                     .thenComparing(o -> o.view().id()))
             .toList();
 
-    return new Export(write(ordered, taskKeys), title);
+    return new Export(write(ordered, taskKeys, columns), title);
+  }
+
+  /** Whether an annotation belongs in the requested slice; anything unknown means "all". */
+  private static boolean matchesScope(AnnotationView view, String scope) {
+    if (scope == null || "all".equalsIgnoreCase(scope)) {
+      return true;
+    }
+    boolean resolved = "RESOLVED".equalsIgnoreCase(view.status());
+    return "resolved".equalsIgnoreCase(scope) == resolved;
   }
 
   /**
@@ -160,7 +171,8 @@ public class AnnotationExportService {
     return keys;
   }
 
-  private byte[] write(List<Ordered> rows, Map<UUID, String> taskKeys) {
+  private byte[] write(
+      List<Ordered> rows, Map<UUID, String> taskKeys, List<AnnotationExportColumn> columns) {
     // Streaming workbook: a review with thousands of annotations must not have to
     // fit in memory as a DOM.
     try (SXSSFWorkbook workbook = new SXSSFWorkbook(200);
@@ -170,24 +182,24 @@ public class AnnotationExportService {
       CellStyle dateStyle = dateStyle(workbook);
 
       Row header = sheet.createRow(0);
-      for (int column = 0; column < HEADERS.size(); column++) {
-        Cell cell = header.createCell(column);
-        cell.setCellValue(HEADERS.get(column));
+      for (int index = 0; index < columns.size(); index++) {
+        Cell cell = header.createCell(index);
+        cell.setCellValue(columns.get(index).getHeader());
         cell.setCellStyle(headerStyle);
       }
 
       int rowIndex = 1;
       for (Ordered row : rows) {
-        writeRow(sheet.createRow(rowIndex++), row, taskKeys, dateStyle);
+        writeRow(sheet.createRow(rowIndex++), row, taskKeys, columns, dateStyle);
       }
 
       // Freeze the header and switch on the filter dropdowns, so Excel's own
       // per-column sort works the moment the file opens — the whole reason the
       // cells are typed rather than pre-formatted strings.
       sheet.createFreezePane(0, 1);
-      sheet.setAutoFilter(new CellRangeAddress(0, Math.max(rows.size(), 1), 0, HEADERS.size() - 1));
-      for (int column = 0; column < HEADERS.size(); column++) {
-        sheet.setColumnWidth(column, columnWidth(column));
+      sheet.setAutoFilter(new CellRangeAddress(0, Math.max(rows.size(), 1), 0, columns.size() - 1));
+      for (int index = 0; index < columns.size(); index++) {
+        sheet.setColumnWidth(index, columnWidth(columns.get(index)));
       }
 
       workbook.write(out);
@@ -198,25 +210,36 @@ public class AnnotationExportService {
     }
   }
 
-  private void writeRow(Row row, Ordered ordered, Map<UUID, String> taskKeys, CellStyle dateStyle) {
+  private void writeRow(
+      Row row,
+      Ordered ordered,
+      Map<UUID, String> taskKeys,
+      List<AnnotationExportColumn> columns,
+      CellStyle dateStyle) {
     AnnotationView view = ordered.view();
-    row.createCell(0).setCellValue(taskKeys.getOrDefault(view.id(), ""));
-
-    Integer page = ordered.position().pageNumber();
-    if (page != null) {
-      // Numeric, not text: "10" must sort after "9" in Excel.
-      row.createCell(1).setCellValue(page);
+    for (int index = 0; index < columns.size(); index++) {
+      switch (columns.get(index)) {
+        case TASK_KEY -> row.createCell(index).setCellValue(taskKeys.getOrDefault(view.id(), ""));
+        case PAGE -> {
+          Integer page = ordered.position().pageNumber();
+          if (page != null) {
+            // Numeric, not text: "10" must sort after "9" in Excel.
+            row.createCell(index).setCellValue(page);
+          }
+        }
+        case STATUS -> row.createCell(index).setCellValue(humanize(view.status()));
+        case TYPE -> row.createCell(index).setCellValue(humanize(view.type()));
+        case PRIORITY -> row.createCell(index).setCellValue(humanize(view.priority()));
+        case SUMMARY -> row.createCell(index).setCellValue(summary(view.firstComment()));
+        case AUTHOR ->
+            row.createCell(index)
+                .setCellValue(view.authorDisplayName() == null ? "" : view.authorDisplayName());
+        case COMMENTS -> row.createCell(index).setCellValue(view.commentCount());
+        case PLACEMENT -> row.createCell(index).setCellValue(humanize(view.placementStatus()));
+        case CREATED -> writeDate(row, index, view.createdAt(), dateStyle);
+        case UPDATED -> writeDate(row, index, view.updatedAt(), dateStyle);
+      }
     }
-    row.createCell(2).setCellValue(humanize(view.status()));
-    row.createCell(3).setCellValue(humanize(view.type()));
-    row.createCell(4).setCellValue(humanize(view.priority()));
-    row.createCell(5).setCellValue(summary(view.firstComment()));
-    row.createCell(6)
-        .setCellValue(view.authorDisplayName() == null ? "" : view.authorDisplayName());
-    row.createCell(7).setCellValue(view.commentCount());
-    row.createCell(8).setCellValue(humanize(view.placementStatus()));
-    writeDate(row, 9, view.createdAt(), dateStyle);
-    writeDate(row, 10, view.updatedAt(), dateStyle);
   }
 
   private static void writeDate(Row row, int column, Instant instant, CellStyle style) {
@@ -270,8 +293,8 @@ public class AnnotationExportService {
   }
 
   /** Roughly sized columns; the summary gets the room, the rest stay compact. */
-  private static int columnWidth(int column) {
-    int characters = column == SUMMARY_COLUMN ? 70 : 16;
+  private static int columnWidth(AnnotationExportColumn column) {
+    int characters = column == AnnotationExportColumn.SUMMARY ? 70 : 16;
     return characters * 256;
   }
 

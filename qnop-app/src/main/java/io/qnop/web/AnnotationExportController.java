@@ -22,6 +22,7 @@ package io.qnop.web;
 
 import io.qnop.service.review.AnnotationExportService;
 import java.io.ByteArrayInputStream;
+import java.util.List;
 import java.util.UUID;
 import org.springframework.core.io.InputStreamResource;
 import org.springframework.http.CacheControl;
@@ -62,9 +63,17 @@ public class AnnotationExportController {
   @GetMapping("/documents/{documentId}/annotations/export")
   public ResponseEntity<InputStreamResource> exportAnnotations(
       @PathVariable UUID documentId,
-      @RequestParam(value = "version", required = false) Integer version) {
+      @RequestParam(value = "version", required = false) Integer version,
+      // Repeated or comma-separated; empty means every column (the wizard's default).
+      @RequestParam(value = "fields", required = false) List<String> fields,
+      @RequestParam(value = "scope", required = false, defaultValue = "all") String scope) {
     AnnotationExportService.Export export =
-        exports.export(documentId, version, CurrentUser.requireUserId(), CurrentUser.isAdmin());
+        exports.export(
+            documentId,
+            version,
+            new AnnotationExportService.ExportRequest(fields == null ? List.of() : fields, scope),
+            CurrentUser.requireUserId(),
+            CurrentUser.isAdmin());
 
     ContentDisposition disposition =
         ContentDisposition.attachment()

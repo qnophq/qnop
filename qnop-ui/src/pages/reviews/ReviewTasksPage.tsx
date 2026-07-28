@@ -29,6 +29,7 @@ import Stack from '@mui/material/Stack';
 import ToggleButton from '@mui/material/ToggleButton';
 import ToggleButtonGroup from '@mui/material/ToggleButtonGroup';
 import { LayoutGrid, List as ListIcon, Plus } from 'lucide-react';
+import { AnnotationStatus } from '../../api/generated';
 import { useAnnotations } from '../../api/hooks/useAnnotations';
 import { useDocument, useDocumentVersions } from '../../api/hooks/useDocuments';
 import { useRecordVisit } from '../../api/hooks/useReviews';
@@ -104,6 +105,12 @@ export function ReviewTasksPage() {
     latestVersion >= 1 ? latestVersion : undefined,
   );
   const annotations = annotationsQuery.data?.annotations ?? [];
+  // What each export scope would contain — shown in the wizard before it runs.
+  const exportCounts = {
+    all: annotations.length,
+    open: annotations.filter((a) => a.status !== AnnotationStatus.Resolved).length,
+    resolved: annotations.filter((a) => a.status === AnnotationStatus.Resolved).length,
+  };
 
   const [view, setView] = useTasksViewMode();
   // The unseen-marker baseline (issue #307): the PREVIOUS visit, stamped once.
@@ -289,6 +296,7 @@ export function ReviewTasksPage() {
         <ExportAnnotationsButton
           documentId={documentId}
           version={latestVersion >= 1 ? latestVersion : undefined}
+          counts={exportCounts}
           onError={(message) => notify(message, 'error')}
         />
         {/* A document-scoped task (issue #395) needs no selection — offered while the review is

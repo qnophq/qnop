@@ -31,56 +31,128 @@ vi.mock('../../api/annotationExport', () => ({
   downloadAnnotationExport: vi.fn(),
 }));
 
+const COUNTS = { all: 12, open: 5, resolved: 7 };
+
 function renderButton(onError = vi.fn()) {
   render(
     <ThemeProvider theme={buildTheme('light')}>
-      <ExportAnnotationsButton documentId="doc-1" version={3} onError={onError} />
+      <ExportAnnotationsButton documentId="doc-1" version={3} counts={COUNTS} onError={onError} />
     </ThemeProvider>,
   );
   return onError;
 }
 
+/** Opens the wizard and walks to the field step. */
+async function openWizard(user: ReturnType<typeof userEvent.setup>) {
+  await user.click(screen.getByRole('button', { name: 'Export' }));
+  return screen.findByRole('dialog');
+}
+
 beforeEach(() => {
   vi.clearAllMocks();
+  localStorage.clear();
   vi.mocked(downloadAnnotationExport).mockResolvedValue(undefined);
 });
 
 describe('ExportAnnotationsButton', () => {
-  it('is a labelled menu trigger, not a direct download', async () => {
+  it('opens the wizard instead of downloading straight away', async () => {
     const user = userEvent.setup();
     renderButton();
 
-    const trigger = screen.getByRole('button', { name: 'Export' });
-    // Icon-only, so the accessible name has to come from the label.
-    expect(trigger).toHaveAttribute('aria-haspopup', 'menu');
     expect(downloadAnnotationExport).not.toHaveBeenCalled();
+    await openWizard(user);
 
-    await user.click(trigger);
-    expect(await screen.findByRole('menuitem', { name: /Export to Excel/ })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: /What do you need/ })).toBeInTheDocument();
+    expect(downloadAnnotationExport).not.toHaveBeenCalled();
   });
 
-  it('downloads the chosen format for the current review and version', async () => {
+  it('exports everything with every column by default', async () => {
     const user = userEvent.setup();
     renderButton();
+    await openWizard(user);
 
-    await user.click(screen.getByRole('button', { name: 'Export' }));
-    await user.click(await screen.findByRole('menuitem', { name: /Export to Excel/ }));
+    await user.click(screen.getByRole('button', { name: /Next/ }));
+    await user.click(screen.getByRole('button', { name: /^Export$/ }));
 
-    expect(downloadAnnotationExport).toHaveBeenCalledWith('doc-1', 3);
-    // The menu closes on choice rather than lingering over the download.
-    await waitFor(() => expect(screen.queryByRole('menuitem')).not.toBeInTheDocument());
+    await waitFor(() => expect(downloadAnnotationExport).toHaveBeenCalled());
+    const [, , options] = vi.mocked(downloadAnnotationExport).mock.calls[0];
+    expect(options?.scope).toBe('all');
+    // All eleven columns, because everything starts selected.
+    expect(options?.fields).toHaveLength(11);
   });
 
-  it('hands a failure to the surface that owns the toast', async () => {
+  it('narrows the export to the chosen scope', async () => {
+    const user = userEvent.setup();
+    renderButton();
+    await openWizard(user);
+
+    await user.click(screen.getByRole('button', { name: /Open only/ }));
+    await user.click(screen.getByRole('button', { name: /Next/ }));
+    await user.click(screen.getByRole('button', { name: /^Export$/ }));
+
+    await waitFor(() => expect(downloadAnnotationExport).toHaveBeenCalled());
+    expect(vi.mocked(downloadAnnotationExport).mock.calls[0][2]?.scope).toBe('open');
+  });
+
+  it('drops deselected columns but keeps the required one', async () => {
+    const user = userEvent.setup();
+    renderButton();
+    await openWizard(user);
+    await user.click(screen.getByRole('button', { name: /Next/ }));
+
+    await user.click(screen.getByRole('button', { name: 'None' }));
+    await user.click(screen.getByRole('button', { name: /^Export$/ }));
+
+    await waitFor(() => expect(downloadAnnotationExport).toHaveBeenCalled());
+    // Clearing everything still leaves the task key: rows with nothing naming
+    // them would be useless, so it cannot be switched off.
+    expect(vi.mocked(downloadAnnotationExport).mock.calls[0][2]?.fields).toEqual(['taskKey']);
+  });
+
+  it('shows what the download will contain before it runs', async () => {
+    const user = userEvent.setup();
+    renderButton();
+    await openWizard(user);
+
+    // An export has no preview and no undo once it lands in the downloads folder.
+    expect(screen.getByText(/12 annotations/)).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: /Resolved only/ }));
+    expect(screen.getByText(/7 annotations/)).toBeInTheDocument();
+  });
+
+  it('remembers the configuration for the next export', async () => {
+    const user = userEvent.setup();
+    renderButton();
+    await openWizard(user);
+    await user.click(screen.getByRole('button', { name: /Open only/ }));
+    await user.click(screen.getByRole('button', { name: /Next/ }));
+    await user.click(screen.getByRole('button', { name: /^Export$/ }));
+    await waitFor(() => expect(downloadAnnotationExport).toHaveBeenCalled());
+
+    // Reopening comes back with the previous scope rather than the default.
+    await user.click(screen.getByRole('button', { name: 'Export' }));
+    expect(await screen.findByText(/5 annotations/)).toBeInTheDocument();
+  });
+
+  it('keeps the wizard open on failure so the selection is not lost', async () => {
     const user = userEvent.setup();
     vi.mocked(downloadAnnotationExport).mockRejectedValue(new Error('boom'));
     const onError = renderButton();
-
-    await user.click(screen.getByRole('button', { name: 'Export' }));
-    await user.click(await screen.findByRole('menuitem', { name: /Export to Excel/ }));
+    await openWizard(user);
+    await user.click(screen.getByRole('button', { name: /Next/ }));
+    await user.click(screen.getByRole('button', { name: /^Export$/ }));
 
     await waitFor(() => expect(onError).toHaveBeenCalledWith(expect.stringMatching(/could not/i)));
-    // …and the trigger is usable again for another try.
-    expect(screen.getByRole('button', { name: 'Export' })).toBeEnabled();
+    expect(screen.getByRole('dialog')).toBeInTheDocument();
+  });
+
+  it('names the planned formats without offering them', async () => {
+    const user = userEvent.setup();
+    renderButton();
+    await openWizard(user);
+
+    // Answering "is Word coming?" in the wizard beats a support request.
+    expect(screen.getByRole('button', { name: /Word/ })).toBeDisabled();
+    expect(screen.getByRole('button', { name: /Excel/ })).toBeEnabled();
   });
 });
