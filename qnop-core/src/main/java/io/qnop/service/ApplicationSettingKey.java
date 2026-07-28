@@ -131,6 +131,13 @@ public enum ApplicationSettingKey {
       SettingValueType.BOOLEAN,
       "true",
       "Send email notifications for review activity (reviewer added, annotations, replies, status changes)."),
+  NOTIFICATIONS_RETAIN_DAYS(
+      "notifications.retain_days",
+      SettingValueType.INTEGER,
+      "90",
+      "Days an in-app notification is kept before the Notification sweep deletes it, read or not (0"
+          + " disables pruning). Only the record of the announcement goes — the review, annotation"
+          + " or comment it points at is untouched."),
   REVIEW_FREE_REATTACH_ENABLED(
       "review.free_reattach_enabled",
       SettingValueType.BOOLEAN,
@@ -173,6 +180,7 @@ public enum ApplicationSettingKey {
           REVIEW_ARCHIVE_AFTER_DAYS, SettingConstraints.range(0, 3650),
           // 0 disables purging; same ~10-year sanity cap as the archive window.
           REVIEW_PURGE_ARCHIVED_AFTER_DAYS, SettingConstraints.range(0, 3650),
+          NOTIFICATIONS_RETAIN_DAYS, SettingConstraints.range(0, 3650),
           SMTP_PORT, SettingConstraints.range(1, 65535),
           SMTP_FROM, SettingConstraints.format(SettingConstraints.ValueFormat.EMAIL),
           GENERAL_BASE_URL, SettingConstraints.format(SettingConstraints.ValueFormat.URL),
