@@ -55,7 +55,7 @@ javaDiffUtils = "4.15"
 
 # --- Pinned for later phases (NOT yet applied) -------------------------
 pdfbox = "3.0.8"            # PDF text extraction with glyph positions
-poi = "5.4.1"              # .docx structural extraction (XWPF)
+poi = "5.4.1"              # XLSX writing (issue #547); .docx extraction (XWPF) later
 
 [libraries]
 junit-bom = { group = "org.junit", name = "junit-bom", version.ref = "junit" }
@@ -93,6 +93,7 @@ jackson-annotations = { module = "com.fasterxml.jackson.core:jackson-annotations
 jackson3-databind = { module = "tools.jackson.core:jackson-databind" }
 # PDF text extraction with glyph positions (ADR-0032, issue #245).
 pdfbox = { module = "org.apache.pdfbox:pdfbox", version.ref = "pdfbox" }
+poi-ooxml = { module = "org.apache.poi:poi-ooxml", version.ref = "poi" }
 swagger-annotations = { module = "io.swagger.core.v3:swagger-annotations", version.ref = "swaggerAnnotations" }
 jakarta-validation-api = { module = "jakarta.validation:jakarta.validation-api", version.ref = "jakartaValidation" }
 jakarta-annotation-api = { module = "jakarta.annotation:jakarta.annotation-api", version.ref = "jakartaAnnotation" }

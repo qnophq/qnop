@@ -29,7 +29,8 @@ import Divider from '@mui/material/Divider';
 import Stack from '@mui/material/Stack';
 import ToggleButton from '@mui/material/ToggleButton';
 import ToggleButtonGroup from '@mui/material/ToggleButtonGroup';
-import { LayoutGrid, List as ListIcon, Plus } from 'lucide-react';
+import { FileDown, LayoutGrid, List as ListIcon, Plus } from 'lucide-react';
+import { downloadAnnotationExport } from '../../api/annotationExport';
 import { useAnnotations } from '../../api/hooks/useAnnotations';
 import { useDocument, useDocumentVersions } from '../../api/hooks/useDocuments';
 import { useRecordVisit } from '../../api/hooks/useReviews';
@@ -128,6 +129,20 @@ export function ReviewTasksPage() {
   };
   const [openTaskId, setOpenTaskId] = useState<string | null>(null);
   const [newTaskOpen, setNewTaskOpen] = useState(false);
+  const [exporting, setExporting] = useState(false);
+
+  const onExport = async () => {
+    setExporting(true);
+    try {
+      await downloadAnnotationExport(documentId, latestVersion >= 1 ? latestVersion : undefined);
+    } catch {
+      // A failed download leaves nothing behind, so the page's own toast is the
+      // whole recovery story — the button stays available for another try.
+      notify('The export could not be generated. Please try again.', 'error');
+    } finally {
+      setExporting(false);
+    }
+  };
 
   // A new version uploaded from this tab lands on its Document view (issue #571).
   const goToNewVersion = (versionNumber: number) =>
@@ -277,6 +292,19 @@ export function ReviewTasksPage() {
             searchLabel="Search tasks"
           />
         </Box>
+        {/* Reporting hand-off (issue #547): the server builds the workbook, so the
+            sheet carries exactly what this caller may see, anonymity included. */}
+        <Button
+          variant="outlined"
+          size="small"
+          startIcon={
+            exporting ? <CircularProgress size={14} color="inherit" /> : <FileDown size={16} />
+          }
+          disabled={exporting}
+          onClick={onExport}
+        >
+          Export to Excel
+        </Button>
         {/* A document-scoped task (issue #395) needs no selection — offered while the review is
             open and has a version to author against; the server refuses a closed review anyway. */}
         {isOpenWorkflowState(document.workflowState) && latestVersion >= 1 && (

@@ -160,5 +160,7 @@ dependencies {
     // The document-ingest ITs (issue #245) generate their PDF fixtures with PDFBox
     // instead of committing binary blobs.
     testImplementation(libs.pdfbox)
+    // Reads the generated workbook back to assert its contents (issue #547).
+    testImplementation(libs.poi.ooxml)
     testRuntimeOnly(libs.junit.platform.launcher)
 }
