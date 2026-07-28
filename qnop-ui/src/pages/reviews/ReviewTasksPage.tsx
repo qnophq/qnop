@@ -29,12 +29,12 @@ import Divider from '@mui/material/Divider';
 import Stack from '@mui/material/Stack';
 import ToggleButton from '@mui/material/ToggleButton';
 import ToggleButtonGroup from '@mui/material/ToggleButtonGroup';
-import { FileDown, LayoutGrid, List as ListIcon, Plus } from 'lucide-react';
-import { downloadAnnotationExport } from '../../api/annotationExport';
+import { LayoutGrid, List as ListIcon, Plus } from 'lucide-react';
 import { useAnnotations } from '../../api/hooks/useAnnotations';
 import { useDocument, useDocumentVersions } from '../../api/hooks/useDocuments';
 import { useRecordVisit } from '../../api/hooks/useReviews';
 import { AdminToast } from '../../components/admin/layout/AdminToast';
+import { ExportAnnotationsButton } from '../../components/reviews/ExportAnnotationsButton';
 import { ReviewPageHeader } from '../../components/reviews/hub/ReviewPageHeader';
 import { ReviewViewTabs } from '../../components/reviews/hub/ReviewViewTabs';
 import { useReviewDocumentId } from '../../components/reviews/reviewDocumentId';
@@ -129,20 +129,6 @@ export function ReviewTasksPage() {
   };
   const [openTaskId, setOpenTaskId] = useState<string | null>(null);
   const [newTaskOpen, setNewTaskOpen] = useState(false);
-  const [exporting, setExporting] = useState(false);
-
-  const onExport = async () => {
-    setExporting(true);
-    try {
-      await downloadAnnotationExport(documentId, latestVersion >= 1 ? latestVersion : undefined);
-    } catch {
-      // A failed download leaves nothing behind, so the page's own toast is the
-      // whole recovery story — the button stays available for another try.
-      notify('The export could not be generated. Please try again.', 'error');
-    } finally {
-      setExporting(false);
-    }
-  };
 
   // A new version uploaded from this tab lands on its Document view (issue #571).
   const goToNewVersion = (versionNumber: number) =>
@@ -282,7 +268,13 @@ export function ReviewTasksPage() {
           />
         ))}
         <Box sx={{ flex: 1 }} />
-        <Box sx={{ width: { xs: '100%', sm: 560, md: 720 } }}>
+        {/*
+          The search field takes what is left instead of a fixed 560/720: with a
+          fixed width the row's total outgrew the content area and the two
+          actions wrapped onto a line of their own. Now the filter bar absorbs
+          the slack and the actions stay pinned to the end of the row.
+        */}
+        <Box sx={{ flex: '1 1 260px', minWidth: 200, maxWidth: 720 }}>
           <PanelFilterBar
             filters={facets}
             onChange={setFacets}
@@ -294,17 +286,11 @@ export function ReviewTasksPage() {
         </Box>
         {/* Reporting hand-off (issue #547): the server builds the workbook, so the
             sheet carries exactly what this caller may see, anonymity included. */}
-        <Button
-          variant="outlined"
-          size="small"
-          startIcon={
-            exporting ? <CircularProgress size={14} color="inherit" /> : <FileDown size={16} />
-          }
-          disabled={exporting}
-          onClick={onExport}
-        >
-          Export to Excel
-        </Button>
+        <ExportAnnotationsButton
+          documentId={documentId}
+          version={latestVersion >= 1 ? latestVersion : undefined}
+          onError={(message) => notify(message, 'error')}
+        />
         {/* A document-scoped task (issue #395) needs no selection — offered while the review is
             open and has a version to author against; the server refuses a closed review anyway. */}
         {isOpenWorkflowState(document.workflowState) && latestVersion >= 1 && (
@@ -313,6 +299,7 @@ export function ReviewTasksPage() {
             size="small"
             startIcon={<Plus size={16} />}
             onClick={() => setNewTaskOpen(true)}
+            sx={{ flexShrink: 0 }}
           >
             Global annotation
           </Button>

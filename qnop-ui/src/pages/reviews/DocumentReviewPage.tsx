@@ -659,6 +659,7 @@ export function DocumentReviewPage() {
                 )}
               >
                 <AnnotationPanel
+                  documentId={documentId}
                   anonymous={document.anonymous ?? false}
                   threadParticipation={document.threadParticipation ?? 'OPEN'}
                   ownerId={document.ownerId}
@@ -701,6 +702,7 @@ export function DocumentReviewPage() {
             )}
           >
             <AnnotationPanel
+              documentId={documentId}
               anonymous={document.anonymous ?? false}
               threadParticipation={document.threadParticipation ?? 'OPEN'}
               ownerId={document.ownerId}

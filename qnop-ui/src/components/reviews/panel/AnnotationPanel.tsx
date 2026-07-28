@@ -38,6 +38,7 @@ import { useAuthStore } from '../../../stores/authStore';
 import type { Notify } from '../../admin/layout/useToast';
 import { SectionCard } from '../../admin/layout/SectionCard';
 import { ToneBadge } from '../../admin/ToneBadge';
+import { ExportAnnotationsButton } from '../ExportAnnotationsButton';
 import { isUnseen } from '../newSince';
 import type { BuildPermalink } from '../useReviewPermalink';
 import { useConfirmPlacement } from '../../../api/hooks/useAnnotations';
@@ -91,6 +92,11 @@ interface AnnotationPanelProps {
   readOnly?: boolean;
   /** The viewed version — the scope of placement outcomes and their confirmation (issue #326). */
   versionNumber?: number | null;
+  /**
+   * The review these annotations belong to. Only needed for the export action
+   * (issue #547) — the panel itself works off the annotations it is handed.
+   */
+  documentId?: string;
   /**
    * Arms re-attaching a lost placement (issue #457) — the page owns the
    * viewer, so it turns the next selection into the new anchor.
@@ -148,6 +154,7 @@ export function AnnotationPanel({
   mentionCandidates,
   readOnly = false,
   versionNumber = null,
+  documentId,
   onArmReattach,
   freeReattachEnabled = false,
   viewerIsAdmin = false,
@@ -354,6 +361,18 @@ export function AnnotationPanel({
               <ToneBadge tone="blue" label={`${newCount} new`} />
             </Box>
           )}
+          {
+            // Icon-only here: the panel header is narrow and already carries the
+            // count badge and the global-annotation action (issue #547).
+            documentId ? (
+              <ExportAnnotationsButton
+                documentId={documentId}
+                version={versionNumber ?? undefined}
+                onError={(message) => notify?.(message, 'error')}
+                compact
+              />
+            ) : undefined
+          }
           {
             // Raise a whole-document task without a selection (issue #395) — a quiet peer to the
             // text-selection gesture, offered while the latest version is open for review.
