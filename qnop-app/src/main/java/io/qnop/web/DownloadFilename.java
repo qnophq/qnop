@@ -37,6 +37,11 @@ final class DownloadFilename {
     return title + "-v" + versionNumber + extensionFor(contentType);
   }
 
+  /** The annotation export's filename (issue #547) — the review's title plus a fixed suffix. */
+  static String forAnnotationExport(String title) {
+    return (title == null || title.isBlank() ? "annotations" : title) + "-annotations.xlsx";
+  }
+
   /** The dotted file extension for a content type, or an empty string when it is not recognized. */
   static String extensionFor(String contentType) {
     if (contentType == null) {

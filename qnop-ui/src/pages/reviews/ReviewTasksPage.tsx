@@ -22,7 +22,6 @@
 import { useState } from 'react';
 import { useNavigate, useParams, useSearchParams } from 'react-router';
 import Box from '@mui/material/Box';
-import Button from '@mui/material/Button';
 import Chip from '@mui/material/Chip';
 import CircularProgress from '@mui/material/CircularProgress';
 import Divider from '@mui/material/Divider';
@@ -30,10 +29,13 @@ import Stack from '@mui/material/Stack';
 import ToggleButton from '@mui/material/ToggleButton';
 import ToggleButtonGroup from '@mui/material/ToggleButtonGroup';
 import { LayoutGrid, List as ListIcon, Plus } from 'lucide-react';
+import { AnnotationStatus } from '../../api/generated';
 import { useAnnotations } from '../../api/hooks/useAnnotations';
 import { useDocument, useDocumentVersions } from '../../api/hooks/useDocuments';
 import { useRecordVisit } from '../../api/hooks/useReviews';
 import { AdminToast } from '../../components/admin/layout/AdminToast';
+import { ExportAnnotationsButton } from '../../components/reviews/ExportAnnotationsButton';
+import { ToolbarIconButton } from '../../components/reviews/ToolbarIconButton';
 import { ReviewPageHeader } from '../../components/reviews/hub/ReviewPageHeader';
 import { ReviewViewTabs } from '../../components/reviews/hub/ReviewViewTabs';
 import { useReviewDocumentId } from '../../components/reviews/reviewDocumentId';
@@ -103,6 +105,12 @@ export function ReviewTasksPage() {
     latestVersion >= 1 ? latestVersion : undefined,
   );
   const annotations = annotationsQuery.data?.annotations ?? [];
+  // What each export scope would contain — shown in the wizard before it runs.
+  const exportCounts = {
+    all: annotations.length,
+    open: annotations.filter((a) => a.status !== AnnotationStatus.Resolved).length,
+    resolved: annotations.filter((a) => a.status === AnnotationStatus.Resolved).length,
+  };
 
   const [view, setView] = useTasksViewMode();
   // The unseen-marker baseline (issue #307): the PREVIOUS visit, stamped once.
@@ -267,7 +275,13 @@ export function ReviewTasksPage() {
           />
         ))}
         <Box sx={{ flex: 1 }} />
-        <Box sx={{ width: { xs: '100%', sm: 560, md: 720 } }}>
+        {/*
+          The search field takes what is left instead of a fixed 560/720: with a
+          fixed width the row's total outgrew the content area and the two
+          actions wrapped onto a line of their own. Now the filter bar absorbs
+          the slack and the actions stay pinned to the end of the row.
+        */}
+        <Box sx={{ flex: '1 1 260px', minWidth: 200, maxWidth: 720 }}>
           <PanelFilterBar
             filters={facets}
             onChange={setFacets}
@@ -277,17 +291,22 @@ export function ReviewTasksPage() {
             searchLabel="Search tasks"
           />
         </Box>
+        {/* Reporting hand-off (issue #547): the server builds the workbook, so the
+            sheet carries exactly what this caller may see, anonymity included. */}
+        <ExportAnnotationsButton
+          documentId={documentId}
+          version={latestVersion >= 1 ? latestVersion : undefined}
+          counts={exportCounts}
+          onError={(message) => notify(message, 'error')}
+        />
         {/* A document-scoped task (issue #395) needs no selection — offered while the review is
             open and has a version to author against; the server refuses a closed review anyway. */}
         {isOpenWorkflowState(document.workflowState) && latestVersion >= 1 && (
-          <Button
-            variant="contained"
-            size="small"
-            startIcon={<Plus size={16} />}
+          <ToolbarIconButton
+            label="Global annotation"
+            icon={Plus}
             onClick={() => setNewTaskOpen(true)}
-          >
-            Global annotation
-          </Button>
+          />
         )}
       </Stack>
 

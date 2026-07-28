@@ -76,6 +76,10 @@ dependencies {
     implementation(libs.pdfbox)
     implementation(libs.jackson3.databind)
 
+    // Annotation export to Excel (issue #547, ADR-0052): POI writes the workbook in
+    // the service layer; the controller only streams what it produced.
+    implementation(libs.poi.ooxml)
+
     // Inter-version diff (issue #249, ADR-0034): Myers diff at word granularity
     // over the two versions' extracted text layers.
     implementation(libs.java.diff.utils)
