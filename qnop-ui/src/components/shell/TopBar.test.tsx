@@ -23,6 +23,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { ThemeProvider } from '@mui/material/styles';
 import { buildTheme } from '../../theme/theme';
 import { TopBar } from './TopBar';
@@ -61,11 +62,16 @@ vi.mock('../../api/hooks/useNotifications', () => ({
 
 function renderTopBar() {
   return render(
-    <ThemeProvider theme={buildTheme('light')}>
-      <MemoryRouter>
-        <TopBar isMobile={false} onToggleSidebar={vi.fn()} />
-      </MemoryRouter>
-    </ThemeProvider>,
+    // The quickview's rows resolve each actor's profile through the query cache.
+    <QueryClientProvider
+      client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}
+    >
+      <ThemeProvider theme={buildTheme('light')}>
+        <MemoryRouter>
+          <TopBar isMobile={false} onToggleSidebar={vi.fn()} />
+        </MemoryRouter>
+      </ThemeProvider>
+    </QueryClientProvider>,
   );
 }
 

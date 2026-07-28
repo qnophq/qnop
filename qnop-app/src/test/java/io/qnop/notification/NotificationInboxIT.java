@@ -229,24 +229,41 @@ class NotificationInboxIT extends SeededIntegrationTest {
   }
 
   @Test
-  @DisplayName("an anonymous review never renders a foreign actor's real name (ADR-0038)")
-  void anonymousReviewStaysAnonymous() throws Exception {
+  @DisplayName("a normal review ships the actor's slug, so the UI can link to them")
+  void normalReviewShipsActorSlug() throws Exception {
+    seedDocument(false);
+    createAnnotation(AUDITOR_ID);
+    UUID id = awaitInbox(MEMBER_ID, 1).getFirst().getId();
+
+    mockMvc
+        .perform(as(get("/api/v1/notifications/" + id), MEMBER_ID))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.actorName").value("Avery Auditor"))
+        // The avatar, hover card and profile link all hang off this one field.
+        .andExpect(jsonPath("$.actorSlug").value("avery-auditor"));
+  }
+
+  @Test
+  @DisplayName("an anonymous review ships neither the real name nor a slug (ADR-0038)")
+  void anonymousReviewHidesTheActor() throws Exception {
     seedDocument(true);
 
     createAnnotation(AUDITOR_ID);
-    awaitInbox(MEMBER_ID, 1);
+    UUID id = awaitInbox(MEMBER_ID, 1).getFirst().getId();
 
-    // The owner may see who acted; a peer participant may not. MEMBER_ID owns this
-    // review, so the check that matters is the stored row: it holds an id, never a name.
-    Notification stored = awaitInbox(MEMBER_ID, 1).getFirst();
-    assertThat(stored.getActorId()).isEqualTo(AUDITOR_ID);
-
+    // Even the owner sees a foreign author pseudonymised — the exposure rule is
+    // "yourself and the owner's own actions", not "the owner sees everyone".
     mockMvc
-        .perform(as(get("/api/v1/notifications/" + stored.getId()), MEMBER_ID))
+        .perform(as(get("/api/v1/notifications/" + id), MEMBER_ID))
         .andExpect(status().isOk())
-        // Resolved at read time through ReviewIdentityResolver, so a later privacy
-        // change is honoured rather than baked in.
-        .andExpect(jsonPath("$.actorName").isNotEmpty());
+        .andExpect(jsonPath("$.actorName").value(org.hamcrest.Matchers.startsWith("Participant")))
+        // A slug identifies as surely as a name, so it must be absent too —
+        // otherwise the avatar and the profile link would undo the pseudonym.
+        .andExpect(jsonPath("$.actorSlug").doesNotExist());
+
+    // …and the stored row still holds the real id; anonymity is a read-time
+    // decision, so a later privacy change is honoured rather than baked in.
+    assertThat(inboxOf(MEMBER_ID).getFirst().getActorId()).isEqualTo(AUDITOR_ID);
   }
 
   @Test

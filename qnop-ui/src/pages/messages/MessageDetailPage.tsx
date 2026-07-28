@@ -32,11 +32,11 @@ import { ArrowRight } from 'lucide-react';
 import { useNavigate, useParams } from 'react-router';
 import { useMarkNotificationRead, useNotification } from '../../api/hooks/useNotifications';
 import { NotificationTypeIcon } from '../../components/notifications/NotificationTypeIcon';
+import { NotificationActor } from '../../components/notifications/NotificationActor';
 import {
   notificationLabel,
   notificationTone,
 } from '../../components/notifications/notificationMeta';
-import { UserAvatar } from '../../components/shell/UserAvatar';
 import { useFormatters } from '../../hooks/useFormatters';
 import { ErrorState } from '../errors/ErrorState';
 import { NotFoundIllustration } from '../errors/illustrations';
@@ -261,14 +261,14 @@ export function MessageDetailPage() {
                 {data.actorName && (
                   <Box>
                     <Typography sx={{ fontSize: 12, color: 'text.secondary' }}>From</Typography>
-                    <Stack direction="row" spacing={1} sx={{ alignItems: 'center', mt: 0.5 }}>
-                      {/* initials-only on purpose: under an anonymous review the
-                          name IS the pseudonym, and it gets a pseudonym's face */}
-                      <UserAvatar name={data.actorName} size={26} imageUrl={null} />
-                      <Typography sx={{ fontSize: 14, fontWeight: 600, wordBreak: 'break-word' }}>
-                        {data.actorName}
-                      </Typography>
-                    </Stack>
+                    <Box sx={{ mt: 0.5 }}>
+                      <NotificationActor
+                        name={data.actorName}
+                        slug={data.actorSlug}
+                        size={28}
+                        showName
+                      />
+                    </Box>
                   </Box>
                 )}
                 {data.documentTitle && <RailFact label="Review" value={data.documentTitle} />}

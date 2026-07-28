@@ -22,6 +22,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { fireEvent, render, screen } from '@testing-library/react';
 import { MemoryRouter, Route, Routes } from 'react-router';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { ThemeProvider } from '@mui/material/styles';
 import type { NotificationSummary } from '../../api/generated';
 import { buildTheme } from '../../theme/theme';
@@ -48,6 +49,8 @@ const UNREAD = summary({
   id: 'n1',
   type: 'MENTION',
   title: 'Ada mentioned you',
+  actorName: 'Ada Admin',
+  actorSlug: 'ada-admin',
   documentTitle: 'NDA Acme Corp',
   preview: 'can you confirm the cap?',
 });
@@ -72,14 +75,18 @@ function mockList(items: NotificationSummary[], unreadTotal: number, extra = {})
 
 function renderPage(entry = '/messages') {
   return render(
-    <ThemeProvider theme={buildTheme('light')}>
-      <MemoryRouter initialEntries={[entry]}>
-        <Routes>
-          <Route path="/messages" element={<MessagesPage />} />
-          <Route path="/messages/:id" element={<div data-testid="detail-probe" />} />
-        </Routes>
-      </MemoryRouter>
-    </ThemeProvider>,
+    <QueryClientProvider
+      client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}
+    >
+      <ThemeProvider theme={buildTheme('light')}>
+        <MemoryRouter initialEntries={[entry]}>
+          <Routes>
+            <Route path="/messages" element={<MessagesPage />} />
+            <Route path="/messages/:id" element={<div data-testid="detail-probe" />} />
+          </Routes>
+        </MemoryRouter>
+      </ThemeProvider>
+    </QueryClientProvider>,
   );
 }
 
@@ -100,6 +107,15 @@ describe('MessagesPage', () => {
     expect(screen.getByText('NDA Acme Corp')).toBeInTheDocument();
     expect(screen.getByText('“can you confirm the cap?”')).toBeInTheDocument();
     expect(screen.getByText('Mia replied')).toBeInTheDocument();
+  });
+
+  it('leads each row with the actor, linked to their profile', () => {
+    renderPage();
+
+    expect(screen.getByRole('link', { name: /Ada Admin/ })).toHaveAttribute(
+      'href',
+      '/users/ada-admin',
+    );
   });
 
   it('marks unread rows and offers to clear them all', () => {

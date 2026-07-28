@@ -6950,6 +6950,15 @@ components:
             Who triggered it, as THIS recipient may see them — pseudonymous in
             an anonymous review (ADR-0038). Null when the review is no longer
             visible to the caller.
+        actorSlug:
+          type: string
+          nullable: true
+          description: |
+            The actor's profile slug, for the avatar, hover card and profile
+            link. Null under exactly the same rule that pseudonymises
+            `actorName` (ADR-0038) — a slug identifies as surely as an id — and
+            null for a user who has none, so the client falls back to the name
+            alone.
         documentTitle:
           type: string
           nullable: true
@@ -7003,6 +7012,15 @@ components:
         actorName:
           type: string
           nullable: true
+        actorSlug:
+          type: string
+          nullable: true
+          description: |
+            The actor's profile slug, for the avatar, hover card and profile
+            link. Null under exactly the same rule that pseudonymises
+            `actorName` (ADR-0038) — a slug identifies as surely as an id — and
+            null for a user who has none, so the client falls back to the name
+            alone.
         documentId:
           type: string
           format: uuid

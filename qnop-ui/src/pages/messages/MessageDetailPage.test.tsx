@@ -22,6 +22,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { fireEvent, render, screen } from '@testing-library/react';
 import { MemoryRouter, Route, Routes } from 'react-router';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { ThemeProvider } from '@mui/material/styles';
 import type { NotificationDetail } from '../../api/generated';
 import { buildTheme } from '../../theme/theme';
@@ -51,6 +52,7 @@ function detail(overrides: DetailOverrides = {}): NotificationDetail {
     body: 'Ada mentioned you in a comment on “NDA Acme Corp”.',
     preview: 'can you confirm the cap?',
     actorName: 'Ada Admin',
+    actorSlug: 'ada-admin',
     documentTitle: 'NDA Acme Corp',
     actionPath: '/reviews/nda-acme?annotation=a1',
     actionLabel: 'Open annotation',
@@ -71,14 +73,18 @@ function mockDetail(value: DetailOverrides | null, extra = {}) {
 
 function renderPage() {
   return render(
-    <ThemeProvider theme={buildTheme('light')}>
-      <MemoryRouter initialEntries={['/messages/n1']}>
-        <Routes>
-          <Route path="/messages/:notificationId" element={<MessageDetailPage />} />
-          <Route path="/reviews/:documentId" element={<div data-testid="review-probe" />} />
-        </Routes>
-      </MemoryRouter>
-    </ThemeProvider>,
+    <QueryClientProvider
+      client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}
+    >
+      <ThemeProvider theme={buildTheme('light')}>
+        <MemoryRouter initialEntries={['/messages/n1']}>
+          <Routes>
+            <Route path="/messages/:notificationId" element={<MessageDetailPage />} />
+            <Route path="/reviews/:documentId" element={<div data-testid="review-probe" />} />
+          </Routes>
+        </MemoryRouter>
+      </ThemeProvider>
+    </QueryClientProvider>,
   );
 }
 
@@ -110,12 +116,24 @@ describe('MessageDetailPage', () => {
     expect(screen.getByText('Mention')).toBeInTheDocument();
   });
 
-  it('shows the sender with a face, not just a name', () => {
+  it('shows the sender with a face that links to their profile', () => {
     renderPage();
 
-    // Initials only — under an anonymous review the name IS the pseudonym, so
-    // the avatar must never reach for a real profile picture.
     expect(screen.getByText('AA')).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: /Ada Admin/ })).toHaveAttribute(
+      'href',
+      '/users/ada-admin',
+    );
+  });
+
+  it('gives a pseudonymised sender no avatar link at all (ADR-0038)', () => {
+    // No slug is exactly what an anonymous review ships — a link or a hover
+    // card here would undo the pseudonym the name carefully keeps.
+    mockDetail({ actorName: 'Participant 2', actorSlug: null });
+    renderPage();
+
+    expect(screen.getByText('Participant 2')).toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: /Participant 2/ })).not.toBeInTheDocument();
   });
 
   it('marks an unread notification read when it is opened', () => {

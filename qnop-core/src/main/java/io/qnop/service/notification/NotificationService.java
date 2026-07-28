@@ -146,6 +146,7 @@ public class NotificationService {
         body(notification, actorName, document.getTitle()),
         notification.getExcerpt(),
         actorName,
+        context.actorSlug(document.getId(), notification.getActorId(), identity),
         document.getId(),
         document.getTitle(),
         actionPath(notification, document),
@@ -165,6 +166,7 @@ public class NotificationService {
         notification.getType().name(),
         "A review you no longer have access to",
         "This notification refers to a review that is no longer available to you.",
+        null,
         null,
         null,
         null,
@@ -274,11 +276,21 @@ public class NotificationService {
       if (actorId == null) {
         return "System";
       }
-      String name =
-          identities
-              .computeIfAbsent(documentId, id -> identity.forDocument(id, recipientId))
-              .displayName(actorId);
+      String name = identities(documentId, identity).displayName(actorId);
       return name == null || name.isBlank() ? "A participant" : name;
+    }
+
+    /**
+     * The actor's profile slug, or null — which is what a pseudonymised author ships (ADR-0038), so
+     * the client renders the pseudonym without an avatar, hover card or profile link.
+     */
+    String actorSlug(UUID documentId, UUID actorId, ReviewIdentityResolver identity) {
+      return actorId == null ? null : identities(documentId, identity).slug(actorId);
+    }
+
+    private ReviewIdentityResolver.ReviewIdentities identities(
+        UUID documentId, ReviewIdentityResolver identity) {
+      return identities.computeIfAbsent(documentId, id -> identity.forDocument(id, recipientId));
     }
   }
 
@@ -294,6 +306,7 @@ public class NotificationService {
       String body,
       String preview,
       String actorName,
+      String actorSlug,
       UUID documentId,
       String documentTitle,
       String actionPath,
