@@ -1,0 +1,37 @@
+# Copyright (c) 2026-present devtank42 GmbH
+# SPDX-License-Identifier: AGPL-3.0-only
+
+# Retention for the in-app inbox (issue #626). ADR-0051 chose fan-out on write —
+# one notification row per recipient per event — and named the unbounded growth
+# that follows as the model's cost. This changeset closes it.
+#
+# Two changes, and the index is not optional:
+#
+#  - notifications.retain_days seeds the retention window (ApplicationSettingKey
+#    stays authoritative per ADR-0025; this row mirrors its default). 0 disables.
+#  - ix_notification_created_at serves the sweep. The inbox index
+#    (recipient_id, read_at, created_at) leads with the recipient, so a delete
+#    predicated on created_at alone cannot use it and would scan the whole table
+#    — once per batch, every run.
+databaseChangeLog:
+  - changeSet:
+      id: 0030-notification-retention
+      author: qnop
+      comment: Adds the notifications.retain_days setting and the sweep's index (issue #626).
+      changes:
+        - insert:
+            tableName: application_setting
+            columns:
+              - column: { name: setting_key, value: "notifications.retain_days" }
+              - column: { name: setting_value, value: "90" }
+              - column:
+                  {
+                    name: setting_desc,
+                    value: "Days an in-app notification is kept before the Notification sweep deletes it, read or not (0 disables pruning). Only the record of the announcement goes — the review, annotation or comment it points at is untouched.",
+                  }
+              - column: { name: value_type, value: "INTEGER" }
+        - createIndex:
+            indexName: ix_notification_created_at
+            tableName: notification
+            columns:
+              - column: { name: created_at }

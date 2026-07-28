@@ -33,6 +33,7 @@ import TextField from '@mui/material/TextField';
 import Typography from '@mui/material/Typography';
 import {
   BarChart3,
+  Bell,
   FileText,
   Lock,
   SlidersHorizontal,
@@ -49,7 +50,7 @@ import { apiErrorMessage, apiFieldErrors } from '../../../utils/apiError';
 import { isHttpUrl, isInteger, isIntegerInRange } from '../../../utils/validation';
 
 /** Group prefixes in display order; unknown groups are appended alphabetically. */
-const GROUP_ORDER = ['general', 'upload', 'tracking', 'auth', 'review'] as const;
+const GROUP_ORDER = ['general', 'upload', 'tracking', 'auth', 'review', 'notifications'] as const;
 
 const GROUP_LABELS: Record<string, string> = {
   general: 'General',
@@ -57,6 +58,7 @@ const GROUP_LABELS: Record<string, string> = {
   tracking: 'Usage tracking',
   auth: 'Authentication',
   review: 'Review',
+  notifications: 'Notifications',
 };
 
 /** Brand-tint section icon per group, matching the Email / SMTP page's language. */
@@ -66,6 +68,7 @@ const GROUP_ICONS: Record<string, LucideIcon> = {
   tracking: BarChart3,
   auth: Lock,
   review: FileText,
+  notifications: Bell,
 };
 
 const GROUP_DESCRIPTIONS: Record<string, string> = {
@@ -74,6 +77,7 @@ const GROUP_DESCRIPTIONS: Record<string, string> = {
   tracking: 'Anonymous, privacy-friendly usage analytics.',
   auth: 'Self-registration and password-reset behaviour.',
   review: 'Behaviour of the document review workflow.',
+  notifications: 'Review e-mails and how long the in-app inbox keeps its records.',
 };
 
 /**

@@ -68,7 +68,7 @@ class SchedulerApiIT extends SeededIntegrationTest {
     mockMvc
         .perform(as(get(SCHEDULER), ADMIN_ID))
         .andExpect(status().isOk())
-        .andExpect(jsonPath("$.items", hasSize(7)))
+        .andExpect(jsonPath("$.items", hasSize(8)))
         .andExpect(jsonPath("$.items[*].jobId", hasItem(STORAGE_ORPHAN_REAPER)))
         .andExpect(jsonPath("$.items[*].jobId", hasItem(REFRESH_TOKEN_SWEEP)));
   }

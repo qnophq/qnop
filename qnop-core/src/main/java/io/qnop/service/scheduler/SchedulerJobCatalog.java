@@ -42,6 +42,7 @@ public final class SchedulerJobCatalog {
   public static final String STORAGE_ORPHAN_REAPER = "storageOrphanReaper";
   public static final String REVIEW_ARCHIVE = "reviewArchive";
   public static final String REVIEW_PURGE = "reviewPurge";
+  public static final String NOTIFICATION_SWEEP = "notificationSweep";
 
   private static final List<SchedulerJobDefinition> DEFINITIONS =
       List.of(
@@ -105,6 +106,19 @@ public final class SchedulerJobCatalog {
               "0 55 3 * * *",
               true,
               false,
+              true),
+          // Ships ENABLED, unlike the purge above (issue #626): it removes only the record
+          // that something was announced — the review, annotation and comment it points at
+          // survive — so the retention window, not a second opt-in, is the control.
+          // Self-transactional because it commits one bounded batch at a time.
+          new SchedulerJobDefinition(
+              NOTIFICATION_SWEEP,
+              "Notification sweep",
+              "Deletes in-app notifications older than the notification retention window, read"
+                  + " or not.",
+              "0 15 4 * * *",
+              true,
+              true,
               true));
 
   private static final List<String> IDS =

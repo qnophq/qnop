@@ -58,6 +58,31 @@ public interface NotificationRepository extends JpaRepository<Notification, UUID
   Optional<Notification> findByIdAndRecipientId(UUID id, UUID recipientId);
 
   /**
+   * How many notifications the retention sweep would delete — the dry-run's number (issue #626).
+   */
+  long countByCreatedAtBefore(Instant cutoff);
+
+  /**
+   * Deletes at most {@code max} notifications older than {@code cutoff}, newest-first order
+   * irrelevant (issue #626).
+   *
+   * <p>Native because JPQL has no {@code LIMIT} on {@code DELETE}, and the cap is the point: a
+   * first run against a table that has grown for months must not become one enormous statement. The
+   * subselect is served by {@code ix_notification_created_at} (changeset 0030).
+   *
+   * @return how many rows this batch actually removed — 0 means the sweep is done
+   */
+  @Modifying(clearAutomatically = true, flushAutomatically = true)
+  @Query(
+      value =
+          """
+          DELETE FROM notification
+          WHERE id IN (SELECT id FROM notification WHERE created_at < :cutoff LIMIT :max)
+          """,
+      nativeQuery = true)
+  int deleteOlderThan(@Param("cutoff") Instant cutoff, @Param("max") int max);
+
+  /**
    * Marks every unread notification of one recipient read in a single statement — "mark all read"
    * on a busy inbox must not load and dirty-check thousands of entities.
    */

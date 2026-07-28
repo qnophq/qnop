@@ -54,9 +54,21 @@ The badge and quickview poll (`refetchInterval` plus refetch-on-focus), consiste
 
 **Positive.** The recipient policy exists once and every future channel inherits it. Anonymity cannot be leaked by a stale notification. A purged review takes its notifications with it. The mail path's behaviour is unchanged, including the mention fall-through.
 
-**Negative.** Resolution runs even with review mails disabled. Fan-out on write means N rows per event — the read path is trivial and indexed, but the table grows with activity and has **no retention policy yet** (follow-up: a `notificationSweep` scheduler job in the shape of #576/#577). Sinks are best-effort and independent: a failing in-app write must not cost the mail, so a partial delivery is possible and is logged rather than retried.
+**Negative.** Resolution runs even with review mails disabled. Fan-out on write means N rows per event — the read path is trivial and indexed, and the growth that follows is bounded by the retention sweep below. Sinks are best-effort and independent: a failing in-app write must not cost the mail, so a partial delivery is possible and is logged rather than retried.
 
 **Neutral.** In-app text is rendered by a dedicated renderer rather than the admin-editable mail templates, so blanking a mail template cannot empty the inbox; the two therefore need to be kept in phrasing sync by hand.
+
+## Amendment (issue #626): retention
+
+Fan-out on write left the table unbounded. `notifications.retain_days` (default 90, `0` disables) and the `notificationSweep` scheduler job close that: notifications older than the window are deleted in bounded batches, each batch its own transaction, capped per run so a long-overdue first pass cannot hold the table for minutes.
+
+Two decisions are worth recording.
+
+**It deletes unread notifications too.** A retention any user can defeat by never opening their inbox is not a retention policy. And the asymmetry with the purge (ADR-0050) is real rather than rhetorical: what is deleted here is *the record that something was announced*, never the thing itself — the review, the annotation and the comment all survive and stay reachable.
+
+**It therefore ships enabled**, where the purge deliberately does not. The retention window is the control, and at rollout the first run is provably a no-op because no notification is older than the default window yet.
+
+The sweep needed its own index. The inbox index leads with `recipient_id`, so a delete predicated on `created_at` alone could not use it and would scan the whole table once per batch; `ix_notification_created_at` (changeset 0030) serves the sweep.
 
 ## Related
 
