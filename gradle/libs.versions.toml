@@ -19,7 +19,7 @@ licenseReport = "2.9"
 # Trivy's filesystem scan cannot parse the Gradle Kotlin DSL to enumerate Java
 # dependencies. Replaces the OWASP Dependency-Check gate, which needed an NVD
 # API key to be effective and was a no-op without it (see ADR-0007 amendment).
-cyclonedx = "2.3.1"
+cyclonedx = "2.4.1"
 # Spring Boot plugin + BOM. The BOM (spring-boot-dependencies) manages the
 # versions of the Spring stack, JPA/Hibernate, the PostgreSQL driver, Liquibase
 # and Testcontainers — so those artifacts are declared below WITHOUT versions.
