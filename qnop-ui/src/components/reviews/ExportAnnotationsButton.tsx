@@ -58,11 +58,6 @@ export function ExportAnnotationsButton({
   };
 
   return (
-    <ToolbarIconButton
-      label="Export to Excel"
-      icon={<FileDown size={16} />}
-      onClick={run}
-      busy={exporting}
-    />
+    <ToolbarIconButton label="Export to Excel" icon={FileDown} onClick={run} busy={exporting} />
   );
 }

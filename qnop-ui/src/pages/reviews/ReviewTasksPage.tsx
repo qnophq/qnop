@@ -296,8 +296,7 @@ export function ReviewTasksPage() {
         {isOpenWorkflowState(document.workflowState) && latestVersion >= 1 && (
           <ToolbarIconButton
             label="Global annotation"
-            icon={<Plus size={16} />}
-            variant="contained"
+            icon={Plus}
             onClick={() => setNewTaskOpen(true)}
           />
         )}

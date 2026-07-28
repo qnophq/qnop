@@ -19,10 +19,10 @@
  * SPDX-License-Identifier: AGPL-3.0-only
  */
 
-import type { ReactNode } from 'react';
 import Button from '@mui/material/Button';
 import CircularProgress from '@mui/material/CircularProgress';
 import Tooltip from '@mui/material/Tooltip';
+import type { LucideIcon } from 'lucide-react';
 
 /**
  * An icon-only action in a review toolbar — the shape the Tasks toolbar and the
@@ -36,19 +36,21 @@ import Tooltip from '@mui/material/Tooltip';
  *
  * <p>The tooltip wraps a `span` because a disabled MUI button fires no pointer
  * events, and a tooltip on it would simply never appear while busy.
+ *
+ * <p>It takes the icon as a component and sizes it itself, and offers no
+ * variant: these actions had drifted to different emphases and glyph sizes on
+ * the two surfaces, and the fix is that the call site cannot choose either.
  */
 export function ToolbarIconButton({
   label,
-  icon,
+  icon: Icon,
   onClick,
-  variant = 'outlined',
   busy = false,
   disabled = false,
 }: {
   label: string;
-  icon: ReactNode;
+  icon: LucideIcon;
   onClick: () => void;
-  variant?: 'outlined' | 'contained';
   busy?: boolean;
   disabled?: boolean;
 }) {
@@ -57,13 +59,13 @@ export function ToolbarIconButton({
       <span style={{ display: 'inline-flex', flexShrink: 0 }}>
         <Button
           size="small"
-          variant={variant}
+          variant="outlined"
           onClick={onClick}
           disabled={disabled || busy}
           aria-label={label}
           sx={{ minWidth: 36, px: 1 }}
         >
-          {busy ? <CircularProgress size={14} color="inherit" /> : icon}
+          {busy ? <CircularProgress size={14} color="inherit" /> : <Icon size={16} />}
         </Button>
       </span>
     </Tooltip>

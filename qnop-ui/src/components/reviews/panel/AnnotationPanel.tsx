@@ -378,7 +378,7 @@ export function AnnotationPanel({
             onNewDocumentNote && !readOnly && !reviewClosed ? (
               <ToolbarIconButton
                 label="Global annotation"
-                icon={<Plus size={15} />}
+                icon={Plus}
                 onClick={onNewDocumentNote}
               />
             ) : undefined
