@@ -156,6 +156,16 @@ tags:
       immediate run-now (an explicit override that runs regardless of the
       enabled flag). Manual runs and setting changes are written to the SYSTEM
       audit stream (ADR-0043). ADMIN only.
+  - name: Notifications
+    description: |
+      The caller's own in-app notification inbox (issue #538, ADR-0051):
+      persisted per-user records of review activity, written one row per
+      recipient when a review event commits — the same resolution that decides
+      who gets an e-mail (issue #316), minus the e-mail-only opt-outs. Every
+      endpoint is scoped to the authenticated user; a notification belonging to
+      somebody else is indistinguishable from one that does not exist (404).
+      Actor names are resolved per recipient, so an anonymous review's
+      pseudonyms hold here too (ADR-0038).
 paths:
   /config:
     get:
@@ -2411,6 +2421,155 @@ paths:
                 $ref: '#/components/schemas/DashboardResponse'
         '401':
           $ref: '#/components/responses/Unauthorized'
+  /notifications:
+    get:
+      tags:
+        - Notifications
+      summary: The caller's notification inbox, newest first
+      description: |
+        A page of the authenticated user's own notifications (issue #538),
+        newest first. `unread=true` narrows to the unread ones, `false` to the
+        read ones; omitting it returns both. The envelope carries `unreadTotal`
+        alongside the page counts so the inbox renders its badge without a
+        second call. Each item is rendered for *this* recipient: the actor's
+        name follows per-review anonymity (ADR-0038), and a notification whose
+        review the caller can no longer see renders without its title rather
+        than leaking it.
+      operationId: listNotifications
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: unread
+          in: query
+          required: false
+          description: Narrow to unread (`true`) or read (`false`) notifications.
+          schema:
+            type: boolean
+        - name: page
+          in: query
+          required: false
+          schema:
+            type: integer
+            format: int32
+            minimum: 0
+            default: 0
+        - name: size
+          in: query
+          required: false
+          schema:
+            type: integer
+            format: int32
+            minimum: 1
+            maximum: 100
+            default: 20
+      responses:
+        '200':
+          description: One page of the caller's notifications
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NotificationPage'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+  /notifications/unread-count:
+    get:
+      tags:
+        - Notifications
+      summary: How many unread notifications the caller has
+      description: |
+        The badge query (issue #538) — deliberately its own cheap endpoint
+        because the shell polls it, while the inbox page gets the same number
+        folded into its list envelope.
+      operationId: getUnreadNotificationCount
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: The caller's unread count
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UnreadNotificationCount'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+  /notifications/read-all:
+    post:
+      tags:
+        - Notifications
+      summary: Mark every unread notification of the caller as read
+      operationId: markAllNotificationsRead
+      security:
+        - bearerAuth: []
+      responses:
+        '204':
+          description: All of the caller's notifications are now read.
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+  /notifications/{notificationId}:
+    get:
+      tags:
+        - Notifications
+      summary: One notification of the caller, fully rendered
+      description: |
+        The detail view (issue #538): title, body and the deep link to what the
+        notification is about. Reading does **not** mark it read — that is the
+        explicit `POST /notifications/{notificationId}/read`, so a prefetch or
+        a re-render can never silently clear the badge. A notification that
+        belongs to somebody else answers `404`, exactly like an unknown id.
+      operationId: getNotification
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: notificationId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: The notification
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NotificationDetail'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          description: Unknown notification, or one belonging to another user
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /notifications/{notificationId}/read:
+    post:
+      tags:
+        - Notifications
+      summary: Mark one notification of the caller as read
+      description: |
+        Idempotent — marking an already-read notification read again succeeds
+        and leaves the original `readAt` untouched.
+      operationId: markNotificationRead
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: notificationId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '204':
+          description: The notification is now read.
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          description: Unknown notification, or one belonging to another user
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
   /audit/events:
     get:
       tags:
@@ -6751,6 +6910,185 @@ components:
         - comments
         - users
         - teams
+    NotificationType:
+      type: string
+      description: |
+        What happened (issue #538). Mirrors the review event/mail-template
+        vocabulary; `MENTION` outranks the `COMMENT_ADDED`/`ANNOTATION_CREATED`
+        it is contained in, so a mentioned follower gets one notification.
+      enum:
+        - PARTICIPANT_ADDED
+        - ANNOTATION_CREATED
+        - ANNOTATION_DECIDED
+        - COMMENT_ADDED
+        - MENTION
+        - VERSION_UPLOADED
+        - WORKFLOW_CHANGED
+      example: COMMENT_ADDED
+    NotificationSummary:
+      type: object
+      description: One row of the inbox or the bell quickview (issue #538).
+      properties:
+        id:
+          type: string
+          format: uuid
+        type:
+          $ref: '#/components/schemas/NotificationType'
+        title:
+          type: string
+          description: One-line headline, already rendered for this recipient.
+        preview:
+          type: string
+          nullable: true
+          description: |
+            The quoted excerpt or transition that gives the headline its
+            context; null when the type carries none.
+        actorName:
+          type: string
+          nullable: true
+          description: |
+            Who triggered it, as THIS recipient may see them — pseudonymous in
+            an anonymous review (ADR-0038). Null when the review is no longer
+            visible to the caller.
+        actorSlug:
+          type: string
+          nullable: true
+          description: |
+            The actor's profile slug, for the avatar, hover card and profile
+            link. Null under exactly the same rule that pseudonymises
+            `actorName` (ADR-0038) — a slug identifies as surely as an id — and
+            null for a user who has none, so the client falls back to the name
+            alone.
+        documentTitle:
+          type: string
+          nullable: true
+          description: Null when the caller may no longer see the review.
+        actionPath:
+          type: string
+          nullable: true
+          description: |
+            Relative SPA path to what the notification is about (e.g.
+            `/reviews/nda-acme?annotation=…`); null when the review is no
+            longer visible.
+        accessible:
+          type: boolean
+          description: |
+            False when the caller has lost access to the referenced review —
+            the row still exists as a record but renders as a tombstone.
+        readAt:
+          type: string
+          format: date-time
+          nullable: true
+          description: Null while unread.
+        createdAt:
+          type: string
+          format: date-time
+      required:
+        - id
+        - type
+        - title
+        - accessible
+        - createdAt
+    NotificationDetail:
+      type: object
+      description: |
+        The full notification behind `GET /notifications/{id}` (issue #538):
+        everything in the summary plus the long-form body and the label its
+        action button should carry.
+      properties:
+        id:
+          type: string
+          format: uuid
+        type:
+          $ref: '#/components/schemas/NotificationType'
+        title:
+          type: string
+        body:
+          type: string
+          description: The formatted message, rendered for this recipient.
+        preview:
+          type: string
+          nullable: true
+        actorName:
+          type: string
+          nullable: true
+        actorSlug:
+          type: string
+          nullable: true
+          description: |
+            The actor's profile slug, for the avatar, hover card and profile
+            link. Null under exactly the same rule that pseudonymises
+            `actorName` (ADR-0038) — a slug identifies as surely as an id — and
+            null for a user who has none, so the client falls back to the name
+            alone.
+        documentId:
+          type: string
+          format: uuid
+          nullable: true
+        documentTitle:
+          type: string
+          nullable: true
+        actionPath:
+          type: string
+          nullable: true
+        actionLabel:
+          type: string
+          nullable: true
+          description: Call to action for the deep link, e.g. `Open annotation`.
+        accessible:
+          type: boolean
+        readAt:
+          type: string
+          format: date-time
+          nullable: true
+        createdAt:
+          type: string
+          format: date-time
+      required:
+        - id
+        - type
+        - title
+        - body
+        - accessible
+        - createdAt
+    NotificationPage:
+      type: object
+      description: One page of the caller's inbox (issue #538).
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/NotificationSummary'
+        total:
+          type: integer
+          format: int64
+        page:
+          type: integer
+          format: int32
+        size:
+          type: integer
+          format: int32
+        unreadTotal:
+          type: integer
+          format: int64
+          description: |
+            Unread notifications across the whole inbox, not just this page —
+            so the page renders its badge without a second call.
+      required:
+        - items
+        - total
+        - page
+        - size
+        - unreadTotal
+    UnreadNotificationCount:
+      type: object
+      description: The bell badge's number (issue #538).
+      properties:
+        unread:
+          type: integer
+          format: int64
+      required:
+        - unread
     ReviewSearchPage:
       type: object
       description: One page of review search results (issue #540).

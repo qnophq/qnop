@@ -34,6 +34,7 @@ import {
   Users,
   UsersRound,
   type LucideIcon,
+  Inbox,
 } from 'lucide-react';
 import type { UserRole } from '../../api/generated';
 
@@ -66,6 +67,8 @@ export const NAV_GROUPS: NavGroup[] = [
       { id: 'dashboard', label: 'Dashboard', path: '/', icon: LayoutDashboard },
       { id: 'reviews', label: 'Reviews', path: '/reviews', icon: FileText },
       { id: 'my-teams', label: 'My Teams', path: '/my-teams', icon: UsersRound },
+      // No roles: the inbox belongs to every authenticated user (issue #538).
+      { id: 'messages', label: 'Messages', path: '/messages', icon: Inbox },
     ],
   },
   {

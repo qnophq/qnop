@@ -62,6 +62,8 @@ import { RateLimitPage } from '../pages/errors/RateLimitPage';
 import { RouteErrorPage } from '../pages/errors/RouteErrorPage';
 import { ServerErrorPage } from '../pages/errors/ServerErrorPage';
 import { NewReviewPage } from '../pages/reviews/NewReviewPage';
+import { MessageDetailPage } from '../pages/messages/MessageDetailPage';
+import { MessagesPage } from '../pages/messages/MessagesPage';
 import { ReviewsPage } from '../pages/reviews/ReviewsPage';
 import { ReviewParamGate } from '../components/reviews/ReviewParamGate';
 
@@ -120,6 +122,8 @@ export const router = createBrowserRouter([
       { path: 'profile', element: <ProfilePage /> },
       { path: 'users/:userId', element: <UserProfilePage /> },
       { path: 'teams/:teamId', element: <TeamProfilePage /> },
+      { path: 'messages', element: <MessagesPage /> },
+      { path: 'messages/:notificationId', element: <MessageDetailPage /> },
       { path: 'reviews', element: <ReviewsPage /> },
       { path: 'reviews/new', element: <NewReviewPage /> },
       {
