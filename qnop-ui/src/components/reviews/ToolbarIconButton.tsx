@@ -22,6 +22,7 @@
 import Button from '@mui/material/Button';
 import CircularProgress from '@mui/material/CircularProgress';
 import Tooltip from '@mui/material/Tooltip';
+import type React from 'react';
 import type { LucideIcon } from 'lucide-react';
 
 /**
@@ -47,12 +48,16 @@ export function ToolbarIconButton({
   onClick,
   busy = false,
   disabled = false,
+  expanded,
 }: {
   label: string;
   icon: LucideIcon;
-  onClick: () => void;
+  /** Receives the event so a menu trigger can anchor to the button. */
+  onClick: (event: React.MouseEvent<HTMLButtonElement>) => void;
   busy?: boolean;
   disabled?: boolean;
+  /** Set on a trigger that opens a menu, so assistive tech announces its state. */
+  expanded?: boolean;
 }) {
   return (
     <Tooltip title={label}>
@@ -63,6 +68,8 @@ export function ToolbarIconButton({
           onClick={onClick}
           disabled={disabled || busy}
           aria-label={label}
+          aria-haspopup={expanded === undefined ? undefined : 'menu'}
+          aria-expanded={expanded ? true : undefined}
           sx={{ minWidth: 36, px: 1 }}
         >
           {busy ? <CircularProgress size={14} color="inherit" /> : <Icon size={16} />}

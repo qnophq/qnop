@@ -20,18 +20,45 @@
  */
 
 import { useState } from 'react';
-import { FileDown } from 'lucide-react';
+import ListItemIcon from '@mui/material/ListItemIcon';
+import ListItemText from '@mui/material/ListItemText';
+import Menu from '@mui/material/Menu';
+import MenuItem from '@mui/material/MenuItem';
+import type { LucideIcon } from 'lucide-react';
+import { Download, FileSpreadsheet } from 'lucide-react';
 import { downloadAnnotationExport } from '../../api/annotationExport';
 import { ToolbarIconButton } from './ToolbarIconButton';
 
+/** One offered format. Adding Word, Markdown or HTML is one more entry here. */
+interface ExportFormat {
+  id: string;
+  label: string;
+  icon: LucideIcon;
+  download: (documentId: string, version?: number) => Promise<void>;
+}
+
+const FORMATS: ExportFormat[] = [
+  {
+    id: 'xlsx',
+    label: 'Export to Excel',
+    icon: FileSpreadsheet,
+    download: downloadAnnotationExport,
+  },
+];
+
 /**
- * Downloads the review's annotations as a spreadsheet (issue #547).
+ * Exports the review's annotations (issue #547).
  *
- * <p>One component for both surfaces — the Tasks toolbar and the review's
- * annotation panel — so the two cannot drift in label, icon or busy behaviour.
- * It owns the in-flight state, because the request is the only thing it does;
- * reporting a failure is the caller's, since each surface already has its own
- * toast.
+ * <p>A menu rather than a single button, even while it offers exactly one
+ * format: Word, Markdown and HTML are planned, and a button that has to be
+ * rebuilt into a menu later would take its label, its tooltip and every test
+ * that names it along. The list above is the extension point — a new format is
+ * an entry, not a change to this component.
+ *
+ * <p>One component for both surfaces (the Tasks toolbar and the review's
+ * annotation panel), so the two cannot drift. It owns the in-flight state,
+ * because the request is the only thing it does; reporting a failure is the
+ * caller's, since each surface already has its own toast.
  */
 export function ExportAnnotationsButton({
   documentId,
@@ -42,15 +69,17 @@ export function ExportAnnotationsButton({
   version?: number;
   onError?: (message: string) => void;
 }) {
+  const [anchor, setAnchor] = useState<HTMLElement | null>(null);
   const [exporting, setExporting] = useState(false);
 
-  const run = async () => {
+  const run = async (format: ExportFormat) => {
+    setAnchor(null);
     setExporting(true);
     try {
-      await downloadAnnotationExport(documentId, version);
+      await format.download(documentId, version);
     } catch {
       // A failed download leaves nothing behind, so the surface's own toast is
-      // the whole recovery story — the button stays available for another try.
+      // the whole recovery story — the action stays available for another try.
       onError?.('The export could not be generated. Please try again.');
     } finally {
       setExporting(false);
@@ -58,6 +87,33 @@ export function ExportAnnotationsButton({
   };
 
   return (
-    <ToolbarIconButton label="Export to Excel" icon={FileDown} onClick={run} busy={exporting} />
+    <>
+      <ToolbarIconButton
+        label="Export"
+        icon={Download}
+        busy={exporting}
+        onClick={(event) => setAnchor(event.currentTarget)}
+        expanded={Boolean(anchor)}
+      />
+      <Menu
+        open={Boolean(anchor)}
+        anchorEl={anchor}
+        onClose={() => setAnchor(null)}
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
+        transformOrigin={{ vertical: 'top', horizontal: 'right' }}
+        slotProps={{ paper: { sx: { minWidth: 210 } } }}
+      >
+        {FORMATS.map((format) => (
+          <MenuItem key={format.id} onClick={() => run(format)}>
+            <ListItemIcon>
+              <format.icon size={16} />
+            </ListItemIcon>
+            <ListItemText slotProps={{ primary: { sx: { fontSize: 14 } } }}>
+              {format.label}
+            </ListItemText>
+          </MenuItem>
+        ))}
+      </Menu>
+    </>
   );
 }
