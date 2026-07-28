@@ -152,6 +152,40 @@ export function MessagesPage() {
           </Stack>
 
           <Paper variant="outlined" sx={{ borderRadius: '14px', overflow: 'hidden' }}>
+            {/*
+              The rows are columnar, so they need a legend — without it four
+              aligned strings read as arbitrary. Hidden on narrow screens, where
+              the row drops those columns anyway. Widths mirror the row's.
+            */}
+            {!isPending && items.length > 0 && (
+              <Box
+                aria-hidden
+                sx={{
+                  display: { xs: 'none', sm: 'flex' },
+                  alignItems: 'center',
+                  gap: 2,
+                  px: 2.5,
+                  py: 0.75,
+                  borderBottom: '1px solid',
+                  borderColor: 'divider',
+                  bgcolor: (t) => t.qnop.surface2,
+                  fontSize: 11,
+                  fontWeight: 700,
+                  letterSpacing: '0.08em',
+                  textTransform: 'uppercase',
+                  color: 'text.disabled',
+                }}
+              >
+                <Box sx={{ width: 30, flexShrink: 0 }} />
+                <Box sx={{ flex: '1.1 1 0', minWidth: 0, pl: 1.5 }}>What happened</Box>
+                <Box sx={{ flex: '1.4 1 0', minWidth: 0, display: { xs: 'none', md: 'block' } }}>
+                  Excerpt
+                </Box>
+                <Box sx={{ width: 190, flexShrink: 0 }}>Review</Box>
+                <Box sx={{ width: 92, flexShrink: 0, textAlign: 'right' }}>When</Box>
+              </Box>
+            )}
+
             {isPending ? (
               <Box sx={{ p: 2.5 }}>
                 {[0, 1, 2, 3].map((row) => (
