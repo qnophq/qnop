@@ -28,8 +28,8 @@ import Skeleton from '@mui/material/Skeleton';
 import Stack from '@mui/material/Stack';
 import Typography from '@mui/material/Typography';
 import { alpha, keyframes, useTheme } from '@mui/material/styles';
-import { ArrowLeft, ArrowRight } from 'lucide-react';
-import { Link as RouterLink, useNavigate, useParams } from 'react-router';
+import { ArrowRight } from 'lucide-react';
+import { useNavigate, useParams } from 'react-router';
 import { useMarkNotificationRead, useNotification } from '../../api/hooks/useNotifications';
 import { NotificationTypeIcon } from '../../components/notifications/NotificationTypeIcon';
 import {
@@ -120,18 +120,6 @@ export function MessageDetailPage() {
 
   return (
     <Stack spacing={2.5}>
-      <Box>
-        <Button
-          component={RouterLink}
-          to="/messages"
-          size="small"
-          startIcon={<ArrowLeft size={15} />}
-          sx={{ ml: -1 }}
-        >
-          All messages
-        </Button>
-      </Box>
-
       {/*
         The type wears its own colour (see notificationMeta): a crest on a
         gradient band, exactly the identity-hero treatment the profile player
