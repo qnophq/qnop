@@ -66,6 +66,20 @@ import {
 
 const STEPS = ['Format & file', 'Content'];
 
+/**
+ * The content area's height.
+ *
+ * <p>One value for both steps, so paging never resizes the dialog, and large
+ * enough that the taller step fits without a scrollbar.
+ *
+ * <p>The viewport cap is the fallback, not the intent: MUI limits a dialog to
+ * the window height less its margins, and on a short window an unconditional
+ * 400px would push the footer — Cancel, Back, Export — out of reach. Yielding
+ * some content height is the better trade, and because both steps read the same
+ * expression they still match each other.
+ */
+const CONTENT_HEIGHT = 'min(400px, 58vh)';
+
 const SCOPES: { id: ExportScope; label: string; hint: string }[] = [
   { id: 'all', label: 'Everything', hint: 'Every annotation in this review' },
   { id: 'open', label: 'Open only', hint: 'What still needs work' },
@@ -156,8 +170,8 @@ export function ExportWizard({
   };
 
   return (
-    <Dialog open={open} onClose={onClose} maxWidth="sm" fullWidth>
-      <DialogTitle sx={{ pb: 1 }}>
+    <Dialog open={open} onClose={onClose} maxWidth="md" fullWidth>
+      <DialogTitle sx={{ pb: 0.5 }}>
         <Typography
           sx={{
             fontSize: 11,
@@ -174,7 +188,7 @@ export function ExportWizard({
         </Typography>
       </DialogTitle>
 
-      <Box sx={{ px: 3, pb: 1 }}>
+      <Box sx={{ px: 3, pb: 0.5 }}>
         <Stepper activeStep={step} sx={{ '& .MuiStepLabel-label': { fontSize: 13 } }}>
           {STEPS.map((label) => (
             <Step key={label}>
@@ -184,115 +198,148 @@ export function ExportWizard({
         </Stepper>
       </Box>
 
-      {/* One height for both steps. The two pages hold different amounts, and
-          letting the dialog resize under the pointer moves the buttons the user
-          is reaching for. */}
-      <DialogContent dividers sx={{ height: 'min(520px, 65vh)' }}>
+      {/* Two columns, one height.
+          The scrolling this replaces was never a height problem: a 600px dialog
+          forces every group into one stack, and eleven checkboxes plus five date
+          samples are simply taller than a dialog should be. Widening it and
+          pairing the groups sideways removes the scrollbar outright.
+          The fixed height is the second half — the two steps hold different
+          amounts, and a dialog that resizes as you page through it moves the
+          buttons out from under the pointer reaching for them. */}
+      <DialogContent
+        dividers
+        sx={{
+          height: { xs: 'auto', sm: CONTENT_HEIGHT },
+          maxHeight: { xs: '60vh', sm: CONTENT_HEIGHT },
+        }}
+      >
         {step === 0 ? (
-          <Stack spacing={3}>
-            <Box>
-              <SectionLabel>Format</SectionLabel>
-              <Box
-                sx={{
-                  display: 'grid',
-                  gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr' },
-                  gap: 1,
-                  mt: 1,
-                }}
-              >
-                {EXPORT_FORMATS.map((entry) => {
-                  const active = entry.id === settings.format;
-                  return (
-                    <Box
-                      key={entry.id}
-                      component="button"
-                      type="button"
-                      disabled={entry.planned}
-                      aria-pressed={active}
-                      onClick={() => setSettings((c) => ({ ...c, format: entry.id }))}
-                      sx={{
-                        textAlign: 'left',
-                        p: 1.5,
-                        borderRadius: 2,
-                        border: '1px solid',
-                        borderColor: active ? 'primary.main' : 'divider',
-                        bgcolor: (t) =>
-                          active ? alpha(t.palette.primary.main, 0.06) : 'transparent',
-                        cursor: entry.planned ? 'not-allowed' : 'pointer',
-                        opacity: entry.planned ? 0.5 : 1,
-                        transition: 'border-color 150ms, background-color 150ms',
-                        '&:hover:not(:disabled)': { borderColor: 'primary.main' },
-                      }}
-                    >
-                      <Stack direction="row" spacing={0.75} sx={{ alignItems: 'center', mb: 0.25 }}>
-                        <Typography sx={{ fontSize: 14, fontWeight: 700 }}>
-                          {entry.label}
+          <Stack spacing={2.5}>
+            <Box
+              sx={{
+                display: 'grid',
+                gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr' },
+                gap: 3,
+              }}
+            >
+              <Box>
+                <SectionLabel>Format</SectionLabel>
+                <Box
+                  sx={{
+                    display: 'grid',
+                    gridTemplateColumns: '1fr 1fr',
+                    gap: 1,
+                    mt: 1,
+                  }}
+                >
+                  {EXPORT_FORMATS.map((entry) => {
+                    const active = entry.id === settings.format;
+                    return (
+                      <Box
+                        key={entry.id}
+                        component="button"
+                        type="button"
+                        disabled={entry.planned}
+                        aria-pressed={active}
+                        onClick={() => setSettings((c) => ({ ...c, format: entry.id }))}
+                        sx={{
+                          textAlign: 'left',
+                          p: 1.25,
+                          borderRadius: 2,
+                          border: '1px solid',
+                          borderColor: active ? 'primary.main' : 'divider',
+                          bgcolor: (t) =>
+                            active ? alpha(t.palette.primary.main, 0.06) : 'transparent',
+                          cursor: entry.planned ? 'not-allowed' : 'pointer',
+                          opacity: entry.planned ? 0.5 : 1,
+                          transition: 'border-color 150ms, background-color 150ms',
+                          '&:hover:not(:disabled)': { borderColor: 'primary.main' },
+                        }}
+                      >
+                        <Stack
+                          direction="row"
+                          spacing={0.75}
+                          sx={{ alignItems: 'center', mb: 0.25 }}
+                        >
+                          <Typography sx={{ fontSize: 14, fontWeight: 700 }}>
+                            {entry.label}
+                          </Typography>
+                          <Typography sx={{ fontSize: 11.5, color: 'text.disabled' }}>
+                            {entry.extension}
+                          </Typography>
+                          {entry.planned && <ToneBadge tone="neutral" label="Planned" />}
+                        </Stack>
+                        <Typography sx={{ fontSize: 12, color: 'text.secondary' }}>
+                          {entry.hint}
                         </Typography>
-                        <Typography sx={{ fontSize: 11.5, color: 'text.disabled' }}>
-                          {entry.extension}
-                        </Typography>
-                        {entry.planned && <ToneBadge tone="neutral" label="Planned" />}
-                      </Stack>
-                      <Typography sx={{ fontSize: 12, color: 'text.secondary' }}>
-                        {entry.hint}
-                      </Typography>
-                    </Box>
-                  );
-                })}
+                      </Box>
+                    );
+                  })}
+                </Box>
+              </Box>
+
+              <Box>
+                <SectionLabel>Which annotations</SectionLabel>
+                <Stack spacing={0.75} sx={{ mt: 1 }}>
+                  {SCOPES.map((scope) => {
+                    const active = scope.id === settings.scope;
+                    return (
+                      <Box
+                        key={scope.id}
+                        component="button"
+                        type="button"
+                        aria-pressed={active}
+                        onClick={() => setSettings((c) => ({ ...c, scope: scope.id }))}
+                        sx={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: 1.5,
+                          width: '100%',
+                          textAlign: 'left',
+                          px: 1.5,
+                          py: 1,
+                          borderRadius: 2,
+                          border: '1px solid',
+                          borderColor: active ? 'primary.main' : 'divider',
+                          bgcolor: (t) =>
+                            active ? alpha(t.palette.primary.main, 0.06) : 'transparent',
+                          cursor: 'pointer',
+                          '&:hover': { borderColor: 'primary.main' },
+                        }}
+                      >
+                        <Box sx={{ flex: 1, minWidth: 0 }}>
+                          <Typography sx={{ fontSize: 14, fontWeight: active ? 700 : 500 }}>
+                            {scope.label}
+                          </Typography>
+                          <Typography sx={{ fontSize: 12, color: 'text.secondary' }}>
+                            {scope.hint}
+                          </Typography>
+                        </Box>
+                        {counts && (
+                          <Typography
+                            sx={{ fontSize: 13, fontWeight: 700, color: 'text.secondary' }}
+                          >
+                            {counts[scope.id]}
+                          </Typography>
+                        )}
+                      </Box>
+                    );
+                  })}
+                </Stack>
               </Box>
             </Box>
 
             <Box>
-              <SectionLabel>Which annotations</SectionLabel>
-              <Stack spacing={0.75} sx={{ mt: 1 }}>
-                {SCOPES.map((scope) => {
-                  const active = scope.id === settings.scope;
-                  return (
-                    <Box
-                      key={scope.id}
-                      component="button"
-                      type="button"
-                      aria-pressed={active}
-                      onClick={() => setSettings((c) => ({ ...c, scope: scope.id }))}
-                      sx={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: 1.5,
-                        width: '100%',
-                        textAlign: 'left',
-                        px: 1.5,
-                        py: 1,
-                        borderRadius: 2,
-                        border: '1px solid',
-                        borderColor: active ? 'primary.main' : 'divider',
-                        bgcolor: (t) =>
-                          active ? alpha(t.palette.primary.main, 0.06) : 'transparent',
-                        cursor: 'pointer',
-                        '&:hover': { borderColor: 'primary.main' },
-                      }}
-                    >
-                      <Box sx={{ flex: 1, minWidth: 0 }}>
-                        <Typography sx={{ fontSize: 14, fontWeight: active ? 700 : 500 }}>
-                          {scope.label}
-                        </Typography>
-                        <Typography sx={{ fontSize: 12, color: 'text.secondary' }}>
-                          {scope.hint}
-                        </Typography>
-                      </Box>
-                      {counts && (
-                        <Typography sx={{ fontSize: 13, fontWeight: 700, color: 'text.secondary' }}>
-                          {counts[scope.id]}
-                        </Typography>
-                      )}
-                    </Box>
-                  );
-                })}
-              </Stack>
-            </Box>
-
-            <Box>
               <SectionLabel>Saved as</SectionLabel>
-              <Stack spacing={1.25} sx={{ mt: 1 }}>
+              <Box
+                sx={{
+                  display: 'grid',
+                  gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr' },
+                  gap: 3,
+                  mt: 1,
+                  alignItems: 'start',
+                }}
+              >
                 <TextField
                   size="small"
                   label="File name"
@@ -320,149 +367,156 @@ export function ExportWizard({
                     onChange={(on) => setSettings((c) => ({ ...c, includeLogo: on }))}
                     icon={<ImageIcon size={14} />}
                     title="Branding logo"
-                    hint="Places the operator's logo on the document. Nothing is placed if no branding has been uploaded."
+                    hint="Placed on the document, if branding has been uploaded."
                   />
                 )}
-              </Stack>
+              </Box>
             </Box>
           </Stack>
         ) : (
-          <Stack spacing={2}>
-            <Stack direction="row" sx={{ alignItems: 'center', justifyContent: 'space-between' }}>
-              <SectionLabel>{capitalise(format?.fieldNoun ?? 'fields')}</SectionLabel>
-              <Stack direction="row" spacing={0.5}>
-                <Button size="small" onClick={() => setAllFields(true)}>
-                  All
-                </Button>
-                <Button size="small" onClick={() => setAllFields(false)}>
-                  None
-                </Button>
+          <Box
+            sx={{
+              display: 'grid',
+              gridTemplateColumns: { xs: '1fr', sm: '1.1fr 1fr' },
+              gap: 3,
+            }}
+          >
+            <Box>
+              <Stack direction="row" sx={{ alignItems: 'center', justifyContent: 'space-between' }}>
+                <SectionLabel>{capitalise(format?.fieldNoun ?? 'fields')}</SectionLabel>
+                <Stack direction="row" spacing={0.5}>
+                  <Button size="small" onClick={() => setAllFields(true)}>
+                    All
+                  </Button>
+                  <Button size="small" onClick={() => setAllFields(false)}>
+                    None
+                  </Button>
+                </Stack>
               </Stack>
-            </Stack>
 
-            {FIELD_GROUPS.map((group) => (
-              <Box key={group}>
-                <Typography
-                  sx={{ fontSize: 11.5, fontWeight: 700, color: 'text.disabled', mb: 0.25 }}
-                >
-                  {group}
-                </Typography>
+              <Stack spacing={1} sx={{ mt: 0.5 }}>
+                {FIELD_GROUPS.map((group) => (
+                  <Box key={group}>
+                    <Typography
+                      sx={{ fontSize: 11.5, fontWeight: 700, color: 'text.disabled', mb: 0.25 }}
+                    >
+                      {group}
+                    </Typography>
+                    <Box
+                      sx={{
+                        display: 'grid',
+                        gridTemplateColumns: '1fr 1fr',
+                        columnGap: 1.5,
+                      }}
+                    >
+                      {EXPORT_FIELDS.filter((field) => field.group === group).map((field) => (
+                        <FormControlLabel
+                          key={field.id}
+                          sx={{ m: 0 }}
+                          control={
+                            <Checkbox
+                              size="small"
+                              sx={{ py: 0.25 }}
+                              checked={selected.includes(field.id)}
+                              disabled={field.required}
+                              onChange={() => toggleField(field.id)}
+                            />
+                          }
+                          label={
+                            <Typography sx={{ fontSize: 13.5 }}>
+                              {field.label}
+                              {field.required && (
+                                <Typography
+                                  component="span"
+                                  sx={{ fontSize: 11.5, color: 'text.disabled', ml: 0.5 }}
+                                >
+                                  (always)
+                                </Typography>
+                              )}
+                            </Typography>
+                          }
+                        />
+                      ))}
+                    </Box>
+                  </Box>
+                ))}
+              </Stack>
+            </Box>
+
+            <Stack spacing={2}>
+              {/* Deliberately not a twelfth checkbox: a thread has no fixed
+                  length, so it cannot be a column. It becomes its own sheet, and
+                  saying so here is cheaper than a support question about the
+                  second tab. */}
+              <ToggleCard
+                on={settings.includeComments}
+                onChange={(on) => setSettings((c) => ({ ...c, includeComments: on }))}
+                icon={<MessagesSquare size={14} />}
+                title="Comment threads"
+                hint={format?.commentsHint ?? ''}
+              />
+
+              <Box>
+                <SectionLabel>Date and time</SectionLabel>
+                <Autocomplete
+                  size="small"
+                  disableClearable
+                  options={zones}
+                  value={settings.timezone}
+                  onChange={(_, zone) => setSettings((c) => ({ ...c, timezone: zone }))}
+                  getOptionLabel={(zone) => timeZoneLabel(zone)}
+                  renderInput={(params) => <TextField {...params} label="Timezone" />}
+                  sx={{ mt: 1, mb: 1 }}
+                />
                 <Box
                   sx={{
                     display: 'grid',
-                    gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr' },
-                    columnGap: 2,
+                    gridTemplateColumns: '1fr 1fr',
+                    gap: 0.75,
                   }}
                 >
-                  {EXPORT_FIELDS.filter((field) => field.group === group).map((field) => (
-                    <FormControlLabel
-                      key={field.id}
-                      sx={{ m: 0 }}
-                      control={
-                        <Checkbox
-                          size="small"
-                          checked={selected.includes(field.id)}
-                          disabled={field.required}
-                          onChange={() => toggleField(field.id)}
-                        />
-                      }
-                      label={
-                        <Typography sx={{ fontSize: 13.5 }}>
-                          {field.label}
-                          {field.required && (
-                            <Typography
-                              component="span"
-                              sx={{ fontSize: 11.5, color: 'text.disabled', ml: 0.5 }}
-                            >
-                              (always)
-                            </Typography>
-                          )}
-                        </Typography>
-                      }
-                    />
-                  ))}
-                </Box>
-              </Box>
-            ))}
-
-            <Divider />
-
-            {/* Deliberately not a twelfth checkbox: a thread has no fixed length,
-                so it cannot be a column. It becomes its own sheet, and saying so
-                here is cheaper than a support question about the second tab. */}
-            <ToggleCard
-              on={settings.includeComments}
-              onChange={(on) => setSettings((c) => ({ ...c, includeComments: on }))}
-              icon={<MessagesSquare size={14} />}
-              title="Comment threads"
-              hint={format?.commentsHint ?? ''}
-            />
-
-            <Box>
-              <Typography sx={{ fontSize: 11.5, fontWeight: 700, color: 'text.disabled', mb: 0.5 }}>
-                Date and time
-              </Typography>
-              <Autocomplete
-                size="small"
-                disableClearable
-                options={zones}
-                value={settings.timezone}
-                onChange={(_, zone) => setSettings((c) => ({ ...c, timezone: zone }))}
-                getOptionLabel={(zone) => timeZoneLabel(zone)}
-                renderInput={(params) => <TextField {...params} label="Timezone" />}
-                sx={{ mb: 1 }}
-              />
-              <Box
-                sx={{
-                  display: 'grid',
-                  gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr' },
-                  gap: 0.75,
-                }}
-              >
-                {EXPORT_DATE_FORMATS.map((entry) => {
-                  const active = entry.id === settings.dateFormat;
-                  return (
-                    <Box
-                      key={entry.id}
-                      component="button"
-                      type="button"
-                      aria-pressed={active}
-                      onClick={() => setSettings((c) => ({ ...c, dateFormat: entry.id }))}
-                      sx={{
-                        display: 'flex',
-                        alignItems: 'baseline',
-                        gap: 1,
-                        textAlign: 'left',
-                        px: 1.25,
-                        py: 0.75,
-                        borderRadius: 2,
-                        border: '1px solid',
-                        borderColor: active ? 'primary.main' : 'divider',
-                        bgcolor: (t) =>
-                          active ? alpha(t.palette.primary.main, 0.06) : 'transparent',
-                        cursor: 'pointer',
-                        '&:hover': { borderColor: 'primary.main' },
-                      }}
-                    >
-                      {/* The sample leads: "European" means nothing until you see it. */}
-                      <Typography
+                  {EXPORT_DATE_FORMATS.map((entry) => {
+                    const active = entry.id === settings.dateFormat;
+                    return (
+                      <Box
+                        key={entry.id}
+                        component="button"
+                        type="button"
+                        aria-pressed={active}
+                        onClick={() => setSettings((c) => ({ ...c, dateFormat: entry.id }))}
                         sx={{
-                          fontSize: 13,
-                          fontWeight: active ? 700 : 500,
-                          fontFamily: 'monospace',
+                          textAlign: 'left',
+                          px: 1.25,
+                          py: 0.6,
+                          borderRadius: 2,
+                          border: '1px solid',
+                          borderColor: active ? 'primary.main' : 'divider',
+                          bgcolor: (t) =>
+                            active ? alpha(t.palette.primary.main, 0.06) : 'transparent',
+                          cursor: 'pointer',
+                          '&:hover': { borderColor: 'primary.main' },
                         }}
                       >
-                        {entry.sample}
-                      </Typography>
-                      <Typography sx={{ fontSize: 11.5, color: 'text.secondary' }}>
-                        {entry.label}
-                      </Typography>
-                    </Box>
-                  );
-                })}
+                        {/* The sample leads: "European" means nothing until you see it. */}
+                        <Typography
+                          sx={{
+                            fontSize: 12.5,
+                            fontWeight: active ? 700 : 500,
+                            fontFamily: 'monospace',
+                          }}
+                        >
+                          {entry.sample}
+                        </Typography>
+                        <Typography sx={{ fontSize: 11, color: 'text.secondary' }}>
+                          {entry.label}
+                        </Typography>
+                      </Box>
+                    );
+                  })}
+                </Box>
               </Box>
-            </Box>
-          </Stack>
+            </Stack>
+          </Box>
         )}
       </DialogContent>
 
