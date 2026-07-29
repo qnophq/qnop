@@ -857,8 +857,16 @@ class AnnotationExportIT extends SeededIntegrationTest {
     try (XWPFDocument document = new XWPFDocument(new ByteArrayInputStream(body))) {
       // Word cannot embed an arbitrary file, so the report links to it — and the
       // link has to survive the round trip as a real hyperlink relationship.
+      //
+      // Absolute, and asserted as such: a relative target is not a dead link,
+      // Word resolves it against the document and produces file:///api/v1/…,
+      // pointing at the reader's own disk.
       assertThat(document.getHyperlinks())
-          .anySatisfy(link -> assertThat(link.getURL()).endsWith(url));
+          .anySatisfy(
+              link -> {
+                assertThat(link.getURL()).startsWith("http");
+                assertThat(link.getURL()).endsWith(url);
+              });
       assertThat(document.getParagraphs().stream().map(XWPFParagraph::getText).toList())
           .anySatisfy(line -> assertThat(line).contains("notes.pdf", "PDF"));
     }

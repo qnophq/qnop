@@ -417,6 +417,35 @@ class DocxAnnotationRendererTest {
   }
 
   @Test
+  @DisplayName("an attachment with no absolute URL is named, never linked relatively")
+  void refusesRelativeAttachmentLinks() throws Exception {
+    String url = "/api/v1/documents/d/attachments/a";
+    AnnotationView view = view("See [notes.pdf](" + url + ")", "Mia", 1);
+    // href null is what the resolver yields when neither general.base_url nor a
+    // request origin is available.
+    Map<String, ExportAttachment> files =
+        Map.of(url, new ExportAttachment("notes.pdf", "application/pdf", 2048, null));
+
+    byte[] docx =
+        renderer.render(
+            model(
+                List.of(row("T-1", view, List.of())),
+                null,
+                ExportDateFormat.ISO,
+                ZoneOffset.UTC,
+                Map.<String, ExportImage>of(),
+                files));
+
+    try (XWPFDocument document = new XWPFDocument(new ByteArrayInputStream(docx))) {
+      // A relative href would resolve against the document's own location and
+      // become file:///api/v1/… on the reader's machine — worse than plain text.
+      assertThat(document.getHyperlinks()).isEmpty();
+      assertThat(document.getParagraphs().stream().map(XWPFParagraph::getText).toList())
+          .anySatisfy(line -> assertThat(line).contains("notes.pdf"));
+    }
+  }
+
+  @Test
   @DisplayName("an attachment that cannot be described still leaves its name")
   void namesUnresolvableAttachments() throws Exception {
     AnnotationView view = view("See [gone.pdf](/api/v1/documents/d/attachments/x)", "Mia", 1);

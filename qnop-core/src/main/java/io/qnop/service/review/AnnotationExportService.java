@@ -109,7 +109,16 @@ public class AnnotationExportService {
       boolean includeComments,
       boolean includeLogo,
       ExportDateFormat dateFormat,
-      ZoneId zone) {
+      ZoneId zone,
+      /**
+       * Where the download was requested from, e.g. {@code https://qnop.example.com}.
+       *
+       * <p>Not a user choice — the only part of this record that is context rather than
+       * configuration. It exists so attachment links can be absolute even before an operator has
+       * set {@code general.base_url}; a relative link in a Word file resolves against the reader's
+       * filesystem.
+       */
+      String requestOrigin) {
 
     public static ExportRequest everything() {
       return new ExportRequest(
@@ -119,7 +128,8 @@ public class AnnotationExportService {
           false,
           true,
           ExportDateFormat.DEFAULT,
-          ZoneOffset.UTC);
+          ZoneOffset.UTC,
+          null);
     }
   }
 
@@ -210,7 +220,7 @@ public class AnnotationExportService {
         request.dateFormat() == null ? ExportDateFormat.DEFAULT : request.dateFormat(),
         request.zone() == null ? ZoneOffset.UTC : request.zone(),
         uploads.images(documentId, bodiesOf(rows), actor, admin),
-        uploads.files(documentId, bodiesOf(rows), actor, admin));
+        uploads.files(documentId, bodiesOf(rows), actor, admin, request.requestOrigin()));
   }
 
   /**

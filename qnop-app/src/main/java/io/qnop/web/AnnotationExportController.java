@@ -41,6 +41,7 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.servlet.support.ServletUriComponentsBuilder;
 
 /**
  * Downloads a review's annotations as a file (issues #547, #635).
@@ -100,7 +101,8 @@ public class AnnotationExportController {
                 includeComments,
                 includeLogo,
                 ExportDateFormat.fromId(dateFormat),
-                zoneOrUtc(timezone)),
+                zoneOrUtc(timezone),
+                requestOrigin()),
             CurrentUser.requireUserId(),
             CurrentUser.isAdmin());
 
@@ -116,6 +118,28 @@ public class AnnotationExportController {
         .contentLength(export.content().length)
         .contentType(MediaType.parseMediaType(export.format().getContentType()))
         .body(new InputStreamResource(new ByteArrayInputStream(export.content())));
+  }
+
+  /**
+   * The scheme and authority this request arrived on, e.g. {@code https://qnop.example.com}.
+   *
+   * <p>Used only as a fallback for attachment links when {@code general.base_url} is unset. Taken
+   * from the request rather than guessed: it is the origin the caller is already talking to, so the
+   * link works for them. It is not used for anything that leaves the app on qnop's behalf — a
+   * notification mail deliberately uses the configured setting only, because its link is followed
+   * by someone who did not make the request and the {@code Host} header is theirs to forge.
+   */
+  private static String requestOrigin() {
+    try {
+      return ServletUriComponentsBuilder.fromCurrentRequest()
+          .replacePath(null)
+          .replaceQuery(null)
+          .build()
+          .toUriString();
+    } catch (IllegalStateException e) {
+      // No request bound (a test calling the service directly, say).
+      return null;
+    }
   }
 
   /**

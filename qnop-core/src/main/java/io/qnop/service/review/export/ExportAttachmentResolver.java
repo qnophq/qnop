@@ -115,17 +115,18 @@ public class ExportAttachmentResolver {
   /**
    * Resolves every non-image attachment a body links to.
    *
-   * <p>Metadata only. The link is absolute, built from {@code general.base_url} — the setting the
-   * notification mails already use — because a report is read outside the app, where a relative
-   * path points nowhere. Without that setting the link is left relative and logged, exactly as the
-   * mail path does, rather than the whole reference disappearing.
+   * <p>Metadata only, plus an <em>absolute</em> link. Absolute is not a nicety: Word resolves a
+   * relative target against the document's own location, so {@code /api/v1/…} in a downloaded
+   * report becomes {@code file:///api/v1/…} and points at the reader's disk.
    *
+   * @param requestOrigin where this download was requested from, used when the operator has not
+   *     configured a base URL; null or blank leaves the attachment unlinked
    * @return url → attachment, for the URLs that resolved
    */
   public Map<String, ExportAttachment> files(
-      UUID documentId, Iterable<String> bodies, UUID actor, boolean admin) {
+      UUID documentId, Iterable<String> bodies, UUID actor, boolean admin, String requestOrigin) {
     Map<String, ExportAttachment> resolved = new LinkedHashMap<>();
-    String base = baseUrl();
+    String base = baseUrl(requestOrigin);
     for (String body : bodies) {
       for (String url : ExportSegment.attachmentUrls(body)) {
         if (resolved.containsKey(url)) {
@@ -155,16 +156,32 @@ public class ExportAttachmentResolver {
     }
   }
 
-  /** The configured public origin, without a trailing slash. */
-  private String baseUrl() {
-    String base = settings.getString(ApplicationSettingKey.GENERAL_BASE_URL);
-    if (base == null || base.isBlank()) {
-      // The report still names the file; only its link is relative and therefore
-      // dead outside the app — configure Settings -> General -> Base URL.
-      log.warn("general.base_url is not configured — attachment links in exports will be relative");
-      return "";
+  /**
+   * The absolute origin to build links from, or empty when there is none.
+   *
+   * <p>The operator's {@code general.base_url} first, as everywhere else. Where it is unset the
+   * origin the export was just downloaded from is used instead — unlike a notification mail, whose
+   * link is followed by someone who did not make the request, this link is read by the person who
+   * asked for the file, in a browser that set that origin itself. Only when neither exists is the
+   * attachment left unlinked, because a relative href is not a dead link: Word turns it into a
+   * {@code file://} target on the reader's own disk.
+   */
+  private String baseUrl(String requestOrigin) {
+    String configured = settings.getString(ApplicationSettingKey.GENERAL_BASE_URL);
+    if (configured != null && !configured.isBlank()) {
+      return trimSlash(configured);
     }
-    return base.endsWith("/") ? base.substring(0, base.length() - 1) : base;
+    if (requestOrigin != null && !requestOrigin.isBlank()) {
+      log.debug("general.base_url is unset — linking export attachments via the request origin");
+      return trimSlash(requestOrigin);
+    }
+    log.warn("general.base_url is not configured — export attachments will not be linked");
+    return "";
+  }
+
+  private static String trimSlash(String url) {
+    String trimmed = url.strip();
+    return trimmed.endsWith("/") ? trimmed.substring(0, trimmed.length() - 1) : trimmed;
   }
 
   /**
