@@ -78,6 +78,9 @@ public class DocxAnnotationRenderer implements AnnotationExportRenderer {
   /** Twips; one indent step for the thread block. */
   private static final int THREAD_INDENT = 480;
 
+  /** The usable text column on A4 with default margins, in points. */
+  private static final int TEXT_COLUMN_PT = 450;
+
   /**
    * The logo's printed width in points — small enough to sit above the text, not compete with it.
    */
@@ -207,7 +210,7 @@ public class DocxAnnotationRenderer implements AnnotationExportRenderer {
       // The full opening comment, not the spreadsheet's 500-character excerpt: a
       // paragraph has room where a cell does not, and a report that clips the
       // finding it reports is worth less than no report.
-      writeProse(document, ExportText.plainText(view.firstComment()), 0);
+      writeBody(document, model, view.firstComment(), 0);
     }
 
     writeThread(document, model, row);
@@ -291,8 +294,87 @@ public class DocxAnnotationRenderer implements AnnotationExportRenderer {
           META_SIZE,
           true,
           MUTED);
-      writeProse(document, ExportText.plainText(comment.body()), THREAD_INDENT);
+      writeBody(document, model, comment.body(), THREAD_INDENT);
     }
+  }
+
+  /**
+   * Writes a comment body: prose as paragraphs, images as pictures, in the order they were written.
+   *
+   * <p>A screenshot is often the substance of a review comment, so placing it where the author put
+   * it — rather than collecting pictures at the end, or dropping them as the flattening used to —
+   * is what makes the report say the same thing the thread does.
+   */
+  private void writeBody(
+      XWPFDocument document, AnnotationExportModel model, String markdown, int indent) {
+    for (ExportSegment segment : ExportSegment.split(markdown)) {
+      if (segment instanceof ExportSegment.Text text) {
+        writeProse(document, text.value(), indent);
+      } else if (segment instanceof ExportSegment.Image image) {
+        writeInlineImage(document, model, image, indent);
+      }
+    }
+  }
+
+  /**
+   * One inline image, scaled to the text column.
+   *
+   * <p>An image that could not be resolved — deleted, too large for the export's budget, a format
+   * Word cannot take — degrades to its alt text in brackets. Silence would leave a sentence
+   * pointing at nothing, which is the bug this whole path exists to fix.
+   */
+  private void writeInlineImage(
+      XWPFDocument document, AnnotationExportModel model, ExportSegment.Image image, int indent) {
+    ExportImage resolved = model.image(image.url());
+    if (resolved == null || !resolved.hasContent()) {
+      XWPFParagraph fallback = document.createParagraph();
+      fallback.setIndentationLeft(indent);
+      fallback.setSpacingAfter(80);
+      String label = image.alt() == null || image.alt().isBlank() ? "image" : image.alt();
+      run(fallback, "[" + label + "]", BODY_SIZE, false, MUTED).setItalic(true);
+      return;
+    }
+    try {
+      Dimension size = fitToColumn(resolved.content(), indent);
+      XWPFParagraph paragraph = document.createParagraph();
+      paragraph.setIndentationLeft(indent);
+      paragraph.setSpacingAfter(120);
+      paragraph
+          .createRun()
+          .addPicture(
+              new ByteArrayInputStream(resolved.content()),
+              pictureType(resolved.contentType()),
+              resolved.fileName() == null ? "image" : resolved.fileName(),
+              Units.toEMU(size.width()),
+              Units.toEMU(size.height()));
+    } catch (Exception e) {
+      log.warn("Could not embed {} in the Word report", resolved.fileName(), e);
+    }
+  }
+
+  /** Shrinks an image to the text column's width; smaller images keep their size. */
+  private static Dimension fitToColumn(byte[] bytes, int indent) throws IOException {
+    // Twips to points: the indent eats into the column the picture may occupy.
+    int available = TEXT_COLUMN_PT - indent / 20;
+    BufferedImage image = ImageIO.read(new ByteArrayInputStream(bytes));
+    if (image == null || image.getWidth() <= 0) {
+      return new Dimension(available, available * 3 / 4);
+    }
+    // Screens are ~96dpi and Word measures in 72dpi points, so a screenshot's
+    // pixel width would otherwise render a third too large.
+    int naturalPt = (int) Math.round(image.getWidth() * 72.0 / 96.0);
+    int width = Math.min(available, Math.max(1, naturalPt));
+    double ratio = (double) image.getHeight() / image.getWidth();
+    return new Dimension(width, Math.max(1, (int) Math.round(width * ratio)));
+  }
+
+  /** POI's picture-type constant for a media type; PNG is the safe default. */
+  private static int pictureType(String contentType) {
+    return switch (contentType == null ? "" : contentType) {
+      case "image/jpeg" -> Document.PICTURE_TYPE_JPEG;
+      case "image/gif" -> Document.PICTURE_TYPE_GIF;
+      default -> Document.PICTURE_TYPE_PNG;
+    };
   }
 
   /** Writes plain text, keeping its paragraph breaks as real paragraphs. */

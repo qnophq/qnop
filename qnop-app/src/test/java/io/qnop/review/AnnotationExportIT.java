@@ -22,6 +22,7 @@ package io.qnop.review;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -34,10 +35,13 @@ import io.qnop.repository.DocumentRepository;
 import io.qnop.repository.DocumentVersionRepository;
 import io.qnop.repository.ReviewParticipantRepository;
 import io.qnop.testsupport.SeededIntegrationTest;
+import java.awt.image.BufferedImage;
 import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
+import javax.imageio.ImageIO;
 import org.apache.poi.ss.usermodel.Cell;
 import org.apache.poi.ss.usermodel.Row;
 import org.apache.poi.ss.usermodel.Sheet;
@@ -49,6 +53,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.MediaType;
+import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
 
 /**
@@ -181,6 +186,23 @@ class AnnotationExportIT extends SeededIntegrationTest {
             .getContentAsByteArray();
     Workbook workbook = new XSSFWorkbook(new ByteArrayInputStream(body));
     return workbook.getSheet("Comments");
+  }
+
+  /** Uploads a real PNG and returns the Markdown URL the composer would write for it. */
+  private String uploadImage(UUID actor, String fileName) throws Exception {
+    ByteArrayOutputStream png = new ByteArrayOutputStream();
+    ImageIO.write(new BufferedImage(120, 60, BufferedImage.TYPE_INT_ARGB), "png", png);
+    String json =
+        mockMvc
+            .perform(
+                multipart("/api/v1/documents/" + documentId + "/attachments")
+                    .file(new MockMultipartFile("file", fileName, "image/png", png.toByteArray()))
+                    .header("Authorization", "Bearer " + token(actor)))
+            .andExpect(status().isCreated())
+            .andReturn()
+            .getResponse()
+            .getContentAsString();
+    return com.jayway.jsonpath.JsonPath.read(json, "$.url");
   }
 
   private void reply(String annotationId, UUID author, String body) throws Exception {
@@ -719,6 +741,85 @@ class AnnotationExportIT extends SeededIntegrationTest {
     // The quoted token is not broken out of, and the file is still a workbook.
     assertThat(disposition).startsWith("attachment; filename=\"");
     assertThat(disposition).endsWith(".xlsx");
+  }
+
+  @Test
+  @DisplayName("an image in a comment is embedded in the Word report")
+  void docxEmbedsCommentImages() throws Exception {
+    seedDocument(false);
+    String url = uploadImage(MEMBER_ID, "screenshot.png");
+    String annotationId = createAnnotationReturningId(MEMBER_ID, 0, 0.1, 0.1, "See the attachment");
+    reply(annotationId, MEMBER_ID, "Here it is: ![screenshot.png](" + url + ")");
+
+    byte[] body =
+        mockMvc
+            .perform(
+                as(
+                    get("/api/v1/documents/" + documentId + "/annotations/export")
+                        .param("format", "docx")
+                        .param("comments", "true")
+                        .param("logo", "false"),
+                    MEMBER_ID))
+            .andExpect(status().isOk())
+            .andReturn()
+            .getResponse()
+            .getContentAsByteArray();
+
+    try (XWPFDocument document = new XWPFDocument(new ByteArrayInputStream(body))) {
+      // The whole chain: the URL is parsed out of the body, the attachment is
+      // read through the participant-gated path, and the bytes land in the file.
+      // Logo off, so the only picture here is the one from the comment.
+      assertThat(document.getAllPictures()).hasSize(1);
+    }
+  }
+
+  @Test
+  @DisplayName("the spreadsheet names an image where it cannot show one")
+  void workbookNamesCommentImages() throws Exception {
+    seedDocument(false);
+    String url = uploadImage(MEMBER_ID, "screenshot.png");
+    createAnnotationReturningId(MEMBER_ID, 0, 0.1, 0.1, "Look: ![screenshot.png](" + url + ")");
+
+    // A cell holds text, and a floating picture would detach from its row on the
+    // first sort — but silence was the bug.
+    assertThat(column(download(MEMBER_ID), 5))
+        .singleElement()
+        .asString()
+        .isEqualTo("Look: [screenshot.png]");
+  }
+
+  @Test
+  @DisplayName("an export never fetches an image belonging to another review")
+  void doesNotFetchForeignAttachments() throws Exception {
+    seedDocument(false);
+    UUID ownDocument = documentId;
+    String foreignUrl = uploadImage(MEMBER_ID, "foreign.png");
+
+    // A second review, whose comment points at the FIRST review's attachment.
+    seedDocument(false);
+    createAnnotationReturningId(MEMBER_ID, 0, 0.1, 0.1, "Sneaky ![f.png](" + foreignUrl + ")");
+    assertThat(foreignUrl).contains(ownDocument.toString());
+
+    byte[] body =
+        mockMvc
+            .perform(
+                as(
+                    get("/api/v1/documents/" + documentId + "/annotations/export")
+                        .param("format", "docx")
+                        .param("logo", "false"),
+                    MEMBER_ID))
+            .andExpect(status().isOk())
+            .andReturn()
+            .getResponse()
+            .getContentAsByteArray();
+
+    try (XWPFDocument document = new XWPFDocument(new ByteArrayInputStream(body))) {
+      // Attachments are resolved only under the document being exported, so a
+      // crafted URL cannot turn an export into a cross-review reader.
+      assertThat(document.getAllPictures()).isEmpty();
+      assertThat(document.getParagraphs().stream().map(XWPFParagraph::getText).toList())
+          .contains("[f.png]");
+    }
   }
 
   @Test

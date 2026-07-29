@@ -72,6 +72,16 @@ In the spreadsheet the logo occupies a band of rows above the header rather than
 
 CSV and Markdown were dropped (#636/#638) after Word shipped. CSV is a strictly worse Excel for this data — no typed dates, and nowhere to put the comment threads that need a second sheet — and Markdown duplicates what the review UI already renders. Excel and Word cover the two things an export is actually for: a grid to filter and a document to read; HTML (#637) and PDF (#639) remain because they answer "opens anywhere" and "archive this", which neither shipped format does.
 
+### Inline images travel with the text
+
+Comment bodies are Markdown, and a screenshot pasted into a review is frequently the substance of the comment. The original flattening stripped image references along with the rest of the markup, so those comments exported as a sentence pointing at nothing.
+
+Bodies are now *split* rather than stripped (`ExportSegment`), and each format decides: Word embeds the picture where the author put it, the spreadsheet writes `[screenshot.png]` in the cell. A floating picture in a filterable grid would be worse than none — the first sort detaches it from its row — but silence was the bug.
+
+The bytes arrive through the model, resolved by `ExportImageResolver`, for the same reason the logo does: a renderer that could read an attachment could read one its caller may not see. Two rules bound that resolver, and both are tested. Only this app's own attachment URLs are followed — otherwise an export becomes a fetcher for whatever URL someone typed into a comment, which is server-side request forgery with a review as the delivery vehicle. And every lookup is scoped to the document being exported, so a comment naming another review's attachment resolves to nothing instead of to a file the reader cannot otherwise open.
+
+WEBP is converted to PNG on the way in, using the ImageIO reader ADR-0053 already put on the classpath; no Office format embeds WEBP.
+
 ### The filename is the user's, within limits
 
 The default is `<slug>-annotations.<ext>`, derived from the review's title, because a folder full of exports has to stay legible. It is only a default: a report going to a customer is rarely best named after an internal document title, so the wizard shows the name and lets it be replaced.
@@ -120,6 +130,7 @@ Headings use direct character formatting plus an OOXML outline level rather than
 - **2026-07-27** — accepted with the XLSX export (#547).
 - **2026-07-29** — extended for Word (#635): the model/renderer split, the `?format=` parameter, and the report layout. The remaining formats (#637, #639) are a renderer and an enum entry.
 - **2026-07-29** — the date convention, its timezone, the branding logo and the filename became per-export choices, all format-independent.
+- **2026-07-29** — inline images in annotations and comments are exported rather than stripped.
 - **ADR-0021 / ADR-0015** — OpenAPI-first, and why this endpoint is the deliberate exception
 - **ADR-0004** — the layering that puts the workbook in the service and leaves the controller streaming
 - Issue **#547**

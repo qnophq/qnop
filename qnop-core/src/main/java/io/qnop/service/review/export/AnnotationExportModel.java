@@ -26,6 +26,7 @@ import io.qnop.service.review.AnnotationService.CommentView;
 import java.time.ZoneId;
 import java.time.ZoneOffset;
 import java.util.List;
+import java.util.Map;
 
 /**
  * Everything an export needs, with nothing left to fetch (issue #635).
@@ -50,6 +51,7 @@ import java.util.List;
  * @param logoPng the operator's branding logo as PNG, or null when there is none to embed
  * @param dateFormat how every timestamp in this export is written
  * @param zone which timezone those timestamps are expressed in
+ * @param images inline images by their Markdown URL, resolved so renderers need not fetch
  */
 public record AnnotationExportModel(
     String documentTitle,
@@ -59,7 +61,8 @@ public record AnnotationExportModel(
     boolean includeComments,
     byte[] logoPng,
     ExportDateFormat dateFormat,
-    ZoneId zone) {
+    ZoneId zone,
+    Map<String, ExportImage> images) {
 
   public AnnotationExportModel {
     rows = List.copyOf(rows);
@@ -67,6 +70,12 @@ public record AnnotationExportModel(
     logoPng = logoPng == null ? null : logoPng.clone();
     dateFormat = dateFormat == null ? ExportDateFormat.DEFAULT : dateFormat;
     zone = zone == null ? ZoneOffset.UTC : zone;
+    images = images == null ? Map.of() : Map.copyOf(images);
+  }
+
+  /** The resolved image for a Markdown target, if this export could load it. */
+  public ExportImage image(String url) {
+    return images.get(url);
   }
 
   /** A timestamp in this export's chosen convention and zone. */

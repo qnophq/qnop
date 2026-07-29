@@ -32,6 +32,7 @@ import java.time.Instant;
 import java.time.ZoneId;
 import java.time.ZoneOffset;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 import javax.imageio.ImageIO;
 import org.apache.poi.util.Units;
@@ -104,8 +105,17 @@ class DocxAnnotationRendererTest {
 
   private static AnnotationExportModel model(
       List<AnnotationExportModel.Row> rows, byte[] logo, ExportDateFormat dates, ZoneId zone) {
+    return model(rows, logo, dates, zone, Map.of());
+  }
+
+  private static AnnotationExportModel model(
+      List<AnnotationExportModel.Row> rows,
+      byte[] logo,
+      ExportDateFormat dates,
+      ZoneId zone,
+      Map<String, ExportImage> images) {
     return new AnnotationExportModel(
-        "Vendor agreement", 3, rows, AnnotationExportColumn.all(), true, logo, dates, zone);
+        "Vendor agreement", 3, rows, AnnotationExportColumn.all(), true, logo, dates, zone, images);
   }
 
   /** A real PNG, so the renderer's own decode-and-scale path is exercised. */
@@ -181,7 +191,8 @@ class DocxAnnotationRendererTest {
             false,
             null,
             ExportDateFormat.ISO,
-            ZoneOffset.UTC);
+            ZoneOffset.UTC,
+            Map.of());
 
     List<String> text = paragraphs(renderer.render(narrowed));
 
@@ -307,6 +318,46 @@ class DocxAnnotationRendererTest {
                     ZoneId.of("Europe/Berlin"))));
 
     assertThat(report).anySatisfy(line -> assertThat(line).contains("Created: 2026-03-04 11:15"));
+  }
+
+  @Test
+  @DisplayName("an image in a comment is embedded where it was written, not dropped")
+  void embedsInlineImages() throws Exception {
+    String url = "/api/v1/documents/d/attachments/a";
+    AnnotationView view =
+        view("Look at this:\n\n![shot.png](" + url + ")\n\nSee the margin.", "Mia", 1);
+    Map<String, ExportImage> images =
+        Map.of(url, new ExportImage("shot.png", logoPng(240, 120), "image/png"));
+
+    byte[] docx =
+        renderer.render(
+            model(
+                List.of(row("T-1", view, List.of())),
+                null,
+                ExportDateFormat.ISO,
+                ZoneOffset.UTC,
+                images));
+
+    try (XWPFDocument document = new XWPFDocument(new ByteArrayInputStream(docx))) {
+      assertThat(document.getAllPictures()).hasSize(1);
+      // Between the two sentences, not appended after them: a screenshot answers
+      // the line above it.
+      List<String> text = document.getParagraphs().stream().map(XWPFParagraph::getText).toList();
+      assertThat(text).containsSubsequence("Look at this:", "See the margin.");
+    }
+  }
+
+  @Test
+  @DisplayName("an image that could not be loaded leaves its name, never silence")
+  void namesUnresolvableImages() throws Exception {
+    AnnotationView view =
+        view("Before\n\n![missing.png](/api/v1/documents/d/attachments/gone)", "Mia", 1);
+
+    List<String> text = paragraphs(renderer.render(model(List.of(row("T-1", view, List.of())))));
+
+    // The bug being fixed was silence: a sentence that pointed at nothing.
+    assertThat(text).contains("[missing.png]");
+    assertThat(text).contains("Before");
   }
 
   @Test

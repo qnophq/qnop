@@ -275,15 +275,36 @@ public class XlsxAnnotationRenderer implements AnnotationExportRenderer {
    * Excel's own per-cell ceiling truncates it.
    */
   static String body(String raw) {
-    if (raw == null) {
-      return "";
-    }
-    return raw.length() <= BODY_MAX ? raw : raw.substring(0, BODY_MAX - 1) + "…";
+    return ExportText.truncate(withImageNames(raw), BODY_MAX);
   }
 
   /** The opening comment as one flat cell — markdown noise stripped, length capped. */
   static String summary(String firstComment) {
-    return ExportText.truncate(ExportText.flatten(firstComment), SUMMARY_MAX);
+    return ExportText.truncate(withImageNames(firstComment), SUMMARY_MAX);
+  }
+
+  /**
+   * Prose with each image named where it stood.
+   *
+   * <p>A cell holds text, not pictures — and a floating picture would be worse than none here,
+   * since the first sort detaches it from the row it belongs to. So the spreadsheet says {@code
+   * [screenshot.png]} where the Word report shows the picture: the reader learns that something
+   * visual was said and what it was called, which beats the silence this replaces.
+   */
+  private static String withImageNames(String markdown) {
+    StringBuilder text = new StringBuilder();
+    for (ExportSegment segment : ExportSegment.split(markdown)) {
+      if (!text.isEmpty()) {
+        text.append(' ');
+      }
+      if (segment instanceof ExportSegment.Text part) {
+        text.append(ExportText.flatten(part.value()));
+      } else if (segment instanceof ExportSegment.Image image) {
+        String label = image.alt() == null || image.alt().isBlank() ? "image" : image.alt();
+        text.append('[').append(label).append(']');
+      }
+    }
+    return text.toString().strip();
   }
 
   /** {@code CHANGES_REQUESTED} → {@code Changes requested}; null/blank → empty cell. */

@@ -34,6 +34,8 @@ import io.qnop.service.review.export.AnnotationExportFormat;
 import io.qnop.service.review.export.AnnotationExportModel;
 import io.qnop.service.review.export.AnnotationExportRenderer;
 import io.qnop.service.review.export.ExportDateFormat;
+import io.qnop.service.review.export.ExportImage;
+import io.qnop.service.review.export.ExportImageResolver;
 import java.io.IOException;
 import java.time.ZoneId;
 import java.time.ZoneOffset;
@@ -74,6 +76,7 @@ public class AnnotationExportService {
   private final DocumentRepository documents;
   private final DocumentVersionRepository versions;
   private final BrandingService branding;
+  private final ExportImageResolver images;
   private final Map<AnnotationExportFormat, AnnotationExportRenderer> renderers;
 
   public AnnotationExportService(
@@ -81,11 +84,13 @@ public class AnnotationExportService {
       DocumentRepository documents,
       DocumentVersionRepository versions,
       BrandingService branding,
+      ExportImageResolver images,
       List<AnnotationExportRenderer> renderers) {
     this.annotations = annotations;
     this.documents = documents;
     this.versions = versions;
     this.branding = branding;
+    this.images = images;
     Map<AnnotationExportFormat, AnnotationExportRenderer> byFormat = new LinkedHashMap<>();
     for (AnnotationExportRenderer renderer : renderers) {
       byFormat.put(renderer.format(), renderer);
@@ -203,7 +208,31 @@ public class AnnotationExportService {
         request.includeComments(),
         logo(request),
         request.dateFormat() == null ? ExportDateFormat.DEFAULT : request.dateFormat(),
-        request.zone() == null ? ZoneOffset.UTC : request.zone());
+        request.zone() == null ? ZoneOffset.UTC : request.zone(),
+        inlineImages(documentId, rows, actor, admin));
+  }
+
+  /**
+   * Every image the exported bodies reference, resolved once.
+   *
+   * <p>A screenshot pasted into a comment is often the substance of it, so dropping the reference
+   * left an export that kept the sentence and lost what it pointed at. The lookup goes through
+   * {@link ExportImageResolver}, which only follows this app's own attachment URLs and only under
+   * the document being exported — an export must not become a fetcher for arbitrary URLs found in
+   * user-authored text.
+   */
+  private Map<String, ExportImage> inlineImages(
+      UUID documentId, List<AnnotationExportModel.Row> rows, UUID actor, boolean admin) {
+    List<String> bodies =
+        rows.stream()
+            .flatMap(
+                row ->
+                    java.util.stream.Stream.concat(
+                        java.util.stream.Stream.of(row.view().firstComment()),
+                        row.thread().stream().map(CommentView::body)))
+            .filter(body -> body != null && body.contains("!["))
+            .toList();
+    return bodies.isEmpty() ? Map.of() : images.resolve(documentId, bodies, actor, admin);
   }
 
   /**
