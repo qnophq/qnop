@@ -190,6 +190,10 @@ public class AnnotationExportService {
     // to the open items — a key that renumbers per filter would be worthless
     // for talking about an annotation.
     Map<UUID, String> taskKeys = taskKeys(views);
+    // The list's firstComment is an excerpt; an export must not ship a finding
+    // cut off at 300 characters, least of all one cut in the middle of an image
+    // reference — which leaves a broken link rather than a shorter sentence.
+    Map<UUID, String> openingComments = annotations.fullFirstComments(views);
 
     List<AnnotationExportModel.Row> rows =
         views.stream()
@@ -200,7 +204,8 @@ public class AnnotationExportService {
                         taskKeys.getOrDefault(view.id(), ""),
                         view,
                         AnnotationPosition.parse(view.anchorJson()),
-                        request.includeComments() ? thread(view.id(), actor, admin) : List.of()))
+                        request.includeComments() ? thread(view.id(), actor, admin) : List.of(),
+                        openingComments.get(view.id())))
             .sorted(
                 Comparator.comparing(
                         AnnotationExportModel.Row::position, AnnotationPosition.READING_ORDER)
@@ -237,8 +242,7 @@ public class AnnotationExportService {
         .flatMap(
             row ->
                 Stream.concat(
-                    Stream.of(row.view().firstComment()),
-                    row.thread().stream().map(CommentView::body)))
+                    Stream.of(row.openingComment()), row.thread().stream().map(CommentView::body)))
         .filter(body -> body != null && body.contains("]("))
         .toList();
   }

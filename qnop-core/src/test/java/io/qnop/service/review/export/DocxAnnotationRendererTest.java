@@ -148,7 +148,7 @@ class DocxAnnotationRendererTest {
   private static AnnotationExportModel.Row row(
       String key, AnnotationView view, List<CommentView> thread) {
     return new AnnotationExportModel.Row(
-        key, view, new AnnotationPosition(true, 1, 0.2, 0.1, 0), thread);
+        key, view, new AnnotationPosition(true, 1, 0.2, 0.1, 0), thread, view.firstComment());
   }
 
   /** Every paragraph's text, in document order — what a reader would see. */

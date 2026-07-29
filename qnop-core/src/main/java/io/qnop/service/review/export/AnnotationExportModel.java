@@ -118,12 +118,21 @@ public record AnnotationExportModel(
    * @param taskKey {@code T-1}, {@code T-2}, … numbering the whole review, not this slice
    * @param position parsed out of the opaque anchor; carries the page number
    * @param thread oldest comment first, empty when threads were not requested
+   * @param openingComment the annotation's own text, unabridged
    */
   public record Row(
-      String taskKey, AnnotationView view, AnnotationPosition position, List<CommentView> thread) {
+      String taskKey,
+      AnnotationView view,
+      AnnotationPosition position,
+      List<CommentView> thread,
+      String openingComment) {
 
     public Row {
       thread = List.copyOf(thread);
+      // The view's own firstComment is a 300-character excerpt built for list
+      // rows; falling back to it is better than nothing, but it is a fallback.
+      openingComment =
+          openingComment == null || openingComment.isBlank() ? view.firstComment() : openingComment;
     }
 
     /** The page this annotation sits on, or null when it could not be placed. */

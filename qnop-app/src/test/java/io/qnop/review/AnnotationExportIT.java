@@ -912,6 +912,40 @@ class AnnotationExportIT extends SeededIntegrationTest {
   }
 
   @Test
+  @DisplayName("an annotation longer than the list excerpt exports whole, images and all")
+  void exportsBeyondTheListExcerpt() throws Exception {
+    seedDocument(false);
+    String url = uploadImage(MEMBER_ID, "late.png");
+    // The list view carries only the first 300 characters of an opening comment,
+    // for the annotation list in the UI. Anything past that — here an image, and
+    // the sentence after it — used to be missing from the export, and a cut that
+    // landed inside a link left a broken reference rather than a short one.
+    String padding = "Ausfuehrliche Vorbemerkung. ".repeat(14);
+    createAnnotationReturningId(
+        MEMBER_ID, 0, 0.1, 0.1, padding + " ![late.png](" + url + ") Schlusssatz.");
+
+    byte[] body =
+        mockMvc
+            .perform(
+                as(
+                    get("/api/v1/documents/" + documentId + "/annotations/export")
+                        .param("format", "docx")
+                        .param("logo", "false"),
+                    MEMBER_ID))
+            .andExpect(status().isOk())
+            .andReturn()
+            .getResponse()
+            .getContentAsByteArray();
+
+    assertThat(padding).hasSizeGreaterThan(300);
+    try (XWPFDocument document = new XWPFDocument(new ByteArrayInputStream(body))) {
+      assertThat(document.getAllPictures()).hasSize(1);
+      assertThat(document.getParagraphs().stream().map(XWPFParagraph::getText).toList())
+          .anySatisfy(line -> assertThat(line).contains("Schlusssatz."));
+    }
+  }
+
+  @Test
   @DisplayName("a review without annotations still yields a valid header-only workbook")
   void emptyReviewYieldsHeaderOnly() throws Exception {
     seedDocument(false);

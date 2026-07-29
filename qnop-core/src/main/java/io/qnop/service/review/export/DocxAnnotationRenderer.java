@@ -212,7 +212,7 @@ public class DocxAnnotationRenderer implements AnnotationExportRenderer {
       // The full opening comment, not the spreadsheet's 500-character excerpt: a
       // paragraph has room where a cell does not, and a report that clips the
       // finding it reports is worth less than no report.
-      writeBody(document, model, view.firstComment(), 0);
+      writeBody(document, model, row.openingComment(), 0);
     }
 
     writeThread(document, model, row);

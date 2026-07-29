@@ -147,7 +147,7 @@ public class XlsxAnnotationRenderer implements AnnotationExportRenderer {
         writeUploadCells(
             sheetRow,
             columns.size(),
-            uploadsIn(model, nullToEmpty(row.view().firstComment())),
+            uploadsIn(model, nullToEmpty(row.openingComment())),
             linkStyle,
             helper);
       }
@@ -499,7 +499,7 @@ public class XlsxAnnotationRenderer implements AnnotationExportRenderer {
         case PRIORITY -> row.createCell(index).setCellValue(humanize(view.priority()));
         case SUMMARY -> {
           Cell cell = row.createCell(index);
-          cell.setCellValue(summary(view.firstComment()));
+          cell.setCellValue(summary(source.openingComment()));
           cell.setCellStyle(textStyle);
         }
         case AUTHOR ->
