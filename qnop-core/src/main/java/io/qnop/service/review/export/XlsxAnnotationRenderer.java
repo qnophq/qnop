@@ -302,6 +302,9 @@ public class XlsxAnnotationRenderer implements AnnotationExportRenderer {
       } else if (segment instanceof ExportSegment.Image image) {
         String label = image.alt() == null || image.alt().isBlank() ? "image" : image.alt();
         text.append('[').append(label).append(']');
+      } else if (segment instanceof ExportSegment.Attachment file) {
+        String label = file.label() == null || file.label().isBlank() ? "attachment" : file.label();
+        text.append('[').append(label).append(']');
       }
     }
     return text.toString().strip();

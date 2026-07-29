@@ -33,9 +33,8 @@ import io.qnop.service.review.export.AnnotationExportColumn;
 import io.qnop.service.review.export.AnnotationExportFormat;
 import io.qnop.service.review.export.AnnotationExportModel;
 import io.qnop.service.review.export.AnnotationExportRenderer;
+import io.qnop.service.review.export.ExportAttachmentResolver;
 import io.qnop.service.review.export.ExportDateFormat;
-import io.qnop.service.review.export.ExportImage;
-import io.qnop.service.review.export.ExportImageResolver;
 import java.io.IOException;
 import java.time.ZoneId;
 import java.time.ZoneOffset;
@@ -44,6 +43,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import java.util.stream.Stream;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
@@ -76,7 +76,7 @@ public class AnnotationExportService {
   private final DocumentRepository documents;
   private final DocumentVersionRepository versions;
   private final BrandingService branding;
-  private final ExportImageResolver images;
+  private final ExportAttachmentResolver uploads;
   private final Map<AnnotationExportFormat, AnnotationExportRenderer> renderers;
 
   public AnnotationExportService(
@@ -84,13 +84,13 @@ public class AnnotationExportService {
       DocumentRepository documents,
       DocumentVersionRepository versions,
       BrandingService branding,
-      ExportImageResolver images,
+      ExportAttachmentResolver uploads,
       List<AnnotationExportRenderer> renderers) {
     this.annotations = annotations;
     this.documents = documents;
     this.versions = versions;
     this.branding = branding;
-    this.images = images;
+    this.uploads = uploads;
     Map<AnnotationExportFormat, AnnotationExportRenderer> byFormat = new LinkedHashMap<>();
     for (AnnotationExportRenderer renderer : renderers) {
       byFormat.put(renderer.format(), renderer);
@@ -209,7 +209,8 @@ public class AnnotationExportService {
         logo(request),
         request.dateFormat() == null ? ExportDateFormat.DEFAULT : request.dateFormat(),
         request.zone() == null ? ZoneOffset.UTC : request.zone(),
-        inlineImages(documentId, rows, actor, admin));
+        uploads.images(documentId, bodiesOf(rows), actor, admin),
+        uploads.files(documentId, bodiesOf(rows), actor, admin));
   }
 
   /**
@@ -221,18 +222,15 @@ public class AnnotationExportService {
    * the document being exported — an export must not become a fetcher for arbitrary URLs found in
    * user-authored text.
    */
-  private Map<String, ExportImage> inlineImages(
-      UUID documentId, List<AnnotationExportModel.Row> rows, UUID actor, boolean admin) {
-    List<String> bodies =
-        rows.stream()
-            .flatMap(
-                row ->
-                    java.util.stream.Stream.concat(
-                        java.util.stream.Stream.of(row.view().firstComment()),
-                        row.thread().stream().map(CommentView::body)))
-            .filter(body -> body != null && body.contains("!["))
-            .toList();
-    return bodies.isEmpty() ? Map.of() : images.resolve(documentId, bodies, actor, admin);
+  private static List<String> bodiesOf(List<AnnotationExportModel.Row> rows) {
+    return rows.stream()
+        .flatMap(
+            row ->
+                Stream.concat(
+                    Stream.of(row.view().firstComment()),
+                    row.thread().stream().map(CommentView::body)))
+        .filter(body -> body != null && body.contains("]("))
+        .toList();
   }
 
   /**

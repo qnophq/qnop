@@ -52,6 +52,7 @@ import java.util.Map;
  * @param dateFormat how every timestamp in this export is written
  * @param zone which timezone those timestamps are expressed in
  * @param images inline images by their Markdown URL, resolved so renderers need not fetch
+ * @param attachments non-image uploads by their Markdown URL, described but not carried
  */
 public record AnnotationExportModel(
     String documentTitle,
@@ -62,7 +63,8 @@ public record AnnotationExportModel(
     byte[] logoPng,
     ExportDateFormat dateFormat,
     ZoneId zone,
-    Map<String, ExportImage> images) {
+    Map<String, ExportImage> images,
+    Map<String, ExportAttachment> attachments) {
 
   public AnnotationExportModel {
     rows = List.copyOf(rows);
@@ -71,6 +73,12 @@ public record AnnotationExportModel(
     dateFormat = dateFormat == null ? ExportDateFormat.DEFAULT : dateFormat;
     zone = zone == null ? ZoneOffset.UTC : zone;
     images = images == null ? Map.of() : Map.copyOf(images);
+    attachments = attachments == null ? Map.of() : Map.copyOf(attachments);
+  }
+
+  /** The resolved attachment for a Markdown target, if this export could describe it. */
+  public ExportAttachment attachment(String url) {
+    return attachments.get(url);
   }
 
   /** The resolved image for a Markdown target, if this export could load it. */

@@ -114,8 +114,27 @@ class DocxAnnotationRendererTest {
       ExportDateFormat dates,
       ZoneId zone,
       Map<String, ExportImage> images) {
+    return model(rows, logo, dates, zone, images, Map.of());
+  }
+
+  private static AnnotationExportModel model(
+      List<AnnotationExportModel.Row> rows,
+      byte[] logo,
+      ExportDateFormat dates,
+      ZoneId zone,
+      Map<String, ExportImage> images,
+      Map<String, ExportAttachment> files) {
     return new AnnotationExportModel(
-        "Vendor agreement", 3, rows, AnnotationExportColumn.all(), true, logo, dates, zone, images);
+        "Vendor agreement",
+        3,
+        rows,
+        AnnotationExportColumn.all(),
+        true,
+        logo,
+        dates,
+        zone,
+        images,
+        files);
   }
 
   /** A real PNG, so the renderer's own decode-and-scale path is exercised. */
@@ -192,6 +211,7 @@ class DocxAnnotationRendererTest {
             null,
             ExportDateFormat.ISO,
             ZoneOffset.UTC,
+            Map.of(),
             Map.of());
 
     List<String> text = paragraphs(renderer.render(narrowed));
@@ -358,6 +378,52 @@ class DocxAnnotationRendererTest {
     // The bug being fixed was silence: a sentence that pointed at nothing.
     assertThat(text).contains("[missing.png]");
     assertThat(text).contains("Before");
+  }
+
+  @Test
+  @DisplayName("an attached file becomes a marked, clickable row with its type and size")
+  void linksAttachedFiles() throws Exception {
+    String url = "/api/v1/documents/d/attachments/a";
+    AnnotationView view = view("The numbers are wrong: [vergleich.xlsx](" + url + ")", "Mia", 1);
+    Map<String, ExportAttachment> files =
+        Map.of(
+            url,
+            new ExportAttachment(
+                "vergleich.xlsx",
+                "application/vnd.ms-excel",
+                86016,
+                "https://qnop.example.com" + url));
+
+    byte[] docx =
+        renderer.render(
+            model(
+                List.of(row("T-1", view, List.of())),
+                null,
+                ExportDateFormat.ISO,
+                ZoneOffset.UTC,
+                Map.<String, ExportImage>of(),
+                files));
+
+    try (XWPFDocument document = new XWPFDocument(new ByteArrayInputStream(docx))) {
+      // The link is absolute: a report is read outside the app, where a relative
+      // path points nowhere.
+      assertThat(document.getHyperlinks())
+          .anySatisfy(
+              link -> assertThat(link.getURL()).isEqualTo("https://qnop.example.com" + url));
+      List<String> text = document.getParagraphs().stream().map(XWPFParagraph::getText).toList();
+      assertThat(text)
+          .anySatisfy(line -> assertThat(line).contains("vergleich.xlsx", "XLSX", "84 KB"));
+    }
+  }
+
+  @Test
+  @DisplayName("an attachment that cannot be described still leaves its name")
+  void namesUnresolvableAttachments() throws Exception {
+    AnnotationView view = view("See [gone.pdf](/api/v1/documents/d/attachments/x)", "Mia", 1);
+
+    List<String> text = paragraphs(renderer.render(model(List.of(row("T-1", view, List.of())))));
+
+    assertThat(text).anySatisfy(line -> assertThat(line).contains("gone.pdf"));
   }
 
   @Test

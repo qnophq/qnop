@@ -33,6 +33,7 @@ import org.apache.poi.util.Units;
 import org.apache.poi.xwpf.model.XWPFHeaderFooterPolicy;
 import org.apache.poi.xwpf.usermodel.Document;
 import org.apache.poi.xwpf.usermodel.ParagraphAlignment;
+import org.apache.poi.xwpf.usermodel.UnderlinePatterns;
 import org.apache.poi.xwpf.usermodel.XWPFDocument;
 import org.apache.poi.xwpf.usermodel.XWPFHeader;
 import org.apache.poi.xwpf.usermodel.XWPFParagraph;
@@ -73,6 +74,7 @@ public class DocxAnnotationRenderer implements AnnotationExportRenderer {
   private static final int META_SIZE = 18;
 
   private static final String MUTED = "6B7280";
+  private static final String LINK = "1D4ED8";
   private static final String ACCENT = "1F3A8A";
 
   /** Twips; one indent step for the thread block. */
@@ -312,6 +314,8 @@ public class DocxAnnotationRenderer implements AnnotationExportRenderer {
         writeProse(document, text.value(), indent);
       } else if (segment instanceof ExportSegment.Image image) {
         writeInlineImage(document, model, image, indent);
+      } else if (segment instanceof ExportSegment.Attachment file) {
+        writeAttachment(document, model, file, indent);
       }
     }
   }
@@ -349,6 +353,47 @@ public class DocxAnnotationRenderer implements AnnotationExportRenderer {
               Units.toEMU(size.height()));
     } catch (Exception e) {
       log.warn("Could not embed {} in the Word report", resolved.fileName(), e);
+    }
+  }
+
+  /**
+   * An attached file as a marked, clickable row.
+   *
+   * <p>Not embedded: OOXML can carry an OLE object, but POI has no API to write one, and mailing a
+   * report with binaries inside it is a different problem from reading a review. The row instead
+   * says what the file is and links to it, so a reader with access is one click away and a reader
+   * without at least knows it exists — which the bare filename this replaces did not convey.
+   */
+  private void writeAttachment(
+      XWPFDocument document,
+      AnnotationExportModel model,
+      ExportSegment.Attachment file,
+      int indent) {
+    ExportAttachment resolved = model.attachment(file.url());
+    String label =
+        resolved != null && resolved.fileName() != null && !resolved.fileName().isBlank()
+            ? resolved.fileName()
+            : (file.label() == null || file.label().isBlank() ? "attachment" : file.label());
+
+    XWPFParagraph paragraph = document.createParagraph();
+    paragraph.setIndentationLeft(indent);
+    paragraph.setSpacingBefore(60);
+    paragraph.setSpacingAfter(60);
+    // U+1F4CE, the paperclip: the row has to read as an attachment at a glance,
+    // not as a stray sentence in the middle of a thread.
+    run(paragraph, "\uD83D\uDCCE ", BODY_SIZE, false, MUTED);
+
+    if (resolved != null && resolved.href() != null && !resolved.href().isBlank()) {
+      XWPFRun link = paragraph.createHyperlinkRun(resolved.href());
+      link.setText(label);
+      link.setFontSize(BODY_SIZE / 2.0);
+      link.setColor(LINK);
+      link.setUnderline(UnderlinePatterns.SINGLE);
+      run(paragraph, "  " + resolved.describe(), META_SIZE, false, MUTED);
+    } else {
+      // Unresolvable — deleted, or belonging to another review. Naming it still
+      // beats the silence, but there is nothing to point at.
+      run(paragraph, label, BODY_SIZE, false, MUTED);
     }
   }
 

@@ -48,8 +48,27 @@ public sealed interface ExportSegment {
    */
   record Image(String alt, String url) implements ExportSegment {}
 
+  /**
+   * A file attached to the annotation or comment, referenced by a plain link.
+   *
+   * <p>{@code MarkdownComposer} writes image syntax for images and link syntax for everything else,
+   * so a PDF or a spreadsheet arrives here rather than as an {@link Image}.
+   *
+   * @param label the link text, which for an upload is the original filename
+   * @param url the Markdown target, pointing at this app's attachment endpoint
+   */
+  record Attachment(String label, String url) implements ExportSegment {}
+
   /** {@code ![alt](target)} — the form {@code MarkdownComposer} writes for an upload. */
   Pattern IMAGE = Pattern.compile("!\\[([^\\]]*)\\]\\(([^)\\s]*)[^)]*\\)");
+
+  /**
+   * {@code [label](/api/v1/…)} — a link at this app's own API, i.e. an upload.
+   *
+   * <p>Deliberately not every link: an external URL someone quoted in prose is part of the
+   * sentence, and turning it into an attachment row would misrepresent what was written.
+   */
+  Pattern ATTACHMENT = Pattern.compile("(?<!!)\\[([^\\]]*)\\]\\((/api/v1/[^)\\s]*)[^)]*\\)");
 
   /**
    * Splits a body into prose and images, in reading order.
@@ -63,12 +82,29 @@ public sealed interface ExportSegment {
       return List.of();
     }
     List<ExportSegment> segments = new ArrayList<>();
-    Matcher matcher = IMAGE.matcher(markdown);
+    Matcher images = IMAGE.matcher(markdown);
+    Matcher files = ATTACHMENT.matcher(markdown);
+    boolean hasImage = images.find();
+    boolean hasFile = files.find();
     int cursor = 0;
-    while (matcher.find()) {
-      addText(segments, markdown.substring(cursor, matcher.start()));
-      segments.add(new Image(matcher.group(1), matcher.group(2)));
-      cursor = matcher.end();
+
+    // One pass over both patterns, taking whichever match comes first, so the
+    // segments keep the order the author wrote them in.
+    while (hasImage || hasFile) {
+      boolean imageNext = hasImage && (!hasFile || images.start() < files.start());
+      Matcher next = imageNext ? images : files;
+      addText(segments, markdown.substring(cursor, next.start()));
+      segments.add(
+          imageNext
+              ? new Image(next.group(1), next.group(2))
+              : new Attachment(next.group(1), next.group(2)));
+      cursor = next.end();
+      if (hasImage && images.start() < cursor) {
+        hasImage = images.find(cursor);
+      }
+      if (hasFile && files.start() < cursor) {
+        hasFile = files.find(cursor);
+      }
     }
     addText(segments, markdown.substring(cursor));
     return List.copyOf(segments);
@@ -79,6 +115,14 @@ public sealed interface ExportSegment {
     return split(markdown).stream()
         .filter(Image.class::isInstance)
         .map(segment -> ((Image) segment).url())
+        .toList();
+  }
+
+  /** Every attachment target in a body, in order, without duplicates removed. */
+  static List<String> attachmentUrls(String markdown) {
+    return split(markdown).stream()
+        .filter(Attachment.class::isInstance)
+        .map(segment -> ((Attachment) segment).url())
         .toList();
   }
 

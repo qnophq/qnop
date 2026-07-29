@@ -20,6 +20,8 @@
  */
 package io.qnop.service.review.export;
 
+import io.qnop.service.ApplicationSettingKey;
+import io.qnop.service.ApplicationSettingsService;
 import io.qnop.service.document.DocumentAttachmentService;
 import java.awt.image.BufferedImage;
 import java.io.ByteArrayInputStream;
@@ -36,7 +38,10 @@ import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
 
 /**
- * Loads the images a comment body references, so an export can embed them (issue #635 follow-up).
+ * Resolves the uploads a comment body references, so an export can carry them (#635 follow-up).
+ *
+ * <p>Images become bytes to embed; other files become metadata to link. Both go through the same
+ * participant-gated lookup, because both are the same question: may this reader see this upload?
  *
  * <p>A screenshot pasted into a review is frequently the substance of the comment; an export that
  * dropped it kept the sentence and lost what it pointed at.
@@ -48,9 +53,9 @@ import org.springframework.stereotype.Component;
  * document's attachment resolves to nothing rather than to a file the caller cannot otherwise see.
  */
 @Component
-public class ExportImageResolver {
+public class ExportAttachmentResolver {
 
-  private static final Logger log = LoggerFactory.getLogger(ExportImageResolver.class);
+  private static final Logger log = LoggerFactory.getLogger(ExportAttachmentResolver.class);
 
   /**
    * {@code /api/v1/documents/{documentId}/attachments/{attachmentId}} — nothing else is fetched.
@@ -70,8 +75,12 @@ public class ExportImageResolver {
 
   private final DocumentAttachmentService attachments;
 
-  public ExportImageResolver(DocumentAttachmentService attachments) {
+  private final ApplicationSettingsService settings;
+
+  public ExportAttachmentResolver(
+      DocumentAttachmentService attachments, ApplicationSettingsService settings) {
     this.attachments = attachments;
+    this.settings = settings;
   }
 
   /**
@@ -79,7 +88,7 @@ public class ExportImageResolver {
    *
    * @return url → image, for the URLs that resolved; absent keys are rendered as their alt text
    */
-  public Map<String, ExportImage> resolve(
+  public Map<String, ExportImage> images(
       UUID documentId, Iterable<String> bodies, UUID actor, boolean admin) {
     Map<String, ExportImage> resolved = new LinkedHashMap<>();
     long budget = TOTAL_BUDGET_BYTES;
@@ -101,6 +110,61 @@ public class ExportImageResolver {
       }
     }
     return Map.copyOf(resolved);
+  }
+
+  /**
+   * Resolves every non-image attachment a body links to.
+   *
+   * <p>Metadata only. The link is absolute, built from {@code general.base_url} — the setting the
+   * notification mails already use — because a report is read outside the app, where a relative
+   * path points nowhere. Without that setting the link is left relative and logged, exactly as the
+   * mail path does, rather than the whole reference disappearing.
+   *
+   * @return url → attachment, for the URLs that resolved
+   */
+  public Map<String, ExportAttachment> files(
+      UUID documentId, Iterable<String> bodies, UUID actor, boolean admin) {
+    Map<String, ExportAttachment> resolved = new LinkedHashMap<>();
+    String base = baseUrl();
+    for (String body : bodies) {
+      for (String url : ExportSegment.attachmentUrls(body)) {
+        if (resolved.containsKey(url)) {
+          continue;
+        }
+        attachmentIdIn(url, documentId)
+            .flatMap(id -> describe(documentId, id, actor, admin, base))
+            .ifPresent(attachment -> resolved.put(url, attachment));
+      }
+    }
+    return Map.copyOf(resolved);
+  }
+
+  private Optional<ExportAttachment> describe(
+      UUID documentId, UUID attachmentId, UUID actor, boolean admin, String base) {
+    try {
+      DocumentAttachmentService.AttachmentMetadata metadata =
+          attachments.metadata(documentId, attachmentId, actor, admin);
+      String href = base + "/api/v1/documents/" + documentId + "/attachments/" + metadata.id();
+      return Optional.of(
+          new ExportAttachment(
+              metadata.fileName(), metadata.contentType(), metadata.sizeBytes(), href));
+    } catch (RuntimeException e) {
+      log.warn(
+          "Could not describe attachment {} for the export of {}", attachmentId, documentId, e);
+      return Optional.empty();
+    }
+  }
+
+  /** The configured public origin, without a trailing slash. */
+  private String baseUrl() {
+    String base = settings.getString(ApplicationSettingKey.GENERAL_BASE_URL);
+    if (base == null || base.isBlank()) {
+      // The report still names the file; only its link is relative and therefore
+      // dead outside the app — configure Settings -> General -> Base URL.
+      log.warn("general.base_url is not configured — attachment links in exports will be relative");
+      return "";
+    }
+    return base.endsWith("/") ? base.substring(0, base.length() - 1) : base;
   }
 
   /**

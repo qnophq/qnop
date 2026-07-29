@@ -82,6 +82,8 @@ The bytes arrive through the model, resolved by `ExportImageResolver`, for the s
 
 WEBP is converted to PNG on the way in, using the ImageIO reader ADR-0053 already put on the classpath; no Office format embeds WEBP.
 
+**Other attachments are linked, not embedded.** A PDF or a spreadsheet attached to a comment becomes a marked row — paperclip, filename, type and size — whose name is a hyperlink to the file, made absolute from `general.base_url`, the setting the notification mails already use. OOXML *can* carry an OLE object, but POI exposes only `getAllEmbeddedParts()` for reading; writing one means hand-authored `w:object` XML, a package part, a relationship and an icon image, on schema types `poi-ooxml-lite` does not guarantee. Weighed against a report that would then mail binaries around, the link is the better answer: a reader with access is one click away, and a reader without at least knows the file exists — which the bare filename this replaces did not convey.
+
 ### The filename is the user's, within limits
 
 The default is `<slug>-annotations.<ext>`, derived from the review's title, because a folder full of exports has to stay legible. It is only a default: a report going to a customer is rarely best named after an internal document title, so the wizard shows the name and lets it be replaced.
@@ -130,7 +132,7 @@ Headings use direct character formatting plus an OOXML outline level rather than
 - **2026-07-27** — accepted with the XLSX export (#547).
 - **2026-07-29** — extended for Word (#635): the model/renderer split, the `?format=` parameter, and the report layout. The remaining formats (#637, #639) are a renderer and an enum entry.
 - **2026-07-29** — the date convention, its timezone, the branding logo and the filename became per-export choices, all format-independent.
-- **2026-07-29** — inline images in annotations and comments are exported rather than stripped.
+- **2026-07-29** — inline images in annotations and comments are exported rather than stripped; other attachments are linked.
 - **ADR-0021 / ADR-0015** — OpenAPI-first, and why this endpoint is the deliberate exception
 - **ADR-0004** — the layering that puts the workbook in the service and leaves the controller streaming
 - Issue **#547**

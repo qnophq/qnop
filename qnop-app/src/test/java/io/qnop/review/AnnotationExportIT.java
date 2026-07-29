@@ -823,6 +823,48 @@ class AnnotationExportIT extends SeededIntegrationTest {
   }
 
   @Test
+  @DisplayName("an attached file becomes a clickable row in the Word report")
+  void docxLinksAttachedFiles() throws Exception {
+    seedDocument(false);
+    String json =
+        mockMvc
+            .perform(
+                multipart("/api/v1/documents/" + documentId + "/attachments")
+                    .file(
+                        new MockMultipartFile(
+                            "file", "notes.pdf", "application/pdf", "%PDF-1.4 body".getBytes()))
+                    .header("Authorization", "Bearer " + token(MEMBER_ID)))
+            .andExpect(status().isCreated())
+            .andReturn()
+            .getResponse()
+            .getContentAsString();
+    String url = com.jayway.jsonpath.JsonPath.read(json, "$.url");
+    createAnnotationReturningId(MEMBER_ID, 0, 0.1, 0.1, "See [notes.pdf](" + url + ")");
+
+    byte[] body =
+        mockMvc
+            .perform(
+                as(
+                    get("/api/v1/documents/" + documentId + "/annotations/export")
+                        .param("format", "docx")
+                        .param("logo", "false"),
+                    MEMBER_ID))
+            .andExpect(status().isOk())
+            .andReturn()
+            .getResponse()
+            .getContentAsByteArray();
+
+    try (XWPFDocument document = new XWPFDocument(new ByteArrayInputStream(body))) {
+      // Word cannot embed an arbitrary file, so the report links to it — and the
+      // link has to survive the round trip as a real hyperlink relationship.
+      assertThat(document.getHyperlinks())
+          .anySatisfy(link -> assertThat(link.getURL()).endsWith(url));
+      assertThat(document.getParagraphs().stream().map(XWPFParagraph::getText).toList())
+          .anySatisfy(line -> assertThat(line).contains("notes.pdf", "PDF"));
+    }
+  }
+
+  @Test
   @DisplayName("a review without annotations still yields a valid header-only workbook")
   void emptyReviewYieldsHeaderOnly() throws Exception {
     seedDocument(false);
