@@ -446,13 +446,12 @@ class AnnotationExportIT extends SeededIntegrationTest {
     Row header = sheet.getRow(0);
     assertThat(header.getCell(0).getStringCellValue()).isEqualTo("#");
     assertThat(header.getCell(3).getStringCellValue()).isEqualTo("Comment");
-    // The opening comment is part of the thread: the annotation body is the
-    // first thing said about it, so leaving it out would lose the context every
-    // reply is answering.
-    assertThat(column(sheet, 3))
-        .containsExactly(
-            "The opening remark", "Answering the first", "And once more", "A second finding");
-    assertThat(column(sheet, 0)).containsExactly("T-1", "T-1", "T-1", "T-2");
+    // Replies only. The opening comment IS the annotation — it is the Summary
+    // column on the first sheet, and repeating it here contradicts the Replies
+    // count beside it, which has always excluded it. An annotation nobody
+    // answered therefore contributes no row at all.
+    assertThat(column(sheet, 3)).containsExactly("Answering the first", "And once more");
+    assertThat(column(sheet, 0)).containsExactly("T-1", "T-1");
     assertThat(second).isNotBlank();
   }
 
@@ -478,12 +477,13 @@ class AnnotationExportIT extends SeededIntegrationTest {
     // through which a foreign reviewer's real name leaks out of the review.
     List<String> authors = column(downloadComments(MEMBER2_ID), 1);
 
-    assertThat(authors).hasSize(3);
-    assertThat(authors.get(0)).startsWith("Participant");
-    assertThat(authors.get(2)).startsWith("Participant");
+    // Two rows, not three: the sheet lists replies, and the opening comment is
+    // the annotation itself.
+    assertThat(authors).hasSize(2);
     // MEMBER owns the document, and the owner is the one identity anonymity does
     // not cover — it is their review, and everybody already knows that.
-    assertThat(authors.get(1)).doesNotStartWith("Participant");
+    assertThat(authors.get(0)).doesNotStartWith("Participant");
+    assertThat(authors.get(1)).startsWith("Participant");
   }
 
   @Test

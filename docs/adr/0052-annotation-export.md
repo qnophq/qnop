@@ -52,7 +52,9 @@ Two columns from the original proposal were dropped rather than duplicated furth
 
 ### Comment threads become a second sheet, off the wire unless asked for
 
-An annotation's thread has no fixed length, so it cannot become columns on the annotation row, and folding a whole conversation into one cell would be neither sortable nor readable. The threads therefore go on their own `Comments` sheet, one row per comment (`#`, `Author`, `Written`, `Comment`), keyed back to the annotation by the same `T-N` shorthand — a relational shape is what a spreadsheet is actually good at.
+An annotation's thread has no fixed length, so it cannot become columns on the annotation row, and folding a whole conversation into one cell would be neither sortable nor readable. The threads therefore go on their own `Comments` sheet, one row per **reply** (`#`, `Author`, `Written`, `Comment`), keyed back to the annotation by the same `T-N` shorthand — a relational shape is what a spreadsheet is actually good at.
+
+The opening comment is not among them. It *is* the annotation: it already fills the Summary column on the first sheet, and a row for it here duplicates that while contradicting the `Replies` count beside it, which has always excluded it. The Word report never showed it either — the sheet was the odd one out.
 
 The rows are read through `AnnotationService.listComments`, for the same reason the annotation rows go through `list`: it applies the PRIVATE-thread visibility check and resolves every author through `ReviewIdentityResolver`, so a pseudonymised reviewer stays pseudonymised in the export by construction. The owner is the one identity that stays real — anonymity never covered them, since it is their review.
 

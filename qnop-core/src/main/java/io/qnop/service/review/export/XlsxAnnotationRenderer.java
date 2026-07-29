@@ -447,7 +447,11 @@ public class XlsxAnnotationRenderer implements AnnotationExportRenderer {
     }
     int rowIndex = headerRow + 1;
     for (AnnotationExportModel.Row annotation : model.rows()) {
-      for (CommentView comment : annotation.thread()) {
+      // Replies only. The opening comment IS the annotation — it is already the
+      // Summary column on the first sheet, and listing it here again both
+      // duplicates it and contradicts the Replies count beside it, which has
+      // always excluded it. Word never showed it either.
+      for (CommentView comment : annotation.replyComments()) {
         Row row = sheet.createRow(rowIndex++);
         row.createCell(0).setCellValue(annotation.taskKey());
         row.createCell(1)

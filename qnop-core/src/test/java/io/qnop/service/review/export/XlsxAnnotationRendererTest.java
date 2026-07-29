@@ -77,6 +77,18 @@ class XlsxAnnotationRendererTest {
         WHEN);
   }
 
+  private static CommentView commentOf(String author, String body) {
+    return new CommentView(
+        UUID.randomUUID(),
+        UUID.randomUUID(),
+        UUID.randomUUID(),
+        null,
+        author,
+        body,
+        List.of(),
+        WHEN);
+  }
+
   private static AnnotationExportModel model(AnnotationView view, List<CommentView> thread) {
     return new AnnotationExportModel(
         "Vendor agreement",
@@ -133,18 +145,11 @@ class XlsxAnnotationRendererTest {
   @DisplayName("a comment on the thread sheet is unabridged and wraps too")
   void keepsCommentsWhole() throws Exception {
     String body = "Sehr langer Kommentar. ".repeat(150);
-    CommentView comment =
-        new CommentView(
-            UUID.randomUUID(),
-            UUID.randomUUID(),
-            UUID.randomUUID(),
-            null,
-            "Mia",
-            body,
-            List.of(),
-            WHEN);
+    // A thread is its opening comment plus the replies to it; the sheet lists the
+    // replies, because the opening one is the annotation.
+    List<CommentView> thread = List.of(commentOf("Mia", "Opening"), commentOf("Mia", body));
 
-    byte[] xlsx = renderer.render(model(view("Opening", 2), List.of(comment)));
+    byte[] xlsx = renderer.render(model(view("Opening", 2), thread));
 
     Cell cell = sheetOf(xlsx, 1).getRow(1).getCell(3);
     assertThat(cell.getStringCellValue()).hasSize(body.strip().length());
@@ -501,6 +506,36 @@ class XlsxAnnotationRendererTest {
     assertThat(value.lines().count()).isGreaterThanOrEqualTo(4);
     // The markup itself never appears.
     assertThat(value).doesNotContain("##", "> quoted", "- first");
+  }
+
+  @Test
+  @DisplayName("the comments sheet lists replies, never the annotation itself")
+  void listsOnlyReplies() throws Exception {
+    List<CommentView> thread =
+        List.of(
+            commentOf("Mia", "The indemnity clause is too broad"),
+            commentOf("Participant 2", "Agreed"),
+            commentOf("Mia", "Will fix"));
+
+    Sheet sheet =
+        sheetOf(renderer.render(model(view("The indemnity clause is too broad", 3), thread)), 1);
+
+    // The opening comment IS the annotation: it is already the Summary column on
+    // the first sheet, and a row for it here both duplicates it and contradicts
+    // the Replies count beside it, which has always excluded it.
+    assertThat(column(sheet, 3)).containsExactly("Agreed", "Will fix");
+    assertThat(column(sheet, 3)).doesNotContain("The indemnity clause is too broad");
+  }
+
+  /** A column's values below the header, as text. */
+  private static List<String> column(Sheet sheet, int index) {
+    List<String> values = new java.util.ArrayList<>();
+    for (int row = 1; row <= sheet.getLastRowNum(); row++) {
+      Row line = sheet.getRow(row);
+      Cell cell = line == null ? null : line.getCell(index);
+      values.add(cell == null ? "" : cell.getStringCellValue());
+    }
+    return values;
   }
 
   @Test
