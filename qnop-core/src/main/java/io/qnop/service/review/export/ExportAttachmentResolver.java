@@ -115,9 +115,10 @@ public class ExportAttachmentResolver {
   /**
    * Resolves every non-image attachment a body links to.
    *
-   * <p>Metadata only, plus an <em>absolute</em> link. Absolute is not a nicety: Word resolves a
-   * relative target against the document's own location, so {@code /api/v1/…} in a downloaded
-   * report becomes {@code file:///api/v1/…} and points at the reader's disk.
+   * <p>Metadata only, plus an <em>absolute</em> link into the app's download page. Absolute is not
+   * a nicety: Word resolves a relative target against the document's own location, so {@code
+   * /attachments/…} in a downloaded report would become {@code file:///attachments/…} and point at
+   * the reader's disk.
    *
    * @param requestOrigin where this download was requested from, used when the operator has not
    *     configured a base URL; null or blank leaves the attachment unlinked
@@ -145,7 +146,16 @@ public class ExportAttachmentResolver {
     try {
       DocumentAttachmentService.AttachmentMetadata metadata =
           attachments.metadata(documentId, attachmentId, actor, admin);
-      String href = base + "/api/v1/documents/" + documentId + "/attachments/" + metadata.id();
+      // The app's own download page, never the API endpoint behind it. That
+      // endpoint wants a bearer token, which a browser following a link out of a
+      // Word file has no way to send — the reader would land on a 401 instead of
+      // a file. The page authenticates first (logging in and returning here if
+      // needed) and only then fetches, with the token attached.
+      //
+      // No base means no link at all: a relative href would become a file://
+      // target on the reader's own machine, which is worse than plain text.
+      String href =
+          base.isEmpty() ? null : base + "/attachments/" + documentId + "/" + metadata.id();
       return Optional.of(
           new ExportAttachment(
               metadata.fileName(), metadata.contentType(), metadata.sizeBytes(), href));

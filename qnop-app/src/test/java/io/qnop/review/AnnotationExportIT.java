@@ -861,11 +861,18 @@ class AnnotationExportIT extends SeededIntegrationTest {
       // Absolute, and asserted as such: a relative target is not a dead link,
       // Word resolves it against the document and produces file:///api/v1/…,
       // pointing at the reader's own disk.
+      String attachmentId = url.substring(url.lastIndexOf('/') + 1);
       assertThat(document.getHyperlinks())
           .anySatisfy(
               link -> {
+                // Absolute, or Word resolves it against the document and yields
+                // file:///… on the reader's disk.
                 assertThat(link.getURL()).startsWith("http");
-                assertThat(link.getURL()).endsWith(url);
+                // The app's download page, not the bearer-authenticated API a
+                // browser could never open by following a link.
+                assertThat(link.getURL())
+                    .endsWith("/attachments/" + documentId + "/" + attachmentId);
+                assertThat(link.getURL()).doesNotContain("/api/v1/");
               });
       assertThat(document.getParagraphs().stream().map(XWPFParagraph::getText).toList())
           .anySatisfy(line -> assertThat(line).contains("notes.pdf", "PDF"));
