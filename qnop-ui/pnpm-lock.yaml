@@ -61,8 +61,8 @@ importers:
         specifier: 5.6.0
         version: 5.6.0
       lucide-react:
-        specifier: 1.26.0
-        version: 1.26.0(react@19.2.8)
+        specifier: 1.27.0
+        version: 1.27.0(react@19.2.8)
       pdfjs-dist:
         specifier: 6.1.200
         version: 6.1.200
@@ -73,8 +73,8 @@ importers:
         specifier: 19.2.8
         version: 19.2.8(react@19.2.8)
       react-easy-crop:
-        specifier: 6.2.2
-        version: 6.2.2(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
+        specifier: 6.2.3
+        version: 6.2.3(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
       react-image-crop:
         specifier: 11.1.2
         version: 11.1.2(react@19.2.8)
@@ -2247,8 +2247,8 @@ packages:
     resolution: {integrity: sha512-jumlc0BIUrS3qJGgIkWZsyfAM7NCWiBcCDhnd+3NNM5KbBmLTgHVfWBcg6W+rLUsIpzpERPsvwUP7CckAQSOoA==}
     engines: {node: '>=12'}
 
-  lucide-react@1.26.0:
-    resolution: {integrity: sha512-raglYVR2+VkMfJL158krjVmE+rV5ST2lzA/KQm1FRSjMHT4MnWaegHxoVEpmc2So3nOEhp9oGejJwAPX8MoAjg==}
+  lucide-react@1.27.0:
+    resolution: {integrity: sha512-rJicGl/3Fly/E0rOH1YmPZ6e49JCnKknh1ox1vpHnkfjujAkKA6sqUZvH3MTAaXXjgexyUwgNwTJzTtYuAFYJw==}
     peerDependencies:
       react: ^16.5.1 || ^17.0.0 || ^18.0.0 || ^19.0.0
 
@@ -2630,8 +2630,8 @@ packages:
     peerDependencies:
       react: ^19.2.8
 
-  react-easy-crop@6.2.2:
-    resolution: {integrity: sha512-b0HOicSvLYoNk1yvZTwjH8sNjF5uD9xLtWrSDnv+fx1dXTbwd8bNLQaP6gjXw//A+tni9Mw5KDmPNOEjKF55NQ==}
+  react-easy-crop@6.2.3:
+    resolution: {integrity: sha512-ebimG3OGlzizjxEZ77Cj9CVLcg5vDZ6QVz8ud1rx4WmsCDWHIROEhgMi0GpJ/jKAuwHrH0M+QZUK4hyvxbYhOA==}
     peerDependencies:
       react: '>=16.4.0'
       react-dom: '>=16.4.0'
@@ -5575,7 +5575,7 @@ snapshots:
 
   lru-cache@7.18.3: {}
 
-  lucide-react@1.26.0(react@19.2.8):
+  lucide-react@1.27.0(react@19.2.8):
     dependencies:
       react: 19.2.8
 
@@ -6165,7 +6165,7 @@ snapshots:
       react: 19.2.8
       scheduler: 0.27.0
 
-  react-easy-crop@6.2.2(react-dom@19.2.8(react@19.2.8))(react@19.2.8):
+  react-easy-crop@6.2.3(react-dom@19.2.8(react@19.2.8))(react@19.2.8):
     dependencies:
       normalize-wheel: 1.0.1
       react: 19.2.8
