@@ -28,7 +28,7 @@ springBoot = "4.1.0"
 # produces pure DTOs into qnop-api-model and Spring MVC interfaces into
 # qnop-api-endpoint from a single spec. Jackson annotations stay on 2.x
 # (com.fasterxml.jackson) — the generated models only carry annotations.
-openapiGenerator = "7.23.0"
+openapiGenerator = "7.24.0"
 jacksonAnnotations = "2.22"
 swaggerAnnotations = "2.2.52"
 jakartaValidation = "3.1.1"
