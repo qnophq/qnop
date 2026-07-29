@@ -103,7 +103,7 @@ services:
   # Then use "Send test" there and read the message at http://localhost:8025.
   # Bound to loopback only — this dev sink must never be reachable off-host.
   mailpit:
-    image: axllent/mailpit:latest@sha256:b868afa176bfd6cce2323ea316cd99ccad77915e51e595748f6d786700ecf109
+    image: axllent/mailpit:latest@sha256:7f33095f80e901f6ad08028f06ca284aa58fe84942be5496008d041d3b9f4d4d
     profiles: ['mail']
     environment:
       # Allow unauthenticated/plaintext SMTP from the local app — dev only.
