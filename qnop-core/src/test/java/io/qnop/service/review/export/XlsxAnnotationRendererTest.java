@@ -352,8 +352,8 @@ class XlsxAnnotationRendererTest {
   }
 
   @Test
-  @DisplayName("each upload gets a linked cell on the annotation's own row")
-  void linksUploadsOnTheRow() throws Exception {
+  @DisplayName("uploads get a sheet of their own, each with a working link")
+  void listsUploadsOnTheirOwnSheet() throws Exception {
     String fileUrl = "/api/v1/documents/d/attachments/a";
     String imageUrl = "/api/v1/documents/d/attachments/b";
     AnnotationView view =
@@ -367,33 +367,38 @@ class XlsxAnnotationRendererTest {
             new ExportAttachment("shot.png", "image/png", 2048, "https://q.example/b"));
 
     byte[] xlsx = renderer.render(withUploads(view, uploads));
-    Sheet sheet = sheetOf(xlsx, 0);
+    Sheet sheet = new XSSFWorkbook(new ByteArrayInputStream(xlsx)).getSheet("Attachments");
 
-    // No separate sheet: the links sit on the annotation's own row, after the
-    // fixed columns, one cell each — the smallest thing Excel can hyperlink.
-    assertThat(new XSSFWorkbook(new ByteArrayInputStream(xlsx)).getSheet("Attachments")).isNull();
-    int first = AnnotationExportColumn.all().size();
-    assertThat(sheet.getRow(0).getCell(first).getStringCellValue()).isEqualTo("Attachment 1");
-    assertThat(sheet.getRow(0).getCell(first + 1).getStringCellValue()).isEqualTo("Attachment 2");
+    // A sheet, not columns on the row: five files on one annotation would give
+    // every row five columns, four of them empty.
+    assertThat(sheet).isNotNull();
+    assertThat(sheetOf(xlsx, 0).getRow(0).getLastCellNum())
+        .isEqualTo((short) AnnotationExportColumn.all().size());
 
-    Cell file = sheet.getRow(1).getCell(first);
+    Cell file = sheet.getRow(1).getCell(1);
     assertThat(file.getStringCellValue()).isEqualTo("v.xlsx");
+    // A real hyperlink, not a URL typed into a cell: Excel only makes the former
+    // clickable, and a cell is the smallest thing it can attach one to.
     assertThat(file.getHyperlink()).isNotNull();
     assertThat(file.getHyperlink().getAddress()).isEqualTo("https://q.example/a");
+    assertThat(sheet.getRow(1).getCell(0).getStringCellValue()).isEqualTo("T-1");
+    assertThat(sheet.getRow(1).getCell(2).getStringCellValue()).isEqualTo("XLSX");
+    assertThat(sheet.getRow(1).getCell(3).getStringCellValue()).isEqualTo("84 KB");
 
     // Images too: Word embeds them, a spreadsheet cannot, and "[shot.png]" with
     // no way to open it helps nobody.
-    Cell image = sheet.getRow(1).getCell(first + 1);
+    Cell image = sheet.getRow(2).getCell(1);
     assertThat(image.getStringCellValue()).isEqualTo("shot.png");
     assertThat(image.getHyperlink().getAddress()).isEqualTo("https://q.example/b");
 
     // The prose still marks where each was mentioned.
-    assertThat(sheet.getRow(1).getCell(5).getStringCellValue()).contains("[v.xlsx]", "[shot.png]");
+    assertThat(sheetOf(xlsx, 0).getRow(1).getCell(5).getStringCellValue())
+        .contains("[v.xlsx]", "[shot.png]");
   }
 
   @Test
-  @DisplayName("a comment's upload is linked on the comment's own row")
-  void linksUploadsOnTheCommentRow() throws Exception {
+  @DisplayName("a comment's upload is listed under its annotation's key")
+  void listsUploadsFromComments() throws Exception {
     String url = "/api/v1/documents/d/attachments/a";
     CommentView comment =
         new CommentView(
@@ -405,6 +410,7 @@ class XlsxAnnotationRendererTest {
             "Proof: [log.txt](" + url + ")",
             List.of(),
             WHEN);
+    AnnotationView opening = view("Opening", 2);
     AnnotationExportModel model =
         new AnnotationExportModel(
             "Vendor agreement",
@@ -412,10 +418,10 @@ class XlsxAnnotationRendererTest {
             List.of(
                 new AnnotationExportModel.Row(
                     "T-1",
-                    view("Opening", 2),
+                    opening,
                     new AnnotationPosition(true, 0, 0.1, 0.1, 0),
                     List.of(comment),
-                    view("Opening", 2).firstComment())),
+                    opening.firstComment())),
             AnnotationExportColumn.all(),
             true,
             null,
@@ -424,22 +430,23 @@ class XlsxAnnotationRendererTest {
             Map.of(),
             Map.of(url, new ExportAttachment("log.txt", "text/plain", 512, "https://q.example/a")));
 
-    Sheet sheet = sheetOf(renderer.render(model), 1);
+    Sheet sheet =
+        new XSSFWorkbook(new ByteArrayInputStream(renderer.render(model))).getSheet("Attachments");
 
-    Cell cell = sheet.getRow(1).getCell(4);
-    assertThat(sheet.getRow(0).getCell(4).getStringCellValue()).isEqualTo("Attachment");
-    assertThat(cell.getStringCellValue()).isEqualTo("log.txt");
-    assertThat(cell.getHyperlink().getAddress()).isEqualTo("https://q.example/a");
+    // Filed under the annotation, because "what belongs to this finding" is the
+    // question a reader brings to this sheet.
+    assertThat(sheet.getRow(1).getCell(0).getStringCellValue()).isEqualTo("T-1");
+    assertThat(sheet.getRow(1).getCell(1).getStringCellValue()).isEqualTo("log.txt");
+    assertThat(sheet.getRow(1).getCell(1).getHyperlink().getAddress())
+        .isEqualTo("https://q.example/a");
   }
 
   @Test
-  @DisplayName("a review with no uploads grows no attachment columns")
-  void addsNoColumnsWhenThereIsNothingToLink() throws Exception {
-    Sheet sheet = sheetOf(renderer.render(model(view("A plain finding", 1), List.of())), 0);
+  @DisplayName("a review with no uploads gets no attachments sheet")
+  void omitsTheSheetWhenThereIsNothingToList() throws Exception {
+    byte[] xlsx = renderer.render(model(view("A plain finding", 1), List.of()));
 
-    // One attachment should not cost five empty columns, and none should cost any.
-    assertThat(sheet.getRow(0).getLastCellNum())
-        .isEqualTo((short) AnnotationExportColumn.all().size());
+    assertThat(new XSSFWorkbook(new ByteArrayInputStream(xlsx)).getSheet("Attachments")).isNull();
   }
 
   private static AnnotationExportModel withUploads(

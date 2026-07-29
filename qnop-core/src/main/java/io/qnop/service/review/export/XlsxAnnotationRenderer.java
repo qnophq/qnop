@@ -84,8 +84,7 @@ public class XlsxAnnotationRenderer implements AnnotationExportRenderer {
 
   private static final List<String> COMMENT_HEADERS = List.of("#", "Author", "Written", "Comment");
 
-  /** An attachment column: room for a filename, not for a path. */
-  private static final int UPLOAD_WIDTH_CHARS = 30;
+  private static final List<String> ATTACHMENT_HEADERS = List.of("#", "File", "Type", "Size");
 
   /** The thread sheet's comment column: wider than the summary, since it is the whole point. */
   private static final int COMMENT_WIDTH_CHARS = 90;
@@ -125,52 +124,34 @@ public class XlsxAnnotationRenderer implements AnnotationExportRenderer {
       // never squeezed to fit a row — the row is sized to fit the logo.
       int headerRow = model.hasLogo() ? reserveLogoRow(sheet, model) : 0;
 
-      // The annotation's own uploads live on its row; a comment's live on the
-      // comment's row, on the other sheet.
-      int uploadColumns =
-          uploadColumns(model, row -> List.of(nullToEmpty(row.view().firstComment())));
-      CellStyle linkStyle = linkStyle(workbook);
-      CreationHelper helper = workbook.getCreationHelper();
-
       Row header = sheet.createRow(headerRow);
       for (int index = 0; index < columns.size(); index++) {
         Cell cell = header.createCell(index);
         cell.setCellValue(columns.get(index).getHeader());
         cell.setCellStyle(headerStyle);
       }
-      writeUploadHeaders(header, columns.size(), uploadColumns, headerStyle);
-
       int rowIndex = headerRow + 1;
       for (AnnotationExportModel.Row row : model.rows()) {
-        Row sheetRow = sheet.createRow(rowIndex++);
-        writeRow(sheetRow, row, columns, dateStyle, textStyle, model.zone());
-        writeUploadCells(
-            sheetRow,
-            columns.size(),
-            uploadsIn(model, nullToEmpty(row.openingComment())),
-            linkStyle,
-            helper);
+        writeRow(sheet.createRow(rowIndex++), row, columns, dateStyle, textStyle, model.zone());
       }
-      int lastColumn = columns.size() + uploadColumns - 1;
 
       // Freeze the header and switch on the filter dropdowns, so Excel's own
       // per-column sort works the moment the file opens — the whole reason the
       // cells are typed rather than pre-formatted strings.
       sheet.createFreezePane(0, headerRow + 1);
       sheet.setAutoFilter(
-          new CellRangeAddress(headerRow, Math.max(rowIndex - 1, headerRow + 1), 0, lastColumn));
+          new CellRangeAddress(
+              headerRow, Math.max(rowIndex - 1, headerRow + 1), 0, columns.size() - 1));
       for (int index = 0; index < columns.size(); index++) {
         sheet.setColumnWidth(index, width(columns.get(index), model.dateFormat()));
       }
-      for (int index = 0; index < uploadColumns; index++) {
-        sheet.setColumnWidth(columns.size() + index, UPLOAD_WIDTH_CHARS * 256);
-      }
       // After the widths, because where the logo sits depends on them.
-      placeLogo(workbook, sheet, model, lastColumn + 1);
+      placeLogo(workbook, sheet, model, columns.size());
 
       if (model.includeComments()) {
         writeComments(workbook, model, dateStyle, headerStyle, textStyle);
       }
+      writeAttachments(workbook, model, headerStyle);
 
       workbook.write(out);
       workbook.dispose(); // drops the streaming temp files
@@ -332,77 +313,92 @@ public class XlsxAnnotationRenderer implements AnnotationExportRenderer {
   }
 
   /**
-   * Writes one cell per upload, appended after the fixed columns.
+   * Every upload the review references, one row each, with a working link.
    *
-   * <p>A cell each because Excel attaches a hyperlink to a whole cell and never to a word inside
-   * one: an attachment named mid-sentence cannot be clickable where it stands, so it gets a cell of
-   * its own on the same row. The prose keeps a {@code [name]} marker showing where it came up.
+   * <p>A sheet rather than columns on the annotation row. Excel applies a hyperlink to a whole cell
+   * and never to a word inside one, so each upload needs a cell of its own — and putting those on
+   * the row means a review whose busiest annotation carries five files gives every row five
+   * columns, most of them empty. A sheet holds any number without deforming the grid, and it sorts
+   * and filters like the others.
    *
-   * @return how many cells were written
+   * <p>The prose keeps a {@code [name]} marker showing where each was mentioned, and the target is
+   * the Word report's: the same absolute URL into the app's download page.
+   *
+   * <p>Images are listed too. Word embeds them and a spreadsheet cannot, so without this a reader
+   * would see {@code [screenshot.png]} and have no way to open it.
    */
-  private int writeUploadCells(
-      Row row,
-      int firstColumn,
-      List<ExportAttachment> uploads,
-      CellStyle linkStyle,
-      CreationHelper helper) {
-    int written = 0;
-    for (ExportAttachment upload : uploads) {
-      Cell cell = row.createCell(firstColumn + written++);
-      cell.setCellValue(upload.fileName() == null ? "attachment" : upload.fileName());
+  private void writeAttachments(
+      Workbook workbook, AnnotationExportModel model, CellStyle headerStyle) {
+    List<Reference> references = referencedUploads(model);
+    if (references.isEmpty()) {
+      return;
+    }
+    Sheet sheet = workbook.createSheet("Attachments");
+    int headerRow = model.hasLogo() ? reserveLogoRow(sheet, model) : 0;
+    Row header = sheet.createRow(headerRow);
+    for (int index = 0; index < ATTACHMENT_HEADERS.size(); index++) {
+      Cell cell = header.createCell(index);
+      cell.setCellValue(ATTACHMENT_HEADERS.get(index));
+      cell.setCellStyle(headerStyle);
+    }
+
+    CellStyle linkStyle = linkStyle(workbook);
+    CreationHelper helper = workbook.getCreationHelper();
+    int rowIndex = headerRow + 1;
+    for (Reference reference : references) {
+      ExportAttachment upload = reference.upload();
+      Row row = sheet.createRow(rowIndex++);
+      row.createCell(0).setCellValue(reference.taskKey());
+      Cell name = row.createCell(1);
+      name.setCellValue(upload.fileName() == null ? "attachment" : upload.fileName());
       if (upload.href() != null && !upload.href().isBlank()) {
         Hyperlink link = helper.createHyperlink(HyperlinkType.URL);
         link.setAddress(upload.href());
-        cell.setHyperlink(link);
-        cell.setCellStyle(linkStyle);
+        name.setHyperlink(link);
+        name.setCellStyle(linkStyle);
       }
+      row.createCell(2).setCellValue(upload.kind());
+      row.createCell(3).setCellValue(upload.size());
     }
-    return written;
+
+    sheet.createFreezePane(0, headerRow + 1);
+    sheet.setAutoFilter(
+        new CellRangeAddress(
+            headerRow, Math.max(rowIndex - 1, headerRow + 1), 0, ATTACHMENT_HEADERS.size() - 1));
+    sheet.setColumnWidth(0, AnnotationExportColumn.TASK_KEY.getWidthChars() * 256);
+    sheet.setColumnWidth(1, 48 * 256);
+    sheet.setColumnWidth(2, 12 * 256);
+    sheet.setColumnWidth(3, 12 * 256);
+    placeLogo(workbook, sheet, model, ATTACHMENT_HEADERS.size());
   }
 
-  private static String nullToEmpty(String value) {
-    return value == null ? "" : value;
-  }
-
-  /** The uploads one body references, resolved and deduplicated, in reading order. */
-  private static List<ExportAttachment> uploadsIn(AnnotationExportModel model, String body) {
-    List<ExportAttachment> uploads = new java.util.ArrayList<>();
-    java.util.Set<String> seen = new java.util.LinkedHashSet<>();
-    for (String url : ExportSegment.uploadUrls(body)) {
-      ExportAttachment upload = model.attachment(url);
-      if (upload != null && seen.add(url)) {
-        uploads.add(upload);
-      }
-    }
-    return uploads;
-  }
+  /** One upload as it was referenced: which annotation mentioned it, and what it is. */
+  private record Reference(String taskKey, ExportAttachment upload) {}
 
   /**
-   * How many attachment columns the sheet needs: as many as the busiest row uses.
+   * The uploads this export can point at, in reading order.
    *
-   * <p>Not a fixed number — a review with one attachment should not carry five empty columns, and
-   * one with five should not lose four of them.
+   * <p>Deduplicated per annotation: the same screenshot quoted twice in one thread is one row, but
+   * a file referenced from two annotations is listed under both, because the question a reader asks
+   * is "what belongs to this finding".
    */
-  private static int uploadColumns(
-      AnnotationExportModel model,
-      java.util.function.Function<AnnotationExportModel.Row, List<String>> bodies) {
-    int most = 0;
+  private static List<Reference> referencedUploads(AnnotationExportModel model) {
+    List<Reference> references = new java.util.ArrayList<>();
     for (AnnotationExportModel.Row row : model.rows()) {
-      for (String body : bodies.apply(row)) {
-        most = Math.max(most, uploadsIn(model, body).size());
+      java.util.Set<String> seen = new java.util.LinkedHashSet<>();
+      java.util.List<String> bodies = new java.util.ArrayList<>();
+      bodies.add(row.openingComment());
+      row.thread().forEach(comment -> bodies.add(comment.body()));
+      for (String body : bodies) {
+        for (String url : ExportSegment.uploadUrls(body == null ? "" : body)) {
+          ExportAttachment upload = model.attachment(url);
+          if (upload != null && seen.add(url)) {
+            references.add(new Reference(row.taskKey(), upload));
+          }
+        }
       }
     }
-    return most;
-  }
-
-  /** Headers for the attachment columns: {@code Attachment}, then numbered. */
-  private static void writeUploadHeaders(
-      Row header, int firstColumn, int count, CellStyle headerStyle) {
-    for (int index = 0; index < count; index++) {
-      Cell cell = header.createCell(firstColumn + index);
-      cell.setCellValue(count == 1 ? "Attachment" : "Attachment " + (index + 1));
-      cell.setCellStyle(headerStyle);
-    }
+    return references;
   }
 
   /** Blue and underlined — Excel does not style a hyperlink on its own. */
@@ -423,19 +419,12 @@ public class XlsxAnnotationRenderer implements AnnotationExportRenderer {
       CellStyle textStyle) {
     Sheet sheet = workbook.createSheet("Comments");
     int headerRow = model.hasLogo() ? reserveLogoRow(sheet, model) : 0;
-    int uploadColumns =
-        uploadColumns(model, row -> row.thread().stream().map(c -> nullToEmpty(c.body())).toList());
-    CellStyle linkStyle = linkStyle(workbook);
-    CreationHelper helper = workbook.getCreationHelper();
-
     Row header = sheet.createRow(headerRow);
     for (int index = 0; index < COMMENT_HEADERS.size(); index++) {
       Cell cell = header.createCell(index);
       cell.setCellValue(COMMENT_HEADERS.get(index));
       cell.setCellStyle(headerStyle);
     }
-    writeUploadHeaders(header, COMMENT_HEADERS.size(), uploadColumns, headerStyle);
-
     int rowIndex = headerRow + 1;
     for (AnnotationExportModel.Row annotation : model.rows()) {
       for (CommentView comment : annotation.thread()) {
@@ -447,19 +436,13 @@ public class XlsxAnnotationRenderer implements AnnotationExportRenderer {
         Cell text = row.createCell(3);
         text.setCellValue(body(comment.body()));
         text.setCellStyle(textStyle);
-        writeUploadCells(
-            row,
-            COMMENT_HEADERS.size(),
-            uploadsIn(model, nullToEmpty(comment.body())),
-            linkStyle,
-            helper);
       }
     }
 
     sheet.createFreezePane(0, headerRow + 1);
-    int lastColumn = COMMENT_HEADERS.size() + uploadColumns - 1;
     sheet.setAutoFilter(
-        new CellRangeAddress(headerRow, Math.max(rowIndex - 1, headerRow + 1), 0, lastColumn));
+        new CellRangeAddress(
+            headerRow, Math.max(rowIndex - 1, headerRow + 1), 0, COMMENT_HEADERS.size() - 1));
     // Mirrors the annotation sheet: the key stays narrow, the author gets a
     // name's worth, the timestamp follows the chosen convention, and the comment
     // takes the rest — it is the column anyone opens this sheet to read.
@@ -468,12 +451,9 @@ public class XlsxAnnotationRenderer implements AnnotationExportRenderer {
     sheet.setColumnWidth(
         2, Math.max(HEADER_ALLOWANCE, model.dateFormat().getPattern().length() + 3) * 256);
     sheet.setColumnWidth(3, COMMENT_WIDTH_CHARS * 256);
-    for (int index = 0; index < uploadColumns; index++) {
-      sheet.setColumnWidth(COMMENT_HEADERS.size() + index, UPLOAD_WIDTH_CHARS * 256);
-    }
     // Every sheet, not just the first: a workbook's second tab is as likely to be
     // the one printed or screenshotted as its first.
-    placeLogo(workbook, sheet, model, lastColumn + 1);
+    placeLogo(workbook, sheet, model, COMMENT_HEADERS.size());
   }
 
   private void writeRow(

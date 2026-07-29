@@ -879,7 +879,7 @@ class AnnotationExportIT extends SeededIntegrationTest {
   }
 
   @Test
-  @DisplayName("the workbook links an upload from the annotation's own row")
+  @DisplayName("the workbook lists every upload on its own sheet, with a working link")
   void workbookLinksUploads() throws Exception {
     seedDocument(false);
     String imageUrl = uploadImage(MEMBER_ID, "screenshot.png");
@@ -897,12 +897,10 @@ class AnnotationExportIT extends SeededIntegrationTest {
             .andReturn()
             .getResponse()
             .getContentAsByteArray();
-    XSSFWorkbook workbook = new XSSFWorkbook(new ByteArrayInputStream(body));
-    Sheet sheet = workbook.getSheetAt(0);
+    Sheet sheet = new XSSFWorkbook(new ByteArrayInputStream(body)).getSheet("Attachments");
 
-    assertThat(workbook.getSheet("Attachments")).isNull();
-    Cell cell = sheet.getRow(1).getCell(11);
-    assertThat(sheet.getRow(0).getCell(11).getStringCellValue()).isEqualTo("Attachment");
+    assertThat(sheet).isNotNull();
+    Cell cell = sheet.getRow(1).getCell(1);
     assertThat(cell.getStringCellValue()).isEqualTo("screenshot.png");
     // Same target as the Word report: the app's download page, absolute, never
     // the bearer-authenticated API a click could not open.
