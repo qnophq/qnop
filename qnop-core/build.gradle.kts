@@ -80,6 +80,19 @@ dependencies {
     // the service layer; the controller only streams what it produced.
     implementation(libs.poi.ooxml)
 
+    // Markdown in the exports (issue #637). Comment bodies are CommonMark + GFM,
+    // and the review UI reads them with remark; parsing them here with a real
+    // parser is what keeps an export's reading of a comment the same as the
+    // application's, which a regex could only approximate.
+    //
+    // Used as a PARSER ONLY — commonmark's own HtmlRenderer is never invoked. It
+    // passes raw HTML nodes through by design, and every format here walks the AST
+    // and drops those instead.
+    implementation(libs.commonmark)
+    implementation(libs.commonmark.ext.tables)
+    implementation(libs.commonmark.ext.strikethrough)
+    implementation(libs.commonmark.ext.autolink)
+
     // SVG -> PNG for the branding logo in document exports (#635 follow-up).
     // Word cannot embed SVG, and the bundled logos are SVG. batik-codec supplies
     // the PNG writer batik-transcoder delegates to.

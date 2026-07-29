@@ -42,6 +42,8 @@ import org.apache.poi.xwpf.usermodel.XWPFHeader;
 import org.apache.poi.xwpf.usermodel.XWPFParagraph;
 import org.apache.poi.xwpf.usermodel.XWPFPictureData;
 import org.apache.poi.xwpf.usermodel.XWPFRun;
+import org.apache.poi.xwpf.usermodel.XWPFTable;
+import org.apache.poi.xwpf.usermodel.XWPFTableCell;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
@@ -547,6 +549,144 @@ class DocxAnnotationRendererTest {
         .findFirst()
         .map(p -> p.getCTP().getPPr().getPBdr().getLeft().getSz().intValue())
         .orElseThrow(() -> new AssertionError("no paragraph containing " + text));
+  }
+
+  @Test
+  @DisplayName("emphasis reaches the run it applied to")
+  void rendersEmphasis() throws Exception {
+    AnnotationView view = view("A **bold** and *italic* and ~~struck~~ and `code` line", "Mia", 1);
+
+    byte[] docx = renderer.render(model(List.of(row("T-1", view, List.of()))));
+
+    try (XWPFDocument document = new XWPFDocument(new ByteArrayInputStream(docx))) {
+      List<XWPFRun> runs =
+          document.getParagraphs().stream().flatMap(p -> p.getRuns().stream()).toList();
+      assertThat(runs).anySatisfy(r -> assertRun(r, "bold", XWPFRun::isBold));
+      assertThat(runs).anySatisfy(r -> assertRun(r, "italic", XWPFRun::isItalic));
+      assertThat(runs).anySatisfy(r -> assertRun(r, "struck", XWPFRun::isStrikeThrough));
+      // Monospace is how a document says "this is code" without a background.
+      assertThat(runs)
+          .anySatisfy(
+              r -> {
+                assertThat(r.text()).isEqualTo("code");
+                assertThat(r.getFontFamily()).isNotNull();
+              });
+    }
+  }
+
+  private static void assertRun(
+      XWPFRun run, String text, java.util.function.Predicate<XWPFRun> styled) {
+    assertThat(run.text()).isEqualTo(text);
+    assertThat(styled.test(run)).as("style on %s", text).isTrue();
+  }
+
+  @Test
+  @DisplayName("headings, bullets and numbers keep their structure")
+  void rendersBlockStructure() throws Exception {
+    AnnotationView view =
+        view("## Findings\n\n- first\n- second\n\n1. step one\n2. step two", "Mia", 1);
+
+    List<String> report = paragraphs(renderer.render(model(List.of(row("T-1", view, List.of())))));
+
+    assertThat(report).contains("Findings");
+    // Each item is its own paragraph with its marker, not one run-on sentence.
+    assertThat(report).anySatisfy(line -> assertThat(line).contains("•", "first"));
+    assertThat(report).anySatisfy(line -> assertThat(line).contains("1.", "step one"));
+    assertThat(report).anySatisfy(line -> assertThat(line).contains("2.", "step two"));
+  }
+
+  @Test
+  @DisplayName("a quote is set in behind a rule, not prefixed with an angle bracket")
+  void rendersQuotes() throws Exception {
+    AnnotationView view = view("Before\n\n> quoted claim\n\nAfter", "Mia", 1);
+
+    byte[] docx = renderer.render(model(List.of(row("T-1", view, List.of()))));
+
+    try (XWPFDocument document = new XWPFDocument(new ByteArrayInputStream(docx))) {
+      XWPFParagraph quoted =
+          document.getParagraphs().stream()
+              .filter(p -> p.getText().contains("quoted claim"))
+              .findFirst()
+              .orElseThrow();
+      // The ">" is markup, not content — a printed document sets a quote in.
+      assertThat(quoted.getText()).doesNotContain(">");
+      assertThat(quoted.getIndentationLeft()).isGreaterThan(0);
+      assertThat(quoted.getBorderLeft()).isNotIn(Borders.NONE, null);
+    }
+  }
+
+  @Test
+  @DisplayName("a link in a sentence stays clickable; an unsafe one keeps only its words")
+  void rendersInlineLinks() throws Exception {
+    AnnotationView view =
+        view("See [the spec](https://example.com/s) and [bad](javascript:alert(1))", "Mia", 1);
+
+    byte[] docx = renderer.render(model(List.of(row("T-1", view, List.of()))));
+
+    try (XWPFDocument document = new XWPFDocument(new ByteArrayInputStream(docx))) {
+      assertThat(document.getHyperlinks())
+          .anySatisfy(link -> assertThat(link.getURL()).isEqualTo("https://example.com/s"));
+      assertThat(document.getHyperlinks())
+          .noneSatisfy(link -> assertThat(link.getURL()).contains("javascript"));
+      // The words survive even where the target does not.
+      assertThat(paragraphs(docx)).anySatisfy(line -> assertThat(line).contains("bad"));
+    }
+  }
+
+  @Test
+  @DisplayName("a markdown table becomes a Word table, not a line with separators")
+  void rendersTables() throws Exception {
+    AnnotationView view =
+        view("Findings:\n\n| Column 1 | Column 2 |\n| --- | --- |\n| asda | sfasdf |", "Mia", 1);
+
+    byte[] docx = renderer.render(model(List.of(row("T-1", view, List.of()))));
+
+    try (XWPFDocument document = new XWPFDocument(new ByteArrayInputStream(docx))) {
+      // Separator-joined lines read as a sentence with punctuation in it, which is
+      // what this replaced: in a document that is otherwise properly set, columns
+      // have to be columns.
+      assertThat(document.getTables()).hasSize(1);
+      XWPFTable table = document.getTables().getFirst();
+      assertThat(table.getNumberOfRows()).isEqualTo(2);
+      assertThat(table.getRow(0).getTableCells())
+          .extracting(XWPFTableCell::getText)
+          .containsExactly("Column 1", "Column 2");
+      assertThat(table.getRow(1).getTableCells())
+          .extracting(XWPFTableCell::getText)
+          .containsExactly("asda", "sfasdf");
+      // The header row is bold; the report carries no fills, so a grey band here
+      // would be the only one in the document.
+      assertThat(table.getRow(0).getCell(0).getParagraphArray(0).getRuns().getFirst().isBold())
+          .isTrue();
+    }
+  }
+
+  @Test
+  @DisplayName("the thread's rule stays straight through code, lists and quotes")
+  void keepsTheThreadRuleStraight() throws Exception {
+    AnnotationView view = view("The finding", "Mia Member", 2);
+    List<CommentView> thread =
+        List.of(
+            comment("Mia Member", "The finding"),
+            comment(
+                "Participant 2",
+                "Look at this:\n\n```\nvalue = compute()\n```\n\n- and a list\n  - nested\n\n> and a quote"));
+
+    byte[] docx = renderer.render(model(List.of(row("T-1", view, thread))));
+
+    try (XWPFDocument document = new XWPFDocument(new ByteArrayInputStream(docx))) {
+      List<Integer> edges =
+          document.getParagraphs().stream()
+              .filter(p -> p.getBorderLeft() != null && p.getBorderLeft() != Borders.NONE)
+              .map(XWPFParagraph::getIndentationLeft)
+              .distinct()
+              .toList();
+
+      // The rule is a paragraph border, so it sits wherever the left edge sits: a
+      // block that indents itself bends the line meant to bind the turn together.
+      // One edge means one straight line — which is what a reader notices.
+      assertThat(edges).hasSize(1);
+    }
   }
 
   @Test

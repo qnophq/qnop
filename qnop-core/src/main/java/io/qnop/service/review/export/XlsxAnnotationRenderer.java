@@ -28,7 +28,10 @@ import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.time.Instant;
 import java.time.ZoneId;
+import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
 import javax.imageio.ImageIO;
 import javax.xml.namespace.QName;
 import org.apache.poi.common.usermodel.HyperlinkType;
@@ -42,6 +45,7 @@ import org.apache.poi.ss.usermodel.Font;
 import org.apache.poi.ss.usermodel.Hyperlink;
 import org.apache.poi.ss.usermodel.IndexedColors;
 import org.apache.poi.ss.usermodel.Picture;
+import org.apache.poi.ss.usermodel.RichTextString;
 import org.apache.poi.ss.usermodel.Row;
 import org.apache.poi.ss.usermodel.Sheet;
 import org.apache.poi.ss.usermodel.VerticalAlignment;
@@ -111,12 +115,19 @@ public class XlsxAnnotationRenderer implements AnnotationExportRenderer {
     List<AnnotationExportColumn> columns = model.columns();
     // Streaming workbook: a review with thousands of annotations must not have to
     // fit in memory as a DOM.
-    try (SXSSFWorkbook workbook = new SXSSFWorkbook(200);
+    //
+    // The shared-strings table is on, and that is not the default — measured: with
+    // it off, a rich string's formatting runs are written away and a cell comes
+    // back as plain text, so the emphasis a comment carries would silently vanish.
+    // It costs memory proportional to the distinct strings, which this export
+    // already spends on the model it holds anyway.
+    try (SXSSFWorkbook workbook = new SXSSFWorkbook(null, 200, false, true);
         ByteArrayOutputStream out = new ByteArrayOutputStream()) {
       Sheet sheet = workbook.createSheet("Annotations");
       CellStyle headerStyle = headerStyle(workbook);
       CellStyle dateStyle = dateStyle(workbook, model.dateFormat());
       CellStyle textStyle = wrappedTextStyle(workbook);
+      FontCache fonts = new FontCache(workbook);
 
       // A band of its own when there is a logo. Floating it over the grid was the
       // literal reading of "on top" and the wrong one: it covered the cells
@@ -132,7 +143,15 @@ public class XlsxAnnotationRenderer implements AnnotationExportRenderer {
       }
       int rowIndex = headerRow + 1;
       for (AnnotationExportModel.Row row : model.rows()) {
-        writeRow(sheet.createRow(rowIndex++), row, columns, dateStyle, textStyle, model.zone());
+        writeRow(
+            sheet.createRow(rowIndex++),
+            row,
+            columns,
+            dateStyle,
+            textStyle,
+            model.zone(),
+            workbook,
+            fonts);
       }
 
       // Freeze the header and switch on the filter dropdowns, so Excel's own
@@ -149,7 +168,7 @@ public class XlsxAnnotationRenderer implements AnnotationExportRenderer {
       placeLogo(workbook, sheet, model, columns.size());
 
       if (model.includeComments()) {
-        writeComments(workbook, model, dateStyle, headerStyle, textStyle);
+        writeComments(workbook, model, dateStyle, headerStyle, textStyle, fonts);
       }
       writeAttachments(workbook, model, headerStyle);
 
@@ -390,7 +409,7 @@ public class XlsxAnnotationRenderer implements AnnotationExportRenderer {
       bodies.add(row.openingComment());
       row.thread().forEach(comment -> bodies.add(comment.body()));
       for (String body : bodies) {
-        for (String url : ExportSegment.uploadUrls(body == null ? "" : body)) {
+        for (String url : ExportMarkdown.uploadUrls(body == null ? "" : body)) {
           ExportAttachment upload = model.attachment(url);
           if (upload != null && seen.add(url)) {
             references.add(new Reference(row.taskKey(), upload));
@@ -416,7 +435,8 @@ public class XlsxAnnotationRenderer implements AnnotationExportRenderer {
       AnnotationExportModel model,
       CellStyle dateStyle,
       CellStyle headerStyle,
-      CellStyle textStyle) {
+      CellStyle textStyle,
+      FontCache fonts) {
     Sheet sheet = workbook.createSheet("Comments");
     int headerRow = model.hasLogo() ? reserveLogoRow(sheet, model) : 0;
     Row header = sheet.createRow(headerRow);
@@ -427,14 +447,18 @@ public class XlsxAnnotationRenderer implements AnnotationExportRenderer {
     }
     int rowIndex = headerRow + 1;
     for (AnnotationExportModel.Row annotation : model.rows()) {
-      for (CommentView comment : annotation.thread()) {
+      // Replies only. The opening comment IS the annotation — it is already the
+      // Summary column on the first sheet, and listing it here again both
+      // duplicates it and contradicts the Replies count beside it, which has
+      // always excluded it. Word never showed it either.
+      for (CommentView comment : annotation.replyComments()) {
         Row row = sheet.createRow(rowIndex++);
         row.createCell(0).setCellValue(annotation.taskKey());
         row.createCell(1)
             .setCellValue(comment.authorDisplayName() == null ? "" : comment.authorDisplayName());
         writeDate(row, 2, comment.createdAt(), dateStyle, model.zone());
         Cell text = row.createCell(3);
-        text.setCellValue(body(comment.body()));
+        text.setCellValue(richBody(workbook, comment.body(), fonts));
         text.setCellStyle(textStyle);
       }
     }
@@ -462,7 +486,9 @@ public class XlsxAnnotationRenderer implements AnnotationExportRenderer {
       List<AnnotationExportColumn> columns,
       CellStyle dateStyle,
       CellStyle textStyle,
-      ZoneId zone) {
+      ZoneId zone,
+      Workbook workbook,
+      FontCache fonts) {
     AnnotationView view = source.view();
     for (int index = 0; index < columns.size(); index++) {
       switch (columns.get(index)) {
@@ -479,7 +505,7 @@ public class XlsxAnnotationRenderer implements AnnotationExportRenderer {
         case PRIORITY -> row.createCell(index).setCellValue(humanize(view.priority()));
         case SUMMARY -> {
           Cell cell = row.createCell(index);
-          cell.setCellValue(summary(source.openingComment()));
+          cell.setCellValue(richBody(workbook, source.openingComment(), fonts));
           cell.setCellStyle(textStyle);
         }
         case AUTHOR ->
@@ -507,46 +533,151 @@ public class XlsxAnnotationRenderer implements AnnotationExportRenderer {
   }
 
   /**
-   * A comment's full text for the thread sheet — unlike the annotation row's {@code summary} this
-   * is not an excerpt, because the point of the sheet is to carry what was actually said. Only
-   * Excel's own per-cell ceiling truncates it.
+   * A body as one rich cell value: block structure as lines, emphasis as runs.
+   *
+   * <p>A spreadsheet cell can carry character formatting — {@code applyFont} over a range — so
+   * bold, italic, strikethrough and monospace survive here too. What it cannot carry is a link on
+   * part of its text: a hyperlink belongs to the whole cell, so a link keeps its words and loses
+   * its target, which the attachments sheet then makes good for uploads.
    */
-  static String body(String raw) {
-    return ExportText.truncate(withImageNames(raw), CELL_MAX);
+  private static RichTextString richBody(Workbook workbook, String markdown, FontCache fonts) {
+    StringBuilder text = new StringBuilder();
+    List<int[]> runs = new ArrayList<>();
+    List<Set<ExportSpan.Style>> styles = new ArrayList<>();
+
+    for (ExportBlock block : ExportMarkdown.parse(markdown)) {
+      if (!text.isEmpty()) {
+        // A block that ended mid-sentence — prose interrupted by an image — leaves
+        // its separating space behind, and a line ending in one reads as an
+        // accident. Trimming here is safe: nothing has been appended past it yet,
+        // so no recorded run can shift.
+        trimTrailingSpaces(text);
+        text.append('\n');
+      }
+      text.append("    ".repeat(Math.max(0, block.quoteDepth())));
+      switch (block) {
+        case ExportBlock.ListItem item -> {
+          text.append("  ".repeat(item.depth())).append(item.marker()).append(' ');
+          append(text, runs, styles, item.spans(), Set.of());
+        }
+        case ExportBlock.Heading heading ->
+            append(text, runs, styles, heading.spans(), Set.of(ExportSpan.Style.BOLD));
+        case ExportBlock.Paragraph paragraph ->
+            append(text, runs, styles, paragraph.spans(), Set.of());
+        case ExportBlock.TableRow row -> {
+          for (int index = 0; index < row.cells().size(); index++) {
+            if (index > 0) {
+              text.append("  |  ");
+            }
+            append(
+                text,
+                runs,
+                styles,
+                row.cells().get(index),
+                row.header() ? Set.of(ExportSpan.Style.BOLD) : Set.of());
+          }
+        }
+        case ExportBlock.Code code -> {
+          int from = text.length();
+          text.append(code.text().stripTrailing());
+          runs.add(new int[] {from, text.length()});
+          styles.add(Set.of(ExportSpan.Style.CODE));
+        }
+        case ExportBlock.Image image ->
+            text.append('[').append(name(image.alt(), "image")).append(']');
+        case ExportBlock.Attachment file ->
+            text.append('[').append(name(file.label(), "attachment")).append(']');
+        case ExportBlock.Divider ignored -> text.append("———");
+      }
+    }
+
+    String value = ExportText.truncate(text.toString().strip(), CELL_MAX);
+    RichTextString rich = workbook.getCreationHelper().createRichTextString(value);
+    for (int index = 0; index < runs.size(); index++) {
+      int[] range = runs.get(index);
+      // A run the cell-length cap cut away has nothing left to style.
+      if (range[0] >= value.length()) {
+        continue;
+      }
+      Font font = fonts.forStyles(styles.get(index));
+      if (font != null) {
+        rich.applyFont(range[0], Math.min(range[1], value.length()), font);
+      }
+    }
+    return rich;
   }
 
-  /** The opening comment in full — markdown noise stripped, line breaks kept. */
-  static String summary(String firstComment) {
-    return ExportText.truncate(withImageNames(firstComment), CELL_MAX);
+  private static void trimTrailingSpaces(StringBuilder text) {
+    int end = text.length();
+    while (end > 0 && (text.charAt(end - 1) == ' ' || text.charAt(end - 1) == '\t')) {
+      end--;
+    }
+    text.setLength(end);
+  }
+
+  /** Appends spans, recording where each styled run begins and ends. */
+  private static void append(
+      StringBuilder text,
+      List<int[]> runs,
+      List<Set<ExportSpan.Style>> styles,
+      List<ExportSpan> spans,
+      Set<ExportSpan.Style> inherited) {
+    for (ExportSpan span : spans) {
+      switch (span) {
+        case ExportSpan.Break ignored -> text.append('\n');
+        case ExportSpan.Link link -> append(text, runs, styles, link.spans(), inherited);
+        case ExportSpan.Text value -> {
+          if (value.value().isEmpty()) {
+            continue;
+          }
+          Set<ExportSpan.Style> combined = new java.util.LinkedHashSet<>(inherited);
+          combined.addAll(value.styles());
+          int from = text.length();
+          text.append(value.value());
+          if (!combined.isEmpty()) {
+            runs.add(new int[] {from, text.length()});
+            styles.add(combined);
+          }
+        }
+      }
+    }
+  }
+
+  private static String name(String value, String fallback) {
+    return value == null || value.isBlank() ? fallback : value;
   }
 
   /**
-   * Prose with each image named where it stood.
+   * Fonts by style combination, created once per workbook.
    *
-   * <p>A cell holds text, not pictures — and a floating picture would be worse than none here,
-   * since the first sort detaches it from the row it belongs to. So the spreadsheet says {@code
-   * [screenshot.png]} where the Word report shows the picture: the reader learns that something
-   * visual was said and what it was called, which beats the silence this replaces.
+   * <p>A workbook holds a bounded number of fonts and a run-by-run {@code createFont} would mint
+   * one per emphasised word.
    */
-  private static String withImageNames(String markdown) {
-    StringBuilder text = new StringBuilder();
-    for (ExportSegment segment : ExportSegment.split(markdown)) {
-      if (!text.isEmpty()) {
-        text.append(' ');
-      }
-      if (segment instanceof ExportSegment.Text part) {
-        // Already plain text with its paragraph breaks intact; flattening again
-        // would undo exactly what the wrapped cells are for.
-        text.append(part.value());
-      } else if (segment instanceof ExportSegment.Image image) {
-        String label = image.alt() == null || image.alt().isBlank() ? "image" : image.alt();
-        text.append('[').append(label).append(']');
-      } else if (segment instanceof ExportSegment.Attachment file) {
-        String label = file.label() == null || file.label().isBlank() ? "attachment" : file.label();
-        text.append('[').append(label).append(']');
-      }
+  private static final class FontCache {
+    private final Workbook workbook;
+    private final Map<Set<ExportSpan.Style>, Font> fonts = new java.util.HashMap<>();
+
+    FontCache(Workbook workbook) {
+      this.workbook = workbook;
     }
-    return text.toString().strip();
+
+    Font forStyles(Set<ExportSpan.Style> styles) {
+      if (styles.isEmpty()) {
+        return null;
+      }
+      return fonts.computeIfAbsent(
+          Set.copyOf(styles),
+          key -> {
+            Font font = workbook.createFont();
+            font.setBold(key.contains(ExportSpan.Style.BOLD));
+            font.setItalic(key.contains(ExportSpan.Style.ITALIC));
+            font.setStrikeout(key.contains(ExportSpan.Style.STRIKETHROUGH));
+            if (key.contains(ExportSpan.Style.CODE)) {
+              font.setFontName("Consolas");
+            }
+            return font;
+          });
+    }
   }
 
   /** {@code CHANGES_REQUESTED} → {@code Changes requested}; null/blank → empty cell. */

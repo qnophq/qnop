@@ -94,7 +94,7 @@ public class ExportAttachmentResolver {
     long budget = TOTAL_BUDGET_BYTES;
 
     for (String body : bodies) {
-      for (String url : ExportSegment.imageUrls(body)) {
+      for (String url : ExportMarkdown.imageUrls(body)) {
         if (resolved.containsKey(url)) {
           continue; // the same screenshot quoted twice costs one read
         }
@@ -132,7 +132,7 @@ public class ExportAttachmentResolver {
       // Images too: Word embeds them, but a spreadsheet cannot, and a reader
       // who sees "[screenshot.png]" with no way to open it is no better off
       // than before.
-      for (String url : ExportSegment.uploadUrls(body)) {
+      for (String url : ExportMarkdown.uploadUrls(body)) {
         if (resolved.containsKey(url)) {
           continue;
         }

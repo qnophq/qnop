@@ -52,11 +52,27 @@ Two columns from the original proposal were dropped rather than duplicated furth
 
 ### Comment threads become a second sheet, off the wire unless asked for
 
-An annotation's thread has no fixed length, so it cannot become columns on the annotation row, and folding a whole conversation into one cell would be neither sortable nor readable. The threads therefore go on their own `Comments` sheet, one row per comment (`#`, `Author`, `Written`, `Comment`), keyed back to the annotation by the same `T-N` shorthand — a relational shape is what a spreadsheet is actually good at.
+An annotation's thread has no fixed length, so it cannot become columns on the annotation row, and folding a whole conversation into one cell would be neither sortable nor readable. The threads therefore go on their own `Comments` sheet, one row per **reply** (`#`, `Author`, `Written`, `Comment`), keyed back to the annotation by the same `T-N` shorthand — a relational shape is what a spreadsheet is actually good at.
+
+The opening comment is not among them. It *is* the annotation: it already fills the Summary column on the first sheet, and a row for it here duplicates that while contradicting the `Replies` count beside it, which has always excluded it. The Word report never showed it either — the sheet was the odd one out.
 
 The rows are read through `AnnotationService.listComments`, for the same reason the annotation rows go through `list`: it applies the PRIVATE-thread visibility check and resolves every author through `ReviewIdentityResolver`, so a pseudonymised reviewer stays pseudonymised in the export by construction. The owner is the one identity that stays real — anonymity never covered them, since it is their review.
 
 That costs one query round per annotation. It is accepted rather than batched: an export is a rare, deliberate action, and re-implementing the visibility rules to avoid the round trips would trade a bounded cost for an unbounded correctness risk. The sheet is opt-in on the wire (`?comments=true`) so an export that does not want it does not pay for it — but the wizard defaults it on, because someone exporting a review usually wants what was said, not just that something was said.
+
+### Markdown is parsed once, and rendered — not flattened
+
+Comment bodies are CommonMark with the GFM extensions the review UI enables. The exports used to reduce them with regexes: emphasis stripped, structure lost, and — the part that mattered more — a *second reader* of the same text, which could and did disagree with the application's.
+
+They are now parsed once, with commonmark, into blocks and spans that every format renders from. Four renderers parsing markdown themselves would be four opinions about what a comment says; this way they differ only in what they can show. `commonmark` is used strictly as a **parser** — its own `HtmlRenderer` is never invoked, because it passes raw HTML through by design.
+
+The model is flat. Markdown nests, and none of the outputs do: Word sets indentation and a border on a paragraph, a spreadsheet cell has lines. Nesting travels as two depths, which turns each renderer into a loop rather than a recursive walk and costs no format anything it could have displayed.
+
+**Raw HTML a commenter wrote is dropped** at the parse, not per format. `HtmlBlock`/`HtmlInline` nodes are ignored, so no renderer can receive markup a user authored — the property the HTML export (#637) will rest on entirely. Link targets are restricted to `http(s)` and app-relative: a `javascript:` URL in a comment would otherwise be one click from execution in a document that opens in a browser.
+
+A markdown table becomes a real Word table. It was a run of separator-joined lines first, on the theory that a table nested inside a comment inside a thread was more structure than a page could carry; held against real content it read as a sentence with punctuation in it. In a document that is otherwise properly set, columns have to be columns.
+
+Each format shows what it can. Word carries the most — emphasis on runs, headings, bullets, quotes set behind a rule, monospace, inline links — and PDF inherits it. A spreadsheet cell carries character formatting too, via rich text; what it cannot carry is a link on part of its text, since a hyperlink belongs to the whole cell. Enabling rich text there required turning the streaming workbook's shared-strings table *on*, which is not its default: measured, with it off the formatting runs are written away and the cell comes back as plain text.
 
 ### Presentation is configured, not assumed
 
@@ -156,6 +172,7 @@ Headings use direct character formatting plus an OOXML outline level rather than
 - **2026-07-29** — the date convention, its timezone, the branding logo and the filename became per-export choices, all format-independent.
 - **2026-07-29** — inline images in annotations and comments are exported rather than stripped; other attachments are linked.
 - **2026-07-29** — PDF (#639) ships by converting the Word report out-of-process, and format availability becomes a server capability rather than a release constant.
+- **2026-07-30** — comment markdown is parsed once with commonmark and rendered by each format instead of being flattened away (#637).
 - **ADR-0021 / ADR-0015** — OpenAPI-first, and why this endpoint is the deliberate exception
 - **ADR-0004** — the layering that puts the workbook in the service and leaves the controller streaming
 - Issue **#547**

@@ -52,6 +52,12 @@ awsSdk = "2.31.6"
 # token lists (word granularity), Apache-2.0. Chosen over the unmaintained
 # java port of diff-match-patch. Not in the Spring Boot BOM → explicit version.
 javaDiffUtils = "4.15"
+# Markdown in the exports (issue #637): comment bodies are CommonMark + GFM, and
+# the review UI reads them with remark-gfm/remark-breaks. Parsing them with a real
+# parser rather than regexes is what keeps an export's reading of a comment the
+# same as the application's. BSD-2-Clause. Used as a PARSER only — its HTML
+# renderer is never invoked, because it would pass raw HTML nodes through.
+commonmark = "0.29.0"
 
 # --- Pinned for later phases (NOT yet applied) -------------------------
 pdfbox = "3.0.8"            # PDF text extraction with glyph positions
@@ -132,6 +138,10 @@ shedlock-provider-jdbc-template = { module = "net.javacrumbs.shedlock:shedlock-p
 # Mail subsystem (issue #19) — JavaMail + logic-less Mustache template rendering.
 spring-boot-starter-mail = { module = "org.springframework.boot:spring-boot-starter-mail" }
 jmustache = { module = "com.samskivert:jmustache", version.ref = "jmustache" }
+commonmark = { module = "org.commonmark:commonmark", version.ref = "commonmark" }
+commonmark-ext-tables = { module = "org.commonmark:commonmark-ext-gfm-tables", version.ref = "commonmark" }
+commonmark-ext-strikethrough = { module = "org.commonmark:commonmark-ext-gfm-strikethrough", version.ref = "commonmark" }
+commonmark-ext-autolink = { module = "org.commonmark:commonmark-ext-autolink", version.ref = "commonmark" }
 
 # Object storage (issue #243, ADR-0005): AWS SDK v2 S3 client — the vendor-neutral
 # StorageProvider default (io.qnop.service.storage). Not BOM-managed → explicit version.
