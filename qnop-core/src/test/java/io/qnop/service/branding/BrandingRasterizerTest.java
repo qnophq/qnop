@@ -52,7 +52,7 @@ class BrandingRasterizerTest {
 
     // The logo's viewBox is 126x64; a renderer that only set the width would get
     // a squashed square out of Batik, which is the bug this asserts against.
-    assertThat(image.getWidth()).isEqualTo(600);
+    assertThat(image.getWidth()).isEqualTo(BrandingRasterizer.RENDER_WIDTH_PX);
     assertThat((double) image.getWidth() / image.getHeight()).isCloseTo(126.0 / 64.0, within(0.05));
   }
 
@@ -69,8 +69,8 @@ class BrandingRasterizerTest {
                 .toPng(BrandingLimits.SVG, svg.getBytes(StandardCharsets.UTF_8))
                 .orElseThrow());
 
-    assertThat(image.getWidth()).isEqualTo(600);
-    assertThat(image.getHeight()).isEqualTo(300);
+    assertThat(image.getWidth()).isEqualTo(BrandingRasterizer.RENDER_WIDTH_PX);
+    assertThat(image.getHeight()).isEqualTo(BrandingRasterizer.RENDER_WIDTH_PX / 2);
   }
 
   @Test

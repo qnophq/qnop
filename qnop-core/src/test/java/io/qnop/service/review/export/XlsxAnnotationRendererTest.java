@@ -230,6 +230,8 @@ class XlsxAnnotationRendererTest {
         long sheetWidth = absoluteX(sheet, lastColumn(sheet) + 1);
         assertThat((sheetWidth - right) / (double) Units.EMU_PER_PIXEL).isBetween(0.0, 12.0);
         assertThat(top / (double) Units.EMU_PER_PIXEL).isBetween(0.0, 12.0);
+        // And it stays inside its own band rather than reaching into the header.
+        assertThat(bottom).isLessThanOrEqualTo(absoluteY(sheet, 1));
       }
     }
   }
@@ -255,8 +257,20 @@ class XlsxAnnotationRendererTest {
     return emu;
   }
 
+  /**
+   * The last column of the grid.
+   *
+   * <p>Found by the header rather than by row 0, which on a branded sheet is the logo's empty band
+   * and reports no cells at all.
+   */
   private static int lastColumn(Sheet sheet) {
-    return sheet.getRow(0).getLastCellNum() - 1;
+    for (int index = 0; index <= sheet.getLastRowNum(); index++) {
+      Row row = sheet.getRow(index);
+      if (row != null && row.getLastCellNum() > 0) {
+        return row.getLastCellNum() - 1;
+      }
+    }
+    throw new IllegalStateException("sheet has no populated row");
   }
 
   @Test
@@ -293,17 +307,22 @@ class XlsxAnnotationRendererTest {
   }
 
   @Test
-  @DisplayName("the logo costs the grid no rows — the header stays in row 1")
-  void logoDoesNotShiftTheGrid() throws Exception {
+  @DisplayName("the logo gets a row of its own instead of covering the data")
+  void logoDoesNotCoverTheGrid() throws Exception {
     Sheet branded = sheetOf(renderer.render(branded(pngOf(240, 120))), 0);
     Sheet plain = sheetOf(renderer.render(model(view("A finding", 1), List.of())), 0);
 
-    // A layer on top means the sheet has the same shape either way; the band
-    // this replaced pushed every header down by four rows.
-    assertThat(branded.getRow(0).getCell(0).getStringCellValue()).isEqualTo("#");
+    // Floating it over the grid was the literal reading of "on top" and hid the
+    // cells underneath. The band is tall enough for the picture, so nothing
+    // overlaps: header below it, data below that.
+    assertThat(branded.getRow(0).getCell(0)).isNull();
+    assertThat(branded.getRow(0).getHeightInPoints()).isGreaterThan(120 * 0.75f);
+    assertThat(branded.getRow(1).getCell(0).getStringCellValue()).isEqualTo("#");
+    assertThat(branded.getRow(2).getCell(5).getStringCellValue()).isEqualTo("A finding");
+    assertThat(branded.getPaneInformation().getHorizontalSplitPosition()).isEqualTo((short) 2);
+
+    // Unbranded, the grid keeps the shape it had before branding existed.
     assertThat(plain.getRow(0).getCell(0).getStringCellValue()).isEqualTo("#");
-    assertThat(branded.getRow(1).getCell(5).getStringCellValue())
-        .isEqualTo(plain.getRow(1).getCell(5).getStringCellValue());
   }
 
   private static byte[] pngOf(int width, int height) throws Exception {

@@ -57,10 +57,12 @@ public class BrandingRasterizer {
   /**
    * Rendered width in pixels.
    *
-   * <p>Generous on purpose: the logo is placed at roughly 100pt in a document, and print is 300 dpi
-   * or better, so a rendition that merely matches the on-screen size would look soft on paper.
+   * <p>A compromise between two consumers. Word scales the rendition down to about 90pt, so more
+   * pixels only buy print sharpness; a spreadsheet places it at its own size, where 600px was
+   * simply too large. 320px keeps Word above 250 dpi at its printed size — past the point the eye
+   * separates — while giving Excel a logo that heads the sheet instead of dominating it.
    */
-  private static final int RENDER_WIDTH_PX = 600;
+  static final int RENDER_WIDTH_PX = 320;
 
   /** A guard against a viewBox so extreme that the raster would exhaust memory. */
   private static final int MAX_RENDER_HEIGHT_PX = 2400;

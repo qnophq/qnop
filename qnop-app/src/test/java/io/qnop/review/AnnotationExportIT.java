@@ -598,7 +598,7 @@ class AnnotationExportIT extends SeededIntegrationTest {
   }
 
   @Test
-  @DisplayName("the workbook's logo floats over the grid without displacing it")
+  @DisplayName("the workbook's logo heads the sheet without covering any data")
   void workbookCarriesTheLogoAboveTheGrid() throws Exception {
     seedDocument(false);
     annotate(MEMBER_ID, 0, 0.1, 0.1, "A finding");
@@ -613,14 +613,15 @@ class AnnotationExportIT extends SeededIntegrationTest {
     XSSFWorkbook branded = new XSSFWorkbook(new ByteArrayInputStream(body));
     Sheet sheet = branded.getSheetAt(0);
 
-    // A layer, not a band: the picture is there, and the grid starts where it
-    // would without any branding at all.
+    // A band of its own: the picture is there, the row above the header is empty
+    // and tall enough to hold it, and no cell is hidden underneath.
     assertThat(branded.getAllPictures()).isNotEmpty();
-    assertThat(sheet.getRow(0).getCell(0).getStringCellValue()).isEqualTo("#");
-    assertThat(sheet.getRow(1).getCell(5).getStringCellValue()).isEqualTo("A finding");
-    assertThat(sheet.getPaneInformation().getHorizontalSplitPosition()).isEqualTo((short) 1);
+    assertThat(sheet.getRow(0).getCell(0)).isNull();
+    assertThat(sheet.getRow(1).getCell(0).getStringCellValue()).isEqualTo("#");
+    assertThat(sheet.getRow(2).getCell(5).getStringCellValue()).isEqualTo("A finding");
+    assertThat(sheet.getPaneInformation().getHorizontalSplitPosition()).isEqualTo((short) 2);
 
-    // And an unbranded export is byte-for-byte the same shape.
+    // And an unbranded export keeps the grid it had before branding existed.
     assertThat(download(MEMBER_ID).getRow(0).getCell(0).getStringCellValue()).isEqualTo("#");
   }
 

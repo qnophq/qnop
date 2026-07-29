@@ -68,7 +68,7 @@ On the wire the zone is a parameter and its absence means UTC. The server does *
 
 **The logo.** Not every export is a document that should carry branding — an extract for a pivot table is not — so it is a switch. Whether the switch is even offered is a property of the format, not a preference: `AnnotationExportFormat.supportsLogo()` is false for Markdown and CSV, which are text and have nowhere to put an image. A control that silently does nothing is worse than an absent one, and the service checks the same flag, so the rendition is not even fetched for a format that could not use it.
 
-In the spreadsheet the logo is a floating layer in the top-right corner of *every* sheet, at the image's own pixel size — the anchor is computed from the picture, never the picture squeezed into the anchor. It costs the grid no rows, so a sheet has the same shape whether or not it is branded.
+In the spreadsheet the logo sits in the top-right corner of *every* sheet, at the image's own pixel size — the anchor is computed from the picture, never the picture squeezed into the anchor. It gets a band of its own above the header, whose height comes from the picture: floating it over the grid was the literal reading of "on top" and the wrong one, because it hid the cells underneath. With no logo the sheet keeps the layout that shipped with #547.
 
 Both of the picture's corners are resolved into the cell that contains them plus the offset inside it. That is not bookkeeping: Excel derives the rectangle from those two markers, so a wrong marker does not misplace the picture, it deforms it. POI's own `Picture.resize()` does the same arithmetic but discards the caller's `dx1`, which makes right-alignment impossible — measured, not assumed.
 

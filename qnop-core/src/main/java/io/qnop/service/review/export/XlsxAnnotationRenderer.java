@@ -104,14 +104,20 @@ public class XlsxAnnotationRenderer implements AnnotationExportRenderer {
       CellStyle dateStyle = dateStyle(workbook, model.dateFormat());
       CellStyle textStyle = wrappedTextStyle(workbook);
 
-      Row header = sheet.createRow(0);
+      // A band of its own when there is a logo. Floating it over the grid was the
+      // literal reading of "on top" and the wrong one: it covered the cells
+      // underneath. The band's height comes from the picture, so the logo is
+      // never squeezed to fit a row — the row is sized to fit the logo.
+      int headerRow = model.hasLogo() ? reserveLogoRow(sheet, model) : 0;
+
+      Row header = sheet.createRow(headerRow);
       for (int index = 0; index < columns.size(); index++) {
         Cell cell = header.createCell(index);
         cell.setCellValue(columns.get(index).getHeader());
         cell.setCellStyle(headerStyle);
       }
 
-      int rowIndex = 1;
+      int rowIndex = headerRow + 1;
       for (AnnotationExportModel.Row row : model.rows()) {
         writeRow(sheet.createRow(rowIndex++), row, columns, dateStyle, textStyle, model.zone());
       }
@@ -119,9 +125,10 @@ public class XlsxAnnotationRenderer implements AnnotationExportRenderer {
       // Freeze the header and switch on the filter dropdowns, so Excel's own
       // per-column sort works the moment the file opens — the whole reason the
       // cells are typed rather than pre-formatted strings.
-      sheet.createFreezePane(0, 1);
+      sheet.createFreezePane(0, headerRow + 1);
       sheet.setAutoFilter(
-          new CellRangeAddress(0, Math.max(model.rows().size(), 1), 0, columns.size() - 1));
+          new CellRangeAddress(
+              headerRow, Math.max(rowIndex - 1, headerRow + 1), 0, columns.size() - 1));
       for (int index = 0; index < columns.size(); index++) {
         sheet.setColumnWidth(index, width(columns.get(index), model.dateFormat()));
       }
@@ -204,6 +211,27 @@ public class XlsxAnnotationRenderer implements AnnotationExportRenderer {
     }
   }
 
+  /**
+   * Creates the row the logo lives in, tall enough to hold it, and returns the row the header goes
+   * in.
+   *
+   * <p>One tall row rather than several default ones: the height follows the picture exactly, so
+   * there is neither a gap under the logo nor a logo hanging into the headers.
+   */
+  private int reserveLogoRow(Sheet sheet, AnnotationExportModel model) {
+    try {
+      java.awt.Dimension size = naturalSize(model.logoPng());
+      Row band = sheet.createRow(0);
+      // Pixels to points, plus the margin above and below.
+      band.setHeightInPoints((float) ((size.height + 2.0 * LOGO_MARGIN_PX) * 72.0 / 96.0));
+      return 1;
+    } catch (RuntimeException | IOException e) {
+      // Undecodable: placeLogo will refuse it too, so leave the grid unchanged.
+      log.warn("Could not measure the branding logo; the sheet keeps its plain layout", e);
+      return 0;
+    }
+  }
+
   /** A picture corner: the cell it falls in, and how far into that cell it sits. */
   private record Marker(Position column, Position row) {}
 
@@ -275,14 +303,15 @@ public class XlsxAnnotationRenderer implements AnnotationExportRenderer {
       CellStyle headerStyle,
       CellStyle textStyle) {
     Sheet sheet = workbook.createSheet("Comments");
-    Row header = sheet.createRow(0);
+    int headerRow = model.hasLogo() ? reserveLogoRow(sheet, model) : 0;
+    Row header = sheet.createRow(headerRow);
     for (int index = 0; index < COMMENT_HEADERS.size(); index++) {
       Cell cell = header.createCell(index);
       cell.setCellValue(COMMENT_HEADERS.get(index));
       cell.setCellStyle(headerStyle);
     }
 
-    int rowIndex = 1;
+    int rowIndex = headerRow + 1;
     for (AnnotationExportModel.Row annotation : model.rows()) {
       for (CommentView comment : annotation.thread()) {
         Row row = sheet.createRow(rowIndex++);
@@ -296,9 +325,10 @@ public class XlsxAnnotationRenderer implements AnnotationExportRenderer {
       }
     }
 
-    sheet.createFreezePane(0, 1);
+    sheet.createFreezePane(0, headerRow + 1);
     sheet.setAutoFilter(
-        new CellRangeAddress(0, Math.max(rowIndex - 1, 1), 0, COMMENT_HEADERS.size() - 1));
+        new CellRangeAddress(
+            headerRow, Math.max(rowIndex - 1, headerRow + 1), 0, COMMENT_HEADERS.size() - 1));
     // Mirrors the annotation sheet: the key stays narrow, the author gets a
     // name's worth, the timestamp follows the chosen convention, and the comment
     // takes the rest — it is the column anyone opens this sheet to read.
