@@ -37,6 +37,8 @@ import io.qnop.service.ApplicationSettingsService;
 import io.qnop.service.branding.BrandingService;
 import io.qnop.service.branding.BrandingService.SlotStatus;
 import io.qnop.service.oidc.OidcProviderService;
+import io.qnop.service.review.AnnotationExportService;
+import io.qnop.service.review.export.AnnotationExportFormat;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -70,15 +72,18 @@ public class ConfigController implements ServerConfigApi {
   private final ApplicationSettingsService settings;
   private final BrandingService branding;
   private final BuildProperties buildProperties;
+  private final AnnotationExportService exports;
 
   public ConfigController(
       OidcProviderService oidcProviders,
       ApplicationSettingsService settings,
       BrandingService branding,
+      AnnotationExportService exports,
       ObjectProvider<BuildProperties> buildProperties) {
     this.oidcProviders = oidcProviders;
     this.settings = settings;
     this.branding = branding;
+    this.exports = exports;
     this.buildProperties = buildProperties.getIfAvailable();
   }
 
@@ -106,6 +111,10 @@ public class ConfigController implements ServerConfigApi {
                         settings.getBoolean(
                             ApplicationSettingKey.REVIEW_FINALIZE_WITH_OPEN_ANNOTATIONS)))
             .upload(new ServerConfigUpload().maxDocumentSizeMb(DEFAULT_MAX_DOCUMENT_SIZE_MB))
+            // Only what this server can actually produce: PDF needs an office
+            // converter, and a client must not offer a download that would fail.
+            .exportFormats(
+                exports.availableFormats().stream().map(AnnotationExportFormat::getId).toList())
             // Report only the formats whose extractor actually ships, so a client never offers an
             // upload the ingest pipeline would reject with 415 (magic-byte sniffing, issue #345).
             // Today that is PDF; DOCX and Markdown are Community-scope and join this list once

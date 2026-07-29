@@ -35,9 +35,11 @@ import io.qnop.service.review.export.AnnotationExportModel;
 import io.qnop.service.review.export.AnnotationExportRenderer;
 import io.qnop.service.review.export.ExportAttachmentResolver;
 import io.qnop.service.review.export.ExportDateFormat;
+import io.qnop.service.review.export.ExportFormatUnavailableException;
 import java.io.IOException;
 import java.time.ZoneId;
 import java.time.ZoneOffset;
+import java.util.Arrays;
 import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -159,12 +161,32 @@ public class AnnotationExportService {
           documentId, new IllegalStateException("no renderer for format " + format.getId()));
     }
 
+    if (!renderer.isAvailable()) {
+      // Said plainly rather than as a subprocess failure three layers down: this
+      // server cannot produce the format, and the wizard should not have offered it.
+      throw new ExportFormatUnavailableException(format.getId());
+    }
+
     AnnotationExportModel model = model(documentId, versionNumber, request, actor, admin);
     try {
       return new Export(renderer.render(model), model.documentTitle(), format);
     } catch (IOException e) {
       throw new AnnotationExportException(documentId, e);
     }
+  }
+
+  /**
+   * The formats this deployment can actually produce, in declaration order.
+   *
+   * <p>Published through {@code GET /api/v1/config} so a client offers only what it can get. Not a
+   * constant: one format needs an external converter, and whether that is installed is a property
+   * of the server, not of the release.
+   */
+  public List<AnnotationExportFormat> availableFormats() {
+    return Arrays.stream(AnnotationExportFormat.values())
+        .filter(renderers::containsKey)
+        .filter(format -> renderers.get(format).isAvailable())
+        .toList();
   }
 
   /** The authorized read, the ordering and the task keys — everything a renderer must not redo. */

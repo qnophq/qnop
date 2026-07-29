@@ -4651,6 +4651,18 @@ components:
             Markdown support extends it once their extractors land.
           items:
             $ref: '#/components/schemas/SupportedFormat'
+        exportFormats:
+          type: array
+          description: |
+            The annotation-export formats this deployment can actually produce
+            (issue #639). Clients should offer only these. It is a server property
+            rather than a release constant: PDF is produced by converting the Word
+            report through an out-of-process office suite (ADR-0007/0010), and a
+            deployment without that installed reports `["xlsx", "docx"]`. Offering a
+            format absent here yields a download that fails.
+          items:
+            type: string
+            example: pdf
         branding:
           $ref: '#/components/schemas/ServerConfigBranding'
       required:

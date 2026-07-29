@@ -36,7 +36,8 @@ public enum AnnotationExportFormat {
       "docx",
       "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
       ".docx",
-      true);
+      true),
+  PDF("pdf", "application/pdf", ".pdf", true);
 
   /** What a request that names no format gets — the format that shipped first. */
   public static final AnnotationExportFormat DEFAULT = XLSX;

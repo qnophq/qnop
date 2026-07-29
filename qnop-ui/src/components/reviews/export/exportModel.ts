@@ -54,11 +54,16 @@ export interface ExportFormat {
 
 /**
  * The formats the wizard shows. Planned ones are listed on purpose: a user who
- * wonders whether Word exists gets an answer here instead of filing a request,
- * and shipping one flips a flag (issues #637, #639). CSV and Markdown were
+ * wonders whether HTML is coming gets an answer here instead of filing a
+ * request, and shipping one flips a flag (issue #637). CSV and Markdown were
  * dropped (#636/#638): CSV is a strictly worse Excel for this data — no typed
  * dates, nowhere to put the comment threads — and Markdown duplicates what the
  * review UI already shows.
+ *
+ * <p>`planned` is a property of the release. Whether a shipped format can
+ * actually be produced is a property of the *server* — PDF converts through an
+ * out-of-process office suite (#639), which a given deployment may not have —
+ * and that answer comes from `ServerConfig.exportFormats`, not from here.
  */
 export const EXPORT_FORMATS: ExportFormat[] = [
   {
@@ -79,7 +84,7 @@ export const EXPORT_FORMATS: ExportFormat[] = [
     hint: 'A readable report — for meetings and sign-off.',
     fieldNoun: 'details',
     commentsHint:
-      'Every reply in full, indented under the annotation it answers. In an anonymous review the authors stay pseudonymous here too.',
+      'The full discussion under each annotation — every reply, with who wrote it and when. In an anonymous review the authors stay pseudonymous here too.',
   },
   {
     id: 'html',
@@ -94,12 +99,12 @@ export const EXPORT_FORMATS: ExportFormat[] = [
   {
     id: 'pdf',
     supportsLogo: true,
-    fieldNoun: 'sections',
-    commentsHint: 'Comment threads are included.',
+    fieldNoun: 'details',
+    commentsHint:
+      'The full discussion under each annotation — every reply, with who wrote it and when. In an anonymous review the authors stay pseudonymous here too.',
     label: 'PDF',
     extension: '.pdf',
-    hint: 'For archiving.',
-    planned: true,
+    hint: 'Looks the same everywhere — for printing and archiving.',
   },
 ];
 
@@ -177,6 +182,19 @@ export interface ExportSettings {
  *   chain (profile → operator default → UTC). Passed in rather than resolved
  *   here, so the wizard and the rest of the app can never disagree about it.
  */
+/**
+ * Whether the server can actually produce a format.
+ *
+ * <p>A format the release ships is not automatically one this deployment can
+ * make. When the server says nothing — an older build, or a request that has not
+ * landed yet — everything shipped is assumed available, so a missing field never
+ * takes a working format away.
+ */
+export function isFormatAvailable(format: ExportFormat, offered: string[] | undefined): boolean {
+  if (format.planned) return false;
+  return offered === undefined || offered.length === 0 || offered.includes(format.id);
+}
+
 export function defaultSettings(timezone: string = FALLBACK_TIME_ZONE): ExportSettings {
   return {
     format: 'xlsx',
