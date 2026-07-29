@@ -43,6 +43,8 @@ import org.apache.poi.ss.usermodel.Row;
 import org.apache.poi.ss.usermodel.Sheet;
 import org.apache.poi.ss.usermodel.Workbook;
 import org.apache.poi.xssf.usermodel.XSSFWorkbook;
+import org.apache.poi.xwpf.usermodel.XWPFDocument;
+import org.apache.poi.xwpf.usermodel.XWPFParagraph;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -175,6 +177,33 @@ class AnnotationExportIT extends SeededIntegrationTest {
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("{\"body\":\"" + body + "\"}"))
         .andExpect(status().isCreated());
+  }
+
+  /** Downloads the Word report and returns its paragraphs, in document order. */
+  private List<String> downloadDocx(UUID actor, String... params) throws Exception {
+    var request =
+        get("/api/v1/documents/" + documentId + "/annotations/export").param("format", "docx");
+    for (int index = 0; index + 1 < params.length; index += 2) {
+      request = request.param(params[index], params[index + 1]);
+    }
+    byte[] body =
+        mockMvc
+            .perform(as(request, actor))
+            .andExpect(status().isOk())
+            .andExpect(
+                header()
+                    .string(
+                        "Content-Type",
+                        "application/vnd.openxmlformats-officedocument.wordprocessingml.document"))
+            .andExpect(
+                header()
+                    .string("Content-Disposition", org.hamcrest.Matchers.containsString(".docx")))
+            .andReturn()
+            .getResponse()
+            .getContentAsByteArray();
+    try (XWPFDocument document = new XWPFDocument(new ByteArrayInputStream(body))) {
+      return document.getParagraphs().stream().map(XWPFParagraph::getText).toList();
+    }
   }
 
   private static List<String> column(Sheet sheet, int index) {
@@ -417,6 +446,90 @@ class AnnotationExportIT extends SeededIntegrationTest {
     // MEMBER owns the document, and the owner is the one identity anonymity does
     // not cover — it is their review, and everybody already knows that.
     assertThat(authors.get(1)).doesNotStartWith("Participant");
+  }
+
+  @Test
+  @DisplayName("the Word report carries the same annotations, in the same reading order")
+  void docxMatchesTheSpreadsheetsContent() throws Exception {
+    seedDocument(false);
+    annotate(MEMBER_ID, 1, 0.1, 0.1, "Second page note");
+    annotate(MEMBER_ID, 0, 0.1, 0.1, "Page one, top");
+    annotate(MEMBER_ID, 0, 0.1, 0.6, "Page one, lower");
+
+    List<String> report = downloadDocx(MEMBER_ID);
+
+    // Reading order, not creation order — the same rule the sheet follows.
+    assertThat(report).containsSubsequence("Page one, top", "Page one, lower", "Second page note");
+    // Task keys still number the review in CREATION order, so the first-created
+    // annotation keeps T-1 even though it sorts last.
+    assertThat(report).containsSubsequence("T-2 · Page 1", "T-3 · Page 1", "T-1 · Page 2");
+    assertThat(report).first().asString().isEqualTo("Vendor agreement");
+  }
+
+  @Test
+  @DisplayName("an anonymous review's Word report names no foreign author (ADR-0038)")
+  void docxRespectsAnonymity() throws Exception {
+    seedDocument(true);
+    String annotationId = createAnnotationReturningId(AUDITOR_ID, 0, 0.1, 0.1, "Opened by a peer");
+    reply(annotationId, AUDITOR_ID, "And answered by the same peer");
+
+    // The report is the format most likely to be forwarded outside qnop, so the
+    // pseudonyms matter here at least as much as in the spreadsheet.
+    List<String> report = downloadDocx(MEMBER2_ID, "comments", "true");
+
+    assertThat(report).anySatisfy(line -> assertThat(line).contains("Participant"));
+    assertThat(report).noneSatisfy(line -> assertThat(line).contains("Avery Auditor"));
+    assertThat(report).contains("Opened by a peer", "And answered by the same peer");
+  }
+
+  @Test
+  @DisplayName("a user who cannot see the review cannot export it as Word either")
+  void docxIsRefusedToForeignUsers() throws Exception {
+    seedDocument(false);
+    annotate(MEMBER_ID, 0, 0.1, 0.1, "Not for outsiders");
+
+    // 404 rather than 403: a refusal that distinguishes the two would confirm
+    // the review exists.
+    mockMvc
+        .perform(
+            as(
+                get("/api/v1/documents/" + documentId + "/annotations/export")
+                    .param("format", "docx"),
+                EXTERNAL_ID))
+        .andExpect(status().isNotFound());
+  }
+
+  @Test
+  @DisplayName("an empty review still yields a well-formed Word document")
+  void docxHandlesTheEmptyReview() throws Exception {
+    seedDocument(false);
+
+    List<String> report = downloadDocx(MEMBER_ID);
+
+    assertThat(report).first().asString().isEqualTo("Vendor agreement");
+    assertThat(report).contains("This review has no annotations.");
+  }
+
+  @Test
+  @DisplayName("an unknown format falls back to the spreadsheet rather than failing")
+  void unknownFormatFallsBackToXlsx() throws Exception {
+    seedDocument(false);
+    annotate(MEMBER_ID, 0, 0.1, 0.1, "Still exports");
+
+    // Same reasoning as unknown fields: a client one release ahead should get a
+    // file it can open, not a 400.
+    mockMvc
+        .perform(
+            as(
+                get("/api/v1/documents/" + documentId + "/annotations/export")
+                    .param("format", "pdf"),
+                MEMBER_ID))
+        .andExpect(status().isOk())
+        .andExpect(
+            header()
+                .string(
+                    "Content-Type",
+                    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"));
   }
 
   @Test
