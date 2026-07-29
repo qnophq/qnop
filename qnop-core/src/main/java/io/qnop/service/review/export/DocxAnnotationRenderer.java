@@ -40,9 +40,6 @@ import org.apache.poi.xwpf.usermodel.XWPFHeader;
 import org.apache.poi.xwpf.usermodel.XWPFParagraph;
 import org.apache.poi.xwpf.usermodel.XWPFRun;
 import org.openxmlformats.schemas.wordprocessingml.x2006.main.CTBorder;
-import org.openxmlformats.schemas.wordprocessingml.x2006.main.CTPPr;
-import org.openxmlformats.schemas.wordprocessingml.x2006.main.CTShd;
-import org.openxmlformats.schemas.wordprocessingml.x2006.main.STShd;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
@@ -84,9 +81,6 @@ public class DocxAnnotationRenderer implements AnnotationExportRenderer {
 
   /** The thread's hairline: the accent, drained almost to grey. */
   private static final String RULE = "C7D2E4";
-
-  /** A wash behind the finding author's turns — visible on screen, faint in print. */
-  private static final String TINT = "F3F6FC";
 
   private static final String LINK = "1D4ED8";
   private static final String ACCENT = "1F3A8A";
@@ -325,15 +319,15 @@ public class DocxAnnotationRenderer implements AnnotationExportRenderer {
           comment.authorDisplayName() == null || comment.authorDisplayName().isBlank()
               ? "Unknown"
               : comment.authorDisplayName();
-      run(attribution, who, META_SIZE, true, INK);
-      run(attribution, "   " + model.formatTimestamp(comment.createdAt()), META_SIZE, false, MUTED);
-
-      writeBody(document, model, comment.body(), THREAD_INDENT);
-
       // The finding's author answering their own thread — the turn a reader looks
       // for first. Compared by display name because an anonymous review has no
       // stable id to compare, but keeps a stable pseudonym (ADR-0038).
       boolean byFinder = finder != null && finder.equals(comment.authorDisplayName());
+
+      run(attribution, who, META_SIZE, true, byFinder ? ACCENT : INK);
+      run(attribution, "   " + model.formatTimestamp(comment.createdAt()), META_SIZE, false, MUTED);
+
+      writeBody(document, model, comment.body(), THREAD_INDENT);
       bindToThread(document, firstParagraph, byFinder);
     }
   }
@@ -361,29 +355,24 @@ public class DocxAnnotationRenderer implements AnnotationExportRenderer {
   }
 
   /**
-   * Draws every paragraph of one turn into the thread: the rule down the left, and the wash when it
-   * is the finding author's.
+   * Draws every paragraph of one turn into the thread: the rule down its left, weighted in the
+   * accent when the turn is the finding author's.
    *
    * <p>Applied to a range after the fact rather than threaded through every writer — prose, images
    * and attachments all create their own paragraphs, and a style parameter on each of them would be
    * four places to forget it.
    */
-  private static void bindToThread(XWPFDocument document, int firstParagraph, boolean tinted) {
+  private static void bindToThread(XWPFDocument document, int firstParagraph, boolean byFinder) {
     List<XWPFParagraph> paragraphs = document.getParagraphs();
     for (int index = firstParagraph; index < paragraphs.size(); index++) {
       XWPFParagraph paragraph = paragraphs.get(index);
       paragraph.setBorderLeft(Borders.SINGLE);
       CTBorder left = paragraph.getCTP().getPPr().getPBdr().getLeft();
-      left.setColor(tinted ? ACCENT : RULE);
-      left.setSz(java.math.BigInteger.valueOf(tinted ? 12 : 6));
+      left.setColor(byFinder ? ACCENT : RULE);
+      // Eighths of a point: a hairline for a reply, twice that for the author's,
+      // which is the difference that still reads once the colour is gone.
+      left.setSz(java.math.BigInteger.valueOf(byFinder ? 12 : 6));
       left.setSpace(java.math.BigInteger.valueOf(10));
-      if (tinted) {
-        CTPPr properties = paragraph.getCTP().getPPr();
-        CTShd shading = properties.isSetShd() ? properties.getShd() : properties.addNewShd();
-        shading.setVal(STShd.CLEAR);
-        shading.setColor("auto");
-        shading.setFill(TINT);
-      }
     }
   }
 

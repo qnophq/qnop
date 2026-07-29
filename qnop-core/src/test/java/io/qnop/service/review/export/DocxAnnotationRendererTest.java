@@ -502,8 +502,8 @@ class DocxAnnotationRendererTest {
   }
 
   @Test
-  @DisplayName("the finding author's own turns are washed, the others are not")
-  void washesTheFindingAuthorsTurns() throws Exception {
+  @DisplayName("the finding author's turns are marked, and no discussion is shaded")
+  void marksTheFindingAuthorsTurns() throws Exception {
     AnnotationView view = view("The finding", "Mia Member", 3);
     List<CommentView> thread =
         List.of(
@@ -514,16 +514,21 @@ class DocxAnnotationRendererTest {
     byte[] docx = renderer.render(model(List.of(row("T-1", view, thread))));
 
     try (XWPFDocument document = new XWPFDocument(new ByteArrayInputStream(docx))) {
-      // "Did the person who raised this come back on it?" is what a review
-      // thread is usually read for, so exactly that turn is marked — two states,
-      // not one tint per participant, because the report gets printed.
-      assertThat(shadedText(document)).anySatisfy(t -> assertThat(t).contains("Fair enough"));
-      assertThat(shadedText(document)).noneSatisfy(t -> assertThat(t).contains("Disagree"));
+      // No background anywhere. The wash this replaced followed whoever happened
+      // to be speaking, so a thread the author answered came out grey and one
+      // they did not came out white — side by side that reads as "some
+      // discussions are shaded", which is not what it meant.
+      assertThat(shadedParagraphs(document)).isEmpty();
+
+      // The signal is the rule's weight instead, per turn: heavier for the
+      // author's, and it survives a greyscale print.
+      assertThat(ruleWeight(document, "Fair enough"))
+          .isGreaterThan(ruleWeight(document, "Disagree"));
     }
   }
 
-  /** The text of every paragraph carrying a shading fill. */
-  private static List<String> shadedText(XWPFDocument document) {
+  /** Paragraphs carrying a shading fill — expected to be none. */
+  private static List<String> shadedParagraphs(XWPFDocument document) {
     return document.getParagraphs().stream()
         .filter(
             p ->
@@ -533,6 +538,15 @@ class DocxAnnotationRendererTest {
                     && !"auto".equals(p.getCTP().getPPr().getShd().getFill()))
         .map(XWPFParagraph::getText)
         .toList();
+  }
+
+  /** The left rule's width, in eighths of a point, on the paragraph holding {@code text}. */
+  private static int ruleWeight(XWPFDocument document, String text) {
+    return document.getParagraphs().stream()
+        .filter(p -> p.getText().contains(text))
+        .findFirst()
+        .map(p -> p.getCTP().getPPr().getPBdr().getLeft().getSz().intValue())
+        .orElseThrow(() -> new AssertionError("no paragraph containing " + text));
   }
 
   @Test
