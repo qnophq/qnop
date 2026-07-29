@@ -64,6 +64,7 @@ import { ServerErrorPage } from '../pages/errors/ServerErrorPage';
 import { NewReviewPage } from '../pages/reviews/NewReviewPage';
 import { MessageDetailPage } from '../pages/messages/MessageDetailPage';
 import { MessagesPage } from '../pages/messages/MessagesPage';
+import { AttachmentDownloadPage } from '../pages/attachments/AttachmentDownloadPage';
 import { ReviewsPage } from '../pages/reviews/ReviewsPage';
 import { ReviewParamGate } from '../components/reviews/ReviewParamGate';
 
@@ -122,6 +123,13 @@ export const router = createBrowserRouter([
       { path: 'profile', element: <ProfilePage /> },
       { path: 'users/:userId', element: <UserProfilePage /> },
       { path: 'teams/:teamId', element: <TeamProfilePage /> },
+      // The landing page an exported report's attachment links point at: inside
+      // the protected routes, so an unauthenticated visitor logs in and is
+      // returned here (issue #635).
+      {
+        path: 'attachments/:documentId/:attachmentId',
+        element: <AttachmentDownloadPage />,
+      },
       { path: 'messages', element: <MessagesPage /> },
       { path: 'messages/:notificationId', element: <MessageDetailPage /> },
       { path: 'reviews', element: <ReviewsPage /> },

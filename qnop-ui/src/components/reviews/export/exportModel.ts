@@ -24,6 +24,8 @@
  * dialog, kept out of it so the choices are testable without rendering anything.
  */
 
+import { FALLBACK_TIME_ZONE, isValidTimeZone } from '../../../utils/timezone';
+
 export type ExportScope = 'all' | 'open' | 'resolved';
 
 export interface ExportFormat {
@@ -32,6 +34,20 @@ export interface ExportFormat {
   extension: string;
   /** One line on the format card: why you would pick this one. */
   hint: string;
+  /**
+   * What this format calls the selected fields. A spreadsheet has columns; a
+   * report has details. The wizard asks the format rather than assuming, so a
+   * new format brings its own vocabulary instead of inheriting Excel's.
+   */
+  fieldNoun: string;
+  /** What switching the comment threads on actually does in this format. */
+  commentsHint: string;
+  /**
+   * Whether the format can carry an image at all. Mirrors `AnnotationExportFormat`
+   * on the server: Markdown and CSV are text, and offering a logo switch there
+   * would be a control that silently does nothing.
+   */
+  supportsLogo: boolean;
   /** Not yet implemented — shown so the wizard tells the truth about what is coming. */
   planned?: boolean;
 }
@@ -39,26 +55,52 @@ export interface ExportFormat {
 /**
  * The formats the wizard shows. Planned ones are listed on purpose: a user who
  * wonders whether Word exists gets an answer here instead of filing a request,
- * and shipping one flips a flag (issues #635–#639).
+ * and shipping one flips a flag (issues #637, #639). CSV and Markdown were
+ * dropped (#636/#638): CSV is a strictly worse Excel for this data — no typed
+ * dates, nowhere to put the comment threads — and Markdown duplicates what the
+ * review UI already shows.
  */
 export const EXPORT_FORMATS: ExportFormat[] = [
   {
     id: 'xlsx',
+    supportsLogo: true,
     label: 'Excel',
     extension: '.xlsx',
     hint: 'Sortable, filterable — for triage and reporting.',
+    fieldNoun: 'columns',
+    commentsHint:
+      'A second sheet with the full text of every comment and who wrote it. In an anonymous review the authors stay pseudonymous here too.',
   },
-  { id: 'docx', label: 'Word', extension: '.docx', hint: 'A readable report.', planned: true },
   {
-    id: 'md',
-    label: 'Markdown',
-    extension: '.md',
-    hint: 'For pull requests and wikis.',
+    id: 'docx',
+    supportsLogo: true,
+    label: 'Word',
+    extension: '.docx',
+    hint: 'A readable report — for meetings and sign-off.',
+    fieldNoun: 'details',
+    commentsHint:
+      'Every reply in full, indented under the annotation it answers. In an anonymous review the authors stay pseudonymous here too.',
+  },
+  {
+    id: 'html',
+    supportsLogo: true,
+    fieldNoun: 'sections',
+    commentsHint: 'Comment threads are included.',
+    label: 'HTML',
+    extension: '.html',
+    hint: 'Opens anywhere.',
     planned: true,
   },
-  { id: 'html', label: 'HTML', extension: '.html', hint: 'Opens anywhere.', planned: true },
-  { id: 'csv', label: 'CSV', extension: '.csv', hint: 'For other tools.', planned: true },
-  { id: 'pdf', label: 'PDF', extension: '.pdf', hint: 'For archiving.', planned: true },
+  {
+    id: 'pdf',
+    supportsLogo: true,
+    fieldNoun: 'sections',
+    commentsHint: 'Comment threads are included.',
+    label: 'PDF',
+    extension: '.pdf',
+    hint: 'For archiving.',
+    planned: true,
+  },
 ];
 
 export interface ExportField {
@@ -91,21 +133,59 @@ export const FIELD_GROUPS: ExportField['group'][] = [
   'History',
 ];
 
+export interface ExportDateFormat {
+  id: string;
+  label: string;
+  /** What the choice actually produces — the only description anyone needs. */
+  sample: string;
+}
+
+/**
+ * Mirrors `ExportDateFormat` on the server; ids must match.
+ *
+ * <p>The sample is the label that matters: "European" means nothing until you
+ * see `04.03.2026`, and `03/04/2026` is two different days depending on who
+ * reads it. All times are UTC, which the wizard says once rather than repeating
+ * per entry.
+ */
+export const EXPORT_DATE_FORMATS: ExportDateFormat[] = [
+  { id: 'iso', label: 'ISO', sample: '2026-03-04 14:30' },
+  { id: 'iso-seconds', label: 'ISO with seconds', sample: '2026-03-04 14:30:07' },
+  { id: 'european', label: 'European', sample: '04.03.2026 14:30' },
+  { id: 'us', label: 'US', sample: '03/04/2026 02:30 PM' },
+  { id: 'date-only', label: 'Date only', sample: '2026-03-04' },
+];
+
 export interface ExportSettings {
   format: string;
   scope: ExportScope;
   fields: string[];
   /** Adds a second sheet with the full text of every comment, one row each. */
   includeComments: boolean;
+  /** Places the operator's branding logo, where the format can carry one. */
+  includeLogo: boolean;
+  /** Which `EXPORT_DATE_FORMATS` entry every timestamp is written in. */
+  dateFormat: string;
+  /** The IANA zone those timestamps are expressed in. */
+  timezone: string;
 }
 
-/** Everything on, everything in — the state the wizard opens in the first time. */
-export function defaultSettings(): ExportSettings {
+/**
+ * Everything on, everything in — the state the wizard opens in the first time.
+ *
+ * @param timezone the reader's own zone, already resolved through the ADR-0041
+ *   chain (profile → operator default → UTC). Passed in rather than resolved
+ *   here, so the wizard and the rest of the app can never disagree about it.
+ */
+export function defaultSettings(timezone: string = FALLBACK_TIME_ZONE): ExportSettings {
   return {
     format: 'xlsx',
     scope: 'all',
     fields: EXPORT_FIELDS.map((field) => field.id),
     includeComments: true,
+    includeLogo: true,
+    dateFormat: 'iso',
+    timezone,
   };
 }
 
@@ -118,8 +198,8 @@ const STORAGE_KEY = 'qnop-export-settings';
  * field list will grow, and a stored selection from an older release must not
  * leave the wizard in a state the user cannot fix.
  */
-export function loadSettings(): ExportSettings {
-  const fallback = defaultSettings();
+export function loadSettings(timezone?: string): ExportSettings {
+  const fallback = defaultSettings(timezone);
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (!raw) return fallback;
@@ -134,6 +214,13 @@ export function loadSettings(): ExportSettings {
         : fallback.scope,
       fields: fields.length > 0 ? fields : fallback.fields,
       includeComments: parsed.includeComments ?? fallback.includeComments,
+      includeLogo: parsed.includeLogo ?? fallback.includeLogo,
+      dateFormat: EXPORT_DATE_FORMATS.some((entry) => entry.id === parsed.dateFormat)
+        ? (parsed.dateFormat as string)
+        : fallback.dateFormat,
+      // A zone the runtime no longer knows would break every timestamp in the
+      // file, so an unusable stored value yields to the reader's own zone.
+      timezone: isValidTimeZone(parsed.timezone) ? parsed.timezone : fallback.timezone,
     };
   } catch {
     return fallback;
@@ -162,4 +249,26 @@ export function scopeCount(
   counts: { all: number; open: number; resolved: number },
 ): number {
   return counts[scope];
+}
+
+/**
+ * The prefilled base name: `<slug>-annotations`, mirroring `ExportFilename` on
+ * the server.
+ *
+ * <p>Mirrored rather than fetched, because the wizard has to show the name
+ * before any request is made. The two can only disagree cosmetically — the
+ * server sanitizes whatever it receives, and the user sees and can edit the
+ * value either way — which is why a round trip to stay in lockstep would cost
+ * more than it is worth.
+ */
+export function defaultFileName(documentTitle: string | null | undefined): string {
+  const slug = (documentTitle ?? '')
+    .normalize('NFKD')
+    .replace(/\p{M}+/gu, '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    .slice(0, 80)
+    .replace(/-+$/, '');
+  return slug ? `${slug}-annotations` : 'annotations';
 }

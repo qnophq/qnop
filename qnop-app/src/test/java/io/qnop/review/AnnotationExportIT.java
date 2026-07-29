@@ -22,6 +22,7 @@ package io.qnop.review;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -34,19 +35,25 @@ import io.qnop.repository.DocumentRepository;
 import io.qnop.repository.DocumentVersionRepository;
 import io.qnop.repository.ReviewParticipantRepository;
 import io.qnop.testsupport.SeededIntegrationTest;
+import java.awt.image.BufferedImage;
 import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
+import javax.imageio.ImageIO;
 import org.apache.poi.ss.usermodel.Cell;
 import org.apache.poi.ss.usermodel.Row;
 import org.apache.poi.ss.usermodel.Sheet;
 import org.apache.poi.ss.usermodel.Workbook;
 import org.apache.poi.xssf.usermodel.XSSFWorkbook;
+import org.apache.poi.xwpf.usermodel.XWPFDocument;
+import org.apache.poi.xwpf.usermodel.XWPFParagraph;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.MediaType;
+import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
 
 /**
@@ -130,10 +137,22 @@ class AnnotationExportIT extends SeededIntegrationTest {
     return com.jayway.jsonpath.JsonPath.read(json, "$.id");
   }
 
+  /**
+   * The workbook without branding.
+   *
+   * <p>Most of these tests are about the grid — which column holds what, which row an annotation
+   * lands in — and a logo moves the header down by the height of its band. Asking for the plain
+   * sheet keeps each test about one thing; {@link #workbookCarriesTheLogoAboveTheGrid} covers the
+   * band itself.
+   */
   private Sheet download(UUID actor) throws Exception {
     byte[] body =
         mockMvc
-            .perform(as(get("/api/v1/documents/" + documentId + "/annotations/export"), actor))
+            .perform(
+                as(
+                    get("/api/v1/documents/" + documentId + "/annotations/export")
+                        .param("logo", "false"),
+                    actor))
             .andExpect(status().isOk())
             .andExpect(
                 header()
@@ -158,7 +177,8 @@ class AnnotationExportIT extends SeededIntegrationTest {
             .perform(
                 as(
                     get("/api/v1/documents/" + documentId + "/annotations/export")
-                        .param("comments", "true"),
+                        .param("comments", "true")
+                        .param("logo", "false"),
                     actor))
             .andExpect(status().isOk())
             .andReturn()
@@ -168,6 +188,23 @@ class AnnotationExportIT extends SeededIntegrationTest {
     return workbook.getSheet("Comments");
   }
 
+  /** Uploads a real PNG and returns the Markdown URL the composer would write for it. */
+  private String uploadImage(UUID actor, String fileName) throws Exception {
+    ByteArrayOutputStream png = new ByteArrayOutputStream();
+    ImageIO.write(new BufferedImage(120, 60, BufferedImage.TYPE_INT_ARGB), "png", png);
+    String json =
+        mockMvc
+            .perform(
+                multipart("/api/v1/documents/" + documentId + "/attachments")
+                    .file(new MockMultipartFile("file", fileName, "image/png", png.toByteArray()))
+                    .header("Authorization", "Bearer " + token(actor)))
+            .andExpect(status().isCreated())
+            .andReturn()
+            .getResponse()
+            .getContentAsString();
+    return com.jayway.jsonpath.JsonPath.read(json, "$.url");
+  }
+
   private void reply(String annotationId, UUID author, String body) throws Exception {
     mockMvc
         .perform(
@@ -175,6 +212,33 @@ class AnnotationExportIT extends SeededIntegrationTest {
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("{\"body\":\"" + body + "\"}"))
         .andExpect(status().isCreated());
+  }
+
+  /** Downloads the Word report and returns its paragraphs, in document order. */
+  private List<String> downloadDocx(UUID actor, String... params) throws Exception {
+    var request =
+        get("/api/v1/documents/" + documentId + "/annotations/export").param("format", "docx");
+    for (int index = 0; index + 1 < params.length; index += 2) {
+      request = request.param(params[index], params[index + 1]);
+    }
+    byte[] body =
+        mockMvc
+            .perform(as(request, actor))
+            .andExpect(status().isOk())
+            .andExpect(
+                header()
+                    .string(
+                        "Content-Type",
+                        "application/vnd.openxmlformats-officedocument.wordprocessingml.document"))
+            .andExpect(
+                header()
+                    .string("Content-Disposition", org.hamcrest.Matchers.containsString(".docx")))
+            .andReturn()
+            .getResponse()
+            .getContentAsByteArray();
+    try (XWPFDocument document = new XWPFDocument(new ByteArrayInputStream(body))) {
+      return document.getParagraphs().stream().map(XWPFParagraph::getText).toList();
+    }
   }
 
   private static List<String> column(Sheet sheet, int index) {
@@ -278,6 +342,7 @@ class AnnotationExportIT extends SeededIntegrationTest {
             .perform(
                 as(
                     get("/api/v1/documents/" + documentId + "/annotations/export")
+                        .param("logo", "false")
                         .param("fields", "status")
                         .param("fields", "taskKey"),
                     MEMBER_ID))
@@ -324,6 +389,7 @@ class AnnotationExportIT extends SeededIntegrationTest {
             .perform(
                 as(
                     get("/api/v1/documents/" + documentId + "/annotations/export")
+                        .param("logo", "false")
                         .param("fields", "status")
                         .param("fields", "somethingNew"),
                     MEMBER_ID))
@@ -351,6 +417,7 @@ class AnnotationExportIT extends SeededIntegrationTest {
             .perform(
                 as(
                     get("/api/v1/documents/" + documentId + "/annotations/export")
+                        .param("logo", "false")
                         .param("scope", "resolved"),
                     MEMBER_ID))
             .andExpect(status().isOk())
@@ -417,6 +484,463 @@ class AnnotationExportIT extends SeededIntegrationTest {
     // MEMBER owns the document, and the owner is the one identity anonymity does
     // not cover — it is their review, and everybody already knows that.
     assertThat(authors.get(1)).doesNotStartWith("Participant");
+  }
+
+  @Test
+  @DisplayName("the Word report carries the same annotations, in the same reading order")
+  void docxMatchesTheSpreadsheetsContent() throws Exception {
+    seedDocument(false);
+    annotate(MEMBER_ID, 1, 0.1, 0.1, "Second page note");
+    annotate(MEMBER_ID, 0, 0.1, 0.1, "Page one, top");
+    annotate(MEMBER_ID, 0, 0.1, 0.6, "Page one, lower");
+
+    List<String> report = downloadDocx(MEMBER_ID);
+
+    // Reading order, not creation order — the same rule the sheet follows.
+    assertThat(report).containsSubsequence("Page one, top", "Page one, lower", "Second page note");
+    // Task keys still number the review in CREATION order, so the first-created
+    // annotation keeps T-1 even though it sorts last.
+    assertThat(report).containsSubsequence("T-2 · Page 1", "T-3 · Page 1", "T-1 · Page 2");
+    assertThat(report).first().asString().isEqualTo("Vendor agreement");
+  }
+
+  @Test
+  @DisplayName("an anonymous review's Word report names no foreign author (ADR-0038)")
+  void docxRespectsAnonymity() throws Exception {
+    seedDocument(true);
+    String annotationId = createAnnotationReturningId(AUDITOR_ID, 0, 0.1, 0.1, "Opened by a peer");
+    reply(annotationId, AUDITOR_ID, "And answered by the same peer");
+
+    // The report is the format most likely to be forwarded outside qnop, so the
+    // pseudonyms matter here at least as much as in the spreadsheet.
+    List<String> report = downloadDocx(MEMBER2_ID, "comments", "true");
+
+    assertThat(report).anySatisfy(line -> assertThat(line).contains("Participant"));
+    assertThat(report).noneSatisfy(line -> assertThat(line).contains("Avery Auditor"));
+    assertThat(report).contains("Opened by a peer", "And answered by the same peer");
+  }
+
+  @Test
+  @DisplayName("a user who cannot see the review cannot export it as Word either")
+  void docxIsRefusedToForeignUsers() throws Exception {
+    seedDocument(false);
+    annotate(MEMBER_ID, 0, 0.1, 0.1, "Not for outsiders");
+
+    // 404 rather than 403: a refusal that distinguishes the two would confirm
+    // the review exists.
+    mockMvc
+        .perform(
+            as(
+                get("/api/v1/documents/" + documentId + "/annotations/export")
+                    .param("format", "docx"),
+                EXTERNAL_ID))
+        .andExpect(status().isNotFound());
+  }
+
+  @Test
+  @DisplayName("an empty review still yields a well-formed Word document")
+  void docxHandlesTheEmptyReview() throws Exception {
+    seedDocument(false);
+
+    List<String> report = downloadDocx(MEMBER_ID);
+
+    assertThat(report).first().asString().isEqualTo("Vendor agreement");
+    assertThat(report).contains("This review has no annotations.");
+  }
+
+  @Test
+  @DisplayName("an unknown format falls back to the spreadsheet rather than failing")
+  void unknownFormatFallsBackToXlsx() throws Exception {
+    seedDocument(false);
+    annotate(MEMBER_ID, 0, 0.1, 0.1, "Still exports");
+
+    // Same reasoning as unknown fields: a client one release ahead should get a
+    // file it can open, not a 400.
+    mockMvc
+        .perform(
+            as(
+                get("/api/v1/documents/" + documentId + "/annotations/export")
+                    .param("format", "pdf"),
+                MEMBER_ID))
+        .andExpect(status().isOk())
+        .andExpect(
+            header()
+                .string(
+                    "Content-Type",
+                    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"));
+  }
+
+  @Test
+  @DisplayName("the Word report carries the branding logo in its page header")
+  void docxCarriesTheBrandingLogo() throws Exception {
+    seedDocument(false);
+    annotate(MEMBER_ID, 0, 0.1, 0.1, "A finding");
+
+    byte[] body =
+        mockMvc
+            .perform(
+                as(
+                    get("/api/v1/documents/" + documentId + "/annotations/export")
+                        .param("format", "docx"),
+                    MEMBER_ID))
+            .andExpect(status().isOk())
+            .andReturn()
+            .getResponse()
+            .getContentAsByteArray();
+
+    try (XWPFDocument document = new XWPFDocument(new ByteArrayInputStream(body))) {
+      // The whole chain, which only an IT covers: the bundled SVG default is
+      // rasterized by the branding service and embedded by the renderer. Word
+      // cannot embed SVG, so a header picture here means the conversion ran.
+      assertThat(document.getHeaderList()).isNotEmpty();
+      assertThat(document.getHeaderList().getFirst().getAllPictures()).isNotEmpty();
+    }
+  }
+
+  @Test
+  @DisplayName("the workbook's logo heads the sheet without covering any data")
+  void workbookCarriesTheLogoAboveTheGrid() throws Exception {
+    seedDocument(false);
+    annotate(MEMBER_ID, 0, 0.1, 0.1, "A finding");
+
+    byte[] body =
+        mockMvc
+            .perform(as(get("/api/v1/documents/" + documentId + "/annotations/export"), MEMBER_ID))
+            .andExpect(status().isOk())
+            .andReturn()
+            .getResponse()
+            .getContentAsByteArray();
+    XSSFWorkbook branded = new XSSFWorkbook(new ByteArrayInputStream(body));
+    Sheet sheet = branded.getSheetAt(0);
+
+    // A band of its own: the picture is there, the row above the header is empty
+    // and tall enough to hold it, and no cell is hidden underneath.
+    assertThat(branded.getAllPictures()).isNotEmpty();
+    assertThat(sheet.getRow(0).getCell(0)).isNull();
+    assertThat(sheet.getRow(1).getCell(0).getStringCellValue()).isEqualTo("#");
+    assertThat(sheet.getRow(2).getCell(5).getStringCellValue()).isEqualTo("A finding");
+    assertThat(sheet.getPaneInformation().getHorizontalSplitPosition()).isEqualTo((short) 2);
+
+    // And an unbranded export keeps the grid it had before branding existed.
+    assertThat(download(MEMBER_ID).getRow(0).getCell(0).getStringCellValue()).isEqualTo("#");
+  }
+
+  @Test
+  @DisplayName("the chosen date convention reaches the cells' display format")
+  void dateFormatReachesTheCells() throws Exception {
+    seedDocument(false);
+    annotate(MEMBER_ID, 0, 0.1, 0.1, "A finding");
+
+    byte[] body =
+        mockMvc
+            .perform(
+                as(
+                    get("/api/v1/documents/" + documentId + "/annotations/export")
+                        .param("logo", "false")
+                        .param("dateFormat", "european"),
+                    MEMBER_ID))
+            .andExpect(status().isOk())
+            .andReturn()
+            .getResponse()
+            .getContentAsByteArray();
+    Sheet sheet = new XSSFWorkbook(new ByteArrayInputStream(body)).getSheetAt(0);
+
+    Cell created = sheet.getRow(1).getCell(9);
+    // The cell still holds a real date — only its display changed, which is what
+    // keeps Excel's own date filters and sorting working.
+    assertThat(created.getCellType()).isEqualTo(org.apache.poi.ss.usermodel.CellType.NUMERIC);
+    assertThat(created.getCellStyle().getDataFormatString()).isEqualTo("dd.mm.yyyy hh:mm");
+  }
+
+  @Test
+  @DisplayName("the requested timezone shifts the cells, and an unusable one falls back to UTC")
+  void timezoneShiftsTheCells() throws Exception {
+    seedDocument(false);
+    annotate(MEMBER_ID, 0, 0.1, 0.1, "A finding");
+
+    double utc = createdCell(null).getNumericCellValue();
+    double tokyo = createdCell("Asia/Tokyo").getNumericCellValue();
+    double nonsense = createdCell("Middle/Earth").getNumericCellValue();
+
+    // Excel dates are wall-clock and zone-less, so a different zone is literally
+    // a different number in the cell — nine hours, in Tokyo's case.
+    assertThat((tokyo - utc) * 24).isCloseTo(9.0, org.assertj.core.data.Offset.offset(0.01));
+    // An id the JVM cannot resolve must not fail the download.
+    assertThat(nonsense).isEqualTo(utc);
+  }
+
+  /** The Created cell of the single seeded annotation, exported in {@code timezone}. */
+  private Cell createdCell(String timezone) throws Exception {
+    var request =
+        get("/api/v1/documents/" + documentId + "/annotations/export").param("logo", "false");
+    if (timezone != null) {
+      request = request.param("timezone", timezone);
+    }
+    byte[] body =
+        mockMvc
+            .perform(as(request, MEMBER_ID))
+            .andExpect(status().isOk())
+            .andReturn()
+            .getResponse()
+            .getContentAsByteArray();
+    return new XSSFWorkbook(new ByteArrayInputStream(body)).getSheetAt(0).getRow(1).getCell(9);
+  }
+
+  @Test
+  @DisplayName("the download is named <slug>-annotations.<ext>, or whatever the user asked for")
+  void filenameFollowsTheSlugUnlessOverridden() throws Exception {
+    seedDocument(false);
+
+    mockMvc
+        .perform(as(get("/api/v1/documents/" + documentId + "/annotations/export"), MEMBER_ID))
+        .andExpect(status().isOk())
+        .andExpect(
+            header()
+                .string(
+                    "Content-Disposition",
+                    org.hamcrest.Matchers.containsString("vendor-agreement-annotations.xlsx")));
+
+    mockMvc
+        .perform(
+            as(
+                get("/api/v1/documents/" + documentId + "/annotations/export")
+                    .param("format", "docx")
+                    .param("filename", "Q3 findings"),
+                MEMBER_ID))
+        .andExpect(status().isOk())
+        .andExpect(
+            header()
+                .string(
+                    "Content-Disposition",
+                    org.hamcrest.Matchers.containsString("Q3%20findings.docx")));
+  }
+
+  @Test
+  @DisplayName("a filename cannot inject a header or escape the downloads folder")
+  void filenameCannotInjectAHeader() throws Exception {
+    seedDocument(false);
+
+    String disposition =
+        mockMvc
+            .perform(
+                as(
+                    get("/api/v1/documents/" + documentId + "/annotations/export")
+                        .param("filename", "evil\r\nX-Injected: yes/../escape"),
+                    MEMBER_ID))
+            .andExpect(status().isOk())
+            .andReturn()
+            .getResponse()
+            .getHeader("Content-Disposition");
+
+    // What matters is that the header cannot be ended early and the name cannot
+    // address a directory: the words the user typed surviving as *text* inside a
+    // filename is not a vulnerability, and stripping them would be theatre.
+    assertThat(disposition).doesNotContain("\r", "\n", "/", "\\");
+    assertThat(disposition.chars().noneMatch(Character::isISOControl)).isTrue();
+    // The quoted token is not broken out of, and the file is still a workbook.
+    assertThat(disposition).startsWith("attachment; filename=\"");
+    assertThat(disposition).endsWith(".xlsx");
+  }
+
+  @Test
+  @DisplayName("an image in a comment is embedded in the Word report")
+  void docxEmbedsCommentImages() throws Exception {
+    seedDocument(false);
+    String url = uploadImage(MEMBER_ID, "screenshot.png");
+    String annotationId = createAnnotationReturningId(MEMBER_ID, 0, 0.1, 0.1, "See the attachment");
+    reply(annotationId, MEMBER_ID, "Here it is: ![screenshot.png](" + url + ")");
+
+    byte[] body =
+        mockMvc
+            .perform(
+                as(
+                    get("/api/v1/documents/" + documentId + "/annotations/export")
+                        .param("format", "docx")
+                        .param("comments", "true")
+                        .param("logo", "false"),
+                    MEMBER_ID))
+            .andExpect(status().isOk())
+            .andReturn()
+            .getResponse()
+            .getContentAsByteArray();
+
+    try (XWPFDocument document = new XWPFDocument(new ByteArrayInputStream(body))) {
+      // The whole chain: the URL is parsed out of the body, the attachment is
+      // read through the participant-gated path, and the bytes land in the file.
+      // Logo off, so the only picture here is the one from the comment.
+      assertThat(document.getAllPictures()).hasSize(1);
+    }
+  }
+
+  @Test
+  @DisplayName("the spreadsheet names an image where it cannot show one")
+  void workbookNamesCommentImages() throws Exception {
+    seedDocument(false);
+    String url = uploadImage(MEMBER_ID, "screenshot.png");
+    createAnnotationReturningId(MEMBER_ID, 0, 0.1, 0.1, "Look: ![screenshot.png](" + url + ")");
+
+    // A cell holds text, and a floating picture would detach from its row on the
+    // first sort — but silence was the bug.
+    assertThat(column(download(MEMBER_ID), 5))
+        .singleElement()
+        .asString()
+        .isEqualTo("Look: [screenshot.png]");
+  }
+
+  @Test
+  @DisplayName("an export never fetches an image belonging to another review")
+  void doesNotFetchForeignAttachments() throws Exception {
+    seedDocument(false);
+    UUID ownDocument = documentId;
+    String foreignUrl = uploadImage(MEMBER_ID, "foreign.png");
+
+    // A second review, whose comment points at the FIRST review's attachment.
+    seedDocument(false);
+    createAnnotationReturningId(MEMBER_ID, 0, 0.1, 0.1, "Sneaky ![f.png](" + foreignUrl + ")");
+    assertThat(foreignUrl).contains(ownDocument.toString());
+
+    byte[] body =
+        mockMvc
+            .perform(
+                as(
+                    get("/api/v1/documents/" + documentId + "/annotations/export")
+                        .param("format", "docx")
+                        .param("logo", "false"),
+                    MEMBER_ID))
+            .andExpect(status().isOk())
+            .andReturn()
+            .getResponse()
+            .getContentAsByteArray();
+
+    try (XWPFDocument document = new XWPFDocument(new ByteArrayInputStream(body))) {
+      // Attachments are resolved only under the document being exported, so a
+      // crafted URL cannot turn an export into a cross-review reader.
+      assertThat(document.getAllPictures()).isEmpty();
+      assertThat(document.getParagraphs().stream().map(XWPFParagraph::getText).toList())
+          .contains("[f.png]");
+    }
+  }
+
+  @Test
+  @DisplayName("an attached file becomes a clickable row in the Word report")
+  void docxLinksAttachedFiles() throws Exception {
+    seedDocument(false);
+    String json =
+        mockMvc
+            .perform(
+                multipart("/api/v1/documents/" + documentId + "/attachments")
+                    .file(
+                        new MockMultipartFile(
+                            "file", "notes.pdf", "application/pdf", "%PDF-1.4 body".getBytes()))
+                    .header("Authorization", "Bearer " + token(MEMBER_ID)))
+            .andExpect(status().isCreated())
+            .andReturn()
+            .getResponse()
+            .getContentAsString();
+    String url = com.jayway.jsonpath.JsonPath.read(json, "$.url");
+    createAnnotationReturningId(MEMBER_ID, 0, 0.1, 0.1, "See [notes.pdf](" + url + ")");
+
+    byte[] body =
+        mockMvc
+            .perform(
+                as(
+                    get("/api/v1/documents/" + documentId + "/annotations/export")
+                        .param("format", "docx")
+                        .param("logo", "false"),
+                    MEMBER_ID))
+            .andExpect(status().isOk())
+            .andReturn()
+            .getResponse()
+            .getContentAsByteArray();
+
+    try (XWPFDocument document = new XWPFDocument(new ByteArrayInputStream(body))) {
+      // Word cannot embed an arbitrary file, so the report links to it — and the
+      // link has to survive the round trip as a real hyperlink relationship.
+      //
+      // Absolute, and asserted as such: a relative target is not a dead link,
+      // Word resolves it against the document and produces file:///api/v1/…,
+      // pointing at the reader's own disk.
+      String attachmentId = url.substring(url.lastIndexOf('/') + 1);
+      assertThat(document.getHyperlinks())
+          .anySatisfy(
+              link -> {
+                // Absolute, or Word resolves it against the document and yields
+                // file:///… on the reader's disk.
+                assertThat(link.getURL()).startsWith("http");
+                // The app's download page, not the bearer-authenticated API a
+                // browser could never open by following a link.
+                assertThat(link.getURL())
+                    .endsWith("/attachments/" + documentId + "/" + attachmentId);
+                assertThat(link.getURL()).doesNotContain("/api/v1/");
+              });
+      assertThat(document.getParagraphs().stream().map(XWPFParagraph::getText).toList())
+          .anySatisfy(line -> assertThat(line).contains("notes.pdf", "PDF"));
+    }
+  }
+
+  @Test
+  @DisplayName("the workbook lists every upload on its own sheet, with a working link")
+  void workbookLinksUploads() throws Exception {
+    seedDocument(false);
+    String imageUrl = uploadImage(MEMBER_ID, "screenshot.png");
+    createAnnotationReturningId(
+        MEMBER_ID, 0, 0.1, 0.1, "Look: ![screenshot.png](" + imageUrl + ")");
+
+    byte[] body =
+        mockMvc
+            .perform(
+                as(
+                    get("/api/v1/documents/" + documentId + "/annotations/export")
+                        .param("logo", "false"),
+                    MEMBER_ID))
+            .andExpect(status().isOk())
+            .andReturn()
+            .getResponse()
+            .getContentAsByteArray();
+    Sheet sheet = new XSSFWorkbook(new ByteArrayInputStream(body)).getSheet("Attachments");
+
+    assertThat(sheet).isNotNull();
+    Cell cell = sheet.getRow(1).getCell(1);
+    assertThat(cell.getStringCellValue()).isEqualTo("screenshot.png");
+    // Same target as the Word report: the app's download page, absolute, never
+    // the bearer-authenticated API a click could not open.
+    assertThat(cell.getHyperlink().getAddress()).startsWith("http");
+    assertThat(cell.getHyperlink().getAddress()).contains("/attachments/" + documentId + "/");
+    assertThat(cell.getHyperlink().getAddress()).doesNotContain("/api/v1/");
+  }
+
+  @Test
+  @DisplayName("an annotation longer than the list excerpt exports whole, images and all")
+  void exportsBeyondTheListExcerpt() throws Exception {
+    seedDocument(false);
+    String url = uploadImage(MEMBER_ID, "late.png");
+    // The list view carries only the first 300 characters of an opening comment,
+    // for the annotation list in the UI. Anything past that — here an image, and
+    // the sentence after it — used to be missing from the export, and a cut that
+    // landed inside a link left a broken reference rather than a short one.
+    String padding = "Ausfuehrliche Vorbemerkung. ".repeat(14);
+    createAnnotationReturningId(
+        MEMBER_ID, 0, 0.1, 0.1, padding + " ![late.png](" + url + ") Schlusssatz.");
+
+    byte[] body =
+        mockMvc
+            .perform(
+                as(
+                    get("/api/v1/documents/" + documentId + "/annotations/export")
+                        .param("format", "docx")
+                        .param("logo", "false"),
+                    MEMBER_ID))
+            .andExpect(status().isOk())
+            .andReturn()
+            .getResponse()
+            .getContentAsByteArray();
+
+    assertThat(padding).hasSizeGreaterThan(300);
+    try (XWPFDocument document = new XWPFDocument(new ByteArrayInputStream(body))) {
+      assertThat(document.getAllPictures()).hasSize(1);
+      assertThat(document.getParagraphs().stream().map(XWPFParagraph::getText).toList())
+          .anySatisfy(line -> assertThat(line).contains("Schlusssatz."));
+    }
   }
 
   @Test

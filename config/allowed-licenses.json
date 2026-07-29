@@ -9,8 +9,9 @@
     "Apache-2.0 / MIT / BSD / MPL-2.0, plus their exact spellings here). EDL-1.0 (the",
     "Eclipse Distribution License) is verbatim BSD-3-Clause, so it belongs with BSD.",
     "",
-    "Tier 2 — per-module exceptions: dependencies whose only licenses are copyleft but",
-    "which are safe to ship in an AGPL/commercial-add-on split, each justified inline.",
+    "Tier 2 — per-module exceptions, each justified inline: dependencies whose only",
+    "licenses are copyleft but safe to ship in an AGPL/commercial-add-on split, and",
+    "permissive ones whose POM declares a name too vague to allow globally.",
     "Scoping every exception to one module keeps the gate strict — a NEW copyleft",
     "dependency that is not listed here fails CI and forces a conscious review."
   ],
@@ -22,6 +23,13 @@
     { "moduleLicense": "The 3-Clause BSD License" },
     { "moduleLicense": "Mozilla Public License, Version 2.0" },
     { "moduleLicense": "Eclipse Distribution License - v 1.0", "_comment": "EDL-1.0 is verbatim BSD-3-Clause (permissive)." },
+
+    { "moduleName": "com.twelvemonkeys.imageio:imageio-webp", "moduleLicense": "The BSD License", "_comment": "TwelveMonkeys ImageIO — the POM declares the vague name 'The BSD License'; LICENSE.txt is verbatim BSD-3-Clause. Scoped per module rather than allowing that name globally, because it could equally denote 4-clause BSD." },
+    { "moduleName": "com.twelvemonkeys.imageio:imageio-core", "moduleLicense": "The BSD License", "_comment": "TwelveMonkeys ImageIO, BSD-3-Clause (see imageio-webp)." },
+    { "moduleName": "com.twelvemonkeys.imageio:imageio-metadata", "moduleLicense": "The BSD License", "_comment": "TwelveMonkeys ImageIO, BSD-3-Clause (see imageio-webp)." },
+    { "moduleName": "com.twelvemonkeys.common:common-image", "moduleLicense": "The BSD License", "_comment": "TwelveMonkeys ImageIO, BSD-3-Clause (see imageio-webp)." },
+    { "moduleName": "com.twelvemonkeys.common:common-io", "moduleLicense": "The BSD License", "_comment": "TwelveMonkeys ImageIO, BSD-3-Clause (see imageio-webp)." },
+    { "moduleName": "com.twelvemonkeys.common:common-lang", "moduleLicense": "The BSD License", "_comment": "TwelveMonkeys ImageIO, BSD-3-Clause (see imageio-webp)." },
 
     { "moduleName": "jakarta.annotation:jakarta.annotation-api", "moduleLicense": "Eclipse Public License - v 2.0", "_comment": "Jakarta spec API; EPL-2.0 / GPL-2.0-with-Classpath-Exception — the classpath exception makes linking license-neutral." },
     { "moduleName": "jakarta.transaction:jakarta.transaction-api", "moduleLicense": "Eclipse Public License - v 2.0", "_comment": "Jakarta spec API; EPL-2.0 / GPL-2.0-with-Classpath-Exception (linking-safe spec)." },

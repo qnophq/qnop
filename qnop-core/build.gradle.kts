@@ -80,6 +80,17 @@ dependencies {
     // the service layer; the controller only streams what it produced.
     implementation(libs.poi.ooxml)
 
+    // SVG -> PNG for the branding logo in document exports (#635 follow-up).
+    // Word cannot embed SVG, and the bundled logos are SVG. batik-codec supplies
+    // the PNG writer batik-transcoder delegates to.
+    implementation(libs.batik.transcoder)
+    implementation(libs.batik.codec)
+
+    // The JDK ships no WEBP reader, and WEBP is an accepted branding upload
+    // (BrandingLimits) — without this a WEBP logo would silently vanish from
+    // every document export. Runtime-only: it registers an ImageIO SPI.
+    runtimeOnly(libs.imageio.webp)
+
     // Inter-version diff (issue #249, ADR-0034): Myers diff at word granularity
     // over the two versions' extracted text layers.
     implementation(libs.java.diff.utils)

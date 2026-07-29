@@ -49,3 +49,38 @@ export function resolveTimeZone(
   if (isValidTimeZone(appDefaultZone)) return appDefaultZone;
   return FALLBACK_TIME_ZONE;
 }
+
+/**
+ * Every IANA zone the runtime knows, for a picker.
+ *
+ * <p>Taken from the platform rather than a checked-in list: zone names change —
+ * Europe/Kyiv arrived in 2022, and abolished DST rules keep arriving — and a
+ * bundled copy would go stale silently. Older runtimes without
+ * `Intl.supportedValuesOf` fall back to what the caller can definitely use.
+ */
+export function listTimeZones(current: string): string[] {
+  try {
+    const all = Intl.supportedValuesOf('timeZone');
+    return all.includes(current) ? all : [current, ...all];
+  } catch {
+    return Array.from(new Set([current, FALLBACK_TIME_ZONE]));
+  }
+}
+
+/**
+ * `Europe/Berlin (GMT+2)` — the offset is the part that answers "is that the one
+ * I mean?", so it belongs in the label rather than a tooltip.
+ */
+export function timeZoneLabel(zone: string, at: Date = new Date()): string {
+  if (!isValidTimeZone(zone)) return zone;
+  try {
+    const parts = new Intl.DateTimeFormat('en', {
+      timeZone: zone,
+      timeZoneName: 'shortOffset',
+    }).formatToParts(at);
+    const offset = parts.find((part) => part.type === 'timeZoneName')?.value;
+    return offset ? `${zone} (${offset})` : zone;
+  } catch {
+    return zone;
+  }
+}

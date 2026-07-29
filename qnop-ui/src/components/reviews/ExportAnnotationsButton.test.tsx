@@ -20,9 +20,11 @@
  */
 
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { render, screen, waitFor } from '@testing-library/react';
+import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { ThemeProvider } from '@mui/material/styles';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { documentKeys } from '../../api/hooks/useDocuments';
 import { buildTheme } from '../../theme/theme';
 import { downloadAnnotationExport } from '../../api/annotationExport';
 import { ExportAnnotationsButton } from './ExportAnnotationsButton';
@@ -34,10 +36,18 @@ vi.mock('../../api/annotationExport', () => ({
 const COUNTS = { all: 12, open: 5, resolved: 7 };
 
 function renderButton(onError = vi.fn()) {
+  // The button reads the document's title from the cache to prefill the
+  // filename. Seeding the cache rather than stubbing the fetch mirrors reality:
+  // both surfaces have already loaded this document by the time the button
+  // renders.
+  const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  client.setQueryData(documentKeys.detail('doc-1'), { id: 'doc-1', title: 'Vendor Agreement' });
   render(
-    <ThemeProvider theme={buildTheme('light')}>
-      <ExportAnnotationsButton documentId="doc-1" version={3} counts={COUNTS} onError={onError} />
-    </ThemeProvider>,
+    <QueryClientProvider client={client}>
+      <ThemeProvider theme={buildTheme('light')}>
+        <ExportAnnotationsButton documentId="doc-1" version={3} counts={COUNTS} onError={onError} />
+      </ThemeProvider>
+    </QueryClientProvider>,
   );
   return onError;
 }
@@ -175,8 +185,90 @@ describe('ExportAnnotationsButton', () => {
     renderButton();
     await openWizard(user);
 
-    // Answering "is Word coming?" in the wizard beats a support request.
-    expect(screen.getByRole('button', { name: /Word/ })).toBeDisabled();
+    // Answering "is PDF coming?" in the wizard beats a support request.
+    expect(screen.getByRole('button', { name: /PDF/ })).toBeDisabled();
     expect(screen.getByRole('button', { name: /Excel/ })).toBeEnabled();
+  });
+
+  it('exports the chosen format', async () => {
+    const user = userEvent.setup();
+    renderButton();
+    await openWizard(user);
+
+    await user.click(screen.getByRole('button', { name: /Word/ }));
+    await user.click(screen.getByRole('button', { name: /Next/ }));
+    await user.click(screen.getByRole('button', { name: /^Export$/ }));
+
+    await waitFor(() => expect(downloadAnnotationExport).toHaveBeenCalled());
+    expect(vi.mocked(downloadAnnotationExport).mock.calls[0][2]?.format).toBe('docx');
+  });
+
+  it('describes the fields in the words of the chosen format', async () => {
+    const user = userEvent.setup();
+    renderButton();
+    await openWizard(user);
+
+    // A spreadsheet has columns; a report does not, and calling them columns
+    // there would describe a file the user is not about to get.
+    expect(screen.getByText(/of 11 columns/)).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: /Word/ }));
+    expect(screen.getByText(/of 11 details/)).toBeInTheDocument();
+  });
+
+  it('can leave the branding logo out', async () => {
+    const user = userEvent.setup();
+    renderButton();
+    await openWizard(user);
+
+    // The logo and the filename live on the first step: they describe the file
+    // being produced, not what goes inside it.
+    await user.click(screen.getByRole('switch', { name: /Branding logo/ }));
+    await user.click(screen.getByRole('button', { name: /Next/ }));
+    await user.click(screen.getByRole('button', { name: /^Export$/ }));
+
+    await waitFor(() => expect(downloadAnnotationExport).toHaveBeenCalled());
+    expect(vi.mocked(downloadAnnotationExport).mock.calls[0][2]?.logo).toBe(false);
+  });
+
+  it('sends the chosen date format', async () => {
+    const user = userEvent.setup();
+    renderButton();
+    await openWizard(user);
+    await user.click(screen.getByRole('button', { name: /Next/ }));
+
+    // Picked by its sample, because that is the part that disambiguates.
+    await user.click(screen.getByRole('button', { name: /04\.03\.2026 14:30/ }));
+    await user.click(screen.getByRole('button', { name: /^Export$/ }));
+
+    await waitFor(() => expect(downloadAnnotationExport).toHaveBeenCalled());
+    expect(vi.mocked(downloadAnnotationExport).mock.calls[0][2]?.dateFormat).toBe('european');
+  });
+
+  it('prefills the filename from the review title', async () => {
+    const user = userEvent.setup();
+    renderButton();
+    await openWizard(user);
+
+    const field = await screen.findByLabelText('File name');
+    await waitFor(() => expect(field).toHaveValue('vendor-agreement-annotations'));
+    // The extension follows the format and is shown beside the field, not typed
+    // into it — scoped to the field, since the format cards name extensions too.
+    const wrapper = field.closest('.MuiInputBase-root') as HTMLElement;
+    expect(within(wrapper).getByText('.xlsx')).toBeInTheDocument();
+  });
+
+  it('sends a filename the user typed instead', async () => {
+    const user = userEvent.setup();
+    renderButton();
+    await openWizard(user);
+
+    const field = await screen.findByLabelText('File name');
+    await user.clear(field);
+    await user.type(field, 'Q3 findings');
+    await user.click(screen.getByRole('button', { name: /Next/ }));
+    await user.click(screen.getByRole('button', { name: /^Export$/ }));
+
+    await waitFor(() => expect(downloadAnnotationExport).toHaveBeenCalled());
+    expect(vi.mocked(downloadAnnotationExport).mock.calls[0][2]?.fileName).toBe('Q3 findings');
   });
 });

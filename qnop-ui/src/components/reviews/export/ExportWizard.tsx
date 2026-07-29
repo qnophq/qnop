@@ -30,18 +30,32 @@ import DialogContent from '@mui/material/DialogContent';
 import DialogTitle from '@mui/material/DialogTitle';
 import Divider from '@mui/material/Divider';
 import FormControlLabel from '@mui/material/FormControlLabel';
+import Autocomplete from '@mui/material/Autocomplete';
 import Stack from '@mui/material/Stack';
 import Switch from '@mui/material/Switch';
+import InputAdornment from '@mui/material/InputAdornment';
+import TextField from '@mui/material/TextField';
 import Step from '@mui/material/Step';
 import StepLabel from '@mui/material/StepLabel';
 import Stepper from '@mui/material/Stepper';
 import Typography from '@mui/material/Typography';
 import { alpha } from '@mui/material/styles';
-import { ArrowLeft, ArrowRight, Check, Download, MessagesSquare } from 'lucide-react';
-import { ToneBadge } from '../../admin/ToneBadge';
 import {
+  ArrowLeft,
+  ArrowRight,
+  Check,
+  Download,
+  Image as ImageIcon,
+  MessagesSquare,
+} from 'lucide-react';
+import { ToneBadge } from '../../admin/ToneBadge';
+import { useUiStore } from '../../../stores/uiStore';
+import { listTimeZones, timeZoneLabel } from '../../../utils/timezone';
+import {
+  EXPORT_DATE_FORMATS,
   EXPORT_FIELDS,
   EXPORT_FORMATS,
+  defaultFileName,
   FIELD_GROUPS,
   effectiveFields,
   loadSettings,
@@ -50,7 +64,21 @@ import {
   type ExportSettings,
 } from './exportModel';
 
-const STEPS = ['Format & scope', 'Fields'];
+const STEPS = ['Format & file', 'Content'];
+
+/**
+ * The content area's height.
+ *
+ * <p>One value for both steps, so paging never resizes the dialog, and large
+ * enough that the taller step fits without a scrollbar.
+ *
+ * <p>The viewport cap is the fallback, not the intent: MUI limits a dialog to
+ * the window height less its margins, and on a short window an unconditional
+ * 400px would push the footer — Cancel, Back, Export — out of reach. Yielding
+ * some content height is the better trade, and because both steps read the same
+ * expression they still match each other.
+ */
+const CONTENT_HEIGHT = 'min(400px, 58vh)';
 
 const SCOPES: { id: ExportScope; label: string; hint: string }[] = [
   { id: 'all', label: 'Everything', hint: 'Every annotation in this review' },
@@ -85,11 +113,14 @@ export function ExportWizard({
   onClose,
   onExport,
   counts,
+  documentTitle,
   exporting = false,
 }: {
   open: boolean;
   onClose: () => void;
-  onExport: (settings: ExportSettings) => void;
+  onExport: (settings: ExportSettings, fileName: string) => void;
+  /** The review's title, which the prefilled filename is derived from. */
+  documentTitle?: string | null;
   /** Row counts per scope, so the wizard can say what the download will contain. */
   counts?: ExportCounts;
   exporting?: boolean;
@@ -98,7 +129,21 @@ export function ExportWizard({
   // every open: first step, last configuration. A reset effect would do the
   // same thing a render too late, and cascade.
   const [step, setStep] = useState(0);
-  const [settings, setSettings] = useState<ExportSettings>(loadSettings);
+  // The reader's own zone (ADR-0041), so the wizard opens on the times they
+  // actually work in rather than on UTC.
+  const displayTimeZone = useUiStore((state) => state.displayTimeZone);
+  const [settings, setSettings] = useState<ExportSettings>(() => loadSettings(displayTimeZone));
+  const zones = useMemo(() => listTimeZones(displayTimeZone), [displayTimeZone]);
+  // Only what the user typed is state; the default is derived on every render.
+  // Capturing it once would freeze whatever the title was at mount — which, on a
+  // cold cache, is nothing at all, and the field would sit on "annotations" even
+  // after the review's name arrived.
+  //
+  // Not persisted with the rest either: a filename belongs to this review, and
+  // carrying last week's name onto a different document is a trap, not a
+  // convenience.
+  const [typedFileName, setTypedFileName] = useState<string | null>(null);
+  const fileName = typedFileName ?? defaultFileName(documentTitle);
 
   const selected = useMemo(() => effectiveFields(settings.fields), [settings.fields]);
   const rows = counts ? counts[settings.scope] : null;
@@ -121,12 +166,12 @@ export function ExportWizard({
   const start = () => {
     const chosen = { ...settings, fields: selected };
     saveSettings(chosen);
-    onExport(chosen);
+    onExport(chosen, fileName.trim());
   };
 
   return (
-    <Dialog open={open} onClose={onClose} maxWidth="sm" fullWidth>
-      <DialogTitle sx={{ pb: 1 }}>
+    <Dialog open={open} onClose={onClose} maxWidth="md" fullWidth>
+      <DialogTitle sx={{ pb: 0.5 }}>
         <Typography
           sx={{
             fontSize: 11,
@@ -143,7 +188,7 @@ export function ExportWizard({
         </Typography>
       </DialogTitle>
 
-      <Box sx={{ px: 3, pb: 1 }}>
+      <Box sx={{ px: 3, pb: 0.5 }}>
         <Stepper activeStep={step} sx={{ '& .MuiStepLabel-label': { fontSize: 13 } }}>
           {STEPS.map((label) => (
             <Step key={label}>
@@ -153,214 +198,325 @@ export function ExportWizard({
         </Stepper>
       </Box>
 
-      <DialogContent dividers>
+      {/* Two columns, one height.
+          The scrolling this replaces was never a height problem: a 600px dialog
+          forces every group into one stack, and eleven checkboxes plus five date
+          samples are simply taller than a dialog should be. Widening it and
+          pairing the groups sideways removes the scrollbar outright.
+          The fixed height is the second half — the two steps hold different
+          amounts, and a dialog that resizes as you page through it moves the
+          buttons out from under the pointer reaching for them. */}
+      <DialogContent
+        dividers
+        sx={{
+          height: { xs: 'auto', sm: CONTENT_HEIGHT },
+          maxHeight: { xs: '60vh', sm: CONTENT_HEIGHT },
+        }}
+      >
         {step === 0 ? (
-          <Stack spacing={3}>
+          <Stack spacing={2.5}>
+            <Box
+              sx={{
+                display: 'grid',
+                gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr' },
+                gap: 3,
+              }}
+            >
+              <Box>
+                <SectionLabel>Format</SectionLabel>
+                <Box
+                  sx={{
+                    display: 'grid',
+                    gridTemplateColumns: '1fr 1fr',
+                    gap: 1,
+                    mt: 1,
+                  }}
+                >
+                  {EXPORT_FORMATS.map((entry) => {
+                    const active = entry.id === settings.format;
+                    return (
+                      <Box
+                        key={entry.id}
+                        component="button"
+                        type="button"
+                        disabled={entry.planned}
+                        aria-pressed={active}
+                        onClick={() => setSettings((c) => ({ ...c, format: entry.id }))}
+                        sx={{
+                          textAlign: 'left',
+                          p: 1.25,
+                          borderRadius: 2,
+                          border: '1px solid',
+                          borderColor: active ? 'primary.main' : 'divider',
+                          bgcolor: (t) =>
+                            active ? alpha(t.palette.primary.main, 0.06) : 'transparent',
+                          cursor: entry.planned ? 'not-allowed' : 'pointer',
+                          opacity: entry.planned ? 0.5 : 1,
+                          transition: 'border-color 150ms, background-color 150ms',
+                          '&:hover:not(:disabled)': { borderColor: 'primary.main' },
+                        }}
+                      >
+                        <Stack
+                          direction="row"
+                          spacing={0.75}
+                          sx={{ alignItems: 'center', mb: 0.25 }}
+                        >
+                          <Typography sx={{ fontSize: 14, fontWeight: 700 }}>
+                            {entry.label}
+                          </Typography>
+                          <Typography sx={{ fontSize: 11.5, color: 'text.disabled' }}>
+                            {entry.extension}
+                          </Typography>
+                          {entry.planned && <ToneBadge tone="neutral" label="Planned" />}
+                        </Stack>
+                        <Typography sx={{ fontSize: 12, color: 'text.secondary' }}>
+                          {entry.hint}
+                        </Typography>
+                      </Box>
+                    );
+                  })}
+                </Box>
+              </Box>
+
+              <Box>
+                <SectionLabel>Which annotations</SectionLabel>
+                <Stack spacing={0.75} sx={{ mt: 1 }}>
+                  {SCOPES.map((scope) => {
+                    const active = scope.id === settings.scope;
+                    return (
+                      <Box
+                        key={scope.id}
+                        component="button"
+                        type="button"
+                        aria-pressed={active}
+                        onClick={() => setSettings((c) => ({ ...c, scope: scope.id }))}
+                        sx={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: 1.5,
+                          width: '100%',
+                          textAlign: 'left',
+                          px: 1.5,
+                          py: 1,
+                          borderRadius: 2,
+                          border: '1px solid',
+                          borderColor: active ? 'primary.main' : 'divider',
+                          bgcolor: (t) =>
+                            active ? alpha(t.palette.primary.main, 0.06) : 'transparent',
+                          cursor: 'pointer',
+                          '&:hover': { borderColor: 'primary.main' },
+                        }}
+                      >
+                        <Box sx={{ flex: 1, minWidth: 0 }}>
+                          <Typography sx={{ fontSize: 14, fontWeight: active ? 700 : 500 }}>
+                            {scope.label}
+                          </Typography>
+                          <Typography sx={{ fontSize: 12, color: 'text.secondary' }}>
+                            {scope.hint}
+                          </Typography>
+                        </Box>
+                        {counts && (
+                          <Typography
+                            sx={{ fontSize: 13, fontWeight: 700, color: 'text.secondary' }}
+                          >
+                            {counts[scope.id]}
+                          </Typography>
+                        )}
+                      </Box>
+                    );
+                  })}
+                </Stack>
+              </Box>
+            </Box>
+
             <Box>
-              <SectionLabel>Format</SectionLabel>
+              <SectionLabel>Saved as</SectionLabel>
               <Box
                 sx={{
                   display: 'grid',
                   gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr' },
-                  gap: 1,
+                  gap: 3,
                   mt: 1,
+                  alignItems: 'start',
                 }}
               >
-                {EXPORT_FORMATS.map((entry) => {
-                  const active = entry.id === settings.format;
-                  return (
-                    <Box
-                      key={entry.id}
-                      component="button"
-                      type="button"
-                      disabled={entry.planned}
-                      aria-pressed={active}
-                      onClick={() => setSettings((c) => ({ ...c, format: entry.id }))}
-                      sx={{
-                        textAlign: 'left',
-                        p: 1.5,
-                        borderRadius: 2,
-                        border: '1px solid',
-                        borderColor: active ? 'primary.main' : 'divider',
-                        bgcolor: (t) =>
-                          active ? alpha(t.palette.primary.main, 0.06) : 'transparent',
-                        cursor: entry.planned ? 'not-allowed' : 'pointer',
-                        opacity: entry.planned ? 0.5 : 1,
-                        transition: 'border-color 150ms, background-color 150ms',
-                        '&:hover:not(:disabled)': { borderColor: 'primary.main' },
-                      }}
-                    >
-                      <Stack direction="row" spacing={0.75} sx={{ alignItems: 'center', mb: 0.25 }}>
-                        <Typography sx={{ fontSize: 14, fontWeight: 700 }}>
-                          {entry.label}
-                        </Typography>
-                        <Typography sx={{ fontSize: 11.5, color: 'text.disabled' }}>
-                          {entry.extension}
-                        </Typography>
-                        {entry.planned && <ToneBadge tone="neutral" label="Planned" />}
-                      </Stack>
-                      <Typography sx={{ fontSize: 12, color: 'text.secondary' }}>
-                        {entry.hint}
-                      </Typography>
-                    </Box>
-                  );
-                })}
+                <TextField
+                  size="small"
+                  label="File name"
+                  value={fileName}
+                  onChange={(event) => setTypedFileName(event.target.value)}
+                  placeholder={defaultFileName(documentTitle)}
+                  slotProps={{
+                    input: {
+                      // The extension follows the format and is not the user's to
+                      // set: typing .pdf on a Word export would name a file that
+                      // lies about its own bytes.
+                      endAdornment: (
+                        <InputAdornment position="end">
+                          <Typography sx={{ fontSize: 13, color: 'text.secondary' }}>
+                            {format?.extension}
+                          </Typography>
+                        </InputAdornment>
+                      ),
+                    },
+                  }}
+                />
+                {format?.supportsLogo && (
+                  <ToggleCard
+                    on={settings.includeLogo}
+                    onChange={(on) => setSettings((c) => ({ ...c, includeLogo: on }))}
+                    icon={<ImageIcon size={14} />}
+                    title="Branding logo"
+                    hint="Placed on the document, if branding has been uploaded."
+                  />
+                )}
               </Box>
-            </Box>
-
-            <Box>
-              <SectionLabel>Which annotations</SectionLabel>
-              <Stack spacing={0.75} sx={{ mt: 1 }}>
-                {SCOPES.map((scope) => {
-                  const active = scope.id === settings.scope;
-                  return (
-                    <Box
-                      key={scope.id}
-                      component="button"
-                      type="button"
-                      aria-pressed={active}
-                      onClick={() => setSettings((c) => ({ ...c, scope: scope.id }))}
-                      sx={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: 1.5,
-                        width: '100%',
-                        textAlign: 'left',
-                        px: 1.5,
-                        py: 1,
-                        borderRadius: 2,
-                        border: '1px solid',
-                        borderColor: active ? 'primary.main' : 'divider',
-                        bgcolor: (t) =>
-                          active ? alpha(t.palette.primary.main, 0.06) : 'transparent',
-                        cursor: 'pointer',
-                        '&:hover': { borderColor: 'primary.main' },
-                      }}
-                    >
-                      <Box sx={{ flex: 1, minWidth: 0 }}>
-                        <Typography sx={{ fontSize: 14, fontWeight: active ? 700 : 500 }}>
-                          {scope.label}
-                        </Typography>
-                        <Typography sx={{ fontSize: 12, color: 'text.secondary' }}>
-                          {scope.hint}
-                        </Typography>
-                      </Box>
-                      {counts && (
-                        <Typography sx={{ fontSize: 13, fontWeight: 700, color: 'text.secondary' }}>
-                          {counts[scope.id]}
-                        </Typography>
-                      )}
-                    </Box>
-                  );
-                })}
-              </Stack>
             </Box>
           </Stack>
         ) : (
-          <Stack spacing={2}>
-            <Stack direction="row" sx={{ alignItems: 'center', justifyContent: 'space-between' }}>
-              <SectionLabel>Columns</SectionLabel>
-              <Stack direction="row" spacing={0.5}>
-                <Button size="small" onClick={() => setAllFields(true)}>
-                  All
-                </Button>
-                <Button size="small" onClick={() => setAllFields(false)}>
-                  None
-                </Button>
+          <Box
+            sx={{
+              display: 'grid',
+              gridTemplateColumns: { xs: '1fr', sm: '1.1fr 1fr' },
+              gap: 3,
+            }}
+          >
+            <Box>
+              <Stack direction="row" sx={{ alignItems: 'center', justifyContent: 'space-between' }}>
+                <SectionLabel>{capitalise(format?.fieldNoun ?? 'fields')}</SectionLabel>
+                <Stack direction="row" spacing={0.5}>
+                  <Button size="small" onClick={() => setAllFields(true)}>
+                    All
+                  </Button>
+                  <Button size="small" onClick={() => setAllFields(false)}>
+                    None
+                  </Button>
+                </Stack>
               </Stack>
-            </Stack>
 
-            {FIELD_GROUPS.map((group) => (
-              <Box key={group}>
-                <Typography
-                  sx={{ fontSize: 11.5, fontWeight: 700, color: 'text.disabled', mb: 0.25 }}
-                >
-                  {group}
-                </Typography>
+              <Stack spacing={1} sx={{ mt: 0.5 }}>
+                {FIELD_GROUPS.map((group) => (
+                  <Box key={group}>
+                    <Typography
+                      sx={{ fontSize: 11.5, fontWeight: 700, color: 'text.disabled', mb: 0.25 }}
+                    >
+                      {group}
+                    </Typography>
+                    <Box
+                      sx={{
+                        display: 'grid',
+                        gridTemplateColumns: '1fr 1fr',
+                        columnGap: 1.5,
+                      }}
+                    >
+                      {EXPORT_FIELDS.filter((field) => field.group === group).map((field) => (
+                        <FormControlLabel
+                          key={field.id}
+                          sx={{ m: 0 }}
+                          control={
+                            <Checkbox
+                              size="small"
+                              sx={{ py: 0.25 }}
+                              checked={selected.includes(field.id)}
+                              disabled={field.required}
+                              onChange={() => toggleField(field.id)}
+                            />
+                          }
+                          label={
+                            <Typography sx={{ fontSize: 13.5 }}>
+                              {field.label}
+                              {field.required && (
+                                <Typography
+                                  component="span"
+                                  sx={{ fontSize: 11.5, color: 'text.disabled', ml: 0.5 }}
+                                >
+                                  (always)
+                                </Typography>
+                              )}
+                            </Typography>
+                          }
+                        />
+                      ))}
+                    </Box>
+                  </Box>
+                ))}
+              </Stack>
+            </Box>
+
+            <Stack spacing={2}>
+              {/* Deliberately not a twelfth checkbox: a thread has no fixed
+                  length, so it cannot be a column. It becomes its own sheet, and
+                  saying so here is cheaper than a support question about the
+                  second tab. */}
+              <ToggleCard
+                on={settings.includeComments}
+                onChange={(on) => setSettings((c) => ({ ...c, includeComments: on }))}
+                icon={<MessagesSquare size={14} />}
+                title="Comment threads"
+                hint={format?.commentsHint ?? ''}
+              />
+
+              <Box>
+                <SectionLabel>Date and time</SectionLabel>
+                <Autocomplete
+                  size="small"
+                  disableClearable
+                  options={zones}
+                  value={settings.timezone}
+                  onChange={(_, zone) => setSettings((c) => ({ ...c, timezone: zone }))}
+                  getOptionLabel={(zone) => timeZoneLabel(zone)}
+                  renderInput={(params) => <TextField {...params} label="Timezone" />}
+                  sx={{ mt: 1, mb: 1 }}
+                />
                 <Box
                   sx={{
                     display: 'grid',
-                    gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr' },
-                    columnGap: 2,
+                    gridTemplateColumns: '1fr 1fr',
+                    gap: 0.75,
                   }}
                 >
-                  {EXPORT_FIELDS.filter((field) => field.group === group).map((field) => (
-                    <FormControlLabel
-                      key={field.id}
-                      sx={{ m: 0 }}
-                      control={
-                        <Checkbox
-                          size="small"
-                          checked={selected.includes(field.id)}
-                          disabled={field.required}
-                          onChange={() => toggleField(field.id)}
-                        />
-                      }
-                      label={
-                        <Typography sx={{ fontSize: 13.5 }}>
-                          {field.label}
-                          {field.required && (
-                            <Typography
-                              component="span"
-                              sx={{ fontSize: 11.5, color: 'text.disabled', ml: 0.5 }}
-                            >
-                              (always)
-                            </Typography>
-                          )}
+                  {EXPORT_DATE_FORMATS.map((entry) => {
+                    const active = entry.id === settings.dateFormat;
+                    return (
+                      <Box
+                        key={entry.id}
+                        component="button"
+                        type="button"
+                        aria-pressed={active}
+                        onClick={() => setSettings((c) => ({ ...c, dateFormat: entry.id }))}
+                        sx={{
+                          textAlign: 'left',
+                          px: 1.25,
+                          py: 0.6,
+                          borderRadius: 2,
+                          border: '1px solid',
+                          borderColor: active ? 'primary.main' : 'divider',
+                          bgcolor: (t) =>
+                            active ? alpha(t.palette.primary.main, 0.06) : 'transparent',
+                          cursor: 'pointer',
+                          '&:hover': { borderColor: 'primary.main' },
+                        }}
+                      >
+                        {/* The sample leads: "European" means nothing until you see it. */}
+                        <Typography
+                          sx={{
+                            fontSize: 12.5,
+                            fontWeight: active ? 700 : 500,
+                            fontFamily: 'monospace',
+                          }}
+                        >
+                          {entry.sample}
                         </Typography>
-                      }
-                    />
-                  ))}
+                        <Typography sx={{ fontSize: 11, color: 'text.secondary' }}>
+                          {entry.label}
+                        </Typography>
+                      </Box>
+                    );
+                  })}
                 </Box>
               </Box>
-            ))}
-
-            <Divider />
-
-            {/* Deliberately not a twelfth checkbox: a thread has no fixed length,
-                so it cannot be a column. It becomes its own sheet, and saying so
-                here is cheaper than a support question about the second tab. */}
-            <Box
-              sx={{
-                px: 1.5,
-                py: 1,
-                borderRadius: 2,
-                border: '1px solid',
-                borderColor: settings.includeComments ? 'primary.main' : 'divider',
-                bgcolor: (t) =>
-                  settings.includeComments ? alpha(t.palette.primary.main, 0.06) : 'transparent',
-                transition: 'border-color 150ms, background-color 150ms',
-              }}
-            >
-              <FormControlLabel
-                sx={{ m: 0, width: '100%', alignItems: 'flex-start' }}
-                control={
-                  <Switch
-                    size="small"
-                    sx={{ mt: 0.25, mr: 1 }}
-                    checked={settings.includeComments}
-                    onChange={(event) =>
-                      setSettings((c) => ({ ...c, includeComments: event.target.checked }))
-                    }
-                  />
-                }
-                label={
-                  <Box>
-                    <Stack direction="row" spacing={0.75} sx={{ alignItems: 'center' }}>
-                      <MessagesSquare size={14} />
-                      <Typography sx={{ fontSize: 13.5, fontWeight: 700 }}>
-                        Comment threads
-                      </Typography>
-                    </Stack>
-                    <Typography sx={{ fontSize: 12, color: 'text.secondary' }}>
-                      A second sheet with the full text of every comment and who wrote it. In an
-                      anonymous review the authors stay pseudonymous here too.
-                    </Typography>
-                  </Box>
-                }
-              />
-            </Box>
-          </Stack>
+            </Stack>
+          </Box>
         )}
       </DialogContent>
 
@@ -368,7 +524,8 @@ export function ExportWizard({
           the downloads folder, so what it will contain is stated before it runs. */}
       <Box sx={{ px: 3, py: 1.25, bgcolor: (t) => t.qnop.surface2 }}>
         <Typography sx={{ fontSize: 12.5, color: 'text.secondary' }}>
-          {format?.label} {format?.extension} · {selected.length} of {EXPORT_FIELDS.length} columns
+          {format?.label} {format?.extension} · {selected.length} of {EXPORT_FIELDS.length}{' '}
+          {format?.fieldNoun}
           {rows !== null && ` · ${rows} annotation${rows === 1 ? '' : 's'}`}
           {settings.includeComments && ' · with comment threads'}
         </Typography>
@@ -408,6 +565,67 @@ export function ExportWizard({
       </DialogActions>
     </Dialog>
   );
+}
+
+/**
+ * One switch with a title and an explanation, used for every optional inclusion.
+ *
+ * <p>Shared so the options cannot drift into looking like different kinds of
+ * decision — they are the same kind: something extra that either goes in or does
+ * not.
+ */
+function ToggleCard({
+  on,
+  onChange,
+  icon,
+  title,
+  hint,
+}: {
+  on: boolean;
+  onChange: (on: boolean) => void;
+  icon: React.ReactNode;
+  title: string;
+  hint: string;
+}) {
+  return (
+    <Box
+      sx={{
+        px: 1.5,
+        py: 1,
+        borderRadius: 2,
+        border: '1px solid',
+        borderColor: on ? 'primary.main' : 'divider',
+        bgcolor: (t) => (on ? alpha(t.palette.primary.main, 0.06) : 'transparent'),
+        transition: 'border-color 150ms, background-color 150ms',
+      }}
+    >
+      <FormControlLabel
+        sx={{ m: 0, width: '100%', alignItems: 'flex-start' }}
+        control={
+          <Switch
+            size="small"
+            sx={{ mt: 0.25, mr: 1 }}
+            checked={on}
+            onChange={(event) => onChange(event.target.checked)}
+          />
+        }
+        label={
+          <Box>
+            <Stack direction="row" spacing={0.75} sx={{ alignItems: 'center' }}>
+              {icon}
+              <Typography sx={{ fontSize: 13.5, fontWeight: 700 }}>{title}</Typography>
+            </Stack>
+            <Typography sx={{ fontSize: 12, color: 'text.secondary' }}>{hint}</Typography>
+          </Box>
+        }
+      />
+    </Box>
+  );
+}
+
+/** Sentence case for a noun that lives lowercase in the format registry. */
+function capitalise(word: string): string {
+  return word.charAt(0).toUpperCase() + word.slice(1);
 }
 
 function SectionLabel({ children }: { children: React.ReactNode }) {

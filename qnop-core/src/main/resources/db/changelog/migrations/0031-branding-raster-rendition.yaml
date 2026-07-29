@@ -1,0 +1,34 @@
+# Copyright (c) 2026-present devtank42 GmbH
+# SPDX-License-Identifier: AGPL-3.0-only
+
+# A raster rendition of each branding asset, for document exports (issue #635
+# follow-up).
+#
+# Word cannot embed SVG, and SVG is both the format of the bundled logos and the
+# one operators most often upload. The report therefore needs a PNG, and the
+# choice is where the conversion happens: on every export, or once.
+#
+# Once — here. The rendition is derived data, so the column is nullable and may
+# be dropped and recomputed at any time; it is a cache that happens to be durable.
+# Durable matters for two reasons: rasterizing an SVG costs real CPU, and in a
+# multi-instance deployment an in-memory cache would pay that cost per instance.
+#
+# No backfill: existing rows get their rendition the first time one is asked for.
+# A migration that rasterized every stored asset would need the application's own
+# code to run inside Liquibase, which is exactly the coupling changesets avoid.
+databaseChangeLog:
+  - changeSet:
+      id: 0031-branding-raster-rendition
+      author: qnop
+      comment: Adds application_asset.raster_content, the PNG rendition used by document exports (issue #635).
+      changes:
+        - addColumn:
+            tableName: application_asset
+            columns:
+              - column:
+                  name: raster_content
+                  type: bytea
+                  remarks: >-
+                    PNG rendition of `content`, for formats that cannot embed the
+                    original (Word cannot embed SVG). Derived and nullable: safe to
+                    drop, recomputed on the next read.

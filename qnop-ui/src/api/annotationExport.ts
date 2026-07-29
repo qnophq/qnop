@@ -20,28 +20,29 @@
  */
 
 import { axiosInstance } from './config';
-
-/** Pulled out of `Content-Disposition`, so the saved file keeps the server's name. */
-function filenameFrom(disposition: string | undefined, fallback: string): string {
-  if (!disposition) return fallback;
-  const utf8 = /filename\*=UTF-8''([^;]+)/i.exec(disposition);
-  if (utf8) return decodeURIComponent(utf8[1]);
-  const plain = /filename="?([^";]+)"?/i.exec(disposition);
-  return plain ? plain[1] : fallback;
-}
+import { filenameFrom, saveBlob } from './download';
 
 /**
- * Downloads a review's annotations as an Excel workbook (issue #547).
+ * Downloads a review's annotations as a file (issues #547, #635).
  *
  * <p>It goes through the shared axios instance rather than a bare `<a href>` or
  * `window.open`, because the endpoint is bearer-authenticated: a plain browser
- * navigation carries no Authorization header and would simply 401. So the file
- * arrives as a blob and is handed to the browser through an object URL.
+ * navigation carries no Authorization header and would simply 401 (see
+ * `download.ts`).
  */
 export async function downloadAnnotationExport(
   documentId: string,
   version?: number,
-  options?: { fields?: string[]; scope?: string; comments?: boolean },
+  options?: {
+    fields?: string[];
+    scope?: string;
+    comments?: boolean;
+    format?: string;
+    logo?: boolean;
+    dateFormat?: string;
+    timezone?: string;
+    fileName?: string;
+  },
 ): Promise<void> {
   const response = await axiosInstance.get(`/documents/${documentId}/annotations/export`, {
     params: {
@@ -52,6 +53,20 @@ export async function downloadAnnotationExport(
       ...(options?.fields?.length ? { fields: options.fields } : {}),
       ...(options?.scope && options.scope !== 'all' ? { scope: options.scope } : {}),
       ...(options?.comments ? { comments: true } : {}),
+      // Omitted for the default, so the links that shipped with #547 stay valid.
+      ...(options?.format && options.format !== 'xlsx' ? { format: options.format } : {}),
+      // Both omitted at their defaults, so a hand-written link stays short and
+      // the server's default is the single source of what "unspecified" means.
+      ...(options?.logo === false ? { logo: false } : {}),
+      ...(options?.dateFormat && options.dateFormat !== 'iso'
+        ? { dateFormat: options.dateFormat }
+        : {}),
+      // Always sent: the server's default is UTC, and the reader's own zone is
+      // what the wizard showed them.
+      ...(options?.timezone ? { timezone: options.timezone } : {}),
+      // Omitted when empty, so the server's <slug>-annotations default applies
+      // and there is one place that decides what "no name given" means.
+      ...(options?.fileName ? { filename: options.fileName } : {}),
     },
     paramsSerializer: { indexes: null },
     responseType: 'blob',
@@ -59,18 +74,7 @@ export async function downloadAnnotationExport(
 
   const filename = filenameFrom(
     response.headers['content-disposition'] as string | undefined,
-    'annotations.xlsx',
+    `annotations.${options?.format ?? 'xlsx'}`,
   );
-  const url = URL.createObjectURL(response.data as Blob);
-  try {
-    const link = window.document.createElement('a');
-    link.href = url;
-    link.download = filename;
-    window.document.body.appendChild(link);
-    link.click();
-    link.remove();
-  } finally {
-    // Revoking immediately is safe — the click has already handed the blob over.
-    URL.revokeObjectURL(url);
-  }
+  saveBlob(response.data as Blob, filename);
 }

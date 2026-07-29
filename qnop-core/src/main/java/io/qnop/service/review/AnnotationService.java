@@ -676,6 +676,28 @@ public class AnnotationService {
   }
 
   /** Opening-comment excerpts for a batch of annotations in a single query (issue #393). */
+  /**
+   * The <em>unabridged</em> opening comment of each given annotation.
+   *
+   * <p>{@link AnnotationView#firstComment()} is an excerpt — {@value #FIRST_COMMENT_EXCERPT_CHARS}
+   * characters, enough for a list row and nothing more. An export needs the whole thing: the cut
+   * lands mid-sentence, and when it lands mid-link it leaves a broken reference behind rather than
+   * a shortened one.
+   *
+   * <p>Takes the views the caller already obtained from {@link #list}, not bare ids, because that
+   * is what makes it safe: those have passed the visibility and PRIVATE-thread filters, and an
+   * opening comment is visible exactly when its annotation is. One batched query, no N+1.
+   */
+  @Transactional(readOnly = true)
+  public Map<UUID, String> fullFirstComments(List<AnnotationView> visible) {
+    if (visible.isEmpty()) {
+      return Map.of();
+    }
+    List<UUID> ids = visible.stream().map(AnnotationView::id).toList();
+    return comments.findFirstByAnnotationIdIn(ids).stream()
+        .collect(toMap(AnnotationFirstComment::getAnnotationId, AnnotationFirstComment::getBody));
+  }
+
   private Map<UUID, String> firstComments(List<Annotation> forAnnotations) {
     if (forAnnotations.isEmpty()) {
       return Map.of();
