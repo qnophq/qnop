@@ -22,6 +22,7 @@
 import { useState } from 'react';
 import { Download } from 'lucide-react';
 import { downloadAnnotationExport } from '../../api/annotationExport';
+import { useDocument } from '../../api/hooks/useDocuments';
 import { ToolbarIconButton } from './ToolbarIconButton';
 import { ExportWizard, type ExportCounts } from './export/ExportWizard';
 import type { ExportSettings } from './export/exportModel';
@@ -51,8 +52,12 @@ export function ExportAnnotationsButton({
 }) {
   const [open, setOpen] = useState(false);
   const [exporting, setExporting] = useState(false);
+  // The title is only needed to prefill the filename, and both surfaces have
+  // already loaded this document — so it comes from the cache rather than
+  // becoming a prop that two call sites have to remember to pass.
+  const documentQuery = useDocument(documentId);
 
-  const run = async (settings: ExportSettings) => {
+  const run = async (settings: ExportSettings, fileName: string) => {
     setExporting(true);
     try {
       await downloadAnnotationExport(documentId, version, {
@@ -63,6 +68,7 @@ export function ExportAnnotationsButton({
         logo: settings.includeLogo,
         dateFormat: settings.dateFormat,
         timezone: settings.timezone,
+        fileName,
       });
       // Closing only after it succeeded keeps the configuration on screen when
       // it did not — the user retries instead of rebuilding their selection.
@@ -89,6 +95,7 @@ export function ExportAnnotationsButton({
           open
           onClose={() => setOpen(false)}
           onExport={run}
+          documentTitle={documentQuery.data?.title}
           counts={counts}
           exporting={exporting}
         />

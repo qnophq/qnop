@@ -267,3 +267,25 @@ export function scopeCount(
 ): number {
   return counts[scope];
 }
+
+/**
+ * The prefilled base name: `<slug>-annotations`, mirroring `ExportFilename` on
+ * the server.
+ *
+ * <p>Mirrored rather than fetched, because the wizard has to show the name
+ * before any request is made. The two can only disagree cosmetically — the
+ * server sanitizes whatever it receives, and the user sees and can edit the
+ * value either way — which is why a round trip to stay in lockstep would cost
+ * more than it is worth.
+ */
+export function defaultFileName(documentTitle: string | null | undefined): string {
+  const slug = (documentTitle ?? '')
+    .normalize('NFKD')
+    .replace(/\p{M}+/gu, '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    .slice(0, 80)
+    .replace(/-+$/, '');
+  return slug ? `${slug}-annotations` : 'annotations';
+}

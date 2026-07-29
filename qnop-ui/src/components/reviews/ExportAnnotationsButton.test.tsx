@@ -23,6 +23,8 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { ThemeProvider } from '@mui/material/styles';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { documentKeys } from '../../api/hooks/useDocuments';
 import { buildTheme } from '../../theme/theme';
 import { downloadAnnotationExport } from '../../api/annotationExport';
 import { ExportAnnotationsButton } from './ExportAnnotationsButton';
@@ -34,10 +36,18 @@ vi.mock('../../api/annotationExport', () => ({
 const COUNTS = { all: 12, open: 5, resolved: 7 };
 
 function renderButton(onError = vi.fn()) {
+  // The button reads the document's title from the cache to prefill the
+  // filename. Seeding the cache rather than stubbing the fetch mirrors reality:
+  // both surfaces have already loaded this document by the time the button
+  // renders.
+  const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  client.setQueryData(documentKeys.detail('doc-1'), { id: 'doc-1', title: 'Vendor Agreement' });
   render(
-    <ThemeProvider theme={buildTheme('light')}>
-      <ExportAnnotationsButton documentId="doc-1" version={3} counts={COUNTS} onError={onError} />
-    </ThemeProvider>,
+    <QueryClientProvider client={client}>
+      <ThemeProvider theme={buildTheme('light')}>
+        <ExportAnnotationsButton documentId="doc-1" version={3} counts={COUNTS} onError={onError} />
+      </ThemeProvider>
+    </QueryClientProvider>,
   );
   return onError;
 }
@@ -230,5 +240,32 @@ describe('ExportAnnotationsButton', () => {
 
     await waitFor(() => expect(downloadAnnotationExport).toHaveBeenCalled());
     expect(vi.mocked(downloadAnnotationExport).mock.calls[0][2]?.dateFormat).toBe('european');
+  });
+
+  it('prefills the filename from the review title', async () => {
+    const user = userEvent.setup();
+    renderButton();
+    await openWizard(user);
+    await user.click(screen.getByRole('button', { name: /Next/ }));
+
+    const field = await screen.findByLabelText('File name');
+    await waitFor(() => expect(field).toHaveValue('vendor-agreement-annotations'));
+    // The extension follows the format and is shown, not typed.
+    expect(screen.getByText('.xlsx')).toBeInTheDocument();
+  });
+
+  it('sends a filename the user typed instead', async () => {
+    const user = userEvent.setup();
+    renderButton();
+    await openWizard(user);
+    await user.click(screen.getByRole('button', { name: /Next/ }));
+
+    const field = await screen.findByLabelText('File name');
+    await user.clear(field);
+    await user.type(field, 'Q3 findings');
+    await user.click(screen.getByRole('button', { name: /^Export$/ }));
+
+    await waitFor(() => expect(downloadAnnotationExport).toHaveBeenCalled());
+    expect(vi.mocked(downloadAnnotationExport).mock.calls[0][2]?.fileName).toBe('Q3 findings');
   });
 });

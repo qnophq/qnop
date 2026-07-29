@@ -33,6 +33,7 @@ import FormControlLabel from '@mui/material/FormControlLabel';
 import Autocomplete from '@mui/material/Autocomplete';
 import Stack from '@mui/material/Stack';
 import Switch from '@mui/material/Switch';
+import InputAdornment from '@mui/material/InputAdornment';
 import TextField from '@mui/material/TextField';
 import Step from '@mui/material/Step';
 import StepLabel from '@mui/material/StepLabel';
@@ -54,6 +55,7 @@ import {
   EXPORT_DATE_FORMATS,
   EXPORT_FIELDS,
   EXPORT_FORMATS,
+  defaultFileName,
   FIELD_GROUPS,
   effectiveFields,
   loadSettings,
@@ -97,11 +99,14 @@ export function ExportWizard({
   onClose,
   onExport,
   counts,
+  documentTitle,
   exporting = false,
 }: {
   open: boolean;
   onClose: () => void;
-  onExport: (settings: ExportSettings) => void;
+  onExport: (settings: ExportSettings, fileName: string) => void;
+  /** The review's title, which the prefilled filename is derived from. */
+  documentTitle?: string | null;
   /** Row counts per scope, so the wizard can say what the download will contain. */
   counts?: ExportCounts;
   exporting?: boolean;
@@ -115,6 +120,16 @@ export function ExportWizard({
   const displayTimeZone = useUiStore((state) => state.displayTimeZone);
   const [settings, setSettings] = useState<ExportSettings>(() => loadSettings(displayTimeZone));
   const zones = useMemo(() => listTimeZones(displayTimeZone), [displayTimeZone]);
+  // Only what the user typed is state; the default is derived on every render.
+  // Capturing it once would freeze whatever the title was at mount — which, on a
+  // cold cache, is nothing at all, and the field would sit on "annotations" even
+  // after the review's name arrived.
+  //
+  // Not persisted with the rest either: a filename belongs to this review, and
+  // carrying last week's name onto a different document is a trap, not a
+  // convenience.
+  const [typedFileName, setTypedFileName] = useState<string | null>(null);
+  const fileName = typedFileName ?? defaultFileName(documentTitle);
 
   const selected = useMemo(() => effectiveFields(settings.fields), [settings.fields]);
   const rows = counts ? counts[settings.scope] : null;
@@ -137,7 +152,7 @@ export function ExportWizard({
   const start = () => {
     const chosen = { ...settings, fields: selected };
     saveSettings(chosen);
-    onExport(chosen);
+    onExport(chosen, fileName.trim());
   };
 
   return (
@@ -334,6 +349,28 @@ export function ExportWizard({
             <Divider />
 
             <SectionLabel>Presentation</SectionLabel>
+
+            <TextField
+              size="small"
+              label="File name"
+              value={fileName}
+              onChange={(event) => setTypedFileName(event.target.value)}
+              placeholder={defaultFileName(documentTitle)}
+              slotProps={{
+                input: {
+                  // The extension follows the format and is not the user's to
+                  // set: typing .pdf on a Word export would name a file that
+                  // lies about its own bytes.
+                  endAdornment: (
+                    <InputAdornment position="end">
+                      <Typography sx={{ fontSize: 13, color: 'text.secondary' }}>
+                        {format?.extension}
+                      </Typography>
+                    </InputAdornment>
+                  ),
+                },
+              }}
+            />
 
             {/* Deliberately not a twelfth checkbox: a thread has no fixed length,
                 so it cannot be a column. It becomes its own sheet, and saying so

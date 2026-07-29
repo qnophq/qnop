@@ -666,6 +666,62 @@ class AnnotationExportIT extends SeededIntegrationTest {
   }
 
   @Test
+  @DisplayName("the download is named <slug>-annotations.<ext>, or whatever the user asked for")
+  void filenameFollowsTheSlugUnlessOverridden() throws Exception {
+    seedDocument(false);
+
+    mockMvc
+        .perform(as(get("/api/v1/documents/" + documentId + "/annotations/export"), MEMBER_ID))
+        .andExpect(status().isOk())
+        .andExpect(
+            header()
+                .string(
+                    "Content-Disposition",
+                    org.hamcrest.Matchers.containsString("vendor-agreement-annotations.xlsx")));
+
+    mockMvc
+        .perform(
+            as(
+                get("/api/v1/documents/" + documentId + "/annotations/export")
+                    .param("format", "docx")
+                    .param("filename", "Q3 findings"),
+                MEMBER_ID))
+        .andExpect(status().isOk())
+        .andExpect(
+            header()
+                .string(
+                    "Content-Disposition",
+                    org.hamcrest.Matchers.containsString("Q3%20findings.docx")));
+  }
+
+  @Test
+  @DisplayName("a filename cannot inject a header or escape the downloads folder")
+  void filenameCannotInjectAHeader() throws Exception {
+    seedDocument(false);
+
+    String disposition =
+        mockMvc
+            .perform(
+                as(
+                    get("/api/v1/documents/" + documentId + "/annotations/export")
+                        .param("filename", "evil\r\nX-Injected: yes/../escape"),
+                    MEMBER_ID))
+            .andExpect(status().isOk())
+            .andReturn()
+            .getResponse()
+            .getHeader("Content-Disposition");
+
+    // What matters is that the header cannot be ended early and the name cannot
+    // address a directory: the words the user typed surviving as *text* inside a
+    // filename is not a vulnerability, and stripping them would be theatre.
+    assertThat(disposition).doesNotContain("\r", "\n", "/", "\\");
+    assertThat(disposition.chars().noneMatch(Character::isISOControl)).isTrue();
+    // The quoted token is not broken out of, and the file is still a workbook.
+    assertThat(disposition).startsWith("attachment; filename=\"");
+    assertThat(disposition).endsWith(".xlsx");
+  }
+
+  @Test
   @DisplayName("a review without annotations still yields a valid header-only workbook")
   void emptyReviewYieldsHeaderOnly() throws Exception {
     seedDocument(false);

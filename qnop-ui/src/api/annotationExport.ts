@@ -49,6 +49,7 @@ export async function downloadAnnotationExport(
     logo?: boolean;
     dateFormat?: string;
     timezone?: string;
+    fileName?: string;
   },
 ): Promise<void> {
   const response = await axiosInstance.get(`/documents/${documentId}/annotations/export`, {
@@ -71,6 +72,9 @@ export async function downloadAnnotationExport(
       // Always sent: the server's default is UTC, and the reader's own zone is
       // what the wizard showed them.
       ...(options?.timezone ? { timezone: options.timezone } : {}),
+      // Omitted when empty, so the server's <slug>-annotations default applies
+      // and there is one place that decides what "no name given" means.
+      ...(options?.fileName ? { filename: options.fileName } : {}),
     },
     paramsSerializer: { indexes: null },
     responseType: 'blob',

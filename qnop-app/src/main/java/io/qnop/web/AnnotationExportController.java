@@ -23,7 +23,9 @@ package io.qnop.web;
 import io.qnop.service.review.AnnotationExportService;
 import io.qnop.service.review.export.AnnotationExportFormat;
 import io.qnop.service.review.export.ExportDateFormat;
+import io.qnop.service.review.export.ExportFilename;
 import java.io.ByteArrayInputStream;
+import java.nio.charset.StandardCharsets;
 import java.time.DateTimeException;
 import java.time.ZoneId;
 import java.time.ZoneOffset;
@@ -82,7 +84,11 @@ public class AnnotationExportController {
       // The UI preselects the reader's own zone (ADR-0041) and always sends it.
       // A request that names none gets UTC — a predictable wire default beats
       // resolving a caller's preference behind their back on a raw API call.
-      @RequestParam(value = "timezone", required = false) String timezone) {
+      @RequestParam(value = "timezone", required = false) String timezone,
+      // Sanitized rather than trusted: this lands in a response header, where a
+      // newline would be header injection and a slash an escape from the
+      // downloads folder.
+      @RequestParam(value = "filename", required = false) String filename) {
     AnnotationExportService.Export export =
         exports.export(
             documentId,
@@ -100,7 +106,9 @@ public class AnnotationExportController {
 
     ContentDisposition disposition =
         ContentDisposition.attachment()
-            .filename(DownloadFilename.forAnnotationExport(export.documentTitle(), export.format()))
+            .filename(
+                ExportFilename.forExport(filename, export.documentTitle(), export.format()),
+                StandardCharsets.UTF_8)
             .build();
     return ResponseEntity.ok()
         .cacheControl(CacheControl.noStore())

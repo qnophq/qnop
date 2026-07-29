@@ -68,6 +68,18 @@ On the wire the zone is a parameter and its absence means UTC. The server does *
 
 In the spreadsheet the logo occupies a band of rows above the header rather than a cell: a picture inside the grid would be dragged around by every sort and filter, which is the one thing that sheet exists to support. The header, freeze pane and autofilter move down with the band — and with the logo off, the grid is byte-for-byte the layout that shipped with #547.
 
+### The filename is the user's, within limits
+
+The default is `<slug>-annotations.<ext>`, derived from the review's title, because a folder full of exports has to stay legible. It is only a default: a report going to a customer is rarely best named after an internal document title, so the wizard shows the name and lets it be replaced.
+
+The extension is not part of that choice. It follows the format, because a file named `.pdf` that contains a workbook lies about its own bytes.
+
+Sanitizing is not cosmetic here — the name lands in a `Content-Disposition` header, where a newline is header injection and a separator aims the download outside the downloads folder. `ExportFilename` folds everything outside a conservative set away rather than escaping it, and the header is UTF-8 encoded so non-Latin names survive. Words that merely *look* alarming are left alone: `..` sitting inside a filename with no separator around it is text, and stripping it would be theatre.
+
+The filename is deliberately **not** persisted with the other wizard settings. Those are preferences; a filename belongs to one review, and carrying last week's name onto a different document would be a trap.
+
+`ExportFilename` does not reuse `UserSlugs`. That derivation carries rules that exist for URL routing — a `-user` suffix for short names, a guard against UUID-shaped results — and a filename has no business inheriting them.
+
 ### A plain controller, not the generated contract
 
 `GET /api/v1/documents/{documentId}/annotations/export` mirrors the existing binary downloads: a hand-written `@RestController`, `Content-Disposition: attachment`, deliberately absent from `openapi.yaml` (ADR-0028/0021). Unlike a version download it carries no ETag — annotations change constantly and there is no content hash to hang one on.
@@ -103,7 +115,7 @@ Headings use direct character formatting plus an OOXML outline level rather than
 
 - **2026-07-27** — accepted with the XLSX export (#547).
 - **2026-07-29** — extended for Word (#635): the model/renderer split, the `?format=` parameter, and the report layout. The remaining formats (#636–#639) are a renderer and an enum entry.
-- **2026-07-29** — the date convention, its timezone and the branding logo became per-export choices, all format-independent.
+- **2026-07-29** — the date convention, its timezone, the branding logo and the filename became per-export choices, all format-independent.
 - **ADR-0021 / ADR-0015** — OpenAPI-first, and why this endpoint is the deliberate exception
 - **ADR-0004** — the layering that puts the workbook in the service and leaves the controller streaming
 - Issue **#547**
