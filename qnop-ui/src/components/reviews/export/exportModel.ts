@@ -55,7 +55,10 @@ export interface ExportFormat {
 /**
  * The formats the wizard shows. Planned ones are listed on purpose: a user who
  * wonders whether Word exists gets an answer here instead of filing a request,
- * and shipping one flips a flag (issues #635–#639).
+ * and shipping one flips a flag (issues #637, #639). CSV and Markdown were
+ * dropped (#636/#638): CSV is a strictly worse Excel for this data — no typed
+ * dates, nowhere to put the comment threads — and Markdown duplicates what the
+ * review UI already shows.
  */
 export const EXPORT_FORMATS: ExportFormat[] = [
   {
@@ -79,16 +82,6 @@ export const EXPORT_FORMATS: ExportFormat[] = [
       'Every reply in full, indented under the annotation it answers. In an anonymous review the authors stay pseudonymous here too.',
   },
   {
-    id: 'md',
-    supportsLogo: false,
-    fieldNoun: 'sections',
-    commentsHint: 'Comment threads are included.',
-    label: 'Markdown',
-    extension: '.md',
-    hint: 'For pull requests and wikis.',
-    planned: true,
-  },
-  {
     id: 'html',
     supportsLogo: true,
     fieldNoun: 'sections',
@@ -96,16 +89,6 @@ export const EXPORT_FORMATS: ExportFormat[] = [
     label: 'HTML',
     extension: '.html',
     hint: 'Opens anywhere.',
-    planned: true,
-  },
-  {
-    id: 'csv',
-    supportsLogo: false,
-    fieldNoun: 'columns',
-    commentsHint: 'Comment threads are included.',
-    label: 'CSV',
-    extension: '.csv',
-    hint: 'For other tools.',
     planned: true,
   },
   {

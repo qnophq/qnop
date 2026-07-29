@@ -68,6 +68,10 @@ On the wire the zone is a parameter and its absence means UTC. The server does *
 
 In the spreadsheet the logo occupies a band of rows above the header rather than a cell: a picture inside the grid would be dragged around by every sort and filter, which is the one thing that sheet exists to support. The header, freeze pane and autofilter move down with the band — and with the logo off, the grid is byte-for-byte the layout that shipped with #547.
 
+### Four formats, not six
+
+CSV and Markdown were dropped (#636/#638) after Word shipped. CSV is a strictly worse Excel for this data — no typed dates, and nowhere to put the comment threads that need a second sheet — and Markdown duplicates what the review UI already renders. Excel and Word cover the two things an export is actually for: a grid to filter and a document to read; HTML (#637) and PDF (#639) remain because they answer "opens anywhere" and "archive this", which neither shipped format does.
+
 ### The filename is the user's, within limits
 
 The default is `<slug>-annotations.<ext>`, derived from the review's title, because a folder full of exports has to stay legible. It is only a default: a report going to a customer is rarely best named after an internal document title, so the wizard shows the name and lets it be replaced.
@@ -114,7 +118,7 @@ Headings use direct character formatting plus an OOXML outline level rather than
 ## History
 
 - **2026-07-27** — accepted with the XLSX export (#547).
-- **2026-07-29** — extended for Word (#635): the model/renderer split, the `?format=` parameter, and the report layout. The remaining formats (#636–#639) are a renderer and an enum entry.
+- **2026-07-29** — extended for Word (#635): the model/renderer split, the `?format=` parameter, and the report layout. The remaining formats (#637, #639) are a renderer and an enum entry.
 - **2026-07-29** — the date convention, its timezone, the branding logo and the filename became per-export choices, all format-independent.
 - **ADR-0021 / ADR-0015** — OpenAPI-first, and why this endpoint is the deliberate exception
 - **ADR-0004** — the layering that puts the workbook in the service and leaves the controller streaming

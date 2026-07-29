@@ -27,7 +27,7 @@ import java.util.Locale;
  * The file formats an annotation export can produce (issues #547, #635).
  *
  * <p>One place that knows an id, its media type and its extension, so the controller, the filename
- * helper and the renderer lookup cannot drift apart. The remaining formats (#636–#639) are entries
+ * helper and the renderer lookup cannot drift apart. The remaining formats (#637, #639) are entries
  * here plus a renderer, nothing else.
  */
 public enum AnnotationExportFormat {

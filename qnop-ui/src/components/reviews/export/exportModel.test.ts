@@ -34,14 +34,19 @@ beforeEach(() => localStorage.clear());
 describe('exportModel', () => {
   it('knows which formats can carry an image', () => {
     // The switch is offered per format, so this flag decides whether a user is
-    // shown a control that could do nothing. Text formats have nowhere to put one.
+    // shown a control that could do nothing.
     const byId = Object.fromEntries(EXPORT_FORMATS.map((format) => [format.id, format]));
     expect(byId.xlsx.supportsLogo).toBe(true);
     expect(byId.docx.supportsLogo).toBe(true);
     expect(byId.pdf.supportsLogo).toBe(true);
     expect(byId.html.supportsLogo).toBe(true);
-    expect(byId.md.supportsLogo).toBe(false);
-    expect(byId.csv.supportsLogo).toBe(false);
+  });
+
+  it('offers only the formats that are still on the roadmap', () => {
+    // CSV and Markdown were dropped (#636/#638) — a wizard that still listed
+    // them as "planned" would be promising work nobody intends to do.
+    const ids = EXPORT_FORMATS.map((format) => format.id);
+    expect(ids).toEqual(['xlsx', 'docx', 'html', 'pdf']);
   });
 
   it('starts with everything included', () => {

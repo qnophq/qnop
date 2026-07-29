@@ -64,7 +64,7 @@ import {
   type ExportSettings,
 } from './exportModel';
 
-const STEPS = ['Format & scope', 'Fields'];
+const STEPS = ['Format & file', 'Content'];
 
 const SCOPES: { id: ExportScope; label: string; hint: string }[] = [
   { id: 'all', label: 'Everything', hint: 'Every annotation in this review' },
@@ -184,7 +184,10 @@ export function ExportWizard({
         </Stepper>
       </Box>
 
-      <DialogContent dividers>
+      {/* One height for both steps. The two pages hold different amounts, and
+          letting the dialog resize under the pointer moves the buttons the user
+          is reaching for. */}
+      <DialogContent dividers sx={{ height: 'min(520px, 65vh)' }}>
         {step === 0 ? (
           <Stack spacing={3}>
             <Box>
@@ -286,6 +289,42 @@ export function ExportWizard({
                 })}
               </Stack>
             </Box>
+
+            <Box>
+              <SectionLabel>Saved as</SectionLabel>
+              <Stack spacing={1.25} sx={{ mt: 1 }}>
+                <TextField
+                  size="small"
+                  label="File name"
+                  value={fileName}
+                  onChange={(event) => setTypedFileName(event.target.value)}
+                  placeholder={defaultFileName(documentTitle)}
+                  slotProps={{
+                    input: {
+                      // The extension follows the format and is not the user's to
+                      // set: typing .pdf on a Word export would name a file that
+                      // lies about its own bytes.
+                      endAdornment: (
+                        <InputAdornment position="end">
+                          <Typography sx={{ fontSize: 13, color: 'text.secondary' }}>
+                            {format?.extension}
+                          </Typography>
+                        </InputAdornment>
+                      ),
+                    },
+                  }}
+                />
+                {format?.supportsLogo && (
+                  <ToggleCard
+                    on={settings.includeLogo}
+                    onChange={(on) => setSettings((c) => ({ ...c, includeLogo: on }))}
+                    icon={<ImageIcon size={14} />}
+                    title="Branding logo"
+                    hint="Places the operator's logo on the document. Nothing is placed if no branding has been uploaded."
+                  />
+                )}
+              </Stack>
+            </Box>
           </Stack>
         ) : (
           <Stack spacing={2}>
@@ -348,30 +387,6 @@ export function ExportWizard({
 
             <Divider />
 
-            <SectionLabel>Presentation</SectionLabel>
-
-            <TextField
-              size="small"
-              label="File name"
-              value={fileName}
-              onChange={(event) => setTypedFileName(event.target.value)}
-              placeholder={defaultFileName(documentTitle)}
-              slotProps={{
-                input: {
-                  // The extension follows the format and is not the user's to
-                  // set: typing .pdf on a Word export would name a file that
-                  // lies about its own bytes.
-                  endAdornment: (
-                    <InputAdornment position="end">
-                      <Typography sx={{ fontSize: 13, color: 'text.secondary' }}>
-                        {format?.extension}
-                      </Typography>
-                    </InputAdornment>
-                  ),
-                },
-              }}
-            />
-
             {/* Deliberately not a twelfth checkbox: a thread has no fixed length,
                 so it cannot be a column. It becomes its own sheet, and saying so
                 here is cheaper than a support question about the second tab. */}
@@ -382,16 +397,6 @@ export function ExportWizard({
               title="Comment threads"
               hint={format?.commentsHint ?? ''}
             />
-
-            {format?.supportsLogo && (
-              <ToggleCard
-                on={settings.includeLogo}
-                onChange={(on) => setSettings((c) => ({ ...c, includeLogo: on }))}
-                icon={<ImageIcon size={14} />}
-                title="Branding logo"
-                hint="Places the operator's logo on the document. Nothing is placed if no branding has been uploaded."
-              />
-            )}
 
             <Box>
               <Typography sx={{ fontSize: 11.5, fontWeight: 700, color: 'text.disabled', mb: 0.5 }}>
