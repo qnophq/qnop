@@ -42,6 +42,8 @@ import org.apache.poi.xwpf.usermodel.XWPFHeader;
 import org.apache.poi.xwpf.usermodel.XWPFParagraph;
 import org.apache.poi.xwpf.usermodel.XWPFPictureData;
 import org.apache.poi.xwpf.usermodel.XWPFRun;
+import org.apache.poi.xwpf.usermodel.XWPFTable;
+import org.apache.poi.xwpf.usermodel.XWPFTableCell;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
@@ -628,6 +630,34 @@ class DocxAnnotationRendererTest {
           .noneSatisfy(link -> assertThat(link.getURL()).contains("javascript"));
       // The words survive even where the target does not.
       assertThat(paragraphs(docx)).anySatisfy(line -> assertThat(line).contains("bad"));
+    }
+  }
+
+  @Test
+  @DisplayName("a markdown table becomes a Word table, not a line with separators")
+  void rendersTables() throws Exception {
+    AnnotationView view =
+        view("Findings:\n\n| Column 1 | Column 2 |\n| --- | --- |\n| asda | sfasdf |", "Mia", 1);
+
+    byte[] docx = renderer.render(model(List.of(row("T-1", view, List.of()))));
+
+    try (XWPFDocument document = new XWPFDocument(new ByteArrayInputStream(docx))) {
+      // Separator-joined lines read as a sentence with punctuation in it, which is
+      // what this replaced: in a document that is otherwise properly set, columns
+      // have to be columns.
+      assertThat(document.getTables()).hasSize(1);
+      XWPFTable table = document.getTables().getFirst();
+      assertThat(table.getNumberOfRows()).isEqualTo(2);
+      assertThat(table.getRow(0).getTableCells())
+          .extracting(XWPFTableCell::getText)
+          .containsExactly("Column 1", "Column 2");
+      assertThat(table.getRow(1).getTableCells())
+          .extracting(XWPFTableCell::getText)
+          .containsExactly("asda", "sfasdf");
+      // The header row is bold; the report carries no fills, so a grey band here
+      // would be the only one in the document.
+      assertThat(table.getRow(0).getCell(0).getParagraphArray(0).getRuns().getFirst().isBold())
+          .isTrue();
     }
   }
 

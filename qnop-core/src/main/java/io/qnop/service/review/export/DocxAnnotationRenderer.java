@@ -39,6 +39,9 @@ import org.apache.poi.xwpf.usermodel.XWPFDocument;
 import org.apache.poi.xwpf.usermodel.XWPFHeader;
 import org.apache.poi.xwpf.usermodel.XWPFParagraph;
 import org.apache.poi.xwpf.usermodel.XWPFRun;
+import org.apache.poi.xwpf.usermodel.XWPFTable;
+import org.apache.poi.xwpf.usermodel.XWPFTableCell;
+import org.apache.poi.xwpf.usermodel.XWPFTableRow;
 import org.openxmlformats.schemas.wordprocessingml.x2006.main.CTBorder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -402,7 +405,20 @@ public class DocxAnnotationRenderer implements AnnotationExportRenderer {
    */
   private void writeBody(
       XWPFDocument document, AnnotationExportModel model, String markdown, int indent) {
-    for (ExportBlock block : ExportMarkdown.parse(markdown)) {
+    List<ExportBlock> blocks = ExportMarkdown.parse(markdown);
+    for (int index = 0; index < blocks.size(); index++) {
+      ExportBlock block = blocks.get(index);
+      // Rows arrive one block at a time; a table is the run of them, so the loop
+      // consumes the whole run at once and hands it over as one table.
+      if (block instanceof ExportBlock.TableRow) {
+        int end = index;
+        while (end < blocks.size() && blocks.get(end) instanceof ExportBlock.TableRow) {
+          end++;
+        }
+        writeTable(document, blocks.subList(index, end), indent);
+        index = end - 1;
+        continue;
+      }
       switch (block) {
         case ExportBlock.Image image -> writeInlineImage(document, model, image, indent);
         case ExportBlock.Attachment file -> writeAttachment(document, model, file, indent);
@@ -423,7 +439,9 @@ public class DocxAnnotationRenderer implements AnnotationExportRenderer {
           run(paragraph, item.marker() + "  ", BODY_SIZE, false, MUTED);
           writeSpans(paragraph, item.spans(), BODY_SIZE, false, null);
         }
-        case ExportBlock.TableRow row -> writeTableRow(document, row, indent);
+        // Consumed as a run above; unreachable here, but the sealed switch has to
+        // say so rather than fall into a default that would hide a new block type.
+        case ExportBlock.TableRow ignored -> {}
         case ExportBlock.Paragraph paragraph ->
             writeSpans(
                 blockParagraph(document, block, indent), paragraph.spans(), BODY_SIZE, false, null);
@@ -510,20 +528,41 @@ public class DocxAnnotationRenderer implements AnnotationExportRenderer {
   }
 
   /**
-   * One row of a table, as a tab-separated line.
+   * A markdown table as a Word table.
    *
-   * <p>Not a Word table: POI can build one, but a table inside a comment inside a thread inside a
-   * report nests further than a page can carry, and the rows are what the reader needs. The header
-   * row is set in bold so the columns stay identifiable.
+   * <p>It was a run of middot-separated lines first, on the theory that a table nested inside a
+   * comment inside a thread was more structure than a page could carry. Held against real content
+   * that reads as a sentence with punctuation in it, not as a table — in a document that is
+   * otherwise properly set, the columns have to be columns.
+   *
+   * <p>The header row is bold rather than shaded: the report carries no fills anywhere, and one
+   * introduced here would print as a grey band that the rest of the document never uses.
    */
-  private void writeTableRow(XWPFDocument document, ExportBlock.TableRow row, int indent) {
-    XWPFParagraph paragraph = blockParagraph(document, row, indent + LIST_STEP);
-    paragraph.setSpacingAfter(0);
-    for (int index = 0; index < row.cells().size(); index++) {
-      if (index > 0) {
-        run(paragraph, "   ·   ", BODY_SIZE, false, MUTED);
+  private void writeTable(XWPFDocument document, List<ExportBlock> rows, int indent) {
+    int columns =
+        rows.stream().mapToInt(row -> ((ExportBlock.TableRow) row).cells().size()).max().orElse(0);
+    if (columns == 0) {
+      return;
+    }
+    XWPFTable table = document.createTable(rows.size(), columns);
+    table.setWidth("100%");
+    // Indented to sit inside whatever contains it — a reply's block, a quote.
+    int offset = indent + QUOTE_STEP * rows.getFirst().quoteDepth();
+    if (offset > 0) {
+      table.getCTTbl().getTblPr().addNewTblInd().setW(java.math.BigInteger.valueOf(offset));
+    }
+
+    for (int rowIndex = 0; rowIndex < rows.size(); rowIndex++) {
+      ExportBlock.TableRow source = (ExportBlock.TableRow) rows.get(rowIndex);
+      XWPFTableRow row = table.getRow(rowIndex);
+      for (int cellIndex = 0; cellIndex < columns; cellIndex++) {
+        XWPFTableCell cell = row.getCell(cellIndex);
+        XWPFParagraph paragraph = cell.getParagraphArray(0);
+        paragraph.setSpacingAfter(0);
+        if (cellIndex < source.cells().size()) {
+          writeSpans(paragraph, source.cells().get(cellIndex), BODY_SIZE, source.header(), null);
+        }
       }
-      writeSpans(paragraph, row.cells().get(index), BODY_SIZE, row.header(), null);
     }
   }
 

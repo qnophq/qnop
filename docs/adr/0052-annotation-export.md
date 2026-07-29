@@ -68,6 +68,8 @@ The model is flat. Markdown nests, and none of the outputs do: Word sets indenta
 
 **Raw HTML a commenter wrote is dropped** at the parse, not per format. `HtmlBlock`/`HtmlInline` nodes are ignored, so no renderer can receive markup a user authored — the property the HTML export (#637) will rest on entirely. Link targets are restricted to `http(s)` and app-relative: a `javascript:` URL in a comment would otherwise be one click from execution in a document that opens in a browser.
 
+A markdown table becomes a real Word table. It was a run of separator-joined lines first, on the theory that a table nested inside a comment inside a thread was more structure than a page could carry; held against real content it read as a sentence with punctuation in it. In a document that is otherwise properly set, columns have to be columns.
+
 Each format shows what it can. Word carries the most — emphasis on runs, headings, bullets, quotes set behind a rule, monospace, inline links — and PDF inherits it. A spreadsheet cell carries character formatting too, via rich text; what it cannot carry is a link on part of its text, since a hyperlink belongs to the whole cell. Enabling rich text there required turning the streaming workbook's shared-strings table *on*, which is not its default: measured, with it off the formatting runs are written away and the cell comes back as plain text.
 
 ### Presentation is configured, not assumed
