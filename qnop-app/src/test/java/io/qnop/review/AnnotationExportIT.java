@@ -993,4 +993,72 @@ class AnnotationExportIT extends SeededIntegrationTest {
     assertThat(sheet.getRow(0).getCell(0).getStringCellValue()).isEqualTo("#");
     assertThat(sheet.getLastRowNum()).isZero();
   }
+
+  /** Downloads the HTML report and returns the page as text. */
+  private String downloadHtml(UUID actor, String... params) throws Exception {
+    var request =
+        get("/api/v1/documents/" + documentId + "/annotations/export").param("format", "html");
+    for (int index = 0; index + 1 < params.length; index += 2) {
+      request = request.param(params[index], params[index + 1]);
+    }
+    return mockMvc
+        .perform(as(request, actor))
+        .andExpect(status().isOk())
+        .andExpect(header().string("Content-Type", "text/html;charset=UTF-8"))
+        .andExpect(
+            header().string("Content-Disposition", org.hamcrest.Matchers.containsString(".html")))
+        .andReturn()
+        .getResponse()
+        .getContentAsString();
+  }
+
+  @Test
+  @DisplayName("the HTML report is one file that fetches nothing, logo and screenshots included")
+  void htmlIsSelfContained() throws Exception {
+    seedDocument(false);
+    String url = uploadImage(MEMBER_ID, "screenshot.png");
+    createAnnotationReturningId(MEMBER_ID, 0, 0.1, 0.1, "A finding ![screenshot.png](" + url + ")");
+
+    String page = downloadHtml(MEMBER_ID);
+
+    // The whole chain, which only an IT covers: the bundled SVG default is
+    // rasterized by the branding service, the screenshot comes back out of object
+    // storage, and both end up inside the file as data URIs. A single external
+    // reference would break the promise the format makes — opens anywhere, and
+    // tells nobody when it was read.
+    assertThat(page).doesNotContain("src=\"http", "src=\"/api/", "<link ");
+    assertThat(page.split("src=\"data:image/", -1)).hasSize(3);
+    assertThat(page).contains("A finding", "Vendor agreement");
+  }
+
+  @Test
+  @DisplayName("an anonymous review's HTML report names no foreign author (ADR-0038)")
+  void htmlRespectsAnonymity() throws Exception {
+    seedDocument(true);
+    String annotationId = createAnnotationReturningId(AUDITOR_ID, 0, 0.1, 0.1, "Opened by a peer");
+    reply(annotationId, AUDITOR_ID, "And answered by the same peer");
+
+    // The renderer never sees a repository, so this can only come out right if
+    // the service pseudonymised before handing over the model — the point of
+    // ADR-0052's split, checked on the format most easily forwarded by mail.
+    String page = downloadHtml(MEMBER2_ID, "comments", "true");
+
+    assertThat(page).contains("Participant", "Opened by a peer", "And answered by the same peer");
+    assertThat(page).doesNotContain("Avery Auditor");
+  }
+
+  @Test
+  @DisplayName("a user who cannot see the review cannot export it as HTML either")
+  void htmlIsRefusedToForeignUsers() throws Exception {
+    seedDocument(false);
+    annotate(MEMBER_ID, 0, 0.1, 0.1, "Not for outsiders");
+
+    mockMvc
+        .perform(
+            as(
+                get("/api/v1/documents/" + documentId + "/annotations/export")
+                    .param("format", "html"),
+                EXTERNAL_ID))
+        .andExpect(status().isNotFound());
+  }
 }

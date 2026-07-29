@@ -48,22 +48,18 @@ export interface ExportFormat {
    * would be a control that silently does nothing.
    */
   supportsLogo: boolean;
-  /** Not yet implemented — shown so the wizard tells the truth about what is coming. */
-  planned?: boolean;
 }
 
 /**
- * The formats the wizard shows. Planned ones are listed on purpose: a user who
- * wonders whether HTML is coming gets an answer here instead of filing a
- * request, and shipping one flips a flag (issue #637). CSV and Markdown were
- * dropped (#636/#638): CSV is a strictly worse Excel for this data — no typed
- * dates, nowhere to put the comment threads — and Markdown duplicates what the
- * review UI already shows.
+ * The formats the wizard shows — all of them shipped, since HTML landed (#637).
+ * CSV and Markdown were dropped (#636/#638): CSV is a strictly worse Excel for
+ * this data — no typed dates, nowhere to put the comment threads — and Markdown
+ * duplicates what the review UI already shows.
  *
- * <p>`planned` is a property of the release. Whether a shipped format can
- * actually be produced is a property of the *server* — PDF converts through an
- * out-of-process office suite (#639), which a given deployment may not have —
- * and that answer comes from `ServerConfig.exportFormats`, not from here.
+ * <p>Listing a format here does not mean this deployment can produce it: PDF
+ * converts through an out-of-process office suite (#639), which a given
+ * installation may not have. That answer comes from `ServerConfig.exportFormats`,
+ * not from here.
  */
 export const EXPORT_FORMATS: ExportFormat[] = [
   {
@@ -89,12 +85,12 @@ export const EXPORT_FORMATS: ExportFormat[] = [
   {
     id: 'html',
     supportsLogo: true,
-    fieldNoun: 'sections',
-    commentsHint: 'Comment threads are included.',
+    fieldNoun: 'details',
+    commentsHint:
+      'The full discussion under each annotation — every reply, with who wrote it and when. In an anonymous review the authors stay pseudonymous here too.',
     label: 'HTML',
     extension: '.html',
-    hint: 'Opens anywhere.',
-    planned: true,
+    hint: 'One self-contained page — searchable in any browser, no attachments to open.',
   },
   {
     id: 'pdf',
@@ -187,11 +183,10 @@ export interface ExportSettings {
  *
  * <p>A format the release ships is not automatically one this deployment can
  * make. When the server says nothing — an older build, or a request that has not
- * landed yet — everything shipped is assumed available, so a missing field never
- * takes a working format away.
+ * landed yet — everything is assumed available, so a missing field never takes a
+ * working format away.
  */
 export function isFormatAvailable(format: ExportFormat, offered: string[] | undefined): boolean {
-  if (format.planned) return false;
   return offered === undefined || offered.length === 0 || offered.includes(format.id);
 }
 
@@ -224,9 +219,9 @@ export function loadSettings(timezone?: string): ExportSettings {
     const parsed = JSON.parse(raw) as Partial<ExportSettings>;
     const known = new Set(EXPORT_FIELDS.map((field) => field.id));
     const fields = (parsed.fields ?? []).filter((id) => known.has(id));
-    const shipped = EXPORT_FORMATS.find((f) => f.id === parsed.format && !f.planned);
+    const format = EXPORT_FORMATS.find((entry) => entry.id === parsed.format);
     return {
-      format: shipped ? shipped.id : fallback.format,
+      format: format ? format.id : fallback.format,
       scope: (['all', 'open', 'resolved'] as const).includes(parsed.scope as ExportScope)
         ? (parsed.scope as ExportScope)
         : fallback.scope,

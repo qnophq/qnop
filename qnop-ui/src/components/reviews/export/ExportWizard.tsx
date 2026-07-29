@@ -255,8 +255,8 @@ export function ExportWizard({
                           borderColor: active ? 'primary.main' : 'divider',
                           bgcolor: (t) =>
                             active ? alpha(t.palette.primary.main, 0.06) : 'transparent',
-                          cursor: entry.planned ? 'not-allowed' : 'pointer',
-                          opacity: entry.planned ? 0.5 : 1,
+                          cursor: available ? 'pointer' : 'not-allowed',
+                          opacity: available ? 1 : 0.5,
                           transition: 'border-color 150ms, background-color 150ms',
                           '&:hover:not(:disabled)': { borderColor: 'primary.main' },
                         }}
@@ -272,10 +272,7 @@ export function ExportWizard({
                           <Typography sx={{ fontSize: 11.5, color: 'text.disabled' }}>
                             {entry.extension}
                           </Typography>
-                          {entry.planned && <ToneBadge tone="neutral" label="Planned" />}
-                          {!entry.planned && !available && (
-                            <ToneBadge tone="neutral" label="Unavailable" />
-                          )}
+                          {!available && <ToneBadge tone="neutral" label="Unavailable" />}
                         </Stack>
                         <Typography sx={{ fontSize: 12, color: 'text.secondary' }}>
                           {entry.hint}
