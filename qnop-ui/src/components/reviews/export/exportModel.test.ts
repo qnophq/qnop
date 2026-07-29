@@ -79,6 +79,31 @@ describe('exportModel', () => {
     expect(loadSettings().dateFormat).toBe('iso');
   });
 
+  it("opens on the reader's own timezone", () => {
+    // Not UTC: the wizard should show the times the reader actually works in,
+    // resolved once for the whole app (ADR-0041) rather than per feature.
+    expect(defaultSettings('Europe/Berlin').timezone).toBe('Europe/Berlin');
+    expect(loadSettings('Europe/Berlin').timezone).toBe('Europe/Berlin');
+  });
+
+  it("yields to the reader's zone when the stored one no longer exists", () => {
+    localStorage.setItem(
+      'qnop-export-settings',
+      JSON.stringify({ ...defaultSettings(), timezone: 'Middle/Earth' }),
+    );
+
+    // A zone the runtime cannot resolve would break every timestamp in the file.
+    expect(loadSettings('Europe/Berlin').timezone).toBe('Europe/Berlin');
+  });
+
+  it('keeps an explicitly chosen timezone across exports', () => {
+    saveSettings({ ...defaultSettings('Europe/Berlin'), timezone: 'Asia/Tokyo' });
+
+    // An explicit choice outranks the account's zone: someone reporting to a
+    // Tokyo counterpart picked it on purpose.
+    expect(loadSettings('Europe/Berlin').timezone).toBe('Asia/Tokyo');
+  });
+
   it('keeps the required field however the selection is cleared', () => {
     expect(effectiveFields([])).toEqual(['taskKey']);
   });

@@ -62,6 +62,7 @@ export function ExportAnnotationsButton({
         format: settings.format,
         logo: settings.includeLogo,
         dateFormat: settings.dateFormat,
+        timezone: settings.timezone,
       });
       // Closing only after it succeeded keeps the configuration on screen when
       // it did not — the user retries instead of rebuilding their selection.

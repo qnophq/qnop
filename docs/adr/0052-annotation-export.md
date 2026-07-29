@@ -58,7 +58,11 @@ That costs one query round per annotation. It is accepted rather than batched: a
 
 Two things an export cannot get right by guessing, so the wizard asks:
 
-**The date convention.** `03/04/2026` is two different days depending on who reads it, and a report going into a German sign-off wants dots. `ExportDateFormat` carries two patterns per entry, because the formats write dates in genuinely different ways: a document renders a string, while a spreadsheet writes a *typed* date and the choice only changes its display — which is what keeps Excel's sorting and date filters working. Times stay UTC everywhere; a per-export timezone is a separate decision with its own consequences.
+**The date convention, and the zone it is expressed in.** `03/04/2026` is two different days depending on who reads it, and a report going into a German sign-off wants dots. `ExportDateFormat` carries two patterns per entry, because the formats write dates in genuinely different ways: a document renders a string, while a spreadsheet writes a *typed* date and the choice only changes its display — which is what keeps Excel's sorting and date filters working.
+
+The zone travels with it, because a convention without one is half an answer: a comment written at 23:40 UTC happened on a different day for the reader in Berlin. The wizard preselects the reader's own zone by reusing the resolution that already exists for the whole app — profile preference → operator default → UTC (ADR-0041) — rather than resolving it a second way, and offers every zone the runtime knows for the case where the report is for someone else. An explicitly chosen zone persists and outranks the account's; a stored zone the runtime no longer recognises yields back to it.
+
+On the wire the zone is a parameter and its absence means UTC. The server does *not* resolve the caller's preference behind their back: a predictable default is worth more on an endpoint whose whole contract is "what you asked for is what you get", and the UI always sends what it showed.
 
 **The logo.** Not every export is a document that should carry branding — an extract for a pivot table is not — so it is a switch. Whether the switch is even offered is a property of the format, not a preference: `AnnotationExportFormat.supportsLogo()` is false for Markdown and CSV, which are text and have nowhere to put an image. A control that silently does nothing is worse than an absent one, and the service checks the same flag, so the rendition is not even fetched for a format that could not use it.
 
@@ -92,13 +96,14 @@ Headings use direct character formatting plus an OOXML outline level rather than
 - **ADR-0009** — the anchor model the reading order is parsed out of
 - **ADR-0011** — the workflow whose `AnnotationStatus` the sheet reports
 - **ADR-0028** — binary downloads as plain controllers outside the contract
+- **ADR-0041** — the display-timezone resolution the wizard's preselection reuses
 - **ADR-0053** — the branding logo's raster rendition, which the Word report places in its header
 
 ## History
 
 - **2026-07-27** — accepted with the XLSX export (#547).
 - **2026-07-29** — extended for Word (#635): the model/renderer split, the `?format=` parameter, and the report layout. The remaining formats (#636–#639) are a renderer and an enum entry.
-- **2026-07-29** — the date convention and the branding logo became per-export choices, both format-independent.
+- **2026-07-29** — the date convention, its timezone and the branding logo became per-export choices, all format-independent.
 - **ADR-0021 / ADR-0015** — OpenAPI-first, and why this endpoint is the deliberate exception
 - **ADR-0004** — the layering that puts the workbook in the service and leaves the controller streaming
 - Issue **#547**

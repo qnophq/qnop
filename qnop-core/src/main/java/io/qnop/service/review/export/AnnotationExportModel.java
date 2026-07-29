@@ -23,6 +23,8 @@ package io.qnop.service.review.export;
 import io.qnop.service.review.AnnotationPosition;
 import io.qnop.service.review.AnnotationService.AnnotationView;
 import io.qnop.service.review.AnnotationService.CommentView;
+import java.time.ZoneId;
+import java.time.ZoneOffset;
 import java.util.List;
 
 /**
@@ -47,6 +49,7 @@ import java.util.List;
  * @param includeComments whether {@link Row#thread()} was populated at all
  * @param logoPng the operator's branding logo as PNG, or null when there is none to embed
  * @param dateFormat how every timestamp in this export is written
+ * @param zone which timezone those timestamps are expressed in
  */
 public record AnnotationExportModel(
     String documentTitle,
@@ -55,13 +58,20 @@ public record AnnotationExportModel(
     List<AnnotationExportColumn> columns,
     boolean includeComments,
     byte[] logoPng,
-    ExportDateFormat dateFormat) {
+    ExportDateFormat dateFormat,
+    ZoneId zone) {
 
   public AnnotationExportModel {
     rows = List.copyOf(rows);
     columns = List.copyOf(columns);
     logoPng = logoPng == null ? null : logoPng.clone();
     dateFormat = dateFormat == null ? ExportDateFormat.DEFAULT : dateFormat;
+    zone = zone == null ? ZoneOffset.UTC : zone;
+  }
+
+  /** A timestamp in this export's chosen convention and zone. */
+  public String formatTimestamp(java.time.Instant instant) {
+    return dateFormat.format(instant, zone);
   }
 
   /**

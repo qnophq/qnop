@@ -48,6 +48,7 @@ export async function downloadAnnotationExport(
     format?: string;
     logo?: boolean;
     dateFormat?: string;
+    timezone?: string;
   },
 ): Promise<void> {
   const response = await axiosInstance.get(`/documents/${documentId}/annotations/export`, {
@@ -67,6 +68,9 @@ export async function downloadAnnotationExport(
       ...(options?.dateFormat && options.dateFormat !== 'iso'
         ? { dateFormat: options.dateFormat }
         : {}),
+      // Always sent: the server's default is UTC, and the reader's own zone is
+      // what the wizard showed them.
+      ...(options?.timezone ? { timezone: options.timezone } : {}),
     },
     paramsSerializer: { indexes: null },
     responseType: 'blob',

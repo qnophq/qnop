@@ -35,6 +35,8 @@ import io.qnop.service.review.export.AnnotationExportModel;
 import io.qnop.service.review.export.AnnotationExportRenderer;
 import io.qnop.service.review.export.ExportDateFormat;
 import java.io.IOException;
+import java.time.ZoneId;
+import java.time.ZoneOffset;
 import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -101,11 +103,18 @@ public class AnnotationExportService {
       String scope,
       boolean includeComments,
       boolean includeLogo,
-      ExportDateFormat dateFormat) {
+      ExportDateFormat dateFormat,
+      ZoneId zone) {
 
     public static ExportRequest everything() {
       return new ExportRequest(
-          AnnotationExportFormat.DEFAULT, List.of(), "all", false, true, ExportDateFormat.DEFAULT);
+          AnnotationExportFormat.DEFAULT,
+          List.of(),
+          "all",
+          false,
+          true,
+          ExportDateFormat.DEFAULT,
+          ZoneOffset.UTC);
     }
   }
 
@@ -193,7 +202,8 @@ public class AnnotationExportService {
         AnnotationExportColumn.resolve(request.columnIds()),
         request.includeComments(),
         logo(request),
-        request.dateFormat() == null ? ExportDateFormat.DEFAULT : request.dateFormat());
+        request.dateFormat() == null ? ExportDateFormat.DEFAULT : request.dateFormat(),
+        request.zone() == null ? ZoneOffset.UTC : request.zone());
   }
 
   /**

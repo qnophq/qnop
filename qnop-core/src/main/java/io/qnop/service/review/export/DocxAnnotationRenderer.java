@@ -256,10 +256,10 @@ public class DocxAnnotationRenderer implements AnnotationExportRenderer {
       add(parts, "Replies", String.valueOf(row.replies()));
     }
     if (model.has(AnnotationExportColumn.CREATED)) {
-      add(parts, "Created", model.dateFormat().format(view.createdAt()));
+      add(parts, "Created", model.formatTimestamp(view.createdAt()));
     }
     if (model.has(AnnotationExportColumn.UPDATED)) {
-      add(parts, "Updated", model.dateFormat().format(view.updatedAt()));
+      add(parts, "Updated", model.formatTimestamp(view.updatedAt()));
     }
     return String.join("   ·   ", parts);
   }
@@ -287,7 +287,7 @@ public class DocxAnnotationRenderer implements AnnotationExportRenderer {
               : comment.authorDisplayName();
       run(
           attribution,
-          who + " · " + model.dateFormat().format(comment.createdAt()),
+          who + " · " + model.formatTimestamp(comment.createdAt()),
           META_SIZE,
           true,
           MUTED);

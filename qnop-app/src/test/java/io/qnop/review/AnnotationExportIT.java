@@ -632,6 +632,40 @@ class AnnotationExportIT extends SeededIntegrationTest {
   }
 
   @Test
+  @DisplayName("the requested timezone shifts the cells, and an unusable one falls back to UTC")
+  void timezoneShiftsTheCells() throws Exception {
+    seedDocument(false);
+    annotate(MEMBER_ID, 0, 0.1, 0.1, "A finding");
+
+    double utc = createdCell(null).getNumericCellValue();
+    double tokyo = createdCell("Asia/Tokyo").getNumericCellValue();
+    double nonsense = createdCell("Middle/Earth").getNumericCellValue();
+
+    // Excel dates are wall-clock and zone-less, so a different zone is literally
+    // a different number in the cell — nine hours, in Tokyo's case.
+    assertThat((tokyo - utc) * 24).isCloseTo(9.0, org.assertj.core.data.Offset.offset(0.01));
+    // An id the JVM cannot resolve must not fail the download.
+    assertThat(nonsense).isEqualTo(utc);
+  }
+
+  /** The Created cell of the single seeded annotation, exported in {@code timezone}. */
+  private Cell createdCell(String timezone) throws Exception {
+    var request =
+        get("/api/v1/documents/" + documentId + "/annotations/export").param("logo", "false");
+    if (timezone != null) {
+      request = request.param("timezone", timezone);
+    }
+    byte[] body =
+        mockMvc
+            .perform(as(request, MEMBER_ID))
+            .andExpect(status().isOk())
+            .andReturn()
+            .getResponse()
+            .getContentAsByteArray();
+    return new XSSFWorkbook(new ByteArrayInputStream(body)).getSheetAt(0).getRow(1).getCell(9);
+  }
+
+  @Test
   @DisplayName("a review without annotations still yields a valid header-only workbook")
   void emptyReviewYieldsHeaderOnly() throws Exception {
     seedDocument(false);

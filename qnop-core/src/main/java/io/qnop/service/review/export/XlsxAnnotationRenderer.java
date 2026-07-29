@@ -27,7 +27,7 @@ import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.time.Instant;
-import java.time.ZoneOffset;
+import java.time.ZoneId;
 import java.util.List;
 import javax.imageio.ImageIO;
 import org.apache.poi.ss.usermodel.BorderStyle;
@@ -113,7 +113,7 @@ public class XlsxAnnotationRenderer implements AnnotationExportRenderer {
 
       int rowIndex = headerRow + 1;
       for (AnnotationExportModel.Row row : model.rows()) {
-        writeRow(sheet.createRow(rowIndex++), row, columns, dateStyle);
+        writeRow(sheet.createRow(rowIndex++), row, columns, dateStyle, model.zone());
       }
 
       // Freeze the header and switch on the filter dropdowns, so Excel's own
@@ -210,7 +210,7 @@ public class XlsxAnnotationRenderer implements AnnotationExportRenderer {
         row.createCell(0).setCellValue(annotation.taskKey());
         row.createCell(1)
             .setCellValue(comment.authorDisplayName() == null ? "" : comment.authorDisplayName());
-        writeDate(row, 2, comment.createdAt(), dateStyle);
+        writeDate(row, 2, comment.createdAt(), dateStyle, model.zone());
         row.createCell(3).setCellValue(body(comment.body()));
       }
     }
@@ -228,7 +228,8 @@ public class XlsxAnnotationRenderer implements AnnotationExportRenderer {
       Row row,
       AnnotationExportModel.Row source,
       List<AnnotationExportColumn> columns,
-      CellStyle dateStyle) {
+      CellStyle dateStyle,
+      ZoneId zone) {
     AnnotationView view = source.view();
     for (int index = 0; index < columns.size(); index++) {
       switch (columns.get(index)) {
@@ -249,19 +250,22 @@ public class XlsxAnnotationRenderer implements AnnotationExportRenderer {
                 .setCellValue(view.authorDisplayName() == null ? "" : view.authorDisplayName());
         case REPLIES -> row.createCell(index).setCellValue(source.replies());
         case PLACEMENT -> row.createCell(index).setCellValue(humanize(view.placementStatus()));
-        case CREATED -> writeDate(row, index, view.createdAt(), dateStyle);
-        case UPDATED -> writeDate(row, index, view.updatedAt(), dateStyle);
+        case CREATED -> writeDate(row, index, view.createdAt(), dateStyle, zone);
+        case UPDATED -> writeDate(row, index, view.updatedAt(), dateStyle, zone);
       }
     }
   }
 
-  private static void writeDate(Row row, int column, Instant instant, CellStyle style) {
+  private static void writeDate(
+      Row row, int column, Instant instant, CellStyle style, ZoneId zone) {
     if (instant == null) {
       return;
     }
     Cell cell = row.createCell(column);
-    // A real Excel date, not a formatted string: sorting and date filters depend on it.
-    cell.setCellValue(instant.atOffset(ZoneOffset.UTC).toLocalDateTime());
+    // A real Excel date, not a formatted string: sorting and date filters depend
+    // on it. Excel dates carry no zone, so the conversion happens here and the
+    // cell holds local wall-clock time in the zone the user picked.
+    cell.setCellValue(instant.atZone(zone).toLocalDateTime());
     cell.setCellStyle(style);
   }
 

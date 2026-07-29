@@ -30,8 +30,10 @@ import DialogContent from '@mui/material/DialogContent';
 import DialogTitle from '@mui/material/DialogTitle';
 import Divider from '@mui/material/Divider';
 import FormControlLabel from '@mui/material/FormControlLabel';
+import Autocomplete from '@mui/material/Autocomplete';
 import Stack from '@mui/material/Stack';
 import Switch from '@mui/material/Switch';
+import TextField from '@mui/material/TextField';
 import Step from '@mui/material/Step';
 import StepLabel from '@mui/material/StepLabel';
 import Stepper from '@mui/material/Stepper';
@@ -46,6 +48,8 @@ import {
   MessagesSquare,
 } from 'lucide-react';
 import { ToneBadge } from '../../admin/ToneBadge';
+import { useUiStore } from '../../../stores/uiStore';
+import { listTimeZones, timeZoneLabel } from '../../../utils/timezone';
 import {
   EXPORT_DATE_FORMATS,
   EXPORT_FIELDS,
@@ -106,7 +110,11 @@ export function ExportWizard({
   // every open: first step, last configuration. A reset effect would do the
   // same thing a render too late, and cascade.
   const [step, setStep] = useState(0);
-  const [settings, setSettings] = useState<ExportSettings>(loadSettings);
+  // The reader's own zone (ADR-0041), so the wizard opens on the times they
+  // actually work in rather than on UTC.
+  const displayTimeZone = useUiStore((state) => state.displayTimeZone);
+  const [settings, setSettings] = useState<ExportSettings>(() => loadSettings(displayTimeZone));
+  const zones = useMemo(() => listTimeZones(displayTimeZone), [displayTimeZone]);
 
   const selected = useMemo(() => effectiveFields(settings.fields), [settings.fields]);
   const rows = counts ? counts[settings.scope] : null;
@@ -350,8 +358,18 @@ export function ExportWizard({
 
             <Box>
               <Typography sx={{ fontSize: 11.5, fontWeight: 700, color: 'text.disabled', mb: 0.5 }}>
-                Date and time · UTC
+                Date and time
               </Typography>
+              <Autocomplete
+                size="small"
+                disableClearable
+                options={zones}
+                value={settings.timezone}
+                onChange={(_, zone) => setSettings((c) => ({ ...c, timezone: zone }))}
+                getOptionLabel={(zone) => timeZoneLabel(zone)}
+                renderInput={(params) => <TextField {...params} label="Timezone" />}
+                sx={{ mb: 1 }}
+              />
               <Box
                 sx={{
                   display: 'grid',

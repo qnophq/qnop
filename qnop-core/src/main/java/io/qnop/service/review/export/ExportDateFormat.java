@@ -21,6 +21,7 @@
 package io.qnop.service.review.export;
 
 import java.time.Instant;
+import java.time.ZoneId;
 import java.time.ZoneOffset;
 import java.time.format.DateTimeFormatter;
 import java.util.Arrays;
@@ -39,8 +40,9 @@ import java.util.Locale;
  * its <em>display</em> format, which is what keeps Excel's own sorting and date filters working —
  * the reason the XLSX export types its cells at all (ADR-0052).
  *
- * <p>Times are UTC throughout, as they are everywhere else in qnop. A per-export timezone would be
- * a separate decision with its own consequences for what "the same review, exported twice" means.
+ * <p>The timezone travels alongside, because a convention without one is only half an answer: a
+ * comment written at 23:40 UTC happened on a different day for the person reading the report in
+ * Berlin. The wizard preselects the reader's own zone (ADR-0041) and lets them change it.
  */
 public enum ExportDateFormat {
   /** {@code 2026-03-04 14:30} — unambiguous everywhere, and it sorts as text. */
@@ -91,9 +93,11 @@ public enum ExportDateFormat {
     return excelPattern;
   }
 
-  /** Formats an instant in UTC, or an empty string when there is nothing to format. */
-  public String format(Instant instant) {
-    return instant == null ? "" : formatter.format(instant.atOffset(ZoneOffset.UTC));
+  /** Formats an instant in the given zone, or an empty string when there is nothing to format. */
+  public String format(Instant instant, ZoneId zone) {
+    return instant == null
+        ? ""
+        : formatter.format(instant.atZone(zone == null ? ZoneOffset.UTC : zone));
   }
 
   /**

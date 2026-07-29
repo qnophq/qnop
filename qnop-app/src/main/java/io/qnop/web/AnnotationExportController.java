@@ -24,6 +24,9 @@ import io.qnop.service.review.AnnotationExportService;
 import io.qnop.service.review.export.AnnotationExportFormat;
 import io.qnop.service.review.export.ExportDateFormat;
 import java.io.ByteArrayInputStream;
+import java.time.DateTimeException;
+import java.time.ZoneId;
+import java.time.ZoneOffset;
 import java.util.List;
 import java.util.UUID;
 import org.springframework.core.io.InputStreamResource;
@@ -75,7 +78,11 @@ public class AnnotationExportController {
       // On unless refused: a branded report is the common case, and a format that
       // cannot carry an image ignores this anyway.
       @RequestParam(value = "logo", required = false, defaultValue = "true") boolean includeLogo,
-      @RequestParam(value = "dateFormat", required = false) String dateFormat) {
+      @RequestParam(value = "dateFormat", required = false) String dateFormat,
+      // The UI preselects the reader's own zone (ADR-0041) and always sends it.
+      // A request that names none gets UTC — a predictable wire default beats
+      // resolving a caller's preference behind their back on a raw API call.
+      @RequestParam(value = "timezone", required = false) String timezone) {
     AnnotationExportService.Export export =
         exports.export(
             documentId,
@@ -86,7 +93,8 @@ public class AnnotationExportController {
                 scope,
                 includeComments,
                 includeLogo,
-                ExportDateFormat.fromId(dateFormat)),
+                ExportDateFormat.fromId(dateFormat),
+                zoneOrUtc(timezone)),
             CurrentUser.requireUserId(),
             CurrentUser.isAdmin());
 
@@ -100,5 +108,22 @@ public class AnnotationExportController {
         .contentLength(export.content().length)
         .contentType(MediaType.parseMediaType(export.format().getContentType()))
         .body(new InputStreamResource(new ByteArrayInputStream(export.content())));
+  }
+
+  /**
+   * The requested zone, or UTC.
+   *
+   * <p>An unusable id falls back rather than failing, like every other malformed export parameter:
+   * the caller wants a file, and a timestamp in the wrong zone is a smaller failure than no export.
+   */
+  private static ZoneId zoneOrUtc(String timezone) {
+    if (timezone == null || timezone.isBlank()) {
+      return ZoneOffset.UTC;
+    }
+    try {
+      return ZoneId.of(timezone.trim());
+    } catch (DateTimeException e) {
+      return ZoneOffset.UTC;
+    }
   }
 }

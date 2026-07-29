@@ -24,6 +24,8 @@
  * dialog, kept out of it so the choices are testable without rendering anything.
  */
 
+import { FALLBACK_TIME_ZONE, isValidTimeZone } from '../../../utils/timezone';
+
 export type ExportScope = 'all' | 'open' | 'resolved';
 
 export interface ExportFormat {
@@ -181,10 +183,18 @@ export interface ExportSettings {
   includeLogo: boolean;
   /** Which `EXPORT_DATE_FORMATS` entry every timestamp is written in. */
   dateFormat: string;
+  /** The IANA zone those timestamps are expressed in. */
+  timezone: string;
 }
 
-/** Everything on, everything in — the state the wizard opens in the first time. */
-export function defaultSettings(): ExportSettings {
+/**
+ * Everything on, everything in — the state the wizard opens in the first time.
+ *
+ * @param timezone the reader's own zone, already resolved through the ADR-0041
+ *   chain (profile → operator default → UTC). Passed in rather than resolved
+ *   here, so the wizard and the rest of the app can never disagree about it.
+ */
+export function defaultSettings(timezone: string = FALLBACK_TIME_ZONE): ExportSettings {
   return {
     format: 'xlsx',
     scope: 'all',
@@ -192,6 +202,7 @@ export function defaultSettings(): ExportSettings {
     includeComments: true,
     includeLogo: true,
     dateFormat: 'iso',
+    timezone,
   };
 }
 
@@ -204,8 +215,8 @@ const STORAGE_KEY = 'qnop-export-settings';
  * field list will grow, and a stored selection from an older release must not
  * leave the wizard in a state the user cannot fix.
  */
-export function loadSettings(): ExportSettings {
-  const fallback = defaultSettings();
+export function loadSettings(timezone?: string): ExportSettings {
+  const fallback = defaultSettings(timezone);
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (!raw) return fallback;
@@ -224,6 +235,9 @@ export function loadSettings(): ExportSettings {
       dateFormat: EXPORT_DATE_FORMATS.some((entry) => entry.id === parsed.dateFormat)
         ? (parsed.dateFormat as string)
         : fallback.dateFormat,
+      // A zone the runtime no longer knows would break every timestamp in the
+      // file, so an unusable stored value yields to the reader's own zone.
+      timezone: isValidTimeZone(parsed.timezone) ? parsed.timezone : fallback.timezone,
     };
   } catch {
     return fallback;

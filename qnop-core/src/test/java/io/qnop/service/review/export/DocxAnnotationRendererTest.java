@@ -29,6 +29,8 @@ import java.awt.image.BufferedImage;
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.time.Instant;
+import java.time.ZoneId;
+import java.time.ZoneOffset;
 import java.util.List;
 import java.util.UUID;
 import javax.imageio.ImageIO;
@@ -97,8 +99,13 @@ class DocxAnnotationRendererTest {
 
   private static AnnotationExportModel model(
       List<AnnotationExportModel.Row> rows, byte[] logo, ExportDateFormat dates) {
+    return model(rows, logo, dates, ZoneOffset.UTC);
+  }
+
+  private static AnnotationExportModel model(
+      List<AnnotationExportModel.Row> rows, byte[] logo, ExportDateFormat dates, ZoneId zone) {
     return new AnnotationExportModel(
-        "Vendor agreement", 3, rows, AnnotationExportColumn.all(), true, logo, dates);
+        "Vendor agreement", 3, rows, AnnotationExportColumn.all(), true, logo, dates, zone);
   }
 
   /** A real PNG, so the renderer's own decode-and-scale path is exercised. */
@@ -173,7 +180,8 @@ class DocxAnnotationRendererTest {
             AnnotationExportColumn.resolve(List.of("taskKey", "status")),
             false,
             null,
-            ExportDateFormat.ISO);
+            ExportDateFormat.ISO,
+            ZoneOffset.UTC);
 
     List<String> text = paragraphs(renderer.render(narrowed));
 
@@ -280,6 +288,25 @@ class DocxAnnotationRendererTest {
 
     assertThat(report).anySatisfy(line -> assertThat(line).contains("Created: 2026-03-04"));
     assertThat(report).noneSatisfy(line -> assertThat(line).contains("10:15"));
+  }
+
+  @Test
+  @DisplayName("timestamps are written in the chosen zone, not in UTC")
+  void honoursTheChosenTimezone() throws Exception {
+    // 10:15 UTC is 11:15 in Berlin on this date — a difference that changes the
+    // day entirely for anything written late in the evening.
+    AnnotationView view = view("A finding", "Mia", 1);
+
+    List<String> report =
+        paragraphs(
+            renderer.render(
+                model(
+                    List.of(row("T-1", view, List.of())),
+                    null,
+                    ExportDateFormat.ISO,
+                    ZoneId.of("Europe/Berlin"))));
+
+    assertThat(report).anySatisfy(line -> assertThat(line).contains("Created: 2026-03-04 11:15"));
   }
 
   @Test
