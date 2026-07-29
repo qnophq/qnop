@@ -40,24 +40,26 @@ import java.util.Set;
  * exports of the same review.
  */
 public enum AnnotationExportColumn {
-  TASK_KEY("taskKey", "#"),
-  PAGE("page", "Page"),
-  STATUS("status", "Status"),
-  TYPE("type", "Type"),
-  PRIORITY("priority", "Priority"),
-  SUMMARY("summary", "Summary"),
-  AUTHOR("author", "Author"),
-  REPLIES("replies", "Replies"),
-  PLACEMENT("placement", "Placement"),
-  CREATED("created", "Created"),
-  UPDATED("updated", "Updated");
+  TASK_KEY("taskKey", "#", 9),
+  PAGE("page", "Page", 8),
+  STATUS("status", "Status", 13),
+  TYPE("type", "Type", 15),
+  PRIORITY("priority", "Priority", 12),
+  SUMMARY("summary", "Summary", 72),
+  AUTHOR("author", "Author", 24),
+  REPLIES("replies", "Replies", 10),
+  PLACEMENT("placement", "Placement", 16),
+  CREATED("created", "Created", 19),
+  UPDATED("updated", "Updated", 19);
 
   private final String id;
   private final String header;
+  private final int widthChars;
 
-  AnnotationExportColumn(String id, String header) {
+  AnnotationExportColumn(String id, String header, int widthChars) {
     this.id = id;
     this.header = header;
+    this.widthChars = widthChars;
   }
 
   /** Stable wire name — what the export request lists. */
@@ -68,6 +70,21 @@ public enum AnnotationExportColumn {
   /** The human-readable column heading. */
   public String getHeader() {
     return header;
+  }
+
+  /**
+   * How wide the column should be, in characters.
+   *
+   * <p>Per column rather than one default with an exception, because the right width is a property
+   * of what the column holds: {@code T-12} does not want the room a name does, and a wrapped
+   * summary that is too narrow turns every row into a paragraph. Sized so the header — plus the
+   * button the auto-filter puts beside it — still reads at the stated width.
+   *
+   * <p>Fixed rather than auto-sized: POI can only measure columns it has kept in memory, and the
+   * export streams rows precisely so a large review never has to fit in memory at once.
+   */
+  public int getWidthChars() {
+    return widthChars;
   }
 
   public static Optional<AnnotationExportColumn> fromId(String id) {

@@ -82,6 +82,9 @@ public class XlsxAnnotationRenderer implements AnnotationExportRenderer {
   /** Rows reserved above the header when the sheet carries a logo. */
   private static final int LOGO_BAND_ROWS = 4;
 
+  /** The thread sheet's comment column: wider than the summary, since it is the whole point. */
+  private static final int COMMENT_WIDTH_CHARS = 90;
+
   /** The logo's width in pixels on the sheet. */
   private static final int LOGO_WIDTH_PX = 160;
 
@@ -131,7 +134,7 @@ public class XlsxAnnotationRenderer implements AnnotationExportRenderer {
           new CellRangeAddress(
               headerRow, Math.max(rowIndex - 1, headerRow + 1), 0, columns.size() - 1));
       for (int index = 0; index < columns.size(); index++) {
-        sheet.setColumnWidth(index, columnWidth(columns.get(index)));
+        sheet.setColumnWidth(index, width(columns.get(index), model.dateFormat()));
       }
 
       if (model.includeComments()) {
@@ -231,10 +234,14 @@ public class XlsxAnnotationRenderer implements AnnotationExportRenderer {
     sheet.createFreezePane(0, 1);
     sheet.setAutoFilter(
         new CellRangeAddress(0, Math.max(rowIndex - 1, 1), 0, COMMENT_HEADERS.size() - 1));
-    sheet.setColumnWidth(0, 12 * 256);
-    sheet.setColumnWidth(1, 22 * 256);
-    sheet.setColumnWidth(2, 20 * 256);
-    sheet.setColumnWidth(3, 90 * 256);
+    // Mirrors the annotation sheet: the key stays narrow, the author gets a
+    // name's worth, the timestamp follows the chosen convention, and the comment
+    // takes the rest — it is the column anyone opens this sheet to read.
+    sheet.setColumnWidth(0, AnnotationExportColumn.TASK_KEY.getWidthChars() * 256);
+    sheet.setColumnWidth(1, AnnotationExportColumn.AUTHOR.getWidthChars() * 256);
+    sheet.setColumnWidth(
+        2, Math.max(HEADER_ALLOWANCE, model.dateFormat().getPattern().length() + 3) * 256);
+    sheet.setColumnWidth(3, COMMENT_WIDTH_CHARS * 256);
   }
 
   private void writeRow(
@@ -371,9 +378,23 @@ public class XlsxAnnotationRenderer implements AnnotationExportRenderer {
     return style;
   }
 
-  /** Roughly sized columns; the summary gets the room, the rest stay compact. */
-  private static int columnWidth(AnnotationExportColumn column) {
-    int characters = column == AnnotationExportColumn.SUMMARY ? 70 : 16;
+  /**
+   * A column's width in Excel's units (1/256 of a character).
+   *
+   * <p>The date columns are the one case the registry cannot decide alone: {@code 2026-03-04} and
+   * {@code 03/04/2026 02:30 PM} are the same column with very different needs, so the chosen
+   * convention sets the width and a date-only export stops reserving room for a time nobody asked
+   * for.
+   */
+  private static int width(AnnotationExportColumn column, ExportDateFormat dates) {
+    int characters =
+        switch (column) {
+          case CREATED, UPDATED -> Math.max(HEADER_ALLOWANCE, dates.getPattern().length() + 3);
+          default -> column.getWidthChars();
+        };
     return characters * 256;
   }
+
+  /** Enough for the shortest header plus the auto-filter's dropdown button. */
+  private static final int HEADER_ALLOWANCE = 11;
 }

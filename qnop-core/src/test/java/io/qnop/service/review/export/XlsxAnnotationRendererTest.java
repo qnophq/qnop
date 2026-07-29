@@ -136,6 +136,56 @@ class XlsxAnnotationRendererTest {
   }
 
   @Test
+  @DisplayName("each column is sized for what it holds, not to one default")
+  void sizesColumnsIndividually() throws Exception {
+    Sheet sheet = sheetOf(renderer.render(model(view("A finding", 1), List.of())), 0);
+
+    // The key needs a fraction of what a name does, and the summary carries
+    // wrapped prose — one width for all of them was the previous behaviour.
+    int key = sheet.getColumnWidth(0) / 256;
+    int author = sheet.getColumnWidth(6) / 256;
+    int summary = sheet.getColumnWidth(5) / 256;
+    assertThat(key).isLessThan(author);
+    assertThat(author).isLessThan(summary);
+    // Even the narrowest column keeps room for its header and the filter button.
+    for (int index = 0; index < AnnotationExportColumn.all().size(); index++) {
+      assertThat(sheet.getColumnWidth(index) / 256)
+          .isGreaterThanOrEqualTo(AnnotationExportColumn.all().get(index).getHeader().length() + 2);
+    }
+  }
+
+  @Test
+  @DisplayName("a date-only export stops reserving room for a time nobody asked for")
+  void narrowsTheDateColumnsToTheChosenConvention() throws Exception {
+    AnnotationExportModel withSeconds = dated(ExportDateFormat.ISO_SECONDS);
+    AnnotationExportModel dateOnly = dated(ExportDateFormat.DATE_ONLY);
+
+    int wide = sheetOf(renderer.render(withSeconds), 0).getColumnWidth(9);
+    int narrow = sheetOf(renderer.render(dateOnly), 0).getColumnWidth(9);
+
+    assertThat(narrow).isLessThan(wide);
+  }
+
+  private static AnnotationExportModel dated(ExportDateFormat dates) {
+    return new AnnotationExportModel(
+        "Vendor agreement",
+        3,
+        List.of(
+            new AnnotationExportModel.Row(
+                "T-1",
+                view("A finding", 1),
+                new AnnotationPosition(true, 0, 0.1, 0.1, 0),
+                List.of())),
+        AnnotationExportColumn.all(),
+        false,
+        null,
+        dates,
+        ZoneOffset.UTC,
+        Map.of(),
+        Map.of());
+  }
+
+  @Test
   @DisplayName("only Excel's own ceiling truncates, and it says so with an ellipsis")
   void stopsAtExcelsLimit() throws Exception {
     String enormous = "x".repeat(40_000);
