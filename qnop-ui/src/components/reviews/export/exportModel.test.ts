@@ -45,17 +45,16 @@ describe('exportModel', () => {
 
   it('offers only the formats that are still on the roadmap', () => {
     // CSV and Markdown were dropped (#636/#638) — a wizard that still listed
-    // them as "planned" would be promising work nobody intends to do.
+    // them would be promising work nobody intends to do.
     const ids = EXPORT_FORMATS.map((format) => format.id);
     expect(ids).toEqual(['xlsx', 'docx', 'html', 'pdf']);
   });
 
-  it("treats availability as the server's answer, not the release's", () => {
+  it('leaves availability to the server', () => {
     const byId = Object.fromEntries(EXPORT_FORMATS.map((format) => [format.id, format]));
 
-    // A planned format is never available, whatever the server lists.
-    expect(isFormatAvailable(byId.html, ['xlsx', 'docx', 'pdf', 'html'])).toBe(false);
-    // A shipped one follows the server: PDF needs an office converter (#639).
+    // Every format ships; whether one can be produced is the deployment's
+    // answer: PDF needs an office converter (#639).
     expect(isFormatAvailable(byId.pdf, ['xlsx', 'docx'])).toBe(false);
     expect(isFormatAvailable(byId.pdf, ['xlsx', 'docx', 'pdf'])).toBe(true);
     // Silence is not a refusal — an older server, or a config request still in

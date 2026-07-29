@@ -94,13 +94,13 @@ Pinning it against cell changes needed a second detour. `ClientAnchor.setAnchorT
 
 ### Four formats, not six
 
-CSV and Markdown were dropped (#636/#638) after Word shipped. CSV is a strictly worse Excel for this data — no typed dates, and nowhere to put the comment threads that need a second sheet — and Markdown duplicates what the review UI already renders. Excel and Word cover the two things an export is actually for: a grid to filter and a document to read; HTML (#637) and PDF (#639) remain because they answer "opens anywhere" and "archive this", which neither shipped format does.
+CSV and Markdown were dropped (#636/#638) after Word shipped. CSV is a strictly worse Excel for this data — no typed dates, and nowhere to put the comment threads that need a second sheet — and Markdown duplicates what the review UI already renders. Excel and Word cover the two things an export is actually for: a grid to filter and a document to read; HTML (#637) and PDF (#639) earn their place by answering "opens anywhere" and "archive this", which neither of those does. All four now ship, so the wizard no longer carries a notion of a planned format.
 
 ### Inline images travel with the text
 
 Comment bodies are Markdown, and a screenshot pasted into a review is frequently the substance of the comment. The original flattening stripped image references along with the rest of the markup, so those comments exported as a sentence pointing at nothing.
 
-Bodies are now *split* rather than stripped (`ExportSegment`), and each format decides: Word embeds the picture where the author put it, the spreadsheet writes `[screenshot.png]` in the cell. A floating picture in a filterable grid would be worse than none — the first sort detaches it from its row — but silence was the bug.
+Bodies are now *parsed* rather than stripped, and an image arrives as a block of its own, so each format decides: Word embeds the picture where the author put it, the spreadsheet writes `[screenshot.png]` in the cell. A floating picture in a filterable grid would be worse than none — the first sort detaches it from its row — but silence was the bug.
 
 The bytes arrive through the model, resolved by `ExportImageResolver`, for the same reason the logo does: a renderer that could read an attachment could read one its caller may not see. Two rules bound that resolver, and both are tested. Only this app's own attachment URLs are followed — otherwise an export becomes a fetcher for whatever URL someone typed into a comment, which is server-side request forgery with a review as the delivery vehicle. And every lookup is scoped to the document being exported, so a comment naming another review's attachment resolves to nothing instead of to a file the reader cannot otherwise open.
 
@@ -121,6 +121,18 @@ So `PdfAnnotationRenderer` renders the DOCX and converts it. One design, one ren
 The conversion runs **out-of-process** through LibreOffice — the only way ADR-0007 permits a copyleft tool, and the same call ADR-0010 already made for DOCX ingest, so this reuses an installation the roadmap had committed to rather than asking for a new one. It is invoked with `ProcessBuilder` rather than through a wrapper library: no Java dependency at all, and the licence boundary stays absolute. Two invocation details are load-bearing — a per-run user profile, because LibreOffice refuses to start against one already in use and concurrent exports would otherwise fail sporadically, and a deadline, because a hung office process would hold a request thread until restart.
 
 Whether a deployment can produce PDF is therefore a property of the **server**, not of the release. `GET /api/v1/config` reports `exportFormats`, the wizard offers only those, and a request for a format this server cannot make answers **503** with a named code — nothing broke and a retry will not help. Every developer machine is such a server, which is why the seam is an interface a test can fake.
+
+### HTML is one file, and escapes by construction
+
+The HTML report (#637) is a **single file with no external reference**: the stylesheet and the script are inlined, the branding logo and every screenshot are `data:` URIs. That is the whole reason the format exists — it is the one that opens on a machine with no Office suite, from a mail attachment, on a train. A stylesheet from a CDN or an image left as a URL would make the report depend on the reader's network, and would quietly report back to this server when and where it was read. The integration test asserts the absence, not the presence: no `src="http`, no `<link>`.
+
+The report is assembled from review titles, comment bodies and filenames — all user-written — into a document a browser *executes*. One missed interpolation is stored XSS that travels by e-mail, so escaping is not something a call site may remember to do. `HtmlWriter` makes it structural: `text` and `attr` are the only ways content enters the document and both always escape; raw markup has a single entrance that takes compile-time constants — the scaffolding, the stylesheet, the script. A user string cannot reach it, because a user string is never a constant. That is defence in depth over the parse-level rule above, which already drops `HtmlBlock`/`HtmlInline` before any renderer sees them: the payload a commenter wrote comes out as visible prose, which is exactly right — the reader sees it, the browser does not run it.
+
+**No data is interpolated into the script.** Escaping for HTML is not escaping for JavaScript, and a comment containing `</script>` would end the block early whatever the escaping. The script only reads the DOM and writes `hidden` and `open`, so the question does not arise. It follows that the report is complete without it: the markup carries every finding and every reply, and a mail client that refuses inline script costs the reader the filter, never the content. An empty review ships no script at all — there is nothing to filter.
+
+Images are inlined against a **budget** (8 MB of source bytes, before base64 adds its third). Past it an image degrades to `[name]`, the same marker the spreadsheet uses. A review of thirty screenshots would otherwise produce a file no mail server will carry, which is a worse failure than a missing picture in a report that still says one was there.
+
+HTML does not copy the Word layout, and should not: it is the only format read in a browser, so it gets what a browser is good at — a text filter, status chips, expand-all across the discussions — and a print stylesheet that drops those controls and keeps a finding from breaking across pages. It is light-only and uses system fonts: this artifact is printed and filed, a document that guesses at the reader's theme guesses wrong on paper, and embedding a webface would add megabytes to a file meant to travel as an attachment.
 
 ### The filename is the user's, within limits
 
@@ -173,6 +185,7 @@ Headings use direct character formatting plus an OOXML outline level rather than
 - **2026-07-29** — inline images in annotations and comments are exported rather than stripped; other attachments are linked.
 - **2026-07-29** — PDF (#639) ships by converting the Word report out-of-process, and format availability becomes a server capability rather than a release constant.
 - **2026-07-30** — comment markdown is parsed once with commonmark and rendered by each format instead of being flattened away (#637).
+- **2026-07-30** — HTML (#637) ships as a single self-contained page; all four formats are now implemented.
 - **ADR-0021 / ADR-0015** — OpenAPI-first, and why this endpoint is the deliberate exception
 - **ADR-0004** — the layering that puts the workbook in the service and leaves the controller streaming
 - Issue **#547**

@@ -180,14 +180,19 @@ describe('ExportAnnotationsButton', () => {
     expect(screen.getByRole('dialog')).toBeInTheDocument();
   });
 
-  it('names the planned formats without offering them', async () => {
+  it('exports HTML like any other format', async () => {
     const user = userEvent.setup();
     renderButton();
     await openWizard(user);
 
-    // Answering "is HTML coming?" in the wizard beats a support request.
-    expect(screen.getByRole('button', { name: /^HTML/ })).toBeDisabled();
-    expect(screen.getByRole('button', { name: /Excel/ })).toBeEnabled();
+    // It shipped in #637; nothing about it is conditional on the server the way
+    // PDF's converter is.
+    await user.click(screen.getByRole('button', { name: /^HTML/ }));
+    await user.click(screen.getByRole('button', { name: /Next/ }));
+    await user.click(screen.getByRole('button', { name: /^Export$/ }));
+
+    await waitFor(() => expect(downloadAnnotationExport).toHaveBeenCalled());
+    expect(vi.mocked(downloadAnnotationExport).mock.calls[0][2]?.format).toBe('html');
   });
 
   it('exports the chosen format', async () => {
