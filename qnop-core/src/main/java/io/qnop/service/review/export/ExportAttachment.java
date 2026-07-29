@@ -43,7 +43,7 @@ public record ExportAttachment(String fileName, String contentType, long sizeByt
   }
 
   /** A short, human name for the type: the extension when there is one, else the subtype. */
-  private String kind() {
+  public String kind() {
     int dot = fileName == null ? -1 : fileName.lastIndexOf('.');
     if (dot > 0 && dot < fileName.length() - 1) {
       return fileName.substring(dot + 1).toUpperCase(Locale.ROOT);
@@ -55,7 +55,7 @@ public record ExportAttachment(String fileName, String contentType, long sizeByt
   }
 
   /** Rounded to the unit a reader thinks in; exact byte counts help nobody here. */
-  private String size() {
+  public String size() {
     if (sizeBytes < 1024) {
       return sizeBytes + " B";
     }

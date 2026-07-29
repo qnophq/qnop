@@ -879,6 +879,37 @@ class AnnotationExportIT extends SeededIntegrationTest {
   }
 
   @Test
+  @DisplayName("the workbook lists every upload on its own sheet, with a working link")
+  void workbookLinksUploads() throws Exception {
+    seedDocument(false);
+    String imageUrl = uploadImage(MEMBER_ID, "screenshot.png");
+    createAnnotationReturningId(
+        MEMBER_ID, 0, 0.1, 0.1, "Look: ![screenshot.png](" + imageUrl + ")");
+
+    byte[] body =
+        mockMvc
+            .perform(
+                as(
+                    get("/api/v1/documents/" + documentId + "/annotations/export")
+                        .param("logo", "false"),
+                    MEMBER_ID))
+            .andExpect(status().isOk())
+            .andReturn()
+            .getResponse()
+            .getContentAsByteArray();
+    Sheet sheet = new XSSFWorkbook(new ByteArrayInputStream(body)).getSheet("Attachments");
+
+    assertThat(sheet).isNotNull();
+    Cell file = sheet.getRow(1).getCell(1);
+    assertThat(file.getStringCellValue()).isEqualTo("screenshot.png");
+    // Same target as the Word report: the app's download page, absolute, never
+    // the bearer-authenticated API a click could not open.
+    assertThat(file.getHyperlink().getAddress()).startsWith("http");
+    assertThat(file.getHyperlink().getAddress()).contains("/attachments/" + documentId + "/");
+    assertThat(file.getHyperlink().getAddress()).doesNotContain("/api/v1/");
+  }
+
+  @Test
   @DisplayName("a review without annotations still yields a valid header-only workbook")
   void emptyReviewYieldsHeaderOnly() throws Exception {
     seedDocument(false);

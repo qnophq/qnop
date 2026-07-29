@@ -118,6 +118,18 @@ public sealed interface ExportSegment {
         .toList();
   }
 
+  /** Every upload a body points at — images and files alike, in order. */
+  static List<String> uploadUrls(String markdown) {
+    return split(markdown).stream()
+        .map(
+            segment ->
+                segment instanceof Image image
+                    ? image.url()
+                    : segment instanceof Attachment file ? file.url() : null)
+        .filter(java.util.Objects::nonNull)
+        .toList();
+  }
+
   /** Every attachment target in a body, in order, without duplicates removed. */
   static List<String> attachmentUrls(String markdown) {
     return split(markdown).stream()

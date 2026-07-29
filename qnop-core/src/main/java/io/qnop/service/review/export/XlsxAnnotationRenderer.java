@@ -31,6 +31,7 @@ import java.time.ZoneId;
 import java.util.List;
 import javax.imageio.ImageIO;
 import javax.xml.namespace.QName;
+import org.apache.poi.common.usermodel.HyperlinkType;
 import org.apache.poi.ss.SpreadsheetVersion;
 import org.apache.poi.ss.usermodel.BorderStyle;
 import org.apache.poi.ss.usermodel.Cell;
@@ -38,6 +39,8 @@ import org.apache.poi.ss.usermodel.CellStyle;
 import org.apache.poi.ss.usermodel.ClientAnchor;
 import org.apache.poi.ss.usermodel.CreationHelper;
 import org.apache.poi.ss.usermodel.Font;
+import org.apache.poi.ss.usermodel.Hyperlink;
+import org.apache.poi.ss.usermodel.IndexedColors;
 import org.apache.poi.ss.usermodel.Picture;
 import org.apache.poi.ss.usermodel.Row;
 import org.apache.poi.ss.usermodel.Sheet;
@@ -80,6 +83,8 @@ public class XlsxAnnotationRenderer implements AnnotationExportRenderer {
   private static final int CELL_MAX = SpreadsheetVersion.EXCEL2007.getMaxTextLength();
 
   private static final List<String> COMMENT_HEADERS = List.of("#", "Author", "Written", "Comment");
+
+  private static final List<String> ATTACHMENT_HEADERS = List.of("#", "File", "Type", "Size");
 
   /** The thread sheet's comment column: wider than the summary, since it is the whole point. */
   private static final int COMMENT_WIDTH_CHARS = 90;
@@ -147,6 +152,7 @@ public class XlsxAnnotationRenderer implements AnnotationExportRenderer {
       if (model.includeComments()) {
         writeComments(workbook, model, dateStyle, headerStyle, textStyle);
       }
+      writeAttachments(workbook, model, headerStyle);
 
       workbook.write(out);
       workbook.dispose(); // drops the streaming temp files
@@ -305,6 +311,101 @@ public class XlsxAnnotationRenderer implements AnnotationExportRenderer {
     return new java.awt.Dimension(
         Math.max(1, (int) Math.round(image.getWidth() * LOGO_SCALE)),
         Math.max(1, (int) Math.round(image.getHeight() * LOGO_SCALE)));
+  }
+
+  /**
+   * Every upload the review references, one row each, with a working link.
+   *
+   * <p>Excel applies a hyperlink to a whole cell, never to a word inside one, so an attachment
+   * mentioned mid-sentence cannot be clickable where it stands — which is why the prose keeps a
+   * {@code [name]} marker and the link lives here. The same resolution as the Word report: the same
+   * absolute URL into the app's download page, so a reader signs in once and gets the file.
+   *
+   * <p>Images are listed too. Word embeds them and a spreadsheet cannot, so without this a reader
+   * would see {@code [screenshot.png]} and have no way to open it.
+   */
+  private void writeAttachments(
+      Workbook workbook, AnnotationExportModel model, CellStyle headerStyle) {
+    List<Reference> references = referencedUploads(model);
+    if (references.isEmpty()) {
+      return;
+    }
+    Sheet sheet = workbook.createSheet("Attachments");
+    int headerRow = model.hasLogo() ? reserveLogoRow(sheet, model) : 0;
+    Row header = sheet.createRow(headerRow);
+    for (int index = 0; index < ATTACHMENT_HEADERS.size(); index++) {
+      Cell cell = header.createCell(index);
+      cell.setCellValue(ATTACHMENT_HEADERS.get(index));
+      cell.setCellStyle(headerStyle);
+    }
+
+    CellStyle linkStyle = linkStyle(workbook);
+    CreationHelper helper = workbook.getCreationHelper();
+    int rowIndex = headerRow + 1;
+    for (Reference reference : references) {
+      ExportAttachment upload = reference.upload();
+      Row row = sheet.createRow(rowIndex++);
+      row.createCell(0).setCellValue(reference.taskKey());
+      Cell name = row.createCell(1);
+      name.setCellValue(upload.fileName() == null ? "attachment" : upload.fileName());
+      if (upload.href() != null && !upload.href().isBlank()) {
+        Hyperlink link = helper.createHyperlink(HyperlinkType.URL);
+        link.setAddress(upload.href());
+        name.setHyperlink(link);
+        name.setCellStyle(linkStyle);
+      }
+      row.createCell(2).setCellValue(upload.kind());
+      row.createCell(3).setCellValue(upload.size());
+    }
+
+    sheet.createFreezePane(0, headerRow + 1);
+    sheet.setAutoFilter(
+        new CellRangeAddress(
+            headerRow, Math.max(rowIndex - 1, headerRow + 1), 0, ATTACHMENT_HEADERS.size() - 1));
+    sheet.setColumnWidth(0, AnnotationExportColumn.TASK_KEY.getWidthChars() * 256);
+    sheet.setColumnWidth(1, 48 * 256);
+    sheet.setColumnWidth(2, 12 * 256);
+    sheet.setColumnWidth(3, 12 * 256);
+    placeLogo(workbook, sheet, model, ATTACHMENT_HEADERS.size());
+  }
+
+  /** One upload as it was referenced: which annotation mentioned it, and what it is. */
+  private record Reference(String taskKey, ExportAttachment upload) {}
+
+  /**
+   * The uploads this export can point at, in reading order.
+   *
+   * <p>Deduplicated per annotation: the same screenshot quoted twice in one thread is one row, but
+   * a file referenced from two annotations is listed under both, because the question a reader asks
+   * is "what belongs to this finding".
+   */
+  private static List<Reference> referencedUploads(AnnotationExportModel model) {
+    List<Reference> references = new java.util.ArrayList<>();
+    for (AnnotationExportModel.Row row : model.rows()) {
+      java.util.Set<String> seen = new java.util.LinkedHashSet<>();
+      java.util.List<String> bodies = new java.util.ArrayList<>();
+      bodies.add(row.view().firstComment());
+      row.thread().forEach(comment -> bodies.add(comment.body()));
+      for (String body : bodies) {
+        for (String url : ExportSegment.uploadUrls(body)) {
+          ExportAttachment upload = model.attachment(url);
+          if (upload != null && seen.add(url)) {
+            references.add(new Reference(row.taskKey(), upload));
+          }
+        }
+      }
+    }
+    return references;
+  }
+
+  /** Blue and underlined — Excel does not style a hyperlink on its own. */
+  private static CellStyle linkStyle(Workbook workbook) {
+    CellStyle style = workbook.createCellStyle();
+    Font font = workbook.createFont();
+    font.setUnderline(Font.U_SINGLE);
+    font.setColor(IndexedColors.BLUE.getIndex());
+    style.setFont(font);
+    return style;
   }
 
   private void writeComments(

@@ -129,7 +129,10 @@ public class ExportAttachmentResolver {
     Map<String, ExportAttachment> resolved = new LinkedHashMap<>();
     String base = baseUrl(requestOrigin);
     for (String body : bodies) {
-      for (String url : ExportSegment.attachmentUrls(body)) {
+      // Images too: Word embeds them, but a spreadsheet cannot, and a reader
+      // who sees "[screenshot.png]" with no way to open it is no better off
+      // than before.
+      for (String url : ExportSegment.uploadUrls(body)) {
         if (resolved.containsKey(url)) {
           continue;
         }

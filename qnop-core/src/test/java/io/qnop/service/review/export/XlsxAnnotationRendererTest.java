@@ -346,6 +346,73 @@ class XlsxAnnotationRendererTest {
   }
 
   @Test
+  @DisplayName("uploads get a sheet of their own, each with a working link")
+  void listsAttachmentsWithLinks() throws Exception {
+    String fileUrl = "/api/v1/documents/d/attachments/a";
+    String imageUrl = "/api/v1/documents/d/attachments/b";
+    AnnotationView view =
+        view("Numbers wrong [v.xlsx](" + fileUrl + ") and ![shot.png](" + imageUrl + ")", 1);
+    Map<String, ExportAttachment> uploads =
+        Map.of(
+            fileUrl,
+            new ExportAttachment(
+                "v.xlsx", "application/vnd.ms-excel", 86016, "https://q.example/a"),
+            imageUrl,
+            new ExportAttachment("shot.png", "image/png", 2048, "https://q.example/b"));
+
+    byte[] xlsx = renderer.render(withUploads(view, uploads));
+
+    Sheet sheet = new XSSFWorkbook(new ByteArrayInputStream(xlsx)).getSheet("Attachments");
+    assertThat(sheet).isNotNull();
+    assertThat(sheet.getRow(0).getCell(1).getStringCellValue()).isEqualTo("File");
+
+    Cell file = sheet.getRow(1).getCell(1);
+    assertThat(file.getStringCellValue()).isEqualTo("v.xlsx");
+    // A real hyperlink, not a URL typed into a cell: Excel only makes the former
+    // clickable, and a cell is the smallest thing it can attach one to — which is
+    // why the link lives here rather than on the word in the prose.
+    assertThat(file.getHyperlink()).isNotNull();
+    assertThat(file.getHyperlink().getAddress()).isEqualTo("https://q.example/a");
+    assertThat(sheet.getRow(1).getCell(2).getStringCellValue()).isEqualTo("XLSX");
+    assertThat(sheet.getRow(1).getCell(3).getStringCellValue()).isEqualTo("84 KB");
+
+    // Images are listed too: Word embeds them, a spreadsheet cannot, and
+    // "[shot.png]" with no way to open it helps nobody.
+    Cell image = sheet.getRow(2).getCell(1);
+    assertThat(image.getStringCellValue()).isEqualTo("shot.png");
+    assertThat(image.getHyperlink().getAddress()).isEqualTo("https://q.example/b");
+
+    // The prose still marks where each was mentioned.
+    assertThat(sheetOf(xlsx, 0).getRow(1).getCell(5).getStringCellValue())
+        .contains("[v.xlsx]", "[shot.png]");
+  }
+
+  @Test
+  @DisplayName("a review with no uploads gets no attachments sheet")
+  void omitsTheSheetWhenThereIsNothingToList() throws Exception {
+    byte[] xlsx = renderer.render(model(view("A plain finding", 1), List.of()));
+
+    assertThat(new XSSFWorkbook(new ByteArrayInputStream(xlsx)).getSheet("Attachments")).isNull();
+  }
+
+  private static AnnotationExportModel withUploads(
+      AnnotationView view, Map<String, ExportAttachment> uploads) {
+    return new AnnotationExportModel(
+        "Vendor agreement",
+        3,
+        List.of(
+            new AnnotationExportModel.Row(
+                "T-1", view, new AnnotationPosition(true, 0, 0.1, 0.1, 0), List.of())),
+        AnnotationExportColumn.all(),
+        false,
+        null,
+        ExportDateFormat.ISO,
+        ZoneOffset.UTC,
+        Map.of(),
+        uploads);
+  }
+
+  @Test
   @DisplayName("only Excel's own ceiling truncates, and it says so with an ellipsis")
   void stopsAtExcelsLimit() throws Exception {
     String enormous = "x".repeat(40_000);
