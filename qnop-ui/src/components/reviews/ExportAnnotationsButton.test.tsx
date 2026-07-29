@@ -175,8 +175,33 @@ describe('ExportAnnotationsButton', () => {
     renderButton();
     await openWizard(user);
 
-    // Answering "is Word coming?" in the wizard beats a support request.
-    expect(screen.getByRole('button', { name: /Word/ })).toBeDisabled();
+    // Answering "is Markdown coming?" in the wizard beats a support request.
+    expect(screen.getByRole('button', { name: /Markdown/ })).toBeDisabled();
     expect(screen.getByRole('button', { name: /Excel/ })).toBeEnabled();
+  });
+
+  it('exports the chosen format', async () => {
+    const user = userEvent.setup();
+    renderButton();
+    await openWizard(user);
+
+    await user.click(screen.getByRole('button', { name: /Word/ }));
+    await user.click(screen.getByRole('button', { name: /Next/ }));
+    await user.click(screen.getByRole('button', { name: /^Export$/ }));
+
+    await waitFor(() => expect(downloadAnnotationExport).toHaveBeenCalled());
+    expect(vi.mocked(downloadAnnotationExport).mock.calls[0][2]?.format).toBe('docx');
+  });
+
+  it('describes the fields in the words of the chosen format', async () => {
+    const user = userEvent.setup();
+    renderButton();
+    await openWizard(user);
+
+    // A spreadsheet has columns; a report does not, and calling them columns
+    // there would describe a file the user is not about to get.
+    expect(screen.getByText(/of 11 columns/)).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: /Word/ }));
+    expect(screen.getByText(/of 11 details/)).toBeInTheDocument();
   });
 });

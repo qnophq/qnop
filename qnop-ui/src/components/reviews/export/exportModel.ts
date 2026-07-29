@@ -32,6 +32,14 @@ export interface ExportFormat {
   extension: string;
   /** One line on the format card: why you would pick this one. */
   hint: string;
+  /**
+   * What this format calls the selected fields. A spreadsheet has columns; a
+   * report has details. The wizard asks the format rather than assuming, so a
+   * new format brings its own vocabulary instead of inheriting Excel's.
+   */
+  fieldNoun: string;
+  /** What switching the comment threads on actually does in this format. */
+  commentsHint: string;
   /** Not yet implemented — shown so the wizard tells the truth about what is coming. */
   planned?: boolean;
 }
@@ -47,18 +55,55 @@ export const EXPORT_FORMATS: ExportFormat[] = [
     label: 'Excel',
     extension: '.xlsx',
     hint: 'Sortable, filterable — for triage and reporting.',
+    fieldNoun: 'columns',
+    commentsHint:
+      'A second sheet with the full text of every comment and who wrote it. In an anonymous review the authors stay pseudonymous here too.',
   },
-  { id: 'docx', label: 'Word', extension: '.docx', hint: 'A readable report.', planned: true },
+  {
+    id: 'docx',
+    label: 'Word',
+    extension: '.docx',
+    hint: 'A readable report — for meetings and sign-off.',
+    fieldNoun: 'details',
+    commentsHint:
+      'Every reply in full, indented under the annotation it answers. In an anonymous review the authors stay pseudonymous here too.',
+  },
   {
     id: 'md',
+    fieldNoun: 'sections',
+    commentsHint: 'Comment threads are included.',
     label: 'Markdown',
     extension: '.md',
     hint: 'For pull requests and wikis.',
     planned: true,
   },
-  { id: 'html', label: 'HTML', extension: '.html', hint: 'Opens anywhere.', planned: true },
-  { id: 'csv', label: 'CSV', extension: '.csv', hint: 'For other tools.', planned: true },
-  { id: 'pdf', label: 'PDF', extension: '.pdf', hint: 'For archiving.', planned: true },
+  {
+    id: 'html',
+    fieldNoun: 'sections',
+    commentsHint: 'Comment threads are included.',
+    label: 'HTML',
+    extension: '.html',
+    hint: 'Opens anywhere.',
+    planned: true,
+  },
+  {
+    id: 'csv',
+    fieldNoun: 'columns',
+    commentsHint: 'Comment threads are included.',
+    label: 'CSV',
+    extension: '.csv',
+    hint: 'For other tools.',
+    planned: true,
+  },
+  {
+    id: 'pdf',
+    fieldNoun: 'sections',
+    commentsHint: 'Comment threads are included.',
+    label: 'PDF',
+    extension: '.pdf',
+    hint: 'For archiving.',
+    planned: true,
+  },
 ];
 
 export interface ExportField {

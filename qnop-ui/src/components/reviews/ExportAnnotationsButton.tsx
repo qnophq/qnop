@@ -59,6 +59,7 @@ export function ExportAnnotationsButton({
         fields: settings.fields,
         scope: settings.scope,
         comments: settings.includeComments,
+        format: settings.format,
       });
       // Closing only after it succeeded keeps the configuration on screen when
       // it did not — the user retries instead of rebuilding their selection.

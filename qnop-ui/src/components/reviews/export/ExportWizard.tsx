@@ -259,7 +259,7 @@ export function ExportWizard({
         ) : (
           <Stack spacing={2}>
             <Stack direction="row" sx={{ alignItems: 'center', justifyContent: 'space-between' }}>
-              <SectionLabel>Columns</SectionLabel>
+              <SectionLabel>{capitalise(format?.fieldNoun ?? 'fields')}</SectionLabel>
               <Stack direction="row" spacing={0.5}>
                 <Button size="small" onClick={() => setAllFields(true)}>
                   All
@@ -353,8 +353,7 @@ export function ExportWizard({
                       </Typography>
                     </Stack>
                     <Typography sx={{ fontSize: 12, color: 'text.secondary' }}>
-                      A second sheet with the full text of every comment and who wrote it. In an
-                      anonymous review the authors stay pseudonymous here too.
+                      {format?.commentsHint}
                     </Typography>
                   </Box>
                 }
@@ -368,7 +367,8 @@ export function ExportWizard({
           the downloads folder, so what it will contain is stated before it runs. */}
       <Box sx={{ px: 3, py: 1.25, bgcolor: (t) => t.qnop.surface2 }}>
         <Typography sx={{ fontSize: 12.5, color: 'text.secondary' }}>
-          {format?.label} {format?.extension} · {selected.length} of {EXPORT_FIELDS.length} columns
+          {format?.label} {format?.extension} · {selected.length} of {EXPORT_FIELDS.length}{' '}
+          {format?.fieldNoun}
           {rows !== null && ` · ${rows} annotation${rows === 1 ? '' : 's'}`}
           {settings.includeComments && ' · with comment threads'}
         </Typography>
@@ -408,6 +408,11 @@ export function ExportWizard({
       </DialogActions>
     </Dialog>
   );
+}
+
+/** Sentence case for a noun that lives lowercase in the format registry. */
+function capitalise(word: string): string {
+  return word.charAt(0).toUpperCase() + word.slice(1);
 }
 
 function SectionLabel({ children }: { children: React.ReactNode }) {

@@ -31,7 +31,7 @@ function filenameFrom(disposition: string | undefined, fallback: string): string
 }
 
 /**
- * Downloads a review's annotations as an Excel workbook (issue #547).
+ * Downloads a review's annotations as a file (issues #547, #635).
  *
  * <p>It goes through the shared axios instance rather than a bare `<a href>` or
  * `window.open`, because the endpoint is bearer-authenticated: a plain browser
@@ -41,7 +41,7 @@ function filenameFrom(disposition: string | undefined, fallback: string): string
 export async function downloadAnnotationExport(
   documentId: string,
   version?: number,
-  options?: { fields?: string[]; scope?: string; comments?: boolean },
+  options?: { fields?: string[]; scope?: string; comments?: boolean; format?: string },
 ): Promise<void> {
   const response = await axiosInstance.get(`/documents/${documentId}/annotations/export`, {
     params: {
@@ -52,6 +52,8 @@ export async function downloadAnnotationExport(
       ...(options?.fields?.length ? { fields: options.fields } : {}),
       ...(options?.scope && options.scope !== 'all' ? { scope: options.scope } : {}),
       ...(options?.comments ? { comments: true } : {}),
+      // Omitted for the default, so the links that shipped with #547 stay valid.
+      ...(options?.format && options.format !== 'xlsx' ? { format: options.format } : {}),
     },
     paramsSerializer: { indexes: null },
     responseType: 'blob',
@@ -59,7 +61,7 @@ export async function downloadAnnotationExport(
 
   const filename = filenameFrom(
     response.headers['content-disposition'] as string | undefined,
-    'annotations.xlsx',
+    `annotations.${options?.format ?? 'xlsx'}`,
   );
   const url = URL.createObjectURL(response.data as Blob);
   try {
