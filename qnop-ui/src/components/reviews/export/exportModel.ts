@@ -84,7 +84,7 @@ export const EXPORT_FORMATS: ExportFormat[] = [
     hint: 'A readable report — for meetings and sign-off.',
     fieldNoun: 'details',
     commentsHint:
-      'Every reply in full, indented under the annotation it answers. In an anonymous review the authors stay pseudonymous here too.',
+      'The full discussion under each annotation — every reply, with who wrote it and when. In an anonymous review the authors stay pseudonymous here too.',
   },
   {
     id: 'html',
@@ -101,10 +101,10 @@ export const EXPORT_FORMATS: ExportFormat[] = [
     supportsLogo: true,
     fieldNoun: 'details',
     commentsHint:
-      'Every reply in full, indented under the annotation it answers. In an anonymous review the authors stay pseudonymous here too.',
+      'The full discussion under each annotation — every reply, with who wrote it and when. In an anonymous review the authors stay pseudonymous here too.',
     label: 'PDF',
     extension: '.pdf',
-    hint: 'The Word report, fixed — for archiving and sign-off.',
+    hint: 'Looks the same everywhere — for printing and archiving.',
   },
 ];
 
