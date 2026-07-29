@@ -25,12 +25,19 @@ import static org.assertj.core.api.Assertions.assertThat;
 import io.qnop.service.review.AnnotationPosition;
 import io.qnop.service.review.AnnotationService.AnnotationView;
 import io.qnop.service.review.AnnotationService.CommentView;
+import java.awt.image.BufferedImage;
 import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
 import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
+import javax.imageio.ImageIO;
+import org.apache.poi.util.Units;
 import org.apache.poi.xwpf.usermodel.XWPFDocument;
+import org.apache.poi.xwpf.usermodel.XWPFHeader;
 import org.apache.poi.xwpf.usermodel.XWPFParagraph;
+import org.apache.poi.xwpf.usermodel.XWPFPictureData;
+import org.apache.poi.xwpf.usermodel.XWPFRun;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
@@ -81,8 +88,20 @@ class DocxAnnotationRendererTest {
   }
 
   private static AnnotationExportModel model(List<AnnotationExportModel.Row> rows) {
+    return model(rows, null);
+  }
+
+  private static AnnotationExportModel model(List<AnnotationExportModel.Row> rows, byte[] logo) {
     return new AnnotationExportModel(
-        "Vendor agreement", 3, rows, AnnotationExportColumn.all(), true);
+        "Vendor agreement", 3, rows, AnnotationExportColumn.all(), true, logo);
+  }
+
+  /** A real PNG, so the renderer's own decode-and-scale path is exercised. */
+  private static byte[] logoPng(int width, int height) throws Exception {
+    BufferedImage image = new BufferedImage(width, height, BufferedImage.TYPE_INT_ARGB);
+    ByteArrayOutputStream out = new ByteArrayOutputStream();
+    ImageIO.write(image, "png", out);
+    return out.toByteArray();
   }
 
   private static AnnotationExportModel.Row row(
@@ -147,7 +166,8 @@ class DocxAnnotationRendererTest {
             3,
             List.of(row("T-1", view, List.of())),
             AnnotationExportColumn.resolve(List.of("taskKey", "status")),
-            false);
+            false,
+            null);
 
     List<String> text = paragraphs(renderer.render(narrowed));
 
@@ -186,6 +206,41 @@ class DocxAnnotationRendererTest {
 
     assertThat(text).first().isEqualTo("Vendor agreement");
     assertThat(text).contains("This review has no annotations.");
+  }
+
+  @Test
+  @DisplayName("the branding logo lands in the page header, scaled to its aspect ratio")
+  void placesTheLogoInTheHeader() throws Exception {
+    byte[] docx =
+        renderer.render(
+            model(List.of(row("T-1", view("A finding", "Mia", 1), List.of())), logoPng(252, 128)));
+
+    try (XWPFDocument document = new XWPFDocument(new ByteArrayInputStream(docx))) {
+      XWPFHeader header = document.getHeaderList().getFirst();
+      List<XWPFPictureData> pictures = header.getAllPictures();
+
+      assertThat(pictures).hasSize(1);
+      // 90pt wide, and the height follows the 252:128 source rather than being
+      // squashed to a square.
+      XWPFRun run = header.getParagraphArray(0).getRuns().getFirst();
+      var extent = run.getEmbeddedPictures().getFirst().getCTPicture().getSpPr().getXfrm().getExt();
+      assertThat(extent.getCx()).isEqualTo(Units.toEMU(90));
+      assertThat(extent.getCy()).isEqualTo(Units.toEMU(46));
+    }
+  }
+
+  @Test
+  @DisplayName("a review with no branding logo still renders, without a header")
+  void toleratesAMissingLogo() throws Exception {
+    byte[] docx =
+        renderer.render(model(List.of(row("T-1", view("A finding", "Mia", 1), List.of()))));
+
+    try (XWPFDocument document = new XWPFDocument(new ByteArrayInputStream(docx))) {
+      // No logo means no header at all, rather than an empty band of whitespace
+      // at the top of every page.
+      assertThat(document.getHeaderList()).isEmpty();
+      assertThat(document.getParagraphs()).isNotEmpty();
+    }
   }
 
   @Test

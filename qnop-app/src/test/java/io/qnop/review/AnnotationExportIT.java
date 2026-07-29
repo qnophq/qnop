@@ -533,6 +533,33 @@ class AnnotationExportIT extends SeededIntegrationTest {
   }
 
   @Test
+  @DisplayName("the Word report carries the branding logo in its page header")
+  void docxCarriesTheBrandingLogo() throws Exception {
+    seedDocument(false);
+    annotate(MEMBER_ID, 0, 0.1, 0.1, "A finding");
+
+    byte[] body =
+        mockMvc
+            .perform(
+                as(
+                    get("/api/v1/documents/" + documentId + "/annotations/export")
+                        .param("format", "docx"),
+                    MEMBER_ID))
+            .andExpect(status().isOk())
+            .andReturn()
+            .getResponse()
+            .getContentAsByteArray();
+
+    try (XWPFDocument document = new XWPFDocument(new ByteArrayInputStream(body))) {
+      // The whole chain, which only an IT covers: the bundled SVG default is
+      // rasterized by the branding service and embedded by the renderer. Word
+      // cannot embed SVG, so a header picture here means the conversion ran.
+      assertThat(document.getHeaderList()).isNotEmpty();
+      assertThat(document.getHeaderList().getFirst().getAllPictures()).isNotEmpty();
+    }
+  }
+
+  @Test
   @DisplayName("a review without annotations still yields a valid header-only workbook")
   void emptyReviewYieldsHeaderOnly() throws Exception {
     seedDocument(false);

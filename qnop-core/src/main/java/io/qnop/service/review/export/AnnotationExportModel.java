@@ -45,17 +45,36 @@ import java.util.List;
  * @param rows the annotations to render, already in reading order
  * @param columns which facts the user asked for, in their fixed order
  * @param includeComments whether {@link Row#thread()} was populated at all
+ * @param logoPng the operator's branding logo as PNG, or null when there is none to embed
  */
 public record AnnotationExportModel(
     String documentTitle,
     Integer versionNumber,
     List<Row> rows,
     List<AnnotationExportColumn> columns,
-    boolean includeComments) {
+    boolean includeComments,
+    byte[] logoPng) {
 
   public AnnotationExportModel {
     rows = List.copyOf(rows);
     columns = List.copyOf(columns);
+    logoPng = logoPng == null ? null : logoPng.clone();
+  }
+
+  /**
+   * The branding logo, already in a form every format can embed.
+   *
+   * <p>It arrives through the model like everything else rather than being fetched by the renderer:
+   * a renderer that could reach the branding service could reach anything, and the whole point of
+   * the split is that it cannot.
+   */
+  public byte[] logoPng() {
+    return logoPng == null ? null : logoPng.clone();
+  }
+
+  /** Whether there is a logo to place at all. */
+  public boolean hasLogo() {
+    return logoPng != null && logoPng.length > 0;
   }
 
   /** Whether a given fact was selected — the question every renderer asks per row. */

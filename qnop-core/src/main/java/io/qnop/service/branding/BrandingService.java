@@ -34,8 +34,10 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.TransactionTemplate;
 
@@ -59,11 +61,26 @@ public class BrandingService {
    */
   private final Map<BrandingSlot, BrandingAsset> defaults;
 
+  private final BrandingRasterizer rasterizer;
+
+  /**
+   * Renditions of the bundled defaults, computed on first use.
+   *
+   * <p>The defaults are classpath resources with no row to write a rendition back to, and they
+   * cannot change without a redeploy — so an in-memory map is the whole of the caching they need.
+   * Values are {@link Optional} because the map may not hold nulls, and a failed conversion is a
+   * real outcome worth remembering rather than retrying on every export.
+   */
+  private final Map<BrandingSlot, Optional<byte[]>> defaultRasters = new ConcurrentHashMap<>();
+
   public BrandingService(
-      ApplicationAssetRepository repository, PlatformTransactionManager transactionManager) {
+      ApplicationAssetRepository repository,
+      PlatformTransactionManager transactionManager,
+      BrandingRasterizer rasterizer) {
     this.repository = repository;
     this.transactionTemplate = new TransactionTemplate(transactionManager);
     this.defaults = loadDefaults();
+    this.rasterizer = rasterizer;
   }
 
   /** Where each slot's effective asset comes from. */
@@ -134,9 +151,13 @@ public class BrandingService {
           // constraint.
           repository.deleteBySlot(resolved);
           repository.flush();
-          repository.saveAndFlush(
+          ApplicationAsset asset =
               ApplicationAsset.create(
-                  resolved, contentType, stored, sha256, stored.length, uploadedBy));
+                  resolved, contentType, stored, sha256, stored.length, uploadedBy);
+          // Converted here, once, rather than on every export: rasterizing an SVG
+          // costs real CPU, and a download should not pay it.
+          rasterizer.toPng(contentType, stored).ifPresent(asset::setRasterContent);
+          repository.saveAndFlush(asset);
           return new StoredAsset(contentType, sha256, stored.length);
         });
   }
@@ -154,6 +175,48 @@ public class BrandingService {
             asset ->
                 new BrandingAsset(asset.getContent(), asset.getContentType(), asset.getSha256()))
         .or(() -> Optional.of(defaults.get(resolved)));
+  }
+
+  /**
+   * The effective asset as a PNG, for formats that cannot embed the original (issue #635).
+   *
+   * <p>Operator uploads carry their rendition in the row, produced when they were stored. Two cases
+   * still have to compute one: an asset uploaded before the column existed, and the bundled
+   * defaults, which live on the classpath rather than in a row. The first is written back so it is
+   * computed once ever; the second is held in memory, since a classpath resource has no row to
+   * write to and cannot change without a redeploy.
+   *
+   * <p>Empty when the asset could not be converted — a logo is decoration, and the caller is
+   * expected to carry on without one.
+   *
+   * <p>Its own transaction, deliberately. Callers are read-only — an export is — and a write-back
+   * would fail inside their transaction; it also has no business being rolled back with them, since
+   * the rendition is a cache whose validity does not depend on whatever the caller was doing.
+   */
+  @Transactional(propagation = Propagation.REQUIRES_NEW)
+  public Optional<byte[]> getRaster(String slot) {
+    BrandingSlot resolved = resolve(slot);
+    Optional<ApplicationAsset> uploaded = repository.findBySlot(resolved);
+    if (uploaded.isPresent()) {
+      ApplicationAsset asset = uploaded.get();
+      byte[] stored = asset.getRasterContent();
+      if (stored != null && stored.length > 0) {
+        return Optional.of(stored);
+      }
+      Optional<byte[]> rendered = rasterizer.toPng(asset.getContentType(), asset.getContent());
+      rendered.ifPresent(
+          png -> {
+            asset.setRasterContent(png);
+            repository.save(asset);
+          });
+      return rendered;
+    }
+    return defaultRasters.computeIfAbsent(
+        resolved,
+        key -> {
+          BrandingAsset fallback = defaults.get(key);
+          return rasterizer.toPng(fallback.contentType(), fallback.content());
+        });
   }
 
   /**

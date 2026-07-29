@@ -69,6 +69,16 @@ public class ApplicationAsset {
   @Column(name = "size_bytes", nullable = false)
   private long sizeBytes;
 
+  /**
+   * A PNG rendition of {@link #content}, for formats that cannot embed the original — Word cannot
+   * embed SVG (issue #635).
+   *
+   * <p>Derived data, hence nullable: it may be absent because the asset predates the column, or
+   * because it could not be produced. Safe to drop; the next read recomputes it.
+   */
+  @Column(name = "raster_content")
+  private byte[] rasterContent;
+
   @CreationTimestamp
   @Column(name = "uploaded_at", nullable = false, updatable = false)
   private Instant uploadedAt;
@@ -100,6 +110,14 @@ public class ApplicationAsset {
     asset.sizeBytes = sizeBytes;
     asset.uploadedBy = uploadedBy;
     return asset;
+  }
+
+  public byte[] getRasterContent() {
+    return rasterContent == null ? null : rasterContent.clone();
+  }
+
+  public void setRasterContent(byte[] rasterContent) {
+    this.rasterContent = rasterContent == null ? null : rasterContent.clone();
   }
 
   public UUID getId() {

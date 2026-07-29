@@ -20,10 +20,12 @@
  */
 package io.qnop.service.review;
 
+import io.qnop.entity.BrandingSlot;
 import io.qnop.entity.Document;
 import io.qnop.entity.DocumentVersion;
 import io.qnop.repository.DocumentRepository;
 import io.qnop.repository.DocumentVersionRepository;
+import io.qnop.service.branding.BrandingService;
 import io.qnop.service.document.DocumentValidationException;
 import io.qnop.service.review.AnnotationService.AnnotationView;
 import io.qnop.service.review.AnnotationService.CommentView;
@@ -68,16 +70,19 @@ public class AnnotationExportService {
   private final AnnotationService annotations;
   private final DocumentRepository documents;
   private final DocumentVersionRepository versions;
+  private final BrandingService branding;
   private final Map<AnnotationExportFormat, AnnotationExportRenderer> renderers;
 
   public AnnotationExportService(
       AnnotationService annotations,
       DocumentRepository documents,
       DocumentVersionRepository versions,
+      BrandingService branding,
       List<AnnotationExportRenderer> renderers) {
     this.annotations = annotations;
     this.documents = documents;
     this.versions = versions;
+    this.branding = branding;
     Map<AnnotationExportFormat, AnnotationExportRenderer> byFormat = new LinkedHashMap<>();
     for (AnnotationExportRenderer renderer : renderers) {
       byFormat.put(renderer.format(), renderer);
@@ -182,7 +187,10 @@ public class AnnotationExportService {
         version,
         rows,
         AnnotationExportColumn.resolve(request.columnIds()),
-        request.includeComments());
+        request.includeComments(),
+        // The light-background variant: an export lands on a white page, and the
+        // dark one is white ink that would be invisible there.
+        branding.getRaster(BrandingSlot.LOGO_LIGHT.urlValue()).orElse(null));
   }
 
   /**

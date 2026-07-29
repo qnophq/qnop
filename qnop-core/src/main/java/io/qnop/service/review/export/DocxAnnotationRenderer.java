@@ -22,6 +22,8 @@ package io.qnop.service.review.export;
 
 import io.qnop.service.review.AnnotationService.AnnotationView;
 import io.qnop.service.review.AnnotationService.CommentView;
+import java.awt.image.BufferedImage;
+import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.time.Instant;
@@ -29,10 +31,17 @@ import java.time.ZoneOffset;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.List;
+import javax.imageio.ImageIO;
+import org.apache.poi.util.Units;
+import org.apache.poi.xwpf.model.XWPFHeaderFooterPolicy;
+import org.apache.poi.xwpf.usermodel.Document;
 import org.apache.poi.xwpf.usermodel.ParagraphAlignment;
 import org.apache.poi.xwpf.usermodel.XWPFDocument;
+import org.apache.poi.xwpf.usermodel.XWPFHeader;
 import org.apache.poi.xwpf.usermodel.XWPFParagraph;
 import org.apache.poi.xwpf.usermodel.XWPFRun;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
 
 /**
@@ -57,6 +66,8 @@ import org.springframework.stereotype.Component;
 @Component
 public class DocxAnnotationRenderer implements AnnotationExportRenderer {
 
+  private static final Logger log = LoggerFactory.getLogger(DocxAnnotationRenderer.class);
+
   private static final DateTimeFormatter TIMESTAMP =
       DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm");
 
@@ -73,6 +84,11 @@ public class DocxAnnotationRenderer implements AnnotationExportRenderer {
   /** Twips; one indent step for the thread block. */
   private static final int THREAD_INDENT = 480;
 
+  /**
+   * The logo's printed width in points — small enough to sit above the text, not compete with it.
+   */
+  private static final int LOGO_WIDTH_PT = 90;
+
   @Override
   public AnnotationExportFormat format() {
     return AnnotationExportFormat.DOCX;
@@ -82,6 +98,7 @@ public class DocxAnnotationRenderer implements AnnotationExportRenderer {
   public byte[] render(AnnotationExportModel model) throws IOException {
     try (XWPFDocument document = new XWPFDocument();
         ByteArrayOutputStream out = new ByteArrayOutputStream()) {
+      writeHeader(document, model);
       writeTitleBlock(document, model);
 
       if (model.rows().isEmpty()) {
@@ -100,6 +117,59 @@ public class DocxAnnotationRenderer implements AnnotationExportRenderer {
       return out.toByteArray();
     }
   }
+
+  /**
+   * The operator's logo in the page header, right-aligned, on every page.
+   *
+   * <p>A header rather than a one-off image on page one: a report is printed, split, and pinned to
+   * a wall a page at a time, and a page that has left the document should still say who it came
+   * from.
+   *
+   * <p>The logo arrives as PNG in the model — Word cannot embed SVG, and converting is the branding
+   * service's job, not a renderer's. A failure here costs the header, never the export: a document
+   * without a logo is a document; a download that 500s is not.
+   */
+  private void writeHeader(XWPFDocument document, AnnotationExportModel model) {
+    if (!model.hasLogo()) {
+      return;
+    }
+    try {
+      byte[] png = model.logoPng();
+      Dimension size = scaled(png);
+      XWPFHeader header =
+          new XWPFHeaderFooterPolicy(document).createHeader(XWPFHeaderFooterPolicy.DEFAULT);
+      XWPFParagraph paragraph = header.getParagraphArray(0);
+      if (paragraph == null) {
+        paragraph = header.createParagraph();
+      }
+      paragraph.setAlignment(ParagraphAlignment.RIGHT);
+      paragraph
+          .createRun()
+          .addPicture(
+              new ByteArrayInputStream(png),
+              Document.PICTURE_TYPE_PNG,
+              "logo.png",
+              Units.toEMU(size.width()),
+              Units.toEMU(size.height()));
+    } catch (Exception e) {
+      log.warn("Could not place the branding logo in the Word report", e);
+    }
+  }
+
+  /** The logo at {@link #LOGO_WIDTH_PT}, keeping its aspect ratio. */
+  private static Dimension scaled(byte[] png) throws IOException {
+    BufferedImage image = ImageIO.read(new ByteArrayInputStream(png));
+    if (image == null || image.getWidth() <= 0) {
+      // A square is a poor guess, but a logo that will not decode has already
+      // failed; this only decides how the failure looks if Word accepts it anyway.
+      return new Dimension(LOGO_WIDTH_PT, LOGO_WIDTH_PT);
+    }
+    double ratio = (double) image.getHeight() / image.getWidth();
+    return new Dimension(LOGO_WIDTH_PT, Math.max(1, (int) Math.round(LOGO_WIDTH_PT * ratio)));
+  }
+
+  /** Printed size in points. */
+  private record Dimension(int width, int height) {}
 
   private void writeTitleBlock(XWPFDocument document, AnnotationExportModel model) {
     XWPFParagraph title = document.createParagraph();

@@ -82,6 +82,7 @@ Headings use direct character formatting plus an OOXML outline level rather than
 - **ADR-0009** — the anchor model the reading order is parsed out of
 - **ADR-0011** — the workflow whose `AnnotationStatus` the sheet reports
 - **ADR-0028** — binary downloads as plain controllers outside the contract
+- **ADR-0053** — the branding logo's raster rendition, which the Word report places in its header
 
 ## History
 
