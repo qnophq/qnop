@@ -38,6 +38,7 @@ import javax.imageio.ImageIO;
 import org.apache.poi.openxml4j.opc.OPCPackage;
 import org.apache.poi.openxml4j.opc.PackagePart;
 import org.apache.poi.ss.usermodel.Cell;
+import org.apache.poi.ss.usermodel.RichTextString;
 import org.apache.poi.ss.usermodel.Row;
 import org.apache.poi.ss.usermodel.Sheet;
 import org.apache.poi.ss.usermodel.VerticalAlignment;
@@ -468,6 +469,38 @@ class XlsxAnnotationRendererTest {
         ZoneOffset.UTC,
         Map.of(),
         uploads);
+  }
+
+  @Test
+  @DisplayName("emphasis survives into the cell as formatting runs")
+  void keepsEmphasisInCells() throws Exception {
+    byte[] xlsx = renderer.render(model(view("A **bold** and *italic* claim", 1), List.of()));
+
+    RichTextString rich = sheetOf(xlsx, 0).getRow(1).getCell(5).getRichStringCellValue();
+
+    // Measured, not assumed: with the streaming workbook's shared-strings table
+    // off — its default — these runs are written away and the cell comes back as
+    // plain text, so the emphasis a comment carries would vanish silently.
+    assertThat(rich.getString()).isEqualTo("A bold and italic claim");
+    assertThat(rich.numFormattingRuns()).isGreaterThan(1);
+  }
+
+  @Test
+  @DisplayName("block structure becomes lines in the wrapped cell")
+  void keepsBlockStructureInCells() throws Exception {
+    byte[] xlsx =
+        renderer.render(model(view("## Findings\n\n- first\n- second\n\n> quoted", 1), List.of()));
+
+    String value = sheetOf(xlsx, 0).getRow(1).getCell(5).getStringCellValue();
+
+    // A cell cannot indent or draw a rule, but it has lines — so the shape of the
+    // comment survives even where its typography cannot.
+    assertThat(value).contains("Findings");
+    assertThat(value).contains("• first", "• second");
+    assertThat(value).contains("quoted");
+    assertThat(value.lines().count()).isGreaterThanOrEqualTo(4);
+    // The markup itself never appears.
+    assertThat(value).doesNotContain("##", "> quoted", "- first");
   }
 
   @Test

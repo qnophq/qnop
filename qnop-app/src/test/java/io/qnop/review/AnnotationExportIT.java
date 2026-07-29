@@ -781,11 +781,12 @@ class AnnotationExportIT extends SeededIntegrationTest {
     createAnnotationReturningId(MEMBER_ID, 0, 0.1, 0.1, "Look: ![screenshot.png](" + url + ")");
 
     // A cell holds text, and a floating picture would detach from its row on the
-    // first sort — but silence was the bug.
+    // first sort — but silence was the bug. The name sits on its own line because
+    // an image is a block, the same reason Word gives it its own paragraph.
     assertThat(column(download(MEMBER_ID), 5))
         .singleElement()
         .asString()
-        .isEqualTo("Look: [screenshot.png]");
+        .isEqualTo("Look:\n[screenshot.png]");
   }
 
   @Test

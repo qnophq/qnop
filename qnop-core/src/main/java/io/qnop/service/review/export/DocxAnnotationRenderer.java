@@ -91,6 +91,15 @@ public class DocxAnnotationRenderer implements AnnotationExportRenderer {
   /** The usable text column on A4 with default margins, in points. */
   private static final int TEXT_COLUMN_PT = 450;
 
+  /** Twips; one indentation step for a nested list item. */
+  private static final int LIST_STEP = 240;
+
+  /** Twips; how far a block quote is set in from its surroundings. */
+  private static final int QUOTE_STEP = 300;
+
+  private static final int CODE_SIZE = 19;
+  private static final String MONO = "Consolas";
+
   /**
    * The logo's printed width in points — small enough to sit above the text, not compete with it.
    */
@@ -384,23 +393,143 @@ public class DocxAnnotationRenderer implements AnnotationExportRenderer {
   }
 
   /**
-   * Writes a comment body: prose as paragraphs, images as pictures, in the order they were written.
+   * Writes a comment body: its markdown, rendered.
    *
-   * <p>A screenshot is often the substance of a review comment, so placing it where the author put
-   * it — rather than collecting pictures at the end, or dropping them as the flattening used to —
-   * is what makes the report say the same thing the thread does.
+   * <p>Word is the format that can show the most of it — emphasis on a run, headings, bullets,
+   * quotes, monospace, links in a sentence — so this is where the shared parse pays off most. What
+   * it cannot do it degrades rather than drops: a table becomes its rows, a nested list one more
+   * indentation step.
    */
   private void writeBody(
       XWPFDocument document, AnnotationExportModel model, String markdown, int indent) {
-    for (ExportSegment segment : ExportSegment.split(markdown)) {
-      if (segment instanceof ExportSegment.Text text) {
-        writeProse(document, text.value(), indent);
-      } else if (segment instanceof ExportSegment.Image image) {
-        writeInlineImage(document, model, image, indent);
-      } else if (segment instanceof ExportSegment.Attachment file) {
-        writeAttachment(document, model, file, indent);
+    for (ExportBlock block : ExportMarkdown.parse(markdown)) {
+      switch (block) {
+        case ExportBlock.Image image -> writeInlineImage(document, model, image, indent);
+        case ExportBlock.Attachment file -> writeAttachment(document, model, file, indent);
+        case ExportBlock.Code code -> writeCode(document, code, indent);
+        case ExportBlock.Divider divider -> writeDivider(document, indent);
+        case ExportBlock.Heading heading -> {
+          XWPFParagraph paragraph = blockParagraph(document, block, indent);
+          paragraph.setSpacingBefore(140);
+          // Two steps down from the annotation's own heading, so a heading a
+          // commenter wrote reads as structure inside their text and never
+          // competes with the report's own.
+          writeSpans(paragraph, heading.spans(), sizeForHeading(heading.level()), true, INK);
+        }
+        case ExportBlock.ListItem item -> {
+          XWPFParagraph paragraph =
+              blockParagraph(document, block, indent + LIST_STEP * item.depth());
+          paragraph.setSpacingAfter(20);
+          run(paragraph, item.marker() + "  ", BODY_SIZE, false, MUTED);
+          writeSpans(paragraph, item.spans(), BODY_SIZE, false, null);
+        }
+        case ExportBlock.TableRow row -> writeTableRow(document, row, indent);
+        case ExportBlock.Paragraph paragraph ->
+            writeSpans(
+                blockParagraph(document, block, indent), paragraph.spans(), BODY_SIZE, false, null);
       }
     }
+  }
+
+  /** A paragraph carrying the block's quote depth as indentation and a rule. */
+  private XWPFParagraph blockParagraph(XWPFDocument document, ExportBlock block, int indent) {
+    XWPFParagraph paragraph = document.createParagraph();
+    paragraph.setAlignment(ParagraphAlignment.LEFT);
+    paragraph.setSpacingAfter(80);
+    int quoted = block.quoteDepth();
+    paragraph.setIndentationLeft(indent + QUOTE_STEP * quoted);
+    if (quoted > 0) {
+      // A quote reads as a quote by being set in from a rule, the way a printed
+      // document does it — not by being prefixed with ">".
+      paragraph.setBorderLeft(Borders.SINGLE);
+      hairline(paragraph.getCTP().getPPr().getPBdr().getLeft());
+    }
+    return paragraph;
+  }
+
+  /** Inline content, one run per style combination. */
+  private void writeSpans(
+      XWPFParagraph paragraph, List<ExportSpan> spans, int size, boolean bold, String colour) {
+    for (ExportSpan span : spans) {
+      switch (span) {
+        case ExportSpan.Break ignored -> {
+          if (paragraph.getRuns().isEmpty()) {
+            run(paragraph, "", size, bold, colour);
+          }
+          paragraph.getRuns().getLast().addBreak();
+        }
+        case ExportSpan.Link link -> {
+          if (ExportMarkdown.isSafeHref(link.href())) {
+            XWPFRun run = paragraph.createHyperlinkRun(link.href());
+            run.setText(ExportMarkdown.flatten(link.spans()));
+            run.setFontSize(size / 2.0);
+            run.setColor(LINK);
+            run.setUnderline(UnderlinePatterns.SINGLE);
+          } else {
+            // A javascript: or data: target is not made clickable anywhere; the
+            // words stay, the link does not.
+            writeSpans(paragraph, link.spans(), size, bold, colour);
+          }
+        }
+        case ExportSpan.Text text -> {
+          if (text.value().isEmpty()) {
+            continue;
+          }
+          XWPFRun run =
+              run(paragraph, text.value(), size, bold || text.has(ExportSpan.Style.BOLD), colour);
+          run.setItalic(text.has(ExportSpan.Style.ITALIC));
+          if (text.has(ExportSpan.Style.STRIKETHROUGH)) {
+            run.setStrikeThrough(true);
+          }
+          if (text.has(ExportSpan.Style.CODE)) {
+            run.setFontFamily(MONO);
+          }
+        }
+      }
+    }
+  }
+
+  /** A code block: monospace, set in, on a tinted-free ground so it prints cleanly. */
+  private void writeCode(XWPFDocument document, ExportBlock.Code code, int indent) {
+    for (String line : code.text().stripTrailing().split("\n", -1)) {
+      XWPFParagraph paragraph = blockParagraph(document, code, indent + LIST_STEP);
+      paragraph.setSpacingAfter(0);
+      XWPFRun run = run(paragraph, line, CODE_SIZE, false, INK);
+      run.setFontFamily(MONO);
+    }
+  }
+
+  /** A thematic break, as a rule rather than a row of dashes. */
+  private void writeDivider(XWPFDocument document, int indent) {
+    XWPFParagraph paragraph = document.createParagraph();
+    paragraph.setIndentationLeft(indent);
+    paragraph.setSpacingBefore(80);
+    paragraph.setSpacingAfter(80);
+    paragraph.setBorderBottom(Borders.SINGLE);
+    hairline(paragraph.getCTP().getPPr().getPBdr().getBottom());
+  }
+
+  /**
+   * One row of a table, as a tab-separated line.
+   *
+   * <p>Not a Word table: POI can build one, but a table inside a comment inside a thread inside a
+   * report nests further than a page can carry, and the rows are what the reader needs. The header
+   * row is set in bold so the columns stay identifiable.
+   */
+  private void writeTableRow(XWPFDocument document, ExportBlock.TableRow row, int indent) {
+    XWPFParagraph paragraph = blockParagraph(document, row, indent + LIST_STEP);
+    paragraph.setSpacingAfter(0);
+    for (int index = 0; index < row.cells().size(); index++) {
+      if (index > 0) {
+        run(paragraph, "   ·   ", BODY_SIZE, false, MUTED);
+      }
+      writeSpans(paragraph, row.cells().get(index), BODY_SIZE, row.header(), null);
+    }
+  }
+
+  /** A commenter's heading, sized below the report's own so it never competes with it. */
+  private static int sizeForHeading(int level) {
+    return Math.max(BODY_SIZE, HEADING_SIZE - 2 - Math.min(level, 4) * 2);
   }
 
   /**
@@ -411,7 +540,7 @@ public class DocxAnnotationRenderer implements AnnotationExportRenderer {
    * pointing at nothing, which is the bug this whole path exists to fix.
    */
   private void writeInlineImage(
-      XWPFDocument document, AnnotationExportModel model, ExportSegment.Image image, int indent) {
+      XWPFDocument document, AnnotationExportModel model, ExportBlock.Image image, int indent) {
     ExportImage resolved = model.image(image.url());
     if (resolved == null || !resolved.hasContent()) {
       XWPFParagraph fallback = document.createParagraph();
@@ -448,10 +577,7 @@ public class DocxAnnotationRenderer implements AnnotationExportRenderer {
    * without at least knows it exists — which the bare filename this replaces did not convey.
    */
   private void writeAttachment(
-      XWPFDocument document,
-      AnnotationExportModel model,
-      ExportSegment.Attachment file,
-      int indent) {
+      XWPFDocument document, AnnotationExportModel model, ExportBlock.Attachment file, int indent) {
     ExportAttachment resolved = model.attachment(file.url());
     String label =
         resolved != null && resolved.fileName() != null && !resolved.fileName().isBlank()

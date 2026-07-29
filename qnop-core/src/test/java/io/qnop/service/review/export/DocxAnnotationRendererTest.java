@@ -550,6 +550,88 @@ class DocxAnnotationRendererTest {
   }
 
   @Test
+  @DisplayName("emphasis reaches the run it applied to")
+  void rendersEmphasis() throws Exception {
+    AnnotationView view = view("A **bold** and *italic* and ~~struck~~ and `code` line", "Mia", 1);
+
+    byte[] docx = renderer.render(model(List.of(row("T-1", view, List.of()))));
+
+    try (XWPFDocument document = new XWPFDocument(new ByteArrayInputStream(docx))) {
+      List<XWPFRun> runs =
+          document.getParagraphs().stream().flatMap(p -> p.getRuns().stream()).toList();
+      assertThat(runs).anySatisfy(r -> assertRun(r, "bold", XWPFRun::isBold));
+      assertThat(runs).anySatisfy(r -> assertRun(r, "italic", XWPFRun::isItalic));
+      assertThat(runs).anySatisfy(r -> assertRun(r, "struck", XWPFRun::isStrikeThrough));
+      // Monospace is how a document says "this is code" without a background.
+      assertThat(runs)
+          .anySatisfy(
+              r -> {
+                assertThat(r.text()).isEqualTo("code");
+                assertThat(r.getFontFamily()).isNotNull();
+              });
+    }
+  }
+
+  private static void assertRun(
+      XWPFRun run, String text, java.util.function.Predicate<XWPFRun> styled) {
+    assertThat(run.text()).isEqualTo(text);
+    assertThat(styled.test(run)).as("style on %s", text).isTrue();
+  }
+
+  @Test
+  @DisplayName("headings, bullets and numbers keep their structure")
+  void rendersBlockStructure() throws Exception {
+    AnnotationView view =
+        view("## Findings\n\n- first\n- second\n\n1. step one\n2. step two", "Mia", 1);
+
+    List<String> report = paragraphs(renderer.render(model(List.of(row("T-1", view, List.of())))));
+
+    assertThat(report).contains("Findings");
+    // Each item is its own paragraph with its marker, not one run-on sentence.
+    assertThat(report).anySatisfy(line -> assertThat(line).contains("•", "first"));
+    assertThat(report).anySatisfy(line -> assertThat(line).contains("1.", "step one"));
+    assertThat(report).anySatisfy(line -> assertThat(line).contains("2.", "step two"));
+  }
+
+  @Test
+  @DisplayName("a quote is set in behind a rule, not prefixed with an angle bracket")
+  void rendersQuotes() throws Exception {
+    AnnotationView view = view("Before\n\n> quoted claim\n\nAfter", "Mia", 1);
+
+    byte[] docx = renderer.render(model(List.of(row("T-1", view, List.of()))));
+
+    try (XWPFDocument document = new XWPFDocument(new ByteArrayInputStream(docx))) {
+      XWPFParagraph quoted =
+          document.getParagraphs().stream()
+              .filter(p -> p.getText().contains("quoted claim"))
+              .findFirst()
+              .orElseThrow();
+      // The ">" is markup, not content — a printed document sets a quote in.
+      assertThat(quoted.getText()).doesNotContain(">");
+      assertThat(quoted.getIndentationLeft()).isGreaterThan(0);
+      assertThat(quoted.getBorderLeft()).isNotIn(Borders.NONE, null);
+    }
+  }
+
+  @Test
+  @DisplayName("a link in a sentence stays clickable; an unsafe one keeps only its words")
+  void rendersInlineLinks() throws Exception {
+    AnnotationView view =
+        view("See [the spec](https://example.com/s) and [bad](javascript:alert(1))", "Mia", 1);
+
+    byte[] docx = renderer.render(model(List.of(row("T-1", view, List.of()))));
+
+    try (XWPFDocument document = new XWPFDocument(new ByteArrayInputStream(docx))) {
+      assertThat(document.getHyperlinks())
+          .anySatisfy(link -> assertThat(link.getURL()).isEqualTo("https://example.com/s"));
+      assertThat(document.getHyperlinks())
+          .noneSatisfy(link -> assertThat(link.getURL()).contains("javascript"));
+      // The words survive even where the target does not.
+      assertThat(paragraphs(docx)).anySatisfy(line -> assertThat(line).contains("bad"));
+    }
+  }
+
+  @Test
   @DisplayName("markdown in a comment arrives as readable prose, not as markup")
   void flattensMarkdown() throws Exception {
     AnnotationView view =

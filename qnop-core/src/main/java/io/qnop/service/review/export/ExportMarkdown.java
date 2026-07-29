@@ -101,6 +101,14 @@ public final class ExportMarkdown {
     return List.copyOf(collector.blocks);
   }
 
+  /** Every image a body points at, in order. */
+  public static List<String> imageUrls(String markdown) {
+    return parse(markdown).stream()
+        .filter(ExportBlock.Image.class::isInstance)
+        .map(block -> ((ExportBlock.Image) block).url())
+        .toList();
+  }
+
   /** Every upload a body points at — images and app-attachment links alike, in order. */
   public static List<String> uploadUrls(String markdown) {
     List<String> urls = new ArrayList<>();
