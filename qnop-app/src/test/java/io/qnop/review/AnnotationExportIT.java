@@ -879,7 +879,7 @@ class AnnotationExportIT extends SeededIntegrationTest {
   }
 
   @Test
-  @DisplayName("the workbook lists every upload on its own sheet, with a working link")
+  @DisplayName("the workbook links an upload from the annotation's own row")
   void workbookLinksUploads() throws Exception {
     seedDocument(false);
     String imageUrl = uploadImage(MEMBER_ID, "screenshot.png");
@@ -897,16 +897,18 @@ class AnnotationExportIT extends SeededIntegrationTest {
             .andReturn()
             .getResponse()
             .getContentAsByteArray();
-    Sheet sheet = new XSSFWorkbook(new ByteArrayInputStream(body)).getSheet("Attachments");
+    XSSFWorkbook workbook = new XSSFWorkbook(new ByteArrayInputStream(body));
+    Sheet sheet = workbook.getSheetAt(0);
 
-    assertThat(sheet).isNotNull();
-    Cell file = sheet.getRow(1).getCell(1);
-    assertThat(file.getStringCellValue()).isEqualTo("screenshot.png");
+    assertThat(workbook.getSheet("Attachments")).isNull();
+    Cell cell = sheet.getRow(1).getCell(11);
+    assertThat(sheet.getRow(0).getCell(11).getStringCellValue()).isEqualTo("Attachment");
+    assertThat(cell.getStringCellValue()).isEqualTo("screenshot.png");
     // Same target as the Word report: the app's download page, absolute, never
     // the bearer-authenticated API a click could not open.
-    assertThat(file.getHyperlink().getAddress()).startsWith("http");
-    assertThat(file.getHyperlink().getAddress()).contains("/attachments/" + documentId + "/");
-    assertThat(file.getHyperlink().getAddress()).doesNotContain("/api/v1/");
+    assertThat(cell.getHyperlink().getAddress()).startsWith("http");
+    assertThat(cell.getHyperlink().getAddress()).contains("/attachments/" + documentId + "/");
+    assertThat(cell.getHyperlink().getAddress()).doesNotContain("/api/v1/");
   }
 
   @Test
