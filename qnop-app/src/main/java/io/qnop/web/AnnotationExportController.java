@@ -21,6 +21,7 @@
 package io.qnop.web;
 
 import io.qnop.service.review.AnnotationExportService;
+import io.qnop.service.review.export.AnnotationExportFormat;
 import java.io.ByteArrayInputStream;
 import java.util.List;
 import java.util.UUID;
@@ -36,7 +37,7 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 /**
- * Downloads a review's annotations as an Excel workbook (issue #547).
+ * Downloads a review's annotations as a file (issues #547, #635).
  *
  * <p>A plain controller by design (ADR-0028), like {@code DocumentContentController}: binary
  * downloads stay outside the generated OpenAPI contract, which describes JSON only. Authorization
@@ -49,9 +50,6 @@ import org.springframework.web.bind.annotation.RestController;
  */
 @RestController
 public class AnnotationExportController {
-
-  private static final String XLSX =
-      "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
 
   private final AnnotationExportService exports;
 
@@ -67,6 +65,9 @@ public class AnnotationExportController {
       // Repeated or comma-separated; empty means every column (the wizard's default).
       @RequestParam(value = "fields", required = false) List<String> fields,
       @RequestParam(value = "scope", required = false, defaultValue = "all") String scope,
+      // A query parameter rather than a sibling path, so the links that shipped
+      // with #547 keep working and every format shares one authorization seam.
+      @RequestParam(value = "format", required = false) String format,
       // Off unless asked for: the comment sheet costs a query round per annotation.
       @RequestParam(value = "comments", required = false, defaultValue = "false")
           boolean includeComments) {
@@ -75,19 +76,22 @@ public class AnnotationExportController {
             documentId,
             version,
             new AnnotationExportService.ExportRequest(
-                fields == null ? List.of() : fields, scope, includeComments),
+                AnnotationExportFormat.fromId(format),
+                fields == null ? List.of() : fields,
+                scope,
+                includeComments),
             CurrentUser.requireUserId(),
             CurrentUser.isAdmin());
 
     ContentDisposition disposition =
         ContentDisposition.attachment()
-            .filename(DownloadFilename.forAnnotationExport(export.documentTitle()))
+            .filename(DownloadFilename.forAnnotationExport(export.documentTitle(), export.format()))
             .build();
     return ResponseEntity.ok()
         .cacheControl(CacheControl.noStore())
         .header(HttpHeaders.CONTENT_DISPOSITION, disposition.toString())
-        .contentLength(export.workbook().length)
-        .contentType(MediaType.parseMediaType(XLSX))
-        .body(new InputStreamResource(new ByteArrayInputStream(export.workbook())));
+        .contentLength(export.content().length)
+        .contentType(MediaType.parseMediaType(export.format().getContentType()))
+        .body(new InputStreamResource(new ByteArrayInputStream(export.content())));
   }
 }

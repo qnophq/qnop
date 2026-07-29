@@ -20,6 +20,7 @@
  */
 package io.qnop.web;
 
+import io.qnop.service.review.export.AnnotationExportFormat;
 import java.util.Locale;
 
 /**
@@ -38,8 +39,9 @@ final class DownloadFilename {
   }
 
   /** The annotation export's filename (issue #547) — the review's title plus a fixed suffix. */
-  static String forAnnotationExport(String title) {
-    return (title == null || title.isBlank() ? "annotations" : title) + "-annotations.xlsx";
+  static String forAnnotationExport(String title, AnnotationExportFormat format) {
+    String base = title == null || title.isBlank() ? "annotations" : title;
+    return base + "-annotations" + format.getExtension();
   }
 
   /** The dotted file extension for a content type, or an empty string when it is not recognized. */

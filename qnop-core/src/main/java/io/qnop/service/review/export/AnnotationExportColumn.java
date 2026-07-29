@@ -18,7 +18,7 @@
  *
  * SPDX-License-Identifier: AGPL-3.0-only
  */
-package io.qnop.service.review;
+package io.qnop.service.review.export;
 
 import java.util.Arrays;
 import java.util.LinkedHashSet;
