@@ -662,6 +662,34 @@ class DocxAnnotationRendererTest {
   }
 
   @Test
+  @DisplayName("the thread's rule stays straight through code, lists and quotes")
+  void keepsTheThreadRuleStraight() throws Exception {
+    AnnotationView view = view("The finding", "Mia Member", 2);
+    List<CommentView> thread =
+        List.of(
+            comment("Mia Member", "The finding"),
+            comment(
+                "Participant 2",
+                "Look at this:\n\n```\nvalue = compute()\n```\n\n- and a list\n  - nested\n\n> and a quote"));
+
+    byte[] docx = renderer.render(model(List.of(row("T-1", view, thread))));
+
+    try (XWPFDocument document = new XWPFDocument(new ByteArrayInputStream(docx))) {
+      List<Integer> edges =
+          document.getParagraphs().stream()
+              .filter(p -> p.getBorderLeft() != null && p.getBorderLeft() != Borders.NONE)
+              .map(XWPFParagraph::getIndentationLeft)
+              .distinct()
+              .toList();
+
+      // The rule is a paragraph border, so it sits wherever the left edge sits: a
+      // block that indents itself bends the line meant to bind the turn together.
+      // One edge means one straight line — which is what a reader notices.
+      assertThat(edges).hasSize(1);
+    }
+  }
+
+  @Test
   @DisplayName("markdown in a comment arrives as readable prose, not as markup")
   void flattensMarkdown() throws Exception {
     AnnotationView view =

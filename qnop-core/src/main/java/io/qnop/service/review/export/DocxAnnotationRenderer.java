@@ -339,7 +339,7 @@ public class DocxAnnotationRenderer implements AnnotationExportRenderer {
       run(attribution, who, META_SIZE, true, byFinder ? ACCENT : INK);
       run(attribution, "   " + model.formatTimestamp(comment.createdAt()), META_SIZE, false, MUTED);
 
-      writeBody(document, model, comment.body(), THREAD_INDENT);
+      writeBody(document, model, comment.body(), THREAD_INDENT, true);
       bindToThread(document, firstParagraph, byFinder);
     }
   }
@@ -405,6 +405,24 @@ public class DocxAnnotationRenderer implements AnnotationExportRenderer {
    */
   private void writeBody(
       XWPFDocument document, AnnotationExportModel model, String markdown, int indent) {
+    writeBody(document, model, markdown, indent, false);
+  }
+
+  /**
+   * @param bound whether this content sits inside a thread turn
+   *     <p>It changes how inner structure is expressed, and the reason is structural rather than
+   *     aesthetic: the thread's rule is a paragraph border, so it sits wherever the paragraph's
+   *     left edge sits. A code block or a nested list that indents itself therefore bends the line
+   *     that is supposed to bind the turn together — which is exactly what a reader notices. Inside
+   *     a turn the left edge is constant and nesting shows in the runs; outside one, nothing
+   *     constrains it and a quote can be set in behind its own rule.
+   */
+  private void writeBody(
+      XWPFDocument document,
+      AnnotationExportModel model,
+      String markdown,
+      int indent,
+      boolean bound) {
     List<ExportBlock> blocks = ExportMarkdown.parse(markdown);
     for (int index = 0; index < blocks.size(); index++) {
       ExportBlock block = blocks.get(index);
@@ -422,10 +440,10 @@ public class DocxAnnotationRenderer implements AnnotationExportRenderer {
       switch (block) {
         case ExportBlock.Image image -> writeInlineImage(document, model, image, indent);
         case ExportBlock.Attachment file -> writeAttachment(document, model, file, indent);
-        case ExportBlock.Code code -> writeCode(document, code, indent);
+        case ExportBlock.Code code -> writeCode(document, code, indent, bound);
         case ExportBlock.Divider divider -> writeDivider(document, indent);
         case ExportBlock.Heading heading -> {
-          XWPFParagraph paragraph = blockParagraph(document, block, indent);
+          XWPFParagraph paragraph = blockParagraph(document, block, indent, bound);
           paragraph.setSpacingBefore(140);
           // Two steps down from the annotation's own heading, so a heading a
           // commenter wrote reads as structure inside their text and never
@@ -434,9 +452,13 @@ public class DocxAnnotationRenderer implements AnnotationExportRenderer {
         }
         case ExportBlock.ListItem item -> {
           XWPFParagraph paragraph =
-              blockParagraph(document, block, indent + LIST_STEP * item.depth());
+              blockParagraph(
+                  document, block, indent + (bound ? 0 : LIST_STEP * item.depth()), bound);
           paragraph.setSpacingAfter(20);
-          run(paragraph, item.marker() + "  ", BODY_SIZE, false, MUTED);
+          // Bound to a thread the depth cannot move the edge, so it shows in the
+          // marker instead — the line stays straight and the nesting still reads.
+          String lead = bound ? "    ".repeat(item.depth()) : "";
+          run(paragraph, lead + item.marker() + "  ", BODY_SIZE, false, MUTED);
           writeSpans(paragraph, item.spans(), BODY_SIZE, false, null);
         }
         // Consumed as a run above; unreachable here, but the sealed switch has to
@@ -444,17 +466,28 @@ public class DocxAnnotationRenderer implements AnnotationExportRenderer {
         case ExportBlock.TableRow ignored -> {}
         case ExportBlock.Paragraph paragraph ->
             writeSpans(
-                blockParagraph(document, block, indent), paragraph.spans(), BODY_SIZE, false, null);
+                blockParagraph(document, block, indent, bound),
+                paragraph.spans(),
+                BODY_SIZE,
+                false,
+                null);
       }
     }
   }
 
-  /** A paragraph carrying the block's quote depth as indentation and a rule. */
-  private XWPFParagraph blockParagraph(XWPFDocument document, ExportBlock block, int indent) {
+  /** A paragraph for one block, set in for its quote depth where that is allowed. */
+  private XWPFParagraph blockParagraph(
+      XWPFDocument document, ExportBlock block, int indent, boolean bound) {
     XWPFParagraph paragraph = document.createParagraph();
     paragraph.setAlignment(ParagraphAlignment.LEFT);
     paragraph.setSpacingAfter(80);
     int quoted = block.quoteDepth();
+    if (bound) {
+      // The thread's rule is this paragraph's left border; moving the edge bends
+      // it. A quote inside a turn is marked in the type instead.
+      paragraph.setIndentationLeft(indent);
+      return paragraph;
+    }
     paragraph.setIndentationLeft(indent + QUOTE_STEP * quoted);
     if (quoted > 0) {
       // A quote reads as a quote by being set in from a rule, the way a printed
@@ -507,10 +540,17 @@ public class DocxAnnotationRenderer implements AnnotationExportRenderer {
     }
   }
 
-  /** A code block: monospace, set in, on a tinted-free ground so it prints cleanly. */
-  private void writeCode(XWPFDocument document, ExportBlock.Code code, int indent) {
+  /**
+   * A code block: monospace, and set in only where that cannot bend the thread's rule.
+   *
+   * <p>The inset was unconditional and it was the visible defect: a reply containing code stepped
+   * outward, taking the vertical line that binds the discussion with it. Monospace already says
+   * "code"; the indentation was decoration, and it lost to a structural line.
+   */
+  private void writeCode(XWPFDocument document, ExportBlock.Code code, int indent, boolean bound) {
     for (String line : code.text().stripTrailing().split("\n", -1)) {
-      XWPFParagraph paragraph = blockParagraph(document, code, indent + LIST_STEP);
+      XWPFParagraph paragraph =
+          blockParagraph(document, code, indent + (bound ? 0 : LIST_STEP), bound);
       paragraph.setSpacingAfter(0);
       XWPFRun run = run(paragraph, line, CODE_SIZE, false, INK);
       run.setFontFamily(MONO);
