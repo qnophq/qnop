@@ -36,6 +36,7 @@ import java.util.Map;
 import java.util.UUID;
 import javax.imageio.ImageIO;
 import org.apache.poi.util.Units;
+import org.apache.poi.xwpf.usermodel.Borders;
 import org.apache.poi.xwpf.usermodel.XWPFDocument;
 import org.apache.poi.xwpf.usermodel.XWPFHeader;
 import org.apache.poi.xwpf.usermodel.XWPFParagraph;
@@ -303,7 +304,10 @@ class DocxAnnotationRendererTest {
     // Both places, not just the column-driven one: a report that dated its
     // headings one way and its replies another would be its own kind of wrong.
     assertThat(european).anySatisfy(line -> assertThat(line).contains("Created: 04.03.2026 10:15"));
-    assertThat(european).anySatisfy(line -> assertThat(line).contains("· 04.03.2026 10:15"));
+    // The reply's attribution line, whatever punctuation separates name from time.
+    assertThat(european)
+        .anySatisfy(
+            line -> assertThat(line).contains("Participant 2").contains("04.03.2026 10:15"));
     assertThat(european).noneSatisfy(line -> assertThat(line).contains("2026-03-04"));
   }
 
@@ -453,6 +457,82 @@ class DocxAnnotationRendererTest {
     List<String> text = paragraphs(renderer.render(model(List.of(row("T-1", view, List.of())))));
 
     assertThat(text).anySatisfy(line -> assertThat(line).contains("gone.pdf"));
+  }
+
+  @Test
+  @DisplayName("the discussion opens with a label saying how long it is")
+  void labelsTheDiscussion() throws Exception {
+    AnnotationView view = view("The finding", "Mia Member", 3);
+    List<CommentView> thread =
+        List.of(
+            comment("Mia Member", "The finding"),
+            comment("Participant 2", "Disagree"),
+            comment("Mia Member", "Fair"));
+
+    List<String> report = paragraphs(renderer.render(model(List.of(row("T-1", view, thread)))));
+
+    // A reader skimming for findings can skip the exchange deliberately, which
+    // needs the exchange to announce itself and its length.
+    assertThat(report)
+        .anySatisfy(line -> assertThat(line).containsIgnoringCase("Discussion").contains("2"));
+  }
+
+  @Test
+  @DisplayName("every turn is bound into one thread by a rule down its left")
+  void bindsTurnsIntoOneThread() throws Exception {
+    AnnotationView view = view("The finding", "Mia Member", 3);
+    List<CommentView> thread =
+        List.of(
+            comment("Mia Member", "The finding"),
+            comment("Participant 2", "Disagree"),
+            comment("Mia Member", "Fair"));
+
+    byte[] docx = renderer.render(model(List.of(row("T-1", view, thread))));
+
+    try (XWPFDocument document = new XWPFDocument(new ByteArrayInputStream(docx))) {
+      List<XWPFParagraph> ruled =
+          document.getParagraphs().stream()
+              .filter(p -> p.getBorderLeft() != Borders.NONE && p.getBorderLeft() != null)
+              .toList();
+      // The reply turns and nothing above them: the annotation's own prose and
+      // the headings stay outside the conversation.
+      assertThat(ruled).hasSizeGreaterThanOrEqualTo(4);
+      assertThat(ruled).allSatisfy(p -> assertThat(p.getText()).doesNotContain("T-1 · Page"));
+    }
+  }
+
+  @Test
+  @DisplayName("the finding author's own turns are washed, the others are not")
+  void washesTheFindingAuthorsTurns() throws Exception {
+    AnnotationView view = view("The finding", "Mia Member", 3);
+    List<CommentView> thread =
+        List.of(
+            comment("Mia Member", "The finding"),
+            comment("Participant 2", "Disagree"),
+            comment("Mia Member", "Fair enough"));
+
+    byte[] docx = renderer.render(model(List.of(row("T-1", view, thread))));
+
+    try (XWPFDocument document = new XWPFDocument(new ByteArrayInputStream(docx))) {
+      // "Did the person who raised this come back on it?" is what a review
+      // thread is usually read for, so exactly that turn is marked — two states,
+      // not one tint per participant, because the report gets printed.
+      assertThat(shadedText(document)).anySatisfy(t -> assertThat(t).contains("Fair enough"));
+      assertThat(shadedText(document)).noneSatisfy(t -> assertThat(t).contains("Disagree"));
+    }
+  }
+
+  /** The text of every paragraph carrying a shading fill. */
+  private static List<String> shadedText(XWPFDocument document) {
+    return document.getParagraphs().stream()
+        .filter(
+            p ->
+                p.getCTP().getPPr() != null
+                    && p.getCTP().getPPr().isSetShd()
+                    && p.getCTP().getPPr().getShd().getFill() != null
+                    && !"auto".equals(p.getCTP().getPPr().getShd().getFill()))
+        .map(XWPFParagraph::getText)
+        .toList();
   }
 
   @Test

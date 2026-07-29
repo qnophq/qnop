@@ -31,6 +31,7 @@ import java.util.List;
 import javax.imageio.ImageIO;
 import org.apache.poi.util.Units;
 import org.apache.poi.xwpf.model.XWPFHeaderFooterPolicy;
+import org.apache.poi.xwpf.usermodel.Borders;
 import org.apache.poi.xwpf.usermodel.Document;
 import org.apache.poi.xwpf.usermodel.ParagraphAlignment;
 import org.apache.poi.xwpf.usermodel.UnderlinePatterns;
@@ -38,6 +39,10 @@ import org.apache.poi.xwpf.usermodel.XWPFDocument;
 import org.apache.poi.xwpf.usermodel.XWPFHeader;
 import org.apache.poi.xwpf.usermodel.XWPFParagraph;
 import org.apache.poi.xwpf.usermodel.XWPFRun;
+import org.openxmlformats.schemas.wordprocessingml.x2006.main.CTBorder;
+import org.openxmlformats.schemas.wordprocessingml.x2006.main.CTPPr;
+import org.openxmlformats.schemas.wordprocessingml.x2006.main.CTShd;
+import org.openxmlformats.schemas.wordprocessingml.x2006.main.STShd;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
@@ -72,8 +77,17 @@ public class DocxAnnotationRenderer implements AnnotationExportRenderer {
   private static final int HEADING_SIZE = 26;
   private static final int BODY_SIZE = 22;
   private static final int META_SIZE = 18;
+  private static final int LABEL_SIZE = 16;
 
   private static final String MUTED = "6B7280";
+  private static final String INK = "111827";
+
+  /** The thread's hairline: the accent, drained almost to grey. */
+  private static final String RULE = "C7D2E4";
+
+  /** A wash behind the finding author's turns — visible on screen, faint in print. */
+  private static final String TINT = "F3F6FC";
+
   private static final String LINK = "1D4ED8";
   private static final String ACCENT = "1F3A8A";
 
@@ -270,10 +284,26 @@ public class DocxAnnotationRenderer implements AnnotationExportRenderer {
   }
 
   /**
-   * The thread as indented paragraphs, each headed by its author and time.
+   * The thread as a discussion, not as an indented list.
    *
-   * <p>The opening comment is skipped here: it is the annotation's own text and has already been
-   * rendered as the section's prose. Repeating it would read as if someone had answered themselves.
+   * <p>Indentation alone said "this belongs to the finding above" and nothing else: who answered
+   * whom, how many turns it took, and where the exchange ends were all left to the reader. The
+   * report is an editorial document, so the discussion is set like one rather than dressed up as a
+   * chat — bubbles print badly and read as a screenshot pasted into a memo.
+   *
+   * <p>Three devices, each carrying one piece of that meaning:
+   *
+   * <ul>
+   *   <li>a labelled opening that states the exchange has begun and how long it is, so a reader
+   *       skimming for findings can skip it deliberately;
+   *   <li>a continuous hairline rule down the left of every turn, binding them into one
+   *       conversation and marking exactly where it stops;
+   *   <li>a wash behind the turns written by whoever raised the finding, because "did the author
+   *       come back on this?" is the question a review thread is usually read for.
+   * </ul>
+   *
+   * <p>Two states, never one per participant: a report is printed, often in greyscale, and a fourth
+   * tint would be noise rather than information.
    */
   private void writeThread(
       XWPFDocument document, AnnotationExportModel model, AnnotationExportModel.Row row) {
@@ -281,23 +311,87 @@ public class DocxAnnotationRenderer implements AnnotationExportRenderer {
     if (replies.isEmpty()) {
       return;
     }
+    writeThreadLabel(document, replies.size());
+
+    String finder = row.view().authorDisplayName();
     for (CommentView comment : replies) {
+      int firstParagraph = document.getParagraphs().size();
+
       XWPFParagraph attribution = document.createParagraph();
       attribution.setIndentationLeft(THREAD_INDENT);
-      attribution.setSpacingBefore(160);
+      attribution.setSpacingBefore(140);
       attribution.setSpacingAfter(0);
       String who =
           comment.authorDisplayName() == null || comment.authorDisplayName().isBlank()
               ? "Unknown"
               : comment.authorDisplayName();
-      run(
-          attribution,
-          who + " · " + model.formatTimestamp(comment.createdAt()),
-          META_SIZE,
-          true,
-          MUTED);
+      run(attribution, who, META_SIZE, true, INK);
+      run(attribution, "   " + model.formatTimestamp(comment.createdAt()), META_SIZE, false, MUTED);
+
       writeBody(document, model, comment.body(), THREAD_INDENT);
+
+      // The finding's author answering their own thread — the turn a reader looks
+      // for first. Compared by display name because an anonymous review has no
+      // stable id to compare, but keeps a stable pseudonym (ADR-0038).
+      boolean byFinder = finder != null && finder.equals(comment.authorDisplayName());
+      bindToThread(document, firstParagraph, byFinder);
     }
+  }
+
+  /** {@code Discussion · 3 replies} — where the exchange starts, and how long it runs. */
+  private void writeThreadLabel(XWPFDocument document, int replies) {
+    XWPFParagraph label = document.createParagraph();
+    label.setIndentationLeft(THREAD_INDENT);
+    label.setSpacingBefore(240);
+    label.setSpacingAfter(100);
+    label.setBorderTop(Borders.SINGLE);
+    hairline(label.getCTP().getPPr().getPBdr().getTop());
+
+    XWPFRun run =
+        run(
+            label,
+            "Discussion · " + replies + (replies == 1 ? " reply" : " replies"),
+            LABEL_SIZE,
+            true,
+            MUTED);
+    // Small caps and a little tracking: the editorial way to mark a label as a
+    // label without shouting it in full capitals.
+    run.setSmallCaps(true);
+    run.setCharacterSpacing(12);
+  }
+
+  /**
+   * Draws every paragraph of one turn into the thread: the rule down the left, and the wash when it
+   * is the finding author's.
+   *
+   * <p>Applied to a range after the fact rather than threaded through every writer — prose, images
+   * and attachments all create their own paragraphs, and a style parameter on each of them would be
+   * four places to forget it.
+   */
+  private static void bindToThread(XWPFDocument document, int firstParagraph, boolean tinted) {
+    List<XWPFParagraph> paragraphs = document.getParagraphs();
+    for (int index = firstParagraph; index < paragraphs.size(); index++) {
+      XWPFParagraph paragraph = paragraphs.get(index);
+      paragraph.setBorderLeft(Borders.SINGLE);
+      CTBorder left = paragraph.getCTP().getPPr().getPBdr().getLeft();
+      left.setColor(tinted ? ACCENT : RULE);
+      left.setSz(java.math.BigInteger.valueOf(tinted ? 12 : 6));
+      left.setSpace(java.math.BigInteger.valueOf(10));
+      if (tinted) {
+        CTPPr properties = paragraph.getCTP().getPPr();
+        CTShd shading = properties.isSetShd() ? properties.getShd() : properties.addNewShd();
+        shading.setVal(STShd.CLEAR);
+        shading.setColor("auto");
+        shading.setFill(TINT);
+      }
+    }
+  }
+
+  /** A quarter-point rule in the thread's grey — a line, not a box. */
+  private static void hairline(CTBorder border) {
+    border.setColor(RULE);
+    border.setSz(java.math.BigInteger.valueOf(4));
+    border.setSpace(java.math.BigInteger.valueOf(4));
   }
 
   /**
