@@ -23,3 +23,11 @@ qnop-ui/.vite/
 # --- qnop local data (docker volumes are named, but keep stray dumps out) ---
 /data/
 *.log
+
+# Exports downloaded into the repo root for a manual look. They are generated
+# artifacts containing real review content, and a stray `git add -A` will pick
+# them up — root-anchored, so fixtures under docs/ or src/test/ are unaffected.
+/*.docx
+/*.xlsx
+/*.pdf
+/*.csv
