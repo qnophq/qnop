@@ -22,21 +22,30 @@ package io.qnop.service.review.export;
 
 import io.qnop.service.review.AnnotationService.AnnotationView;
 import io.qnop.service.review.AnnotationService.CommentView;
+import java.awt.image.BufferedImage;
+import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.time.Instant;
 import java.time.ZoneOffset;
 import java.util.List;
+import javax.imageio.ImageIO;
 import org.apache.poi.ss.usermodel.BorderStyle;
 import org.apache.poi.ss.usermodel.Cell;
 import org.apache.poi.ss.usermodel.CellStyle;
+import org.apache.poi.ss.usermodel.ClientAnchor;
 import org.apache.poi.ss.usermodel.CreationHelper;
+import org.apache.poi.ss.usermodel.Drawing;
 import org.apache.poi.ss.usermodel.Font;
+import org.apache.poi.ss.usermodel.Picture;
 import org.apache.poi.ss.usermodel.Row;
 import org.apache.poi.ss.usermodel.Sheet;
 import org.apache.poi.ss.usermodel.Workbook;
 import org.apache.poi.ss.util.CellRangeAddress;
+import org.apache.poi.util.Units;
 import org.apache.poi.xssf.streaming.SXSSFWorkbook;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
 
 /**
@@ -54,6 +63,8 @@ import org.springframework.stereotype.Component;
 @Component
 public class XlsxAnnotationRenderer implements AnnotationExportRenderer {
 
+  private static final Logger log = LoggerFactory.getLogger(XlsxAnnotationRenderer.class);
+
   /** Excel's own hard ceiling is 32767; a shorter cap keeps the sheet readable. */
   private static final int SUMMARY_MAX = 500;
 
@@ -61,6 +72,12 @@ public class XlsxAnnotationRenderer implements AnnotationExportRenderer {
   private static final int BODY_MAX = 32_000;
 
   private static final List<String> COMMENT_HEADERS = List.of("#", "Author", "Written", "Comment");
+
+  /** Rows reserved above the header when the sheet carries a logo. */
+  private static final int LOGO_BAND_ROWS = 4;
+
+  /** The logo's width in pixels on the sheet. */
+  private static final int LOGO_WIDTH_PX = 160;
 
   @Override
   public AnnotationExportFormat format() {
@@ -76,16 +93,25 @@ public class XlsxAnnotationRenderer implements AnnotationExportRenderer {
         ByteArrayOutputStream out = new ByteArrayOutputStream()) {
       Sheet sheet = workbook.createSheet("Annotations");
       CellStyle headerStyle = headerStyle(workbook);
-      CellStyle dateStyle = dateStyle(workbook);
+      CellStyle dateStyle = dateStyle(workbook, model.dateFormat());
 
-      Row header = sheet.createRow(0);
+      // The logo needs somewhere to float that is not on top of the data, so it
+      // gets a band of its own above the header. Without a logo the sheet starts
+      // at row 0 exactly as before — the grid's shape follows the content, and a
+      // spreadsheet nobody asked to brand keeps its headers in row 1.
+      int headerRow = model.hasLogo() ? LOGO_BAND_ROWS : 0;
+      if (model.hasLogo()) {
+        writeLogoBand(workbook, sheet, model);
+      }
+
+      Row header = sheet.createRow(headerRow);
       for (int index = 0; index < columns.size(); index++) {
         Cell cell = header.createCell(index);
         cell.setCellValue(columns.get(index).getHeader());
         cell.setCellStyle(headerStyle);
       }
 
-      int rowIndex = 1;
+      int rowIndex = headerRow + 1;
       for (AnnotationExportModel.Row row : model.rows()) {
         writeRow(sheet.createRow(rowIndex++), row, columns, dateStyle);
       }
@@ -93,9 +119,10 @@ public class XlsxAnnotationRenderer implements AnnotationExportRenderer {
       // Freeze the header and switch on the filter dropdowns, so Excel's own
       // per-column sort works the moment the file opens — the whole reason the
       // cells are typed rather than pre-formatted strings.
-      sheet.createFreezePane(0, 1);
+      sheet.createFreezePane(0, headerRow + 1);
       sheet.setAutoFilter(
-          new CellRangeAddress(0, Math.max(model.rows().size(), 1), 0, columns.size() - 1));
+          new CellRangeAddress(
+              headerRow, Math.max(rowIndex - 1, headerRow + 1), 0, columns.size() - 1));
       for (int index = 0; index < columns.size(); index++) {
         sheet.setColumnWidth(index, columnWidth(columns.get(index)));
       }
@@ -108,6 +135,62 @@ public class XlsxAnnotationRenderer implements AnnotationExportRenderer {
       workbook.dispose(); // drops the streaming temp files
       return out.toByteArray();
     }
+  }
+
+  /**
+   * The branding logo floating in a band above the header, with the review's name beside it.
+   *
+   * <p>Anchored rather than placed in a cell: a picture inside the grid would be dragged around by
+   * every sort and filter, which is the one thing this sheet exists to support. The band is real
+   * rows, so the picture has somewhere to live that the data never reaches.
+   */
+  private void writeLogoBand(Workbook workbook, Sheet sheet, AnnotationExportModel model) {
+    for (int index = 0; index < LOGO_BAND_ROWS; index++) {
+      sheet.createRow(index);
+    }
+    Cell title = sheet.getRow(LOGO_BAND_ROWS - 1).createCell(1);
+    title.setCellValue(model.documentTitle());
+    title.setCellStyle(headerStyle(workbook));
+
+    try {
+      int pictureIndex =
+          workbook.addPicture(
+              model.logoPng(), org.apache.poi.ss.usermodel.Workbook.PICTURE_TYPE_PNG);
+      Drawing<?> drawing = sheet.createDrawingPatriarch();
+      CreationHelper helper = workbook.getCreationHelper();
+      ClientAnchor anchor = helper.createClientAnchor();
+      anchor.setCol1(0);
+      anchor.setRow1(0);
+      // A fixed anchor, so resizing a column does not stretch the logo.
+      anchor.setAnchorType(ClientAnchor.AnchorType.DONT_MOVE_AND_RESIZE);
+      Picture picture = drawing.createPicture(anchor, pictureIndex);
+      sizeLogo(picture, model.logoPng());
+    } catch (RuntimeException e) {
+      // Same contract as everywhere else: a logo is decoration, and a workbook
+      // without one beats a download that failed.
+      log.warn("Could not place the branding logo in the workbook", e);
+    }
+  }
+
+  /** Scales the picture to {@link #LOGO_WIDTH_PX} wide, keeping its aspect ratio. */
+  private static void sizeLogo(Picture picture, byte[] png) {
+    int height = LOGO_WIDTH_PX / 2;
+    try {
+      BufferedImage image = ImageIO.read(new ByteArrayInputStream(png));
+      if (image != null && image.getWidth() > 0) {
+        height =
+            Math.max(1, Math.round(LOGO_WIDTH_PX * (float) image.getHeight() / image.getWidth()));
+      }
+    } catch (IOException e) {
+      log.debug("Could not measure the branding logo; falling back to a default height", e);
+    }
+    ClientAnchor anchor = picture.getClientAnchor();
+    anchor.setDx1(Units.EMU_PER_PIXEL * 4);
+    anchor.setDy1(Units.EMU_PER_PIXEL * 4);
+    anchor.setCol2(0);
+    anchor.setRow2(0);
+    anchor.setDx2(Units.EMU_PER_PIXEL * (LOGO_WIDTH_PX + 4));
+    anchor.setDy2(Units.EMU_PER_PIXEL * (height + 4));
   }
 
   private void writeComments(
@@ -213,10 +296,16 @@ public class XlsxAnnotationRenderer implements AnnotationExportRenderer {
     return style;
   }
 
-  private static CellStyle dateStyle(Workbook workbook) {
+  /**
+   * The chosen display format for date cells.
+   *
+   * <p>Only the display changes: the cell still holds a real date, so Excel's sorting and date
+   * filters keep working whichever convention the user picked.
+   */
+  private static CellStyle dateStyle(Workbook workbook, ExportDateFormat format) {
     CellStyle style = workbook.createCellStyle();
     CreationHelper helper = workbook.getCreationHelper();
-    style.setDataFormat(helper.createDataFormat().getFormat("yyyy-mm-dd hh:mm"));
+    style.setDataFormat(helper.createDataFormat().getFormat(format.getExcelPattern()));
     return style;
   }
 

@@ -204,4 +204,31 @@ describe('ExportAnnotationsButton', () => {
     await user.click(screen.getByRole('button', { name: /Word/ }));
     expect(screen.getByText(/of 11 details/)).toBeInTheDocument();
   });
+
+  it('can leave the branding logo out', async () => {
+    const user = userEvent.setup();
+    renderButton();
+    await openWizard(user);
+    await user.click(screen.getByRole('button', { name: /Next/ }));
+
+    await user.click(screen.getByRole('switch', { name: /Branding logo/ }));
+    await user.click(screen.getByRole('button', { name: /^Export$/ }));
+
+    await waitFor(() => expect(downloadAnnotationExport).toHaveBeenCalled());
+    expect(vi.mocked(downloadAnnotationExport).mock.calls[0][2]?.logo).toBe(false);
+  });
+
+  it('sends the chosen date format', async () => {
+    const user = userEvent.setup();
+    renderButton();
+    await openWizard(user);
+    await user.click(screen.getByRole('button', { name: /Next/ }));
+
+    // Picked by its sample, because that is the part that disambiguates.
+    await user.click(screen.getByRole('button', { name: /04\.03\.2026 14:30/ }));
+    await user.click(screen.getByRole('button', { name: /^Export$/ }));
+
+    await waitFor(() => expect(downloadAnnotationExport).toHaveBeenCalled());
+    expect(vi.mocked(downloadAnnotationExport).mock.calls[0][2]?.dateFormat).toBe('european');
+  });
 });

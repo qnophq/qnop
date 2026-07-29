@@ -22,6 +22,7 @@ package io.qnop.web;
 
 import io.qnop.service.review.AnnotationExportService;
 import io.qnop.service.review.export.AnnotationExportFormat;
+import io.qnop.service.review.export.ExportDateFormat;
 import java.io.ByteArrayInputStream;
 import java.util.List;
 import java.util.UUID;
@@ -70,7 +71,11 @@ public class AnnotationExportController {
       @RequestParam(value = "format", required = false) String format,
       // Off unless asked for: the comment sheet costs a query round per annotation.
       @RequestParam(value = "comments", required = false, defaultValue = "false")
-          boolean includeComments) {
+          boolean includeComments,
+      // On unless refused: a branded report is the common case, and a format that
+      // cannot carry an image ignores this anyway.
+      @RequestParam(value = "logo", required = false, defaultValue = "true") boolean includeLogo,
+      @RequestParam(value = "dateFormat", required = false) String dateFormat) {
     AnnotationExportService.Export export =
         exports.export(
             documentId,
@@ -79,7 +84,9 @@ public class AnnotationExportController {
                 AnnotationExportFormat.fromId(format),
                 fields == null ? List.of() : fields,
                 scope,
-                includeComments),
+                includeComments,
+                includeLogo,
+                ExportDateFormat.fromId(dateFormat)),
             CurrentUser.requireUserId(),
             CurrentUser.isAdmin());
 

@@ -40,6 +40,12 @@ export interface ExportFormat {
   fieldNoun: string;
   /** What switching the comment threads on actually does in this format. */
   commentsHint: string;
+  /**
+   * Whether the format can carry an image at all. Mirrors `AnnotationExportFormat`
+   * on the server: Markdown and CSV are text, and offering a logo switch there
+   * would be a control that silently does nothing.
+   */
+  supportsLogo: boolean;
   /** Not yet implemented — shown so the wizard tells the truth about what is coming. */
   planned?: boolean;
 }
@@ -52,6 +58,7 @@ export interface ExportFormat {
 export const EXPORT_FORMATS: ExportFormat[] = [
   {
     id: 'xlsx',
+    supportsLogo: true,
     label: 'Excel',
     extension: '.xlsx',
     hint: 'Sortable, filterable — for triage and reporting.',
@@ -61,6 +68,7 @@ export const EXPORT_FORMATS: ExportFormat[] = [
   },
   {
     id: 'docx',
+    supportsLogo: true,
     label: 'Word',
     extension: '.docx',
     hint: 'A readable report — for meetings and sign-off.',
@@ -70,6 +78,7 @@ export const EXPORT_FORMATS: ExportFormat[] = [
   },
   {
     id: 'md',
+    supportsLogo: false,
     fieldNoun: 'sections',
     commentsHint: 'Comment threads are included.',
     label: 'Markdown',
@@ -79,6 +88,7 @@ export const EXPORT_FORMATS: ExportFormat[] = [
   },
   {
     id: 'html',
+    supportsLogo: true,
     fieldNoun: 'sections',
     commentsHint: 'Comment threads are included.',
     label: 'HTML',
@@ -88,6 +98,7 @@ export const EXPORT_FORMATS: ExportFormat[] = [
   },
   {
     id: 'csv',
+    supportsLogo: false,
     fieldNoun: 'columns',
     commentsHint: 'Comment threads are included.',
     label: 'CSV',
@@ -97,6 +108,7 @@ export const EXPORT_FORMATS: ExportFormat[] = [
   },
   {
     id: 'pdf',
+    supportsLogo: true,
     fieldNoun: 'sections',
     commentsHint: 'Comment threads are included.',
     label: 'PDF',
@@ -136,12 +148,39 @@ export const FIELD_GROUPS: ExportField['group'][] = [
   'History',
 ];
 
+export interface ExportDateFormat {
+  id: string;
+  label: string;
+  /** What the choice actually produces — the only description anyone needs. */
+  sample: string;
+}
+
+/**
+ * Mirrors `ExportDateFormat` on the server; ids must match.
+ *
+ * <p>The sample is the label that matters: "European" means nothing until you
+ * see `04.03.2026`, and `03/04/2026` is two different days depending on who
+ * reads it. All times are UTC, which the wizard says once rather than repeating
+ * per entry.
+ */
+export const EXPORT_DATE_FORMATS: ExportDateFormat[] = [
+  { id: 'iso', label: 'ISO', sample: '2026-03-04 14:30' },
+  { id: 'iso-seconds', label: 'ISO with seconds', sample: '2026-03-04 14:30:07' },
+  { id: 'european', label: 'European', sample: '04.03.2026 14:30' },
+  { id: 'us', label: 'US', sample: '03/04/2026 02:30 PM' },
+  { id: 'date-only', label: 'Date only', sample: '2026-03-04' },
+];
+
 export interface ExportSettings {
   format: string;
   scope: ExportScope;
   fields: string[];
   /** Adds a second sheet with the full text of every comment, one row each. */
   includeComments: boolean;
+  /** Places the operator's branding logo, where the format can carry one. */
+  includeLogo: boolean;
+  /** Which `EXPORT_DATE_FORMATS` entry every timestamp is written in. */
+  dateFormat: string;
 }
 
 /** Everything on, everything in — the state the wizard opens in the first time. */
@@ -151,6 +190,8 @@ export function defaultSettings(): ExportSettings {
     scope: 'all',
     fields: EXPORT_FIELDS.map((field) => field.id),
     includeComments: true,
+    includeLogo: true,
+    dateFormat: 'iso',
   };
 }
 
@@ -179,6 +220,10 @@ export function loadSettings(): ExportSettings {
         : fallback.scope,
       fields: fields.length > 0 ? fields : fallback.fields,
       includeComments: parsed.includeComments ?? fallback.includeComments,
+      includeLogo: parsed.includeLogo ?? fallback.includeLogo,
+      dateFormat: EXPORT_DATE_FORMATS.some((entry) => entry.id === parsed.dateFormat)
+        ? (parsed.dateFormat as string)
+        : fallback.dateFormat,
     };
   } catch {
     return fallback;

@@ -46,6 +46,7 @@ import java.util.List;
  * @param columns which facts the user asked for, in their fixed order
  * @param includeComments whether {@link Row#thread()} was populated at all
  * @param logoPng the operator's branding logo as PNG, or null when there is none to embed
+ * @param dateFormat how every timestamp in this export is written
  */
 public record AnnotationExportModel(
     String documentTitle,
@@ -53,12 +54,14 @@ public record AnnotationExportModel(
     List<Row> rows,
     List<AnnotationExportColumn> columns,
     boolean includeComments,
-    byte[] logoPng) {
+    byte[] logoPng,
+    ExportDateFormat dateFormat) {
 
   public AnnotationExportModel {
     rows = List.copyOf(rows);
     columns = List.copyOf(columns);
     logoPng = logoPng == null ? null : logoPng.clone();
+    dateFormat = dateFormat == null ? ExportDateFormat.DEFAULT : dateFormat;
   }
 
   /**

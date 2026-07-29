@@ -41,7 +41,14 @@ function filenameFrom(disposition: string | undefined, fallback: string): string
 export async function downloadAnnotationExport(
   documentId: string,
   version?: number,
-  options?: { fields?: string[]; scope?: string; comments?: boolean; format?: string },
+  options?: {
+    fields?: string[];
+    scope?: string;
+    comments?: boolean;
+    format?: string;
+    logo?: boolean;
+    dateFormat?: string;
+  },
 ): Promise<void> {
   const response = await axiosInstance.get(`/documents/${documentId}/annotations/export`, {
     params: {
@@ -54,6 +61,12 @@ export async function downloadAnnotationExport(
       ...(options?.comments ? { comments: true } : {}),
       // Omitted for the default, so the links that shipped with #547 stay valid.
       ...(options?.format && options.format !== 'xlsx' ? { format: options.format } : {}),
+      // Both omitted at their defaults, so a hand-written link stays short and
+      // the server's default is the single source of what "unspecified" means.
+      ...(options?.logo === false ? { logo: false } : {}),
+      ...(options?.dateFormat && options.dateFormat !== 'iso'
+        ? { dateFormat: options.dateFormat }
+        : {}),
     },
     paramsSerializer: { indexes: null },
     responseType: 'blob',

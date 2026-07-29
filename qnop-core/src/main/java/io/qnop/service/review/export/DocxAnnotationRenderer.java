@@ -26,9 +26,6 @@ import java.awt.image.BufferedImage;
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
-import java.time.Instant;
-import java.time.ZoneOffset;
-import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.List;
 import javax.imageio.ImageIO;
@@ -67,9 +64,6 @@ import org.springframework.stereotype.Component;
 public class DocxAnnotationRenderer implements AnnotationExportRenderer {
 
   private static final Logger log = LoggerFactory.getLogger(DocxAnnotationRenderer.class);
-
-  private static final DateTimeFormatter TIMESTAMP =
-      DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm");
 
   /** Half-points, which is how OOXML sizes runs. */
   private static final int TITLE_SIZE = 32;
@@ -216,7 +210,7 @@ public class DocxAnnotationRenderer implements AnnotationExportRenderer {
       writeProse(document, ExportText.plainText(view.firstComment()), 0);
     }
 
-    writeThread(document, row);
+    writeThread(document, model, row);
   }
 
   /** {@code T-3 · Page 2} — the key first, because that is how people refer to a finding. */
@@ -262,10 +256,10 @@ public class DocxAnnotationRenderer implements AnnotationExportRenderer {
       add(parts, "Replies", String.valueOf(row.replies()));
     }
     if (model.has(AnnotationExportColumn.CREATED)) {
-      add(parts, "Created", timestamp(view.createdAt()));
+      add(parts, "Created", model.dateFormat().format(view.createdAt()));
     }
     if (model.has(AnnotationExportColumn.UPDATED)) {
-      add(parts, "Updated", timestamp(view.updatedAt()));
+      add(parts, "Updated", model.dateFormat().format(view.updatedAt()));
     }
     return String.join("   ·   ", parts);
   }
@@ -276,7 +270,8 @@ public class DocxAnnotationRenderer implements AnnotationExportRenderer {
    * <p>The opening comment is skipped here: it is the annotation's own text and has already been
    * rendered as the section's prose. Repeating it would read as if someone had answered themselves.
    */
-  private void writeThread(XWPFDocument document, AnnotationExportModel.Row row) {
+  private void writeThread(
+      XWPFDocument document, AnnotationExportModel model, AnnotationExportModel.Row row) {
     List<CommentView> replies = row.replyComments();
     if (replies.isEmpty()) {
       return;
@@ -290,7 +285,12 @@ public class DocxAnnotationRenderer implements AnnotationExportRenderer {
           comment.authorDisplayName() == null || comment.authorDisplayName().isBlank()
               ? "Unknown"
               : comment.authorDisplayName();
-      run(attribution, who + " · " + timestamp(comment.createdAt()), META_SIZE, true, MUTED);
+      run(
+          attribution,
+          who + " · " + model.dateFormat().format(comment.createdAt()),
+          META_SIZE,
+          true,
+          MUTED);
       writeProse(document, ExportText.plainText(comment.body()), THREAD_INDENT);
     }
   }
@@ -323,10 +323,6 @@ public class DocxAnnotationRenderer implements AnnotationExportRenderer {
     if (value != null && !value.isBlank()) {
       parts.add(label + ": " + value);
     }
-  }
-
-  private static String timestamp(Instant instant) {
-    return instant == null ? "" : TIMESTAMP.format(instant.atOffset(ZoneOffset.UTC));
   }
 
   private static XWPFRun run(

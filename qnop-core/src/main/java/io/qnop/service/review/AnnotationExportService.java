@@ -33,6 +33,7 @@ import io.qnop.service.review.export.AnnotationExportColumn;
 import io.qnop.service.review.export.AnnotationExportFormat;
 import io.qnop.service.review.export.AnnotationExportModel;
 import io.qnop.service.review.export.AnnotationExportRenderer;
+import io.qnop.service.review.export.ExportDateFormat;
 import java.io.IOException;
 import java.util.Comparator;
 import java.util.LinkedHashMap;
@@ -93,15 +94,18 @@ public class AnnotationExportService {
   /** The finished file plus the title the download filename is built from. */
   public record Export(byte[] content, String documentTitle, AnnotationExportFormat format) {}
 
-  /** What the wizard asked for: which format, which columns, which slice, threads or not. */
+  /** Everything the wizard configured: format, columns, slice, threads, logo, date style. */
   public record ExportRequest(
       AnnotationExportFormat format,
       List<String> columnIds,
       String scope,
-      boolean includeComments) {
+      boolean includeComments,
+      boolean includeLogo,
+      ExportDateFormat dateFormat) {
 
     public static ExportRequest everything() {
-      return new ExportRequest(AnnotationExportFormat.DEFAULT, List.of(), "all", false);
+      return new ExportRequest(
+          AnnotationExportFormat.DEFAULT, List.of(), "all", false, true, ExportDateFormat.DEFAULT);
     }
   }
 
@@ -188,9 +192,24 @@ public class AnnotationExportService {
         rows,
         AnnotationExportColumn.resolve(request.columnIds()),
         request.includeComments(),
-        // The light-background variant: an export lands on a white page, and the
-        // dark one is white ink that would be invisible there.
-        branding.getRaster(BrandingSlot.LOGO_LIGHT.urlValue()).orElse(null));
+        logo(request),
+        request.dateFormat() == null ? ExportDateFormat.DEFAULT : request.dateFormat());
+  }
+
+  /**
+   * The branding logo, or null when this export will not carry one.
+   *
+   * <p>Two ways to end up without it, and only one is a user's choice: the wizard's switch, and a
+   * format with nowhere to put an image. Asking the format means the rendition is not even fetched
+   * for a Markdown export — the check is not merely cosmetic.
+   */
+  private byte[] logo(ExportRequest request) {
+    if (!request.includeLogo() || !request.format().supportsLogo()) {
+      return null;
+    }
+    // The light-background variant: an export lands on a white page, and the dark
+    // one is white ink that would be invisible there.
+    return branding.getRaster(BrandingSlot.LOGO_LIGHT.urlValue()).orElse(null);
   }
 
   /**

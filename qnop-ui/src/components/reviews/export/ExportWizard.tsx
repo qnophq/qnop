@@ -37,9 +37,17 @@ import StepLabel from '@mui/material/StepLabel';
 import Stepper from '@mui/material/Stepper';
 import Typography from '@mui/material/Typography';
 import { alpha } from '@mui/material/styles';
-import { ArrowLeft, ArrowRight, Check, Download, MessagesSquare } from 'lucide-react';
+import {
+  ArrowLeft,
+  ArrowRight,
+  Check,
+  Download,
+  Image as ImageIcon,
+  MessagesSquare,
+} from 'lucide-react';
 import { ToneBadge } from '../../admin/ToneBadge';
 import {
+  EXPORT_DATE_FORMATS,
   EXPORT_FIELDS,
   EXPORT_FORMATS,
   FIELD_GROUPS,
@@ -317,47 +325,82 @@ export function ExportWizard({
 
             <Divider />
 
+            <SectionLabel>Presentation</SectionLabel>
+
             {/* Deliberately not a twelfth checkbox: a thread has no fixed length,
                 so it cannot be a column. It becomes its own sheet, and saying so
                 here is cheaper than a support question about the second tab. */}
-            <Box
-              sx={{
-                px: 1.5,
-                py: 1,
-                borderRadius: 2,
-                border: '1px solid',
-                borderColor: settings.includeComments ? 'primary.main' : 'divider',
-                bgcolor: (t) =>
-                  settings.includeComments ? alpha(t.palette.primary.main, 0.06) : 'transparent',
-                transition: 'border-color 150ms, background-color 150ms',
-              }}
-            >
-              <FormControlLabel
-                sx={{ m: 0, width: '100%', alignItems: 'flex-start' }}
-                control={
-                  <Switch
-                    size="small"
-                    sx={{ mt: 0.25, mr: 1 }}
-                    checked={settings.includeComments}
-                    onChange={(event) =>
-                      setSettings((c) => ({ ...c, includeComments: event.target.checked }))
-                    }
-                  />
-                }
-                label={
-                  <Box>
-                    <Stack direction="row" spacing={0.75} sx={{ alignItems: 'center' }}>
-                      <MessagesSquare size={14} />
-                      <Typography sx={{ fontSize: 13.5, fontWeight: 700 }}>
-                        Comment threads
-                      </Typography>
-                    </Stack>
-                    <Typography sx={{ fontSize: 12, color: 'text.secondary' }}>
-                      {format?.commentsHint}
-                    </Typography>
-                  </Box>
-                }
+            <ToggleCard
+              on={settings.includeComments}
+              onChange={(on) => setSettings((c) => ({ ...c, includeComments: on }))}
+              icon={<MessagesSquare size={14} />}
+              title="Comment threads"
+              hint={format?.commentsHint ?? ''}
+            />
+
+            {format?.supportsLogo && (
+              <ToggleCard
+                on={settings.includeLogo}
+                onChange={(on) => setSettings((c) => ({ ...c, includeLogo: on }))}
+                icon={<ImageIcon size={14} />}
+                title="Branding logo"
+                hint="Places the operator's logo on the document. Nothing is placed if no branding has been uploaded."
               />
+            )}
+
+            <Box>
+              <Typography sx={{ fontSize: 11.5, fontWeight: 700, color: 'text.disabled', mb: 0.5 }}>
+                Date and time · UTC
+              </Typography>
+              <Box
+                sx={{
+                  display: 'grid',
+                  gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr' },
+                  gap: 0.75,
+                }}
+              >
+                {EXPORT_DATE_FORMATS.map((entry) => {
+                  const active = entry.id === settings.dateFormat;
+                  return (
+                    <Box
+                      key={entry.id}
+                      component="button"
+                      type="button"
+                      aria-pressed={active}
+                      onClick={() => setSettings((c) => ({ ...c, dateFormat: entry.id }))}
+                      sx={{
+                        display: 'flex',
+                        alignItems: 'baseline',
+                        gap: 1,
+                        textAlign: 'left',
+                        px: 1.25,
+                        py: 0.75,
+                        borderRadius: 2,
+                        border: '1px solid',
+                        borderColor: active ? 'primary.main' : 'divider',
+                        bgcolor: (t) =>
+                          active ? alpha(t.palette.primary.main, 0.06) : 'transparent',
+                        cursor: 'pointer',
+                        '&:hover': { borderColor: 'primary.main' },
+                      }}
+                    >
+                      {/* The sample leads: "European" means nothing until you see it. */}
+                      <Typography
+                        sx={{
+                          fontSize: 13,
+                          fontWeight: active ? 700 : 500,
+                          fontFamily: 'monospace',
+                        }}
+                      >
+                        {entry.sample}
+                      </Typography>
+                      <Typography sx={{ fontSize: 11.5, color: 'text.secondary' }}>
+                        {entry.label}
+                      </Typography>
+                    </Box>
+                  );
+                })}
+              </Box>
             </Box>
           </Stack>
         )}
@@ -407,6 +450,62 @@ export function ExportWizard({
         )}
       </DialogActions>
     </Dialog>
+  );
+}
+
+/**
+ * One switch with a title and an explanation, used for every optional inclusion.
+ *
+ * <p>Shared so the options cannot drift into looking like different kinds of
+ * decision — they are the same kind: something extra that either goes in or does
+ * not.
+ */
+function ToggleCard({
+  on,
+  onChange,
+  icon,
+  title,
+  hint,
+}: {
+  on: boolean;
+  onChange: (on: boolean) => void;
+  icon: React.ReactNode;
+  title: string;
+  hint: string;
+}) {
+  return (
+    <Box
+      sx={{
+        px: 1.5,
+        py: 1,
+        borderRadius: 2,
+        border: '1px solid',
+        borderColor: on ? 'primary.main' : 'divider',
+        bgcolor: (t) => (on ? alpha(t.palette.primary.main, 0.06) : 'transparent'),
+        transition: 'border-color 150ms, background-color 150ms',
+      }}
+    >
+      <FormControlLabel
+        sx={{ m: 0, width: '100%', alignItems: 'flex-start' }}
+        control={
+          <Switch
+            size="small"
+            sx={{ mt: 0.25, mr: 1 }}
+            checked={on}
+            onChange={(event) => onChange(event.target.checked)}
+          />
+        }
+        label={
+          <Box>
+            <Stack direction="row" spacing={0.75} sx={{ alignItems: 'center' }}>
+              {icon}
+              <Typography sx={{ fontSize: 13.5, fontWeight: 700 }}>{title}</Typography>
+            </Stack>
+            <Typography sx={{ fontSize: 12, color: 'text.secondary' }}>{hint}</Typography>
+          </Box>
+        }
+      />
+    </Box>
   );
 }
 

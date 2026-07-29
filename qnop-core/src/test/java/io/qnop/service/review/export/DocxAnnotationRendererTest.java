@@ -92,8 +92,13 @@ class DocxAnnotationRendererTest {
   }
 
   private static AnnotationExportModel model(List<AnnotationExportModel.Row> rows, byte[] logo) {
+    return model(rows, logo, ExportDateFormat.ISO);
+  }
+
+  private static AnnotationExportModel model(
+      List<AnnotationExportModel.Row> rows, byte[] logo, ExportDateFormat dates) {
     return new AnnotationExportModel(
-        "Vendor agreement", 3, rows, AnnotationExportColumn.all(), true, logo);
+        "Vendor agreement", 3, rows, AnnotationExportColumn.all(), true, logo, dates);
   }
 
   /** A real PNG, so the renderer's own decode-and-scale path is exercised. */
@@ -167,7 +172,8 @@ class DocxAnnotationRendererTest {
             List.of(row("T-1", view, List.of())),
             AnnotationExportColumn.resolve(List.of("taskKey", "status")),
             false,
-            null);
+            null,
+            ExportDateFormat.ISO);
 
     List<String> text = paragraphs(renderer.render(narrowed));
 
@@ -241,6 +247,39 @@ class DocxAnnotationRendererTest {
       assertThat(document.getHeaderList()).isEmpty();
       assertThat(document.getParagraphs()).isNotEmpty();
     }
+  }
+
+  @Test
+  @DisplayName("timestamps follow the chosen convention, in the meta line and the thread alike")
+  void honoursTheChosenDateFormat() throws Exception {
+    AnnotationView view = view("A finding", "Mia", 2);
+    List<CommentView> thread =
+        List.of(comment("Mia", "A finding"), comment("Participant 2", "A reply"));
+
+    List<String> european =
+        paragraphs(
+            renderer.render(
+                model(List.of(row("T-1", view, thread)), null, ExportDateFormat.EUROPEAN)));
+
+    // Both places, not just the column-driven one: a report that dated its
+    // headings one way and its replies another would be its own kind of wrong.
+    assertThat(european).anySatisfy(line -> assertThat(line).contains("Created: 04.03.2026 10:15"));
+    assertThat(european).anySatisfy(line -> assertThat(line).contains("· 04.03.2026 10:15"));
+    assertThat(european).noneSatisfy(line -> assertThat(line).contains("2026-03-04"));
+  }
+
+  @Test
+  @DisplayName("date-only drops the time everywhere")
+  void supportsDateOnly() throws Exception {
+    AnnotationView view = view("A finding", "Mia", 1);
+
+    List<String> report =
+        paragraphs(
+            renderer.render(
+                model(List.of(row("T-1", view, List.of())), null, ExportDateFormat.DATE_ONLY)));
+
+    assertThat(report).anySatisfy(line -> assertThat(line).contains("Created: 2026-03-04"));
+    assertThat(report).noneSatisfy(line -> assertThat(line).contains("10:15"));
   }
 
   @Test

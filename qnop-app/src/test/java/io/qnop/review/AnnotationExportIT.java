@@ -132,10 +132,22 @@ class AnnotationExportIT extends SeededIntegrationTest {
     return com.jayway.jsonpath.JsonPath.read(json, "$.id");
   }
 
+  /**
+   * The workbook without branding.
+   *
+   * <p>Most of these tests are about the grid — which column holds what, which row an annotation
+   * lands in — and a logo moves the header down by the height of its band. Asking for the plain
+   * sheet keeps each test about one thing; {@link #workbookCarriesTheLogoAboveTheGrid} covers the
+   * band itself.
+   */
   private Sheet download(UUID actor) throws Exception {
     byte[] body =
         mockMvc
-            .perform(as(get("/api/v1/documents/" + documentId + "/annotations/export"), actor))
+            .perform(
+                as(
+                    get("/api/v1/documents/" + documentId + "/annotations/export")
+                        .param("logo", "false"),
+                    actor))
             .andExpect(status().isOk())
             .andExpect(
                 header()
@@ -160,7 +172,8 @@ class AnnotationExportIT extends SeededIntegrationTest {
             .perform(
                 as(
                     get("/api/v1/documents/" + documentId + "/annotations/export")
-                        .param("comments", "true"),
+                        .param("comments", "true")
+                        .param("logo", "false"),
                     actor))
             .andExpect(status().isOk())
             .andReturn()
@@ -307,6 +320,7 @@ class AnnotationExportIT extends SeededIntegrationTest {
             .perform(
                 as(
                     get("/api/v1/documents/" + documentId + "/annotations/export")
+                        .param("logo", "false")
                         .param("fields", "status")
                         .param("fields", "taskKey"),
                     MEMBER_ID))
@@ -353,6 +367,7 @@ class AnnotationExportIT extends SeededIntegrationTest {
             .perform(
                 as(
                     get("/api/v1/documents/" + documentId + "/annotations/export")
+                        .param("logo", "false")
                         .param("fields", "status")
                         .param("fields", "somethingNew"),
                     MEMBER_ID))
@@ -380,6 +395,7 @@ class AnnotationExportIT extends SeededIntegrationTest {
             .perform(
                 as(
                     get("/api/v1/documents/" + documentId + "/annotations/export")
+                        .param("logo", "false")
                         .param("scope", "resolved"),
                     MEMBER_ID))
             .andExpect(status().isOk())
@@ -557,6 +573,62 @@ class AnnotationExportIT extends SeededIntegrationTest {
       assertThat(document.getHeaderList()).isNotEmpty();
       assertThat(document.getHeaderList().getFirst().getAllPictures()).isNotEmpty();
     }
+  }
+
+  @Test
+  @DisplayName("the workbook carries the logo in a band above the grid, and only when asked")
+  void workbookCarriesTheLogoAboveTheGrid() throws Exception {
+    seedDocument(false);
+    annotate(MEMBER_ID, 0, 0.1, 0.1, "A finding");
+
+    byte[] body =
+        mockMvc
+            .perform(as(get("/api/v1/documents/" + documentId + "/annotations/export"), MEMBER_ID))
+            .andExpect(status().isOk())
+            .andReturn()
+            .getResponse()
+            .getContentAsByteArray();
+    XSSFWorkbook branded = new XSSFWorkbook(new ByteArrayInputStream(body));
+    Sheet sheet = branded.getSheetAt(0);
+
+    // The picture floats above the data rather than sitting in a cell, so no sort
+    // or filter can drag it into the grid.
+    assertThat(branded.getAllPictures()).isNotEmpty();
+    assertThat(sheet.getRow(4).getCell(0).getStringCellValue()).isEqualTo("#");
+    assertThat(sheet.getRow(5).getCell(5).getStringCellValue()).isEqualTo("A finding");
+    // The freeze pane follows the header rather than staying at row 1, or the
+    // band would scroll away and take the column names with it.
+    assertThat(sheet.getPaneInformation().getHorizontalSplitPosition()).isEqualTo((short) 5);
+
+    // Without branding the grid is exactly what it was before the logo existed.
+    assertThat(download(MEMBER_ID).getRow(0).getCell(0).getStringCellValue()).isEqualTo("#");
+  }
+
+  @Test
+  @DisplayName("the chosen date convention reaches the cells' display format")
+  void dateFormatReachesTheCells() throws Exception {
+    seedDocument(false);
+    annotate(MEMBER_ID, 0, 0.1, 0.1, "A finding");
+
+    byte[] body =
+        mockMvc
+            .perform(
+                as(
+                    get("/api/v1/documents/" + documentId + "/annotations/export")
+                        .param("logo", "false")
+                        .param("dateFormat", "european"),
+                    MEMBER_ID))
+            .andExpect(status().isOk())
+            .andReturn()
+            .getResponse()
+            .getContentAsByteArray();
+    Sheet sheet = new XSSFWorkbook(new ByteArrayInputStream(body)).getSheetAt(0);
+
+    Cell created = sheet.getRow(1).getCell(9);
+    // The cell still holds a real date — only its display changed, which is what
+    // keeps Excel's own date filters and sorting working.
+    assertThat(created.getCellType()).isEqualTo(org.apache.poi.ss.usermodel.CellType.NUMERIC);
+    assertThat(created.getCellStyle().getDataFormatString()).isEqualTo("dd.mm.yyyy hh:mm");
   }
 
   @Test

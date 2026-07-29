@@ -54,6 +54,16 @@ The rows are read through `AnnotationService.listComments`, for the same reason 
 
 That costs one query round per annotation. It is accepted rather than batched: an export is a rare, deliberate action, and re-implementing the visibility rules to avoid the round trips would trade a bounded cost for an unbounded correctness risk. The sheet is opt-in on the wire (`?comments=true`) so an export that does not want it does not pay for it — but the wizard defaults it on, because someone exporting a review usually wants what was said, not just that something was said.
 
+### Presentation is configured, not assumed
+
+Two things an export cannot get right by guessing, so the wizard asks:
+
+**The date convention.** `03/04/2026` is two different days depending on who reads it, and a report going into a German sign-off wants dots. `ExportDateFormat` carries two patterns per entry, because the formats write dates in genuinely different ways: a document renders a string, while a spreadsheet writes a *typed* date and the choice only changes its display — which is what keeps Excel's sorting and date filters working. Times stay UTC everywhere; a per-export timezone is a separate decision with its own consequences.
+
+**The logo.** Not every export is a document that should carry branding — an extract for a pivot table is not — so it is a switch. Whether the switch is even offered is a property of the format, not a preference: `AnnotationExportFormat.supportsLogo()` is false for Markdown and CSV, which are text and have nowhere to put an image. A control that silently does nothing is worse than an absent one, and the service checks the same flag, so the rendition is not even fetched for a format that could not use it.
+
+In the spreadsheet the logo occupies a band of rows above the header rather than a cell: a picture inside the grid would be dragged around by every sort and filter, which is the one thing that sheet exists to support. The header, freeze pane and autofilter move down with the band — and with the logo off, the grid is byte-for-byte the layout that shipped with #547.
+
 ### A plain controller, not the generated contract
 
 `GET /api/v1/documents/{documentId}/annotations/export` mirrors the existing binary downloads: a hand-written `@RestController`, `Content-Disposition: attachment`, deliberately absent from `openapi.yaml` (ADR-0028/0021). Unlike a version download it carries no ETag — annotations change constantly and there is no content hash to hang one on.
@@ -88,6 +98,7 @@ Headings use direct character formatting plus an OOXML outline level rather than
 
 - **2026-07-27** — accepted with the XLSX export (#547).
 - **2026-07-29** — extended for Word (#635): the model/renderer split, the `?format=` parameter, and the report layout. The remaining formats (#636–#639) are a renderer and an enum entry.
+- **2026-07-29** — the date convention and the branding logo became per-export choices, both format-independent.
 - **ADR-0021 / ADR-0015** — OpenAPI-first, and why this endpoint is the deliberate exception
 - **ADR-0004** — the layering that puts the workbook in the service and leaves the controller streaming
 - Issue **#547**

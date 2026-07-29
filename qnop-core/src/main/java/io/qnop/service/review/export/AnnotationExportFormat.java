@@ -31,8 +31,12 @@ import java.util.Locale;
  * here plus a renderer, nothing else.
  */
 public enum AnnotationExportFormat {
-  XLSX("xlsx", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", ".xlsx"),
-  DOCX("docx", "application/vnd.openxmlformats-officedocument.wordprocessingml.document", ".docx");
+  XLSX("xlsx", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", ".xlsx", true),
+  DOCX(
+      "docx",
+      "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+      ".docx",
+      true);
 
   /** What a request that names no format gets — the format that shipped first. */
   public static final AnnotationExportFormat DEFAULT = XLSX;
@@ -40,11 +44,13 @@ public enum AnnotationExportFormat {
   private final String id;
   private final String contentType;
   private final String extension;
+  private final boolean supportsLogo;
 
-  AnnotationExportFormat(String id, String contentType, String extension) {
+  AnnotationExportFormat(String id, String contentType, String extension, boolean supportsLogo) {
     this.id = id;
     this.contentType = contentType;
     this.extension = extension;
+    this.supportsLogo = supportsLogo;
   }
 
   public String getId() {
@@ -58,6 +64,17 @@ public enum AnnotationExportFormat {
   /** The dotted file extension, including the dot. */
   public String getExtension() {
     return extension;
+  }
+
+  /**
+   * Whether this format can carry the branding logo at all.
+   *
+   * <p>A property of the file format, not a preference: Markdown and CSV are text, and there is
+   * nowhere in them to put an image. The wizard asks this before offering the choice, so a user is
+   * never shown a switch that would silently do nothing.
+   */
+  public boolean supportsLogo() {
+    return supportsLogo;
   }
 
   /**
