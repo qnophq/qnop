@@ -44,6 +44,8 @@ The parser is deliberately forgiving: the anchor format is open by design (ADR-0
 
 The `#` column carries the `T-1`, `T-2`, … shorthand people use to talk about annotations, and it is assigned in **creation** order — not in the export's reading order — because the key has to agree with the board the user has been looking at. That rule now exists twice, in `tasksModel.taskKeys()` and in the exporter; both are named and tested, and the duplication is the price of putting the key in the sheet at all.
 
+Cells carry the full text. An earlier cap clipped the summary column to 500 characters on the theory that a spreadsheet wants short cells; that was the wrong call, because an export which quietly drops the second half of a finding is worse than a tall row. Paragraph breaks survive, the long-text columns wrap and align to the top, and nothing is cut until Excel's own 32 767-character ceiling — which POI enforces by throwing, so the cut is unavoidable and is marked with an ellipsis rather than made silently.
+
 Two columns from the original proposal were dropped rather than duplicated further: a *Board column* (`Open`/`In discussion`/`Resolved`) is a pure derivation of two columns already in the sheet and Excel can filter it itself, and a *Position* ordinal would be identical to the row number while the sheet is in its default order and misleading the moment the user re-sorts.
 
 ### Comment threads become a second sheet, off the wire unless asked for

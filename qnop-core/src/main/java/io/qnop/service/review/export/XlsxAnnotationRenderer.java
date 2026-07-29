@@ -30,6 +30,7 @@ import java.time.Instant;
 import java.time.ZoneId;
 import java.util.List;
 import javax.imageio.ImageIO;
+import org.apache.poi.ss.SpreadsheetVersion;
 import org.apache.poi.ss.usermodel.BorderStyle;
 import org.apache.poi.ss.usermodel.Cell;
 import org.apache.poi.ss.usermodel.CellStyle;
@@ -40,6 +41,7 @@ import org.apache.poi.ss.usermodel.Font;
 import org.apache.poi.ss.usermodel.Picture;
 import org.apache.poi.ss.usermodel.Row;
 import org.apache.poi.ss.usermodel.Sheet;
+import org.apache.poi.ss.usermodel.VerticalAlignment;
 import org.apache.poi.ss.usermodel.Workbook;
 import org.apache.poi.ss.util.CellRangeAddress;
 import org.apache.poi.util.Units;
@@ -65,11 +67,15 @@ public class XlsxAnnotationRenderer implements AnnotationExportRenderer {
 
   private static final Logger log = LoggerFactory.getLogger(XlsxAnnotationRenderer.class);
 
-  /** Excel's own hard ceiling is 32767; a shorter cap keeps the sheet readable. */
-  private static final int SUMMARY_MAX = 500;
-
-  /** Excel's own hard per-cell ceiling, minus room for the ellipsis. */
-  private static final int BODY_MAX = 32_000;
+  /**
+   * The only limit left: Excel's own, which POI enforces by throwing.
+   *
+   * <p>There used to be a shorter cap on the summary column, on the theory that a spreadsheet wants
+   * short cells. It was the wrong call — an export that quietly drops the second half of a finding
+   * is worse than a tall row. Cells wrap and grow instead, and nothing is cut until the file format
+   * itself refuses.
+   */
+  private static final int CELL_MAX = SpreadsheetVersion.EXCEL2007.getMaxTextLength();
 
   private static final List<String> COMMENT_HEADERS = List.of("#", "Author", "Written", "Comment");
 
@@ -94,6 +100,7 @@ public class XlsxAnnotationRenderer implements AnnotationExportRenderer {
       Sheet sheet = workbook.createSheet("Annotations");
       CellStyle headerStyle = headerStyle(workbook);
       CellStyle dateStyle = dateStyle(workbook, model.dateFormat());
+      CellStyle textStyle = wrappedTextStyle(workbook);
 
       // The logo needs somewhere to float that is not on top of the data, so it
       // gets a band of its own above the header. Without a logo the sheet starts
@@ -113,7 +120,7 @@ public class XlsxAnnotationRenderer implements AnnotationExportRenderer {
 
       int rowIndex = headerRow + 1;
       for (AnnotationExportModel.Row row : model.rows()) {
-        writeRow(sheet.createRow(rowIndex++), row, columns, dateStyle, model.zone());
+        writeRow(sheet.createRow(rowIndex++), row, columns, dateStyle, textStyle, model.zone());
       }
 
       // Freeze the header and switch on the filter dropdowns, so Excel's own
@@ -128,7 +135,7 @@ public class XlsxAnnotationRenderer implements AnnotationExportRenderer {
       }
 
       if (model.includeComments()) {
-        writeComments(workbook, model, dateStyle, headerStyle);
+        writeComments(workbook, model, dateStyle, headerStyle, textStyle);
       }
 
       workbook.write(out);
@@ -194,7 +201,11 @@ public class XlsxAnnotationRenderer implements AnnotationExportRenderer {
   }
 
   private void writeComments(
-      Workbook workbook, AnnotationExportModel model, CellStyle dateStyle, CellStyle headerStyle) {
+      Workbook workbook,
+      AnnotationExportModel model,
+      CellStyle dateStyle,
+      CellStyle headerStyle,
+      CellStyle textStyle) {
     Sheet sheet = workbook.createSheet("Comments");
     Row header = sheet.createRow(0);
     for (int index = 0; index < COMMENT_HEADERS.size(); index++) {
@@ -211,7 +222,9 @@ public class XlsxAnnotationRenderer implements AnnotationExportRenderer {
         row.createCell(1)
             .setCellValue(comment.authorDisplayName() == null ? "" : comment.authorDisplayName());
         writeDate(row, 2, comment.createdAt(), dateStyle, model.zone());
-        row.createCell(3).setCellValue(body(comment.body()));
+        Cell text = row.createCell(3);
+        text.setCellValue(body(comment.body()));
+        text.setCellStyle(textStyle);
       }
     }
 
@@ -229,6 +242,7 @@ public class XlsxAnnotationRenderer implements AnnotationExportRenderer {
       AnnotationExportModel.Row source,
       List<AnnotationExportColumn> columns,
       CellStyle dateStyle,
+      CellStyle textStyle,
       ZoneId zone) {
     AnnotationView view = source.view();
     for (int index = 0; index < columns.size(); index++) {
@@ -244,7 +258,11 @@ public class XlsxAnnotationRenderer implements AnnotationExportRenderer {
         case STATUS -> row.createCell(index).setCellValue(humanize(view.status()));
         case TYPE -> row.createCell(index).setCellValue(humanize(view.type()));
         case PRIORITY -> row.createCell(index).setCellValue(humanize(view.priority()));
-        case SUMMARY -> row.createCell(index).setCellValue(summary(view.firstComment()));
+        case SUMMARY -> {
+          Cell cell = row.createCell(index);
+          cell.setCellValue(summary(view.firstComment()));
+          cell.setCellStyle(textStyle);
+        }
         case AUTHOR ->
             row.createCell(index)
                 .setCellValue(view.authorDisplayName() == null ? "" : view.authorDisplayName());
@@ -275,12 +293,12 @@ public class XlsxAnnotationRenderer implements AnnotationExportRenderer {
    * Excel's own per-cell ceiling truncates it.
    */
   static String body(String raw) {
-    return ExportText.truncate(withImageNames(raw), BODY_MAX);
+    return ExportText.truncate(withImageNames(raw), CELL_MAX);
   }
 
-  /** The opening comment as one flat cell — markdown noise stripped, length capped. */
+  /** The opening comment in full — markdown noise stripped, line breaks kept. */
   static String summary(String firstComment) {
-    return ExportText.truncate(withImageNames(firstComment), SUMMARY_MAX);
+    return ExportText.truncate(withImageNames(firstComment), CELL_MAX);
   }
 
   /**
@@ -298,7 +316,9 @@ public class XlsxAnnotationRenderer implements AnnotationExportRenderer {
         text.append(' ');
       }
       if (segment instanceof ExportSegment.Text part) {
-        text.append(ExportText.flatten(part.value()));
+        // Already plain text with its paragraph breaks intact; flattening again
+        // would undo exactly what the wrapped cells are for.
+        text.append(part.value());
       } else if (segment instanceof ExportSegment.Image image) {
         String label = image.alt() == null || image.alt().isBlank() ? "image" : image.alt();
         text.append('[').append(label).append(']');
@@ -330,6 +350,20 @@ public class XlsxAnnotationRenderer implements AnnotationExportRenderer {
    * <p>Only the display changes: the cell still holds a real date, so Excel's sorting and date
    * filters keep working whichever convention the user picked.
    */
+  /**
+   * The style for cells that hold whole comments.
+   *
+   * <p>Wrapping is what makes an unabridged export usable: without it Excel shows one endless line
+   * and hides the rest behind the next column. Top alignment because a tall cell whose text starts
+   * at the bottom does not line up with the short cells beside it.
+   */
+  private static CellStyle wrappedTextStyle(Workbook workbook) {
+    CellStyle style = workbook.createCellStyle();
+    style.setWrapText(true);
+    style.setVerticalAlignment(VerticalAlignment.TOP);
+    return style;
+  }
+
   private static CellStyle dateStyle(Workbook workbook, ExportDateFormat format) {
     CellStyle style = workbook.createCellStyle();
     CreationHelper helper = workbook.getCreationHelper();
