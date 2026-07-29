@@ -68,7 +68,9 @@ On the wire the zone is a parameter and its absence means UTC. The server does *
 
 **The logo.** Not every export is a document that should carry branding — an extract for a pivot table is not — so it is a switch. Whether the switch is even offered is a property of the format, not a preference: `AnnotationExportFormat.supportsLogo()` is false for Markdown and CSV, which are text and have nowhere to put an image. A control that silently does nothing is worse than an absent one, and the service checks the same flag, so the rendition is not even fetched for a format that could not use it.
 
-In the spreadsheet the logo occupies a band of rows above the header rather than a cell: a picture inside the grid would be dragged around by every sort and filter, which is the one thing that sheet exists to support. The header, freeze pane and autofilter move down with the band — and with the logo off, the grid is byte-for-byte the layout that shipped with #547.
+In the spreadsheet the logo is a floating layer in the top-right corner of *every* sheet, at the image's own pixel size — the anchor is computed from the picture, never the picture squeezed into the anchor. It costs the grid no rows, so a sheet has the same shape whether or not it is branded.
+
+Pinning it against cell changes needed a detour. `ClientAnchor.setAnchorType` is the obvious way to say "do not move or resize", and the streaming workbook silently drops it — measured across all four values, before and after `createPicture`. The attribute it stands for, `editAs` on the anchor element, is therefore written directly through POI's object model. POI's own reader does not report it back either, so the test asserts against the drawing XML in the produced file, which is what Excel actually reads.
 
 ### Four formats, not six
 

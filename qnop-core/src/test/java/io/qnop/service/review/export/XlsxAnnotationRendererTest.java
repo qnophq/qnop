@@ -25,15 +25,24 @@ import static org.assertj.core.api.Assertions.assertThat;
 import io.qnop.service.review.AnnotationPosition;
 import io.qnop.service.review.AnnotationService.AnnotationView;
 import io.qnop.service.review.AnnotationService.CommentView;
+import java.awt.image.BufferedImage;
 import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
 import java.time.Instant;
 import java.time.ZoneOffset;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import javax.imageio.ImageIO;
+import org.apache.poi.openxml4j.opc.OPCPackage;
+import org.apache.poi.openxml4j.opc.PackagePart;
 import org.apache.poi.ss.usermodel.Cell;
 import org.apache.poi.ss.usermodel.Sheet;
 import org.apache.poi.ss.usermodel.VerticalAlignment;
+import org.apache.poi.util.Units;
+import org.apache.poi.xssf.usermodel.XSSFClientAnchor;
+import org.apache.poi.xssf.usermodel.XSSFShape;
+import org.apache.poi.xssf.usermodel.XSSFSheet;
 import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -180,6 +189,111 @@ class XlsxAnnotationRendererTest {
         false,
         null,
         dates,
+        ZoneOffset.UTC,
+        Map.of(),
+        Map.of());
+  }
+
+  @Test
+  @DisplayName("the logo floats at its own size, top right, on every sheet")
+  void placesTheLogoOnEverySheet() throws Exception {
+    byte[] logo = pngOf(240, 120);
+    byte[] xlsx = renderer.render(branded(logo));
+
+    try (XSSFWorkbook workbook = new XSSFWorkbook(new ByteArrayInputStream(xlsx))) {
+      assertThat(workbook.getNumberOfSheets()).isEqualTo(2);
+      for (int index = 0; index < workbook.getNumberOfSheets(); index++) {
+        XSSFSheet sheet = workbook.getSheetAt(index);
+        List<XSSFShape> shapes = sheet.getDrawingPatriarch().getShapes();
+        assertThat(shapes).as("sheet %s", sheet.getSheetName()).hasSize(1);
+
+        XSSFClientAnchor anchor = (XSSFClientAnchor) shapes.getFirst().getAnchor();
+        // Its own pixels, undistorted: the anchor is derived from the image, not
+        // the image squeezed into the anchor.
+        assertThat(anchor.getDx2() - anchor.getDx1()).isEqualTo(Units.pixelToEMU(240));
+        assertThat(anchor.getDy2() - anchor.getDy1()).isEqualTo(Units.pixelToEMU(120));
+        // Top row; the pinning is asserted separately, against the file.
+        assertThat(anchor.getRow1()).isZero();
+      }
+    }
+  }
+
+  @Test
+  @DisplayName("the logo is pinned, so a column resize cannot stretch it")
+  void pinsTheLogoAgainstCellChanges() throws Exception {
+    byte[] xlsx = renderer.render(branded(pngOf(240, 120)));
+
+    // Asserted against the file, not against POI's reader: getAnchorType() does
+    // not report editAs back for a streamed workbook, but Excel reads the XML —
+    // and the XML is what has to be right.
+    List<String> drawings = drawingXml(xlsx);
+    assertThat(drawings).hasSize(2);
+    assertThat(drawings).allSatisfy(xml -> assertThat(xml).contains("editAs=\"absolute\""));
+  }
+
+  /**
+   * The drawing parts of a written workbook, as raw XML.
+   *
+   * <p>Read through OPC rather than {@code ZipInputStream}: POI writes entries with data
+   * descriptors, which the streaming zip reader rejects outright.
+   */
+  private static List<String> drawingXml(byte[] xlsx) throws Exception {
+    List<String> parts = new java.util.ArrayList<>();
+    try (OPCPackage pkg = OPCPackage.open(new ByteArrayInputStream(xlsx))) {
+      for (PackagePart part : pkg.getParts()) {
+        if (part.getPartName().getName().startsWith("/xl/drawings/drawing")) {
+          parts.add(
+              new String(
+                  part.getInputStream().readAllBytes(), java.nio.charset.StandardCharsets.UTF_8));
+        }
+      }
+    }
+    return parts;
+  }
+
+  @Test
+  @DisplayName("the logo costs the grid no rows — the header stays in row 1")
+  void logoDoesNotShiftTheGrid() throws Exception {
+    Sheet branded = sheetOf(renderer.render(branded(pngOf(240, 120))), 0);
+    Sheet plain = sheetOf(renderer.render(model(view("A finding", 1), List.of())), 0);
+
+    // A layer on top means the sheet has the same shape either way; the band
+    // this replaced pushed every header down by four rows.
+    assertThat(branded.getRow(0).getCell(0).getStringCellValue()).isEqualTo("#");
+    assertThat(plain.getRow(0).getCell(0).getStringCellValue()).isEqualTo("#");
+    assertThat(branded.getRow(1).getCell(5).getStringCellValue())
+        .isEqualTo(plain.getRow(1).getCell(5).getStringCellValue());
+  }
+
+  private static byte[] pngOf(int width, int height) throws Exception {
+    ByteArrayOutputStream out = new ByteArrayOutputStream();
+    ImageIO.write(new BufferedImage(width, height, BufferedImage.TYPE_INT_ARGB), "png", out);
+    return out.toByteArray();
+  }
+
+  private static AnnotationExportModel branded(byte[] logo) {
+    return new AnnotationExportModel(
+        "Vendor agreement",
+        3,
+        List.of(
+            new AnnotationExportModel.Row(
+                "T-1",
+                view("A finding", 2),
+                new AnnotationPosition(true, 0, 0.1, 0.1, 0),
+                List.of(
+                    new CommentView(
+                        UUID.randomUUID(),
+                        UUID.randomUUID(),
+                        UUID.randomUUID(),
+                        null,
+                        "Mia",
+                        "A reply",
+                        List.of(),
+                        WHEN)))),
+        AnnotationExportColumn.all(),
+        true,
+        logo,
+        ExportDateFormat.ISO,
         ZoneOffset.UTC,
         Map.of(),
         Map.of());

@@ -30,13 +30,13 @@ import java.time.Instant;
 import java.time.ZoneId;
 import java.util.List;
 import javax.imageio.ImageIO;
+import javax.xml.namespace.QName;
 import org.apache.poi.ss.SpreadsheetVersion;
 import org.apache.poi.ss.usermodel.BorderStyle;
 import org.apache.poi.ss.usermodel.Cell;
 import org.apache.poi.ss.usermodel.CellStyle;
 import org.apache.poi.ss.usermodel.ClientAnchor;
 import org.apache.poi.ss.usermodel.CreationHelper;
-import org.apache.poi.ss.usermodel.Drawing;
 import org.apache.poi.ss.usermodel.Font;
 import org.apache.poi.ss.usermodel.Picture;
 import org.apache.poi.ss.usermodel.Row;
@@ -45,7 +45,9 @@ import org.apache.poi.ss.usermodel.VerticalAlignment;
 import org.apache.poi.ss.usermodel.Workbook;
 import org.apache.poi.ss.util.CellRangeAddress;
 import org.apache.poi.util.Units;
+import org.apache.poi.xssf.streaming.SXSSFPicture;
 import org.apache.poi.xssf.streaming.SXSSFWorkbook;
+import org.apache.xmlbeans.XmlCursor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
@@ -79,14 +81,11 @@ public class XlsxAnnotationRenderer implements AnnotationExportRenderer {
 
   private static final List<String> COMMENT_HEADERS = List.of("#", "Author", "Written", "Comment");
 
-  /** Rows reserved above the header when the sheet carries a logo. */
-  private static final int LOGO_BAND_ROWS = 4;
-
   /** The thread sheet's comment column: wider than the summary, since it is the whole point. */
   private static final int COMMENT_WIDTH_CHARS = 90;
 
-  /** The logo's width in pixels on the sheet. */
-  private static final int LOGO_WIDTH_PX = 160;
+  /** Breathing room between the logo and the sheet's top-right edge, in pixels. */
+  private static final int LOGO_MARGIN_PX = 6;
 
   @Override
   public AnnotationExportFormat format() {
@@ -105,23 +104,14 @@ public class XlsxAnnotationRenderer implements AnnotationExportRenderer {
       CellStyle dateStyle = dateStyle(workbook, model.dateFormat());
       CellStyle textStyle = wrappedTextStyle(workbook);
 
-      // The logo needs somewhere to float that is not on top of the data, so it
-      // gets a band of its own above the header. Without a logo the sheet starts
-      // at row 0 exactly as before — the grid's shape follows the content, and a
-      // spreadsheet nobody asked to brand keeps its headers in row 1.
-      int headerRow = model.hasLogo() ? LOGO_BAND_ROWS : 0;
-      if (model.hasLogo()) {
-        writeLogoBand(workbook, sheet, model);
-      }
-
-      Row header = sheet.createRow(headerRow);
+      Row header = sheet.createRow(0);
       for (int index = 0; index < columns.size(); index++) {
         Cell cell = header.createCell(index);
         cell.setCellValue(columns.get(index).getHeader());
         cell.setCellStyle(headerStyle);
       }
 
-      int rowIndex = headerRow + 1;
+      int rowIndex = 1;
       for (AnnotationExportModel.Row row : model.rows()) {
         writeRow(sheet.createRow(rowIndex++), row, columns, dateStyle, textStyle, model.zone());
       }
@@ -129,13 +119,14 @@ public class XlsxAnnotationRenderer implements AnnotationExportRenderer {
       // Freeze the header and switch on the filter dropdowns, so Excel's own
       // per-column sort works the moment the file opens — the whole reason the
       // cells are typed rather than pre-formatted strings.
-      sheet.createFreezePane(0, headerRow + 1);
+      sheet.createFreezePane(0, 1);
       sheet.setAutoFilter(
-          new CellRangeAddress(
-              headerRow, Math.max(rowIndex - 1, headerRow + 1), 0, columns.size() - 1));
+          new CellRangeAddress(0, Math.max(model.rows().size(), 1), 0, columns.size() - 1));
       for (int index = 0; index < columns.size(); index++) {
         sheet.setColumnWidth(index, width(columns.get(index), model.dateFormat()));
       }
+      // After the widths, because where the right edge is depends on them.
+      placeLogo(workbook, sheet, model, columns.size());
 
       if (model.includeComments()) {
         writeComments(workbook, model, dateStyle, headerStyle, textStyle);
@@ -148,59 +139,95 @@ public class XlsxAnnotationRenderer implements AnnotationExportRenderer {
   }
 
   /**
-   * The branding logo floating in a band above the header, with the review's name beside it.
+   * The branding logo, floating over the top-right corner of a sheet.
    *
-   * <p>Anchored rather than placed in a cell: a picture inside the grid would be dragged around by
-   * every sort and filter, which is the one thing this sheet exists to support. The band is real
-   * rows, so the picture has somewhere to live that the data never reaches.
+   * <p>A layer rather than a cell: an image sized to fit a cell is an image nobody chose the size
+   * of, and the previous attempt squashed it into one. The picture keeps its own dimensions exactly
+   * — the anchor is computed from them, never the other way round — and floats above the grid, so
+   * no row is spent on branding and the sheet has the same shape whether or not one is placed.
+   *
+   * <p>Anchored so it ends at the last column's right edge. That is arithmetic on the column widths
+   * this renderer just set, which is also why it runs after them.
    */
-  private void writeLogoBand(Workbook workbook, Sheet sheet, AnnotationExportModel model) {
-    for (int index = 0; index < LOGO_BAND_ROWS; index++) {
-      sheet.createRow(index);
+  private void placeLogo(
+      Workbook workbook, Sheet sheet, AnnotationExportModel model, int columnCount) {
+    if (!model.hasLogo()) {
+      return;
     }
-    Cell title = sheet.getRow(LOGO_BAND_ROWS - 1).createCell(1);
-    title.setCellValue(model.documentTitle());
-    title.setCellStyle(headerStyle(workbook));
-
     try {
-      int pictureIndex =
-          workbook.addPicture(
-              model.logoPng(), org.apache.poi.ss.usermodel.Workbook.PICTURE_TYPE_PNG);
-      Drawing<?> drawing = sheet.createDrawingPatriarch();
-      CreationHelper helper = workbook.getCreationHelper();
-      ClientAnchor anchor = helper.createClientAnchor();
-      anchor.setCol1(0);
+      byte[] png = model.logoPng();
+      java.awt.Dimension size = naturalSize(png);
+      long widthEmu = (long) Units.pixelToEMU(size.width);
+      long heightEmu = (long) Units.pixelToEMU(size.height);
+
+      long sheetWidthEmu = 0;
+      for (int index = 0; index < columnCount; index++) {
+        sheetWidthEmu += Units.columnWidthToEMU(sheet.getColumnWidth(index));
+      }
+      long rightEdge = Math.max(0, sheetWidthEmu - widthEmu - Units.pixelToEMU(LOGO_MARGIN_PX));
+
+      // Excel stores an anchor as a column plus an offset inside it, so the
+      // absolute position has to be walked back into that pair.
+      int column = 0;
+      long offset = rightEdge;
+      while (column < columnCount - 1) {
+        long columnWidth = Units.columnWidthToEMU(sheet.getColumnWidth(column));
+        if (offset < columnWidth) {
+          break;
+        }
+        offset -= columnWidth;
+        column++;
+      }
+
+      int pictureIndex = workbook.addPicture(png, Workbook.PICTURE_TYPE_PNG);
+      ClientAnchor anchor = workbook.getCreationHelper().createClientAnchor();
+      anchor.setCol1(column);
       anchor.setRow1(0);
-      // A fixed anchor, so resizing a column does not stretch the logo.
-      anchor.setAnchorType(ClientAnchor.AnchorType.DONT_MOVE_AND_RESIZE);
-      Picture picture = drawing.createPicture(anchor, pictureIndex);
-      sizeLogo(picture, model.logoPng());
-    } catch (RuntimeException e) {
+      anchor.setDx1((int) offset);
+      anchor.setDy1(Units.pixelToEMU(LOGO_MARGIN_PX));
+      anchor.setCol2(column);
+      anchor.setRow2(0);
+      anchor.setDx2((int) (offset + widthEmu));
+      anchor.setDy2((int) (heightEmu + Units.pixelToEMU(LOGO_MARGIN_PX)));
+      Picture picture = sheet.createDrawingPatriarch().createPicture(anchor, pictureIndex);
+      pinAnchor(picture);
+    } catch (RuntimeException | IOException e) {
       // Same contract as everywhere else: a logo is decoration, and a workbook
       // without one beats a download that failed.
-      log.warn("Could not place the branding logo in the workbook", e);
+      log.warn("Could not place the branding logo on sheet {}", sheet.getSheetName(), e);
     }
   }
 
-  /** Scales the picture to {@link #LOGO_WIDTH_PX} wide, keeping its aspect ratio. */
-  private static void sizeLogo(Picture picture, byte[] png) {
-    int height = LOGO_WIDTH_PX / 2;
-    try {
-      BufferedImage image = ImageIO.read(new ByteArrayInputStream(png));
-      if (image != null && image.getWidth() > 0) {
-        height =
-            Math.max(1, Math.round(LOGO_WIDTH_PX * (float) image.getHeight() / image.getWidth()));
-      }
-    } catch (IOException e) {
-      log.debug("Could not measure the branding logo; falling back to a default height", e);
+  /**
+   * Pins the picture so cells cannot move or stretch it.
+   *
+   * <p>{@code ClientAnchor.setAnchorType} is the obvious way to say this and does nothing here: the
+   * streaming workbook drops it, whether set before {@code createPicture} or after — measured, not
+   * assumed. The attribute it stands for is {@code editAs} on the anchor element, so it is written
+   * there directly. That is POI's own object model, one level below the convenience method that
+   * fails.
+   *
+   * <p>The guard matters: if a future POI nests pictures differently, this quietly does nothing
+   * rather than corrupting an unrelated element.
+   */
+  private static void pinAnchor(Picture picture) {
+    if (!(picture instanceof SXSSFPicture streaming)) {
+      return;
     }
-    ClientAnchor anchor = picture.getClientAnchor();
-    anchor.setDx1(Units.EMU_PER_PIXEL * 4);
-    anchor.setDy1(Units.EMU_PER_PIXEL * 4);
-    anchor.setCol2(0);
-    anchor.setRow2(0);
-    anchor.setDx2(Units.EMU_PER_PIXEL * (LOGO_WIDTH_PX + 4));
-    anchor.setDy2(Units.EMU_PER_PIXEL * (height + 4));
+    try (XmlCursor cursor = streaming.getCTPicture().newCursor()) {
+      if (cursor.toParent() && "twoCellAnchor".equals(cursor.getName().getLocalPart())) {
+        cursor.setAttributeText(new QName("editAs"), "absolute");
+      }
+    }
+  }
+
+  /** The image's own pixel dimensions — the size it is placed at, unaltered. */
+  private static java.awt.Dimension naturalSize(byte[] png) throws IOException {
+    BufferedImage image = ImageIO.read(new ByteArrayInputStream(png));
+    if (image == null || image.getWidth() <= 0) {
+      throw new IOException("branding logo could not be decoded");
+    }
+    return new java.awt.Dimension(image.getWidth(), image.getHeight());
   }
 
   private void writeComments(
@@ -242,6 +269,9 @@ public class XlsxAnnotationRenderer implements AnnotationExportRenderer {
     sheet.setColumnWidth(
         2, Math.max(HEADER_ALLOWANCE, model.dateFormat().getPattern().length() + 3) * 256);
     sheet.setColumnWidth(3, COMMENT_WIDTH_CHARS * 256);
+    // Every sheet, not just the first: a workbook's second tab is as likely to be
+    // the one printed or screenshotted as its first.
+    placeLogo(workbook, sheet, model, COMMENT_HEADERS.size());
   }
 
   private void writeRow(
