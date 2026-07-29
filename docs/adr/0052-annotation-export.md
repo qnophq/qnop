@@ -70,7 +70,9 @@ On the wire the zone is a parameter and its absence means UTC. The server does *
 
 In the spreadsheet the logo is a floating layer in the top-right corner of *every* sheet, at the image's own pixel size — the anchor is computed from the picture, never the picture squeezed into the anchor. It costs the grid no rows, so a sheet has the same shape whether or not it is branded.
 
-Pinning it against cell changes needed a detour. `ClientAnchor.setAnchorType` is the obvious way to say "do not move or resize", and the streaming workbook silently drops it — measured across all four values, before and after `createPicture`. The attribute it stands for, `editAs` on the anchor element, is therefore written directly through POI's object model. POI's own reader does not report it back either, so the test asserts against the drawing XML in the produced file, which is what Excel actually reads.
+Both of the picture's corners are resolved into the cell that contains them plus the offset inside it. That is not bookkeeping: Excel derives the rectangle from those two markers, so a wrong marker does not misplace the picture, it deforms it. POI's own `Picture.resize()` does the same arithmetic but discards the caller's `dx1`, which makes right-alignment impossible — measured, not assumed.
+
+Pinning it against cell changes needed a second detour. `ClientAnchor.setAnchorType` is the obvious way to say "do not move or resize", and the streaming workbook silently drops it — measured across all four values, before and after `createPicture`. The attribute it stands for, `editAs` on the anchor element, is therefore written directly through POI's object model. POI's own reader does not report it back either, so the test asserts against the drawing XML in the produced file, which is what Excel actually reads.
 
 ### Four formats, not six
 

@@ -21,6 +21,7 @@
 package io.qnop.service.review.export;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.within;
 
 import io.qnop.service.review.AnnotationPosition;
 import io.qnop.service.review.AnnotationService.AnnotationView;
@@ -37,6 +38,7 @@ import javax.imageio.ImageIO;
 import org.apache.poi.openxml4j.opc.OPCPackage;
 import org.apache.poi.openxml4j.opc.PackagePart;
 import org.apache.poi.ss.usermodel.Cell;
+import org.apache.poi.ss.usermodel.Row;
 import org.apache.poi.ss.usermodel.Sheet;
 import org.apache.poi.ss.usermodel.VerticalAlignment;
 import org.apache.poi.util.Units;
@@ -195,10 +197,9 @@ class XlsxAnnotationRendererTest {
   }
 
   @Test
-  @DisplayName("the logo floats at its own size, top right, on every sheet")
-  void placesTheLogoOnEverySheet() throws Exception {
-    byte[] logo = pngOf(240, 120);
-    byte[] xlsx = renderer.render(branded(logo));
+  @DisplayName("the logo keeps its own proportions and sits in the top-right corner")
+  void placesTheLogoUndistortedAtTopRight() throws Exception {
+    byte[] xlsx = renderer.render(branded(pngOf(240, 120)));
 
     try (XSSFWorkbook workbook = new XSSFWorkbook(new ByteArrayInputStream(xlsx))) {
       assertThat(workbook.getNumberOfSheets()).isEqualTo(2);
@@ -206,16 +207,56 @@ class XlsxAnnotationRendererTest {
         XSSFSheet sheet = workbook.getSheetAt(index);
         List<XSSFShape> shapes = sheet.getDrawingPatriarch().getShapes();
         assertThat(shapes).as("sheet %s", sheet.getSheetName()).hasSize(1);
-
         XSSFClientAnchor anchor = (XSSFClientAnchor) shapes.getFirst().getAnchor();
-        // Its own pixels, undistorted: the anchor is derived from the image, not
-        // the image squeezed into the anchor.
-        assertThat(anchor.getDx2() - anchor.getDx1()).isEqualTo(Units.pixelToEMU(240));
-        assertThat(anchor.getDy2() - anchor.getDy1()).isEqualTo(Units.pixelToEMU(120));
-        // Top row; the pinning is asserted separately, against the file.
-        assertThat(anchor.getRow1()).isZero();
+
+        // The rectangle the markers actually describe. Getting a marker wrong
+        // does not move the picture, it deforms it — a to-marker left on the
+        // start cell squeezed the logo into one column and one row.
+        long left = absoluteX(sheet, anchor.getCol1()) + anchor.getDx1();
+        long right = absoluteX(sheet, anchor.getCol2()) + anchor.getDx2();
+        long top = absoluteY(sheet, anchor.getRow1()) + anchor.getDy1();
+        long bottom = absoluteY(sheet, anchor.getRow2()) + anchor.getDy2();
+
+        assertThat((right - left) / (double) Units.EMU_PER_PIXEL)
+            .as("width on %s", sheet.getSheetName())
+            .isCloseTo(240, within(1.0));
+        assertThat((bottom - top) / (double) Units.EMU_PER_PIXEL)
+            .as("height on %s", sheet.getSheetName())
+            .isCloseTo(120, within(1.0));
+        // Which is the same as saying it is not distorted.
+        assertThat((right - left) / (double) (bottom - top)).isCloseTo(2.0, within(0.02));
+
+        // Top-right: hard against the last column, a hair's margin off each edge.
+        long sheetWidth = absoluteX(sheet, lastColumn(sheet) + 1);
+        assertThat((sheetWidth - right) / (double) Units.EMU_PER_PIXEL).isBetween(0.0, 12.0);
+        assertThat(top / (double) Units.EMU_PER_PIXEL).isBetween(0.0, 12.0);
       }
     }
+  }
+
+  /** The left edge of a column, in EMU from the sheet's origin. */
+  private static long absoluteX(Sheet sheet, int column) {
+    long emu = 0;
+    for (int index = 0; index < column; index++) {
+      emu += Units.columnWidthToEMU(sheet.getColumnWidth(index));
+    }
+    return emu;
+  }
+
+  /** The top edge of a row, in EMU from the sheet's origin. */
+  private static long absoluteY(Sheet sheet, int row) {
+    long emu = 0;
+    for (int index = 0; index < row; index++) {
+      Row line = sheet.getRow(index);
+      emu +=
+          Units.toEMU(
+              line == null ? sheet.getDefaultRowHeightInPoints() : line.getHeightInPoints());
+    }
+    return emu;
+  }
+
+  private static int lastColumn(Sheet sheet) {
+    return sheet.getRow(0).getLastCellNum() - 1;
   }
 
   @Test

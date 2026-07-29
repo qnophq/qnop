@@ -157,38 +157,44 @@ public class XlsxAnnotationRenderer implements AnnotationExportRenderer {
     try {
       byte[] png = model.logoPng();
       java.awt.Dimension size = naturalSize(png);
-      long widthEmu = (long) Units.pixelToEMU(size.width);
-      long heightEmu = (long) Units.pixelToEMU(size.height);
+      long width = Units.pixelToEMU(size.width);
+      long height = Units.pixelToEMU(size.height);
+      long margin = Units.pixelToEMU(LOGO_MARGIN_PX);
 
-      long sheetWidthEmu = 0;
+      long sheetWidth = 0;
       for (int index = 0; index < columnCount; index++) {
-        sheetWidthEmu += Units.columnWidthToEMU(sheet.getColumnWidth(index));
+        sheetWidth += Units.columnWidthToEMU(sheet.getColumnWidth(index));
       }
-      long rightEdge = Math.max(0, sheetWidthEmu - widthEmu - Units.pixelToEMU(LOGO_MARGIN_PX));
+      long left = Math.max(0, sheetWidth - width - margin);
 
-      // Excel stores an anchor as a column plus an offset inside it, so the
-      // absolute position has to be walked back into that pair.
-      int column = 0;
-      long offset = rightEdge;
-      while (column < columnCount - 1) {
-        long columnWidth = Units.columnWidthToEMU(sheet.getColumnWidth(column));
-        if (offset < columnWidth) {
-          break;
-        }
-        offset -= columnWidth;
-        column++;
-      }
+      // All four edges, each resolved into the cell that contains it plus the
+      // offset inside it. Excel derives the picture's rectangle from these two
+      // markers, so getting one wrong does not move the image — it deforms it,
+      // which is exactly what a to-marker pinned to the start cell did.
+      Marker topLeft =
+          new Marker(
+              cellAt(
+                  left, columnCount, index -> Units.columnWidthToEMU(sheet.getColumnWidth(index))),
+              cellAt(margin, Integer.MAX_VALUE, index -> rowHeight(sheet, index)));
+      Marker bottomRight =
+          new Marker(
+              cellAt(
+                  left + width,
+                  columnCount,
+                  index -> Units.columnWidthToEMU(sheet.getColumnWidth(index))),
+              cellAt(margin + height, Integer.MAX_VALUE, index -> rowHeight(sheet, index)));
 
       int pictureIndex = workbook.addPicture(png, Workbook.PICTURE_TYPE_PNG);
       ClientAnchor anchor = workbook.getCreationHelper().createClientAnchor();
-      anchor.setCol1(column);
-      anchor.setRow1(0);
-      anchor.setDx1((int) offset);
-      anchor.setDy1(Units.pixelToEMU(LOGO_MARGIN_PX));
-      anchor.setCol2(column);
-      anchor.setRow2(0);
-      anchor.setDx2((int) (offset + widthEmu));
-      anchor.setDy2((int) (heightEmu + Units.pixelToEMU(LOGO_MARGIN_PX)));
+      anchor.setCol1(topLeft.column().index());
+      anchor.setDx1((int) topLeft.column().offset());
+      anchor.setRow1(topLeft.row().index());
+      anchor.setDy1((int) topLeft.row().offset());
+      anchor.setCol2(bottomRight.column().index());
+      anchor.setDx2((int) bottomRight.column().offset());
+      anchor.setRow2(bottomRight.row().index());
+      anchor.setDy2((int) bottomRight.row().offset());
+
       Picture picture = sheet.createDrawingPatriarch().createPicture(anchor, pictureIndex);
       pinAnchor(picture);
     } catch (RuntimeException | IOException e) {
@@ -198,8 +204,40 @@ public class XlsxAnnotationRenderer implements AnnotationExportRenderer {
     }
   }
 
+  /** A picture corner: the cell it falls in, and how far into that cell it sits. */
+  private record Marker(Position column, Position row) {}
+
+  private record Position(int index, long offset) {}
+
   /**
-   * Pins the picture so cells cannot move or stretch it.
+   * Resolves an absolute offset into the cell containing it.
+   *
+   * <p>Deliberately not {@code Picture.resize()}, which does this arithmetic but discards the
+   * caller's {@code dx1} — measured — and so cannot place anything anywhere but a cell boundary.
+   */
+  private static Position cellAt(
+      long target, int limit, java.util.function.IntToLongFunction sizeOf) {
+    int index = 0;
+    long remaining = target;
+    while (index < limit - 1) {
+      long size = sizeOf.applyAsLong(index);
+      if (size <= 0 || remaining < size) {
+        break;
+      }
+      remaining -= size;
+      index++;
+    }
+    return new Position(index, remaining);
+  }
+
+  /** A row's height in EMU; rows that do not exist yet carry the sheet's default. */
+  private static long rowHeight(Sheet sheet, int index) {
+    Row row = sheet.getRow(index);
+    return Units.toEMU(row == null ? sheet.getDefaultRowHeightInPoints() : row.getHeightInPoints());
+  }
+
+  /**
+   * Pins the picture so cell changes cannot move or stretch it.
    *
    * <p>{@code ClientAnchor.setAnchorType} is the obvious way to say this and does nothing here: the
    * streaming workbook drops it, whether set before {@code createPicture} or after — measured, not
