@@ -24,6 +24,7 @@ import {
   EXPORT_DATE_FORMATS,
   EXPORT_FORMATS,
   defaultSettings,
+  isFormatAvailable,
   effectiveFields,
   loadSettings,
   saveSettings,
@@ -47,6 +48,20 @@ describe('exportModel', () => {
     // them as "planned" would be promising work nobody intends to do.
     const ids = EXPORT_FORMATS.map((format) => format.id);
     expect(ids).toEqual(['xlsx', 'docx', 'html', 'pdf']);
+  });
+
+  it("treats availability as the server's answer, not the release's", () => {
+    const byId = Object.fromEntries(EXPORT_FORMATS.map((format) => [format.id, format]));
+
+    // A planned format is never available, whatever the server lists.
+    expect(isFormatAvailable(byId.html, ['xlsx', 'docx', 'pdf', 'html'])).toBe(false);
+    // A shipped one follows the server: PDF needs an office converter (#639).
+    expect(isFormatAvailable(byId.pdf, ['xlsx', 'docx'])).toBe(false);
+    expect(isFormatAvailable(byId.pdf, ['xlsx', 'docx', 'pdf'])).toBe(true);
+    // Silence is not a refusal — an older server, or a config request still in
+    // flight, must not take a working format away.
+    expect(isFormatAvailable(byId.pdf, undefined)).toBe(true);
+    expect(isFormatAvailable(byId.pdf, [])).toBe(true);
   });
 
   it('starts with everything included', () => {

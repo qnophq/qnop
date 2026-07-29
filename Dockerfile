@@ -26,6 +26,18 @@ RUN ./gradlew --no-daemon -x test :qnop-app:bootJar \
 FROM eclipse-temurin:21.0.11_10-jre@sha256:273396ed5998598ed1091e8d72711c2d36980a0e65103859c55a4e977a41ffd3 AS runtime
 WORKDIR /app
 
+# LibreOffice, headless, for the PDF export (issue #639) — and for DOCX ingest
+# when that lands (ADR-0010). It is invoked as a subprocess and never linked, which
+# is the only way ADR-0007 permits a copyleft tool.
+#
+# `--no-install-recommends` plus the Writer-only package keeps this to what the
+# conversion actually needs; the full suite would be several times the size. A
+# deployment that drops it still runs — the server then reports PDF as
+# unavailable and the export wizard stops offering it.
+RUN apt-get update \
+    && apt-get install --yes --no-install-recommends libreoffice-writer-nogui fonts-dejavu-core \
+    && rm -rf /var/lib/apt/lists/*
+
 # Run unprivileged.
 RUN groupadd --system qnop && useradd --system --gid qnop --home /app qnop
 

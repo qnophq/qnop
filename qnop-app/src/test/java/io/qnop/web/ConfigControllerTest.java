@@ -32,6 +32,8 @@ import io.qnop.service.branding.BrandingService.BrandingSource;
 import io.qnop.service.branding.BrandingService.SlotStatus;
 import io.qnop.service.oidc.OidcProviderLoginView;
 import io.qnop.service.oidc.OidcProviderService;
+import io.qnop.service.review.AnnotationExportService;
+import io.qnop.service.review.export.AnnotationExportFormat;
 import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -60,6 +62,7 @@ class ConfigControllerTest {
   @MockitoBean private OidcProviderService oidcProviders;
   @MockitoBean private ApplicationSettingsService settings;
   @MockitoBean private BrandingService branding;
+  @MockitoBean private AnnotationExportService exports;
 
   @BeforeEach
   void setUp() {
@@ -69,6 +72,10 @@ class ConfigControllerTest {
         .thenReturn(false);
     when(settings.getString(ApplicationSettingKey.GENERAL_DEFAULT_TIMEZONE))
         .thenReturn("Europe/Berlin");
+    // The two formats that need nothing installed; PDF depends on an office
+    // converter this deployment may not have (issue #639).
+    when(exports.availableFormats())
+        .thenReturn(List.of(AnnotationExportFormat.XLSX, AnnotationExportFormat.DOCX));
     // All slots on the factory default until something is uploaded.
     when(branding.statusAll())
         .thenReturn(

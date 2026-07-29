@@ -96,6 +96,16 @@ In the spreadsheet the link cannot sit in the prose at all: Excel attaches a hyp
 
 The link must also be **absolute**, and that is a correctness requirement rather than a nicety: Word resolves a relative target against the document's own location, so `/api/v1/…` in a downloaded report becomes `file:///api/v1/…` and points at the reader's disk. The origin comes from `general.base_url`; where an operator has not set it, the origin the export was just downloaded from is used instead — unlike a notification mail, whose link is followed by someone who did not make the request, this link is read by the person who asked for the file. With neither available the file is named but not linked. OOXML *can* carry an OLE object, but POI exposes only `getAllEmbeddedParts()` for reading; writing one means hand-authored `w:object` XML, a package part, a relationship and an icon image, on schema types `poi-ooxml-lite` does not guarantee. Weighed against a report that would then mail binaries around, the link is the better answer: a reader with access is one click away, and a reader without at least knows the file exists — which the bare filename this replaces did not convey.
 
+### PDF is the Word report, converted — not drawn again
+
+The requirement was that the PDF look like the Word report. That settles the question the issue left open, because the report is no longer a text dump: a running header with the logo, outline levels, inline images, attachment rows with hyperlinks, and a discussion set with rules and small caps. Drawing that a second time on a PDF canvas means hand-writing line breaking, pagination and running headers — and then keeping two implementations in step forever. A second implementation matches a design only until the next change to either.
+
+So `PdfAnnotationRenderer` renders the DOCX and converts it. One design, one renderer; a change to the report reaches the PDF without anyone doing anything, because it *is* the report.
+
+The conversion runs **out-of-process** through LibreOffice — the only way ADR-0007 permits a copyleft tool, and the same call ADR-0010 already made for DOCX ingest, so this reuses an installation the roadmap had committed to rather than asking for a new one. It is invoked with `ProcessBuilder` rather than through a wrapper library: no Java dependency at all, and the licence boundary stays absolute. Two invocation details are load-bearing — a per-run user profile, because LibreOffice refuses to start against one already in use and concurrent exports would otherwise fail sporadically, and a deadline, because a hung office process would hold a request thread until restart.
+
+Whether a deployment can produce PDF is therefore a property of the **server**, not of the release. `GET /api/v1/config` reports `exportFormats`, the wizard offers only those, and a request for a format this server cannot make answers **503** with a named code — nothing broke and a retry will not help. Every developer machine is such a server, which is why the seam is an interface a test can fake.
+
 ### The filename is the user's, within limits
 
 The default is `<slug>-annotations.<ext>`, derived from the review's title, because a folder full of exports has to stay legible. It is only a default: a report going to a customer is rarely best named after an internal document title, so the wizard shows the name and lets it be replaced.
@@ -145,6 +155,7 @@ Headings use direct character formatting plus an OOXML outline level rather than
 - **2026-07-29** — extended for Word (#635): the model/renderer split, the `?format=` parameter, and the report layout. The remaining formats (#637, #639) are a renderer and an enum entry.
 - **2026-07-29** — the date convention, its timezone, the branding logo and the filename became per-export choices, all format-independent.
 - **2026-07-29** — inline images in annotations and comments are exported rather than stripped; other attachments are linked.
+- **2026-07-29** — PDF (#639) ships by converting the Word report out-of-process, and format availability becomes a server capability rather than a release constant.
 - **ADR-0021 / ADR-0015** — OpenAPI-first, and why this endpoint is the deliberate exception
 - **ADR-0004** — the layering that puts the workbook in the service and leaves the controller streaming
 - Issue **#547**

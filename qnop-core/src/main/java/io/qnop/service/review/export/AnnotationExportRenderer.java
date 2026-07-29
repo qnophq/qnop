@@ -38,6 +38,17 @@ public interface AnnotationExportRenderer {
   AnnotationExportFormat format();
 
   /**
+   * Whether this server can actually produce the format right now.
+   *
+   * <p>Almost always yes — a renderer that only assembles bytes has nothing to be unavailable. It
+   * is a question at all because one format converts through an external process (issue #639), and
+   * a deployment without that installed must not be offered a download it cannot deliver.
+   */
+  default boolean isAvailable() {
+    return true;
+  }
+
+  /**
    * Renders the whole model.
    *
    * @throws java.io.IOException when the underlying document library fails to assemble the file

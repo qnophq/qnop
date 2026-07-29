@@ -22,6 +22,7 @@
 import { useState } from 'react';
 import { Download } from 'lucide-react';
 import { downloadAnnotationExport } from '../../api/annotationExport';
+import { useConfig } from '../../api/hooks/useConfig';
 import { useDocument } from '../../api/hooks/useDocuments';
 import { ToolbarIconButton } from './ToolbarIconButton';
 import { ExportWizard, type ExportCounts } from './export/ExportWizard';
@@ -56,6 +57,9 @@ export function ExportAnnotationsButton({
   // already loaded this document — so it comes from the cache rather than
   // becoming a prop that two call sites have to remember to pass.
   const documentQuery = useDocument(documentId);
+  // Which formats this deployment can actually produce (#639): PDF needs an
+  // office converter, and offering one the server lacks yields a failed download.
+  const configQuery = useConfig();
 
   const run = async (settings: ExportSettings, fileName: string) => {
     setExporting(true);
@@ -96,6 +100,7 @@ export function ExportAnnotationsButton({
           onClose={() => setOpen(false)}
           onExport={run}
           documentTitle={documentQuery.data?.title}
+          offeredFormats={configQuery.data?.exportFormats}
           counts={counts}
           exporting={exporting}
         />

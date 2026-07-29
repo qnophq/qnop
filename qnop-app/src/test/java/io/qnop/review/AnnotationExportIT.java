@@ -555,12 +555,13 @@ class AnnotationExportIT extends SeededIntegrationTest {
     annotate(MEMBER_ID, 0, 0.1, 0.1, "Still exports");
 
     // Same reasoning as unknown fields: a client one release ahead should get a
-    // file it can open, not a 400.
+    // file it can open, not a 400. (PDF used to stand in for "unknown" here and no
+    // longer can — it is a format this server knows, and may even be able to make.)
     mockMvc
         .perform(
             as(
                 get("/api/v1/documents/" + documentId + "/annotations/export")
-                    .param("format", "pdf"),
+                    .param("format", "somethingNew"),
                 MEMBER_ID))
         .andExpect(status().isOk())
         .andExpect(
@@ -940,6 +941,44 @@ class AnnotationExportIT extends SeededIntegrationTest {
       assertThat(document.getAllPictures()).hasSize(1);
       assertThat(document.getParagraphs().stream().map(XWPFParagraph::getText).toList())
           .anySatisfy(line -> assertThat(line).contains("Schlusssatz."));
+    }
+  }
+
+  @Test
+  @DisplayName("PDF is offered only where the server can produce it, and refused clearly otherwise")
+  void pdfFollowsTheServersCapability() throws Exception {
+    seedDocument(false);
+    annotate(MEMBER_ID, 0, 0.1, 0.1, "A finding");
+
+    String config =
+        mockMvc
+            .perform(as(get("/api/v1/config"), MEMBER_ID))
+            .andExpect(status().isOk())
+            .andReturn()
+            .getResponse()
+            .getContentAsString();
+    List<String> offered = com.jayway.jsonpath.JsonPath.read(config, "$.exportFormats");
+
+    // The two formats that only assemble bytes are always there.
+    assertThat(offered).contains("xlsx", "docx");
+
+    var request =
+        get("/api/v1/documents/" + documentId + "/annotations/export").param("format", "pdf");
+    if (offered.contains("pdf")) {
+      // An office converter is installed (CI images that ship one); the download works.
+      mockMvc
+          .perform(as(request, MEMBER_ID))
+          .andExpect(status().isOk())
+          .andExpect(header().string("Content-Type", "application/pdf"));
+    } else {
+      // The common case on a developer machine. Nothing broke and a retry will not
+      // help, so it is 503 with a named code — never a 500.
+      mockMvc
+          .perform(as(request, MEMBER_ID))
+          .andExpect(status().isServiceUnavailable())
+          .andExpect(
+              org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath(
+                  "$.code", org.hamcrest.Matchers.is("EXPORT_FORMAT_UNAVAILABLE")));
     }
   }
 

@@ -56,6 +56,7 @@ import {
   EXPORT_FIELDS,
   EXPORT_FORMATS,
   defaultFileName,
+  isFormatAvailable,
   FIELD_GROUPS,
   effectiveFields,
   loadSettings,
@@ -114,6 +115,7 @@ export function ExportWizard({
   onExport,
   counts,
   documentTitle,
+  offeredFormats,
   exporting = false,
 }: {
   open: boolean;
@@ -121,6 +123,8 @@ export function ExportWizard({
   onExport: (settings: ExportSettings, fileName: string) => void;
   /** The review's title, which the prefilled filename is derived from. */
   documentTitle?: string | null;
+  /** Formats this server can actually produce; undefined means "assume all shipped ones". */
+  offeredFormats?: string[];
   /** Row counts per scope, so the wizard can say what the download will contain. */
   counts?: ExportCounts;
   exporting?: boolean;
@@ -234,12 +238,13 @@ export function ExportWizard({
                 >
                   {EXPORT_FORMATS.map((entry) => {
                     const active = entry.id === settings.format;
+                    const available = isFormatAvailable(entry, offeredFormats);
                     return (
                       <Box
                         key={entry.id}
                         component="button"
                         type="button"
-                        disabled={entry.planned}
+                        disabled={!available}
                         aria-pressed={active}
                         onClick={() => setSettings((c) => ({ ...c, format: entry.id }))}
                         sx={{
@@ -268,6 +273,9 @@ export function ExportWizard({
                             {entry.extension}
                           </Typography>
                           {entry.planned && <ToneBadge tone="neutral" label="Planned" />}
+                          {!entry.planned && !available && (
+                            <ToneBadge tone="neutral" label="Unavailable" />
+                          )}
                         </Stack>
                         <Typography sx={{ fontSize: 12, color: 'text.secondary' }}>
                           {entry.hint}

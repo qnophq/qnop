@@ -28,6 +28,7 @@ import io.qnop.service.review.AnnotationNotFoundException;
 import io.qnop.service.review.DocumentNotFoundException;
 import io.qnop.service.review.NotDocumentOwnerException;
 import io.qnop.service.review.WorkflowTransitionException;
+import io.qnop.service.review.export.ExportFormatUnavailableException;
 import java.time.OffsetDateTime;
 import java.util.List;
 import org.springframework.http.HttpStatus;
@@ -57,6 +58,14 @@ public class DocumentExceptionHandler {
       body.fieldErrors(List.of(new FieldError().field(ex.getField()).message(ex.getMessage())));
     }
     return ResponseEntity.status(ex.getStatus()).body(body);
+  }
+
+  @ExceptionHandler(ExportFormatUnavailableException.class)
+  ResponseEntity<ErrorResponse> exportFormatUnavailable(ExportFormatUnavailableException ex) {
+    // 503 rather than 500: nothing broke, and nothing will change on a retry —
+    // this deployment lacks the converter the format needs (issue #639).
+    return error(
+        HttpStatus.SERVICE_UNAVAILABLE.value(), "EXPORT_FORMAT_UNAVAILABLE", ex.getMessage());
   }
 
   @ExceptionHandler(DocumentNotFoundException.class)
