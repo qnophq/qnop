@@ -197,8 +197,8 @@ class XlsxAnnotationRendererTest {
   }
 
   @Test
-  @DisplayName("the logo keeps its own proportions and sits in the top-right corner")
-  void placesTheLogoUndistortedAtTopRight() throws Exception {
+  @DisplayName("the logo keeps its proportions, halved, in the top-left corner")
+  void placesTheLogoUndistortedAtTopLeft() throws Exception {
     byte[] xlsx = renderer.render(branded(pngOf(240, 120)));
 
     try (XSSFWorkbook workbook = new XSSFWorkbook(new ByteArrayInputStream(xlsx))) {
@@ -217,18 +217,18 @@ class XlsxAnnotationRendererTest {
         long top = absoluteY(sheet, anchor.getRow1()) + anchor.getDy1();
         long bottom = absoluteY(sheet, anchor.getRow2()) + anchor.getDy2();
 
+        // Half of the 240x120 source, both sides by the same factor.
         assertThat((right - left) / (double) Units.EMU_PER_PIXEL)
             .as("width on %s", sheet.getSheetName())
-            .isCloseTo(240, within(1.0));
+            .isCloseTo(120, within(1.0));
         assertThat((bottom - top) / (double) Units.EMU_PER_PIXEL)
             .as("height on %s", sheet.getSheetName())
-            .isCloseTo(120, within(1.0));
+            .isCloseTo(60, within(1.0));
         // Which is the same as saying it is not distorted.
         assertThat((right - left) / (double) (bottom - top)).isCloseTo(2.0, within(0.02));
 
-        // Top-right: hard against the last column, a hair's margin off each edge.
-        long sheetWidth = absoluteX(sheet, lastColumn(sheet) + 1);
-        assertThat((sheetWidth - right) / (double) Units.EMU_PER_PIXEL).isBetween(0.0, 12.0);
+        // Top-left: a hair's margin off both edges of the sheet.
+        assertThat(left / (double) Units.EMU_PER_PIXEL).isBetween(0.0, 12.0);
         assertThat(top / (double) Units.EMU_PER_PIXEL).isBetween(0.0, 12.0);
         // And it stays inside its own band rather than reaching into the header.
         assertThat(bottom).isLessThanOrEqualTo(absoluteY(sheet, 1));
@@ -255,22 +255,6 @@ class XlsxAnnotationRendererTest {
               line == null ? sheet.getDefaultRowHeightInPoints() : line.getHeightInPoints());
     }
     return emu;
-  }
-
-  /**
-   * The last column of the grid.
-   *
-   * <p>Found by the header rather than by row 0, which on a branded sheet is the logo's empty band
-   * and reports no cells at all.
-   */
-  private static int lastColumn(Sheet sheet) {
-    for (int index = 0; index <= sheet.getLastRowNum(); index++) {
-      Row row = sheet.getRow(index);
-      if (row != null && row.getLastCellNum() > 0) {
-        return row.getLastCellNum() - 1;
-      }
-    }
-    throw new IllegalStateException("sheet has no populated row");
   }
 
   @Test
@@ -316,7 +300,9 @@ class XlsxAnnotationRendererTest {
     // cells underneath. The band is tall enough for the picture, so nothing
     // overlaps: header below it, data below that.
     assertThat(branded.getRow(0).getCell(0)).isNull();
-    assertThat(branded.getRow(0).getHeightInPoints()).isGreaterThan(120 * 0.75f);
+    // Tall enough for the halved picture, and no taller than it needs.
+    assertThat(branded.getRow(0).getHeightInPoints()).isGreaterThan(60 * 0.75f);
+    assertThat(branded.getRow(0).getHeightInPoints()).isLessThan(120 * 0.75f);
     assertThat(branded.getRow(1).getCell(0).getStringCellValue()).isEqualTo("#");
     assertThat(branded.getRow(2).getCell(5).getStringCellValue()).isEqualTo("A finding");
     assertThat(branded.getPaneInformation().getHorizontalSplitPosition()).isEqualTo((short) 2);

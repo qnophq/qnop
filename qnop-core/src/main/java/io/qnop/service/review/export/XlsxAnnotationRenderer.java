@@ -84,8 +84,17 @@ public class XlsxAnnotationRenderer implements AnnotationExportRenderer {
   /** The thread sheet's comment column: wider than the summary, since it is the whole point. */
   private static final int COMMENT_WIDTH_CHARS = 90;
 
-  /** Breathing room between the logo and the sheet's top-right edge, in pixels. */
+  /** Breathing room between the logo and the sheet's top-left corner, in pixels. */
   private static final int LOGO_MARGIN_PX = 6;
+
+  /**
+   * How much of the branding rendition a sheet shows.
+   *
+   * <p>Halved here rather than in the rendition itself: one rendition serves both formats, and Word
+   * scales it down to about 90pt where the extra pixels are print sharpness. Shrinking the source
+   * would cost Word that and gain nothing a scale factor cannot.
+   */
+  private static final double LOGO_SCALE = 0.5;
 
   @Override
   public AnnotationExportFormat format() {
@@ -163,16 +172,11 @@ public class XlsxAnnotationRenderer implements AnnotationExportRenderer {
     }
     try {
       byte[] png = model.logoPng();
-      java.awt.Dimension size = naturalSize(png);
+      java.awt.Dimension size = displaySize(png);
       long width = Units.pixelToEMU(size.width);
       long height = Units.pixelToEMU(size.height);
       long margin = Units.pixelToEMU(LOGO_MARGIN_PX);
-
-      long sheetWidth = 0;
-      for (int index = 0; index < columnCount; index++) {
-        sheetWidth += Units.columnWidthToEMU(sheet.getColumnWidth(index));
-      }
-      long left = Math.max(0, sheetWidth - width - margin);
+      long left = margin;
 
       // All four edges, each resolved into the cell that contains it plus the
       // offset inside it. Excel derives the picture's rectangle from these two
@@ -220,7 +224,7 @@ public class XlsxAnnotationRenderer implements AnnotationExportRenderer {
    */
   private int reserveLogoRow(Sheet sheet, AnnotationExportModel model) {
     try {
-      java.awt.Dimension size = naturalSize(model.logoPng());
+      java.awt.Dimension size = displaySize(model.logoPng());
       Row band = sheet.createRow(0);
       // Pixels to points, plus the margin above and below.
       band.setHeightInPoints((float) ((size.height + 2.0 * LOGO_MARGIN_PX) * 72.0 / 96.0));
@@ -287,13 +291,20 @@ public class XlsxAnnotationRenderer implements AnnotationExportRenderer {
     }
   }
 
-  /** The image's own pixel dimensions — the size it is placed at, unaltered. */
-  private static java.awt.Dimension naturalSize(byte[] png) throws IOException {
+  /**
+   * The size the logo is drawn at: its own pixels, scaled proportionally.
+   *
+   * <p>Both dimensions by the same factor, always — a picture whose sides scale differently is the
+   * deformation this code has already been wrong about once.
+   */
+  private static java.awt.Dimension displaySize(byte[] png) throws IOException {
     BufferedImage image = ImageIO.read(new ByteArrayInputStream(png));
     if (image == null || image.getWidth() <= 0) {
       throw new IOException("branding logo could not be decoded");
     }
-    return new java.awt.Dimension(image.getWidth(), image.getHeight());
+    return new java.awt.Dimension(
+        Math.max(1, (int) Math.round(image.getWidth() * LOGO_SCALE)),
+        Math.max(1, (int) Math.round(image.getHeight() * LOGO_SCALE)));
   }
 
   private void writeComments(
