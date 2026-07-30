@@ -482,6 +482,17 @@ describe('ReviewsPage — the admin moderation listing (#563)', () => {
     expect(screen.getByTestId('participation-all')).toBeInTheDocument();
   });
 
+  it('still offers the switch to an admin who owns no reviews at all', () => {
+    useAuthStore.setState({ userId: ME, isAuthenticated: true, role: 'ADMIN' });
+    mockReviews({ data: { items: [], total: 0, page: 0, size: 100 } });
+
+    renderPage();
+
+    // The switch lives in the filter row, which an empty list does not render —
+    // without this an admin who only administers could never reach the workspace.
+    expect(screen.getByTestId('participation-all')).toBeInTheDocument();
+  });
+
   it("lists the caller's own reviews until the admin asks for all of them", () => {
     useAuthStore.setState({ userId: ME, isAuthenticated: true, role: 'ADMIN' });
     renderPage();

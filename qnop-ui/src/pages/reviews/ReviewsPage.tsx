@@ -493,6 +493,25 @@ export function ReviewsPage() {
     </Button>
   );
 
+  // Rendered next to the search field, and again over the empty state — an admin
+  // with no reviews of their own must still be able to reach everyone else's.
+  const participationToggle = isAdmin ? (
+    <ToggleButtonGroup
+      exclusive
+      size="small"
+      value={moderating ? 'all' : 'mine'}
+      onChange={(_e, next: string | null) => next && setModerating(next === 'all')}
+      aria-label="Which reviews"
+    >
+      <ToggleButton value="mine" data-testid="participation-mine">
+        My reviews
+      </ToggleButton>
+      <ToggleButton value="all" data-testid="participation-all">
+        All reviews
+      </ToggleButton>
+    </ToggleButtonGroup>
+  ) : null;
+
   return (
     <Stack spacing={3}>
       <PageHeader
@@ -504,23 +523,6 @@ export function ReviewsPage() {
         }
         action={newReviewButton}
       />
-
-      {isAdmin && (
-        <ToggleButtonGroup
-          exclusive
-          size="small"
-          value={moderating ? 'all' : 'mine'}
-          onChange={(_e, next: string | null) => next && setModerating(next === 'all')}
-          aria-label="Which reviews"
-        >
-          <ToggleButton value="mine" data-testid="participation-mine">
-            My reviews
-          </ToggleButton>
-          <ToggleButton value="all" data-testid="participation-all">
-            All reviews
-          </ToggleButton>
-        </ToggleButtonGroup>
-      )}
 
       {isError && (
         // The branded failure shell (issue #611) instead of a bare alert -
@@ -544,7 +546,12 @@ export function ReviewsPage() {
       )}
 
       {data && items.length === 0 && (
-        <ReviewsEmptyState onNewReview={() => navigate('/reviews/new')} />
+        <Stack spacing={2} sx={{ alignItems: 'flex-start' }}>
+          {participationToggle}
+          <Box sx={{ alignSelf: 'stretch' }}>
+            <ReviewsEmptyState onNewReview={() => navigate('/reviews/new')} />
+          </Box>
+        </Stack>
       )}
 
       {data && items.length > 0 && (
@@ -560,6 +567,7 @@ export function ReviewsPage() {
               onValueChange={setSearchAndParam}
               sx={{ width: { xs: '100%', md: 280 } }}
             />
+            {participationToggle}
             <Box sx={{ flex: 1 }} />
             {!moderating && (
               <ReviewFilterMenu
