@@ -19,7 +19,7 @@
  * SPDX-License-Identifier: AGPL-3.0-only
  */
 
-import { useRef, useState } from 'react';
+import { useState } from 'react';
 import Box from '@mui/material/Box';
 import Divider from '@mui/material/Divider';
 import Button from '@mui/material/Button';
@@ -38,7 +38,6 @@ import {
   useArchiveReview,
   useParticipants,
   useTransitionWorkflow,
-  useUploadVersion,
   useWorkflow,
 } from '../../../api/hooks/useReviews';
 import { useAuthStore } from '../../../stores/authStore';
@@ -51,9 +50,10 @@ import { TeamAvatar } from '../../shell/TeamAvatar';
 import { DueDateLabel } from '../DueDateLabel';
 import { ProgressBar } from '../list/ReviewListParts';
 import { isOpenWorkflowState, workflowLabel } from '../workflowMeta';
-import { acceptedUploads, validateDocumentFile } from '../wizard/wizardModel';
+import { acceptedUploads } from '../wizard/wizardModel';
 import { apiErrorCode, apiErrorMessage } from '../../../utils/apiError';
 import { DueDateDialog } from './DueDateDialog';
+import { NewVersionDialog } from './NewVersionDialog';
 import { ParticipantsDialog } from './ParticipantsDialog';
 
 const FALLBACK_MAX_SIZE_MB = 50;
@@ -111,8 +111,8 @@ export function ReviewHubHead({
   onVersionUploaded,
 }: ReviewHubHeadProps) {
   const theme = useTheme();
-  const fileInputRef = useRef<HTMLInputElement>(null);
   const [participantsOpen, setParticipantsOpen] = useState(false);
+  const [newVersionOpen, setNewVersionOpen] = useState(false);
   const [dueDateOpen, setDueDateOpen] = useState(false);
   const [workflowMenuAnchor, setWorkflowMenuAnchor] = useState<HTMLElement | null>(null);
   const [confirmTarget, setConfirmTarget] = useState<string | null>(null);
@@ -125,7 +125,6 @@ export function ReviewHubHead({
   // A closed review (FINALIZED/CANCELLED) can be archived out of the active lists,
   // or restored if already archived (issue #576) — owner action.
   const isClosed = !isOpenWorkflowState(workflowState);
-  const uploadVersion = useUploadVersion(documentId);
 
   const participants = participantsQuery.data?.participants ?? [];
   const ownDisplayName = useAuthStore((state) => state.displayName);
@@ -172,25 +171,6 @@ export function ReviewHubHead({
           'error',
         ),
     });
-  };
-
-  const handleFilePicked = (file: File) => {
-    const error = validateDocumentFile(file, maxSizeMb, accepted);
-    if (error) {
-      notify(error, 'error');
-      return;
-    }
-    uploadVersion.mutate(
-      { file },
-      {
-        onSuccess: (result) => {
-          notify(`Version ${result.versionNumber} uploaded.`);
-          onVersionUploaded(result.versionNumber);
-        },
-        onError: (uploadError) =>
-          notify(apiErrorMessage(uploadError, 'The new version could not be uploaded.'), 'error'),
-      },
-    );
   };
 
   const shown = participants.slice(0, MAX_STACK_AVATARS);
@@ -420,25 +400,22 @@ export function ReviewHubHead({
             size="small"
             variant="outlined"
             startIcon={<Upload size={14} />}
-            disabled={uploadVersion.isPending}
-            onClick={() => fileInputRef.current?.click()}
+            onClick={() => setNewVersionOpen(true)}
           >
-            {uploadVersion.isPending ? 'Uploading…' : 'New version'}
+            New version
           </Button>
-          <input
-            ref={fileInputRef}
-            type="file"
-            accept={accepted.accept}
-            hidden
-            data-testid="version-file-input"
-            onChange={(e) => {
-              const picked = e.target.files?.[0];
-              if (picked) handleFilePicked(picked);
-              e.target.value = '';
-            }}
-          />
         </>
       )}
+
+      <NewVersionDialog
+        documentId={documentId}
+        open={newVersionOpen}
+        onClose={() => setNewVersionOpen(false)}
+        maxSizeMb={maxSizeMb}
+        accepted={accepted}
+        notify={notify}
+        onUploaded={onVersionUploaded}
+      />
 
       <ParticipantsDialog
         documentId={documentId}

@@ -71,7 +71,7 @@ function renderPage() {
 
 function pickPdf(name = 'NDA Acme Corp.pdf') {
   const file = new File(['%PDF-1.4'], name, { type: 'application/pdf' });
-  fireEvent.change(screen.getByTestId('wizard-file-input'), { target: { files: [file] } });
+  fireEvent.change(screen.getByTestId('wizard-dropzone-input'), { target: { files: [file] } });
   return file;
 }
 
@@ -125,7 +125,7 @@ describe('NewReviewPage — step 1', () => {
     renderPage();
 
     const file = new File(['hi'], 'notes.docx', { type: 'application/msword' });
-    fireEvent.change(screen.getByTestId('wizard-file-input'), { target: { files: [file] } });
+    fireEvent.change(screen.getByTestId('wizard-dropzone-input'), { target: { files: [file] } });
 
     expect(screen.getByText('Only PDF documents are supported.')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /Next/ })).toBeDisabled();
