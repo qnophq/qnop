@@ -2855,6 +2855,36 @@ paths:
             type: string
             enum: [mine, all]
             default: mine
+        - name: state
+          in: query
+          required: false
+          description: |
+            The workflow slice, orthogonal to `scope` (issue #563). `any`
+            (default), `open` for reviews the workflow has not closed, `closed`
+            for FINALIZED/CANCELLED.
+
+            Applied by the server only under `participation=all`, where the
+            listing is paged and a client-side facet would narrow one page while
+            appearing to describe the workspace. The participant-scoped listing
+            fetches its rows in one go and facets them in the browser.
+          schema:
+            type: string
+            enum: [any, open, closed]
+            default: any
+        - name: role
+          in: query
+          required: false
+          description: |
+            The caller's part in the review (issue #563): `any` (default),
+            `owner`, `reviewer` — on the roster directly or through a team — or
+            `observer` for the reviews they are no part of at all.
+
+            Applied by the server only under `participation=all`, for the same
+            reason as `state`.
+          schema:
+            type: string
+            enum: [any, owner, reviewer, observer]
+            default: any
         - name: page
           in: query
           required: false
@@ -6625,6 +6655,56 @@ components:
         - participants
         - createdAt
         - updatedAt
+    ReviewFacetCounts:
+      type: object
+      description: |
+        What each filter chip would show if clicked (issue #563). Present only
+        under `participation=all`, where the listing is paged: a count derived
+        from one page would describe that page while appearing to describe the
+        workspace.
+
+        Each group is counted against the OTHER group's current selection — the
+        rule the participant-scoped listing already follows — so a chip's number
+        keeps predicting what clicking it shows.
+      properties:
+        roleAny:
+          type: integer
+          format: int64
+        roleOwner:
+          type: integer
+          format: int64
+        roleReviewer:
+          type: integer
+          format: int64
+        roleObserver:
+          type: integer
+          format: int64
+          description: Reviews the caller is no part of — the moderation listing's own facet.
+        stateActive:
+          type: integer
+          format: int64
+        stateOpen:
+          type: integer
+          format: int64
+        stateClosed:
+          type: integer
+          format: int64
+        stateArchived:
+          type: integer
+          format: int64
+        stateAll:
+          type: integer
+          format: int64
+      required:
+        - roleAny
+        - roleOwner
+        - roleReviewer
+        - roleObserver
+        - stateActive
+        - stateOpen
+        - stateClosed
+        - stateArchived
+        - stateAll
     DocumentListResponse:
       type: object
       description: A page of the caller's documents.
@@ -6645,6 +6725,8 @@ components:
           type: integer
           format: int32
           description: Page size.
+        facets:
+          $ref: '#/components/schemas/ReviewFacetCounts'
       required:
         - items
         - total

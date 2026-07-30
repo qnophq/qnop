@@ -32,6 +32,9 @@ import io.qnop.repository.ReviewParticipantRepository;
 import io.qnop.repository.UserDisplayName;
 import io.qnop.repository.UserRepository;
 import io.qnop.repository.UserSlug;
+import io.qnop.service.document.ReviewModerationFilter.Role;
+import io.qnop.service.document.ReviewModerationFilter.Scope;
+import io.qnop.service.document.ReviewModerationFilter.State;
 import io.qnop.service.document.ReviewParticipantService.ParticipantView;
 import io.qnop.service.review.ReviewIdentityResolver;
 import java.time.Instant;
@@ -102,6 +105,9 @@ public class DocumentOverviewService {
       boolean moderation,
       String query,
       String sort,
+      String scope,
+      String state,
+      String role,
       boolean includeActive,
       boolean includeArchived,
       int page,
@@ -116,13 +122,24 @@ public class DocumentOverviewService {
         query == null || query.isBlank() ? null : "%" + query.trim().toLowerCase(Locale.ROOT) + "%";
     // The retention slice (issue #576): the caller picks any combination — the
     // overview's "All" facet spans active AND archived at once, the default
-    // hides the records, the Archived view shows only them. Open/closed stays
-    // a client-side facet over the result.
+    // hides the records, the Archived view shows only them. In the participant-
+    // scoped view the finer slices stay client-side facets over the result; the
+    // moderation listing is paged, so they have to be predicates (issue #563).
     PageRequest pageRequest = PageRequest.of(page, size, parseSort(sort));
-    Page<Document> result =
-        moderation
-            ? documents.findAllForModeration(like, includeActive, includeArchived, pageRequest)
-            : documents.findVisibleTo(actor, like, includeActive, includeArchived, pageRequest);
+    ReviewFacetCounts facets = null;
+    Page<Document> result;
+    if (moderation) {
+      Scope wantedScope = Scope.of(scope);
+      State wantedState = State.of(state);
+      Role wantedRole = Role.of(role);
+      result =
+          documents.findAll(
+              ReviewModerationFilter.of(actor, like, wantedScope, wantedState, wantedRole),
+              pageRequest);
+      facets = countFacets(actor, like, wantedScope, wantedState, wantedRole);
+    } else {
+      result = documents.findVisibleTo(actor, like, includeActive, includeArchived, pageRequest);
+    }
 
     List<UUID> ids = result.getContent().stream().map(Document::getId).toList();
     Map<UUID, Integer> maxVersions =
@@ -215,13 +232,34 @@ public class DocumentOverviewService {
                       participating.contains(document.getId()));
                 })
             .toList();
-    return new DocumentPage(items, result.getTotalElements(), page, size);
+    return new DocumentPage(items, result.getTotalElements(), page, size, facets);
   }
 
   /**
    * The reviewer set for one summary card, anonymised (issue #422) when the review is anonymous and
    * the caller is not its owner — so the overview never leaks the roster of an anonymous review.
    */
+  /**
+   * The chip counts, each group counted against the other group's selection.
+   *
+   * <p>Nine counts rather than one grouped query: they are plain indexed counts over a table whose
+   * rows are reviews, and keeping each chip's number the result of the very predicate that chip
+   * applies is what stops the two drifting apart.
+   */
+  private ReviewFacetCounts countFacets(
+      UUID actor, String like, Scope scope, State state, Role role) {
+    return new ReviewFacetCounts(
+        documents.count(ReviewModerationFilter.of(actor, like, scope, state, Role.ANY)),
+        documents.count(ReviewModerationFilter.of(actor, like, scope, state, Role.OWNER)),
+        documents.count(ReviewModerationFilter.of(actor, like, scope, state, Role.REVIEWER)),
+        documents.count(ReviewModerationFilter.of(actor, like, scope, state, Role.OBSERVER)),
+        documents.count(ReviewModerationFilter.of(actor, like, Scope.ACTIVE, State.ANY, role)),
+        documents.count(ReviewModerationFilter.of(actor, like, Scope.ACTIVE, State.OPEN, role)),
+        documents.count(ReviewModerationFilter.of(actor, like, Scope.ACTIVE, State.CLOSED, role)),
+        documents.count(ReviewModerationFilter.of(actor, like, Scope.ARCHIVED, State.ANY, role)),
+        documents.count(ReviewModerationFilter.of(actor, like, Scope.ALL, State.ANY, role)));
+  }
+
   private List<ParticipantView> rosterFor(
       Document document, UUID actor, List<ParticipantProjection> rows, Map<UUID, String> slugById) {
     if (!document.isAnonymous() || document.getOwnerId().equals(actor)) {
@@ -273,6 +311,26 @@ public class DocumentOverviewService {
        */
       boolean participating) {}
 
-  /** A page of the caller's documents. */
-  public record DocumentPage(List<DocumentSummaryView> items, long total, int page, int size) {}
+  /** A page of the caller's documents; {@code facets} is set only when moderating (issue #563). */
+  public record DocumentPage(
+      List<DocumentSummaryView> items, long total, int page, int size, ReviewFacetCounts facets) {}
+
+  /**
+   * What each chip would show if clicked.
+   *
+   * <p>Counted on the server for the same reason the rows are paged there: a number derived from
+   * one page would describe that page while appearing to describe the workspace. Each group is
+   * counted against the OTHER group's current selection, which is the rule the participant-scoped
+   * view already follows — so a chip's number keeps predicting what clicking it shows.
+   */
+  public record ReviewFacetCounts(
+      long roleAny,
+      long roleOwner,
+      long roleReviewer,
+      long roleObserver,
+      long stateActive,
+      long stateOpen,
+      long stateClosed,
+      long stateArchived,
+      long stateAll) {}
 }

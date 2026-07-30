@@ -523,15 +523,81 @@ describe('ReviewsPage — the admin moderation listing (#563)', () => {
     expect(screen.queryByText('Reviewer')).not.toBeInTheDocument();
   });
 
-  it('hides the client-side facets while moderating', () => {
+  const FACETS = {
+    roleAny: 57,
+    roleOwner: 2,
+    roleReviewer: 5,
+    roleObserver: 50,
+    stateActive: 40,
+    stateOpen: 31,
+    stateClosed: 9,
+    stateArchived: 17,
+    stateAll: 57,
+  };
+
+  it('counts the chips from the whole workspace, not from the page on screen', () => {
     useAuthStore.setState({ userId: ME, isAuthenticated: true, role: 'ADMIN' });
-    mockReviews({ data: { items: [foreign], total: 1, page: 0, size: 20 } });
+    mockReviews({ data: { items: [foreign], total: 57, page: 0, size: 20, facets: FACETS } });
 
     renderPage('/reviews?participation=all');
 
-    // They would narrow the current page and read as the whole workspace.
-    expect(screen.queryByText('Owned by me')).not.toBeInTheDocument();
-    expect(screen.queryByText('Every state')).not.toBeInTheDocument();
+    // One row is on screen and the numbers describe 57 reviews, which is the
+    // whole point: a count taken from the page would describe the page while
+    // appearing to describe the workspace.
+    expect(screen.getByText('Owned by me (2)')).toBeInTheDocument();
+    expect(screen.getByText('Reviewing (5)')).toBeInTheDocument();
+    expect(screen.getByText('Every state (57)')).toBeInTheDocument();
+    expect(screen.getByText('Archived (17)')).toBeInTheDocument();
+  });
+
+  it('offers the not-participating facet, and only while moderating', () => {
+    useAuthStore.setState({ userId: ME, isAuthenticated: true, role: 'ADMIN' });
+    mockReviews({ data: { items: [foreign], total: 57, page: 0, size: 20, facets: FACETS } });
+
+    renderPage('/reviews?participation=all');
+
+    expect(screen.getByText('Not participating (50)')).toBeInTheDocument();
+  });
+
+  it("has no not-participating facet in the caller's own listing", () => {
+    useAuthStore.setState({ userId: ME, isAuthenticated: true, role: 'ADMIN' });
+
+    renderPage();
+
+    // There, every row is the caller's by construction — a facet that can never
+    // match is a control that only puzzles.
+    expect(screen.queryByText(/Not participating/)).not.toBeInTheDocument();
+  });
+
+  it('sends a chosen chip to the server rather than filtering the page', () => {
+    useAuthStore.setState({ userId: ME, isAuthenticated: true, role: 'ADMIN' });
+    mockReviews({ data: { items: [foreign], total: 57, page: 0, size: 20, facets: FACETS } });
+
+    renderPage('/reviews?participation=all');
+    fireEvent.click(screen.getByText('Not participating (50)'));
+
+    const last = vi.mocked(useReviews).mock.calls.at(-1)![0];
+    expect(last.role).toBe('observer');
+    expect(last.participation).toBe('all');
+  });
+
+  it('splits the status chips into the retention and workflow slices', () => {
+    useAuthStore.setState({ userId: ME, isAuthenticated: true, role: 'ADMIN' });
+    mockReviews({ data: { items: [foreign], total: 57, page: 0, size: 20, facets: FACETS } });
+
+    renderPage('/reviews?participation=all');
+    fireEvent.click(screen.getByText('Closed (9)'));
+
+    // 'Closed' means "not archived, and the workflow closed it" — two orthogonal
+    // parameters on the wire, the same rule the browser-side facet follows.
+    const closed = vi.mocked(useReviews).mock.calls.at(-1)![0];
+    expect(closed.scope).toBe('active');
+    expect(closed.state).toBe('closed');
+
+    fireEvent.click(screen.getByText('Archived (17)'));
+    const archived = vi.mocked(useReviews).mock.calls.at(-1)![0];
+    expect(archived.scope).toBe('archived');
+    expect(archived.state).toBe('any');
   });
 
   it('says which slice of the workspace is on screen', () => {

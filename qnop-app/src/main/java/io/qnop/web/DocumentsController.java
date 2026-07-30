@@ -37,6 +37,7 @@ import io.qnop.api.v1.model.ParticipantKind;
 import io.qnop.api.v1.model.ParticipantListResponse;
 import io.qnop.api.v1.model.ParticipantView;
 import io.qnop.api.v1.model.RenderedDocumentResponse;
+import io.qnop.api.v1.model.ReviewFacetCounts;
 import io.qnop.api.v1.model.ThreadParticipation;
 import io.qnop.api.v1.model.VersionDiffResponse;
 import io.qnop.api.v1.model.VisitResponse;
@@ -94,7 +95,14 @@ public class DocumentsController implements DocumentsApi {
 
   @Override
   public ResponseEntity<DocumentListResponse> listDocuments(
-      String q, String sort, String scope, String participation, Integer page, Integer size) {
+      String q,
+      String sort,
+      String scope,
+      String participation,
+      String state,
+      String role,
+      Integer page,
+      Integer size) {
     // The retention slice (issue #576): active (default) / archived / all.
     boolean includeArchived = "archived".equals(scope) || "all".equals(scope);
     boolean includeActive = !"archived".equals(scope);
@@ -107,6 +115,9 @@ public class DocumentsController implements DocumentsApi {
             moderation,
             q,
             sort,
+            scope,
+            state,
+            role,
             includeActive,
             includeArchived,
             page == null ? 0 : page,
@@ -116,7 +127,8 @@ public class DocumentsController implements DocumentsApi {
             .items(result.items().stream().map(DocumentsController::toSummary).toList())
             .total(result.total())
             .page(result.page())
-            .size(result.size()));
+            .size(result.size())
+            .facets(toFacets(result.facets())));
   }
 
   @Override
@@ -149,6 +161,22 @@ public class DocumentsController implements DocumentsApi {
     participants.remove(
         documentId, participantId, CurrentUser.requireUserId(), CurrentUser.isAdmin());
     return ResponseEntity.noContent().build();
+  }
+
+  /** The chip counts, or null outside the moderation listing (issue #563). */
+  private static ReviewFacetCounts toFacets(DocumentOverviewService.ReviewFacetCounts counts) {
+    return counts == null
+        ? null
+        : new ReviewFacetCounts()
+            .roleAny(counts.roleAny())
+            .roleOwner(counts.roleOwner())
+            .roleReviewer(counts.roleReviewer())
+            .roleObserver(counts.roleObserver())
+            .stateActive(counts.stateActive())
+            .stateOpen(counts.stateOpen())
+            .stateClosed(counts.stateClosed())
+            .stateArchived(counts.stateArchived())
+            .stateAll(counts.stateAll());
   }
 
   private static DocumentSummary toSummary(DocumentOverviewService.DocumentSummaryView view) {

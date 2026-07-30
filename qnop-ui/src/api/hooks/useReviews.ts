@@ -45,6 +45,10 @@ export interface ReviewListParams {
    * that knows the caller's role.
    */
   participation?: 'mine' | 'all';
+  /** Workflow slice, server-applied while moderating (issue #563). */
+  state?: 'any' | 'open' | 'closed';
+  /** The caller's part, server-applied while moderating (issue #563). */
+  role?: 'any' | 'owner' | 'reviewer' | 'observer';
   page: number;
   size: number;
 }
@@ -68,6 +72,8 @@ export function useReviews(params: ReviewListParams) {
         sort: params.sort,
         scope: params.scope,
         participation: params.participation,
+        state: params.state,
+        role: params.role,
         page: params.page,
         size: params.size,
       });

@@ -66,9 +66,17 @@ class AdminReviewModerationIT extends SeededIntegrationTest {
     return foreignReview(title, ThreadParticipation.OPEN);
   }
 
+  private UUID foreignReview(String title, WorkflowState state) {
+    return foreignReview(title, ThreadParticipation.OPEN, state);
+  }
+
   private UUID foreignReview(String title, ThreadParticipation threads) {
+    return foreignReview(title, threads, WorkflowState.IN_REVIEW);
+  }
+
+  private UUID foreignReview(String title, ThreadParticipation threads, WorkflowState state) {
     Document document = new Document(MEMBER_ID, title);
-    document.setWorkflowState(WorkflowState.IN_REVIEW);
+    document.setWorkflowState(state);
     document.setThreadParticipation(threads);
     UUID documentId = documents.save(document).getId();
     versions.save(
@@ -83,12 +91,14 @@ class AdminReviewModerationIT extends SeededIntegrationTest {
     return documentId;
   }
 
-  private String list(UUID actor, String participation) throws Exception {
+  private String list(UUID actor, String participation, String... params) throws Exception {
+    var request =
+        get("/api/v1/documents").param("participation", participation).param("size", "100");
+    for (int index = 0; index + 1 < params.length; index += 2) {
+      request = request.param(params[index], params[index + 1]);
+    }
     return mockMvc
-        .perform(
-            as(
-                get("/api/v1/documents").param("participation", participation).param("size", "100"),
-                actor))
+        .perform(as(request, actor))
         .andExpect(status().isOk())
         .andReturn()
         .getResponse()
@@ -199,6 +209,61 @@ class AdminReviewModerationIT extends SeededIntegrationTest {
     // And the reviewer now sees it in their own listing, which is the point of
     // being able to do it at all.
     assertThat(titles(list(MEMBER2_ID, "mine"))).contains("Reviewer added by an admin");
+  }
+
+  @Test
+  @DisplayName("the facets filter the workspace on the server, not the page on screen")
+  void facetsAreServerSide() throws Exception {
+    foreignReview("Closed foreign review", WorkflowState.FINALIZED);
+    foreignReview("Open foreign review");
+    Document own = new Document(ADMIN_ID, "The admins own open one");
+    own.setWorkflowState(WorkflowState.IN_REVIEW);
+    documents.save(own);
+
+    // The workflow slice is a predicate, orthogonal to the retention one.
+    String open = list(ADMIN_ID, "all", "state", "open");
+    assertThat(titles(open)).contains("Open foreign review", "The admins own open one");
+    assertThat(titles(open)).doesNotContain("Closed foreign review");
+
+    // And so is the caller's part in it — the facet that only this listing has.
+    String observed = list(ADMIN_ID, "all", "role", "observer");
+    assertThat(titles(observed)).contains("Open foreign review");
+    assertThat(titles(observed)).doesNotContain("The admins own open one");
+
+    String owned = list(ADMIN_ID, "all", "role", "owner");
+    assertThat(titles(owned)).containsOnly("The admins own open one");
+  }
+
+  @Test
+  @DisplayName("the chip counts describe the workspace, not the page")
+  void facetCountsSpanTheWorkspace() throws Exception {
+    for (int index = 0; index < 3; index++) {
+      foreignReview("Foreign review " + index);
+    }
+    Document own = new Document(ADMIN_ID, "Owned by the admin");
+    own.setWorkflowState(WorkflowState.IN_REVIEW);
+    documents.save(own);
+
+    // One row per page, so a count taken from the page would read 1 for
+    // everything — which is exactly the lie the server-side counts prevent.
+    String json =
+        mockMvc
+            .perform(
+                as(
+                    get("/api/v1/documents")
+                        .param("participation", "all")
+                        .param("size", "1")
+                        .param("q", "review "),
+                    ADMIN_ID))
+            .andExpect(status().isOk())
+            .andReturn()
+            .getResponse()
+            .getContentAsString();
+
+    assertThat((Integer) JsonPath.read(json, "$.items.length()")).isEqualTo(1);
+    assertThat(((Number) JsonPath.read(json, "$.facets.roleObserver")).intValue()).isEqualTo(3);
+    assertThat(((Number) JsonPath.read(json, "$.facets.roleOwner")).intValue()).isZero();
+    assertThat(json).doesNotContain("Owned by the admin"); // the search excluded it
   }
 
   /** Raises one open annotation on version 1, authored by {@code author}. */

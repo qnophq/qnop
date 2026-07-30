@@ -30,12 +30,20 @@ import java.util.UUID;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
 import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
-/** Data access for review aggregate roots (issue #244, ADR-0011). */
-public interface DocumentRepository extends JpaRepository<Document, UUID> {
+/**
+ * Data access for review aggregate roots (issue #244, ADR-0011).
+ *
+ * <p>Extends {@link JpaSpecificationExecutor} for the admin's moderation listing (issue #563),
+ * whose facets are independent dimensions the caller combines freely — built as a {@code
+ * Specification} rather than one query with a fistful of booleans.
+ */
+public interface DocumentRepository
+    extends JpaRepository<Document, UUID>, JpaSpecificationExecutor<Document> {
 
   /**
    * Loads a document under a {@code PESSIMISTIC_WRITE} row lock (issue #324): serializes the
@@ -79,26 +87,6 @@ public interface DocumentRepository extends JpaRepository<Document, UUID> {
           + "   WHERE pt.documentId = d.id AND pt.teamId = m.teamId AND m.userId = :actor))")
   Page<Document> findVisibleTo(
       @Param("actor") UUID actor,
-      @Param("q") String q,
-      @Param("includeActive") boolean includeActive,
-      @Param("includeArchived") boolean includeArchived,
-      Pageable pageable);
-
-  /**
-   * Every review, for an admin's moderation listing (issue #563).
-   *
-   * <p>A separate query rather than a flag on {@link #findVisibleTo}: a predicate that drops its
-   * own access clause when a boolean says so is the kind of construct that gets misread the next
-   * time someone touches it, and the thing being dropped here is the access rule. Two queries make
-   * the unscoped one impossible to reach by accident — the caller has to name it.
-   *
-   * <p>Callers must check the admin role themselves; this method asks nobody's permission.
-   */
-  @Query(
-      "SELECT d FROM Document d WHERE (:q IS NULL OR LOWER(d.title) LIKE :q)"
-          + " AND ((:includeActive = TRUE AND d.archivedAt IS NULL)"
-          + "   OR (:includeArchived = TRUE AND d.archivedAt IS NOT NULL))")
-  Page<Document> findAllForModeration(
       @Param("q") String q,
       @Param("includeActive") boolean includeActive,
       @Param("includeArchived") boolean includeArchived,
