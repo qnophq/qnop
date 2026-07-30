@@ -121,6 +121,8 @@ public class StorageRemediationService {
   private boolean isReferenced(String key) {
     List<String> one = List.of(key);
     return !documentVersions.findVersionRefsByStorageKeyIn(one).isEmpty()
+        // A version's converted PDF is referenced just as much as its upload (#343).
+        || !documentVersions.findVersionRefsByRenditionKeyIn(one).isEmpty()
         || !documentAttachments.findAttachmentRefsByStorageKeyIn(one).isEmpty()
         || storageObjects.findByObjectKey(key).isPresent();
   }

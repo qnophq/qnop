@@ -43,6 +43,7 @@ import { SummaryStep } from '../../components/reviews/wizard/SummaryStep';
 import type { SubmitPhase } from '../../components/reviews/wizard/SummaryStep';
 import { WizardStepsHeader } from '../../components/reviews/wizard/WizardStepsHeader';
 import {
+  acceptedUploads,
   launchChecklist,
   suggestSlug,
   titleFromFilename,
@@ -90,6 +91,7 @@ export function NewReviewPage() {
   const [submit, setSubmit] = useState<SubmitState>(SUBMIT_IDLE);
 
   const maxSizeMb = config?.upload.maxDocumentSizeMb ?? FALLBACK_MAX_SIZE_MB;
+  const accepted = acceptedUploads(config?.supportedFormats);
   const isSubmitting = submit.phase !== 'idle';
 
   // Until the user edits the slug themselves it mirrors the title (issue #411).
@@ -102,7 +104,7 @@ export function NewReviewPage() {
   };
 
   const handleFilePicked = (picked: File) => {
-    const error = validateDocumentFile(picked, maxSizeMb);
+    const error = validateDocumentFile(picked, maxSizeMb, accepted);
     if (error) {
       setFileError(error);
       return;
@@ -266,6 +268,7 @@ export function NewReviewPage() {
                 slug={slug}
                 slugError={slugError}
                 maxSizeMb={maxSizeMb}
+                accepted={accepted}
                 onFilePicked={handleFilePicked}
                 onFileCleared={() => setFile(null)}
                 onTitleChange={handleTitleChange}

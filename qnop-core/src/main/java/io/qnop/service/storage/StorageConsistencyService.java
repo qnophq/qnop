@@ -129,11 +129,15 @@ public class StorageConsistencyService {
    */
   public ConsistencyReport scan() {
     List<String> versionKeys = documentVersions.findAllStorageKeys();
+    // A converted version is rendered from a second object (issue #343); leaving it
+    // out would report every DOCX review's rendition as an orphan.
+    List<String> renditionKeys = documentVersions.findAllRenditionStorageKeys();
     List<String> attachmentKeys = documentAttachments.findAllStorageKeys();
     List<String> registryKeys = storageObjects.findAllObjectKeys();
 
     Set<String> referenced = new HashSet<>();
     referenced.addAll(versionKeys);
+    referenced.addAll(renditionKeys);
     referenced.addAll(attachmentKeys);
     referenced.addAll(registryKeys);
 
@@ -190,7 +194,8 @@ public class StorageConsistencyService {
       return List.of();
     }
     List<VersionStorageRef> versionRefs =
-        documentVersions.findVersionRefsByStorageKeyIn(missingKeys);
+        new java.util.ArrayList<>(documentVersions.findVersionRefsByStorageKeyIn(missingKeys));
+    versionRefs.addAll(documentVersions.findVersionRefsByRenditionKeyIn(missingKeys));
     List<AttachmentStorageRef> attachmentRefs =
         documentAttachments.findAttachmentRefsByStorageKeyIn(missingKeys);
 

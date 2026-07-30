@@ -81,6 +81,7 @@ class DocumentIngestServiceTest {
   @Mock private AnnotationRepository annotations;
   @Mock private AnnotationPlacementRepository placements;
   @Mock private PlatformTransactionManager transactionManager;
+  @Mock private DocumentRenditionService renditions;
 
   private DocumentIngestService service;
 
@@ -91,6 +92,11 @@ class DocumentIngestServiceTest {
   private static final byte[] PDF_BYTES = "%PDF-1.7\n%âã".getBytes(StandardCharsets.UTF_8);
 
   private DocumentIngestService newService() {
+    // Every format this server takes, unless a test says otherwise: the converter
+    // question is answered by DocumentRenditionService and tested there.
+    org.mockito.Mockito.lenient()
+        .when(renditions.supports(org.mockito.ArgumentMatchers.anyString()))
+        .thenReturn(true);
     return new DocumentIngestService(
         documents,
         versions,
@@ -101,7 +107,8 @@ class DocumentIngestServiceTest {
         annotations,
         placements,
         transactionManager,
-        org.mockito.Mockito.mock(org.springframework.context.ApplicationEventPublisher.class));
+        org.mockito.Mockito.mock(org.springframework.context.ApplicationEventPublisher.class),
+        renditions);
   }
 
   // --- request validation (rejected before any storage or settings work) -----
@@ -221,6 +228,23 @@ class DocumentIngestServiceTest {
 
       assertRejected(
           () -> service.createDocument(OWNER, "Contract", huge, null, null, false, null), 413);
+      verify(storage, never()).stage(any(), any(), anyLong());
+    }
+
+    @Test
+    @DisplayName(
+        "a Word upload is refused where no converter is installed, before any storage work")
+    void wordRejectedWithoutAConverter() throws Exception {
+      service = newService();
+      when(settings.getInteger(ApplicationSettingKey.UPLOAD_DOCUMENT_MAX_FILE_SIZE_MB))
+          .thenReturn(10);
+      // The server knows now that it can never render this, so it says so now —
+      // rather than accepting the file and failing a job the user waited for (#343).
+      when(renditions.supports(DocumentTypeSniffer.DOCX)).thenReturn(false);
+      UploadSource word = upload(wordArchive(), 512);
+
+      assertRejected(
+          () -> service.createDocument(OWNER, "Contract", word, null, null, false, null), 415);
       verify(storage, never()).stage(any(), any(), anyLong());
     }
 
@@ -435,6 +459,20 @@ class DocumentIngestServiceTest {
 
   private static UploadSource pdfUpload() {
     return upload(PDF_BYTES, PDF_BYTES.length);
+  }
+
+  /** The smallest thing the sniffer accepts as Word: a ZIP carrying the main part. */
+  private static byte[] wordArchive() throws java.io.IOException {
+    java.io.ByteArrayOutputStream out = new java.io.ByteArrayOutputStream();
+    try (java.util.zip.ZipOutputStream zip = new java.util.zip.ZipOutputStream(out)) {
+      zip.putNextEntry(new java.util.zip.ZipEntry("[Content_Types].xml"));
+      zip.write("<Types/>".getBytes(StandardCharsets.UTF_8));
+      zip.closeEntry();
+      zip.putNextEntry(new java.util.zip.ZipEntry("word/document.xml"));
+      zip.write("<w:document/>".getBytes(StandardCharsets.UTF_8));
+      zip.closeEntry();
+    }
+    return out.toByteArray();
   }
 
   private static UploadSource upload(byte[] content, long declaredSize) {

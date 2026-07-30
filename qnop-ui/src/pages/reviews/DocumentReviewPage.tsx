@@ -545,8 +545,11 @@ export function DocumentReviewPage() {
             )}
             {extractionStatus === ExtractionStatus.Failed && (
               <Alert severity="error">
-                Extraction failed for this version, so it cannot be annotated. The original document
-                is still shown below.
+                Extraction failed for this version, so it cannot be annotated.
+                {/* A PDF still displays — it is its own viewable copy. A Word file
+                    is viewed through a conversion that never happened, so there is
+                    nothing to show and promising otherwise would be a lie. */}
+                {pdf ? ' The original document is still shown below.' : ' Download it to read it.'}
               </Alert>
             )}
             {pdfError && <Alert severity="error">The PDF could not be displayed: {pdfError}</Alert>}

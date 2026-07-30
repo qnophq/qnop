@@ -21,15 +21,51 @@
 
 /** Pure logic of the new-review wizard — kept DOM-free for direct unit testing. */
 
+import type { SupportedFormat } from '../../../api/generated';
+
 const BYTES_PER_MB = 1024 * 1024;
+
+const DOCX_MIME = 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
+
+/**
+ * What this server takes, as the pieces the upload UI needs.
+ *
+ * <p>Derived from `ServerConfig.supportedFormats` rather than hardcoded, because
+ * it is a property of the deployment: Word needs an out-of-process converter
+ * (issue #343, ADR-0010), and a server without one rejects a DOCX with 415. When
+ * the config has not arrived yet the answer is PDF — offering a format that may
+ * be refused is worse than briefly offering one fewer.
+ */
+export interface AcceptedUploads {
+  /** The `accept` attribute of a file input. */
+  accept: string;
+  /** How the dropzone names the formats, e.g. `PDF or Word`. */
+  label: string;
+  /** Whether a picked file passes the client-side type check. */
+  matches: (file: File) => boolean;
+}
+
+export function acceptedUploads(formats: SupportedFormat[] | undefined): AcceptedUploads {
+  const word = (formats ?? []).includes('DOCX');
+  const matchesPdf = (file: File) => file.type === 'application/pdf' || /\.pdf$/i.test(file.name);
+  const matchesWord = (file: File) => file.type === DOCX_MIME || /\.docx$/i.test(file.name);
+  return {
+    accept: word ? `application/pdf,.pdf,${DOCX_MIME},.docx` : 'application/pdf,.pdf',
+    label: word ? 'PDF or Word' : 'PDF',
+    matches: (file) => matchesPdf(file) || (word && matchesWord(file)),
+  };
+}
 
 /**
  * Client-side pre-check of the chosen file (the backend re-validates and is
- * authoritative). PDF-only mirrors the Community scope of the vertical slice.
+ * authoritative).
  */
-export function validateDocumentFile(file: File, maxSizeMb: number): string | null {
-  const isPdf = file.type === 'application/pdf' || /\.pdf$/i.test(file.name);
-  if (!isPdf) return 'Only PDF documents are supported.';
+export function validateDocumentFile(
+  file: File,
+  maxSizeMb: number,
+  accepted: AcceptedUploads,
+): string | null {
+  if (!accepted.matches(file)) return `Only ${accepted.label} documents are supported.`;
   if (file.size > maxSizeMb * BYTES_PER_MB) {
     return `The file exceeds the maximum size of ${maxSizeMb} MB.`;
   }
@@ -38,7 +74,7 @@ export function validateDocumentFile(file: File, maxSizeMb: number): string | nu
 
 /** Default review title derived from the file name (extension stripped). */
 export function titleFromFilename(filename: string): string {
-  return filename.replace(/\.pdf$/i, '').trim();
+  return filename.replace(/\.(pdf|docx)$/i, '').trim();
 }
 
 export const SLUG_MIN_LENGTH = 3;

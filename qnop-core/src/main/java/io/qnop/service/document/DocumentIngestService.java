@@ -40,7 +40,6 @@ import io.qnop.service.storage.StorageQuotaExceededException;
 import io.qnop.service.storage.StorageService;
 import java.io.IOException;
 import java.io.InputStream;
-import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.util.Comparator;
 import java.util.Locale;
@@ -74,8 +73,6 @@ public class DocumentIngestService {
   /** The job type consumed by {@code DocumentExtractionJobHandler}. */
   public static final String EXTRACTION_JOB_TYPE = "document.extract";
 
-  static final String PDF_CONTENT_TYPE = "application/pdf";
-  private static final byte[] PDF_MAGIC = "%PDF-".getBytes(StandardCharsets.US_ASCII);
   private static final int MAX_TITLE_LENGTH = 500;
 
   private static final int MIN_SLUG_LENGTH = 3;
@@ -96,6 +93,7 @@ public class DocumentIngestService {
   private final AnnotationPlacementRepository placements;
   private final TransactionTemplate transactionTemplate;
   private final ApplicationEventPublisher events;
+  private final DocumentRenditionService renditions;
 
   public DocumentIngestService(
       DocumentRepository documents,
@@ -107,7 +105,8 @@ public class DocumentIngestService {
       AnnotationRepository annotations,
       AnnotationPlacementRepository placements,
       PlatformTransactionManager transactionManager,
-      ApplicationEventPublisher events) {
+      ApplicationEventPublisher events,
+      DocumentRenditionService renditions) {
     this.documents = documents;
     this.versions = versions;
     this.storage = storage;
@@ -118,6 +117,7 @@ public class DocumentIngestService {
     this.placements = placements;
     this.transactionTemplate = new TransactionTemplate(transactionManager);
     this.events = events;
+    this.renditions = renditions;
   }
 
   /**
@@ -143,9 +143,9 @@ public class DocumentIngestService {
       throw DocumentValidationException.slugTaken("slug is already in use: " + cleanSlug);
     }
     long maxBytes = maxUploadBytes();
-    validateUpload(upload, maxBytes);
+    String contentType = validateUpload(upload, maxBytes);
 
-    StagedObject staged = stageUpload(upload, maxBytes);
+    StagedObject staged = stageUpload(upload, maxBytes, contentType);
     UploadResult result;
     try {
       result =
@@ -157,7 +157,8 @@ public class DocumentIngestService {
                 document.setAnonymous(anonymous);
                 document.setThreadParticipation(policy);
                 document = documents.save(document);
-                DocumentVersion version = saveVersionAndEnqueue(document.getId(), 1, staged, actor);
+                DocumentVersion version =
+                    saveVersionAndEnqueue(document.getId(), 1, staged, contentType, actor);
                 return new UploadResult(
                     document.getId(),
                     version.getVersionNumber(),
@@ -191,9 +192,9 @@ public class DocumentIngestService {
       throw DocumentValidationException.notOwner("only the owner may upload a new version");
     }
     long maxBytes = maxUploadBytes();
-    validateUpload(upload, maxBytes);
+    String contentType = validateUpload(upload, maxBytes);
 
-    StagedObject staged = stageUpload(upload, maxBytes);
+    StagedObject staged = stageUpload(upload, maxBytes, contentType);
     UploadResult result =
         transactionTemplate.execute(
             status -> {
@@ -207,7 +208,8 @@ public class DocumentIngestService {
                           .map(DocumentVersion::getVersionNumber)
                           .orElse(0)
                       + 1;
-              DocumentVersion version = saveVersionAndEnqueue(documentId, next, staged, actor);
+              DocumentVersion version =
+                  saveVersionAndEnqueue(documentId, next, staged, contentType, actor);
               seedPendingPlacements(documentId, version);
               // Participants learn about the new version after commit (issue #316).
               events.publishEvent(new ReviewEvent.VersionUploaded(documentId, actor, next));
@@ -219,7 +221,7 @@ public class DocumentIngestService {
   }
 
   private DocumentVersion saveVersionAndEnqueue(
-      UUID documentId, int versionNumber, StagedObject staged, UUID actor) {
+      UUID documentId, int versionNumber, StagedObject staged, String contentType, UUID actor) {
     DocumentVersion version =
         versions.save(
             new DocumentVersion(
@@ -227,7 +229,7 @@ public class DocumentIngestService {
                 versionNumber,
                 staged.key(),
                 staged.contentHash(),
-                PDF_CONTENT_TYPE,
+                contentType,
                 staged.sizeBytes(),
                 actor));
     // Outbox (ADR-0033): the job commits with the version row, so extraction can never be lost
@@ -339,43 +341,58 @@ public class DocumentIngestService {
    * then a streaming magic-byte sniff of the real type (ADR-0032 §5 — the client-declared MIME is
    * never trusted). The authoritative size limit is enforced while staging (issue #361).
    */
-  private void validateUpload(UploadSource upload, long maxBytes) {
+  /**
+   * Checks the size and decides what the upload is, returning its content type.
+   *
+   * <p>Decided from the bytes, never from what the client declared (issue #245). A format this
+   * server cannot render is refused <em>here</em> rather than accepted and failed asynchronously:
+   * DOCX needs an out-of-process converter (issue #343, ADR-0010), and on a server without one the
+   * answer is the same at every later moment, so making the user wait for a job to tell them would
+   * be a worse way of saying no.
+   */
+  private String validateUpload(UploadSource upload, long maxBytes) {
     if (upload.declaredSize() > maxBytes) {
       throw DocumentValidationException.tooLarge("document exceeds " + maxBytes + " bytes");
     }
-    byte[] prefix = new byte[PDF_MAGIC.length];
-    int read;
+    String contentType;
     try (InputStream in = upload.open()) {
-      read = in.readNBytes(prefix, 0, prefix.length);
+      contentType = DocumentTypeSniffer.sniff(in);
     } catch (IOException e) {
       throw DocumentValidationException.invalidRequest("upload could not be read");
     }
-    if (read == 0) {
+    if (contentType == null && isEmpty(upload)) {
+      // Nothing at all is a malformed request, not an unsupported format — the
+      // distinction a client needs to tell "you sent nothing" from "we do not take
+      // that kind of file".
       throw DocumentValidationException.invalidRequest("empty upload");
     }
-    if (read < PDF_MAGIC.length || !hasPdfMagic(prefix)) {
-      throw DocumentValidationException.unsupportedType("only PDF documents are accepted");
+    if (contentType == null) {
+      throw DocumentValidationException.unsupportedType("only PDF and Word documents are accepted");
+    }
+    if (!renditions.supports(contentType)) {
+      throw DocumentValidationException.unsupportedType(
+          "this server cannot process Word documents; no office converter is installed");
+    }
+    return contentType;
+  }
+
+  private static boolean isEmpty(UploadSource upload) {
+    try (InputStream in = upload.open()) {
+      return in.read() < 0;
+    } catch (IOException e) {
+      throw DocumentValidationException.invalidRequest("upload could not be read");
     }
   }
 
   /** Streams the upload into storage under the authoritative size cap, mapping its errors. */
-  private StagedObject stageUpload(UploadSource upload, long maxBytes) {
+  private StagedObject stageUpload(UploadSource upload, long maxBytes, String contentType) {
     try (InputStream in = upload.open()) {
-      return storage.stage(in, PDF_CONTENT_TYPE, maxBytes);
+      return storage.stage(in, contentType, maxBytes);
     } catch (StorageQuotaExceededException e) {
       throw DocumentValidationException.tooLarge("document exceeds " + e.limitBytes() + " bytes");
     } catch (IOException e) {
       throw DocumentValidationException.invalidRequest("upload could not be read");
     }
-  }
-
-  private static boolean hasPdfMagic(byte[] prefix) {
-    for (int i = 0; i < PDF_MAGIC.length; i++) {
-      if (prefix[i] != PDF_MAGIC[i]) {
-        return false;
-      }
-    }
-    return true;
   }
 
   /** Outcome of an upload: which document/version was created and its extraction state. */

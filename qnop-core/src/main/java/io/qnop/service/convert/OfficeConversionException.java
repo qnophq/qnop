@@ -21,15 +21,37 @@
 package io.qnop.service.convert;
 
 /**
- * A document could not be converted — an environment or infrastructure failure, not a user error.
+ * A document could not be converted.
+ *
+ * <p>Usually an environment failure rather than a user error — no converter installed, a run that
+ * did not finish in time — and those are worth retrying. {@link #isPermanent()} marks the one case
+ * that is not: the converter ran to completion and produced nothing, which is how the tool says it
+ * could not read the document. Retrying that forever would leave a version stuck in PENDING (issue
+ * #343), so it is failed instead.
  */
 public class OfficeConversionException extends RuntimeException {
 
+  private final boolean permanent;
+
   public OfficeConversionException(String message) {
-    super(message);
+    this(message, null, false);
   }
 
   public OfficeConversionException(String message, Throwable cause) {
+    this(message, cause, false);
+  }
+
+  private OfficeConversionException(String message, Throwable cause, boolean permanent) {
     super(message, cause);
+    this.permanent = permanent;
+  }
+
+  /** The converter ran and could not read the document; a retry produces the same answer. */
+  public static OfficeConversionException unreadableDocument(String message) {
+    return new OfficeConversionException(message, null, true);
+  }
+
+  public boolean isPermanent() {
+    return permanent;
   }
 }

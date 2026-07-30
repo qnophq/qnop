@@ -32,6 +32,7 @@ import io.qnop.entity.ExtractionStatus;
 import io.qnop.repository.AnnotationPlacementRepository;
 import io.qnop.repository.AuditEventRepository;
 import io.qnop.repository.DocumentVersionRepository;
+import io.qnop.service.convert.OfficeConverter;
 import io.qnop.service.job.JobEnqueuer;
 import io.qnop.service.job.JobPayload;
 import io.qnop.service.job.JobPayloadCodec;
@@ -77,7 +78,12 @@ class DocumentExtractionJobHandlerTest {
     // directly (no Spring proxy), over the same mocked repositories.
     DocumentExtractionWriter writer =
         new DocumentExtractionWriter(versions, placements, jobs, auditEvents);
-    return new DocumentExtractionJobHandler(versions, storage, List.of(extractors), writer);
+    // A PDF version needs no conversion, so the real service is used with a
+    // converter that is never called; the DOCX path has its own test.
+    DocumentRenditionService renditions =
+        new DocumentRenditionService(mock(OfficeConverter.class), storage, writer);
+    return new DocumentExtractionJobHandler(
+        versions, storage, List.of(extractors), writer, renditions);
   }
 
   private static String payload(UUID versionId) {

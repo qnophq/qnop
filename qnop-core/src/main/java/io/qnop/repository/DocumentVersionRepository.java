@@ -63,15 +63,28 @@ public interface DocumentVersionRepository extends JpaRepository<DocumentVersion
 
   /**
    * Every version's storage key, for the storage-consistency scan's referenced set (issue #523).
+   *
+   * <p>A converted version references two objects, and its rendition is just as referenced as its
+   * upload (issue #343) — hence {@link #findAllRenditionStorageKeys()}. Left as two queries rather
+   * than one union so each stays a plain projection.
    */
   @Query("SELECT v.storageKey FROM DocumentVersion v")
   List<String> findAllStorageKeys();
 
+  /** Every converted version's rendition key; the other half of the referenced set (issue #343). */
+  @Query(
+      "SELECT v.renditionStorageKey FROM DocumentVersion v WHERE v.renditionStorageKey IS NOT NULL")
+  List<String> findAllRenditionStorageKeys();
+
   /**
    * The storage keys one document's versions reference — collected before a purge deletes the
-   * aggregate, so the purge knows which keys to re-check for other referrers (issue #577).
+   * aggregate, so the purge knows which keys to re-check for other referrers (issue #577). Includes
+   * the converted PDFs (issue #343), which nothing else would ever reclaim.
    */
-  @Query("SELECT v.storageKey FROM DocumentVersion v WHERE v.documentId = :documentId")
+  @Query(
+      "SELECT v.storageKey FROM DocumentVersion v WHERE v.documentId = :documentId"
+          + " UNION SELECT v.renditionStorageKey FROM DocumentVersion v"
+          + " WHERE v.documentId = :documentId AND v.renditionStorageKey IS NOT NULL")
   List<String> findStorageKeysByDocumentId(@Param("documentId") UUID documentId);
 
   /** Maps missing storage keys back to their document + version, to explain a data-loss finding. */
@@ -79,4 +92,17 @@ public interface DocumentVersionRepository extends JpaRepository<DocumentVersion
       "SELECT new io.qnop.repository.VersionStorageRef(v.storageKey, v.documentId, v.versionNumber)"
           + " FROM DocumentVersion v WHERE v.storageKey IN :keys")
   List<VersionStorageRef> findVersionRefsByStorageKeyIn(@Param("keys") Collection<String> keys);
+
+  /**
+   * The same, for keys referenced as a rendition (issue #343).
+   *
+   * <p>Separate from {@link #findVersionRefsByStorageKeyIn} because the projection has to name the
+   * key that matched: a purge asking "is this key still referenced?" about a rendition would
+   * otherwise be told about the upload instead, and delete a file that is still in use.
+   */
+  @Query(
+      "SELECT new io.qnop.repository.VersionStorageRef("
+          + "v.renditionStorageKey, v.documentId, v.versionNumber)"
+          + " FROM DocumentVersion v WHERE v.renditionStorageKey IN :keys")
+  List<VersionStorageRef> findVersionRefsByRenditionKeyIn(@Param("keys") Collection<String> keys);
 }

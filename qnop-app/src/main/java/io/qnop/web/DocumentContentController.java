@@ -58,8 +58,28 @@ public class DocumentContentController {
       @RequestHeader(value = HttpHeaders.IF_NONE_MATCH, required = false) String ifNoneMatch) {
     UUID actor = CurrentUser.requireUserId();
     boolean admin = CurrentUser.isAdmin();
+    return stream(documents.getOriginal(documentId, versionNumber, actor, admin), ifNoneMatch);
+  }
 
-    OriginalDownload download = documents.getOriginal(documentId, versionNumber, actor, admin);
+  /**
+   * The PDF the viewer renders (issue #343).
+   *
+   * <p>For a PDF version this is the upload; for a Word one it is the conversion made at ingest
+   * (ADR-0010). Two endpoints rather than one that guesses, because {@code /original} has a reader
+   * who wants the file that was uploaded — and for a Word review that is the Word file.
+   */
+  @GetMapping("/documents/{documentId}/versions/{versionNumber}/rendition")
+  public ResponseEntity<InputStreamResource> downloadRendition(
+      @PathVariable UUID documentId,
+      @PathVariable int versionNumber,
+      @RequestHeader(value = HttpHeaders.IF_NONE_MATCH, required = false) String ifNoneMatch) {
+    UUID actor = CurrentUser.requireUserId();
+    boolean admin = CurrentUser.isAdmin();
+    return stream(documents.getRendition(documentId, versionNumber, actor, admin), ifNoneMatch);
+  }
+
+  private ResponseEntity<InputStreamResource> stream(
+      OriginalDownload download, String ifNoneMatch) {
     String etag = "\"" + download.contentHash() + "\"";
     if (etag.equals(ifNoneMatch)) {
       download.close();

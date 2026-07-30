@@ -129,7 +129,10 @@ public class LibreOfficeConverter implements OfficeConverter {
 
       Path output = workspace.resolve("document.pdf");
       if (!Files.exists(output)) {
-        throw new OfficeConversionException(
+        // It started, it finished, it wrote nothing. That is how LibreOffice says
+        // "I could not read this", so the document is the problem and a retry
+        // would only repeat it.
+        throw OfficeConversionException.unreadableDocument(
             "the converter reported success but produced no PDF for " + input.getFileName());
       }
       return Files.readAllBytes(output);

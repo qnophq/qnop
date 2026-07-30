@@ -51,7 +51,7 @@ import { TeamAvatar } from '../../shell/TeamAvatar';
 import { DueDateLabel } from '../DueDateLabel';
 import { ProgressBar } from '../list/ReviewListParts';
 import { isOpenWorkflowState, workflowLabel } from '../workflowMeta';
-import { validateDocumentFile } from '../wizard/wizardModel';
+import { acceptedUploads, validateDocumentFile } from '../wizard/wizardModel';
 import { apiErrorCode, apiErrorMessage } from '../../../utils/apiError';
 import { DueDateDialog } from './DueDateDialog';
 import { ParticipantsDialog } from './ParticipantsDialog';
@@ -140,6 +140,7 @@ export function ReviewHubHead({
   const mayTransition = workflowQuery.data?.mayTransition ?? false;
   const transitionOptions = workflowQuery.data?.transitions ?? [];
   const maxSizeMb = config?.upload.maxDocumentSizeMb ?? FALLBACK_MAX_SIZE_MB;
+  const accepted = acceptedUploads(config?.supportedFormats);
 
   const total = annotations.length;
   const resolved = annotations.filter((a) => a.status !== AnnotationStatus.Open).length;
@@ -174,7 +175,7 @@ export function ReviewHubHead({
   };
 
   const handleFilePicked = (file: File) => {
-    const error = validateDocumentFile(file, maxSizeMb);
+    const error = validateDocumentFile(file, maxSizeMb, accepted);
     if (error) {
       notify(error, 'error');
       return;
@@ -427,7 +428,7 @@ export function ReviewHubHead({
           <input
             ref={fileInputRef}
             type="file"
-            accept="application/pdf,.pdf"
+            accept={accepted.accept}
             hidden
             data-testid="version-file-input"
             onChange={(e) => {

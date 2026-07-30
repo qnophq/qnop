@@ -31,7 +31,7 @@ import Tooltip from '@mui/material/Tooltip';
 import Typography from '@mui/material/Typography';
 import { useTheme } from '@mui/material/styles';
 import { FileText, Upload, X } from 'lucide-react';
-import { formatFileSize } from './wizardModel';
+import { formatFileSize, type AcceptedUploads } from './wizardModel';
 
 interface DocumentStepProps {
   file: File | null;
@@ -43,13 +43,15 @@ interface DocumentStepProps {
   /** Client- or server-side slug rejection to attach to the field. */
   slugError: string | null;
   maxSizeMb: number;
+  /** Which formats this server takes, and how to name them (issue #343). */
+  accepted: AcceptedUploads;
   onFilePicked: (file: File) => void;
   onFileCleared: () => void;
   onTitleChange: (title: string) => void;
   onSlugChange: (slug: string) => void;
 }
 
-/** Step 1 — pick the PDF (dropzone or picker) and name the review. */
+/** Step 1 — pick the document (dropzone or picker) and name the review. */
 export function DocumentStep({
   file,
   title,
@@ -57,6 +59,7 @@ export function DocumentStep({
   slug,
   slugError,
   maxSizeMb,
+  accepted,
   onFilePicked,
   onFileCleared,
   onTitleChange,
@@ -116,7 +119,7 @@ export function DocumentStep({
             Drop your document here or choose a file
           </Typography>
           <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-            PDF · max. {maxSizeMb} MB
+            {accepted.label} · max. {maxSizeMb} MB
           </Typography>
           <Button variant="contained" startIcon={<Upload size={16} />}>
             Choose file
@@ -167,7 +170,7 @@ export function DocumentStep({
       <input
         ref={inputRef}
         type="file"
-        accept="application/pdf,.pdf"
+        accept={accepted.accept}
         hidden
         data-testid="wizard-file-input"
         onChange={(e) => {
