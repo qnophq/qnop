@@ -76,9 +76,13 @@ describe('validateDocumentFile', () => {
   });
 
   it('rejects a format nobody offered', () => {
-    expect(validateDocumentFile(fileOf('a.odt', 'application/vnd.oasis.opendocument.text', 10), 50, withWord)).toBe(
-      'Only PDF or Word documents are supported.',
-    );
+    expect(
+      validateDocumentFile(
+        fileOf('a.odt', 'application/vnd.oasis.opendocument.text', 10),
+        50,
+        withWord,
+      ),
+    ).toBe('Only PDF or Word documents are supported.');
   });
 
   it('rejects files over the configured limit', () => {

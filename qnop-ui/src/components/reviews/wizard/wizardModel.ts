@@ -47,8 +47,7 @@ export interface AcceptedUploads {
 
 export function acceptedUploads(formats: SupportedFormat[] | undefined): AcceptedUploads {
   const word = (formats ?? []).includes('DOCX');
-  const matchesPdf = (file: File) =>
-    file.type === 'application/pdf' || /\.pdf$/i.test(file.name);
+  const matchesPdf = (file: File) => file.type === 'application/pdf' || /\.pdf$/i.test(file.name);
   const matchesWord = (file: File) => file.type === DOCX_MIME || /\.docx$/i.test(file.name);
   return {
     accept: word ? `application/pdf,.pdf,${DOCX_MIME},.docx` : 'application/pdf,.pdf',
