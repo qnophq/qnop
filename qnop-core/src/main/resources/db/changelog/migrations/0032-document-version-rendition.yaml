@@ -1,0 +1,36 @@
+# Copyright (c) 2026-present devtank42 GmbH
+# SPDX-License-Identifier: AGPL-3.0-only
+
+# The PDF a non-PDF version is viewed through (issue #343, ADR-0010).
+#
+# DOCX is converted to PDF on ingest and then flows through the same pipeline as
+# a native PDF (ADR-0032): PDFBox extracts the spans, the client renders with
+# PDF.js. That conversion produces a second binary, and the viewer needs it —
+# `RenderedDocument` carries geometry and text, never pixels.
+#
+# So the version points at two objects: `storage_key` is what was uploaded and
+# stays downloadable (ADR-0010 keeps the original), `rendition_storage_key` is
+# what the viewer renders. Null means the two are the same file, which is every
+# PDF version and therefore every row that exists today — hence no backfill.
+#
+# Not derived-and-disposable like a branding rendition: converting is a
+# subprocess, and a review's pages must not change under its annotations because
+# a cache expired. The key is written once, on the extraction job that created
+# it, and reused on replay.
+databaseChangeLog:
+  - changeSet:
+      id: 0032-document-version-rendition
+      author: qnop
+      comment: Adds document_version.rendition_storage_key, the converted PDF a DOCX version is viewed through (issue #343).
+      changes:
+        - addColumn:
+            tableName: document_version
+            columns:
+              - column:
+                  name: rendition_storage_key
+                  type: varchar(512)
+                  remarks: >-
+                    Object-storage key of the PDF this version is rendered from.
+                    Null when `storage_key` is already a PDF. Referenced by the
+                    purge, the orphan reaper and the consistency scan alongside
+                    `storage_key`.

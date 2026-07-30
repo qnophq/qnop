@@ -77,6 +77,18 @@ public class DocumentVersion {
   @Column(name = "size_bytes", nullable = false, updatable = false)
   private long sizeBytes;
 
+  /**
+   * The PDF this version is rendered from (issue #343, ADR-0010); null when {@link #storageKey} is
+   * already one.
+   *
+   * <p>A DOCX is converted on ingest and viewed through the result, while the upload itself stays
+   * downloadable. Written once by the extraction job and never recomputed: the conversion is not
+   * byte-deterministic, so re-running it would mint a second key and orphan the first — and a
+   * review's pages must not shift under its annotations.
+   */
+  @Column(name = "rendition_storage_key", length = 512)
+  private String renditionStorageKey;
+
   /** Normalized rendering (ADR-0032); null until the extraction job (#245) attaches it. */
   @JdbcTypeCode(SqlTypes.JSON)
   @Column(name = "rendered_document")
@@ -177,6 +189,25 @@ public class DocumentVersion {
 
   public String getStorageKey() {
     return storageKey;
+  }
+
+  /** The converted PDF's key, or null when the original is already a PDF (issue #343). */
+  public String getRenditionStorageKey() {
+    return renditionStorageKey;
+  }
+
+  public void setRenditionStorageKey(String renditionStorageKey) {
+    this.renditionStorageKey = renditionStorageKey;
+  }
+
+  /**
+   * The key to render this version from: the conversion when there was one, the upload otherwise.
+   *
+   * <p>The one place that decision is made, so no caller has to remember which formats need
+   * converting.
+   */
+  public String getRenderableStorageKey() {
+    return renditionStorageKey == null ? storageKey : renditionStorageKey;
   }
 
   public String getContentHash() {

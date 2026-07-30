@@ -55,3 +55,11 @@ The review surface must show a document **faithfully** (legal/compliance documen
 ## Amendment (2026-07-16, shipped vs. planned extractors)
 
 Decision point 4 lists the intended Community extractor set; as of this date only the **PDF extractor** (`PdfBoxDocumentExtractor`) is shipped. The Markdown and DOCX extractors remain planned Community scope per [ADR-0010](0010-docx-representation-strategy.md). The **image** extractor's placement (Community vs. Enterprise) was re-opened by the PDF-first roadmap decision and is no longer settled by this ADR.
+
+## Amendment (2026-07-30, DOCX ingest — issue #343)
+
+DOCX now ingests, and it did **not** arrive as a second extractor. The pipeline gained a step instead: a version whose upload is not already a PDF is converted to one before extraction, and the result is stored as a second object (`document_version.rendition_storage_key`). The PDF extractor then runs on that, so the extractor set is still one entry long and `DocumentExtractor` is unchanged.
+
+The reason is this ADR's own model: `RenderedDocument` is geometry and text, and the client renders the *binary* — so a format whose binary the browser cannot display needs a converted binary kept alongside it, which an extractor has no way to return. See the amendment in [ADR-0010](0010-docx-representation-strategy.md) for the full reasoning and its consequences.
+
+Serving therefore has two endpoints where §5 described one: `…/original` streams what was uploaded, `…/rendition` the PDF it is viewed through. They are the same object for a PDF version.

@@ -21,6 +21,7 @@
 
 import { describe, expect, it } from 'vitest';
 import {
+  acceptedUploads,
   launchChecklist,
   launchReadiness,
   formatFileSize,
@@ -36,24 +37,55 @@ function fileOf(name: string, type: string, sizeBytes: number): File {
   return file;
 }
 
+const DOCX_MIME = 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
+
+const pdfOnly = acceptedUploads(['PDF']);
+const withWord = acceptedUploads(['PDF', 'DOCX']);
+
+describe('acceptedUploads', () => {
+  it('offers Word only where the server said it can take one', () => {
+    // It is a property of the deployment, not of the release: Word needs an
+    // out-of-process converter (issue #343), and a server without one answers 415.
+    expect(withWord.accept).toContain('.docx');
+    expect(withWord.label).toBe('PDF or Word');
+    expect(pdfOnly.accept).not.toContain('.docx');
+    expect(pdfOnly.label).toBe('PDF');
+  });
+
+  it('falls back to PDF while the config is still loading', () => {
+    // Offering a format that may be refused is worse than briefly offering fewer.
+    expect(acceptedUploads(undefined).accept).toBe('application/pdf,.pdf');
+  });
+});
+
 describe('validateDocumentFile', () => {
   it('accepts a PDF under the limit', () => {
-    expect(validateDocumentFile(fileOf('a.pdf', 'application/pdf', 1024), 50)).toBeNull();
+    expect(validateDocumentFile(fileOf('a.pdf', 'application/pdf', 1024), 50, pdfOnly)).toBeNull();
   });
 
-  it('accepts by .pdf extension when the browser reports no MIME type', () => {
-    expect(validateDocumentFile(fileOf('Scan.PDF', '', 1024), 50)).toBeNull();
+  it('accepts by extension when the browser reports no MIME type', () => {
+    expect(validateDocumentFile(fileOf('Scan.PDF', '', 1024), 50, pdfOnly)).toBeNull();
+    expect(validateDocumentFile(fileOf('Draft.DOCX', '', 1024), 50, withWord)).toBeNull();
   });
 
-  it('rejects non-PDF files', () => {
-    expect(validateDocumentFile(fileOf('a.docx', 'application/msword', 10), 50)).toBe(
+  it('accepts a Word document only where the server takes one', () => {
+    expect(validateDocumentFile(fileOf('a.docx', DOCX_MIME, 10), 50, withWord)).toBeNull();
+    expect(validateDocumentFile(fileOf('a.docx', DOCX_MIME, 10), 50, pdfOnly)).toBe(
       'Only PDF documents are supported.',
+    );
+  });
+
+  it('rejects a format nobody offered', () => {
+    expect(validateDocumentFile(fileOf('a.odt', 'application/vnd.oasis.opendocument.text', 10), 50, withWord)).toBe(
+      'Only PDF or Word documents are supported.',
     );
   });
 
   it('rejects files over the configured limit', () => {
     const tooBig = fileOf('big.pdf', 'application/pdf', 51 * 1024 * 1024);
-    expect(validateDocumentFile(tooBig, 50)).toBe('The file exceeds the maximum size of 50 MB.');
+    expect(validateDocumentFile(tooBig, 50, pdfOnly)).toBe(
+      'The file exceeds the maximum size of 50 MB.',
+    );
   });
 });
 

@@ -171,19 +171,58 @@ public class DocumentAccessService {
   @Transactional(readOnly = true)
   public OriginalDownload getOriginal(
       UUID documentId, int versionNumber, UUID actor, boolean admin) {
+    return download(documentId, versionNumber, actor, admin, false);
+  }
+
+  /**
+   * The PDF one version is <em>viewed</em> through (issue #343): the upload for a PDF, the
+   * conversion for a DOCX (ADR-0010).
+   *
+   * <p>Separate from {@link #getOriginal} because the two answer different questions. The viewer
+   * needs something PDF.js can render; a reader who clicks download wants the file that was
+   * uploaded, which for a Word review is the Word file.
+   */
+  @Transactional(readOnly = true)
+  public OriginalDownload getRendition(
+      UUID documentId, int versionNumber, UUID actor, boolean admin) {
+    return download(documentId, versionNumber, actor, admin, true);
+  }
+
+  private OriginalDownload download(
+      UUID documentId, int versionNumber, UUID actor, boolean admin, boolean renderable) {
     Document document = requireVisible(documentId, actor, admin);
     DocumentVersion version = requireVersion(documentId, versionNumber);
+    if (renderable
+        && version.getRenditionStorageKey() == null
+        && !DocumentTypeSniffer.PDF.equalsIgnoreCase(version.getContentType())) {
+      // Uploaded but not yet converted. Handing the viewer the DOCX would be worse
+      // than saying "not ready" — the same answer the rendered model gives while
+      // extraction is pending, and the client already knows how to wait for it.
+      throw DocumentValidationException.renderingUnavailable(
+          version.getExtractionStatus() == ExtractionStatus.FAILED
+              ? "EXTRACTION_FAILED"
+              : "EXTRACTION_PENDING",
+          "this version has not been converted for viewing yet");
+    }
+    String key = renderable ? version.getRenderableStorageKey() : version.getStorageKey();
     StorageContent content =
         storage
-            .get(version.getStorageKey())
+            .get(key)
             .orElseThrow(
                 () ->
                     new IllegalStateException(
                         "stored object missing for version " + version.getId()));
+    // The hash identifies the upload, so a converted version would hand the same
+    // ETag to two different payloads. Distinguishing them keeps a cached rendition
+    // from being served as the original, and the other way round.
+    String etagSource =
+        renderable && version.getRenditionStorageKey() != null
+            ? version.getContentHash() + "-pdf"
+            : version.getContentHash();
     return new OriginalDownload(
         document.getTitle(),
         version.getVersionNumber(),
-        version.getContentHash(),
+        etagSource,
         content.stream(),
         content.contentLength(),
         content.contentType());

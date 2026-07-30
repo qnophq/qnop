@@ -60,7 +60,7 @@ describe('documentKeys', () => {
   it('namespaces per document and version', () => {
     expect(documentKeys.detail(DOC_ID)).toEqual(['documents', 'detail', DOC_ID]);
     expect(documentKeys.rendered(DOC_ID, 2)).toEqual(['documents', 'rendered', DOC_ID, 2]);
-    expect(documentKeys.original(DOC_ID, 2)).toEqual(['documents', 'original', DOC_ID, 2]);
+    expect(documentKeys.rendition(DOC_ID, 2)).toEqual(['documents', 'rendition', DOC_ID, 2]);
   });
 });
 
@@ -212,14 +212,16 @@ describe('useRenderedDocument', () => {
 });
 
 describe('useOriginalPdf', () => {
-  it('downloads the original bytes outside the generated contract', async () => {
+  it('downloads the viewable PDF outside the generated contract', async () => {
     const bytes = new ArrayBuffer(8);
     vi.mocked(axiosInstance.get).mockResolvedValue({ data: bytes });
 
     const { result } = renderHook(() => useOriginalPdf(DOC_ID, 2), { wrapper });
 
     await waitFor(() => expect(result.current.isSuccess).toBe(true));
-    expect(axiosInstance.get).toHaveBeenCalledWith(`/documents/${DOC_ID}/versions/2/original`, {
+    // The rendition, not the original: a Word review is viewed through the PDF
+    // made at ingest, and the viewer must never be handed a .docx (issue #343).
+    expect(axiosInstance.get).toHaveBeenCalledWith(`/documents/${DOC_ID}/versions/2/rendition`, {
       responseType: 'arraybuffer',
     });
     expect(result.current.data).toBe(bytes);

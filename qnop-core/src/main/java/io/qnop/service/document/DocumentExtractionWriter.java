@@ -117,6 +117,30 @@ class DocumentExtractionWriter {
   }
 
   /**
+   * Records the PDF a converted version is rendered from (issue #343).
+   *
+   * <p>Its own short transaction, before the extraction runs, and written exactly once: the key is
+   * kept if one is already there. Conversion is not byte-deterministic, so a replay that converted
+   * again would mint a second key, orphan the first, and change the pages under any annotation
+   * already placed on them.
+   *
+   * @return the key now in force — the caller's, or the one that was already stored
+   */
+  @Transactional
+  public String attachRendition(UUID versionId, String renditionKey) {
+    DocumentVersion version = versions.findById(versionId).orElse(null);
+    if (version == null) {
+      return null; // deleted while the conversion ran
+    }
+    if (version.getRenditionStorageKey() != null) {
+      return version.getRenditionStorageKey();
+    }
+    version.setRenditionStorageKey(renditionKey);
+    versions.save(version);
+    return renditionKey;
+  }
+
+  /**
    * Marks the version FAILED permanently (unprocessable content or no extractor), records {@code
    * reason} for operators (issue #325), and fails its pending placements — they can never be
    * re-anchored against a version with no text layer. A version already FAILED (a replay) is a

@@ -237,6 +237,11 @@ public class ReviewPurgeService {
               versions.findVersionRefsByStorageKeyIn(candidateKeys).stream()
                   .map(ref -> ref.storageKey())
                   .forEach(referenced::add);
+              // Renditions are referenced too (issue #343), and the projection names
+              // the key that matched — so a shared conversion is not deleted.
+              versions.findVersionRefsByRenditionKeyIn(candidateKeys).stream()
+                  .map(ref -> ref.storageKey())
+                  .forEach(referenced::add);
               attachments.findAttachmentRefsByStorageKeyIn(candidateKeys).stream()
                   .map(ref -> ref.storageKey())
                   .forEach(referenced::add);
@@ -301,6 +306,9 @@ public class ReviewPurgeService {
     }
     Set<String> shared = new LinkedHashSet<>();
     versions.findVersionRefsByStorageKeyIn(candidates).stream()
+        .filter(ref -> !purgedDocumentIds.contains(ref.documentId()))
+        .forEach(ref -> shared.add(ref.storageKey()));
+    versions.findVersionRefsByRenditionKeyIn(candidates).stream()
         .filter(ref -> !purgedDocumentIds.contains(ref.documentId()))
         .forEach(ref -> shared.add(ref.storageKey()));
     attachments.findAttachmentRefsByStorageKeyIn(candidates).stream()

@@ -36,9 +36,12 @@ import io.qnop.service.ApplicationSettingKey;
 import io.qnop.service.ApplicationSettingsService;
 import io.qnop.service.branding.BrandingService;
 import io.qnop.service.branding.BrandingService.SlotStatus;
+import io.qnop.service.document.DocumentRenditionService;
+import io.qnop.service.document.DocumentTypeSniffer;
 import io.qnop.service.oidc.OidcProviderService;
 import io.qnop.service.review.AnnotationExportService;
 import io.qnop.service.review.export.AnnotationExportFormat;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -73,17 +76,20 @@ public class ConfigController implements ServerConfigApi {
   private final BrandingService branding;
   private final BuildProperties buildProperties;
   private final AnnotationExportService exports;
+  private final DocumentRenditionService renditions;
 
   public ConfigController(
       OidcProviderService oidcProviders,
       ApplicationSettingsService settings,
       BrandingService branding,
       AnnotationExportService exports,
+      DocumentRenditionService renditions,
       ObjectProvider<BuildProperties> buildProperties) {
     this.oidcProviders = oidcProviders;
     this.settings = settings;
     this.branding = branding;
     this.exports = exports;
+    this.renditions = renditions;
     this.buildProperties = buildProperties.getIfAvailable();
   }
 
@@ -115,14 +121,24 @@ public class ConfigController implements ServerConfigApi {
             // converter, and a client must not offer a download that would fail.
             .exportFormats(
                 exports.availableFormats().stream().map(AnnotationExportFormat::getId).toList())
-            // Report only the formats whose extractor actually ships, so a client never offers an
-            // upload the ingest pipeline would reject with 415 (magic-byte sniffing, issue #345).
-            // Today that is PDF; DOCX and Markdown are Community-scope and join this list once
-            // their
-            // extractors land (further formats are an Enterprise feature).
-            .supportedFormats(List.of(SupportedFormat.PDF))
+            // Only what this server can actually ingest, so a client never offers an
+            // upload the pipeline would reject with 415 (issue #345). PDF always; Word
+            // only where an office converter is installed, because that is what turns a
+            // DOCX into something the viewer can render (issue #343, ADR-0010). Markdown
+            // joins once its extractor lands; further formats are an Enterprise feature.
+            .supportedFormats(supportedFormats())
             .branding(buildBranding());
     return ResponseEntity.ok(body);
+  }
+
+  /** The document formats this deployment can take, not the ones the release knows about. */
+  private List<SupportedFormat> supportedFormats() {
+    List<SupportedFormat> formats = new ArrayList<>();
+    formats.add(SupportedFormat.PDF);
+    if (renditions.supports(DocumentTypeSniffer.DOCX)) {
+      formats.add(SupportedFormat.DOCX);
+    }
+    return formats;
   }
 
   /** Effective branding (custom vs default) per slot, so the SPA can render and badge each logo. */

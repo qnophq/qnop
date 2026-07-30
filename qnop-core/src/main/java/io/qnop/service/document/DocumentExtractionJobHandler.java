@@ -74,16 +74,19 @@ public class DocumentExtractionJobHandler implements JobHandler {
   private final StorageService storage;
   private final List<DocumentExtractor> extractors;
   private final DocumentExtractionWriter writer;
+  private final DocumentRenditionService renditions;
 
   public DocumentExtractionJobHandler(
       DocumentVersionRepository versions,
       StorageService storage,
       List<DocumentExtractor> extractors,
-      DocumentExtractionWriter writer) {
+      DocumentExtractionWriter writer,
+      DocumentRenditionService renditions) {
     this.versions = versions;
     this.storage = storage;
     this.extractors = extractors;
     this.writer = writer;
+    this.renditions = renditions;
   }
 
   @Override
@@ -105,16 +108,33 @@ public class DocumentExtractionJobHandler implements JobHandler {
       return; // idempotent: replay after a crash-past-the-work
     }
 
+    // What gets extracted is the PDF, whether that is the upload or the conversion of
+    // it (issue #343). The renditions service converts at most once per version and
+    // records the key, so a replay reuses it rather than producing a second PDF.
+    String renderableKey;
+    try {
+      renderableKey = renditions.renderableKey(version);
+    } catch (ExtractionException e) {
+      log.warn("Conversion of version {} failed permanently: {}", versionId, e.getMessage());
+      writer.failPermanently(versionId, e.getMessage());
+      return;
+    }
+
+    // The extractor is chosen for what is actually parsed, not for what was uploaded:
+    // a converted DOCX is a PDF by the time it gets here.
+    String extractedType =
+        renderableKey.equals(version.getStorageKey())
+            ? version.getContentType()
+            : DocumentTypeSniffer.PDF;
     Optional<DocumentExtractor> extractor =
-        extractors.stream().filter(e -> e.supports(version.getContentType())).findFirst();
+        extractors.stream().filter(e -> e.supports(extractedType)).findFirst();
     if (extractor.isEmpty()) {
       // Permanent: no extractor can ever appear for this version's content type at runtime.
       log.warn(
           "No DocumentExtractor supports {} — marking version {} FAILED.",
-          version.getContentType(),
+          extractedType,
           versionId);
-      writer.failPermanently(
-          versionId, "no extractor supports content type " + version.getContentType());
+      writer.failPermanently(versionId, "no extractor supports content type " + extractedType);
       return;
     }
 
@@ -123,7 +143,7 @@ public class DocumentExtractionJobHandler implements JobHandler {
     String renderedJson;
     try (StorageContent content =
         storage
-            .get(version.getStorageKey())
+            .get(renderableKey)
             .orElseThrow(
                 () ->
                     new IllegalStateException( // retryable: the object should exist post-commit

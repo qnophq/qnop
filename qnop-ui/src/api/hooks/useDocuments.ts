@@ -38,8 +38,8 @@ export const documentKeys = {
   versions: (documentId: string) => [...documentKeys.all, 'versions', documentId] as const,
   rendered: (documentId: string, versionNumber: number) =>
     [...documentKeys.all, 'rendered', documentId, versionNumber] as const,
-  original: (documentId: string, versionNumber: number) =>
-    [...documentKeys.all, 'original', documentId, versionNumber] as const,
+  rendition: (documentId: string, versionNumber: number) =>
+    [...documentKeys.all, 'rendition', documentId, versionNumber] as const,
 };
 
 /** A review document's metadata (title, owner, workflow state, latest version). */
@@ -126,18 +126,22 @@ export function useRenderedDocument(documentId: string, versionNumber: number, e
 }
 
 /**
- * The original binary of a version, served through the server with per-request
- * authorization (ADR-0032 §5). The endpoint is deliberately outside the
- * generated OpenAPI contract, hence the plain axios call; the bearer token is
- * attached by the shared instance's interceptor. Versions are immutable, so the
- * bytes never go stale.
+ * The PDF a version is *viewed* through, served with per-request authorization
+ * (ADR-0032 §5). For a PDF review that is the upload; for a Word one it is the
+ * conversion made at ingest (issue #343, ADR-0010) — which is why this asks for
+ * the rendition rather than the original. `/original` still exists and still
+ * means the uploaded file, which is what a download should hand over.
+ *
+ * The endpoint is deliberately outside the generated OpenAPI contract, hence the
+ * plain axios call; the bearer token is attached by the shared instance's
+ * interceptor. Versions are immutable, so the bytes never go stale.
  */
 export function useOriginalPdf(documentId: string, versionNumber: number | undefined) {
   return useQuery<ArrayBuffer>({
-    queryKey: documentKeys.original(documentId, versionNumber ?? 0),
+    queryKey: documentKeys.rendition(documentId, versionNumber ?? 0),
     queryFn: async () => {
       const response = await axiosInstance.get<ArrayBuffer>(
-        `/documents/${documentId}/versions/${versionNumber}/original`,
+        `/documents/${documentId}/versions/${versionNumber}/rendition`,
         { responseType: 'arraybuffer' },
       );
       return response.data;

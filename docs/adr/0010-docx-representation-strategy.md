@@ -19,6 +19,22 @@ Documents arrive as PDF, DOCX, or Markdown. The browser must render them faithfu
 
 Concretely: the `DocumentExtractor` SPI has a DOCX implementation = "convert to PDF out-of-process, then delegate to the PDF extractor". Markdown takes an HTML path; PDF and images are native.
 
+### Amendment (2026-07-30, issue #343): the conversion sits one step before the SPI
+
+Implementing this showed the last sentence to be wrong about *where* the seam goes, and right about everything else.
+
+`DocumentExtractor.extract` returns a `RenderedDocument` — geometry and text spans, never pixels. A DOCX extractor would therefore convert, hand over the spans, and throw the converted PDF away, leaving the viewer with nothing to render: this ADR's own decision is that the client renders the *converted PDF* with PDF.js, so that PDF is an artifact the pipeline has to keep.
+
+So the conversion runs in the pipeline, immediately before extraction (`DocumentRenditionService`), and the published SPI (ADR-0003/0046) is untouched. A version now points at two objects: `storage_key`, the upload, which stays downloadable as this ADR requires, and `rendition_storage_key`, the PDF it is viewed and extracted through. Everything downstream — anchoring, diff, workflow, the viewer — still sees one model and one format.
+
+Three consequences worth recording:
+
+- **The conversion is stored, not recomputed.** It is not byte-deterministic (a PDF carries a creation date), and keys are content-addressed, so re-converting would mint a second key, orphan the first, and shift the pages under annotations already placed on them. The key is written once and reused on replay, which is what keeps the extraction job idempotent under ADR-0033.
+- **Whether a deployment accepts DOCX is a server property**, not a release constant — the same shape ADR-0052 arrived at for PDF export. `GET /api/v1/config` reports it in `supportedFormats`, the upload UI offers only those, and a server with no converter refuses a Word upload with **415** at upload time rather than accepting a document it could never render and failing a job the user waited for.
+- **A conversion failure is retryable, with one exception.** No converter, or a run that timed out, is the environment and heals on its own; a converter that ran to completion and produced no PDF is how LibreOffice says it could not read the file, and that is failed permanently — otherwise the version would sit in PENDING forever.
+
+Uploads are still decided by their bytes, never by the declared type. DOCX is a ZIP, so the check is for the `word/document.xml` part rather than for the ZIP magic, which would also accept spreadsheets and arbitrary archives.
+
 ## Consequences
 
 - One rendering model and one anchoring model for PDF and DOCX — simpler frontend, shared diff and re-anchoring.

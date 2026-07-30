@@ -30,6 +30,7 @@ import io.qnop.service.ApplicationSettingsService;
 import io.qnop.service.branding.BrandingService;
 import io.qnop.service.branding.BrandingService.BrandingSource;
 import io.qnop.service.branding.BrandingService.SlotStatus;
+import io.qnop.service.document.DocumentRenditionService;
 import io.qnop.service.oidc.OidcProviderLoginView;
 import io.qnop.service.oidc.OidcProviderService;
 import io.qnop.service.review.AnnotationExportService;
@@ -63,6 +64,7 @@ class ConfigControllerTest {
   @MockitoBean private ApplicationSettingsService settings;
   @MockitoBean private BrandingService branding;
   @MockitoBean private AnnotationExportService exports;
+  @MockitoBean private DocumentRenditionService renditions;
 
   @BeforeEach
   void setUp() {
@@ -101,6 +103,8 @@ class ConfigControllerTest {
         .andExpect(jsonPath("$.upload.maxDocumentSizeMb").value(50))
         // Community ingests PDF only — the list must not advertise unsupported formats (issue
         // #345).
+        // PDF always; Word only where a converter is installed, which this mock is
+        // not (issue #343) — the server's capability, not the release's.
         .andExpect(jsonPath("$.supportedFormats.length()").value(1))
         .andExpect(jsonPath("$.supportedFormats[0]").value("PDF"))
         .andExpect(jsonPath("$.branding.logoLight.source").value("DEFAULT"))
