@@ -61,7 +61,7 @@ commonmark = "0.29.0"
 
 # --- Pinned for later phases (NOT yet applied) -------------------------
 pdfbox = "3.0.8"            # PDF text extraction with glyph positions
-twelvemonkeys = "3.12.0"  # ImageIO WEBP reader; the JDK has none (issue #635 follow-up)
+twelvemonkeys = "3.14.0"  # ImageIO WEBP reader; the JDK has none (issue #635 follow-up)
 batik = "1.19"            # SVG -> PNG for document exports (issue #635 follow-up)
 poi = "5.4.1"              # XLSX writing (issue #547); .docx extraction (XWPF) later
 
