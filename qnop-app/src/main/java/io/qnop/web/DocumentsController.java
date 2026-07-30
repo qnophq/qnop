@@ -38,6 +38,7 @@ import io.qnop.api.v1.model.ParticipantListResponse;
 import io.qnop.api.v1.model.ParticipantView;
 import io.qnop.api.v1.model.RenderedDocumentResponse;
 import io.qnop.api.v1.model.ReviewFacetCounts;
+import io.qnop.api.v1.model.ReviewOwnerOption;
 import io.qnop.api.v1.model.ThreadParticipation;
 import io.qnop.api.v1.model.VersionDiffResponse;
 import io.qnop.api.v1.model.VisitResponse;
@@ -99,7 +100,11 @@ public class DocumentsController implements DocumentsApi {
       String sort,
       String scope,
       String participation,
-      String state,
+      String lifecycle,
+      String workflowState,
+      String due,
+      String format,
+      UUID ownerId,
       String role,
       Integer page,
       Integer size) {
@@ -116,8 +121,12 @@ public class DocumentsController implements DocumentsApi {
             q,
             sort,
             scope,
-            state,
+            lifecycle,
             role,
+            workflowState,
+            due,
+            format,
+            ownerId,
             includeActive,
             includeArchived,
             page == null ? 0 : page,
@@ -168,6 +177,10 @@ public class DocumentsController implements DocumentsApi {
     return counts == null
         ? null
         : new ReviewFacetCounts()
+            .owners(
+                counts.owners().stream()
+                    .map(o -> new ReviewOwnerOption().id(o.id()).displayName(o.displayName()))
+                    .toList())
             .totalUnfiltered(counts.totalUnfiltered())
             .roleAny(counts.roleAny())
             .roleOwner(counts.roleOwner())

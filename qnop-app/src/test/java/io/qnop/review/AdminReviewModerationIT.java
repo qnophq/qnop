@@ -221,7 +221,7 @@ class AdminReviewModerationIT extends SeededIntegrationTest {
     documents.save(own);
 
     // The workflow slice is a predicate, orthogonal to the retention one.
-    String open = list(ADMIN_ID, "all", "state", "open");
+    String open = list(ADMIN_ID, "all", "lifecycle", "open");
     assertThat(titles(open)).contains("Open foreign review", "The admins own open one");
     assertThat(titles(open)).doesNotContain("Closed foreign review");
 
@@ -264,6 +264,33 @@ class AdminReviewModerationIT extends SeededIntegrationTest {
     assertThat(((Number) JsonPath.read(json, "$.facets.roleObserver")).intValue()).isEqualTo(3);
     assertThat(((Number) JsonPath.read(json, "$.facets.roleOwner")).intValue()).isZero();
     assertThat(json).doesNotContain("Owned by the admin"); // the search excluded it
+  }
+
+  @Test
+  @DisplayName("the advanced filters narrow the workspace, and the owner facet spans it")
+  void advancedFiltersAreServerSide() throws Exception {
+    foreignReview("Cancelled elsewhere", WorkflowState.CANCELLED);
+    foreignReview("Still in review");
+
+    // One specific workflow state, not just open/closed.
+    String cancelled = list(ADMIN_ID, "all", "workflowState", "CANCELLED", "scope", "all");
+    assertThat(titles(cancelled)).contains("Cancelled elsewhere");
+    assertThat(titles(cancelled)).doesNotContain("Still in review");
+
+    // Owned by somebody: the facet offers owners from the whole workspace, so it
+    // can name people whose reviews are not on the current page.
+    String json = list(ADMIN_ID, "all");
+    assertThat(JsonPath.read(json, "$.facets.owners[*].id").toString())
+        .contains(MEMBER_ID.toString());
+
+    String byOwner = list(ADMIN_ID, "all", "ownerId", MEMBER_ID.toString(), "scope", "all");
+    assertThat(titles(byOwner)).contains("Still in review");
+
+    // A format nothing matches empties the page without emptying the workspace.
+    String markdown = list(ADMIN_ID, "all", "format", "md", "scope", "all");
+    assertThat(titles(markdown)).isEmpty();
+    assertThat(((Number) JsonPath.read(markdown, "$.facets.totalUnfiltered")).intValue())
+        .isGreaterThan(0);
   }
 
   /** Raises one open annotation on version 1, authored by {@code author}. */

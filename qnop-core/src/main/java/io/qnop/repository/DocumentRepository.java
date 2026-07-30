@@ -128,6 +128,16 @@ public interface DocumentRepository
   List<Document> findTeamParticipationsVisibleTo(
       @Param("teamId") UUID teamId, @Param("actor") UUID actor);
 
+  /**
+   * Everyone who owns a review, for the moderation listing's owner facet (issue #563).
+   *
+   * <p>Across the whole workspace rather than the current page: a dropdown offering only the owners
+   * of the twenty rows on screen would look like the complete list and quietly not be one.
+   * Ownership is structurally public (#413), so this leaks nothing a row would not.
+   */
+  @Query("SELECT DISTINCT d.ownerId FROM Document d")
+  List<UUID> findDistinctOwnerIds(Pageable pageable);
+
   /** Reviews the user owns — ownership is structurally public, anonymous ones included (#473). */
   long countByOwnerId(UUID ownerId);
 

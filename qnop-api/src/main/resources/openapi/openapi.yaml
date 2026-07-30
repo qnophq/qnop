@@ -2855,13 +2855,17 @@ paths:
             type: string
             enum: [mine, all]
             default: mine
-        - name: state
+        - name: lifecycle
           in: query
           required: false
           description: |
             The workflow slice, orthogonal to `scope` (issue #563). `any`
             (default), `open` for reviews the workflow has not closed, `closed`
             for FINALIZED/CANCELLED.
+
+            Named `lifecycle` rather than `state` because `workflowState` below
+            slices the same column more finely; two parameters called `state`
+            would be a trap.
 
             Applied by the server only under `participation=all`, where the
             listing is paged and a client-side facet would narrow one page while
@@ -2871,6 +2875,47 @@ paths:
             type: string
             enum: [any, open, closed]
             default: any
+        - name: workflowState
+          in: query
+          required: false
+          description: |
+            One specific workflow state (issue #563), e.g. `CHANGES_REQUESTED`.
+            Open string set, not an enum: an enterprise edition may extend the
+            state machine (ADR-0011/0035). `participation=all` only.
+          schema:
+            type: string
+        - name: due
+          in: query
+          required: false
+          description: |
+            The deadline slice (issue #563). `overdue` and `soon` speak about
+            LIVING deadlines — a closed or archived review is never overdue —
+            while `none` finds work nobody has put a clock on.
+            `participation=all` only.
+          schema:
+            type: string
+            enum: [any, overdue, soon, none]
+            default: any
+        - name: format
+          in: query
+          required: false
+          description: |
+            The document family of the review's LATEST version (issue #563) —
+            what the row's ribbon shows, so a review that started as a PDF and is
+            now Word counts as Word. `participation=all` only.
+          schema:
+            type: string
+            enum: [any, pdf, docx, md]
+            default: any
+        - name: ownerId
+          in: query
+          required: false
+          description: |
+            One specific owner (issue #563). Ownership is structurally public
+            (#413). `participation=all` only.
+          schema:
+            type: string
+            format: uuid
         - name: role
           in: query
           required: false
@@ -6655,6 +6700,18 @@ components:
         - participants
         - createdAt
         - updatedAt
+    ReviewOwnerOption:
+      type: object
+      description: One entry of the moderation listing's owner facet (issue #563).
+      properties:
+        id:
+          type: string
+          format: uuid
+        displayName:
+          type: string
+      required:
+        - id
+        - displayName
     ReviewFacetCounts:
       type: object
       description: |
@@ -6667,6 +6724,14 @@ components:
         rule the participant-scoped listing already follows — so a chip's number
         keeps predicting what clicking it shows.
       properties:
+        owners:
+          type: array
+          description: >-
+            Everyone who owns a review, across the workspace rather than the
+            current page — a dropdown built from twenty rows would look complete
+            and quietly not be. Capped; past that the search field is the tool.
+          items:
+            $ref: '#/components/schemas/ReviewOwnerOption'
         totalUnfiltered:
           type: integer
           format: int64
@@ -6703,6 +6768,7 @@ components:
           type: integer
           format: int64
       required:
+        - owners
         - totalUnfiltered
         - roleAny
         - roleOwner

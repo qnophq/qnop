@@ -102,7 +102,7 @@ const SCOPE_OF_STATUS: Record<StatusFilter, 'active' | 'archived' | 'all'> = {
   archived: 'archived',
   all: 'all',
 };
-const STATE_OF_STATUS: Record<StatusFilter, 'any' | 'open' | 'closed'> = {
+const LIFECYCLE_OF_STATUS: Record<StatusFilter, 'any' | 'open' | 'closed'> = {
   active: 'any',
   open: 'open',
   closed: 'closed',
@@ -388,6 +388,11 @@ export function ReviewsPage() {
     setServerPage(0);
     setParam('role', next, 'all');
   };
+  /** The advanced menu's picks; same page reset as the chips. */
+  const setAdvancedParam = (key: string, next: string, fallback: string) => {
+    setServerPage(0);
+    setParam(key, next, fallback);
+  };
 
   const { data, isPending, isError, refetch } = useReviews(
     moderating
@@ -399,8 +404,12 @@ export function ReviewsPage() {
           // paged, so a browser-side facet would narrow one page while reading
           // as the whole workspace (issue #563).
           scope: SCOPE_OF_STATUS[statusFilter],
-          state: STATE_OF_STATUS[statusFilter],
+          lifecycle: LIFECYCLE_OF_STATUS[statusFilter],
           role: roleFilter === 'all' ? 'any' : roleFilter,
+          workflowState: stateFilter === 'any' ? undefined : stateFilter,
+          due: dueFilter,
+          format: formatFilter,
+          ownerId: ownerFilter ?? undefined,
           participation: 'all',
           q: debouncedQuery,
         }
@@ -525,14 +534,19 @@ export function ReviewsPage() {
     statusFilter !== 'all' &&
     statusCounts.archived > 0;
 
-  // The owner facet offers everyone who owns a loaded review, alphabetically.
-  const owners = (() => {
+  // While moderating the owners come from the server (issue #563): a list built
+  // from the twenty rows on screen would look complete and quietly not be.
+  const owners: [string, string][] = moderating
+    ? (facets?.owners ?? []).map((o) => [o.id, o.displayName])
+    : ownersFromRows();
+
+  function ownersFromRows(): [string, string][] {
     const byId = new Map<string, string>();
     for (const r of items) {
       if (r.ownerId && !byId.has(r.ownerId)) byId.set(r.ownerId, r.ownerDisplayName ?? 'Unknown');
     }
     return [...byId].sort((a, b) => a[1].localeCompare(b[1]));
-  })();
+  }
 
   const hasActiveFilters =
     query !== '' || roleFilter !== 'all' || statusFilter !== 'active' || advancedCount > 0;
@@ -640,17 +654,15 @@ export function ReviewsPage() {
             />
             {participationToggle}
             <Box sx={{ flex: 1 }} />
-            {!moderating && (
-              <ReviewFilterMenu
-                dueFilter={dueFilter}
-                formatFilter={formatFilter}
-                stateFilter={stateFilter}
-                ownerFilter={ownerFilter}
-                owners={owners}
-                activeCount={advancedCount}
-                onSet={setParam}
-              />
-            )}
+            <ReviewFilterMenu
+              dueFilter={dueFilter}
+              formatFilter={formatFilter}
+              stateFilter={stateFilter}
+              ownerFilter={ownerFilter}
+              owners={owners}
+              activeCount={advancedCount}
+              onSet={setAdvancedParam}
+            />
             <TextField
               select
               size="small"

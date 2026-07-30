@@ -526,6 +526,7 @@ describe('ReviewsPage — the admin moderation listing (#563)', () => {
   });
 
   const FACETS = {
+    owners: [{ id: OTHER, displayName: 'Someone Else' }],
     totalUnfiltered: 57,
     roleAny: 57,
     roleOwner: 2,
@@ -595,12 +596,12 @@ describe('ReviewsPage — the admin moderation listing (#563)', () => {
     // parameters on the wire, the same rule the browser-side facet follows.
     const closed = vi.mocked(useReviews).mock.calls.at(-1)![0];
     expect(closed.scope).toBe('active');
-    expect(closed.state).toBe('closed');
+    expect(closed.lifecycle).toBe('closed');
 
     fireEvent.click(screen.getByText('Archived (17)'));
     const archived = vi.mocked(useReviews).mock.calls.at(-1)![0];
     expect(archived.scope).toBe('archived');
-    expect(archived.state).toBe('any');
+    expect(archived.lifecycle).toBe('any');
   });
 
   it('says a filter matched nothing instead of greeting a full workspace as empty', () => {
@@ -653,6 +654,47 @@ describe('ReviewsPage — the admin moderation listing (#563)', () => {
     renderPage('/reviews?participation=all');
 
     expect(screen.getByText(/Start your first review/i)).toBeInTheDocument();
+  });
+
+  it('sends the advanced filters to the server too', () => {
+    useAuthStore.setState({ userId: ME, isAuthenticated: true, role: 'ADMIN' });
+    mockReviews({ data: { items: [foreign], total: 57, page: 0, size: 20, facets: FACETS } });
+
+    renderPage('/reviews?participation=all&due=overdue&format=docx&state=CHANGES_REQUESTED');
+
+    // Everything the filter button offers has to reach the query, or it would
+    // narrow the page while reading as the workspace — the same trap the chips
+    // had (issue #563).
+    const sent = vi.mocked(useReviews).mock.calls.at(-1)![0];
+    expect(sent.due).toBe('overdue');
+    expect(sent.format).toBe('docx');
+    expect(sent.workflowState).toBe('CHANGES_REQUESTED');
+  });
+
+  it('offers every owner in the workspace, not just the ones on this page', () => {
+    useAuthStore.setState({ userId: ME, isAuthenticated: true, role: 'ADMIN' });
+    mockReviews({
+      data: {
+        items: [foreign],
+        total: 57,
+        page: 0,
+        size: 20,
+        facets: {
+          ...FACETS,
+          owners: [
+            { id: OTHER, displayName: 'Someone Else' },
+            { id: 'owner-3', displayName: 'Nobody On This Page' },
+          ],
+        },
+      },
+    });
+
+    renderPage('/reviews?participation=all');
+    fireEvent.click(screen.getByRole('button', { name: 'Filter reviews' }));
+
+    // The page holds one row owned by one person; the facet still offers both,
+    // because it comes from the server.
+    expect(screen.getByText('Nobody On This Page')).toBeInTheDocument();
   });
 
   it('says which slice of the workspace is on screen', () => {

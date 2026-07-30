@@ -32,12 +32,15 @@ import io.qnop.repository.ReviewParticipantRepository;
 import io.qnop.repository.UserDisplayName;
 import io.qnop.repository.UserRepository;
 import io.qnop.repository.UserSlug;
+import io.qnop.service.document.ReviewModerationFilter.Due;
+import io.qnop.service.document.ReviewModerationFilter.Facets;
+import io.qnop.service.document.ReviewModerationFilter.Lifecycle;
 import io.qnop.service.document.ReviewModerationFilter.Role;
 import io.qnop.service.document.ReviewModerationFilter.Scope;
-import io.qnop.service.document.ReviewModerationFilter.State;
 import io.qnop.service.document.ReviewParticipantService.ParticipantView;
 import io.qnop.service.review.ReviewIdentityResolver;
 import java.time.Instant;
+import java.util.Comparator;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
@@ -98,6 +101,9 @@ public class DocumentOverviewService {
    * — a moderation list that silently stops at the first page would be worse than no list, because
    * "I can see everything" is exactly what a moderator relies on.
    */
+  /** How many owners the facet offers before the search field is the better tool. */
+  private static final int MAX_OWNER_OPTIONS = 100;
+
   @Transactional(readOnly = true)
   public DocumentPage listVisible(
       UUID actor,
@@ -106,8 +112,12 @@ public class DocumentOverviewService {
       String query,
       String sort,
       String scope,
-      String state,
+      String lifecycle,
       String role,
+      String workflowState,
+      String due,
+      String format,
+      UUID ownerId,
       boolean includeActive,
       boolean includeArchived,
       int page,
@@ -129,14 +139,19 @@ public class DocumentOverviewService {
     ReviewFacetCounts facets = null;
     Page<Document> result;
     if (moderation) {
-      Scope wantedScope = Scope.of(scope);
-      State wantedState = State.of(state);
-      Role wantedRole = Role.of(role);
-      result =
-          documents.findAll(
-              ReviewModerationFilter.of(actor, like, wantedScope, wantedState, wantedRole),
-              pageRequest);
-      facets = countFacets(actor, like, wantedScope, wantedState, wantedRole);
+      Instant now = Instant.now();
+      Facets wanted =
+          new Facets(
+              like,
+              Scope.of(scope),
+              Lifecycle.of(lifecycle),
+              Role.of(role),
+              blankToNull(workflowState),
+              Due.of(due),
+              blankToNull(format),
+              ownerId);
+      result = documents.findAll(ReviewModerationFilter.of(actor, wanted, now), pageRequest);
+      facets = countFacets(actor, wanted, now);
     } else {
       result = documents.findVisibleTo(actor, like, includeActive, includeArchived, pageRequest);
     }
@@ -246,21 +261,52 @@ public class DocumentOverviewService {
    * rows are reviews, and keeping each chip's number the result of the very predicate that chip
    * applies is what stops the two drifting apart.
    */
-  private ReviewFacetCounts countFacets(
-      UUID actor, String like, Scope scope, State state, Role role) {
+  private ReviewFacetCounts countFacets(UUID actor, Facets wanted, Instant now) {
+    Facets unfiltered =
+        new Facets(null, Scope.ALL, Lifecycle.ANY, Role.ANY, null, Due.ANY, null, null);
     return new ReviewFacetCounts(
         // Told apart from "this filter matched nothing", which is a different
         // message and must not show the first-run welcome.
-        documents.count(ReviewModerationFilter.of(actor, null, Scope.ALL, State.ANY, Role.ANY)),
-        documents.count(ReviewModerationFilter.of(actor, like, scope, state, Role.ANY)),
-        documents.count(ReviewModerationFilter.of(actor, like, scope, state, Role.OWNER)),
-        documents.count(ReviewModerationFilter.of(actor, like, scope, state, Role.REVIEWER)),
-        documents.count(ReviewModerationFilter.of(actor, like, scope, state, Role.OBSERVER)),
-        documents.count(ReviewModerationFilter.of(actor, like, Scope.ACTIVE, State.ANY, role)),
-        documents.count(ReviewModerationFilter.of(actor, like, Scope.ACTIVE, State.OPEN, role)),
-        documents.count(ReviewModerationFilter.of(actor, like, Scope.ACTIVE, State.CLOSED, role)),
-        documents.count(ReviewModerationFilter.of(actor, like, Scope.ARCHIVED, State.ANY, role)),
-        documents.count(ReviewModerationFilter.of(actor, like, Scope.ALL, State.ANY, role)));
+        documents.count(ReviewModerationFilter.of(actor, unfiltered, now)),
+        ownerOptions(),
+        count(actor, wanted.withRole(Role.ANY), now),
+        count(actor, wanted.withRole(Role.OWNER), now),
+        count(actor, wanted.withRole(Role.REVIEWER), now),
+        count(actor, wanted.withRole(Role.OBSERVER), now),
+        count(actor, wanted.withStatus(Scope.ACTIVE, Lifecycle.ANY), now),
+        count(actor, wanted.withStatus(Scope.ACTIVE, Lifecycle.OPEN), now),
+        count(actor, wanted.withStatus(Scope.ACTIVE, Lifecycle.CLOSED), now),
+        count(actor, wanted.withStatus(Scope.ARCHIVED, Lifecycle.ANY), now),
+        count(actor, wanted.withStatus(Scope.ALL, Lifecycle.ANY), now));
+  }
+
+  /**
+   * The owner facet's entries.
+   *
+   * <p>Capped: past a few dozen owners a dropdown stops being a way to find anything, and the
+   * search field is the better tool. The cap is generous enough that no ordinary workspace meets
+   * it.
+   */
+  private List<OwnerOption> ownerOptions() {
+    List<UUID> ids = documents.findDistinctOwnerIds(PageRequest.of(0, MAX_OWNER_OPTIONS));
+    if (ids.isEmpty()) {
+      return List.of();
+    }
+    Map<UUID, String> names =
+        users.findDisplayNamesByIdIn(ids).stream()
+            .collect(Collectors.toMap(UserDisplayName::id, UserDisplayName::displayName));
+    return ids.stream()
+        .map(id -> new OwnerOption(id, names.getOrDefault(id, "Unknown")))
+        .sorted(Comparator.comparing(OwnerOption::displayName, String.CASE_INSENSITIVE_ORDER))
+        .toList();
+  }
+
+  private long count(UUID actor, Facets facets, Instant now) {
+    return documents.count(ReviewModerationFilter.of(actor, facets, now));
+  }
+
+  private static String blankToNull(String value) {
+    return value == null || value.isBlank() || "any".equalsIgnoreCase(value) ? null : value;
   }
 
   private List<ParticipantView> rosterFor(
@@ -314,6 +360,9 @@ public class DocumentOverviewService {
        */
       boolean participating) {}
 
+  /** One entry of the owner facet (issue #563). */
+  public record OwnerOption(UUID id, String displayName) {}
+
   /** A page of the caller's documents; {@code facets} is set only when moderating (issue #563). */
   public record DocumentPage(
       List<DocumentSummaryView> items, long total, int page, int size, ReviewFacetCounts facets) {}
@@ -329,6 +378,8 @@ public class DocumentOverviewService {
   public record ReviewFacetCounts(
       /** Every review there is, ignoring search and facets — "is the workspace empty?" (#563). */
       long totalUnfiltered,
+      /** Everyone who owns a review, so the owner facet is not limited to the page. */
+      List<OwnerOption> owners,
       long roleAny,
       long roleOwner,
       long roleReviewer,
