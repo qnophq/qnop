@@ -19,19 +19,10 @@
  * SPDX-License-Identifier: AGPL-3.0-only
  */
 
-import { useRef, useState } from 'react';
-import type { DragEvent } from 'react';
-import Alert from '@mui/material/Alert';
-import Box from '@mui/material/Box';
-import Button from '@mui/material/Button';
-import IconButton from '@mui/material/IconButton';
 import Stack from '@mui/material/Stack';
 import TextField from '@mui/material/TextField';
-import Tooltip from '@mui/material/Tooltip';
-import Typography from '@mui/material/Typography';
-import { useTheme } from '@mui/material/styles';
-import { FileText, Upload, X } from 'lucide-react';
-import { formatFileSize, type AcceptedUploads } from './wizardModel';
+import { DocumentDropzone } from '../upload/DocumentDropzone';
+import { type AcceptedUploads } from './wizardModel';
 
 interface DocumentStepProps {
   file: File | null;
@@ -65,122 +56,17 @@ export function DocumentStep({
   onTitleChange,
   onSlugChange,
 }: DocumentStepProps) {
-  const theme = useTheme();
-  const inputRef = useRef<HTMLInputElement>(null);
-  const [isDragOver, setIsDragOver] = useState(false);
-
-  const handleDrop = (event: DragEvent) => {
-    event.preventDefault();
-    setIsDragOver(false);
-    const dropped = event.dataTransfer.files[0];
-    if (dropped) onFilePicked(dropped);
-  };
-
   return (
     <Stack spacing={2.5}>
-      {!file ? (
-        <Box
-          data-testid="wizard-dropzone"
-          onClick={() => inputRef.current?.click()}
-          onDragOver={(e) => {
-            e.preventDefault();
-            setIsDragOver(true);
-          }}
-          onDragLeave={() => setIsDragOver(false)}
-          onDrop={handleDrop}
-          sx={{
-            border: '2px dashed',
-            borderColor: isDragOver ? theme.qnop.brand.blue : theme.palette.divider,
-            borderRadius: 3,
-            px: 3,
-            py: 7,
-            textAlign: 'center',
-            cursor: 'pointer',
-            bgcolor: isDragOver ? theme.palette.primary.light : 'transparent',
-            transition: 'border-color 160ms ease, background-color 160ms ease',
-          }}
-        >
-          <Box
-            sx={{
-              width: 60,
-              height: 60,
-              borderRadius: 3.5,
-              bgcolor: theme.palette.primary.light,
-              color: theme.qnop.brand.blue,
-              display: 'inline-flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              mb: 2,
-            }}
-          >
-            <Upload size={26} aria-hidden />
-          </Box>
-          <Typography sx={{ fontWeight: 600, fontSize: 18, mb: 0.5 }}>
-            Drop your document here or choose a file
-          </Typography>
-          <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-            {accepted.label} · max. {maxSizeMb} MB
-          </Typography>
-          <Button variant="contained" startIcon={<Upload size={16} />}>
-            Choose file
-          </Button>
-        </Box>
-      ) : (
-        <Stack
-          direction="row"
-          spacing={1.75}
-          sx={{
-            alignItems: 'center',
-            p: 2,
-            borderRadius: 2,
-            bgcolor: theme.qnop.surface2,
-          }}
-        >
-          <Box
-            sx={{
-              width: 44,
-              height: 44,
-              borderRadius: 2,
-              bgcolor: theme.qnop.brand.blue,
-              color: '#fff',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              flexShrink: 0,
-            }}
-          >
-            <FileText size={20} aria-hidden />
-          </Box>
-          <Box sx={{ flex: 1, minWidth: 0 }}>
-            <Typography variant="body2" noWrap sx={{ fontWeight: 500 }}>
-              {file.name}
-            </Typography>
-            <Typography variant="caption" color="text.secondary">
-              {formatFileSize(file.size)}
-            </Typography>
-          </Box>
-          <Tooltip title="Remove file">
-            <IconButton size="small" onClick={onFileCleared} aria-label="Remove file">
-              <X size={16} />
-            </IconButton>
-          </Tooltip>
-        </Stack>
-      )}
-
-      <input
-        ref={inputRef}
-        type="file"
-        accept={accepted.accept}
-        hidden
-        data-testid="wizard-file-input"
-        onChange={(e) => {
-          const picked = e.target.files?.[0];
-          if (picked) onFilePicked(picked);
-          e.target.value = '';
-        }}
+      <DocumentDropzone
+        file={file}
+        error={fileError}
+        maxSizeMb={maxSizeMb}
+        accepted={accepted}
+        onFilePicked={onFilePicked}
+        onFileCleared={onFileCleared}
+        testId="wizard-dropzone"
       />
-
-      {fileError && <Alert severity="error">{fileError}</Alert>}
 
       <TextField
         label="Review title"

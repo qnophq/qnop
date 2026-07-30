@@ -313,29 +313,43 @@ describe('ReviewHubHead — workflow transitions', () => {
 });
 
 describe('ReviewHubHead — new version upload', () => {
-  it('uploads a PDF and reports the new version', async () => {
+  /** Opens the dialog and returns its file input. */
+  function openDialog() {
+    fireEvent.click(screen.getByRole('button', { name: /New version/ }));
+    return screen.getByTestId('new-version-dropzone-input');
+  }
+
+  it('uploads only once the owner confirms the file they picked', async () => {
     vi.mocked(axiosInstance.post).mockResolvedValue({
       data: { documentId: DOC_ID, versionNumber: 3, extractionStatus: 'PENDING' },
     });
     renderHub();
 
     const file = new File(['%PDF-1.4'], 'v3.pdf', { type: 'application/pdf' });
-    fireEvent.change(screen.getByTestId('version-file-input'), { target: { files: [file] } });
+    fireEvent.change(openDialog(), { target: { files: [file] } });
+
+    // Picking is not sending (issue #652): a new version becomes the version
+    // everyone reviews, so there is a moment to notice the wrong file.
+    expect(axiosInstance.post).not.toHaveBeenCalled();
+    expect(await screen.findByText('v3.pdf')).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: /Upload version/ }));
 
     await waitFor(() => expect(onVersionUploaded).toHaveBeenCalledWith(3));
     expect(vi.mocked(axiosInstance.post).mock.calls[0][0]).toBe(`/documents/${DOC_ID}/versions`);
     expect(notify).toHaveBeenCalledWith('Version 3 uploaded.');
   });
 
-  it('rejects a non-PDF without calling the API', async () => {
+  it('rejects an unsupported file in the dialog, without calling the API', async () => {
     renderHub();
 
     const file = new File(['x'], 'notes.txt', { type: 'text/plain' });
-    fireEvent.change(screen.getByTestId('version-file-input'), { target: { files: [file] } });
+    fireEvent.change(openDialog(), { target: { files: [file] } });
 
-    await waitFor(() =>
-      expect(notify).toHaveBeenCalledWith('Only PDF documents are supported.', 'error'),
-    );
+    // The refusal belongs next to the dropzone that refused it, not in a toast
+    // that outlives the dialog.
+    expect(await screen.findByText('Only PDF documents are supported.')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Upload version/ })).toBeDisabled();
     expect(axiosInstance.post).not.toHaveBeenCalled();
   });
 
@@ -344,7 +358,6 @@ describe('ReviewHubHead — new version upload', () => {
 
     await screen.findByTestId('participants-button');
     expect(screen.queryByRole('button', { name: /New version/ })).not.toBeInTheDocument();
-    expect(screen.queryByTestId('version-file-input')).not.toBeInTheDocument();
   });
 });
 
