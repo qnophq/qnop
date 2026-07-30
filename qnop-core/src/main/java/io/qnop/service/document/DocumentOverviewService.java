@@ -249,6 +249,9 @@ public class DocumentOverviewService {
   private ReviewFacetCounts countFacets(
       UUID actor, String like, Scope scope, State state, Role role) {
     return new ReviewFacetCounts(
+        // Told apart from "this filter matched nothing", which is a different
+        // message and must not show the first-run welcome.
+        documents.count(ReviewModerationFilter.of(actor, null, Scope.ALL, State.ANY, Role.ANY)),
         documents.count(ReviewModerationFilter.of(actor, like, scope, state, Role.ANY)),
         documents.count(ReviewModerationFilter.of(actor, like, scope, state, Role.OWNER)),
         documents.count(ReviewModerationFilter.of(actor, like, scope, state, Role.REVIEWER)),
@@ -324,6 +327,8 @@ public class DocumentOverviewService {
    * view already follows — so a chip's number keeps predicting what clicking it shows.
    */
   public record ReviewFacetCounts(
+      /** Every review there is, ignoring search and facets — "is the workspace empty?" (#563). */
+      long totalUnfiltered,
       long roleAny,
       long roleOwner,
       long roleReviewer,

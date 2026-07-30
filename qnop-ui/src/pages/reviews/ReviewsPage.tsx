@@ -450,6 +450,19 @@ export function ReviewsPage() {
   // group's filter, so a chip's number always predicts what clicking it shows.
   const searched = items.filter((r) => matchesSearch(r, query) && matchesAdvanced(r));
   const facets = data?.facets;
+  /**
+   * Whether there is nothing to show *at all*, as opposed to nothing matching.
+   *
+   * <p>The welcome state invites you to start your first review, which is only
+   * true of an empty workspace. In the participant-scoped view the fetched rows
+   * are unfiltered, so an empty page does mean that; the moderation listing is
+   * filtered by the server, so it has to ask (issue #563) — otherwise a filter
+   * combination with no hits greets a workspace full of reviews as a fresh
+   * install, and hides the very controls needed to undo it.
+   */
+  const nothingAtAll = moderating
+    ? (facets?.totalUnfiltered ?? 0) === 0
+    : (data?.items.length ?? 0) === 0;
   const roleCounts = (() => {
     if (moderating) {
       return {
@@ -603,7 +616,7 @@ export function ReviewsPage() {
         </Stack>
       )}
 
-      {data && items.length === 0 && (
+      {data && nothingAtAll && (
         <Stack spacing={2} sx={{ alignItems: 'flex-start' }}>
           {participationToggle}
           <Box sx={{ alignSelf: 'stretch' }}>
@@ -612,7 +625,7 @@ export function ReviewsPage() {
         </Stack>
       )}
 
-      {data && items.length > 0 && (
+      {data && !nothingAtAll && (
         <>
           <Stack
             direction={{ xs: 'column', md: 'row' }}

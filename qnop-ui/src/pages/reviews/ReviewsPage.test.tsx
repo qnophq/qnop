@@ -512,7 +512,9 @@ describe('ReviewsPage — the admin moderation listing (#563)', () => {
 
   it('marks the rows the admin has no part in', () => {
     useAuthStore.setState({ userId: ME, isAuthenticated: true, role: 'ADMIN' });
-    mockReviews({ data: { items: [foreign], total: 1, page: 0, size: 20 } });
+    mockReviews({
+      data: { items: [foreign], total: 1, page: 0, size: 20, facets: { ...FACETS, roleAny: 1 } },
+    });
 
     renderPage('/reviews?participation=all');
 
@@ -524,6 +526,7 @@ describe('ReviewsPage — the admin moderation listing (#563)', () => {
   });
 
   const FACETS = {
+    totalUnfiltered: 57,
     roleAny: 57,
     roleOwner: 2,
     roleReviewer: 5,
@@ -600,9 +603,61 @@ describe('ReviewsPage — the admin moderation listing (#563)', () => {
     expect(archived.state).toBe('any');
   });
 
+  it('says a filter matched nothing instead of greeting a full workspace as empty', () => {
+    useAuthStore.setState({ userId: ME, isAuthenticated: true, role: 'ADMIN' });
+    // A filter combination with no hits, in a workspace holding 57 reviews.
+    mockReviews({
+      data: {
+        items: [],
+        total: 0,
+        page: 0,
+        size: 20,
+        // Nothing archived either, so the plain "no matches" line is the one
+        // under test rather than the archive-only variant (#578).
+        facets: { ...FACETS, roleAny: 0, stateActive: 0, stateArchived: 0, totalUnfiltered: 57 },
+      },
+    });
+
+    renderPage('/reviews?participation=all&role=observer');
+
+    expect(screen.getByText('No reviews match your filters.')).toBeInTheDocument();
+    expect(screen.queryByText(/Start your first review/i)).not.toBeInTheDocument();
+    // And the chips stay: without them there is no way to undo the filter that
+    // emptied the page.
+    expect(screen.getByText('Not participating (50)')).toBeInTheDocument();
+  });
+
+  it('still welcomes an admin whose workspace really is empty', () => {
+    useAuthStore.setState({ userId: ME, isAuthenticated: true, role: 'ADMIN' });
+    mockReviews({
+      data: {
+        items: [],
+        total: 0,
+        page: 0,
+        size: 20,
+        facets: {
+          totalUnfiltered: 0,
+          roleAny: 0,
+          roleOwner: 0,
+          roleReviewer: 0,
+          roleObserver: 0,
+          stateActive: 0,
+          stateOpen: 0,
+          stateClosed: 0,
+          stateArchived: 0,
+          stateAll: 0,
+        },
+      },
+    });
+
+    renderPage('/reviews?participation=all');
+
+    expect(screen.getByText(/Start your first review/i)).toBeInTheDocument();
+  });
+
   it('says which slice of the workspace is on screen', () => {
     useAuthStore.setState({ userId: ME, isAuthenticated: true, role: 'ADMIN' });
-    mockReviews({ data: { items: [foreign], total: 57, page: 0, size: 20 } });
+    mockReviews({ data: { items: [foreign], total: 57, page: 0, size: 20, facets: FACETS } });
 
     renderPage('/reviews?participation=all');
 

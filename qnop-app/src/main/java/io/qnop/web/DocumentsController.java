@@ -168,6 +168,7 @@ public class DocumentsController implements DocumentsApi {
     return counts == null
         ? null
         : new ReviewFacetCounts()
+            .totalUnfiltered(counts.totalUnfiltered())
             .roleAny(counts.roleAny())
             .roleOwner(counts.roleOwner())
             .roleReviewer(counts.roleReviewer())

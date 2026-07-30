@@ -6667,6 +6667,13 @@ components:
         rule the participant-scoped listing already follows — so a chip's number
         keeps predicting what clicking it shows.
       properties:
+        totalUnfiltered:
+          type: integer
+          format: int64
+          description: >-
+            Every review there is, ignoring the search and every facet. Tells
+            "the workspace is empty" apart from "this filter matched nothing" —
+            two states with very different messages.
         roleAny:
           type: integer
           format: int64
@@ -6696,6 +6703,7 @@ components:
           type: integer
           format: int64
       required:
+        - totalUnfiltered
         - roleAny
         - roleOwner
         - roleReviewer
