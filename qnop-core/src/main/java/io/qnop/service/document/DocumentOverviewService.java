@@ -84,28 +84,45 @@ public class DocumentOverviewService {
     this.users = users;
   }
 
+  /**
+   * The reviews the caller may list.
+   *
+   * <p>{@code moderation} is the admin's cross-review listing (issue #563): every review, not just
+   * the caller's own participations. It is refused for anyone else here rather than in the
+   * controller, so the rule sits next to the query it guards.
+   *
+   * <p>Unlike the participant-scoped view, this one is meant to be paged and searched on the server
+   * — a moderation list that silently stops at the first page would be worse than no list, because
+   * "I can see everything" is exactly what a moderator relies on.
+   */
   @Transactional(readOnly = true)
   public DocumentPage listVisible(
       UUID actor,
+      boolean admin,
+      boolean moderation,
       String query,
       String sort,
       boolean includeActive,
       boolean includeArchived,
       int page,
       int size) {
+    if (moderation && !admin) {
+      // 403, not 404: the caller is authenticated and the listing exists — it is
+      // simply not theirs. Anti-enumeration does not apply, because this reveals
+      // nothing about any particular review.
+      throw DocumentValidationException.forbidden("only admins may list every review");
+    }
     String like =
         query == null || query.isBlank() ? null : "%" + query.trim().toLowerCase(Locale.ROOT) + "%";
     // The retention slice (issue #576): the caller picks any combination — the
     // overview's "All" facet spans active AND archived at once, the default
     // hides the records, the Archived view shows only them. Open/closed stays
     // a client-side facet over the result.
+    PageRequest pageRequest = PageRequest.of(page, size, parseSort(sort));
     Page<Document> result =
-        documents.findVisibleTo(
-            actor,
-            like,
-            includeActive,
-            includeArchived,
-            PageRequest.of(page, size, parseSort(sort)));
+        moderation
+            ? documents.findAllForModeration(like, includeActive, includeArchived, pageRequest)
+            : documents.findVisibleTo(actor, like, includeActive, includeArchived, pageRequest);
 
     List<UUID> ids = result.getContent().stream().map(Document::getId).toList();
     Map<UUID, Integer> maxVersions =
@@ -129,7 +146,7 @@ public class DocumentOverviewService {
     Map<UUID, DocumentAnnotationCounts> counts =
         ids.isEmpty()
             ? Map.of()
-            : annotations.countVisibleByDocumentIds(ids, actor).stream()
+            : annotations.countVisibleByDocumentIds(ids, actor, admin).stream()
                 .collect(
                     Collectors.toMap(DocumentAnnotationCounts::documentId, Function.identity()));
     // Owner names, batched (issue #469 polish): structurally public (#413).
@@ -160,6 +177,13 @@ public class DocumentOverviewService {
                 .filter(row -> row.slug() != null)
                 .collect(Collectors.toMap(UserSlug::id, UserSlug::slug));
 
+    // Only in moderation mode: everywhere else every row is the caller's by
+    // construction, so the extra query would answer a question nobody asked.
+    Set<UUID> participating =
+        moderation && !ids.isEmpty()
+            ? new HashSet<>(documents.findParticipatingIds(ids, actor))
+            : Set.copyOf(ids);
+
     List<DocumentSummaryView> items =
         result.getContent().stream()
             .map(
@@ -187,7 +211,8 @@ public class DocumentOverviewService {
                       document.getCreatedAt(),
                       document.getUpdatedAt(),
                       document.getDueAt(),
-                      document.getArchivedAt());
+                      document.getArchivedAt(),
+                      participating.contains(document.getId()));
                 })
             .toList();
     return new DocumentPage(items, result.getTotalElements(), page, size);
@@ -242,7 +267,11 @@ public class DocumentOverviewService {
       Instant createdAt,
       Instant updatedAt,
       Instant dueAt,
-      Instant archivedAt) {}
+      Instant archivedAt,
+      /**
+       * Whether the caller owns or reviews this one (issue #563); always true outside moderation.
+       */
+      boolean participating) {}
 
   /** A page of the caller's documents. */
   public record DocumentPage(List<DocumentSummaryView> items, long total, int page, int size) {}

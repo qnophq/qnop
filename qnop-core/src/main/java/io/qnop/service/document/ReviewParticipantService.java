@@ -223,7 +223,10 @@ public class ReviewParticipantService {
         documents
             .findById(documentId)
             .orElseThrow(() -> DocumentValidationException.notFound("document " + documentId));
-    if (!document.getOwnerId().equals(actor)) {
+    if (!admin && !document.getOwnerId().equals(actor)) {
+      // Admins moderate (issue #563): taking someone off a review, or adding a
+      // reviewer, when the owner is unreachable. The audit trail records the real
+      // actor either way (ADR-0042).
       throw DocumentValidationException.notOwner("only the owner manages participants");
     }
     return document;

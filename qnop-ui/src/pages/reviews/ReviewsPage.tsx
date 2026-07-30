@@ -19,7 +19,7 @@
  * SPDX-License-Identifier: AGPL-3.0-only
  */
 
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import Box from '@mui/material/Box';
 import Button from '@mui/material/Button';
 import Chip from '@mui/material/Chip';
@@ -49,7 +49,7 @@ import { roleOf } from '../../components/reviews/list/reviewListModel';
 import { ReviewCards } from '../../components/reviews/list/ReviewCards';
 import { ReviewsTable } from '../../components/reviews/list/ReviewsTable';
 import { ReviewsEmptyState } from './ReviewsEmptyState';
-import { useAuthStore } from '../../stores/authStore';
+import { selectIsAdmin, useAuthStore } from '../../stores/authStore';
 
 type RoleFilter = 'all' | 'owner' | 'reviewer';
 // Client facets over ONE scope=all fetch (issue #576 follow-up), so every chip
@@ -70,6 +70,19 @@ const VIEW_STORAGE_KEY = 'qnop-reviews-view';
 // stay consistent with what is on screen; server paging arrives when real
 // installations outgrow this (documented trade-off in #251).
 const FETCH_SIZE = 100;
+
+/**
+ * The moderation listing pages on the server (issue #563).
+ *
+ * <p>The participant-scoped view fetches once and facets in the browser, which is
+ * honest as long as the caller's own reviews fit in one page. Across a whole
+ * workspace they do not, and a moderation view that quietly stopped at the first
+ * hundred would be the worst kind of wrong: seeing everything is the point.
+ */
+const MODERATION_PAGE_SIZE = 20;
+
+/** Mirrors the admin lists' debounce — one query per typing pause. */
+const SEARCH_DEBOUNCE_MS = 300;
 
 function readStoredView(): ViewMode {
   try {
@@ -308,6 +321,7 @@ function ReviewFilterMenu({
 export function ReviewsPage() {
   const navigate = useNavigate();
   const userId = useAuthStore((s) => s.userId);
+  const isAdmin = useAuthStore(selectIsAdmin);
 
   // Every facet is URL-persisted (issue #576 follow-up) so any sliced view is
   // shareable and survives reloads. ONE scope=all fetch backs them all: the
@@ -330,20 +344,48 @@ export function ReviewsPage() {
   const formatFilter = parseParam(searchParams.get('format'), FORMAT_FILTERS, 'any');
   const stateFilter = parseParam(searchParams.get('state'), STATE_FILTERS, 'any');
   const ownerFilter = searchParams.get('owner');
+  // The admin's moderation listing (issue #563). Opt-in and URL-persisted like
+  // the rest, default off so an admin's own work is not drowned out.
+  const moderating = isAdmin && searchParams.get('participation') === 'all';
+  const [serverPage, setServerPage] = useState(0);
+  // Moderation searches the SERVER, so it waits for a pause in typing the way the
+  // admin lists do; the participant-scoped view keeps filtering as you type
+  // because it already holds its rows.
+  const [debouncedQuery, setDebouncedQuery] = useState('');
   const setStatusFilter = (next: StatusFilter) => setParam('status', next, 'active');
   const setRoleFilter = (next: RoleFilter) => setParam('role', next, 'all');
 
-  const { data, isPending, isError, refetch } = useReviews({
-    page: 0,
-    size: FETCH_SIZE,
-    sort: 'updatedAt,desc',
-    scope: 'all',
-  });
+  const { data, isPending, isError, refetch } = useReviews(
+    moderating
+      ? {
+          page: serverPage,
+          size: MODERATION_PAGE_SIZE,
+          sort: 'updatedAt,desc',
+          scope: 'all',
+          participation: 'all',
+          q: debouncedQuery,
+        }
+      : { page: 0, size: FETCH_SIZE, sort: 'updatedAt,desc', scope: 'all' },
+  );
 
   const [search, setSearch] = useState(searchParams.get('q') ?? '');
   const setSearchAndParam = (next: string) => {
     setSearch(next);
     setParam('q', next.trim(), '');
+  };
+  useEffect(() => {
+    if (!moderating) return;
+    const timer = setTimeout(() => {
+      setDebouncedQuery(search.trim());
+      setServerPage(0); // a new query starts at its own first page
+    }, SEARCH_DEBOUNCE_MS);
+    return () => clearTimeout(timer);
+  }, [search, moderating]);
+
+  const setModerating = (next: boolean) => {
+    setServerPage(0);
+    setDebouncedQuery(search.trim());
+    setParam('participation', next ? 'all' : 'mine', 'mine');
   };
   const [sortBy, setSortBy] = useState<SortBy>('updated');
   const [view, setView] = useState<ViewMode>(readStoredView);
@@ -390,10 +432,17 @@ export function ReviewsPage() {
     };
   })();
 
-  const visible = sortReviews(
-    searched.filter((r) => matchesRole(r, roleFilter, userId) && matchesStatus(r, statusFilter)),
-    sortBy,
-  );
+  // Moderation rows arrive already filtered and paged by the server, so the client
+  // facets are neither applied nor offered: applied, they would narrow one page
+  // and read as the whole workspace.
+  const visible = moderating
+    ? sortReviews(items, sortBy)
+    : sortReviews(
+        searched.filter(
+          (r) => matchesRole(r, roleFilter, userId) && matchesStatus(r, statusFilter),
+        ),
+        sortBy,
+      );
 
   // A workspace whose living work is all done holds nothing but records. Saying
   // "nothing matches your filters" there would be a dead end — no filter is set
@@ -448,9 +497,30 @@ export function ReviewsPage() {
     <Stack spacing={3}>
       <PageHeader
         title="Reviews"
-        description="Documents you own or review — pick one up where it stands."
+        description={
+          moderating
+            ? 'Every review in the workspace — you are moderating, not participating.'
+            : 'Documents you own or review — pick one up where it stands.'
+        }
         action={newReviewButton}
       />
+
+      {isAdmin && (
+        <ToggleButtonGroup
+          exclusive
+          size="small"
+          value={moderating ? 'all' : 'mine'}
+          onChange={(_e, next: string | null) => next && setModerating(next === 'all')}
+          aria-label="Which reviews"
+        >
+          <ToggleButton value="mine" data-testid="participation-mine">
+            My reviews
+          </ToggleButton>
+          <ToggleButton value="all" data-testid="participation-all">
+            All reviews
+          </ToggleButton>
+        </ToggleButtonGroup>
+      )}
 
       {isError && (
         // The branded failure shell (issue #611) instead of a bare alert -
@@ -491,15 +561,17 @@ export function ReviewsPage() {
               sx={{ width: { xs: '100%', md: 280 } }}
             />
             <Box sx={{ flex: 1 }} />
-            <ReviewFilterMenu
-              dueFilter={dueFilter}
-              formatFilter={formatFilter}
-              stateFilter={stateFilter}
-              ownerFilter={ownerFilter}
-              owners={owners}
-              activeCount={advancedCount}
-              onSet={setParam}
-            />
+            {!moderating && (
+              <ReviewFilterMenu
+                dueFilter={dueFilter}
+                formatFilter={formatFilter}
+                stateFilter={stateFilter}
+                ownerFilter={ownerFilter}
+                owners={owners}
+                activeCount={advancedCount}
+                onSet={setParam}
+              />
+            )}
             <TextField
               select
               size="small"
@@ -528,75 +600,77 @@ export function ReviewsPage() {
             </ToggleButtonGroup>
           </Stack>
 
-          <Stack direction="row" spacing={1} sx={{ flexWrap: 'wrap', rowGap: 1 }}>
-            <FilterChip
-              label="All"
-              hint="Every review you can see, whatever your part in it"
-              count={roleCounts.all}
-              selected={roleFilter === 'all'}
-              onClick={() => setRoleFilter('all')}
-            />
-            <FilterChip
-              label="Owned by me"
-              hint="Reviews you own and steer"
-              count={roleCounts.owner}
-              selected={roleFilter === 'owner'}
-              onClick={() => setRoleFilter('owner')}
-            />
-            <FilterChip
-              label="Reviewing"
-              hint="Reviews where you are on the reviewer roster"
-              count={roleCounts.reviewer}
-              selected={roleFilter === 'reviewer'}
-              onClick={() => setRoleFilter('reviewer')}
-            />
-            <Box sx={{ width: 8 }} />
-            <FilterChip
-              label="Active"
-              hint="All live work — every workflow state except archived records (the default)"
-              count={statusCounts.active}
-              selected={statusFilter === 'active'}
-              onClick={() => setStatusFilter('active')}
-            />
-            <FilterChip
-              label="Open"
-              hint="Live reviews the workflow has not closed yet"
-              count={statusCounts.open}
-              selected={statusFilter === 'open'}
-              onClick={() => setStatusFilter(statusFilter === 'open' ? 'active' : 'open')}
-            />
-            <FilterChip
-              label="Closed"
-              hint="Finalized or cancelled reviews that are not archived yet"
-              count={statusCounts.closed}
-              selected={statusFilter === 'closed'}
-              onClick={() => setStatusFilter(statusFilter === 'closed' ? 'active' : 'closed')}
-            />
-            <FilterChip
-              label="Archived"
-              hint="Only the records archived out of the active lists"
-              count={statusCounts.archived}
-              selected={statusFilter === 'archived'}
-              onClick={() => setStatusFilter(statusFilter === 'archived' ? 'active' : 'archived')}
-            />
-            <FilterChip
-              label="Every state"
-              hint="Everything at once — every workflow state, archived records included"
-              count={statusCounts.all}
-              selected={statusFilter === 'all'}
-              onClick={() => setStatusFilter(statusFilter === 'all' ? 'active' : 'all')}
-            />
-            {hasActiveFilters && (
-              <Chip
-                label="Clear filters"
-                size="small"
-                variant="outlined"
-                onDelete={clearFilters}
-                onClick={clearFilters}
-                sx={{ ml: 'auto' }}
+          {!moderating && (
+            <Stack direction="row" spacing={1} sx={{ flexWrap: 'wrap', rowGap: 1 }}>
+              <FilterChip
+                label="All"
+                hint="Every review you can see, whatever your part in it"
+                count={roleCounts.all}
+                selected={roleFilter === 'all'}
+                onClick={() => setRoleFilter('all')}
               />
-            )}
-          </Stack>
+              <FilterChip
+                label="Owned by me"
+                hint="Reviews you own and steer"
+                count={roleCounts.owner}
+                selected={roleFilter === 'owner'}
+                onClick={() => setRoleFilter('owner')}
+              />
+              <FilterChip
+                label="Reviewing"
+                hint="Reviews where you are on the reviewer roster"
+                count={roleCounts.reviewer}
+                selected={roleFilter === 'reviewer'}
+                onClick={() => setRoleFilter('reviewer')}
+              />
+              <Box sx={{ width: 8 }} />
+              <FilterChip
+                label="Active"
+                hint="All live work — every workflow state except archived records (the default)"
+                count={statusCounts.active}
+                selected={statusFilter === 'active'}
+                onClick={() => setStatusFilter('active')}
+              />
+              <FilterChip
+                label="Open"
+                hint="Live reviews the workflow has not closed yet"
+                count={statusCounts.open}
+                selected={statusFilter === 'open'}
+                onClick={() => setStatusFilter(statusFilter === 'open' ? 'active' : 'open')}
+              />
+              <FilterChip
+                label="Closed"
+                hint="Finalized or cancelled reviews that are not archived yet"
+                count={statusCounts.closed}
+                selected={statusFilter === 'closed'}
+                onClick={() => setStatusFilter(statusFilter === 'closed' ? 'active' : 'closed')}
+              />
+              <FilterChip
+                label="Archived"
+                hint="Only the records archived out of the active lists"
+                count={statusCounts.archived}
+                selected={statusFilter === 'archived'}
+                onClick={() => setStatusFilter(statusFilter === 'archived' ? 'active' : 'archived')}
+              />
+              <FilterChip
+                label="Every state"
+                hint="Everything at once — every workflow state, archived records included"
+                count={statusCounts.all}
+                selected={statusFilter === 'all'}
+                onClick={() => setStatusFilter(statusFilter === 'all' ? 'active' : 'all')}
+              />
+              {hasActiveFilters && (
+                <Chip
+                  label="Clear filters"
+                  size="small"
+                  variant="outlined"
+                  onDelete={clearFilters}
+                  onClick={clearFilters}
+                  sx={{ ml: 'auto' }}
+                />
+              )}
+            </Stack>
+          )}
 
           {visible.length === 0 ? (
             <Paper variant="outlined" sx={{ py: 6, px: 3, textAlign: 'center' }}>
@@ -624,6 +698,36 @@ export function ReviewsPage() {
             <ReviewsTable reviews={visible} userId={userId} onOpen={openReview} />
           ) : (
             <ReviewCards reviews={visible} userId={userId} onOpen={openReview} />
+          )}
+
+          {moderating && (data?.total ?? 0) > MODERATION_PAGE_SIZE && (
+            <Stack
+              direction="row"
+              spacing={2}
+              sx={{ alignItems: 'center', justifyContent: 'flex-end' }}
+            >
+              {/* Named counts, not just arrows: a moderator has to know whether
+                  they are looking at everything or at page one of twelve. */}
+              <Typography variant="body2" color="text.secondary">
+                {serverPage * MODERATION_PAGE_SIZE + 1}–
+                {Math.min((serverPage + 1) * MODERATION_PAGE_SIZE, data?.total ?? 0)} of{' '}
+                {data?.total ?? 0}
+              </Typography>
+              <Button
+                size="small"
+                disabled={serverPage === 0}
+                onClick={() => setServerPage((p) => Math.max(0, p - 1))}
+              >
+                Previous
+              </Button>
+              <Button
+                size="small"
+                disabled={(serverPage + 1) * MODERATION_PAGE_SIZE >= (data?.total ?? 0)}
+                onClick={() => setServerPage((p) => p + 1)}
+              >
+                Next
+              </Button>
+            </Stack>
           )}
         </>
       )}

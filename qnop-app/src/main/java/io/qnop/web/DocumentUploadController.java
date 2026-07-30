@@ -82,7 +82,8 @@ public class DocumentUploadController {
   public ResponseEntity<DocumentUploadResponse> addVersion(
       @PathVariable UUID documentId, @RequestParam("file") MultipartFile file) {
     UploadResult result =
-        ingest.addVersion(CurrentUser.requireUserId(), documentId, sourceOf(file));
+        ingest.addVersion(
+            CurrentUser.requireUserId(), CurrentUser.isAdmin(), documentId, sourceOf(file));
     return ResponseEntity.status(HttpStatus.CREATED).body(DocumentUploadResponse.of(result));
   }
 

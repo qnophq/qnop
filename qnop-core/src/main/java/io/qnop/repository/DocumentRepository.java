@@ -23,6 +23,7 @@ package io.qnop.repository;
 import io.qnop.entity.Document;
 import jakarta.persistence.LockModeType;
 import java.time.Instant;
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -82,6 +83,44 @@ public interface DocumentRepository extends JpaRepository<Document, UUID> {
       @Param("includeActive") boolean includeActive,
       @Param("includeArchived") boolean includeArchived,
       Pageable pageable);
+
+  /**
+   * Every review, for an admin's moderation listing (issue #563).
+   *
+   * <p>A separate query rather than a flag on {@link #findVisibleTo}: a predicate that drops its
+   * own access clause when a boolean says so is the kind of construct that gets misread the next
+   * time someone touches it, and the thing being dropped here is the access rule. Two queries make
+   * the unscoped one impossible to reach by accident — the caller has to name it.
+   *
+   * <p>Callers must check the admin role themselves; this method asks nobody's permission.
+   */
+  @Query(
+      "SELECT d FROM Document d WHERE (:q IS NULL OR LOWER(d.title) LIKE :q)"
+          + " AND ((:includeActive = TRUE AND d.archivedAt IS NULL)"
+          + "   OR (:includeArchived = TRUE AND d.archivedAt IS NOT NULL))")
+  Page<Document> findAllForModeration(
+      @Param("q") String q,
+      @Param("includeActive") boolean includeActive,
+      @Param("includeArchived") boolean includeArchived,
+      Pageable pageable);
+
+  /**
+   * Which of the given reviews the actor is actually part of (issue #563).
+   *
+   * <p>So the moderation listing can mark the rest. The same three ways in as {@link
+   * #findVisibleTo} — owned, joined directly, joined through a team — because a row is only "not
+   * yours" if none of them applies; a reviewer who joined via their team is participating even
+   * though no row names them.
+   */
+  @Query(
+      "SELECT d.id FROM Document d WHERE d.id IN :documentIds"
+          + " AND (d.ownerId = :actor"
+          + " OR EXISTS (SELECT 1 FROM ReviewParticipant p"
+          + "   WHERE p.documentId = d.id AND p.userId = :actor)"
+          + " OR EXISTS (SELECT 1 FROM ReviewParticipant pt, TeamMembership m"
+          + "   WHERE pt.documentId = d.id AND pt.teamId = m.teamId AND m.userId = :actor))")
+  List<UUID> findParticipatingIds(
+      @Param("documentIds") Collection<UUID> documentIds, @Param("actor") UUID actor);
 
   /**
    * Reviews the given team participates in AND the actor may see (issue #586). The public team

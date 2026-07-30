@@ -94,13 +94,17 @@ public class DocumentsController implements DocumentsApi {
 
   @Override
   public ResponseEntity<DocumentListResponse> listDocuments(
-      String q, String sort, String scope, Integer page, Integer size) {
+      String q, String sort, String scope, String participation, Integer page, Integer size) {
     // The retention slice (issue #576): active (default) / archived / all.
     boolean includeArchived = "archived".equals(scope) || "all".equals(scope);
     boolean includeActive = !"archived".equals(scope);
+    // The moderation listing (issue #563); the service refuses it for non-admins.
+    boolean moderation = "all".equals(participation);
     DocumentOverviewService.DocumentPage result =
         overview.listVisible(
             CurrentUser.requireUserId(),
+            CurrentUser.isAdmin(),
+            moderation,
             q,
             sort,
             includeActive,
@@ -166,7 +170,8 @@ public class DocumentsController implements DocumentsApi {
         .createdAt(view.createdAt().atOffset(ZoneOffset.UTC))
         .updatedAt(view.updatedAt().atOffset(ZoneOffset.UTC))
         .dueAt(atUtc(view.dueAt()))
-        .archivedAt(atUtc(view.archivedAt()));
+        .archivedAt(atUtc(view.archivedAt()))
+        .participating(view.participating());
   }
 
   /** Nullable {@link Instant} → {@link OffsetDateTime} at UTC for the wire model (#295). */

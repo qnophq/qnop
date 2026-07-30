@@ -25,8 +25,9 @@ import Tooltip from '@mui/material/Tooltip';
 import Typography from '@mui/material/Typography';
 import { useTheme } from '@mui/material/styles';
 import type { Theme } from '@mui/material/styles';
-import { Eye, User } from 'lucide-react';
+import { Eye, ShieldCheck, User } from 'lucide-react';
 import type { ParticipantView } from '../../../api/generated';
+import type { ReviewRole } from './reviewListModel';
 import { ToneBadge } from '../../admin/ToneBadge';
 import { TeamHoverCard } from '../../people/TeamHoverCard';
 import { UserHoverCard } from '../../people/UserHoverCard';
@@ -37,16 +38,18 @@ import { tokens } from '../../../theme/tokens';
 
 /** Shared bits of the reviews overview: role badge, doc icon, progress, reviewer stack. */
 
-export function RoleBadge({ role }: { role: 'owner' | 'reviewer' }) {
-  return role === 'owner' ? (
-    <ToneBadge tone="blue" label="Owner" />
-  ) : (
-    <ToneBadge tone="neutral" label="Reviewer" />
-  );
+export function RoleBadge({ role }: { role: ReviewRole }) {
+  if (role === 'owner') return <ToneBadge tone="blue" label="Owner" />;
+  // The moderation listing (issue #563) shows reviews the admin has no part in;
+  // saying so plainly is what makes the row's context obvious.
+  if (role === 'observer') return <ToneBadge tone="amber" label="Not participating" />;
+  return <ToneBadge tone="neutral" label="Reviewer" />;
 }
 
-export function RoleIcon({ role }: { role: 'owner' | 'reviewer' }) {
-  return role === 'owner' ? <User size={12} aria-hidden /> : <Eye size={12} aria-hidden />;
+export function RoleIcon({ role }: { role: ReviewRole }) {
+  if (role === 'owner') return <User size={12} aria-hidden />;
+  if (role === 'observer') return <ShieldCheck size={12} aria-hidden />;
+  return <Eye size={12} aria-hidden />;
 }
 
 /** Known document MIME types and their ribbon label + tone (issue #509 follow-up). */

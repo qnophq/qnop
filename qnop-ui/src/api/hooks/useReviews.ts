@@ -39,6 +39,12 @@ export interface ReviewListParams {
   sort?: string;
   /** When true, return only archived reviews (the "Archived" view); default excludes them (#576). */
   scope?: 'active' | 'archived' | 'all';
+  /**
+   * Whose reviews (issue #563). `all` is the ADMIN-only moderation listing and is
+   * refused with 403 for anyone else, so it is only ever requested from a surface
+   * that knows the caller's role.
+   */
+  participation?: 'mine' | 'all';
   page: number;
   size: number;
 }
@@ -61,6 +67,7 @@ export function useReviews(params: ReviewListParams) {
         q: params.q || undefined,
         sort: params.sort,
         scope: params.scope,
+        participation: params.participation,
         page: params.page,
         size: params.size,
       });

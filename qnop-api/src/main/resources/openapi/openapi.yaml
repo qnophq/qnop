@@ -2831,6 +2831,30 @@ paths:
             type: string
             enum: [active, archived, all]
             default: active
+        - name: participation
+          in: query
+          required: false
+          description: |
+            Whose reviews to list (issue #563). `mine` (default) is the caller's
+            own — owned, joined directly, or joined through a team. `all` lists
+            **every** review for moderation and is **ADMIN-only**: any other
+            caller gets `403 FORBIDDEN`.
+
+            Separate from `scope`, which selects the retention slice; the two
+            combine freely.
+
+            Under `all`, rows the caller is not part of come back with
+            `participating: false`, and the annotation counts are the true totals
+            rather than the caller's slice — an admin already reads private
+            threads, so scoping the numbers would only under-report.
+
+            This listing is meant to be paged and searched on the **server**: a
+            moderation view that quietly stopped at the first page would be worse
+            than none, because seeing everything is the point.
+          schema:
+            type: string
+            enum: [mine, all]
+            default: mine
         - name: page
           in: query
           required: false
@@ -2892,7 +2916,8 @@ paths:
         - Documents
       summary: Add a review participant
       description: |
-        Owner-only. Exactly one of `userId` or `teamId` — a participant is a
+        The owner, or an admin moderating (issue #563). Exactly one of `userId`
+        or `teamId` — a participant is a
         user XOR a team. Adding the owner, a disabled principal, or an unknown
         principal is rejected with 400; adding a principal twice with 409.
       operationId: addParticipant
@@ -2920,7 +2945,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
         '403':
-          description: The caller is a participant but not the owner
+          description: The caller is a participant, but neither the owner nor an admin
           content:
             application/json:
               schema:
@@ -2944,7 +2969,7 @@ paths:
       tags:
         - Documents
       summary: Remove a review participant
-      description: Owner-only.
+      description: The owner, or an admin moderating (issue #563).
       operationId: removeParticipant
       security:
         - bearerAuth: []
@@ -2955,7 +2980,7 @@ paths:
         '204':
           description: The participant was removed.
         '403':
-          description: The caller is a participant but not the owner
+          description: The caller is a participant, but neither the owner nor an admin
           content:
             application/json:
               schema:
@@ -3227,10 +3252,10 @@ paths:
         - Documents
       summary: Update document metadata
       description: |
-        Owner-only. Currently patches the optional review due date (issue #295):
-        a supplied `dueAt` sets it, an explicit `null` clears it. Any value —
-        including the past — is accepted on edit so the owner can correct a
-        deadline after the fact.
+        The owner, or an admin moderating (issue #563). Currently patches the
+        optional review due date (issue #295): a supplied `dueAt` sets it, an
+        explicit `null` clears it. Any value — including the past — is accepted on
+        edit so the deadline can be corrected after the fact.
       operationId: updateDocument
       security:
         - bearerAuth: []
@@ -3250,7 +3275,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/DocumentResponse'
         '403':
-          description: The caller is a participant but not the owner
+          description: The caller is a participant, but neither the owner nor an admin
           content:
             application/json:
               schema:
@@ -6582,6 +6607,13 @@ components:
             When the review was archived out of the active lists (issue #576), or
             null when not archived. The terminal workflowState is preserved, so
             the UI can read "Archived · was Finalized".
+        participating:
+          type: boolean
+          description: >-
+            Whether the caller owns or reviews this one (issue #563). Always true
+            in the default listing, where every row is theirs by construction;
+            under `participation=all` it marks the reviews an admin is moderating
+            from the outside.
       required:
         - id
         - title
@@ -7270,8 +7302,9 @@ components:
     DocumentUpdateRequest:
       type: object
       description: >-
-        Owner-only patch of a document's mutable metadata (issue #295). Every
-        supplied field replaces the stored value; an explicit `null` clears it.
+        Patch of a document's mutable metadata by its owner or an admin (issues
+        #295, #563). Every supplied field replaces the stored value; an explicit
+        `null` clears it.
       properties:
         dueAt:
           type: string

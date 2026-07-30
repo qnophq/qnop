@@ -453,3 +453,85 @@ describe('ReviewsPage', () => {
     expect(screen.getByRole('option', { name: 'Due date' })).toBeInTheDocument();
   });
 });
+
+describe('ReviewsPage — the admin moderation listing (#563)', () => {
+  const foreign = summary({
+    id: 'doc-9',
+    title: 'A review nobody invited me to',
+    ownerId: OTHER,
+    ownerDisplayName: 'Someone Else',
+    workflowState: 'IN_REVIEW',
+    participating: false,
+  });
+
+  it('does not offer the switch to a member', () => {
+    useAuthStore.setState({ userId: ME, isAuthenticated: true, role: 'MEMBER' });
+
+    renderPage();
+
+    // The API refuses them anyway; not showing the control keeps the UI from
+    // promising something the server will deny.
+    expect(screen.queryByTestId('participation-all')).not.toBeInTheDocument();
+  });
+
+  it('offers the switch to an admin', () => {
+    useAuthStore.setState({ userId: ME, isAuthenticated: true, role: 'ADMIN' });
+
+    renderPage();
+
+    expect(screen.getByTestId('participation-all')).toBeInTheDocument();
+  });
+
+  it("lists the caller's own reviews until the admin asks for all of them", () => {
+    useAuthStore.setState({ userId: ME, isAuthenticated: true, role: 'ADMIN' });
+    renderPage();
+
+    // Default off, so an admin's own work is not drowned out on every visit.
+    expect(vi.mocked(useReviews).mock.calls[0][0].participation).toBeUndefined();
+
+    fireEvent.click(screen.getByTestId('participation-all'));
+
+    const last = vi.mocked(useReviews).mock.calls.at(-1)![0];
+    expect(last.participation).toBe('all');
+    // Paged on the server, not sliced from one big fetch (issue #563): a
+    // moderation view that stopped at the first hundred would read as "that is
+    // everything".
+    expect(last.size).toBe(20);
+  });
+
+  it('marks the rows the admin has no part in', () => {
+    useAuthStore.setState({ userId: ME, isAuthenticated: true, role: 'ADMIN' });
+    mockReviews({ data: { items: [foreign], total: 1, page: 0, size: 20 } });
+
+    renderPage('/reviews?participation=all');
+
+    expect(screen.getByText('A review nobody invited me to')).toBeInTheDocument();
+    expect(screen.getByText('Not participating')).toBeInTheDocument();
+    // Not "Reviewer": the admin is not on the roster, and saying so would be a
+    // small lie in exactly the view where the context matters.
+    expect(screen.queryByText('Reviewer')).not.toBeInTheDocument();
+  });
+
+  it('hides the client-side facets while moderating', () => {
+    useAuthStore.setState({ userId: ME, isAuthenticated: true, role: 'ADMIN' });
+    mockReviews({ data: { items: [foreign], total: 1, page: 0, size: 20 } });
+
+    renderPage('/reviews?participation=all');
+
+    // They would narrow the current page and read as the whole workspace.
+    expect(screen.queryByText('Owned by me')).not.toBeInTheDocument();
+    expect(screen.queryByText('Every state')).not.toBeInTheDocument();
+  });
+
+  it('says which slice of the workspace is on screen', () => {
+    useAuthStore.setState({ userId: ME, isAuthenticated: true, role: 'ADMIN' });
+    mockReviews({ data: { items: [foreign], total: 57, page: 0, size: 20 } });
+
+    renderPage('/reviews?participation=all');
+
+    // A moderator has to know whether this is everything or page one of three.
+    expect(screen.getByText(/1–20 of 57/)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Previous' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Next' })).toBeEnabled();
+  });
+});
