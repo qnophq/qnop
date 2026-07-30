@@ -26,10 +26,23 @@ import type {
   RenderedDocumentResponse,
 } from '../generated';
 import { ExtractionStatus } from '../generated';
+import { isAxiosError } from 'axios';
 import { axiosInstance, documentsApi } from '../config';
+import { apiErrorCode } from '../../utils/apiError';
 
 /** How often to re-poll the version list while extraction is still running. */
 const EXTRACTION_POLL_MS = 2500;
+
+/**
+ * How long to keep asking for a version's PDF while it is still being made.
+ *
+ * <p>A Word upload has no viewable binary until the conversion finishes (issue
+ * #343), and the server says so with `409 EXTRACTION_PENDING`. Long enough to
+ * outlast a conversion — the server kills one at 60s — plus the queue delay
+ * before it starts.
+ */
+const RENDITION_RETRY_MS = 2000;
+const RENDITION_MAX_RETRIES = 45;
 
 export const documentKeys = {
   all: ['documents'] as const,
@@ -41,6 +54,51 @@ export const documentKeys = {
   rendition: (documentId: string, versionNumber: number) =>
     [...documentKeys.all, 'rendition', documentId, versionNumber] as const,
 };
+
+/**
+ * The API error code of a failed binary request.
+ *
+ * <p>Not `apiErrorCode`: these responses are fetched as `arraybuffer`, so an error
+ * body arrives as bytes rather than as parsed JSON and the shared helper sees no
+ * `code` at all.
+ */
+function binaryErrorCode(error: unknown): string | undefined {
+  if (!isAxiosError(error) || !error.response) return undefined;
+  const data: unknown = error.response.data;
+  // Tag rather than `instanceof`: a buffer that crossed a realm boundary — which
+  // is what an XHR response is — has the right shape and fails the identity check.
+  const isBuffer =
+    Object.prototype.toString.call(data) === '[object ArrayBuffer]' || ArrayBuffer.isView(data);
+  if (isBuffer) {
+    try {
+      const body: unknown = JSON.parse(new TextDecoder().decode(data as ArrayBuffer));
+      const code = (body as { code?: unknown }).code;
+      return typeof code === 'string' ? code : undefined;
+    } catch {
+      return undefined;
+    }
+  }
+  return apiErrorCode(error);
+}
+
+/**
+ * Whether a failed request for a version's PDF is worth repeating.
+ *
+ * <p>A version being converted has no viewable binary yet and says so with `409
+ * EXTRACTION_PENDING`. That is a "not yet", not a "no": the review page opens
+ * straight after an upload, while the conversion is still running, and treating
+ * it as final left the reader looking at an error until they reloaded the page
+ * (issue #343). Everything else follows the shared policy — a 4xx is a stable
+ * answer, a 5xx might not be.
+ */
+export function shouldRetryRendition(failureCount: number, error: unknown): boolean {
+  if (binaryErrorCode(error) === 'EXTRACTION_PENDING') {
+    return failureCount < RENDITION_MAX_RETRIES;
+  }
+  const status = isAxiosError(error) ? error.response?.status : undefined;
+  if (status && status >= 400 && status < 500) return false;
+  return failureCount < 2;
+}
 
 /** A review document's metadata (title, owner, workflow state, latest version). */
 export function useDocument(documentId: string) {
@@ -148,5 +206,10 @@ export function useOriginalPdf(documentId: string, versionNumber: number | undef
     },
     enabled: versionNumber !== undefined && versionNumber >= 1,
     staleTime: Infinity,
+    retry: shouldRetryRendition,
+    retryDelay: (attempt, error) =>
+      binaryErrorCode(error) === 'EXTRACTION_PENDING'
+        ? RENDITION_RETRY_MS
+        : Math.min(1000 * 2 ** attempt, 30_000),
   });
 }

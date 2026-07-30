@@ -29,6 +29,7 @@ import {
   documentKeys,
   useDocument,
   useDocumentVersions,
+  shouldRetryRendition,
   useOriginalPdf,
   useRenderedDocument,
 } from './useDocuments';
@@ -232,5 +233,45 @@ describe('useOriginalPdf', () => {
 
     expect(result.current.fetchStatus).toBe('idle');
     expect(axiosInstance.get).not.toHaveBeenCalled();
+  });
+});
+
+describe('shouldRetryRendition', () => {
+  /** An axios error whose body arrived as bytes, the way an arraybuffer request fails. */
+  function binaryError(status: number, code?: string) {
+    return {
+      isAxiosError: true,
+      response: {
+        status,
+        data: code
+          ? new TextEncoder().encode(JSON.stringify({ code, detail: 'x' })).buffer
+          : new ArrayBuffer(0),
+      },
+    };
+  }
+
+  it('keeps waiting while a version is still being converted', () => {
+    // The regression this exists for: opening the review page right after a Word
+    // upload asked for a PDF that did not exist yet, and one 409 left the reader
+    // with "could not be loaded" until a manual reload (issue #343).
+    expect(shouldRetryRendition(0, binaryError(409, 'EXTRACTION_PENDING'))).toBe(true);
+    expect(shouldRetryRendition(10, binaryError(409, 'EXTRACTION_PENDING'))).toBe(true);
+  });
+
+  it('gives up eventually rather than polling forever', () => {
+    expect(shouldRetryRendition(45, binaryError(409, 'EXTRACTION_PENDING'))).toBe(false);
+  });
+
+  it('does not retry an answer that will not change', () => {
+    // A conversion that failed, a version that is not there, a reader who may not
+    // see it: all stable, and repeating them only delays telling the user.
+    expect(shouldRetryRendition(0, binaryError(409, 'EXTRACTION_FAILED'))).toBe(false);
+    expect(shouldRetryRendition(0, binaryError(404))).toBe(false);
+    expect(shouldRetryRendition(0, binaryError(403))).toBe(false);
+  });
+
+  it('still retries a server error twice', () => {
+    expect(shouldRetryRendition(0, binaryError(503))).toBe(true);
+    expect(shouldRetryRendition(2, binaryError(503))).toBe(false);
   });
 });
