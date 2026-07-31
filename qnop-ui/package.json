@@ -22,7 +22,7 @@
     "@codemirror/autocomplete": "6.20.3",
     "@codemirror/lang-html": "6.4.11",
     "@codemirror/state": "6.7.1",
-    "@codemirror/view": "6.43.6",
+    "@codemirror/view": "6.43.7",
     "@emoji-mart/data": "1.2.1",
     "@emotion/react": "11.14.0",
     "@emotion/styled": "11.14.1",
