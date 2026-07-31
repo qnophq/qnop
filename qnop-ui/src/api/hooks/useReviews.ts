@@ -222,6 +222,25 @@ export function useArchiveReview(documentId: string) {
   return { archive, unarchive };
 }
 
+/**
+ * Deleting a review for good (issue #421) — ADMIN only, and there is no undo.
+ *
+ * <p>Invalidates the lists rather than patching them: after this the review is
+ * not stale, it is gone, and every cached page that mentioned it is wrong.
+ */
+export function useDeleteReview(documentId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async () => {
+      await documentsApi.deleteDocument({ documentId });
+    },
+    onSuccess: () => {
+      queryClient.removeQueries({ queryKey: documentKeys.detail(documentId) });
+      queryClient.invalidateQueries({ queryKey: reviewKeys.all });
+    },
+  });
+}
+
 export interface UploadResult {
   documentId: string;
   versionNumber: number;

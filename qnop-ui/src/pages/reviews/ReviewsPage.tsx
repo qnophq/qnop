@@ -35,8 +35,9 @@ import TextField from '@mui/material/TextField';
 import ToggleButton from '@mui/material/ToggleButton';
 import ToggleButtonGroup from '@mui/material/ToggleButtonGroup';
 import Tooltip from '@mui/material/Tooltip';
+import { alpha } from '@mui/material/styles';
 import Typography from '@mui/material/Typography';
-import { LayoutGrid, ListFilter, Plus, Rows3 } from 'lucide-react';
+import { LayoutGrid, ListFilter, Plus, Rows3, Trash2 } from 'lucide-react';
 import { useNavigate, useSearchParams } from 'react-router';
 import type { DocumentSummary } from '../../api/generated';
 import { useReviews } from '../../api/hooks/useReviews';
@@ -48,6 +49,8 @@ import { isOpenWorkflowState, workflowLabel } from '../../components/reviews/wor
 import { roleOf } from '../../components/reviews/list/reviewListModel';
 import { ReviewCards } from '../../components/reviews/list/ReviewCards';
 import { ReviewsTable } from '../../components/reviews/list/ReviewsTable';
+import { DeleteReviewDialog } from '../../components/reviews/DeleteReviewDialog';
+import { DeleteReviewsDialog } from '../../components/reviews/DeleteReviewsDialog';
 import { ReviewsEmptyState } from './ReviewsEmptyState';
 import { selectIsAdmin, useAuthStore } from '../../stores/authStore';
 
@@ -374,6 +377,11 @@ export function ReviewsPage() {
   // the rest, default off so an admin's own work is not drowned out.
   const moderating = isAdmin && searchParams.get('participation') === 'all';
   const [serverPage, setServerPage] = useState(0);
+  const [pendingDelete, setPendingDelete] = useState<DocumentSummary | null>(null);
+  // Selection for bulk deletion (issue #421). Admin-only, because deleting is;
+  // by id rather than by row, so it survives a re-render or a refetch.
+  const [selectedIds, setSelectedIds] = useState<ReadonlySet<string>>(new Set());
+  const [bulkOpen, setBulkOpen] = useState(false);
   // Moderation searches the SERVER, so it waits for a pause in typing the way the
   // admin lists do; the participant-scoped view keeps filtering as you type
   // because it already holds its rows.
@@ -551,6 +559,30 @@ export function ReviewsPage() {
   const hasActiveFilters =
     query !== '' || roleFilter !== 'all' || statusFilter !== 'active' || advancedCount > 0;
 
+  const toggleSelected = (documentId: string) => {
+    setSelectedIds((current) => {
+      const next = new Set(current);
+      if (!next.delete(documentId)) {
+        next.add(documentId);
+      }
+      return next;
+    });
+  };
+
+  /** Selects every row currently shown, or clears them if they all already are. */
+  const toggleAllOnPage = () => {
+    setSelectedIds((current) => {
+      const shown = visible.map((review) => review.id);
+      const allSelected = shown.length > 0 && shown.every((id) => current.has(id));
+      const next = new Set(current);
+      shown.forEach((id) => (allSelected ? next.delete(id) : next.add(id)));
+      return next;
+    });
+  };
+
+  /** The selected rows that are actually on screen, in the order they appear. */
+  const selectedReviews = visible.filter((review) => selectedIds.has(review.id));
+
   const changeView = (next: ViewMode | null) => {
     if (!next) return;
     setView(next);
@@ -587,6 +619,9 @@ export function ReviewsPage() {
       value={moderating ? 'all' : 'mine'}
       onChange={(_e, next: string | null) => next && setModerating(next === 'all')}
       aria-label="Which reviews"
+      // Two words per button, never two lines: wrapped labels read as a broken
+      // control, and this row gets crowded once a selection joins it.
+      sx={{ flexShrink: 0, '& .MuiToggleButton-root': { whiteSpace: 'nowrap' } }}
     >
       <ToggleButton value="mine" data-testid="participation-mine">
         My reviews
@@ -630,6 +665,35 @@ export function ReviewsPage() {
         </Stack>
       )}
 
+      {bulkOpen && (
+        <DeleteReviewsDialog
+          reviews={selectedReviews.map((review) => ({ id: review.id, title: review.title }))}
+          open
+          onClose={() => setBulkOpen(false)}
+          onDeleted={(deletedIds) => {
+            // Only the ones that actually went: a partial failure leaves the rest
+            // selected, so the retry is one click rather than a fresh hunt.
+            setSelectedIds((current) => {
+              const next = new Set(current);
+              deletedIds.forEach((id) => next.delete(id));
+              return next;
+            });
+          }}
+        />
+      )}
+
+      {pendingDelete && (
+        <DeleteReviewDialog
+          documentId={pendingDelete.id}
+          title={pendingDelete.title}
+          open
+          onClose={() => setPendingDelete(null)}
+          versionCount={pendingDelete.latestVersionNumber}
+          annotationCount={pendingDelete.annotationCount}
+          onDeleted={() => setPendingDelete(null)}
+        />
+      )}
+
       {data && nothingAtAll && (
         <Stack spacing={2} sx={{ alignItems: 'flex-start' }}>
           {participationToggle}
@@ -644,15 +708,66 @@ export function ReviewsPage() {
           <Stack
             direction={{ xs: 'column', md: 'row' }}
             spacing={2}
-            sx={{ alignItems: { md: 'center' } }}
+            // Wraps rather than squeezes: with a selection live there are five
+            // controls in this row, and past a certain width something has to
+            // give. A second line costs nothing; a search field crushed to its
+            // magnifier is no longer a search field.
+            sx={{ alignItems: { md: 'center' }, flexWrap: 'wrap', rowGap: 2 }}
           >
             <ClearableSearchField
               placeholder="Search by title or owner…"
               value={search}
               onValueChange={setSearchAndParam}
-              sx={{ width: { xs: '100%', md: 280 } }}
+              sx={{ width: { xs: '100%', md: 280 }, minWidth: { md: 220 } }}
             />
             {participationToggle}
+
+            {selectedReviews.length > 0 && (
+              // Inline with the toolbar rather than a band of its own: the
+              // selection is a mode of this list, not a separate announcement,
+              // and it reads at the same scale as the controls beside it. The
+              // tinted rule keeps the three parts one unit as the row grows.
+              <Stack
+                direction="row"
+                spacing={1}
+                data-testid="bulk-actions"
+                sx={{
+                  alignItems: 'center',
+                  // The action must stay legible; the neighbours give way first.
+                  flexShrink: 0,
+                  pl: 1.25,
+                  pr: 0.5,
+                  py: 0.25,
+                  borderRadius: 1.5,
+                  bgcolor: (t) => alpha(t.palette.primary.main, 0.07),
+                  border: '1px solid',
+                  borderColor: (t) => alpha(t.palette.primary.main, 0.35),
+                }}
+              >
+                <Typography variant="body2" sx={{ fontWeight: 600, whiteSpace: 'nowrap' }}>
+                  {selectedReviews.length} selected
+                </Typography>
+                <Button
+                  size="small"
+                  color="inherit"
+                  sx={{ minWidth: 0 }}
+                  onClick={() => setSelectedIds(new Set())}
+                >
+                  Clear
+                </Button>
+                <Button
+                  size="small"
+                  variant="outlined"
+                  color="error"
+                  startIcon={<Trash2 size={15} />}
+                  sx={{ whiteSpace: 'nowrap' }}
+                  onClick={() => setBulkOpen(true)}
+                >
+                  Delete selected ({selectedReviews.length})
+                </Button>
+              </Stack>
+            )}
+
             <Box sx={{ flex: 1 }} />
             <ReviewFilterMenu
               dueFilter={dueFilter}
@@ -669,7 +784,9 @@ export function ReviewsPage() {
               label="Sort"
               value={sortBy}
               onChange={(e) => setSortBy(e.target.value as SortBy)}
-              sx={{ width: 180 }}
+              // A label truncated to "Re…" is not a control anyone can read; the
+              // search field is the one element that shrinks without cost.
+              sx={{ width: 180, flexShrink: 0 }}
             >
               <MenuItem value="updated">Recently updated</MenuItem>
               <MenuItem value="name">Name</MenuItem>
@@ -795,7 +912,17 @@ export function ReviewsPage() {
               )}
             </Paper>
           ) : view === 'table' ? (
-            <ReviewsTable reviews={visible} userId={userId} onOpen={openReview} />
+            <ReviewsTable
+              reviews={visible}
+              userId={userId}
+              onOpen={openReview}
+              // Admin-only, in both listings: deleting is theirs wherever they
+              // find the review (issues #421/#563).
+              onDelete={isAdmin ? setPendingDelete : undefined}
+              selectedIds={isAdmin ? selectedIds : undefined}
+              onToggleSelected={isAdmin ? toggleSelected : undefined}
+              onToggleAll={isAdmin ? toggleAllOnPage : undefined}
+            />
           ) : (
             <ReviewCards reviews={visible} userId={userId} onOpen={openReview} />
           )}

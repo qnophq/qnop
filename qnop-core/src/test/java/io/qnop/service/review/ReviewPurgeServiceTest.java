@@ -94,6 +94,19 @@ class ReviewPurgeServiceTest {
   @BeforeEach
   void setUp() {
     when(transactionManager.getTransaction(any())).thenReturn(new SimpleTransactionStatus());
+    // The real deletion service over the same mocks (issue #421): the sweep
+    // delegates to it, so the assertions below still watch the storage calls the
+    // sweep is responsible for.
+    ReviewDeletionService deletions =
+        new ReviewDeletionService(
+            documents,
+            versions,
+            attachments,
+            auditEvents,
+            org.mockito.Mockito.mock(io.qnop.service.document.DocumentAccessService.class),
+            storage,
+            org.mockito.Mockito.mock(org.springframework.context.ApplicationEventPublisher.class),
+            transactionManager);
     service =
         new ReviewPurgeService(
             scheduler,
@@ -102,7 +115,7 @@ class ReviewPurgeServiceTest {
             attachments,
             auditEvents,
             settings,
-            storage,
+            deletions,
             transactionManager);
     when(settings.getInteger(ApplicationSettingKey.REVIEW_PURGE_ARCHIVED_AFTER_DAYS))
         .thenReturn(180);

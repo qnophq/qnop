@@ -3363,6 +3363,50 @@ paths:
                 $ref: '#/components/schemas/ErrorResponse'
         '401':
           $ref: '#/components/responses/Unauthorized'
+    delete:
+      tags:
+        - Documents
+      summary: Delete a review permanently
+      description: |
+        **ADMIN only** (issue #421). Destroys the review and everything it owns
+        — versions, annotations, discussions, participants, attachments and its
+        own audit trail — and releases the object-storage blobs that nothing else
+        references. There is no undo and no recycle bin.
+
+        The owner's tool is `archive`, which is reversible and hides the review
+        from the active lists; the retention sweep (ADR-0050) removes archived
+        reviews on its own schedule. This endpoint is the same destruction, aimed
+        at one review and running now.
+
+        Any workflow state, archived or not: a review created by mistake is
+        usually still a draft, and routing its removal through cancel and archive
+        would be friction rather than safety. Clients are expected to confirm
+        explicitly instead.
+
+        One SYSTEM-scoped `review.deleted` audit event survives, naming the real
+        actor and the review's title — the per-review events die with it.
+      operationId: deleteDocument
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/DocumentIdParam'
+      responses:
+        '204':
+          description: The review and everything it owned are gone.
+        '403':
+          description: The caller can see the review but is not an admin
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Unknown document, or the caller cannot see it at all
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
   /documents/by-slug/{slug}:
     get:
       tags:
@@ -7119,6 +7163,10 @@ components:
         What happened (issue #538). Mirrors the review event/mail-template
         vocabulary; `MENTION` outranks the `COMMENT_ADDED`/`ANNOTATION_CREATED`
         it is contained in, so a mentioned follower gets one notification.
+
+        `REVIEW_DELETED` (issue #421) is the one type whose review no longer
+        exists: it carries no `documentId` and no action to follow, and its
+        `documentTitle` is the deleted review's name rather than a link to it.
       enum:
         - PARTICIPANT_ADDED
         - ANNOTATION_CREATED
@@ -7127,6 +7175,7 @@ components:
         - MENTION
         - VERSION_UPLOADED
         - WORKFLOW_CHANGED
+        - REVIEW_DELETED
       example: COMMENT_ADDED
     NotificationSummary:
       type: object

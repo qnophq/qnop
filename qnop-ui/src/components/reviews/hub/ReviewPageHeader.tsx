@@ -39,6 +39,8 @@ interface ReviewPageHeaderProps {
   notify: Notify;
   /** Where to go after a successful new-version upload — the page decides. */
   onVersionUploaded: (versionNumber: number) => void;
+  /** Called once the review has been deleted — the page has nothing left to show (#421). */
+  onDeleted: () => void;
 }
 
 /**
@@ -54,6 +56,7 @@ export function ReviewPageHeader({
   annotations,
   notify,
   onVersionUploaded,
+  onDeleted,
 }: ReviewPageHeaderProps) {
   const documentId = useReviewDocumentId();
   const userId = useAuthStore((s) => s.userId);
@@ -76,6 +79,7 @@ export function ReviewPageHeader({
       action={
         <ReviewHubHead
           documentId={documentId}
+          title={document.title}
           ownerId={document.ownerId}
           ownerSlug={document.ownerSlug}
           ownerDisplayName={document.ownerDisplayName}
@@ -88,6 +92,7 @@ export function ReviewPageHeader({
           archivedAt={document.archivedAt ?? null}
           notify={notify}
           onVersionUploaded={onVersionUploaded}
+          onDeleted={onDeleted}
         />
       }
     />

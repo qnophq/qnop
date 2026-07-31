@@ -50,6 +50,7 @@ import io.qnop.service.document.DocumentOverviewService;
 import io.qnop.service.document.DocumentUpdateService;
 import io.qnop.service.document.ReviewParticipantService;
 import io.qnop.service.review.ReviewArchiveService;
+import io.qnop.service.review.ReviewDeletionService;
 import io.qnop.service.review.ReviewVisitService;
 import java.time.Instant;
 import java.time.OffsetDateTime;
@@ -76,6 +77,7 @@ public class DocumentsController implements DocumentsApi {
   private final DocumentUpdateService updates;
   private final ReviewVisitService visits;
   private final ReviewArchiveService archive;
+  private final ReviewDeletionService deletions;
 
   public DocumentsController(
       DocumentAccessService documents,
@@ -84,7 +86,8 @@ public class DocumentsController implements DocumentsApi {
       ReviewParticipantService participants,
       DocumentUpdateService updates,
       ReviewVisitService visits,
-      ReviewArchiveService archive) {
+      ReviewArchiveService archive,
+      ReviewDeletionService deletions) {
     this.documents = documents;
     this.diffs = diffs;
     this.overview = overview;
@@ -92,6 +95,7 @@ public class DocumentsController implements DocumentsApi {
     this.updates = updates;
     this.visits = visits;
     this.archive = archive;
+    this.deletions = deletions;
   }
 
   @Override
@@ -191,6 +195,12 @@ public class DocumentsController implements DocumentsApi {
             .stateClosed(counts.stateClosed())
             .stateArchived(counts.stateArchived())
             .stateAll(counts.stateAll());
+  }
+
+  @Override
+  public ResponseEntity<Void> deleteDocument(UUID documentId) {
+    deletions.delete(documentId, CurrentUser.requireUserId(), CurrentUser.isAdmin());
+    return ResponseEntity.noContent().build();
   }
 
   private static DocumentSummary toSummary(DocumentOverviewService.DocumentSummaryView view) {

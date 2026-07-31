@@ -166,6 +166,7 @@ export function VersionComparePage() {
         document={document_}
         annotations={annotations}
         notify={notify}
+        onDeleted={() => navigate('/reviews')}
         onVersionUploaded={(versionNumber) =>
           // A new version uploaded from this tab lands on its Document view (issue #571).
           navigate(`/reviews/${routeSegment}?version=${versionNumber}`)

@@ -233,6 +233,7 @@ export function ReviewTasksPage() {
         document={document}
         annotations={annotations}
         notify={notify}
+        onDeleted={() => navigate('/reviews')}
         onVersionUploaded={goToNewVersion}
       />
       <ReviewViewTabs
