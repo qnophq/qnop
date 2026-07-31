@@ -619,6 +619,9 @@ export function ReviewsPage() {
       value={moderating ? 'all' : 'mine'}
       onChange={(_e, next: string | null) => next && setModerating(next === 'all')}
       aria-label="Which reviews"
+      // Two words per button, never two lines: wrapped labels read as a broken
+      // control, and this row gets crowded once a selection joins it.
+      sx={{ flexShrink: 0, '& .MuiToggleButton-root': { whiteSpace: 'nowrap' } }}
     >
       <ToggleButton value="mine" data-testid="participation-mine">
         My reviews
@@ -705,15 +708,66 @@ export function ReviewsPage() {
           <Stack
             direction={{ xs: 'column', md: 'row' }}
             spacing={2}
-            sx={{ alignItems: { md: 'center' } }}
+            // Wraps rather than squeezes: with a selection live there are five
+            // controls in this row, and past a certain width something has to
+            // give. A second line costs nothing; a search field crushed to its
+            // magnifier is no longer a search field.
+            sx={{ alignItems: { md: 'center' }, flexWrap: 'wrap', rowGap: 2 }}
           >
             <ClearableSearchField
               placeholder="Search by title or owner…"
               value={search}
               onValueChange={setSearchAndParam}
-              sx={{ width: { xs: '100%', md: 280 } }}
+              sx={{ width: { xs: '100%', md: 280 }, minWidth: { md: 220 } }}
             />
             {participationToggle}
+
+            {selectedReviews.length > 0 && (
+              // Inline with the toolbar rather than a band of its own: the
+              // selection is a mode of this list, not a separate announcement,
+              // and it reads at the same scale as the controls beside it. The
+              // tinted rule keeps the three parts one unit as the row grows.
+              <Stack
+                direction="row"
+                spacing={1}
+                data-testid="bulk-actions"
+                sx={{
+                  alignItems: 'center',
+                  // The action must stay legible; the neighbours give way first.
+                  flexShrink: 0,
+                  pl: 1.25,
+                  pr: 0.5,
+                  py: 0.25,
+                  borderRadius: 1.5,
+                  bgcolor: (t) => alpha(t.palette.primary.main, 0.07),
+                  border: '1px solid',
+                  borderColor: (t) => alpha(t.palette.primary.main, 0.35),
+                }}
+              >
+                <Typography variant="body2" sx={{ fontWeight: 600, whiteSpace: 'nowrap' }}>
+                  {selectedReviews.length} selected
+                </Typography>
+                <Button
+                  size="small"
+                  color="inherit"
+                  sx={{ minWidth: 0 }}
+                  onClick={() => setSelectedIds(new Set())}
+                >
+                  Clear
+                </Button>
+                <Button
+                  size="small"
+                  variant="outlined"
+                  color="error"
+                  startIcon={<Trash2 size={15} />}
+                  sx={{ whiteSpace: 'nowrap' }}
+                  onClick={() => setBulkOpen(true)}
+                >
+                  Delete selected ({selectedReviews.length})
+                </Button>
+              </Stack>
+            )}
+
             <Box sx={{ flex: 1 }} />
             <ReviewFilterMenu
               dueFilter={dueFilter}
@@ -730,7 +784,9 @@ export function ReviewsPage() {
               label="Sort"
               value={sortBy}
               onChange={(e) => setSortBy(e.target.value as SortBy)}
-              sx={{ width: 180 }}
+              // A label truncated to "Re…" is not a control anyone can read; the
+              // search field is the one element that shrinks without cost.
+              sx={{ width: 180, flexShrink: 0 }}
             >
               <MenuItem value="updated">Recently updated</MenuItem>
               <MenuItem value="name">Name</MenuItem>
@@ -751,42 +807,6 @@ export function ReviewsPage() {
               </ToggleButton>
             </ToggleButtonGroup>
           </Stack>
-
-          {selectedReviews.length > 0 && (
-            // Replaces the facet row while a selection is live: the chips would
-            // change what is on screen underneath a selection made against it.
-            <Stack
-              direction="row"
-              spacing={1.5}
-              data-testid="bulk-actions"
-              sx={{
-                alignItems: 'center',
-                px: 2,
-                py: 1,
-                borderRadius: 1.5,
-                bgcolor: (t) => alpha(t.palette.primary.main, 0.06),
-                border: '1px solid',
-                borderColor: 'primary.main',
-              }}
-            >
-              <Typography variant="body2" sx={{ fontWeight: 600 }}>
-                {selectedReviews.length} selected
-              </Typography>
-              <Button size="small" color="inherit" onClick={() => setSelectedIds(new Set())}>
-                Clear
-              </Button>
-              <Box sx={{ flex: 1 }} />
-              <Button
-                size="small"
-                variant="outlined"
-                color="error"
-                startIcon={<Trash2 size={15} />}
-                onClick={() => setBulkOpen(true)}
-              >
-                Delete selected ({selectedReviews.length})
-              </Button>
-            </Stack>
-          )}
 
           <Stack direction="row" spacing={1} sx={{ flexWrap: 'wrap', rowGap: 1 }}>
             <FilterChip
