@@ -30,7 +30,7 @@ import Stack from '@mui/material/Stack';
 import Tooltip from '@mui/material/Tooltip';
 import Typography from '@mui/material/Typography';
 import { useTheme } from '@mui/material/styles';
-import { Archive, CalendarClock, ChevronDown, Upload, UserPlus } from 'lucide-react';
+import { Archive, CalendarClock, ChevronDown, Trash2, Upload, UserPlus } from 'lucide-react';
 import type { AnnotationView } from '../../../api/generated';
 import { AnnotationStatus, ParticipantKind } from '../../../api/generated';
 import { useConfig } from '../../../api/hooks/useConfig';
@@ -40,7 +40,7 @@ import {
   useTransitionWorkflow,
   useWorkflow,
 } from '../../../api/hooks/useReviews';
-import { useAuthStore } from '../../../stores/authStore';
+import { selectIsAdmin, useAuthStore } from '../../../stores/authStore';
 import { ConfirmDialog } from '../../admin/ConfirmDialog';
 import type { Notify } from '../../admin/layout/useToast';
 import { UserHoverCard } from '../../people/UserHoverCard';
@@ -53,6 +53,7 @@ import { isOpenWorkflowState, workflowLabel } from '../workflowMeta';
 import { acceptedUploads } from '../wizard/wizardModel';
 import { apiErrorCode, apiErrorMessage } from '../../../utils/apiError';
 import { DueDateDialog } from './DueDateDialog';
+import { DeleteReviewDialog } from '../DeleteReviewDialog';
 import { NewVersionDialog } from './NewVersionDialog';
 import { ParticipantsDialog } from './ParticipantsDialog';
 
@@ -67,6 +68,8 @@ const TRANSITION_CONFLICTS: Record<string, string> = {
 
 interface ReviewHubHeadProps {
   documentId: string;
+  /** The review's title — typed back by the admin to confirm a deletion (issue #421). */
+  title: string;
   /** The document owner — shown prominently in the header (issue #403). */
   ownerId: string;
   /** The owner's profile slug (issue #486) — structurally public (#472). */
@@ -87,6 +90,8 @@ interface ReviewHubHeadProps {
   notify: Notify;
   /** Called with the new version number after a successful re-upload. */
   onVersionUploaded: (versionNumber: number) => void;
+  /** Called once the review has been deleted; there is nothing left to show (issue #421). */
+  onDeleted: () => void;
 }
 
 /**
@@ -97,6 +102,7 @@ interface ReviewHubHeadProps {
  */
 export function ReviewHubHead({
   documentId,
+  title,
   ownerId,
   ownerSlug,
   ownerDisplayName,
@@ -109,14 +115,17 @@ export function ReviewHubHead({
   archivedAt,
   notify,
   onVersionUploaded,
+  onDeleted,
 }: ReviewHubHeadProps) {
   const theme = useTheme();
   const [participantsOpen, setParticipantsOpen] = useState(false);
   const [newVersionOpen, setNewVersionOpen] = useState(false);
+  const [deleteOpen, setDeleteOpen] = useState(false);
   const [dueDateOpen, setDueDateOpen] = useState(false);
   const [workflowMenuAnchor, setWorkflowMenuAnchor] = useState<HTMLElement | null>(null);
   const [confirmTarget, setConfirmTarget] = useState<string | null>(null);
 
+  const isAdmin = useAuthStore(selectIsAdmin);
   const { data: config } = useConfig();
   const participantsQuery = useParticipants(documentId);
   const workflowQuery = useWorkflow(documentId);
@@ -394,6 +403,20 @@ export function ReviewHubHead({
         </Button>
       )}
 
+      {isAdmin && (
+        // Deleting is the admin's alone (issue #421): the owner's tool beside it
+        // is Archive, which is reversible and keeps the record.
+        <Button
+          size="small"
+          variant="outlined"
+          color="error"
+          startIcon={<Trash2 size={14} />}
+          onClick={() => setDeleteOpen(true)}
+        >
+          Delete
+        </Button>
+      )}
+
       {isOwner && (
         <>
           <Button
@@ -406,6 +429,15 @@ export function ReviewHubHead({
           </Button>
         </>
       )}
+
+      <DeleteReviewDialog
+        documentId={documentId}
+        title={title}
+        open={deleteOpen}
+        onClose={() => setDeleteOpen(false)}
+        annotationCount={annotations.length}
+        onDeleted={onDeleted}
+      />
 
       <NewVersionDialog
         documentId={documentId}

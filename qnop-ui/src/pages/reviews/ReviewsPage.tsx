@@ -48,6 +48,7 @@ import { isOpenWorkflowState, workflowLabel } from '../../components/reviews/wor
 import { roleOf } from '../../components/reviews/list/reviewListModel';
 import { ReviewCards } from '../../components/reviews/list/ReviewCards';
 import { ReviewsTable } from '../../components/reviews/list/ReviewsTable';
+import { DeleteReviewDialog } from '../../components/reviews/DeleteReviewDialog';
 import { ReviewsEmptyState } from './ReviewsEmptyState';
 import { selectIsAdmin, useAuthStore } from '../../stores/authStore';
 
@@ -374,6 +375,7 @@ export function ReviewsPage() {
   // the rest, default off so an admin's own work is not drowned out.
   const moderating = isAdmin && searchParams.get('participation') === 'all';
   const [serverPage, setServerPage] = useState(0);
+  const [pendingDelete, setPendingDelete] = useState<DocumentSummary | null>(null);
   // Moderation searches the SERVER, so it waits for a pause in typing the way the
   // admin lists do; the participant-scoped view keeps filtering as you type
   // because it already holds its rows.
@@ -630,6 +632,18 @@ export function ReviewsPage() {
         </Stack>
       )}
 
+      {pendingDelete && (
+        <DeleteReviewDialog
+          documentId={pendingDelete.id}
+          title={pendingDelete.title}
+          open
+          onClose={() => setPendingDelete(null)}
+          versionCount={pendingDelete.latestVersionNumber}
+          annotationCount={pendingDelete.annotationCount}
+          onDeleted={() => setPendingDelete(null)}
+        />
+      )}
+
       {data && nothingAtAll && (
         <Stack spacing={2} sx={{ alignItems: 'flex-start' }}>
           {participationToggle}
@@ -795,7 +809,14 @@ export function ReviewsPage() {
               )}
             </Paper>
           ) : view === 'table' ? (
-            <ReviewsTable reviews={visible} userId={userId} onOpen={openReview} />
+            <ReviewsTable
+              reviews={visible}
+              userId={userId}
+              onOpen={openReview}
+              // Only while moderating: deleting is the admin's, and this listing
+              // is where the abandoned reviews are found (issues #421/#563).
+              onDelete={moderating ? setPendingDelete : undefined}
+            />
           ) : (
             <ReviewCards reviews={visible} userId={userId} onOpen={openReview} />
           )}

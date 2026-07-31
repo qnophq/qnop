@@ -30,7 +30,6 @@ import io.qnop.service.ApplicationSettingKey;
 import io.qnop.service.ApplicationSettingsService;
 import io.qnop.service.scheduler.SchedulerJobCatalog;
 import io.qnop.service.scheduler.SchedulerService;
-import io.qnop.service.storage.StorageService;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
@@ -112,7 +111,7 @@ public class ReviewPurgeService {
   private final DocumentAttachmentRepository attachments;
   private final AuditEventRepository auditEvents;
   private final ApplicationSettingsService settings;
-  private final StorageService storage;
+  private final ReviewDeletionService deletions;
   private final TransactionTemplate tx;
 
   public ReviewPurgeService(
@@ -122,7 +121,7 @@ public class ReviewPurgeService {
       DocumentAttachmentRepository attachments,
       AuditEventRepository auditEvents,
       ApplicationSettingsService settings,
-      StorageService storage,
+      ReviewDeletionService deletions,
       PlatformTransactionManager transactionManager) {
     this.scheduler = scheduler;
     this.documents = documents;
@@ -130,7 +129,7 @@ public class ReviewPurgeService {
     this.attachments = attachments;
     this.auditEvents = auditEvents;
     this.settings = settings;
-    this.storage = storage;
+    this.deletions = deletions;
     this.tx = new TransactionTemplate(transactionManager);
   }
 
@@ -171,13 +170,13 @@ public class ReviewPurgeService {
     int objectsDeleted = 0;
     for (UUID documentId : eligible) {
       // One transaction per review: an interrupted run leaves whole reviews, never fragments.
-      PurgedAggregate result = purgeAggregate(documentId, cutoff);
+      ReviewDeletionService.DeletedAggregate result = purgeAggregate(documentId, cutoff);
       if (result == null) {
         continue; // no longer eligible — unarchived or already gone since the batch was read
       }
       // Only now — the aggregate delete has committed, so the document's own rows can no longer
       // make a key look shared.
-      objectsDeleted += deleteUnreferenced(result.storageKeys());
+      objectsDeleted += deletions.deleteUnreferencedObjects(result.storageKeys());
       purged.add(new PurgedReview(documentId, result.title()));
     }
 
@@ -202,64 +201,12 @@ public class ReviewPurgeService {
    * Purging is irreversible, so the eligibility decision is made in the same transaction as the
    * delete. The keys are read before the delete, because afterwards the rows are gone.
    */
-  private PurgedAggregate purgeAggregate(UUID documentId, Instant cutoff) {
-    return tx.execute(
-        status -> {
-          Document document = documents.findById(documentId).orElse(null);
-          if (document == null
-              || document.getArchivedAt() == null
-              || !document.getArchivedAt().isBefore(cutoff)) {
-            return null;
-          }
-          Set<String> referenced = new LinkedHashSet<>();
-          referenced.addAll(versions.findStorageKeysByDocumentId(documentId));
-          referenced.addAll(attachments.findStorageKeysByDocumentId(documentId));
-          // The schema cascades the whole aggregate (versions, annotations, placements, comments,
-          // reactions, mentions, participants, visits, attachments, version diffs and the
-          // per-document audit trail) — see DocumentReviewSchemaIT.
-          documents.delete(document);
-          return new PurgedAggregate(document.getTitle(), referenced);
-        });
-  }
-
-  /**
-   * Deletes each key that no surviving row references, and returns how many went. Both reference
-   * checks are one query over the whole key set, not one per key.
-   */
-  private int deleteUnreferenced(Set<String> candidateKeys) {
-    if (candidateKeys.isEmpty()) {
-      return 0;
-    }
-    Set<String> stillReferenced =
-        tx.execute(
-            status -> {
-              Set<String> referenced = new LinkedHashSet<>();
-              versions.findVersionRefsByStorageKeyIn(candidateKeys).stream()
-                  .map(ref -> ref.storageKey())
-                  .forEach(referenced::add);
-              // Renditions are referenced too (issue #343), and the projection names
-              // the key that matched — so a shared conversion is not deleted.
-              versions.findVersionRefsByRenditionKeyIn(candidateKeys).stream()
-                  .map(ref -> ref.storageKey())
-                  .forEach(referenced::add);
-              attachments.findAttachmentRefsByStorageKeyIn(candidateKeys).stream()
-                  .map(ref -> ref.storageKey())
-                  .forEach(referenced::add);
-              return referenced;
-            });
-    Set<String> shared = stillReferenced == null ? Set.of() : stillReferenced;
-    int deleted = 0;
-    for (String key : candidateKeys) {
-      if (shared.contains(key)) {
-        log.debug("Keeping storage object {} — still referenced by a surviving document.", key);
-        continue;
-      }
-      // Own transaction (StorageService.delete is @Transactional and we hold none), so the object
-      // and its registry row go together, now — not at the end of the run.
-      storage.delete(key);
-      deleted++;
-    }
-    return deleted;
+  private ReviewDeletionService.DeletedAggregate purgeAggregate(UUID documentId, Instant cutoff) {
+    // Shared with the admin's manual delete (issue #421): one implementation, so
+    // the storage release cannot drift apart between the two ways in.
+    return deletions.deleteAggregate(
+        documentId,
+        document -> document.getArchivedAt() != null && document.getArchivedAt().isBefore(cutoff));
   }
 
   /**
@@ -380,5 +327,4 @@ public class ReviewPurgeService {
   private record DryRunReport(long reviews, int storageObjects) {}
 
   /** What one committed aggregate delete leaves the caller to finish: the title and the keys. */
-  private record PurgedAggregate(String title, Set<String> storageKeys) {}
 }

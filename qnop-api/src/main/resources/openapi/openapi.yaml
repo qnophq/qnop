@@ -3363,6 +3363,50 @@ paths:
                 $ref: '#/components/schemas/ErrorResponse'
         '401':
           $ref: '#/components/responses/Unauthorized'
+    delete:
+      tags:
+        - Documents
+      summary: Delete a review permanently
+      description: |
+        **ADMIN only** (issue #421). Destroys the review and everything it owns
+        — versions, annotations, discussions, participants, attachments and its
+        own audit trail — and releases the object-storage blobs that nothing else
+        references. There is no undo and no recycle bin.
+
+        The owner's tool is `archive`, which is reversible and hides the review
+        from the active lists; the retention sweep (ADR-0050) removes archived
+        reviews on its own schedule. This endpoint is the same destruction, aimed
+        at one review and running now.
+
+        Any workflow state, archived or not: a review created by mistake is
+        usually still a draft, and routing its removal through cancel and archive
+        would be friction rather than safety. Clients are expected to confirm
+        explicitly instead.
+
+        One SYSTEM-scoped `review.deleted` audit event survives, naming the real
+        actor and the review's title — the per-review events die with it.
+      operationId: deleteDocument
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/DocumentIdParam'
+      responses:
+        '204':
+          description: The review and everything it owned are gone.
+        '403':
+          description: The caller can see the review but is not an admin
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Unknown document, or the caller cannot see it at all
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
   /documents/by-slug/{slug}:
     get:
       tags:

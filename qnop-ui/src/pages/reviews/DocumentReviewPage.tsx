@@ -20,7 +20,7 @@
  */
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { useParams, useSearchParams } from 'react-router';
+import { useNavigate, useParams, useSearchParams } from 'react-router';
 import Alert from '@mui/material/Alert';
 import Box from '@mui/material/Box';
 import Button from '@mui/material/Button';
@@ -113,6 +113,7 @@ export function DocumentReviewPage() {
   // The raw segment may be a slug (issue #411) — sibling links keep it, while
   // all data access below uses the canonical id resolved by the route gate.
   const { documentId: routeSegment = '' } = useParams();
+  const navigate = useNavigate();
   const documentId = useReviewDocumentId();
   const [searchParams, setSearchParams] = useSearchParams();
   const { toast, notify, clear } = useToast();
@@ -480,6 +481,7 @@ export function DocumentReviewPage() {
         annotations={annotations}
         notify={notify}
         onVersionUploaded={handleVersionChange}
+        onDeleted={() => navigate('/reviews')}
       />
       <ReviewViewTabs
         documentId={routeSegment}

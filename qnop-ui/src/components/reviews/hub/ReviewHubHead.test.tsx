@@ -110,6 +110,7 @@ function renderHub({
   return render(
     <ReviewHubHead
       documentId={DOC_ID}
+      title="NDA Acme Corp"
       ownerId={isOwner ? ME : 'owner-far-away'}
       isOwner={isOwner}
       ownUserId={ME}
@@ -120,6 +121,7 @@ function renderHub({
       archivedAt={archivedAt}
       notify={notify}
       onVersionUploaded={onVersionUploaded}
+      onDeleted={vi.fn()}
     />,
     { wrapper },
   );

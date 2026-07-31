@@ -36,6 +36,19 @@ This is the first and only code path in qnop that destroys user data with no rec
 - **Neutral.** A concurrent upload can re-reference a key between the check and the delete. Accepted rather than locked away: `StorageService.stage` verifies a dedup hit and re-uploads from the buffered bytes when the object is missing (#575), so the race self-heals instead of yielding a key that points at nothing. Locking the whole content-addressed namespace to close a window this narrow is not worth the contention.
 - **Negative / deferred.** The `job` queue (ADR-0033) carries document ids inside its jsonb `payload` and has **no** FK to `document`, so a purge cannot be blocked by it — but it also leaves any queued job for a purged review behind. A review archived ≥180 days has no in-flight extraction work in practice, so this is an accepted gap rather than a solved problem; the worker fails and dead-letters if it ever happens. There is also no **manual** "purge now" for owners or admins: #576 shipped manual archive/unarchive because archiving is reversible, and a one-click irreversible destructor deserves its own confirmation UX. Finally, a purge is invisible to participants by design — no notification; the review was archived long ago, and purging is an operator-level lifecycle event.
 
+## Amendment (2026-07-31, who may delete — issue #421)
+
+The open question from #421 is settled: **the owner archives, only an admin deletes.**
+
+Archiving is reversible and hides a review from the active lists; it is the owner's call, because it takes nothing away. Deleting destroys other people's annotations and discussions along with the document, and a review is not the owner's alone merely because they created it. `DELETE /documents/{id}` is therefore ADMIN-only — 403 for a caller who can see the review, 404 for one who cannot, the same anti-enumeration split the rest of the document API uses.
+
+This adds a second way into the destruction this ADR already describes, and it shares the implementation rather than repeating it: `ReviewDeletionService` owns the aggregate delete and the storage release, and the retention sweep calls it with its own eligibility check. A second delete path is exactly the kind of duplicate where one of the two eventually forgets to release the objects and nobody notices for months.
+
+Two deliberate differences from the sweep:
+
+- **Any state, archived or not.** The sweep exists to enforce retention and therefore only ever sees archived reviews. A manual deletion usually targets a review that should never have existed — most often still a draft — and routing that through cancel and archive would be friction rather than safety, because archiving requires a closed review. What guards it is the role plus a confirmation that makes the admin type the review's title.
+- **An actor, not the system.** The sweep's `review.purged` event has no actor; a manual `review.deleted` carries the real one. Both are SYSTEM-scoped for the same reason: per-document audit rows cascade away with the document, so a run- or review-level record is the only surviving answer to "where did that review go?" — which is why it carries the title and not just the id.
+
 ## Alternatives considered
 
 - **Purge as a workflow state (`PURGED`) rather than a deletion.** Rejected — it is soft deletion under another name and delivers none of the point: the rows and the storage objects stay, so the retention policy still never frees anything.
@@ -43,4 +56,6 @@ This is the first and only code path in qnop that destroys user data with no rec
 - **Reference-count storage objects** (a counter on `storage_object`). Rejected as premature: the two `IN`-clause queries answer the same question against the actual referrers, cannot drift from them, and reuse code ADR-0044 already needed. A counter would add a write to every upload path to save two reads on a nightly sweep.
 - **One transaction for the whole run.** Rejected: a failure after 199 of 200 reviews would roll back all of them while their storage objects are already deleted — the worst of both orderings.
 - **Keeping ADR-0045's gate transaction and using `REQUIRES_NEW` per review.** Rejected: the outer transaction would stay open for the whole run holding a connection, and `StorageService.delete` (a `@Transactional` bean) would join *it* rather than commit per object — so registry rows would commit at the end of the run while objects vanished immediately. The `selfTransactional` opt-out states the intent instead of working around the wrapper.
+- **Letting the owner delete their own review** (#421). Rejected: a review holds other people's annotations and discussions, so the owner deleting it destroys work that was never theirs alone. They keep `archive`, which is reversible, and `CANCELLED`, which ends a review without removing it.
+- **Requiring an admin to archive before deleting.** Rejected: archiving demands a closed review, so removing an obvious mistake would take three steps. The safety belongs in the confirmation, not in a detour.
 - **Purging by `closed_at` instead of `archived_at`.** Rejected: it would let a review skip the archive stage entirely if both windows elapsed before a sweep ran. Chaining the purge to `archived_at` guarantees a review is always archived first, so the archive window is a real grace period.

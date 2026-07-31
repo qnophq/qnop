@@ -29,7 +29,9 @@ import TableHead from '@mui/material/TableHead';
 import TableRow from '@mui/material/TableRow';
 import Typography from '@mui/material/Typography';
 import { useTheme } from '@mui/material/styles';
-import { ChevronRight } from 'lucide-react';
+import IconButton from '@mui/material/IconButton';
+import Tooltip from '@mui/material/Tooltip';
+import { ChevronRight, Trash2 } from 'lucide-react';
 import type { DocumentSummary } from '../../../api/generated';
 import { useFormatters } from '../../../hooks/useFormatters';
 import { DueDateLabel } from '../DueDateLabel';
@@ -44,10 +46,15 @@ interface ReviewsTableProps {
   reviews: DocumentSummary[];
   userId: string | null;
   onOpen: (documentId: string) => void;
+  /**
+   * Offers a per-row delete (issue #421). Set only in the admin's moderation
+   * listing, which is where the reviews nobody wants are actually found.
+   */
+  onDelete?: (review: DocumentSummary) => void;
 }
 
 /** The overview's table view (prototype `reviews.jsx`): dense, scannable rows. */
-export function ReviewsTable({ reviews, userId, onOpen }: ReviewsTableProps) {
+export function ReviewsTable({ reviews, userId, onOpen, onDelete }: ReviewsTableProps) {
   const theme = useTheme();
   const { formatRelative } = useFormatters();
   return (
@@ -169,7 +176,23 @@ export function ReviewsTable({ reviews, userId, onOpen }: ReviewsTableProps) {
                       {formatRelative(review.updatedAt)}
                     </Typography>
                   </TableCell>
-                  <TableCell align="right" sx={{ color: 'text.secondary' }}>
+                  <TableCell align="right" sx={{ color: 'text.secondary', whiteSpace: 'nowrap' }}>
+                    {onDelete && (
+                      <Tooltip title="Delete permanently">
+                        <IconButton
+                          size="small"
+                          color="error"
+                          aria-label={`Delete ${review.title}`}
+                          onClick={(event) => {
+                            // The row itself opens the review; this must not.
+                            event.stopPropagation();
+                            onDelete(review);
+                          }}
+                        >
+                          <Trash2 size={15} />
+                        </IconButton>
+                      </Tooltip>
+                    )}
                     <ChevronRight size={16} aria-hidden />
                   </TableCell>
                 </TableRow>
