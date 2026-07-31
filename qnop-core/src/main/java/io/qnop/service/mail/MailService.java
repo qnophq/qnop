@@ -77,7 +77,10 @@ public class MailService {
       sender.send(message);
       return new SendResult.Sent(to);
     } catch (Exception e) {
-      log.warn("Failed to send mail to {}: {}", to, e.getMessage());
+      // Never the address (issue #659): a failed send would otherwise write a
+      // recipient into a log file on every SMTP hiccup. The request or job in the
+      // diagnostic context is enough to find which send this was.
+      log.warn("Failed to send mail: {}", e.getMessage());
       return new SendResult.Failed(e.getMessage());
     }
   }
@@ -89,7 +92,7 @@ public class MailService {
     try {
       mail = templates.render(key, vars, locale);
     } catch (RuntimeException e) {
-      log.warn("Failed to render template {} for {}: {}", key, to, e.getMessage());
+      log.warn("Failed to render mail template {}: {}", key, e.getMessage());
       return new SendResult.Failed("template render failed: " + e.getMessage());
     }
     return sendMail(to, mail.subject(), mail.bodyPlain(), mail.bodyHtml());

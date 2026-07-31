@@ -37,6 +37,18 @@ Client IP addresses are not logged either. They are personal data, and "reconstr
 
 `LogPrivacyTest` enforces this by scanning the sources for log calls whose arguments reach a user-entered accessor. Deliberately a source scan and not an ArchUnit rule: ArchUnit sees that a class calls `getTitle()` and that it calls `Logger.info()`, never that the first is an argument to the second — the data flow is invisible in the dependency model.
 
+**The scan is a net, not a proof.** It was written against accessors and therefore did not see `MailService` logging its recipient, because the address was already in a local named `to` — found by reading the code, not by the guard. Unambiguous identifier names are now checked too (`email`, `displayName`, `fileName`, …); `to` is deliberately absent, because a version diff legitimately logs a `from`/`to` pair of numbers. A name-shaped check cannot be complete, so review still matters.
+
+### Failures are logged where the context still exists
+
+An exception nobody handled used to leave the dispatcher, unwind the filter chain — which clears the MDC in its `finally` — and only then reach the servlet container, which wrote the stack trace. The single most important line in the system therefore arrived correlated to nothing. `UnhandledExceptionHandler` catches it inside the chain, logs it at `ERROR` with the trace, and returns the standard envelope with a generic message; internals are for the log, not the caller.
+
+It is ordered `LOWEST_PRECEDENCE` because `Exception` matches everything: at default precedence it would shadow the specific handlers and turn every 403 and 404 into a 500. What Spring Security and Spring MVC own — `AccessDeniedException`, `AuthenticationException`, anything implementing Spring's `ErrorResponse` — is rethrown rather than swallowed.
+
+The same reasoning applies out-of-process: the office converter discarded its own output, so a failed DOCX conversion reported an exit status and nothing about what LibreOffice objected to. Its output is now captured (bounded, drained on its own thread so a chatty converter cannot deadlock on a full pipe) and logged when the conversion fails.
+
+Object storage keeps throwing `StorageException` with the key rather than logging and rethrowing: log-and-throw duplicates every failure, and the handler above now records it with the request context attached.
+
 ### What is logged, and what is not
 
 **Logged:** authentication outcomes and token-rotation rejections; permission denials; job start, completion with duration, and failure; external I/O (object storage, SMTP, the office converter); state transitions and destructive acts; and every `catch` that discards a genuine failure.

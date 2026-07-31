@@ -70,7 +70,17 @@ class LogPrivacyTest {
           "getComment()",
           ".comment()",
           "getExcerpt()",
-          ".excerpt()");
+          ".excerpt()",
+          // Bare identifiers too, for the case an accessor list cannot see: a
+          // local variable already holding the value. Only names with one
+          // possible meaning — `to` is deliberately absent, because a version
+          // diff legitimately logs a `from`/`to` pair of numbers.
+          "email",
+          "emailAddress",
+          "recipientEmail",
+          "displayName",
+          "fileName",
+          "username");
 
   private static final Pattern LOG_CALL =
       Pattern.compile("\\blog\\.(trace|debug|info|warn|error)\\s*\\(");

@@ -24,6 +24,7 @@ import io.qnop.entity.AnnotationPlacement;
 import io.qnop.entity.DocumentVersion;
 import io.qnop.entity.ExtractionStatus;
 import io.qnop.entity.PlacementStatus;
+import io.qnop.observability.LogContext;
 import io.qnop.repository.AnnotationPlacementRepository;
 import io.qnop.repository.DocumentVersionRepository;
 import io.qnop.service.job.JobHandler;
@@ -92,6 +93,15 @@ public class ReanchorJobHandler implements JobHandler {
       return; // idempotent: the document was deleted after enqueue
     }
     DocumentVersion version = found.get();
+    // Ties the re-anchoring lines to the review they concern (issue #659). Scoped
+    // rather than merely set: this runs on a pooled worker, and a value left behind
+    // would attribute the next job to this review.
+    try (LogContext.Scope ignored = LogContext.document(version.getDocumentId())) {
+      reanchor(version, versionId);
+    }
+  }
+
+  private void reanchor(DocumentVersion version, UUID versionId) {
     if (version.getExtractionStatus() != ExtractionStatus.READY
         || version.getRenderedDocument() == null) {
       // Enqueued transactionally with the READY write, so this can only be a broken invariant —
@@ -103,17 +113,32 @@ public class ReanchorJobHandler implements JobHandler {
 
     List<AnnotationPlacement> pending =
         placements.findByDocumentVersionIdAndStatus(versionId, PlacementStatus.PENDING);
+    int moved = 0;
+    int orphaned = 0;
     for (AnnotationPlacement placement : pending) {
       AnchorResolver.Resolution resolution = resolver.resolve(placement.getAnchor(), rendered);
       switch (resolution.outcome()) {
         case PLACED -> placement.markPlaced(resolution.anchorJson());
-        case MOVED -> placement.markMoved(resolution.anchorJson());
-        case ORPHANED -> placement.markOrphaned();
+        case MOVED -> {
+          placement.markMoved(resolution.anchorJson());
+          moved++;
+        }
+        case ORPHANED -> {
+          placement.markOrphaned();
+          orphaned++;
+        }
       }
       placements.save(placement);
     }
     if (!pending.isEmpty()) {
-      log.info("Re-anchored {} placement(s) on version {}.", pending.size(), versionId);
+      // The breakdown, not just the count: "annotations vanished after the new version"
+      // is a support report, and orphaned-versus-moved is the first thing to know.
+      log.info(
+          "Re-anchored {} placement(s) on version {}: {} moved, {} orphaned",
+          pending.size(),
+          versionId,
+          moved,
+          orphaned);
     }
   }
 
