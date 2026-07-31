@@ -67,6 +67,11 @@ Two refinement conventions (see the 2026-07-16 amendment to [ADR-0001](0001-reco
 | [0048](0048-cross-namespace-slug-uniqueness.md) | Cross-namespace slug uniqueness (users and teams) | Accepted |
 | [0049](0049-extension-plugin-packaging-model.md) | Extension packaging model — boot-time SPI plugins, not a runtime plugin framework | Proposed |
 | [0050](0050-purging-archived-reviews.md) | Purging archived reviews: irreversible deletion with a shared-object guard | Accepted |
+| [0051](0051-in-app-notifications.md) | In-app notifications — fan-out on write, identity resolved on read | Accepted |
+| [0052](0052-annotation-export.md) | Exporting annotations — server-side, in reading order, one model per format | Accepted |
+| [0053](0053-branding-raster-renditions.md) | Raster renditions of branding assets, produced on upload | Accepted |
+| [0054](0054-logging-and-diagnostic-context.md) | Logging and the diagnostic context | Accepted |
+| [0055](0055-bounding-out-of-process-conversions.md) | Bounding out-of-process conversions — per instance, with a bounded wait | Accepted |
 
 ## Template
 
