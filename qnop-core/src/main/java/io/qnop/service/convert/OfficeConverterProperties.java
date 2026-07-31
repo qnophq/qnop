@@ -31,17 +31,32 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
  * @param timeout how long one conversion may take before the process is killed (60s). A cold
  *     LibreOffice needs a second or two; a minute means it has hung, and an export must not hold a
  *     request thread indefinitely because of it.
+ * @param maxConcurrent how many conversions may run at once on this instance (2, issue #651). Each
+ *     run is an office suite's worth of memory and a cold start, so the useful number is small.
+ *     Zero or negative is not a way to switch the limit off — it reads as "unconfigured" and gives
+ *     the default, because an unbounded setting is the failure this exists to prevent.
+ * @param maxWait how long a conversion may wait for a free slot before it is refused (30s). Waiting
+ *     is kinder than failing right up to the point where a request thread is held so long that the
+ *     caller has given up; past that a refusal it can retry is the better answer.
  */
 @ConfigurationProperties(prefix = "qnop.office")
-public record OfficeConverterProperties(String binary, Duration timeout) {
+public record OfficeConverterProperties(
+    String binary, Duration timeout, int maxConcurrent, Duration maxWait) {
+
+  private static final int DEFAULT_MAX_CONCURRENT = 2;
+  private static final Duration DEFAULT_MAX_WAIT = Duration.ofSeconds(30);
 
   public OfficeConverterProperties {
     binary = binary == null || binary.isBlank() ? "soffice" : binary.strip();
     timeout = timeout == null ? Duration.ofSeconds(60) : timeout;
+    maxConcurrent = maxConcurrent < 1 ? DEFAULT_MAX_CONCURRENT : maxConcurrent;
+    // Zero is left as configured: "do not wait at all" is a legitimate choice for an
+    // operator who would rather have a fast refusal than a held thread.
+    maxWait = maxWait == null || maxWait.isNegative() ? DEFAULT_MAX_WAIT : maxWait;
   }
 
   /** The documented defaults — for direct construction in tests and non-Spring callers. */
   public static OfficeConverterProperties defaults() {
-    return new OfficeConverterProperties(null, null);
+    return new OfficeConverterProperties(null, null, 0, null);
   }
 }
