@@ -30,9 +30,11 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import io.qnop.entity.AuditEvent;
 import io.qnop.entity.Document;
+import io.qnop.entity.ReviewParticipant;
 import io.qnop.entity.WorkflowState;
 import io.qnop.repository.AuditEventRepository;
 import io.qnop.repository.DocumentRepository;
+import io.qnop.repository.ReviewParticipantRepository;
 import io.qnop.service.ApplicationSettingKey;
 import io.qnop.service.ApplicationSettingsService;
 import io.qnop.service.review.ReviewArchiveService;
@@ -71,6 +73,7 @@ class ReviewArchiveApiIT extends SeededIntegrationTest {
   @Autowired private DocumentRepository documents;
   @Autowired private AuditEventRepository auditEvents;
   @Autowired private ApplicationSettingsService settings;
+  @Autowired private ReviewParticipantRepository participants;
 
   /**
    * {@code application_setting} deliberately survives {@code clean.sql} (it is migration-seeded),
@@ -340,19 +343,44 @@ class ReviewArchiveApiIT extends SeededIntegrationTest {
   }
 
   @Test
-  @DisplayName("archiving is owner-or-admin only, and an unknown review is a 404")
-  void archivingIsOwnerOrAdminOnly() throws Exception {
-    Document document = closedReview("Archive authz refusal", WorkflowState.FINALIZED, 1);
+  @DisplayName("a non-participant gets 404, not 403 — archive must not leak that the review exists")
+  void archivingHidesExistenceFromNonParticipants() throws Exception {
+    Document document = closedReview("Archive anti-enumeration", WorkflowState.FINALIZED, 1);
 
+    // The read and delete paths answer a non-participant 404 so an id is not
+    // enumerable (issue #661); archive and unarchive must answer the same, not a
+    // 403 that confirms the id resolves to a real review. MEMBER2 is not a
+    // participant of this review, so it is indistinguishable from an unknown id.
     mockMvc
         .perform(as(post("/api/v1/documents/" + document.getId() + "/archive"), MEMBER2_ID))
-        .andExpect(status().isForbidden())
-        .andExpect(jsonPath("$.code").value("NOT_DOCUMENT_OWNER"));
+        .andExpect(status().isNotFound())
+        .andExpect(jsonPath("$.code").value("DOCUMENT_NOT_FOUND"));
+    mockMvc
+        .perform(as(post("/api/v1/documents/" + document.getId() + "/unarchive"), MEMBER2_ID))
+        .andExpect(status().isNotFound())
+        .andExpect(jsonPath("$.code").value("DOCUMENT_NOT_FOUND"));
 
+    // The same 404 an unknown id gives — the two are meant to be indistinguishable.
     mockMvc
         .perform(as(post("/api/v1/documents/" + UUID.randomUUID() + "/archive"), MEMBER_ID))
         .andExpect(status().isNotFound())
         .andExpect(jsonPath("$.code").value("DOCUMENT_NOT_FOUND"));
+
+    assertThat(reload(document.getId()).getArchivedAt()).isNull();
+  }
+
+  @Test
+  @DisplayName("a participant who is not the owner gets the honest 403 — they already see it")
+  void archivingIsOwnerOnlyForParticipants() throws Exception {
+    Document document = closedReview("Archive participant refusal", WorkflowState.FINALIZED, 1);
+    participants.save(ReviewParticipant.forUser(document.getId(), MEMBER2_ID));
+
+    // A reviewer can already see the review, so hiding it would be pointless; 403
+    // tells them plainly that archiving is the owner's call.
+    mockMvc
+        .perform(as(post("/api/v1/documents/" + document.getId() + "/archive"), MEMBER2_ID))
+        .andExpect(status().isForbidden())
+        .andExpect(jsonPath("$.code").value("NOT_DOCUMENT_OWNER"));
 
     assertThat(reload(document.getId()).getArchivedAt()).isNull();
   }

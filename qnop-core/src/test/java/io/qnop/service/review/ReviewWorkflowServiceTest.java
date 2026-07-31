@@ -125,10 +125,26 @@ class ReviewWorkflowServiceTest {
   // --- transition authorization ---------------------------------------------
 
   @Test
-  @DisplayName("a non-owner cannot transition the workflow")
-  void transitionIsOwnerOnly() {
+  @DisplayName("a non-participant cannot tell the review exists — transition answers 404 (#661)")
+  void transitionHidesReviewFromNonParticipants() {
     Document draft = document(WorkflowState.DRAFT);
     when(documents.findByIdForUpdate(documentId)).thenReturn(Optional.of(draft));
+    // isVisible defaults to false — the stranger is not a participant, so this must be
+    // the same 404 an unknown id gives, not a 403 that confirms the review is real.
+
+    assertThatThrownBy(
+            () -> service.transition(documentId, WorkflowState.IN_REVIEW.name(), stranger, false))
+        .isInstanceOf(DocumentNotFoundException.class);
+    assertThat(draft.getWorkflowState()).isEqualTo(WorkflowState.DRAFT.name());
+    verify(auditEvents, never()).save(any());
+  }
+
+  @Test
+  @DisplayName("a participant who is not the owner cannot transition — 403, not 404")
+  void transitionRejectsAParticipantWhoIsNotTheOwner() {
+    Document draft = document(WorkflowState.DRAFT);
+    when(documents.findByIdForUpdate(documentId)).thenReturn(Optional.of(draft));
+    when(documentAccess.isVisible(documentId, stranger, false)).thenReturn(true);
 
     assertThatThrownBy(
             () -> service.transition(documentId, WorkflowState.IN_REVIEW.name(), stranger, false))
@@ -486,6 +502,9 @@ class ReviewWorkflowServiceTest {
     when(annotations.findById(any())).thenReturn(Optional.of(open));
     when(documents.findByIdForUpdate(documentId))
         .thenReturn(Optional.of(document(WorkflowState.IN_REVIEW)));
+    // The author is a participant, so they can see the review — the refusal is the
+    // honest 403, not the anti-enumeration 404 (#661).
+    when(documentAccess.isVisible(documentId, stranger, false)).thenReturn(true);
 
     assertThatThrownBy(
             () -> service.dismissAnnotation(UUID.randomUUID(), "justified", stranger, false))

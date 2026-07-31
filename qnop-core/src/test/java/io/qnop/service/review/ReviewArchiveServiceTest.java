@@ -37,6 +37,7 @@ import io.qnop.repository.AuditEventRepository;
 import io.qnop.repository.DocumentRepository;
 import io.qnop.service.ApplicationSettingKey;
 import io.qnop.service.ApplicationSettingsService;
+import io.qnop.service.document.DocumentAccessService;
 import io.qnop.service.scheduler.SchedulerService;
 import java.time.Instant;
 import java.util.List;
@@ -58,9 +59,10 @@ class ReviewArchiveServiceTest {
   @Mock private DocumentRepository documents;
   @Mock private AuditEventRepository auditEvents;
   @Mock private ApplicationSettingsService settings;
+  @Mock private DocumentAccessService access;
 
   private ReviewArchiveService service() {
-    return new ReviewArchiveService(scheduler, documents, auditEvents, settings);
+    return new ReviewArchiveService(scheduler, documents, auditEvents, settings, access);
   }
 
   private static Document closed(WorkflowState state) {
@@ -170,11 +172,29 @@ class ReviewArchiveServiceTest {
   }
 
   @Test
-  void manualArchiveRejectsAStranger() {
+  void manualArchiveHidesAReviewFromNonParticipants() {
+    // A caller who cannot see the review must not be told it exists (issue #661):
+    // the same 404 the read and delete paths give, not a 403 that confirms the id.
     Document doc = closed(WorkflowState.FINALIZED);
+    UUID stranger = UUID.randomUUID();
     when(documents.findById(DOC)).thenReturn(Optional.of(doc));
+    // access.isVisible defaults to false — the stranger is not a participant.
 
-    assertThatThrownBy(() -> service().archive(DOC, UUID.randomUUID(), false))
+    assertThatThrownBy(() -> service().archive(DOC, stranger, false))
+        .isInstanceOf(DocumentNotFoundException.class);
+    verifyNoInteractions(auditEvents);
+  }
+
+  @Test
+  void manualArchiveRejectsAParticipantWhoIsNotTheOwner() {
+    // A reviewer can already see the review, so the honest 403 (owner's call) leaks
+    // nothing — the branch that must stay a 403 rather than collapse to 404.
+    Document doc = closed(WorkflowState.FINALIZED);
+    UUID reviewer = UUID.randomUUID();
+    when(documents.findById(DOC)).thenReturn(Optional.of(doc));
+    when(access.isVisible(DOC, reviewer, false)).thenReturn(true);
+
+    assertThatThrownBy(() -> service().archive(DOC, reviewer, false))
         .isInstanceOf(NotDocumentOwnerException.class);
     verifyNoInteractions(auditEvents);
   }
