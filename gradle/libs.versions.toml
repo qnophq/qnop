@@ -7,7 +7,7 @@ junit = "6.1.2"
 archunit = "1.4.2"
 # NOTE: keep `spotless` in sync with build-logic/build.gradle.kts (precompiled
 # script plugins cannot read this catalog at plugin-resolution time).
-spotless = "8.8.0"
+spotless = "8.9.0"
 # Dependency-license scanner (issue #498, ADR-0007). Applied at the root; the CI
 # `license-scan` job runs `checkLicense`, which fails on any runtime dependency
 # whose license is outside the permissive allowlist (Apache-2.0/MIT/BSD/MPL-2.0).
