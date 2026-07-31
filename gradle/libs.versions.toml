@@ -51,7 +51,7 @@ awsSdk = "2.31.6"
 # Inter-version diff (issue #249, ADR-0034): actively-maintained Myers diff over
 # token lists (word granularity), Apache-2.0. Chosen over the unmaintained
 # java port of diff-match-patch. Not in the Spring Boot BOM → explicit version.
-javaDiffUtils = "4.15"
+javaDiffUtils = "4.17"
 # Markdown in the exports (issue #637): comment bodies are CommonMark + GFM, and
 # the review UI reads them with remark-gfm/remark-breaks. Parsing them with a real
 # parser rather than regexes is what keeps an export's reading of a comment the
