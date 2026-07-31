@@ -27,6 +27,7 @@ import io.qnop.repository.AuditEventRepository;
 import io.qnop.repository.DocumentRepository;
 import io.qnop.service.ApplicationSettingKey;
 import io.qnop.service.ApplicationSettingsService;
+import io.qnop.service.document.DocumentAccessService;
 import io.qnop.service.scheduler.SchedulerJobCatalog;
 import io.qnop.service.scheduler.SchedulerService;
 import java.time.Duration;
@@ -78,16 +79,19 @@ public class ReviewArchiveService {
   private final DocumentRepository documents;
   private final AuditEventRepository auditEvents;
   private final ApplicationSettingsService settings;
+  private final DocumentAccessService access;
 
   public ReviewArchiveService(
       SchedulerService scheduler,
       DocumentRepository documents,
       AuditEventRepository auditEvents,
-      ApplicationSettingsService settings) {
+      ApplicationSettingsService settings,
+      DocumentAccessService access) {
     this.scheduler = scheduler;
     this.documents = documents;
     this.auditEvents = auditEvents;
     this.settings = settings;
+    this.access = access;
   }
 
   /** Off-peak cron entry point; the gate runs the registered {@link #archiveOnce} work. */
@@ -141,7 +145,7 @@ public class ReviewArchiveService {
   @Transactional
   public Document archive(UUID documentId, UUID actorId, boolean admin) {
     Document document = load(documentId);
-    requireOwnerOrAdmin(document, actorId, admin);
+    requireOwnerOrAdmin(documentId, document, actorId, admin);
     if (!WorkflowState.isClosed(document.getWorkflowState())) {
       throw new WorkflowTransitionException(
           WorkflowTransitionException.REVIEW_NOT_CLOSED,
@@ -160,7 +164,7 @@ public class ReviewArchiveService {
   @Transactional
   public Document unarchive(UUID documentId, UUID actorId, boolean admin) {
     Document document = load(documentId);
-    requireOwnerOrAdmin(document, actorId, admin);
+    requireOwnerOrAdmin(documentId, document, actorId, admin);
     if (document.getArchivedAt() == null) {
       throw new WorkflowTransitionException(
           WorkflowTransitionException.REVIEW_NOT_ARCHIVED, "the review is not archived");
@@ -184,9 +188,24 @@ public class ReviewArchiveService {
         .orElseThrow(() -> new DocumentNotFoundException(documentId));
   }
 
-  private static void requireOwnerOrAdmin(Document document, UUID actorId, boolean admin) {
-    if (!admin && !document.getOwnerId().equals(actorId)) {
-      throw new NotDocumentOwnerException();
+  /**
+   * Owner or admin may archive; everyone else is refused — but the refusal must not leak the
+   * review's existence (issue #661). A caller who cannot even see the review gets the same 404 the
+   * read and delete paths give ({@link DocumentAccessService#isVisible} upholds "non-participants
+   * must not learn that the document exists"); a participant who is simply not the owner already
+   * knows it exists, so they get the honest 403. Mirrors {@code ReviewDeletionService.delete}.
+   *
+   * <p>Keyed on the request's {@code documentId} rather than the loaded entity's id — the two are
+   * equal, and the id the caller asked about is the one the anti-enumeration answer is about.
+   */
+  private void requireOwnerOrAdmin(
+      UUID documentId, Document document, UUID actorId, boolean admin) {
+    if (admin || document.getOwnerId().equals(actorId)) {
+      return;
     }
+    if (!access.isVisible(documentId, actorId, false)) {
+      throw new DocumentNotFoundException(documentId);
+    }
+    throw new NotDocumentOwnerException();
   }
 }
