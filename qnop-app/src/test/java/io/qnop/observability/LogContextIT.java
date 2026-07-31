@@ -34,6 +34,7 @@ import org.slf4j.LoggerFactory;
 import org.slf4j.MDC;
 import org.springframework.boot.test.system.CapturedOutput;
 import org.springframework.boot.test.system.OutputCaptureExtension;
+import org.springframework.test.context.TestPropertySource;
 import org.springframework.test.web.servlet.MvcResult;
 
 /**
@@ -44,6 +45,7 @@ import org.springframework.test.web.servlet.MvcResult;
  * prove nothing, so these tests read what was actually written.
  */
 @ExtendWith(OutputCaptureExtension.class)
+@TestPropertySource(properties = "logging.level.io.qnop.web=DEBUG")
 class LogContextIT extends SeededIntegrationTest {
 
   private static final Logger log = LoggerFactory.getLogger(LogContextIT.class);
@@ -114,6 +116,23 @@ class LogContextIT extends SeededIntegrationTest {
     // attribute the next request — a different person — to whoever came before.
     assertThat(MDC.get(LogContext.REQUEST_ID)).isNull();
     assertThat(MDC.get(LogContext.USER_ID)).isNull();
+  }
+
+  @Test
+  @DisplayName("the request line names the route, not the URI the caller typed")
+  void requestLineUsesTheRouteTemplate(CapturedOutput output) throws Exception {
+    UUID unknown = UUID.randomUUID();
+
+    mockMvc
+        .perform(
+            get("/api/v1/documents/{id}", unknown)
+                .header("Authorization", "Bearer " + token(MEMBER_ID)))
+        .andExpect(status().isNotFound());
+
+    // The template, because the same shape of route also accepts a slug, and a slug is
+    // a display name. Logging "/api/v1/documents/{documentId}" says as much about where
+    // the request went, and groups every call to that route together.
+    assertThat(output).contains("GET /api/v1/documents/{documentId} -> 404");
   }
 
   @Test

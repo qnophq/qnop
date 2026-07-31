@@ -34,6 +34,22 @@ logging:
     # specific failure rather than turning up the whole tree.
     io.qnop: ${QNOP_LOG_LEVEL_QNOP:INFO}
 
+    # Verbose method tracing of the service layer: entry with the call's ids, exit
+    # with the result's shape and duration (MethodTraceAspect). Its own switch, so
+    # DEBUG here does not also turn the rest of io.qnop to DEBUG — and OFF here
+    # keeps the traffic down when io.qnop is at DEBUG for one specific hunt.
+    # A single class: QNOP_LOG_LEVEL_TRACE stays INFO and set
+    # logging.level.io.qnop.trace.ReviewService=DEBUG instead.
+    io.qnop.trace: ${QNOP_LOG_LEVEL_TRACE:INFO}
+
+    # The layers below the application, each off unless asked for. They are noisy by
+    # design — one request can be dozens of statements — which is why none of them is
+    # tied to the switch above.
+    org.hibernate.SQL: ${QNOP_LOG_SQL:INFO}
+    org.springframework.security: ${QNOP_LOG_LEVEL_SECURITY:INFO}
+    org.springframework.web: ${QNOP_LOG_LEVEL_WEB:INFO}
+    org.springframework.transaction: ${QNOP_LOG_LEVEL_TX:INFO}
+
 spring:
   lifecycle:
     # Upper bound for the graceful-shutdown drain (issue #495).

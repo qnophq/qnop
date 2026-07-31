@@ -27,11 +27,14 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import java.io.IOException;
 import java.util.UUID;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.slf4j.MDC;
 import org.springframework.core.Ordered;
 import org.springframework.core.annotation.Order;
 import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
+import org.springframework.web.servlet.HandlerMapping;
 
 /**
  * Gives every request an identity in the logs (issue #659, ADR-0054).
@@ -55,6 +58,8 @@ import org.springframework.web.filter.OncePerRequestFilter;
 @Order(Ordered.HIGHEST_PRECEDENCE + 10)
 public class RequestLogContextFilter extends OncePerRequestFilter {
 
+  private static final Logger log = LoggerFactory.getLogger(RequestLogContextFilter.class);
+
   static final String REQUEST_ID_HEADER = "X-Request-Id";
 
   /** Short enough to read out over the phone, long enough not to collide within a day's logs. */
@@ -67,15 +72,43 @@ public class RequestLogContextFilter extends OncePerRequestFilter {
     String requestId = requestIdOf(request);
     MDC.put(LogContext.REQUEST_ID, requestId);
     MDC.put(LogContext.METHOD, request.getMethod());
-    // The path only — never the query string, which carries search terms and other
-    // things a user typed.
-    MDC.put(LogContext.PATH, request.getRequestURI());
     response.setHeader(REQUEST_ID_HEADER, requestId);
+    // The path is deliberately NOT set here. At this point only the raw URI exists, and
+    // it carries whatever the caller put in it — a profile slug is a display name. The
+    // interceptor sets the matched route template instead, once Spring has parsed it.
+    long started = System.nanoTime();
     try {
       chain.doFilter(request, response);
     } finally {
+      logCompletion(request, response, started);
       MDC.clear();
     }
+  }
+
+  /**
+   * One line per request at DEBUG: what came in, what went out, how long it took.
+   *
+   * <p>Cheap to leave in and the first thing worth having when a flow is under investigation — a
+   * 404 nobody expected, or a call that was slow rather than broken.
+   *
+   * <p>The route template is preferred over the raw URI for the reason above. An unmatched request
+   * has no template, and there the raw path is logged: a 404 you cannot identify is not worth
+   * logging at all, and a path that matched nothing is junk or a probe rather than one of our
+   * users' names.
+   */
+  private void logCompletion(
+      HttpServletRequest request, HttpServletResponse response, long startedNanos) {
+    if (!log.isDebugEnabled()) {
+      return;
+    }
+    Object pattern = request.getAttribute(HandlerMapping.BEST_MATCHING_PATTERN_ATTRIBUTE);
+    String route = pattern != null ? pattern.toString() : request.getRequestURI() + " (unmatched)";
+    log.debug(
+        "{} {} -> {} [{} ms]",
+        request.getMethod(),
+        route,
+        response.getStatus(),
+        (System.nanoTime() - startedNanos) / 1_000_000);
   }
 
   /**

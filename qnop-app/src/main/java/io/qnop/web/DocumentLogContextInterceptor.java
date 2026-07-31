@@ -63,6 +63,14 @@ public class DocumentLogContextInterceptor implements HandlerInterceptor, WebMvc
   @Override
   public boolean preHandle(
       HttpServletRequest request, HttpServletResponse response, Object handler) {
+    // The route, not the URI a caller typed. "/api/v1/users/{slug}" says as much about
+    // where a request went, groups lines that belong together, and cannot carry the
+    // display name a slug is derived from — the same reason a slug is refused below.
+    Object pattern = request.getAttribute(HandlerMapping.BEST_MATCHING_PATTERN_ATTRIBUTE);
+    if (pattern != null) {
+      MDC.put(LogContext.PATH, pattern.toString());
+    }
+
     Object variables = request.getAttribute(HandlerMapping.URI_TEMPLATE_VARIABLES_ATTRIBUTE);
     if (!(variables instanceof Map<?, ?> parsed)) {
       return true;

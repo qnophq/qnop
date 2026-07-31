@@ -83,6 +83,14 @@ spring-boot-starter-actuator = { module = "org.springframework.boot:spring-boot-
 # auto-configured at runtime, so it is a runtime-only dependency (no compile-time symbols).
 micrometer-registry-prometheus = { module = "io.micrometer:micrometer-registry-prometheus" }
 spring-boot-starter-data-jpa = { module = "org.springframework.boot:spring-boot-starter-data-jpa" }
+# AOP, for the one aspect that traces the service layer at DEBUG (issue #659, ADR-0054).
+# Writing that by hand would mean a log line in every method, drifting from the first
+# refactor onwards; one pointcut cannot drift.
+#
+# The weaver directly rather than a starter: Spring Boot 4 dropped
+# spring-boot-starter-aop, and its AopAutoConfiguration keys off org.aspectj.weaver.Advice
+# being on the classpath. spring-aop itself already arrives with spring-context.
+aspectjweaver = { module = "org.aspectj:aspectjweaver" }
 liquibase-core = { module = "org.liquibase:liquibase-core" }
 # Spring Boot 4 split LiquibaseAutoConfiguration out of spring-boot-autoconfigure
 # into this dedicated module; without it on the classpath Liquibase never runs.
