@@ -22,6 +22,7 @@ package io.qnop.service.document;
 
 import io.qnop.entity.DocumentVersion;
 import io.qnop.entity.ExtractionStatus;
+import io.qnop.observability.LogContext;
 import io.qnop.repository.DocumentVersionRepository;
 import io.qnop.service.job.JobHandler;
 import io.qnop.service.job.JobPayload;
@@ -107,6 +108,16 @@ public class DocumentExtractionJobHandler implements JobHandler {
     if (version.getExtractionStatus() == ExtractionStatus.READY) {
       return; // idempotent: replay after a crash-past-the-work
     }
+
+    // From here on the lines carry the review (issue #659). Without it, extraction is
+    // the one place where a failure a user reports on their review has no way back to
+    // it: the job runs on its own thread, long after the upload's request is gone.
+    try (LogContext.Scope ignored = LogContext.document(version.getDocumentId())) {
+      extract(version, versionId);
+    }
+  }
+
+  private void extract(DocumentVersion version, UUID versionId) {
 
     // What gets extracted is the PDF, whether that is the upload or the conversion of
     // it (issue #343). The renditions service converts at most once per version and

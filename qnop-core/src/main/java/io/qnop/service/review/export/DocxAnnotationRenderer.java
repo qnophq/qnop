@@ -643,7 +643,13 @@ public class DocxAnnotationRenderer implements AnnotationExportRenderer {
               Units.toEMU(size.width()),
               Units.toEMU(size.height()));
     } catch (Exception e) {
-      log.warn("Could not embed {} in the Word report", resolved.fileName(), e);
+      // The file name is the uploader's, and uploaders name files after people
+      // (issue #659). The type and size say enough to diagnose an embed failure.
+      log.warn(
+          "Could not embed a {} attachment of {} bytes in the Word report",
+          resolved.contentType(),
+          resolved.content().length,
+          e);
     }
   }
 

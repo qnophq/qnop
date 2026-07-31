@@ -43,6 +43,8 @@ import io.qnop.service.review.ReviewWorkflowMachine.TransitionResult;
 import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -59,6 +61,8 @@ import org.springframework.transaction.annotation.Transactional;
  */
 @Service
 public class ReviewWorkflowService {
+
+  private static final Logger log = LoggerFactory.getLogger(ReviewWorkflowService.class);
 
   /** Audit event type for a workflow state change; detail carries {@code {"from","to"}}. */
   static final String AUDIT_WORKFLOW_TRANSITION = "workflow.transition";
@@ -372,6 +376,14 @@ public class ReviewWorkflowService {
             : machine.transition(from, target, context);
     switch (result) {
       case TransitionResult.Allowed allowed -> {
+        // The review id rides in the diagnostic context on a request; the sweeps that
+        // transition without one open their own document scope.
+        log.info(
+            "Workflow {} -> {} ({}) by {}",
+            from,
+            allowed.target(),
+            manual ? "requested" : "derived",
+            actorId);
         document.setWorkflowState(allowed.target());
         // Record the terminal instant once, so the auto-archive sweep (issue #576) has a cheap
         // "closed since" predicate. FINALIZED/CANCELLED are terminal, so this fires exactly once.
@@ -379,9 +391,11 @@ public class ReviewWorkflowService {
           document.setClosedAt(Instant.now());
         }
       }
-      case TransitionResult.Denied denied ->
-          throw new WorkflowTransitionException(
-              WorkflowTransitionException.INVALID_TRANSITION, denied.reason());
+      case TransitionResult.Denied denied -> {
+        log.info("Workflow {} -> {} denied: {}", from, target, denied.reason());
+        throw new WorkflowTransitionException(
+            WorkflowTransitionException.INVALID_TRANSITION, denied.reason());
+      }
     }
     auditEvents.save(
         new AuditEvent(

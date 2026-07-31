@@ -29,6 +29,8 @@ import java.util.Optional;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Stream;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import software.amazon.awssdk.core.ResponseInputStream;
 import software.amazon.awssdk.core.sync.RequestBody;
 import software.amazon.awssdk.services.s3.S3Client;
@@ -46,6 +48,8 @@ import software.amazon.awssdk.services.s3.model.S3Exception;
  * (SaaS) identically — the S3 API is the abstraction, so there is no multi-cloud layer.
  */
 public class S3StorageProvider implements StorageProvider {
+
+  private static final Logger log = LoggerFactory.getLogger(S3StorageProvider.class);
 
   /**
    * The content-addressed key shape this adapter accepts: {@code sha256/<2-hex-shard>/<64-hex>}, as
@@ -67,10 +71,13 @@ public class S3StorageProvider implements StorageProvider {
   @Override
   public void put(String key, InputStream content, long contentLength, String contentType) {
     requireValidKey(key);
+    long started = System.nanoTime();
     try {
       s3.putObject(
           PutObjectRequest.builder().bucket(bucket).key(key).contentType(contentType).build(),
           RequestBody.fromInputStream(content, contentLength));
+      // Keys are content-addressed and pattern-checked (issue #337): a hash, never a name.
+      log.debug("PUT {} ({} bytes, {}) in {} ms", key, contentLength, contentType, millis(started));
     } catch (S3Exception e) {
       throw new StorageException("Failed to store object " + key, e);
     }
@@ -79,13 +86,16 @@ public class S3StorageProvider implements StorageProvider {
   @Override
   public Optional<StorageContent> get(String key) {
     requireValidKey(key);
+    long started = System.nanoTime();
     try {
       ResponseInputStream<GetObjectResponse> stream =
           s3.getObject(GetObjectRequest.builder().bucket(bucket).key(key).build());
       GetObjectResponse response = stream.response();
+      log.debug("GET {} ({} bytes) in {} ms", key, response.contentLength(), millis(started));
       return Optional.of(
           new StorageContent(stream, response.contentLength(), response.contentType()));
     } catch (NoSuchKeyException e) {
+      log.debug("GET {} missed", key);
       return Optional.empty();
     } catch (S3Exception e) {
       throw new StorageException("Failed to read object " + key, e);
@@ -117,6 +127,7 @@ public class S3StorageProvider implements StorageProvider {
     }
     try {
       s3.deleteObject(b -> b.bucket(bucket).key(key));
+      log.debug("DELETE {}", key);
       return true;
     } catch (S3Exception e) {
       throw new StorageException("Failed to delete object " + key, e);
@@ -143,6 +154,10 @@ public class S3StorageProvider implements StorageProvider {
     } catch (S3Exception e) {
       throw new StorageException("Failed to list objects under prefix", e);
     }
+  }
+
+  private static long millis(long startedNanos) {
+    return (System.nanoTime() - startedNanos) / 1_000_000;
   }
 
   /**

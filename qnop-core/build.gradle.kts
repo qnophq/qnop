@@ -35,6 +35,9 @@ dependencies {
     // Persistence: JPA entities + Spring Data repositories live in this module.
     implementation(libs.spring.boot.starter.data.jpa)
 
+    // Method tracing for the service layer at DEBUG (issue #659, ADR-0054).
+    implementation(libs.aspectjweaver)
+
     // Security & crypto foundation (issue #10, ADR-0022): the framework-light
     // io.qnop.security layer — validated properties, BCrypt, TextEncryptor, HKDF.
     // The servlet filter chain lives in qnop-app; core stays free of

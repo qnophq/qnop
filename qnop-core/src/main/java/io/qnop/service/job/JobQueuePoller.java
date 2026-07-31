@@ -20,6 +20,7 @@
  */
 package io.qnop.service.job;
 
+import io.qnop.observability.LogContext;
 import java.util.List;
 import java.util.UUID;
 import net.javacrumbs.shedlock.spring.annotation.SchedulerLock;
@@ -55,14 +56,26 @@ public class JobQueuePoller {
   @SchedulerLock(name = "jobQueuePoller", lockAtMostFor = "PT2M")
   public void poll() {
     List<UUID> claimed = jobService.claimBatch();
+    if (claimed.isEmpty()) {
+      return; // the common tick: say nothing rather than a line every five seconds
+    }
+    log.debug("Claimed {} job(s) to run", claimed.size());
     for (UUID id : claimed) {
-      try {
-        jobService.runOne(id);
-      } catch (RuntimeException e) {
+      // Async work has no request behind it, so without this the whole extraction
+      // and re-anchoring cascade would log unattributed (issue #659). The scope
+      // closes before the next job, so one job's id can never label another's.
+      try (LogContext.Scope ignored = LogContext.scope(LogContext.JOB_ID, id)) {
         try {
-          jobService.recordFailure(id, e);
-        } catch (RuntimeException recordError) {
-          log.error("Could not record failure for job {}", id, recordError);
+          jobService.runOne(id);
+        } catch (RuntimeException e) {
+          // The queue's own retry/backoff decides what happens next; this is the
+          // line that says a job attempt went wrong at all.
+          log.warn("Job {} failed and will be retried or failed by the queue", id, e);
+          try {
+            jobService.recordFailure(id, e);
+          } catch (RuntimeException recordError) {
+            log.error("Could not record failure for job {}", id, recordError);
+          }
         }
       }
     }

@@ -29,6 +29,8 @@ import java.util.regex.Pattern;
 import javax.imageio.ImageIO;
 import javax.xml.XMLConstants;
 import javax.xml.parsers.DocumentBuilderFactory;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.w3c.dom.Element;
 
 /**
@@ -39,6 +41,8 @@ import org.w3c.dom.Element;
  * byte-size cap.
  */
 public record ImageDimensions(int width, int height) {
+
+  private static final Logger log = LoggerFactory.getLogger(ImageDimensions.class);
 
   private static final Pattern VIEW_BOX =
       Pattern.compile("\\s*[-+0-9.eE]+\\s+[-+0-9.eE]+\\s+([-+0-9.eE]+)\\s+([-+0-9.eE]+)\\s*");
@@ -89,6 +93,10 @@ public record ImageDimensions(int width, int height) {
       }
       return Optional.empty();
     } catch (Exception e) {
+      // A catch-all over XML parsing of an uploaded file: "unreadable" is the
+      // right answer to the caller, but silence is the wrong answer to whoever
+      // later asks why a valid-looking logo had no dimensions (issue #659).
+      log.debug("Could not read SVG dimensions from an uploaded asset", e);
       return Optional.empty();
     }
   }

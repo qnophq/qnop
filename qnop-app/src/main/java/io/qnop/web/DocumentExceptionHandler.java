@@ -31,6 +31,8 @@ import io.qnop.service.review.WorkflowTransitionException;
 import io.qnop.service.review.export.ExportFormatUnavailableException;
 import java.time.OffsetDateTime;
 import java.util.List;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.ExceptionHandler;
@@ -44,6 +46,8 @@ import org.springframework.web.bind.annotation.RestControllerAdvice;
  */
 @RestControllerAdvice
 public class DocumentExceptionHandler {
+
+  private static final Logger log = LoggerFactory.getLogger(DocumentExceptionHandler.class);
 
   @ExceptionHandler(DocumentValidationException.class)
   public ResponseEntity<ErrorResponse> onDocumentError(DocumentValidationException ex) {
@@ -80,12 +84,17 @@ public class DocumentExceptionHandler {
 
   @ExceptionHandler(NotDocumentOwnerException.class)
   public ResponseEntity<ErrorResponse> onNotOwner(NotDocumentOwnerException ex) {
+    // A denial is worth a line: it is either somebody probing, or a permission bug
+    // reported as "it says I am not allowed". The caller and the review come from
+    // the diagnostic context, so the message adds only what it refused.
+    log.info("Denied: not the review owner");
     return error(HttpStatus.FORBIDDEN.value(), "NOT_DOCUMENT_OWNER", ex.getMessage());
   }
 
   @ExceptionHandler(AnnotationActionForbiddenException.class)
   public ResponseEntity<ErrorResponse> onAnnotationActionForbidden(
       AnnotationActionForbiddenException ex) {
+    log.info("Denied: annotation action not permitted for this caller");
     return error(HttpStatus.FORBIDDEN.value(), "ANNOTATION_ACTION_FORBIDDEN", ex.getMessage());
   }
 

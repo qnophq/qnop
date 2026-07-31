@@ -20,9 +20,13 @@
  */
 package io.qnop.service.convert;
 
+import java.io.BufferedReader;
 import java.io.IOException;
+import java.io.InputStreamReader;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.time.Duration;
 import java.util.Comparator;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
@@ -48,6 +52,12 @@ import org.springframework.stereotype.Component;
 public class LibreOfficeConverter implements OfficeConverter {
 
   private static final Logger log = LoggerFactory.getLogger(LibreOfficeConverter.class);
+
+  /** Enough for a stack of LibreOffice complaints, far short of anything that fills a log file. */
+  private static final int MAX_CAPTURED_OUTPUT = 4_000;
+
+  /** How long to wait for the reader once the process is already gone. */
+  private static final Duration OUTPUT_DRAIN_GRACE = Duration.ofSeconds(2);
 
   private final OfficeConverterProperties properties;
 
@@ -125,7 +135,13 @@ public class LibreOfficeConverter implements OfficeConverter {
       workspace = Files.createTempDirectory("qnop-convert-");
       Path input = workspace.resolve("document." + sourceExtension);
       Files.write(input, source);
+      long started = System.nanoTime();
       run(workspace, input);
+      log.info(
+          "Converted {} bytes of {} to PDF in {} ms",
+          source.length,
+          sourceExtension,
+          (System.nanoTime() - started) / 1_000_000);
 
       Path output = workspace.resolve("document.pdf");
       if (!Files.exists(output)) {
@@ -160,18 +176,29 @@ public class LibreOfficeConverter implements OfficeConverter {
             workspace.toString(),
             input.toString());
 
-    Process process =
-        new ProcessBuilder(command)
-            .redirectErrorStream(true)
-            .redirectOutput(ProcessBuilder.Redirect.DISCARD)
-            .start();
+    // Kept rather than discarded (issue #659): a non-zero exit used to leave nothing
+    // but a status number, and what LibreOffice actually complained about is the one
+    // thing a developer needs. The workspace path holds no user-chosen name — the
+    // input is always "document.<ext>" under a generated temp directory — so the
+    // output carries nothing personal.
+    Process process = new ProcessBuilder(command).redirectErrorStream(true).start();
+    StringBuilder output = new StringBuilder();
+    Thread drain = drainInto(process, output);
     try {
       if (!process.waitFor(properties.timeout().toMillis(), TimeUnit.MILLISECONDS)) {
         process.destroyForcibly();
+        log.warn(
+            "The office converter did not finish within {}; it said: {}",
+            properties.timeout(),
+            saidOrNothing(drain, output));
         throw new OfficeConversionException(
             "the converter did not finish within " + properties.timeout());
       }
       if (process.exitValue() != 0) {
+        log.warn(
+            "The office converter exited with status {}; it said: {}",
+            process.exitValue(),
+            saidOrNothing(drain, output));
         throw new OfficeConversionException(
             "the converter exited with status " + process.exitValue());
       }
@@ -180,6 +207,49 @@ public class LibreOfficeConverter implements OfficeConverter {
       Thread.currentThread().interrupt();
       throw new OfficeConversionException("interrupted while converting a document", e);
     }
+  }
+
+  /**
+   * Reads the process output on its own thread.
+   *
+   * <p>Not optional: with the pipe kept rather than discarded, a converter that writes more than
+   * the OS buffer holds would block forever on a reader that only starts after {@code waitFor}. The
+   * capture is bounded for the same reason the buffer is — a runaway process must not become a
+   * runaway log line.
+   */
+  private static Thread drainInto(Process process, StringBuilder sink) {
+    Thread thread =
+        new Thread(
+            () -> {
+              try (BufferedReader reader =
+                  new BufferedReader(
+                      new InputStreamReader(process.getInputStream(), StandardCharsets.UTF_8))) {
+                int character;
+                while ((character = reader.read()) != -1) {
+                  if (sink.length() < MAX_CAPTURED_OUTPUT) {
+                    sink.append((char) character);
+                  }
+                }
+              } catch (IOException e) {
+                // The process is gone or the pipe broke; there is nothing left to read
+                // and nothing a failed drain changes about the conversion's outcome.
+              }
+            },
+            "office-converter-output");
+    thread.setDaemon(true);
+    thread.start();
+    return thread;
+  }
+
+  /** Whatever the converter managed to say, collapsed onto one line. */
+  private static String saidOrNothing(Thread drain, StringBuilder output) {
+    try {
+      drain.join(OUTPUT_DRAIN_GRACE.toMillis());
+    } catch (InterruptedException e) {
+      Thread.currentThread().interrupt();
+    }
+    String said = output.toString().replaceAll("\\s+", " ").trim();
+    return said.isEmpty() ? "(nothing)" : said;
   }
 
   /** Best-effort cleanup: a leftover temp directory must not fail a conversion that succeeded. */
