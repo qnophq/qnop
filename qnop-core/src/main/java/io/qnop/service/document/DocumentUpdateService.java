@@ -112,7 +112,9 @@ public class DocumentUpdateService {
         documents
             .findById(documentId)
             .orElseThrow(() -> DocumentValidationException.notFound("document " + documentId));
-    if (!document.getOwnerId().equals(actor)) {
+    if (!admin && !document.getOwnerId().equals(actor)) {
+      // Structural and low-consequence: it moves a deadline, not the content
+      // (issue #563).
       throw DocumentValidationException.notOwner("only the owner may edit the due date");
     }
     return document;

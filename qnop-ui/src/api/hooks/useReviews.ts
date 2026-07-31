@@ -39,6 +39,24 @@ export interface ReviewListParams {
   sort?: string;
   /** When true, return only archived reviews (the "Archived" view); default excludes them (#576). */
   scope?: 'active' | 'archived' | 'all';
+  /**
+   * Whose reviews (issue #563). `all` is the ADMIN-only moderation listing and is
+   * refused with 403 for anyone else, so it is only ever requested from a surface
+   * that knows the caller's role.
+   */
+  participation?: 'mine' | 'all';
+  /** Workflow slice, server-applied while moderating (issue #563). */
+  lifecycle?: 'any' | 'open' | 'closed';
+  /** One specific workflow state; open string set (ADR-0011/0035). */
+  workflowState?: string;
+  /** Deadline slice, server-applied while moderating. */
+  due?: 'any' | 'overdue' | 'soon' | 'none';
+  /** Document family of the latest version, server-applied while moderating. */
+  format?: 'any' | 'pdf' | 'docx' | 'md';
+  /** One specific owner, server-applied while moderating. */
+  ownerId?: string;
+  /** The caller's part, server-applied while moderating (issue #563). */
+  role?: 'any' | 'owner' | 'reviewer' | 'observer';
   page: number;
   size: number;
 }
@@ -61,6 +79,13 @@ export function useReviews(params: ReviewListParams) {
         q: params.q || undefined,
         sort: params.sort,
         scope: params.scope,
+        participation: params.participation,
+        lifecycle: params.lifecycle,
+        workflowState: params.workflowState,
+        due: params.due,
+        format: params.format,
+        ownerId: params.ownerId,
+        role: params.role,
         page: params.page,
         size: params.size,
       });

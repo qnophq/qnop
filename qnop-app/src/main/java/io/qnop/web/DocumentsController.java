@@ -37,6 +37,8 @@ import io.qnop.api.v1.model.ParticipantKind;
 import io.qnop.api.v1.model.ParticipantListResponse;
 import io.qnop.api.v1.model.ParticipantView;
 import io.qnop.api.v1.model.RenderedDocumentResponse;
+import io.qnop.api.v1.model.ReviewFacetCounts;
+import io.qnop.api.v1.model.ReviewOwnerOption;
 import io.qnop.api.v1.model.ThreadParticipation;
 import io.qnop.api.v1.model.VersionDiffResponse;
 import io.qnop.api.v1.model.VisitResponse;
@@ -94,15 +96,37 @@ public class DocumentsController implements DocumentsApi {
 
   @Override
   public ResponseEntity<DocumentListResponse> listDocuments(
-      String q, String sort, String scope, Integer page, Integer size) {
+      String q,
+      String sort,
+      String scope,
+      String participation,
+      String lifecycle,
+      String workflowState,
+      String due,
+      String format,
+      UUID ownerId,
+      String role,
+      Integer page,
+      Integer size) {
     // The retention slice (issue #576): active (default) / archived / all.
     boolean includeArchived = "archived".equals(scope) || "all".equals(scope);
     boolean includeActive = !"archived".equals(scope);
+    // The moderation listing (issue #563); the service refuses it for non-admins.
+    boolean moderation = "all".equals(participation);
     DocumentOverviewService.DocumentPage result =
         overview.listVisible(
             CurrentUser.requireUserId(),
+            CurrentUser.isAdmin(),
+            moderation,
             q,
             sort,
+            scope,
+            lifecycle,
+            role,
+            workflowState,
+            due,
+            format,
+            ownerId,
             includeActive,
             includeArchived,
             page == null ? 0 : page,
@@ -112,7 +136,8 @@ public class DocumentsController implements DocumentsApi {
             .items(result.items().stream().map(DocumentsController::toSummary).toList())
             .total(result.total())
             .page(result.page())
-            .size(result.size()));
+            .size(result.size())
+            .facets(toFacets(result.facets())));
   }
 
   @Override
@@ -147,6 +172,27 @@ public class DocumentsController implements DocumentsApi {
     return ResponseEntity.noContent().build();
   }
 
+  /** The chip counts, or null outside the moderation listing (issue #563). */
+  private static ReviewFacetCounts toFacets(DocumentOverviewService.ReviewFacetCounts counts) {
+    return counts == null
+        ? null
+        : new ReviewFacetCounts()
+            .owners(
+                counts.owners().stream()
+                    .map(o -> new ReviewOwnerOption().id(o.id()).displayName(o.displayName()))
+                    .toList())
+            .totalUnfiltered(counts.totalUnfiltered())
+            .roleAny(counts.roleAny())
+            .roleOwner(counts.roleOwner())
+            .roleReviewer(counts.roleReviewer())
+            .roleObserver(counts.roleObserver())
+            .stateActive(counts.stateActive())
+            .stateOpen(counts.stateOpen())
+            .stateClosed(counts.stateClosed())
+            .stateArchived(counts.stateArchived())
+            .stateAll(counts.stateAll());
+  }
+
   private static DocumentSummary toSummary(DocumentOverviewService.DocumentSummaryView view) {
     return new DocumentSummary()
         .id(view.id())
@@ -166,7 +212,8 @@ public class DocumentsController implements DocumentsApi {
         .createdAt(view.createdAt().atOffset(ZoneOffset.UTC))
         .updatedAt(view.updatedAt().atOffset(ZoneOffset.UTC))
         .dueAt(atUtc(view.dueAt()))
-        .archivedAt(atUtc(view.archivedAt()));
+        .archivedAt(atUtc(view.archivedAt()))
+        .participating(view.participating());
   }
 
   /** Nullable {@link Instant} → {@link OffsetDateTime} at UTC for the wire model (#295). */

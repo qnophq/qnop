@@ -176,14 +176,21 @@ public class DocumentIngestService {
     return result;
   }
 
-  /** Appends the upload as the next version of {@code documentId}; owner-only. */
-  public UploadResult addVersion(UUID actor, UUID documentId, UploadSource upload) {
+  /**
+   * Appends the upload as the next version of {@code documentId} — the owner, or an admin
+   * moderating (issue #563).
+   *
+   * <p>The most consequential of the admin's moderation powers, and worth naming as such: a new
+   * version re-anchors every annotation and changes what everyone is reviewing. It is here because
+   * an owner can become unreachable mid-review; the audit trail records who actually did it.
+   */
+  public UploadResult addVersion(UUID actor, boolean admin, UUID documentId, UploadSource upload) {
     Document document =
         documents
             .findById(documentId)
             .orElseThrow(
                 () -> DocumentValidationException.notFound("no such document: " + documentId));
-    if (!document.getOwnerId().equals(actor)) {
+    if (!admin && !document.getOwnerId().equals(actor)) {
       // Anti-enumeration: a caller who cannot even see the document gets the same 404 as for an
       // unknown id; only a visible non-owner (participant/admin) learns the action is owner-only.
       if (!access.isVisible(documentId, actor, false)) {

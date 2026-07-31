@@ -23,18 +23,27 @@ package io.qnop.repository;
 import io.qnop.entity.Document;
 import jakarta.persistence.LockModeType;
 import java.time.Instant;
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
 import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
-/** Data access for review aggregate roots (issue #244, ADR-0011). */
-public interface DocumentRepository extends JpaRepository<Document, UUID> {
+/**
+ * Data access for review aggregate roots (issue #244, ADR-0011).
+ *
+ * <p>Extends {@link JpaSpecificationExecutor} for the admin's moderation listing (issue #563),
+ * whose facets are independent dimensions the caller combines freely — built as a {@code
+ * Specification} rather than one query with a fistful of booleans.
+ */
+public interface DocumentRepository
+    extends JpaRepository<Document, UUID>, JpaSpecificationExecutor<Document> {
 
   /**
    * Loads a document under a {@code PESSIMISTIC_WRITE} row lock (issue #324): serializes the
@@ -84,6 +93,24 @@ public interface DocumentRepository extends JpaRepository<Document, UUID> {
       Pageable pageable);
 
   /**
+   * Which of the given reviews the actor is actually part of (issue #563).
+   *
+   * <p>So the moderation listing can mark the rest. The same three ways in as {@link
+   * #findVisibleTo} — owned, joined directly, joined through a team — because a row is only "not
+   * yours" if none of them applies; a reviewer who joined via their team is participating even
+   * though no row names them.
+   */
+  @Query(
+      "SELECT d.id FROM Document d WHERE d.id IN :documentIds"
+          + " AND (d.ownerId = :actor"
+          + " OR EXISTS (SELECT 1 FROM ReviewParticipant p"
+          + "   WHERE p.documentId = d.id AND p.userId = :actor)"
+          + " OR EXISTS (SELECT 1 FROM ReviewParticipant pt, TeamMembership m"
+          + "   WHERE pt.documentId = d.id AND pt.teamId = m.teamId AND m.userId = :actor))")
+  List<UUID> findParticipatingIds(
+      @Param("documentIds") Collection<UUID> documentIds, @Param("actor") UUID actor);
+
+  /**
    * Reviews the given team participates in AND the actor may see (issue #586). The public team
    * profile's participation list is this intersection by construction, so it can never leak a
    * review the caller cannot reach (ADR-0038) — same visibility predicate as {@link
@@ -100,6 +127,16 @@ public interface DocumentRepository extends JpaRepository<Document, UUID> {
           + " ORDER BY d.updatedAt DESC")
   List<Document> findTeamParticipationsVisibleTo(
       @Param("teamId") UUID teamId, @Param("actor") UUID actor);
+
+  /**
+   * Everyone who owns a review, for the moderation listing's owner facet (issue #563).
+   *
+   * <p>Across the whole workspace rather than the current page: a dropdown offering only the owners
+   * of the twenty rows on screen would look like the complete list and quietly not be one.
+   * Ownership is structurally public (#413), so this leaks nothing a row would not.
+   */
+  @Query("SELECT DISTINCT d.ownerId FROM Document d")
+  List<UUID> findDistinctOwnerIds(Pageable pageable);
 
   /** Reviews the user owns — ownership is structurally public, anonymous ones included (#473). */
   long countByOwnerId(UUID ownerId);

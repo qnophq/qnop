@@ -68,6 +68,16 @@ Resolving identity on the server is the only way anonymity can be real, and it a
 - **Deriving the pseudonym token from the real author id** (e.g. a hash of `documentId:authorId`). Rejected: the participant roster exposes reviewer user ids, so such a token is confirmable by brute force over the roster — it must derive from the ordinal, whose mapping to real ids lives only server-side.
 - **A single "private review" flag** conflating anonymity and visibility. Rejected: they are independent choices (an anonymous but fully-open review, or a named but private one, are both sensible).
 
+## Amendment (2026-07-30, admins do not unmask — issue #563)
+
+Admins can now list and moderate reviews they are no part of. That reopened the obvious question: should the review surface show them the real names?
+
+**No.** An admin browsing a foreign anonymous review sees the same pseudonyms as everyone else; `ReviewIdentityResolver` deliberately takes no admin flag. Anonymity is a promise made to the participants when the review was created, and the person moderating is not the person it was made to.
+
+The unmasking path already exists and is the right one: the audit trail ([ADR-0042](0042-audit-trail-exposure.md)) resolves real actors for ADMIN and AUDITOR, and reading it is itself an auditable act. So the capability is not lost — it is moved to the surface that leaves a trace, instead of the one that does not.
+
+One thing does change for admins, and it is a correction rather than an exception. The overview's annotation counts are visibility-scoped, and under a `PRIVATE` thread policy that made a moderation row read "0 open" for a review full of open concerns — while `AnnotationService.canSeeThread` was letting the same admin read every one of those threads. The counts now follow what the admin can actually see. That is a wrong number being fixed, not a privacy boundary being moved.
+
 ## Relationships
 
-Extends [ADR-0011](0011-review-workflow-state-model.md) (review model & the `FINALIZED` invariant). Related issues: #403 (the original "Participant" placeholder), #410 (likes), #412 (permalinks).
+Extends [ADR-0011](0011-review-workflow-state-model.md) (review model & the `FINALIZED` invariant). Related issues: #403 (the original "Participant" placeholder), #410 (likes), #412 (permalinks), #563 (admin moderation).

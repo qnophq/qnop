@@ -155,7 +155,7 @@ class ReviewPurgeServiceTest {
     service.purgeOnce(false);
 
     verifyNoInteractions(auditEvents, storage);
-    verify(documents, never()).delete(any());
+    verify(documents, never()).delete(any(Document.class));
   }
 
   // --- the dry run ---------------------------------------------------------
@@ -174,7 +174,7 @@ class ReviewPurgeServiceTest {
 
     service.purgeOnce(true);
 
-    verify(documents, never()).delete(any());
+    verify(documents, never()).delete(any(Document.class));
     verify(storage, never()).delete(anyString());
     verifyNoInteractions(auditEvents);
   }
@@ -265,7 +265,7 @@ class ReviewPurgeServiceTest {
 
     service.purgeOnce(false);
 
-    verify(documents, never()).delete(any());
+    verify(documents, never()).delete(any(Document.class));
     verify(storage, never()).delete(anyString());
     verifyNoInteractions(auditEvents);
   }
@@ -282,7 +282,7 @@ class ReviewPurgeServiceTest {
 
     service.purgeOnce(false);
 
-    verify(documents, never()).delete(any());
+    verify(documents, never()).delete(any(Document.class));
   }
 
   @Test
@@ -295,7 +295,7 @@ class ReviewPurgeServiceTest {
 
     service.purgeOnce(false);
 
-    verify(documents, never()).delete(any());
+    verify(documents, never()).delete(any(Document.class));
     verifyNoInteractions(auditEvents);
   }
 

@@ -22,7 +22,17 @@
 import type { DocumentSummary } from '../../../api/generated';
 
 /** The caller's role on a review — owner is structural (ADR-0011), everyone else reviews. */
-export function roleOf(review: DocumentSummary, userId: string | null): 'owner' | 'reviewer' {
+export type ReviewRole = 'owner' | 'reviewer' | 'observer';
+
+/**
+ * The caller's part in a review.
+ *
+ * <p>`observer` only occurs in an admin's moderation listing (issue #563), where
+ * rows appear that the caller has no part in at all. The server decides it —
+ * participation can come through a team, which the row itself does not show.
+ */
+export function roleOf(review: DocumentSummary, userId: string | null): ReviewRole {
+  if (review.participating === false) return 'observer';
   return review.ownerId === userId ? 'owner' : 'reviewer';
 }
 

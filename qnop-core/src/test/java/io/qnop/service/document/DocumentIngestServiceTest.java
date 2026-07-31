@@ -404,7 +404,8 @@ class DocumentIngestServiceTest {
               });
       when(annotations.findByDocumentId(DOC)).thenReturn(List.of());
 
-      DocumentIngestService.UploadResult result = service.addVersion(OWNER, DOC, pdfUpload());
+      DocumentIngestService.UploadResult result =
+          service.addVersion(OWNER, false, DOC, pdfUpload());
 
       assertThat(result.versionNumber()).isEqualTo(3);
       assertThat(result.extractionStatus()).isEqualTo("PENDING");
@@ -418,7 +419,7 @@ class DocumentIngestServiceTest {
       service = newService();
       when(documents.findById(DOC)).thenReturn(Optional.empty());
 
-      assertRejected(() -> service.addVersion(OWNER, DOC, pdfUpload()), 404);
+      assertRejected(() -> service.addVersion(OWNER, false, DOC, pdfUpload()), 404);
     }
 
     @Test
@@ -428,8 +429,37 @@ class DocumentIngestServiceTest {
       when(documents.findById(DOC)).thenReturn(Optional.of(new Document(OWNER, "Contract")));
       when(access.isVisible(DOC, STRANGER, false)).thenReturn(true);
 
-      assertRejected(() -> service.addVersion(STRANGER, DOC, pdfUpload()), 403);
+      assertRejected(() -> service.addVersion(STRANGER, false, DOC, pdfUpload()), 403);
       verify(storage, never()).stage(any(), any(), anyLong());
+    }
+
+    @Test
+    @DisplayName("an admin may append a version to a review they do not own (#563)")
+    void adminMayAddVersion() {
+      service = newService();
+      when(documents.findById(DOC)).thenReturn(Optional.of(new Document(OWNER, "Contract")));
+      when(settings.getInteger(ApplicationSettingKey.UPLOAD_DOCUMENT_MAX_FILE_SIZE_MB))
+          .thenReturn(10);
+      StagedObject staged = new StagedObject("sha256/ab/key", "hash", 42L);
+      when(storage.stage(any(), eq(PDF_CONTENT_TYPE), anyLong())).thenReturn(staged);
+      when(versions.findTopByDocumentIdOrderByVersionNumberDesc(DOC))
+          .thenReturn(Optional.of(version(1)));
+      when(versions.save(any(DocumentVersion.class)))
+          .thenAnswer(
+              inv -> {
+                DocumentVersion saved = inv.getArgument(0);
+                setId(saved, UUID.randomUUID());
+                return saved;
+              });
+      when(annotations.findByDocumentId(DOC)).thenReturn(List.of());
+
+      // The most consequential moderation power (issue #563): it re-anchors every
+      // annotation. Deliberate, and audited with the real actor.
+      DocumentIngestService.UploadResult result =
+          service.addVersion(STRANGER, true, DOC, pdfUpload());
+
+      assertThat(result.versionNumber()).isEqualTo(2);
+      verify(storage).commit(staged.key());
     }
 
     @Test
@@ -439,7 +469,7 @@ class DocumentIngestServiceTest {
       when(documents.findById(DOC)).thenReturn(Optional.of(new Document(OWNER, "Contract")));
       when(access.isVisible(DOC, STRANGER, false)).thenReturn(false);
 
-      assertRejected(() -> service.addVersion(STRANGER, DOC, pdfUpload()), 404);
+      assertRejected(() -> service.addVersion(STRANGER, false, DOC, pdfUpload()), 404);
     }
   }
 

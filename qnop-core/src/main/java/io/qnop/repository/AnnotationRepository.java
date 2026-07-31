@@ -60,17 +60,25 @@ public interface AnnotationRepository extends JpaRepository<Annotation, UUID> {
    * only the actor's own annotations (and, if they own the review, all of them) count — so the
    * reviews overview's totals follow the caller's visibility rather than over-counting hidden
    * threads. A document where the actor sees nothing is simply absent (the caller defaults to 0).
+   *
+   * <p>{@code admin} counts everything, because an admin already <em>reads</em> everything: {@code
+   * AnnotationService.canSeeThread} lets them into PRIVATE threads. Without the flag the moderation
+   * listing (issue #563) under-reports — a review with open concerns showing "0 open" — which is
+   * not privacy, just a wrong number.
    */
   @Query(
       "SELECT new io.qnop.repository.DocumentAnnotationCounts(a.documentId, COUNT(a),"
           + " SUM(CASE WHEN a.status = io.qnop.entity.AnnotationStatus.OPEN THEN 1 ELSE 0 END))"
           + " FROM Annotation a, Document d"
           + " WHERE a.documentId = d.id AND a.documentId IN :documentIds"
-          + " AND (d.threadParticipation <> io.qnop.entity.ThreadParticipation.PRIVATE"
+          + " AND (:admin = TRUE"
+          + " OR d.threadParticipation <> io.qnop.entity.ThreadParticipation.PRIVATE"
           + " OR d.ownerId = :actor OR a.authorId = :actor)"
           + " GROUP BY a.documentId")
   List<DocumentAnnotationCounts> countVisibleByDocumentIds(
-      @Param("documentIds") Collection<UUID> documentIds, @Param("actor") UUID actor);
+      @Param("documentIds") Collection<UUID> documentIds,
+      @Param("actor") UUID actor,
+      @Param("admin") boolean admin);
 
   /** Annotations the user raised in NON-anonymous reviews (ADR-0038, issue #473). */
   @Query(

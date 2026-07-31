@@ -65,6 +65,16 @@ public class DocumentValidationException extends RuntimeException {
     return new DocumentValidationException(403, "NOT_OWNER", detail);
   }
 
+  /**
+   * An action reserved for admins (issue #563).
+   *
+   * <p>Distinct from {@link #notFound}: the cross-review listing is not a document whose existence
+   * could be probed, so hiding it behind a 404 would only obscure why the call failed.
+   */
+  public static DocumentValidationException forbidden(String detail) {
+    return new DocumentValidationException(403, "FORBIDDEN", detail);
+  }
+
   public static DocumentValidationException unsupportedType(String detail) {
     return new DocumentValidationException(415, "UNSUPPORTED_MEDIA_TYPE", detail);
   }

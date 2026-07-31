@@ -32,9 +32,15 @@ import io.qnop.repository.ReviewParticipantRepository;
 import io.qnop.repository.UserDisplayName;
 import io.qnop.repository.UserRepository;
 import io.qnop.repository.UserSlug;
+import io.qnop.service.document.ReviewModerationFilter.Due;
+import io.qnop.service.document.ReviewModerationFilter.Facets;
+import io.qnop.service.document.ReviewModerationFilter.Lifecycle;
+import io.qnop.service.document.ReviewModerationFilter.Role;
+import io.qnop.service.document.ReviewModerationFilter.Scope;
 import io.qnop.service.document.ReviewParticipantService.ParticipantView;
 import io.qnop.service.review.ReviewIdentityResolver;
 import java.time.Instant;
+import java.util.Comparator;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
@@ -84,28 +90,71 @@ public class DocumentOverviewService {
     this.users = users;
   }
 
+  /**
+   * The reviews the caller may list.
+   *
+   * <p>{@code moderation} is the admin's cross-review listing (issue #563): every review, not just
+   * the caller's own participations. It is refused for anyone else here rather than in the
+   * controller, so the rule sits next to the query it guards.
+   *
+   * <p>Unlike the participant-scoped view, this one is meant to be paged and searched on the server
+   * — a moderation list that silently stops at the first page would be worse than no list, because
+   * "I can see everything" is exactly what a moderator relies on.
+   */
+  /** How many owners the facet offers before the search field is the better tool. */
+  private static final int MAX_OWNER_OPTIONS = 100;
+
   @Transactional(readOnly = true)
   public DocumentPage listVisible(
       UUID actor,
+      boolean admin,
+      boolean moderation,
       String query,
       String sort,
+      String scope,
+      String lifecycle,
+      String role,
+      String workflowState,
+      String due,
+      String format,
+      UUID ownerId,
       boolean includeActive,
       boolean includeArchived,
       int page,
       int size) {
+    if (moderation && !admin) {
+      // 403, not 404: the caller is authenticated and the listing exists — it is
+      // simply not theirs. Anti-enumeration does not apply, because this reveals
+      // nothing about any particular review.
+      throw DocumentValidationException.forbidden("only admins may list every review");
+    }
     String like =
         query == null || query.isBlank() ? null : "%" + query.trim().toLowerCase(Locale.ROOT) + "%";
     // The retention slice (issue #576): the caller picks any combination — the
     // overview's "All" facet spans active AND archived at once, the default
-    // hides the records, the Archived view shows only them. Open/closed stays
-    // a client-side facet over the result.
-    Page<Document> result =
-        documents.findVisibleTo(
-            actor,
-            like,
-            includeActive,
-            includeArchived,
-            PageRequest.of(page, size, parseSort(sort)));
+    // hides the records, the Archived view shows only them. In the participant-
+    // scoped view the finer slices stay client-side facets over the result; the
+    // moderation listing is paged, so they have to be predicates (issue #563).
+    PageRequest pageRequest = PageRequest.of(page, size, parseSort(sort));
+    ReviewFacetCounts facets = null;
+    Page<Document> result;
+    if (moderation) {
+      Instant now = Instant.now();
+      Facets wanted =
+          new Facets(
+              like,
+              Scope.of(scope),
+              Lifecycle.of(lifecycle),
+              Role.of(role),
+              blankToNull(workflowState),
+              Due.of(due),
+              blankToNull(format),
+              ownerId);
+      result = documents.findAll(ReviewModerationFilter.of(actor, wanted, now), pageRequest);
+      facets = countFacets(actor, wanted, now);
+    } else {
+      result = documents.findVisibleTo(actor, like, includeActive, includeArchived, pageRequest);
+    }
 
     List<UUID> ids = result.getContent().stream().map(Document::getId).toList();
     Map<UUID, Integer> maxVersions =
@@ -129,7 +178,7 @@ public class DocumentOverviewService {
     Map<UUID, DocumentAnnotationCounts> counts =
         ids.isEmpty()
             ? Map.of()
-            : annotations.countVisibleByDocumentIds(ids, actor).stream()
+            : annotations.countVisibleByDocumentIds(ids, actor, admin).stream()
                 .collect(
                     Collectors.toMap(DocumentAnnotationCounts::documentId, Function.identity()));
     // Owner names, batched (issue #469 polish): structurally public (#413).
@@ -160,6 +209,13 @@ public class DocumentOverviewService {
                 .filter(row -> row.slug() != null)
                 .collect(Collectors.toMap(UserSlug::id, UserSlug::slug));
 
+    // Only in moderation mode: everywhere else every row is the caller's by
+    // construction, so the extra query would answer a question nobody asked.
+    Set<UUID> participating =
+        moderation && !ids.isEmpty()
+            ? new HashSet<>(documents.findParticipatingIds(ids, actor))
+            : Set.copyOf(ids);
+
     List<DocumentSummaryView> items =
         result.getContent().stream()
             .map(
@@ -187,16 +243,72 @@ public class DocumentOverviewService {
                       document.getCreatedAt(),
                       document.getUpdatedAt(),
                       document.getDueAt(),
-                      document.getArchivedAt());
+                      document.getArchivedAt(),
+                      participating.contains(document.getId()));
                 })
             .toList();
-    return new DocumentPage(items, result.getTotalElements(), page, size);
+    return new DocumentPage(items, result.getTotalElements(), page, size, facets);
   }
 
   /**
    * The reviewer set for one summary card, anonymised (issue #422) when the review is anonymous and
    * the caller is not its owner — so the overview never leaks the roster of an anonymous review.
    */
+  /**
+   * The chip counts, each group counted against the other group's selection.
+   *
+   * <p>Nine counts rather than one grouped query: they are plain indexed counts over a table whose
+   * rows are reviews, and keeping each chip's number the result of the very predicate that chip
+   * applies is what stops the two drifting apart.
+   */
+  private ReviewFacetCounts countFacets(UUID actor, Facets wanted, Instant now) {
+    Facets unfiltered =
+        new Facets(null, Scope.ALL, Lifecycle.ANY, Role.ANY, null, Due.ANY, null, null);
+    return new ReviewFacetCounts(
+        // Told apart from "this filter matched nothing", which is a different
+        // message and must not show the first-run welcome.
+        documents.count(ReviewModerationFilter.of(actor, unfiltered, now)),
+        ownerOptions(),
+        count(actor, wanted.withRole(Role.ANY), now),
+        count(actor, wanted.withRole(Role.OWNER), now),
+        count(actor, wanted.withRole(Role.REVIEWER), now),
+        count(actor, wanted.withRole(Role.OBSERVER), now),
+        count(actor, wanted.withStatus(Scope.ACTIVE, Lifecycle.ANY), now),
+        count(actor, wanted.withStatus(Scope.ACTIVE, Lifecycle.OPEN), now),
+        count(actor, wanted.withStatus(Scope.ACTIVE, Lifecycle.CLOSED), now),
+        count(actor, wanted.withStatus(Scope.ARCHIVED, Lifecycle.ANY), now),
+        count(actor, wanted.withStatus(Scope.ALL, Lifecycle.ANY), now));
+  }
+
+  /**
+   * The owner facet's entries.
+   *
+   * <p>Capped: past a few dozen owners a dropdown stops being a way to find anything, and the
+   * search field is the better tool. The cap is generous enough that no ordinary workspace meets
+   * it.
+   */
+  private List<OwnerOption> ownerOptions() {
+    List<UUID> ids = documents.findDistinctOwnerIds(PageRequest.of(0, MAX_OWNER_OPTIONS));
+    if (ids.isEmpty()) {
+      return List.of();
+    }
+    Map<UUID, String> names =
+        users.findDisplayNamesByIdIn(ids).stream()
+            .collect(Collectors.toMap(UserDisplayName::id, UserDisplayName::displayName));
+    return ids.stream()
+        .map(id -> new OwnerOption(id, names.getOrDefault(id, "Unknown")))
+        .sorted(Comparator.comparing(OwnerOption::displayName, String.CASE_INSENSITIVE_ORDER))
+        .toList();
+  }
+
+  private long count(UUID actor, Facets facets, Instant now) {
+    return documents.count(ReviewModerationFilter.of(actor, facets, now));
+  }
+
+  private static String blankToNull(String value) {
+    return value == null || value.isBlank() || "any".equalsIgnoreCase(value) ? null : value;
+  }
+
   private List<ParticipantView> rosterFor(
       Document document, UUID actor, List<ParticipantProjection> rows, Map<UUID, String> slugById) {
     if (!document.isAnonymous() || document.getOwnerId().equals(actor)) {
@@ -242,8 +354,39 @@ public class DocumentOverviewService {
       Instant createdAt,
       Instant updatedAt,
       Instant dueAt,
-      Instant archivedAt) {}
+      Instant archivedAt,
+      /**
+       * Whether the caller owns or reviews this one (issue #563); always true outside moderation.
+       */
+      boolean participating) {}
 
-  /** A page of the caller's documents. */
-  public record DocumentPage(List<DocumentSummaryView> items, long total, int page, int size) {}
+  /** One entry of the owner facet (issue #563). */
+  public record OwnerOption(UUID id, String displayName) {}
+
+  /** A page of the caller's documents; {@code facets} is set only when moderating (issue #563). */
+  public record DocumentPage(
+      List<DocumentSummaryView> items, long total, int page, int size, ReviewFacetCounts facets) {}
+
+  /**
+   * What each chip would show if clicked.
+   *
+   * <p>Counted on the server for the same reason the rows are paged there: a number derived from
+   * one page would describe that page while appearing to describe the workspace. Each group is
+   * counted against the OTHER group's current selection, which is the rule the participant-scoped
+   * view already follows — so a chip's number keeps predicting what clicking it shows.
+   */
+  public record ReviewFacetCounts(
+      /** Every review there is, ignoring search and facets — "is the workspace empty?" (#563). */
+      long totalUnfiltered,
+      /** Everyone who owns a review, so the owner facet is not limited to the page. */
+      List<OwnerOption> owners,
+      long roleAny,
+      long roleOwner,
+      long roleReviewer,
+      long roleObserver,
+      long stateActive,
+      long stateOpen,
+      long stateClosed,
+      long stateArchived,
+      long stateAll) {}
 }

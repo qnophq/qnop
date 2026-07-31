@@ -453,3 +453,259 @@ describe('ReviewsPage', () => {
     expect(screen.getByRole('option', { name: 'Due date' })).toBeInTheDocument();
   });
 });
+
+describe('ReviewsPage — the admin moderation listing (#563)', () => {
+  const foreign = summary({
+    id: 'doc-9',
+    title: 'A review nobody invited me to',
+    ownerId: OTHER,
+    ownerDisplayName: 'Someone Else',
+    workflowState: 'IN_REVIEW',
+    participating: false,
+  });
+
+  it('does not offer the switch to a member', () => {
+    useAuthStore.setState({ userId: ME, isAuthenticated: true, role: 'MEMBER' });
+
+    renderPage();
+
+    // The API refuses them anyway; not showing the control keeps the UI from
+    // promising something the server will deny.
+    expect(screen.queryByTestId('participation-all')).not.toBeInTheDocument();
+  });
+
+  it('offers the switch to an admin', () => {
+    useAuthStore.setState({ userId: ME, isAuthenticated: true, role: 'ADMIN' });
+
+    renderPage();
+
+    expect(screen.getByTestId('participation-all')).toBeInTheDocument();
+  });
+
+  it('still offers the switch to an admin who owns no reviews at all', () => {
+    useAuthStore.setState({ userId: ME, isAuthenticated: true, role: 'ADMIN' });
+    mockReviews({ data: { items: [], total: 0, page: 0, size: 100 } });
+
+    renderPage();
+
+    // The switch lives in the filter row, which an empty list does not render —
+    // without this an admin who only administers could never reach the workspace.
+    expect(screen.getByTestId('participation-all')).toBeInTheDocument();
+  });
+
+  it("lists the caller's own reviews until the admin asks for all of them", () => {
+    useAuthStore.setState({ userId: ME, isAuthenticated: true, role: 'ADMIN' });
+    renderPage();
+
+    // Default off, so an admin's own work is not drowned out on every visit.
+    expect(vi.mocked(useReviews).mock.calls[0][0].participation).toBeUndefined();
+
+    fireEvent.click(screen.getByTestId('participation-all'));
+
+    const last = vi.mocked(useReviews).mock.calls.at(-1)![0];
+    expect(last.participation).toBe('all');
+    // Paged on the server, not sliced from one big fetch (issue #563): a
+    // moderation view that stopped at the first hundred would read as "that is
+    // everything".
+    expect(last.size).toBe(20);
+  });
+
+  it('marks the rows the admin has no part in', () => {
+    useAuthStore.setState({ userId: ME, isAuthenticated: true, role: 'ADMIN' });
+    mockReviews({
+      data: { items: [foreign], total: 1, page: 0, size: 20, facets: { ...FACETS, roleAny: 1 } },
+    });
+
+    renderPage('/reviews?participation=all');
+
+    expect(screen.getByText('A review nobody invited me to')).toBeInTheDocument();
+    expect(screen.getByText('Not participating')).toBeInTheDocument();
+    // Not "Reviewer": the admin is not on the roster, and saying so would be a
+    // small lie in exactly the view where the context matters.
+    expect(screen.queryByText('Reviewer')).not.toBeInTheDocument();
+  });
+
+  const FACETS = {
+    owners: [{ id: OTHER, displayName: 'Someone Else' }],
+    totalUnfiltered: 57,
+    roleAny: 57,
+    roleOwner: 2,
+    roleReviewer: 5,
+    roleObserver: 50,
+    stateActive: 40,
+    stateOpen: 31,
+    stateClosed: 9,
+    stateArchived: 17,
+    stateAll: 57,
+  };
+
+  it('counts the chips from the whole workspace, not from the page on screen', () => {
+    useAuthStore.setState({ userId: ME, isAuthenticated: true, role: 'ADMIN' });
+    mockReviews({ data: { items: [foreign], total: 57, page: 0, size: 20, facets: FACETS } });
+
+    renderPage('/reviews?participation=all');
+
+    // One row is on screen and the numbers describe 57 reviews, which is the
+    // whole point: a count taken from the page would describe the page while
+    // appearing to describe the workspace.
+    expect(screen.getByText('Owned by me (2)')).toBeInTheDocument();
+    expect(screen.getByText('Reviewing (5)')).toBeInTheDocument();
+    expect(screen.getByText('Every state (57)')).toBeInTheDocument();
+    expect(screen.getByText('Archived (17)')).toBeInTheDocument();
+  });
+
+  it('offers the not-participating facet, and only while moderating', () => {
+    useAuthStore.setState({ userId: ME, isAuthenticated: true, role: 'ADMIN' });
+    mockReviews({ data: { items: [foreign], total: 57, page: 0, size: 20, facets: FACETS } });
+
+    renderPage('/reviews?participation=all');
+
+    expect(screen.getByText('Not participating (50)')).toBeInTheDocument();
+  });
+
+  it("has no not-participating facet in the caller's own listing", () => {
+    useAuthStore.setState({ userId: ME, isAuthenticated: true, role: 'ADMIN' });
+
+    renderPage();
+
+    // There, every row is the caller's by construction — a facet that can never
+    // match is a control that only puzzles.
+    expect(screen.queryByText(/Not participating/)).not.toBeInTheDocument();
+  });
+
+  it('sends a chosen chip to the server rather than filtering the page', () => {
+    useAuthStore.setState({ userId: ME, isAuthenticated: true, role: 'ADMIN' });
+    mockReviews({ data: { items: [foreign], total: 57, page: 0, size: 20, facets: FACETS } });
+
+    renderPage('/reviews?participation=all');
+    fireEvent.click(screen.getByText('Not participating (50)'));
+
+    const last = vi.mocked(useReviews).mock.calls.at(-1)![0];
+    expect(last.role).toBe('observer');
+    expect(last.participation).toBe('all');
+  });
+
+  it('splits the status chips into the retention and workflow slices', () => {
+    useAuthStore.setState({ userId: ME, isAuthenticated: true, role: 'ADMIN' });
+    mockReviews({ data: { items: [foreign], total: 57, page: 0, size: 20, facets: FACETS } });
+
+    renderPage('/reviews?participation=all');
+    fireEvent.click(screen.getByText('Closed (9)'));
+
+    // 'Closed' means "not archived, and the workflow closed it" — two orthogonal
+    // parameters on the wire, the same rule the browser-side facet follows.
+    const closed = vi.mocked(useReviews).mock.calls.at(-1)![0];
+    expect(closed.scope).toBe('active');
+    expect(closed.lifecycle).toBe('closed');
+
+    fireEvent.click(screen.getByText('Archived (17)'));
+    const archived = vi.mocked(useReviews).mock.calls.at(-1)![0];
+    expect(archived.scope).toBe('archived');
+    expect(archived.lifecycle).toBe('any');
+  });
+
+  it('says a filter matched nothing instead of greeting a full workspace as empty', () => {
+    useAuthStore.setState({ userId: ME, isAuthenticated: true, role: 'ADMIN' });
+    // A filter combination with no hits, in a workspace holding 57 reviews.
+    mockReviews({
+      data: {
+        items: [],
+        total: 0,
+        page: 0,
+        size: 20,
+        // Nothing archived either, so the plain "no matches" line is the one
+        // under test rather than the archive-only variant (#578).
+        facets: { ...FACETS, roleAny: 0, stateActive: 0, stateArchived: 0, totalUnfiltered: 57 },
+      },
+    });
+
+    renderPage('/reviews?participation=all&role=observer');
+
+    expect(screen.getByText('No reviews match your filters.')).toBeInTheDocument();
+    expect(screen.queryByText(/Start your first review/i)).not.toBeInTheDocument();
+    // And the chips stay: without them there is no way to undo the filter that
+    // emptied the page.
+    expect(screen.getByText('Not participating (50)')).toBeInTheDocument();
+  });
+
+  it('still welcomes an admin whose workspace really is empty', () => {
+    useAuthStore.setState({ userId: ME, isAuthenticated: true, role: 'ADMIN' });
+    mockReviews({
+      data: {
+        items: [],
+        total: 0,
+        page: 0,
+        size: 20,
+        facets: {
+          totalUnfiltered: 0,
+          roleAny: 0,
+          roleOwner: 0,
+          roleReviewer: 0,
+          roleObserver: 0,
+          stateActive: 0,
+          stateOpen: 0,
+          stateClosed: 0,
+          stateArchived: 0,
+          stateAll: 0,
+        },
+      },
+    });
+
+    renderPage('/reviews?participation=all');
+
+    expect(screen.getByText(/Start your first review/i)).toBeInTheDocument();
+  });
+
+  it('sends the advanced filters to the server too', () => {
+    useAuthStore.setState({ userId: ME, isAuthenticated: true, role: 'ADMIN' });
+    mockReviews({ data: { items: [foreign], total: 57, page: 0, size: 20, facets: FACETS } });
+
+    renderPage('/reviews?participation=all&due=overdue&format=docx&state=CHANGES_REQUESTED');
+
+    // Everything the filter button offers has to reach the query, or it would
+    // narrow the page while reading as the workspace — the same trap the chips
+    // had (issue #563).
+    const sent = vi.mocked(useReviews).mock.calls.at(-1)![0];
+    expect(sent.due).toBe('overdue');
+    expect(sent.format).toBe('docx');
+    expect(sent.workflowState).toBe('CHANGES_REQUESTED');
+  });
+
+  it('offers every owner in the workspace, not just the ones on this page', () => {
+    useAuthStore.setState({ userId: ME, isAuthenticated: true, role: 'ADMIN' });
+    mockReviews({
+      data: {
+        items: [foreign],
+        total: 57,
+        page: 0,
+        size: 20,
+        facets: {
+          ...FACETS,
+          owners: [
+            { id: OTHER, displayName: 'Someone Else' },
+            { id: 'owner-3', displayName: 'Nobody On This Page' },
+          ],
+        },
+      },
+    });
+
+    renderPage('/reviews?participation=all');
+    fireEvent.click(screen.getByRole('button', { name: 'Filter reviews' }));
+
+    // The page holds one row owned by one person; the facet still offers both,
+    // because it comes from the server.
+    expect(screen.getByText('Nobody On This Page')).toBeInTheDocument();
+  });
+
+  it('says which slice of the workspace is on screen', () => {
+    useAuthStore.setState({ userId: ME, isAuthenticated: true, role: 'ADMIN' });
+    mockReviews({ data: { items: [foreign], total: 57, page: 0, size: 20, facets: FACETS } });
+
+    renderPage('/reviews?participation=all');
+
+    // A moderator has to know whether this is everything or page one of three.
+    expect(screen.getByText(/1–20 of 57/)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Previous' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Next' })).toBeEnabled();
+  });
+});
