@@ -48,6 +48,25 @@ public final class CurrentUser {
     }
   }
 
+  /**
+   * The caller's id, or null when there is none (issue #659).
+   *
+   * <p>For the log context, which runs on anonymous traffic too — health probes, the login form,
+   * the branding assets — and must not turn "nobody is signed in" into a rejected request.
+   */
+  public static UUID optionalUserId() {
+    Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+    String name = authentication == null ? null : authentication.getName();
+    if (name == null) {
+      return null;
+    }
+    try {
+      return UUID.fromString(name);
+    } catch (IllegalArgumentException e) {
+      return null; // a machine principal is not a user
+    }
+  }
+
   /** Whether the caller carries the global {@code ROLE_ADMIN} authority (issue #245). */
   public static boolean isAdmin() {
     Authentication authentication = SecurityContextHolder.getContext().getAuthentication();

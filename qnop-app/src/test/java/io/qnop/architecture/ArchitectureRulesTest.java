@@ -64,6 +64,8 @@ class ArchitectureRulesTest {
             .definedBy("io.qnop.web..", "io.qnop.bootstrap..")
             .layer("Security")
             .definedBy("io.qnop.security..")
+            .layer("Observability")
+            .definedBy("io.qnop.observability..")
             // Spi is intentionally consumable by everyone (plugin contract).
             .whereLayer("Web")
             .mayNotBeAccessedByAnyLayer()
@@ -71,6 +73,11 @@ class ArchitectureRulesTest {
             // layers; it never depends back on them (see securityFoundationStaysPure).
             .whereLayer("Security")
             .mayOnlyBeAccessedByLayers("Web", "Service")
+            // The diagnostic context (issue #659) is deliberately reachable from
+            // everywhere that logs — it carries ids into the MDC and depends on
+            // nothing but slf4j.
+            .whereLayer("Observability")
+            .mayOnlyBeAccessedByLayers("Web", "Service", "Repository", "Security")
             .whereLayer("Service")
             .mayOnlyBeAccessedByLayers("Web")
             .whereLayer("Repository")

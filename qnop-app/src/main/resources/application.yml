@@ -6,6 +6,34 @@
 # single .env drives both the DB container and the app. Defaults target the local
 # docker-compose Postgres; production may override with the standard
 # SPRING_DATASOURCE_* keys.
+# Logging (issue #659, ADR-0054). Two things are configured here and nothing else
+# is: what identifies a line, and in which shape it is written.
+#
+# `pattern.correlation` is the slot Boot's default console pattern already leaves
+# for diagnostic context, so the rest of the layout stays Boot's. Without it the
+# MDC would be populated and invisible — the default pattern prints none of it.
+# Blank values render as empty fields, which is why the keys are the three that
+# earn their width on every line; method and path are in the MDC for structured
+# output but not in the console layout, where the message usually names them.
+#
+# `structured.format.console` is empty by default, i.e. human-readable text for a
+# developer at a terminal. Set QNOP_LOG_FORMAT=ecs (or logstash / gelf) in a
+# deployment and every line becomes one JSON object with the MDC as fields — the
+# form a log aggregator can actually query. Boot ships this; no encoder library.
+logging:
+  pattern:
+    # Not env-overridable on purpose: the value contains ':' inside %X{...},
+    # which Spring's placeholder syntax would read as a default separator.
+    correlation: "[%X{requestId:-} %X{userId:-} %X{documentId:-}] "
+  structured:
+    format:
+      console: ${QNOP_LOG_FORMAT:}
+  level:
+    # The application's own packages speak at INFO; everything below is Boot's
+    # default. Raise one package with QNOP_LOG_LEVEL_QNOP=DEBUG when chasing a
+    # specific failure rather than turning up the whole tree.
+    io.qnop: ${QNOP_LOG_LEVEL_QNOP:INFO}
+
 spring:
   lifecycle:
     # Upper bound for the graceful-shutdown drain (issue #495).

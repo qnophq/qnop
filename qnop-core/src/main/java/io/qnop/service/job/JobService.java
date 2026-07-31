@@ -22,6 +22,7 @@ package io.qnop.service.job;
 
 import io.qnop.entity.Job;
 import io.qnop.entity.JobStatus;
+import io.qnop.observability.LogContext;
 import io.qnop.repository.JobRepository;
 import java.time.Duration;
 import java.time.Instant;
@@ -107,9 +108,17 @@ public class JobService {
     if (handler == null) {
       throw new IllegalStateException("No JobHandler registered for type: " + job.getType());
     }
-    handler.handle(job.getPayload());
-    job.markDone();
-    repository.save(job);
+    // The type belongs on every line the handler writes: an id alone says which
+    // job, not what it was trying to do (issue #659).
+    try (LogContext.Scope ignored = LogContext.scope(LogContext.JOB_TYPE, job.getType())) {
+      long startedAt = System.nanoTime();
+      handler.handle(job.getPayload());
+      job.markDone();
+      repository.save(job);
+      // One line per completed job, with the duration: the cheapest way to see a
+      // handler that has quietly become slow.
+      log.info("Job done in {} ms", (System.nanoTime() - startedAt) / 1_000_000);
+    }
   }
 
   /**

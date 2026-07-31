@@ -37,6 +37,8 @@ import io.qnop.web.security.RefreshTokenCookieFactory;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
 import java.util.UUID;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseCookie;
@@ -57,6 +59,8 @@ import org.springframework.web.server.ResponseStatusException;
  */
 @RestController
 public class AuthController implements AuthApi {
+
+  private static final Logger log = LoggerFactory.getLogger(AuthController.class);
 
   private static final String TOKEN_TYPE = "Bearer";
 
@@ -84,11 +88,19 @@ public class AuthController implements AuthApi {
 
   @Override
   public ResponseEntity<TokenResponse> login(LoginRequest request) {
+    // Never the identifier that was tried (issue #659): it is an e-mail address
+    // or a username, and a failed login writes it into a file with no access
+    // control. The request id ties the attempt to its rate-limit and audit rows.
     UUID userId =
         authService
             .authenticate(request.getUsernameOrEmail(), request.getPassword())
             .orElseThrow(
-                () -> new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Invalid credentials"));
+                () -> {
+                  log.info("Login rejected: invalid credentials");
+                  return new ResponseStatusException(
+                      HttpStatus.UNAUTHORIZED, "Invalid credentials");
+                });
+    log.info("Login succeeded for {}", userId);
     return issueSession(userId);
   }
 
@@ -99,8 +111,14 @@ public class AuthController implements AuthApi {
     }
     RotationResult result = refreshTokenService.rotate(refreshCookie);
     if (result instanceof RotationResult.Success success) {
+      log.debug("Refresh token rotated for {}", success.userId());
       return issueSession(success.userId(), success.token());
     }
+    // A presented token that is not valid is either replayed or forged, and both
+    // are worth seeing: a burst of them is the shape of a stolen cookie
+    // (ADR-0026). WARN, because unlike a mistyped password this should not happen
+    // in normal use.
+    log.warn("Refresh rejected: the presented token was reused or unknown");
     // Reused or Unknown: clear the cookie and reject. The two are indistinguishable to the client.
     return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
         .header(HttpHeaders.SET_COOKIE, cookieFactory.clear().toString())

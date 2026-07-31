@@ -134,12 +134,10 @@ public class ReviewDeletionService {
             events.publishEvent(
                 new ReviewEvent.ReviewDeleted(
                     documentId, actorId, deleted.ownerId(), deleted.title())));
-    log.info(
-        "Review {} ({}) deleted by {}; {} storage object(s) released.",
-        documentId,
-        deleted.title(),
-        actorId,
-        objects);
+    // The title is deliberately absent (issue #659): it is user content and
+    // routinely carries a name. The audit trail keeps it, behind access control;
+    // a log file has neither.
+    log.info("Review deleted by {}; {} storage object(s) released", actorId, objects);
     return new DeletedReview(documentId, deleted.title(), objects);
   }
 
