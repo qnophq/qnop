@@ -7163,6 +7163,10 @@ components:
         What happened (issue #538). Mirrors the review event/mail-template
         vocabulary; `MENTION` outranks the `COMMENT_ADDED`/`ANNOTATION_CREATED`
         it is contained in, so a mentioned follower gets one notification.
+
+        `REVIEW_DELETED` (issue #421) is the one type whose review no longer
+        exists: it carries no `documentId` and no action to follow, and its
+        `documentTitle` is the deleted review's name rather than a link to it.
       enum:
         - PARTICIPANT_ADDED
         - ANNOTATION_CREATED
@@ -7171,6 +7175,7 @@ components:
         - MENTION
         - VERSION_UPLOADED
         - WORKFLOW_CHANGED
+        - REVIEW_DELETED
       example: COMMENT_ADDED
     NotificationSummary:
       type: object

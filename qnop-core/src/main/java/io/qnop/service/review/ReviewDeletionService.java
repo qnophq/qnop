@@ -35,6 +35,7 @@ import java.util.UUID;
 import java.util.function.Predicate;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.support.TransactionTemplate;
@@ -74,6 +75,7 @@ public class ReviewDeletionService {
   private final AuditEventRepository auditEvents;
   private final DocumentAccessService access;
   private final StorageService storage;
+  private final ApplicationEventPublisher events;
   private final TransactionTemplate tx;
 
   public ReviewDeletionService(
@@ -83,6 +85,7 @@ public class ReviewDeletionService {
       AuditEventRepository auditEvents,
       DocumentAccessService access,
       StorageService storage,
+      ApplicationEventPublisher events,
       PlatformTransactionManager transactionManager) {
     this.documents = documents;
     this.versions = versions;
@@ -90,6 +93,7 @@ public class ReviewDeletionService {
     this.auditEvents = auditEvents;
     this.access = access;
     this.storage = storage;
+    this.events = events;
     this.tx = new TransactionTemplate(transactionManager);
   }
 
@@ -119,6 +123,17 @@ public class ReviewDeletionService {
     }
     int objects = deleteUnreferencedObjects(deleted.storageKeys());
     audit(documentId, deleted.title(), actorId, objects);
+    // Inside a transaction, and that is not decoration: the notification listener
+    // is @TransactionalEventListener(AFTER_COMMIT), and an event published outside
+    // a transaction is dropped without a word. The aggregate delete has already
+    // committed by now, so this one exists purely to give the event a commit to
+    // ride on. It carries what the review was, because nothing can be looked up
+    // any more (issue #421).
+    tx.executeWithoutResult(
+        status ->
+            events.publishEvent(
+                new ReviewEvent.ReviewDeleted(
+                    documentId, actorId, deleted.ownerId(), deleted.title())));
     log.info(
         "Review {} ({}) deleted by {}; {} storage object(s) released.",
         documentId,
@@ -148,11 +163,12 @@ public class ReviewDeletionService {
           Set<String> referenced = new LinkedHashSet<>();
           referenced.addAll(versions.findStorageKeysByDocumentId(documentId));
           referenced.addAll(attachments.findStorageKeysByDocumentId(documentId));
+          UUID ownerId = document.getOwnerId();
           // The schema cascades the whole aggregate (versions, annotations, placements, comments,
           // reactions, mentions, participants, visits, attachments, version diffs and the
           // per-document audit trail) — see DocumentReviewSchemaIT.
           documents.delete(document);
-          return new DeletedAggregate(document.getTitle(), referenced);
+          return new DeletedAggregate(document.getTitle(), ownerId, referenced);
         });
   }
 
@@ -220,6 +236,6 @@ public class ReviewDeletionService {
   /** What one deletion destroyed, for the caller's response and log line. */
   public record DeletedReview(UUID documentId, String title, int storageObjectsDeleted) {}
 
-  /** The aggregate's title and the storage keys it referenced, read before it was deleted. */
-  record DeletedAggregate(String title, Set<String> storageKeys) {}
+  /** What the aggregate was, read before it was deleted — nothing can be looked up afterwards. */
+  record DeletedAggregate(String title, UUID ownerId, Set<String> storageKeys) {}
 }

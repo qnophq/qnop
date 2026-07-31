@@ -151,6 +151,11 @@ public class ReviewNotificationService {
 
   /** The event's intents, grouped per recipient and ranked most-specific first. */
   private Map<UUID, List<ReviewNotificationIntent>> resolve(ReviewEvent event) {
+    if (event instanceof ReviewEvent.ReviewDeleted deleted) {
+      // Before the lookup, deliberately: the review is gone, which is the whole
+      // message (issue #421).
+      return byRecipient(reviewDeleted(deleted));
+    }
     Optional<Document> loaded = documents.findById(event.documentId());
     if (loaded.isEmpty()) {
       return Map.of(); // deleted between commit and dispatch — nothing to say
@@ -174,7 +179,44 @@ public class ReviewNotificationService {
           case ReviewEvent.CommentAdded comment -> commentAdded(document, comment);
           case ReviewEvent.VersionUploaded uploaded -> versionUploaded(document, uploaded);
           case ReviewEvent.WorkflowChanged changed -> workflowChanged(document, changed);
+          // Handled above, before the document lookup that this branch depends on.
+          case ReviewEvent.ReviewDeleted ignored -> List.of();
         };
+    return byRecipient(intents);
+  }
+
+  /**
+   * Tells the owner their review was destroyed.
+   *
+   * <p>Only the owner: everyone else's stake in a review is the discussion, and there is no
+   * discussion left to point them at. The owner is the one person who has to know the thing they
+   * started is gone.
+   *
+   * <p>The intent carries no {@code documentId} on purpose — {@code notification.document_id}
+   * cascades with the document, so a row naming the deleted review would be deleted in the same
+   * statement. The title travels as the excerpt instead.
+   */
+  private List<ReviewNotificationIntent> reviewDeleted(ReviewEvent.ReviewDeleted event) {
+    if (event.ownerId() == null || event.ownerId().equals(event.actorId())) {
+      // An admin deleting their own review already knows.
+      return List.of();
+    }
+    return users
+        .findById(event.ownerId())
+        .<List<ReviewNotificationIntent>>map(
+            owner ->
+                List.of(
+                    ReviewNotificationIntent.to(
+                            owner, NotificationType.REVIEW_DELETED, MailTemplateKey.REVIEW_DELETED)
+                        .actor(event.actorId())
+                        .excerpt(event.title())
+                        .var("documentTitle", event.title())
+                        .build()))
+        .orElseGet(List::of);
+  }
+
+  private Map<UUID, List<ReviewNotificationIntent>> byRecipient(
+      List<ReviewNotificationIntent> intents) {
     return intents.stream()
         .collect(
             Collectors.groupingBy(

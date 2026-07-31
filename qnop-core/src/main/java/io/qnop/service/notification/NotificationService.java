@@ -22,6 +22,7 @@ package io.qnop.service.notification;
 
 import io.qnop.entity.Document;
 import io.qnop.entity.Notification;
+import io.qnop.entity.NotificationType;
 import io.qnop.repository.DocumentRepository;
 import io.qnop.repository.NotificationRepository;
 import io.qnop.service.document.DocumentAccessService;
@@ -131,6 +132,12 @@ public class NotificationService {
   // --- rendering -----------------------------------------------------------
 
   private NotificationView render(Notification notification, RenderContext context) {
+    if (notification.getType() == NotificationType.REVIEW_DELETED) {
+      // Self-describing by necessity (issue #421): there is no review left to
+      // load, and tombstoning it would replace the one thing the owner needs —
+      // which review went — with "no longer available to you".
+      return deletedReview(notification);
+    }
     UUID documentId = notification.getDocumentId();
     boolean accessible = documentId != null && context.isVisible(documentId, access);
     Document document = accessible ? context.document(documentId, documents) : null;
@@ -152,6 +159,39 @@ public class NotificationService {
         actionPath(notification, document),
         actionLabel(notification),
         true,
+        notification.getReadAt(),
+        notification.getCreatedAt());
+  }
+
+  /**
+   * A review an admin destroyed: everything it says travels on the row itself (issue #421).
+   *
+   * <p>The admin is not named. Actor names elsewhere resolve through the review's identity rules
+   * (ADR-0038), and there is no review left to resolve against; naming them anyway would be a
+   * privacy decision made by accident. The audit trail holds the real actor for anyone entitled to
+   * it.
+   */
+  private NotificationView deletedReview(Notification notification) {
+    String title = notification.getExcerpt() == null ? "a review" : notification.getExcerpt();
+    return new NotificationView(
+        notification.getId(),
+        notification.getType().name(),
+        "A review was deleted",
+        "“" + title + "” was permanently deleted by an administrator.",
+        // No preview: there is no comment or annotation text to quote.
+        null,
+        null,
+        null,
+        // No id — the row never had one — but the name, which is the whole point
+        // of the notice.
+        null,
+        title,
+        // No path and no label either: there is nothing left to open, and a link
+        // that 404s would be worse than none. `accessible` false says exactly
+        // that to the client.
+        null,
+        null,
+        false,
         notification.getReadAt(),
         notification.getCreatedAt());
   }
@@ -187,6 +227,9 @@ public class NotificationService {
       case COMMENT_ADDED -> actorName + " replied";
       case VERSION_UPLOADED -> "New version uploaded";
       case WORKFLOW_CHANGED -> "The review moved to " + humanState(notification.getToState());
+      // Rendered by deletedReview before this is reached; listed so the switch
+      // stays exhaustive and a new type cannot slip past the compiler.
+      case REVIEW_DELETED -> "A review was deleted";
     };
   }
 
@@ -213,6 +256,9 @@ public class NotificationService {
               + " to "
               + humanState(notification.getToState())
               + ".";
+      // Rendered by deletedReview before this is reached; listed so a new type
+      // cannot slip past the compiler.
+      case REVIEW_DELETED -> review + " was permanently deleted by an administrator.";
     };
   }
 

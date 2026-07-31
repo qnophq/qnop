@@ -262,6 +262,33 @@ public enum MailTemplateKey {
       "oldState",
       "newState",
       "actionUrl"),
+  REVIEW_DELETED(
+      "review.deleted",
+      "Review deleted",
+      "“{{documentTitle}}” was deleted",
+      """
+      Hi {{recipientName}},
+
+      Your review "{{documentTitle}}" ({{siteName}}) was permanently deleted by an administrator.
+
+      Everything in it is gone: every version, annotation and discussion. This cannot be undone.
+
+      If you were not expecting this, ask your administrator — the deletion is recorded in the audit trail.
+      """,
+      """
+      <h1 style="margin:0 0 14px;color:#18191f;font-size:22px;font-weight:700;letter-spacing:-0.01em;line-height:1.3;">Review deleted</h1>
+      <p style="margin:0 0 14px;">Hi {{recipientName}},</p>
+      <p style="margin:0 0 14px;">Your review <strong style="color:#18191f;">&#8220;{{documentTitle}}&#8221;</strong> was permanently deleted by an administrator.</p>
+      <p style="margin:0 0 14px;">Everything in it is gone &#8212; every version, annotation and discussion. This cannot be undone.</p>
+      <p style="margin:0;color:#9a9ea8;font-size:13px;">If you were not expecting this, ask your administrator; the deletion is recorded in the audit trail.</p>
+      """,
+      // No call to action: there is nothing left to open, and a button leading to
+      // a 404 would be worse than none (issue #421).
+      null,
+      "“{{documentTitle}}” was permanently deleted.",
+      "siteName",
+      "recipientName",
+      "documentTitle"),
   REVIEW_VERSION_UPLOADED(
       "review.version_uploaded",
       "New document version",

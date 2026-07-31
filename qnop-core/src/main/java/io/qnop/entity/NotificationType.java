@@ -36,5 +36,18 @@ public enum NotificationType {
   ANNOTATION_DECIDED,
   COMMENT_ADDED,
   VERSION_UPLOADED,
-  WORKFLOW_CHANGED
+  WORKFLOW_CHANGED,
+  /**
+   * A review was deleted permanently by an admin (issue #421).
+   *
+   * <p>Last, and outside the ranking that matters above: it never competes with another candidate,
+   * because the event it comes from concerns exactly one recipient and no other event can fire for
+   * a review that no longer exists.
+   *
+   * <p>The only type whose notification carries no {@code documentId} — that column cascades with
+   * the document, so a row pointing at the deleted review would be deleted along with it. The
+   * review's title travels in {@code excerpt} instead, which is why this one renders without
+   * loading anything.
+   */
+  REVIEW_DELETED
 }

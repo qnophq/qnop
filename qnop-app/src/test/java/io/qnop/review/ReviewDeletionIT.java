@@ -29,12 +29,15 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import io.qnop.entity.Document;
 import io.qnop.entity.DocumentVersion;
+import io.qnop.entity.Notification;
+import io.qnop.entity.NotificationType;
 import io.qnop.entity.ReviewParticipant;
 import io.qnop.entity.WorkflowState;
 import io.qnop.repository.AnnotationRepository;
 import io.qnop.repository.AuditEventRepository;
 import io.qnop.repository.DocumentRepository;
 import io.qnop.repository.DocumentVersionRepository;
+import io.qnop.repository.NotificationRepository;
 import io.qnop.repository.ReviewParticipantRepository;
 import io.qnop.service.review.ReviewDeletionService;
 import io.qnop.service.storage.StorageService;
@@ -62,6 +65,7 @@ class ReviewDeletionIT extends SeededIntegrationTest {
   @Autowired private AnnotationRepository annotations;
   @Autowired private ReviewParticipantRepository participants;
   @Autowired private AuditEventRepository auditEvents;
+  @Autowired private NotificationRepository notifications;
   @Autowired private StorageService storage;
 
   private MockHttpServletRequestBuilder as(MockHttpServletRequestBuilder builder, UUID user) {
@@ -205,6 +209,58 @@ class ReviewDeletionIT extends SeededIntegrationTest {
     mockMvc
         .perform(as(delete("/api/v1/documents/" + documentId), ADMIN_ID))
         .andExpect(status().isNotFound());
+  }
+
+  @Test
+  @DisplayName("the owner is told their review is gone, and the notice outlives it")
+  void theOwnerIsNotified() throws Exception {
+    UUID documentId = review("Deleted out from under its owner", storeObject("notified"));
+
+    mockMvc
+        .perform(as(delete("/api/v1/documents/" + documentId), ADMIN_ID))
+        .andExpect(status().isNoContent());
+
+    List<Notification> mine =
+        notifications.findAll().stream()
+            .filter(n -> MEMBER_ID.equals(n.getRecipientId()))
+            .filter(n -> n.getType() == NotificationType.REVIEW_DELETED)
+            .toList();
+
+    assertThat(mine).hasSize(1);
+    // No documentId, deliberately: that column cascades with the document, so a
+    // row naming the deleted review would have been deleted in the same
+    // statement. The title rides along instead.
+    assertThat(mine.getFirst().getDocumentId()).isNull();
+    assertThat(mine.getFirst().getExcerpt()).isEqualTo("Deleted out from under its owner");
+
+    // And the inbox says which review, rather than the "no longer available to
+    // you" tombstone every other document-less notification gets.
+    mockMvc
+        .perform(as(get("/api/v1/notifications"), MEMBER_ID))
+        .andExpect(status().isOk())
+        .andExpect(
+            jsonPath("$.items[?(@.type == 'REVIEW_DELETED')].documentTitle")
+                .value(org.hamcrest.Matchers.hasItem("Deleted out from under its owner")))
+        // Nothing to open: the client hides the link rather than offering a 404.
+        .andExpect(
+            jsonPath("$.items[?(@.type == 'REVIEW_DELETED')].accessible")
+                .value(org.hamcrest.Matchers.hasItem(false)));
+  }
+
+  @Test
+  @DisplayName("an admin deleting their own review is not notified about it")
+  void noSelfNotification() throws Exception {
+    Document own = new Document(ADMIN_ID, "The admins own mistake");
+    own.setWorkflowState(WorkflowState.DRAFT);
+    UUID documentId = documents.save(own).getId();
+
+    mockMvc
+        .perform(as(delete("/api/v1/documents/" + documentId), ADMIN_ID))
+        .andExpect(status().isNoContent());
+
+    assertThat(notifications.findAll())
+        .filteredOn(n -> n.getType() == NotificationType.REVIEW_DELETED)
+        .isEmpty();
   }
 
   /** Raises one annotation on version 1, so the cascade has something to take. */

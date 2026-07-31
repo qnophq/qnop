@@ -39,6 +39,7 @@ const LABELS: Record<NotificationType, string> = {
   [NotificationType.CommentAdded]: 'Reply',
   [NotificationType.VersionUploaded]: 'New version',
   [NotificationType.WorkflowChanged]: 'Workflow',
+  [NotificationType.ReviewDeleted]: 'Review deleted',
 };
 
 /** Index into the brand's avatar ramp — see `tokens.ts`. */
@@ -50,6 +51,9 @@ const TONE_INDEX: Record<NotificationType, number> = {
   [NotificationType.CommentAdded]: 6, // mid blue — the conversation continues
   [NotificationType.VersionUploaded]: 3, // amber — the document itself moved
   [NotificationType.WorkflowChanged]: 7, // slate — a state change, not a person
+  // Red, the only one: everything else in this inbox reports work moving along,
+  // and this reports work that is gone (issue #421).
+  [NotificationType.ReviewDeleted]: 4,
 };
 
 export function notificationLabel(type: NotificationType): string {

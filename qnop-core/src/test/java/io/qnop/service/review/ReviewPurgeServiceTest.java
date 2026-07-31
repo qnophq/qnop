@@ -105,6 +105,7 @@ class ReviewPurgeServiceTest {
             auditEvents,
             org.mockito.Mockito.mock(io.qnop.service.document.DocumentAccessService.class),
             storage,
+            org.mockito.Mockito.mock(org.springframework.context.ApplicationEventPublisher.class),
             transactionManager);
     service =
         new ReviewPurgeService(
