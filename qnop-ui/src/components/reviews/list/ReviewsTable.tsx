@@ -29,6 +29,7 @@ import TableHead from '@mui/material/TableHead';
 import TableRow from '@mui/material/TableRow';
 import Typography from '@mui/material/Typography';
 import { useTheme } from '@mui/material/styles';
+import Checkbox from '@mui/material/Checkbox';
 import IconButton from '@mui/material/IconButton';
 import Tooltip from '@mui/material/Tooltip';
 import { ChevronRight, Trash2 } from 'lucide-react';
@@ -47,22 +48,52 @@ interface ReviewsTableProps {
   userId: string | null;
   onOpen: (documentId: string) => void;
   /**
-   * Offers a per-row delete (issue #421). Set only in the admin's moderation
-   * listing, which is where the reviews nobody wants are actually found.
+   * Offers a per-row delete (issue #421). Set only for admins, the only role that
+   * may destroy a review.
    */
   onDelete?: (review: DocumentSummary) => void;
+  /**
+   * Turns on row selection for bulk actions (issue #421). Absent means no
+   * checkbox column at all, rather than a disabled one nobody can use.
+   */
+  selectedIds?: ReadonlySet<string>;
+  onToggleSelected?: (documentId: string) => void;
+  onToggleAll?: () => void;
 }
 
 /** The overview's table view (prototype `reviews.jsx`): dense, scannable rows. */
-export function ReviewsTable({ reviews, userId, onOpen, onDelete }: ReviewsTableProps) {
+export function ReviewsTable({
+  reviews,
+  userId,
+  onOpen,
+  onDelete,
+  selectedIds,
+  onToggleSelected,
+  onToggleAll,
+}: ReviewsTableProps) {
   const theme = useTheme();
   const { formatRelative } = useFormatters();
+  const selectable = selectedIds !== undefined && onToggleSelected !== undefined;
+  const selectedHere = selectable ? reviews.filter((r) => selectedIds.has(r.id)).length : 0;
   return (
     <Paper variant="outlined" sx={{ overflow: 'hidden' }}>
       <Box sx={{ overflowX: 'auto' }}>
         <Table size="small" sx={{ minWidth: 720 }}>
           <TableHead>
             <TableRow sx={{ bgcolor: theme.qnop.surface2 }}>
+              {selectable && (
+                <TableCell padding="checkbox">
+                  <Checkbox
+                    size="small"
+                    // Indeterminate says "some of these", which is the honest state
+                    // when a page is partly selected.
+                    checked={selectedHere > 0 && selectedHere === reviews.length}
+                    indeterminate={selectedHere > 0 && selectedHere < reviews.length}
+                    onChange={onToggleAll}
+                    slotProps={{ input: { 'aria-label': 'Select every review on this page' } }}
+                  />
+                </TableCell>
+              )}
               {[
                 'Document',
                 'Role',
@@ -99,8 +130,21 @@ export function ReviewsTable({ reviews, userId, onOpen, onDelete }: ReviewsTable
                   hover
                   onClick={() => onOpen(review.slug ?? review.id)}
                   data-testid={`review-row-${review.id}`}
+                  selected={selectable && selectedIds.has(review.id)}
                   sx={{ cursor: 'pointer', '&:last-child td': { borderBottom: 0 } }}
                 >
+                  {selectable && (
+                    <TableCell padding="checkbox">
+                      <Checkbox
+                        size="small"
+                        checked={selectedIds.has(review.id)}
+                        // The row opens the review; ticking it must not.
+                        onClick={(event) => event.stopPropagation()}
+                        onChange={() => onToggleSelected(review.id)}
+                        slotProps={{ input: { 'aria-label': `Select ${review.title}` } }}
+                      />
+                    </TableCell>
+                  )}
                   <TableCell sx={{ py: 1.5 }}>
                     <Stack direction="row" spacing={1.5} sx={{ alignItems: 'center' }}>
                       <DocumentIcon contentType={review.contentType} />

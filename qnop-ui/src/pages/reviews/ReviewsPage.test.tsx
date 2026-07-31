@@ -22,6 +22,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { fireEvent, render, screen, within } from '@testing-library/react';
 import { MemoryRouter, Route, Routes } from 'react-router';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { ThemeProvider } from '@mui/material/styles';
 import type { DocumentSummary } from '../../api/generated';
 import { ParticipantKind } from '../../api/generated';
@@ -106,16 +107,21 @@ function mockReviews(value: Queryish) {
 }
 
 function renderPage(entry = '/reviews') {
+  // The page lives inside one in the app; the dialogs it opens use the cache to
+  // invalidate the lists after a deletion (issue #421).
+  const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   return render(
-    <ThemeProvider theme={buildTheme('light')}>
-      <MemoryRouter initialEntries={[entry]}>
-        <Routes>
-          <Route path="/reviews" element={<ReviewsPage />} />
-          <Route path="/reviews/new" element={<div data-testid="new-review-probe" />} />
-          <Route path="/reviews/:documentId" element={<div data-testid="detail-probe" />} />
-        </Routes>
-      </MemoryRouter>
-    </ThemeProvider>,
+    <QueryClientProvider client={client}>
+      <ThemeProvider theme={buildTheme('light')}>
+        <MemoryRouter initialEntries={[entry]}>
+          <Routes>
+            <Route path="/reviews" element={<ReviewsPage />} />
+            <Route path="/reviews/new" element={<div data-testid="new-review-probe" />} />
+            <Route path="/reviews/:documentId" element={<div data-testid="detail-probe" />} />
+          </Routes>
+        </MemoryRouter>
+      </ThemeProvider>
+    </QueryClientProvider>,
   );
 }
 
@@ -695,6 +701,60 @@ describe('ReviewsPage — the admin moderation listing (#563)', () => {
     // The page holds one row owned by one person; the facet still offers both,
     // because it comes from the server.
     expect(screen.getByText('Nobody On This Page')).toBeInTheDocument();
+  });
+
+  it('selects rows and offers to delete them together', () => {
+    useAuthStore.setState({ userId: ME, isAuthenticated: true, role: 'ADMIN' });
+
+    renderPage();
+
+    // No selection, no bar: an empty toolbar taking up room says nothing.
+    expect(screen.queryByTestId('bulk-actions')).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('checkbox', { name: 'Select NDA Acme Corp' }));
+    fireEvent.click(screen.getByRole('checkbox', { name: 'Select Architecture handbook' }));
+
+    const bar = screen.getByTestId('bulk-actions');
+    expect(within(bar).getByText('2 selected')).toBeInTheDocument();
+    expect(within(bar).getByRole('button', { name: /Delete selected \(2\)/ })).toBeEnabled();
+  });
+
+  it('names every review the bulk delete would take', () => {
+    useAuthStore.setState({ userId: ME, isAuthenticated: true, role: 'ADMIN' });
+
+    renderPage();
+    fireEvent.click(screen.getByRole('checkbox', { name: 'Select NDA Acme Corp' }));
+    fireEvent.click(screen.getByRole('button', { name: /Delete selected/ }));
+
+    // A selection made across a filtered listing is easy to misjudge; the titles
+    // are what catch the row that should not be there (issue #421).
+    const list = screen.getByTestId('bulk-delete-list');
+    expect(within(list).getByText('NDA Acme Corp')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Delete 1 permanently/ })).toBeDisabled();
+  });
+
+  it('selects and clears every row on the page at once', () => {
+    useAuthStore.setState({ userId: ME, isAuthenticated: true, role: 'ADMIN' });
+
+    renderPage();
+    const all = screen.getByRole('checkbox', { name: 'Select every review on this page' });
+    fireEvent.click(all);
+    // Three of the four fixtures are live work; the archived one is not shown by
+    // default, so "every row on this page" means exactly what is on screen.
+    expect(within(screen.getByTestId('bulk-actions')).getByText('3 selected')).toBeInTheDocument();
+
+    fireEvent.click(all);
+    expect(screen.queryByTestId('bulk-actions')).not.toBeInTheDocument();
+  });
+
+  it('offers no selection to someone who may not delete', () => {
+    useAuthStore.setState({ userId: ME, isAuthenticated: true, role: 'MEMBER' });
+
+    renderPage();
+
+    // Deleting is admin-only, so a checkbox column would promise something the
+    // server refuses.
+    expect(screen.queryByRole('checkbox', { name: /^Select / })).not.toBeInTheDocument();
   });
 
   it('says which slice of the workspace is on screen', () => {
