@@ -329,8 +329,26 @@ class ReviewWorkflowControllerIT extends SeededIntegrationTest {
   }
 
   @Test
-  void nonOwnerIsRejectedWith403() throws Exception {
+  void nonParticipantIsRejectedWith404() throws Exception {
+    // A non-participant must not learn the review exists (issue #661): the same 404
+    // the read path gives, not a 403 that confirms the id resolves to a real review.
     Document document = draftOwnedByMember();
+
+    mockMvc
+        .perform(
+            post(workflowPath(document.getId()))
+                .header("Authorization", "Bearer " + token(MEMBER2_ID))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"targetState\":\"IN_REVIEW\"}"))
+        .andExpect(status().isNotFound())
+        .andExpect(jsonPath("$.code").value("DOCUMENT_NOT_FOUND"));
+  }
+
+  @Test
+  void participantNonOwnerIsRejectedWith403() throws Exception {
+    // A reviewer can already see the review, so the honest 403 leaks nothing.
+    Document document = draftOwnedByMember();
+    participants.save(ReviewParticipant.forUser(document.getId(), MEMBER2_ID));
 
     mockMvc
         .perform(

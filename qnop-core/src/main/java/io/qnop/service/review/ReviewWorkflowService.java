@@ -156,7 +156,7 @@ public class ReviewWorkflowService {
   @Transactional
   public WorkflowStatus transition(UUID documentId, String targetRaw, UUID actorId, boolean admin) {
     Document document = loadForUpdate(documentId);
-    requireOwnerOrAdmin(document, actorId, admin);
+    requireOwnerOrAdmin(documentId, document, actorId, admin);
     WorkflowState target =
         WorkflowState.fromString(targetRaw)
             .orElseThrow(
@@ -262,7 +262,7 @@ public class ReviewWorkflowService {
             .findById(annotationId)
             .orElseThrow(() -> new AnnotationNotFoundException(annotationId));
     Document document = loadForUpdate(annotation.getDocumentId());
-    requireOwnerOrAdmin(document, actorId, admin);
+    requireOwnerOrAdmin(annotation.getDocumentId(), document, actorId, admin);
     // Belt-and-suspenders: a closed review cannot hold OPEN annotations (terminal transitions
     // auto-close them, issue #568), but the guard keeps dismiss symmetric with resolve/reopen.
     requireReviewOpen(document);
@@ -462,9 +462,21 @@ public class ReviewWorkflowService {
         .orElseThrow(() -> new DocumentNotFoundException(documentId));
   }
 
-  private static void requireOwnerOrAdmin(Document document, UUID actorId, boolean admin) {
-    if (!admin && !document.getOwnerId().equals(actorId)) {
-      throw new NotDocumentOwnerException();
+  /**
+   * Owner or admin may transition or dismiss; everyone else is refused without leaking the review's
+   * existence (issue #661). A caller who cannot see the review gets the same 404 the read paths
+   * give ({@link #status} already does this); a participant who is not the owner keeps the honest
+   * 403, since they already know it exists. Mirrors {@code ReviewArchiveService} and {@code
+   * ReviewDeletionService} — the read path here was correct while the write paths were not.
+   */
+  private void requireOwnerOrAdmin(
+      UUID documentId, Document document, UUID actorId, boolean admin) {
+    if (admin || document.getOwnerId().equals(actorId)) {
+      return;
     }
+    if (!documentAccess.isVisible(documentId, actorId, false)) {
+      throw new DocumentNotFoundException(documentId);
+    }
+    throw new NotDocumentOwnerException();
   }
 }
