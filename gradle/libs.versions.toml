@@ -30,6 +30,15 @@ springBoot = "4.1.0"
 # (com.fasterxml.jackson) — the generated models only carry annotations.
 openapiGenerator = "7.24.0"
 jacksonAnnotations = "2.22"
+# Two pins ahead of the Spring Boot 4.1.0 BOM, both for published advisories
+# (issue #668). Remove them when a Boot release carries these versions or newer;
+# Renovate will offer the bump and the constraint below keeps it honest.
+# - pgjdbc 42.7.12 fixes CVE-2026-54291: with channelBinding=require, a
+#   connection could be silently downgraded to SCRAM without channel binding.
+# - Jackson 3.1.5 fixes CVE-2026-59889: @JsonView was not applied to
+#   @JsonUnwrapped properties on deserialisation.
+postgresql = "42.7.13"
+jackson3 = "3.1.5"
 swaggerAnnotations = "2.2.52"
 jakartaValidation = "3.1.1"
 jakartaAnnotation = "3.0.0"
@@ -96,7 +105,7 @@ liquibase-core = { module = "org.liquibase:liquibase-core" }
 # into this dedicated module; without it on the classpath Liquibase never runs.
 # Pulls liquibase-core transitively. Version via the Spring Boot BOM.
 spring-boot-liquibase = { module = "org.springframework.boot:spring-boot-liquibase" }
-postgresql = { module = "org.postgresql:postgresql" }
+postgresql = { module = "org.postgresql:postgresql", version.ref = "postgresql" }
 
 # OpenAPI contract (ADR-0021). qnop-api-model needs only the annotation libraries
 # the generated POJOs reference (Jackson 2.x annotations + Jakarta Bean
@@ -106,7 +115,7 @@ jackson-annotations = { module = "com.fasterxml.jackson.core:jackson-annotations
 # Jackson 3 (tools.jackson) — the JSON stack Spring Boot 4 uses at runtime; version
 # from the Boot BOM. The annotations above deliberately stay on the shared
 # com.fasterxml 2.x line, which Jackson 3 reads unchanged.
-jackson3-databind = { module = "tools.jackson.core:jackson-databind" }
+jackson3-databind = { module = "tools.jackson.core:jackson-databind", version.ref = "jackson3" }
 # PDF text extraction with glyph positions (ADR-0032, issue #245).
 pdfbox = { module = "org.apache.pdfbox:pdfbox", version.ref = "pdfbox" }
 poi-ooxml = { module = "org.apache.poi:poi-ooxml", version.ref = "poi" }
