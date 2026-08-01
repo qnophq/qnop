@@ -34,6 +34,7 @@ import io.qnop.api.v1.model.ServerConfigUpload;
 import io.qnop.api.v1.model.SupportedFormat;
 import io.qnop.service.ApplicationSettingKey;
 import io.qnop.service.ApplicationSettingsService;
+import io.qnop.service.banner.InfoBannerService;
 import io.qnop.service.branding.BrandingService;
 import io.qnop.service.branding.BrandingService.SlotStatus;
 import io.qnop.service.document.DocumentRenditionService;
@@ -77,6 +78,7 @@ public class ConfigController implements ServerConfigApi {
   private final BuildProperties buildProperties;
   private final AnnotationExportService exports;
   private final DocumentRenditionService renditions;
+  private final InfoBannerService banners;
 
   public ConfigController(
       OidcProviderService oidcProviders,
@@ -84,12 +86,14 @@ public class ConfigController implements ServerConfigApi {
       BrandingService branding,
       AnnotationExportService exports,
       DocumentRenditionService renditions,
+      InfoBannerService banners,
       ObjectProvider<BuildProperties> buildProperties) {
     this.oidcProviders = oidcProviders;
     this.settings = settings;
     this.branding = branding;
     this.exports = exports;
     this.renditions = renditions;
+    this.banners = banners;
     this.buildProperties = buildProperties.getIfAvailable();
   }
 
@@ -128,6 +132,12 @@ public class ConfigController implements ServerConfigApi {
             // joins once its extractor lands; further formats are an Enterprise feature.
             .supportedFormats(supportedFormats())
             .branding(buildBranding());
+    // The sign-in notice (issue #664) belongs in the one response the login
+    // screen already fetches, and it is public because that screen is. The
+    // in-app banner deliberately does NOT ride along here — it is an
+    // authenticated read (GET /banner), so a deployment's troubles are not
+    // announced to anonymous callers.
+    banners.signIn().map(BannerMapper::toApi).ifPresent(body::banner);
     return ResponseEntity.ok(body);
   }
 
