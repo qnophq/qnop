@@ -1,0 +1,84 @@
+# SPDX-License-Identifier: AGPL-3.0-only
+#
+# Coolify service template for qnop (Community edition).
+#
+# Paste this compose into Coolify ("+ New" → "Docker Compose") or add it as a
+# custom service. Coolify's magic environment variables generate the database
+# password and auth secrets on first deploy:
+#   - SERVICE_FQDN_QNOP        → the public URL Coolify routes to the app
+#   - SERVICE_PASSWORD_*       → generated secrets (persisted per service)
+#
+# ONE MANUAL STEP — the encryption salt must be HEX-ENCODED, which the magic
+# variables cannot guarantee: set QNOP_AUTH_ENCRYPTION_SALT yourself in the
+# service's environment (generate with `openssl rand -hex 32`). The server
+# fails fast if it is missing or not hex.
+#
+# First login: the initial admin password is printed once to the qnop
+# container's log on first start (`docker logs <qnop-container> | tail`).
+# Full environment contract and upgrade notes: docs/DEPLOYMENT.md.
+
+services:
+  qnop:
+    image: docker.io/qnophq/qnop-ce:latest
+    environment:
+      - SERVICE_FQDN_QNOP_8080
+      - QNOP_DB_HOST=postgres
+      - QNOP_DB_PORT=5432
+      - QNOP_DB_NAME=qnop
+      - QNOP_DB_USERNAME=qnop
+      - QNOP_DB_PASSWORD=$SERVICE_PASSWORD_POSTGRES
+      - QNOP_S3_ENDPOINT=http://minio:9000
+      - QNOP_S3_BUCKET=qnop-documents
+      - QNOP_S3_ACCESS_KEY=qnop
+      - QNOP_S3_SECRET_KEY=$SERVICE_PASSWORD_MINIO
+      - QNOP_S3_PATH_STYLE_ACCESS=true
+      - QNOP_S3_AUTO_CREATE_BUCKET=true
+      - QNOP_AUTH_JWT_SECRET=$SERVICE_PASSWORD_64_JWTSECRET
+      - QNOP_AUTH_ENCRYPTION_KEY=$SERVICE_PASSWORD_64_ENCKEY
+      # REQUIRED, set manually (hex, e.g. `openssl rand -hex 32`):
+      - QNOP_AUTH_ENCRYPTION_SALT=${QNOP_AUTH_ENCRYPTION_SALT:?generate with `openssl rand -hex 32`}
+      # Coolify terminates TLS in front of the app:
+      - QNOP_HTTP_FORWARD_HEADERS_STRATEGY=framework
+    depends_on:
+      postgres:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+    healthcheck:
+      test: ['CMD-SHELL', 'exec 3<>/dev/tcp/127.0.0.1/8080 && printf "GET /actuator/health HTTP/1.0\r\nHost: localhost\r\n\r\n" >&3 && head -1 <&3 | grep -q 200']
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 60s
+
+  postgres:
+    image: postgres:18
+    environment:
+      - POSTGRES_USER=qnop
+      - POSTGRES_PASSWORD=$SERVICE_PASSWORD_POSTGRES
+      - POSTGRES_DB=qnop
+    volumes:
+      - qnop-pgdata:/var/lib/postgresql
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U qnop -d qnop']
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  minio:
+    image: minio/minio:latest
+    command: server /data
+    environment:
+      - MINIO_ROOT_USER=qnop
+      - MINIO_ROOT_PASSWORD=$SERVICE_PASSWORD_MINIO
+    volumes:
+      - qnop-minio:/data
+    healthcheck:
+      test: ['CMD', 'mc', 'ready', 'local']
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  qnop-pgdata:
+  qnop-minio:
