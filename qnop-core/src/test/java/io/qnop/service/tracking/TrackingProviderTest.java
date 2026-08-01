@@ -45,7 +45,11 @@ class TrackingProviderTest {
     assertThat(TrackingProvider.PLAUSIBLE.allowsCollectPath("/api/event")).isTrue();
     assertThat(TrackingProvider.PLAUSIBLE.allowsCollectPath("/api/event/../../admin")).isFalse();
     // A prefix match would have let this through; the list is compared exactly.
-    assertThat(TrackingProvider.PIRSCH.allowsCollectPath("/e")).isTrue();
+    // Verified against api.pirsch.io: /hit, /event and /session answer; the
+    // /pv, /e, /s this once assumed answer 404.
+    assertThat(TrackingProvider.PIRSCH.allowsCollectPath("/hit")).isTrue();
+    assertThat(TrackingProvider.PIRSCH.allowsCollectPath("/event")).isTrue();
+    assertThat(TrackingProvider.PIRSCH.allowsCollectPath("/pv")).isFalse();
     assertThat(TrackingProvider.PIRSCH.allowsCollectPath("/export-everything")).isFalse();
     assertThat(TrackingProvider.UMAMI.allowsCollectPath("/api/send")).isTrue();
     assertThat(TrackingProvider.UMAMI.allowsCollectPath("/api/admin/websites")).isFalse();

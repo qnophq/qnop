@@ -130,6 +130,14 @@ const posthog: TrackerAdapter = {
       // Plain JSON, so the proxy can read — and sanitise — what travels.
       disable_compression: true,
       persistence: 'memory',
+      // No remote config, no feature flags, no lazily-loaded modules. qnop uses
+      // PostHog to count page views and nothing else, and each of those would
+      // fetch a path (/array/<token>/config.js, /flags/, /static/<module>.js)
+      // that the proxy's allowlist does not carry — by design, since an
+      // allowlist that grew to cover them would stop being a boundary.
+      advanced_disable_decide: true,
+      advanced_disable_flags: true,
+      disable_external_dependency_loading: true,
     });
   },
   pageview(url) {
@@ -144,9 +152,10 @@ const pirsch: TrackerAdapter = {
   attributes: (siteId) => ({
     id: 'pianjs',
     'data-code': siteId,
-    'data-hit-endpoint': `${COLLECT_BASE}/pv`,
-    'data-event-endpoint': `${COLLECT_BASE}/e`,
-    'data-session-endpoint': `${COLLECT_BASE}/s`,
+    // The names pa.js defaults to; the proxy forwards them under the same names.
+    'data-hit-endpoint': `${COLLECT_BASE}/hit`,
+    'data-event-endpoint': `${COLLECT_BASE}/event`,
+    'data-session-endpoint': `${COLLECT_BASE}/session`,
     // Pirsch has no documented way to send a page view with a URL of our
     // choosing, so its automatic one stays on and the server rewrites the id
     // out of it (TrackedUrlSanitizer). Query strings never leave at all.

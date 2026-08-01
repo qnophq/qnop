@@ -69,8 +69,14 @@ public enum TrackingProvider {
       "https://us.i.posthog.com",
       "https://us-assets.i.posthog.com"),
 
-  /** Built for proxying: the script takes its endpoints as data attributes. */
-  PIRSCH("pirsch", "/pa.js", List.of("/pv", "/e", "/s"), "https://api.pirsch.io", null);
+  /**
+   * Built for proxying: the script takes its endpoints as data attributes.
+   *
+   * <p>The paths are the ones {@code pa.js} actually defaults to — {@code /hit} (sent as a GET),
+   * {@code /event} and {@code /session}. An earlier guess at {@code /pv}, {@code /e}, {@code /s}
+   * answers 404 on the real host, which is what checking rather than assuming is for.
+   */
+  PIRSCH("pirsch", "/pa.js", List.of("/hit", "/event", "/session"), "https://api.pirsch.io", null);
 
   private final String id;
   private final String scriptPath;
