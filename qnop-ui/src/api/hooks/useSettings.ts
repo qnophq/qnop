@@ -22,6 +22,8 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import type { AdminSettingsResponse } from '../generated';
 import { adminSettingsApi } from '../config';
+import { bannerKeys } from './useBanner';
+import { configKeys } from './useConfig';
 
 export const settingsKeys = {
   all: ['admin', 'settings'] as const,
@@ -57,6 +59,16 @@ export function useUpdateSettings() {
       // Seed the cache with the authoritative response so the form re-bases on
       // the freshly stored (and re-masked) values without a second round-trip.
       queryClient.setQueryData(settingsKeys.all, data);
+      // Some settings are read through their own endpoints, and those caches
+      // know nothing about this save (issue #664): the in-app banner comes from
+      // /banner, which is otherwise only polled, and the sign-in banner from
+      // /config. Without this, an admin switches a banner on and waits minutes —
+      // or reloads — to see whether it worked, which is no way to check your own
+      // wording. Invalidated unconditionally: this map is a partial patch, and
+      // deciding "did a banner key change" from it would be one more thing that
+      // can silently fall out of step with the registry.
+      queryClient.invalidateQueries({ queryKey: bannerKeys.all });
+      queryClient.invalidateQueries({ queryKey: configKeys.all });
     },
   });
 }

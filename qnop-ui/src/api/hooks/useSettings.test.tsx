@@ -25,6 +25,8 @@ import { renderHook, waitFor } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import type { AdminSettingsResponse } from '../generated';
 import { settingsKeys, useSettings, useUpdateSettings } from './useSettings';
+import { bannerKeys } from './useBanner';
+import { configKeys } from './useConfig';
 import { adminSettingsApi } from '../config';
 
 const SETTINGS: AdminSettingsResponse = {
@@ -94,5 +96,25 @@ describe('useUpdateSettings', () => {
     expect(adminSettingsApi.updateAdminSettings).toHaveBeenCalledWith({
       adminSettingsUpdateRequest: { values: { 'general.application_name': 'Acme' } },
     });
+  });
+
+  it('refreshes the caches that read settings through other endpoints (#664)', async () => {
+    vi.mocked(adminSettingsApi.updateAdminSettings).mockResolvedValue({ data: SETTINGS } as Awaited<
+      ReturnType<typeof adminSettingsApi.updateAdminSettings>
+    >);
+    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    const invalidate = vi.spyOn(queryClient, 'invalidateQueries');
+
+    const { result } = renderHook(() => useUpdateSettings(), {
+      wrapper: ({ children }: { children: ReactNode }) => (
+        <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
+      ),
+    });
+    await result.current.mutateAsync({ 'banner.app_enabled': 'true' });
+
+    // The banner is served by /banner and only polled; without this an admin
+    // switches one on and waits minutes to find out whether it looks right.
+    expect(invalidate).toHaveBeenCalledWith({ queryKey: bannerKeys.all });
+    expect(invalidate).toHaveBeenCalledWith({ queryKey: configKeys.all });
   });
 });

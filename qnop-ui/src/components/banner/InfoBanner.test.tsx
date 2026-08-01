@@ -85,8 +85,10 @@ describe('InfoBanner', () => {
 
   it('falls back to the info tone for a severity it does not know', () => {
     renderWithProviders(
+      // Cast through unknown on purpose: the point is a value the enum does not
+      // have — a severity a newer server might send to an older client.
       <InfoBanner
-        banner={{ severity: 'nonsense', message: 'Still readable' } as InfoBannerModel}
+        banner={{ severity: 'nonsense', message: 'Still readable' } as unknown as InfoBannerModel}
       />,
     );
 
