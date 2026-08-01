@@ -29,7 +29,8 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Controller;
 import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestMethod;
 import org.springframework.web.bind.annotation.ResponseBody;
 
 /**
@@ -80,14 +81,27 @@ public class TrackingProxyController {
   /**
    * One measurement, forwarded to the configured backend.
    *
+   * <p>Both methods, because the backends disagree: Matomo and Pirsch measure over a query string
+   * with GET, Umami, Plausible and PostHog post a JSON body. A proxy that took only one of them
+   * would work for half the providers — which is exactly how this was found.
+   *
    * <p>Answers 204 whatever the backend said. The browser can do nothing useful with an analytics
    * error, and a page that reports its own measurement failures to the user is a page that has its
    * priorities backwards — the server logs what went wrong instead.
    */
-  @PostMapping("/t/c/**")
+  @RequestMapping(
+      value = "/t/c/**",
+      method = {RequestMethod.GET, RequestMethod.POST})
   @ResponseBody
   public ResponseEntity<Void> collect(HttpServletRequest request) throws IOException {
-    String path = request.getRequestURI().substring("/t/c".length());
+    // Everything up to the first '?': a servlet container keeps the query out of
+    // getRequestURI(), but not every caller of this method is a servlet
+    // container, and a path carrying a query would never match the provider's
+    // allowlist — failing closed and silently, which is the hardest way to find
+    // anything.
+    String uri = request.getRequestURI();
+    int query = uri.indexOf('?');
+    String path = (query >= 0 ? uri.substring(0, query) : uri).substring("/t/c".length());
     byte[] body = request.getInputStream().readNBytes(TrackingProxyService.MAX_BODY_BYTES + 1);
     if (body.length > TrackingProxyService.MAX_BODY_BYTES) {
       // A measurement is a few hundred bytes. Something this size is not one.
@@ -97,6 +111,7 @@ public class TrackingProxyController {
     // (ADR-0027): behind a load balancer getRemoteAddr() is the balancer, and
     // truncating that address would tell the backend nothing at all.
     proxy.forward(
+        request.getMethod(),
         path,
         request.getQueryString(),
         body,

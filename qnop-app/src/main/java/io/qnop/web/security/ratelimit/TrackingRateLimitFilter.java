@@ -58,8 +58,11 @@ public class TrackingRateLimitFilter extends AbstractRateLimitFilter {
 
   @Override
   protected boolean handles(HttpServletRequest request) {
-    return "POST".equalsIgnoreCase(request.getMethod())
-        && request.getRequestURI().startsWith(PATH_PREFIX);
+    // GET as well as POST: Matomo and Pirsch measure over the query string, and a
+    // limit that only counted POSTs would leave those two unbounded.
+    return request.getRequestURI().startsWith(PATH_PREFIX)
+        && ("POST".equalsIgnoreCase(request.getMethod())
+            || "GET".equalsIgnoreCase(request.getMethod()));
   }
 
   @Override

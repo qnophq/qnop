@@ -132,6 +132,7 @@ public class TrackingProxyService {
   /**
    * Forwards one measurement.
    *
+   * @param method the browser's HTTP method — Matomo and Pirsch measure over GET, the rest POST
    * @param path the collect path the browser asked for; refused unless the provider declares it
    * @param query the query string as sent, sanitized here before it travels
    * @param body the request body, sanitized here before it travels
@@ -141,6 +142,7 @@ public class TrackingProxyService {
    * @return the backend's status code, or empty when the request was refused or never got through
    */
   public Optional<Integer> forward(
+      String method,
       String path,
       String query,
       byte[] body,
@@ -167,11 +169,18 @@ public class TrackingProxyService {
             + (sanitizedQuery == null || sanitizedQuery.isBlank() ? "" : "?" + sanitizedQuery);
 
     HttpRequest.Builder request =
-        HttpRequest.newBuilder(URI.create(target))
-            .timeout(FORWARD_TIMEOUT)
-            .POST(
-                HttpRequest.BodyPublishers.ofByteArray(
-                    sanitizedBody == null ? new byte[0] : sanitizedBody));
+        HttpRequest.newBuilder(URI.create(target)).timeout(FORWARD_TIMEOUT);
+    if ("GET".equalsIgnoreCase(method)) {
+      // Matomo and Pirsch measure over the query string. Forwarding those as a
+      // POST happens to work for Matomo — it reads parameters from either — but
+      // it is not what the browser did, and the next backend need not be so
+      // forgiving.
+      request.GET();
+    } else {
+      request.POST(
+          HttpRequest.BodyPublishers.ofByteArray(
+              sanitizedBody == null ? new byte[0] : sanitizedBody));
+    }
     if (contentType != null && !contentType.isBlank()) {
       request.header("Content-Type", contentType);
     }
