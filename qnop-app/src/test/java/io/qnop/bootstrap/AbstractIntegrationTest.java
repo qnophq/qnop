@@ -45,8 +45,14 @@ import org.testcontainers.utility.DockerImageName;
 public abstract class AbstractIntegrationTest {
 
   // postgres:18 to match docker-compose(.smoke).yml — the ADR-0020 test/infra parity (issue #199).
+  // Every test class with its own @TestPropertySource builds its own Spring context,
+  // and each holds its own connection pool against this one container. Postgres's
+  // default ceiling of 100 is reached after a handful of them, and it surfaces as an
+  // unrelated context-load failure in whichever class happens to be last (issue #666).
+  // Raising the ceiling keeps the pools at a size the concurrency tests need.
   @ServiceConnection
-  static final PostgreSQLContainer<?> postgres = new PostgreSQLContainer<>("postgres:18");
+  static final PostgreSQLContainer<?> postgres =
+      new PostgreSQLContainer<>("postgres:18").withCommand("postgres", "-c", "max_connections=300");
 
   // MinIO for the object-storage adapter (ADR-0005). No @ServiceConnection: the qnop.s3.* props are
   // wired manually below. Digest-pinned to match docker-compose.yml.

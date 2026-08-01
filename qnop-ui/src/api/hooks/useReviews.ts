@@ -33,6 +33,7 @@ import { axiosInstance, documentsApi, principalsApi, reviewWorkflowApi } from '.
 import { annotationKeys } from './useAnnotations';
 import { commentKeys } from './useComments';
 import { documentKeys } from './useDocuments';
+import { trackEvent } from '../../tracking/trackEvent';
 
 export interface ReviewListParams {
   q?: string;
@@ -187,7 +188,12 @@ export function useTransitionWorkflow(documentId: string) {
       });
       return response.data;
     },
-    onSuccess: () => {
+    onSuccess: (workflow) => {
+      // Only the end of the road counts as a finalisation; the other edges are
+      // ordinary progress (issue #666).
+      if (workflow?.state === 'FINALIZED') {
+        trackEvent('review_finalized');
+      }
       queryClient.invalidateQueries({ queryKey: reviewKeys.workflow(documentId) });
       queryClient.invalidateQueries({ queryKey: documentKeys.detail(documentId) });
       queryClient.invalidateQueries({ queryKey: reviewKeys.all });
@@ -281,7 +287,10 @@ export function useCreateReview() {
       });
       return response.data;
     },
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: reviewKeys.all }),
+    onSuccess: () => {
+      trackEvent('review_created');
+      queryClient.invalidateQueries({ queryKey: reviewKeys.all });
+    },
   });
 }
 

@@ -45,6 +45,7 @@ import type { AdminSetting } from '../../../api/generated';
 import { useSettings, useUpdateSettings } from '../../../api/hooks/useSettings';
 import { TimezonePicker } from '../../TimezonePicker';
 import { SectionCard } from '../layout/SectionCard';
+import { trackingStatus } from './trackingStatus';
 import { AdminToast } from '../layout/AdminToast';
 import { useToast } from '../layout/useToast';
 import { apiErrorMessage, apiFieldErrors } from '../../../utils/apiError';
@@ -85,7 +86,8 @@ const GROUP_ICONS: Record<string, LucideIcon> = {
 const GROUP_DESCRIPTIONS: Record<string, string> = {
   general: 'Workspace identity, base URL, default language and time zone.',
   upload: 'Constraints applied to document uploads.',
-  tracking: 'Anonymous, privacy-friendly usage analytics.',
+  tracking:
+    'Anonymous usage measurement through this server: the browser loads the script from qnop and sends its measurements to qnop, which forwards them. Page addresses are reduced to route patterns first, so no document id ever reaches the backend.',
   auth: 'Self-registration and password-reset behaviour.',
   review: 'Behaviour of the document review workflow.',
   notifications: 'Review e-mails and how long the in-app inbox keeps its records.',
@@ -117,6 +119,12 @@ const SELECT_OPTIONS: Record<string, { value: string; label: string }[]> = {
     { value: 'matomo', label: 'Matomo' },
     { value: 'plausible', label: 'Plausible' },
     { value: 'umami', label: 'Umami' },
+    { value: 'posthog', label: 'PostHog' },
+    { value: 'pirsch', label: 'Pirsch' },
+  ],
+  'tracking.forward_client_ip': [
+    { value: 'anonymized', label: 'Anonymised (recommended)' },
+    { value: 'none', label: 'Do not forward' },
   ],
   'auth.self_registration_default_role': [
     { value: 'MEMBER', label: 'Member' },
@@ -184,6 +192,10 @@ const SETTING_RULES: Record<string, { test: (value: string) => boolean; message:
   'banner.app_link_label': {
     test: (value) => value.length <= 40,
     message: 'Keep the label to 40 characters.',
+  },
+  'tracking.host': {
+    test: isHttpUrl,
+    message: 'Enter a valid http(s) URL, e.g. https://matomo.internal.',
   },
   'banner.login_link_url': {
     test: (value) => isHttpUrl(value) && value.length <= 500,
@@ -296,6 +308,16 @@ export function ApplicationSettingsForm() {
     setSubmitAttempted(false);
   };
 
+  // Stored values overlaid with unsaved edits: the status line below has to
+  // answer for what is on screen, not for what was last saved.
+  const effectiveValues = useMemo(() => {
+    const map: Record<string, string> = {};
+    for (const setting of settings) {
+      map[setting.key] = edits[setting.key] ?? setting.value ?? '';
+    }
+    return map;
+  }, [settings, edits]);
+
   const groups = useMemo(() => {
     const byGroup = new Map<string, AdminSetting[]>();
     for (const setting of settings) {
@@ -357,6 +379,7 @@ export function ApplicationSettingsForm() {
             description={GROUP_DESCRIPTIONS[group]}
           >
             <Stack spacing={2.5}>
+              {group === 'tracking' && <TrackingStatusNote values={effectiveValues} />}
               {items.map((setting) => (
                 <SettingField
                   key={setting.key}
@@ -492,5 +515,22 @@ function SettingField({ setting, value, error, onChange }: SettingFieldProps) {
       autoComplete={isPassword ? 'new-password' : undefined}
       sx={{ maxWidth: 480 }}
     />
+  );
+}
+
+/**
+ * One line saying whether measurement is actually running, and if not, which condition is missing
+ * (issue #666). It reads the form's live values, so switching the master toggle answers immediately
+ * rather than after a save and a reload.
+ */
+function TrackingStatusNote({ values }: { values: Record<string, string> }) {
+  const status = trackingStatus(values);
+  if (!status) {
+    return null;
+  }
+  return (
+    <Alert severity={status.severity === 'success' ? 'success' : 'warning'} variant="outlined">
+      {status.message}
+    </Alert>
   );
 }

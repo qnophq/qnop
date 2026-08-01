@@ -21,6 +21,7 @@
 
 import { lazy } from 'react';
 import { Navigate, createBrowserRouter } from 'react-router';
+import { TrackingBoot } from '../tracking/TrackingBoot';
 import { AppShell } from '../components/shell/AppShell';
 import { LazyBoundary } from '../components/errors/LazyBoundary';
 import { AdminRoute } from '../components/auth/AdminRoute';
@@ -93,193 +94,202 @@ const ReviewTasksPage = lazy(() =>
  * roles the sidebar uses (#102). Real pages replace these in #104+ / Phase B.
  */
 export const router = createBrowserRouter([
-  { path: '/login', element: <LoginPage /> },
-  { path: '/register', element: <RegisterPage /> },
-  { path: '/forgot-password', element: <ForgotPasswordPage /> },
-  { path: '/reset-password', element: <ResetPasswordPage /> },
-  { path: '/verify-email', element: <VerifyEmailPage /> },
-  { path: '/change-password', element: <ChangePasswordPage /> },
-  // The branded full-page states (issue #611). They live outside the shell so
-  // 503/offline also work when nothing else does; the in-app catch-all below
-  // keeps 404 inside the shell for signed-in users.
-  { path: '/403', element: <ForbiddenPage /> },
-  { path: '/409', element: <ConflictPage /> },
-  { path: '/500', element: <ServerErrorPage /> },
-  { path: '/503', element: <MaintenancePage /> },
-  { path: '/429', element: <RateLimitPage /> },
-  { path: '/offline', element: <OfflinePage /> },
   {
-    path: '/',
-    element: (
-      <ProtectedRoute>
-        <AppShell />
-      </ProtectedRoute>
-    ),
-    // A throw during navigation lands on the branded shell, not the router's
-    // default screen (issue #611); pane render errors stay with #331.
-    errorElement: <RouteErrorPage />,
+    // A pathless layout wrapping everything (issue #666): usage measurement has
+    // to see the sign-in screen as well as the shell, and it needs the router's
+    // own params to report a route pattern rather than a URL with a document id
+    // in it. It renders nothing of its own beyond the consent strip.
+    element: <TrackingBoot />,
     children: [
-      { index: true, element: <HomePage /> },
-      { path: 'profile', element: <ProfilePage /> },
-      { path: 'users/:userId', element: <UserProfilePage /> },
-      { path: 'teams/:teamId', element: <TeamProfilePage /> },
-      // The landing page an exported report's attachment links point at: inside
-      // the protected routes, so an unauthenticated visitor logs in and is
-      // returned here (issue #635).
+      { path: '/login', element: <LoginPage /> },
+      { path: '/register', element: <RegisterPage /> },
+      { path: '/forgot-password', element: <ForgotPasswordPage /> },
+      { path: '/reset-password', element: <ResetPasswordPage /> },
+      { path: '/verify-email', element: <VerifyEmailPage /> },
+      { path: '/change-password', element: <ChangePasswordPage /> },
+      // The branded full-page states (issue #611). They live outside the shell so
+      // 503/offline also work when nothing else does; the in-app catch-all below
+      // keeps 404 inside the shell for signed-in users.
+      { path: '/403', element: <ForbiddenPage /> },
+      { path: '/409', element: <ConflictPage /> },
+      { path: '/500', element: <ServerErrorPage /> },
+      { path: '/503', element: <MaintenancePage /> },
+      { path: '/429', element: <RateLimitPage /> },
+      { path: '/offline', element: <OfflinePage /> },
       {
-        path: 'attachments/:documentId/:attachmentId',
-        element: <AttachmentDownloadPage />,
-      },
-      { path: 'messages', element: <MessagesPage /> },
-      { path: 'messages/:notificationId', element: <MessageDetailPage /> },
-      { path: 'reviews', element: <ReviewsPage /> },
-      { path: 'reviews/new', element: <NewReviewPage /> },
-      {
-        path: 'reviews/:documentId',
+        path: '/',
         element: (
-          <ReviewParamGate>
-            <LazyBoundary>
-              <DocumentReviewPage />
-            </LazyBoundary>
-          </ReviewParamGate>
+          <ProtectedRoute>
+            <AppShell />
+          </ProtectedRoute>
         ),
-      },
-      {
-        path: 'reviews/:documentId/compare',
-        element: (
-          <ReviewParamGate>
-            <LazyBoundary>
-              <VersionComparePage />
-            </LazyBoundary>
-          </ReviewParamGate>
-        ),
-      },
-      {
-        path: 'reviews/:documentId/tasks',
-        element: (
-          <ReviewParamGate>
-            <LazyBoundary>
-              <ReviewTasksPage />
-            </LazyBoundary>
-          </ReviewParamGate>
-        ),
-      },
-      { path: 'search', element: <SearchPage /> },
-      { path: 'my-teams', element: <MyTeamsPage /> },
-      { path: 'my-teams/:id', element: <MyTeamDetailPage /> },
-      {
-        path: 'audit',
-        element: (
-          <RoleRoute allow={['ADMIN', 'AUDITOR']}>
-            <AuditPage />
-          </RoleRoute>
-        ),
-      },
-      {
-        path: 'admin/users',
-        element: (
-          <AdminRoute>
-            <UsersPage />
-          </AdminRoute>
-        ),
-      },
-      {
-        path: 'admin/teams',
-        element: (
-          <AdminRoute>
-            <TeamsPage />
-          </AdminRoute>
-        ),
-      },
-      {
-        path: 'admin/teams/:id',
-        element: (
-          <AdminRoute>
-            <TeamDetailPage />
-          </AdminRoute>
-        ),
-      },
-      {
-        path: 'admin/settings',
-        element: (
-          <AdminRoute>
-            <SettingsPage />
-          </AdminRoute>
-        ),
-      },
-      {
-        path: 'admin/configuration',
-        element: (
-          <AdminRoute>
-            <ConfigurationPage />
-          </AdminRoute>
-        ),
-      },
-      {
-        path: 'admin/scheduler',
-        element: (
-          <AdminRoute>
-            <SchedulerPage />
-          </AdminRoute>
-        ),
-      },
-      {
-        path: 'admin/oidc-providers',
-        element: (
-          <AdminRoute>
-            <OidcProvidersPage />
-          </AdminRoute>
-        ),
-      },
-      {
-        // The email admin area (#525): one tabbed shell over the SMTP
-        // server settings and the mail templates, guarded once here.
-        path: 'admin/email',
-        element: (
-          <AdminRoute>
-            <EmailLayout />
-          </AdminRoute>
-        ),
+        // A throw during navigation lands on the branded shell, not the router's
+        // default screen (issue #611); pane render errors stay with #331.
+        errorElement: <RouteErrorPage />,
         children: [
-          { index: true, element: <Navigate to="/admin/email/server" replace /> },
-          { path: 'server', element: <EmailServerPage /> },
-          { path: 'templates', element: <MailTemplatesListPage /> },
+          { index: true, element: <HomePage /> },
+          { path: 'profile', element: <ProfilePage /> },
+          { path: 'users/:userId', element: <UserProfilePage /> },
+          { path: 'teams/:teamId', element: <TeamProfilePage /> },
+          // The landing page an exported report's attachment links point at: inside
+          // the protected routes, so an unauthenticated visitor logs in and is
+          // returned here (issue #635).
           {
-            path: 'templates/:key',
+            path: 'attachments/:documentId/:attachmentId',
+            element: <AttachmentDownloadPage />,
+          },
+          { path: 'messages', element: <MessagesPage /> },
+          { path: 'messages/:notificationId', element: <MessageDetailPage /> },
+          { path: 'reviews', element: <ReviewsPage /> },
+          { path: 'reviews/new', element: <NewReviewPage /> },
+          {
+            path: 'reviews/:documentId',
             element: (
-              <LazyBoundary>
-                <MailTemplateEditPage />
-              </LazyBoundary>
+              <ReviewParamGate>
+                <LazyBoundary>
+                  <DocumentReviewPage />
+                </LazyBoundary>
+              </ReviewParamGate>
             ),
           },
+          {
+            path: 'reviews/:documentId/compare',
+            element: (
+              <ReviewParamGate>
+                <LazyBoundary>
+                  <VersionComparePage />
+                </LazyBoundary>
+              </ReviewParamGate>
+            ),
+          },
+          {
+            path: 'reviews/:documentId/tasks',
+            element: (
+              <ReviewParamGate>
+                <LazyBoundary>
+                  <ReviewTasksPage />
+                </LazyBoundary>
+              </ReviewParamGate>
+            ),
+          },
+          { path: 'search', element: <SearchPage /> },
+          { path: 'my-teams', element: <MyTeamsPage /> },
+          { path: 'my-teams/:id', element: <MyTeamDetailPage /> },
+          {
+            path: 'audit',
+            element: (
+              <RoleRoute allow={['ADMIN', 'AUDITOR']}>
+                <AuditPage />
+              </RoleRoute>
+            ),
+          },
+          {
+            path: 'admin/users',
+            element: (
+              <AdminRoute>
+                <UsersPage />
+              </AdminRoute>
+            ),
+          },
+          {
+            path: 'admin/teams',
+            element: (
+              <AdminRoute>
+                <TeamsPage />
+              </AdminRoute>
+            ),
+          },
+          {
+            path: 'admin/teams/:id',
+            element: (
+              <AdminRoute>
+                <TeamDetailPage />
+              </AdminRoute>
+            ),
+          },
+          {
+            path: 'admin/settings',
+            element: (
+              <AdminRoute>
+                <SettingsPage />
+              </AdminRoute>
+            ),
+          },
+          {
+            path: 'admin/configuration',
+            element: (
+              <AdminRoute>
+                <ConfigurationPage />
+              </AdminRoute>
+            ),
+          },
+          {
+            path: 'admin/scheduler',
+            element: (
+              <AdminRoute>
+                <SchedulerPage />
+              </AdminRoute>
+            ),
+          },
+          {
+            path: 'admin/oidc-providers',
+            element: (
+              <AdminRoute>
+                <OidcProvidersPage />
+              </AdminRoute>
+            ),
+          },
+          {
+            // The email admin area (#525): one tabbed shell over the SMTP
+            // server settings and the mail templates, guarded once here.
+            path: 'admin/email',
+            element: (
+              <AdminRoute>
+                <EmailLayout />
+              </AdminRoute>
+            ),
+            children: [
+              { index: true, element: <Navigate to="/admin/email/server" replace /> },
+              { path: 'server', element: <EmailServerPage /> },
+              { path: 'templates', element: <MailTemplatesListPage /> },
+              {
+                path: 'templates/:key',
+                element: (
+                  <LazyBoundary>
+                    <MailTemplateEditPage />
+                  </LazyBoundary>
+                ),
+              },
+            ],
+          },
+          // Pre-#525 bookmarks; targets are guarded, so no AdminRoute here.
+          {
+            path: 'admin/mail-templates',
+            element: <Navigate to="/admin/email/templates" replace />,
+          },
+          {
+            path: 'admin/mail-templates/:key',
+            element: <MailTemplatesKeyRedirect />,
+          },
+          {
+            path: 'admin/branding',
+            element: (
+              <AdminRoute>
+                <BrandingPage />
+              </AdminRoute>
+            ),
+          },
+          {
+            path: 'admin/storage-consistency',
+            element: (
+              <AdminRoute>
+                <StorageConsistencyPage />
+              </AdminRoute>
+            ),
+          },
+          { path: '*', element: <NotFoundPage /> },
         ],
       },
-      // Pre-#525 bookmarks; targets are guarded, so no AdminRoute here.
-      {
-        path: 'admin/mail-templates',
-        element: <Navigate to="/admin/email/templates" replace />,
-      },
-      {
-        path: 'admin/mail-templates/:key',
-        element: <MailTemplatesKeyRedirect />,
-      },
-      {
-        path: 'admin/branding',
-        element: (
-          <AdminRoute>
-            <BrandingPage />
-          </AdminRoute>
-        ),
-      },
-      {
-        path: 'admin/storage-consistency',
-        element: (
-          <AdminRoute>
-            <StorageConsistencyPage />
-          </AdminRoute>
-        ),
-      },
-      { path: '*', element: <NotFoundPage /> },
     ],
   },
 ]);

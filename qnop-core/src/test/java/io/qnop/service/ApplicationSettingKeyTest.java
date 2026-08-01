@@ -76,7 +76,13 @@ class ApplicationSettingKeyTest {
           "banner.app_severity",
           "banner.app_text",
           "banner.app_link_label",
-          "banner.app_link_url");
+          "banner.app_link_url",
+          "tracking.host",
+          "tracking.site_id",
+          "tracking.respect_dnt",
+          "tracking.consent_required",
+          "tracking.track_privileged_roles",
+          "tracking.forward_client_ip");
 
   @Test
   void registryMatchesSeededKeys() {

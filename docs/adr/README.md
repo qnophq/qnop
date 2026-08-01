@@ -72,6 +72,7 @@ Two refinement conventions (see the 2026-07-16 amendment to [ADR-0001](0001-reco
 | [0053](0053-branding-raster-renditions.md) | Raster renditions of branding assets, produced on upload | Accepted |
 | [0054](0054-logging-and-diagnostic-context.md) | Logging and the diagnostic context | Accepted |
 | [0055](0055-bounding-out-of-process-conversions.md) | Bounding out-of-process conversions — per instance, with a bounded wait | Accepted |
+| [0056](0056-usage-tracking.md) | Usage tracking — server-proxied, path-anonymised, consent-gated | Accepted |
 
 ## Template
 

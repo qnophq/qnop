@@ -73,13 +73,53 @@ public enum ApplicationSettingKey {
       "tracking.enabled",
       SettingValueType.BOOLEAN,
       "false",
-      "Whether anonymous usage tracking is enabled."),
+      "Whether anonymous usage tracking is enabled. Measurement runs through this server, never"
+          + " past it: the browser loads the analytics script from qnop and sends its events to"
+          + " qnop, which forwards them (issue #666)."),
   TRACKING_PROVIDER(
       "tracking.provider",
       SettingValueType.ENUM,
       "none",
-      "Usage-tracking provider.",
-      List.of("none", "matomo", "plausible", "umami")),
+      "Which analytics backend receives the forwarded measurements.",
+      List.of("none", "matomo", "plausible", "umami", "posthog", "pirsch")),
+  TRACKING_HOST(
+      "tracking.host",
+      SettingValueType.STRING,
+      "",
+      "Base URL of the analytics backend, e.g. https://matomo.internal. Empty uses the provider's"
+          + " own cloud where it has one (Plausible, PostHog, Pirsch); Matomo and Umami are"
+          + " self-hosted and always need this."),
+  TRACKING_SITE_ID(
+      "tracking.site_id",
+      SettingValueType.STRING,
+      "",
+      "The backend's identifier for this site: Matomo idSite, Plausible domain, Umami website id,"
+          + " PostHog project API key, Pirsch identification code."),
+  TRACKING_RESPECT_DNT(
+      "tracking.respect_dnt",
+      SettingValueType.BOOLEAN,
+      "true",
+      "Load nothing at all for browsers that send Do-Not-Track or Global Privacy Control."),
+  TRACKING_CONSENT_REQUIRED(
+      "tracking.consent_required",
+      SettingValueType.BOOLEAN,
+      "true",
+      "Ask before measuring anything. Off is defensible only where the backend sets no cookies and"
+          + " your legal basis says so — that call is yours, not this server's."),
+  TRACKING_PRIVILEGED_ROLES(
+      "tracking.track_privileged_roles",
+      SettingValueType.BOOLEAN,
+      "false",
+      "Also measure administrators and auditors. Off by default: a handful of privileged people is"
+          + " barely a statistic and very much personal data."),
+  TRACKING_FORWARD_CLIENT_IP(
+      "tracking.forward_client_ip",
+      SettingValueType.ENUM,
+      "anonymized",
+      "What reaches the backend as the visitor's address. 'anonymized' truncates it (IPv4 to /24,"
+          + " IPv6 to /64) so visitors stay countable without being identifiable; 'none' sends"
+          + " nothing, and the backend then sees every reviewer as one visitor.",
+      List.of("anonymized", "none")),
   SMTP_ENABLED(
       "smtp.enabled",
       SettingValueType.BOOLEAN,
@@ -259,7 +299,14 @@ public enum ApplicationSettingKey {
           Map.entry(BANNER_APP_LINK_LABEL, SettingConstraints.maxLength(40)),
           Map.entry(
               BANNER_APP_LINK_URL,
-              SettingConstraints.format(SettingConstraints.ValueFormat.URL).withMaxLength(500)));
+              SettingConstraints.format(SettingConstraints.ValueFormat.URL).withMaxLength(500)),
+          // The analytics host is a URL this server will call (issue #666), so it is
+          // checked like every other outbound target: http(s) only, and the SSRF
+          // policy decides at call time whether the address itself is allowed.
+          Map.entry(
+              TRACKING_HOST,
+              SettingConstraints.format(SettingConstraints.ValueFormat.URL).withMaxLength(300)),
+          Map.entry(TRACKING_SITE_ID, SettingConstraints.maxLength(200)));
 
   private final String key;
   private final SettingValueType type;

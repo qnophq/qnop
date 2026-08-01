@@ -32,6 +32,7 @@ import { annotationsApi } from '../config';
 import type { Notify } from '../../components/admin/layout/useToast';
 import { commentKeys } from './useComments';
 import { documentKeys } from './useDocuments';
+import { trackEvent } from '../../tracking/trackEvent';
 
 export const annotationKeys = {
   all: ['annotations'] as const,
@@ -117,6 +118,7 @@ export function useCreateAnnotation(documentId: string) {
       return response.data;
     },
     onSuccess: () => {
+      trackEvent('annotation_created');
       queryClient.invalidateQueries({ queryKey: annotationKeys.all });
       queryClient.invalidateQueries({ queryKey: ['reviews'] });
       // Detail only (workflow chip / counts) — NEVER documentKeys.all: that

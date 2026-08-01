@@ -30,6 +30,7 @@ import io.qnop.api.v1.model.ServerConfigBrandingSlot;
 import io.qnop.api.v1.model.ServerConfigGeneral;
 import io.qnop.api.v1.model.ServerConfigResponse;
 import io.qnop.api.v1.model.ServerConfigReview;
+import io.qnop.api.v1.model.ServerConfigTracking;
 import io.qnop.api.v1.model.ServerConfigUpload;
 import io.qnop.api.v1.model.SupportedFormat;
 import io.qnop.service.ApplicationSettingKey;
@@ -42,6 +43,8 @@ import io.qnop.service.document.DocumentTypeSniffer;
 import io.qnop.service.oidc.OidcProviderService;
 import io.qnop.service.review.AnnotationExportService;
 import io.qnop.service.review.export.AnnotationExportFormat;
+import io.qnop.service.tracking.TrackingConfigService;
+import io.qnop.service.tracking.TrackingRuntimeConfig;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -79,6 +82,7 @@ public class ConfigController implements ServerConfigApi {
   private final AnnotationExportService exports;
   private final DocumentRenditionService renditions;
   private final InfoBannerService banners;
+  private final TrackingConfigService tracking;
 
   public ConfigController(
       OidcProviderService oidcProviders,
@@ -87,6 +91,7 @@ public class ConfigController implements ServerConfigApi {
       AnnotationExportService exports,
       DocumentRenditionService renditions,
       InfoBannerService banners,
+      TrackingConfigService tracking,
       ObjectProvider<BuildProperties> buildProperties) {
     this.oidcProviders = oidcProviders;
     this.settings = settings;
@@ -94,6 +99,7 @@ public class ConfigController implements ServerConfigApi {
     this.exports = exports;
     this.renditions = renditions;
     this.banners = banners;
+    this.tracking = tracking;
     this.buildProperties = buildProperties.getIfAvailable();
   }
 
@@ -138,7 +144,20 @@ public class ConfigController implements ServerConfigApi {
     // authenticated read (GET /banner), so a deployment's troubles are not
     // announced to anonymous callers.
     banners.signIn().map(BannerMapper::toApi).ifPresent(body::banner);
+    // Absent unless an operator configured measurement AND completed it (issue
+    // #666) — a client that sees no tracking block loads no script at all.
+    tracking.current().map(ConfigController::toApi).ifPresent(body::tracking);
     return ResponseEntity.ok(body);
+  }
+
+  /** What the browser needs to measure usage; the analytics host stays server-side. */
+  private static ServerConfigTracking toApi(TrackingRuntimeConfig config) {
+    return new ServerConfigTracking()
+        .provider(ServerConfigTracking.ProviderEnum.fromValue(config.provider().id()))
+        .siteId(config.siteId())
+        .consentRequired(config.consentRequired())
+        .respectDnt(config.respectDnt())
+        .trackPrivilegedRoles(config.trackPrivilegedRoles());
   }
 
   /** The document formats this deployment can take, not the ones the release knows about. */

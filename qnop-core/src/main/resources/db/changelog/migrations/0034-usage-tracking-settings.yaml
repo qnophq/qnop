@@ -1,0 +1,69 @@
+# Copyright (c) 2026-present devtank42 GmbH
+# SPDX-License-Identifier: AGPL-3.0-only
+
+# Seed rows for the usage-tracking settings (issue #666). Additive changeset —
+# new keys land in their own changeset (1.0.0 shipped the original seed). The
+# registry (ApplicationSettingKey) stays authoritative per ADR-0025; these rows
+# mirror its defaults, and tracking stays off until an operator turns it on.
+#
+# tracking.enabled and tracking.provider were seeded back in #13 as placeholders;
+# only their stored descriptions are refreshed here, since the API serves the
+# registry's text and this column is the denormalized copy for DBA/ops.
+databaseChangeLog:
+  - changeSet:
+      id: 0034-usage-tracking-settings
+      author: qnop
+      comment: Adds the tracking.* application settings for server-proxied usage tracking (issue #666).
+      changes:
+        - insert:
+            tableName: application_setting
+            columns:
+              - column: { name: setting_key, value: "tracking.host" }
+              - column: { name: setting_value, value: "" }
+              - column: { name: setting_desc, value: "Base URL of the analytics backend, e.g. https://matomo.internal. Empty uses the provider's own cloud where it has one." }
+              - column: { name: value_type, value: "STRING" }
+        - insert:
+            tableName: application_setting
+            columns:
+              - column: { name: setting_key, value: "tracking.site_id" }
+              - column: { name: setting_value, value: "" }
+              - column: { name: setting_desc, value: "The backend's identifier for this site (Matomo idSite, Plausible domain, Umami website id, PostHog project API key, Pirsch identification code)." }
+              - column: { name: value_type, value: "STRING" }
+        - insert:
+            tableName: application_setting
+            columns:
+              - column: { name: setting_key, value: "tracking.respect_dnt" }
+              - column: { name: setting_value, value: "true" }
+              - column: { name: setting_desc, value: "Load nothing at all for browsers that send Do-Not-Track or Global Privacy Control." }
+              - column: { name: value_type, value: "BOOLEAN" }
+        - insert:
+            tableName: application_setting
+            columns:
+              - column: { name: setting_key, value: "tracking.consent_required" }
+              - column: { name: setting_value, value: "true" }
+              - column: { name: setting_desc, value: "Ask before measuring anything." }
+              - column: { name: value_type, value: "BOOLEAN" }
+        - insert:
+            tableName: application_setting
+            columns:
+              - column: { name: setting_key, value: "tracking.track_privileged_roles" }
+              - column: { name: setting_value, value: "false" }
+              - column: { name: setting_desc, value: "Also measure administrators and auditors." }
+              - column: { name: value_type, value: "BOOLEAN" }
+        - insert:
+            tableName: application_setting
+            columns:
+              - column: { name: setting_key, value: "tracking.forward_client_ip" }
+              - column: { name: setting_value, value: "anonymized" }
+              - column: { name: setting_desc, value: "What reaches the backend as the visitor's address: 'anonymized' (IPv4 to /24, IPv6 to /64) or 'none'." }
+              - column: { name: value_type, value: "ENUM" }
+        - update:
+            tableName: application_setting
+            columns:
+              - column: { name: setting_desc, value: "Whether anonymous usage tracking is enabled. Measurement runs through this server, never past it." }
+            where: setting_key = 'tracking.enabled'
+        - update:
+            tableName: application_setting
+            columns:
+              - column: { name: setting_desc, value: "Which analytics backend receives the forwarded measurements." }
+            where: setting_key = 'tracking.provider'
