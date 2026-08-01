@@ -22,6 +22,7 @@
 import { afterEach, describe, expect, it } from 'vitest';
 import { cleanup, render, screen } from '@testing-library/react';
 import { RouterProvider } from 'react-router';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { ThemeProvider } from '@mui/material/styles';
 import { buildTheme } from '../theme/theme';
 import { router } from './index';
@@ -46,9 +47,16 @@ describe('error routes (#611)', () => {
   it.each(CASES)('serves the branded state at %s without auth', async (path, headline) => {
     await router.navigate(path);
     render(
-      <ThemeProvider theme={buildTheme('light')}>
-        <RouterProvider router={router} />
-      </ThemeProvider>,
+      // The route table is wrapped by TrackingBoot (issue #666), which reads the
+      // server config — so exercising the real router needs the same provider the
+      // application mounts.
+      <QueryClientProvider
+        client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}
+      >
+        <ThemeProvider theme={buildTheme('light')}>
+          <RouterProvider router={router} />
+        </ThemeProvider>
+      </QueryClientProvider>,
     );
     expect(await screen.findByText(headline)).toBeInTheDocument();
   });

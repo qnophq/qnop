@@ -27,6 +27,7 @@ import { useDocument } from '../../api/hooks/useDocuments';
 import { ToolbarIconButton } from './ToolbarIconButton';
 import { ExportWizard, type ExportCounts } from './export/ExportWizard';
 import type { ExportSettings } from './export/exportModel';
+import { trackEvent } from '../../tracking/trackEvent';
 
 /**
  * Opens the export wizard for a review's annotations (issue #547).
@@ -74,6 +75,7 @@ export function ExportAnnotationsButton({
         timezone: settings.timezone,
         fileName,
       });
+      trackEvent('export_generated');
       // Closing only after it succeeded keeps the configuration on screen when
       // it did not — the user retries instead of rebuilding their selection.
       setOpen(false);

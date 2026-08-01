@@ -85,7 +85,8 @@ const GROUP_ICONS: Record<string, LucideIcon> = {
 const GROUP_DESCRIPTIONS: Record<string, string> = {
   general: 'Workspace identity, base URL, default language and time zone.',
   upload: 'Constraints applied to document uploads.',
-  tracking: 'Anonymous, privacy-friendly usage analytics.',
+  tracking:
+    'Anonymous usage measurement through this server: the browser loads the script from qnop and sends its measurements to qnop, which forwards them. Page addresses are reduced to route patterns first, so no document id ever reaches the backend.',
   auth: 'Self-registration and password-reset behaviour.',
   review: 'Behaviour of the document review workflow.',
   notifications: 'Review e-mails and how long the in-app inbox keeps its records.',
@@ -117,6 +118,12 @@ const SELECT_OPTIONS: Record<string, { value: string; label: string }[]> = {
     { value: 'matomo', label: 'Matomo' },
     { value: 'plausible', label: 'Plausible' },
     { value: 'umami', label: 'Umami' },
+    { value: 'posthog', label: 'PostHog' },
+    { value: 'pirsch', label: 'Pirsch' },
+  ],
+  'tracking.forward_client_ip': [
+    { value: 'anonymized', label: 'Anonymised (recommended)' },
+    { value: 'none', label: 'Do not forward' },
   ],
   'auth.self_registration_default_role': [
     { value: 'MEMBER', label: 'Member' },
@@ -184,6 +191,10 @@ const SETTING_RULES: Record<string, { test: (value: string) => boolean; message:
   'banner.app_link_label': {
     test: (value) => value.length <= 40,
     message: 'Keep the label to 40 characters.',
+  },
+  'tracking.host': {
+    test: isHttpUrl,
+    message: 'Enter a valid http(s) URL, e.g. https://matomo.internal.',
   },
   'banner.login_link_url': {
     test: (value) => isHttpUrl(value) && value.length <= 500,

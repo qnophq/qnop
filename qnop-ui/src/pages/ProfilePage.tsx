@@ -31,6 +31,9 @@ import Switch from '@mui/material/Switch';
 import Typography from '@mui/material/Typography';
 import { alpha, useTheme } from '@mui/material/styles';
 import { useAuthStore } from '../stores/authStore';
+import { useConfig } from '../api/hooks/useConfig';
+import { OPT_OUT_KEY } from '../tracking/trackingGate';
+import { clearConsent } from '../tracking/consent';
 import { useReviews } from '../api/hooks/useReviews';
 import { useUploadMyAvatar, useRemoveMyAvatar } from '../api/hooks/useAvatar';
 import { AchievementRow } from '../components/profile/AchievementRow';
@@ -101,6 +104,26 @@ export function ProfilePage() {
         onError: () => setToast({ message: 'The setting could not be saved.', severity: 'error' }),
       },
     );
+  };
+
+  // Usage measurement (issue #666). Only offered where the deployment measures
+  // anything at all — a switch for a feature that is off would be a puzzle.
+  const trackingConfigured = Boolean(useConfig().data?.tracking);
+  const optedOut =
+    settingsQuery.data?.settings.find((setting) => setting.key === OPT_OUT_KEY)?.value === 'true';
+
+  const onToggleTracking = (measured: boolean) => {
+    updateSettings.mutate(
+      { [OPT_OUT_KEY]: String(!measured) },
+      {
+        onError: () => setToast({ message: 'The setting could not be saved.', severity: 'error' }),
+      },
+    );
+    // Opting back in means the browser question is asked again rather than
+    // silently answered from an old click.
+    if (measured) {
+      clearConsent();
+    }
   };
 
   const onChangeTimezone = (zone: string) => {
@@ -271,6 +294,30 @@ export function ProfilePage() {
           label="Email me about review activity"
         />
       </Paper>
+
+      {trackingConfigured && (
+        <Paper variant="outlined" sx={{ p: { xs: 2.5, sm: 3 } }}>
+          <Typography sx={{ fontSize: 16, fontWeight: 600 }}>Usage measurement</Typography>
+          <Typography color="text.secondary" sx={{ fontSize: 14, mt: 0.5, mb: 2.5 }}>
+            Anonymous counts of which pages get used, so this workspace can be improved with
+            evidence rather than guesswork. Page addresses are reduced to their shape first — never
+            a document, never a name, never a search term. This choice follows your account to every
+            device you sign in from.
+          </Typography>
+          <Divider sx={{ mb: 1.5 }} />
+          <FormControlLabel
+            control={
+              <Switch
+                checked={!optedOut}
+                onChange={(event) => onToggleTracking(event.target.checked)}
+                disabled={settingsQuery.isPending}
+                slotProps={{ input: { 'aria-label': 'Include me in anonymous usage measurement' } }}
+              />
+            }
+            label="Include me in anonymous usage measurement"
+          />
+        </Paper>
+      )}
 
       <TimezoneSetting
         value={displayZone}
