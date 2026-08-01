@@ -34,6 +34,7 @@ import {
   AuthApi,
   AuthPasswordResetApi,
   AuthRegistrationApi,
+  BannerApi,
   DocumentsApi,
   PrincipalsApi,
   ReviewWorkflowApi,
@@ -96,6 +97,7 @@ axiosInstance.interceptors.response.use(
 // Generated, type-safe API clients bound to the shared axios instance. Add more
 // here as endpoints are consumed (admin users, teams, settings — #104+).
 export const serverConfigApi = new ServerConfigApi(undefined, undefined, axiosInstance);
+export const bannerApi = new BannerApi(undefined, undefined, axiosInstance);
 export const usersApi = new UsersApi(undefined, undefined, axiosInstance);
 export const authApi = new AuthApi(undefined, undefined, axiosInstance);
 export const authRegistrationApi = new AuthRegistrationApi(undefined, undefined, axiosInstance);
