@@ -22,6 +22,7 @@ package io.qnop.web;
 
 import io.qnop.api.v1.model.ErrorResponse;
 import io.qnop.api.v1.model.FieldError;
+import io.qnop.service.convert.OfficeConverterBusyException;
 import io.qnop.service.document.DocumentValidationException;
 import io.qnop.service.review.AnnotationActionForbiddenException;
 import io.qnop.service.review.AnnotationNotFoundException;
@@ -33,6 +34,7 @@ import java.time.OffsetDateTime;
 import java.util.List;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.ExceptionHandler;
@@ -70,6 +72,21 @@ public class DocumentExceptionHandler {
     // this deployment lacks the converter the format needs (issue #639).
     return error(
         HttpStatus.SERVICE_UNAVAILABLE.value(), "EXPORT_FORMAT_UNAVAILABLE", ex.getMessage());
+  }
+
+  @ExceptionHandler(OfficeConverterBusyException.class)
+  ResponseEntity<ErrorResponse> converterBusy(OfficeConverterBusyException ex) {
+    // 503 and not 500: the server works, it is simply already running as many
+    // conversions as it allows itself (issue #651). Retry-After says so in the one
+    // way a client can act on without reading the message.
+    log.warn("Refused an export: every conversion slot is busy");
+    return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE)
+        .header(HttpHeaders.RETRY_AFTER, Long.toString(ex.retryAfterSeconds()))
+        .body(
+            new ErrorResponse()
+                .code("EXPORT_BUSY")
+                .message(ex.getMessage())
+                .timestamp(OffsetDateTime.now()));
   }
 
   @ExceptionHandler(DocumentNotFoundException.class)

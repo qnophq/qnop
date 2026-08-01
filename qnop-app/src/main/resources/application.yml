@@ -172,3 +172,19 @@ qnop:
     auto-create-bucket: ${QNOP_S3_AUTO_CREATE_BUCKET:false}
     reaper-grace-period: ${QNOP_S3_REAPER_GRACE_PERIOD:PT1H}
     reaper-cron: ${QNOP_S3_REAPER_CRON:0 30 3 * * *}
+  # The out-of-process office converter (issues #639/#343, ADR-0007/0010/0055) — it
+  # turns DOCX uploads into the PDF a review is read on, and renders the annotation
+  # export to PDF. `binary` is resolved on PATH; leave it unless the suite lives
+  # somewhere unusual. A deployment without it simply offers neither, which
+  # `GET /api/v1/config` reports.
+  #
+  # `max-concurrent` bounds how many conversions run at once *on this instance*:
+  # each is a cold-started office suite with that much memory, so the useful number
+  # is small, and it is not a per-deployment limit (ADR-0055). A conversion that
+  # finds every slot busy waits up to `max-wait` and is then refused — the export
+  # answers 503 with Retry-After, an ingest job retries under the queue's backoff.
+  office:
+    binary: ${QNOP_OFFICE_BINARY:soffice}
+    timeout: ${QNOP_OFFICE_TIMEOUT:60s}
+    max-concurrent: ${QNOP_OFFICE_MAX_CONCURRENT:2}
+    max-wait: ${QNOP_OFFICE_MAX_WAIT:30s}
