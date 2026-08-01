@@ -2,9 +2,16 @@
 
 **Document review your team actually wants to finish.**
 
+[![CI](https://github.com/qnophq/qnop/actions/workflows/ci.yml/badge.svg)](https://github.com/qnophq/qnop/actions/workflows/ci.yml)
+[![Latest release](https://img.shields.io/github/v/release/qnophq/qnop)](https://github.com/qnophq/qnop/releases)
+[![Docker pulls](https://img.shields.io/docker/pulls/qnophq/qnop-ce)](https://hub.docker.com/r/qnophq/qnop-ce)
+[![License: AGPL-3.0](https://img.shields.io/github/license/qnophq/qnop)](LICENSE)
+
 qnop is a self-hosted, enterprise-grade **document review system**. Upload a document, invite reviewers — individual users or whole teams — and run a coordinated review: passages are marked up right in the browser, discussed in threads, accepted or rejected; changes produce new document versions, and the review is finalized once no open annotation remains. The goal: replace the e-mail-attachment-and-comment-spreadsheet workflow with one place where reviews are precise, accountable — and genuinely satisfying to complete.
 
-qnop reviews **PDF documents today**; DOCX and Markdown follow the same ingest pipeline later ([ADR-0010](docs/adr/0010-docx-representation-strategy.md), [ADR-0032](docs/adr/0032-document-representation-and-rendering-pipeline.md)).
+![A contract under review in qnop: line-precise highlights on the rendered PDF, the annotation panel with an open discussion, workflow state and due date in the header](docs/assets/readme/review-viewer.png)
+
+qnop reviews **PDF and Word (DOCX) documents today** (DOCX is converted out-of-process via LibreOffice where installed); Markdown follows the same ingest pipeline later ([ADR-0010](docs/adr/0010-docx-representation-strategy.md), [ADR-0032](docs/adr/0032-document-representation-and-rendering-pipeline.md)).
 
 ## Why qnop
 
@@ -17,6 +24,14 @@ qnop reviews **PDF documents today**; DOCX and Markdown follow the same ingest p
 - **Yours to run.** One container (REST API + embedded web UI), PostgreSQL, and any S3-compatible object storage. Your documents never leave your infrastructure. Tenant branding, SMTP and mail templates are configured at runtime in the admin area.
 
 qnop is open-core: this repository is the **AGPL-3.0 Community edition**; commercial add-ons live in a separate private repository built against the published `qnop-spi` contract.
+
+## A quick look
+
+| The dashboard: your two hats at a glance | Annotations as a task board |
+| --- | --- |
+| ![Dashboard with the day's numbers, reviews waiting on you, deadlines, activity feed and your reviewer card](docs/assets/readme/dashboard.png) | ![Kanban board of a review's annotations: Open, In discussion and Resolved columns, drag a card to resolve](docs/assets/readme/tasks-board.png) |
+
+Every annotation is also a **task**: the board derives its columns from the discussion state, and dragging your own card to *Resolved* closes it. Profiles collect achievements as you review — finishing work is the whole point.
 
 ## Installation
 
