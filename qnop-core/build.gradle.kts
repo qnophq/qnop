@@ -71,7 +71,19 @@ dependencies {
     // Object storage (issue #243, ADR-0005): the AWS SDK v2 S3 client backs the
     // StorageProvider default (io.qnop.service.storage) via endpointOverride +
     // path-style, so MinIO / S3 / GCS is a deploy-time config switch.
-    implementation(libs.aws.sdk.s3)
+    implementation(libs.aws.sdk.s3) {
+        // The Netty-based async transport goes with it (issue #668). qnop builds
+        // the *synchronous* S3Client (S3Configuration), which runs on
+        // apache-client — netty-nio-client is never instantiated, yet it drags a
+        // full HTTP/2 and SPDY codec stack onto the classpath and with it ten
+        // advisories qnop cannot execute. An unused protocol parser is attack
+        // surface that earns nothing.
+        //
+        // Consequence to know about: S3AsyncClient will not start without a
+        // transport. Anything that needs it should add one deliberately rather
+        // than inherit one nobody chose.
+        exclude(group = "software.amazon.awssdk", module = "netty-nio-client")
+    }
 
     // PDF extraction (issue #245, ADR-0032): PDFBox turns uploads into RenderedDocuments;
     // Jackson 3 (tools.jackson, BOM-managed — the same stack Boot 4's MVC uses) serializes
