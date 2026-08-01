@@ -35,11 +35,17 @@ vi.mock('../../api/hooks/useConfig', () => ({
 interface ConfigShape {
   selfRegistrationEnabled?: boolean;
   oidcProviders?: unknown[];
+  /** The operator's sign-in notice (issue #664), when one is configured. */
+  banner?: { severity: string; message: string; linkLabel?: string; linkUrl?: string };
 }
 
-function mockConfig({ selfRegistrationEnabled = false, oidcProviders = [] }: ConfigShape = {}) {
+function mockConfig({
+  selfRegistrationEnabled = false,
+  oidcProviders = [],
+  banner,
+}: ConfigShape = {}) {
   vi.mocked(useConfig).mockReturnValue({
-    data: { auth: { selfRegistrationEnabled, oidcProviders } },
+    data: { auth: { selfRegistrationEnabled, oidcProviders }, banner },
   } as unknown as ReturnType<typeof useConfig>);
 }
 
@@ -255,5 +261,27 @@ describe('LoginPage', () => {
       'href',
       '/oauth2/authorization/acme',
     );
+  });
+
+  it("shows the operator's sign-in notice, without a way to dismiss it", () => {
+    mockConfig({
+      banner: {
+        severity: 'info',
+        message: 'Demo installation — sign in with demo@qnop.io / demo',
+      },
+    });
+    renderLogin();
+
+    expect(screen.getByText(/Demo installation/)).toBeInTheDocument();
+    // Nothing to dismiss: it is the answer to the question the visitor is
+    // about to ask (issue #664).
+    expect(screen.queryByRole('button', { name: /dismiss/i })).not.toBeInTheDocument();
+  });
+
+  it('shows no notice when the operator configured none', () => {
+    mockConfig();
+    renderLogin();
+
+    expect(screen.queryByRole('status')).not.toBeInTheDocument();
   });
 });

@@ -1,0 +1,83 @@
+# Copyright (c) 2026-present devtank42 GmbH
+# SPDX-License-Identifier: AGPL-3.0-only
+
+# Seed rows for the two admin-settable info banners (issue #664). Additive
+# changeset — new keys land in their own changeset (1.0.0 shipped the original
+# seed). The registry (ApplicationSettingKey) stays authoritative per ADR-0025;
+# these rows mirror its defaults, and both banners start off.
+databaseChangeLog:
+  - changeSet:
+      id: 0033-info-banner-settings
+      author: qnop
+      comment: Adds the banner.* application settings for the sign-in and in-app info banners (issue #664).
+      changes:
+        - insert:
+            tableName: application_setting
+            columns:
+              - column: { name: setting_key, value: "banner.login_enabled" }
+              - column: { name: setting_value, value: "false" }
+              - column: { name: setting_desc, value: "Show a banner on the sign-in and other authentication screens. Readable by anyone who can reach this server, signed in or not." }
+              - column: { name: value_type, value: "BOOLEAN" }
+        - insert:
+            tableName: application_setting
+            columns:
+              - column: { name: setting_key, value: "banner.login_severity" }
+              - column: { name: setting_value, value: "info" }
+              - column: { name: setting_desc, value: "Tone of the sign-in banner." }
+              - column: { name: value_type, value: "ENUM" }
+        - insert:
+            tableName: application_setting
+            columns:
+              - column: { name: setting_key, value: "banner.login_text" }
+              - column: { name: setting_value, value: "" }
+              - column: { name: setting_desc, value: "Text of the sign-in banner. Empty hides the banner even when it is enabled." }
+              - column: { name: value_type, value: "STRING" }
+        - insert:
+            tableName: application_setting
+            columns:
+              - column: { name: setting_key, value: "banner.login_link_label" }
+              - column: { name: setting_value, value: "" }
+              - column: { name: setting_desc, value: "Optional link shown after the sign-in banner's text; empty means no link." }
+              - column: { name: value_type, value: "STRING" }
+        - insert:
+            tableName: application_setting
+            columns:
+              - column: { name: setting_key, value: "banner.login_link_url" }
+              - column: { name: setting_value, value: "" }
+              - column: { name: setting_desc, value: "Where the sign-in banner's link points (http/https)." }
+              - column: { name: value_type, value: "STRING" }
+        - insert:
+            tableName: application_setting
+            columns:
+              - column: { name: setting_key, value: "banner.app_enabled" }
+              - column: { name: setting_value, value: "false" }
+              - column: { name: setting_desc, value: "Show a banner to signed-in users — maintenance windows, a degraded integration, a global problem." }
+              - column: { name: value_type, value: "BOOLEAN" }
+        - insert:
+            tableName: application_setting
+            columns:
+              - column: { name: setting_key, value: "banner.app_severity" }
+              - column: { name: setting_value, value: "info" }
+              - column: { name: setting_desc, value: "Tone of the in-app banner." }
+              - column: { name: value_type, value: "ENUM" }
+        - insert:
+            tableName: application_setting
+            columns:
+              - column: { name: setting_key, value: "banner.app_text" }
+              - column: { name: setting_value, value: "" }
+              - column: { name: setting_desc, value: "Text of the in-app banner. Empty hides the banner even when it is enabled." }
+              - column: { name: value_type, value: "STRING" }
+        - insert:
+            tableName: application_setting
+            columns:
+              - column: { name: setting_key, value: "banner.app_link_label" }
+              - column: { name: setting_value, value: "" }
+              - column: { name: setting_desc, value: "Optional link shown after the in-app banner's text; empty means no link." }
+              - column: { name: value_type, value: "STRING" }
+        - insert:
+            tableName: application_setting
+            columns:
+              - column: { name: setting_key, value: "banner.app_link_url" }
+              - column: { name: setting_value, value: "" }
+              - column: { name: setting_desc, value: "Where the in-app banner's link points (http/https)." }
+              - column: { name: value_type, value: "STRING" }

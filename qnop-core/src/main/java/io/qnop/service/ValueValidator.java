@@ -86,11 +86,17 @@ public final class ValueValidator {
 
   /**
    * Enforces beyond-type constraints after the type check has passed: an inclusive integer range
-   * (the value already parses as an int) and/or a string format (skipped when blank, so empty
-   * defaults stay valid).
+   * (the value already parses as an int), a maximum length, and/or a string format (the last
+   * skipped when blank, so empty defaults stay valid).
    */
   private static void validateConstraints(
       SettingConstraints constraints, String value, String keyForError) {
+    if (constraints.maxLength() != null && value.length() > constraints.maxLength()) {
+      // Checked before the format: "500 characters is too long" is a more useful
+      // answer than "that is not a URL" for a value that is both.
+      throw new SettingValidationException(
+          keyForError, "must be at most " + constraints.maxLength() + " characters");
+    }
     if (constraints.min() != null || constraints.max() != null) {
       int parsed = Integer.parseInt(value.trim());
       if (constraints.min() != null && parsed < constraints.min()) {

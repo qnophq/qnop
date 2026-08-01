@@ -36,6 +36,7 @@ import {
   Bell,
   FileText,
   Lock,
+  Megaphone,
   SlidersHorizontal,
   Upload,
   type LucideIcon,
@@ -50,7 +51,15 @@ import { apiErrorMessage, apiFieldErrors } from '../../../utils/apiError';
 import { isHttpUrl, isInteger, isIntegerInRange } from '../../../utils/validation';
 
 /** Group prefixes in display order; unknown groups are appended alphabetically. */
-const GROUP_ORDER = ['general', 'upload', 'tracking', 'auth', 'review', 'notifications'] as const;
+const GROUP_ORDER = [
+  'general',
+  'upload',
+  'tracking',
+  'auth',
+  'review',
+  'notifications',
+  'banner',
+] as const;
 
 const GROUP_LABELS: Record<string, string> = {
   general: 'General',
@@ -59,6 +68,7 @@ const GROUP_LABELS: Record<string, string> = {
   auth: 'Authentication',
   review: 'Review',
   notifications: 'Notifications',
+  banner: 'Info banners',
 };
 
 /** Brand-tint section icon per group, matching the Email / SMTP page's language. */
@@ -69,6 +79,7 @@ const GROUP_ICONS: Record<string, LucideIcon> = {
   auth: Lock,
   review: FileText,
   notifications: Bell,
+  banner: Megaphone,
 };
 
 const GROUP_DESCRIPTIONS: Record<string, string> = {
@@ -78,6 +89,10 @@ const GROUP_DESCRIPTIONS: Record<string, string> = {
   auth: 'Self-registration and password-reset behaviour.',
   review: 'Behaviour of the document review workflow.',
   notifications: 'Review e-mails and how long the in-app inbox keeps its records.',
+  // The one thing an operator must know before typing: where each banner is
+  // read, and by whom (issue #664).
+  banner:
+    'Two notices you can switch on: one on the sign-in screens — readable by anyone who can reach this server — and one for signed-in users, which they may dismiss until you change the text.',
 };
 
 /**
@@ -151,6 +166,32 @@ const SETTING_RULES: Record<string, { test: (value: string) => boolean; message:
   'auth.password_reset_token_ttl_minutes': {
     test: (value) => isIntegerInRange(value, 1, 1440),
     message: 'Enter a whole number of minutes between 1 and 1440.',
+  },
+  // The banner texts and links (issue #664) — the same ceilings the server
+  // enforces, said at the field instead of after a failed save.
+  'banner.login_text': {
+    test: (value) => value.length <= 200,
+    message: 'Keep it to 200 characters — it has to fit above the sign-in form.',
+  },
+  'banner.app_text': {
+    test: (value) => value.length <= 300,
+    message: 'Keep it to 300 characters — it is one line across every page.',
+  },
+  'banner.login_link_label': {
+    test: (value) => value.length <= 40,
+    message: 'Keep the label to 40 characters.',
+  },
+  'banner.app_link_label': {
+    test: (value) => value.length <= 40,
+    message: 'Keep the label to 40 characters.',
+  },
+  'banner.login_link_url': {
+    test: (value) => isHttpUrl(value) && value.length <= 500,
+    message: 'Enter a valid http(s) URL, e.g. https://qnop.example.',
+  },
+  'banner.app_link_url': {
+    test: (value) => isHttpUrl(value) && value.length <= 500,
+    message: 'Enter a valid http(s) URL, e.g. https://qnop.example.',
   },
 };
 

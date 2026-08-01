@@ -22,11 +22,11 @@ package io.qnop.service;
 
 /**
  * Optional, beyond-type constraints for an {@link ApplicationSettingKey} value (issue: admin
- * validation): an inclusive integer range and/or a string format. {@link ValueValidator} enforces
- * these after the type check. A {@code format} check is skipped for blank values (the empty default
- * stays valid until an operator fills it in).
+ * validation): an inclusive integer range, a string format, and/or a maximum length. {@link
+ * ValueValidator} enforces these after the type check. A {@code format} check is skipped for blank
+ * values (the empty default stays valid until an operator fills it in).
  */
-public record SettingConstraints(Integer min, Integer max, ValueFormat format) {
+public record SettingConstraints(Integer min, Integer max, ValueFormat format, Integer maxLength) {
 
   /** A string format an {@code ENUM}-free value must match when non-blank. */
   public enum ValueFormat {
@@ -36,18 +36,32 @@ public record SettingConstraints(Integer min, Integer max, ValueFormat format) {
   }
 
   /** No extra constraints beyond the declared type. */
-  public static final SettingConstraints NONE = new SettingConstraints(null, null, null);
+  public static final SettingConstraints NONE = new SettingConstraints(null, null, null, null);
 
   /**
    * An inclusive integer range, e.g. a TCP port (1–65535). Only valid for {@code INTEGER}-typed
    * keys: {@link ValueValidator} parses the value as an int after the type check has passed.
    */
   public static SettingConstraints range(int min, int max) {
-    return new SettingConstraints(min, max, null);
+    return new SettingConstraints(min, max, null, null);
   }
 
   /** A string-format constraint, e.g. an email address or http(s) URL. */
   public static SettingConstraints format(ValueFormat format) {
-    return new SettingConstraints(null, null, format);
+    return new SettingConstraints(null, null, format, null);
+  }
+
+  /**
+   * A ceiling on how many characters a value may have — for the free-text settings that end up in a
+   * layout (issue #664). Without it, an operator's paragraph becomes a design problem on every page
+   * that renders it.
+   */
+  public static SettingConstraints maxLength(int maxLength) {
+    return new SettingConstraints(null, null, null, maxLength);
+  }
+
+  /** The same constraints with a length ceiling added, e.g. a URL that is also bounded. */
+  public SettingConstraints withMaxLength(int maxLength) {
+    return new SettingConstraints(min, max, format, maxLength);
   }
 }

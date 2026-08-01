@@ -25,6 +25,7 @@ import Typography from '@mui/material/Typography';
 import { keyframes } from '@mui/material/styles';
 import { ShieldCheck } from 'lucide-react';
 import { useConfig } from '../../api/hooks/useConfig';
+import { InfoBanner } from '../banner/InfoBanner';
 import { BrandLogo } from '../branding/BrandLogo';
 import { BrandPanel } from './BrandPanel';
 import { tokens } from '../../theme/tokens';
@@ -163,6 +164,7 @@ function MobileBrandBand() {
  * right.
  */
 export function AuthLayout({ title, subtitle, headerSlot, children }: AuthLayoutProps) {
+  const signInBanner = useConfig().data?.banner;
   return (
     <Box
       sx={{
@@ -214,6 +216,16 @@ export function AuthLayout({ title, subtitle, headerSlot, children }: AuthLayout
           }}
         >
           <Box sx={{ width: '100%', maxWidth: 408, position: 'relative', zIndex: 1 }}>
+            {/* The operator's sign-in notice (issue #664) — a demo installation
+                announcing its test credentials, say. It lives here rather than on
+                the login page so it also greets whoever lands on register or
+                password-reset first. Never dismissible: it is the answer to a
+                question the visitor is about to ask. */}
+            {signInBanner && (
+              <Box sx={{ mb: 2.5 }}>
+                <InfoBanner banner={signInBanner} variant="card" />
+              </Box>
+            )}
             {headerSlot}
             <Typography
               component="h1"

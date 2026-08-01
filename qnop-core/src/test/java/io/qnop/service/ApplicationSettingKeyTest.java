@@ -66,7 +66,17 @@ class ApplicationSettingKeyTest {
           "review.free_reattach_enabled",
           "review.finalize_with_open_annotations",
           "review.archive_after_days",
-          "review.purge_archived_after_days");
+          "review.purge_archived_after_days",
+          "banner.login_enabled",
+          "banner.login_severity",
+          "banner.login_text",
+          "banner.login_link_label",
+          "banner.login_link_url",
+          "banner.app_enabled",
+          "banner.app_severity",
+          "banner.app_text",
+          "banner.app_link_label",
+          "banner.app_link_url");
 
   @Test
   void registryMatchesSeededKeys() {

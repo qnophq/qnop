@@ -157,7 +157,64 @@ public enum ApplicationSettingKey {
       "review.purge_archived_after_days",
       SettingValueType.INTEGER,
       "180",
-      "Days an archived review is kept before it is deleted permanently, including storage objects no other document references (0 disables purging). Irreversible — the Review purge job must be enabled as well.");
+      "Days an archived review is kept before it is deleted permanently, including storage objects no other document references (0 disables purging). Irreversible — the Review purge job must be enabled as well."),
+  BANNER_LOGIN_ENABLED(
+      "banner.login_enabled",
+      SettingValueType.BOOLEAN,
+      "false",
+      "Show a banner on the sign-in and other authentication screens. Readable by anyone who can"
+          + " reach this server, signed in or not — never put internal detail here."),
+  BANNER_LOGIN_SEVERITY(
+      "banner.login_severity",
+      SettingValueType.ENUM,
+      "info",
+      "Tone of the sign-in banner.",
+      List.of("info", "warning", "critical")),
+  BANNER_LOGIN_TEXT(
+      "banner.login_text",
+      SettingValueType.STRING,
+      "",
+      "Text of the sign-in banner, e.g. \"Demo installation — sign in with demo@qnop.io /"
+          + " demo\". Empty hides the banner even when it is enabled."),
+  BANNER_LOGIN_LINK_LABEL(
+      "banner.login_link_label",
+      SettingValueType.STRING,
+      "",
+      "Optional link shown after the sign-in banner's text; empty means no link."),
+  BANNER_LOGIN_LINK_URL(
+      "banner.login_link_url",
+      SettingValueType.STRING,
+      "",
+      "Where the sign-in banner's link points (http/https)."),
+  BANNER_APP_ENABLED(
+      "banner.app_enabled",
+      SettingValueType.BOOLEAN,
+      "false",
+      "Show a banner to signed-in users — maintenance windows, a degraded integration, a global"
+          + " problem. Visible only after sign-in, and each user may dismiss it until the text"
+          + " changes."),
+  BANNER_APP_SEVERITY(
+      "banner.app_severity",
+      SettingValueType.ENUM,
+      "info",
+      "Tone of the in-app banner.",
+      List.of("info", "warning", "critical")),
+  BANNER_APP_TEXT(
+      "banner.app_text",
+      SettingValueType.STRING,
+      "",
+      "Text of the in-app banner, e.g. \"Maintenance on Saturday 20:00–22:00 UTC; uploads are"
+          + " paused.\" Empty hides the banner even when it is enabled."),
+  BANNER_APP_LINK_LABEL(
+      "banner.app_link_label",
+      SettingValueType.STRING,
+      "",
+      "Optional link shown after the in-app banner's text; empty means no link."),
+  BANNER_APP_LINK_URL(
+      "banner.app_link_url",
+      SettingValueType.STRING,
+      "",
+      "Where the in-app banner's link points (http/https).");
 
   private static final Map<String, ApplicationSettingKey> BY_KEY =
       Arrays.stream(values())
@@ -170,22 +227,39 @@ public enum ApplicationSettingKey {
    * them.
    */
   private static final Map<ApplicationSettingKey, SettingConstraints> CONSTRAINTS =
-      Map.of(
-          UPLOAD_DOCUMENT_MAX_FILE_SIZE_MB, SettingConstraints.range(1, 1024),
+      Map.ofEntries(
+          Map.entry(UPLOAD_DOCUMENT_MAX_FILE_SIZE_MB, SettingConstraints.range(1, 1024)),
           // Capped below the container's multipart ceiling (QNOP_UPLOAD_MULTIPART_LIMIT_MB,
           // default 55) so the service's clean 413 always fires first.
-          UPLOAD_ATTACHMENT_MAX_FILE_SIZE_MB, SettingConstraints.range(1, 50),
-          AUTH_PASSWORD_RESET_TOKEN_TTL_MINUTES, SettingConstraints.range(1, 1440),
+          Map.entry(UPLOAD_ATTACHMENT_MAX_FILE_SIZE_MB, SettingConstraints.range(1, 50)),
+          Map.entry(AUTH_PASSWORD_RESET_TOKEN_TTL_MINUTES, SettingConstraints.range(1, 1440)),
           // 0 disables auto-archiving; the upper bound (~10 years) is a sanity cap.
-          REVIEW_ARCHIVE_AFTER_DAYS, SettingConstraints.range(0, 3650),
+          Map.entry(REVIEW_ARCHIVE_AFTER_DAYS, SettingConstraints.range(0, 3650)),
           // 0 disables purging; same ~10-year sanity cap as the archive window.
-          REVIEW_PURGE_ARCHIVED_AFTER_DAYS, SettingConstraints.range(0, 3650),
-          NOTIFICATIONS_RETAIN_DAYS, SettingConstraints.range(0, 3650),
-          SMTP_PORT, SettingConstraints.range(1, 65535),
-          SMTP_FROM, SettingConstraints.format(SettingConstraints.ValueFormat.EMAIL),
-          GENERAL_BASE_URL, SettingConstraints.format(SettingConstraints.ValueFormat.URL),
-          GENERAL_DEFAULT_TIMEZONE,
-              SettingConstraints.format(SettingConstraints.ValueFormat.TIMEZONE));
+          Map.entry(REVIEW_PURGE_ARCHIVED_AFTER_DAYS, SettingConstraints.range(0, 3650)),
+          Map.entry(NOTIFICATIONS_RETAIN_DAYS, SettingConstraints.range(0, 3650)),
+          Map.entry(SMTP_PORT, SettingConstraints.range(1, 65535)),
+          Map.entry(SMTP_FROM, SettingConstraints.format(SettingConstraints.ValueFormat.EMAIL)),
+          Map.entry(
+              GENERAL_BASE_URL, SettingConstraints.format(SettingConstraints.ValueFormat.URL)),
+          Map.entry(
+              GENERAL_DEFAULT_TIMEZONE,
+              SettingConstraints.format(SettingConstraints.ValueFormat.TIMEZONE)),
+          // The banner texts land in a layout (issue #664), so they are bounded rather
+          // than trusted: one line that wraps to two, not a paragraph that pushes the
+          // sign-in form off the screen. The link is bounded and must be http(s), which
+          // is also what keeps a `javascript:` URL out of an anchor the whole
+          // deployment sees.
+          Map.entry(BANNER_LOGIN_TEXT, SettingConstraints.maxLength(200)),
+          Map.entry(BANNER_LOGIN_LINK_LABEL, SettingConstraints.maxLength(40)),
+          Map.entry(
+              BANNER_LOGIN_LINK_URL,
+              SettingConstraints.format(SettingConstraints.ValueFormat.URL).withMaxLength(500)),
+          Map.entry(BANNER_APP_TEXT, SettingConstraints.maxLength(300)),
+          Map.entry(BANNER_APP_LINK_LABEL, SettingConstraints.maxLength(40)),
+          Map.entry(
+              BANNER_APP_LINK_URL,
+              SettingConstraints.format(SettingConstraints.ValueFormat.URL).withMaxLength(500)));
 
   private final String key;
   private final SettingValueType type;

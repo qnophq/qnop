@@ -25,6 +25,12 @@ tags:
       Public, unauthenticated server configuration the frontend needs before a
       user is authenticated (edition flag, branding, enabled login providers,
       upload limits, supported document formats).
+  - name: Banner
+    description: |
+      The operator's in-app announcement (issue #664) — maintenance windows, a
+      degraded integration, a global problem. Authenticated on purpose: the
+      sign-in banner travels in the public `/config` response, this one does
+      not, because what is wrong with a deployment is not for anonymous callers.
   - name: AdminSettings
     description: |
       Superadmin-only administration of the global application settings
@@ -205,6 +211,39 @@ paths:
                   - PDF
                   - DOCX
                   - MD
+  /banner:
+    get:
+      tags:
+        - Banner
+      summary: Get the in-app announcement banner
+      description: |
+        Returns the banner the operator has enabled for signed-in users, or an
+        empty object when there is none (issue #664). Clients may poll this: it
+        is a snapshot read with no database access, and a maintenance notice is
+        expected to appear without the user reloading the application.
+
+        The sign-in banner is **not** here — it is public and travels in
+        `GET /config`. This one requires authentication, because an operator
+        describing a degraded deployment should not be describing it to the
+        internet.
+      operationId: getBanner
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: The active in-app banner, if any
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BannerResponse'
+              example:
+                banner:
+                  severity: warning
+                  message: "Maintenance on Saturday 20:00–22:00 UTC; uploads are paused."
+                  linkLabel: "Status page"
+                  linkUrl: "https://status.example.com"
+        '401':
+          $ref: '#/components/responses/Unauthorized'
   /admin/configuration:
     get:
       tags:
@@ -4812,6 +4851,15 @@ components:
             example: pdf
         branding:
           $ref: '#/components/schemas/ServerConfigBranding'
+        banner:
+          allOf:
+            - $ref: '#/components/schemas/InfoBanner'
+          description: |
+            The operator's sign-in notice (issue #664), e.g. the credentials of a
+            demo installation. Absent when none is configured — a client renders
+            nothing rather than an empty bar. Public by definition, since the
+            screen it appears on is; the in-app banner is a separate,
+            authenticated read (`GET /banner`).
       required:
         - version
         - edition
@@ -4819,6 +4867,46 @@ components:
         - auth
         - upload
         - supportedFormats
+    InfoBanner:
+      type: object
+      description: |
+        An operator-authored notice (issue #664): a severity, one short line of
+        plain text — never markup — and an optional link. The text is plain by
+        design: a banner is rendered on screens as different as the sign-in card
+        and the review workspace, and a format that can restyle itself would
+        restyle those.
+      properties:
+        severity:
+          type: string
+          enum: [info, warning, critical]
+          description: |
+            How loudly it is rendered. Only the tone changes — the shape of the
+            banner is the same, so a critical notice cannot rearrange a page.
+        message:
+          type: string
+          description: The notice itself, plain text.
+          example: "Demo installation — sign in with demo@qnop.io / demo"
+        linkLabel:
+          type: string
+          description: Label of the optional link; absent when the banner has no link.
+        linkUrl:
+          type: string
+          description: |
+            Target of the optional link, always `http`/`https` (validated when the
+            setting is saved).
+      required:
+        - severity
+        - message
+    BannerResponse:
+      type: object
+      description: |
+        The in-app banner, or nothing. An object rather than a bare nullable
+        banner so the response stays extensible.
+      properties:
+        banner:
+          allOf:
+            - $ref: '#/components/schemas/InfoBanner'
+          description: Absent when the operator has no in-app banner enabled.
     ServerConfigBranding:
       type: object
       description: |

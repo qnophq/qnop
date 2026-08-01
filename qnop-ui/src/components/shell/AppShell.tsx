@@ -26,6 +26,7 @@ import Drawer from '@mui/material/Drawer';
 import useMediaQuery from '@mui/material/useMediaQuery';
 import { useTheme } from '@mui/material/styles';
 import { Outlet, useMatch } from 'react-router';
+import { AppBanner } from '../banner/AppBanner';
 import { SidebarContent } from './SidebarContent';
 import { TopBar } from './TopBar';
 
@@ -151,6 +152,11 @@ export function AppShell() {
       {/* Main column */}
       <Box sx={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column' }}>
         <TopBar isMobile={isMobile} onToggleSidebar={toggleSidebar} />
+        {/* The operator's notice (issue #664) sits outside the scroll container,
+            so it stays put on every route — including the review workspace,
+            which simply gets that much less height rather than scrolling it
+            away or having its own height maths disturbed. */}
+        <AppBanner />
         <Box
           component="main"
           sx={{

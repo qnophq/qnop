@@ -75,7 +75,10 @@ class AdminSettingsControllerIT extends AbstractIntegrationTest {
         .perform(get("/api/v1/admin/settings"))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.settings").isArray())
-        .andExpect(jsonPath("$.settings.length()").value(26));
+        // Every registry key is offered, so the count moves whenever the registry
+        // does — asserted against the registry rather than a number that has to be
+        // remembered (the banner keys of issue #664 were the latest to move it).
+        .andExpect(jsonPath("$.settings.length()").value(ApplicationSettingKey.values().length));
   }
 
   @Test

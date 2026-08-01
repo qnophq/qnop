@@ -27,6 +27,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import io.qnop.service.ApplicationSettingKey;
 import io.qnop.service.ApplicationSettingsService;
+import io.qnop.service.banner.InfoBannerService;
 import io.qnop.service.branding.BrandingService;
 import io.qnop.service.branding.BrandingService.BrandingSource;
 import io.qnop.service.branding.BrandingService.SlotStatus;
@@ -65,6 +66,10 @@ class ConfigControllerTest {
   @MockitoBean private BrandingService branding;
   @MockitoBean private AnnotationExportService exports;
   @MockitoBean private DocumentRenditionService renditions;
+  // Unstubbed, so it answers Optional.empty(): no sign-in banner configured is
+  // the default this endpoint's shape is asserted against (issue #664). The
+  // banner's own behaviour is covered by BannerApiIT and InfoBannerServiceTest.
+  @MockitoBean private InfoBannerService banners;
 
   @BeforeEach
   void setUp() {
