@@ -77,3 +77,10 @@ docker compose exec qnop cat /tmp/qnop-admin-password.txt
 1. Read the release notes of every version you skip: <https://github.com/qnophq/qnop/releases>.
 2. Back up the database and the bucket.
 3. Bump `QNOP_VERSION` and `docker compose up -d` — Liquibase applies schema migrations forward automatically. Downgrades are not supported; restore from backup instead.
+
+## One-click / template deployments
+
+- **Portainer**: add the raw URL of [`deploy/portainer-templates.json`](../deploy/portainer-templates.json) as an app-template source (*Settings → App Templates*); the template deploys the stack from [`deploy/docker-compose.yml`](../deploy/docker-compose.yml) and prompts for the required secrets.
+- **Coolify**: paste [`deploy/coolify/docker-compose.yml`](../deploy/coolify/docker-compose.yml) as a Docker-Compose service. Coolify generates the passwords and auth secrets via its magic variables; only `QNOP_AUTH_ENCRYPTION_SALT` must be set manually (hex — `openssl rand -hex 32`).
+
+Both templates are starting points for a single host — the environment contract above stays authoritative.

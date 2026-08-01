@@ -1,0 +1,29 @@
+{
+  "version": "3",
+  "templates": [
+    {
+      "type": 3,
+      "title": "qnop",
+      "name": "qnop",
+      "description": "Document review platform: line-precise PDF/Word annotations, threaded discussions, version-aware re-anchoring, workflow that only finalizes when every annotation is resolved, teams/roles, OIDC SSO and audit trail. AGPL-3.0 Community edition.",
+      "note": "Requires strong secrets — generate with `openssl rand -base64 48` (JWT secret, encryption key, passwords) and `openssl rand -hex 32` (encryption salt, MUST be hex). The initial admin password is printed once to the qnop container log on first start. Docs: https://github.com/qnophq/qnop/blob/main/docs/DEPLOYMENT.md",
+      "categories": ["documents", "collaboration", "productivity"],
+      "platform": "linux",
+      "logo": "https://raw.githubusercontent.com/qnophq/qnop/main/qnop-ui/public/apple-touch-icon.png",
+      "repository": {
+        "url": "https://github.com/qnophq/qnop",
+        "stackfile": "deploy/docker-compose.yml"
+      },
+      "env": [
+        { "name": "QNOP_VERSION", "label": "qnop version (image tag)", "default": "latest" },
+        { "name": "QNOP_HTTP_PORT", "label": "Published HTTP port", "default": "8080" },
+        { "name": "QNOP_DB_PASSWORD", "label": "PostgreSQL password" },
+        { "name": "QNOP_S3_ACCESS_KEY", "label": "Object storage access key", "default": "qnop" },
+        { "name": "QNOP_S3_SECRET_KEY", "label": "Object storage secret key" },
+        { "name": "QNOP_AUTH_JWT_SECRET", "label": "JWT secret (>= 32 chars)" },
+        { "name": "QNOP_AUTH_ENCRYPTION_KEY", "label": "Encryption key (>= 32 chars)" },
+        { "name": "QNOP_AUTH_ENCRYPTION_SALT", "label": "Encryption salt (hex, e.g. openssl rand -hex 32)" }
+      ]
+    }
+  ]
+}
