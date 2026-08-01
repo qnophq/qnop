@@ -4851,6 +4851,14 @@ components:
             example: pdf
         branding:
           $ref: '#/components/schemas/ServerConfigBranding'
+        tracking:
+          allOf:
+            - $ref: '#/components/schemas/ServerConfigTracking'
+          description: |
+            Usage measurement, when an operator has configured it (issue #666).
+            Absent means the client loads nothing and measures nothing. Public
+            because the sign-in screen is measured too — it names a backend and a
+            site id, both of which the browser would see in the script anyway.
         banner:
           allOf:
             - $ref: '#/components/schemas/InfoBanner'
@@ -4867,6 +4875,41 @@ components:
         - auth
         - upload
         - supportedFormats
+    ServerConfigTracking:
+      type: object
+      description: |
+        What the client needs to measure usage (issue #666). It never learns the
+        analytics host: the script comes from `/t/s.js` and measurements go to
+        `/t/c/…` on this origin, which is what keeps the CSP pinned to 'self'.
+      properties:
+        provider:
+          type: string
+          enum: [matomo, plausible, umami, posthog, pirsch]
+          description: Which backend's script and call shape to use.
+        siteId:
+          type: string
+          description: |
+            The backend's identifier for this site, as the script needs it
+            (Matomo idSite, Plausible domain, Umami website id, PostHog project
+            API key, Pirsch identification code).
+        consentRequired:
+          type: boolean
+          description: Ask before loading anything at all.
+        respectDnt:
+          type: boolean
+          description: Leave browsers that send Do-Not-Track or GPC entirely alone.
+        trackPrivilegedRoles:
+          type: boolean
+          description: |
+            Whether administrators and auditors are measured. Off by default — a
+            handful of privileged people is barely a statistic and very much
+            personal data.
+      required:
+        - provider
+        - siteId
+        - consentRequired
+        - respectDnt
+        - trackPrivilegedRoles
     InfoBanner:
       type: object
       description: |

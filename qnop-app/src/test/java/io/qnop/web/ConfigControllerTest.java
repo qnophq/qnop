@@ -36,6 +36,7 @@ import io.qnop.service.oidc.OidcProviderLoginView;
 import io.qnop.service.oidc.OidcProviderService;
 import io.qnop.service.review.AnnotationExportService;
 import io.qnop.service.review.export.AnnotationExportFormat;
+import io.qnop.service.tracking.TrackingConfigService;
 import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -70,6 +71,9 @@ class ConfigControllerTest {
   // the default this endpoint's shape is asserted against (issue #664). The
   // banner's own behaviour is covered by BannerApiIT and InfoBannerServiceTest.
   @MockitoBean private InfoBannerService banners;
+  // Unstubbed too: no tracking configured is the shape this endpoint is asserted
+  // against (issue #666); TrackingConfigServiceTest covers the resolution itself.
+  @MockitoBean private TrackingConfigService tracking;
 
   @BeforeEach
   void setUp() {

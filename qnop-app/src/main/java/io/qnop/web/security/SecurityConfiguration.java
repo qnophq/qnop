@@ -27,6 +27,7 @@ import io.qnop.web.security.ratelimit.ForgotPasswordRateLimitFilter;
 import io.qnop.web.security.ratelimit.LoginRateLimitFilter;
 import io.qnop.web.security.ratelimit.RefreshRateLimitFilter;
 import io.qnop.web.security.ratelimit.RegisterRateLimitFilter;
+import io.qnop.web.security.ratelimit.TrackingRateLimitFilter;
 import java.util.List;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -94,6 +95,7 @@ public class SecurityConfiguration {
       ChangePasswordRateLimitFilter changePasswordRateLimitFilter,
       RegisterRateLimitFilter registerRateLimitFilter,
       ForgotPasswordRateLimitFilter forgotPasswordRateLimitFilter,
+      TrackingRateLimitFilter trackingRateLimitFilter,
       PasswordChangeRequiredFilter passwordChangeRequiredFilter)
       throws Exception {
     http.csrf(
@@ -114,6 +116,10 @@ public class SecurityConfiguration {
         // IP-keyed limiters for the public self-service endpoints (issue #20).
         .addFilterBefore(registerRateLimitFilter, CsrfFilter.class)
         .addFilterBefore(forgotPasswordRateLimitFilter, CsrfFilter.class)
+        // The measurement endpoint is unauthenticated by necessity (the sign-in
+        // screen is measured too), so its ceiling is enforced before anything else
+        // touches the request (issue #666).
+        .addFilterBefore(trackingRateLimitFilter, CsrfFilter.class)
         // Force a password change before any non-auth resource (issue #20); needs the
         // authenticated subject, so it runs after the authorization filter.
         .addFilterAfter(passwordChangeRequiredFilter, AuthorizationFilter.class)
@@ -152,6 +158,12 @@ public class SecurityConfiguration {
                     // (enabled OIDC providers, self-registration, edition). OpenAPI
                     // declares GET /config as security: [] — honour that here.
                     .requestMatchers(HttpMethod.GET, "/api/v1/config")
+                    .permitAll()
+                    // Usage tracking (issue #666) is measured on the sign-in screen
+                    // too, so its proxy cannot require a token. It reaches exactly
+                    // one configured backend on exactly the paths that backend
+                    // declares, and it is rate-limited per IP.
+                    .requestMatchers("/t/s.js", "/t/c/**")
                     .permitAll()
                     .requestMatchers("/api/v1/admin/**")
                     .hasRole("ADMIN")
