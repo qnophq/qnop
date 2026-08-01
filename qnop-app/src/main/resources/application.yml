@@ -183,6 +183,18 @@ qnop:
   # is small, and it is not a per-deployment limit (ADR-0055). A conversion that
   # finds every slot busy waits up to `max-wait` and is then refused — the export
   # answers 503 with Retry-After, an ingest job retries under the queue's backoff.
+  # Usage tracking (issue #666). What an operator configures lives in the admin
+  # settings (provider, host, site id, consent, opt-outs); the two keys here are
+  # deployment decisions that must not be reachable from the web UI.
+  #
+  # `allow-private-host` lets the proxy call a private/loopback address — a
+  # self-hosted Matomo on an internal network is the normal case, but so is
+  # 169.254.169.254, which is why this is a property and not a setting.
+  tracking:
+    allow-private-host: ${QNOP_TRACKING_ALLOW_PRIVATE_HOST:false}
+    rate-limit:
+      max-attempts: ${QNOP_TRACKING_RATE_LIMIT_MAX_ATTEMPTS:120}
+      window-seconds: ${QNOP_TRACKING_RATE_LIMIT_WINDOW_SECONDS:60}
   office:
     binary: ${QNOP_OFFICE_BINARY:soffice}
     timeout: ${QNOP_OFFICE_TIMEOUT:60s}

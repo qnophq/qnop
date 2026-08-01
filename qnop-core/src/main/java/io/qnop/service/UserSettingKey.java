@@ -64,7 +64,15 @@ public enum UserSettingKey {
       "email_mentions",
       SettingValueType.BOOLEAN,
       "true",
-      "Receive an email when someone @mentions you in a review (issue #462).");
+      "Receive an email when someone @mentions you in a review (issue #462)."),
+  // Tied to the account rather than the browser (issue #666): somebody who has
+  // opted out has opted out on their laptop and their tablet, and a cleared
+  // browser store must not quietly re-enrol them.
+  USAGE_TRACKING_OPT_OUT(
+      "usage_tracking_opt_out",
+      SettingValueType.BOOLEAN,
+      "false",
+      "Exclude me from anonymous usage measurement, on every device I sign in from (issue #666).");
 
   private static final Map<String, UserSettingKey> BY_KEY =
       Arrays.stream(values())

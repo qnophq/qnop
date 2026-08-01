@@ -30,6 +30,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import io.qnop.bootstrap.AbstractIntegrationTest;
 import io.qnop.entity.User;
 import io.qnop.repository.UserRepository;
+import io.qnop.service.UserSettingKey;
 import java.util.UUID;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -73,7 +74,10 @@ class UserSettingsControllerIT extends AbstractIntegrationTest {
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.settings").isArray())
         // theme, preferred_language, timezone, email_review_notifications, email_mentions (#462).
-        .andExpect(jsonPath("$.settings.length()").value(5));
+        // Every registry key is offered, so this moves whenever the registry does —
+        // asserted against it rather than against a number to remember (the usage
+        // measurement opt-out of issue #666 was the latest to move it).
+        .andExpect(jsonPath("$.settings.length()").value(UserSettingKey.values().length));
   }
 
   @Test
