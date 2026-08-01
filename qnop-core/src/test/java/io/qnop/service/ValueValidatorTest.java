@@ -116,6 +116,46 @@ class ValueValidatorTest {
   }
 
   @Test
+  void boundsTheLengthOfBannerText() {
+    assertDoesNotThrow(
+        () ->
+            ValueValidator.validate(
+                ApplicationSettingKey.BANNER_APP_TEXT, "Maintenance on Saturday 20:00 UTC."));
+    assertDoesNotThrow(() -> ValueValidator.validate(ApplicationSettingKey.BANNER_APP_TEXT, ""));
+    // A banner is one line in a layout, not a place to publish a change log.
+    assertThrows(
+        SettingValidationException.class,
+        () -> ValueValidator.validate(ApplicationSettingKey.BANNER_APP_TEXT, "x".repeat(301)));
+    assertThrows(
+        SettingValidationException.class,
+        () -> ValueValidator.validate(ApplicationSettingKey.BANNER_LOGIN_TEXT, "x".repeat(201)));
+  }
+
+  @Test
+  void bannerLinksMustBeHttpUrls() {
+    assertDoesNotThrow(
+        () ->
+            ValueValidator.validate(
+                ApplicationSettingKey.BANNER_LOGIN_LINK_URL, "https://qnop.example/demo"));
+    assertDoesNotThrow(
+        () -> ValueValidator.validate(ApplicationSettingKey.BANNER_LOGIN_LINK_URL, ""));
+    // The banner is rendered as an anchor for every visitor of the sign-in page,
+    // so the scheme check is the thing standing between an admin typo — or an
+    // admin with bad intentions — and a script URL in everyone's browser.
+    assertThrows(
+        SettingValidationException.class,
+        () ->
+            ValueValidator.validate(
+                ApplicationSettingKey.BANNER_LOGIN_LINK_URL, "javascript:alert(1)"));
+    assertThrows(
+        SettingValidationException.class,
+        () ->
+            ValueValidator.validate(
+                ApplicationSettingKey.BANNER_APP_LINK_URL,
+                "https://qnop.example/" + "x".repeat(500)));
+  }
+
+  @Test
   void enforcesTimezoneFormat() {
     assertDoesNotThrow(
         () -> ValueValidator.validate(ApplicationSettingKey.GENERAL_DEFAULT_TIMEZONE, "UTC"));
