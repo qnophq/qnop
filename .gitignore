@@ -31,3 +31,4 @@ qnop-ui/.vite/
 /*.xlsx
 /*.pdf
 /*.csv
+.playwright-mcp/

@@ -29,6 +29,7 @@ import java.net.http.HttpResponse;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.Optional;
+import java.util.concurrent.atomic.AtomicBoolean;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
@@ -66,6 +67,16 @@ public class TrackingProxyService {
   private final HttpClient http;
 
   private volatile CachedScript cachedScript;
+
+  /**
+   * Whether the last forward failed, so a broken backend is reported once instead of once per
+   * measurement.
+   *
+   * <p>Measurement fails silently by design — a reviewer must never see an analytics error — but
+   * silent to the <em>user</em> is not the same as silent to the operator. Without this, "no events
+   * are arriving" is a question only a packet capture can answer.
+   */
+  private final AtomicBoolean forwardingBroken = new AtomicBoolean();
 
   public TrackingProxyService(TrackingConfigService config, HttpClientProperties httpProperties) {
     this.config = config;
@@ -175,13 +186,32 @@ public class TrackingProxyService {
     try {
       HttpResponse<Void> response =
           http.send(request.build(), HttpResponse.BodyHandlers.discarding());
-      return Optional.of(response.statusCode());
+      int status = response.statusCode();
+      if (status >= 200 && status < 300) {
+        recovered();
+      } else {
+        broken("{} answered {} for a measurement", active.collectBaseUrl(), status);
+      }
+      return Optional.of(status);
     } catch (IOException e) {
-      log.debug("Could not forward a measurement: {}", e.getMessage());
+      broken("could not reach {}: {}", active.collectBaseUrl(), e.getMessage());
       return Optional.empty();
     } catch (InterruptedException e) {
       Thread.currentThread().interrupt();
       return Optional.empty();
+    }
+  }
+
+  /** Reports a broken backend on the transition into that state, never once per measurement. */
+  private void broken(String message, Object... arguments) {
+    if (forwardingBroken.compareAndSet(false, true)) {
+      log.warn("Usage tracking is not being recorded — " + message, arguments);
+    }
+  }
+
+  private void recovered() {
+    if (forwardingBroken.compareAndSet(true, false)) {
+      log.info("Usage tracking is being recorded again");
     }
   }
 
