@@ -91,6 +91,26 @@ class TrackingPayloadSanitizerTest {
   }
 
   @Test
+  @DisplayName("drops the page title, which cannot be anonymised")
+  void dropsTitles() {
+    // Every backend sends document.title along with the address. A title has no
+    // structure to rewrite, and in qnop it is one browser-tab feature away from
+    // being the name of a customer's contract — so it does not travel.
+    String umami =
+        sanitize(
+            "{\"payload\":{\"website\":\"w1\",\"title\":\"Vendor agreement\",\"url\":\"/reviews\"}}");
+    assertThat(umami).doesNotContain("Vendor agreement").contains("w1").contains("/reviews");
+
+    String posthog = sanitize("{\"properties\":{\"$title\":\"Vendor agreement\"}}");
+    assertThat(posthog).doesNotContain("Vendor agreement");
+
+    // Matomo carries it as a query parameter; emptied, not removed.
+    String matomo =
+        TrackingPayloadSanitizer.sanitizeQuery("idsite=1&action_name=Vendor%20agreement&rec=1");
+    assertThat(matomo).doesNotContain("Vendor").contains("action_name=").contains("rec=1");
+  }
+
+  @Test
   @DisplayName("leaves what it cannot read alone rather than mangling it")
   void passesThroughNonJson() {
     byte[] binary = new byte[] {0x1f, (byte) 0x8b, 0x08, 0x00};

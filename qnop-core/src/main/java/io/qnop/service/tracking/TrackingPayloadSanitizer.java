@@ -21,6 +21,7 @@
 package io.qnop.service.tracking;
 
 import java.nio.charset.StandardCharsets;
+import java.util.List;
 import java.util.Set;
 import tools.jackson.core.JacksonException;
 import tools.jackson.databind.JsonNode;
@@ -62,7 +63,19 @@ public final class TrackingPayloadSanitizer {
           "$referrer");
 
   /** Query parameters that carry one, for the backends that measure over a query string. */
-  private static final Set<String> URL_QUERY_PARAMS = Set.of("url", "u", "urlref", "action_name");
+  private static final Set<String> URL_QUERY_PARAMS = Set.of("url", "u", "urlref");
+
+  /**
+   * Fields that carry the page <em>title</em>, which is dropped rather than rewritten.
+   *
+   * <p>Every one of these backends sends the document title along with the address — Umami as
+   * {@code title}, Matomo as {@code action_name}, PostHog as {@code $title}. In qnop a page title
+   * is not neutral: the moment somebody makes browser tabs say what they are showing, it becomes
+   * the name of a customer's contract. Rewriting it is not possible (a title has no structure to
+   * anonymise), so it does not travel at all and reports are keyed on the route pattern instead.
+   */
+  private static final Set<String> DROPPED_FIELDS =
+      Set.of("title", "$title", "page_title", "action_name", "pageTitle");
 
   /** Returns the body with every recognised URL field sanitized; the input if it is not JSON. */
   public static byte[] sanitizeBody(byte[] body) {
@@ -96,6 +109,12 @@ public final class TrackingPayloadSanitizer {
       }
       String name = pairs[i].substring(0, eq);
       String value = pairs[i].substring(eq + 1);
+      if (DROPPED_FIELDS.contains(name)) {
+        // Matomo carries the title as action_name; it is emptied rather than
+        // removed so the parameter list stays the shape the backend expects.
+        out.append(name).append('=');
+        continue;
+      }
       if (URL_QUERY_PARAMS.contains(name)) {
         String decoded = java.net.URLDecoder.decode(value, StandardCharsets.UTF_8);
         value =
@@ -109,9 +128,11 @@ public final class TrackingPayloadSanitizer {
 
   private static void sanitizeNode(JsonNode node) {
     if (node instanceof ObjectNode object) {
-      for (String name : object.propertyNames()) {
+      for (String name : List.copyOf(object.propertyNames())) {
         JsonNode value = object.get(name);
-        if (value != null && value.isString() && URL_FIELDS.contains(name)) {
+        if (DROPPED_FIELDS.contains(name)) {
+          object.remove(name);
+        } else if (value != null && value.isString() && URL_FIELDS.contains(name)) {
           object.put(name, TrackedUrlSanitizer.sanitize(value.stringValue()));
         } else {
           sanitizeNode(value);

@@ -45,6 +45,7 @@ import type { AdminSetting } from '../../../api/generated';
 import { useSettings, useUpdateSettings } from '../../../api/hooks/useSettings';
 import { TimezonePicker } from '../../TimezonePicker';
 import { SectionCard } from '../layout/SectionCard';
+import { trackingStatus } from './trackingStatus';
 import { AdminToast } from '../layout/AdminToast';
 import { useToast } from '../layout/useToast';
 import { apiErrorMessage, apiFieldErrors } from '../../../utils/apiError';
@@ -307,6 +308,16 @@ export function ApplicationSettingsForm() {
     setSubmitAttempted(false);
   };
 
+  // Stored values overlaid with unsaved edits: the status line below has to
+  // answer for what is on screen, not for what was last saved.
+  const effectiveValues = useMemo(() => {
+    const map: Record<string, string> = {};
+    for (const setting of settings) {
+      map[setting.key] = edits[setting.key] ?? setting.value ?? '';
+    }
+    return map;
+  }, [settings, edits]);
+
   const groups = useMemo(() => {
     const byGroup = new Map<string, AdminSetting[]>();
     for (const setting of settings) {
@@ -368,6 +379,7 @@ export function ApplicationSettingsForm() {
             description={GROUP_DESCRIPTIONS[group]}
           >
             <Stack spacing={2.5}>
+              {group === 'tracking' && <TrackingStatusNote values={effectiveValues} />}
               {items.map((setting) => (
                 <SettingField
                   key={setting.key}
@@ -503,5 +515,22 @@ function SettingField({ setting, value, error, onChange }: SettingFieldProps) {
       autoComplete={isPassword ? 'new-password' : undefined}
       sx={{ maxWidth: 480 }}
     />
+  );
+}
+
+/**
+ * One line saying whether measurement is actually running, and if not, which condition is missing
+ * (issue #666). It reads the form's live values, so switching the master toggle answers immediately
+ * rather than after a save and a reload.
+ */
+function TrackingStatusNote({ values }: { values: Record<string, string> }) {
+  const status = trackingStatus(values);
+  if (!status) {
+    return null;
+  }
+  return (
+    <Alert severity={status.severity === 'success' ? 'success' : 'warning'} variant="outlined">
+      {status.message}
+    </Alert>
   );
 }

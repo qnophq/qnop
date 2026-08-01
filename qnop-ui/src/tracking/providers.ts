@@ -78,6 +78,8 @@ const matomo: TrackerAdapter = {
   },
   pageview(url) {
     window._paq?.push(['setCustomUrl', url]);
+    // Matomo would otherwise send document.title as the action name.
+    window._paq?.push(['setDocumentTitle', url]);
     window._paq?.push(['trackPageView']);
   },
   event(name) {
@@ -103,7 +105,9 @@ const umami: TrackerAdapter = {
     'data-auto-track': 'false',
   }),
   pageview(url) {
-    window.umami?.track((props: unknown) => ({ ...(props as object), url }));
+    // `title` is document.title, which qnop must not export (see the server's
+    // sanitiser); it is blanked here so it never leaves the tab either.
+    window.umami?.track((props: unknown) => ({ ...(props as object), url, title: '' }));
   },
   event(name) {
     window.umami?.track(name);
@@ -129,7 +133,7 @@ const posthog: TrackerAdapter = {
     });
   },
   pageview(url) {
-    window.posthog?.capture('$pageview', { $current_url: absolute(url) });
+    window.posthog?.capture('$pageview', { $current_url: absolute(url), $title: '' });
   },
   event(name) {
     window.posthog?.capture(name);
