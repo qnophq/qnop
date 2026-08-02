@@ -20,11 +20,12 @@
  */
 
 import { useQuery } from '@tanstack/react-query';
-import type { ConfigurationResponse } from '../generated';
+import type { ConfigurationResponse, InstanceLimitsResponse } from '../generated';
 import { adminConfigurationApi } from '../config';
 
 export const adminConfigurationKeys = {
   all: ['admin', 'configuration'] as const,
+  limits: ['admin', 'limits'] as const,
 };
 
 /**
@@ -40,5 +41,24 @@ export function useAdminConfiguration() {
       return response.data;
     },
     staleTime: Infinity,
+  });
+}
+
+/**
+ * The instance quotas and what they hold (issue #673).
+ *
+ * <p>Unlike the configuration beside it, usage moves while the page is open — somebody is adding
+ * users, reviews are being finished — so this one is not cached indefinitely. It is still only
+ * refetched on mount and focus: an administrator wants to know whether there is room, not to watch
+ * a live counter.
+ */
+export function useInstanceLimits() {
+  return useQuery<InstanceLimitsResponse>({
+    queryKey: adminConfigurationKeys.limits,
+    queryFn: async () => {
+      const response = await adminConfigurationApi.getInstanceLimits();
+      return response.data;
+    },
+    staleTime: 30_000,
   });
 }

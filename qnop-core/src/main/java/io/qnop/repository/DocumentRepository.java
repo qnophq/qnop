@@ -163,4 +163,17 @@ public interface DocumentRepository
 
   /** How many reviews the purge would delete at {@code cutoff} — the dry-run count (issue #577). */
   long countByArchivedAtBefore(Instant cutoff);
+
+  /**
+   * Reviews still being worked on — the figure the active-review quota is measured against (issue
+   * #673). Finished work does not occupy a seat, so a deployment full of completed reviews still
+   * has its whole quota.
+   *
+   * <p>Expressed as "not closed and not archived" rather than as a list of open states. {@code
+   * workflow_state} is deliberately an extensible string (ADR-0011) that enterprise builds add to,
+   * and a positive list would have quietly counted an enterprise state — a review awaiting
+   * signature, say — as *not* active. {@code closed_at} is set for exactly the terminal states, so
+   * it says "finished" without having to know their names.
+   */
+  long countByArchivedAtIsNullAndClosedAtIsNull();
 }

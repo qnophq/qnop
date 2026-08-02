@@ -244,6 +244,38 @@ paths:
                   linkUrl: "https://status.example.com"
         '401':
           $ref: '#/components/responses/Unauthorized'
+  /admin/limits:
+    get:
+      tags:
+        - AdminConfiguration
+      summary: Get the instance quotas and what they currently hold
+      description: |
+        The four quotas this deployment enforces and their current usage (issue
+        #673). They are deployment properties (`qnop.limits.*`), not application
+        settings — an administrator inside the instance can read them here but
+        cannot change them, because a quota its subject can edit is a suggestion.
+
+        A `maximum` of `0` means unlimited. `teamMembers.used` reports the
+        *fullest* team, since a per-team ceiling has no instance-wide total.
+      operationId: getInstanceLimits
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Quotas and usage
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/InstanceLimitsResponse'
+              example:
+                users: { used: 18, maximum: 25 }
+                teams: { used: 3, maximum: 5 }
+                teamMembers: { used: 9, maximum: 10 }
+                activeReviews: { used: 42, maximum: 0 }
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
   /admin/configuration:
     get:
       tags:
@@ -4875,6 +4907,44 @@ components:
         - auth
         - upload
         - supportedFormats
+    InstanceLimitsResponse:
+      type: object
+      description: What this deployment may hold, and what it holds (issue #673).
+      properties:
+        users:
+          $ref: '#/components/schemas/InstanceQuota'
+        teams:
+          $ref: '#/components/schemas/InstanceQuota'
+        teamMembers:
+          allOf:
+            - $ref: '#/components/schemas/InstanceQuota'
+          description: |
+            `used` is the size of the largest single team — the number that says
+            whether the next invitation will land.
+        activeReviews:
+          allOf:
+            - $ref: '#/components/schemas/InstanceQuota'
+          description: |
+            Counts reviews in `DRAFT`, `IN_REVIEW` or `CHANGES_REQUESTED` that are
+            not archived. Finished work occupies no seat.
+      required:
+        - users
+        - teams
+        - teamMembers
+        - activeReviews
+    InstanceQuota:
+      type: object
+      properties:
+        used:
+          type: integer
+          format: int64
+          description: How much is in use now.
+        maximum:
+          type: integer
+          description: What is permitted; `0` means unlimited.
+      required:
+        - used
+        - maximum
     ServerConfigTracking:
       type: object
       description: |

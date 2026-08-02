@@ -39,6 +39,8 @@ import io.qnop.repository.TeamRepository;
 import io.qnop.repository.UserRepository;
 import io.qnop.repository.UserTeamProjection;
 import io.qnop.service.TeamService.TeamMemberView;
+import io.qnop.service.limits.InstanceLimitProperties;
+import io.qnop.service.limits.InstanceLimitService;
 import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
@@ -53,7 +55,7 @@ class TeamServiceTest {
   private final TeamMembershipRepository memberships = mock(TeamMembershipRepository.class);
   private final UserRepository users = mock(UserRepository.class);
   private final TeamSlugService slugs = mock(TeamSlugService.class);
-  private final TeamService service = new TeamService(teams, memberships, users, slugs);
+  private final TeamService service = new TeamService(teams, memberships, users, slugs, noLimits());
 
   @Test
   @DisplayName("create persists a new team with its initial LEAD and rejects a duplicate name")
@@ -555,5 +557,18 @@ class TeamServiceTest {
       throw new IllegalStateException(e);
     }
     return team;
+  }
+
+  /**
+   * Quotas are off in these tests (issue #673): they cover this service's own behaviour, and
+   * InstanceLimitServiceTest covers the quotas.
+   */
+  private static InstanceLimitService noLimits() {
+    return new InstanceLimitService(
+        InstanceLimitProperties.unlimited(),
+        org.mockito.Mockito.mock(io.qnop.repository.UserRepository.class),
+        org.mockito.Mockito.mock(io.qnop.repository.TeamRepository.class),
+        org.mockito.Mockito.mock(io.qnop.repository.TeamMembershipRepository.class),
+        org.mockito.Mockito.mock(io.qnop.repository.DocumentRepository.class));
   }
 }

@@ -29,6 +29,7 @@ import io.qnop.repository.TeamMembershipRepository;
 import io.qnop.repository.TeamRepository;
 import io.qnop.repository.UserRepository;
 import io.qnop.repository.UserTeamProjection;
+import io.qnop.service.limits.InstanceLimitService;
 import java.time.Instant;
 import java.util.List;
 import java.util.Locale;
@@ -53,6 +54,9 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 public class TeamService {
 
+  /** Instance quotas (issue #673). */
+  private final InstanceLimitService limits;
+
   private final TeamRepository teams;
   private final TeamMembershipRepository memberships;
   private final UserRepository users;
@@ -62,7 +66,9 @@ public class TeamService {
       TeamRepository teams,
       TeamMembershipRepository memberships,
       UserRepository users,
-      TeamSlugService slugs) {
+      TeamSlugService slugs,
+      InstanceLimitService limits) {
+    this.limits = limits;
     this.teams = teams;
     this.memberships = memberships;
     this.users = users;
@@ -129,6 +135,8 @@ public class TeamService {
       Boolean enabled,
       Boolean profileShowMembers,
       Boolean profileShowReviews) {
+    // Quota on teams (issue #673).
+    limits.requireTeamCapacity();
     String trimmed = requireName(name);
     if (teams.existsByNameIgnoreCase(trimmed)) {
       throw new TeamConflictException("NAME_TAKEN", "A team with that name already exists.");
@@ -188,6 +196,8 @@ public class TeamService {
 
   @Transactional
   public TeamMemberView addMember(UUID teamId, UUID userId, String teamRole) {
+    // Quota on how large one team may get (issue #673).
+    limits.requireTeamMemberCapacity(teamId);
     if (!teams.existsById(teamId)) {
       throw TeamNotFoundException.team(teamId);
     }
@@ -360,6 +370,8 @@ public class TeamService {
   @Transactional
   public TeamMemberView addMemberAsLead(
       UUID teamId, UUID actorId, boolean admin, UUID userId, String teamRole) {
+    // The lead's own path into a team is bounded by the same quota (issue #673).
+    limits.requireTeamMemberCapacity(teamId);
     requireLeadOrAdmin(teamId, actorId, admin);
     return addMember(teamId, userId, teamRole);
   }

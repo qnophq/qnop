@@ -29,6 +29,7 @@ import io.qnop.repository.UserRepository;
 import io.qnop.security.PasswordGenerator;
 import io.qnop.service.auth.PasswordResetFlowService;
 import io.qnop.service.auth.PasswordResetFlowService.SetupLinkOutcome;
+import io.qnop.service.limits.InstanceLimitService;
 import io.qnop.service.mail.MailTemplateKey;
 import java.time.Instant;
 import java.util.List;
@@ -58,6 +59,9 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 public class AdminUserService {
 
+  /** Instance quotas (issue #673). */
+  private final InstanceLimitService limits;
+
   /** Whitelist of API sort fields → entity properties (guards the ORDER BY against injection). */
   private static final Map<String, String> SORTABLE =
       Map.of(
@@ -81,7 +85,9 @@ public class AdminUserService {
       PasswordEncoder passwordEncoder,
       PasswordResetFlowService passwordResetFlow,
       RefreshTokenService refreshTokens,
-      UserSlugService slugs) {
+      UserSlugService slugs,
+      InstanceLimitService limits) {
+    this.limits = limits;
     this.users = users;
     this.oidcIdentities = oidcIdentities;
     this.passwordEncoder = passwordEncoder;
@@ -120,6 +126,8 @@ public class AdminUserService {
   @Transactional
   public AdminUserView create(
       String displayName, String username, String email, String roleName, String initialPassword) {
+    // An administrator adding somebody is still an account (issue #673).
+    limits.requireUserCapacity();
     String normalizedEmail = normalizeEmail(email);
     if (users.existsByEmailIgnoreCaseAndSource(normalizedEmail, UserSource.INTERNAL)) {
       throw new AdminUserConflictException("EMAIL_TAKEN", "A user with that email already exists.");

@@ -98,6 +98,13 @@ public interface UserRepository extends JpaRepository<User, UUID> {
   /** Number of enabled users with the given role — guards the last-admin invariant (issue #104). */
   long countByRoleAndEnabledTrue(UserRole role);
 
+  /**
+   * Enabled accounts on this instance — the figure the user quota is measured against (issue #673).
+   * Disabled accounts are excluded: they cannot sign in, so charging a seat for one would make
+   * "deactivate the leaver" a worse move than deleting their history.
+   */
+  long countByEnabledTrue();
+
   boolean existsByEmailIgnoreCaseAndSource(String email, UserSource source);
 
   /**

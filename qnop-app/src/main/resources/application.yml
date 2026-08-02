@@ -183,6 +183,21 @@ qnop:
   # is small, and it is not a per-deployment limit (ADR-0055). A conversion that
   # finds every slot busy waits up to `max-wait` and is then refused — the export
   # answers 503 with Retry-After, an ingest job retries under the queue's backoff.
+  # Instance quotas (issue #673, ADR-0057). What this deployment may hold, set by
+  # whoever operates it — a SaaS plan, in practice. Deliberately NOT application
+  # settings: an administrator inside the instance must not be able to raise their
+  # own ceiling, and anything in the settings registry appears in a web form.
+  #
+  # 0 means unlimited, so a Community deployment is unaffected. Limits bound what
+  # is created and never invalidate what exists: lowering one below current usage
+  # refuses the next record and leaves every present one alone. `max-team-members`
+  # applies per team; `max-active-reviews` counts DRAFT, IN_REVIEW and
+  # CHANGES_REQUESTED — finished work occupies no seat.
+  limits:
+    max-users: ${QNOP_LIMITS_MAX_USERS:0}
+    max-teams: ${QNOP_LIMITS_MAX_TEAMS:0}
+    max-team-members: ${QNOP_LIMITS_MAX_TEAM_MEMBERS:0}
+    max-active-reviews: ${QNOP_LIMITS_MAX_ACTIVE_REVIEWS:0}
   # Usage tracking (issue #666). What an operator configures lives in the admin
   # settings (provider, host, site id, consent, opt-outs); the two keys here are
   # deployment decisions that must not be reachable from the web UI.

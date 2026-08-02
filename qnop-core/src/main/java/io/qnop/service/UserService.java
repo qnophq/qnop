@@ -24,6 +24,7 @@ import io.qnop.entity.User;
 import io.qnop.entity.UserRole;
 import io.qnop.entity.UserSource;
 import io.qnop.repository.UserRepository;
+import io.qnop.service.limits.InstanceLimitService;
 import java.time.Instant;
 import java.util.Locale;
 import java.util.Optional;
@@ -43,11 +44,19 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 public class UserService {
 
+  /** Instance quotas (issue #673): every path that creates an account checks them. */
+  private final InstanceLimitService limits;
+
   private final UserRepository users;
   private final PasswordEncoder passwordEncoder;
   private final UserSlugService slugs;
 
-  public UserService(UserRepository users, PasswordEncoder passwordEncoder, UserSlugService slugs) {
+  public UserService(
+      UserRepository users,
+      PasswordEncoder passwordEncoder,
+      UserSlugService slugs,
+      InstanceLimitService limits) {
+    this.limits = limits;
     this.users = users;
     this.passwordEncoder = passwordEncoder;
     this.slugs = slugs;
@@ -57,6 +66,8 @@ public class UserService {
   @Transactional
   public User createSelfRegistered(
       String username, String email, String rawPassword, String displayName, UserRole role) {
+    // Self-registration is the one path a stranger can walk (issue #673).
+    limits.requireUserCapacity();
     String name = displayName == null || displayName.isBlank() ? username : displayName;
     User user =
         User.internal(name, normalizeEmail(email), username, passwordEncoder.encode(rawPassword));
@@ -133,6 +144,9 @@ public class UserService {
   /** Provisions an enabled external (OIDC) user — no local credentials (issue #21). */
   @Transactional
   public User provisionExternal(String displayName, String email) {
+    // A first OIDC login creates an account like any other; a quota the identity
+    // provider walks around is not a quota (issue #673).
+    limits.requireUserCapacity();
     User user = User.external(displayName, normalizeEmail(email));
     user.setEnabled(true);
     user.setSlug(slugs.allocate(displayName));

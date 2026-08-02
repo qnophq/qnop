@@ -38,6 +38,7 @@ import type { ConfigurationEntry, ConfigurationGroup } from '../../api/generated
 import { useAdminConfiguration } from '../../api/hooks/useAdminConfiguration';
 import { PageHeader } from '../../components/admin/layout/PageHeader';
 import { SectionCard } from '../../components/admin/layout/SectionCard';
+import { InstanceQuotaCard } from '../../components/admin/InstanceQuotaCard';
 import { AdminToast } from '../../components/admin/layout/AdminToast';
 import { useToast } from '../../components/admin/layout/useToast';
 import { ToneBadge } from '../../components/admin/ToneBadge';
@@ -280,6 +281,10 @@ export function ConfigurationPage() {
         title="Configuration"
         description="The effective qnop.* settings this server bound at startup, from application.yml and QNOP_* environment variables."
       />
+
+      {/* Quotas first (issue #673): what the deployment may hold is the question
+          an administrator comes here with far more often than any single property. */}
+      <InstanceQuotaCard />
 
       <Alert severity="info" variant="outlined">
         Read-only. These values are set in your deployment — change one by updating the environment

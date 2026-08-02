@@ -32,6 +32,8 @@ import io.qnop.entity.UserSource;
 import io.qnop.repository.TeamRepository;
 import io.qnop.repository.UserRepository;
 import io.qnop.service.UserService.UserProfileView;
+import io.qnop.service.limits.InstanceLimitProperties;
+import io.qnop.service.limits.InstanceLimitService;
 import java.util.Optional;
 import java.util.UUID;
 import org.junit.jupiter.api.DisplayName;
@@ -49,7 +51,8 @@ class UserServiceTest {
       new UserService(
           users,
           passwordEncoder,
-          new UserSlugService(new SlugNamespace(users, mock(TeamRepository.class))));
+          new UserSlugService(new SlugNamespace(users, mock(TeamRepository.class))),
+          noLimits());
 
   @Test
   @DisplayName("getProfile returns an entity-free view with role and source as names")
@@ -140,5 +143,18 @@ class UserServiceTest {
 
     assertThatThrownBy(() -> service.applyPasswordReset(id, "new-password"))
         .isInstanceOf(UserNotFoundException.class);
+  }
+
+  /**
+   * Quotas are off in these tests (issue #673): they cover this service's own behaviour, and
+   * InstanceLimitServiceTest covers the quotas.
+   */
+  private static InstanceLimitService noLimits() {
+    return new InstanceLimitService(
+        InstanceLimitProperties.unlimited(),
+        org.mockito.Mockito.mock(io.qnop.repository.UserRepository.class),
+        org.mockito.Mockito.mock(io.qnop.repository.TeamRepository.class),
+        org.mockito.Mockito.mock(io.qnop.repository.TeamMembershipRepository.class),
+        org.mockito.Mockito.mock(io.qnop.repository.DocumentRepository.class));
   }
 }

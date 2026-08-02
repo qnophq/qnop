@@ -34,6 +34,7 @@ import io.qnop.service.ApplicationSettingsService;
 import io.qnop.service.job.JobPayload;
 import io.qnop.service.job.JobPayloadCodec;
 import io.qnop.service.job.JobService;
+import io.qnop.service.limits.InstanceLimitService;
 import io.qnop.service.review.ReviewEvent;
 import io.qnop.service.storage.StagedObject;
 import io.qnop.service.storage.StorageQuotaExceededException;
@@ -69,6 +70,9 @@ import org.springframework.transaction.support.TransactionTemplate;
  */
 @Service
 public class DocumentIngestService {
+
+  /** Instance quotas (issue #673). */
+  private final InstanceLimitService limits;
 
   /** The job type consumed by {@code DocumentExtractionJobHandler}. */
   public static final String EXTRACTION_JOB_TYPE = "document.extract";
@@ -106,7 +110,9 @@ public class DocumentIngestService {
       AnnotationPlacementRepository placements,
       PlatformTransactionManager transactionManager,
       ApplicationEventPublisher events,
-      DocumentRenditionService renditions) {
+      DocumentRenditionService renditions,
+      InstanceLimitService limits) {
+    this.limits = limits;
     this.documents = documents;
     this.versions = versions;
     this.storage = storage;
@@ -135,6 +141,9 @@ public class DocumentIngestService {
       String slug,
       boolean anonymous,
       String threadParticipation) {
+    // Quota on reviews being worked on (issue #673). Checked before the upload
+    // is stored, so a refused review leaves no orphaned object behind.
+    limits.requireActiveReviewCapacity();
     String cleanTitle = requireTitle(title);
     Instant validDueAt = requireFutureOrNull(dueAt);
     String cleanSlug = normalizeSlug(slug);
