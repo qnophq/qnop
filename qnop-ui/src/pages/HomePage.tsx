@@ -37,7 +37,7 @@ import {
 } from 'lucide-react';
 import { useNavigate } from 'react-router';
 import { useDashboard } from '../api/hooks/useDashboard';
-import { useReviews } from '../api/hooks/useReviews';
+import { useReviews, useReviewCapacity } from '../api/hooks/useReviews';
 import { PageHeader } from '../components/admin/layout/PageHeader';
 import { ActivityCard } from '../components/dashboard/ActivityCard';
 import { PlayerCard } from '../components/dashboard/PlayerCard';
@@ -76,6 +76,9 @@ const DATE_FORMAT = new Intl.DateTimeFormat('en-US', {
  */
 export function HomePage() {
   const navigate = useNavigate();
+  // Shares its cache entry with the reviews list, so this costs no extra call
+  // on a page that already lists reviews (issue #692).
+  const reviewCapacity = useReviewCapacity();
   const displayName = useAuthStore((s) => s.displayName);
   const userId = useAuthStore((s) => s.userId);
   const reviewsQuery = useReviews({ page: 0, size: 100, sort: 'updatedAt,desc' });
@@ -115,6 +118,7 @@ export function HomePage() {
           <Button
             variant="contained"
             startIcon={<Plus size={16} />}
+            disabled={reviewCapacity.full}
             onClick={() => navigate('/reviews/new')}
           >
             New review

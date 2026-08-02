@@ -718,7 +718,10 @@ export function ReviewsPage() {
         <Stack spacing={2} sx={{ alignItems: 'flex-start' }}>
           {participationToggle}
           <Box sx={{ alignSelf: 'stretch' }}>
-            <ReviewsEmptyState onNewReview={() => navigate('/reviews/new')} />
+            <ReviewsEmptyState
+              onNewReview={() => navigate('/reviews/new')}
+              disabled={reviewsFull}
+            />
           </Box>
         </Stack>
       )}

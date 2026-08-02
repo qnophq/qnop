@@ -118,6 +118,10 @@ That prediction held: the team quota was reported the same way a day later, on a
 
 All four say it the same way (#690), through one shared component. They had drifted within a day of each other: the user list warned in yellow, the team list put a number in its page description, and the review button explained itself in a tooltip only a pointer could reach — three appearances for one event. The caller supplies what is full and how to free one, because that genuinely differs; the closing sentence is fixed, since "the ceiling is set where this deployment is configured, not in the admin settings" is the same answer every time and the one that stops an administrator searching a settings page that will never contain it.
 
+It has to be **every** way in, not the most obvious one (#692). The review quota was first given to the reviews list alone, which left `/reviews/new` reachable: the whole three-step wizard — upload, reviewers, deadline — could be filled in and was refused at the last step, and the dashboard and empty-state buttons stayed live. The wizard is where the most work is lost, so it is the worst place to find out.
+
+That screen deliberately does **not** get the withheld-capability page from #682. A full quota is not a wall: it clears itself the moment somebody finalizes a review. So it says which number is full and how to free one, and offers the way back — a refusal that will resolve itself should read as a queue, not as a locked door.
+
 **A ceiling belongs on the screen that offers the action, not only on the one that reports configuration.** `/admin/limits` cannot serve this: it belongs to a configuration page a deployment may withhold (#683), and a tenant who cannot see the configuration still has to know why they cannot add a user.
 
 ## Related

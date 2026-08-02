@@ -35,6 +35,8 @@ const CANDIDATES: AdminUserSummary[] = ['Ada', 'Ben', 'Cleo', 'Dara'].map((name,
   role: 'MEMBER' as AdminUserSummary['role'],
   source: 'INTERNAL' as AdminUserSummary['source'],
   enabled: true,
+  passwordChangeRequired: false,
+  createdAt: '2026-01-01T00:00:00Z',
 }));
 
 vi.mock('../../../api/hooks/useAdminUsers', () => ({

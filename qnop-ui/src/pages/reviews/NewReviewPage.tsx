@@ -33,7 +33,8 @@ import type { PrincipalView } from '../../api/generated';
 import { ParticipantKind, ThreadParticipation } from '../../api/generated';
 import { documentsApi, reviewWorkflowApi } from '../../api/config';
 import { useConfig } from '../../api/hooks/useConfig';
-import { reviewKeys, useCreateReview } from '../../api/hooks/useReviews';
+import { reviewKeys, useCreateReview, useReviewCapacity } from '../../api/hooks/useReviews';
+import { QuotaAlert } from '../../components/limits/QuotaAlert';
 import { PageHeader } from '../../components/admin/layout/PageHeader';
 import { CommanderCard } from '../../components/reviews/wizard/CommanderCard';
 import { DocumentStep } from '../../components/reviews/wizard/DocumentStep';
@@ -73,6 +74,7 @@ export function NewReviewPage() {
   const userId = useAuthStore((s) => s.userId);
   const { data: config } = useConfig();
   const createReview = useCreateReview();
+  const capacity = useReviewCapacity();
 
   const [step, setStep] = useState(1);
   const [file, setFile] = useState<File | null>(null);
@@ -233,6 +235,34 @@ export function NewReviewPage() {
             onClick={() => navigate(`/reviews/${submit.partial?.documentId}`)}
           >
             Open review
+          </Button>
+        </Box>
+      </Stack>
+    );
+  }
+
+  // A wizard that cannot end in a review is worse than no wizard (issue #692):
+  // three steps of uploading, picking reviewers and setting a deadline, only to
+  // be refused at the last one. The ingest endpoint refuses either way; this is
+  // about not asking for the work first.
+  //
+  // Not an error page: unlike a withheld capability (#682) this clears itself
+  // the moment somebody finalizes a review, so it says what to do rather than
+  // showing a wall.
+  if (capacity.full) {
+    return (
+      <Stack spacing={3}>
+        <PageHeader
+          title="New review"
+          description="Guided three-step setup: document, reviewers, start."
+        />
+        <QuotaAlert>
+          This instance allows {capacity.limit} reviews open at once, and {capacity.used} are open.
+          Finalizing or archiving one frees a slot; finished work occupies nothing.
+        </QuotaAlert>
+        <Box>
+          <Button variant="contained" onClick={() => navigate('/reviews')}>
+            Back to reviews
           </Button>
         </Box>
       </Stack>

@@ -56,7 +56,14 @@ const PERKS: { icon: ReactNode; label: string }[] = [
  * review. Same visual language as the My Teams empty state — full-width, brand
  * glow, staggered reveal.
  */
-export function ReviewsEmptyState({ onNewReview }: { onNewReview: () => void }) {
+export function ReviewsEmptyState({
+  onNewReview,
+  disabled = false,
+}: {
+  onNewReview: () => void;
+  /** True where the instance has no open-review slots left (issue #692). */
+  disabled?: boolean;
+}) {
   return (
     <Paper
       variant="outlined"
@@ -143,12 +150,15 @@ export function ReviewsEmptyState({ onNewReview }: { onNewReview: () => void }) 
             variant="contained"
             size="large"
             startIcon={<Plus size={18} />}
+            disabled={disabled}
             onClick={onNewReview}
           >
             New review
           </Button>
           <Typography sx={{ mt: 1.25, fontSize: 13, color: 'text.disabled' }}>
-            Upload a document to begin.
+            {disabled
+              ? 'This instance has no open-review slots left.'
+              : 'Upload a document to begin.'}
           </Typography>
         </Box>
       </Stack>
