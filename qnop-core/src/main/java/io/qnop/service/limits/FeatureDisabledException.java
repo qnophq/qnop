@@ -50,7 +50,8 @@ public class FeatureDisabledException extends RuntimeException {
   public enum Feature {
     OIDC("OIDC_DISABLED", "single sign-on"),
     ANNOTATION_EXPORT("ANNOTATION_EXPORT_DISABLED", "annotation export"),
-    CUSTOM_BRANDING("CUSTOM_BRANDING_DISABLED", "custom branding");
+    CUSTOM_BRANDING("CUSTOM_BRANDING_DISABLED", "custom branding"),
+    SCHEDULER_MANUAL_RUN("SCHEDULER_MANUAL_RUN_DISABLED", "starting a maintenance job by hand");
 
     private final String code;
     private final String subject;

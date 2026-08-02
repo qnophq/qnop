@@ -43,6 +43,12 @@ interface SchedulerJobCardProps {
   onToggleEnabled: (job: SchedulerJob) => void;
   onToggleDryRun: (job: SchedulerJob) => void;
   onRunNow: (job: SchedulerJob) => void;
+  /**
+   * Whether this deployment allows a manual run at all (issue #676). False drops
+   * the button rather than disabling it: a greyed-out control invites hovering
+   * for a tooltip that explains nothing the page has not already said above.
+   */
+  manualRunEnabled: boolean;
 }
 
 /** The last-run outcome as a coloured pill: green success, red failure, neutral "never run". */
@@ -69,6 +75,7 @@ export function SchedulerJobCard({
   onToggleEnabled,
   onToggleDryRun,
   onRunNow,
+  manualRunEnabled,
 }: SchedulerJobCardProps) {
   const theme = useTheme();
   const { formatRelative } = useFormatters();
@@ -191,17 +198,19 @@ export function SchedulerJobCard({
               />
             )}
           </Stack>
-          <Button
-            size="small"
-            variant="outlined"
-            disabled={running}
-            startIcon={
-              running ? <CircularProgress size={14} color="inherit" /> : <Play size={15} />
-            }
-            onClick={() => onRunNow(job)}
-          >
-            Run now
-          </Button>
+          {manualRunEnabled && (
+            <Button
+              size="small"
+              variant="outlined"
+              disabled={running}
+              startIcon={
+                running ? <CircularProgress size={14} color="inherit" /> : <Play size={15} />
+              }
+              onClick={() => onRunNow(job)}
+            >
+              Run now
+            </Button>
+          )}
         </Stack>
       </Stack>
     </Paper>

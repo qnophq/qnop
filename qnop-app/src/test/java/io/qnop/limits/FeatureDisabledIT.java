@@ -51,7 +51,8 @@ import org.springframework.test.context.TestPropertySource;
     properties = {
       "qnop.features.oidc=false",
       "qnop.features.annotation-export=false",
-      "qnop.features.custom-branding=false"
+      "qnop.features.custom-branding=false",
+      "qnop.features.scheduler-manual-run=false"
     })
 class FeatureDisabledIT extends SeededIntegrationTest {
 
@@ -137,6 +138,29 @@ class FeatureDisabledIT extends SeededIntegrationTest {
     mockMvc
         .perform(get("/api/v1/config"))
         .andExpect(jsonPath("$.branding.logoLight.source").value("DEFAULT"));
+  }
+
+  @Test
+  @DisplayName("a job cannot be started by hand, and the screen is told why")
+  void schedulerManualRunIsRefused() throws Exception {
+    mockMvc
+        .perform(
+            // A real catalogued job on purpose: the guard runs before the id is
+            // looked up, so a made-up id would answer 403 too and prove nothing.
+            post("/api/v1/admin/scheduler/emailVerificationTokenSweep/run")
+                .header("Authorization", "Bearer " + token(ADMIN_ID)))
+        .andExpect(status().isForbidden())
+        .andExpect(jsonPath("$.code").value("SCHEDULER_MANUAL_RUN_DISABLED"));
+
+    // The list says so as well, so the page can drop the button instead of
+    // offering one that always fails. The jobs themselves are still listed:
+    // what is withheld is the manual trigger, not the schedule.
+    mockMvc
+        .perform(
+            get("/api/v1/admin/scheduler").header("Authorization", "Bearer " + token(ADMIN_ID)))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.manualRunEnabled").value(false))
+        .andExpect(jsonPath("$.items").isNotEmpty());
   }
 
   /** A review the export can be asked for; its content does not matter here. */

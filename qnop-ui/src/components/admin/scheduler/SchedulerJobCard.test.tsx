@@ -49,6 +49,7 @@ function renderCard(job: SchedulerJob, handlers = {}) {
     onToggleEnabled: vi.fn(),
     onToggleDryRun: vi.fn(),
     onRunNow: vi.fn(),
+    manualRunEnabled: true,
     ...handlers,
   };
   render(<SchedulerJobCard {...props} />, { wrapper });
@@ -111,5 +112,15 @@ describe('SchedulerJobCard', () => {
 
     expect(onToggleEnabled).toHaveBeenCalledWith(BASE);
     expect(onRunNow).toHaveBeenCalledWith(BASE);
+  });
+
+  it('offers no run-now button where the deployment forbids manual runs', () => {
+    // Issue #676: dropped rather than disabled — the page says why once, at the
+    // top, so a greyed-out button here would only invite a hover for nothing.
+    renderCard(BASE, { manualRunEnabled: false });
+
+    expect(screen.queryByRole('button', { name: 'Run now' })).not.toBeInTheDocument();
+    // The rest of the card still works: what is withheld is the manual trigger.
+    expect(screen.getByLabelText('Enable Storage orphan reaper')).toBeTruthy();
   });
 });

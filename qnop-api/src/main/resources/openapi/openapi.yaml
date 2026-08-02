@@ -6012,8 +6012,18 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/SchedulerJob'
+        manualRunEnabled:
+          type: boolean
+          description: |
+            Whether this deployment permits starting a job by hand
+            (`qnop.features.scheduler-manual-run`, issue #676). False means the
+            run-now endpoint refuses for every job; the schedules themselves are
+            unaffected and keep running. It travels here rather than in the
+            public `/config` because it answers a question only an administrator
+            asks, and this is the response the scheduler screen already loads.
       required:
         - items
+        - manualRunEnabled
     SchedulerJobUpdateRequest:
       type: object
       description: |

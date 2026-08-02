@@ -45,12 +45,18 @@ import org.springframework.boot.context.properties.bind.DefaultValue;
  * @param customBranding operator logos; off means every slot serves the bundled default, including
  *     slots that already hold an upload — otherwise a downgrade would leave the previous logo in
  *     place
+ * @param schedulerManualRun an administrator's run-now on a maintenance job (issue #676). Off
+ *     leaves the schedule itself alone: the sweeps keep running on their cron, and only the manual
+ *     trigger is withheld. It is its own switch because run-now is deliberately an override — it
+ *     starts a job regardless of the job's own enabled flag — which is right for a self-hosted
+ *     installation and is arbitrary load on demand for a hosted one.
  */
 @ConfigurationProperties(prefix = "qnop.features")
 public record FeatureToggleProperties(
     @DefaultValue("true") boolean oidc,
     @DefaultValue("true") boolean annotationExport,
-    @DefaultValue("true") boolean customBranding) {
+    @DefaultValue("true") boolean customBranding,
+    @DefaultValue("true") boolean schedulerManualRun) {
 
   /**
    * Everything on — the Community default, for tests and non-Spring callers.
@@ -62,6 +68,6 @@ public record FeatureToggleProperties(
    * annotations below are what actually supplies the defaults.
    */
   public static FeatureToggleProperties all() {
-    return new FeatureToggleProperties(true, true, true);
+    return new FeatureToggleProperties(true, true, true, true);
   }
 }

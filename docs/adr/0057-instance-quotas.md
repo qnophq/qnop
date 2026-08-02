@@ -46,7 +46,9 @@ Quotas here are a commercial boundary, not a safety interlock. This is written d
 
 ### Capabilities are switches beside the quotas, not more of them
 
-`qnop.features.oidc`, `.annotation-export` and `.custom-branding` (issue #674), all defaulting to on. Their own prefix, because a switch is not a ceiling — the same block of a configuration file, because an operator reads them together.
+`qnop.features.oidc`, `.annotation-export`, `.custom-branding` (issue #674) and `.scheduler-manual-run` (issue #676), all defaulting to on. Their own prefix, because a switch is not a ceiling — the same block of a configuration file, because an operator reads them together.
+
+The fourth is a different kind of thing from the first three and belongs here anyway. Run-now on a maintenance job is not a plan feature; it is an override that starts a sweep **regardless of the job's own enabled flag**. On a self-hosted installation that is exactly what an administrator needs. On a hosted one it is arbitrary load on demand, held by the person the operator cannot overrule. What is withheld is the trigger, never the schedule: the sweeps keep running on their cron, which is the property the tests pin down.
 
 **Off closes the door rather than hiding the handle.** Removing an option from a list a client renders is not withholding a capability: `/oauth2/authorization/{id}` is a URL somebody can type, and an export endpoint answers on its own. So the OAuth2 filter chain is not registered at all when SSO is off, the export endpoint refuses as well as vanishing from the format list, and branding refuses uploads *and* serves the bundled logo for slots that already hold one — otherwise a downgrade would change nothing anybody can see.
 
@@ -58,7 +60,11 @@ A trap worth recording, because it cost a debugging round and would have shipped
 
 `GET /admin/limits` reports each quota with its usage, shown on the Configuration page — the surface that already answers "what did the deployment set" rather than "what did an administrator choose". An administrator should know they are at 24 of 25 before the twenty-sixth attempt fails.
 
-`/config` publishes the capability flags alongside, and the client drops what a withheld capability would offer: the sidebar omits the pages that administer it, and the export button does not appear on a review. That is presentation, not enforcement — the endpoints refuse either way — but leaving it out was a real defect, not a cosmetic one: the first version hid the pages and kept the button, so a user could configure an export through four steps of a wizard and be refused at the download. **An affordance that cannot succeed is worse than no affordance**, and "the endpoint refuses anyway" is not a reason to leave one standing.
+`/config` publishes the first three capability flags, since a client needs them before anybody has logged in. The scheduler switch travels on the admin scheduler response instead: it answers a question only an administrator asks, that response is what the screen already loads, and a public endpoint is the wrong place to describe a deployment's internal operations. Same switch, different audience — so a different messenger.
+
+The client drops what a withheld capability would offer: the sidebar omits the pages that administer it, and the export button does not appear on a review. That is presentation, not enforcement — the endpoints refuse either way — but leaving it out was a real defect, not a cosmetic one: the first version hid the pages and kept the button, so a user could configure an export through four steps of a wizard and be refused at the download. **An affordance that cannot succeed is worse than no affordance**, and "the endpoint refuses anyway" is not a reason to leave one standing.
+
+Where the *whole* capability is gone, the affordance goes silently — there is nothing left to explain on a page the user can no longer reach. Where only one action is withheld and the page remains useful, the page says so once, at the top: the scheduler still shows schedules, dry-run and enable/disable, and run buttons that had simply vanished would read as a broken scheduler rather than a deliberate setting. The sentence names the deployment, not the user's permissions, so the reader takes the question to whoever operates it.
 
 ## Consequences
 

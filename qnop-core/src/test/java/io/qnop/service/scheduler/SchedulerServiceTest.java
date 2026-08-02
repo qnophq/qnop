@@ -33,6 +33,8 @@ import io.qnop.entity.AuditEvent;
 import io.qnop.entity.SchedulerJob;
 import io.qnop.repository.AuditEventRepository;
 import io.qnop.repository.SchedulerJobRepository;
+import io.qnop.service.limits.FeatureDisabledException;
+import io.qnop.service.limits.FeatureToggleProperties;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -75,7 +77,9 @@ class SchedulerServiceTest {
   @BeforeEach
   void setUp() {
     when(transactionManager.getTransaction(any())).thenReturn(new SimpleTransactionStatus());
-    scheduler = new SchedulerService(jobs, auditEvents, lockProvider, transactionManager);
+    scheduler =
+        new SchedulerService(
+            jobs, auditEvents, lockProvider, transactionManager, FeatureToggleProperties.all());
   }
 
   @Test
@@ -364,5 +368,41 @@ class SchedulerServiceTest {
     // The purge costs two — the work itself is invoked with no enclosing transaction (issue #577),
     // so it can commit per review and delete storage objects between those commits.
     verify(transactionManager, times(2)).getTransaction(any());
+  }
+
+  @Test
+  @DisplayName("a deployment may withhold run-now, and its schedules keep running")
+  void manualRunCanBeWithheld() {
+    SchedulerService withoutManualRun =
+        new SchedulerService(
+            jobs,
+            auditEvents,
+            lockProvider,
+            transactionManager,
+            new FeatureToggleProperties(true, true, true, false));
+    AtomicInteger runs = new AtomicInteger();
+    withoutManualRun.register(
+        TOKEN_JOB,
+        dryRun -> {
+          runs.incrementAndGet();
+          return null;
+        });
+
+    assertThatThrownBy(() -> withoutManualRun.runNow(UUID.randomUUID(), TOKEN_JOB))
+        .isInstanceOf(FeatureDisabledException.class);
+
+    assertThat(withoutManualRun.manualRunEnabled()).isFalse();
+    // Refused before anything could happen: nothing ran, and no lock was taken
+    // that a scheduled run would then have had to wait for.
+    assertThat(runs).hasValue(0);
+    verify(lockProvider, never()).lock(any());
+    verify(auditEvents, never()).save(any());
+
+    // The whole point of the switch: what is withheld is the manual override,
+    // not the job. The cron entry point still runs it.
+    when(jobs.findById(TOKEN_JOB)).thenReturn(Optional.of(SchedulerJob.seed(TOKEN_JOB, true)));
+
+    assertThat(withoutManualRun.runScheduled(TOKEN_JOB)).isEqualTo(RunOutcome.SUCCESS);
+    assertThat(runs).hasValue(1);
   }
 }

@@ -55,6 +55,9 @@ export function SchedulerPage() {
   const [runningId, setRunningId] = useState<string | null>(null);
 
   const jobs = data?.items ?? [];
+  // Optimistic while the list is still loading, so the button does not appear a
+  // beat late on the deployments — the majority — that allow manual runs.
+  const manualRunEnabled = data?.manualRunEnabled ?? true;
   const tiles: StatTile[] = [
     { label: 'Jobs', value: jobs.length, icon: ListChecks },
     { label: 'Enabled', value: jobs.filter((j) => j.enabled).length, icon: Power, tone: 'success' },
@@ -127,6 +130,16 @@ export function SchedulerPage() {
 
       {!isError && jobs.length > 0 && <StatStrip tiles={tiles} />}
 
+      {/* Said once, at the top, rather than as a tooltip on each missing button.
+          The second sentence is the one that matters: without it, a page whose
+          run buttons have vanished reads as a broken scheduler. */}
+      {!manualRunEnabled && !isError && (
+        <Alert severity="info" variant="outlined">
+          Running a job by hand is disabled on this deployment. The schedules below are unaffected
+          and keep running.
+        </Alert>
+      )}
+
       <Box sx={{ height: 3 }}>{isFetching && !isLoading && <LinearProgress />}</Box>
 
       {isError ? (
@@ -146,6 +159,7 @@ export function SchedulerPage() {
               onToggleEnabled={onToggleEnabled}
               onToggleDryRun={onToggleDryRun}
               onRunNow={onRunNow}
+              manualRunEnabled={manualRunEnabled}
             />
           ))}
         </Stack>

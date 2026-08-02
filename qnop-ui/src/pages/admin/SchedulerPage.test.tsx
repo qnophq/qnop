@@ -85,7 +85,7 @@ beforeEach(() => {
   updateMutate.mockReset().mockResolvedValue(undefined);
   runMutate.mockReset().mockResolvedValue({ ...REFRESH, lastOutcome: 'SUCCESS' });
   useSchedulerJobsMock.mockReset().mockReturnValue({
-    data: { items: [REFRESH, REAPER] },
+    data: { items: [REFRESH, REAPER], manualRunEnabled: true },
     isLoading: false,
     isFetching: false,
     isError: false,
@@ -112,7 +112,7 @@ describe('SchedulerPage', () => {
 
   it('shows a progress bar while refetching', () => {
     useSchedulerJobsMock.mockReturnValue({
-      data: { items: [REFRESH, REAPER] },
+      data: { items: [REFRESH, REAPER], manualRunEnabled: true },
       isLoading: false,
       isFetching: true,
       isError: false,
@@ -177,5 +177,22 @@ describe('SchedulerPage', () => {
 
     const alert = await screen.findByText('The job could not be started.');
     expect(alert.closest('.MuiAlert-colorError')).toBeTruthy();
+  });
+
+  it('explains the missing run buttons where manual runs are forbidden', async () => {
+    useSchedulerJobsMock.mockReturnValue({
+      data: { items: [REFRESH, REAPER], manualRunEnabled: false },
+      isLoading: false,
+      isFetching: false,
+      isError: false,
+    });
+
+    renderPage();
+
+    // Both halves matter: no button that would always fail, and a reason — a
+    // scheduler page whose run buttons simply vanished reads as broken.
+    expect(await screen.findByText(/Running a job by hand is disabled/)).toBeInTheDocument();
+    expect(screen.getByText(/schedules below are unaffected/)).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Run now' })).not.toBeInTheDocument();
   });
 });
