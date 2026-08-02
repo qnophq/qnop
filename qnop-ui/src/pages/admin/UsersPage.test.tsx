@@ -408,6 +408,7 @@ describe('UsersPage', () => {
     // The way out is deleting, not disabling — that distinction is the whole
     // reason the count changed.
     expect(screen.getByText(/disabling one does not/i)).toBeInTheDocument();
+    expect(screen.getByRole('alert')).toHaveTextContent(/not in the admin settings/);
   });
 
   it('leaves the button alone where the deployment sets no ceiling', async () => {

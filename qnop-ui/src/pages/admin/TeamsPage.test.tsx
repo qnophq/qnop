@@ -303,5 +303,9 @@ describe('TeamsPage', () => {
 
     expect(await screen.findByRole('button', { name: /Create team/i })).toBeDisabled();
     expect(screen.getByText(/2 of 2 teams used/)).toBeInTheDocument();
+    // The same yellow warning the user list shows (issue #690), not a quieter
+    // variant — one ceiling should not look like two kinds of event.
+    expect(screen.getByRole('alert')).toHaveTextContent(/configured for 2 teams/);
+    expect(screen.getByRole('alert')).toHaveTextContent(/not in the admin settings/);
   });
 });

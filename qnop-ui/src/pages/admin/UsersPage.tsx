@@ -46,6 +46,7 @@ import { ResetLinkDialog } from '../../components/admin/users/ResetLinkDialog';
 import { GeneratedPasswordDialog } from '../../components/admin/users/GeneratedPasswordDialog';
 import { ConfirmDialog } from '../../components/admin/ConfirmDialog';
 import { PageHeader } from '../../components/admin/layout/PageHeader';
+import { QuotaAlert } from '../../components/limits/QuotaAlert';
 import { AdminToast } from '../../components/admin/layout/AdminToast';
 import { useToast } from '../../components/admin/layout/useToast';
 import { useAuthStore } from '../../stores/authStore';
@@ -206,11 +207,10 @@ export function UsersPage() {
       />
 
       {seatsFull && (
-        <Alert severity="warning">
+        <QuotaAlert>
           This instance is configured for {seatLimit} accounts and holds {seatsUsed}. Deleting an
-          account frees a seat; disabling one does not. The ceiling is set where this deployment is
-          configured, not in the admin settings.
-        </Alert>
+          account frees a seat; disabling one does not.
+        </QuotaAlert>
       )}
 
       <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1.5} sx={{ flexWrap: 'wrap' }}>

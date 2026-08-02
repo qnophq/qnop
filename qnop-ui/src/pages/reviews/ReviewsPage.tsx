@@ -41,6 +41,7 @@ import { LayoutGrid, ListFilter, Plus, Rows3, Trash2 } from 'lucide-react';
 import { useNavigate, useSearchParams } from 'react-router';
 import type { DocumentSummary } from '../../api/generated';
 import { useReviews } from '../../api/hooks/useReviews';
+import { QuotaAlert } from '../../components/limits/QuotaAlert';
 import { ErrorState } from '../errors/ErrorState';
 import { ServerErrorIllustration } from '../errors/illustrations';
 import { ClearableSearchField } from '../../components/ClearableSearchField';
@@ -607,29 +608,25 @@ export function ReviewsPage() {
   const reviewsFull = reviewLimit > 0 && reviewsOpen >= reviewLimit;
 
   const newReviewButton = (
-    <Tooltip
-      title={
-        reviewsFull
-          ? `This instance allows ${reviewLimit} reviews open at once. Finalizing or archiving one frees a slot.`
-          : ''
-      }
+    <Button
+      variant="contained"
+      startIcon={<Plus size={16} />}
+      disabled={reviewsFull}
+      onClick={() => navigate('/reviews/new')}
     >
-      {/* A span, because a disabled MUI button does not emit the events a
-          tooltip needs — and here the explanation is the whole point: the
-          way out is finishing a review, which is not obvious from a grey
-          button. */}
-      <span>
-        <Button
-          variant="contained"
-          startIcon={<Plus size={16} />}
-          disabled={reviewsFull}
-          onClick={() => navigate('/reviews/new')}
-        >
-          New review
-        </Button>
-      </span>
-    </Tooltip>
+      New review
+    </Button>
   );
+
+  // The same warning the other three quotas show (issue #690) — it replaced a
+  // tooltip on the button, which said the same thing in a place only a mouse
+  // could reach.
+  const reviewQuotaWarning = reviewsFull ? (
+    <QuotaAlert>
+      This instance allows {reviewLimit} reviews open at once, and {reviewsOpen} are open.
+      Finalizing or archiving a review frees a slot; finished work occupies nothing.
+    </QuotaAlert>
+  ) : null;
 
   // Rendered next to the search field, and again over the empty state — an admin
   // with no reviews of their own must still be able to reach everyone else's.
@@ -664,6 +661,8 @@ export function ReviewsPage() {
         }
         action={newReviewButton}
       />
+
+      {reviewQuotaWarning}
 
       {isError && (
         // The branded failure shell (issue #611) instead of a bare alert -

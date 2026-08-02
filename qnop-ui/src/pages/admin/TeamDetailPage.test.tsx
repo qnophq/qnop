@@ -274,5 +274,6 @@ describe('TeamDetailPage', () => {
 
     expect(await screen.findByRole('button', { name: /Add member/i })).toBeDisabled();
     expect(screen.getByText(/member slots used/)).toBeInTheDocument();
+    expect(screen.getByRole('alert')).toHaveTextContent(/Removing a member frees a slot/);
   });
 });

@@ -785,5 +785,7 @@ describe('ReviewsPage — the admin moderation listing (#563)', () => {
     renderPage();
 
     expect(await screen.findByRole('button', { name: /New review/i })).toBeDisabled();
+    // Was a tooltip, which only a pointer could reach (issue #690).
+    expect(screen.getByRole('alert')).toHaveTextContent(/Finalizing or archiving a review/);
   });
 });

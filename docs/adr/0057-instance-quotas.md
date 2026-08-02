@@ -112,6 +112,8 @@ The same round added the missing half of the feature. Nothing had warned before 
 
 That prediction held: the team quota was reported the same way a day later, on an instance whose seven teams all predated the limit. Nothing was broken — the server refuses correctly and quotas never touch existing rows — but the button was still offered, and an offered button is a promise. So all four quotas now travel on the screen that offers the action: `seatLimit`/`seatsUsed` on the user list, `teamLimit`/`teamsUsed` on the team list, `memberLimit` on a team (per team, so only the ceiling — the count is already there), and `activeReviewLimit`/`activeReviewsUsed` on the review list. The review one is not an administrator's screen at all; any reviewer can start one, and they are the one being turned away.
 
+All four say it the same way (#690), through one shared component. They had drifted within a day of each other: the user list warned in yellow, the team list put a number in its page description, and the review button explained itself in a tooltip only a pointer could reach — three appearances for one event. The caller supplies what is full and how to free one, because that genuinely differs; the closing sentence is fixed, since "the ceiling is set where this deployment is configured, not in the admin settings" is the same answer every time and the one that stops an administrator searching a settings page that will never contain it.
+
 **A ceiling belongs on the screen that offers the action, not only on the one that reports configuration.** `/admin/limits` cannot serve this: it belongs to a configuration page a deployment may withhold (#683), and a tenant who cannot see the configuration still has to know why they cannot add a user.
 
 ## Related

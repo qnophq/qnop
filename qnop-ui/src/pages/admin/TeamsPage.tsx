@@ -48,6 +48,7 @@ import { useDeleteTeam, useTeams } from '../../api/hooks/useTeams';
 import { TeamFormDialog } from '../../components/admin/teams/TeamFormDialog';
 import { ConfirmDialog } from '../../components/admin/ConfirmDialog';
 import { PageHeader } from '../../components/admin/layout/PageHeader';
+import { QuotaAlert } from '../../components/limits/QuotaAlert';
 import { AdminToast } from '../../components/admin/layout/AdminToast';
 import { useToast } from '../../components/admin/layout/useToast';
 import { UserStatusBadge } from '../../components/admin/users/UserBadges';
@@ -144,6 +145,13 @@ export function TeamsPage() {
           </Button>
         }
       />
+
+      {teamsFull && (
+        <QuotaAlert>
+          This instance is configured for {teamLimit} teams and holds {teamsUsed}. Deleting a team
+          frees a slot.
+        </QuotaAlert>
+      )}
 
       <ClearableSearchField
         value={search}

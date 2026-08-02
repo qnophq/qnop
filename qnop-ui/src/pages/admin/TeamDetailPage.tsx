@@ -45,6 +45,7 @@ import { TeamFormDialog } from '../../components/admin/teams/TeamFormDialog';
 import { TeamRoleBadge } from '../../components/admin/teams/TeamRoleBadge';
 import { ConfirmDialog } from '../../components/admin/ConfirmDialog';
 import { PageHeader } from '../../components/admin/layout/PageHeader';
+import { QuotaAlert } from '../../components/limits/QuotaAlert';
 import { TeamAvatar } from '../../components/shell/TeamAvatar';
 import { PersonLink } from '../../components/dashboard/PersonLink';
 import { UserStatusBadge } from '../../components/admin/users/UserBadges';
@@ -133,6 +134,13 @@ export function TeamDetailPage() {
           </Stack>
         }
       />
+
+      {membersFull && (
+        <QuotaAlert>
+          This deployment allows {memberLimit} members per team, and this one has {members.length}.
+          Removing a member frees a slot.
+        </QuotaAlert>
+      )}
 
       <Paper variant="outlined" sx={{ overflow: 'hidden' }}>
         <Table size="medium" sx={{ '& td, & th': { borderColor: 'divider' } }}>
