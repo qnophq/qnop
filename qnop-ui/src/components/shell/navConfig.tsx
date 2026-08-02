@@ -95,6 +95,7 @@ export const NAV_GROUPS: NavGroup[] = [
         id: 'configuration',
         label: 'Configuration',
         path: '/admin/configuration',
+        feature: 'deploymentConfiguration',
         icon: ServerCog,
         roles: ['ADMIN'],
       },

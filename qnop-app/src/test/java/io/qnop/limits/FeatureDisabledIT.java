@@ -65,7 +65,12 @@ import org.springframework.test.context.TestPropertySource;
       "qnop.features.email-templates=false",
       "qnop.features.usage-tracking=false",
       "qnop.features.upload-constraints=false",
-      "qnop.features.self-registration=false"
+      "qnop.features.self-registration=false",
+      "qnop.features.deployment-configuration=false",
+      // A quota alongside, to pin down that hiding the screen does not stop the
+      // machinery behind it. The seed holds more than one account already, so
+      // this ceiling is already full.
+      "qnop.limits.max-users=1"
     })
 class FeatureDisabledIT extends SeededIntegrationTest {
 
@@ -348,6 +353,37 @@ class FeatureDisabledIT extends SeededIntegrationTest {
                         + "\"password\":\"Sufficiently-long-passphrase-1\","
                         + "\"displayName\":\"Newcomer\"}"))
         .andExpect(status().isNotFound());
+  }
+
+  @Test
+  @DisplayName("the configuration screen is refused, and the quotas it would show still apply")
+  void deploymentConfigurationIsHiddenButEnforced() throws Exception {
+    mockMvc
+        .perform(
+            get("/api/v1/admin/configuration").header("Authorization", "Bearer " + token(ADMIN_ID)))
+        .andExpect(status().isForbidden())
+        .andExpect(jsonPath("$.code").value("DEPLOYMENT_CONFIGURATION_DISABLED"));
+
+    // The quota card lives on that screen, so its endpoint goes with it.
+    mockMvc
+        .perform(get("/api/v1/admin/limits").header("Authorization", "Bearer " + token(ADMIN_ID)))
+        .andExpect(status().isForbidden())
+        .andExpect(jsonPath("$.code").value("DEPLOYMENT_CONFIGURATION_DISABLED"));
+
+    // The point of putting the guard in the controller rather than in
+    // InstanceLimitService: what is withheld is the view, not the enforcement.
+    // An administrator who cannot see the ceiling still stands under it.
+    mockMvc
+        .perform(
+            post("/api/v1/admin/users")
+                .header("Authorization", "Bearer " + token(ADMIN_ID))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(
+                    "{\"username\":\"overflow\",\"email\":\"overflow@example.com\","
+                        + "\"password\":\"Sufficiently-long-passphrase-1\","
+                        + "\"displayName\":\"Overflow\",\"role\":\"MEMBER\"}"))
+        .andExpect(status().isConflict())
+        .andExpect(jsonPath("$.code").value("USER_LIMIT_EXCEEDED"));
   }
 
   /** Writes a setting the way an operator would: straight into the table. */

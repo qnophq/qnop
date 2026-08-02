@@ -4980,12 +4980,20 @@ components:
           description: |
             Editing the outgoing mail templates. When false updating, resetting
             and template test-mails refuse; reading and preview stay.
+        deploymentConfiguration:
+          type: boolean
+          description: |
+            The administration screen reporting the effective deployment
+            configuration and the instance quotas. When false both of its
+            endpoints refuse and the page is not offered; the quotas themselves
+            keep being enforced.
       required:
         - oidc
         - annotationExport
         - customBranding
         - smtpConfiguration
         - emailTemplates
+        - deploymentConfiguration
     ServerConfigTracking:
       type: object
       description: |

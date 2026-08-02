@@ -59,7 +59,9 @@ public class FeatureDisabledException extends RuntimeException {
     EMAIL_TEMPLATES("EMAIL_TEMPLATES_DISABLED", "editing the outgoing mail templates"),
     USAGE_TRACKING("USAGE_TRACKING_DISABLED", "changing the usage-tracking configuration"),
     UPLOAD_CONSTRAINTS("UPLOAD_CONSTRAINTS_DISABLED", "changing the document upload limits"),
-    SELF_REGISTRATION("SELF_REGISTRATION_DISABLED", "self-registration");
+    SELF_REGISTRATION("SELF_REGISTRATION_DISABLED", "self-registration"),
+    DEPLOYMENT_CONFIGURATION(
+        "DEPLOYMENT_CONFIGURATION_DISABLED", "viewing this deployment's configuration");
 
     private final String code;
     private final String subject;

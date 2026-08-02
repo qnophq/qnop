@@ -224,7 +224,9 @@ export const router = createBrowserRouter([
             path: 'admin/configuration',
             element: (
               <AdminRoute>
-                <ConfigurationPage />
+                <FeatureRoute feature="deploymentConfiguration">
+                  <ConfigurationPage />
+                </FeatureRoute>
               </AdminRoute>
             ),
           },

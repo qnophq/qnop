@@ -254,6 +254,9 @@ qnop:
     usage-tracking: ${QNOP_FEATURES_USAGE_TRACKING:true}
     upload-constraints: ${QNOP_FEATURES_UPLOAD_CONSTRAINTS:true}
     self-registration: ${QNOP_FEATURES_SELF_REGISTRATION:true}
+    # The admin screen that reports how this deployment is set up (issue #683).
+    # Off hides the page and refuses its endpoints; the quotas keep applying.
+    deployment-configuration: ${QNOP_FEATURES_DEPLOYMENT_CONFIGURATION:true}
   # Usage tracking (issue #666). What an operator configures lives in the admin
   # settings (provider, host, site id, consent, opt-outs); the two keys here are
   # deployment decisions that must not be reachable from the web UI.

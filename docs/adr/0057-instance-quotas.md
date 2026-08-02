@@ -46,7 +46,7 @@ Quotas here are a commercial boundary, not a safety interlock. This is written d
 
 ### Capabilities are switches beside the quotas, not more of them
 
-`qnop.features.oidc`, `.annotation-export`, `.custom-branding` (issue #674), `.scheduler-manual-run` (#676), `.scheduler-job-settings` (#677), `.smtp-configuration` (#678), `.email-templates` (#679), `.usage-tracking`, `.upload-constraints` and `.self-registration` (#681), all defaulting to on. Their own prefix, because a switch is not a ceiling — the same block of a configuration file, because an operator reads them together.
+`qnop.features.oidc`, `.annotation-export`, `.custom-branding` (issue #674), `.scheduler-manual-run` (#676), `.scheduler-job-settings` (#677), `.smtp-configuration` (#678), `.email-templates` (#679), `.usage-tracking`, `.upload-constraints`, `.self-registration` (#681) and `.deployment-configuration` (#683), all defaulting to on. Their own prefix, because a switch is not a ceiling — the same block of a configuration file, because an operator reads them together.
 
 The fourth is a different kind of thing from the first three and belongs here anyway. Run-now on a maintenance job is not a plan feature; it is an override that starts a sweep **regardless of the job's own enabled flag**. On a self-hosted installation that is exactly what an administrator needs. On a hosted one it is arbitrary load on demand, held by the person the operator cannot overrule. What is withheld is the trigger, never the schedule: the sweeps keep running on their cron, which is the property the tests pin down.
 
@@ -67,6 +67,8 @@ What differs between the three is the effect, and each difference was chosen rat
 - **Usage tracking** withholds *changing* the configuration, not tracking. A configuration already in the database keeps working — an operator who set tracking up for a tenant wants it to run, not to be re-pointed. The section is dropped from the response entirely rather than greyed out, because an endpoint an administrator cannot change tells them nothing they can act on.
 - **Upload constraints** stay visible and go read-only. The ceiling is the answer to "why was my file refused", which an administrator needs whether or not they can raise it.
 - **Self-registration** is the only one that withholds the capability itself: off means nobody can sign up whatever the setting says. Because two places ask — the registration endpoint and the public config that decides whether a sign-up link appears — the effective answer lives in one method. Two independent `&&`s would have been one refactor away from a deployment that hides the link and still accepts registrations.
+
+The configuration screen (#683) is the same distinction at the level of a whole page: `/admin/configuration` exists to report how the operator set this installation up, which on a managed instance is not the tenant's business. Its guard sits in the controller rather than in the services, and that is not a shortcut — `InstanceLimitService` enforces the quotas on every user and team that gets created, so a switch about an administration screen must never be able to reach it. The integration test withholds the screen and creates a user over the ceiling in the same breath: refused view, enforced quota.
 
 So "governed" means *not editable here*, and deliberately not *inactive*. Conflating the two would have turned a configuration switch into an off switch for a feature the operator had chosen to run.
 

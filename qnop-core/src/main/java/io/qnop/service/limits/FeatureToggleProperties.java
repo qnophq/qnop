@@ -68,7 +68,8 @@ public record FeatureToggleProperties(
     @DefaultValue("true") boolean emailTemplates,
     @DefaultValue("true") boolean usageTracking,
     @DefaultValue("true") boolean uploadConstraints,
-    @DefaultValue("true") boolean selfRegistration) {
+    @DefaultValue("true") boolean selfRegistration,
+    @DefaultValue("true") boolean deploymentConfiguration) {
 
   /**
    * Whether the named capability is present.
@@ -88,6 +89,7 @@ public record FeatureToggleProperties(
       case USAGE_TRACKING -> usageTracking;
       case UPLOAD_CONSTRAINTS -> uploadConstraints;
       case SELF_REGISTRATION -> selfRegistration;
+      case DEPLOYMENT_CONFIGURATION -> deploymentConfiguration;
     };
   }
 
@@ -101,7 +103,8 @@ public record FeatureToggleProperties(
    * annotations below are what actually supplies the defaults.
    */
   public static FeatureToggleProperties all() {
-    return new FeatureToggleProperties(true, true, true, true, true, true, true, true, true, true);
+    return new FeatureToggleProperties(
+        true, true, true, true, true, true, true, true, true, true, true);
   }
 
   /**
@@ -124,6 +127,7 @@ public record FeatureToggleProperties(
         !off.contains(FeatureDisabledException.Feature.EMAIL_TEMPLATES),
         !off.contains(FeatureDisabledException.Feature.USAGE_TRACKING),
         !off.contains(FeatureDisabledException.Feature.UPLOAD_CONSTRAINTS),
-        !off.contains(FeatureDisabledException.Feature.SELF_REGISTRATION));
+        !off.contains(FeatureDisabledException.Feature.SELF_REGISTRATION),
+        !off.contains(FeatureDisabledException.Feature.DEPLOYMENT_CONFIGURATION));
   }
 }

@@ -25,6 +25,8 @@ import io.qnop.api.v1.model.ConfigurationResponse;
 import io.qnop.api.v1.model.InstanceLimitsResponse;
 import io.qnop.api.v1.model.InstanceQuota;
 import io.qnop.service.config.EffectiveConfigurationService;
+import io.qnop.service.limits.FeatureDisabledException;
+import io.qnop.service.limits.FeatureToggleProperties;
 import io.qnop.service.limits.InstanceLimitService;
 import io.qnop.service.limits.InstanceLimitUsage;
 import org.springframework.http.ResponseEntity;
@@ -41,15 +43,33 @@ public class ConfigurationController implements AdminConfigurationApi {
 
   private final EffectiveConfigurationService configuration;
   private final InstanceLimitService limits;
+  private final FeatureToggleProperties features;
 
   public ConfigurationController(
-      EffectiveConfigurationService configuration, InstanceLimitService limits) {
+      EffectiveConfigurationService configuration,
+      InstanceLimitService limits,
+      FeatureToggleProperties features) {
     this.configuration = configuration;
     this.limits = limits;
+    this.features = features;
+  }
+
+  /**
+   * Refuses when this deployment does not show its own configuration (issue #683).
+   *
+   * <p>Here rather than in the services on purpose. {@link InstanceLimitService} enforces the
+   * quotas on every user and team that gets created; a switch about an administration screen must
+   * never be able to stop that. What is withheld is the view, not the machinery.
+   */
+  private void requireConfigurationVisible() {
+    if (!features.deploymentConfiguration()) {
+      throw new FeatureDisabledException(FeatureDisabledException.Feature.DEPLOYMENT_CONFIGURATION);
+    }
   }
 
   @Override
   public ResponseEntity<ConfigurationResponse> getAdminConfiguration() {
+    requireConfigurationVisible();
     return ResponseEntity.ok(configuration.effectiveConfiguration());
   }
 
@@ -61,6 +81,8 @@ public class ConfigurationController implements AdminConfigurationApi {
    */
   @Override
   public ResponseEntity<InstanceLimitsResponse> getInstanceLimits() {
+    // The quota card lives on the same screen, so it goes with it.
+    requireConfigurationVisible();
     InstanceLimitUsage usage = limits.usage();
     return ResponseEntity.ok(
         new InstanceLimitsResponse()
