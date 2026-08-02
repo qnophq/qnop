@@ -25,6 +25,7 @@ import { TrackingBoot } from '../tracking/TrackingBoot';
 import { AppShell } from '../components/shell/AppShell';
 import { LazyBoundary } from '../components/errors/LazyBoundary';
 import { AdminRoute } from '../components/auth/AdminRoute';
+import { FeatureRoute } from '../components/auth/FeatureRoute';
 import { ProtectedRoute } from '../components/auth/ProtectedRoute';
 import { RoleRoute } from '../components/auth/RoleRoute';
 import { AuditPage } from '../pages/audit/AuditPage';
@@ -55,6 +56,7 @@ import { RegisterPage } from '../pages/auth/RegisterPage';
 import { ResetPasswordPage } from '../pages/auth/ResetPasswordPage';
 import { VerifyEmailPage } from '../pages/auth/VerifyEmailPage';
 import { ConflictPage } from '../pages/errors/ConflictPage';
+import { FeatureUnavailablePage } from '../pages/errors/FeatureUnavailablePage';
 import { ForbiddenPage } from '../pages/errors/ForbiddenPage';
 import { MaintenancePage } from '../pages/errors/MaintenancePage';
 import { NotFoundPage } from '../pages/errors/NotFoundPage';
@@ -111,6 +113,9 @@ export const router = createBrowserRouter([
       // 503/offline also work when nothing else does; the in-app catch-all below
       // keeps 404 inside the shell for signed-in users.
       { path: '/403', element: <ForbiddenPage /> },
+      // A capability this deployment does not offer (issue #682) — out here with
+      // the others, so it is a wall rather than a panel inside the shell.
+      { path: '/feature-unavailable', element: <FeatureUnavailablePage /> },
       { path: '/409', element: <ConflictPage /> },
       { path: '/500', element: <ServerErrorPage /> },
       { path: '/503', element: <MaintenancePage /> },
@@ -235,7 +240,9 @@ export const router = createBrowserRouter([
             path: 'admin/oidc-providers',
             element: (
               <AdminRoute>
-                <OidcProvidersPage />
+                <FeatureRoute feature="oidc">
+                  <OidcProvidersPage />
+                </FeatureRoute>
               </AdminRoute>
             ),
           },
@@ -250,14 +257,32 @@ export const router = createBrowserRouter([
             ),
             children: [
               { index: true, element: <EmailIndexRedirect /> },
-              { path: 'server', element: <EmailServerPage /> },
-              { path: 'templates', element: <MailTemplatesListPage /> },
               {
+                path: 'server',
+                element: (
+                  <FeatureRoute feature="smtpConfiguration">
+                    <EmailServerPage />
+                  </FeatureRoute>
+                ),
+              },
+              {
+                path: 'templates',
+                element: (
+                  <FeatureRoute feature="emailTemplates">
+                    <MailTemplatesListPage />
+                  </FeatureRoute>
+                ),
+              },
+              {
+                // Guarded here too: the editor is a deep link people bookmark,
+                // and it is the screen where a refused save costs the most work.
                 path: 'templates/:key',
                 element: (
-                  <LazyBoundary>
-                    <MailTemplateEditPage />
-                  </LazyBoundary>
+                  <FeatureRoute feature="emailTemplates">
+                    <LazyBoundary>
+                      <MailTemplateEditPage />
+                    </LazyBoundary>
+                  </FeatureRoute>
                 ),
               },
             ],
@@ -275,7 +300,9 @@ export const router = createBrowserRouter([
             path: 'admin/branding',
             element: (
               <AdminRoute>
-                <BrandingPage />
+                <FeatureRoute feature="customBranding">
+                  <BrandingPage />
+                </FeatureRoute>
               </AdminRoute>
             ),
           },
