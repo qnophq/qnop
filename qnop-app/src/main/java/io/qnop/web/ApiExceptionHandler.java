@@ -22,10 +22,14 @@ package io.qnop.web;
 
 import io.qnop.api.v1.model.ErrorResponse;
 import io.qnop.api.v1.model.FieldError;
+import io.qnop.service.limits.FeatureDisabledException;
+import io.qnop.service.limits.InstanceLimitExceededException;
 import jakarta.validation.ConstraintViolationException;
 import jakarta.validation.Path;
 import java.time.OffsetDateTime;
 import java.util.List;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.MethodArgumentNotValidException;
@@ -41,6 +45,8 @@ import org.springframework.web.method.annotation.HandlerMethodValidationExceptio
  */
 @RestControllerAdvice
 public class ApiExceptionHandler {
+
+  private static final Logger log = LoggerFactory.getLogger(ApiExceptionHandler.class);
 
   @ExceptionHandler(MethodArgumentNotValidException.class)
   public ResponseEntity<ErrorResponse> onBodyValidation(MethodArgumentNotValidException ex) {
@@ -93,6 +99,46 @@ public class ApiExceptionHandler {
       }
     }
     return leaf;
+  }
+
+  /**
+   * A quota is full (issue #673).
+   *
+   * <p>409 rather than 403: the caller is entitled to do this and asked for it correctly — the
+   * deployment has no room. That is a conflict with the current state, which is what 409 means, and
+   * telling the two apart matters to whoever has to act on it: a permission problem is solved by an
+   * administrator, a full quota by the operator of the deployment.
+   *
+   * <p>The message carries the ceiling. "Refused" without a number leaves the reader guessing at
+   * how much room they would need to free.
+   */
+  @ExceptionHandler(InstanceLimitExceededException.class)
+  ResponseEntity<ErrorResponse> limitExceeded(InstanceLimitExceededException ex) {
+    log.info("Refused: {} ({})", ex.getMessage(), ex.code());
+    return ResponseEntity.status(HttpStatus.CONFLICT)
+        .body(
+            new ErrorResponse()
+                .code(ex.code())
+                .message(ex.getMessage())
+                .timestamp(OffsetDateTime.now()));
+  }
+
+  /**
+   * A capability this deployment does not offer (issue #674).
+   *
+   * <p>403 and not 409: nothing is full, and no amount of waiting or freeing changes the answer.
+   * Not 404 either — pretending the capability does not exist would leave an administrator hunting
+   * for a setting instead of asking whoever operates the deployment.
+   */
+  @ExceptionHandler(FeatureDisabledException.class)
+  ResponseEntity<ErrorResponse> featureDisabled(FeatureDisabledException ex) {
+    log.info("Refused: {} ({})", ex.getMessage(), ex.code());
+    return ResponseEntity.status(HttpStatus.FORBIDDEN)
+        .body(
+            new ErrorResponse()
+                .code(ex.code())
+                .message(ex.getMessage())
+                .timestamp(OffsetDateTime.now()));
   }
 
   private static ResponseEntity<ErrorResponse> badRequest(String message) {

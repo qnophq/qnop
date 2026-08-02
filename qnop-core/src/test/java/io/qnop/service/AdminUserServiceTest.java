@@ -40,6 +40,8 @@ import io.qnop.service.AdminUserService.GeneratedPasswordOutcome;
 import io.qnop.service.AdminUserService.PasswordResetOutcome;
 import io.qnop.service.auth.PasswordResetFlowService;
 import io.qnop.service.auth.PasswordResetFlowService.SetupLinkOutcome;
+import io.qnop.service.limits.InstanceLimitProperties;
+import io.qnop.service.limits.InstanceLimitService;
 import io.qnop.service.mail.MailTemplateKey;
 import java.util.List;
 import java.util.Optional;
@@ -70,7 +72,8 @@ class AdminUserServiceTest {
           passwordEncoder,
           passwordResetFlow,
           refreshTokens,
-          new UserSlugService(new SlugNamespace(users, mock(TeamRepository.class))));
+          new UserSlugService(new SlugNamespace(users, mock(TeamRepository.class))),
+          noLimits());
 
   private void noClash() {
     when(users.existsByEmailIgnoreCaseAndSource(any(), any())).thenReturn(false);
@@ -351,5 +354,18 @@ class AdminUserServiceTest {
     assertThat(page.total()).isEqualTo(1);
     assertThat(page.items().get(0).email()).isEqualTo("alice@example.com");
     assertThat(page.items().get(0).providerName()).isNull(); // internal user
+  }
+
+  /**
+   * Quotas are off in these tests (issue #673): they cover this service's own behaviour, and
+   * InstanceLimitServiceTest covers the quotas.
+   */
+  private static InstanceLimitService noLimits() {
+    return new InstanceLimitService(
+        InstanceLimitProperties.unlimited(),
+        org.mockito.Mockito.mock(io.qnop.repository.UserRepository.class),
+        org.mockito.Mockito.mock(io.qnop.repository.TeamRepository.class),
+        org.mockito.Mockito.mock(io.qnop.repository.TeamMembershipRepository.class),
+        org.mockito.Mockito.mock(io.qnop.repository.DocumentRepository.class));
   }
 }

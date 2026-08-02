@@ -25,7 +25,7 @@ import { MemoryRouter, Route, Routes } from 'react-router';
 import { ThemeProvider } from '@mui/material/styles';
 import type { DashboardResponse, DocumentSummary } from '../api/generated';
 import { useDashboard } from '../api/hooks/useDashboard';
-import { useReviews } from '../api/hooks/useReviews';
+import { useReviewCapacity, useReviews } from '../api/hooks/useReviews';
 import { useUserProfile } from '../api/hooks/useUsers';
 import { buildTheme } from '../theme/theme';
 import { useAuthStore } from '../stores/authStore';
@@ -34,6 +34,7 @@ import { HomePage } from './HomePage';
 vi.mock('../api/hooks/useReviews', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../api/hooks/useReviews')>()),
   useReviews: vi.fn(),
+  useReviewCapacity: vi.fn(() => ({ limit: 0, used: 0, full: false, isLoading: false })),
 }));
 vi.mock('../api/hooks/useDashboard', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../api/hooks/useDashboard')>()),
@@ -242,5 +243,19 @@ describe('HomePage dashboard (issue #454)', () => {
     expect(screen.getByRole('button', { name: 'View profile' })).toBeInTheDocument();
     // Earned achievements render as unlocked stickers.
     expect(screen.getByLabelText(/Liftoff: Started a review/)).toBeInTheDocument();
+  });
+
+  it('does not offer a new review when the instance has no open slots (#692)', () => {
+    vi.mocked(useReviewCapacity).mockReturnValue({
+      limit: 2,
+      used: 2,
+      full: true,
+      isLoading: false,
+    });
+    mockData([]);
+    renderPage();
+
+    // All four entry points have to agree; this is the dashboard one.
+    expect(screen.getByRole('button', { name: /New review/i })).toBeDisabled();
   });
 });

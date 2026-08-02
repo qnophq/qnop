@@ -49,6 +49,8 @@ import io.qnop.service.document.DocumentAccessService.DocumentView;
 import io.qnop.service.document.DocumentOverviewService;
 import io.qnop.service.document.DocumentUpdateService;
 import io.qnop.service.document.ReviewParticipantService;
+import io.qnop.service.limits.InstanceLimitService;
+import io.qnop.service.limits.InstanceLimitUsage;
 import io.qnop.service.review.ReviewArchiveService;
 import io.qnop.service.review.ReviewDeletionService;
 import io.qnop.service.review.ReviewVisitService;
@@ -78,6 +80,7 @@ public class DocumentsController implements DocumentsApi {
   private final ReviewVisitService visits;
   private final ReviewArchiveService archive;
   private final ReviewDeletionService deletions;
+  private final InstanceLimitService limits;
 
   public DocumentsController(
       DocumentAccessService documents,
@@ -87,7 +90,8 @@ public class DocumentsController implements DocumentsApi {
       DocumentUpdateService updates,
       ReviewVisitService visits,
       ReviewArchiveService archive,
-      ReviewDeletionService deletions) {
+      ReviewDeletionService deletions,
+      InstanceLimitService limits) {
     this.documents = documents;
     this.diffs = diffs;
     this.overview = overview;
@@ -96,6 +100,7 @@ public class DocumentsController implements DocumentsApi {
     this.visits = visits;
     this.archive = archive;
     this.deletions = deletions;
+    this.limits = limits;
   }
 
   @Override
@@ -135,13 +140,17 @@ public class DocumentsController implements DocumentsApi {
             includeArchived,
             page == null ? 0 : page,
             size == null ? 20 : size);
+    InstanceLimitUsage.Quota reviewSeats = limits.activeReviewSeats();
     return ResponseEntity.ok(
         new DocumentListResponse()
             .items(result.items().stream().map(DocumentsController::toSummary).toList())
             .total(result.total())
             .page(result.page())
             .size(result.size())
-            .facets(toFacets(result.facets())));
+            .facets(toFacets(result.facets()))
+            // So the screen that offers "new review" can say no first (#688).
+            .activeReviewLimit(reviewSeats.maximum())
+            .activeReviewsUsed(reviewSeats.used()));
   }
 
   @Override

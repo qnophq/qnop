@@ -437,6 +437,12 @@ interface SettingFieldProps {
 /** Renders a single setting as the control appropriate to its declared type. */
 function SettingField({ setting, value, error, onChange }: SettingFieldProps) {
   const label = fieldLabel(setting.key);
+  // What the deployment governs (issues #678/#681): shown, but not editable
+  // here. The endpoint refuses the change in any case — this keeps the form
+  // from inviting one. `editable` is absent on older responses, and absent
+  // means editable.
+  const locked = setting.editable === false;
+  const lockNote = 'Set by this deployment.';
 
   if (setting.type === 'BOOLEAN') {
     return (
@@ -444,6 +450,7 @@ function SettingField({ setting, value, error, onChange }: SettingFieldProps) {
         control={
           <Switch
             checked={value === 'true'}
+            disabled={locked}
             onChange={(e) => onChange(e.target.checked ? 'true' : 'false')}
           />
         }
@@ -451,7 +458,7 @@ function SettingField({ setting, value, error, onChange }: SettingFieldProps) {
           <Box>
             <Typography sx={{ fontSize: 15 }}>{label}</Typography>
             <Typography color="text.secondary" sx={{ fontSize: 13 }}>
-              {setting.description}
+              {locked ? `${setting.description} ${lockNote}` : setting.description}
             </Typography>
           </Box>
         }
@@ -485,9 +492,10 @@ function SettingField({ setting, value, error, onChange }: SettingFieldProps) {
         select
         label={label}
         value={value}
+        disabled={locked}
         onChange={(e) => onChange(e.target.value)}
         error={Boolean(error)}
-        helperText={error ?? setting.description}
+        helperText={error ?? (locked ? `${setting.description} ${lockNote}` : setting.description)}
         sx={{ maxWidth: 480 }}
       >
         {options.map((option) => (
@@ -508,10 +516,11 @@ function SettingField({ setting, value, error, onChange }: SettingFieldProps) {
       label={label}
       type={isPassword ? 'password' : setting.type === 'INTEGER' ? 'number' : 'text'}
       value={value}
+      disabled={locked}
       onChange={(e) => onChange(e.target.value)}
       placeholder={isPassword && setting.value === '***' ? '•••••• (unchanged)' : undefined}
       error={Boolean(error)}
-      helperText={error ?? baseHelper}
+      helperText={error ?? (locked ? `${baseHelper} ${lockNote}` : baseHelper)}
       autoComplete={isPassword ? 'new-password' : undefined}
       sx={{ maxWidth: 480 }}
     />

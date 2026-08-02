@@ -41,6 +41,17 @@ const settings: AdminSetting[] = [
     description: 'Default display timezone.',
     sensitive: false,
   },
+  {
+    // Governed by a capability the operator withheld (issue #681): shown,
+    // because the ceiling is the answer to "why was my file refused", but not
+    // editable here.
+    key: 'upload.document_max_file_size_mb',
+    value: '50',
+    type: 'INTEGER' as AdminSetting['type'],
+    description: 'Largest document accepted.',
+    sensitive: false,
+    editable: false,
+  },
 ];
 
 vi.mock('../../../api/hooks/useSettings', () => ({
@@ -65,5 +76,14 @@ describe('ApplicationSettingsForm — default timezone', () => {
 
     await user.click(screen.getByRole('combobox', { name: /default timezone/i }));
     expect(await screen.findByRole('option', { name: /Asia\/Tokyo/ })).toBeInTheDocument();
+  });
+
+  it('renders a governed setting read-only and says who set it', () => {
+    renderWithProviders(<ApplicationSettingsForm />);
+
+    expect(screen.getByDisplayValue('50')).toBeDisabled();
+    expect(screen.getByText(/Set by this deployment/)).toBeInTheDocument();
+    // Ungoverned settings are untouched — the form is not read-only wholesale.
+    expect(screen.getByRole('textbox', { name: /application name/i })).toBeEnabled();
   });
 });

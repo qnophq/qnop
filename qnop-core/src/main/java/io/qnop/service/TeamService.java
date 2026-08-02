@@ -29,6 +29,7 @@ import io.qnop.repository.TeamMembershipRepository;
 import io.qnop.repository.TeamRepository;
 import io.qnop.repository.UserRepository;
 import io.qnop.repository.UserTeamProjection;
+import io.qnop.service.limits.InstanceLimitService;
 import java.time.Instant;
 import java.util.List;
 import java.util.Locale;
@@ -53,6 +54,9 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 public class TeamService {
 
+  /** Instance quotas (issue #673). */
+  private final InstanceLimitService limits;
+
   private final TeamRepository teams;
   private final TeamMembershipRepository memberships;
   private final UserRepository users;
@@ -62,7 +66,9 @@ public class TeamService {
       TeamRepository teams,
       TeamMembershipRepository memberships,
       UserRepository users,
-      TeamSlugService slugs) {
+      TeamSlugService slugs,
+      InstanceLimitService limits) {
+    this.limits = limits;
     this.teams = teams;
     this.memberships = memberships;
     this.users = users;
@@ -129,6 +135,8 @@ public class TeamService {
       Boolean enabled,
       Boolean profileShowMembers,
       Boolean profileShowReviews) {
+    // Quota on teams (issue #673).
+    limits.requireTeamCapacity();
     String trimmed = requireName(name);
     if (teams.existsByNameIgnoreCase(trimmed)) {
       throw new TeamConflictException("NAME_TAKEN", "A team with that name already exists.");
@@ -188,9 +196,16 @@ public class TeamService {
 
   @Transactional
   public TeamMemberView addMember(UUID teamId, UUID userId, String teamRole) {
-    if (!teams.existsById(teamId)) {
+    // The row lock comes first, and the quota is counted inside it (issues
+    // #673/#691). The admin dialog submits one request per selected user in
+    // parallel, so an unlocked count is read by all of them before any of them
+    // has inserted: a team at 3 of 5 accepted four people and ended up at 7.
+    // The same lock already serialises the last-lead guard (#470), and it is per
+    // team, so it costs nothing to anybody working on a different one.
+    if (teams.findByIdForUpdate(teamId).isEmpty()) {
       throw TeamNotFoundException.team(teamId);
     }
+    limits.requireTeamMemberCapacity(teamId);
     User user = users.findById(userId).orElseThrow(() -> new UserNotFoundException(userId));
     if (memberships.existsByTeamIdAndUserId(teamId, userId)) {
       throw new TeamConflictException(
@@ -360,6 +375,9 @@ public class TeamService {
   @Transactional
   public TeamMemberView addMemberAsLead(
       UUID teamId, UUID actorId, boolean admin, UUID userId, String teamRole) {
+    // The quota is not checked here: addMember below counts it under the team's
+    // row lock (#691), and a check outside that lock would only be a second
+    // reading of a number that can change before the insert.
     requireLeadOrAdmin(teamId, actorId, admin);
     return addMember(teamId, userId, teamRole);
   }

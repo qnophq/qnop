@@ -23,6 +23,8 @@ package io.qnop.bootstrap;
 import io.qnop.security.QnopProperties;
 import io.qnop.service.convert.OfficeConverterProperties;
 import io.qnop.service.http.HttpClientProperties;
+import io.qnop.service.limits.FeatureToggleProperties;
+import io.qnop.service.limits.InstanceLimitProperties;
 import io.qnop.service.review.ReanchoringProperties;
 import io.qnop.web.security.ratelimit.RateLimitProperties;
 import org.springframework.boot.SpringApplication;
@@ -46,7 +48,9 @@ import org.springframework.scheduling.annotation.EnableScheduling;
   RateLimitProperties.class,
   HttpClientProperties.class,
   ReanchoringProperties.class,
-  OfficeConverterProperties.class
+  OfficeConverterProperties.class,
+  InstanceLimitProperties.class,
+  FeatureToggleProperties.class
 })
 @EntityScan("io.qnop.entity")
 @EnableJpaRepositories("io.qnop.repository")

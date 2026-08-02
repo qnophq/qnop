@@ -264,4 +264,16 @@ describe('TeamDetailPage', () => {
     expect(screen.getByRole('heading', { name: 'Platform' })).toBeTruthy();
     expect(screen.queryByText('Owns the ingest pipeline.')).toBeNull();
   });
+
+  it('refuses to add a member when the team is at its per-team ceiling', async () => {
+    // Per team, not per instance (issue #688) — the count is already on screen,
+    // so only the ceiling comes from the server.
+    const team = makeTeam();
+    teamState.data = { ...team, memberLimit: (team.members ?? []).length };
+    renderPage();
+
+    expect(await screen.findByRole('button', { name: /Add member/i })).toBeDisabled();
+    expect(screen.getByText(/member slots used/)).toBeInTheDocument();
+    expect(screen.getByRole('alert')).toHaveTextContent(/Removing a member frees a slot/);
+  });
 });

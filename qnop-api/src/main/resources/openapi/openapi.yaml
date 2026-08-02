@@ -244,6 +244,38 @@ paths:
                   linkUrl: "https://status.example.com"
         '401':
           $ref: '#/components/responses/Unauthorized'
+  /admin/limits:
+    get:
+      tags:
+        - AdminConfiguration
+      summary: Get the instance quotas and what they currently hold
+      description: |
+        The four quotas this deployment enforces and their current usage (issue
+        #673). They are deployment properties (`qnop.limits.*`), not application
+        settings — an administrator inside the instance can read them here but
+        cannot change them, because a quota its subject can edit is a suggestion.
+
+        A `maximum` of `0` means unlimited. `teamMembers.used` reports the
+        *fullest* team, since a per-team ceiling has no instance-wide total.
+      operationId: getInstanceLimits
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Quotas and usage
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/InstanceLimitsResponse'
+              example:
+                users: { used: 18, maximum: 25 }
+                teams: { used: 3, maximum: 5 }
+                teamMembers: { used: 9, maximum: 10 }
+                activeReviews: { used: 42, maximum: 0 }
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
   /admin/configuration:
     get:
       tags:
@@ -4851,6 +4883,15 @@ components:
             example: pdf
         branding:
           $ref: '#/components/schemas/ServerConfigBranding'
+        features:
+          allOf:
+            - $ref: '#/components/schemas/ServerConfigFeatures'
+          description: |
+            Capabilities this deployment offers (issue #674). Mostly derivable
+            from the lists beside it — no OIDC providers, no export formats — but
+            not entirely: whether custom branding is permitted has no list, and
+            "the operator switched export off" is a different sentence to a user
+            than "no converter is installed".
         tracking:
           allOf:
             - $ref: '#/components/schemas/ServerConfigTracking'
@@ -4875,6 +4916,84 @@ components:
         - auth
         - upload
         - supportedFormats
+    InstanceLimitsResponse:
+      type: object
+      description: What this deployment may hold, and what it holds (issue #673).
+      properties:
+        users:
+          $ref: '#/components/schemas/InstanceQuota'
+        teams:
+          $ref: '#/components/schemas/InstanceQuota'
+        teamMembers:
+          allOf:
+            - $ref: '#/components/schemas/InstanceQuota'
+          description: |
+            `used` is the size of the largest single team — the number that says
+            whether the next invitation will land.
+        activeReviews:
+          allOf:
+            - $ref: '#/components/schemas/InstanceQuota'
+          description: |
+            Counts reviews in `DRAFT`, `IN_REVIEW` or `CHANGES_REQUESTED` that are
+            not archived. Finished work occupies no seat.
+      required:
+        - users
+        - teams
+        - teamMembers
+        - activeReviews
+    InstanceQuota:
+      type: object
+      properties:
+        used:
+          type: integer
+          format: int64
+          description: How much is in use now.
+        maximum:
+          type: integer
+          description: What is permitted; `0` means unlimited.
+      required:
+        - used
+        - maximum
+    ServerConfigFeatures:
+      type: object
+      description: What this deployment offers at all (issue #674, ADR-0057).
+      properties:
+        oidc:
+          type: boolean
+          description: Single sign-on. When false the OAuth2 endpoints are not mounted.
+        annotationExport:
+          type: boolean
+          description: Downloading a review's annotations.
+        customBranding:
+          type: boolean
+          description: |
+            Operator logos. When false every slot serves the bundled default,
+            including slots that already hold an upload.
+        smtpConfiguration:
+          type: boolean
+          description: |
+            Configuring the outgoing mail server. When false the `smtp.*`
+            settings and the test-mail endpoint refuse, and the Email → Server
+            tab is not offered.
+        emailTemplates:
+          type: boolean
+          description: |
+            Editing the outgoing mail templates. When false updating, resetting
+            and template test-mails refuse; reading and preview stay.
+        deploymentConfiguration:
+          type: boolean
+          description: |
+            The administration screen reporting the effective deployment
+            configuration and the instance quotas. When false both of its
+            endpoints refuse and the page is not offered; the quotas themselves
+            keep being enforced.
+      required:
+        - oidc
+        - annotationExport
+        - customBranding
+        - smtpConfiguration
+        - emailTemplates
+        - deploymentConfiguration
     ServerConfigTracking:
       type: object
       description: |
@@ -4998,6 +5117,14 @@ components:
       type: object
       description: One application setting with its current (possibly masked) value.
       properties:
+        editable:
+          type: boolean
+          description: |
+            Whether this deployment allows the value to be changed here (issues
+            #678/#681). False means the update endpoint refuses it: the setting
+            is governed by a capability the operator withheld. It says nothing
+            about whether the setting is in effect — a governed tracking
+            configuration keeps working, it just cannot be overwritten here.
         key:
           type: string
           description: Stable dotted setting key (e.g. `smtp.host`).
@@ -5739,6 +5866,22 @@ components:
           type: integer
           format: int64
           description: Total number of users matching the query.
+        seatLimit:
+          type: integer
+          format: int32
+          description: |
+            How many accounts this instance may hold in total
+            (`qnop.limits.max-users`, issue #687); `0` means unlimited. Reported
+            here rather than only on `/admin/limits`, because that endpoint
+            belongs to the configuration screen a deployment may withhold
+            (#683) — and somebody who cannot add a user still needs to know why.
+        seatsUsed:
+          type: integer
+          format: int64
+          description: |
+            Accounts that exist, disabled ones included — the number compared
+            against `seatLimit`. Not the same as `total`, which counts the rows
+            matching the current query.
         page:
           type: integer
           format: int32
@@ -5914,8 +6057,27 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/SchedulerJob'
+        manualRunEnabled:
+          type: boolean
+          description: |
+            Whether this deployment permits starting a job by hand
+            (`qnop.features.scheduler-manual-run`, issue #676). False means the
+            run-now endpoint refuses for every job; the schedules themselves are
+            unaffected and keep running. It travels here rather than in the
+            public `/config` because it answers a question only an administrator
+            asks, and this is the response the scheduler screen already loads.
+        jobSettingsEditable:
+          type: boolean
+          description: |
+            Whether a job's own settings — its enabled switch and its dry-run
+            mode — may be changed here (`qnop.features.scheduler-job-settings`,
+            issue #677). False means the update endpoint refuses for every job,
+            and both switches are read-only. One flag covers both settings
+            because dry-run is a soft off for the jobs that delete things.
       required:
         - items
+        - manualRunEnabled
+        - jobSettingsEditable
     SchedulerJobUpdateRequest:
       type: object
       description: |
@@ -6064,6 +6226,13 @@ components:
       type: object
       description: Full team detail including its members.
       properties:
+        memberLimit:
+          type: integer
+          format: int32
+          description: |
+            How many members any one team may hold on this instance
+            (`qnop.limits.max-team-members`, issue #688); `0` means unlimited.
+            Per team, unlike the instance-wide user and team quotas.
         id:
           type: string
           format: uuid
@@ -6113,6 +6282,20 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/AdminTeamSummary'
+        teamLimit:
+          type: integer
+          format: int32
+          description: |
+            How many teams this instance may hold (`qnop.limits.max-teams`,
+            issue #688); `0` means unlimited. Reported here for the same reason
+            as the user list's seats (#687): `/admin/limits` belongs to the
+            configuration screen a deployment may withhold (#683).
+        teamsUsed:
+          type: integer
+          format: int64
+          description: |
+            Teams that exist — the number compared against `teamLimit`, and not
+            the same as `total`, which counts the rows matching the query.
         total:
           type: integer
           format: int64
@@ -6962,6 +7145,20 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/DocumentSummary'
+        activeReviewLimit:
+          type: integer
+          format: int32
+          description: |
+            How many reviews may be open on this instance at once
+            (`qnop.limits.max-active-reviews`, issue #688); `0` means unlimited.
+            Instance-wide, not per user — a reviewer sees it because they are
+            the one being turned away.
+        activeReviewsUsed:
+          type: integer
+          format: int64
+          description: |
+            Reviews currently open — neither closed nor archived. Finished work
+            occupies nothing, so this falls as reviews are finalized.
         total:
           type: integer
           format: int64

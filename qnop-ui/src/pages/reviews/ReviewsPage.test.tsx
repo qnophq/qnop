@@ -768,4 +768,24 @@ describe('ReviewsPage — the admin moderation listing (#563)', () => {
     expect(screen.getByRole('button', { name: 'Previous' })).toBeDisabled();
     expect(screen.getByRole('button', { name: 'Next' })).toBeEnabled();
   });
+
+  it('refuses a new review when the instance has no open slots left', async () => {
+    // The four entry points all lead to the same wizard, and the wizard is where
+    // the work would be lost — so the button that starts it says no (issue #688).
+    mockReviews({
+      data: {
+        items: REVIEWS,
+        total: REVIEWS.length,
+        page: 0,
+        size: 100,
+        activeReviewLimit: 2,
+        activeReviewsUsed: 2,
+      },
+    });
+    renderPage();
+
+    expect(await screen.findByRole('button', { name: /New review/i })).toBeDisabled();
+    // Was a tooltip, which only a pointer could reach (issue #690).
+    expect(screen.getByRole('alert')).toHaveTextContent(/Finalizing or archiving a review/);
+  });
 });

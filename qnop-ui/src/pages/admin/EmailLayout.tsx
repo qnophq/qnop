@@ -22,13 +22,10 @@
 import Stack from '@mui/material/Stack';
 import Tab from '@mui/material/Tab';
 import Tabs from '@mui/material/Tabs';
-import { Link as RouterLink, Outlet, useLocation } from 'react-router';
+import { Link as RouterLink, Navigate, Outlet, useLocation } from 'react-router';
 import { PageHeader } from '../../components/admin/layout/PageHeader';
-
-const EMAIL_TABS = [
-  { path: 'server', label: 'Server' },
-  { path: 'templates', label: 'Templates' },
-] as const;
+import { useConfig } from '../../api/hooks/useConfig';
+import { offeredEmailTabs } from './emailTabs';
 
 /**
  * Shell for the `/admin/email/*` admin area (issue #525): one page-level
@@ -38,8 +35,19 @@ const EMAIL_TABS = [
  * every child, the template editor included — child pages heading below
  * it use h2, keeping the single page-level h1 here.
  */
+/**
+ * `/admin/email` lands on the first tab this deployment offers, rather than on
+ * `server` unconditionally — with SMTP configuration withheld that would have
+ * been a page whose every control is refused (issue #678).
+ */
+export function EmailIndexRedirect() {
+  const tabs = offeredEmailTabs(useConfig().data?.features);
+  return <Navigate to={`/admin/email/${tabs[0]?.path ?? 'server'}`} replace />;
+}
+
 export function EmailLayout() {
   const location = useLocation();
+  const tabs = offeredEmailTabs(useConfig().data?.features);
 
   const activeTab = location.pathname.startsWith('/admin/email/templates') ? 'templates' : 'server';
 
@@ -55,7 +63,7 @@ export function EmailLayout() {
         aria-label="Email admin sub-pages"
         sx={{ borderBottom: 1, borderColor: 'divider' }}
       >
-        {EMAIL_TABS.map((tab) => (
+        {tabs.map((tab) => (
           <Tab
             key={tab.path}
             component={RouterLink}

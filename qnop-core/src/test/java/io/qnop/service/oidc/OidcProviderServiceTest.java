@@ -30,6 +30,7 @@ import static org.mockito.Mockito.when;
 import io.qnop.entity.OidcProvider;
 import io.qnop.entity.OidcProviderType;
 import io.qnop.repository.OidcProviderRepository;
+import io.qnop.service.limits.FeatureToggleProperties;
 import io.qnop.service.oidc.OidcProviderService.OidcDiscoveryOutcome;
 import io.qnop.service.oidc.OidcProviderService.OidcProviderPatch;
 import java.util.Optional;
@@ -53,7 +54,9 @@ class OidcProviderServiceTest {
   @BeforeEach
   void setUp() {
     // Use the real SSRF policy so its rules are exercised through the service.
-    service = new OidcProviderService(providers, new OidcSsrfPolicy(false), events);
+    service =
+        new OidcProviderService(
+            providers, new OidcSsrfPolicy(false), events, FeatureToggleProperties.all());
   }
 
   @Test

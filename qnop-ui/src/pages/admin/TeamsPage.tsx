@@ -48,6 +48,7 @@ import { useDeleteTeam, useTeams } from '../../api/hooks/useTeams';
 import { TeamFormDialog } from '../../components/admin/teams/TeamFormDialog';
 import { ConfirmDialog } from '../../components/admin/ConfirmDialog';
 import { PageHeader } from '../../components/admin/layout/PageHeader';
+import { QuotaAlert } from '../../components/limits/QuotaAlert';
 import { AdminToast } from '../../components/admin/layout/AdminToast';
 import { useToast } from '../../components/admin/layout/useToast';
 import { UserStatusBadge } from '../../components/admin/users/UserBadges';
@@ -87,6 +88,11 @@ export function TeamsPage() {
     page,
     size: PAGE_SIZE,
   });
+  // What this deployment allows (issue #688); 0 means no ceiling, which is the
+  // ordinary self-hosted case and shows nothing.
+  const teamLimit = data?.teamLimit ?? 0;
+  const teamsUsed = data?.teamsUsed ?? 0;
+  const teamsFull = teamLimit > 0 && teamsUsed >= teamLimit;
   const teams = data?.items ?? [];
   const total = data?.total ?? 0;
 
@@ -120,13 +126,32 @@ export function TeamsPage() {
     <Stack spacing={3}>
       <PageHeader
         title="Teams"
-        description="Group reviewers and manage their team roles."
+        description={
+          teamLimit > 0
+            ? `Group reviewers and manage their team roles. ${teamsUsed} of ${teamLimit} teams used.`
+            : 'Group reviewers and manage their team roles.'
+        }
         action={
-          <Button variant="contained" startIcon={<UsersRound size={18} />} onClick={openCreate}>
+          // Disabled rather than left to fail (issue #688): the refusal is
+          // correct either way, but learning about a ceiling by filling in a
+          // form and being turned away reads as a fault rather than a setting.
+          <Button
+            variant="contained"
+            startIcon={<UsersRound size={18} />}
+            disabled={teamsFull}
+            onClick={openCreate}
+          >
             Create team
           </Button>
         }
       />
+
+      {teamsFull && (
+        <QuotaAlert>
+          This instance is configured for {teamLimit} teams and holds {teamsUsed}. Deleting a team
+          frees a slot.
+        </QuotaAlert>
+      )}
 
       <ClearableSearchField
         value={search}

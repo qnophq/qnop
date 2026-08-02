@@ -20,6 +20,7 @@
  */
 
 import { describe, expect, it } from 'vitest';
+import type { ServerConfigFeatures } from '../../api/generated';
 import { crumbsFor, visibleNavGroups } from './navConfig';
 
 function ids(role: 'ADMIN' | 'MEMBER' | 'AUDITOR' | null): string[] {
@@ -101,5 +102,76 @@ describe('crumbsFor', () => {
   it('resolves the My Teams surface and its detail path', () => {
     expect(crumbsFor('/my-teams')).toEqual([{ label: 'My Teams' }]);
     expect(crumbsFor('/my-teams/abc-123')).toEqual([{ label: 'My Teams', to: '/my-teams' }]);
+  });
+});
+
+/**
+ * Every capability present, minus the ones named. A literal listing all of them
+ * had to be widened in four places each time a switch was added (#674 → #683),
+ * and the interesting part — which one is missing — was the easiest to miss.
+ */
+function features(withheld: Partial<ServerConfigFeatures> = {}): ServerConfigFeatures {
+  return {
+    oidc: true,
+    annotationExport: true,
+    customBranding: true,
+    smtpConfiguration: true,
+    emailTemplates: true,
+    deploymentConfiguration: true,
+    ...withheld,
+  };
+}
+
+describe('capability-aware navigation (#674)', () => {
+  it('hides the pages that administer a withheld capability', () => {
+    const groups = visibleNavGroups('ADMIN', features({ oidc: false, customBranding: false }));
+    const ids = groups.flatMap((group) => group.items.map((item) => item.id));
+
+    expect(ids).not.toContain('oidc-providers');
+    expect(ids).not.toContain('branding');
+    // Everything else an administrator has stays put.
+    expect(ids).toContain('users');
+    expect(ids).toContain('settings');
+  });
+
+  it('shows them where the capabilities are present', () => {
+    const groups = visibleNavGroups('ADMIN', features({}));
+    const ids = groups.flatMap((group) => group.items.map((item) => item.id));
+
+    expect(ids).toContain('oidc-providers');
+    expect(ids).toContain('branding');
+  });
+
+  it('shows them while the config has not arrived yet', () => {
+    // Absent is "not known", not "not available": a sidebar that flickers items
+    // in as the config lands reads as a bug.
+    const ids = visibleNavGroups('ADMIN', undefined).flatMap((group) =>
+      group.items.map((item) => item.id),
+    );
+
+    expect(ids).toContain('oidc-providers');
+    expect(ids).toContain('branding');
+  });
+
+  it('keeps the Email entry while either of its two capabilities remains', () => {
+    // The item covers two sub-pages with a capability each (#678/#679), so it
+    // earns its place as long as one of them is still worth opening.
+    const withTemplatesOnly = visibleNavGroups('ADMIN', features({ smtpConfiguration: false }));
+    expect(withTemplatesOnly.flatMap((g) => g.items.map((i) => i.id))).toContain('email');
+
+    const withNeither = visibleNavGroups(
+      'ADMIN',
+      features({ smtpConfiguration: false, emailTemplates: false }),
+    );
+    expect(withNeither.flatMap((g) => g.items.map((i) => i.id))).not.toContain('email');
+  });
+
+  it('hides the configuration page where the deployment does not show its own setup', () => {
+    const groups = visibleNavGroups('ADMIN', features({ deploymentConfiguration: false }));
+    const ids = groups.flatMap((group) => group.items.map((item) => item.id));
+
+    expect(ids).not.toContain('configuration');
+    // The quotas it reports keep applying; only the screen is gone (#683).
+    expect(ids).toContain('users');
   });
 });

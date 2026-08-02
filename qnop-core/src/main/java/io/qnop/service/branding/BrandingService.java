@@ -23,6 +23,8 @@ package io.qnop.service.branding;
 import io.qnop.entity.ApplicationAsset;
 import io.qnop.entity.BrandingSlot;
 import io.qnop.repository.ApplicationAssetRepository;
+import io.qnop.service.limits.FeatureDisabledException;
+import io.qnop.service.limits.FeatureToggleProperties;
 import java.io.IOException;
 import java.io.InputStream;
 import java.security.MessageDigest;
@@ -50,6 +52,9 @@ import org.springframework.transaction.support.TransactionTemplate;
 @Service
 public class BrandingService {
 
+  /** What this deployment may do at all (issue #674). */
+  private final FeatureToggleProperties features;
+
   private final ApplicationAssetRepository repository;
   private final TransactionTemplate transactionTemplate;
 
@@ -76,7 +81,9 @@ public class BrandingService {
   public BrandingService(
       ApplicationAssetRepository repository,
       PlatformTransactionManager transactionManager,
-      BrandingRasterizer rasterizer) {
+      BrandingRasterizer rasterizer,
+      FeatureToggleProperties features) {
+    this.features = features;
     this.repository = repository;
     this.transactionTemplate = new TransactionTemplate(transactionManager);
     this.defaults = loadDefaults();
@@ -123,6 +130,9 @@ public class BrandingService {
    *     image unreadable/oversized, or the SVG unsafe
    */
   public StoredAsset store(String slot, byte[] bytes, UUID uploadedBy) {
+    if (!features.customBranding()) {
+      throw new FeatureDisabledException(FeatureDisabledException.Feature.CUSTOM_BRANDING);
+    }
     BrandingSlot resolved = resolve(slot);
     String contentType = sniffContentType(bytes);
 
@@ -169,6 +179,12 @@ public class BrandingService {
   @Transactional(readOnly = true)
   public Optional<BrandingAsset> get(String slot) {
     BrandingSlot resolved = resolve(slot);
+    if (!features.customBranding()) {
+      // Not merely "no new uploads": a deployment that loses this capability has
+      // to stop showing the logo it already holds, or a downgrade would change
+      // nothing anybody can see. The row stays — this is a plan, not a deletion.
+      return Optional.of(defaults.get(resolved));
+    }
     return repository
         .findBySlot(resolved)
         .map(
@@ -230,6 +246,11 @@ public class BrandingService {
   }
 
   private SlotStatus statusFor(BrandingSlot slot) {
+    if (!features.customBranding()) {
+      // Reported as DEFAULT because that is what is served: the badge in the
+      // admin UI must agree with the logo on the page.
+      return new SlotStatus(slot.urlValue(), BrandingSource.DEFAULT, defaults.get(slot).sha256());
+    }
     return repository
         .findBySlot(slot)
         .map(asset -> new SlotStatus(slot.urlValue(), BrandingSource.CUSTOM, asset.getSha256()))
@@ -242,6 +263,10 @@ public class BrandingService {
   /** Removes the asset for a slot (idempotent). */
   @Transactional
   public void delete(String slot) {
+    if (!features.customBranding()) {
+      // Symmetry with store(): the whole surface is off, not just the upload.
+      throw new FeatureDisabledException(FeatureDisabledException.Feature.CUSTOM_BRANDING);
+    }
     repository.deleteBySlot(resolve(slot));
   }
 

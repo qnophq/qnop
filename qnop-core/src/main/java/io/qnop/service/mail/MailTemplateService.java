@@ -27,6 +27,8 @@ import io.qnop.repository.MailTemplateRepository;
 import io.qnop.repository.UserRepository;
 import io.qnop.service.ApplicationSettingKey;
 import io.qnop.service.ApplicationSettingsService;
+import io.qnop.service.limits.FeatureDisabledException;
+import io.qnop.service.limits.FeatureToggleProperties;
 import java.time.Instant;
 import java.util.HashMap;
 import java.util.List;
@@ -60,6 +62,7 @@ public class MailTemplateService {
   private final UserRepository userRepository;
   private final ApplicationSettingsService settings;
   private final EmailLayoutBuilder layoutBuilder;
+  private final FeatureToggleProperties features;
   private final Mustache.Compiler plainCompiler = Mustache.compiler().escapeHTML(false);
   private final Mustache.Compiler htmlCompiler = Mustache.compiler().escapeHTML(true);
 
@@ -67,11 +70,30 @@ public class MailTemplateService {
       MailTemplateRepository repository,
       UserRepository userRepository,
       ApplicationSettingsService settings,
-      EmailLayoutBuilder layoutBuilder) {
+      EmailLayoutBuilder layoutBuilder,
+      FeatureToggleProperties features) {
     this.repository = repository;
     this.userRepository = userRepository;
     this.settings = settings;
     this.layoutBuilder = layoutBuilder;
+    this.features = features;
+  }
+
+  /** Whether this deployment lets the templates be edited at all (issue #679). */
+  public boolean editable() {
+    return features.emailTemplates();
+  }
+
+  /**
+   * Refuses when the deployment withholds template editing.
+   *
+   * <p>Reading and previewing stay open: they only show what the deployment already sends, and a
+   * plan that excludes editing has no reason to hide the wording of its own mail.
+   */
+  public void requireEditable() {
+    if (!features.emailTemplates()) {
+      throw new FeatureDisabledException(FeatureDisabledException.Feature.EMAIL_TEMPLATES);
+    }
   }
 
   /**
@@ -232,6 +254,7 @@ public class MailTemplateService {
       String bodyPlain,
       String bodyHtml,
       UUID actor) {
+    requireEditable();
     validatePlaceholders(key, subject, bodyPlain, bodyHtml);
     MailTemplate row =
         findRow(key, locale)
@@ -257,6 +280,7 @@ public class MailTemplateService {
    */
   @Transactional
   public boolean reset(MailTemplateKey key, String locale) {
+    requireEditable();
     return findRow(key, locale)
         .map(
             row -> {

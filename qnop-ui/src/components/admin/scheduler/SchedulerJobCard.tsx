@@ -43,6 +43,19 @@ interface SchedulerJobCardProps {
   onToggleEnabled: (job: SchedulerJob) => void;
   onToggleDryRun: (job: SchedulerJob) => void;
   onRunNow: (job: SchedulerJob) => void;
+  /**
+   * Whether this deployment allows a manual run at all (issue #676). False drops
+   * the button rather than disabling it: a greyed-out control invites hovering
+   * for a tooltip that explains nothing the page has not already said above.
+   */
+  manualRunEnabled: boolean;
+  /**
+   * Whether this deployment allows the enabled and dry-run switches to be
+   * changed (issue #677). False renders them read-only rather than removing
+   * them: unlike the run button, a switch carries information — whether the job
+   * is on — that stays worth reading when it cannot be flipped.
+   */
+  jobSettingsEditable: boolean;
 }
 
 /** The last-run outcome as a coloured pill: green success, red failure, neutral "never run". */
@@ -69,6 +82,8 @@ export function SchedulerJobCard({
   onToggleEnabled,
   onToggleDryRun,
   onRunNow,
+  manualRunEnabled,
+  jobSettingsEditable,
 }: SchedulerJobCardProps) {
   const theme = useTheme();
   const { formatRelative } = useFormatters();
@@ -163,7 +178,7 @@ export function SchedulerJobCard({
                 <Switch
                   size="small"
                   checked={job.enabled}
-                  disabled={saving}
+                  disabled={saving || !jobSettingsEditable}
                   onChange={() => onToggleEnabled(job)}
                   slotProps={{ input: { 'aria-label': `Enable ${job.displayName}` } }}
                 />
@@ -182,7 +197,7 @@ export function SchedulerJobCard({
                   <Switch
                     size="small"
                     checked={job.dryRun}
-                    disabled={saving}
+                    disabled={saving || !jobSettingsEditable}
                     onChange={() => onToggleDryRun(job)}
                     slotProps={{ input: { 'aria-label': `Dry-run ${job.displayName}` } }}
                   />
@@ -191,17 +206,19 @@ export function SchedulerJobCard({
               />
             )}
           </Stack>
-          <Button
-            size="small"
-            variant="outlined"
-            disabled={running}
-            startIcon={
-              running ? <CircularProgress size={14} color="inherit" /> : <Play size={15} />
-            }
-            onClick={() => onRunNow(job)}
-          >
-            Run now
-          </Button>
+          {manualRunEnabled && (
+            <Button
+              size="small"
+              variant="outlined"
+              disabled={running}
+              startIcon={
+                running ? <CircularProgress size={14} color="inherit" /> : <Play size={15} />
+              }
+              onClick={() => onRunNow(job)}
+            >
+              Run now
+            </Button>
+          )}
         </Stack>
       </Stack>
     </Paper>

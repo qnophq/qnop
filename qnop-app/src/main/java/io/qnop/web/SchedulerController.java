@@ -56,7 +56,9 @@ public class SchedulerController implements AdminSchedulerApi {
   public ResponseEntity<SchedulerJobListResponse> listSchedulerJobs() {
     return ResponseEntity.ok(
         new SchedulerJobListResponse()
-            .items(scheduler.list().stream().map(SchedulerController::toDto).toList()));
+            .items(scheduler.list().stream().map(SchedulerController::toDto).toList())
+            .manualRunEnabled(scheduler.manualRunEnabled())
+            .jobSettingsEditable(scheduler.jobSettingsEditable()));
   }
 
   @Override

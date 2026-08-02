@@ -28,6 +28,9 @@ import { ConfigurationPage } from './ConfigurationPage';
 const mockHook = vi.fn();
 vi.mock('../../api/hooks/useAdminConfiguration', () => ({
   useAdminConfiguration: () => mockHook(),
+  // The page now carries the quota card (issue #673); no quota configured is
+  // the shape these tests are about, so it renders nothing.
+  useInstanceLimits: vi.fn(() => ({ data: undefined })),
 }));
 
 const RESPONSE: ConfigurationResponse = {

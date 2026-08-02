@@ -21,6 +21,7 @@
 
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { useReviewCapacity } from '../../api/hooks/useReviews';
 import { MemoryRouter, Route, Routes } from 'react-router';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { ThemeProvider } from '@mui/material/styles';
@@ -36,6 +37,10 @@ vi.mock('../../api/config', () => ({
   documentsApi: { addParticipant: vi.fn() },
   principalsApi: { searchPrincipals: vi.fn() },
   reviewWorkflowApi: { transitionDocumentWorkflow: vi.fn() },
+}));
+vi.mock('../../api/hooks/useReviews', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../api/hooks/useReviews')>()),
+  useReviewCapacity: vi.fn(() => ({ limit: 0, used: 0, full: false, isLoading: false })),
 }));
 vi.mock('../../api/hooks/useConfig', () => ({
   useConfig: () => ({ data: { upload: { maxDocumentSizeMb: 50 } } }),
@@ -282,5 +287,22 @@ describe('NewReviewPage — step 3 & submit', () => {
 
     fireEvent.click(screen.getByRole('button', { name: /Open review/ }));
     expect(screen.getByTestId('detail-probe')).toBeInTheDocument();
+  });
+
+  it('does not open the wizard when no review may be started (#692)', async () => {
+    vi.mocked(useReviewCapacity).mockReturnValue({
+      limit: 3,
+      used: 3,
+      full: true,
+      isLoading: false,
+    });
+    renderPage();
+
+    // Three steps of work — a document, reviewers, a deadline — must not be
+    // asked for when the last one cannot succeed.
+    expect(await screen.findByRole('alert')).toHaveTextContent(/allows 3 reviews open at once/);
+    expect(screen.queryByRole('button', { name: /Continue|Next/i })).not.toBeInTheDocument();
+    // And a way onward, since finalizing a review clears this by itself.
+    expect(screen.getByRole('button', { name: /Back to reviews/i })).toBeInTheDocument();
   });
 });

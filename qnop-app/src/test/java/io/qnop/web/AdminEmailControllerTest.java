@@ -54,8 +54,25 @@ import org.springframework.test.web.servlet.MockMvc;
  */
 @WebMvcTest
 @AutoConfigureMockMvc(addFilters = false)
-@ContextConfiguration(classes = {AdminEmailController.class, ApiPathConfig.class})
+@ContextConfiguration(
+    classes = {
+      AdminEmailController.class,
+      ApiPathConfig.class,
+      AdminEmailControllerTest.Features.class
+    })
 class AdminEmailControllerTest {
+
+  /**
+   * A real properties bean rather than a mock: mocking it would answer {@code false} for every
+   * capability and silently turn each case here into a refusal test (issue #678/#679).
+   */
+  @org.springframework.boot.test.context.TestConfiguration
+  static class Features {
+    @org.springframework.context.annotation.Bean
+    io.qnop.service.limits.FeatureToggleProperties featureToggles() {
+      return io.qnop.service.limits.FeatureToggleProperties.all();
+    }
+  }
 
   @Autowired private MockMvc mockMvc;
 

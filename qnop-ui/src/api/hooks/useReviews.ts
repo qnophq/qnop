@@ -72,6 +72,24 @@ export const reviewKeys = {
 };
 
 /** A page of the caller's reviews (owned or participating, incl. via team). */
+/**
+ * What this instance still allows to be open (issue #692).
+ *
+ * <p>Reads the ceiling off the review list, asking for a single row: the numbers ride along with
+ * every page, so this needs no endpoint of its own and shares its cache entry with any other
+ * caller asking the same way.
+ *
+ * <p>`full` is deliberately false while it loads. Nothing here is enforcement — the ingest endpoint
+ * refuses on its own — and blocking the way to a wizard on a deployment that has room, for as long
+ * as a request takes, is the worse mistake.
+ */
+export function useReviewCapacity() {
+  const query = useReviews({ page: 0, size: 1 });
+  const limit = query.data?.activeReviewLimit ?? 0;
+  const used = query.data?.activeReviewsUsed ?? 0;
+  return { limit, used, full: limit > 0 && used >= limit, isLoading: query.isPending };
+}
+
 export function useReviews(params: ReviewListParams) {
   return useQuery<DocumentListResponse>({
     queryKey: reviewKeys.list(params),

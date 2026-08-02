@@ -29,6 +29,7 @@ import io.qnop.web.security.ratelimit.RefreshRateLimitFilter;
 import io.qnop.web.security.ratelimit.RegisterRateLimitFilter;
 import io.qnop.web.security.ratelimit.TrackingRateLimitFilter;
 import java.util.List;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.core.annotation.Order;
@@ -224,6 +225,11 @@ public class SecurityConfiguration {
    */
   @Bean
   @Order(1)
+  // Not registered at all when single sign-on is switched off (issue #674).
+  // Hiding the login buttons would leave /oauth2/authorization/{id} answering to
+  // anyone who types it; without this chain those paths fall through to the API
+  // rules, which do not permit them.
+  @ConditionalOnProperty(name = "qnop.features.oidc", havingValue = "true", matchIfMissing = true)
   SecurityFilterChain oidcLoginSecurityChain(
       HttpSecurity http,
       ClientRegistrationRepository clientRegistrationRepository,

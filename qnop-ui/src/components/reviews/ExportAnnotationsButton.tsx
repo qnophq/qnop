@@ -86,6 +86,24 @@ export function ExportAnnotationsButton({
     }
   };
 
+  // Nothing to offer: either the operator withheld export entirely (issue #674)
+  // or this deployment can produce no format at all. Hiding the button rather
+  // than letting the wizard open on an empty choice — walking a user through
+  // four steps of configuration to refuse at the download is worse than never
+  // offering it. The endpoint refuses either way; this is only the sign on the
+  // door matching the lock.
+  //
+  // While the config is still loading the button stays: "not known yet" is not
+  // "not available", and an affordance that appears a moment late reads as a
+  // glitch.
+  const config = configQuery.data;
+  const exportOffered =
+    !config ||
+    (config.features?.annotationExport !== false && (config.exportFormats?.length ?? 0) > 0);
+  if (!exportOffered) {
+    return null;
+  }
+
   return (
     <>
       <ToolbarIconButton

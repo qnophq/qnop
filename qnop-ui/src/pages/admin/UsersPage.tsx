@@ -46,6 +46,7 @@ import { ResetLinkDialog } from '../../components/admin/users/ResetLinkDialog';
 import { GeneratedPasswordDialog } from '../../components/admin/users/GeneratedPasswordDialog';
 import { ConfirmDialog } from '../../components/admin/ConfirmDialog';
 import { PageHeader } from '../../components/admin/layout/PageHeader';
+import { QuotaAlert } from '../../components/limits/QuotaAlert';
 import { AdminToast } from '../../components/admin/layout/AdminToast';
 import { useToast } from '../../components/admin/layout/useToast';
 import { useAuthStore } from '../../stores/authStore';
@@ -174,17 +175,43 @@ export function UsersPage() {
     }
   };
 
+  // What this deployment allows (issue #687). `seatLimit` is 0 where there is no
+  // ceiling, which is the ordinary self-hosted case and shows nothing at all.
+  const seatLimit = data?.seatLimit ?? 0;
+  const seatsUsed = data?.seatsUsed ?? 0;
+  const seatsFull = seatLimit > 0 && seatsUsed >= seatLimit;
+
   return (
     <Stack spacing={3}>
       <PageHeader
         title="Users"
-        description="Manage accounts, roles and access."
+        description={
+          seatLimit > 0
+            ? `Manage accounts, roles and access. ${seatsUsed} of ${seatLimit} seats used.`
+            : 'Manage accounts, roles and access.'
+        }
         action={
-          <Button variant="contained" startIcon={<UserPlus size={18} />} onClick={openCreate}>
+          // Disabled rather than left to fail: filling in a name, an email and a
+          // password only to be refused at submit is the worst way to learn that
+          // an instance is full. Disabled accounts occupy a seat too, so freeing
+          // one means deleting, not deactivating.
+          <Button
+            variant="contained"
+            startIcon={<UserPlus size={18} />}
+            disabled={seatsFull}
+            onClick={openCreate}
+          >
             Add user
           </Button>
         }
       />
+
+      {seatsFull && (
+        <QuotaAlert>
+          This instance is configured for {seatLimit} accounts and holds {seatsUsed}. Deleting an
+          account frees a seat; disabling one does not.
+        </QuotaAlert>
+      )}
 
       <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1.5} sx={{ flexWrap: 'wrap' }}>
         <ClearableSearchField

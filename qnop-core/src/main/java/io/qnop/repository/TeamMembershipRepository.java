@@ -26,6 +26,7 @@ import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -62,6 +63,14 @@ public interface TeamMembershipRepository extends JpaRepository<TeamMembership, 
       "SELECT new io.qnop.repository.TeamMemberCount(m.teamId, COUNT(m)) "
           + "FROM TeamMembership m WHERE m.teamId IN :teamIds GROUP BY m.teamId")
   List<TeamMemberCount> countMembersByTeamIds(@Param("teamIds") Collection<UUID> teamIds);
+
+  /**
+   * Team sizes, largest first — read with a one-row {@code Pageable} to answer "how full is the
+   * fullest team" for the per-team quota (issue #673). That is the number an administrator needs: a
+   * total across teams would say nothing about whether the next invitation fits.
+   */
+  @Query("SELECT COUNT(m) FROM TeamMembership m GROUP BY m.teamId ORDER BY COUNT(m) DESC")
+  List<Long> memberCountsLargestFirst(Pageable pageable);
 
   /** The user's enabled teams with their role there, ordered by name (issue #473). */
   @Query(

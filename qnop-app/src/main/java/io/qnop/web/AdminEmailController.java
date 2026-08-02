@@ -31,6 +31,8 @@ import io.qnop.api.v1.model.SendTestEmailRequest;
 import io.qnop.api.v1.model.SendTestEmailResponse;
 import io.qnop.api.v1.model.TemplateTestEmailRequest;
 import io.qnop.api.v1.model.UpdateMailTemplateRequest;
+import io.qnop.service.limits.FeatureDisabledException;
+import io.qnop.service.limits.FeatureToggleProperties;
 import io.qnop.service.mail.MailService;
 import io.qnop.service.mail.MailService.SendResult;
 import io.qnop.service.mail.MailTemplateKey;
@@ -67,14 +69,24 @@ public class AdminEmailController implements AdminEmailApi {
 
   private final MailService mailService;
   private final MailTemplateService templates;
+  private final FeatureToggleProperties features;
 
-  public AdminEmailController(MailService mailService, MailTemplateService templates) {
+  public AdminEmailController(
+      MailService mailService, MailTemplateService templates, FeatureToggleProperties features) {
     this.mailService = mailService;
     this.templates = templates;
+    this.features = features;
   }
 
   @Override
   public ResponseEntity<SendTestEmailResponse> sendTestEmail(SendTestEmailRequest request) {
+    // Part of the mail-server screen (issue #678), so it goes when that does —
+    // and it sends from the operator's server, which is reason enough on its own.
+    // The guard sits here rather than in MailService, which every notification
+    // also goes through.
+    if (!features.smtpConfiguration()) {
+      throw new FeatureDisabledException(FeatureDisabledException.Feature.SMTP_CONFIGURATION);
+    }
     SendResult result = mailService.sendMail(request.getRecipient(), TEST_SUBJECT, TEST_BODY, null);
     SendTestEmailResponse body =
         switch (result) {
@@ -88,6 +100,8 @@ public class AdminEmailController implements AdminEmailApi {
   @Override
   public ResponseEntity<SendTestEmailResponse> sendTemplateTestEmail(
       String key, TemplateTestEmailRequest request) {
+    // Testing a draft is part of editing it (issue #679).
+    templates.requireEditable();
     MailTemplateKey templateKey = resolveKey(key);
     MailPreview preview;
     try {

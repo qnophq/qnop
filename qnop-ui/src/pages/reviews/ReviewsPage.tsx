@@ -41,6 +41,7 @@ import { LayoutGrid, ListFilter, Plus, Rows3, Trash2 } from 'lucide-react';
 import { useNavigate, useSearchParams } from 'react-router';
 import type { DocumentSummary } from '../../api/generated';
 import { useReviews } from '../../api/hooks/useReviews';
+import { QuotaAlert } from '../../components/limits/QuotaAlert';
 import { ErrorState } from '../errors/ErrorState';
 import { ServerErrorIllustration } from '../errors/illustrations';
 import { ClearableSearchField } from '../../components/ClearableSearchField';
@@ -600,15 +601,32 @@ export function ReviewsPage() {
 
   const openReview = (documentId: string) => navigate(`/reviews/${documentId}`);
 
+  // What this instance allows open at once (issue #688); 0 means no ceiling.
+  // Finished work occupies nothing, so finalizing a review frees a slot.
+  const reviewLimit = data?.activeReviewLimit ?? 0;
+  const reviewsOpen = data?.activeReviewsUsed ?? 0;
+  const reviewsFull = reviewLimit > 0 && reviewsOpen >= reviewLimit;
+
   const newReviewButton = (
     <Button
       variant="contained"
       startIcon={<Plus size={16} />}
+      disabled={reviewsFull}
       onClick={() => navigate('/reviews/new')}
     >
       New review
     </Button>
   );
+
+  // The same warning the other three quotas show (issue #690) — it replaced a
+  // tooltip on the button, which said the same thing in a place only a mouse
+  // could reach.
+  const reviewQuotaWarning = reviewsFull ? (
+    <QuotaAlert>
+      This instance allows {reviewLimit} reviews open at once, and {reviewsOpen} are open.
+      Finalizing or archiving a review frees a slot; finished work occupies nothing.
+    </QuotaAlert>
+  ) : null;
 
   // Rendered next to the search field, and again over the empty state — an admin
   // with no reviews of their own must still be able to reach everyone else's.
@@ -643,6 +661,8 @@ export function ReviewsPage() {
         }
         action={newReviewButton}
       />
+
+      {reviewQuotaWarning}
 
       {isError && (
         // The branded failure shell (issue #611) instead of a bare alert -
@@ -698,7 +718,10 @@ export function ReviewsPage() {
         <Stack spacing={2} sx={{ alignItems: 'flex-start' }}>
           {participationToggle}
           <Box sx={{ alignSelf: 'stretch' }}>
-            <ReviewsEmptyState onNewReview={() => navigate('/reviews/new')} />
+            <ReviewsEmptyState
+              onNewReview={() => navigate('/reviews/new')}
+              disabled={reviewsFull}
+            />
           </Box>
         </Stack>
       )}

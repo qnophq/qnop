@@ -38,6 +38,8 @@ import io.qnop.repository.DocumentVersionRepository;
 import io.qnop.service.ApplicationSettingKey;
 import io.qnop.service.ApplicationSettingsService;
 import io.qnop.service.job.JobService;
+import io.qnop.service.limits.InstanceLimitProperties;
+import io.qnop.service.limits.InstanceLimitService;
 import io.qnop.service.storage.StagedObject;
 import io.qnop.service.storage.StorageQuotaExceededException;
 import io.qnop.service.storage.StorageService;
@@ -108,7 +110,8 @@ class DocumentIngestServiceTest {
         placements,
         transactionManager,
         org.mockito.Mockito.mock(org.springframework.context.ApplicationEventPublisher.class),
-        renditions);
+        renditions,
+        noLimits());
   }
 
   // --- request validation (rejected before any storage or settings work) -----
@@ -528,5 +531,18 @@ class DocumentIngestServiceTest {
     } catch (ReflectiveOperationException e) {
       throw new IllegalStateException("could not seed entity id in test", e);
     }
+  }
+
+  /**
+   * Quotas are off in these tests (issue #673): they cover this service's own behaviour, and
+   * InstanceLimitServiceTest covers the quotas.
+   */
+  private static InstanceLimitService noLimits() {
+    return new InstanceLimitService(
+        InstanceLimitProperties.unlimited(),
+        org.mockito.Mockito.mock(io.qnop.repository.UserRepository.class),
+        org.mockito.Mockito.mock(io.qnop.repository.TeamRepository.class),
+        org.mockito.Mockito.mock(io.qnop.repository.TeamMembershipRepository.class),
+        org.mockito.Mockito.mock(io.qnop.repository.DocumentRepository.class));
   }
 }

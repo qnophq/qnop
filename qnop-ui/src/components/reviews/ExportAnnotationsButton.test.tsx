@@ -25,6 +25,7 @@ import userEvent from '@testing-library/user-event';
 import { ThemeProvider } from '@mui/material/styles';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { documentKeys } from '../../api/hooks/useDocuments';
+import { configKeys } from '../../api/hooks/useConfig';
 import { buildTheme } from '../../theme/theme';
 import { downloadAnnotationExport } from '../../api/annotationExport';
 import { ExportAnnotationsButton } from './ExportAnnotationsButton';
@@ -275,5 +276,51 @@ describe('ExportAnnotationsButton', () => {
 
     await waitFor(() => expect(downloadAnnotationExport).toHaveBeenCalled());
     expect(vi.mocked(downloadAnnotationExport).mock.calls[0][2]?.fileName).toBe('Q3 findings');
+  });
+
+  // Issue #674: a deployment may withhold export entirely. The endpoint refuses
+  // either way — these are about the button not promising something the server
+  // will not do.
+  describe('when the deployment withholds export', () => {
+    function renderWithConfig(config: unknown) {
+      const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+      client.setQueryData(documentKeys.detail('doc-1'), { id: 'doc-1', title: 'Vendor Agreement' });
+      client.setQueryData(configKeys.all, config);
+      render(
+        <QueryClientProvider client={client}>
+          <ThemeProvider theme={buildTheme('light')}>
+            <ExportAnnotationsButton documentId="doc-1" version={3} counts={COUNTS} />
+          </ThemeProvider>
+        </QueryClientProvider>,
+      );
+    }
+
+    it('offers no button at all when the capability is off', () => {
+      renderWithConfig({ features: { annotationExport: false }, exportFormats: [] });
+
+      // Not merely disabled: a user who cannot export should not be walked
+      // through four steps of configuration to be refused at the download.
+      expect(screen.queryByRole('button', { name: 'Export' })).not.toBeInTheDocument();
+    });
+
+    it('offers no button when the deployment can produce no format', () => {
+      renderWithConfig({ features: { annotationExport: true }, exportFormats: [] });
+
+      expect(screen.queryByRole('button', { name: 'Export' })).not.toBeInTheDocument();
+    });
+
+    it('keeps the button while the config is still loading', () => {
+      // "Not known yet" is not "not available" — an affordance that appears a
+      // moment late reads as a glitch.
+      renderWithConfig(undefined);
+
+      expect(screen.getByRole('button', { name: 'Export' })).toBeInTheDocument();
+    });
+
+    it('offers the button on a deployment that allows export', () => {
+      renderWithConfig({ features: { annotationExport: true }, exportFormats: ['xlsx', 'csv'] });
+
+      expect(screen.getByRole('button', { name: 'Export' })).toBeInTheDocument();
+    });
   });
 });

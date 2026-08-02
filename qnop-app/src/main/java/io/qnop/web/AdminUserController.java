@@ -39,6 +39,8 @@ import io.qnop.service.AdminUserService.GeneratedPasswordOutcome;
 import io.qnop.service.AdminUserService.PasswordResetOutcome;
 import io.qnop.service.UserNotFoundException;
 import io.qnop.service.avatar.AvatarService;
+import io.qnop.service.limits.InstanceLimitService;
+import io.qnop.service.limits.InstanceLimitUsage;
 import java.time.Instant;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
@@ -62,10 +64,13 @@ public class AdminUserController implements AdminUsersApi {
 
   private final AdminUserService adminUsers;
   private final AvatarService avatars;
+  private final InstanceLimitService limits;
 
-  public AdminUserController(AdminUserService adminUsers, AvatarService avatars) {
+  public AdminUserController(
+      AdminUserService adminUsers, AvatarService avatars, InstanceLimitService limits) {
     this.adminUsers = adminUsers;
     this.avatars = avatars;
+    this.limits = limits;
   }
 
   @Override
@@ -76,6 +81,7 @@ public class AdminUserController implements AdminUsersApi {
     // One batched lookup for the whole page so building avatar URLs never streams image bytes.
     Map<UUID, Instant> avatarTimestamps =
         avatars.updatedAt(result.items().stream().map(AdminUserView::id).toList());
+    InstanceLimitUsage.Quota seats = limits.userSeats();
     return ResponseEntity.ok(
         new AdminUserListResponse()
             .items(
@@ -84,7 +90,11 @@ public class AdminUserController implements AdminUsersApi {
                     .toList())
             .total(result.total())
             .page(result.page())
-            .size(result.size()));
+            .size(result.size())
+            // So the screen can refuse before the form is filled in (issue #687)
+            // rather than after.
+            .seatLimit(seats.maximum())
+            .seatsUsed(seats.used()));
   }
 
   @Override

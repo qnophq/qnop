@@ -183,6 +183,80 @@ qnop:
   # is small, and it is not a per-deployment limit (ADR-0055). A conversion that
   # finds every slot busy waits up to `max-wait` and is then refused — the export
   # answers 503 with Retry-After, an ingest job retries under the queue's backoff.
+  # Instance quotas (issue #673, ADR-0057). What this deployment may hold, set by
+  # whoever operates it — a SaaS plan, in practice. Deliberately NOT application
+  # settings: an administrator inside the instance must not be able to raise their
+  # own ceiling, and anything in the settings registry appears in a web form.
+  #
+  # 0 means unlimited, so a Community deployment is unaffected. Limits bound what
+  # is created and never invalidate what exists: lowering one below current usage
+  # refuses the next record and leaves every present one alone. `max-team-members`
+  # applies per team; `max-active-reviews` counts DRAFT, IN_REVIEW and
+  # CHANGES_REQUESTED — finished work occupies no seat.
+  limits:
+    max-users: ${QNOP_LIMITS_MAX_USERS:0}
+    max-teams: ${QNOP_LIMITS_MAX_TEAMS:0}
+    max-team-members: ${QNOP_LIMITS_MAX_TEAM_MEMBERS:0}
+    max-active-reviews: ${QNOP_LIMITS_MAX_ACTIVE_REVIEWS:0}
+  # Capabilities this deployment offers at all (issue #674, ADR-0057). Same place
+  # and same reasoning as the quotas above: what the operator granted, not what
+  # the tenant chose. All default to true, so a Community deployment has
+  # everything.
+  #
+  # Switching one off closes the door rather than hiding the handle: with
+  # `oidc: false` the OAuth2 endpoints are not mounted at all, with
+  # `annotation-export: false` the export endpoint refuses as well as vanishing
+  # from the format list, and with `custom-branding: false` every slot serves the
+  # bundled logo even where an upload is stored — otherwise a downgrade would
+  # leave the previous branding on screen.
+  #
+  # `scheduler-manual-run: false` withholds an administrator's run-now on the
+  # maintenance jobs (issue #676). The schedules are untouched — the sweeps keep
+  # running on their cron — because what is withheld is the override, which
+  # starts a job regardless of the job's own enabled flag.
+  #
+  # `scheduler-job-settings: false` fixes the jobs as this deployment ships them
+  # (issue #677): neither the enabled switch nor dry-run can be changed from the
+  # admin UI. One switch covers both, because dry-run is a soft off for the jobs
+  # that delete things — the reaper and the review purge run but delete nothing
+  # in dry-run, so guarding only `enabled` would leave the same outcome one
+  # toggle away.
+  #
+  # `smtp-configuration: false` hands the outgoing mail server to the operator
+  # (issue #678): the `smtp.*` settings and the test-mail endpoint refuse, and
+  # the Email → Server tab is not offered. Reading the settings is unaffected.
+  #
+  # `email-templates: false` withholds editing the outgoing messages (issue
+  # #679) — update, reset and template test-mails. Reading and preview stay,
+  # since they only show what the deployment already sends.
+  # The last three govern groups of application settings rather than endpoints
+  # of their own (issue #681), and they differ on purpose:
+  #
+  #   usage-tracking: false      the tracking.* settings are not editable and the
+  #                              section is not shown — but a configuration
+  #                              already in the database KEEPS WORKING. What is
+  #                              withheld is overwriting it, not the feature.
+  #   upload-constraints: false  the upload.* limits stay visible and become
+  #                              read-only: an administrator who cannot raise the
+  #                              ceiling still needs to know where it is.
+  #   self-registration: false   self-registration is off whatever the setting
+  #                              says — the endpoint refuses and no sign-up link
+  #                              is offered. The only one that withholds the
+  #                              capability rather than just the editing.
+  features:
+    oidc: ${QNOP_FEATURES_OIDC:true}
+    annotation-export: ${QNOP_FEATURES_ANNOTATION_EXPORT:true}
+    custom-branding: ${QNOP_FEATURES_CUSTOM_BRANDING:true}
+    scheduler-manual-run: ${QNOP_FEATURES_SCHEDULER_MANUAL_RUN:true}
+    scheduler-job-settings: ${QNOP_FEATURES_SCHEDULER_JOB_SETTINGS:true}
+    smtp-configuration: ${QNOP_FEATURES_SMTP_CONFIGURATION:true}
+    email-templates: ${QNOP_FEATURES_EMAIL_TEMPLATES:true}
+    usage-tracking: ${QNOP_FEATURES_USAGE_TRACKING:true}
+    upload-constraints: ${QNOP_FEATURES_UPLOAD_CONSTRAINTS:true}
+    self-registration: ${QNOP_FEATURES_SELF_REGISTRATION:true}
+    # The admin screen that reports how this deployment is set up (issue #683).
+    # Off hides the page and refuses its endpoints; the quotas keep applying.
+    deployment-configuration: ${QNOP_FEATURES_DEPLOYMENT_CONFIGURATION:true}
   # Usage tracking (issue #666). What an operator configures lives in the admin
   # settings (provider, host, site id, consent, opt-outs); the two keys here are
   # deployment decisions that must not be reachable from the web UI.

@@ -24,6 +24,8 @@ import io.qnop.entity.AuditEvent;
 import io.qnop.entity.SchedulerJob;
 import io.qnop.repository.AuditEventRepository;
 import io.qnop.repository.SchedulerJobRepository;
+import io.qnop.service.limits.FeatureDisabledException;
+import io.qnop.service.limits.FeatureToggleProperties;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
@@ -94,17 +96,30 @@ public class SchedulerService {
   private final AuditEventRepository auditEvents;
   private final LockProvider lockProvider;
   private final TransactionTemplate tx;
+  private final FeatureToggleProperties features;
   private final Map<String, SchedulerWork> works = new ConcurrentHashMap<>();
 
   public SchedulerService(
       SchedulerJobRepository jobs,
       AuditEventRepository auditEvents,
       LockProvider lockProvider,
-      PlatformTransactionManager transactionManager) {
+      PlatformTransactionManager transactionManager,
+      FeatureToggleProperties features) {
     this.jobs = jobs;
     this.auditEvents = auditEvents;
     this.lockProvider = lockProvider;
     this.tx = new TransactionTemplate(transactionManager);
+    this.features = features;
+  }
+
+  /** Whether this deployment lets an administrator trigger a job at all (issue #676). */
+  public boolean manualRunEnabled() {
+    return features.schedulerManualRun();
+  }
+
+  /** Whether a job's own enabled/dry-run settings may be changed here (issue #677). */
+  public boolean jobSettingsEditable() {
+    return features.schedulerJobSettings();
   }
 
   /** One dashboard row: the static catalogue metadata joined with the mutable operator state. */
@@ -142,10 +157,19 @@ public class SchedulerService {
    * An admin's run-now: an explicit override that runs the job regardless of {@code enabled}, under
    * the job's distributed lock so it never overlaps a scheduled run or another manual trigger.
    *
+   * @throws FeatureDisabledException if this deployment forbids manual runs (403, issue #676)
    * @throws SchedulerJobNotFoundException if the id is not catalogued (404)
    * @throws SchedulerJobBusyException if a run is already in progress (409)
    */
   public SchedulerJobView runNow(UUID actorId, String jobId) {
+    // Here rather than in the controller: this is the one place a manual run can
+    // start, so no future caller — a console command, an enterprise module — can
+    // reach it without passing the switch. Checked before the job is even looked
+    // up, since a deployment that forbids manual runs should answer the same way
+    // for a job that exists and one that does not.
+    if (!features.schedulerManualRun()) {
+      throw new FeatureDisabledException(FeatureDisabledException.Feature.SCHEDULER_MANUAL_RUN);
+    }
     SchedulerJobDefinition definition = requireDefinition(jobId);
     LockConfiguration lockConfiguration =
         new LockConfiguration(Instant.now(), jobId, MANUAL_LOCK_AT_MOST, Duration.ZERO);
@@ -165,11 +189,18 @@ public class SchedulerService {
    * Applies operator settings to a job (a null field leaves that setting unchanged), audits the
    * change, and returns the fresh view.
    *
+   * @throws FeatureDisabledException if this deployment fixes the job settings (403, issue #677)
    * @throws SchedulerJobNotFoundException if the id is not catalogued (404)
    * @throws DryRunNotSupportedException if dry-run is requested for a job that cannot dry-run (400)
    */
   public SchedulerJobView updateSettings(
       UUID actorId, String jobId, Boolean enabled, Boolean dryRun) {
+    // Both settings behind one switch on purpose: dry-run is a soft off for the
+    // jobs that delete things, so guarding only `enabled` would leave the same
+    // outcome one toggle away.
+    if (!features.schedulerJobSettings()) {
+      throw new FeatureDisabledException(FeatureDisabledException.Feature.SCHEDULER_JOB_SETTINGS);
+    }
     SchedulerJobDefinition definition = requireDefinition(jobId);
     if (Boolean.TRUE.equals(dryRun) && !definition.supportsDryRun()) {
       throw new DryRunNotSupportedException(jobId);
