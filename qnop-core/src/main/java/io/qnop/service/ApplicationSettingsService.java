@@ -138,10 +138,35 @@ public class ApplicationSettingsService {
   }
 
   /** All settings with their (redacted) current values, for the admin API. */
+  /**
+   * Self-registration as it actually applies: the administrator's setting <em>and</em> the
+   * deployment's permission to offer it at all (issue #681).
+   *
+   * <p>One method because two callers need the same answer — the registration endpoint and the
+   * public config that decides whether a sign-up link appears. Two independent {@code &&}s would
+   * have been one refactor away from a deployment that hides the link and still accepts
+   * registrations, or the reverse.
+   */
+  public boolean selfRegistrationEnabled() {
+    return features.isEnabled(FeatureDisabledException.Feature.SELF_REGISTRATION)
+        && getBoolean(ApplicationSettingKey.AUTH_SELF_REGISTRATION_ENABLED);
+  }
+
   public List<SettingDescriptor> describeAll() {
     Map<ApplicationSettingKey, String> current = snapshot.get();
     List<SettingDescriptor> descriptors = new ArrayList<>();
     for (ApplicationSettingKey key : ApplicationSettingKey.values()) {
+      Optional<FeatureDisabledException.Feature> governing = key.governedBy();
+      boolean available = governing.map(features::isEnabled).orElse(true);
+      // Tracking is the one group that disappears rather than greying out
+      // (issue #681). The difference is what an administrator gains from
+      // seeing it: an upload limit they cannot raise still answers "why was my
+      // file refused", while a tracking endpoint they cannot change tells them
+      // nothing they can act on — and it is the operator's arrangement, not
+      // theirs. It keeps working; it is simply not their screen.
+      if (!available && governing.get() == FeatureDisabledException.Feature.USAGE_TRACKING) {
+        continue;
+      }
       descriptors.add(
           new SettingDescriptor(
               key.getKey(),
@@ -149,7 +174,10 @@ public class ApplicationSettingsService {
               key.getType().name(),
               key.getDescription(),
               key.isSensitive(),
-              key.getEnumOptions()));
+              key.getEnumOptions(),
+              // Same lookup the write guard uses (issues #678/#681), so what the
+              // screen offers and what the endpoint accepts cannot drift apart.
+              available));
     }
     return descriptors;
   }
@@ -173,18 +201,10 @@ public class ApplicationSettingsService {
    * @param actor the editing user's id, or {@code null} when unattributed (wired in issue #17)
    */
   public void update(Map<String, String> changes, UUID actor) {
+    requireGovernedKeysAreAvailable(changes);
     Map<ApplicationSettingKey, String> resolved = resolveAndValidate(changes);
     if (resolved.isEmpty()) {
       return;
-    }
-    // Selective: this endpoint carries every application setting, and only the
-    // mail-server ones are withheld (issue #678). A patch that mixes them in is
-    // refused whole rather than partly applied — silently dropping the keys the
-    // caller is not allowed to set would report success for a change that did
-    // not happen.
-    if (!features.smtpConfiguration()
-        && resolved.keySet().stream().anyMatch(ApplicationSettingKey::isSmtpConfiguration)) {
-      throw new FeatureDisabledException(FeatureDisabledException.Feature.SMTP_CONFIGURATION);
     }
     OptimisticRetry.execute(
         MAX_WRITE_ATTEMPTS,
@@ -198,6 +218,31 @@ public class ApplicationSettingsService {
    * SettingsValidationException} if anything is invalid. Pure, DB-free work — runs outside the
    * write transaction and is never retried.
    */
+  /**
+   * Refuses a patch that touches a setting this deployment governs (issues #678/#681).
+   *
+   * <p>Selective, because this endpoint carries every application setting and only some groups are
+   * governed. Which ones is the registry's answer ({@link ApplicationSettingKey#governedBy}), not a
+   * condition maintained here, so a new key joins its group by being declared.
+   *
+   * <p>Before validation on purpose: a governed field would otherwise answer 400 or 403 depending
+   * on whether the value the caller was not allowed to set happened to be well-formed. "You cannot
+   * change this" is the more fundamental answer, and it does not depend on the value.
+   *
+   * <p>The whole patch is refused rather than the governed keys quietly dropped — reporting success
+   * for a change that did not happen is worse than refusing one the caller could resubmit without
+   * the offending key.
+   */
+  private void requireGovernedKeysAreAvailable(Map<String, String> changes) {
+    for (String rawKey : changes.keySet()) {
+      Optional<FeatureDisabledException.Feature> governing =
+          ApplicationSettingKey.fromKey(rawKey).flatMap(ApplicationSettingKey::governedBy);
+      if (governing.isPresent() && !features.isEnabled(governing.get())) {
+        throw new FeatureDisabledException(governing.get());
+      }
+    }
+  }
+
   private Map<ApplicationSettingKey, String> resolveAndValidate(Map<String, String> changes) {
     Map<ApplicationSettingKey, String> resolved = new LinkedHashMap<>();
     List<SettingFieldError> errors = new ArrayList<>();
@@ -289,7 +334,8 @@ public class ApplicationSettingsService {
       String type,
       String description,
       boolean sensitive,
-      List<String> allowedValues) {}
+      List<String> allowedValues,
+      boolean editable) {}
 
   // retained for symmetry with values()/keys() callers
   static List<ApplicationSettingKey> allKeys() {

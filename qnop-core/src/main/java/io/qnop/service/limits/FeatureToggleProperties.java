@@ -65,7 +65,31 @@ public record FeatureToggleProperties(
     @DefaultValue("true") boolean schedulerManualRun,
     @DefaultValue("true") boolean schedulerJobSettings,
     @DefaultValue("true") boolean smtpConfiguration,
-    @DefaultValue("true") boolean emailTemplates) {
+    @DefaultValue("true") boolean emailTemplates,
+    @DefaultValue("true") boolean usageTracking,
+    @DefaultValue("true") boolean uploadConstraints,
+    @DefaultValue("true") boolean selfRegistration) {
+
+  /**
+   * Whether the named capability is present.
+   *
+   * <p>The one place that maps a capability to its component, so a setting group, a guard and a
+   * test all ask the same question rather than each spelling out an accessor.
+   */
+  public boolean isEnabled(FeatureDisabledException.Feature feature) {
+    return switch (feature) {
+      case OIDC -> oidc;
+      case ANNOTATION_EXPORT -> annotationExport;
+      case CUSTOM_BRANDING -> customBranding;
+      case SCHEDULER_MANUAL_RUN -> schedulerManualRun;
+      case SCHEDULER_JOB_SETTINGS -> schedulerJobSettings;
+      case SMTP_CONFIGURATION -> smtpConfiguration;
+      case EMAIL_TEMPLATES -> emailTemplates;
+      case USAGE_TRACKING -> usageTracking;
+      case UPLOAD_CONSTRAINTS -> uploadConstraints;
+      case SELF_REGISTRATION -> selfRegistration;
+    };
+  }
 
   /**
    * Everything on — the Community default, for tests and non-Spring callers.
@@ -77,7 +101,7 @@ public record FeatureToggleProperties(
    * annotations below are what actually supplies the defaults.
    */
   public static FeatureToggleProperties all() {
-    return new FeatureToggleProperties(true, true, true, true, true, true, true);
+    return new FeatureToggleProperties(true, true, true, true, true, true, true, true, true, true);
   }
 
   /**
@@ -97,6 +121,9 @@ public record FeatureToggleProperties(
         !off.contains(FeatureDisabledException.Feature.SCHEDULER_MANUAL_RUN),
         !off.contains(FeatureDisabledException.Feature.SCHEDULER_JOB_SETTINGS),
         !off.contains(FeatureDisabledException.Feature.SMTP_CONFIGURATION),
-        !off.contains(FeatureDisabledException.Feature.EMAIL_TEMPLATES));
+        !off.contains(FeatureDisabledException.Feature.EMAIL_TEMPLATES),
+        !off.contains(FeatureDisabledException.Feature.USAGE_TRACKING),
+        !off.contains(FeatureDisabledException.Feature.UPLOAD_CONSTRAINTS),
+        !off.contains(FeatureDisabledException.Feature.SELF_REGISTRATION));
   }
 }

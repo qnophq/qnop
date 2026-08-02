@@ -46,7 +46,7 @@ Quotas here are a commercial boundary, not a safety interlock. This is written d
 
 ### Capabilities are switches beside the quotas, not more of them
 
-`qnop.features.oidc`, `.annotation-export`, `.custom-branding` (issue #674), `.scheduler-manual-run` (#676), `.scheduler-job-settings` (#677), `.smtp-configuration` (#678) and `.email-templates` (#679), all defaulting to on. Their own prefix, because a switch is not a ceiling — the same block of a configuration file, because an operator reads them together.
+`qnop.features.oidc`, `.annotation-export`, `.custom-branding` (issue #674), `.scheduler-manual-run` (#676), `.scheduler-job-settings` (#677), `.smtp-configuration` (#678), `.email-templates` (#679), `.usage-tracking`, `.upload-constraints` and `.self-registration` (#681), all defaulting to on. Their own prefix, because a switch is not a ceiling — the same block of a configuration file, because an operator reads them together.
 
 The fourth is a different kind of thing from the first three and belongs here anyway. Run-now on a maintenance job is not a plan feature; it is an override that starts a sweep **regardless of the job's own enabled flag**. On a self-hosted installation that is exactly what an administrator needs. On a hosted one it is arbitrary load on demand, held by the person the operator cannot overrule. What is withheld is the trigger, never the schedule: the sweeps keep running on their cron, which is the property the tests pin down.
 
@@ -55,6 +55,20 @@ The fifth covers the jobs' own settings, and covers **both** of them with one sw
 The mail pair (#678/#679) is the first that had to be **selective inside an endpoint**. `PATCH /admin/settings` carries every application setting, so withholding the mail server cannot mean refusing the endpoint — it means refusing the `smtp.*` keys and leaving the rest editable. A patch that mixes them is refused whole rather than partly applied: silently dropping the keys the caller may not set would report success for a change that did not happen. Which keys those are is a question the registry answers (`ApplicationSettingKey.isSmtpConfiguration`), so a new `smtp.*` setting joins the group by being declared rather than by somebody remembering to widen a condition.
 
 Both mail switches stop at the boundary of *changing* things. Reading a setting and previewing a template stay open, because they only show what the deployment already sends; the test-mail endpoints do not, because they send from the operator's server. And the guard for those sits in the controller rather than in `MailService` — every notification in the product goes through that service, and a switch about an admin screen has no business standing in their way.
+
+### Settings-governing switches (#681)
+
+Three more capabilities govern *groups of settings* rather than endpoints, so the selective guard became the general mechanism instead of a second special case. Each protected key names the capability that governs it (`ApplicationSettingKey.governedBy`); the write guard and the `editable` flag the API reports both come from that one lookup, which is why the form and the endpoint cannot disagree about what may be changed.
+
+The guard runs **before validation**. Otherwise a governed field answers 400 or 403 depending on whether the value the caller was never allowed to set happened to be well-formed, and "you cannot change this" does not depend on the value.
+
+What differs between the three is the effect, and each difference was chosen rather than inherited:
+
+- **Usage tracking** withholds *changing* the configuration, not tracking. A configuration already in the database keeps working — an operator who set tracking up for a tenant wants it to run, not to be re-pointed. The section is dropped from the response entirely rather than greyed out, because an endpoint an administrator cannot change tells them nothing they can act on.
+- **Upload constraints** stay visible and go read-only. The ceiling is the answer to "why was my file refused", which an administrator needs whether or not they can raise it.
+- **Self-registration** is the only one that withholds the capability itself: off means nobody can sign up whatever the setting says. Because two places ask — the registration endpoint and the public config that decides whether a sign-up link appears — the effective answer lives in one method. Two independent `&&`s would have been one refactor away from a deployment that hides the link and still accepts registrations.
+
+So "governed" means *not editable here*, and deliberately not *inactive*. Conflating the two would have turned a configuration switch into an off switch for a feature the operator had chosen to run.
 
 **Off closes the door rather than hiding the handle.** Removing an option from a list a client renders is not withholding a capability: `/oauth2/authorization/{id}` is a URL somebody can type, and an export endpoint answers on its own. So the OAuth2 filter chain is not registered at all when SSO is off, the export endpoint refuses as well as vanishing from the format list, and branding refuses uploads *and* serves the bundled logo for slots that already hold one — otherwise a downgrade would change nothing anybody can see.
 

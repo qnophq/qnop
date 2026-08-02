@@ -21,6 +21,7 @@
 package io.qnop.service;
 
 import io.qnop.entity.SettingValueType;
+import io.qnop.service.limits.FeatureDisabledException;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
@@ -337,14 +338,32 @@ public enum ApplicationSettingKey {
   }
 
   /**
-   * Whether this key configures the outgoing mail server (issue #678).
+   * The deployment capability that governs this setting, if any (issues #678/#681).
    *
-   * <p>On the enum rather than as a prefix test at the call site: the grouping is a property of the
-   * registry, and a new {@code smtp.*} key should join the group by being declared, not by somebody
-   * remembering to widen a condition elsewhere.
+   * <p>On the enum rather than as prefix tests at the call sites: the grouping is a property of the
+   * registry, so a new {@code smtp.*} or {@code tracking.*} key joins its group by being declared,
+   * not by somebody remembering to widen a condition somewhere else. One lookup then serves both
+   * the write guard and the {@code editable} flag the API reports, which is why they cannot
+   * disagree.
+   *
+   * <p>Governed means <em>not editable here</em>. It does not mean inactive: a tracking
+   * configuration already in the database keeps working when the capability to change it is
+   * withheld.
    */
-  public boolean isSmtpConfiguration() {
-    return key.startsWith("smtp.");
+  public Optional<FeatureDisabledException.Feature> governedBy() {
+    if (key.startsWith("smtp.")) {
+      return Optional.of(FeatureDisabledException.Feature.SMTP_CONFIGURATION);
+    }
+    if (key.startsWith("tracking.")) {
+      return Optional.of(FeatureDisabledException.Feature.USAGE_TRACKING);
+    }
+    if (key.startsWith("upload.")) {
+      return Optional.of(FeatureDisabledException.Feature.UPLOAD_CONSTRAINTS);
+    }
+    if (key.startsWith("auth.self_registration")) {
+      return Optional.of(FeatureDisabledException.Feature.SELF_REGISTRATION);
+    }
+    return Optional.empty();
   }
 
   public String getKey() {

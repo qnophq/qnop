@@ -56,7 +56,10 @@ public class FeatureDisabledException extends RuntimeException {
         "SCHEDULER_JOB_SETTINGS_DISABLED",
         "changing a maintenance job's enabled or dry-run setting"),
     SMTP_CONFIGURATION("SMTP_CONFIGURATION_DISABLED", "configuring the outgoing mail server"),
-    EMAIL_TEMPLATES("EMAIL_TEMPLATES_DISABLED", "editing the outgoing mail templates");
+    EMAIL_TEMPLATES("EMAIL_TEMPLATES_DISABLED", "editing the outgoing mail templates"),
+    USAGE_TRACKING("USAGE_TRACKING_DISABLED", "changing the usage-tracking configuration"),
+    UPLOAD_CONSTRAINTS("UPLOAD_CONSTRAINTS_DISABLED", "changing the document upload limits"),
+    SELF_REGISTRATION("SELF_REGISTRATION_DISABLED", "self-registration");
 
     private final String code;
     private final String subject;

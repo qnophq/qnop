@@ -24,7 +24,6 @@ import io.qnop.api.v1.endpoint.AuthRegistrationApi;
 import io.qnop.api.v1.model.RegisterRequest;
 import io.qnop.api.v1.model.RegisterResponse;
 import io.qnop.api.v1.model.VerifyEmailResponse;
-import io.qnop.service.ApplicationSettingKey;
 import io.qnop.service.ApplicationSettingsService;
 import io.qnop.service.auth.EmailVerificationTokenService.InvalidVerificationTokenException;
 import io.qnop.service.auth.RegistrationService;
@@ -56,7 +55,10 @@ public class AuthRegistrationController implements AuthRegistrationApi {
 
   @Override
   public ResponseEntity<RegisterResponse> register(RegisterRequest request) {
-    if (!settings.getBoolean(ApplicationSettingKey.AUTH_SELF_REGISTRATION_ENABLED)) {
+    // The effective answer: the setting, and whether this deployment offers
+    // self-registration at all (issue #681). Still a 404 either way — a closed
+    // sign-up should not advertise that it exists somewhere else.
+    if (!settings.selfRegistrationEnabled()) {
       throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Not found");
     }
     registrationService.register(

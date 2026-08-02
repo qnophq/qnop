@@ -229,6 +229,20 @@ qnop:
   # `email-templates: false` withholds editing the outgoing messages (issue
   # #679) — update, reset and template test-mails. Reading and preview stay,
   # since they only show what the deployment already sends.
+  # The last three govern groups of application settings rather than endpoints
+  # of their own (issue #681), and they differ on purpose:
+  #
+  #   usage-tracking: false      the tracking.* settings are not editable and the
+  #                              section is not shown — but a configuration
+  #                              already in the database KEEPS WORKING. What is
+  #                              withheld is overwriting it, not the feature.
+  #   upload-constraints: false  the upload.* limits stay visible and become
+  #                              read-only: an administrator who cannot raise the
+  #                              ceiling still needs to know where it is.
+  #   self-registration: false   self-registration is off whatever the setting
+  #                              says — the endpoint refuses and no sign-up link
+  #                              is offered. The only one that withholds the
+  #                              capability rather than just the editing.
   features:
     oidc: ${QNOP_FEATURES_OIDC:true}
     annotation-export: ${QNOP_FEATURES_ANNOTATION_EXPORT:true}
@@ -237,6 +251,9 @@ qnop:
     scheduler-job-settings: ${QNOP_FEATURES_SCHEDULER_JOB_SETTINGS:true}
     smtp-configuration: ${QNOP_FEATURES_SMTP_CONFIGURATION:true}
     email-templates: ${QNOP_FEATURES_EMAIL_TEMPLATES:true}
+    usage-tracking: ${QNOP_FEATURES_USAGE_TRACKING:true}
+    upload-constraints: ${QNOP_FEATURES_UPLOAD_CONSTRAINTS:true}
+    self-registration: ${QNOP_FEATURES_SELF_REGISTRATION:true}
   # Usage tracking (issue #666). What an operator configures lives in the admin
   # settings (provider, host, site id, consent, opt-outs); the two keys here are
   # deployment decisions that must not be reachable from the web UI.

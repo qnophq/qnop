@@ -5109,6 +5109,14 @@ components:
       type: object
       description: One application setting with its current (possibly masked) value.
       properties:
+        editable:
+          type: boolean
+          description: |
+            Whether this deployment allows the value to be changed here (issues
+            #678/#681). False means the update endpoint refuses it: the setting
+            is governed by a capability the operator withheld. It says nothing
+            about whether the setting is in effect — a governed tracking
+            configuration keeps working, it just cannot be overwritten here.
         key:
           type: string
           description: Stable dotted setting key (e.g. `smtp.host`).

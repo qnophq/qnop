@@ -29,11 +29,15 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import io.qnop.entity.ApplicationSetting;
 import io.qnop.entity.Document;
 import io.qnop.entity.DocumentVersion;
 import io.qnop.entity.WorkflowState;
+import io.qnop.repository.ApplicationSettingRepository;
 import io.qnop.repository.DocumentRepository;
 import io.qnop.repository.DocumentVersionRepository;
+import io.qnop.service.ApplicationSettingKey;
+import io.qnop.service.ApplicationSettingsService;
 import io.qnop.testsupport.SeededIntegrationTest;
 import java.util.UUID;
 import org.junit.jupiter.api.DisplayName;
@@ -58,11 +62,16 @@ import org.springframework.test.context.TestPropertySource;
       "qnop.features.scheduler-manual-run=false",
       "qnop.features.scheduler-job-settings=false",
       "qnop.features.smtp-configuration=false",
-      "qnop.features.email-templates=false"
+      "qnop.features.email-templates=false",
+      "qnop.features.usage-tracking=false",
+      "qnop.features.upload-constraints=false",
+      "qnop.features.self-registration=false"
     })
 class FeatureDisabledIT extends SeededIntegrationTest {
 
   @Autowired private DocumentRepository documents;
+  @Autowired private ApplicationSettingRepository applicationSettings;
+  @Autowired private ApplicationSettingsService settings;
   @Autowired private DocumentVersionRepository versions;
 
   @Test
@@ -250,6 +259,108 @@ class FeatureDisabledIT extends SeededIntegrationTest {
             get("/api/v1/admin/email/templates")
                 .header("Authorization", "Bearer " + token(ADMIN_ID)))
         .andExpect(status().isOk());
+  }
+
+  @Test
+  @DisplayName("tracking cannot be configured here, is not shown — and still works")
+  void trackingIsTheOperatorsButStillRuns() throws Exception {
+    mockMvc
+        .perform(
+            patch("/api/v1/admin/settings")
+                .header("Authorization", "Bearer " + token(ADMIN_ID))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"values\":{\"tracking.host\":\"https://elsewhere.example\"}}"))
+        .andExpect(status().isForbidden())
+        .andExpect(jsonPath("$.code").value("USAGE_TRACKING_DISABLED"));
+
+    // Not merely locked: the section is gone from the screen, because an
+    // endpoint an administrator cannot change tells them nothing they can act on.
+    mockMvc
+        .perform(get("/api/v1/admin/settings").header("Authorization", "Bearer " + token(ADMIN_ID)))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.settings[?(@.key =~ /tracking\\..*/)]").isEmpty());
+
+    // The promise that makes this a *configuration* switch and not an off
+    // switch: a configuration seeded straight into the database keeps working.
+    seedSetting(ApplicationSettingKey.TRACKING_ENABLED, "true");
+    seedSetting(ApplicationSettingKey.TRACKING_PROVIDER, "umami");
+    seedSetting(ApplicationSettingKey.TRACKING_HOST, "https://analytics.example");
+    seedSetting(ApplicationSettingKey.TRACKING_SITE_ID, "site-1");
+    settings.reload();
+
+    mockMvc
+        .perform(get("/api/v1/config"))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.tracking.provider").value("umami"));
+  }
+
+  @Test
+  @DisplayName("upload limits stay visible and become read-only")
+  void uploadLimitsAreVisibleButFixed() throws Exception {
+    mockMvc
+        .perform(
+            patch("/api/v1/admin/settings")
+                .header("Authorization", "Bearer " + token(ADMIN_ID))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"values\":{\"upload.document_max_file_size_mb\":\"4096\"}}"))
+        .andExpect(status().isForbidden())
+        .andExpect(jsonPath("$.code").value("UPLOAD_CONSTRAINTS_DISABLED"));
+
+    // Shown, unlike tracking: an administrator who cannot raise the ceiling
+    // still needs to know where it is.
+    mockMvc
+        .perform(get("/api/v1/admin/settings").header("Authorization", "Bearer " + token(ADMIN_ID)))
+        .andExpect(status().isOk())
+        .andExpect(
+            jsonPath("$.settings[?(@.key == 'upload.document_max_file_size_mb')].editable")
+                .value(false))
+        // And an ungoverned setting is still reported as editable, so the form
+        // is not read-only wholesale.
+        .andExpect(
+            jsonPath("$.settings[?(@.key == 'general.default_language')].editable").value(true));
+  }
+
+  @Test
+  @DisplayName("self-registration is off whatever the setting says, and cannot be turned back on")
+  void selfRegistrationIsWithheld() throws Exception {
+    mockMvc
+        .perform(
+            patch("/api/v1/admin/settings")
+                .header("Authorization", "Bearer " + token(ADMIN_ID))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"values\":{\"auth.self_registration_enabled\":\"true\"}}"))
+        .andExpect(status().isForbidden())
+        .andExpect(jsonPath("$.code").value("SELF_REGISTRATION_DISABLED"));
+
+    // Even with the stored setting saying yes, the capability decides.
+    seedSetting(ApplicationSettingKey.AUTH_SELF_REGISTRATION_ENABLED, "true");
+    settings.reload();
+
+    mockMvc
+        .perform(get("/api/v1/config"))
+        .andExpect(jsonPath("$.auth.selfRegistrationEnabled").value(false));
+    mockMvc
+        .perform(
+            post("/api/v1/auth/register")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(
+                    "{\"username\":\"newcomer\",\"email\":\"newcomer@example.com\","
+                        + "\"password\":\"Sufficiently-long-passphrase-1\","
+                        + "\"displayName\":\"Newcomer\"}"))
+        .andExpect(status().isNotFound());
+  }
+
+  /** Writes a setting the way an operator would: straight into the table. */
+  private void seedSetting(ApplicationSettingKey key, String value) {
+    applicationSettings.save(
+        applicationSettings
+            .findById(key.getKey())
+            .map(
+                row -> {
+                  row.setSettingValue(value);
+                  return row;
+                })
+            .orElseGet(() -> new ApplicationSetting(key.getKey(), value, key.getType())));
   }
 
   /** A review the export can be asked for; its content does not matter here. */

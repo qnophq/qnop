@@ -122,8 +122,7 @@ public class ConfigController implements ServerConfigApi {
             .auth(
                 new ServerConfigAuth()
                     .oidcProviders(enabledOidcProviders())
-                    .selfRegistrationEnabled(
-                        settings.getBoolean(ApplicationSettingKey.AUTH_SELF_REGISTRATION_ENABLED)))
+                    .selfRegistrationEnabled(settings.selfRegistrationEnabled()))
             .review(
                 new ServerConfigReview()
                     .freeReattachEnabled(

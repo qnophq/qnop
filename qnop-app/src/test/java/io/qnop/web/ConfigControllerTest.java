@@ -143,10 +143,12 @@ class ConfigControllerTest {
   }
 
   @Test
-  @DisplayName("selfRegistrationEnabled reflects the application setting")
+  @DisplayName("selfRegistrationEnabled reflects the effective answer, not the raw setting")
   void getConfig_reflectsSelfRegistrationSetting() throws Exception {
-    when(settings.getBoolean(ApplicationSettingKey.AUTH_SELF_REGISTRATION_ENABLED))
-        .thenReturn(true);
+    // The effective value folds in whether this deployment offers self-registration
+    // at all (issue #681), so the config and the endpoint cannot disagree about
+    // whether a sign-up link should appear.
+    when(settings.selfRegistrationEnabled()).thenReturn(true);
 
     mockMvc
         .perform(get("/api/v1/config"))
