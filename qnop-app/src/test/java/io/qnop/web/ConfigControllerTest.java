@@ -32,6 +32,7 @@ import io.qnop.service.branding.BrandingService;
 import io.qnop.service.branding.BrandingService.BrandingSource;
 import io.qnop.service.branding.BrandingService.SlotStatus;
 import io.qnop.service.document.DocumentRenditionService;
+import io.qnop.service.limits.FeatureToggleProperties;
 import io.qnop.service.oidc.OidcProviderLoginView;
 import io.qnop.service.oidc.OidcProviderService;
 import io.qnop.service.review.AnnotationExportService;
@@ -57,8 +58,22 @@ import org.springframework.test.web.servlet.MockMvc;
 // package — ADR-0004), so the slice cannot auto-discover the @SpringBootConfiguration.
 // Configure the context explicitly with just the controller and the path-prefix config.
 @WebMvcTest
-@ContextConfiguration(classes = {ConfigController.class, ApiPathConfig.class})
+@ContextConfiguration(
+    classes = {ConfigController.class, ApiPathConfig.class, ConfigControllerTest.Features.class})
 class ConfigControllerTest {
+
+  /**
+   * A real value rather than a mock: the capability flags are part of what this endpoint publishes,
+   * and a mocked record answers false to everything — which would assert the opposite of the
+   * Community default (issue #674).
+   */
+  @org.springframework.boot.test.context.TestConfiguration
+  static class Features {
+    @org.springframework.context.annotation.Bean
+    FeatureToggleProperties featureToggles() {
+      return FeatureToggleProperties.all();
+    }
+  }
 
   @Autowired private MockMvc mockMvc;
 
@@ -119,7 +134,12 @@ class ConfigControllerTest {
         .andExpect(jsonPath("$.branding.logoLight.source").value("DEFAULT"))
         .andExpect(
             jsonPath("$.branding.logoLight.url").value("/api/v1/branding/logo-light?v=sha-light"))
-        .andExpect(jsonPath("$.branding.logomark.source").value("DEFAULT"));
+        .andExpect(jsonPath("$.branding.logomark.source").value("DEFAULT"))
+        // Community has every capability; a deployment that says nothing about
+        // features must not appear to have lost them (issue #674).
+        .andExpect(jsonPath("$.features.oidc").value(true))
+        .andExpect(jsonPath("$.features.annotationExport").value(true))
+        .andExpect(jsonPath("$.features.customBranding").value(true));
   }
 
   @Test

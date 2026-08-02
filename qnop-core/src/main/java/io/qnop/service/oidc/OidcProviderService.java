@@ -23,6 +23,8 @@ package io.qnop.service.oidc;
 import io.qnop.entity.OidcProvider;
 import io.qnop.entity.OidcProviderType;
 import io.qnop.repository.OidcProviderRepository;
+import io.qnop.service.limits.FeatureDisabledException;
+import io.qnop.service.limits.FeatureToggleProperties;
 import java.util.List;
 import java.util.UUID;
 import org.slf4j.Logger;
@@ -44,6 +46,9 @@ import org.springframework.transaction.annotation.Transactional;
 @Transactional
 public class OidcProviderService {
 
+  /** What this deployment may do at all (issue #674). */
+  private final FeatureToggleProperties features;
+
   private static final String DISCOVERY_FAILED =
       "OIDC discovery failed — verify the issuer URI is reachable and serves a valid"
           + " openid-configuration document.";
@@ -58,7 +63,9 @@ public class OidcProviderService {
   public OidcProviderService(
       OidcProviderRepository providers,
       OidcSsrfPolicy ssrfPolicy,
-      ApplicationEventPublisher events) {
+      ApplicationEventPublisher events,
+      FeatureToggleProperties features) {
+    this.features = features;
     this.providers = providers;
     this.ssrfPolicy = ssrfPolicy;
     this.events = events;
@@ -80,6 +87,11 @@ public class OidcProviderService {
    */
   @Transactional(readOnly = true)
   public List<OidcProviderLoginView> enabledLoginViews() {
+    if (!features.oidc()) {
+      // No buttons — and the endpoint behind them is not mounted either
+      // (SecurityConfiguration), so this is the visible half of a closed door.
+      return List.of();
+    }
     return providers.findAll().stream()
         .filter(OidcProvider::isEnabled)
         .map(OidcLoginInfoFactory::loginView)
@@ -165,6 +177,9 @@ public class OidcProviderService {
       String userNameAttribute,
       String emailAttribute,
       String displayNameAttribute) {
+    // Configuring a capability this deployment does not have would be a form
+    // that changes nothing (issue #674).
+    requireOidcEnabled();
     if (providers.findByName(name).isPresent()) {
       throw new OidcProviderConflictException(
           "NAME_TAKEN", "A provider with that name already exists.");
@@ -199,6 +214,8 @@ public class OidcProviderService {
    * Applies a partial update; only non-null fields change. A blank secret means "do not change".
    */
   public OidcProviderView update(UUID id, OidcProviderPatch patch) {
+    // See create(): the capability is off, so there is nothing to configure.
+    requireOidcEnabled();
     OidcProvider provider = require(id);
     if (patch.enabled() != null) {
       provider.setEnabled(patch.enabled());
@@ -252,6 +269,9 @@ public class OidcProviderService {
   }
 
   public void delete(UUID id) {
+    // Refused for symmetry: an administrator who cannot add a provider should
+    // not be able to remove one either — the whole surface is off.
+    requireOidcEnabled();
     if (!providers.existsById(id)) {
       throw new OidcProviderNotFoundException(id);
     }
@@ -324,6 +344,15 @@ public class OidcProviderService {
 
     static OidcDiscoveryOutcome failure(String error) {
       return new OidcDiscoveryOutcome(false, null, null, null, null, error);
+    }
+  }
+
+  /**
+   * @throws FeatureDisabledException when this deployment does not offer single sign-on
+   */
+  private void requireOidcEnabled() {
+    if (!features.oidc()) {
+      throw new FeatureDisabledException(FeatureDisabledException.Feature.OIDC);
     }
   }
 }

@@ -198,6 +198,21 @@ qnop:
     max-teams: ${QNOP_LIMITS_MAX_TEAMS:0}
     max-team-members: ${QNOP_LIMITS_MAX_TEAM_MEMBERS:0}
     max-active-reviews: ${QNOP_LIMITS_MAX_ACTIVE_REVIEWS:0}
+  # Capabilities this deployment offers at all (issue #674, ADR-0057). Same place
+  # and same reasoning as the quotas above: what the operator granted, not what
+  # the tenant chose. All default to true, so a Community deployment has
+  # everything.
+  #
+  # Switching one off closes the door rather than hiding the handle: with
+  # `oidc: false` the OAuth2 endpoints are not mounted at all, with
+  # `annotation-export: false` the export endpoint refuses as well as vanishing
+  # from the format list, and with `custom-branding: false` every slot serves the
+  # bundled logo even where an upload is stored — otherwise a downgrade would
+  # leave the previous branding on screen.
+  features:
+    oidc: ${QNOP_FEATURES_OIDC:true}
+    annotation-export: ${QNOP_FEATURES_ANNOTATION_EXPORT:true}
+    custom-branding: ${QNOP_FEATURES_CUSTOM_BRANDING:true}
   # Usage tracking (issue #666). What an operator configures lives in the admin
   # settings (provider, host, site id, consent, opt-outs); the two keys here are
   # deployment decisions that must not be reachable from the web UI.

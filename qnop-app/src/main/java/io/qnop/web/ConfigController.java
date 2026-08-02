@@ -27,6 +27,7 @@ import io.qnop.api.v1.model.OidcProviderLoginInfo;
 import io.qnop.api.v1.model.ServerConfigAuth;
 import io.qnop.api.v1.model.ServerConfigBranding;
 import io.qnop.api.v1.model.ServerConfigBrandingSlot;
+import io.qnop.api.v1.model.ServerConfigFeatures;
 import io.qnop.api.v1.model.ServerConfigGeneral;
 import io.qnop.api.v1.model.ServerConfigResponse;
 import io.qnop.api.v1.model.ServerConfigReview;
@@ -40,6 +41,7 @@ import io.qnop.service.branding.BrandingService;
 import io.qnop.service.branding.BrandingService.SlotStatus;
 import io.qnop.service.document.DocumentRenditionService;
 import io.qnop.service.document.DocumentTypeSniffer;
+import io.qnop.service.limits.FeatureToggleProperties;
 import io.qnop.service.oidc.OidcProviderService;
 import io.qnop.service.review.AnnotationExportService;
 import io.qnop.service.review.export.AnnotationExportFormat;
@@ -83,6 +85,7 @@ public class ConfigController implements ServerConfigApi {
   private final DocumentRenditionService renditions;
   private final InfoBannerService banners;
   private final TrackingConfigService tracking;
+  private final FeatureToggleProperties features;
 
   public ConfigController(
       OidcProviderService oidcProviders,
@@ -92,6 +95,7 @@ public class ConfigController implements ServerConfigApi {
       DocumentRenditionService renditions,
       InfoBannerService banners,
       TrackingConfigService tracking,
+      FeatureToggleProperties features,
       ObjectProvider<BuildProperties> buildProperties) {
     this.oidcProviders = oidcProviders;
     this.settings = settings;
@@ -100,6 +104,7 @@ public class ConfigController implements ServerConfigApi {
     this.renditions = renditions;
     this.banners = banners;
     this.tracking = tracking;
+    this.features = features;
     this.buildProperties = buildProperties.getIfAvailable();
   }
 
@@ -136,6 +141,11 @@ public class ConfigController implements ServerConfigApi {
             // only where an office converter is installed, because that is what turns a
             // DOCX into something the viewer can render (issue #343, ADR-0010). Markdown
             // joins once its extractor lands; further formats are an Enterprise feature.
+            .features(
+                new ServerConfigFeatures()
+                    .oidc(features.oidc())
+                    .annotationExport(features.annotationExport())
+                    .customBranding(features.customBranding()))
             .supportedFormats(supportedFormats())
             .branding(buildBranding());
     // The sign-in notice (issue #664) belongs in the one response the login

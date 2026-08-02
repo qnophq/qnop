@@ -36,7 +36,7 @@ import {
   type LucideIcon,
   Inbox,
 } from 'lucide-react';
-import type { UserRole } from '../../api/generated';
+import type { ServerConfigFeatures, UserRole } from '../../api/generated';
 
 export interface NavItem {
   id: string;
@@ -45,6 +45,13 @@ export interface NavItem {
   icon: LucideIcon;
   /** Roles allowed to see the item; omit for "any authenticated user". */
   roles?: UserRole[];
+  /**
+   * The deployment capability this item administers; omit for items that always exist.
+   *
+   * <p>A withheld capability (issue #674) refuses at its endpoints regardless — this only keeps the
+   * sidebar from offering a page whose every action would be denied.
+   */
+  feature?: keyof ServerConfigFeatures;
 }
 
 export interface NavGroup {
@@ -94,6 +101,7 @@ export const NAV_GROUPS: NavGroup[] = [
         id: 'branding',
         label: 'Branding',
         path: '/admin/branding',
+        feature: 'customBranding',
         icon: Palette,
         roles: ['ADMIN'],
       },
@@ -101,6 +109,7 @@ export const NAV_GROUPS: NavGroup[] = [
         id: 'oidc-providers',
         label: 'OIDC providers',
         path: '/admin/oidc-providers',
+        feature: 'oidc',
         icon: KeyRound,
         roles: ['ADMIN'],
       },
@@ -145,11 +154,26 @@ export function isNavItemVisible(item: NavItem, role: UserRole | null): boolean 
 }
 
 /** The nav groups filtered for a role, dropping any group left with no items. */
-export function visibleNavGroups(role: UserRole | null): NavGroup[] {
+export function visibleNavGroups(
+  role: UserRole | null,
+  features?: ServerConfigFeatures,
+): NavGroup[] {
   return NAV_GROUPS.map((group) => ({
     ...group,
-    items: group.items.filter((item) => isNavItemVisible(item, role)),
+    items: group.items.filter(
+      (item) => isNavItemVisible(item, role) && isFeatureAvailable(item, features),
+    ),
   })).filter((group) => group.items.length > 0);
+}
+
+/**
+ * Whether the capability an item administers is present.
+ *
+ * <p>Absent config means "not known yet", and the item stays — a sidebar that flickers items in as
+ * the config arrives is worse than one that occasionally shows a page the server will refuse.
+ */
+function isFeatureAvailable(item: NavItem, features?: ServerConfigFeatures): boolean {
+  return !item.feature || !features || features[item.feature];
 }
 
 /** All items flattened — used to resolve the active item / breadcrumb label. */

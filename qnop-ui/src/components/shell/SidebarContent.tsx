@@ -49,7 +49,10 @@ interface SidebarContentProps {
  */
 export function SidebarContent({ collapsed, onNavigate }: SidebarContentProps) {
   const role = useAuthStore((s) => s.role);
-  const groups = visibleNavGroups(role);
+  // A page whose every action the deployment refuses does not belong in the
+  // sidebar (issue #674).
+  const features = useConfig().data?.features;
+  const groups = visibleNavGroups(role, features);
   const theme = useTheme();
   const branding = useConfig().data?.branding;
   const logomarkUrl = branding?.logomark.url;

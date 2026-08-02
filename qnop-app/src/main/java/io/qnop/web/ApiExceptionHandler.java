@@ -22,6 +22,7 @@ package io.qnop.web;
 
 import io.qnop.api.v1.model.ErrorResponse;
 import io.qnop.api.v1.model.FieldError;
+import io.qnop.service.limits.FeatureDisabledException;
 import io.qnop.service.limits.InstanceLimitExceededException;
 import jakarta.validation.ConstraintViolationException;
 import jakarta.validation.Path;
@@ -115,6 +116,24 @@ public class ApiExceptionHandler {
   ResponseEntity<ErrorResponse> limitExceeded(InstanceLimitExceededException ex) {
     log.info("Refused: {} ({})", ex.getMessage(), ex.code());
     return ResponseEntity.status(HttpStatus.CONFLICT)
+        .body(
+            new ErrorResponse()
+                .code(ex.code())
+                .message(ex.getMessage())
+                .timestamp(OffsetDateTime.now()));
+  }
+
+  /**
+   * A capability this deployment does not offer (issue #674).
+   *
+   * <p>403 and not 409: nothing is full, and no amount of waiting or freeing changes the answer.
+   * Not 404 either — pretending the capability does not exist would leave an administrator hunting
+   * for a setting instead of asking whoever operates the deployment.
+   */
+  @ExceptionHandler(FeatureDisabledException.class)
+  ResponseEntity<ErrorResponse> featureDisabled(FeatureDisabledException ex) {
+    log.info("Refused: {} ({})", ex.getMessage(), ex.code());
+    return ResponseEntity.status(HttpStatus.FORBIDDEN)
         .body(
             new ErrorResponse()
                 .code(ex.code())

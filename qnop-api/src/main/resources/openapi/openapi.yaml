@@ -4883,6 +4883,15 @@ components:
             example: pdf
         branding:
           $ref: '#/components/schemas/ServerConfigBranding'
+        features:
+          allOf:
+            - $ref: '#/components/schemas/ServerConfigFeatures'
+          description: |
+            Capabilities this deployment offers (issue #674). Mostly derivable
+            from the lists beside it — no OIDC providers, no export formats — but
+            not entirely: whether custom branding is permitted has no list, and
+            "the operator switched export off" is a different sentence to a user
+            than "no converter is installed".
         tracking:
           allOf:
             - $ref: '#/components/schemas/ServerConfigTracking'
@@ -4945,6 +4954,25 @@ components:
       required:
         - used
         - maximum
+    ServerConfigFeatures:
+      type: object
+      description: What this deployment offers at all (issue #674, ADR-0057).
+      properties:
+        oidc:
+          type: boolean
+          description: Single sign-on. When false the OAuth2 endpoints are not mounted.
+        annotationExport:
+          type: boolean
+          description: Downloading a review's annotations.
+        customBranding:
+          type: boolean
+          description: |
+            Operator logos. When false every slot serves the bundled default,
+            including slots that already hold an upload.
+      required:
+        - oidc
+        - annotationExport
+        - customBranding
     ServerConfigTracking:
       type: object
       description: |

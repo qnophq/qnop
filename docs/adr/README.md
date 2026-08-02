@@ -73,7 +73,7 @@ Two refinement conventions (see the 2026-07-16 amendment to [ADR-0001](0001-reco
 | [0054](0054-logging-and-diagnostic-context.md) | Logging and the diagnostic context | Accepted |
 | [0055](0055-bounding-out-of-process-conversions.md) | Bounding out-of-process conversions — per instance, with a bounded wait | Accepted |
 | [0056](0056-usage-tracking.md) | Usage tracking — server-proxied, path-anonymised, consent-gated | Accepted |
-| [0057](0057-instance-quotas.md) | Instance quotas — deployment properties, enforced at creation | Accepted |
+| [0057](0057-instance-quotas.md) | Instance quotas and capability switches — deployment properties | Accepted |
 
 ## Template
 

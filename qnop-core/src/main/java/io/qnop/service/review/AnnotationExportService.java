@@ -27,6 +27,8 @@ import io.qnop.repository.DocumentRepository;
 import io.qnop.repository.DocumentVersionRepository;
 import io.qnop.service.branding.BrandingService;
 import io.qnop.service.document.DocumentValidationException;
+import io.qnop.service.limits.FeatureDisabledException;
+import io.qnop.service.limits.FeatureToggleProperties;
 import io.qnop.service.review.AnnotationService.AnnotationView;
 import io.qnop.service.review.AnnotationService.CommentView;
 import io.qnop.service.review.export.AnnotationExportColumn;
@@ -72,6 +74,9 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 public class AnnotationExportService {
 
+  /** What this deployment may do at all (issue #674). */
+  private final FeatureToggleProperties features;
+
   private static final Logger log = LoggerFactory.getLogger(AnnotationExportService.class);
 
   private final AnnotationService annotations;
@@ -87,7 +92,9 @@ public class AnnotationExportService {
       DocumentVersionRepository versions,
       BrandingService branding,
       ExportAttachmentResolver uploads,
-      List<AnnotationExportRenderer> renderers) {
+      List<AnnotationExportRenderer> renderers,
+      FeatureToggleProperties features) {
+    this.features = features;
     this.annotations = annotations;
     this.documents = documents;
     this.versions = versions;
@@ -152,6 +159,11 @@ public class AnnotationExportService {
   @Transactional(readOnly = true)
   public Export export(
       UUID documentId, Integer versionNumber, ExportRequest request, UUID actor, boolean admin) {
+    if (!features.annotationExport()) {
+      // Checked at the endpoint as well as in the format list: the list is what a
+      // client offers, and a URL is what a person can type.
+      throw new FeatureDisabledException(FeatureDisabledException.Feature.ANNOTATION_EXPORT);
+    }
     AnnotationExportFormat format = request.format();
     AnnotationExportRenderer renderer = renderers.get(format);
     if (renderer == null) {
@@ -183,6 +195,9 @@ public class AnnotationExportService {
    * of the server, not of the release.
    */
   public List<AnnotationExportFormat> availableFormats() {
+    if (!features.annotationExport()) {
+      return List.of();
+    }
     return Arrays.stream(AnnotationExportFormat.values())
         .filter(renderers::containsKey)
         .filter(format -> renderers.get(format).isAvailable())

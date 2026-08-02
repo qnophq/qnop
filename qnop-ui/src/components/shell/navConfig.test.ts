@@ -103,3 +103,43 @@ describe('crumbsFor', () => {
     expect(crumbsFor('/my-teams/abc-123')).toEqual([{ label: 'My Teams', to: '/my-teams' }]);
   });
 });
+
+describe('capability-aware navigation (#674)', () => {
+  it('hides the pages that administer a withheld capability', () => {
+    const groups = visibleNavGroups('ADMIN', {
+      oidc: false,
+      annotationExport: true,
+      customBranding: false,
+    });
+    const ids = groups.flatMap((group) => group.items.map((item) => item.id));
+
+    expect(ids).not.toContain('oidc-providers');
+    expect(ids).not.toContain('branding');
+    // Everything else an administrator has stays put.
+    expect(ids).toContain('users');
+    expect(ids).toContain('settings');
+  });
+
+  it('shows them where the capabilities are present', () => {
+    const groups = visibleNavGroups('ADMIN', {
+      oidc: true,
+      annotationExport: true,
+      customBranding: true,
+    });
+    const ids = groups.flatMap((group) => group.items.map((item) => item.id));
+
+    expect(ids).toContain('oidc-providers');
+    expect(ids).toContain('branding');
+  });
+
+  it('shows them while the config has not arrived yet', () => {
+    // Absent is "not known", not "not available": a sidebar that flickers items
+    // in as the config lands reads as a bug.
+    const ids = visibleNavGroups('ADMIN', undefined).flatMap((group) =>
+      group.items.map((item) => item.id),
+    );
+
+    expect(ids).toContain('oidc-providers');
+    expect(ids).toContain('branding');
+  });
+});
