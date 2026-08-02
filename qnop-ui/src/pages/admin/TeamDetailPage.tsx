@@ -226,6 +226,7 @@ export function TeamDetailPage() {
         open={addOpen}
         teamId={id}
         existingMemberIds={members.map((m) => m.userId)}
+        remainingSlots={memberLimit > 0 ? Math.max(0, memberLimit - members.length) : undefined}
         onClose={() => setAddOpen(false)}
       />
 

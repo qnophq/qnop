@@ -44,6 +44,10 @@ Two administrators creating the last permitted user at the same moment can both 
 
 Quotas here are a commercial boundary, not a safety interlock. This is written down rather than left to be discovered by whoever first reads the code and wonders.
 
+**Except where the race is the normal path (#691).** The admin dialog adds a multi-selection with one request per user, in parallel — so every one of them read the same membership count and passed: a team two below its ceiling accepted four people. That is not two administrators coinciding; it is one click, every time, and the overshoot is as large as the selection. Team membership therefore counts under the team's `PESSIMISTIC_WRITE` row lock, the same one that already serialises the last-lead guard (#470). Per team, so it costs nothing to anybody working on another, and the check now sits *inside* the lock — a check outside it is only a second reading of a number that can still change before the insert.
+
+The lesson generalises: "an overshoot of one, rarely" is an acceptable trade only where the concurrency is accidental. Wherever a client fans out by design, the quota needs the lock. The concurrency test was verified by removing the lock and watching it fail — a race test that has never been red is not evidence.
+
 ### Capabilities are switches beside the quotas, not more of them
 
 `qnop.features.oidc`, `.annotation-export`, `.custom-branding` (issue #674), `.scheduler-manual-run` (#676), `.scheduler-job-settings` (#677), `.smtp-configuration` (#678), `.email-templates` (#679), `.usage-tracking`, `.upload-constraints`, `.self-registration` (#681) and `.deployment-configuration` (#683), all defaulting to on. Their own prefix, because a switch is not a ceiling — the same block of a configuration file, because an operator reads them together.

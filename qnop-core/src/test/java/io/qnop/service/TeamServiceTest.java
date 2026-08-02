@@ -65,7 +65,7 @@ class TeamServiceTest {
     when(teams.existsByNameIgnoreCase("Core")).thenReturn(false);
     when(slugs.allocate("Core")).thenReturn("core");
     when(teams.save(any())).thenAnswer(inv -> withId(inv.getArgument(0), teamId));
-    when(teams.existsById(teamId)).thenReturn(true);
+    when(teams.findByIdForUpdate(teamId)).thenReturn(Optional.of(team(teamId)));
     when(users.findById(leadId))
         .thenReturn(Optional.of(User.external("Lena Lead", "lena@example.com")));
     when(memberships.existsByTeamIdAndUserId(teamId, leadId)).thenReturn(false);
@@ -98,7 +98,7 @@ class TeamServiceTest {
     when(teams.existsByNameIgnoreCase("Ops")).thenReturn(false);
     when(slugs.allocate("Ops")).thenReturn("ops");
     when(teams.save(any())).thenAnswer(inv -> withId(inv.getArgument(0), teamId));
-    when(teams.existsById(teamId)).thenReturn(true);
+    when(teams.findByIdForUpdate(teamId)).thenReturn(Optional.of(team(teamId)));
     when(users.findById(leadId))
         .thenReturn(Optional.of(User.external("Lena Lead", "lena@example.com")));
     when(memberships.existsByTeamIdAndUserId(teamId, leadId)).thenReturn(false);
@@ -119,7 +119,7 @@ class TeamServiceTest {
     when(teams.existsByNameIgnoreCase("Core")).thenReturn(false);
     when(slugs.allocate("Core")).thenReturn("core");
     when(teams.save(any())).thenAnswer(inv -> withId(inv.getArgument(0), teamId));
-    when(teams.existsById(teamId)).thenReturn(true);
+    when(teams.findByIdForUpdate(teamId)).thenReturn(Optional.of(team(teamId)));
     when(users.findById(leadId)).thenReturn(Optional.empty());
 
     assertThatThrownBy(() -> service.create("Core", null, leadId, null, null, null))
@@ -175,11 +175,11 @@ class TeamServiceTest {
     UUID teamId = UUID.randomUUID();
     UUID userId = UUID.randomUUID();
 
-    when(teams.existsById(teamId)).thenReturn(false);
+    when(teams.findByIdForUpdate(teamId)).thenReturn(Optional.empty());
     assertThatThrownBy(() -> service.addMember(teamId, userId, "MEMBER"))
         .isInstanceOf(TeamNotFoundException.class);
 
-    when(teams.existsById(teamId)).thenReturn(true);
+    when(teams.findByIdForUpdate(teamId)).thenReturn(Optional.of(team(teamId)));
     when(users.findById(userId)).thenReturn(Optional.empty());
     assertThatThrownBy(() -> service.addMember(teamId, userId, "MEMBER"))
         .isInstanceOf(UserNotFoundException.class);
@@ -381,7 +381,7 @@ class TeamServiceTest {
     UUID teamId = UUID.randomUUID();
     UUID lead = UUID.randomUUID();
     UUID target = UUID.randomUUID();
-    when(teams.existsById(teamId)).thenReturn(true);
+    when(teams.findByIdForUpdate(teamId)).thenReturn(Optional.of(team(teamId)));
     when(users.findById(target))
         .thenReturn(Optional.of(User.internal("Al", "al@example.com", "al", "h")));
     when(memberships.existsByTeamIdAndUserId(teamId, target)).thenReturn(false);
@@ -570,5 +570,13 @@ class TeamServiceTest {
         org.mockito.Mockito.mock(io.qnop.repository.TeamRepository.class),
         org.mockito.Mockito.mock(io.qnop.repository.TeamMembershipRepository.class),
         org.mockito.Mockito.mock(io.qnop.repository.DocumentRepository.class));
+  }
+
+  /**
+   * A stand-in for the row the service takes under lock before counting (#691). The id is JPA's to
+   * assign and the service only asks whether the row is there, so it is not set here.
+   */
+  private static Team team(UUID id) {
+    return Team.create("Team " + id, null);
   }
 }

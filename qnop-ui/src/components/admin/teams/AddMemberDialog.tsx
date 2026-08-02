@@ -41,6 +41,13 @@ interface AddMemberDialogProps {
   open: boolean;
   teamId: string;
   existingMemberIds: string[];
+  /**
+   * How many members this team may still take, or {@code undefined} where the
+   * deployment sets no per-team ceiling (issue #691). The dialog will not let
+   * more than this be selected — the additions go out in parallel, so a
+   * selection that overshoots used to be accepted in full.
+   */
+  remainingSlots?: number;
   onClose: () => void;
 }
 
@@ -53,6 +60,7 @@ export function AddMemberDialog({
   open,
   teamId,
   existingMemberIds,
+  remainingSlots,
   onClose,
 }: AddMemberDialogProps) {
   const addMember = useAddTeamMember();
@@ -60,6 +68,8 @@ export function AddMemberDialog({
   const [debounced, setDebounced] = useState('');
   const [selected, setSelected] = useState<AdminUserSummary[]>([]);
   const [teamRole, setTeamRole] = useState<TeamRole>('MEMBER');
+  // null where the deployment sets no per-team ceiling, which is the usual case.
+  const atMost = remainingSlots ?? null;
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
@@ -98,13 +108,26 @@ export function AddMemberDialog({
         <DialogTitle>Add members</DialogTitle>
         <DialogContent>
           <Stack spacing={2.5} sx={{ mt: 1 }}>
+            {atMost !== null && (
+              <Typography color="text.secondary" sx={{ fontSize: 13 }}>
+                {atMost === 1
+                  ? 'One more member fits in this team.'
+                  : `${atMost} more members fit in this team.`}
+              </Typography>
+            )}
             <Autocomplete
               multiple
               disableCloseOnSelect
               options={options}
               loading={isFetching}
               value={selected}
-              onChange={(_, value) => setSelected(value)}
+              // Capped rather than trimmed after the fact (issue #691): the
+              // requests go out in parallel, so a selection larger than the
+              // remaining slots used to be accepted in full. The server now
+              // refuses the surplus under a row lock; this keeps a user from
+              // picking people it will refuse.
+              onChange={(_, value) => setSelected(atMost === null ? value : value.slice(0, atMost))}
+              getOptionDisabled={() => atMost !== null && selected.length >= atMost}
               onInputChange={(_, value) => setSearch(value)}
               getOptionLabel={(u) => `${u.displayName} (${u.email})`}
               isOptionEqualToValue={(a, b) => a.id === b.id}

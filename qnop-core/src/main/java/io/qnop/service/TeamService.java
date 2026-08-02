@@ -196,11 +196,16 @@ public class TeamService {
 
   @Transactional
   public TeamMemberView addMember(UUID teamId, UUID userId, String teamRole) {
-    // Quota on how large one team may get (issue #673).
-    limits.requireTeamMemberCapacity(teamId);
-    if (!teams.existsById(teamId)) {
+    // The row lock comes first, and the quota is counted inside it (issues
+    // #673/#691). The admin dialog submits one request per selected user in
+    // parallel, so an unlocked count is read by all of them before any of them
+    // has inserted: a team at 3 of 5 accepted four people and ended up at 7.
+    // The same lock already serialises the last-lead guard (#470), and it is per
+    // team, so it costs nothing to anybody working on a different one.
+    if (teams.findByIdForUpdate(teamId).isEmpty()) {
       throw TeamNotFoundException.team(teamId);
     }
+    limits.requireTeamMemberCapacity(teamId);
     User user = users.findById(userId).orElseThrow(() -> new UserNotFoundException(userId));
     if (memberships.existsByTeamIdAndUserId(teamId, userId)) {
       throw new TeamConflictException(
@@ -370,8 +375,9 @@ public class TeamService {
   @Transactional
   public TeamMemberView addMemberAsLead(
       UUID teamId, UUID actorId, boolean admin, UUID userId, String teamRole) {
-    // The lead's own path into a team is bounded by the same quota (issue #673).
-    limits.requireTeamMemberCapacity(teamId);
+    // The quota is not checked here: addMember below counts it under the team's
+    // row lock (#691), and a check outside that lock would only be a second
+    // reading of a number that can change before the insert.
     requireLeadOrAdmin(teamId, actorId, admin);
     return addMember(teamId, userId, teamRole);
   }
