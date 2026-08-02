@@ -145,7 +145,9 @@ public class ConfigController implements ServerConfigApi {
                 new ServerConfigFeatures()
                     .oidc(features.oidc())
                     .annotationExport(features.annotationExport())
-                    .customBranding(features.customBranding()))
+                    .customBranding(features.customBranding())
+                    .smtpConfiguration(features.smtpConfiguration())
+                    .emailTemplates(features.emailTemplates()))
             .supportedFormats(supportedFormats())
             .branding(buildBranding());
     // The sign-in notice (issue #664) belongs in the one response the login

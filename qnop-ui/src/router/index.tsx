@@ -34,7 +34,7 @@ import { StorageConsistencyPage } from '../pages/admin/StorageConsistencyPage';
 import { ProfilePage } from '../pages/ProfilePage';
 import { UserProfilePage } from '../pages/UserProfilePage';
 import { TeamProfilePage } from '../pages/TeamProfilePage';
-import { EmailLayout } from '../pages/admin/EmailLayout';
+import { EmailIndexRedirect, EmailLayout } from '../pages/admin/EmailLayout';
 import { EmailServerPage } from '../pages/admin/EmailServerPage';
 import { MailTemplatesKeyRedirect } from '../pages/admin/MailTemplatesKeyRedirect';
 import { MailTemplatesListPage } from '../pages/admin/MailTemplatesListPage';
@@ -249,7 +249,7 @@ export const router = createBrowserRouter([
               </AdminRoute>
             ),
             children: [
-              { index: true, element: <Navigate to="/admin/email/server" replace /> },
+              { index: true, element: <EmailIndexRedirect /> },
               { path: 'server', element: <EmailServerPage /> },
               { path: 'templates', element: <MailTemplatesListPage /> },
               {

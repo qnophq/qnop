@@ -4969,10 +4969,23 @@ components:
           description: |
             Operator logos. When false every slot serves the bundled default,
             including slots that already hold an upload.
+        smtpConfiguration:
+          type: boolean
+          description: |
+            Configuring the outgoing mail server. When false the `smtp.*`
+            settings and the test-mail endpoint refuse, and the Email → Server
+            tab is not offered.
+        emailTemplates:
+          type: boolean
+          description: |
+            Editing the outgoing mail templates. When false updating, resetting
+            and template test-mails refuse; reading and preview stay.
       required:
         - oidc
         - annotationExport
         - customBranding
+        - smtpConfiguration
+        - emailTemplates
     ServerConfigTracking:
       type: object
       description: |

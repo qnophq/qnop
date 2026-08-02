@@ -22,23 +22,34 @@
 import { describe, expect, it } from 'vitest';
 import { fireEvent, render, screen } from '@testing-library/react';
 import { ThemeProvider } from '@mui/material/styles';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { configKeys } from '../../api/hooks/useConfig';
+import type { ServerConfigFeatures } from '../../api/generated';
 import { MemoryRouter, Route, Routes } from 'react-router';
 import { buildTheme } from '../../theme/theme';
 import { EmailLayout } from './EmailLayout';
 
-function renderAt(path: string) {
+function renderAt(path: string, features?: Partial<ServerConfigFeatures>) {
+  // The tab strip asks the config which sub-pages this deployment offers
+  // (#678/#679); seeding the cache keeps that out of the network.
+  const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  if (features) {
+    client.setQueryData(configKeys.all, { features });
+  }
   return render(
-    <ThemeProvider theme={buildTheme('light')}>
-      <MemoryRouter initialEntries={[path]}>
-        <Routes>
-          <Route path="/admin/email" element={<EmailLayout />}>
-            <Route path="server" element={<div>server-child</div>} />
-            <Route path="templates" element={<div>templates-child</div>} />
-            <Route path="templates/:key" element={<div>editor-child</div>} />
-          </Route>
-        </Routes>
-      </MemoryRouter>
-    </ThemeProvider>,
+    <QueryClientProvider client={client}>
+      <ThemeProvider theme={buildTheme('light')}>
+        <MemoryRouter initialEntries={[path]}>
+          <Routes>
+            <Route path="/admin/email" element={<EmailLayout />}>
+              <Route path="server" element={<div>server-child</div>} />
+              <Route path="templates" element={<div>templates-child</div>} />
+              <Route path="templates/:key" element={<div>editor-child</div>} />
+            </Route>
+          </Routes>
+        </MemoryRouter>
+      </ThemeProvider>
+    </QueryClientProvider>,
   );
 }
 
@@ -86,5 +97,21 @@ describe('EmailLayout', () => {
 
     expect(screen.getByText('templates-child')).toBeTruthy();
     expect(tab('Templates').getAttribute('aria-selected')).toBe('true');
+  });
+
+  it('offers only the tabs this deployment has capabilities for', () => {
+    renderAt('/admin/email/templates', { smtpConfiguration: false, emailTemplates: true });
+
+    expect(screen.queryByRole('tab', { name: 'Server' })).not.toBeInTheDocument();
+    expect(tab('Templates')).toBeInTheDocument();
+  });
+
+  it('keeps both tabs while the config is still loading', () => {
+    // "Not known yet" is not "not available"; a tab strip that fills in late
+    // reads as a glitch.
+    renderAt('/admin/email/server');
+
+    expect(tab('Server')).toBeInTheDocument();
+    expect(tab('Templates')).toBeInTheDocument();
   });
 });

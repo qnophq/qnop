@@ -110,6 +110,8 @@ describe('capability-aware navigation (#674)', () => {
       oidc: false,
       annotationExport: true,
       customBranding: false,
+      smtpConfiguration: true,
+      emailTemplates: true,
     });
     const ids = groups.flatMap((group) => group.items.map((item) => item.id));
 
@@ -125,6 +127,8 @@ describe('capability-aware navigation (#674)', () => {
       oidc: true,
       annotationExport: true,
       customBranding: true,
+      smtpConfiguration: true,
+      emailTemplates: true,
     });
     const ids = groups.flatMap((group) => group.items.map((item) => item.id));
 
@@ -141,5 +145,27 @@ describe('capability-aware navigation (#674)', () => {
 
     expect(ids).toContain('oidc-providers');
     expect(ids).toContain('branding');
+  });
+
+  it('keeps the Email entry while either of its two capabilities remains', () => {
+    // The item covers two sub-pages with a capability each (#678/#679), so it
+    // earns its place as long as one of them is still worth opening.
+    const withTemplatesOnly = visibleNavGroups('ADMIN', {
+      oidc: true,
+      annotationExport: true,
+      customBranding: true,
+      smtpConfiguration: false,
+      emailTemplates: true,
+    });
+    expect(withTemplatesOnly.flatMap((g) => g.items.map((i) => i.id))).toContain('email');
+
+    const withNeither = visibleNavGroups('ADMIN', {
+      oidc: true,
+      annotationExport: true,
+      customBranding: true,
+      smtpConfiguration: false,
+      emailTemplates: false,
+    });
+    expect(withNeither.flatMap((g) => g.items.map((i) => i.id))).not.toContain('email');
   });
 });

@@ -24,6 +24,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.lenient;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import io.qnop.entity.MailTemplate;
@@ -32,6 +34,8 @@ import io.qnop.repository.MailTemplateRepository;
 import io.qnop.repository.UserRepository;
 import io.qnop.service.ApplicationSettingKey;
 import io.qnop.service.ApplicationSettingsService;
+import io.qnop.service.limits.FeatureDisabledException;
+import io.qnop.service.limits.FeatureToggleProperties;
 import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
@@ -70,7 +74,12 @@ class MailTemplateServiceTest {
   @BeforeEach
   void setUp() {
     service =
-        new MailTemplateService(repository, userRepository, settings, new EmailLayoutBuilder());
+        new MailTemplateService(
+            repository,
+            userRepository,
+            settings,
+            new EmailLayoutBuilder(),
+            FeatureToggleProperties.all());
     lenient()
         .when(settings.getString(ApplicationSettingKey.GENERAL_DEFAULT_LANGUAGE))
         .thenReturn("en");
@@ -347,5 +356,29 @@ class MailTemplateServiceTest {
     MailTemplateView view = service.getEffective(MailTemplateKey.PASSWORD_RESET, "en");
 
     assertThat(view.updatedByName()).isNull();
+  }
+
+  @Test
+  @DisplayName("a deployment may withhold template editing, and still render what it sends")
+  void editingCanBeWithheld() {
+    MailTemplateService withoutEditing =
+        new MailTemplateService(
+            repository,
+            userRepository,
+            settings,
+            new EmailLayoutBuilder(),
+            FeatureToggleProperties.allExcept(FeatureDisabledException.Feature.EMAIL_TEMPLATES));
+
+    assertThatThrownBy(
+            () ->
+                withoutEditing.update(
+                    MailTemplateKey.PASSWORD_RESET, "en", "s", "plain", "<p>html</p>", null))
+        .isInstanceOf(FeatureDisabledException.class);
+    // Reset is the same capability by another route: it changes what goes out.
+    assertThatThrownBy(() -> withoutEditing.reset(MailTemplateKey.PASSWORD_RESET, "en"))
+        .isInstanceOf(FeatureDisabledException.class);
+
+    assertThat(withoutEditing.editable()).isFalse();
+    verify(repository, never()).save(any());
   }
 }

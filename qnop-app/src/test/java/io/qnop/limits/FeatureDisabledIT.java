@@ -20,10 +20,12 @@
  */
 package io.qnop.limits;
 
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -54,7 +56,9 @@ import org.springframework.test.context.TestPropertySource;
       "qnop.features.annotation-export=false",
       "qnop.features.custom-branding=false",
       "qnop.features.scheduler-manual-run=false",
-      "qnop.features.scheduler-job-settings=false"
+      "qnop.features.scheduler-job-settings=false",
+      "qnop.features.smtp-configuration=false",
+      "qnop.features.email-templates=false"
     })
 class FeatureDisabledIT extends SeededIntegrationTest {
 
@@ -70,6 +74,8 @@ class FeatureDisabledIT extends SeededIntegrationTest {
         .andExpect(jsonPath("$.features.oidc").value(false))
         .andExpect(jsonPath("$.features.annotationExport").value(false))
         .andExpect(jsonPath("$.features.customBranding").value(false))
+        .andExpect(jsonPath("$.features.smtpConfiguration").value(false))
+        .andExpect(jsonPath("$.features.emailTemplates").value(false))
         // The lists agree with the flags: a client reading either one reaches the
         // same conclusion.
         .andExpect(jsonPath("$.auth.oidcProviders").isEmpty())
@@ -181,6 +187,69 @@ class FeatureDisabledIT extends SeededIntegrationTest {
           .andExpect(status().isForbidden())
           .andExpect(jsonPath("$.code").value("SCHEDULER_JOB_SETTINGS_DISABLED"));
     }
+  }
+
+  @Test
+  @DisplayName("the mail server cannot be pointed elsewhere, but other settings still save")
+  void smtpSettingsAreTheOperators() throws Exception {
+    mockMvc
+        .perform(
+            patch("/api/v1/admin/settings")
+                .header("Authorization", "Bearer " + token(ADMIN_ID))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"values\":{\"smtp.host\":\"mail.attacker.example\"}}"))
+        .andExpect(status().isForbidden())
+        .andExpect(jsonPath("$.code").value("SMTP_CONFIGURATION_DISABLED"));
+
+    // The guard is selective: this endpoint carries every application setting,
+    // and the rest of them are nobody's business but the administrator's.
+    mockMvc
+        .perform(
+            patch("/api/v1/admin/settings")
+                .header("Authorization", "Bearer " + token(ADMIN_ID))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"values\":{\"general.default_language\":\"en\"}}"))
+        .andExpect(status().isOk());
+
+    // Sending from the operator's server belongs to the same screen.
+    mockMvc
+        .perform(
+            post("/api/v1/admin/email/test")
+                .header("Authorization", "Bearer " + token(ADMIN_ID))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"recipient\":\"someone@example.com\"}"))
+        .andExpect(status().isForbidden())
+        .andExpect(jsonPath("$.code").value("SMTP_CONFIGURATION_DISABLED"));
+  }
+
+  @Test
+  @DisplayName("templates cannot be edited or reset, but stay readable")
+  void mailTemplatesAreReadOnly() throws Exception {
+    mockMvc
+        .perform(
+            put("/api/v1/admin/email/templates/auth.password_reset")
+                .header("Authorization", "Bearer " + token(ADMIN_ID))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(
+                    "{\"locale\":\"en\",\"subject\":\"Reset\","
+                        + "\"bodyPlain\":\"{{link}}\",\"bodyHtml\":\"<p>{{link}}</p>\"}"))
+        .andExpect(status().isForbidden())
+        .andExpect(jsonPath("$.code").value("EMAIL_TEMPLATES_DISABLED"));
+
+    mockMvc
+        .perform(
+            delete("/api/v1/admin/email/templates/auth.password_reset")
+                .header("Authorization", "Bearer " + token(ADMIN_ID)))
+        .andExpect(status().isForbidden())
+        .andExpect(jsonPath("$.code").value("EMAIL_TEMPLATES_DISABLED"));
+
+    // Reading stays: a plan that excludes editing has no reason to hide the
+    // wording of the mail the deployment already sends.
+    mockMvc
+        .perform(
+            get("/api/v1/admin/email/templates")
+                .header("Authorization", "Bearer " + token(ADMIN_ID)))
+        .andExpect(status().isOk());
   }
 
   /** A review the export can be asked for; its content does not matter here. */

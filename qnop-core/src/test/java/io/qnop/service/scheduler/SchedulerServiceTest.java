@@ -379,7 +379,8 @@ class SchedulerServiceTest {
             auditEvents,
             lockProvider,
             transactionManager,
-            new FeatureToggleProperties(true, true, true, false, true));
+            FeatureToggleProperties.allExcept(
+                FeatureDisabledException.Feature.SCHEDULER_MANUAL_RUN));
     AtomicInteger runs = new AtomicInteger();
     withoutManualRun.register(
         TOKEN_JOB,
@@ -415,7 +416,8 @@ class SchedulerServiceTest {
             auditEvents,
             lockProvider,
             transactionManager,
-            new FeatureToggleProperties(true, true, true, true, false));
+            FeatureToggleProperties.allExcept(
+                FeatureDisabledException.Feature.SCHEDULER_JOB_SETTINGS));
 
     assertThatThrownBy(
             () -> withFixedSettings.updateSettings(UUID.randomUUID(), TOKEN_JOB, false, null))

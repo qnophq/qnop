@@ -336,6 +336,17 @@ public enum ApplicationSettingKey {
     return Optional.ofNullable(BY_KEY.get(key));
   }
 
+  /**
+   * Whether this key configures the outgoing mail server (issue #678).
+   *
+   * <p>On the enum rather than as a prefix test at the call site: the grouping is a property of the
+   * registry, and a new {@code smtp.*} key should join the group by being declared, not by somebody
+   * remembering to widen a condition elsewhere.
+   */
+  public boolean isSmtpConfiguration() {
+    return key.startsWith("smtp.");
+  }
+
   public String getKey() {
     return key;
   }

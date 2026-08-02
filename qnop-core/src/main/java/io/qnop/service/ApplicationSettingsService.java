@@ -22,6 +22,8 @@ package io.qnop.service;
 
 import io.qnop.entity.ApplicationSetting;
 import io.qnop.repository.ApplicationSettingRepository;
+import io.qnop.service.limits.FeatureDisabledException;
+import io.qnop.service.limits.FeatureToggleProperties;
 import jakarta.annotation.PostConstruct;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -64,6 +66,7 @@ public class ApplicationSettingsService {
   private final ConfigurationKeyRedactor redactor;
   private final List<SettingsChangeListener> listeners;
   private final TransactionTemplate transactionTemplate;
+  private final FeatureToggleProperties features;
 
   private final java.util.concurrent.atomic.AtomicReference<Map<ApplicationSettingKey, String>>
       snapshot = new java.util.concurrent.atomic.AtomicReference<>(Map.of());
@@ -73,12 +76,14 @@ public class ApplicationSettingsService {
       TextEncryptor textEncryptor,
       ConfigurationKeyRedactor redactor,
       List<SettingsChangeListener> listeners,
-      PlatformTransactionManager transactionManager) {
+      PlatformTransactionManager transactionManager,
+      FeatureToggleProperties features) {
     this.repository = repository;
     this.textEncryptor = textEncryptor;
     this.redactor = redactor;
     this.listeners = listeners;
     this.transactionTemplate = new TransactionTemplate(transactionManager);
+    this.features = features;
   }
 
   @PostConstruct
@@ -171,6 +176,15 @@ public class ApplicationSettingsService {
     Map<ApplicationSettingKey, String> resolved = resolveAndValidate(changes);
     if (resolved.isEmpty()) {
       return;
+    }
+    // Selective: this endpoint carries every application setting, and only the
+    // mail-server ones are withheld (issue #678). A patch that mixes them in is
+    // refused whole rather than partly applied — silently dropping the keys the
+    // caller is not allowed to set would report success for a change that did
+    // not happen.
+    if (!features.smtpConfiguration()
+        && resolved.keySet().stream().anyMatch(ApplicationSettingKey::isSmtpConfiguration)) {
+      throw new FeatureDisabledException(FeatureDisabledException.Feature.SMTP_CONFIGURATION);
     }
     OptimisticRetry.execute(
         MAX_WRITE_ATTEMPTS,

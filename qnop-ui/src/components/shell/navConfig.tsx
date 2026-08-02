@@ -50,8 +50,11 @@ export interface NavItem {
    *
    * <p>A withheld capability (issue #674) refuses at its endpoints regardless — this only keeps the
    * sidebar from offering a page whose every action would be denied.
+   *
+   * <p>A list means "any of these": the Email item covers two sub-pages with a capability each
+   * (issues #678/#679), and it is worth offering while either one remains.
    */
-  feature?: keyof ServerConfigFeatures;
+  feature?: keyof ServerConfigFeatures | (keyof ServerConfigFeatures)[];
 }
 
 export interface NavGroup {
@@ -117,6 +120,7 @@ export const NAV_GROUPS: NavGroup[] = [
         id: 'email',
         label: 'Email',
         path: '/admin/email',
+        feature: ['smtpConfiguration', 'emailTemplates'],
         icon: Mail,
         roles: ['ADMIN'],
       },
@@ -173,7 +177,11 @@ export function visibleNavGroups(
  * the config arrives is worse than one that occasionally shows a page the server will refuse.
  */
 function isFeatureAvailable(item: NavItem, features?: ServerConfigFeatures): boolean {
-  return !item.feature || !features || features[item.feature];
+  if (!item.feature || !features) {
+    return true;
+  }
+  const required = Array.isArray(item.feature) ? item.feature : [item.feature];
+  return required.some((name) => features[name]);
 }
 
 /** All items flattened — used to resolve the active item / breadcrumb label. */

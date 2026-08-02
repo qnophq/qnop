@@ -54,7 +54,9 @@ public class FeatureDisabledException extends RuntimeException {
     SCHEDULER_MANUAL_RUN("SCHEDULER_MANUAL_RUN_DISABLED", "starting a maintenance job by hand"),
     SCHEDULER_JOB_SETTINGS(
         "SCHEDULER_JOB_SETTINGS_DISABLED",
-        "changing a maintenance job's enabled or dry-run setting");
+        "changing a maintenance job's enabled or dry-run setting"),
+    SMTP_CONFIGURATION("SMTP_CONFIGURATION_DISABLED", "configuring the outgoing mail server"),
+    EMAIL_TEMPLATES("EMAIL_TEMPLATES_DISABLED", "editing the outgoing mail templates");
 
     private final String code;
     private final String subject;

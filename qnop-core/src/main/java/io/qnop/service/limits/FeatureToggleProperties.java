@@ -20,6 +20,7 @@
  */
 package io.qnop.service.limits;
 
+import java.util.Set;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.boot.context.properties.bind.DefaultValue;
 
@@ -62,7 +63,9 @@ public record FeatureToggleProperties(
     @DefaultValue("true") boolean annotationExport,
     @DefaultValue("true") boolean customBranding,
     @DefaultValue("true") boolean schedulerManualRun,
-    @DefaultValue("true") boolean schedulerJobSettings) {
+    @DefaultValue("true") boolean schedulerJobSettings,
+    @DefaultValue("true") boolean smtpConfiguration,
+    @DefaultValue("true") boolean emailTemplates) {
 
   /**
    * Everything on — the Community default, for tests and non-Spring callers.
@@ -74,6 +77,26 @@ public record FeatureToggleProperties(
    * annotations below are what actually supplies the defaults.
    */
   public static FeatureToggleProperties all() {
-    return new FeatureToggleProperties(true, true, true, true, true);
+    return new FeatureToggleProperties(true, true, true, true, true, true, true);
+  }
+
+  /**
+   * Everything on except the named capabilities — for tests and non-Spring callers.
+   *
+   * <p>Exists because seven positional booleans stopped being readable at about the third one:
+   * {@code new FeatureToggleProperties(true, true, true, true, false, true, true)} says nothing at
+   * a glance and silently means something else if a component is ever inserted. Naming the withheld
+   * capability says exactly what the case under test is about.
+   */
+  public static FeatureToggleProperties allExcept(FeatureDisabledException.Feature... withheld) {
+    Set<FeatureDisabledException.Feature> off = Set.of(withheld);
+    return new FeatureToggleProperties(
+        !off.contains(FeatureDisabledException.Feature.OIDC),
+        !off.contains(FeatureDisabledException.Feature.ANNOTATION_EXPORT),
+        !off.contains(FeatureDisabledException.Feature.CUSTOM_BRANDING),
+        !off.contains(FeatureDisabledException.Feature.SCHEDULER_MANUAL_RUN),
+        !off.contains(FeatureDisabledException.Feature.SCHEDULER_JOB_SETTINGS),
+        !off.contains(FeatureDisabledException.Feature.SMTP_CONFIGURATION),
+        !off.contains(FeatureDisabledException.Feature.EMAIL_TEMPLATES));
   }
 }
