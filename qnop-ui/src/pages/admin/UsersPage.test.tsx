@@ -388,4 +388,40 @@ describe('UsersPage', () => {
 
     expect(await screen.findByText('A password could not be generated.')).toBeTruthy();
   });
+
+  it('refuses to open the form when the instance has no seats left', async () => {
+    // Issue #687: disabled rather than left to fail. Filling in a name, an email
+    // and a password only to be refused at submit is the worst way to learn an
+    // instance is full.
+    queryState.data = {
+      items: [ADA, BEN],
+      total: 2,
+      page: 0,
+      size: 20,
+      seatLimit: 2,
+      seatsUsed: 2,
+    };
+    renderPage();
+
+    expect(await screen.findByRole('button', { name: /Add user/i })).toBeDisabled();
+    expect(screen.getByText(/holds 2/)).toBeInTheDocument();
+    // The way out is deleting, not disabling — that distinction is the whole
+    // reason the count changed.
+    expect(screen.getByText(/disabling one does not/i)).toBeInTheDocument();
+  });
+
+  it('leaves the button alone where the deployment sets no ceiling', async () => {
+    queryState.data = {
+      items: [ADA, BEN],
+      total: 2,
+      page: 0,
+      size: 20,
+      seatLimit: 0,
+      seatsUsed: 0,
+    };
+    renderPage();
+
+    expect(await screen.findByRole('button', { name: /Add user/i })).toBeEnabled();
+    expect(screen.queryByText(/seats used/)).not.toBeInTheDocument();
+  });
 });

@@ -40,7 +40,8 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
  * blocks the next record and leaves every present one alone — the alternative would be a deployment
  * that silently disables accounts an operator is still paying attention to.
  *
- * @param maxUsers enabled accounts; disabled ones do not occupy a seat
+ * @param maxUsers accounts on this instance, disabled ones included (issue #687): a seat is a
+ *     record, so the ceiling cannot be walked around by deactivating somebody
  * @param maxTeams teams on this instance
  * @param maxTeamMembers members of any single team
  * @param maxActiveReviews reviews still being worked on — not closed and not archived. Said as a

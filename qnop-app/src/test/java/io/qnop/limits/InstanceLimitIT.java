@@ -58,6 +58,9 @@ class InstanceLimitIT extends SeededIntegrationTest {
   @org.springframework.beans.factory.annotation.Autowired
   private io.qnop.service.ApplicationSettingsService settings;
 
+  @org.springframework.beans.factory.annotation.Autowired
+  private io.qnop.repository.UserRepository users;
+
   @org.junit.jupiter.api.AfterEach
   void restoreSelfRegistration() {
     settings.update(
@@ -174,5 +177,39 @@ class InstanceLimitIT extends SeededIntegrationTest {
       document.save(out);
       return out.toByteArray();
     }
+  }
+
+  @Test
+  @DisplayName("the user list carries its own capacity, so the screen can refuse first")
+  void userListReportsSeats() throws Exception {
+    // Straight from the list the admin screen already loads (issue #687): it
+    // cannot come from /admin/limits, which belongs to the configuration screen
+    // a deployment may withhold (#683).
+    mockMvc
+        .perform(get("/api/v1/admin/users").header("Authorization", "Bearer " + token(ADMIN_ID)))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.seatLimit").value(1))
+        // Every account counts, disabled ones included — the seed holds more
+        // than one, which is exactly why the next creation is refused.
+        .andExpect(jsonPath("$.seatsUsed").value(org.hamcrest.Matchers.greaterThan(1)));
+  }
+
+  @Test
+  @DisplayName("a disabled account still occupies its seat")
+  void disabledAccountsStillCount() throws Exception {
+    // The bug this replaced (issue #687): with the enabled-only count, disabling
+    // an account freed a seat, so a deployment configured for N could hold N+1.
+    long before = users.count();
+    users
+        .findById(MEMBER_ID)
+        .ifPresent(
+            user -> {
+              user.setEnabled(false);
+              users.save(user);
+            });
+
+    mockMvc
+        .perform(get("/api/v1/admin/users").header("Authorization", "Bearer " + token(ADMIN_ID)))
+        .andExpect(jsonPath("$.seatsUsed").value((int) before));
   }
 }

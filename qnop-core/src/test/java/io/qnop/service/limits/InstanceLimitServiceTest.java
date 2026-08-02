@@ -80,10 +80,10 @@ class InstanceLimitServiceTest {
   void refusesAtTheCeiling() {
     InstanceLimitService service = service(new InstanceLimitProperties(3, 0, 0, 0));
 
-    when(users.countByEnabledTrue()).thenReturn(2L);
+    when(users.count()).thenReturn(2L);
     assertThatCode(service::requireUserCapacity).doesNotThrowAnyException();
 
-    when(users.countByEnabledTrue()).thenReturn(3L);
+    when(users.count()).thenReturn(3L);
     assertThatThrownBy(service::requireUserCapacity)
         .isInstanceOf(InstanceLimitExceededException.class)
         .satisfies(
@@ -145,7 +145,7 @@ class InstanceLimitServiceTest {
   @Test
   @DisplayName("usage reports the fullest team, and says which quotas are unlimited")
   void usageReportsWhatAnAdministratorNeeds() {
-    when(users.countByEnabledTrue()).thenReturn(18L);
+    when(users.count()).thenReturn(18L);
     when(teams.count()).thenReturn(3L);
     when(memberships.memberCountsLargestFirst(any(Pageable.class))).thenReturn(List.of(9L));
     when(documents.countByArchivedAtIsNullAndClosedAtIsNull()).thenReturn(42L);
@@ -160,5 +160,21 @@ class InstanceLimitServiceTest {
     assertThat(usage.activeReviews().unlimited()).isTrue();
     assertThat(usage.activeReviews().remaining()).isEmpty();
     verify(memberships, never()).countByTeamId(any());
+  }
+
+  @Test
+  @DisplayName("a disabled account still occupies a seat")
+  void disabledAccountsCountTowardsTheCeiling() {
+    // Issue #687: counting only enabled accounts made the ceiling avoidable —
+    // disable one, create another — which is how a deployment configured for 30
+    // ended up holding 31.
+    InstanceLimitService service = service(new InstanceLimitProperties(30, 0, 0, 0));
+    when(users.count()).thenReturn(30L);
+
+    assertThatThrownBy(service::requireUserCapacity)
+        .isInstanceOf(InstanceLimitExceededException.class);
+    // Explicitly not the enabled-only count that let 31 accounts exist under a
+    // ceiling of 30.
+    verify(users, never()).countByEnabledTrue();
   }
 }

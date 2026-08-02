@@ -5866,6 +5866,22 @@ components:
           type: integer
           format: int64
           description: Total number of users matching the query.
+        seatLimit:
+          type: integer
+          format: int32
+          description: |
+            How many accounts this instance may hold in total
+            (`qnop.limits.max-users`, issue #687); `0` means unlimited. Reported
+            here rather than only on `/admin/limits`, because that endpoint
+            belongs to the configuration screen a deployment may withhold
+            (#683) — and somebody who cannot add a user still needs to know why.
+        seatsUsed:
+          type: integer
+          format: int64
+          description: |
+            Accounts that exist, disabled ones included — the number compared
+            against `seatLimit`. Not the same as `total`, which counts the rows
+            matching the current query.
         page:
           type: integer
           format: int32

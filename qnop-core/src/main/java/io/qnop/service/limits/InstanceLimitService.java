@@ -104,6 +104,20 @@ public class InstanceLimitService {
     require(InstanceLimit.ACTIVE_REVIEWS, limits.maxActiveReviews(), this::activeReviewCount);
   }
 
+  /**
+   * The user seats alone, for the admin user list (issue #687).
+   *
+   * <p>Its own method rather than {@link #usage()} so listing users does not count teams, team
+   * members and active reviews as a side effect — and it skips the count entirely where there is no
+   * ceiling, so an unconfigured deployment pays nothing per page.
+   */
+  @Transactional(readOnly = true)
+  public InstanceLimitUsage.Quota userSeats() {
+    return limits.maxUsers() <= 0
+        ? new InstanceLimitUsage.Quota(0, 0)
+        : new InstanceLimitUsage.Quota(userCount(), limits.maxUsers());
+  }
+
   /** Every quota with what it currently holds — the administration view (issue #673). */
   @Transactional(readOnly = true)
   public InstanceLimitUsage usage() {
@@ -126,7 +140,12 @@ public class InstanceLimitService {
   }
 
   private long userCount() {
-    return users.countByEnabledTrue();
+    // Every account, disabled ones included (issue #687). Counting only enabled
+    // accounts made the ceiling avoidable — disable one, create another — and it
+    // is not what an operator means by "thirty users". The cost is recorded in
+    // ADR-0057: a tenant who deactivates leavers rather than deleting them now
+    // fills up, and has to delete to make room.
+    return users.count();
   }
 
   /**

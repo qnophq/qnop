@@ -98,7 +98,17 @@ Read-only is not the same call as removed, and the difference is whether the con
 
 **Negative.** A plan change requires a restart, for capabilities as much as for quotas. The quotas are instance-wide, so they suit one-tenant-per-deployment (which is what qnop SaaS is) and would need rework for several tenants in one instance. The race window above is real, if small.
 
-**Neutral.** Disabled accounts do not occupy a seat, making "deactivate the leaver" cheaper than deleting their history — which is the behaviour an audit trail wants anyway.
+**Neutral.** Freeing a user seat means deleting an account, not disabling one (see the correction below), so a tenant at its ceiling has to choose between the audit trail and the seat.
+
+### Correction: a seat is a record (#687)
+
+The first version counted **enabled** accounts, on the reasoning that deactivating a leaver should not cost a seat. A live deployment configured for 30 was found holding 31: thirty enabled and one disabled. The guard had worked exactly as written.
+
+That reading is wrong for a quota, on two counts. It is not what an operator means by "thirty users", and it is avoidable — disable an account, create another, repeat. A ceiling somebody can step over by pressing a toggle is not a ceiling. So the count is now every account.
+
+The cost is real and accepted: a tenant that deactivates leavers rather than deleting them fills up, and has to delete history to make room. That is the trade an operator can price; the alternative was a quota that does not hold.
+
+The same round added the missing half of the feature. Nothing had warned before the refusal — the ceiling was only visible on `/admin/configuration`, which a deployment may withhold (#683), so an administrator could fill in a whole form and be refused at submit. `GET /admin/users` now carries `seatLimit` and `seatsUsed`, and *Add user* is disabled with the number on screen. A quota that is only ever discovered by hitting it is a quota that reads as a bug — which is precisely how this one was reported.
 
 ## Related
 
