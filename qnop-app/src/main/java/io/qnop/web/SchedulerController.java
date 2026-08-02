@@ -57,7 +57,8 @@ public class SchedulerController implements AdminSchedulerApi {
     return ResponseEntity.ok(
         new SchedulerJobListResponse()
             .items(scheduler.list().stream().map(SchedulerController::toDto).toList())
-            .manualRunEnabled(scheduler.manualRunEnabled()));
+            .manualRunEnabled(scheduler.manualRunEnabled())
+            .jobSettingsEditable(scheduler.jobSettingsEditable()));
   }
 
   @Override

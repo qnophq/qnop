@@ -117,6 +117,11 @@ public class SchedulerService {
     return features.schedulerManualRun();
   }
 
+  /** Whether a job's own enabled/dry-run settings may be changed here (issue #677). */
+  public boolean jobSettingsEditable() {
+    return features.schedulerJobSettings();
+  }
+
   /** One dashboard row: the static catalogue metadata joined with the mutable operator state. */
   public record SchedulerJobView(
       String jobId,
@@ -184,11 +189,18 @@ public class SchedulerService {
    * Applies operator settings to a job (a null field leaves that setting unchanged), audits the
    * change, and returns the fresh view.
    *
+   * @throws FeatureDisabledException if this deployment fixes the job settings (403, issue #677)
    * @throws SchedulerJobNotFoundException if the id is not catalogued (404)
    * @throws DryRunNotSupportedException if dry-run is requested for a job that cannot dry-run (400)
    */
   public SchedulerJobView updateSettings(
       UUID actorId, String jobId, Boolean enabled, Boolean dryRun) {
+    // Both settings behind one switch on purpose: dry-run is a soft off for the
+    // jobs that delete things, so guarding only `enabled` would leave the same
+    // outcome one toggle away.
+    if (!features.schedulerJobSettings()) {
+      throw new FeatureDisabledException(FeatureDisabledException.Feature.SCHEDULER_JOB_SETTINGS);
+    }
     SchedulerJobDefinition definition = requireDefinition(jobId);
     if (Boolean.TRUE.equals(dryRun) && !definition.supportsDryRun()) {
       throw new DryRunNotSupportedException(jobId);

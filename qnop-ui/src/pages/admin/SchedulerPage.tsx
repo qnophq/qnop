@@ -58,6 +58,7 @@ export function SchedulerPage() {
   // Optimistic while the list is still loading, so the button does not appear a
   // beat late on the deployments — the majority — that allow manual runs.
   const manualRunEnabled = data?.manualRunEnabled ?? true;
+  const jobSettingsEditable = data?.jobSettingsEditable ?? true;
   const tiles: StatTile[] = [
     { label: 'Jobs', value: jobs.length, icon: ListChecks },
     { label: 'Enabled', value: jobs.filter((j) => j.enabled).length, icon: Power, tone: 'success' },
@@ -121,6 +122,16 @@ export function SchedulerPage() {
     }
   };
 
+  // What this deployment withholds, in one sentence rather than two stacked
+  // alerts — an operator who fixed both settings made a single decision.
+  const notice = manualRunEnabled
+    ? jobSettingsEditable
+      ? null
+      : 'Job settings are fixed on this deployment: the enabled and dry-run switches cannot be changed here. The schedules below keep running as configured.'
+    : jobSettingsEditable
+      ? 'Running a job by hand is disabled on this deployment. The schedules below are unaffected and keep running.'
+      : 'This deployment manages its own scheduler: jobs cannot be started by hand, enabled, or put in dry-run from here. The schedules below keep running as configured.';
+
   return (
     <Stack spacing={3}>
       <PageHeader
@@ -130,13 +141,12 @@ export function SchedulerPage() {
 
       {!isError && jobs.length > 0 && <StatStrip tiles={tiles} />}
 
-      {/* Said once, at the top, rather than as a tooltip on each missing button.
-          The second sentence is the one that matters: without it, a page whose
-          run buttons have vanished reads as a broken scheduler. */}
-      {!manualRunEnabled && !isError && (
+      {/* Said once, at the top, rather than as a tooltip on every inert control.
+          The closing sentence is the one that matters: without it, a page of
+          missing buttons and dead switches reads as a broken scheduler. */}
+      {notice && !isError && (
         <Alert severity="info" variant="outlined">
-          Running a job by hand is disabled on this deployment. The schedules below are unaffected
-          and keep running.
+          {notice}
         </Alert>
       )}
 
@@ -160,6 +170,7 @@ export function SchedulerPage() {
               onToggleDryRun={onToggleDryRun}
               onRunNow={onRunNow}
               manualRunEnabled={manualRunEnabled}
+              jobSettingsEditable={jobSettingsEditable}
             />
           ))}
         </Stack>

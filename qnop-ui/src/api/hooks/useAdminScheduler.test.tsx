@@ -42,7 +42,11 @@ const REAPER: SchedulerJob = {
   dryRun: false,
 };
 
-const LIST: SchedulerJobListResponse = { manualRunEnabled: true, items: [REAPER] };
+const LIST: SchedulerJobListResponse = {
+  manualRunEnabled: true,
+  jobSettingsEditable: true,
+  items: [REAPER],
+};
 
 vi.mock('../config', () => ({
   adminSchedulerApi: {

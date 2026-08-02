@@ -66,13 +66,21 @@ vi.mock('../../components/admin/scheduler/SchedulerJobCard', () => ({
     onToggleEnabled,
     onToggleDryRun,
     onRunNow,
+    manualRunEnabled,
+    jobSettingsEditable,
   }: {
     job: SchedulerJob;
     onToggleEnabled: (j: SchedulerJob) => void;
     onToggleDryRun: (j: SchedulerJob) => void;
     onRunNow: (j: SchedulerJob) => void;
+    manualRunEnabled: boolean;
+    jobSettingsEditable: boolean;
   }) => (
-    <div>
+    <div
+      data-testid={`card-${job.jobId}`}
+      data-manual-run={String(manualRunEnabled)}
+      data-job-settings={String(jobSettingsEditable)}
+    >
       <span>{job.displayName}</span>
       <button onClick={() => onToggleEnabled(job)}>enable-{job.jobId}</button>
       <button onClick={() => onToggleDryRun(job)}>dryrun-{job.jobId}</button>
@@ -85,7 +93,7 @@ beforeEach(() => {
   updateMutate.mockReset().mockResolvedValue(undefined);
   runMutate.mockReset().mockResolvedValue({ ...REFRESH, lastOutcome: 'SUCCESS' });
   useSchedulerJobsMock.mockReset().mockReturnValue({
-    data: { items: [REFRESH, REAPER], manualRunEnabled: true },
+    data: { items: [REFRESH, REAPER], manualRunEnabled: true, jobSettingsEditable: true },
     isLoading: false,
     isFetching: false,
     isError: false,
@@ -112,7 +120,7 @@ describe('SchedulerPage', () => {
 
   it('shows a progress bar while refetching', () => {
     useSchedulerJobsMock.mockReturnValue({
-      data: { items: [REFRESH, REAPER], manualRunEnabled: true },
+      data: { items: [REFRESH, REAPER], manualRunEnabled: true, jobSettingsEditable: true },
       isLoading: false,
       isFetching: true,
       isError: false,
@@ -181,7 +189,7 @@ describe('SchedulerPage', () => {
 
   it('explains the missing run buttons where manual runs are forbidden', async () => {
     useSchedulerJobsMock.mockReturnValue({
-      data: { items: [REFRESH, REAPER], manualRunEnabled: false },
+      data: { items: [REFRESH, REAPER], manualRunEnabled: false, jobSettingsEditable: true },
       isLoading: false,
       isFetching: false,
       isError: false,
@@ -193,6 +201,45 @@ describe('SchedulerPage', () => {
     // scheduler page whose run buttons simply vanished reads as broken.
     expect(await screen.findByText(/Running a job by hand is disabled/)).toBeInTheDocument();
     expect(screen.getByText(/schedules below are unaffected/)).toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: 'Run now' })).not.toBeInTheDocument();
+    // The page's job is to pass the flag down; whether a card then draws a
+    // button is that card's own test.
+    expect(screen.getByTestId(`card-${REFRESH.jobId}`)).toHaveAttribute('data-manual-run', 'false');
+  });
+
+  it('locks both switches where the deployment fixes job settings', async () => {
+    useSchedulerJobsMock.mockReturnValue({
+      data: { items: [REFRESH, REAPER], manualRunEnabled: true, jobSettingsEditable: false },
+      isLoading: false,
+      isFetching: false,
+      isError: false,
+    });
+
+    renderPage();
+
+    expect(
+      await screen.findByText(/Job settings are fixed on this deployment/),
+    ).toBeInTheDocument();
+    const card = screen.getByTestId(`card-${REFRESH.jobId}`);
+    expect(card).toHaveAttribute('data-job-settings', 'false');
+    // Run-now is a separate switch and still allowed here.
+    expect(card).toHaveAttribute('data-manual-run', 'true');
+  });
+
+  it('says it once when the deployment withholds both', async () => {
+    useSchedulerJobsMock.mockReturnValue({
+      data: { items: [REFRESH, REAPER], manualRunEnabled: false, jobSettingsEditable: false },
+      isLoading: false,
+      isFetching: false,
+      isError: false,
+    });
+
+    renderPage();
+
+    // One sentence, not two stacked alerts: the operator made one decision.
+    expect(await screen.findByText(/manages its own scheduler/)).toBeInTheDocument();
+    expect(screen.getAllByRole('alert')).toHaveLength(1);
+    const card = screen.getByTestId(`card-${REFRESH.jobId}`);
+    expect(card).toHaveAttribute('data-manual-run', 'false');
+    expect(card).toHaveAttribute('data-job-settings', 'false');
   });
 });

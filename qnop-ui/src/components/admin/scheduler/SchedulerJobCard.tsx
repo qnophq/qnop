@@ -49,6 +49,13 @@ interface SchedulerJobCardProps {
    * for a tooltip that explains nothing the page has not already said above.
    */
   manualRunEnabled: boolean;
+  /**
+   * Whether this deployment allows the enabled and dry-run switches to be
+   * changed (issue #677). False renders them read-only rather than removing
+   * them: unlike the run button, a switch carries information — whether the job
+   * is on — that stays worth reading when it cannot be flipped.
+   */
+  jobSettingsEditable: boolean;
 }
 
 /** The last-run outcome as a coloured pill: green success, red failure, neutral "never run". */
@@ -76,6 +83,7 @@ export function SchedulerJobCard({
   onToggleDryRun,
   onRunNow,
   manualRunEnabled,
+  jobSettingsEditable,
 }: SchedulerJobCardProps) {
   const theme = useTheme();
   const { formatRelative } = useFormatters();
@@ -170,7 +178,7 @@ export function SchedulerJobCard({
                 <Switch
                   size="small"
                   checked={job.enabled}
-                  disabled={saving}
+                  disabled={saving || !jobSettingsEditable}
                   onChange={() => onToggleEnabled(job)}
                   slotProps={{ input: { 'aria-label': `Enable ${job.displayName}` } }}
                 />
@@ -189,7 +197,7 @@ export function SchedulerJobCard({
                   <Switch
                     size="small"
                     checked={job.dryRun}
-                    disabled={saving}
+                    disabled={saving || !jobSettingsEditable}
                     onChange={() => onToggleDryRun(job)}
                     slotProps={{ input: { 'aria-label': `Dry-run ${job.displayName}` } }}
                   />

@@ -214,11 +214,19 @@ qnop:
   # maintenance jobs (issue #676). The schedules are untouched — the sweeps keep
   # running on their cron — because what is withheld is the override, which
   # starts a job regardless of the job's own enabled flag.
+  #
+  # `scheduler-job-settings: false` fixes the jobs as this deployment ships them
+  # (issue #677): neither the enabled switch nor dry-run can be changed from the
+  # admin UI. One switch covers both, because dry-run is a soft off for the jobs
+  # that delete things — the reaper and the review purge run but delete nothing
+  # in dry-run, so guarding only `enabled` would leave the same outcome one
+  # toggle away.
   features:
     oidc: ${QNOP_FEATURES_OIDC:true}
     annotation-export: ${QNOP_FEATURES_ANNOTATION_EXPORT:true}
     custom-branding: ${QNOP_FEATURES_CUSTOM_BRANDING:true}
     scheduler-manual-run: ${QNOP_FEATURES_SCHEDULER_MANUAL_RUN:true}
+    scheduler-job-settings: ${QNOP_FEATURES_SCHEDULER_JOB_SETTINGS:true}
   # Usage tracking (issue #666). What an operator configures lives in the admin
   # settings (provider, host, site id, consent, opt-outs); the two keys here are
   # deployment decisions that must not be reachable from the web UI.

@@ -6021,9 +6021,18 @@ components:
             unaffected and keep running. It travels here rather than in the
             public `/config` because it answers a question only an administrator
             asks, and this is the response the scheduler screen already loads.
+        jobSettingsEditable:
+          type: boolean
+          description: |
+            Whether a job's own settings — its enabled switch and its dry-run
+            mode — may be changed here (`qnop.features.scheduler-job-settings`,
+            issue #677). False means the update endpoint refuses for every job,
+            and both switches are read-only. One flag covers both settings
+            because dry-run is a soft off for the jobs that delete things.
       required:
         - items
         - manualRunEnabled
+        - jobSettingsEditable
     SchedulerJobUpdateRequest:
       type: object
       description: |

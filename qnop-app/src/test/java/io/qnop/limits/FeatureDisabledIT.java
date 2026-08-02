@@ -22,6 +22,7 @@ package io.qnop.limits;
 
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -52,7 +53,8 @@ import org.springframework.test.context.TestPropertySource;
       "qnop.features.oidc=false",
       "qnop.features.annotation-export=false",
       "qnop.features.custom-branding=false",
-      "qnop.features.scheduler-manual-run=false"
+      "qnop.features.scheduler-manual-run=false",
+      "qnop.features.scheduler-job-settings=false"
     })
 class FeatureDisabledIT extends SeededIntegrationTest {
 
@@ -160,7 +162,25 @@ class FeatureDisabledIT extends SeededIntegrationTest {
             get("/api/v1/admin/scheduler").header("Authorization", "Bearer " + token(ADMIN_ID)))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.manualRunEnabled").value(false))
+        .andExpect(jsonPath("$.jobSettingsEditable").value(false))
         .andExpect(jsonPath("$.items").isNotEmpty());
+  }
+
+  @Test
+  @DisplayName("neither the enabled switch nor dry-run can be changed")
+  void schedulerJobSettingsAreFixed() throws Exception {
+    // Both in one test because they are one switch: dry-run is a soft off for
+    // the jobs that delete things, so a deployment that fixes one fixes both.
+    for (String body : new String[] {"{\"enabled\":false}", "{\"dryRun\":true}"}) {
+      mockMvc
+          .perform(
+              patch("/api/v1/admin/scheduler/storageOrphanReaper")
+                  .header("Authorization", "Bearer " + token(ADMIN_ID))
+                  .contentType(MediaType.APPLICATION_JSON)
+                  .content(body))
+          .andExpect(status().isForbidden())
+          .andExpect(jsonPath("$.code").value("SCHEDULER_JOB_SETTINGS_DISABLED"));
+    }
   }
 
   /** A review the export can be asked for; its content does not matter here. */

@@ -50,6 +50,7 @@ function renderCard(job: SchedulerJob, handlers = {}) {
     onToggleDryRun: vi.fn(),
     onRunNow: vi.fn(),
     manualRunEnabled: true,
+    jobSettingsEditable: true,
     ...handlers,
   };
   render(<SchedulerJobCard {...props} />, { wrapper });
@@ -122,5 +123,17 @@ describe('SchedulerJobCard', () => {
     expect(screen.queryByRole('button', { name: 'Run now' })).not.toBeInTheDocument();
     // The rest of the card still works: what is withheld is the manual trigger.
     expect(screen.getByLabelText('Enable Storage orphan reaper')).toBeTruthy();
+  });
+
+  it('renders the switches read-only where the deployment fixes job settings', () => {
+    // Issue #677: kept, not removed — a switch says whether the job is on, which
+    // stays worth reading when it cannot be flipped. That is the opposite call
+    // from the run button, which said nothing once it could not be pressed.
+    renderCard(BASE, { jobSettingsEditable: false });
+
+    expect(screen.getByLabelText('Enable Storage orphan reaper')).toBeDisabled();
+    expect(screen.getByLabelText('Dry-run Storage orphan reaper')).toBeDisabled();
+    // Still legible: the state is what the operator came to check.
+    expect(screen.getByText('Enabled')).toBeInTheDocument();
   });
 });

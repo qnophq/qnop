@@ -50,13 +50,19 @@ import org.springframework.boot.context.properties.bind.DefaultValue;
  *     trigger is withheld. It is its own switch because run-now is deliberately an override — it
  *     starts a job regardless of the job's own enabled flag — which is right for a self-hosted
  *     installation and is arbitrary load on demand for a hosted one.
+ * @param schedulerJobSettings changing a job's own settings — its enabled switch and its dry-run
+ *     mode (issue #677). One switch for both, because dry-run is a soft off for the jobs where it
+ *     matters: the reaper and the review purge run but delete nothing in dry-run, so a deployment
+ *     that withholds the enabled switch while leaving dry-run open has locked a door beside an open
+ *     window. Off leaves the deployment's own configuration in charge: the jobs run as shipped.
  */
 @ConfigurationProperties(prefix = "qnop.features")
 public record FeatureToggleProperties(
     @DefaultValue("true") boolean oidc,
     @DefaultValue("true") boolean annotationExport,
     @DefaultValue("true") boolean customBranding,
-    @DefaultValue("true") boolean schedulerManualRun) {
+    @DefaultValue("true") boolean schedulerManualRun,
+    @DefaultValue("true") boolean schedulerJobSettings) {
 
   /**
    * Everything on — the Community default, for tests and non-Spring callers.
@@ -68,6 +74,6 @@ public record FeatureToggleProperties(
    * annotations below are what actually supplies the defaults.
    */
   public static FeatureToggleProperties all() {
-    return new FeatureToggleProperties(true, true, true, true);
+    return new FeatureToggleProperties(true, true, true, true, true);
   }
 }

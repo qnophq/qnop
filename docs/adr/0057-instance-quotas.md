@@ -46,9 +46,11 @@ Quotas here are a commercial boundary, not a safety interlock. This is written d
 
 ### Capabilities are switches beside the quotas, not more of them
 
-`qnop.features.oidc`, `.annotation-export`, `.custom-branding` (issue #674) and `.scheduler-manual-run` (issue #676), all defaulting to on. Their own prefix, because a switch is not a ceiling — the same block of a configuration file, because an operator reads them together.
+`qnop.features.oidc`, `.annotation-export`, `.custom-branding` (issue #674), `.scheduler-manual-run` (#676) and `.scheduler-job-settings` (#677), all defaulting to on. Their own prefix, because a switch is not a ceiling — the same block of a configuration file, because an operator reads them together.
 
 The fourth is a different kind of thing from the first three and belongs here anyway. Run-now on a maintenance job is not a plan feature; it is an override that starts a sweep **regardless of the job's own enabled flag**. On a self-hosted installation that is exactly what an administrator needs. On a hosted one it is arbitrary load on demand, held by the person the operator cannot overrule. What is withheld is the trigger, never the schedule: the sweeps keep running on their cron, which is the property the tests pin down.
+
+The fifth covers the jobs' own settings, and covers **both** of them with one switch. Dry-run is not a lesser setting beside the enabled flag: for the storage reaper and the review purge it means *runs but deletes nothing*, which is being off by another name. A switch that guarded `enabled` and left dry-run open would be a locked door beside an open window, so `scheduler-job-settings` governs the whole update endpoint. Two separate switches were considered and rejected: the only combination anybody would set is both.
 
 **Off closes the door rather than hiding the handle.** Removing an option from a list a client renders is not withholding a capability: `/oauth2/authorization/{id}` is a URL somebody can type, and an export endpoint answers on its own. So the OAuth2 filter chain is not registered at all when SSO is off, the export endpoint refuses as well as vanishing from the format list, and branding refuses uploads *and* serves the bundled logo for slots that already hold one — otherwise a downgrade would change nothing anybody can see.
 
@@ -64,7 +66,9 @@ A trap worth recording, because it cost a debugging round and would have shipped
 
 The client drops what a withheld capability would offer: the sidebar omits the pages that administer it, and the export button does not appear on a review. That is presentation, not enforcement — the endpoints refuse either way — but leaving it out was a real defect, not a cosmetic one: the first version hid the pages and kept the button, so a user could configure an export through four steps of a wizard and be refused at the download. **An affordance that cannot succeed is worse than no affordance**, and "the endpoint refuses anyway" is not a reason to leave one standing.
 
-Where the *whole* capability is gone, the affordance goes silently — there is nothing left to explain on a page the user can no longer reach. Where only one action is withheld and the page remains useful, the page says so once, at the top: the scheduler still shows schedules, dry-run and enable/disable, and run buttons that had simply vanished would read as a broken scheduler rather than a deliberate setting. The sentence names the deployment, not the user's permissions, so the reader takes the question to whoever operates it.
+Where the *whole* capability is gone, the affordance goes silently — there is nothing left to explain on a page the user can no longer reach. Where only one action is withheld and the page remains useful, the page says so once, at the top: the scheduler still shows schedules, dry-run and enable/disable, and run buttons that had simply vanished would read as a broken scheduler rather than a deliberate setting. The sentence names the deployment, not the user's permissions, so the reader takes the question to whoever operates it. Where two switches are off at once it stays one sentence, because the operator made one decision.
+
+Read-only is not the same call as removed, and the difference is whether the control carries information. A button that cannot be pressed says nothing, so it goes. A switch says whether the job is on — worth reading even when it cannot be flipped — so it stays and greys out. Same principle, opposite outcome; getting this backwards is how a page ends up either lying or losing its state display.
 
 ## Consequences
 

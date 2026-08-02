@@ -379,7 +379,7 @@ class SchedulerServiceTest {
             auditEvents,
             lockProvider,
             transactionManager,
-            new FeatureToggleProperties(true, true, true, false));
+            new FeatureToggleProperties(true, true, true, false, true));
     AtomicInteger runs = new AtomicInteger();
     withoutManualRun.register(
         TOKEN_JOB,
@@ -404,5 +404,31 @@ class SchedulerServiceTest {
 
     assertThat(withoutManualRun.runScheduled(TOKEN_JOB)).isEqualTo(RunOutcome.SUCCESS);
     assertThat(runs).hasValue(1);
+  }
+
+  @Test
+  @DisplayName("a deployment may fix the job settings, covering dry-run as well as enabled")
+  void jobSettingsCanBeFixed() {
+    SchedulerService withFixedSettings =
+        new SchedulerService(
+            jobs,
+            auditEvents,
+            lockProvider,
+            transactionManager,
+            new FeatureToggleProperties(true, true, true, true, false));
+
+    assertThatThrownBy(
+            () -> withFixedSettings.updateSettings(UUID.randomUUID(), TOKEN_JOB, false, null))
+        .isInstanceOf(FeatureDisabledException.class);
+    // Dry-run is the same door: it is a soft off for the jobs that delete
+    // things, so leaving it open would defeat the switch.
+    assertThatThrownBy(
+            () -> withFixedSettings.updateSettings(UUID.randomUUID(), TOKEN_JOB, null, true))
+        .isInstanceOf(FeatureDisabledException.class);
+
+    assertThat(withFixedSettings.jobSettingsEditable()).isFalse();
+    // Nothing was written or audited on the way to the refusal.
+    verify(jobs, never()).save(any());
+    verify(auditEvents, never()).save(any());
   }
 }

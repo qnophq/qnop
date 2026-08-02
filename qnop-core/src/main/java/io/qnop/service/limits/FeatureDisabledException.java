@@ -51,7 +51,10 @@ public class FeatureDisabledException extends RuntimeException {
     OIDC("OIDC_DISABLED", "single sign-on"),
     ANNOTATION_EXPORT("ANNOTATION_EXPORT_DISABLED", "annotation export"),
     CUSTOM_BRANDING("CUSTOM_BRANDING_DISABLED", "custom branding"),
-    SCHEDULER_MANUAL_RUN("SCHEDULER_MANUAL_RUN_DISABLED", "starting a maintenance job by hand");
+    SCHEDULER_MANUAL_RUN("SCHEDULER_MANUAL_RUN_DISABLED", "starting a maintenance job by hand"),
+    SCHEDULER_JOB_SETTINGS(
+        "SCHEDULER_JOB_SETTINGS_DISABLED",
+        "changing a maintenance job's enabled or dry-run setting");
 
     private final String code;
     private final String subject;
