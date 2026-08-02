@@ -58,7 +58,7 @@ A trap worth recording, because it cost a debugging round and would have shipped
 
 `GET /admin/limits` reports each quota with its usage, shown on the Configuration page — the surface that already answers "what did the deployment set" rather than "what did an administrator choose". An administrator should know they are at 24 of 25 before the twenty-sixth attempt fails.
 
-`/config` publishes the capability flags alongside, and the sidebar drops the pages that administer a withheld capability. That is presentation, not enforcement: the endpoints refuse either way. A page whose every action would be denied is simply not worth offering.
+`/config` publishes the capability flags alongside, and the client drops what a withheld capability would offer: the sidebar omits the pages that administer it, and the export button does not appear on a review. That is presentation, not enforcement — the endpoints refuse either way — but leaving it out was a real defect, not a cosmetic one: the first version hid the pages and kept the button, so a user could configure an export through four steps of a wizard and be refused at the download. **An affordance that cannot succeed is worse than no affordance**, and "the endpoint refuses anyway" is not a reason to leave one standing.
 
 ## Consequences
 
