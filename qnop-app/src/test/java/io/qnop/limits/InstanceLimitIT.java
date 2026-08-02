@@ -212,4 +212,47 @@ class InstanceLimitIT extends SeededIntegrationTest {
         .perform(get("/api/v1/admin/users").header("Authorization", "Bearer " + token(ADMIN_ID)))
         .andExpect(jsonPath("$.seatsUsed").value((int) before));
   }
+
+  @Test
+  @DisplayName("the team list carries its own capacity too")
+  void teamListReportsSeats() throws Exception {
+    // Issue #688: the same gap the user list had — the server refused correctly
+    // while the screen kept offering the button.
+    mockMvc
+        .perform(get("/api/v1/admin/teams").header("Authorization", "Bearer " + token(ADMIN_ID)))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.teamLimit").value(1))
+        .andExpect(jsonPath("$.teamsUsed").value(org.hamcrest.Matchers.greaterThan(0)));
+  }
+
+  @Test
+  @DisplayName("the review list carries the active-review ceiling")
+  void reviewListReportsSeats() throws Exception {
+    // Not an administrator's screen — any reviewer can start one, so the number
+    // travels on the list they already load (issue #688).
+    mockMvc
+        .perform(get("/api/v1/documents").header("Authorization", "Bearer " + token(MEMBER_ID)))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.activeReviewLimit").value(1));
+  }
+
+  @Test
+  @DisplayName("a team reports the per-team member ceiling")
+  void teamDetailReportsMemberLimit() throws Exception {
+    String body =
+        mockMvc
+            .perform(
+                get("/api/v1/admin/teams").header("Authorization", "Bearer " + token(ADMIN_ID)))
+            .andReturn()
+            .getResponse()
+            .getContentAsString();
+    String teamId = com.jayway.jsonpath.JsonPath.read(body, "$.items[0].id");
+
+    mockMvc
+        .perform(
+            get("/api/v1/admin/teams/" + teamId)
+                .header("Authorization", "Bearer " + token(ADMIN_ID)))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.memberLimit").value(1));
+  }
 }

@@ -6226,6 +6226,13 @@ components:
       type: object
       description: Full team detail including its members.
       properties:
+        memberLimit:
+          type: integer
+          format: int32
+          description: |
+            How many members any one team may hold on this instance
+            (`qnop.limits.max-team-members`, issue #688); `0` means unlimited.
+            Per team, unlike the instance-wide user and team quotas.
         id:
           type: string
           format: uuid
@@ -6275,6 +6282,20 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/AdminTeamSummary'
+        teamLimit:
+          type: integer
+          format: int32
+          description: |
+            How many teams this instance may hold (`qnop.limits.max-teams`,
+            issue #688); `0` means unlimited. Reported here for the same reason
+            as the user list's seats (#687): `/admin/limits` belongs to the
+            configuration screen a deployment may withhold (#683).
+        teamsUsed:
+          type: integer
+          format: int64
+          description: |
+            Teams that exist — the number compared against `teamLimit`, and not
+            the same as `total`, which counts the rows matching the query.
         total:
           type: integer
           format: int64
@@ -7124,6 +7145,20 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/DocumentSummary'
+        activeReviewLimit:
+          type: integer
+          format: int32
+          description: |
+            How many reviews may be open on this instance at once
+            (`qnop.limits.max-active-reviews`, issue #688); `0` means unlimited.
+            Instance-wide, not per user — a reviewer sees it because they are
+            the one being turned away.
+        activeReviewsUsed:
+          type: integer
+          format: int64
+          description: |
+            Reviews currently open — neither closed nor archived. Finished work
+            occupies nothing, so this falls as reviews are finalized.
         total:
           type: integer
           format: int64

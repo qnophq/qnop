@@ -600,14 +600,35 @@ export function ReviewsPage() {
 
   const openReview = (documentId: string) => navigate(`/reviews/${documentId}`);
 
+  // What this instance allows open at once (issue #688); 0 means no ceiling.
+  // Finished work occupies nothing, so finalizing a review frees a slot.
+  const reviewLimit = data?.activeReviewLimit ?? 0;
+  const reviewsOpen = data?.activeReviewsUsed ?? 0;
+  const reviewsFull = reviewLimit > 0 && reviewsOpen >= reviewLimit;
+
   const newReviewButton = (
-    <Button
-      variant="contained"
-      startIcon={<Plus size={16} />}
-      onClick={() => navigate('/reviews/new')}
+    <Tooltip
+      title={
+        reviewsFull
+          ? `This instance allows ${reviewLimit} reviews open at once. Finalizing or archiving one frees a slot.`
+          : ''
+      }
     >
-      New review
-    </Button>
+      {/* A span, because a disabled MUI button does not emit the events a
+          tooltip needs — and here the explanation is the whole point: the
+          way out is finishing a review, which is not obvious from a grey
+          button. */}
+      <span>
+        <Button
+          variant="contained"
+          startIcon={<Plus size={16} />}
+          disabled={reviewsFull}
+          onClick={() => navigate('/reviews/new')}
+        >
+          New review
+        </Button>
+      </span>
+    </Tooltip>
   );
 
   // Rendered next to the search field, and again over the empty state — an admin

@@ -289,4 +289,19 @@ describe('TeamsPage', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Clear search' }));
     expect(input.value).toBe('');
   });
+
+  it('refuses to open the form when the instance has no team slots left', async () => {
+    // Issue #688: the server refuses either way, but a form that can only end in
+    // a refusal should not open.
+    teamsRef.current = {
+      data: { ...LIST, teamLimit: 2, teamsUsed: 2 },
+      isLoading: false,
+      isFetching: false,
+      isError: false,
+    };
+    renderPage();
+
+    expect(await screen.findByRole('button', { name: /Create team/i })).toBeDisabled();
+    expect(screen.getByText(/2 of 2 teams used/)).toBeInTheDocument();
+  });
 });

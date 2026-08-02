@@ -110,6 +110,10 @@ The cost is real and accepted: a tenant that deactivates leavers rather than del
 
 The same round added the missing half of the feature. Nothing had warned before the refusal — the ceiling was only visible on `/admin/configuration`, which a deployment may withhold (#683), so an administrator could fill in a whole form and be refused at submit. `GET /admin/users` now carries `seatLimit` and `seatsUsed`, and *Add user* is disabled with the number on screen. A quota that is only ever discovered by hitting it is a quota that reads as a bug — which is precisely how this one was reported.
 
+That prediction held: the team quota was reported the same way a day later, on an instance whose seven teams all predated the limit. Nothing was broken — the server refuses correctly and quotas never touch existing rows — but the button was still offered, and an offered button is a promise. So all four quotas now travel on the screen that offers the action: `seatLimit`/`seatsUsed` on the user list, `teamLimit`/`teamsUsed` on the team list, `memberLimit` on a team (per team, so only the ceiling — the count is already there), and `activeReviewLimit`/`activeReviewsUsed` on the review list. The review one is not an administrator's screen at all; any reviewer can start one, and they are the one being turned away.
+
+**A ceiling belongs on the screen that offers the action, not only on the one that reports configuration.** `/admin/limits` cannot serve this: it belongs to a configuration page a deployment may withhold (#683), and a tenant who cannot see the configuration still has to know why they cannot add a user.
+
 ## Related
 
 - **ADR-0025** — application settings, and why these are deliberately not among them

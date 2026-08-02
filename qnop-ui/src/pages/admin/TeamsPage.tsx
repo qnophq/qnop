@@ -87,6 +87,11 @@ export function TeamsPage() {
     page,
     size: PAGE_SIZE,
   });
+  // What this deployment allows (issue #688); 0 means no ceiling, which is the
+  // ordinary self-hosted case and shows nothing.
+  const teamLimit = data?.teamLimit ?? 0;
+  const teamsUsed = data?.teamsUsed ?? 0;
+  const teamsFull = teamLimit > 0 && teamsUsed >= teamLimit;
   const teams = data?.items ?? [];
   const total = data?.total ?? 0;
 
@@ -120,9 +125,21 @@ export function TeamsPage() {
     <Stack spacing={3}>
       <PageHeader
         title="Teams"
-        description="Group reviewers and manage their team roles."
+        description={
+          teamLimit > 0
+            ? `Group reviewers and manage their team roles. ${teamsUsed} of ${teamLimit} teams used.`
+            : 'Group reviewers and manage their team roles.'
+        }
         action={
-          <Button variant="contained" startIcon={<UsersRound size={18} />} onClick={openCreate}>
+          // Disabled rather than left to fail (issue #688): the refusal is
+          // correct either way, but learning about a ceiling by filling in a
+          // form and being turned away reads as a fault rather than a setting.
+          <Button
+            variant="contained"
+            startIcon={<UsersRound size={18} />}
+            disabled={teamsFull}
+            onClick={openCreate}
+          >
             Create team
           </Button>
         }

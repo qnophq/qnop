@@ -41,6 +41,8 @@ import io.qnop.service.TeamService.TeamSummaryView;
 import io.qnop.service.UserNotFoundException;
 import io.qnop.service.avatar.AvatarService;
 import io.qnop.service.avatar.TeamAvatarService;
+import io.qnop.service.limits.InstanceLimitService;
+import io.qnop.service.limits.InstanceLimitUsage;
 import java.time.Instant;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
@@ -64,11 +66,17 @@ public class TeamController implements AdminTeamsApi {
   private final TeamService teams;
   private final AvatarService avatars;
   private final TeamAvatarService teamAvatars;
+  private final InstanceLimitService limits;
 
-  public TeamController(TeamService teams, AvatarService avatars, TeamAvatarService teamAvatars) {
+  public TeamController(
+      TeamService teams,
+      AvatarService avatars,
+      TeamAvatarService teamAvatars,
+      InstanceLimitService limits) {
     this.teams = teams;
     this.avatars = avatars;
     this.teamAvatars = teamAvatars;
+    this.limits = limits;
   }
 
   @Override
@@ -78,6 +86,7 @@ public class TeamController implements AdminTeamsApi {
     // (#509).
     Map<UUID, Instant> avatarTs =
         teamAvatars.updatedAt(result.items().stream().map(TeamSummaryView::id).toList());
+    InstanceLimitUsage.Quota seats = limits.teamSeats();
     return ResponseEntity.ok(
         new AdminTeamListResponse()
             .items(
@@ -86,7 +95,10 @@ public class TeamController implements AdminTeamsApi {
                     .toList())
             .total(result.total())
             .page(result.page())
-            .size(result.size()));
+            .size(result.size())
+            // So the screen refuses before the form is filled in (issue #688).
+            .teamLimit(seats.maximum())
+            .teamsUsed(seats.used()));
   }
 
   @Override
@@ -105,7 +117,7 @@ public class TeamController implements AdminTeamsApi {
 
   @Override
   public ResponseEntity<AdminTeamDetail> getTeam(UUID teamId) {
-    return ResponseEntity.ok(toDetail(teams.get(teamId)));
+    return ResponseEntity.ok(toDetail(teams.get(teamId)).memberLimit(limits.memberLimit()));
   }
 
   @Override

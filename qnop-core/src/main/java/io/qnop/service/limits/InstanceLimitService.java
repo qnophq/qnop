@@ -118,6 +118,43 @@ public class InstanceLimitService {
         : new InstanceLimitUsage.Quota(userCount(), limits.maxUsers());
   }
 
+  /**
+   * The team ceiling and, where there is one, how many are taken (issue #688).
+   *
+   * <p>Same shape and same reasoning as {@link #userSeats()}: the screen that offers "add" is the
+   * screen that has to know, and it cannot ask {@code /admin/limits} because that belongs to a
+   * configuration page a deployment may withhold.
+   */
+  @Transactional(readOnly = true)
+  public InstanceLimitUsage.Quota teamSeats() {
+    return limits.maxTeams() <= 0
+        ? new InstanceLimitUsage.Quota(0, 0)
+        : new InstanceLimitUsage.Quota(teams.count(), limits.maxTeams());
+  }
+
+  /**
+   * The per-team member ceiling (issue #688), or {@code 0} where there is none.
+   *
+   * <p>Only the ceiling: how many a given team holds is already on the screen that asks, so
+   * counting again here would be a query for a number the caller has.
+   */
+  public int memberLimit() {
+    return limits.maxTeamMembers();
+  }
+
+  /**
+   * The active-review ceiling and, where there is one, how many are open (issue #688).
+   *
+   * <p>Unlike the other two this is not an administrator's screen: any reviewer can start a review,
+   * so the number travels on the list they already load.
+   */
+  @Transactional(readOnly = true)
+  public InstanceLimitUsage.Quota activeReviewSeats() {
+    return limits.maxActiveReviews() <= 0
+        ? new InstanceLimitUsage.Quota(0, 0)
+        : new InstanceLimitUsage.Quota(activeReviewCount(), limits.maxActiveReviews());
+  }
+
   /** Every quota with what it currently holds — the administration view (issue #673). */
   @Transactional(readOnly = true)
   public InstanceLimitUsage usage() {

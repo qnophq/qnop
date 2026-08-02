@@ -99,6 +99,10 @@ export function TeamDetailPage() {
   };
 
   const members = team.members ?? [];
+  // Per team, unlike the instance-wide quotas (issue #688). The count is already
+  // on screen, so only the ceiling travels.
+  const memberLimit = team.memberLimit ?? 0;
+  const membersFull = memberLimit > 0 && members.length >= memberLimit;
 
   return (
     <Stack spacing={3}>
@@ -106,13 +110,24 @@ export function TeamDetailPage() {
         title={team.name}
         leading={<TeamAvatar name={team.name} imageUrl={team.avatarUrl} size={48} />}
         titleAdornment={<UserStatusBadge enabled={team.enabled} />}
-        description={team.description || undefined}
+        description={
+          memberLimit > 0
+            ? [team.description, `${members.length} of ${memberLimit} member slots used.`]
+                .filter(Boolean)
+                .join(' — ')
+            : team.description || undefined
+        }
         action={
           <Stack direction="row" spacing={1.5}>
             <Button color="inherit" startIcon={<SquarePen size={16} />} onClick={openEdit}>
               Edit
             </Button>
-            <Button variant="contained" startIcon={<UserPlus size={18} />} onClick={openAdd}>
+            <Button
+              variant="contained"
+              startIcon={<UserPlus size={18} />}
+              disabled={membersFull}
+              onClick={openAdd}
+            >
               Add member
             </Button>
           </Stack>
