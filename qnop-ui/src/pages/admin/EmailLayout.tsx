@@ -25,22 +25,7 @@ import Tabs from '@mui/material/Tabs';
 import { Link as RouterLink, Navigate, Outlet, useLocation } from 'react-router';
 import { PageHeader } from '../../components/admin/layout/PageHeader';
 import { useConfig } from '../../api/hooks/useConfig';
-import type { ServerConfigFeatures } from '../../api/generated';
-
-const EMAIL_TABS = [
-  { path: 'server', label: 'Server', feature: 'smtpConfiguration' },
-  { path: 'templates', label: 'Templates', feature: 'emailTemplates' },
-] as const;
-
-/**
- * The tabs this deployment offers (issues #678/#679). A withheld capability
- * refuses at its endpoints regardless; dropping the tab keeps the shell from
- * pointing at a page whose every action would be denied. While the config is
- * loading both stay — "not known yet" is not "not available".
- */
-export function offeredEmailTabs(features?: ServerConfigFeatures) {
-  return EMAIL_TABS.filter((tab) => !features || features[tab.feature]);
-}
+import { offeredEmailTabs } from './emailTabs';
 
 /**
  * Shell for the `/admin/email/*` admin area (issue #525): one page-level
