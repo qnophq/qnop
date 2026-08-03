@@ -73,6 +73,40 @@ import org.springframework.test.web.servlet.MvcResult;
     })
 public abstract class SeededIntegrationTest extends AbstractIntegrationTest {
 
+  @org.springframework.beans.factory.annotation.Autowired
+  private io.qnop.repository.UserSettingRepository userSettingsForCadence;
+
+  /**
+   * Puts recipients on per-event review mail, for suites that assert immediate delivery.
+   *
+   * <p>Needed since issue #680 made the cadence three-valued with {@code DAILY} as the default: a
+   * seeded account no longer gets a mail per event, which is the point of that change. Suites about
+   * the immediate channel therefore say so out loud rather than relying on a default that now means
+   * the opposite.
+   */
+  protected void preferImmediateReviewMail(UUID... userIds) {
+    for (UUID userId : userIds) {
+      storeReviewMailCadence(userId, "IMMEDIATE");
+    }
+  }
+
+  /**
+   * Writes the cadence for one recipient, replacing whatever was there.
+   *
+   * <p>Update-or-insert rather than a bare insert, because the suites that set a cadence run after
+   * {@link #preferImmediateReviewMail} has already written one — a second insert would hit the
+   * unique key on {@code (user_id, setting_key)}.
+   */
+  protected void storeReviewMailCadence(UUID userId, String cadence) {
+    String key = io.qnop.service.UserSettingKey.EMAIL_REVIEW_NOTIFICATIONS.getKey();
+    io.qnop.entity.UserSetting setting =
+        userSettingsForCadence
+            .findByUserIdAndSettingKey(userId, key)
+            .orElseGet(() -> new io.qnop.entity.UserSetting(userId, key, cadence));
+    setting.setSettingValue(cadence);
+    userSettingsForCadence.saveAndFlush(setting);
+  }
+
   /** The plaintext behind every seeded user's bcrypt hash (for the real-login flows). */
   public static final String SEED_PASSWORD = "Test-Pass-1234!";
 

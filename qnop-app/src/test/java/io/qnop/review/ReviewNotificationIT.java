@@ -37,14 +37,12 @@ import io.qnop.entity.Document;
 import io.qnop.entity.DocumentVersion;
 import io.qnop.entity.ReviewParticipant;
 import io.qnop.entity.User;
-import io.qnop.entity.UserSetting;
 import io.qnop.entity.WorkflowState;
 import io.qnop.repository.DocumentRepository;
 import io.qnop.repository.DocumentVersionRepository;
 import io.qnop.repository.ReviewParticipantRepository;
 import io.qnop.repository.UserRepository;
 import io.qnop.repository.UserSettingRepository;
-import io.qnop.service.UserSettingKey;
 import io.qnop.service.mail.MailService;
 import io.qnop.service.mail.MailTemplateKey;
 import io.qnop.testsupport.SeededIntegrationTest;
@@ -73,6 +71,15 @@ import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilde
  * SMTP is involved and the assertions read the exact template key, recipient and variables.
  */
 class ReviewNotificationIT extends SeededIntegrationTest {
+
+  /**
+   * This suite is about the immediate channel, which is now a choice rather than the default (issue
+   * #680) — so the participants say so before anything is asserted.
+   */
+  @org.junit.jupiter.api.BeforeEach
+  void mailPerEvent() {
+    preferImmediateReviewMail(ADMIN_ID, ADMIN2_ID, MEMBER_ID, MEMBER2_ID, AUDITOR_ID);
+  }
 
   private static final String ANCHOR =
       "{\"region\":{\"surfaceIndex\":0,\"box\":{\"x\":0.1,\"y\":0.2,\"width\":0.3,\"height\":0.1}},"
@@ -247,8 +254,9 @@ class ReviewNotificationIT extends SeededIntegrationTest {
   void manualTransitionMailsParticipantsRespectingOptOut() throws Exception {
     seedDocument(false);
     participants.save(ReviewParticipant.forUser(documentId, MEMBER2_ID));
-    userSettings.save(
-        new UserSetting(MEMBER2_ID, UserSettingKey.EMAIL_REVIEW_NOTIFICATIONS.getKey(), "false"));
+    // OFF rather than "false" now that the setting is three-valued (#680); the
+    // helper replaces the IMMEDIATE row this suite writes for everybody.
+    storeReviewMailCadence(MEMBER2_ID, "OFF");
 
     mockMvc
         .perform(

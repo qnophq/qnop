@@ -65,6 +65,15 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
  */
 class MentionNotificationIT extends SeededIntegrationTest {
 
+  /**
+   * This suite is about the immediate channel, which is now a choice rather than the default (issue
+   * #680) — so the participants say so before anything is asserted.
+   */
+  @org.junit.jupiter.api.BeforeEach
+  void mailPerEvent() {
+    preferImmediateReviewMail(ADMIN_ID, MEMBER_ID, MEMBER2_ID);
+  }
+
   private static final String ANCHOR =
       "{\"region\":{\"surfaceIndex\":0,\"box\":{\"x\":0.1,\"y\":0.2,\"width\":0.3,\"height\":0.1}},"
           + "\"textQuote\":{\"quote\":\"the clause\"}}";
