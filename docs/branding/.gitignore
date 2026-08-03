@@ -1,4 +1,11 @@
 node_modules/
+# No lock file is kept for these tools: the fonts and the generator are pinned in
+# package.json, and the assets they produce are committed rather than rebuilt on
+# demand. pnpm's own artefacts join package-lock.json here — a plain `pnpm install`
+# in this directory writes both, and pnpm-workspace.yaml lands with a placeholder
+# it asks you to fill in, which is not a file anyone meant to keep.
 package-lock.json
+pnpm-lock.yaml
+pnpm-workspace.yaml
 Manrope\[wght\].ttf
 SpaceGrotesk\[wght\].ttf
