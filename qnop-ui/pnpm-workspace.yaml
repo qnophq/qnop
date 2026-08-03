@@ -1,7 +1,3 @@
-# pnpm 11 reads settings from here (the package.json `pnpm` field is no longer
-# read). Allow the OpenAPI generator's install script to run so `generate:api`
-# can fetch and invoke the generator JAR; without this pnpm blocks the build
-# script and the generator's preflight `pnpm install` fails.
 allowBuilds:
   '@openapitools/openapi-generator-cli': true
   # core-js-pure's only "build" is a funding postinstall; it needs no compilation.
@@ -19,5 +15,5 @@ allowBuilds:
 # 5.0.7) collapse into a single override onto 5.0.8. That is safe for the CJS
 # consumers in the tree: 5.0.8 still publishes a `require` export condition.
 overrides:
-  'brace-expansion@<5.0.8': 5.0.8
+  'brace-expansion@<5.0.8': 5.0.9
   'shell-quote@<=1.8.4': 1.10.0
