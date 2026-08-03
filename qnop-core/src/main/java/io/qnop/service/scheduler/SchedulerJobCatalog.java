@@ -134,7 +134,13 @@ public final class SchedulerJobCatalog {
               "0 5 * * * *",
               true,
               true,
-              false));
+              // Self-transactional (issue #680): a digest is sent per recipient and
+              // its watermark committed with it. Inside the gate's transaction the
+              // watermarks would all commit at the end, so a crash after fifty
+              // recipients would roll back fifty watermarks whose mails are already
+              // delivered — and the next run would send them again. Mail cannot be
+              // rolled back, so the commit must not be deferred past it.
+              true));
 
   private static final List<String> IDS =
       DEFINITIONS.stream().map(SchedulerJobDefinition::jobId).toList();

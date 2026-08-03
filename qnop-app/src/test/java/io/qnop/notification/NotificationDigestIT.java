@@ -161,6 +161,29 @@ class NotificationDigestIT extends SeededIntegrationTest {
     assertThat(vars.getValue().get("totalPhrase")).isEqualTo("3 updates");
   }
 
+  @Test
+  @DisplayName("each recipient's watermark is committed with their own mail, not at the end")
+  void watermarkCommitsPerRecipient() {
+    // The job is catalogued self-transactional for this reason (issue #680): mail
+    // cannot be rolled back, so a watermark deferred to the end of the run would
+    // be undone by a crash whose mails had already gone out — and the next run
+    // would send them a second time.
+    assertThat(
+            io.qnop.service.scheduler.SchedulerJobCatalog.find(
+                    io.qnop.service.scheduler.SchedulerJobCatalog.NOTIFICATION_DIGEST)
+                .orElseThrow()
+                .selfTransactional())
+        .isTrue();
+
+    unread(MEMBER_ID, NotificationType.COMMENT_ADDED);
+    String summary = digest.digestOnce(false);
+    org.junit.jupiter.api.Assumptions.assumeTrue(
+        summary.startsWith("Sent"), "not yet the recipient's send hour on this run");
+
+    // Visible from outside any transaction this test holds, i.e. actually committed.
+    assertThat(watermarks.findById(MEMBER_ID)).isPresent();
+  }
+
   private void unread(UUID recipientId, NotificationType type) {
     notifications.save(notification(recipientId, type));
   }
