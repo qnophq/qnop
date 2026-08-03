@@ -261,35 +261,56 @@ public class NotificationDigestService {
     vars.put("siteName", settings.getString(ApplicationSettingKey.GENERAL_APPLICATION_NAME));
     vars.put("recipientName", recipient.getDisplayName());
     vars.put("totalCount", content.total());
-    vars.put("digestBody", DigestRenderer.plain(content, titlesFor(content)));
-    vars.put("digestBodyHtml", DigestRenderer.html(content, titlesFor(content)));
+    Map<UUID, DigestRenderer.Target> targets = targetsFor(content);
+    vars.put("totalPhrase", DigestRenderer.totalPhrase(content.total()));
+    vars.put("digestBody", DigestRenderer.plain(content, targets));
+    vars.put("digestBodyHtml", DigestRenderer.html(content, targets));
     vars.put("actionUrl", reviewsUrl());
     return vars;
   }
 
-  /** Document titles for the summary, in one query rather than one per group. */
-  private Map<UUID, String> titlesFor(DigestContent content) {
+  /**
+   * Title and link per document, in one query rather than one per group.
+   *
+   * <p>A document that has since been deleted simply does not appear here, and the renderer then
+   * writes its line without a link — the count stays true either way.
+   */
+  private Map<UUID, DigestRenderer.Target> targetsFor(DigestContent content) {
     List<UUID> ids =
         content.documents().stream()
             .map(DigestContent.DocumentSummary::documentId)
             .filter(java.util.Objects::nonNull)
             .toList();
-    Map<UUID, String> titles = new LinkedHashMap<>();
+    Map<UUID, DigestRenderer.Target> targets = new LinkedHashMap<>();
     if (ids.isEmpty()) {
-      return titles;
+      return targets;
     }
+    String base = baseUrl();
     documents
         .findAllById(ids)
-        .forEach(document -> titles.put(document.getId(), document.getTitle()));
-    return titles;
+        .forEach(
+            document ->
+                targets.put(
+                    document.getId(),
+                    new DigestRenderer.Target(
+                        document.getTitle(),
+                        base.isEmpty() ? null : base + "/reviews/" + document.getId())));
+    return targets;
+  }
+
+  private String baseUrl() {
+    String base = settings.getString(ApplicationSettingKey.GENERAL_BASE_URL);
+    if (base == null || base.isBlank()) {
+      // Rather than emit relative links that are dead in a mail client, the
+      // renderer leaves them out entirely — configure Settings → General → Base URL.
+      log.warn("general.base_url is not configured — the digest will have no links");
+      return "";
+    }
+    return base.replaceAll("/+$", "");
   }
 
   private String reviewsUrl() {
-    String base = settings.getString(ApplicationSettingKey.GENERAL_BASE_URL);
-    if (base == null || base.isBlank()) {
-      log.warn("general.base_url is not configured — digest links will be relative/broken");
-      base = "";
-    }
-    return base.replaceAll("/+$", "") + "/reviews";
+    String base = baseUrl();
+    return base.isEmpty() ? "" : base + "/reviews";
   }
 }

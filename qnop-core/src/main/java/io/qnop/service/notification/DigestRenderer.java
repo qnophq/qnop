@@ -35,6 +35,10 @@ import java.util.UUID;
  *
  * <p>Counts, never one line per event — "3 new annotations, 7 comments" is what somebody can act
  * on, and fifty individual lines are precisely what the digest exists to replace.
+ *
+ * <p>Each document carries its own link, because the digest's job is not to inform but to get
+ * somebody back to the right review. One link to the list would make the reader search for what
+ * they just read about.
  */
 public final class DigestRenderer {
 
@@ -52,31 +56,55 @@ public final class DigestRenderer {
 
   private DigestRenderer() {}
 
-  /** The plain-text block: one line per document, its counts behind an em dash. */
-  public static String plain(DigestContent content, Map<UUID, String> titles) {
+  /**
+   * One document as the digest refers to it: what it is called and where it lives.
+   *
+   * <p>The URL comes from the caller rather than being assembled here, so the review path stays in
+   * one place and this class stays about wording.
+   */
+  public record Target(String title, String url) {}
+
+  /** The plain-text block: one line per document, its counts, then the link on its own line. */
+  public static String plain(DigestContent content, Map<UUID, Target> targets) {
     StringBuilder out = new StringBuilder();
     for (DigestContent.DocumentSummary document : content.documents()) {
+      Target target = targetOf(document, targets);
       out.append("* ")
-          .append(titleOf(document, titles))
+          .append(target.title())
           .append(" — ")
           .append(String.join(", ", phrases(document)))
           .append('\n');
+      if (target.url() != null && !target.url().isBlank()) {
+        out.append("  ").append(target.url()).append('\n');
+      }
     }
     return out.toString().stripTrailing();
   }
 
-  /** The same, as list items for the HTML body. */
-  public static String html(DigestContent content, Map<UUID, String> titles) {
+  /** The same, as list items whose titles are the links. */
+  public static String html(DigestContent content, Map<UUID, Target> targets) {
     StringBuilder out = new StringBuilder("<ul style=\"margin:0 0 4px;padding-left:18px;\">");
     for (DigestContent.DocumentSummary document : content.documents()) {
-      out.append("<li style=\"margin:0 0 8px;color:#3d3f47;font-size:15px;line-height:1.6;\">")
-          .append("<strong>")
-          .append(escape(titleOf(document, titles)))
-          .append("</strong> — ")
-          .append(escape(String.join(", ", phrases(document))))
-          .append("</li>");
+      Target target = targetOf(document, targets);
+      String label = escape(target.title());
+      out.append("<li style=\"margin:0 0 8px;color:#3d3f47;font-size:15px;line-height:1.6;\">");
+      if (target.url() == null || target.url().isBlank()) {
+        out.append("<strong>").append(label).append("</strong>");
+      } else {
+        out.append("<a href=\"")
+            .append(escape(target.url()))
+            .append("\" style=\"color:#18191f;font-weight:600;\">")
+            .append(label)
+            .append("</a>");
+      }
+      out.append(" — ").append(escape(String.join(", ", phrases(document)))).append("</li>");
     }
     return out.append("</ul>").toString();
+  }
+
+  /** A phrase for the total, pluralised — Mustache cannot, and the subject line needs one. */
+  public static String totalPhrase(int total) {
+    return total + (total == 1 ? " update" : " updates");
   }
 
   /** e.g. ["3 new annotations", "7 comments"] — singular where it is one. */
@@ -116,13 +144,16 @@ public final class DigestRenderer {
     };
   }
 
-  private static String titleOf(DigestContent.DocumentSummary document, Map<UUID, String> titles) {
+  private static Target targetOf(
+      DigestContent.DocumentSummary document, Map<UUID, Target> targets) {
     if (document.documentId() == null) {
-      return "Your workspace";
+      return new Target("Your workspace", null);
     }
     // A document deleted between the notification and the digest still gets a
-    // line: the count is true, and pretending it did not happen is worse.
-    return titles.getOrDefault(document.documentId(), "A review you take part in");
+    // line, without a link: the count is true, and pretending it did not happen
+    // is worse than a line that goes nowhere.
+    return targets.getOrDefault(
+        document.documentId(), new Target("A review you take part in", null));
   }
 
   private static String escape(String raw) {

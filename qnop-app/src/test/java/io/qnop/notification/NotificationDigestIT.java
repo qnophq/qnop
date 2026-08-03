@@ -56,6 +56,7 @@ class NotificationDigestIT extends SeededIntegrationTest {
   @Autowired private NotificationRepository notifications;
   @Autowired private NotificationDigestRepository watermarks;
   @Autowired private io.qnop.repository.DocumentRepository documents;
+  @Autowired private io.qnop.service.ApplicationSettingsService settings;
 
   private UUID documentId;
 
@@ -65,6 +66,9 @@ class NotificationDigestIT extends SeededIntegrationTest {
     storeUserSetting(MEMBER_ID, "timezone", "UTC");
     // A real review, because notification.document_id is a foreign key — and a
     // digest grouped by document is only meaningful against one.
+    // Without a base URL the renderer deliberately writes no links at all, so a
+    // test about links has to configure one.
+    settings.update(java.util.Map.of("general.base_url", "https://qnop.example"), null);
     io.qnop.entity.Document document = new io.qnop.entity.Document(MEMBER_ID, "Digest subject");
     document.setWorkflowState(io.qnop.entity.WorkflowState.IN_REVIEW);
     documentId = documents.save(document).getId();
@@ -128,6 +132,33 @@ class NotificationDigestIT extends SeededIntegrationTest {
     String summary = digest.digestOnce(false);
 
     assertThat(summary).doesNotStartWith("Sent");
+  }
+
+  @Test
+  @DisplayName("the mail carries counts and a link per document")
+  void mailContentIsASummaryWithWayBack() {
+    unread(MEMBER_ID, NotificationType.COMMENT_ADDED);
+    unread(MEMBER_ID, NotificationType.COMMENT_ADDED);
+    unread(MEMBER_ID, NotificationType.ANNOTATION_CREATED);
+
+    String summary = digest.digestOnce(false);
+    org.junit.jupiter.api.Assumptions.assumeTrue(
+        summary.startsWith("Sent"), "not yet the recipient's send hour on this run");
+
+    org.mockito.ArgumentCaptor<java.util.Map<String, Object>> vars =
+        org.mockito.ArgumentCaptor.forClass(java.util.Map.class);
+    verify(mail)
+        .sendMailFromTemplate(
+            eq(MailTemplateKey.REVIEW_DAILY_DIGEST), eq("member@qnop.test"), vars.capture(), any());
+
+    // Counts, not one line per event — the whole point of the feature.
+    assertThat(vars.getValue().get("digestBody").toString())
+        .contains("Digest subject")
+        .contains("1 new annotation")
+        .contains("2 comments");
+    // And the way back into that specific review, not just the list.
+    assertThat(vars.getValue().get("digestBodyHtml").toString()).contains("/reviews/" + documentId);
+    assertThat(vars.getValue().get("totalPhrase")).isEqualTo("3 updates");
   }
 
   private void unread(UUID recipientId, NotificationType type) {

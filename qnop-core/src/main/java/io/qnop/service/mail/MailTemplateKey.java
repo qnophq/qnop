@@ -152,11 +152,11 @@ public enum MailTemplateKey {
   REVIEW_DAILY_DIGEST(
       "review.daily_digest",
       "Daily review summary",
-      "Your {{siteName}} review summary",
+      "{{totalPhrase}} in your reviews",
       """
       Hi {{recipientName}},
 
-      Since your last summary, {{totalCount}} thing(s) happened in your reviews:
+      {{totalPhrase}} in your reviews since your last summary:
 
       {{digestBody}}
 
@@ -168,16 +168,17 @@ public enum MailTemplateKey {
       """,
       """
       <h1 style="margin:0 0 14px;color:#18191f;font-size:22px;font-weight:700;letter-spacing:-0.01em;line-height:1.3;">Your review summary</h1>
-      <p style="margin:0 0 14px;color:#3d3f47;font-size:15px;line-height:1.6;">Hi {{recipientName}}, since your last summary {{totalCount}} thing(s) happened in your reviews.</p>
+      <p style="margin:0 0 14px;color:#3d3f47;font-size:15px;line-height:1.6;">Hi {{recipientName}}, {{totalPhrase}} in your reviews since your last summary.</p>
       {{{digestBodyHtml}}}
       <p style="margin:22px 0 0;"><a href="{{actionUrl}}" style="display:inline-block;padding:11px 18px;border-radius:8px;background:#18191f;color:#ffffff;font-size:15px;font-weight:600;text-decoration:none;">Open your reviews</a></p>
       <p style="margin:22px 0 0;color:#6b6d76;font-size:13px;line-height:1.6;">You are getting one summary a day because that is your notification setting; you can switch to per-event mail or turn it off in your profile.</p>
       """,
       "Open your reviews",
-      "{{totalCount}} thing(s) happened in your reviews since your last summary.",
+      "{{totalPhrase}} since your last summary.",
       "siteName",
       "recipientName",
       "totalCount",
+      "totalPhrase",
       "digestBody",
       "digestBodyHtml",
       "actionUrl"),

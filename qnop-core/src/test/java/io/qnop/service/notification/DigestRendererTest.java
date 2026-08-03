@@ -45,11 +45,15 @@ class DigestRendererTest {
                     NotificationType.COMMENT_ADDED, 7,
                     NotificationType.ANNOTATION_CREATED, 3,
                     NotificationType.VERSION_UPLOADED, 1)),
-            Map.of(DOC, "Vendor Agreement"));
+            Map.of(DOC, target("Vendor Agreement")));
 
-    // Annotations before comments before versions, whatever order they arrived in.
+    // Annotations before comments before versions, whatever order they arrived in,
+    // and the way back on its own line.
     assertThat(plain)
-        .isEqualTo("* Vendor Agreement — 3 new annotations, 7 comments, 1 new version");
+        .isEqualTo(
+            "* Vendor Agreement — 3 new annotations, 7 comments, 1 new version\n"
+                + "  https://qnop.example/reviews/"
+                + DOC);
   }
 
   @Test
@@ -60,6 +64,7 @@ class DigestRendererTest {
     String plain =
         DigestRenderer.plain(content(Map.of(NotificationType.COMMENT_ADDED, 1)), Map.of());
 
+    // No link either: a line that goes nowhere beats a link that 404s.
     assertThat(plain).isEqualTo("* A review you take part in — 1 comment");
   }
 
@@ -69,9 +74,44 @@ class DigestRendererTest {
     String html =
         DigestRenderer.html(
             content(Map.of(NotificationType.COMMENT_ADDED, 1)),
-            Map.of(DOC, "Terms & <Conditions>"));
+            Map.of(DOC, target("Terms & <Conditions>")));
 
     assertThat(html).contains("Terms &amp; &lt;Conditions&gt;").doesNotContain("<Conditions>");
+  }
+
+  @Test
+  @DisplayName("each document links to its own review, not to the list")
+  void everyDocumentLinksToItself() {
+    // The digest's job is not to inform but to get somebody back to the right
+    // review; one link to the list would make them search for what they just read.
+    String html =
+        DigestRenderer.html(
+            content(Map.of(NotificationType.COMMENT_ADDED, 2)), Map.of(DOC, target("Contract")));
+
+    assertThat(html).contains("href=\"https://qnop.example/reviews/" + DOC + "\"");
+    assertThat(html).contains(">Contract</a>");
+  }
+
+  @Test
+  @DisplayName("a document with no link is still named, just not linked")
+  void unlinkedDocument() {
+    String html =
+        DigestRenderer.html(
+            content(Map.of(NotificationType.COMMENT_ADDED, 1)),
+            Map.of(DOC, new DigestRenderer.Target("Contract", null)));
+
+    assertThat(html).contains("<strong>Contract</strong>").doesNotContain("<a href");
+  }
+
+  @Test
+  @DisplayName("the total is pluralised, since the subject line uses it")
+  void totalPhrasePluralises() {
+    assertThat(DigestRenderer.totalPhrase(1)).isEqualTo("1 update");
+    assertThat(DigestRenderer.totalPhrase(11)).isEqualTo("11 updates");
+  }
+
+  private static DigestRenderer.Target target(String title) {
+    return new DigestRenderer.Target(title, "https://qnop.example/reviews/" + DOC);
   }
 
   private static DigestContent content(Map<NotificationType, Integer> counts) {
