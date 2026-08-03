@@ -87,6 +87,7 @@ public class NotificationDigestService {
   private final UserSettingRepository userSettings;
   private final DocumentRepository documents;
   private final ApplicationSettingsService settings;
+  private final io.qnop.service.review.ReviewIdentityResolver identity;
   private final MailService mail;
   private final SchedulerService scheduler;
   private final TransactionTemplate tx;
@@ -98,6 +99,7 @@ public class NotificationDigestService {
       UserSettingRepository userSettings,
       DocumentRepository documents,
       ApplicationSettingsService settings,
+      io.qnop.service.review.ReviewIdentityResolver identity,
       MailService mail,
       SchedulerService scheduler,
       PlatformTransactionManager transactionManager) {
@@ -107,6 +109,7 @@ public class NotificationDigestService {
     this.userSettings = userSettings;
     this.documents = documents;
     this.settings = settings;
+    this.identity = identity;
     this.mail = mail;
     this.scheduler = scheduler;
     this.tx = new TransactionTemplate(transactionManager);
@@ -197,7 +200,7 @@ public class NotificationDigestService {
     mail.sendMailFromTemplate(
         MailTemplateKey.REVIEW_DAILY_DIGEST,
         recipient.getEmail(),
-        varsFor(recipient, content),
+        varsFor(recipient, content, zone),
         localeFor(recipientId));
     // The newest createdAt actually included — never now(), or a notification
     // written while this was being assembled would fall in the gap.
@@ -256,17 +259,57 @@ public class NotificationDigestService {
         .orElse(null);
   }
 
-  private Map<String, Object> varsFor(User recipient, DigestContent content) {
+  private Map<String, Object> varsFor(User recipient, DigestContent content, ZoneId zone) {
     Map<String, Object> vars = new HashMap<>();
     vars.put("siteName", settings.getString(ApplicationSettingKey.GENERAL_APPLICATION_NAME));
     vars.put("recipientName", recipient.getDisplayName());
     vars.put("totalCount", content.total());
     Map<UUID, DigestRenderer.Target> targets = targetsFor(content);
+    java.util.function.Function<UUID, String> actorNames =
+        actorNamesFor(recipient.getId(), content);
     vars.put("totalPhrase", DigestRenderer.totalPhrase(content.total()));
-    vars.put("digestBody", DigestRenderer.plain(content, targets));
-    vars.put("digestBodyHtml", DigestRenderer.html(content, targets));
+    vars.put("digestBody", DigestRenderer.plain(content, targets, actorNames, zone));
+    vars.put("digestBodyHtml", DigestRenderer.html(content, targets, actorNames, zone));
     vars.put("actionUrl", reviewsUrl());
     return vars;
+  }
+
+  /**
+   * Resolves actor ids to the names <em>this</em> recipient may see.
+   *
+   * <p>Through the same resolver the in-app list uses (ADR-0038), because under per-review
+   * anonymity a name belongs to a (review, viewer) pair — reading it off the user row would leak
+   * the very identity the review was set up to withhold. Resolved once per document and cached for
+   * the mail, since a digest names the same handful of people repeatedly.
+   */
+  private java.util.function.Function<UUID, String> actorNamesFor(
+      UUID recipientId, DigestContent content) {
+    Map<UUID, io.qnop.service.review.ReviewIdentityResolver.ReviewIdentities> perDocument =
+        new LinkedHashMap<>();
+    Map<UUID, String> resolved = new LinkedHashMap<>();
+    for (DigestContent.DocumentSummary document : content.documents()) {
+      if (document.documentId() == null) {
+        continue;
+      }
+      io.qnop.service.review.ReviewIdentityResolver.ReviewIdentities identities;
+      try {
+        identities =
+            perDocument.computeIfAbsent(
+                document.documentId(), id -> identity.forDocument(id, recipientId));
+      } catch (RuntimeException e) {
+        // A review deleted between the notification and the digest: its lines stay,
+        // with a neutral actor rather than no digest at all.
+        continue;
+      }
+      for (DigestContent.Event event : document.events()) {
+        if (event.actorId() != null) {
+          String name = identities.displayName(event.actorId());
+          resolved.putIfAbsent(
+              event.actorId(), name == null || name.isBlank() ? "A participant" : name);
+        }
+      }
+    }
+    return actorId -> actorId == null ? "System" : resolved.getOrDefault(actorId, "A participant");
   }
 
   /**

@@ -151,11 +151,13 @@ class NotificationDigestIT extends SeededIntegrationTest {
         .sendMailFromTemplate(
             eq(MailTemplateKey.REVIEW_DAILY_DIGEST), eq("member@qnop.test"), vars.capture(), any());
 
-    // Counts, not one line per event — the whole point of the feature.
+    // Headline counts first, then the events themselves in order.
     assertThat(vars.getValue().get("digestBody").toString())
         .contains("Digest subject")
         .contains("1 new annotation")
-        .contains("2 comments");
+        .contains("2 comments")
+        .contains("raised an annotation")
+        .contains("replied in a thread");
     // And the way back into that specific review, not just the list.
     assertThat(vars.getValue().get("digestBodyHtml").toString()).contains("/reviews/" + documentId);
     assertThat(vars.getValue().get("totalPhrase")).isEqualTo("3 updates");
