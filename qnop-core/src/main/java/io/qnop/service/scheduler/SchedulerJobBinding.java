@@ -24,6 +24,7 @@ import io.qnop.service.RefreshTokenService;
 import io.qnop.service.TokenRevocationService;
 import io.qnop.service.auth.EmailVerificationTokenService;
 import io.qnop.service.auth.PasswordResetTokenService;
+import io.qnop.service.notification.NotificationDigestService;
 import io.qnop.service.notification.NotificationSweepService;
 import io.qnop.service.review.ReviewArchiveService;
 import io.qnop.service.review.ReviewPurgeService;
@@ -53,7 +54,8 @@ public class SchedulerJobBinding {
       StorageService storage,
       ReviewArchiveService reviewArchive,
       ReviewPurgeService reviewPurge,
-      NotificationSweepService notificationSweep) {
+      NotificationSweepService notificationSweep,
+      NotificationDigestService notificationDigest) {
     scheduler.register(
         SchedulerJobCatalog.EMAIL_VERIFICATION_TOKEN_SWEEP,
         dryRun -> {
@@ -82,5 +84,6 @@ public class SchedulerJobBinding {
     scheduler.register(SchedulerJobCatalog.REVIEW_ARCHIVE, reviewArchive::archiveOnce);
     scheduler.register(SchedulerJobCatalog.REVIEW_PURGE, reviewPurge::purgeOnce);
     scheduler.register(SchedulerJobCatalog.NOTIFICATION_SWEEP, notificationSweep::sweepOnce);
+    scheduler.register(SchedulerJobCatalog.NOTIFICATION_DIGEST, notificationDigest::digestOnce);
   }
 }

@@ -68,7 +68,11 @@ class SchedulerApiIT extends SeededIntegrationTest {
     mockMvc
         .perform(as(get(SCHEDULER), ADMIN_ID))
         .andExpect(status().isOk())
-        .andExpect(jsonPath("$.items", hasSize(8)))
+        // Counted from the catalogue rather than hard-coded, so adding a job is
+        // a one-line change there instead of a puzzle here.
+        .andExpect(
+            jsonPath(
+                "$.items", hasSize(io.qnop.service.scheduler.SchedulerJobCatalog.jobIds().size())))
         .andExpect(jsonPath("$.items[*].jobId", hasItem(STORAGE_ORPHAN_REAPER)))
         .andExpect(jsonPath("$.items[*].jobId", hasItem(REFRESH_TOKEN_SWEEP)));
   }

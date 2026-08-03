@@ -43,6 +43,7 @@ public final class SchedulerJobCatalog {
   public static final String REVIEW_ARCHIVE = "reviewArchive";
   public static final String REVIEW_PURGE = "reviewPurge";
   public static final String NOTIFICATION_SWEEP = "notificationSweep";
+  public static final String NOTIFICATION_DIGEST = "notificationDigest";
 
   private static final List<SchedulerJobDefinition> DEFINITIONS =
       List.of(
@@ -119,7 +120,21 @@ public final class SchedulerJobCatalog {
               "0 15 4 * * *",
               true,
               true,
-              true));
+              true),
+          // Hourly, and that is the point rather than an accident (issue #680):
+          // it sends to whoever has reached 08:00 in their own timezone since the
+          // last run, which a single daily run cannot do for more than one zone —
+          // and an hourly grid alone would miss the half-hour offsets.
+          new SchedulerJobDefinition(
+              NOTIFICATION_DIGEST,
+              "Review digest",
+              "Sends each recipient one summary of their unread review notifications, in their own"
+                  + " morning. Recipients on immediate or no mail are skipped, and a quiet day"
+                  + " sends nothing.",
+              "0 5 * * * *",
+              true,
+              true,
+              false));
 
   private static final List<String> IDS =
       DEFINITIONS.stream().map(SchedulerJobDefinition::jobId).toList();

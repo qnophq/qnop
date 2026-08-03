@@ -22,6 +22,7 @@ package io.qnop.repository;
 
 import io.qnop.entity.Notification;
 import java.time.Instant;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 import org.springframework.data.domain.Page;
@@ -53,6 +54,28 @@ public interface NotificationRepository extends JpaRepository<Notification, UUID
 
   /** The badge's number. */
   long countByRecipientIdAndReadAtIsNull(UUID recipientId);
+
+  /**
+   * Recipients with anything a digest could carry (issue #680).
+   *
+   * <p>Candidates, not the final set: cadence, timezone and whether today's digest already went out
+   * are decided per recipient afterwards. Driving the run from this rather than from the user table
+   * means an instance with ten thousand quiet accounts does no work for them.
+   */
+  @Query("SELECT DISTINCT n.recipientId FROM Notification n WHERE n.readAt IS NULL")
+  List<UUID> findRecipientsWithUnread();
+
+  /**
+   * One recipient's unread notifications newer than their watermark, oldest first (issue #680).
+   *
+   * <p>Unread is the interaction with in-app: anything already read in the app is left out, which
+   * is what makes the evening mail feel considerate rather than redundant.
+   */
+  @Query(
+      "SELECT n FROM Notification n WHERE n.recipientId = :recipientId AND n.readAt IS NULL"
+          + " AND n.createdAt > :after ORDER BY n.createdAt ASC")
+  List<Notification> findUnreadForDigest(
+      @Param("recipientId") UUID recipientId, @Param("after") Instant after);
 
   /** Scoped lookup — an id belonging to somebody else is simply absent (404, never 403). */
   Optional<Notification> findByIdAndRecipientId(UUID id, UUID recipientId);

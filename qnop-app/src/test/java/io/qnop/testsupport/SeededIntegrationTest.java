@@ -98,12 +98,17 @@ public abstract class SeededIntegrationTest extends AbstractIntegrationTest {
    * unique key on {@code (user_id, setting_key)}.
    */
   protected void storeReviewMailCadence(UUID userId, String cadence) {
-    String key = io.qnop.service.UserSettingKey.EMAIL_REVIEW_NOTIFICATIONS.getKey();
+    storeUserSetting(
+        userId, io.qnop.service.UserSettingKey.EMAIL_REVIEW_NOTIFICATIONS.getKey(), cadence);
+  }
+
+  /** Writes any per-user setting, replacing whatever was there. */
+  protected void storeUserSetting(UUID userId, String key, String value) {
     io.qnop.entity.UserSetting setting =
         userSettingsForCadence
             .findByUserIdAndSettingKey(userId, key)
-            .orElseGet(() -> new io.qnop.entity.UserSetting(userId, key, cadence));
-    setting.setSettingValue(cadence);
+            .orElseGet(() -> new io.qnop.entity.UserSetting(userId, key, value));
+    setting.setSettingValue(value);
     userSettingsForCadence.saveAndFlush(setting);
   }
 
