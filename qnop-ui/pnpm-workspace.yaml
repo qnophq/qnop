@@ -14,6 +14,14 @@ allowBuilds:
 # patches only the 5.0.x line, so the two former per-line pins (1.1.16 and
 # 5.0.7) collapse into a single override onto 5.0.8. That is safe for the CJS
 # consumers in the tree: 5.0.8 still publishes a `require` export condition.
+#
+# undici GHSA (cross-user information disclosure) and ip-address GHSA-mwp4-54f8-5fhr
+# (Address4 reads leading-zero octets as decimal where resolvers read octal, so a
+# check and the resolver disagree) join them (issue #701). Both are reachable only
+# through @openapitools/openapi-generator-cli's proxy chain, which runs when the
+# typed client is regenerated and never ships.
 overrides:
   'brace-expansion@<5.0.8': 5.0.9
   'shell-quote@<=1.8.4': 1.10.0
+  'ip-address@<10.3.1': 10.3.1
+  'undici@<7.29.0': 7.29.0
