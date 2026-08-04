@@ -1,0 +1,50 @@
+# Copyright (c) 2026-present devtank42 GmbH
+# SPDX-License-Identifier: AGPL-3.0-only
+
+# email_review_notifications becomes three-valued: IMMEDIATE | DAILY | OFF
+# (issue #680). Additive changeset; the registry (UserSettingKey) stays
+# authoritative per ADR-0025 and this only rewrites the stored rows so none of
+# them holds a value the registry would now reject.
+#
+# The mapping is not symmetrical, on purpose:
+#
+#   "false" -> OFF        An explicit opt-out stays an opt-out. Turning it into
+#                         DAILY would start mailing somebody who had said no,
+#                         which is the one outcome this change must not have.
+#   "true"  -> DAILY      The chosen default (see below). Somebody who ticked
+#                         the box asked for review mail, not specifically for a
+#                         mail per event — that distinction did not exist yet.
+#
+# Rows are only rewritten where they still hold the old boolean text, so re-runs
+# and hand-edited values are left alone.
+#
+# Accounts with no row at all inherit the registry default, which is now DAILY.
+# That is a deliberate, visible change for existing users and belongs in the
+# release notes: mail volume drops from one per event to one per morning.
+databaseChangeLog:
+  - changeSet:
+      id: 0035-review-notification-cadence
+      author: qnop
+      comment: Migrates email_review_notifications from boolean to IMMEDIATE/DAILY/OFF (issue #680).
+      changes:
+        - update:
+            tableName: user_setting
+            columns:
+              - column: { name: setting_value, value: "OFF" }
+            where: setting_key = 'email_review_notifications' AND lower(setting_value) = 'false'
+        - update:
+            tableName: user_setting
+            columns:
+              - column: { name: setting_value, value: "DAILY" }
+            where: setting_key = 'email_review_notifications' AND lower(setting_value) = 'true'
+      rollback:
+        - update:
+            tableName: user_setting
+            columns:
+              - column: { name: setting_value, value: "false" }
+            where: setting_key = 'email_review_notifications' AND setting_value = 'OFF'
+        - update:
+            tableName: user_setting
+            columns:
+              - column: { name: setting_value, value: "true" }
+            where: setting_key = 'email_review_notifications' AND setting_value IN ('DAILY', 'IMMEDIATE')

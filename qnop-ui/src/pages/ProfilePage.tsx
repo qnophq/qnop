@@ -27,7 +27,9 @@ import FormControlLabel from '@mui/material/FormControlLabel';
 import Paper from '@mui/material/Paper';
 import Snackbar from '@mui/material/Snackbar';
 import Stack from '@mui/material/Stack';
+import MenuItem from '@mui/material/MenuItem';
 import Switch from '@mui/material/Switch';
+import TextField from '@mui/material/TextField';
 import Typography from '@mui/material/Typography';
 import { alpha, useTheme } from '@mui/material/styles';
 import { useAuthStore } from '../stores/authStore';
@@ -49,6 +51,7 @@ import {
 } from '../api/hooks/useUserSettings';
 import { useDisplayTimezone } from '../api/hooks/useDisplayTimezone';
 import { TIMEZONE_SETTING_KEY } from '../utils/timezone';
+import { CADENCE_HELP, CADENCE_OPTIONS, normalizeCadence } from '../utils/reviewMailCadence';
 
 type Toast = { message: string; severity: 'success' | 'error' } | null;
 
@@ -77,8 +80,9 @@ export function ProfilePage() {
   const reviewMailsSetting = settingsQuery.data?.settings.find(
     (setting) => setting.key === EMAIL_REVIEW_NOTIFICATIONS_KEY,
   );
-  // Absent value = registry default (true) — the toggle reflects what the server does.
-  const reviewMailsOn = reviewMailsSetting ? reviewMailsSetting.value !== 'false' : true;
+  // Absent value = registry default, which the server reports in the same list —
+  // so the control shows what will actually happen rather than a guess (#680).
+  const reviewMailsCadence = normalizeCadence(reviewMailsSetting?.value);
 
   // The zone actually applied (own preference → workspace default → UTC); an empty stored
   // value means the user has made no explicit choice yet (issue #465).
@@ -93,13 +97,14 @@ export function ProfilePage() {
     reviews,
     userId,
     hasAvatar: Boolean(avatarUrl),
-    notificationsOn: reviewMailsOn,
+    // Any cadence but OFF counts as being reachable (#680).
+    notificationsOn: reviewMailsCadence !== 'OFF',
   });
   const earnedCount = achievements.filter((a) => a.earned).length;
 
-  const onToggleReviewMails = (checked: boolean) => {
+  const onChangeReviewMails = (cadence: string) => {
     updateSettings.mutate(
-      { [EMAIL_REVIEW_NOTIFICATIONS_KEY]: String(checked) },
+      { [EMAIL_REVIEW_NOTIFICATIONS_KEY]: cadence },
       {
         onError: () => setToast({ message: 'The setting could not be saved.', severity: 'error' }),
       },
@@ -282,17 +287,28 @@ export function ProfilePage() {
           in your discussions, decisions, and status changes.
         </Typography>
         <Divider sx={{ mb: 1.5 }} />
-        <FormControlLabel
-          control={
-            <Switch
-              checked={reviewMailsOn}
-              onChange={(event) => onToggleReviewMails(event.target.checked)}
-              disabled={settingsQuery.isPending}
-              slotProps={{ input: { 'aria-label': 'Email me about review activity' } }}
-            />
-          }
+        {/* Three choices rather than a switch (issue #680): with on/off, the only
+            honest answer on a busy review was off, and then the one mail that
+            mattered was missed along with the ninety that did not. */}
+        <TextField
+          select
           label="Email me about review activity"
-        />
+          value={reviewMailsCadence}
+          onChange={(event) => onChangeReviewMails(event.target.value)}
+          disabled={settingsQuery.isPending}
+          helperText={CADENCE_HELP[reviewMailsCadence]}
+          sx={{ maxWidth: 420 }}
+        >
+          {CADENCE_OPTIONS.map((option) => (
+            <MenuItem key={option.value} value={option.value}>
+              {option.label}
+            </MenuItem>
+          ))}
+        </TextField>
+        <Typography color="text.secondary" sx={{ fontSize: 13, mt: 1.5 }}>
+          Mentions reach you straight away either way — being named personally is the one case where
+          waiting costs something.
+        </Typography>
       </Paper>
 
       {trackingConfigured && (

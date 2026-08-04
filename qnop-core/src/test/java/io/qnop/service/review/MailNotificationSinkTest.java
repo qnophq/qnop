@@ -78,8 +78,13 @@ class MailNotificationSinkTest {
   }
 
   private void optOut(UserSettingKey key) {
+    stored(key, "false");
+  }
+
+  /** Stores a raw setting value for the recipient, as the registry would hold it. */
+  private void stored(UserSettingKey key, String value) {
     UserSetting setting = mock(UserSetting.class);
-    when(setting.getSettingValue()).thenReturn("false");
+    when(setting.getSettingValue()).thenReturn(value);
     when(userSettings.findByUserIdAndSettingKey(RECIPIENT_ID, key.getKey()))
         .thenReturn(Optional.of(setting));
   }
@@ -122,16 +127,56 @@ class MailNotificationSinkTest {
 
     assertThat(sink().accepts(intent(NotificationType.MENTION, "a@qnop.test"))).isFalse();
     // …and the dispatcher then offers the reply candidate instead, which is the
-    // fall-through ReviewNotificationServiceTest pins down.
+    // fall-through ReviewNotificationServiceTest pins down. It needs IMMEDIATE
+    // now, since the cadence default no longer mails per event (#680).
+    stored(UserSettingKey.EMAIL_REVIEW_NOTIFICATIONS, "IMMEDIATE");
     assertThat(sink().accepts(intent(NotificationType.COMMENT_ADDED, "a@qnop.test"))).isTrue();
   }
 
   @Test
-  @DisplayName("an ordinary recipient is mailed")
-  void ordinaryRecipient() {
+  @DisplayName("a recipient who chose IMMEDIATE is mailed per event")
+  void immediateRecipient() {
+    emailsEnabled(true);
+    when(userSettings.findByUserIdAndSettingKey(any(), any())).thenReturn(Optional.empty());
+    stored(UserSettingKey.EMAIL_REVIEW_NOTIFICATIONS, "IMMEDIATE");
+
+    assertThat(sink().accepts(intent(NotificationType.COMMENT_ADDED, "a@qnop.test"))).isTrue();
+  }
+
+  @Test
+  @DisplayName("DAILY leaves this sink silent — the digest carries it instead (#680)")
+  void dailyIsNotThisSinksBusiness() {
+    emailsEnabled(true);
+    when(userSettings.findByUserIdAndSettingKey(any(), any())).thenReturn(Optional.empty());
+    stored(UserSettingKey.EMAIL_REVIEW_NOTIFICATIONS, "DAILY");
+
+    assertThat(sink().accepts(intent(NotificationType.COMMENT_ADDED, "a@qnop.test"))).isFalse();
+    // The in-app sink still writes the row, which is what the digest reads, and a
+    // mention still goes out at once — it is not part of the cadence.
+    assertThat(sink().accepts(intent(NotificationType.MENTION, "a@qnop.test"))).isTrue();
+  }
+
+  @Test
+  @DisplayName("a recipient who never chose gets the registry default, which is DAILY")
+  void defaultIsDaily() {
     emailsEnabled(true);
     when(userSettings.findByUserIdAndSettingKey(any(), any())).thenReturn(Optional.empty());
 
-    assertThat(sink().accepts(intent(NotificationType.COMMENT_ADDED, "a@qnop.test"))).isTrue();
+    // The visible half of issue #680: an account that never touched this setting
+    // stops getting a mail per event.
+    assertThat(sink().accepts(intent(NotificationType.COMMENT_ADDED, "a@qnop.test"))).isFalse();
+  }
+
+  @Test
+  @DisplayName("the legacy booleans still read correctly before the migration runs")
+  void legacyValues() {
+    emailsEnabled(true);
+    when(userSettings.findByUserIdAndSettingKey(any(), any())).thenReturn(Optional.empty());
+
+    stored(UserSettingKey.EMAIL_REVIEW_NOTIFICATIONS, "true");
+    assertThat(sink().accepts(intent(NotificationType.COMMENT_ADDED, "a@qnop.test"))).isFalse();
+
+    stored(UserSettingKey.EMAIL_REVIEW_NOTIFICATIONS, "false");
+    assertThat(sink().accepts(intent(NotificationType.COMMENT_ADDED, "a@qnop.test"))).isFalse();
   }
 }

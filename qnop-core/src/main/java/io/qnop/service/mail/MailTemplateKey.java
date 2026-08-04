@@ -144,6 +144,44 @@ public enum MailTemplateKey {
       "actorName",
       "documentTitle",
       "actionUrl"),
+  // The digest (issue #680). Counts rather than a line per event: "3 new
+  // annotations, 7 comments" is a sentence somebody can act on, where fifty
+  // individual lines are the thing the digest exists to replace. Mustache has no
+  // loops-with-logic worth relying on here, so the service renders the per-document
+  // lines and passes them in as one block.
+  REVIEW_DAILY_DIGEST(
+      "review.daily_digest",
+      "Daily review digest",
+      "Review digest: {{totalPhrase}} in your reviews",
+      """
+      Hi {{recipientName}},
+
+      Here is what happened in your reviews since your last digest — {{totalPhrase}} in all:
+
+      {{digestBody}}
+
+      Open your reviews:
+
+      {{actionUrl}}
+
+      You are getting one digest a day because that is your notification setting; you can switch to per-event mail or turn it off in your profile.
+      """,
+      """
+      <h1 style="margin:0 0 14px;color:#18191f;font-size:22px;font-weight:700;letter-spacing:-0.01em;line-height:1.3;">Your review digest</h1>
+      <p style="margin:0 0 14px;color:#3d3f47;font-size:15px;line-height:1.6;">Hi {{recipientName}}, here is what happened in your reviews since your last digest — {{totalPhrase}} in all.</p>
+      {{{digestBodyHtml}}}
+      <p style="margin:22px 0 0;"><a href="{{actionUrl}}" style="display:inline-block;padding:11px 18px;border-radius:8px;background:#18191f;color:#ffffff;font-size:15px;font-weight:600;text-decoration:none;">Open your reviews</a></p>
+      <p style="margin:22px 0 0;color:#6b6d76;font-size:13px;line-height:1.6;">You are getting one digest a day because that is your notification setting; you can switch to per-event mail or turn it off in your profile.</p>
+      """,
+      "Open your reviews",
+      "{{totalPhrase}} in your reviews since your last digest.",
+      "siteName",
+      "recipientName",
+      "totalCount",
+      "totalPhrase",
+      "digestBody",
+      "digestBodyHtml",
+      "actionUrl"),
   REVIEW_ANNOTATION_CREATED(
       "review.annotation_created",
       "New annotation",

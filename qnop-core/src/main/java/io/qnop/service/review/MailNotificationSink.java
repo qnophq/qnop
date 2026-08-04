@@ -27,6 +27,7 @@ import io.qnop.service.ApplicationSettingKey;
 import io.qnop.service.ApplicationSettingsService;
 import io.qnop.service.UserSettingKey;
 import io.qnop.service.mail.MailService;
+import io.qnop.service.notification.ReviewMailCadence;
 import java.util.UUID;
 import org.springframework.stereotype.Component;
 
@@ -75,13 +76,25 @@ public class MailNotificationSink implements ReviewNotificationSink {
    * "someone named you"; everything else follows the general review-mail opt-out.
    */
   private boolean optedOut(UUID userId, NotificationType type) {
-    UserSettingKey key =
-        type == NotificationType.MENTION
-            ? UserSettingKey.EMAIL_MENTIONS
-            : UserSettingKey.EMAIL_REVIEW_NOTIFICATIONS;
+    if (type == NotificationType.MENTION) {
+      // Still a plain opt-out: being named personally is the case where latency
+      // actually costs something, so a mention is never held for a digest.
+      return userSettings
+          .findByUserIdAndSettingKey(userId, UserSettingKey.EMAIL_MENTIONS.getKey())
+          .map(setting -> "false".equalsIgnoreCase(setting.getSettingValue()))
+          .orElse(false);
+    }
+    // Everything else follows the cadence (issue #680). This sink is the
+    // immediate channel, so it stays silent for DAILY — the digest job picks
+    // those up from the notification rows the in-app sink writes regardless.
+    return cadenceFor(userId) != ReviewMailCadence.IMMEDIATE;
+  }
+
+  /** The recipient's chosen cadence, or the registry default where they never chose. */
+  private ReviewMailCadence cadenceFor(UUID userId) {
     return userSettings
-        .findByUserIdAndSettingKey(userId, key.getKey())
-        .map(setting -> "false".equalsIgnoreCase(setting.getSettingValue()))
-        .orElse(false);
+        .findByUserIdAndSettingKey(userId, UserSettingKey.EMAIL_REVIEW_NOTIFICATIONS.getKey())
+        .flatMap(setting -> ReviewMailCadence.parse(setting.getSettingValue()))
+        .orElseGet(ReviewMailCadence::registryDefault);
   }
 }

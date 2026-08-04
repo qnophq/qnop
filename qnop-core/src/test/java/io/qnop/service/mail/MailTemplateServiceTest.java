@@ -67,7 +67,15 @@ class MailTemplateServiceTest {
           Map.entry("decision", "resolved"),
           Map.entry("versionNumber", "3"),
           Map.entry("oldState", "In review"),
-          Map.entry("newState", "Changes requested"));
+          Map.entry("newState", "Changes requested"),
+          // The digest renders its per-document lines in the service and passes
+          // them in as one block (issue #680) — Mustache cannot count.
+          Map.entry("totalCount", 11),
+          Map.entry("totalPhrase", "11 updates"),
+          Map.entry("digestBody", "* Q3 contract draft — 3 new annotations, 7 comments"),
+          Map.entry(
+              "digestBodyHtml",
+              "<ul><li><strong>Q3 contract draft</strong> — 3 new annotations, 7 comments</li></ul>"));
 
   private MailTemplateService service;
 

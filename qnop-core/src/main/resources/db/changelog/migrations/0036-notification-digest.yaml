@@ -1,0 +1,55 @@
+# Copyright (c) 2026-present devtank42 GmbH
+# SPDX-License-Identifier: AGPL-3.0-only
+
+# Per-recipient watermark for the daily digest (issue #680). One row per
+# recipient, written after a digest goes out.
+#
+# Two columns rather than one, because they answer different questions:
+#
+#   last_sent_at     when the last digest went out. An instant, never a local
+#                    date (ADR-0041): a stored date would be read against
+#                    whatever timezone the recipient has now, so somebody who
+#                    travels would get two in a day or none. The instant plus
+#                    their current zone answers "have they had today's yet".
+#   covered_through  the newest createdAt actually included. Not now(): rows
+#                    written while the digest was being built would fall in the
+#                    gap between the query and the update and never be sent.
+databaseChangeLog:
+  - changeSet:
+      id: 0036-notification-digest
+      author: qnop
+      comment: Adds the per-recipient digest watermark (issue #680).
+      changes:
+        - createTable:
+            tableName: notification_digest
+            columns:
+              - column:
+                  name: recipient_id
+                  type: uuid
+                  constraints:
+                    primaryKey: true
+                    primaryKeyName: pk_notification_digest
+                    nullable: false
+              - column:
+                  name: last_sent_at
+                  type: timestamptz
+                  constraints:
+                    nullable: false
+              - column:
+                  name: covered_through
+                  type: timestamptz
+                  constraints:
+                    nullable: false
+              - column:
+                  name: version
+                  type: bigint
+                  defaultValueNumeric: 0
+                  constraints:
+                    nullable: false
+        - addForeignKeyConstraint:
+            constraintName: fk_notification_digest_recipient
+            baseTableName: notification_digest
+            baseColumnNames: recipient_id
+            referencedTableName: qnop_user
+            referencedColumnNames: id
+            onDelete: CASCADE

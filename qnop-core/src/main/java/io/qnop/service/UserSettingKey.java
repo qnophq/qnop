@@ -52,11 +52,17 @@ public enum UserSettingKey {
       SettingValueType.STRING,
       "",
       "Preferred display timezone (IANA id); empty follows the application default."),
+  // Three-valued rather than a second checkbox (issue #680): with only on/off the
+  // honest choice for a busy review was "off", and a notification system people
+  // mute has failed however correct each mail was. DAILY is the default, so an
+  // account that never touched this gets one summary instead of a mail per event.
   EMAIL_REVIEW_NOTIFICATIONS(
       "email_review_notifications",
-      SettingValueType.BOOLEAN,
-      "true",
-      "Receive email notifications for review activity (issue #316)."),
+      SettingValueType.ENUM,
+      "DAILY",
+      "When to email about review activity: IMMEDIATE per event, DAILY as one"
+          + " morning summary, or OFF (issues #316/#680).",
+      List.of("IMMEDIATE", "DAILY", "OFF")),
   // Separate from the general review-activity toggle: a mention is a direct "you are needed here"
   // signal, so it carries its own opt-out and is not silenced by turning off general thread mail
   // (issue #462).
