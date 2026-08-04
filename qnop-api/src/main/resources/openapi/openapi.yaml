@@ -4703,13 +4703,19 @@ components:
         - `DOCX` → `application/vnd.openxmlformats-officedocument.wordprocessingml.document`
         - `MD`   → `text/markdown`
 
-        `PDF`, `DOCX` and `MD` are the Community-scope document formats; further
-        formats are an Enterprise feature. A deployment reports what it can
-        actually ingest in `ServerConfig.supportedFormats`, which is a property of
-        the server rather than of the release: `PDF` always, `DOCX` only where an
-        out-of-process office converter is installed, since that is what turns a
-        Word file into something the viewer can render (ADR-0010). Markdown joins
-        once its extractor ships.
+        `PDF` and `DOCX` are the Community-scope document formats; `MD` and
+        anything further are an Enterprise feature (qnop-ee#20, ADR-0010
+        amendment). `MD` stays in this enum deliberately: the value is the
+        vocabulary a client must understand, not a promise that any given server
+        accepts it.
+
+        What a deployment can actually ingest is reported in
+        `ServerConfig.supportedFormats`, which is a property of the server rather
+        than of the release: `PDF` always; `DOCX` only where an out-of-process
+        office converter is installed, since that is what turns a Word file into
+        something the viewer can render (ADR-0010); `MD` only where an enterprise
+        module has registered an extractor for it. A client that reads that list
+        rather than this enum needs no changes when a deployment gains a format.
       enum:
         - PDF
         - DOCX

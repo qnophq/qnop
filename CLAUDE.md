@@ -6,7 +6,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 **qnop** — "Qualified Notes on Papers": an enterprise **document review** system. Reviewers (individual users or teams) mark up lines/regions of documents, comment, and run a coordinated review workflow (comments accepted/rejected → new document versions → finalized when no open annotations remain). Open-core: an AGPL Community edition plus commercial add-ons (e.g. AI features) and a possible SaaS.
 
-**Scope of supported formats.** The focus is on reviewing **textual documents first — PDF, DOCX, and Markdown (`.md`)**. Other formats (e.g. images, and later possibly more) may follow once the text workflow is solid; such additional formats are a likely **Enterprise** feature rather than Community scope. Design the ingest/anchoring/rendering seams so a new format is an added implementation, not a core rewrite.
+**Scope of supported formats.** Community reviews **PDF and DOCX**. Everything else — Markdown (`qnop-ee#20`), images, and whatever follows — is **Enterprise** scope and lives in the private `qnop-enterprise` repository. Markdown was Community scope until 2026-08-05; see the amendment in ADR-0010 for what changed and why the seams did not. Design the ingest/anchoring/rendering seams so a new format is an added implementation, not a core rewrite.
 
 Read `docs/ARCHITECTURE.md` and `docs/adr/` first — they hold the binding decisions and rationale.
 
@@ -35,7 +35,7 @@ The Spring Boot server **boots and runs** (PostgreSQL + Liquibase + JPA, ADR-002
 
 The REST contract is OpenAPI-first (ADR-0021); the `qnop-ui` SPA consumes the generated client; `GET /api/v1/config` exposes the running edition.
 
-**Genuinely still pending (do not assume they exist):** Markdown ingest (ADR-0010), enterprise runtime extensions and their packaging (ADR-0039), Redis/search (ADR-0013). `docker-compose.yml` provides local Postgres (+ MinIO) for `bootRun`; the test suite spins up its own Postgres **and MinIO** via **Testcontainers** (Docker required).
+**Genuinely still pending (do not assume they exist):** enterprise runtime extensions and their packaging (ADR-0039), Redis/search (ADR-0013). Markdown ingest is no longer Community work — it moved to the enterprise repository (ADR-0010 amendment). `docker-compose.yml` provides local Postgres (+ MinIO) for `bootRun`; the test suite spins up its own Postgres **and MinIO** via **Testcontainers** (Docker required).
 
 ## Stack
 
