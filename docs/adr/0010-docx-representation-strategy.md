@@ -19,6 +19,14 @@ Documents arrive as PDF, DOCX, or Markdown. The browser must render them faithfu
 
 Concretely: the `DocumentExtractor` SPI has a DOCX implementation = "convert to PDF out-of-process, then delegate to the PDF extractor". Markdown takes an HTML path; PDF and images are native.
 
+### Amendment (2026-08-05, qnop-ee#20): Markdown is Enterprise scope
+
+The decision above lists Markdown among the formats Community ingests ("Markdown takes an HTML path"), and issue #344 tracked building that extractor. Both are now wrong about *where*: Markdown moved to the private enterprise repository, so Community reviews PDF and DOCX and nothing else.
+
+What does **not** change is the reasoning. Markdown was always going to be the format that proved the seam, because it is the one that cannot funnel through a PDF conversion the way DOCX does — it has no layout to preserve, so it takes the HTML path this ADR named. That the seam has to carry a format the canonical pipeline does not natively fit is exactly why `DocumentExtractor` is a published SPI (ADR-0003/0046) rather than an internal interface. An enterprise module implementing it is the case this architecture was drawn for, not a departure from it.
+
+The practical consequence for this repository: `GET /api/v1/config` keeps reporting `supportedFormats` from the extractors actually registered, so a deployment with the enterprise module simply advertises one more. Nothing here needs a flag, a branch, or a stub.
+
 ### Amendment (2026-07-30, issue #343): the conversion sits one step before the SPI
 
 Implementing this showed the last sentence to be wrong about *where* the seam goes, and right about everything else.
