@@ -95,8 +95,9 @@ if [ -n "${DEMO_TRACKING_HOST:-}" ] && [ -n "${DEMO_TRACKING_SITE_ID:-}" ]; then
   "tracking.provider": "umami",
   "tracking.host": "$DEMO_TRACKING_HOST",
   "tracking.site_id": "$DEMO_TRACKING_SITE_ID",
-  "tracking.respect_dnt": "true",
+  "tracking.respect_dnt": "false",
   "tracking.consent_required": "false",
+  "tracking.track_privileged_roles": "true",
   "tracking.forward_client_ip": "anonymized"
 }}
 EOF
