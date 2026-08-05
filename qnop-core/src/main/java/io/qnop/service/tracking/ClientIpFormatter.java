@@ -35,15 +35,53 @@ import java.util.Optional;
  * anonymisation does and what German data-protection authorities have long treated as the workable
  * middle. Visitors stay countable; individuals do not stay identifiable.
  */
-public final class ClientIpAnonymizer {
+public final class ClientIpFormatter {
 
-  private ClientIpAnonymizer() {}
+  private ClientIpFormatter() {}
 
   /**
-   * Returns the truncated form of {@code ip}, or empty when it is missing or unparseable — in which
-   * case nothing is forwarded, because a half-understood address is not worth guessing at.
+   * The exact address, canonicalised — for {@code tracking.forward_client_ip=full} (issue #712).
+   *
+   * <p>It parses just as {@link #anonymize} does, and that is the point rather than tidiness. The
+   * resolved address is only trustworthy as far as the proxy in front of this server is: behind
+   * one, {@code X-Forwarded-For} carries whatever that proxy passed along. Forwarding the raw
+   * string would put unvalidated foreign text into an outgoing header, and until now nothing had to
+   * say so because truncating an address requires understanding it first.
+   */
+  public static Optional<String> normalize(String ip) {
+    return parse(ip).map(InetAddress::getHostAddress);
+  }
+
+  /**
+   * The address truncated to its /24 (IPv4) or /64 (IPv6) — the default, and the recommendation.
    */
   public static Optional<String> anonymize(String ip) {
+    return parse(ip)
+        .flatMap(
+            parsed -> {
+              byte[] address = parsed.getAddress();
+              if (address.length == 4) {
+                address[3] = 0;
+              } else if (address.length == 16) {
+                for (int i = 8; i < 16; i++) {
+                  address[i] = 0;
+                }
+              } else {
+                return Optional.empty();
+              }
+              try {
+                return Optional.of(InetAddress.getByAddress(address).getHostAddress());
+              } catch (UnknownHostException e) {
+                return Optional.empty();
+              }
+            });
+  }
+
+  /**
+   * Parses a literal address, or empty when it is missing or unparseable — in which case nothing is
+   * forwarded in any mode, because a half-understood address is not worth guessing at.
+   */
+  private static Optional<InetAddress> parse(String ip) {
     if (ip == null || ip.isBlank()) {
       return Optional.empty();
     }
@@ -51,27 +89,12 @@ public final class ClientIpAnonymizer {
     if (value.startsWith("[") && value.endsWith("]")) {
       value = value.substring(1, value.length() - 1);
     }
-    byte[] address;
     try {
       // Literal only: this must never trigger a DNS lookup on a request path.
       if (!isIpLiteral(value)) {
         return Optional.empty();
       }
-      address = InetAddress.getByName(value).getAddress();
-    } catch (UnknownHostException e) {
-      return Optional.empty();
-    }
-    if (address.length == 4) {
-      address[3] = 0;
-    } else if (address.length == 16) {
-      for (int i = 8; i < 16; i++) {
-        address[i] = 0;
-      }
-    } else {
-      return Optional.empty();
-    }
-    try {
-      return Optional.of(InetAddress.getByAddress(address).getHostAddress());
+      return Optional.of(InetAddress.getByName(value));
     } catch (UnknownHostException e) {
       return Optional.empty();
     }

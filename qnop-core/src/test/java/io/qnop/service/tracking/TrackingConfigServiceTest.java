@@ -67,7 +67,7 @@ class TrackingConfigServiceTest {
               assertThat(config.provider()).isEqualTo(TrackingProvider.PLAUSIBLE);
               assertThat(config.scriptUrl()).isEqualTo("https://plausible.io/js/script.manual.js");
               assertThat(config.collectBaseUrl()).isEqualTo("https://plausible.io");
-              assertThat(config.forwardClientIp()).isTrue();
+              assertThat(config.forwardClientIp()).isEqualTo(ClientIpForwarding.ANONYMIZED);
             });
   }
 
@@ -136,6 +136,24 @@ class TrackingConfigServiceTest {
   void forwardIpIsOptional() {
     when(settings.getString(ApplicationSettingKey.TRACKING_FORWARD_CLIENT_IP)).thenReturn("none");
     assertThat(service(false).current())
-        .hasValueSatisfying(c -> assertThat(c.forwardClientIp()).isFalse());
+        .hasValueSatisfying(
+            c -> assertThat(c.forwardClientIp()).isEqualTo(ClientIpForwarding.NONE));
+  }
+
+  @Test
+  @DisplayName("choosing full addresses loosens nothing else (#712)")
+  void fullAddressesLeaveTheOtherGatesAlone() {
+    when(settings.getString(ApplicationSettingKey.TRACKING_FORWARD_CLIENT_IP)).thenReturn("full");
+
+    // The promise attached to the opt-in: consent and Do-Not-Track keep applying
+    // exactly as configured. They are separate settings, and this pins that they
+    // stay separate rather than being read together by some later convenience.
+    assertThat(service(false).current())
+        .hasValueSatisfying(
+            config -> {
+              assertThat(config.forwardClientIp()).isEqualTo(ClientIpForwarding.FULL);
+              assertThat(config.consentRequired()).isTrue();
+              assertThat(config.respectDnt()).isTrue();
+            });
   }
 }

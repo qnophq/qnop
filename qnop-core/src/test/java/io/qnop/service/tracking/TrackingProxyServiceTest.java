@@ -88,7 +88,7 @@ class TrackingProxyServiceTest {
                     false,
                     false,
                     false,
-                    true)));
+                    ClientIpForwarding.ANONYMIZED)));
     proxy = new TrackingProxyService(config, defaults());
   }
 
@@ -140,7 +140,7 @@ class TrackingProxyServiceTest {
                     false,
                     false,
                     false,
-                    true)));
+                    ClientIpForwarding.ANONYMIZED)));
 
     proxy.forward(
         "POST",

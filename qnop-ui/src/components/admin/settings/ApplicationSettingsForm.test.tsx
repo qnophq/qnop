@@ -42,6 +42,15 @@ const settings: AdminSetting[] = [
     sensitive: false,
   },
   {
+    // The opt-in that loosens a privacy floor (issue #712).
+    key: 'tracking.forward_client_ip',
+    value: 'full',
+    type: 'ENUM' as AdminSetting['type'],
+    description: 'What reaches the backend as the visitor address.',
+    sensitive: false,
+    allowedValues: ['anonymized', 'none', 'full'],
+  },
+  {
     // Governed by a capability the operator withheld (issue #681): shown,
     // because the ceiling is the answer to "why was my file refused", but not
     // editable here.
@@ -85,5 +94,18 @@ describe('ApplicationSettingsForm — default timezone', () => {
     expect(screen.getByText(/Set by this deployment/)).toBeInTheDocument();
     // Ungoverned settings are untouched — the form is not read-only wholesale.
     expect(screen.getByRole('textbox', { name: /application name/i })).toBeEnabled();
+  });
+
+  it('warns where the operator chose to forward exact addresses (#712)', () => {
+    renderWithProviders(<ApplicationSettingsForm />);
+
+    // Said where the choice is made, not only in a document nobody has open —
+    // and it names the duties rather than second-guessing the decision.
+    const warning = screen.getByText(/Exact addresses are personal data/);
+    expect(warning).toBeInTheDocument();
+    expect(screen.getByText(/legal basis/)).toBeInTheDocument();
+    // The other gates are explicitly said to survive, which is the promise the
+    // opt-in was granted on.
+    expect(screen.getByText(/Do-Not-Track keep applying/)).toBeInTheDocument();
   });
 });

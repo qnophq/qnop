@@ -187,10 +187,12 @@ public class TrackingProxyService {
     if (userAgent != null && !userAgent.isBlank()) {
       request.header("User-Agent", userAgent);
     }
-    if (active.forwardClientIp()) {
-      ClientIpAnonymizer.anonymize(clientIp)
-          .ifPresent(truncated -> request.header("X-Forwarded-For", truncated));
-    }
+    // Truncated, exact or nothing (issues #666/#712) — and in every case parsed
+    // first, so an address this server could not read travels in no mode at all.
+    active
+        .forwardClientIp()
+        .format(clientIp)
+        .ifPresent(forwarded -> request.header("X-Forwarded-For", forwarded));
 
     try {
       HttpResponse<Void> response =

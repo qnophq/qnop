@@ -60,8 +60,8 @@ public enum UserSettingKey {
       "email_review_notifications",
       SettingValueType.ENUM,
       "DAILY",
-      "When to email about review activity: IMMEDIATE per event, DAILY as one"
-          + " morning summary, or OFF (issues #316/#680).",
+      "How often to email you about activity in your reviews: as it happens, once a day as a"
+          + " morning digest, or never. Mentions reach you straight away either way.",
       List.of("IMMEDIATE", "DAILY", "OFF")),
   // Separate from the general review-activity toggle: a mention is a direct "you are needed here"
   // signal, so it carries its own opt-out and is not silenced by turning off general thread mail
@@ -70,7 +70,8 @@ public enum UserSettingKey {
       "email_mentions",
       SettingValueType.BOOLEAN,
       "true",
-      "Receive an email when someone @mentions you in a review (issue #462)."),
+      "Receive an email when someone @mentions you in a review. Kept separate from general review"
+          + " activity, so muting the rest does not mute being addressed personally."),
   // Tied to the account rather than the browser (issue #666): somebody who has
   // opted out has opted out on their laptop and their tablet, and a cleared
   // browser store must not quietly re-enrol them.
@@ -78,7 +79,7 @@ public enum UserSettingKey {
       "usage_tracking_opt_out",
       SettingValueType.BOOLEAN,
       "false",
-      "Exclude me from anonymous usage measurement, on every device I sign in from (issue #666).");
+      "Exclude me from anonymous usage measurement, on every device I sign in from.");
 
   private static final Map<String, UserSettingKey> BY_KEY =
       Arrays.stream(values())

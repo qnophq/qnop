@@ -76,7 +76,7 @@ public enum ApplicationSettingKey {
       "false",
       "Whether anonymous usage tracking is enabled. Measurement runs through this server, never"
           + " past it: the browser loads the analytics script from qnop and sends its events to"
-          + " qnop, which forwards them (issue #666)."),
+          + " qnop, which forwards them. Visitors never talk to the analytics backend directly."),
   TRACKING_PROVIDER(
       "tracking.provider",
       SettingValueType.ENUM,
@@ -117,10 +117,11 @@ public enum ApplicationSettingKey {
       "tracking.forward_client_ip",
       SettingValueType.ENUM,
       "anonymized",
-      "What reaches the backend as the visitor's address. 'anonymized' truncates it (IPv4 to /24,"
-          + " IPv6 to /64) so visitors stay countable without being identifiable; 'none' sends"
-          + " nothing, and the backend then sees every reviewer as one visitor.",
-      List.of("anonymized", "none")),
+      "How much of a visitor's IP address is passed on to your analytics backend. Anonymised"
+          + " shortens it, so visitors stay countable without being identifiable. Not forwarded"
+          + " means the backend counts everyone as a single visitor. Full sends the exact address,"
+          + " which is personal data — you need your own legal basis for it.",
+      List.of("anonymized", "none", "full")),
   SMTP_ENABLED(
       "smtp.enabled",
       SettingValueType.BOOLEAN,
