@@ -126,6 +126,12 @@ export const AUDIT_EVENT_META: Record<string, AuditEventMeta> = {
       'An administrator manually triggered a scheduled maintenance job (“Run now”, issue #524); the job and its outcome are shown in the details.',
     tone: 'amber',
   },
+  'settings.updated': {
+    label: 'Setting changed',
+    description:
+      'An administrator changed an application setting; the details name the setting and the values before and after. Passwords and other secrets are recorded as changed without either value.',
+    tone: 'amber',
+  },
   'scheduler.job.updated': {
     label: 'Scheduler job updated',
     description:

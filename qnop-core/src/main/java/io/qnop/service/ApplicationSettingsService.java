@@ -21,7 +21,9 @@
 package io.qnop.service;
 
 import io.qnop.entity.ApplicationSetting;
+import io.qnop.entity.AuditEvent;
 import io.qnop.repository.ApplicationSettingRepository;
+import io.qnop.repository.AuditEventRepository;
 import io.qnop.service.limits.FeatureDisabledException;
 import io.qnop.service.limits.FeatureToggleProperties;
 import jakarta.annotation.PostConstruct;
@@ -34,6 +36,7 @@ import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
@@ -43,6 +46,9 @@ import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.support.TransactionSynchronization;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
 import org.springframework.transaction.support.TransactionTemplate;
+import tools.jackson.databind.ObjectMapper;
+import tools.jackson.databind.json.JsonMapper;
+import tools.jackson.databind.node.ObjectNode;
 
 /**
  * Runtime access to the global application settings (issue #16). Reads are served lock-free from an
@@ -59,6 +65,11 @@ import org.springframework.transaction.support.TransactionTemplate;
 public class ApplicationSettingsService {
 
   /** Attempts for an optimistic-locking write before giving up (issue #47). */
+  /** SYSTEM audit event for a changed application setting (issue #718). */
+  private static final String AUDIT_SETTING_UPDATED = "settings.updated";
+
+  private static final ObjectMapper MAPPER = JsonMapper.builder().build();
+
   private static final int MAX_WRITE_ATTEMPTS = 3;
 
   private final ApplicationSettingRepository repository;
@@ -67,6 +78,7 @@ public class ApplicationSettingsService {
   private final List<SettingsChangeListener> listeners;
   private final TransactionTemplate transactionTemplate;
   private final FeatureToggleProperties features;
+  private final AuditEventRepository auditEvents;
 
   private final java.util.concurrent.atomic.AtomicReference<Map<ApplicationSettingKey, String>>
       snapshot = new java.util.concurrent.atomic.AtomicReference<>(Map.of());
@@ -77,13 +89,15 @@ public class ApplicationSettingsService {
       ConfigurationKeyRedactor redactor,
       List<SettingsChangeListener> listeners,
       PlatformTransactionManager transactionManager,
-      FeatureToggleProperties features) {
+      FeatureToggleProperties features,
+      AuditEventRepository auditEvents) {
     this.repository = repository;
     this.textEncryptor = textEncryptor;
     this.redactor = redactor;
     this.listeners = listeners;
     this.transactionTemplate = new TransactionTemplate(transactionManager);
     this.features = features;
+    this.auditEvents = auditEvents;
   }
 
   @PostConstruct
@@ -180,6 +194,45 @@ public class ApplicationSettingsService {
               available));
     }
     return descriptors;
+  }
+
+  /**
+   * Records a settings change in the SYSTEM audit stream (issue #718).
+   *
+   * <p>Written inside the same transaction as the change, so a rolled-back write leaves no entry
+   * claiming something happened.
+   *
+   * <p>Only real changes are recorded. Saving a form re-sends every field it holds, and an audit
+   * that logs a hundred no-ops per visit buries the one entry somebody came to find.
+   *
+   * <p>A sensitive value is recorded as having changed, with neither the old nor the new value. The
+   * snapshot holds decrypted secrets, so writing them here would turn the audit trail — a page
+   * administrators read — into the least protected copy of the SMTP password in the system.
+   */
+  private void audit(ApplicationSettingKey key, String previous, String next, UUID actor) {
+    if (key.isSensitive()) {
+      auditEvents.save(
+          AuditEvent.system(AUDIT_SETTING_UPDATED, actor, detail(key.getKey(), null, null, true)));
+      return;
+    }
+    if (Objects.equals(previous, next)) {
+      return;
+    }
+    auditEvents.save(
+        AuditEvent.system(
+            AUDIT_SETTING_UPDATED, actor, detail(key.getKey(), previous, next, false)));
+  }
+
+  /** The detail payload, built rather than concatenated: a setting value may contain anything. */
+  private static String detail(String key, String previous, String next, boolean secret) {
+    ObjectNode node = MAPPER.createObjectNode();
+    node.put("key", key);
+    node.put("secret", secret);
+    if (!secret) {
+      node.put("previous", previous);
+      node.put("next", next);
+    }
+    return node.toString();
   }
 
   // --- writes ----------------------------------------------------------------
@@ -279,11 +332,13 @@ public class ApplicationSettingsService {
           repository
               .findById(key.getKey())
               .orElseGet(() -> new ApplicationSetting(key.getKey(), null, key.getType()));
+      String previous = row.getSettingValue();
       row.setSettingValue(encryptIfSecret(key, entry.getValue()));
       row.setValueType(key.getType());
       row.setUpdatedBy(actor);
       repository.save(row);
       changed.add(key);
+      audit(key, previous, entry.getValue(), actor);
     }
     if (!changed.isEmpty()) {
       refreshAfterCommit(changed);
