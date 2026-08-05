@@ -1,9 +1,9 @@
 # Ready-to-submit entry for awesome-selfhosted-data (as software/qnop.yml).
 # Submit ON OR AFTER 2026-11-19 (4 months after the first release, their rule).
-# Add demo_url if a public demo instance exists by then.
 name: qnop
 website_url: https://qnop.io/
 source_code_url: https://github.com/qnophq/qnop
+demo_url: https://demo.qnop.io/
 description: Document review platform with line-precise PDF/Word annotations, threaded discussions, version-aware re-anchoring, audit trail and review gamification (alternative to Filestage, PandaDoc).
 licenses:
   - AGPL-3.0

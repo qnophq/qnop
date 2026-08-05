@@ -26,5 +26,6 @@ GoVisually, PageProof
 
 **Links:**
 - Website: https://qnop.io
+- Live demo: https://demo.qnop.io (sign in as `member` / `Test-Pass-1234!`; resets every 12 h)
 - Pricing: https://qnop.io/pricing
 - Source: https://github.com/qnophq/qnop

@@ -28,6 +28,7 @@ Submit at <https://alternativeto.net/manage-item/> (account required).
 
 **Links:**
 - Website: https://qnop.io
+- Live demo: https://demo.qnop.io (sign in as `member` / `Test-Pass-1234!`; resets every 12 h)
 - Source: https://github.com/qnophq/qnop
 - Docker: https://hub.docker.com/r/qnophq/qnop-ce
 
