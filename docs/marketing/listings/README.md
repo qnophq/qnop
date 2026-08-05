@@ -25,5 +25,5 @@ when the positioning changes.
 Their guidelines to respect (they ban LLM-spam and sloppy submissions):
 no words like *free/open-source/self-hosted* in the description, sentence
 case, < 250 chars, `(alternative to …)` suffix is the sanctioned way to
-name competitors. A demo instance URL noticeably helps acceptance —
-if `demo.qnop.io` exists by then, add `demo_url`.
+name competitors. The kit already carries `demo_url` — the live demo at
+https://demo.qnop.io noticeably helps acceptance.

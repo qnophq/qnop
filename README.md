@@ -6,6 +6,9 @@
 [![Latest release](https://img.shields.io/github/v/release/qnophq/qnop)](https://github.com/qnophq/qnop/releases)
 [![Docker pulls](https://img.shields.io/docker/pulls/qnophq/qnop-ce)](https://hub.docker.com/r/qnophq/qnop-ce)
 [![License: AGPL-3.0](https://img.shields.io/github/license/qnophq/qnop)](LICENSE)
+[![Live demo](https://img.shields.io/badge/live_demo-demo.qnop.io-1292EE)](https://demo.qnop.io)
+
+> **[Try the live demo →](https://demo.qnop.io)** Sign in as `member`, `nora` or `paul` (password `Test-Pass-1234!`) or take the read-only auditor view with `auditor` — 14 staged reviews with real annotated discussions await. All data resets every 12 hours.
 
 qnop is a self-hosted, enterprise-grade **document review system**. Upload a document, invite reviewers — individual users or whole teams — and run a coordinated review: passages are marked up right in the browser, discussed in threads, accepted or rejected; changes produce new document versions, and the review is finalized once no open annotation remains. The goal: replace the e-mail-attachment-and-comment-spreadsheet workflow with one place where reviews are precise, accountable — and genuinely satisfying to complete.
 
