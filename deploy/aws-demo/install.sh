@@ -14,7 +14,7 @@ SRC="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 DEST=/opt/qnop-demo
 
 mkdir -p "$DEST/golden"
-install -m 0755 "$SRC/reset-demo.sh" "$SRC/build-golden-state.sh" "$DEST/"
+install -m 0755 "$SRC/reset-demo.sh" "$SRC/build-golden-state.sh" "$SRC/stage-demo-settings.sh" "$DEST/"
 install -m 0644 "$SRC/docker-compose.yml" "$SRC/Caddyfile" "$DEST/"
 
 if [ ! -f "$DEST/.env" ]; then
@@ -33,6 +33,13 @@ QNOP_S3_SECRET_KEY=$(openssl rand -hex 24)
 QNOP_AUTH_JWT_SECRET=$(openssl rand -base64 48 | tr -d '\n')
 QNOP_AUTH_ENCRYPTION_KEY=$(openssl rand -base64 48 | tr -d '\n')
 QNOP_AUTH_ENCRYPTION_SALT=$(openssl rand -hex 32)
+
+# Demo staging (stage-demo-settings.sh) — host-only secrets, never committed.
+# The rotated password of the 'admin' account:
+DEMO_ADMIN_PASSWORD=$(openssl rand -base64 18 | tr -d '\n')
+# Private Umami instance for usage tracking; leave empty to skip:
+DEMO_TRACKING_HOST=
+DEMO_TRACKING_SITE_ID=
 EOF
   umask 022
   echo "Wrote fresh secrets to $DEST/.env"

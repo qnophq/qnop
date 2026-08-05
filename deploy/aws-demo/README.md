@@ -37,6 +37,7 @@ Internet ──▶ EC2 (eu-central-1, t4g.medium, Amazon Linux 2023)
 | `install.sh` | Idempotent host setup: `/opt/qnop-demo`, secrets in `.env` (first run only), cron job, stack up |
 | `docker-compose.yml` | The demo stack (deployer stack + Caddy + `mc` tool profile) |
 | `Caddyfile` | TLS + reverse proxy for `$QNOP_DEMO_DOMAIN` |
+| `stage-demo-settings.sh` | Apply the demo configuration (see below) to a freshly seeded database |
 | `build-golden-state.sh` | Capture the current DB + bucket as the golden state |
 | `reset-demo.sh` | The 12-hourly reset/redeploy job |
 
@@ -58,17 +59,45 @@ Region: `eu-central-1`. Steps in order — each is a single CLI action:
    provider. Caddy obtains the certificate automatically once the record
    resolves.
 
+## Demo configuration
+
+The demo hardens and configures itself via `stage-demo-settings.sh`
+(admin API + one SQL cleanup). Secrets stay in `/opt/qnop-demo/.env` on
+the instance — the repository never contains a working credential:
+
+- **No outgoing mail**: `smtp.enabled=false` and the SMTP host cleared —
+  the demo never sends e-mail; review notification e-mails are off too.
+- **Admin takeover hardening**: the seeded `admin` password (public in
+  `testdata/db/seed.sql`) is rotated to the random `DEMO_ADMIN_PASSWORD`
+  from `.env`; the second seeded admin (`admin2`) is disabled.
+- **Local accounts only**: the seeded OIDC providers are deleted — the
+  demo has no external identity provider, visitors sign in with the
+  published demo accounts.
+- **Upload limits**: documents max 5 MB, comment attachments max 1 MB.
+- **Closed authentication**: self-registration and e-mail password reset
+  are disabled — visitors use the published demo accounts.
+- **Sign-in banner**: announces the 12-hour reset and lists the public
+  demo accounts (`member`, `nora`, `paul`, `auditor` — the shared seed
+  password). These are intentionally public; the admin account is not.
+- **Usage tracking**: if `DEMO_TRACKING_HOST` + `DEMO_TRACKING_SITE_ID`
+  are set in `.env` (private Umami instance, values never committed),
+  tracking is enabled with provider `umami`, anonymized IPs and DNT
+  respected.
+
 ## Staging the demo content
 
-1. After first boot the stack runs with an empty database. Retrieve the
-   initial admin password from the app log
-   (`docker compose logs qnop | grep -i password`).
-2. Load the seed users, then create the example reviews (upload the demo
-   PDFs, invite participants, add annotations) — see `testdata/README.md`
-   for the seed and the staging notes.
-3. Capture it: `sudo /opt/qnop-demo/build-golden-state.sh`.
-4. Verify: `sudo /opt/qnop-demo/reset-demo.sh` and check the app still
-   shows the staged content.
+1. After first boot the stack runs with an empty database.
+2. Load `testdata/db/clean.sql` + `seed.sql` through
+   `docker compose exec -T postgres psql …`, then restart the app
+   (settings are read at boot): `docker compose restart qnop`.
+3. Fill in `DEMO_TRACKING_HOST` / `DEMO_TRACKING_SITE_ID` in
+   `/opt/qnop-demo/.env` (optional), then run
+   `sudo /opt/qnop-demo/stage-demo-settings.sh`.
+4. Create the example reviews (upload the demo PDFs, invite
+   participants, add annotations) — see `testdata/README.md`.
+5. Capture it: `sudo /opt/qnop-demo/build-golden-state.sh`.
+6. Verify: `sudo /opt/qnop-demo/reset-demo.sh` and check the app still
+   shows the staged content and the rotated admin password still works.
 
 ## Operations
 
