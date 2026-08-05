@@ -4804,9 +4804,18 @@ components:
             Whether the operator has enabled public self-registration (issue #20).
             The backend enforces the gate independently; flipping this client-side
             cannot bypass the controller check.
+        passwordResetEnabled:
+          type: boolean
+          description: |
+            Whether this deployment offers a self-service password reset
+            (`auth.password_reset_enabled`, issue #713). False hides the "Forgot
+            password?" link and the `/forgot-password` screen, and the endpoint
+            refuses — a reset that quietly does nothing is worse than one that is
+            visibly absent, because the sender waits for a mail that never comes.
       required:
         - oidcProviders
         - selfRegistrationEnabled
+        - passwordResetEnabled
     ServerConfigReview:
       type: object
       description: Public review-related configuration.

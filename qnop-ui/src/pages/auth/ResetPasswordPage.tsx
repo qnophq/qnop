@@ -26,6 +26,7 @@ import Button from '@mui/material/Button';
 import Link from '@mui/material/Link';
 import Stack from '@mui/material/Stack';
 import { Link as RouterLink, useSearchParams } from 'react-router';
+import { useConfig } from '../../api/hooks/useConfig';
 import { AuthLayout } from '../../components/auth/AuthLayout';
 import { PasswordField } from '../../components/auth/PasswordField';
 import { PasswordStrengthMeter } from '../../components/auth/PasswordStrengthMeter';
@@ -35,6 +36,9 @@ import { passwordStrength } from '../../utils/passwordStrength';
 
 /** Completes a password reset using the token from the emailed link. */
 export function ResetPasswordPage() {
+  // The reset itself keeps working from a valid link even where the self-service
+  // request is off — an administrator may still hand somebody a link (#713).
+  const canResetPassword = !!useConfig().data?.auth?.passwordResetEnabled;
   const [params] = useSearchParams();
   const token = params.get('token') ?? '';
   const [password, setPassword] = useState('');
@@ -77,10 +81,18 @@ export function ResetPasswordPage() {
       ) : !token ? (
         <>
           <Alert severity="error" sx={{ mb: 2 }}>
-            This link is invalid or incomplete. Please request a new one.
+            {canResetPassword
+              ? 'This link is invalid or incomplete. Please request a new one.'
+              : 'This link is invalid or incomplete, and this deployment does not offer self-service password reset. An administrator can set a new password for you.'}
           </Alert>
-          <Link component={RouterLink} to="/forgot-password" underline="hover">
-            Request a new link
+          {/* Only where there is somewhere to go: pointing at /forgot-password on a
+              deployment without reset would send the reader in a circle (#713). */}
+          <Link
+            component={RouterLink}
+            to={canResetPassword ? '/forgot-password' : '/login'}
+            underline="hover"
+          >
+            {canResetPassword ? 'Request a new link' : 'To sign in'}
           </Link>
         </>
       ) : (
