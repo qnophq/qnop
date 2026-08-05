@@ -54,6 +54,9 @@ else
   echo "Rotating the admin password away from the public seed value…"
   api POST /auth/change-password "$TOKEN" \
     "{\"currentPassword\":\"$SEED_PASSWORD\",\"newPassword\":\"$DEMO_ADMIN_PASSWORD\"}" > /dev/null
+  # Tokens minted in the same second as the password change count as revoked —
+  # step past the second boundary before signing in again.
+  sleep 2
   TOKEN=$(login admin "$DEMO_ADMIN_PASSWORD")
 fi
 
