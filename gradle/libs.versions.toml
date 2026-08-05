@@ -38,7 +38,7 @@ jacksonAnnotations = "2.22"
 # - Jackson 3.1.5 fixes CVE-2026-59889: @JsonView was not applied to
 #   @JsonUnwrapped properties on deserialisation.
 postgresql = "42.7.13"
-jackson3 = "3.1.5"
+jackson3 = "3.2.1"
 swaggerAnnotations = "2.2.52"
 jakartaValidation = "3.1.1"
 jakartaAnnotation = "3.0.0"
