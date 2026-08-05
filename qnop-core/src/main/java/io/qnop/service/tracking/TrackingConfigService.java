@@ -104,8 +104,8 @@ public class TrackingConfigService {
             settings.getBoolean(ApplicationSettingKey.TRACKING_CONSENT_REQUIRED),
             settings.getBoolean(ApplicationSettingKey.TRACKING_RESPECT_DNT),
             settings.getBoolean(ApplicationSettingKey.TRACKING_PRIVILEGED_ROLES),
-            "anonymized"
-                .equals(settings.getString(ApplicationSettingKey.TRACKING_FORWARD_CLIENT_IP))));
+            ClientIpForwarding.parse(
+                settings.getString(ApplicationSettingKey.TRACKING_FORWARD_CLIENT_IP))));
   }
 
   private static String trimTrailingSlash(String value) {

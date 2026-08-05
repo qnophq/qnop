@@ -125,6 +125,7 @@ const SELECT_OPTIONS: Record<string, { value: string; label: string }[]> = {
   'tracking.forward_client_ip': [
     { value: 'anonymized', label: 'Anonymised (recommended)' },
     { value: 'none', label: 'Do not forward' },
+    { value: 'full', label: 'Full address (personal data)' },
   ],
   'auth.self_registration_default_role': [
     { value: 'MEMBER', label: 'Member' },
@@ -443,6 +444,11 @@ function SettingField({ setting, value, error, onChange }: SettingFieldProps) {
   // means editable.
   const locked = setting.editable === false;
   const lockNote = 'Set by this deployment.';
+  // Issue #712: an opt-in that loosens a privacy floor should say so where it is
+  // chosen, not only in a document nobody has open. Shown on the current value
+  // rather than as a confirmation dialog — the operator has decided; what they
+  // need is the list of duties that come with the decision.
+  const forwardsFullAddress = setting.key === 'tracking.forward_client_ip' && value === 'full';
 
   if (setting.type === 'BOOLEAN') {
     return (
@@ -488,22 +494,32 @@ function SettingField({ setting, value, error, onChange }: SettingFieldProps) {
   const options = optionsFor(setting);
   if (options) {
     return (
-      <TextField
-        select
-        label={label}
-        value={value}
-        disabled={locked}
-        onChange={(e) => onChange(e.target.value)}
-        error={Boolean(error)}
-        helperText={error ?? (locked ? `${setting.description} ${lockNote}` : setting.description)}
-        sx={{ maxWidth: 480 }}
-      >
-        {options.map((option) => (
-          <MenuItem key={option.value} value={option.value}>
-            {option.label}
-          </MenuItem>
-        ))}
-      </TextField>
+      <Stack spacing={1.5} sx={{ maxWidth: 480 }}>
+        <TextField
+          select
+          label={label}
+          value={value}
+          disabled={locked}
+          onChange={(e) => onChange(e.target.value)}
+          error={Boolean(error)}
+          helperText={
+            error ?? (locked ? `${setting.description} ${lockNote}` : setting.description)
+          }
+        >
+          {options.map((option) => (
+            <MenuItem key={option.value} value={option.value}>
+              {option.label}
+            </MenuItem>
+          ))}
+        </TextField>
+        {forwardsFullAddress && (
+          <Alert severity="warning">
+            Exact addresses are personal data. The legal basis, the consent record and the retention
+            period are yours to hold — this server only forwards what you configure here. Consent
+            and Do-Not-Track keep applying as you set them.
+          </Alert>
+        )}
+      </Stack>
     );
   }
 

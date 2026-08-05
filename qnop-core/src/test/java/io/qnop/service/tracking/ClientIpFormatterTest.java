@@ -26,13 +26,13 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 /** Truncating the visitor address that the proxy forwards (issue #666). */
-class ClientIpAnonymizerTest {
+class ClientIpFormatterTest {
 
   @Test
   @DisplayName("IPv4 keeps its network, loses its host")
   void truncatesIpv4() {
-    assertThat(ClientIpAnonymizer.anonymize("203.0.113.42")).contains("203.0.113.0");
-    assertThat(ClientIpAnonymizer.anonymize("10.1.2.3")).contains("10.1.2.0");
+    assertThat(ClientIpFormatter.anonymize("203.0.113.42")).contains("203.0.113.0");
+    assertThat(ClientIpFormatter.anonymize("10.1.2.3")).contains("10.1.2.0");
   }
 
   @Test
@@ -40,7 +40,7 @@ class ClientIpAnonymizerTest {
   void truncatesIpv6() {
     // A /64 is one subscriber line, not one device — the same trade the IPv4 /24
     // makes, at the size IPv6 hands out.
-    assertThat(ClientIpAnonymizer.anonymize("2001:db8:85a3:1:1a2b:3c4d:5e6f:7a8b"))
+    assertThat(ClientIpFormatter.anonymize("2001:db8:85a3:1:1a2b:3c4d:5e6f:7a8b"))
         .hasValueSatisfying(
             value -> assertThat(value).startsWith("2001:db8:85a3:1:").endsWith("0:0:0:0"));
   }
@@ -48,17 +48,17 @@ class ClientIpAnonymizerTest {
   @Test
   @DisplayName("brackets around an IPv6 literal are tolerated")
   void tolerName() {
-    assertThat(ClientIpAnonymizer.anonymize("[2001:db8::1]")).isPresent();
+    assertThat(ClientIpFormatter.anonymize("[2001:db8::1]")).isPresent();
   }
 
   @Test
   @DisplayName("forwards nothing rather than guessing")
   void failsClosed() {
-    assertThat(ClientIpAnonymizer.anonymize(null)).isEmpty();
-    assertThat(ClientIpAnonymizer.anonymize("")).isEmpty();
-    assertThat(ClientIpAnonymizer.anonymize("not-an-ip")).isEmpty();
+    assertThat(ClientIpFormatter.anonymize(null)).isEmpty();
+    assertThat(ClientIpFormatter.anonymize("")).isEmpty();
+    assertThat(ClientIpFormatter.anonymize("not-an-ip")).isEmpty();
     // A hostname must never be resolved on a request path, so it is simply refused.
-    assertThat(ClientIpAnonymizer.anonymize("analytics.example.com")).isEmpty();
-    assertThat(ClientIpAnonymizer.anonymize("999.1.1.1")).isEmpty();
+    assertThat(ClientIpFormatter.anonymize("analytics.example.com")).isEmpty();
+    assertThat(ClientIpFormatter.anonymize("999.1.1.1")).isEmpty();
   }
 }

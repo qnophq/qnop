@@ -41,6 +41,22 @@ The server checks again on every forwarded measurement (`TrackedUrlSanitizer`): 
 
 Proxying raises a question direct measurement never asks. Forward nothing and the backend counts a whole company as one visitor; forward the real address and proxying has withheld nothing. So `X-Forwarded-For` carries the address truncated to its /24 (IPv4) or /64 (IPv6) — Matomo's own anonymisation, and the long-standing middle ground of German data-protection practice. `tracking.forward_client_ip=none` remains available, with distorted counts as the stated cost.
 
+### Amendment (2026-08-05, issue #712): a third option, opt-in
+
+Running the public demo produced a need the pair above could not express. The operator wanted to see exact addresses **in their own Umami instance** — to tell a returning evaluator from a bot, and to line abuse up with what the logs already show. Under the original two options the only way there was to stop proxying, which would have given up every other protection at once.
+
+So `tracking.forward_client_ip` takes a third value, `full`. Three things make that defensible rather than a hole in the floor:
+
+- **It is opt-in and never a default.** Existing deployments are untouched, and an unreadable setting value falls to `anonymized` — the fallback direction is deliberate, because a typo must not start forwarding personal data.
+- **It loosens exactly one thing.** Consent and Do-Not-Track keep applying as configured; the path anonymisation, the collect allowlist and the SSRF checks are unaffected. A test pins this rather than leaving it as an intention.
+- **It is not a disclosure to a third party.** The self-hosted case sends the address to the operator's own analytics instance — the same operator whose web server already logged it. What changes is which of their systems sees it, and that is a decision they are entitled to make under their own legal basis.
+
+The wording follows `tracking.consent_required`: the setting says plainly that the legal basis, the consent record and the retention are the operator's to hold, and the admin screen repeats it where the choice is made rather than only in a document nobody has open.
+
+One thing this amendment does **not** provide, and an operator relying on it should know: changing an application setting currently leaves no audit trail, so "when did this deployment start forwarding full addresses, and who decided" is not answerable from qnop today. That gap is tracked in issue #718.
+
+**A note on the mechanism.** `full` parses the address and re-emits it canonically rather than passing the resolved string through. That is not tidiness: behind a trusted proxy, `X-Forwarded-For` carries whatever that proxy passed along, and the truncating path only validated it as a side effect of having to understand it. Forwarding raw would have put unvalidated foreign text into an outgoing header.
+
 ### Four gates, any of which says no
 
 Operator configuration, Do-Not-Track/GPC, the account-level opt-out, and consent. All four must agree before a script tag is even created. The consent answer lives in the browser (the sign-in screen is measured, and nobody has an account yet at that point); the opt-out lives on the account, so it follows a person across devices and outlives a cleared browser store. Administrators and auditors are excluded unless an operator explicitly includes them — a handful of privileged people is barely a statistic and very much personal data.

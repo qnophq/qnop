@@ -34,7 +34,8 @@ package io.qnop.service.tracking;
  * @param consentRequired whether the client must ask before loading anything
  * @param respectDnt whether a Do-Not-Track browser is left alone
  * @param trackPrivilegedRoles whether administrators and auditors are measured too
- * @param forwardClientIp whether a truncated visitor address travels with each measurement
+ * @param forwardClientIp how much of the visitor's address travels with each measurement (issue
+ *     #712): nothing, truncated, or exact
  */
 public record TrackingRuntimeConfig(
     TrackingProvider provider,
@@ -44,4 +45,4 @@ public record TrackingRuntimeConfig(
     boolean consentRequired,
     boolean respectDnt,
     boolean trackPrivilegedRoles,
-    boolean forwardClientIp) {}
+    ClientIpForwarding forwardClientIp) {}

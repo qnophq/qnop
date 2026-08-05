@@ -119,8 +119,10 @@ public enum ApplicationSettingKey {
       "anonymized",
       "What reaches the backend as the visitor's address. 'anonymized' truncates it (IPv4 to /24,"
           + " IPv6 to /64) so visitors stay countable without being identifiable; 'none' sends"
-          + " nothing, and the backend then sees every reviewer as one visitor.",
-      List.of("anonymized", "none")),
+          + " nothing, and the backend then sees every reviewer as one visitor; 'full' sends the"
+          + " exact address. A full address is personal data: the legal basis, the consent and the"
+          + " retention are the operator's call, not this server's (issue #712).",
+      List.of("anonymized", "none", "full")),
   SMTP_ENABLED(
       "smtp.enabled",
       SettingValueType.BOOLEAN,
