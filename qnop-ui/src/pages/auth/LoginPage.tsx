@@ -65,6 +65,10 @@ export function LoginPage() {
   const [submitting, setSubmitting] = useState(false);
 
   const canRegister = !!config?.auth?.selfRegistrationEnabled;
+  // Issue #713: a deployment may run without self-service reset. The link used to
+  // lead to a form whose submit was silently swallowed, so the sender waited for a
+  // mail nobody was going to send.
+  const canResetPassword = !!config?.auth?.passwordResetEnabled;
 
   const onSubmit = async (event: FormEvent) => {
     event.preventDefault();
@@ -122,16 +126,18 @@ export function LoginPage() {
               autoComplete="current-password"
               required
             />
-            <Box sx={{ textAlign: 'right', mt: 0.75 }}>
-              <Link
-                component={RouterLink}
-                to="/forgot-password"
-                underline="hover"
-                sx={{ fontSize: 13 }}
-              >
-                Forgot password?
-              </Link>
-            </Box>
+            {canResetPassword && (
+              <Box sx={{ textAlign: 'right', mt: 0.75 }}>
+                <Link
+                  component={RouterLink}
+                  to="/forgot-password"
+                  underline="hover"
+                  sx={{ fontSize: 13 }}
+                >
+                  Forgot password?
+                </Link>
+              </Box>
+            )}
           </Box>
 
           <Button

@@ -35,8 +35,10 @@ import org.springframework.web.server.ResponseStatusException;
  * AuthPasswordResetApi}. Public; the {@code User} entity never reaches this layer — the flow lives
  * in {@link PasswordResetFlowService} (ADR-0004).
  *
- * <p><strong>Anti-enumeration:</strong> {@code forgot-password} always returns {@code 204},
- * disclosing nothing about whether the address is registered.
+ * <p><strong>Anti-enumeration:</strong> where a reset is offered, {@code forgot-password} always
+ * returns {@code 204}, disclosing nothing about whether the address is registered. Where the
+ * deployment offers none it returns {@code 403} instead — which reveals nothing about any person,
+ * only about the instance, and the public config says as much already (issue #713).
  */
 @RestController
 public class AuthPasswordResetController implements AuthPasswordResetApi {
@@ -49,6 +51,12 @@ public class AuthPasswordResetController implements AuthPasswordResetApi {
 
   @Override
   public ResponseEntity<Void> forgotPassword(ForgotPasswordRequest request) {
+    if (!passwordResetFlow.enabled()) {
+      // Refusing beats the silent 204 this used to give: the sender would
+      // otherwise be told a mail was on its way and wait for one that was never
+      // going to be sent.
+      throw new ResponseStatusException(HttpStatus.FORBIDDEN, "PASSWORD_RESET_DISABLED");
+    }
     passwordResetFlow.requestReset(request.getEmail());
     return ResponseEntity.noContent().build();
   }

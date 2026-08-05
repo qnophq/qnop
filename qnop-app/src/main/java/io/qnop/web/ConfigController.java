@@ -122,7 +122,11 @@ public class ConfigController implements ServerConfigApi {
             .auth(
                 new ServerConfigAuth()
                     .oidcProviders(enabledOidcProviders())
-                    .selfRegistrationEnabled(settings.selfRegistrationEnabled()))
+                    .selfRegistrationEnabled(settings.selfRegistrationEnabled())
+                    // So the login page can leave out a link that leads nowhere
+                    // (issue #713).
+                    .passwordResetEnabled(
+                        settings.getBoolean(ApplicationSettingKey.AUTH_PASSWORD_RESET_ENABLED)))
             .review(
                 new ServerConfigReview()
                     .freeReattachEnabled(

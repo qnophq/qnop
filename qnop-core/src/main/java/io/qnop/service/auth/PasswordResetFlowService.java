@@ -59,12 +59,23 @@ public class PasswordResetFlowService {
     this.settings = settings;
   }
 
+  /** Whether this deployment offers a self-service reset at all (issue #713). */
+  public boolean enabled() {
+    return settings.getBoolean(ApplicationSettingKey.AUTH_PASSWORD_RESET_ENABLED);
+  }
+
   /**
    * Issues a reset token and emails the link, only for an enabled local account. Silent otherwise.
+   *
+   * <p>Silence covers the address, never the feature: a caller learns nothing about whether this
+   * e-mail is registered, but a deployment that offers no reset at all says so (see {@link
+   * #enabled()} and the controller). Those are different secrets — one is about a person, the other
+   * is in the public config already — and conflating them left a sender waiting for a mail that was
+   * never going to arrive.
    */
   @Transactional
   public void requestReset(String email) {
-    if (!settings.getBoolean(ApplicationSettingKey.AUTH_PASSWORD_RESET_ENABLED)) {
+    if (!enabled()) {
       return;
     }
     userService
