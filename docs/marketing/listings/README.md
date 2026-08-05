@@ -9,9 +9,25 @@ when the positioning changes.
 | Directory | Status | Kit |
 |---|---|---|
 | [awesome-selfhosted](https://github.com/awesome-selfhosted/awesome-selfhosted-data) | ⏳ **Blocked until 2026-11-19** — their rule: *"first released more than 4 months ago"* (qnop v1.0.0: 2026-07-19) | [awesome-selfhosted-qnop.yml](awesome-selfhosted-qnop.yml) |
-| [AlternativeTo](https://alternativeto.net/manage-item/) | Ready — needs an AlternativeTo account | [alternativeto.md](alternativeto.md) |
-| [selfh.st](https://selfh.st/apps/) | Ready — submit via their apps-list GitHub repo or contact form | [selfhst.md](selfhst.md) |
-| [SaaSHub](https://www.saashub.com/submit) | Ready — needs a SaaSHub account | [saashub.md](saashub.md) |
+| [AlternativeTo](https://alternativeto.net/manage-item/) | ⏳ **Blocked until 2026-08-09, 10:32 (Europe/Stockholm)** — new-app submissions require an account age of 7+ days; the account exists, so this is a pure waiting period | [alternativeto.md](alternativeto.md) |
+| [selfh.st](https://selfh.st/apps/) | ✅ **Submitted** via their Project Launch form — awaiting listing | [selfhst.md](selfhst.md) |
+| [SaaSHub](https://www.saashub.com/submit) | ✅ **Submitted**, ownership verified — awaiting listing | [saashub.md](saashub.md) |
+
+Two of the four directories gate submission on elapsed time rather than on
+content, so those kits sit finished until their window opens. Both waiting
+periods carry the exact moment they expire; an earlier attempt only burns a
+moderation slot.
+
+## AlternativeTo — how to submit (on/after 2026-08-09, 10:32 Europe/Stockholm)
+
+1. Sign in with the existing account — the 7-day age requirement is counted
+   from account creation, so the timestamp above is when it becomes eligible,
+   not when the submission is due.
+2. Open <https://alternativeto.net/manage-item/> and paste the fields from
+   [alternativeto.md](alternativeto.md).
+3. Add the alternatives and tags from the kit; they drive most of the
+   discovery traffic on that site.
+4. Upload the screenshots named in the kit and submit for moderation.
 
 ## awesome-selfhosted — how to submit (on/after 2026-11-19)
 

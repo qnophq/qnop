@@ -4,6 +4,10 @@
 
 Submit at <https://alternativeto.net/manage-item/> (account required).
 
+> **Not yet submitted** — new-app submissions need an account age of 7+ days,
+> so the earliest possible attempt is **2026-08-09, 10:32 (Europe/Stockholm)**.
+> See the status table in [README.md](README.md).
+
 **Name:** qnop
 
 **Tagline (short):** Self-hosted document review with line-precise annotations
