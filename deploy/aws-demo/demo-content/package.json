@@ -1,0 +1,12 @@
+{
+  "name": "qnop-demo-content",
+  "private": true,
+  "type": "module",
+  "description": "Generates the demo reviews for demo.qnop.io: public-domain excerpts rendered to PDF plus a scripted API run that stages a lively, anchored discussion (issue #710).",
+  "engines": {
+    "node": ">=18"
+  },
+  "dependencies": {
+    "pdfkit": "0.15.2"
+  }
+}
