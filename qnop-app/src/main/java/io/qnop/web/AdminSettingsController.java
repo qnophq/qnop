@@ -61,7 +61,9 @@ public class AdminSettingsController implements AdminSettingsApi {
   @Override
   public ResponseEntity<AdminSettingsResponse> updateAdminSettings(
       AdminSettingsUpdateRequest adminSettingsUpdateRequest) {
-    settings.update(adminSettingsUpdateRequest.getValues(), null);
+    // The actor, not null (issue #718): "what changed and when" without "by whom"
+    // does not answer the question an audit trail exists for.
+    settings.update(adminSettingsUpdateRequest.getValues(), CurrentUser.requireUserId());
     return ResponseEntity.ok(currentSettings());
   }
 

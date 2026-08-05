@@ -27,7 +27,6 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-import io.qnop.bootstrap.AbstractIntegrationTest;
 import io.qnop.service.ApplicationSettingKey;
 import io.qnop.service.ApplicationSettingsService;
 import java.util.Map;
@@ -37,7 +36,6 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.MediaType;
 import org.springframework.security.test.context.support.WithMockUser;
-import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.web.context.WebApplicationContext;
 
@@ -50,12 +48,20 @@ import org.springframework.web.context.WebApplicationContext;
  * by the filter chain (Spring Boot 4's {@code @AutoConfigureMockMvc} does not apply it on its own
  * here). Requires Docker.
  */
-class AdminSettingsControllerIT extends AbstractIntegrationTest {
+class AdminSettingsControllerIT extends io.qnop.testsupport.SeededIntegrationTest {
+
+  /**
+   * A principal that is a real, seeded user id.
+   *
+   * <p>The endpoint records who changed a setting (issue #718), and {@code audit_event.actor_id} is
+   * a foreign key — so an invented id fails the insert rather than being written and ignored.
+   * {@code @WithMockUser}'s default principal ("user") is not a UUID at all, and this class now
+   * extends the seeded base so the id below exists.
+   */
+  private static final String ADMIN_PRINCIPAL = "a0000000-0000-0000-0000-000000000001";
 
   @Autowired WebApplicationContext context;
   @Autowired ApplicationSettingsService settings;
-
-  private MockMvc mockMvc;
 
   @BeforeEach
   void setUpMockMvc() {
@@ -69,7 +75,7 @@ class AdminSettingsControllerIT extends AbstractIntegrationTest {
   }
 
   @Test
-  @WithMockUser(roles = "ADMIN")
+  @WithMockUser(username = ADMIN_PRINCIPAL, roles = "ADMIN")
   void getReturnsSettingsForAdmin() throws Exception {
     mockMvc
         .perform(get("/api/v1/admin/settings"))
@@ -82,7 +88,7 @@ class AdminSettingsControllerIT extends AbstractIntegrationTest {
   }
 
   @Test
-  @WithMockUser(roles = "MEMBER")
+  @WithMockUser(username = ADMIN_PRINCIPAL, roles = "MEMBER")
   void getForbiddenForNonAdmin() throws Exception {
     mockMvc.perform(get("/api/v1/admin/settings")).andExpect(status().isForbidden());
   }
@@ -93,7 +99,7 @@ class AdminSettingsControllerIT extends AbstractIntegrationTest {
   }
 
   @Test
-  @WithMockUser(roles = "ADMIN")
+  @WithMockUser(username = ADMIN_PRINCIPAL, roles = "ADMIN")
   void patchUpdatesSetting() throws Exception {
     mockMvc
         .perform(
@@ -107,7 +113,7 @@ class AdminSettingsControllerIT extends AbstractIntegrationTest {
   }
 
   @Test
-  @WithMockUser(roles = "ADMIN")
+  @WithMockUser(username = ADMIN_PRINCIPAL, roles = "ADMIN")
   void patchRejectsTypeInvalidValue() throws Exception {
     mockMvc
         .perform(
@@ -121,7 +127,7 @@ class AdminSettingsControllerIT extends AbstractIntegrationTest {
   }
 
   @Test
-  @WithMockUser(roles = "ADMIN")
+  @WithMockUser(username = ADMIN_PRINCIPAL, roles = "ADMIN")
   void patchReportsEveryInvalidFieldAtOnce() throws Exception {
     mockMvc
         .perform(
