@@ -70,13 +70,22 @@ describe('ApplicationSettingsForm — default timezone', () => {
     expect(screen.getByRole('textbox', { name: /application name/i })).toBeInTheDocument();
   });
 
+  // Budget and `delay: null` as in TimezoneSetting.test.tsx: opening the picker
+  // renders ~418 zones, and resolving one by accessible name costs ~1.1 s in
+  // jsdom — a query cost, not a production one (issue #716).
   it('lists known zones with their offsets when opened', async () => {
-    const user = userEvent.setup();
+    const user = userEvent.setup({ delay: null });
     renderWithProviders(<ApplicationSettingsForm />);
 
     await user.click(screen.getByRole('combobox', { name: /default timezone/i }));
-    expect(await screen.findByRole('option', { name: /Asia\/Tokyo/ })).toBeInTheDocument();
-  });
+    const tokyo = await screen.findByRole('option', { name: /Asia\/Tokyo/ });
+
+    // The row carries the zone AND its offset — the two halves the option
+    // renders. Asserted explicitly because #716 rebuilt this markup from
+    // Box/Typography with `sx` into hoisted `styled` elements.
+    expect(tokyo).toHaveTextContent('Asia/Tokyo');
+    expect(tokyo).toHaveTextContent(/GMT[+-]\d/);
+  }, 15_000);
 
   it('renders a governed setting read-only and says who set it', () => {
     renderWithProviders(<ApplicationSettingsForm />);

@@ -42,8 +42,18 @@ describe('TimezoneSetting', () => {
     expect(screen.getByText(/following the workspace default/i)).toBeInTheDocument();
   });
 
+  // Opening the picker is expensive in jsdom for reasons no user pays for: the
+  // engine lists ~418 zones, and `findByRole('option', { name })` computes an
+  // accessible name for every one of them — measured at ~1.1 s, on top of ~0.5 s
+  // for MUI's own per-option work. Against the 5 s default that left too little
+  // headroom under `vitest run`'s parallel load, and this test failed roughly
+  // one full run in three (issue #716). The generous budget here is for the
+  // query cost, not for slow production code: the offset computation it used to
+  // wait on was ~25× faster after caching the Intl formatters.
   it('saves the picked zone', async () => {
-    const user = userEvent.setup();
+    // `delay: null` drops userEvent's artificial inter-event pauses (~0.35 s
+    // here) without weakening the interaction it simulates.
+    const user = userEvent.setup({ delay: null });
     const onChange = vi.fn();
     renderWithProviders(
       <TimezoneSetting value="UTC" isExplicit={false} saving={false} onChange={onChange} />,
@@ -54,5 +64,5 @@ describe('TimezoneSetting', () => {
     await user.click(option);
 
     expect(onChange).toHaveBeenCalledWith('Asia/Tokyo');
-  });
+  }, 15_000);
 });
