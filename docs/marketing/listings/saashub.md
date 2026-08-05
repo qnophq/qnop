@@ -4,6 +4,10 @@
 
 Submit at <https://www.saashub.com/submit> (account required).
 
+> **Already submitted** and ownership-verified — awaiting listing. Keep this
+> kit as the reference for later edits instead of submitting again. See the
+> status table in [README.md](README.md).
+
 **Name:** qnop
 
 **Tagline:** Self-hosted document review your team actually wants to finish

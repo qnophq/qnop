@@ -7,6 +7,10 @@ regularly features new apps. Submission: open an issue/PR against their apps
 list repository (linked from <https://selfh.st/apps/>) or use the contact
 form; new-release announcements can also be sent for the weekly roundup.
 
+> **Already submitted** via their Project Launch form — awaiting listing. Keep
+> this kit as the reference for the newsletter pitch and later edits instead of
+> submitting again. See the status table in [README.md](README.md).
+
 **Name:** qnop
 
 **One-liner:** Document review platform — line-precise PDF/Word annotations,
