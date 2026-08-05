@@ -93,8 +93,10 @@ the instance — the repository never contains a working credential:
 3. Fill in `DEMO_TRACKING_HOST` / `DEMO_TRACKING_SITE_ID` in
    `/opt/qnop-demo/.env` (optional), then run
    `sudo /opt/qnop-demo/stage-demo-settings.sh`.
-4. Create the example reviews (upload the demo PDFs, invite
-   participants, add annotations) — see `testdata/README.md`.
+4. Create the example reviews: the scripted set comes from
+   [`demo-content/`](demo-content/README.md) (public-domain excerpts,
+   anchored discussions, mixed workflow states), staged from any machine
+   with `QNOP_BASE_URL=https://demo.qnop.io node create-demo-content.mjs`.
 5. Capture it: `sudo /opt/qnop-demo/build-golden-state.sh`.
 6. Verify: `sudo /opt/qnop-demo/reset-demo.sh` and check the app still
    shows the staged content and the rotated admin password still works.

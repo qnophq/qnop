@@ -1,0 +1,7 @@
+node_modules/
+package-lock.json
+pnpm-lock.yaml
+# Generated artifacts — reproducible via generate-pdfs.mjs
+pdfs/
+targets/
+cache/
