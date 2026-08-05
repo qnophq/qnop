@@ -42,15 +42,28 @@ templates 849 px, users 785 px, teams 563 px — and every one of them sits insi
 an ancestor with `overflow-x: auto`. This is the behaviour the issue asks for,
 already built.
 
-### 3. A primary action sits outside the viewport at 768 px — the real finding
+### 3. A primary action sat outside the viewport at 768 px — fixed (#723)
 
-On the review workspace at 768 px, **“New version” spans x = 692…798** against a
-768 px viewport: 30 px past the edge. It is not lost — its action bar scrolls
-horizontally (`scrollWidth` 798 vs `clientWidth` 768) — but nothing indicates
-that, so on a portrait tablet the control looks cut off rather than scrollable.
+On the review workspace at 768 px, **“New version” spanned x = 692…798** against
+a 768 px viewport: 30 px past the edge, reachable only through an action bar
+that scrolled without saying so.
 
-That is the gap worth closing: not overflow, but an affordance that hides a
-primary action behind an invisible gesture.
+The cause was a chain, not the bar: the bar itself always had `flexWrap`, but
+`PageHeader`'s action slot is `flexShrink: 0` (so long titles cannot crush the
+buttons), which also means the slot never imposes a width the wrap could fire
+at — and the shell's `overflow: auto` below `md` swallowed the resulting
+horizontal scroll instead of surfacing it.
+
+Fixed by stacking the header below `md` (title above, actions in full width
+underneath), so the wrap that was always there finally has an edge to wrap at.
+Re-measured live after the change: the button sits at x = 36…142, and no hidden
+horizontal scroller remains on the route.
+
+**A consequence worth keeping in mind:** the shell's `overflow: auto` masks
+body-level overflow on sub-`md` viewports. The audit's “no body overflow”
+numbers are partly *because* that container swallows; the regression assertion
+(#725) must therefore check the shell content element as well as
+`document.body`, or it will pass while a surface silently scrolls.
 
 ### 4. Header controls are 28×28 px
 

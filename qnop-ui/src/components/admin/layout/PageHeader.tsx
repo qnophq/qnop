@@ -53,9 +53,17 @@ export function PageHeader({
 }: PageHeaderProps) {
   return (
     <Stack
-      direction={{ xs: 'column', sm: 'row' }}
+      // Stacked below md, side by side above (issue #723). The action slot is
+      // flexShrink: 0 so long titles cannot crush the buttons — which also
+      // means a wide action bar can never be given a smaller width than it
+      // asks for. Between 600 and 900px that produced a 798px row in a 768px
+      // viewport, silently scrolling inside the shell; the review head's own
+      // flexWrap never fired because its parent never imposed a limit.
+      // Stacking hands the actions the full content width instead, and the
+      // wrap that was always there finally has an edge to wrap at.
+      direction={{ xs: 'column', md: 'row' }}
       spacing={2}
-      sx={{ justifyContent: 'space-between', alignItems: { sm: 'center' } }}
+      sx={{ justifyContent: 'space-between', alignItems: { md: 'center' } }}
     >
       <Stack direction="row" spacing={1.5} sx={{ minWidth: 0, alignItems: 'center' }}>
         {leading && <Box sx={{ flexShrink: 0 }}>{leading}</Box>}
