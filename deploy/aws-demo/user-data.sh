@@ -10,8 +10,10 @@
 # /var/log/cloud-init-output.log on the instance.
 set -euxo pipefail
 
-dnf -y install docker git
-systemctl enable --now docker
+# cronie: AL2023 minimal ships without a cron daemon, but the 12-hourly
+# reset job (install.sh) relies on /etc/cron.d.
+dnf -y install docker git cronie
+systemctl enable --now docker crond
 
 # The compose plugin is not packaged in AL2023 — install the static binary.
 ARCH=$(uname -m) # aarch64 on Graviton, x86_64 otherwise
