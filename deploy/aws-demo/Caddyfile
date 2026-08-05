@@ -1,0 +1,13 @@
+# SPDX-License-Identifier: AGPL-3.0-only
+#
+# Caddy config for the demo instance: automatic Let's Encrypt TLS for the
+# demo domain, everything proxied to the qnop container.
+
+{
+	email {$QNOP_DEMO_ACME_EMAIL}
+}
+
+{$QNOP_DEMO_DOMAIN} {
+	encode zstd gzip
+	reverse_proxy qnop:8080
+}
