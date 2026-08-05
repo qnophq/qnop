@@ -34,6 +34,8 @@ vi.mock('../../api/hooks/useConfig', () => ({
 
 interface ConfigShape {
   selfRegistrationEnabled?: boolean;
+  /** Whether the deployment offers a self-service reset (issue #713). */
+  passwordResetEnabled?: boolean;
   oidcProviders?: unknown[];
   /** The operator's sign-in notice (issue #664), when one is configured. */
   banner?: { severity: string; message: string; linkLabel?: string; linkUrl?: string };
@@ -41,11 +43,15 @@ interface ConfigShape {
 
 function mockConfig({
   selfRegistrationEnabled = false,
+  passwordResetEnabled = true,
   oidcProviders = [],
   banner,
 }: ConfigShape = {}) {
   vi.mocked(useConfig).mockReturnValue({
-    data: { auth: { selfRegistrationEnabled, oidcProviders }, banner },
+    data: {
+      auth: { selfRegistrationEnabled, passwordResetEnabled, oidcProviders },
+      banner,
+    },
   } as unknown as ReturnType<typeof useConfig>);
 }
 
@@ -283,5 +289,16 @@ describe('LoginPage', () => {
     renderLogin();
 
     expect(screen.queryByRole('status')).not.toBeInTheDocument();
+  });
+
+  it('leaves out the reset link where the deployment offers no reset (#713)', () => {
+    mockConfig({ passwordResetEnabled: false });
+    renderLogin();
+
+    // The link used to lead to a form whose submit was silently swallowed, so the
+    // sender waited for a mail nobody was going to send.
+    expect(screen.queryByRole('link', { name: /Forgot password/ })).not.toBeInTheDocument();
+    // The rest of the form is untouched — this is one capability, not the page.
+    expect(screen.getByRole('button', { name: 'Sign in' })).toBeInTheDocument();
   });
 });

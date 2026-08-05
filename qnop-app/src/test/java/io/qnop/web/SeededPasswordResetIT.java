@@ -20,11 +20,13 @@
  */
 package io.qnop.web;
 
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import io.qnop.testsupport.SeededIntegrationTest;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
@@ -39,6 +41,20 @@ import org.springframework.http.MediaType;
 class SeededPasswordResetIT extends SeededIntegrationTest {
 
   private static final String FORGOT = "/api/v1/auth/forgot-password";
+
+  @org.springframework.beans.factory.annotation.Autowired
+  private io.qnop.service.ApplicationSettingsService settings;
+
+  /**
+   * Application settings are shared state that outlives a single test — the service caches them and
+   * the row stays written. A case that switches the reset off therefore has to switch it back, or
+   * every later test in this class runs against a deployment it did not ask for.
+   */
+  @org.junit.jupiter.api.AfterEach
+  void restoreResetSetting() {
+    settings.update(java.util.Map.of("auth.password_reset_enabled", "true"), null);
+  }
+
   private static final String RESET = "/api/v1/auth/reset-password";
 
   @ParameterizedTest
@@ -77,5 +93,46 @@ class SeededPasswordResetIT extends SeededIntegrationTest {
                 .content("{\"token\":\"whatever\",\"newPassword\":\"short\"}"))
         .andExpect(status().isBadRequest())
         .andExpect(jsonPath("$.code").value("VALIDATION_ERROR"));
+  }
+
+  @Test
+  @DisplayName("a deployment without self-service reset refuses instead of going quiet (#713)")
+  void refusesWhereResetIsDisabled() throws Exception {
+    settings.update(java.util.Map.of("auth.password_reset_enabled", "false"), null);
+
+    // It used to answer 204 and do nothing, so the sender waited for a mail that
+    // was never going to be sent. What is disclosed here is a property of the
+    // instance, which /config publishes anyway — never anything about a person.
+    mockMvc
+        .perform(
+            post(FORGOT)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"email\":\"member@qnop.test\"}"))
+        .andExpect(status().isForbidden());
+
+    mockMvc
+        .perform(get("/api/v1/config"))
+        .andExpect(jsonPath("$.auth.passwordResetEnabled").value(false));
+  }
+
+  @Test
+  @DisplayName("with reset enabled the answer stays uniform, known address or not")
+  void answerStaysUniformWhereResetIsEnabled() throws Exception {
+    settings.update(java.util.Map.of("auth.password_reset_enabled", "true"), null);
+
+    // The anti-enumeration property is the one thing #713 must not have broken:
+    // both of these are 204, and a caller learns nothing from the difference.
+    mockMvc
+        .perform(
+            post(FORGOT)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"email\":\"member@qnop.test\"}"))
+        .andExpect(status().isNoContent());
+    mockMvc
+        .perform(
+            post(FORGOT)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"email\":\"nobody-at-all@qnop.test\"}"))
+        .andExpect(status().isNoContent());
   }
 }

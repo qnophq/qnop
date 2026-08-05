@@ -28,13 +28,15 @@ import Link from '@mui/material/Link';
 import Stack from '@mui/material/Stack';
 import TextField from '@mui/material/TextField';
 import { Mail } from 'lucide-react';
-import { Link as RouterLink } from 'react-router';
+import { Link as RouterLink, Navigate } from 'react-router';
+import { useConfig } from '../../api/hooks/useConfig';
 import { AuthLayout } from '../../components/auth/AuthLayout';
 import { forgotPassword } from '../../api/auth';
 import { apiErrorMessage } from '../../utils/apiError';
 
 /** Requests a password-reset email. The response is a uniform acknowledgement. */
 export function ForgotPasswordPage() {
+  const { data: config, isLoading: configLoading } = useConfig();
   const [email, setEmail] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
@@ -53,6 +55,13 @@ export function ForgotPasswordPage() {
       setSubmitting(false);
     }
   };
+
+  // Same shape as RegisterPage: a screen for a capability the deployment does not
+  // offer is not a screen, and the endpoint refuses anyway (issue #713). Nothing
+  // is decided while the config is still loading — "not known yet" is not "off".
+  if (!configLoading && !config?.auth?.passwordResetEnabled) {
+    return <Navigate to="/login" replace />;
+  }
 
   return (
     <AuthLayout

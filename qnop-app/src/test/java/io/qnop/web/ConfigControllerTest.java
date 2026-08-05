@@ -122,6 +122,9 @@ class ConfigControllerTest {
         .andExpect(jsonPath("$.general.siteName").value("qnop"))
         .andExpect(jsonPath("$.general.defaultTimezone").value("Europe/Berlin"))
         .andExpect(jsonPath("$.auth.selfRegistrationEnabled").value(false))
+        // The login page needs this to decide whether "Forgot password?" leads
+        // anywhere (issue #713).
+        .andExpect(jsonPath("$.auth.passwordResetEnabled").exists())
         .andExpect(jsonPath("$.auth.oidcProviders").isArray())
         .andExpect(jsonPath("$.auth.oidcProviders").isEmpty())
         .andExpect(jsonPath("$.upload.maxDocumentSizeMb").value(50))
