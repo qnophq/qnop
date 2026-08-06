@@ -7,6 +7,6 @@
     "node": ">=18"
   },
   "dependencies": {
-    "pdfkit": "0.15.2"
+    "pdfkit": "0.19.1"
   }
 }
