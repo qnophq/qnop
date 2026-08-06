@@ -29,7 +29,7 @@ on:
 jobs:
   renovate:
     # Pinned to a qnophq/.github commit SHA; Renovate keeps it current.
-    uses: qnophq/.github/.github/workflows/renovate.yml@a3e25c268c5610529830ec5348b2c7f043f34bf8 # main
+    uses: qnophq/.github/.github/workflows/renovate.yml@5aef7edfde66a790dad832accfa4fa257990ad04 # main
     # Permissions belong on the calling job, not on the reusable workflow.
     # The reusable workflow inherits these for the duration of the call.
     # (Renovate now authenticates as a GitHub App, so these GITHUB_TOKEN
