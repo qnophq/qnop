@@ -81,8 +81,19 @@ the instance — the repository never contains a working credential:
   password). These are intentionally public; the admin account is not.
 - **Usage tracking**: if `DEMO_TRACKING_HOST` + `DEMO_TRACKING_SITE_ID`
   are set in `.env` (private Umami instance, values never committed),
-  tracking is enabled with provider `umami`, anonymized IPs and DNT
-  respected.
+  tracking is enabled with provider `umami` and anonymized (/24) IPs.
+  **The analytics host must trust this instance**, or every visit
+  geolocates to the instance's AWS region: qnop forwards the visitor's
+  truncated address in `X-Forwarded-For`, and the nginx in front of
+  Umami has to honour it from exactly this source —
+
+  ```nginx
+  set_real_ip_from  <instance elastic IP>;
+  real_ip_header    X-Forwarded-For;
+  real_ip_recursive on;
+  ```
+
+  Spoofed headers from any other sender stay ignored.
 
 ## Staging the demo content
 
