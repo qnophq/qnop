@@ -10,7 +10,7 @@
 # intentionally not run here — the dedicated CI jobs own those gates; this image
 # only packages the runnable artifact (used by the smoke-test stack, issue #207).
 
-FROM eclipse-temurin:21.0.11_10-jdk@sha256:da9d3a4f7650db39b918fc5a2c3da76556fb8cc8e5f3767cdea0bb409286951a AS build
+FROM eclipse-temurin:21.0.11_10-jdk@sha256:efd34b940f2d5a621605c8531c2afb7759c936b6c2ef637a69aa3bf3e1e789d1 AS build
 WORKDIR /workspace
 
 # The whole multi-module project is needed to configure the build (settings.gradle
@@ -23,7 +23,7 @@ COPY . .
 RUN ./gradlew --no-daemon -x test :qnop-app:bootJar \
     && cp "$(ls qnop-app/build/libs/*.jar | grep -v -- '-plain')" /workspace/app.jar
 
-FROM eclipse-temurin:21.0.11_10-jre@sha256:273396ed5998598ed1091e8d72711c2d36980a0e65103859c55a4e977a41ffd3 AS runtime
+FROM eclipse-temurin:21.0.11_10-jre@sha256:8cef5fc7bebe421363ab543a2f4db5caf7d119d8db67d56b0f56c485d2de4d55 AS runtime
 WORKDIR /app
 
 # LibreOffice, headless, for the PDF export (issue #639) — and for DOCX ingest

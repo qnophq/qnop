@@ -19,7 +19,7 @@
 
 services:
   qnop:
-    image: docker.io/qnophq/qnop-ce:latest
+    image: docker.io/qnophq/qnop-ce:latest@sha256:24eec1cf2b678a85dd907f04477c238497bd96645f96690e6ed307d9147a6297
     environment:
       - SERVICE_FQDN_QNOP_8080
       - QNOP_DB_HOST=postgres
@@ -52,7 +52,7 @@ services:
       start_period: 60s
 
   postgres:
-    image: postgres:18
+    image: postgres:18@sha256:a02db8cac496f15b094798a38254f14d6e00741f709360e5e00bb6668ea31636
     environment:
       - POSTGRES_USER=qnop
       - POSTGRES_PASSWORD=$SERVICE_PASSWORD_POSTGRES
@@ -66,7 +66,7 @@ services:
       retries: 5
 
   minio:
-    image: minio/minio:latest
+    image: minio/minio:latest@sha256:14cea493d9a34af32f524e538b8346cf79f3321eff8e708c1e2960462bd8936e
     command: server /data
     environment:
       - MINIO_ROOT_USER=qnop

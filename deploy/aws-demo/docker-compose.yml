@@ -11,7 +11,7 @@ name: qnop-demo
 
 services:
   caddy:
-    image: caddy:2
+    image: caddy:2@sha256:844f60b64e4724a5aa8245e019dace0d3f199f7433ce6c57676cb30a920dbad9
     ports:
       - '80:80'
       - '443:443'
@@ -63,7 +63,7 @@ services:
     restart: unless-stopped
 
   postgres:
-    image: postgres:18
+    image: postgres:18@sha256:a02db8cac496f15b094798a38254f14d6e00741f709360e5e00bb6668ea31636
     environment:
       POSTGRES_USER: ${QNOP_DB_USERNAME:-qnop}
       POSTGRES_PASSWORD: ${QNOP_DB_PASSWORD:?set a real database password}
@@ -80,7 +80,7 @@ services:
     restart: unless-stopped
 
   minio:
-    image: minio/minio:latest
+    image: minio/minio:latest@sha256:14cea493d9a34af32f524e538b8346cf79f3321eff8e708c1e2960462bd8936e
     command: server /data
     environment:
       MINIO_ROOT_USER: ${QNOP_S3_ACCESS_KEY:?set a real object-storage access key}
@@ -97,7 +97,7 @@ services:
   # One-shot MinIO client used by reset-demo.sh / build-golden-state.sh:
   #   docker compose --profile tools run --rm mc <command…>
   mc:
-    image: minio/mc:latest
+    image: minio/mc:latest@sha256:a7fe349ef4bd8521fb8497f55c6042871b2ae640607cf99d9bede5e9bdf11727
     profiles: ['tools']
     entrypoint: ['/bin/sh', '-c']
     environment:
