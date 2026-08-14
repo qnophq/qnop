@@ -1,4 +1,4 @@
-# syntax=docker/dockerfile:1@sha256:87999aa3d42bdc6bea60565083ee17e86d1f3339802f543c0d03998580f9cb89
+# syntax=docker/dockerfile:1@sha256:ecfaec9ed6d810b56388c508f4121597bfbba70d41a6dfeee4d8cad5f295fc32
 # SPDX-License-Identifier: AGPL-3.0-only
 #
 # Multi-stage image for the qnop Community server (qnop-app, ADR-0020).
@@ -10,7 +10,7 @@
 # intentionally not run here — the dedicated CI jobs own those gates; this image
 # only packages the runnable artifact (used by the smoke-test stack, issue #207).
 
-FROM eclipse-temurin:21.0.11_10-jdk@sha256:efd34b940f2d5a621605c8531c2afb7759c936b6c2ef637a69aa3bf3e1e789d1 AS build
+FROM eclipse-temurin:21.0.11_10-jdk@sha256:57865c22b954cf920cb05a610af81d577e89783282514ba071e99c7357f6c769 AS build
 WORKDIR /workspace
 
 # The whole multi-module project is needed to configure the build (settings.gradle
@@ -23,7 +23,7 @@ COPY . .
 RUN ./gradlew --no-daemon -x test :qnop-app:bootJar \
     && cp "$(ls qnop-app/build/libs/*.jar | grep -v -- '-plain')" /workspace/app.jar
 
-FROM eclipse-temurin:21.0.11_10-jre@sha256:8cef5fc7bebe421363ab543a2f4db5caf7d119d8db67d56b0f56c485d2de4d55 AS runtime
+FROM eclipse-temurin:21.0.11_10-jre@sha256:371da296b8cb74c7e53fbe7083d5374befc0011b493231d97d45fa789915e434 AS runtime
 WORKDIR /app
 
 # LibreOffice, headless, for the PDF export (issue #639) — and for DOCX ingest

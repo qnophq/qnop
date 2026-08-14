@@ -1,4 +1,4 @@
-# syntax=docker/dockerfile:1@sha256:87999aa3d42bdc6bea60565083ee17e86d1f3339802f543c0d03998580f9cb89
+# syntax=docker/dockerfile:1@sha256:ecfaec9ed6d810b56388c508f4121597bfbba70d41a6dfeee4d8cad5f295fc32
 # SPDX-License-Identifier: AGPL-3.0-only
 #
 # Runtime image for the RELEASED qnop server (ADR-0040). Copy-only by design:
@@ -10,7 +10,7 @@
 # Extend JVM flags via JDK_JAVA_OPTS (picked up by the java launcher), e.g.
 #   JDK_JAVA_OPTS="-Xlog:gc* -XX:MaxRAMPercentage=60.0"
 
-FROM eclipse-temurin:21.0.11_10-jre@sha256:8cef5fc7bebe421363ab543a2f4db5caf7d119d8db67d56b0f56c485d2de4d55
+FROM eclipse-temurin:21.0.11_10-jre@sha256:371da296b8cb74c7e53fbe7083d5374befc0011b493231d97d45fa789915e434
 WORKDIR /app
 
 # Run unprivileged.
