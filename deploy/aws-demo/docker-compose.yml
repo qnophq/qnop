@@ -11,7 +11,7 @@ name: qnop-demo
 
 services:
   caddy:
-    image: caddy:2@sha256:844f60b64e4724a5aa8245e019dace0d3f199f7433ce6c57676cb30a920dbad9
+    image: caddy:2@sha256:df7f1c2fb114453b951de51a98efc010db1655a92c2e86be6706714e2417a78d
     ports:
       - '80:80'
       - '443:443'
@@ -63,7 +63,7 @@ services:
     restart: unless-stopped
 
   postgres:
-    image: postgres:18@sha256:a02db8cac496f15b094798a38254f14d6e00741f709360e5e00bb6668ea31636
+    image: postgres:18@sha256:7157393f508fd8eb46119937fab39813783fe3e7d4c6316c45c12ce2ea25e61d
     environment:
       POSTGRES_USER: ${QNOP_DB_USERNAME:-qnop}
       POSTGRES_PASSWORD: ${QNOP_DB_PASSWORD:?set a real database password}
