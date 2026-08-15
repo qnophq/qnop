@@ -9,7 +9,7 @@ when the positioning changes.
 | Directory | Status | Kit |
 |---|---|---|
 | [awesome-selfhosted](https://github.com/awesome-selfhosted/awesome-selfhosted-data) | ⏳ **Blocked until 2026-11-19** — their rule: *"first released more than 4 months ago"* (qnop v1.0.0: 2026-07-19) | [awesome-selfhosted-qnop.yml](awesome-selfhosted-qnop.yml) |
-| [AlternativeTo](https://alternativeto.net/manage-item/) | ⏳ **Blocked until 2026-08-09, 10:32 (Europe/Stockholm)** — new-app submissions require an account age of 7+ days; the account exists, so this is a pure waiting period | [alternativeto.md](alternativeto.md) |
+| [AlternativeTo](https://alternativeto.net/manage-item/) | ✅ **Submitted 2026-08-16** — app page [alternativeto.net/software/qnop](https://alternativeto.net/software/qnop/) pending review; Filestage, Ziflow, PageProof and PandaDoc suggested as alternatives (GoVisually is not on AlternativeTo; Acrobat Reader skipped — no shared app type) | [alternativeto.md](alternativeto.md) |
 | [selfh.st](https://selfh.st/apps/) | ✅ **Submitted** via their Project Launch form — awaiting listing | [selfhst.md](selfhst.md) |
 | [SaaSHub](https://www.saashub.com/submit) | ✅ **Submitted**, ownership verified — awaiting listing | [saashub.md](saashub.md) |
 

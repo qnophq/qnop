@@ -4,9 +4,13 @@
 
 Submit at <https://alternativeto.net/manage-item/> (account required).
 
-> **Not yet submitted** — new-app submissions need an account age of 7+ days,
-> so the earliest possible attempt is **2026-08-09, 10:32 (Europe/Stockholm)**.
-> See the status table in [README.md](README.md).
+> **Submitted 2026-08-16** — app page:
+> <https://alternativeto.net/software/qnop/> (visible to the submitter only
+> until approved; the free queue takes months, priority review 1–2 business
+> days). Suggested as alternative to Filestage, Ziflow, PageProof and
+> PandaDoc — all pending the same approval. GoVisually does not exist on
+> AlternativeTo, and Acrobat Reader was skipped deliberately: no shared app
+> type, and weak links hurt maker-submission credibility.
 
 **Name:** qnop
 
