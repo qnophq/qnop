@@ -66,7 +66,7 @@ javaDiffUtils = "4.17"
 # parser rather than regexes is what keeps an export's reading of a comment the
 # same as the application's. BSD-2-Clause. Used as a PARSER only — its HTML
 # renderer is never invoked, because it would pass raw HTML nodes through.
-commonmark = "0.29.0"
+commonmark = "0.30.0"
 
 # --- Pinned for later phases (NOT yet applied) -------------------------
 pdfbox = "3.0.8"            # PDF text extraction with glyph positions
