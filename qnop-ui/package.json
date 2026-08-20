@@ -3,7 +3,7 @@
   "private": true,
   "version": "0.0.0",
   "type": "module",
-  "packageManager": "pnpm@11.21.0",
+  "packageManager": "pnpm@11.22.0",
   "scripts": {
     "preinstall": "npx only-allow pnpm",
     "generate:api": "openapi-generator-cli generate",
@@ -22,7 +22,7 @@
     "@codemirror/autocomplete": "6.20.3",
     "@codemirror/lang-html": "6.4.12",
     "@codemirror/state": "6.7.1",
-    "@codemirror/view": "6.43.8",
+    "@codemirror/view": "6.43.9",
     "@emoji-mart/data": "1.2.1",
     "@emotion/react": "11.14.0",
     "@emotion/styled": "11.14.1",
