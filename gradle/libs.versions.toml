@@ -56,7 +56,7 @@ jmustache = "1.16"
 # Object storage (issue #243, ADR-0005): the AWS SDK v2 S3 client, used with
 # endpointOverride + path-style so MinIO (On-Prem) and S3/GCS (SaaS) are a
 # deploy-time config switch. Not in the Spring Boot BOM → explicit version.
-awsSdk = "2.53.1"
+awsSdk = "2.53.2"
 # Inter-version diff (issue #249, ADR-0034): actively-maintained Myers diff over
 # token lists (word granularity), Apache-2.0. Chosen over the unmaintained
 # java port of diff-match-patch. Not in the Spring Boot BOM → explicit version.
