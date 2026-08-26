@@ -208,3 +208,18 @@ jobs:
           done < <(find . -type f \( -name '*.java' -o -name '*.kts' \) \
                    -not -path './**/build/*' -not -path './.gradle/*')
           exit $missing
+
+  wrapper-checksum:
+    name: Gradle wrapper checksum pin
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      # The distributionSha256Sum pin (issue #194) is what protects a cold
+      # `./gradlew` run from a substituted distribution — setup-gradle validates
+      # the wrapper JAR, not the distribution ZIP. Renovate bumps distributionUrl
+      # on a Gradle release without touching the checksum (issue #763), so the two
+      # drift apart and every Gradle-invoking job dies on an opaque
+      # "Verification of Gradle distribution failed!". Catch the drift here, in
+      # seconds, with the correct value to paste in.
+      - name: Verify the pinned Gradle distribution checksum
+        run: scripts/check-gradle-wrapper-checksum.sh
