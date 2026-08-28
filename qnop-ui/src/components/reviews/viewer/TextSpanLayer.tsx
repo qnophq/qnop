@@ -19,19 +19,28 @@
  * SPDX-License-Identifier: AGPL-3.0-only
  */
 
-import { useRef, useState } from 'react';
-import type { MouseEvent, PointerEvent } from 'react';
+import { useId, useRef, useState } from 'react';
+import type { KeyboardEvent, MouseEvent, PointerEvent } from 'react';
 import Box from '@mui/material/Box';
+import { useTheme } from '@mui/material/styles';
 import type { RenderedTextSpan } from '../../../api/generated';
 import type { ScreenPosition, TextSelectionOffsets } from './anchoring';
 import {
   boxesForRange,
   caretOffsetAtPoint,
+  charLeftEdge,
   markerLineBox,
   surfaceLinePitch,
+  surfaceText,
   wordRangeAt,
 } from './anchoring';
 import { SELECTION_MARKER_BG } from './markerColors';
+import { visuallyHidden } from '../../../theme/visuallyHidden';
+import { keyboardCaretMove, spanAtOffset } from './keyboardSelection';
+
+/** How the keyboard path is announced to assistive tech (issue #460). */
+const KEYBOARD_HINT =
+  'Arrow keys move the caret through the text, Shift with an arrow key extends the selection, Enter annotates the selection, Escape clears it.';
 
 interface TextSpanLayerProps {
   spans: RenderedTextSpan[];
@@ -51,6 +60,11 @@ interface TextSpanLayerProps {
  * to the pending preview and persisted highlights; double-click selects the
  * word under the pointer. The emitted offsets are the canonical-text offsets
  * the anchor model needs (ADR-0009).
+ *
+ * Keyboard equivalent (issue #460, WCAG 2.1.1): the layer is focusable; arrow
+ * keys walk a caret through the same canonical text, Shift extends a range
+ * from the anchor, Enter emits it exactly like a pointer release, Escape
+ * clears. The caret and range paint with the same marker bands.
  */
 export function TextSpanLayer({
   spans,
@@ -61,8 +75,14 @@ export function TextSpanLayer({
   const rootRef = useRef<HTMLDivElement>(null);
   const dragRef = useRef<{ anchor: number } | null>(null);
   const [liveRange, setLiveRange] = useState<{ start: number; end: number } | null>(null);
+  // The keyboard caret: `anchor` is where Shift-extension started, `focus`
+  // the moving end. Null until the layer is focused and a key is pressed.
+  const [caret, setCaret] = useState<{ anchor: number; focus: number } | null>(null);
+  const hintId = useId();
+  const theme = useTheme();
 
   const pitch = surfaceLinePitch(spans);
+  const textLength = surfaceText(spans).length;
 
   const caretAt = (event: PointerEvent | MouseEvent): number | null => {
     const root = rootRef.current;
@@ -127,11 +147,73 @@ export function TextSpanLayer({
     }
   };
 
+  /** Viewport position of a range's trailing edge — the keyboard stand-in for the pointer. */
+  const screenPositionAtEnd = (end: number): ScreenPosition => {
+    const rect = rootRef.current?.getBoundingClientRect();
+    const span = spanAtOffset(spans, Math.max(end - 1, 0));
+    if (!rect || !span) return { left: 0, top: 0 };
+    const x = charLeftEdge(span, Math.min(end - span.startOffset, span.text.length));
+    return {
+      left: rect.left + x * rect.width,
+      top: rect.top + (span.box.y + span.box.height) * rect.height,
+    };
+  };
+
+  const handleKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
+    if (!enabled || textLength === 0) return;
+    if (event.key === 'Escape') {
+      if (!caret) return;
+      event.preventDefault();
+      setCaret(null);
+      return;
+    }
+    if (event.key === 'Enter') {
+      if (!caret || caret.anchor === caret.focus) return;
+      event.preventDefault();
+      const start = Math.min(caret.anchor, caret.focus);
+      const end = Math.max(caret.anchor, caret.focus);
+      setCaret(null);
+      onTextSelected({ surfaceIndex, start, end }, screenPositionAtEnd(end));
+      return;
+    }
+    const focus = keyboardCaretMove(spans, caret?.focus ?? 0, event.key, textLength);
+    if (focus === null) return;
+    event.preventDefault();
+    setCaret({ anchor: event.shiftKey && caret ? caret.anchor : focus, focus });
+  };
+
+  const keyboardRange =
+    caret && caret.anchor !== caret.focus
+      ? { start: Math.min(caret.anchor, caret.focus), end: Math.max(caret.anchor, caret.focus) }
+      : null;
+
   // Guarded by `enabled` so a stale range never paints on a disabled layer.
+  const paintedRange = liveRange ?? keyboardRange;
   const liveBoxes =
-    enabled && liveRange
-      ? boxesForRange(spans, liveRange.start, liveRange.end).map((box) => markerLineBox(box, pitch))
+    enabled && paintedRange
+      ? boxesForRange(spans, paintedRange.start, paintedRange.end).map((box) =>
+          markerLineBox(box, pitch),
+        )
       : [];
+
+  // A thin bar at the keyboard caret, so a sighted keyboard user sees where
+  // the selection will start.
+  const caretSpan = enabled && caret ? spanAtOffset(spans, caret.focus) : null;
+  const caretBox =
+    caretSpan && caret
+      ? markerLineBox(
+          {
+            x: charLeftEdge(
+              caretSpan,
+              Math.min(caret.focus - caretSpan.startOffset, caretSpan.text.length),
+            ),
+            y: caretSpan.box.y,
+            width: 0,
+            height: caretSpan.box.height,
+          },
+          pitch,
+        )
+      : null;
 
   return (
     <Box
@@ -141,11 +223,15 @@ export function TextSpanLayer({
       // the printed glyphs live in the canvas below, so this layer needs its own label.
       role="group"
       aria-label={`Selectable document text, page ${surfaceIndex + 1}`}
+      aria-describedby={enabled ? hintId : undefined}
+      tabIndex={enabled ? 0 : -1}
       onPointerDown={handlePointerDown}
       onPointerMove={handlePointerMove}
       onPointerUp={handlePointerUp}
       onPointerCancel={endDrag}
       onDoubleClick={handleDoubleClick}
+      onKeyDown={handleKeyDown}
+      onBlur={() => setCaret(null)}
       sx={{
         position: 'absolute',
         inset: 0,
@@ -154,8 +240,29 @@ export function TextSpanLayer({
         pointerEvents: enabled ? 'auto' : 'none',
         userSelect: 'none',
         touchAction: 'none',
+        '&:focus-visible': { outline: 'none', boxShadow: `inset ${theme.qnop.focusRing}` },
       }}
     >
+      {enabled && (
+        <Box component="span" id={hintId} sx={visuallyHidden}>
+          {KEYBOARD_HINT}
+        </Box>
+      )}
+      {caretBox && (
+        <div
+          data-testid={`keyboard-caret-${surfaceIndex}`}
+          style={{
+            position: 'absolute',
+            left: `${caretBox.x * 100}%`,
+            top: `${caretBox.y * 100}%`,
+            width: '2px',
+            marginLeft: '-1px',
+            height: `${caretBox.height * 100}%`,
+            backgroundColor: theme.qnop.brand.blue,
+            pointerEvents: 'none',
+          }}
+        />
+      )}
       {liveBoxes.map((box, index) => (
         <div
           key={index}

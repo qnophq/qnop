@@ -177,4 +177,63 @@ describe('TextSpanLayer', () => {
 
     expect(onTextSelected).not.toHaveBeenCalled();
   });
+
+  describe('keyboard selection (issue #460)', () => {
+    it('is focusable and describes its keys while enabled', () => {
+      renderLayer();
+      const layer = layerAt();
+      expect(layer).toHaveAttribute('tabindex', '0');
+      expect(layer).toHaveAccessibleDescription(/Arrow keys move the caret/);
+    });
+
+    it('is out of the tab order while disabled', () => {
+      renderLayer({ enabled: false });
+      expect(layerAt()).toHaveAttribute('tabindex', '-1');
+    });
+
+    it('extends a range with Shift+Arrow and emits it on Enter', () => {
+      const onTextSelected = renderLayer();
+      const layer = layerAt();
+      layer.focus();
+      fireEvent.keyDown(layer, { key: 'ArrowRight' });
+      fireEvent.keyDown(layer, { key: 'ArrowRight', shiftKey: true });
+      fireEvent.keyDown(layer, { key: 'ArrowRight', shiftKey: true });
+      expect(screen.getByTestId('live-selection-0')).toBeInTheDocument();
+      fireEvent.keyDown(layer, { key: 'Enter' });
+
+      expect(onTextSelected).toHaveBeenCalledWith(
+        { surfaceIndex: 0, start: 1, end: 3 },
+        expect.objectContaining({ left: expect.any(Number), top: expect.any(Number) }),
+      );
+      expect(screen.queryByTestId('live-selection-0')).not.toBeInTheDocument();
+    });
+
+    it('walks lines with ArrowDown and shows a caret', () => {
+      renderLayer();
+      const layer = layerAt();
+      fireEvent.keyDown(layer, { key: 'ArrowRight' });
+      fireEvent.keyDown(layer, { key: 'ArrowDown' });
+      // Column 1 of the second line, whose box starts at y = 0.15.
+      expect(screen.getByTestId('keyboard-caret-0').style.top).not.toBe('10%');
+    });
+
+    it('does not emit a collapsed caret on Enter and clears on Escape', () => {
+      const onTextSelected = renderLayer();
+      const layer = layerAt();
+      fireEvent.keyDown(layer, { key: 'ArrowRight' });
+      fireEvent.keyDown(layer, { key: 'Enter' });
+      expect(onTextSelected).not.toHaveBeenCalled();
+      fireEvent.keyDown(layer, { key: 'Escape' });
+      expect(screen.queryByTestId('keyboard-caret-0')).not.toBeInTheDocument();
+    });
+
+    it('ignores keys while disabled', () => {
+      const onTextSelected = renderLayer({ enabled: false });
+      const layer = layerAt();
+      fireEvent.keyDown(layer, { key: 'ArrowRight', shiftKey: true });
+      fireEvent.keyDown(layer, { key: 'Enter' });
+      expect(onTextSelected).not.toHaveBeenCalled();
+      expect(screen.queryByTestId('keyboard-caret-0')).not.toBeInTheDocument();
+    });
+  });
 });
