@@ -29,3 +29,8 @@ src/api/generated
 *.njsproj
 *.sln
 *.sw?
+
+# Playwright (issue #725): per-run results and the HTML report are artefacts;
+# the committed baselines live in e2e/__screenshots__.
+test-results
+playwright-report

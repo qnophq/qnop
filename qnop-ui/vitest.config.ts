@@ -14,6 +14,9 @@ export default defineConfig({
     environment: 'jsdom',
     setupFiles: ['./src/test/setup.ts'],
     globals: true,
+    // The Playwright suite (issue #725) also uses `*.spec.ts`; it runs against a
+    // real browser and backend, never under Vitest.
+    exclude: ['node_modules/**', 'e2e/**'],
     server: {
       deps: {
         inline: [/@mui\//],
