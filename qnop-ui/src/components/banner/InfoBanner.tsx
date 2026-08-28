@@ -128,12 +128,14 @@ export function InfoBanner({ banner, variant = 'bar', onDismiss }: InfoBannerPro
           size="small"
           onClick={onDismiss}
           aria-label="Dismiss this notice"
-          // 25 px visually, 44 px to hit (#724).
+          // 25 px visually, 44 px to hit (#724). The overlay reaches ~10 px past
+          // the button, so the extra margin keeps it clear of the message link.
           sx={{
             ...touchTargetSx,
             color: 'inherit',
             opacity: 0.7,
             mt: '-2px',
+            ml: 1.25,
             '&:hover': { opacity: 1 },
           }}
         >

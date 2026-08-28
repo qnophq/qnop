@@ -32,7 +32,8 @@ export function pseudoBeforeRule(element: Element): string | undefined {
     .map((style) => style.textContent ?? '')
     .join('\n');
   for (const className of Array.from(element.classList)) {
-    const match = css.match(new RegExp(`\\.${className}::before\\{([^}]*)\\}`));
+    const escaped = className.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const match = css.match(new RegExp(`\\.${escaped}::before\\{([^}]*)\\}`));
     if (match) return match[1];
   }
   return undefined;
