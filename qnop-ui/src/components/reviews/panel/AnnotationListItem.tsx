@@ -319,9 +319,15 @@ function AnnotationListItemBase({
               size="small"
               aria-label="Collapse annotation"
               aria-expanded
+              aria-controls={`annotation-item-${annotation.id}`}
               onClick={toggle}
               data-testid={`annotation-toggle-${annotation.id}`}
-              sx={{ color: 'text.secondary', flexShrink: 0, mt: '-2px' }}
+              sx={{
+                color: 'text.secondary',
+                flexShrink: 0,
+                mt: '-2px',
+                '&:focus-visible': { boxShadow: theme.qnop.focusRing },
+              }}
             >
               <ChevronUp size={16} aria-hidden />
             </IconButton>
@@ -332,6 +338,7 @@ function AnnotationListItemBase({
           ref={rowRef}
           onClick={toggle}
           aria-expanded={false}
+          aria-controls={`annotation-item-${annotation.id}`}
           data-testid={`annotation-toggle-${annotation.id}`}
           sx={{
             display: 'block',

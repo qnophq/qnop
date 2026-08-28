@@ -251,8 +251,9 @@ describe('AnnotationPanel', () => {
     expect(props.onSelect).toHaveBeenCalledWith('a1');
   });
 
-  // Issue #480: placement actions live inside the row's ButtonBase — acting on
-  // a placement must never toggle the card the reviewer is reading.
+  // Issue #480: acting on a placement must never toggle the card the reviewer
+  // is reading. Since #549 the expanded card is no longer a button at all, so
+  // this holds structurally rather than through a click guard.
   it('keeps the row expanded when "Looks right" confirms a MOVED placement (#480)', () => {
     useAuthStore.setState({ userId: 'u1' });
     const props = renderPanel({
