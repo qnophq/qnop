@@ -27,6 +27,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import type { OidcProviderDto } from '../../api/generated';
 import { buildTheme } from '../../theme/theme';
 import { OidcProvidersPage } from './OidcProvidersPage';
+import { checkA11y } from '../../test/axe';
 
 const { updateMutate, deleteMutate, useOidcProvidersMock } = vi.hoisted(() => ({
   updateMutate: vi.fn(),
@@ -118,6 +119,11 @@ function wrapper({ children }: { children: ReactNode }) {
 const renderPage = () => render(<OidcProvidersPage />, { wrapper });
 
 describe('OidcProvidersPage', () => {
+  it('has no accessibility violations', async () => {
+    const { container } = renderPage();
+    expect(await checkA11y(container)).toHaveNoViolations();
+  });
+
   it('lists the configured providers', () => {
     renderPage();
 

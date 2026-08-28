@@ -30,6 +30,7 @@ import { usersApi } from '../api/config';
 import { buildTheme } from '../theme/theme';
 import { useAuthStore } from '../stores/authStore';
 import { UserProfilePage } from './UserProfilePage';
+import { checkA11y } from '../test/axe';
 
 vi.mock('../api/config', () => ({
   usersApi: {
@@ -105,6 +106,15 @@ beforeEach(() => {
 });
 
 describe('UserProfilePage slug URLs (issue #486)', () => {
+  it('has no accessibility violations', async () => {
+    vi.mocked(usersApi.getUserProfileBySlug).mockReturnValue(
+      respond(profile({ teams: [{ id: 't1', name: 'Platform', role: 'LEAD' }] })) as never,
+    );
+    const { container } = renderPage('anna-krause');
+    await screen.findByText('Anna Krause');
+    expect(await checkA11y(container)).toHaveNoViolations();
+  });
+
   it('resolves a slug segment via the by-slug endpoint and keeps the pretty URL', async () => {
     vi.mocked(usersApi.getUserProfileBySlug).mockReturnValue(respond(profile()) as never);
 

@@ -27,6 +27,7 @@ import { buildTheme } from '../../theme/theme';
 import { useAuthStore } from '../../stores/authStore';
 import { useConfig } from '../../api/hooks/useConfig';
 import { LoginPage } from './LoginPage';
+import { checkA11y } from '../../test/axe';
 
 vi.mock('../../api/hooks/useConfig', () => ({
   useConfig: vi.fn(),
@@ -94,6 +95,18 @@ beforeEach(() => {
 });
 
 describe('LoginPage', () => {
+  it('has no accessibility violations', async () => {
+    mockConfig({
+      selfRegistrationEnabled: true,
+      oidcProviders: [
+        { id: 'p1', name: 'Acme SSO', loginUrl: '/oauth2/authorization/acme', iconKind: 'OIDC' },
+      ],
+      banner: { severity: 'info', message: 'Demo installation' },
+    });
+    const { container } = renderLogin();
+    expect(await checkA11y(container)).toHaveNoViolations();
+  });
+
   it('renders the credential form with required fields', () => {
     renderLogin();
 

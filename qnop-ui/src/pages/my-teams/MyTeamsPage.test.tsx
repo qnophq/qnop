@@ -26,6 +26,7 @@ import { MemoryRouter } from 'react-router';
 import type { MyTeamListResponse } from '../../api/generated';
 import { buildTheme } from '../../theme/theme';
 import { MyTeamsPage } from './MyTeamsPage';
+import { checkA11y } from '../../test/axe';
 
 const { myTeamsState } = vi.hoisted(() => ({
   myTeamsState: { data: undefined, isLoading: false, isError: false } as {
@@ -67,6 +68,11 @@ function renderPage() {
 }
 
 describe('MyTeamsPage', () => {
+  it('has no accessibility violations', async () => {
+    const { container } = renderPage();
+    expect(await checkA11y(container)).toHaveNoViolations();
+  });
+
   it('renders led teams as management cards that link to their detail page', () => {
     renderPage();
 

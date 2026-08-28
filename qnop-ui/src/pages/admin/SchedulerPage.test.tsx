@@ -27,6 +27,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import type { SchedulerJob } from '../../api/generated';
 import { buildTheme } from '../../theme/theme';
 import { SchedulerPage } from './SchedulerPage';
+import { checkA11y } from '../../test/axe';
 
 const { updateMutate, runMutate, useSchedulerJobsMock } = vi.hoisted(() => ({
   updateMutate: vi.fn(),
@@ -112,6 +113,11 @@ function wrapper({ children }: { children: ReactNode }) {
 const renderPage = () => render(<SchedulerPage />, { wrapper });
 
 describe('SchedulerPage', () => {
+  it('has no accessibility violations', async () => {
+    const { container } = renderPage();
+    expect(await checkA11y(container)).toHaveNoViolations();
+  });
+
   it('lists the catalogued jobs', () => {
     renderPage();
     expect(screen.getByText('Refresh token sweep')).toBeTruthy();
