@@ -23,6 +23,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import type { InfoBanner as InfoBannerModel } from '../../api/generated';
+import { hasTouchTarget } from '../../test/cssRules';
 import { renderWithProviders } from '../../test/renderWithProviders';
 import { InfoBanner } from './InfoBanner';
 
@@ -95,5 +96,11 @@ describe('InfoBanner', () => {
     // A future severity must never blank the notice out.
     expect(screen.getByText('Still readable')).toBeInTheDocument();
     expect(screen.getByRole('status')).toBeInTheDocument();
+  });
+
+  it('gives the dismiss button a 44 px hit area (#724)', () => {
+    renderWithProviders(<InfoBanner banner={banner()} onDismiss={vi.fn()} />);
+
+    expect(hasTouchTarget(screen.getByRole('button', { name: 'Dismiss this notice' }))).toBe(true);
   });
 });
