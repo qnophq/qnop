@@ -36,6 +36,7 @@ import {
 import { useParticipants } from '../../api/hooks/useReviews';
 import { useVersionDiff } from '../../api/hooks/useVersionDiff';
 import { usePdfDocument } from '../../components/reviews/viewer/usePdfDocument';
+import { checkA11y } from '../../test/axe';
 
 vi.mock('../../components/reviews/hub/ReviewHubHead', () => ({
   ReviewHubHead: ({ isOwner }: { isOwner: boolean }) => (
@@ -238,5 +239,10 @@ describe('VersionComparePage', () => {
       expect(screen.getByTestId('rail-collapsed')).toBeInTheDocument();
       expect(screen.queryByTestId('change-summary')).not.toBeInTheDocument();
     });
+  });
+
+  it('has no accessibility violations', async () => {
+    const { container } = renderPage();
+    expect(await checkA11y(container)).toHaveNoViolations();
   });
 });

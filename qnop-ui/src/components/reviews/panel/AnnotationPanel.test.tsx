@@ -29,6 +29,7 @@ import { useParticipants } from '../../../api/hooks/useReviews';
 import { buildTheme } from '../../../theme/theme';
 import { useAuthStore } from '../../../stores/authStore';
 import { AnnotationPanel } from './AnnotationPanel';
+import { checkA11y } from '../../../test/axe';
 
 // The reaction toggles (issue #410) reach for the query client; the data
 // hooks above stay mocked, so a bare client per file is all the tests need.
@@ -117,9 +118,10 @@ function renderPanel(props: Partial<Parameters<typeof AnnotationPanel>[0]> = {})
       </ThemeProvider>
     </QueryClientProvider>
   );
-  const { rerender } = render(wrap(merged));
+  const { rerender, container } = render(wrap(merged));
   return {
     ...merged,
+    container,
     /** Re-renders the same panel with patched props — the panel keeps its own state. */
     update: (patch: Partial<Parameters<typeof AnnotationPanel>[0]>) =>
       rerender(wrap({ ...merged, ...patch })),
@@ -745,5 +747,10 @@ describe('AnnotationPanel', () => {
     fireEvent.keyUp(ta, { key: 'l' });
 
     expect(screen.getByText('Alice')).toBeInTheDocument();
+  });
+
+  it('has no accessibility violations', async () => {
+    const { container } = renderPanel({ annotations: [annotation('a1'), annotation('a2')] });
+    expect(await checkA11y(container)).toHaveNoViolations();
   });
 });

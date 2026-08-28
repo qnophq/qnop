@@ -30,6 +30,7 @@ import { useUserProfile } from '../api/hooks/useUsers';
 import { buildTheme } from '../theme/theme';
 import { useAuthStore } from '../stores/authStore';
 import { HomePage } from './HomePage';
+import { checkA11y } from '../test/axe';
 
 vi.mock('../api/hooks/useReviews', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../api/hooks/useReviews')>()),
@@ -257,5 +258,14 @@ describe('HomePage dashboard (issue #454)', () => {
 
     // All four entry points have to agree; this is the dashboard one.
     expect(screen.getByRole('button', { name: /New review/i })).toBeDisabled();
+  });
+
+  it('has no accessibility violations', async () => {
+    mockData([
+      review({ id: 'w1', title: 'Their contract' }),
+      review({ id: 'o1', title: 'My own paper', ownerId: ME }),
+    ]);
+    const { container } = renderPage();
+    expect(await checkA11y(container)).toHaveNoViolations();
   });
 });

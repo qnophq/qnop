@@ -27,6 +27,7 @@ import { buildTheme } from '../../../theme/theme';
 import { useAuthStore } from '../../../stores/authStore';
 import { CommentThread } from './CommentThread';
 import { useAddComment, useComments } from '../../../api/hooks/useComments';
+import { checkA11y } from '../../../test/axe';
 
 // The reaction toggles (issue #410) reach for the query client; the data
 // hooks above stay mocked, so a bare client per file is all the tests need.
@@ -473,5 +474,10 @@ describe('full-screen writing stage (issue #403)', () => {
     await waitFor(() =>
       expect(screen.queryByTestId('fullscreen-composer')).not.toBeInTheDocument(),
     );
+  });
+
+  it('has no accessibility violations', async () => {
+    const { container } = renderThread();
+    expect(await checkA11y(container)).toHaveNoViolations();
   });
 });
