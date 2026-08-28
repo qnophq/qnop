@@ -266,7 +266,7 @@ describe('DocumentReviewPage', () => {
     expect(screen.getByText('Annotations (1)')).toBeInTheDocument();
     expect(screen.getByText('“Hello”')).toBeInTheDocument();
     // Placement cues are expanded-state details.
-    fireEvent.click(screen.getByTestId('annotation-item-a1'));
+    fireEvent.click(screen.getByTestId('annotation-toggle-a1'));
     expect(screen.getByText('Moved')).toBeInTheDocument();
   });
 
@@ -397,7 +397,7 @@ describe('DocumentReviewPage deep link', () => {
   it('activates the annotation named by ?annotation=', () => {
     seedHappyPath();
     renderPage('/reviews/doc-1?annotation=a1');
-    expect(screen.getByTestId('annotation-item-a1')).toHaveAttribute('aria-expanded', 'true');
+    expect(screen.getByTestId('annotation-toggle-a1')).toHaveAttribute('aria-expanded', 'true');
   });
 
   // Issue #412: a comment permalink opens the annotation AND scrolls its thread
@@ -431,7 +431,7 @@ describe('DocumentReviewPage deep link', () => {
 
     renderPage('/reviews/doc-1?annotation=a1&comment=c9');
 
-    expect(screen.getByTestId('annotation-item-a1')).toHaveAttribute('aria-expanded', 'true');
+    expect(screen.getByTestId('annotation-toggle-a1')).toHaveAttribute('aria-expanded', 'true');
     expect(scrollIntoView).toHaveBeenCalled();
   });
 
@@ -465,14 +465,12 @@ describe('DocumentReviewPage placement actions (#480)', () => {
     useAuthStore.setState({ userId: 'u1' });
     seedOrphaned();
     renderPage('/reviews/doc-1?annotation=a1');
-    expect(screen.getByTestId('annotation-item-a1')).toHaveAttribute('aria-expanded', 'true');
+    expect(screen.getByTestId('annotation-toggle-a1')).toHaveAttribute('aria-expanded', 'true');
 
-    // Exact name: the expanded row is itself role="button" and its accessible
-    // name contains the action's text, so a substring match would be ambiguous.
     fireEvent.click(screen.getByRole('button', { name: 'Re-attach' }));
 
     expect(screen.getByTestId('reattach-hint')).toBeInTheDocument();
-    expect(screen.getByTestId('annotation-item-a1')).toHaveAttribute('aria-expanded', 'true');
+    expect(screen.getByTestId('annotation-toggle-a1')).toHaveAttribute('aria-expanded', 'true');
   });
 
   it('still clears the selection and closes the drawer when arming re-attach in focus mode', () => {
@@ -481,14 +479,14 @@ describe('DocumentReviewPage placement actions (#480)', () => {
     renderPage('/reviews/doc-1?annotation=a1&view=focus');
 
     fireEvent.click(screen.getByRole('button', { name: /Show annotations/ }));
-    expect(screen.getByTestId('annotation-item-a1')).toHaveAttribute('aria-expanded', 'true');
+    expect(screen.getByTestId('annotation-toggle-a1')).toHaveAttribute('aria-expanded', 'true');
 
     fireEvent.click(screen.getByRole('button', { name: 'Re-attach' }));
     expect(screen.getByTestId('reattach-hint')).toBeInTheDocument();
 
     // The selection is cleared so the focus overlay cannot spring back onto
     // the thread (issue #403); the drawer closes, its content stays mounted.
-    expect(screen.getByTestId('annotation-item-a1')).toHaveAttribute('aria-expanded', 'false');
+    expect(screen.getByTestId('annotation-toggle-a1')).toHaveAttribute('aria-expanded', 'false');
   });
 });
 
@@ -520,7 +518,7 @@ describe('DocumentReviewPage on an older version', () => {
       useAuthStore.setState({ userId: 'u1' });
       renderPage('/reviews/doc-1?version=1');
 
-      fireEvent.click(screen.getByTestId('annotation-item-a1'));
+      fireEvent.click(screen.getByTestId('annotation-toggle-a1'));
       expect(screen.queryByTestId('resolve-bar')).not.toBeInTheDocument();
       expect(screen.queryByLabelText('Add a comment')).not.toBeInTheDocument();
     });
@@ -530,7 +528,7 @@ describe('DocumentReviewPage on an older version', () => {
       useAuthStore.setState({ userId: 'u1' });
       renderPage('/reviews/doc-1?version=2');
 
-      fireEvent.click(screen.getByTestId('annotation-item-a1'));
+      fireEvent.click(screen.getByTestId('annotation-toggle-a1'));
       expect(screen.getByTestId('resolve-bar')).toBeInTheDocument();
       expect(screen.getByLabelText('Add a comment')).toBeInTheDocument();
     });

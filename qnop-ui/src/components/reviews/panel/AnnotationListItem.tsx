@@ -19,14 +19,15 @@
  * SPDX-License-Identifier: AGPL-3.0-only
  */
 
-import { memo, type MouseEvent } from 'react';
+import { memo, useEffect, useRef } from 'react';
 import Box from '@mui/material/Box';
 import ButtonBase from '@mui/material/ButtonBase';
+import IconButton from '@mui/material/IconButton';
 import Stack from '@mui/material/Stack';
 import Tooltip from '@mui/material/Tooltip';
 import Typography from '@mui/material/Typography';
 import { alpha, useTheme, type Theme } from '@mui/material/styles';
-import { MessageSquare, MoveRight, Unlink } from 'lucide-react';
+import { ChevronUp, MessageSquare, MoveRight, Unlink } from 'lucide-react';
 import type { AnnotationView } from '../../../api/generated';
 import { PlacementStatus } from '../../../api/generated';
 import { useComments } from '../../../api/hooks/useComments';
@@ -99,6 +100,12 @@ function ParticipantAvatars({
             userId={realAuthorId(review, userId, participant.id)}
             slug={participant.slug}
             profileName={participant.name ?? undefined}
+            // The stack lives inside the collapsed row's toggle button, so the
+            // triggers stay previews rather than links (issue #549) — a link
+            // inside a button is invalid, and these 20px avatars were never the
+            // way to a profile. The card still previews on hover; the expanded
+            // card's author row carries the real link.
+            link={false}
           >
             <Box
               sx={{
@@ -160,6 +167,11 @@ interface AnnotationListItemProps {
  * status speaks through icon, badge and the mark on the page; interaction —
  * hover, the linked mark, the active card — speaks the brand blue in two
  * quiet steps instead of a status rail with a pointer arrow.
+ *
+ * The card itself is never a button (issue #549): collapsed, the whole row is
+ * one — a single dense target that expands on click or Enter; expanded, it is a
+ * plain container whose controls are real controls, closed again by the chevron
+ * beside the head. Focus follows that toggle in both directions.
  *
  * Memoized (issue #333): the panel re-renders on every hover/selection, but with stable props only
  * the two items whose {@code active}/{@code linked} actually changed re-render — not the whole list.
@@ -231,39 +243,44 @@ function AnnotationListItemBase({
   // annotation keeps its anchor, so it never lands here.
   const fallbackLabel = region ? 'Region annotation' : 'Whole document';
 
+  // Expanding swaps the row's button for the card's collapse control (and back
+  // again), so the element that had focus disappears mid-interaction. Focus
+  // therefore follows the toggle — but only when the reviewer pressed it HERE:
+  // a mark click on the page selects the row too (issue #491) and must not
+  // yank focus out of the document (issue #549).
+  const toggledHere = useRef(false);
+  const rowRef = useRef<HTMLButtonElement>(null);
+  const collapseRef = useRef<HTMLButtonElement>(null);
+  useEffect(() => {
+    if (!toggledHere.current) return;
+    toggledHere.current = false;
+    (active ? collapseRef : rowRef).current?.focus();
+  }, [active]);
+  const toggle = () => {
+    toggledHere.current = true;
+    onSelect(active ? null : annotation.id);
+  };
+
   return (
-    <ButtonBase
-      // Expanded, the card hosts real buttons (the head's copy-link) — a
-      // <button> may not nest, so the active card is a div with button role.
-      component={active ? 'div' : 'button'}
-      onClick={(event: MouseEvent<HTMLElement>) => {
-        // The expanded card hosts real interactive controls (placement
-        // actions, copy, reactions, profile links). Each stops propagation,
-        // but the row must not depend on every future control remembering to
-        // — a click originating on any interactive descendant never toggles
-        // the card (issue #480).
-        const interactive = (event.target as HTMLElement).closest(
-          'button, a, [role="button"], input, textarea, [contenteditable="true"]',
-        );
-        if (interactive && interactive !== event.currentTarget) return;
-        // Selecting quote text inside the card ends with a click on it —
-        // don't treat a live selection as a toggle (issue #478).
-        const selection = window.getSelection();
-        if (selection && !selection.isCollapsed) return;
-        onSelect(active ? null : annotation.id);
-      }}
+    <Box
+      // The card is a plain container (issue #549). Expanded it hosts real
+      // controls — placement actions, copy, reactions, profile links — and
+      // interactive content inside a role="button" is invalid ARIA: a screen
+      // reader announces the whole card as one button and every nested control
+      // depends on stopping propagation. So the toggle is an explicit control
+      // instead: collapsed, the entire row IS the button; expanded, the card
+      // carries a collapse chevron. That also retires #480's
+      // interactive-descendant guard and #478's selection guard — nothing on
+      // the expanded card listens for a click any more, so selecting the
+      // quoted passage simply selects it.
       onMouseEnter={() => onHover?.(annotation.id)}
       onMouseLeave={() => onHover?.(null)}
       onFocus={() => onHover?.(annotation.id)}
       onBlur={() => onHover?.(null)}
-      aria-expanded={active}
       // Stable DOM id — the scroll target when a mark click selects this row (#491).
       id={`annotation-item-${annotation.id}`}
       data-testid={`annotation-item-${annotation.id}`}
       sx={{
-        display: 'block',
-        width: '100%',
-        textAlign: 'left',
         position: 'relative',
         borderRadius: 0.75,
         border: '1px solid',
@@ -273,183 +290,218 @@ function AnnotationListItemBase({
         borderColor: active || linked ? theme.qnop.brand.blue : theme.palette.divider,
         bgcolor: active || linked ? alpha(theme.qnop.brand.blue, 0.06) : 'background.paper',
         boxShadow: linked && theme.palette.mode === 'light' ? tokens.shadow.sm : 'none',
-        px: 1.25,
-        py: active ? 1.25 : 0.75,
+        // Collapsed, the padding belongs to the button so the whole padded row
+        // is the click target; expanded, the container owns it.
+        ...(active ? { px: 1.25, py: 1.25 } : null),
         transition: 'border-color 120ms ease, background-color 120ms ease, box-shadow 120ms ease',
         '@media (prefers-reduced-motion: reduce)': { transition: 'none' },
         '&:hover': {
           borderColor: active || linked ? theme.qnop.brand.blue : alpha(theme.qnop.brand.blue, 0.4),
           bgcolor: active || linked ? alpha(theme.qnop.brand.blue, 0.06) : theme.qnop.surface2,
         },
-        '&:focus-visible': { boxShadow: theme.qnop.focusRing },
       }}
     >
       {active ? (
-        <AnnotationHead
-          annotation={annotation}
-          unseen={unseen}
-          permalinkUrl={permalinkUrl}
-          notify={notify}
-          onConfirmPlacement={onConfirmPlacement}
-          onReattachPlacement={onReattachPlacement}
-        />
+        <Stack direction="row" spacing={0.5} sx={{ alignItems: 'flex-start', minWidth: 0 }}>
+          <Box sx={{ flex: 1, minWidth: 0 }}>
+            <AnnotationHead
+              annotation={annotation}
+              unseen={unseen}
+              permalinkUrl={permalinkUrl}
+              notify={notify}
+              onConfirmPlacement={onConfirmPlacement}
+              onReattachPlacement={onReattachPlacement}
+            />
+          </Box>
+          <Tooltip title="Collapse">
+            <IconButton
+              ref={collapseRef}
+              size="small"
+              aria-label="Collapse annotation"
+              aria-expanded
+              onClick={toggle}
+              data-testid={`annotation-toggle-${annotation.id}`}
+              sx={{ color: 'text.secondary', flexShrink: 0, mt: '-2px' }}
+            >
+              <ChevronUp size={16} aria-hidden />
+            </IconButton>
+          </Tooltip>
+        </Stack>
       ) : (
-        <Stack spacing={0.5} sx={{ minWidth: 0 }}>
-          {/* Title line: status tile, the content itself, participants. */}
-          <Stack direction="row" spacing={1} sx={{ alignItems: 'center', minWidth: 0 }}>
-            <Tooltip title={statusCue.label}>
-              <Box
+        <ButtonBase
+          ref={rowRef}
+          onClick={toggle}
+          aria-expanded={false}
+          data-testid={`annotation-toggle-${annotation.id}`}
+          sx={{
+            display: 'block',
+            width: '100%',
+            textAlign: 'left',
+            borderRadius: 'inherit',
+            px: 1.25,
+            py: 0.75,
+            '&:focus-visible': { boxShadow: theme.qnop.focusRing },
+          }}
+        >
+          <Stack spacing={0.5} sx={{ minWidth: 0 }}>
+            {/* Title line: status tile, the content itself, participants. */}
+            <Stack direction="row" spacing={1} sx={{ alignItems: 'center', minWidth: 0 }}>
+              <Tooltip title={statusCue.label}>
+                <Box
+                  sx={{
+                    position: 'relative',
+                    width: 26,
+                    height: 26,
+                    borderRadius: '8px',
+                    display: 'grid',
+                    placeItems: 'center',
+                    bgcolor: alpha(statusCue.color(theme), 0.12),
+                    color: statusCue.color(theme),
+                    flexShrink: 0,
+                  }}
+                >
+                  <StatusIcon size={14} aria-label={statusCue.label} />
+                  {unseen && (
+                    <Tooltip title="New since your last visit">
+                      <Box
+                        data-testid="unseen-dot"
+                        sx={{
+                          position: 'absolute',
+                          top: -3,
+                          right: -3,
+                          width: 9,
+                          height: 9,
+                          borderRadius: '50%',
+                          bgcolor: theme.qnop.brand.blue,
+                          border: '2px solid',
+                          borderColor: 'background.paper',
+                        }}
+                      />
+                    </Tooltip>
+                  )}
+                </Box>
+              </Tooltip>
+              <Typography
+                variant="body2"
+                noWrap
                 sx={{
-                  position: 'relative',
-                  width: 26,
-                  height: 26,
-                  borderRadius: '8px',
-                  display: 'grid',
-                  placeItems: 'center',
-                  bgcolor: alpha(statusCue.color(theme), 0.12),
-                  color: statusCue.color(theme),
+                  flex: 1,
+                  minWidth: 0,
+                  color: annotation.status === 'RESOLVED' ? 'text.secondary' : 'text.primary',
+                  fontStyle: quote ? 'italic' : 'normal',
+                }}
+              >
+                {quote
+                  ? `“${quote}”`
+                  : plainExcerpt(resolveMentions(annotation.firstComment ?? '')) || fallbackLabel}
+              </Typography>
+              <ParticipantAvatars participants={participants} review={review} />
+            </Stack>
+            {/* Meta line: who, when, what kind — then the counters. */}
+            <Stack
+              direction="row"
+              spacing={0.75}
+              sx={{ alignItems: 'center', minWidth: 0, pl: TILE_INDENT, color: 'text.secondary' }}
+            >
+              <UserHoverCard
+                userId={hoverUserId}
+                slug={annotation.authorSlug}
+                profileName={authorName}
+                // Preview, not link — see the participant stack above (#549).
+                link={false}
+                sx={{ alignItems: 'center', gap: 0.75, flexShrink: 1 }}
+              >
+                <UserAvatar
+                  name={authorName}
+                  size={16}
+                  imageUrl={
+                    annotation.authorId === viewerId
+                      ? viewerAvatarUrl
+                      : avatarSrc(annotation.authorId)
+                  }
+                />
+                <Typography variant="caption" noWrap sx={{ fontWeight: 500, flexShrink: 1 }}>
+                  {authorName}
+                </Typography>
+              </UserHoverCard>
+              <Typography
+                variant="caption"
+                title={formatDateTime(annotation.createdAt)}
+                sx={{ flexShrink: 0, color: 'text.disabled' }}
+              >
+                {shortRelativeTime(annotation.createdAt)}
+              </Typography>
+              {placementCue && (
+                <Stack
+                  direction="row"
+                  spacing={0.4}
+                  sx={{ alignItems: 'center', color: placementCue.color(theme), flexShrink: 0 }}
+                >
+                  <placementCue.icon size={11} aria-hidden />
+                  <Typography component="span" sx={{ fontSize: 11, fontWeight: 700 }}>
+                    {placementCue.label}
+                  </Typography>
+                </Stack>
+              )}
+              {typeCue && (
+                <Stack
+                  direction="row"
+                  spacing={0.4}
+                  sx={{ alignItems: 'center', color: typeCue.color(theme), flexShrink: 0 }}
+                >
+                  <typeCue.icon size={11} aria-hidden />
+                  <Typography variant="caption">{typeCue.label}</Typography>
+                </Stack>
+              )}
+              {priorityCue && (
+                <Tooltip title={`${priorityCue.label} priority`}>
+                  <Box
+                    sx={{
+                      width: 7,
+                      height: 7,
+                      borderRadius: '50%',
+                      bgcolor: priorityCue.color(theme),
+                      flexShrink: 0,
+                    }}
+                  />
+                </Tooltip>
+              )}
+              <Box sx={{ flex: 1 }} />
+              <Stack
+                direction="row"
+                spacing={0.5}
+                data-testid="comment-count"
+                sx={{
+                  alignItems: 'center',
+                  color: freshComments ? theme.qnop.brand.blue : 'text.secondary',
+                  fontWeight: freshComments ? 600 : undefined,
                   flexShrink: 0,
                 }}
               >
-                <StatusIcon size={14} aria-label={statusCue.label} />
-                {unseen && (
-                  <Tooltip title="New since your last visit">
-                    <Box
-                      data-testid="unseen-dot"
-                      sx={{
-                        position: 'absolute',
-                        top: -3,
-                        right: -3,
-                        width: 9,
-                        height: 9,
-                        borderRadius: '50%',
-                        bgcolor: theme.qnop.brand.blue,
-                        border: '2px solid',
-                        borderColor: 'background.paper',
-                      }}
-                    />
-                  </Tooltip>
-                )}
-              </Box>
-            </Tooltip>
-            <Typography
-              variant="body2"
-              noWrap
-              sx={{
-                flex: 1,
-                minWidth: 0,
-                color: annotation.status === 'RESOLVED' ? 'text.secondary' : 'text.primary',
-                fontStyle: quote ? 'italic' : 'normal',
-              }}
-            >
-              {quote
-                ? `“${quote}”`
-                : plainExcerpt(resolveMentions(annotation.firstComment ?? '')) || fallbackLabel}
-            </Typography>
-            <ParticipantAvatars participants={participants} review={review} />
-          </Stack>
-          {/* Meta line: who, when, what kind — then the counters. */}
-          <Stack
-            direction="row"
-            spacing={0.75}
-            sx={{ alignItems: 'center', minWidth: 0, pl: TILE_INDENT, color: 'text.secondary' }}
-          >
-            <UserHoverCard
-              userId={hoverUserId}
-              slug={annotation.authorSlug}
-              profileName={authorName}
-              sx={{ alignItems: 'center', gap: 0.75, flexShrink: 1 }}
-            >
-              <UserAvatar
-                name={authorName}
-                size={16}
-                imageUrl={
-                  annotation.authorId === viewerId
-                    ? viewerAvatarUrl
-                    : avatarSrc(annotation.authorId)
-                }
-              />
-              <Typography variant="caption" noWrap sx={{ fontWeight: 500, flexShrink: 1 }}>
-                {authorName}
-              </Typography>
-            </UserHoverCard>
-            <Typography
-              variant="caption"
-              title={formatDateTime(annotation.createdAt)}
-              sx={{ flexShrink: 0, color: 'text.disabled' }}
-            >
-              {shortRelativeTime(annotation.createdAt)}
-            </Typography>
-            {placementCue && (
-              <Stack
-                direction="row"
-                spacing={0.4}
-                sx={{ alignItems: 'center', color: placementCue.color(theme), flexShrink: 0 }}
-              >
-                <placementCue.icon size={11} aria-hidden />
-                <Typography component="span" sx={{ fontSize: 11, fontWeight: 700 }}>
-                  {placementCue.label}
+                <MessageSquare size={12} aria-hidden />
+                <Typography variant="caption" aria-label={`${annotation.commentCount} comments`}>
+                  {annotation.commentCount}
                 </Typography>
               </Stack>
-            )}
-            {typeCue && (
-              <Stack
-                direction="row"
-                spacing={0.4}
-                sx={{ alignItems: 'center', color: typeCue.color(theme), flexShrink: 0 }}
-              >
-                <typeCue.icon size={11} aria-hidden />
-                <Typography variant="caption">{typeCue.label}</Typography>
-              </Stack>
-            )}
-            {priorityCue && (
-              <Tooltip title={`${priorityCue.label} priority`}>
-                <Box
-                  sx={{
-                    width: 7,
-                    height: 7,
-                    borderRadius: '50%',
-                    bgcolor: priorityCue.color(theme),
-                    flexShrink: 0,
-                  }}
-                />
-              </Tooltip>
-            )}
-            <Box sx={{ flex: 1 }} />
-            <Stack
-              direction="row"
-              spacing={0.5}
-              data-testid="comment-count"
-              sx={{
-                alignItems: 'center',
-                color: freshComments ? theme.qnop.brand.blue : 'text.secondary',
-                fontWeight: freshComments ? 600 : undefined,
-                flexShrink: 0,
-              }}
-            >
-              <MessageSquare size={12} aria-hidden />
-              <Typography variant="caption" aria-label={`${annotation.commentCount} comments`}>
-                {annotation.commentCount}
-              </Typography>
+              {region ? (
+                <Typography
+                  variant="caption"
+                  color="text.secondary"
+                  sx={{ flexShrink: 0, fontVariantNumeric: 'tabular-nums' }}
+                >
+                  p. {region.surfaceIndex + 1}
+                </Typography>
+              ) : (
+                // In the flat list (issue #481) the scope must read per card —
+                // collapsed document-scoped rows mark themselves like the
+                // anchored ones mark their page.
+                isDocumentScoped(annotation) && <WholeDocumentChip compact />
+              )}
             </Stack>
-            {region ? (
-              <Typography
-                variant="caption"
-                color="text.secondary"
-                sx={{ flexShrink: 0, fontVariantNumeric: 'tabular-nums' }}
-              >
-                p. {region.surfaceIndex + 1}
-              </Typography>
-            ) : (
-              // In the flat list (issue #481) the scope must read per card —
-              // collapsed document-scoped rows mark themselves like the
-              // anchored ones mark their page.
-              isDocumentScoped(annotation) && <WholeDocumentChip compact />
-            )}
           </Stack>
-        </Stack>
+        </ButtonBase>
       )}
-    </ButtonBase>
+    </Box>
   );
 }
 
