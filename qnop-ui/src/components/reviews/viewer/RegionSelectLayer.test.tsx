@@ -125,7 +125,7 @@ describe('RegionSelectLayer keyboard path (issue #771)', () => {
   it('is focusable with a described keyboard hint while enabled', () => {
     const { layer } = renderLayer();
     expect(layer).toHaveAttribute('tabindex', '0');
-    expect(layer).toHaveAccessibleDescription(/Arrow keys place and move/);
+    expect(layer).toHaveAccessibleDescription(/first arrow key press places/);
   });
 
   it('leaves the tab order when disabled', () => {
@@ -159,6 +159,24 @@ describe('RegionSelectLayer keyboard path (issue #771)', () => {
 
     fireEvent.keyDown(layer, { key: 'ArrowUp', altKey: true, shiftKey: true });
     expect(draft.style.height).toBe('10%');
+  });
+
+  it('clamps growth at the page edge and shrinking at the minimum size', () => {
+    const { layer } = renderLayer();
+
+    fireEvent.keyDown(layer, { key: 'ArrowRight' });
+    // Grow far past the right edge: width caps at 1 - x = 0.6.
+    for (let i = 0; i < 8; i += 1) {
+      fireEvent.keyDown(layer, { key: 'ArrowRight', altKey: true, shiftKey: true });
+    }
+    const draft = screen.getByTestId('region-draft-0');
+    expect(draft.style.width).toBe('60%');
+
+    // Shrink far past zero: height floors at the 2% minimum.
+    for (let i = 0; i < 8; i += 1) {
+      fireEvent.keyDown(layer, { key: 'ArrowUp', altKey: true, shiftKey: true });
+    }
+    expect(draft.style.height).toBe('2%');
   });
 
   it('keeps the rectangle on the page when moving against an edge', () => {

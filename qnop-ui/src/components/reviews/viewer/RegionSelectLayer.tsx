@@ -30,7 +30,7 @@ import { visuallyHidden } from '../../../theme/visuallyHidden';
 
 /** How the keyboard path is announced to assistive tech (issue #771). */
 const KEYBOARD_HINT =
-  'Arrow keys place and move the selection rectangle, Shift with an arrow key moves in larger steps, Alt with an arrow key grows or shrinks it, Enter annotates the region, Escape clears it.';
+  'The first arrow key press places a selection rectangle in the middle of the page. Arrow keys then move it, Shift with an arrow key moves in larger steps, Alt with an arrow key grows or shrinks it, Enter annotates the region, Escape clears it.';
 
 /** One arrow press moves or resizes by this fraction of the page. */
 const MOVE_STEP = 0.02;
