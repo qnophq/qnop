@@ -227,6 +227,26 @@ describe('TextSpanLayer', () => {
       expect(screen.queryByTestId('keyboard-caret-0')).not.toBeInTheDocument();
     });
 
+    it('keeps the moving caret in view (issue #782)', () => {
+      const scrollIntoView = vi.fn();
+      Object.defineProperty(HTMLElement.prototype, 'scrollIntoView', {
+        configurable: true,
+        value: scrollIntoView,
+      });
+      vi.useFakeTimers();
+      try {
+        renderLayer();
+        const layer = layerAt();
+        fireEvent.keyDown(layer, { key: 'ArrowRight' });
+        fireEvent.keyDown(layer, { key: 'ArrowDown' });
+        vi.advanceTimersToNextFrame();
+        expect(scrollIntoView).toHaveBeenCalledTimes(1);
+        expect(scrollIntoView.mock.instances[0]).toBe(screen.getByTestId('keyboard-caret-0'));
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+
     it('ignores keys while disabled', () => {
       const onTextSelected = renderLayer({ enabled: false });
       const layer = layerAt();
