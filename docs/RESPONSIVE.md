@@ -143,8 +143,10 @@ rather than one that is honestly absent.
 
 `qnop-ui/e2e/` is a Playwright suite that runs in CI inside the smoke job,
 against the stack the smoke script has just built, seeded and uploaded a PDF
-review into. It drives the working-tree SPA through the Vite dev server, so the
-API is proxied to the smoke stack (`QNOP_API_URL`) and nothing is bundled first.
+review into. It drives a production build of the working tree served by
+`vite preview`, with the API proxied to the smoke stack (`QNOP_API_URL`) — the
+same bundle a deployment ships, and none of the dev server's per-route cold
+transforms, which cost more than a test's timeout inside the Playwright image.
 
 **What it asserts.**
 
@@ -165,15 +167,33 @@ API is proxied to the smoke stack (`QNOP_API_URL`) and nothing is bundled first.
 
 **Running it locally.** Bring the smoke stack up and run the smoke script once
 (it seeds the users and uploads the review the suite reads), then from
-`qnop-ui/`: `pnpm test:e2e` — Playwright starts the dev server itself. Point
-`QNOP_API_URL` at the backend if it is not on `localhost:8080`.
+`qnop-ui/`: `pnpm test:e2e` for a run on the host Chromium (it builds the
+bundle first), or `scripts/e2e-docker.sh` for the run CI does. Point `QNOP_API_URL` at the
+backend if it is not on `localhost:8080`.
+
+**Where the screenshots come from.** Inside the official Playwright image
+(`scripts/e2e-docker.sh`), in CI and on a developer machine alike. A host
+browser renders the same page a few percent differently in antialiasing alone
+— the first CI run proved it on all twenty baselines — so the image is the one
+environment the pixels are compared in. The host run is still worth having for
+the overflow and touch-target assertions, which need no images.
 
 **Updating a baseline.** A screenshot that changed on purpose is updated with
-`pnpm test:e2e:update` and committed with the change that moved it; the PR diff
-then shows the before/after image, which is the review. A failing screenshot in
-CI leaves its actual/expected/diff triple in the `playwright-report` artefact.
-The comparison allows a 0.5 % pixel difference for antialiasing; a layout
-regression moves whole boxes and sits far above that.
+`pnpm test:e2e:update` (the docker run with `--update-snapshots=all`) and
+committed with the change that moved it; the PR diff then shows the
+before/after image, which is the review. A failing screenshot in CI leaves its
+actual/expected/diff triple in the `playwright-report` artefact. The
+comparison allows a 0.5 % pixel difference; a layout regression moves whole
+boxes and sits far above that.
+
+**Two limits the run has to live with.** The login endpoint allows ten
+attempts a minute per IP and the refresh endpoint thirty (ADR-0027). The suite
+signs in once per worker and resolves the review once per run; but every page
+load refreshes the access token, and a hundred pages from one address in three
+minutes is more than thirty. The smoke stack therefore raises the refresh limit
+(`QNOP_AUTH_RATE_LIMIT_REFRESH_MAX_ATTEMPTS`, `docker-compose.smoke.yml`) —
+a test deployment; production keeps its default. A run against a backend with
+the default limit fails at random surfaces with a page that never renders.
 
 **Known gap.** The seeded review is the smoke PDF, a one-page text fixture, so
 the viewer toolbar is exercised but the toolbar-density finding for a dense,

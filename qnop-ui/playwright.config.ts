@@ -26,9 +26,11 @@ import { defineConfig, devices } from '@playwright/test';
  *
  * Runs against a real backend: locally the docker-compose smoke stack (or a
  * `bootRun`), in CI the stack the smoke job has already built, seeded and
- * exercised. The tests drive the Vite dev server, which proxies the API to
- * `QNOP_API_URL` — so the SPA under test is the working tree, not a bundle,
- * and the same backend serves both the smoke script and the browser.
+ * exercised. The tests drive a production build of the working tree served by
+ * `vite preview`, which proxies the API to `QNOP_API_URL` — the dev server's
+ * per-route cold transforms cost more than a test's timeout inside the
+ * Playwright image — and the same backend serves the smoke script and the
+ * browser.
  */
 const apiUrl = process.env.QNOP_API_URL ?? 'http://localhost:8080';
 const port = 5173;
@@ -66,10 +68,13 @@ export default defineConfig({
   },
   projects: [{ name: 'chromium', use: { ...devices['Desktop Chrome'] } }],
   webServer: {
-    command: `pnpm exec vite --port ${port} --strictPort`,
+    // Plain node, not `pnpm exec`: the suite also runs inside the Playwright
+    // image (scripts/e2e-docker.sh), which has node but no pnpm.
+    command: `node node_modules/vite/bin/vite.js build && node node_modules/vite/bin/vite.js preview --port ${port} --strictPort`,
     url: baseURL,
     reuseExistingServer: !process.env.CI,
     env: { QNOP_API_URL: apiUrl },
-    timeout: 120_000,
+    // The build is the bulk of it.
+    timeout: 300_000,
   },
 });
