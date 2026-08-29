@@ -167,80 +167,92 @@ export function ViewerToolbar({
         <ToneBadge tone="red" label="Extraction failed" />
       )}
 
-      <Stack direction="row" spacing={1.5} sx={{ alignItems: 'center', ml: 'auto' }}>
-        <ToggleButtonGroup
-          exclusive
-          size="small"
-          value={tool}
-          onChange={(_event, next: ViewerTool | null) => next && onToolChange(next)}
-          disabled={!canAnnotate}
-          aria-label="Annotation tool"
-        >
-          <ToggleButton value="text" disabled={!textToolAvailable} aria-label="Select text">
-            <Tooltip title="Select text to annotate a quote">
-              <TextCursor size={16} />
+      {/* The trailing controls: two sub-groups inside a wrapping, right-aligned
+          cluster, so a 320 px viewport breaks between the groups instead of
+          overflowing `main` (issue #772). `ml: 'auto'` keeps the whole cluster
+          right-aligned on wide screens; `justifyContent: 'flex-end'` keeps a
+          wrapped second row right-aligned too. */}
+      <Stack
+        direction="row"
+        spacing={1.5}
+        useFlexGap
+        sx={{ alignItems: 'center', ml: 'auto', flexWrap: 'wrap', justifyContent: 'flex-end' }}
+      >
+        <Stack direction="row" spacing={1.5} sx={{ alignItems: 'center' }}>
+          <ToggleButtonGroup
+            exclusive
+            size="small"
+            value={tool}
+            onChange={(_event, next: ViewerTool | null) => next && onToolChange(next)}
+            disabled={!canAnnotate}
+            aria-label="Annotation tool"
+          >
+            <ToggleButton value="text" disabled={!textToolAvailable} aria-label="Select text">
+              <Tooltip title="Select text to annotate a quote">
+                <TextCursor size={16} />
+              </Tooltip>
+            </ToggleButton>
+            <ToggleButton value="region" aria-label="Draw region">
+              <Tooltip title="Draw a rectangle to annotate a region">
+                <BoxSelect size={16} />
+              </Tooltip>
+            </ToggleButton>
+          </ToggleButtonGroup>
+
+          <Divider orientation="vertical" flexItem />
+
+          <ZoomControls zoom={zoom} onZoomChange={onZoomChange} />
+        </Stack>
+
+        <Stack direction="row" spacing={1.5} sx={{ alignItems: 'center' }}>
+          {/* Panel vs. focus is a presentation of THIS tab (issue #403), so the
+              switch lives here rather than in the page-level tab strip. */}
+          <ToggleButtonGroup
+            exclusive
+            size="small"
+            value={viewMode}
+            onChange={(_event, next: ReviewViewMode | null) => next && onViewModeChange(next)}
+            aria-label="Document layout"
+          >
+            <ToggleButton value="panel" aria-label="Panel view" sx={{ gap: 0.5, px: 1 }}>
+              <Tooltip title="Document beside the annotation panel">
+                <Stack direction="row" spacing={0.5} sx={{ alignItems: 'center' }}>
+                  <PanelRight size={15} />
+                  <Typography variant="caption" sx={{ fontWeight: 600, lineHeight: 1 }}>
+                    Panel
+                  </Typography>
+                </Stack>
+              </Tooltip>
+            </ToggleButton>
+            <ToggleButton value="focus" aria-label="Focus view" sx={{ gap: 0.5, px: 1 }}>
+              <Tooltip title="Full-width document with the spotlight overlay">
+                <Stack direction="row" spacing={0.5} sx={{ alignItems: 'center' }}>
+                  <Focus size={15} />
+                  <Typography variant="caption" sx={{ fontWeight: 600, lineHeight: 1 }}>
+                    Focus
+                  </Typography>
+                </Stack>
+              </Tooltip>
+            </ToggleButton>
+          </ToggleButtonGroup>
+
+          {focusMode && (
+            <Tooltip title="Show the annotation list">
+              <IconButton
+                size="small"
+                aria-label={`Show annotations (${annotationCount})`}
+                onClick={onOpenAnnotationList}
+              >
+                <Stack direction="row" spacing={0.5} sx={{ alignItems: 'center' }}>
+                  <NotebookPen size={16} />
+                  <Typography variant="caption" sx={{ fontVariantNumeric: 'tabular-nums' }}>
+                    {annotationCount}
+                  </Typography>
+                </Stack>
+              </IconButton>
             </Tooltip>
-          </ToggleButton>
-          <ToggleButton value="region" aria-label="Draw region">
-            <Tooltip title="Draw a rectangle to annotate a region">
-              <BoxSelect size={16} />
-            </Tooltip>
-          </ToggleButton>
-        </ToggleButtonGroup>
-
-        <Divider orientation="vertical" flexItem />
-
-        <ZoomControls zoom={zoom} onZoomChange={onZoomChange} />
-
-        <Divider orientation="vertical" flexItem />
-
-        {/* Panel vs. focus is a presentation of THIS tab (issue #403), so the
-            switch lives here rather than in the page-level tab strip. */}
-        <ToggleButtonGroup
-          exclusive
-          size="small"
-          value={viewMode}
-          onChange={(_event, next: ReviewViewMode | null) => next && onViewModeChange(next)}
-          aria-label="Document layout"
-        >
-          <ToggleButton value="panel" aria-label="Panel view" sx={{ gap: 0.5, px: 1 }}>
-            <Tooltip title="Document beside the annotation panel">
-              <Stack direction="row" spacing={0.5} sx={{ alignItems: 'center' }}>
-                <PanelRight size={15} />
-                <Typography variant="caption" sx={{ fontWeight: 600, lineHeight: 1 }}>
-                  Panel
-                </Typography>
-              </Stack>
-            </Tooltip>
-          </ToggleButton>
-          <ToggleButton value="focus" aria-label="Focus view" sx={{ gap: 0.5, px: 1 }}>
-            <Tooltip title="Full-width document with the spotlight overlay">
-              <Stack direction="row" spacing={0.5} sx={{ alignItems: 'center' }}>
-                <Focus size={15} />
-                <Typography variant="caption" sx={{ fontWeight: 600, lineHeight: 1 }}>
-                  Focus
-                </Typography>
-              </Stack>
-            </Tooltip>
-          </ToggleButton>
-        </ToggleButtonGroup>
-
-        {focusMode && (
-          <Tooltip title="Show the annotation list">
-            <IconButton
-              size="small"
-              aria-label={`Show annotations (${annotationCount})`}
-              onClick={onOpenAnnotationList}
-            >
-              <Stack direction="row" spacing={0.5} sx={{ alignItems: 'center' }}>
-                <NotebookPen size={16} />
-                <Typography variant="caption" sx={{ fontVariantNumeric: 'tabular-nums' }}>
-                  {annotationCount}
-                </Typography>
-              </Stack>
-            </IconButton>
-          </Tooltip>
-        )}
+          )}
+        </Stack>
       </Stack>
     </Paper>
   );
