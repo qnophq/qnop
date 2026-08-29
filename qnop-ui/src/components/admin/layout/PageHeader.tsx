@@ -61,9 +61,15 @@ export function PageHeader({
       // flexWrap never fired because its parent never imposed a limit.
       // Stacking hands the actions the full content width instead, and the
       // wrap that was always there finally has an edge to wrap at.
+      //
+      // Above md the row itself wraps (issue #774): beside an open sidebar
+      // the content can be narrower than the action row even at 1024 px, so
+      // the actions drop below the title exactly when they stop fitting —
+      // stacking follows the available width, not a fixed breakpoint.
       direction={{ xs: 'column', md: 'row' }}
       spacing={2}
-      sx={{ justifyContent: 'space-between', alignItems: { md: 'center' } }}
+      useFlexGap
+      sx={{ justifyContent: 'space-between', alignItems: { md: 'center' }, flexWrap: 'wrap' }}
     >
       <Stack direction="row" spacing={1.5} sx={{ minWidth: 0, alignItems: 'center' }}>
         {leading && <Box sx={{ flexShrink: 0 }}>{leading}</Box>}
@@ -81,7 +87,9 @@ export function PageHeader({
           )}
         </Box>
       </Stack>
-      {action && <Box sx={{ flexShrink: 0 }}>{action}</Box>}
+      {/* maxWidth caps the slot at the line it wrapped onto, so a wide action
+          bar's own flexWrap finally has an edge to break at (issue #774). */}
+      {action && <Box sx={{ flexShrink: 0, maxWidth: '100%' }}>{action}</Box>}
     </Stack>
   );
 }
