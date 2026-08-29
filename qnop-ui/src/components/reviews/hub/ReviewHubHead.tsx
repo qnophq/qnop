@@ -185,7 +185,10 @@ export function ReviewHubHead({
   const shown = participants.slice(0, MAX_STACK_AVATARS);
 
   return (
-    <Stack direction="row" spacing={1.5} sx={{ alignItems: 'center', flexWrap: 'wrap' }}>
+    // useFlexGap: with margin-based spacing a wrapped second row would sit
+    // flush against the first — the wrap fires for real now that PageHeader
+    // hands this bar a width limit (issue #774).
+    <Stack direction="row" spacing={1.5} useFlexGap sx={{ alignItems: 'center', flexWrap: 'wrap' }}>
       {/* The owner is structurally public (issue #472), so the hover card
           (issue #482) may attach even in anonymous reviews — it replaces the
           old "Review owner" tooltip, which the OWNER label already spells. */}
