@@ -28,6 +28,7 @@ import type { AdminUserListResponse, AdminUserSummary } from '../../api/generate
 import { buildTheme } from '../../theme/theme';
 import { useAuthStore } from '../../stores/authStore';
 import { UsersPage } from './UsersPage';
+import { checkA11y } from '../../test/axe';
 
 // The four page-owned mutations plus a mutable query-state object so each test
 // can steer loading / error / empty / populated list responses.
@@ -219,6 +220,11 @@ function wrapper({ children }: { children: ReactNode }) {
 const renderPage = () => render(<UsersPage />, { wrapper });
 
 describe('UsersPage', () => {
+  it('has no accessibility violations', async () => {
+    const { container } = renderPage();
+    expect(await checkA11y(container)).toHaveNoViolations();
+  });
+
   it('renders the header and the current page of users', () => {
     renderPage();
 

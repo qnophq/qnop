@@ -26,6 +26,7 @@ import { ThemeProvider } from '@mui/material/styles';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { buildTheme } from '../../theme/theme';
 import { SettingsPage } from './SettingsPage';
+import { checkA11y } from '../../test/axe';
 
 // SettingsPage is a thin composition wrapper: it delegates to
 // ApplicationSettingsForm, whose own hooks are out of scope here. Stub the
@@ -46,6 +47,11 @@ function wrapper({ children }: { children: ReactNode }) {
 const renderPage = () => render(<SettingsPage />, { wrapper });
 
 describe('SettingsPage', () => {
+  it('has no accessibility violations', async () => {
+    const { container } = renderPage();
+    expect(await checkA11y(container)).toHaveNoViolations();
+  });
+
   it('renders the page header title and description', () => {
     renderPage();
 

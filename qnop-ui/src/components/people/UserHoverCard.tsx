@@ -137,7 +137,10 @@ function TriggerFrame({ children, to, profileName, sx, ...events }: TriggerFrame
             // Rows and cards underneath often have their own click targets
             // (open review, expand annotation) — the profile click wins.
             onClick: (event: MouseEvent) => event.stopPropagation(),
-            'aria-label': profileName ? `View ${profileName}'s profile` : undefined,
+            // Always named: the trigger is often a bare avatar with an empty
+            // `alt`, which leaves a focusable link with no accessible name
+            // when the profile name is unknown (issue #460).
+            'aria-label': profileName ? `View ${profileName}'s profile` : 'View profile',
           }
         : {})}
       sx={{

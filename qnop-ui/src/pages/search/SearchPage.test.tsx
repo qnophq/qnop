@@ -25,6 +25,7 @@ import { ThemeProvider } from '@mui/material/styles';
 import { MemoryRouter, Route, Routes, useLocation } from 'react-router';
 import { buildTheme } from '../../theme/theme';
 import { SearchPage } from './SearchPage';
+import { checkA11y } from '../../test/axe';
 
 const quick = {
   data: {
@@ -129,6 +130,11 @@ function renderPage(initialEntry = '/search?q=alpha') {
 describe('SearchPage', () => {
   beforeEach(() => {
     quick.isPending = false;
+  });
+
+  it('has no accessibility violations', async () => {
+    const { container } = renderPage();
+    expect(await checkA11y(container)).toHaveNoViolations();
   });
 
   it('reads the query from the URL and shows counted type chips', () => {

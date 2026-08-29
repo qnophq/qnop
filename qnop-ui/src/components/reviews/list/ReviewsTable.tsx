@@ -42,6 +42,25 @@ import { ToneBadge } from '../../admin/ToneBadge';
 import { readyToFinalize } from '../../dashboard/dashboardModel';
 import { DocumentIcon, OwnerChip, ProgressBar, ReviewerStack, RoleBadge } from './ReviewListParts';
 import { progressOf, roleOf } from './reviewListModel';
+import { visuallyHidden } from '../../../theme/visuallyHidden';
+
+/**
+ * The column headers. The trailing actions column shows nothing on screen, but
+ * a `<th>` with no text is an unnamed column header — axe flags it, and a
+ * screen reader announces the column as blank. Naming it and hiding the name
+ * visually keeps the layout and fixes the announcement (issue #460).
+ */
+const HEADERS: { label: string; hidden?: boolean }[] = [
+  { label: 'Document' },
+  { label: 'Role' },
+  { label: 'Owner' },
+  { label: 'Status' },
+  { label: 'Progress' },
+  { label: 'Reviewers' },
+  { label: 'Due' },
+  { label: 'Updated' },
+  { label: 'Actions', hidden: true },
+];
 
 interface ReviewsTableProps {
   reviews: DocumentSummary[];
@@ -94,19 +113,9 @@ export function ReviewsTable({
                   />
                 </TableCell>
               )}
-              {[
-                'Document',
-                'Role',
-                'Owner',
-                'Status',
-                'Progress',
-                'Reviewers',
-                'Due',
-                'Updated',
-                '',
-              ].map((header) => (
+              {HEADERS.map(({ label, hidden }) => (
                 <TableCell
-                  key={header}
+                  key={label}
                   sx={{
                     fontSize: 10.5,
                     fontWeight: 500,
@@ -116,7 +125,13 @@ export function ReviewsTable({
                     whiteSpace: 'nowrap',
                   }}
                 >
-                  {header}
+                  {hidden ? (
+                    <Box component="span" sx={visuallyHidden}>
+                      {label}
+                    </Box>
+                  ) : (
+                    label
+                  )}
                 </TableCell>
               ))}
             </TableRow>

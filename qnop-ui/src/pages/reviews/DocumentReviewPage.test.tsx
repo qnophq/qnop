@@ -39,6 +39,7 @@ import { useAnnotations, useCreateAnnotation } from '../../api/hooks/useAnnotati
 import { useComments } from '../../api/hooks/useComments';
 import { usePdfDocument } from '../../components/reviews/viewer/usePdfDocument';
 import { useAuthStore } from '../../stores/authStore';
+import { checkA11y } from '../../test/axe';
 
 // The reaction toggles (issue #410) reach for the query client; the data
 // hooks above stay mocked, so a bare client per file is all the tests need.
@@ -188,7 +189,7 @@ function seedHappyPath(extractionStatus: ExtractionStatus = ExtractionStatus.Rea
 }
 
 function renderPage(initialEntry = '/reviews/doc-1') {
-  render(
+  return render(
     <QueryClientProvider client={queryClient}>
       <ThemeProvider theme={buildTheme('light')}>
         <MemoryRouter initialEntries={[initialEntry]}>
@@ -532,5 +533,17 @@ describe('DocumentReviewPage on an older version', () => {
       expect(screen.getByTestId('resolve-bar')).toBeInTheDocument();
       expect(screen.getByLabelText('Add a comment')).toBeInTheDocument();
     });
+  });
+
+  it('has no accessibility violations', async () => {
+    const { container } = renderPage();
+    expect(
+      await checkA11y(container, {
+        // The expanded annotation card is a `ButtonBase` hosting real
+        // controls; issue #549 replaces that structure. Until it lands, the
+        // rule would only ever report that one known finding.
+        rules: { 'nested-interactive': { enabled: false } },
+      }),
+    ).toHaveNoViolations();
   });
 });

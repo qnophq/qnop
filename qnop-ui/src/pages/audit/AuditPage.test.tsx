@@ -24,6 +24,7 @@ import { fireEvent, screen, within } from '@testing-library/react';
 import type { AuditEvent, AuditEventListResponse } from '../../api/generated';
 import { renderWithProviders } from '../../test/renderWithProviders';
 import { AuditPage } from './AuditPage';
+import { checkA11y } from '../../test/axe';
 
 const { queryState, hookCalls } = vi.hoisted(() => ({
   queryState: {
@@ -88,6 +89,12 @@ beforeEach(() => {
 });
 
 describe('AuditPage', () => {
+  it('has no accessibility violations', async () => {
+    queryState.data = page({ items: [event, { ...event, id: 'e2' }], total: 2 });
+    const { container } = renderWithProviders(<AuditPage />);
+    expect(await checkA11y(container)).toHaveNoViolations();
+  });
+
   it('renders the page header', () => {
     renderWithProviders(<AuditPage />);
     expect(screen.getByRole('heading', { name: 'Audit trail' })).toBeInTheDocument();

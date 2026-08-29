@@ -31,6 +31,7 @@ import { buildTheme } from '../../theme/theme';
 import { useAuthStore } from '../../stores/authStore';
 import { axiosInstance, documentsApi, principalsApi, reviewWorkflowApi } from '../../api/config';
 import { NewReviewPage } from './NewReviewPage';
+import { checkA11y } from '../../test/axe';
 
 vi.mock('../../api/config', () => ({
   axiosInstance: { post: vi.fn(), get: vi.fn() },
@@ -112,6 +113,20 @@ beforeEach(() => {
   vi.mocked(reviewWorkflowApi.transitionDocumentWorkflow).mockResolvedValue({
     data: started,
   } as Awaited<ReturnType<typeof reviewWorkflowApi.transitionDocumentWorkflow>>);
+});
+
+describe('NewReviewPage accessibility (issue #460)', () => {
+  it('has no accessibility violations on step 1 with a picked file', async () => {
+    const { container } = renderPage();
+    pickPdf();
+    expect(await checkA11y(container)).toHaveNoViolations();
+  });
+
+  it('has no accessibility violations on step 3', async () => {
+    const { container } = renderPage();
+    await goToStep3WithMax();
+    expect(await checkA11y(container)).toHaveNoViolations();
+  });
 });
 
 describe('NewReviewPage — step 1', () => {

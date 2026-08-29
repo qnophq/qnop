@@ -152,10 +152,19 @@ export function StorageConsistencyPage() {
           <Button
             variant="outlined"
             startIcon={
-              <RefreshCw
-                size={16}
-                style={isFetching ? { animation: 'qnop-spin 1s linear infinite' } : undefined}
-              />
+              <Box
+                component="span"
+                sx={{
+                  display: 'inline-flex',
+                  // The one animation on this page; stilled for reduced-motion
+                  // users like every other spinner in the app (issue #460).
+                  animation: isFetching ? 'qnop-spin 1s linear infinite' : 'none',
+                  '@keyframes qnop-spin': { to: { transform: 'rotate(360deg)' } },
+                  '@media (prefers-reduced-motion: reduce)': { animation: 'none' },
+                }}
+              >
+                <RefreshCw size={16} />
+              </Box>
             }
             onClick={handleRescan}
             disabled={isFetching}
@@ -164,7 +173,6 @@ export function StorageConsistencyPage() {
           </Button>
         }
       />
-      <style>{'@keyframes qnop-spin { to { transform: rotate(360deg); } }'}</style>
 
       {isScanLimit(error) ? (
         <Alert severity="warning">

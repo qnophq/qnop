@@ -37,6 +37,7 @@ import { useParticipants } from '../../api/hooks/useReviews';
 import { buildTheme } from '../../theme/theme';
 import { useAuthStore } from '../../stores/authStore';
 import { ReviewTasksPage } from './ReviewTasksPage';
+import { checkA11y } from '../../test/axe';
 
 // The reaction toggles (issue #410) reach for the query client; the data
 // hooks above stay mocked, so a bare client per file is all the tests need.
@@ -123,7 +124,7 @@ function mockData() {
 }
 
 function renderPage(initialEntry = '/reviews/d1/tasks') {
-  render(
+  return render(
     <QueryClientProvider client={queryClient}>
       <ThemeProvider theme={buildTheme('light')}>
         <MemoryRouter initialEntries={[initialEntry]}>
@@ -148,6 +149,12 @@ afterEach(() => {
 });
 
 describe('ReviewTasksPage', () => {
+  it('has no accessibility violations', async () => {
+    mockData();
+    const { container } = renderPage();
+    expect(await checkA11y(container)).toHaveNoViolations();
+  });
+
   it('renders the board with derived columns and filter counts', () => {
     mockData();
     renderPage();

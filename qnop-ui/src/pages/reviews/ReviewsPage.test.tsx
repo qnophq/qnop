@@ -30,6 +30,7 @@ import { buildTheme } from '../../theme/theme';
 import { useAuthStore } from '../../stores/authStore';
 import { useReviews } from '../../api/hooks/useReviews';
 import { ReviewsPage } from './ReviewsPage';
+import { checkA11y } from '../../test/axe';
 
 vi.mock('../../api/hooks/useReviews', () => ({
   useReviews: vi.fn(),
@@ -787,5 +788,10 @@ describe('ReviewsPage — the admin moderation listing (#563)', () => {
     expect(await screen.findByRole('button', { name: /New review/i })).toBeDisabled();
     // Was a tooltip, which only a pointer could reach (issue #690).
     expect(screen.getByRole('alert')).toHaveTextContent(/Finalizing or archiving a review/);
+  });
+
+  it('has no accessibility violations', async () => {
+    const { container } = renderPage();
+    expect(await checkA11y(container)).toHaveNoViolations();
   });
 });

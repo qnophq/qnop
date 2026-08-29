@@ -33,6 +33,7 @@ import {
 import { buildTheme } from '../../../theme/theme';
 import { TaskBoard } from './TaskBoard';
 import { TASK_DRAG_TYPE } from './TaskCard';
+import { checkA11y } from '../../../test/axe';
 
 // TaskCard resolves mention tokens through the review roster (issue #462);
 // these tests run without a query client, so the resolver stays identity.
@@ -75,7 +76,7 @@ function renderBoard({
   onResolve?: Mock<(annotationId: string) => void>;
   onOpen?: Mock<(annotationId: string) => void>;
 } = {}) {
-  render(
+  const { container } = render(
     <ThemeProvider theme={buildTheme('light')}>
       <TaskBoard
         annotations={ANNOTATIONS}
@@ -87,7 +88,7 @@ function renderBoard({
       />
     </ThemeProvider>,
   );
-  return { onResolve, onOpen };
+  return { container, onResolve, onOpen };
 }
 
 const dataTransfer = (id: string) => ({
@@ -149,5 +150,10 @@ describe('TaskBoard', () => {
     expect(screen.getByTestId('task-card-a-open')).toHaveAttribute('draggable', 'true');
     expect(screen.getByTestId('task-card-a-talk')).toHaveAttribute('draggable', 'false');
     expect(screen.getByTestId('task-card-a-done')).toHaveAttribute('draggable', 'false');
+  });
+
+  it('has no accessibility violations', async () => {
+    const { container } = renderBoard();
+    expect(await checkA11y(container)).toHaveNoViolations();
   });
 });

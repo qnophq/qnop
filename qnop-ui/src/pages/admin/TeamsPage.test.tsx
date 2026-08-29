@@ -28,6 +28,7 @@ import { MemoryRouter } from 'react-router';
 import type { AdminTeamListResponse, AdminTeamSummary } from '../../api/generated';
 import { buildTheme } from '../../theme/theme';
 import { TeamsPage } from './TeamsPage';
+import { checkA11y } from '../../test/axe';
 
 type TeamsHookResult = {
   data: AdminTeamListResponse | undefined;
@@ -158,6 +159,11 @@ const openRowMenu = async (teamName: string) => {
 };
 
 describe('TeamsPage', () => {
+  it('has no accessibility violations', async () => {
+    const { container } = renderPage();
+    expect(await checkA11y(container)).toHaveNoViolations();
+  });
+
   it('renders a row per team with description, member count and status', () => {
     renderPage();
 

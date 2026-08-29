@@ -32,6 +32,7 @@ import { useDocument } from '../../../api/hooks/useDocuments';
 import { buildTheme } from '../../../theme/theme';
 import { useAuthStore } from '../../../stores/authStore';
 import { AnnotationPanel } from './AnnotationPanel';
+import { checkA11y } from '../../../test/axe';
 
 // The reaction toggles (issue #410) reach for the query client; the data
 // hooks above stay mocked, so a bare client per file is all the tests need.
@@ -769,6 +770,11 @@ describe('AnnotationPanel', () => {
     fireEvent.keyUp(ta, { key: 'l' });
 
     expect(screen.getByText('Alice')).toBeInTheDocument();
+  });
+
+  it('has no accessibility violations', async () => {
+    const { container } = renderPanel({ annotations: [annotation('a1'), annotation('a2')] });
+    expect(await checkA11y(container)).toHaveNoViolations();
   });
 });
 

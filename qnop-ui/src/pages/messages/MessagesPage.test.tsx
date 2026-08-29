@@ -28,6 +28,7 @@ import type { NotificationSummary } from '../../api/generated';
 import { buildTheme } from '../../theme/theme';
 import { useMarkAllNotificationsRead, useNotifications } from '../../api/hooks/useNotifications';
 import { MessagesPage } from './MessagesPage';
+import { checkA11y } from '../../test/axe';
 
 vi.mock('../../api/hooks/useNotifications', () => ({
   useNotifications: vi.fn(),
@@ -100,6 +101,11 @@ beforeEach(() => {
 });
 
 describe('MessagesPage', () => {
+  it('has no accessibility violations', async () => {
+    const { container } = renderPage();
+    expect(await checkA11y(container)).toHaveNoViolations();
+  });
+
   it('lists notifications with their review and quoted excerpt', () => {
     renderPage();
 

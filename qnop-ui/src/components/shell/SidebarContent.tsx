@@ -22,6 +22,7 @@
 import Box from '@mui/material/Box';
 import Divider from '@mui/material/Divider';
 import List from '@mui/material/List';
+import ListItem from '@mui/material/ListItem';
 import ListItemButton from '@mui/material/ListItemButton';
 import ListItemIcon from '@mui/material/ListItemIcon';
 import ListItemText from '@mui/material/ListItemText';
@@ -134,8 +135,13 @@ export function SidebarContent({ collapsed, onNavigate }: SidebarContentProps) {
         )}
       </Box>
 
-      {/* Navigation */}
-      <Box sx={{ flex: 1, overflowY: 'auto', overflowX: 'hidden', py: 1 }}>
+      {/* Navigation — a named landmark, so a screen reader can jump straight to
+          it instead of walking the rail (issue #460). */}
+      <Box
+        component="nav"
+        aria-label="Main navigation"
+        sx={{ flex: 1, overflowY: 'auto', overflowX: 'hidden', py: 1 }}
+      >
         {groups.map((group, gi) => (
           <Box key={group.label || `g${gi}`} sx={{ px: 1, pt: gi === 0 ? 0.5 : 1.5 }}>
             {group.label && !collapsed && (
@@ -158,7 +164,6 @@ export function SidebarContent({ collapsed, onNavigate }: SidebarContentProps) {
               {group.items.map((item) => {
                 const button = (
                   <ListItemButton
-                    key={item.id}
                     component={NavLink}
                     to={item.path}
                     end={item.path === '/'}
@@ -197,12 +202,19 @@ export function SidebarContent({ collapsed, onNavigate }: SidebarContentProps) {
                     )}
                   </ListItemButton>
                 );
-                return collapsed ? (
-                  <Tooltip key={item.id} title={item.label} placement="right">
-                    {button}
-                  </Tooltip>
-                ) : (
-                  button
+                // Each entry sits in its own `<li>`: a `<ul>` whose direct
+                // children are anchors is invalid list markup and axe flags
+                // it (issue #460).
+                return (
+                  <ListItem key={item.id} disablePadding disableGutters>
+                    {collapsed ? (
+                      <Tooltip title={item.label} placement="right">
+                        {button}
+                      </Tooltip>
+                    ) : (
+                      button
+                    )}
+                  </ListItem>
                 );
               })}
             </List>
