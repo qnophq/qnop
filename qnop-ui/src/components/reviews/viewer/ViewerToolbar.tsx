@@ -205,6 +205,14 @@ export function ViewerToolbar({
         </Stack>
 
         <Stack direction="row" spacing={1.5} sx={{ alignItems: 'center' }}>
+          {/* Separates the sub-groups on one row; hidden below sm, where the
+              cluster may wrap and a dangling divider would end the first row. */}
+          <Divider
+            orientation="vertical"
+            flexItem
+            sx={{ display: { xs: 'none', sm: 'block' } }}
+          />
+
           {/* Panel vs. focus is a presentation of THIS tab (issue #403), so the
               switch lives here rather than in the page-level tab strip. */}
           <ToggleButtonGroup
