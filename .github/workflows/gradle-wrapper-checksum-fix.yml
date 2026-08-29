@@ -1,0 +1,70 @@
+# SPDX-License-Identifier: AGPL-3.0-only
+#
+# Auto-correct the Gradle wrapper checksum on Renovate branches (issue #769).
+#
+# Renovate's gradle-wrapper manager bumps distributionUrl on a Gradle release
+# but leaves distributionSha256Sum untouched (issue #763), so every wrapper PR
+# arrives with a stale pin. The CI guard (issue #768) catches that in seconds
+# and prints the value to paste in; this workflow pastes it. It runs the same
+# script in `--fix` mode, so guard and fixer can never disagree, and commits
+# the single corrected line.
+#
+# Two things make this work at all, both from ADR-0017:
+#  - The push uses the Renovate App's installation token, not GITHUB_TOKEN. A
+#    GITHUB_TOKEN push starts no workflow runs (GitHub's anti-recursion rule),
+#    so the PR would keep its stale red checks and nothing would be gained.
+#  - The commit carries its own author, listed in gitIgnoredAuthors of
+#    .github/renovate.json, so Renovate keeps updating the branch instead of
+#    treating it as modified by a human — and the fix stays recognisable in
+#    `git log`.
+#
+# Scope guard: only branches under renovate/**, only when that one file
+# changed, and the job refuses to push anything but a one-line change to it.
+# Everything wider is a privileged workflow with push access looking for a
+# way to go wrong. A push by this workflow re-triggers it once; the second run
+# finds the pin correct and ends without a commit.
+
+name: Gradle wrapper checksum fix
+
+on:
+  push:
+    branches: ['renovate/**']
+    paths: ['gradle/wrapper/gradle-wrapper.properties']
+
+permissions:
+  contents: read
+
+jobs:
+  fix:
+    name: Correct a stale distributionSha256Sum
+    runs-on: ubuntu-latest
+    steps:
+      - name: Mint Renovate App token
+        id: app-token
+        uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
+        with:
+          app-id: ${{ secrets.RENOVATE_APP_ID }}
+          private-key: ${{ secrets.RENOVATE_APP_PRIVATE_KEY }}
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          token: ${{ steps.app-token.outputs.token }}
+      - name: Correct the pin if it is stale
+        run: scripts/check-gradle-wrapper-checksum.sh --fix
+      - name: Commit and push the corrected line
+        run: |
+          if git diff --quiet; then
+            echo "pin already matches — nothing to push"
+            exit 0
+          fi
+          # The scope guard: exactly one file, exactly one line replaced.
+          changed="$(git diff --name-only)"
+          [ "$changed" = "gradle/wrapper/gradle-wrapper.properties" ] || {
+            echo "::error::refusing to push: unexpected changes in $changed"; exit 1; }
+          read -r added removed _ < <(git diff --numstat -- gradle/wrapper/gradle-wrapper.properties)
+          [ "$added" = 1 ] && [ "$removed" = 1 ] || {
+            echo "::error::refusing to push: expected a one-line change, got +$added -$removed"; exit 1; }
+          git config user.name 'qnop-wrapper-checksum-fix[bot]'
+          git config user.email 'qnop-wrapper-checksum-fix[bot]@users.noreply.github.com'
+          git commit -am 'chore(deps): correct the Gradle wrapper distribution checksum' \
+            -m 'The wrapper bump left distributionSha256Sum on the previous release (issue #763); set it to the checksum Gradle publishes for the new distributionUrl. Automated by gradle-wrapper-checksum-fix.yml (issue #769).'
+          git push

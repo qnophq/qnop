@@ -18,10 +18,22 @@
 # on every wrapper run.
 #
 # Run from the repo root:
-#   scripts/check-gradle-wrapper-checksum.sh [path/to/gradle-wrapper.properties]
+#   scripts/check-gradle-wrapper-checksum.sh [--fix] [path/to/gradle-wrapper.properties]
+#
+# --fix (issue #769) rewrites the distributionSha256Sum line to the published
+# value instead of failing, and touches nothing else in the file. The guard and
+# the fixer share this one script so their notion of "the pinned URL" and "the
+# published checksum" can never drift apart. Exit status is 0 whether the pin
+# already matched or was just corrected; the caller reads `git diff` to learn
+# which.
 
 set -euo pipefail
 
+FIX=0
+if [[ "${1:-}" == "--fix" ]]; then
+  FIX=1
+  shift
+fi
 PROPS="${1:-gradle/wrapper/gradle-wrapper.properties}"
 
 fail() {
@@ -55,6 +67,16 @@ published="$(curl -fsSL --retry 3 --retry-delay 2 "${url}.sha256" | tr -d '[:spa
 [[ "$published" =~ ^[0-9a-f]{64}$ ]] || fail \
   "${url}.sha256 did not return a SHA-256 digest" \
   "Got: ${published:0:100}"
+
+if [[ "$pinned" != "$published" && "$FIX" == 1 ]]; then
+  # Replace the value on the existing line only; every other line stays byte
+  # for byte, so the resulting diff is exactly one line.
+  sed -i "s/^distributionSha256Sum=.*$/distributionSha256Sum=${published}/" "$PROPS"
+  echo "distributionSha256Sum corrected to the checksum published for ${url##*/}"
+  echo "  was: $pinned"
+  echo "  now: $published"
+  exit 0
+fi
 
 if [[ "$pinned" != "$published" ]]; then
   fail \

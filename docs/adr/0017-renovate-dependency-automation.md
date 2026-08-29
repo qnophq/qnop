@@ -59,3 +59,15 @@ An App installation token is a distinct identity: it is not bound by the Actions
 ## Amendment (2026-07-16): frontend lockfile
 
 The frontend lockfile noted as missing under *Consequences* (`qnop-ui/pnpm-lock.yaml`) has since been committed; Renovate updates it as part of its npm PRs.
+
+## Amendment (2026-08-29): Gradle wrapper checksum auto-fix
+
+Renovate's `gradle-wrapper` manager bumps `distributionUrl` on a Gradle release but leaves `distributionSha256Sum` (the pin from issue #194) untouched, so every wrapper PR arrived with a stale pin and four opaque "Verification of Gradle distribution failed!" jobs (issue #763). The CI guard from issue #768 turned that into a fast failure that prints the value to paste in; issue #769 closes the remaining manual step.
+
+**Decision:** a second privileged workflow, `.github/workflows/gradle-wrapper-checksum-fix.yml`, runs on `push` to `renovate/**` when `gradle/wrapper/gradle-wrapper.properties` changed, runs the guard script in `--fix` mode (one script for guard and fixer, so they cannot disagree), and commits the corrected line.
+
+- It pushes with the **Renovate App installation token** — the same identity and secrets as the Renovate run — because a `GITHUB_TOKEN` push starts no workflow runs and the PR would keep its stale red checks.
+- It commits as its **own author**, `qnop-wrapper-checksum-fix[bot]`, listed in `gitIgnoredAuthors` of `.github/renovate.json`, so Renovate keeps updating the branch (it otherwise stops on a branch whose last commit is not its own) and the fix stays distinguishable in `git log`. The alternative — committing under Renovate's identity — needs no config but hides the automation.
+- **Scope guard:** the job refuses to push anything but a one-line change to that one file, and only on `renovate/**`. Its own push re-triggers it once; that run finds the pin correct and ends without a commit.
+
+**Consequence:** one more workflow holds the App private key and can push to Renovate branches — the trade-off issue #769 weighs. Accepted because the blast radius is bounded by the scope guard, and because the alternative was a monthly hand-edit that the guard only made faster, not unnecessary.
