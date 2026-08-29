@@ -63,11 +63,12 @@ for (const breakpoint of BREAKPOINTS) {
           surface.name.startsWith('review workspace') && breakpoint.width <= 375,
           'issue #772',
         );
-        // KPI card rows do not wrap: the storage-consistency row overflows at
-        // 320, the dashboard's at 320 and 375 (issue #773).
+        // KPI card rows do not wrap: the dashboard's and the storage-consistency
+        // page's overflow at 320 (issue #773). At 375 the dashboard's row fits
+        // the smoke data by a hair — not marked, since a hair is not a promise.
         test.fail(
-          (surface.name === 'admin storage consistency' && breakpoint.width === 320) ||
-            (surface.name === 'dashboard' && breakpoint.width <= 375),
+          ['dashboard', 'admin storage consistency'].includes(surface.name) &&
+            breakpoint.width === 320,
           'issue #773',
         );
         // The review head's action row (784 px) is wider than the content beside

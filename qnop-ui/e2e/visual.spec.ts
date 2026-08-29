@@ -20,7 +20,7 @@
  */
 
 import { BREAKPOINTS, VISUAL_WIDTHS } from './breakpoints';
-import { expect, FIXED_TIME, open, settle, test } from './fixtures';
+import { expect, fixedTime, open, settle, test } from './fixtures';
 
 /**
  * Screenshot baselines for the surfaces whose layout the #461 audit cares
@@ -60,7 +60,7 @@ for (const breakpoint of visual) {
         viewport: { width: breakpoint.width, height: breakpoint.height },
       });
       const page = await context.newPage();
-      await page.clock.setFixedTime(FIXED_TIME);
+      await page.clock.setFixedTime(fixedTime());
       await page.goto('/login');
       await expect(page.locator('form button[type=submit]')).toBeVisible();
       await settle(page);
