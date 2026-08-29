@@ -162,11 +162,14 @@ transforms, which cost more than a test's timeout inside the Playwright image.
 - `visual.spec.ts`: screenshot baselines of the dashboard, reviews list, review
   workspace, tasks board and login at 320/768/1024/1440, light theme. The theme
   changes colours, not boxes, so one theme carries the layout signal. The
-  browser clock is fixed (`FIXED_TIME`) so the hour-of-day greeting and every
-  relative time render the same on every run.
+  browser clock is frozen one hour after the smoke review was created — not at
+  a calendar date, because the review is re-created by every smoke run — so the
+  hour-of-day greeting and every relative time render the same on every run.
 
 **Running it locally.** Bring the smoke stack up and run the smoke script once
-(it seeds the users and uploads the review the suite reads), then from
+— the real one, `scripts/smoke-test.sh`, because the screenshots are of its
+data: the users it seeds, the review it uploads, the due date it clears, the
+fixtures it adds. A hand-seeded backend renders a different page. Then from
 `qnop-ui/`: `pnpm test:e2e` for a run on the host Chromium (it builds the
 bundle first), or `scripts/e2e-docker.sh` for the run CI does. Point `QNOP_API_URL` at the
 backend if it is not on `localhost:8080`.

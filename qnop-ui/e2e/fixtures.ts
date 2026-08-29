@@ -40,17 +40,20 @@ export const BASE_URL = process.env.E2E_BASE_URL ?? 'http://localhost:5173';
  */
 export const SMOKE_REVIEW_TITLE = 'Smoke Review';
 
-/**
- * A moment the whole run agrees on. The dashboard greets by the hour and every
- * list shows relative times, so screenshots taken at real time would drift
- * from one run to the next. Later than every seeded timestamp, earlier than
- * the smoke review's due date.
- */
-export const FIXED_TIME = new Date('2026-08-28T10:00:00Z');
+/** Set by global.setup.ts: the moment the whole run agrees on, see {@link fixedTime}. */
+export const FIXED_TIME_ENV = 'E2E_FIXED_TIME';
+
+/** One hour after the smoke review was created (see global.setup.ts). */
+export function fixedTime(): Date {
+  const value = process.env[FIXED_TIME_ENV];
+  if (!value) throw new Error(`${FIXED_TIME_ENV} is not set — global.setup.ts did not run`);
+  return new Date(value);
+}
 
 interface DocumentSummary {
   readonly id: string;
   readonly title: string;
+  readonly createdAt: string;
 }
 
 /** Set by global.setup.ts — one API login per run, inherited by every worker. */
@@ -159,7 +162,7 @@ export const expect = baseExpect;
  * never idle for long on the surfaces that matter most.
  */
 export async function open(page: Page, path: string): Promise<void> {
-  await page.clock.setFixedTime(FIXED_TIME);
+  await page.clock.setFixedTime(fixedTime());
   await page.goto(path);
   await page.getByRole('main').waitFor();
   // The workspace is its PDF: the viewer mounts after the review query and

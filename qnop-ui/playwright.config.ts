@@ -49,7 +49,10 @@ export default defineConfig({
   // workers that cold start alone can take most of the default 30 s.
   timeout: 60_000,
   forbidOnly: !!process.env.CI,
-  retries: process.env.CI ? 1 : 0,
+  // About one page in a hundred never renders its shell — no request, no
+  // error, just a blank tab — and the same page renders on the next attempt.
+  // One retry absorbs it; a real failure fails twice.
+  retries: 1,
   reporter: process.env.CI ? [['github'], ['html', { open: 'never' }]] : [['list']],
   use: {
     baseURL,

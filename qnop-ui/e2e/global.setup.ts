@@ -20,17 +20,30 @@
  */
 
 import { request } from '@playwright/test';
-import { BASE_URL, findSmokeReview, SMOKE_REVIEW_ID_ENV } from './fixtures';
+import { BASE_URL, findSmokeReview, FIXED_TIME_ENV, SMOKE_REVIEW_ID_ENV } from './fixtures';
 
 /**
- * Resolves the smoke review once for the whole run. The login endpoint is
- * rate-limited per IP (ADR-0027, ten per minute), so the run spends one API
- * login here and one browser sign-in per worker — nothing more.
+ * Resolves the smoke review once for the whole run, and with it the moment
+ * the browser clock is frozen at: one hour after the review was created. The
+ * dashboard greets by the hour and every list shows relative times, and the
+ * review is re-created by each smoke run — so a fixed calendar date would
+ * read "in 3 days" on one run and "2 hours ago" on the next, while a moment
+ * tied to the seed reads the same every time.
+ *
+ * The login endpoint is rate-limited per IP (ADR-0027, ten per minute), so
+ * the run spends one API login here and one browser sign-in per worker —
+ * nothing more.
  */
+const ONE_HOUR_MS = 60 * 60 * 1000;
+
 export default async function globalSetup(): Promise<void> {
   const api = await request.newContext({ baseURL: BASE_URL });
   try {
-    process.env[SMOKE_REVIEW_ID_ENV] = (await findSmokeReview(api)).id;
+    const review = await findSmokeReview(api);
+    process.env[SMOKE_REVIEW_ID_ENV] = review.id;
+    process.env[FIXED_TIME_ENV] = new Date(
+      new Date(review.createdAt).getTime() + ONE_HOUR_MS,
+    ).toISOString();
   } finally {
     await api.dispose();
   }
