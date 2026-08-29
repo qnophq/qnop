@@ -56,7 +56,14 @@ export function StatStrip({ tiles }: { tiles: StatTile[] }) {
     <Box
       sx={{
         display: 'grid',
-        gridTemplateColumns: { xs: '1fr 1fr', sm: 'repeat(4, 1fr)' },
+        // minmax(0, 1fr): a plain 1fr column refuses to shrink below its
+        // content's min width, so the longest label pushed the whole grid
+        // past a 320 px viewport (issue #773). With the floor at 0 the tiles
+        // share the row and the labels wrap instead.
+        gridTemplateColumns: {
+          xs: 'repeat(2, minmax(0, 1fr))',
+          sm: 'repeat(4, minmax(0, 1fr))',
+        },
         gap: 1.5,
       }}
     >
@@ -106,7 +113,10 @@ export function StatStrip({ tiles }: { tiles: StatTile[] }) {
                 >
                   {tile.value}
                 </Typography>
-                <Typography variant="caption" color="text.secondary" noWrap component="p">
+                {/* Wrapping beats truncation for a KPI label: on a 320 px
+                    phone "Resolved this week" takes a second line instead of
+                    an ellipsis. */}
+                <Typography variant="caption" color="text.secondary" component="p">
                   {tile.label}
                 </Typography>
               </Box>
