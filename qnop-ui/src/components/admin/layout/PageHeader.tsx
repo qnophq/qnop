@@ -88,8 +88,10 @@ export function PageHeader({
         </Box>
       </Stack>
       {/* maxWidth caps the slot at the line it wrapped onto, so a wide action
-          bar's own flexWrap finally has an edge to break at (issue #774). */}
-      {action && <Box sx={{ flexShrink: 0, maxWidth: '100%' }}>{action}</Box>}
+          bar's own flexWrap finally has an edge to break at; ml: 'auto' keeps
+          the slot right-aligned even when it is alone on a wrapped line, where
+          space-between would park a lone item at line start (issue #774). */}
+      {action && <Box sx={{ flexShrink: 0, maxWidth: '100%', ml: { md: 'auto' } }}>{action}</Box>}
     </Stack>
   );
 }
