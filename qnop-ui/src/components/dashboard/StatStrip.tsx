@@ -109,6 +109,10 @@ export function StatStrip({ tiles }: { tiles: StatTile[] }) {
                     lineHeight: 1.2,
                     fontVariantNumeric: 'tabular-nums',
                     color: tile.value > 0 ? color : 'text.primary',
+                    // Defensive: a many-digit value is one unbreakable token;
+                    // without this it would re-open the overflow the
+                    // minmax(0, 1fr) columns just closed (issue #773).
+                    overflowWrap: 'anywhere',
                   }}
                 >
                   {tile.value}
