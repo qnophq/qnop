@@ -64,13 +64,16 @@ lines, Home/End jump to the line ends), Shift extends a range, Enter emits it
 exactly like a pointer release, Escape clears. A visually hidden description
 names the keys. Caret and range paint with the same marker bands as a drag.
 
-### 6. Region (rubber-band) selection is pointer-only — tracked
+### 6. Region (rubber-band) selection is pointer-only — fixed (#771)
 
-`RegionSelectLayer` has no keyboard equivalent. With text selection now
-keyboard-reachable (finding 5), a keyboard user can annotate any extracted
-text; what they cannot do is mark an arbitrary rectangle (a figure, a scanned
-page). A keyboard rectangle (arrows move, Shift+arrows size, Enter commits) is
-a self-contained follow-up and is filed as such rather than bolted on here.
+`RegionSelectLayer` had no keyboard equivalent. With text selection
+keyboard-reachable (finding 5), a keyboard user could annotate any extracted
+text; what they could not do was mark an arbitrary rectangle (a figure, a
+scanned page). The layer is now focusable while region mode is on: the first
+arrow press places a rectangle, arrows move it (Shift for larger steps),
+Alt+arrows grow or shrink it, Enter commits through the same path as a
+pointer release, Escape clears. A visually hidden description names the keys;
+the draft paints with the pointer preview's styling.
 
 ### 7. Expanded annotation card nests controls inside `role="button"` — tracked (#549)
 

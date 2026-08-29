@@ -120,3 +120,123 @@ describe('RegionSelectLayer', () => {
     expect(onRegionSelected).not.toHaveBeenCalled();
   });
 });
+
+describe('RegionSelectLayer keyboard path (issue #771)', () => {
+  it('is focusable with a described keyboard hint while enabled', () => {
+    const { layer } = renderLayer();
+    expect(layer).toHaveAttribute('tabindex', '0');
+    expect(layer).toHaveAccessibleDescription(/first arrow key press places/);
+  });
+
+  it('leaves the tab order when disabled', () => {
+    const { layer } = renderLayer(false);
+    expect(layer).toHaveAttribute('tabindex', '-1');
+  });
+
+  it('places the rectangle on the first arrow press and moves it on the next', () => {
+    const { layer } = renderLayer();
+
+    fireEvent.keyDown(layer, { key: 'ArrowRight' });
+    const draft = screen.getByTestId('region-draft-0');
+    // The initial box: centered fifth of the page.
+    expect(draft.style.left).toBe('40%');
+    expect(draft.style.top).toBe('40%');
+
+    fireEvent.keyDown(layer, { key: 'ArrowRight' });
+    expect(draft.style.left).toBe('42%');
+
+    fireEvent.keyDown(layer, { key: 'ArrowDown', shiftKey: true });
+    expect(draft.style.top).toBe('50%');
+  });
+
+  it('grows and shrinks the rectangle with Alt + arrows', () => {
+    const { layer } = renderLayer();
+
+    fireEvent.keyDown(layer, { key: 'ArrowRight' });
+    fireEvent.keyDown(layer, { key: 'ArrowRight', altKey: true });
+    const draft = screen.getByTestId('region-draft-0');
+    expect(draft.style.width).toBe('22%');
+
+    fireEvent.keyDown(layer, { key: 'ArrowUp', altKey: true, shiftKey: true });
+    expect(draft.style.height).toBe('10%');
+  });
+
+  it('clamps growth at the page edge and shrinking at the minimum size', () => {
+    const { layer } = renderLayer();
+
+    fireEvent.keyDown(layer, { key: 'ArrowRight' });
+    // Grow far past the right edge: width caps at 1 - x = 0.6.
+    for (let i = 0; i < 8; i += 1) {
+      fireEvent.keyDown(layer, { key: 'ArrowRight', altKey: true, shiftKey: true });
+    }
+    const draft = screen.getByTestId('region-draft-0');
+    expect(draft.style.width).toBe('60%');
+
+    // Shrink far past zero: height floors at the 2% minimum.
+    for (let i = 0; i < 8; i += 1) {
+      fireEvent.keyDown(layer, { key: 'ArrowUp', altKey: true, shiftKey: true });
+    }
+    expect(draft.style.height).toBe('2%');
+  });
+
+  it('keeps the rectangle on the page when moving against an edge', () => {
+    const { layer } = renderLayer();
+
+    fireEvent.keyDown(layer, { key: 'ArrowLeft' });
+    for (let i = 0; i < 6; i += 1) {
+      fireEvent.keyDown(layer, { key: 'ArrowLeft', shiftKey: true });
+    }
+    const draft = screen.getByTestId('region-draft-0');
+    expect(draft.style.left).toBe('0%');
+    expect(draft.style.width).toBe('20%');
+  });
+
+  it('commits the rectangle with Enter through the pointer path, at its bottom-right corner', () => {
+    const { layer, onRegionSelected } = renderLayer();
+
+    fireEvent.keyDown(layer, { key: 'ArrowRight' });
+    fireEvent.keyDown(layer, { key: 'Enter' });
+
+    // { x: 0.4, y: 0.4, width: 0.2, height: 0.2 } against the 200×100 rect.
+    expect(onRegionSelected).toHaveBeenCalledWith(
+      0,
+      { x: 0.4, y: 0.4, width: 0.2, height: 0.2 },
+      { left: 120, top: 60 },
+    );
+    expect(screen.queryByTestId('region-draft-0')).toBeNull();
+  });
+
+  it('clears the rectangle on Escape and on blur without committing', () => {
+    const { layer, onRegionSelected } = renderLayer();
+
+    fireEvent.keyDown(layer, { key: 'ArrowRight' });
+    fireEvent.keyDown(layer, { key: 'Escape' });
+    expect(screen.queryByTestId('region-draft-0')).toBeNull();
+
+    fireEvent.keyDown(layer, { key: 'ArrowRight' });
+    fireEvent.blur(layer);
+    expect(screen.queryByTestId('region-draft-0')).toBeNull();
+
+    expect(onRegionSelected).not.toHaveBeenCalled();
+  });
+
+  it('does nothing on Enter or Escape before a rectangle exists', () => {
+    const { layer, onRegionSelected } = renderLayer();
+
+    fireEvent.keyDown(layer, { key: 'Enter' });
+    fireEvent.keyDown(layer, { key: 'Escape' });
+
+    expect(onRegionSelected).not.toHaveBeenCalled();
+    expect(screen.queryByTestId('region-draft-0')).toBeNull();
+  });
+
+  it('ignores keys when disabled', () => {
+    const { layer, onRegionSelected } = renderLayer(false);
+
+    fireEvent.keyDown(layer, { key: 'ArrowRight' });
+    fireEvent.keyDown(layer, { key: 'Enter' });
+
+    expect(onRegionSelected).not.toHaveBeenCalled();
+    expect(screen.queryByTestId('region-draft-0')).toBeNull();
+  });
+});
