@@ -211,8 +211,8 @@ export function AnnotationHead({
             borderColor: 'divider',
             bgcolor: theme.qnop.surface2,
             borderRadius: '0 6px 6px 0',
-            // The passage is copy material (issue #478) — selectable even
-            // inside the clickable card (ButtonBase disables selection).
+            // The passage is copy material (issue #478): explicitly selectable
+            // so no ancestor styling can ever take that away again.
             userSelect: 'text',
             px: 1.25,
             py: 0.75,

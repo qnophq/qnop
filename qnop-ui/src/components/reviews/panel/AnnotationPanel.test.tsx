@@ -21,11 +21,14 @@
 
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { cleanup, fireEvent, render, screen, within } from '@testing-library/react';
+import { axe } from 'vitest-axe';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { ThemeProvider } from '@mui/material/styles';
+import { MemoryRouter } from 'react-router';
 import type { AnnotationView } from '../../../api/generated';
 import { AnnotationStatus, ParticipantKind, PlacementStatus } from '../../../api/generated';
 import { useParticipants } from '../../../api/hooks/useReviews';
+import { useDocument } from '../../../api/hooks/useDocuments';
 import { buildTheme } from '../../../theme/theme';
 import { useAuthStore } from '../../../stores/authStore';
 import { AnnotationPanel } from './AnnotationPanel';
@@ -52,6 +55,14 @@ vi.mock('./CommentThread', () => ({
   ),
 }));
 
+// Partial: only the review lookup is steered. It gates the profile hover cards
+// (issue #482) — without a review they render neither card nor link, and the
+// nested-interactive assertions below would be vacuous.
+vi.mock('../../../api/hooks/useDocuments', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../../api/hooks/useDocuments')>()),
+  useDocument: vi.fn(),
+}));
+
 vi.mock('../../../api/hooks/useComments', () => ({
   useComments: vi.fn().mockReturnValue({ isPending: false, isError: false, data: undefined }),
 }));
@@ -74,6 +85,7 @@ vi.mock('../../../api/hooks/useAnnotations', () => ({
 beforeEach(() => {
   resolveMutate.mockClear();
   confirmMutate.mockClear();
+  vi.mocked(useDocument).mockReturnValue({ data: undefined } as never);
   vi.mocked(useParticipants).mockReturnValue({
     data: { participants: [{ principalId: 'other', displayName: 'Anna Weber' }] },
   } as never);
@@ -113,13 +125,17 @@ function renderPanel(props: Partial<Parameters<typeof AnnotationPanel>[0]> = {})
   const wrap = (current: Parameters<typeof AnnotationPanel>[0]) => (
     <QueryClientProvider client={queryClient}>
       <ThemeProvider theme={buildTheme('light')}>
-        <AnnotationPanel {...current} />
+        {/* The profile links in the hover cards (issue #482) are router links. */}
+        <MemoryRouter>
+          <AnnotationPanel {...current} />
+        </MemoryRouter>
       </ThemeProvider>
     </QueryClientProvider>
   );
-  const { rerender } = render(wrap(merged));
+  const { rerender, container } = render(wrap(merged));
   return {
     ...merged,
+    container,
     /** Re-renders the same panel with patched props — the panel keeps its own state. */
     update: (patch: Partial<Parameters<typeof AnnotationPanel>[0]>) =>
       rerender(wrap({ ...merged, ...patch })),
@@ -222,12 +238,22 @@ describe('AnnotationPanel', () => {
     const props = renderPanel({ annotations: [annotation('a1')], activeAnnotationId: 'a1' });
 
     expect(screen.getByTestId('thread-a1')).toBeInTheDocument();
-    fireEvent.click(screen.getByTestId('annotation-item-a1'));
+    // Expanded, the card is a plain container and collapsing is an explicit
+    // control rather than a click anywhere on it (issue #549).
+    fireEvent.click(screen.getByTestId('annotation-toggle-a1'));
     expect(props.onSelect).toHaveBeenCalledWith(null);
   });
 
-  // Issue #480: placement actions live inside the row's ButtonBase — acting on
-  // a placement must never toggle the card the reviewer is reading.
+  it('expands a collapsed row from its toggle', () => {
+    const props = renderPanel({ annotations: [annotation('a1')], activeAnnotationId: null });
+
+    fireEvent.click(screen.getByTestId('annotation-toggle-a1'));
+    expect(props.onSelect).toHaveBeenCalledWith('a1');
+  });
+
+  // Issue #480: acting on a placement must never toggle the card the reviewer
+  // is reading. Since #549 the expanded card is no longer a button at all, so
+  // this holds structurally rather than through a click guard.
   it('keeps the row expanded when "Looks right" confirms a MOVED placement (#480)', () => {
     useAuthStore.setState({ userId: 'u1' });
     const props = renderPanel({
@@ -236,8 +262,6 @@ describe('AnnotationPanel', () => {
       versionNumber: 3,
     });
 
-    // Exact name: the expanded row is itself role="button" and its accessible
-    // name contains the action's text, so a substring match would be ambiguous.
     fireEvent.click(screen.getByRole('button', { name: 'Looks right' }));
 
     expect(confirmMutate).toHaveBeenCalledWith({
@@ -745,5 +769,110 @@ describe('AnnotationPanel', () => {
     fireEvent.keyUp(ta, { key: 'l' });
 
     expect(screen.getByText('Alice')).toBeInTheDocument();
+  });
+});
+
+// Issue #549: the expanded card hosts real controls — placement actions, copy,
+// reactions, profile links — so it may not be a role="button" itself. The
+// toggle is explicit instead: the collapsed row IS the button, the expanded
+// card carries a collapse chevron.
+describe('AnnotationPanel accessibility (#549)', () => {
+  beforeEach(() => {
+    // A non-anonymous review: every author id is real, so the hover cards and
+    // their profile links render (issue #482).
+    vi.mocked(useDocument).mockReturnValue({
+      data: { id: 'd1', anonymous: false, ownerId: 'u1' },
+    } as never);
+  });
+
+  /** Every focusable element that sits inside something announced as a button. */
+  const nestedInteractives = (container: HTMLElement) =>
+    [...container.querySelectorAll('button, [role="button"]')].flatMap((widget) => [
+      ...widget.querySelectorAll('a[href], button, input, select, textarea, [tabindex]'),
+    ]);
+
+  const AXE_OPTIONS = { rules: { region: { enabled: false } } };
+
+  /** An annotation with every expanded-state control in play. */
+  const loaded = () =>
+    annotation('a1', {
+      placementStatus: PlacementStatus.Moved,
+      reactions: [{ emoji: '👍', count: 1, reactedByMe: false, reactors: ['Anna Weber'] }],
+    });
+
+  it('nests no interactive control inside a button, collapsed or expanded', () => {
+    useAuthStore.setState({ userId: 'u1' });
+    const collapsed = renderPanel({ annotations: [loaded()], activeAnnotationId: null });
+    expect(nestedInteractives(collapsed.container)).toEqual([]);
+    cleanup();
+
+    const expanded = renderPanel({
+      annotations: [loaded()],
+      activeAnnotationId: 'a1',
+      versionNumber: 3,
+      buildPermalink: () => 'https://qnop.test/reviews/d1?annotation=a1',
+      onArmReattach: vi.fn(),
+    });
+    // The card really does carry the controls this test is about.
+    expect(screen.getByRole('button', { name: 'Looks right' })).toBeInTheDocument();
+    expect(nestedInteractives(expanded.container)).toEqual([]);
+  });
+
+  it('has no axe violations with a collapsed list', async () => {
+    useAuthStore.setState({ userId: 'u1' });
+    const { container } = renderPanel({
+      annotations: [loaded(), annotation('a2')],
+      activeAnnotationId: null,
+    });
+
+    expect(await axe(container, AXE_OPTIONS)).toHaveNoViolations();
+  });
+
+  it('has no axe violations with the card expanded', async () => {
+    useAuthStore.setState({ userId: 'u1' });
+    const { container } = renderPanel({
+      annotations: [loaded()],
+      activeAnnotationId: 'a1',
+      versionNumber: 3,
+      buildPermalink: () => 'https://qnop.test/reviews/d1?annotation=a1',
+      onArmReattach: vi.fn(),
+    });
+
+    expect(await axe(container, AXE_OPTIONS)).toHaveNoViolations();
+  });
+
+  it('announces the toggle state on the control that carries it', () => {
+    const panel = renderPanel({ annotations: [annotation('a1')], activeAnnotationId: null });
+    expect(screen.getByTestId('annotation-toggle-a1')).toHaveAttribute('aria-expanded', 'false');
+
+    panel.update({ activeAnnotationId: 'a1' });
+    expect(screen.getByTestId('annotation-toggle-a1')).toHaveAttribute('aria-expanded', 'true');
+    expect(screen.getByTestId('annotation-toggle-a1')).toHaveAccessibleName('Collapse annotation');
+  });
+
+  // Expanding replaces the focused row button with the collapse chevron, so
+  // without this the keyboard user is dropped back to the document body.
+  it('carries focus across the toggle in both directions', () => {
+    const panel = renderPanel({ annotations: [annotation('a1')], activeAnnotationId: null });
+
+    const row = screen.getByTestId('annotation-toggle-a1');
+    row.focus();
+    fireEvent.click(row);
+    panel.update({ activeAnnotationId: 'a1' });
+    expect(screen.getByTestId('annotation-toggle-a1')).toHaveFocus();
+
+    fireEvent.click(screen.getByTestId('annotation-toggle-a1'));
+    panel.update({ activeAnnotationId: null });
+    expect(screen.getByTestId('annotation-toggle-a1')).toHaveFocus();
+  });
+
+  // A mark click on the page selects the row too (#491) — focus belongs to the
+  // document there, not to the panel.
+  it('leaves focus alone when the selection arrives from outside', () => {
+    const panel = renderPanel({ annotations: [annotation('a1')], activeAnnotationId: null });
+
+    panel.update({ activeAnnotationId: 'a1' });
+
+    expect(screen.getByTestId('annotation-toggle-a1')).not.toHaveFocus();
   });
 });
