@@ -83,6 +83,11 @@ services:
       # The smoke deployment serves plain HTTP, so the refresh cookie must not be
       # Secure-only (otherwise it could not be replayed over http in a test).
       QNOP_AUTH_COOKIE_SECURE: 'false'
+      # The Playwright net (#725) reloads a page per test and every load refreshes
+      # the access token; the per-IP default of 30 refreshes a minute is a brake
+      # on a real deployment and a wall for a test run of a hundred pages from
+      # one address. Test stack only — production keeps the default.
+      QNOP_AUTH_RATE_LIMIT_REFRESH_MAX_ATTEMPTS: '1000'
     ports:
       - '8080:8080'
 

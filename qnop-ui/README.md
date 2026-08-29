@@ -16,7 +16,7 @@ pnpm dev            # generate:api + Vite dev server (proxies /api to :8080)
 pnpm build          # generate:api + tsc -b + vite build
 pnpm typecheck      # generate:api + tsc -b --noEmit
 pnpm test           # vitest (watch) · pnpm test:run for one-shot
-pnpm test:e2e       # Playwright responsive net against a running backend (docs/RESPONSIVE.md)
+pnpm test:e2e       # Playwright responsive net against a running backend · scripts/e2e-docker.sh = the CI run (docs/RESPONSIVE.md)
 pnpm lint           # eslint
 pnpm format         # prettier --write · pnpm format:check
 pnpm generate:api   # regenerate the typed API client

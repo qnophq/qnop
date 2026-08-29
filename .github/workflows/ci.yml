@@ -123,17 +123,19 @@ jobs:
         with:
           distribution: temurin
           java-version: "21"
-      - name: Install the frontend and its browser
+      - name: Install the frontend
         working-directory: qnop-ui
         run: |
           pnpm install --frozen-lockfile
           pnpm generate:api
-          pnpm exec playwright install --with-deps chromium
+      # Inside the official Playwright image, not on the runner: the screenshot
+      # baselines are made in that same image, so fonts and antialiasing match
+      # to the pixel here and on a developer machine alike.
       - name: Run the responsive regression net
         working-directory: qnop-ui
         env:
           QNOP_API_URL: http://localhost:8080
-        run: pnpm test:e2e
+        run: scripts/e2e-docker.sh
       # The report carries the diff images and traces of any failure — the only
       # way to judge a screenshot mismatch, and the input for updating a baseline.
       - name: Upload the Playwright report
