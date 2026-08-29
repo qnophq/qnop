@@ -19,6 +19,7 @@
  * SPDX-License-Identifier: AGPL-3.0-only
  */
 
+import Stack from '@mui/material/Stack';
 import type { AnnotationView, DocumentResponse } from '../../../api/generated';
 import { AnnotationStatus } from '../../../api/generated';
 import { PageHeader } from '../../admin/layout/PageHeader';
@@ -66,7 +67,10 @@ export function ReviewPageHeader({
       title={document.title}
       leading={<DocumentIcon size={34} contentType={document.contentType} />}
       titleAdornment={
-        <>
+        // One Stack, not a Fragment: the header's title row wraps (issue
+        // #775), and two loose flex items could split onto separate lines —
+        // milestones and badge travel as a single unit instead.
+        <Stack direction="row" spacing={1.5} sx={{ alignItems: 'center' }}>
           <WorkflowMilestones
             state={document.workflowState}
             total={annotations.length}
@@ -74,7 +78,7 @@ export function ReviewPageHeader({
             archivedAt={document.archivedAt ?? null}
           />
           {document.anonymous && <AnonymousBadge />}
-        </>
+        </Stack>
       }
       action={
         <ReviewHubHead
