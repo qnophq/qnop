@@ -26,6 +26,7 @@ import { MemoryRouter } from 'react-router';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { ThemeProvider } from '@mui/material/styles';
 import { buildTheme } from '../../theme/theme';
+import { hasTouchTarget } from '../../test/cssRules';
 import { TopBar } from './TopBar';
 
 // The embedded GlobalSearch (#540) queries through TanStack Query; the bar's
@@ -114,4 +115,18 @@ describe('TopBar notifications (#538)', () => {
     expect(screen.getByLabelText('Search reviews, people and teams')).toBeInTheDocument();
     expect(screen.queryByText(/jump to any review/i)).not.toBeInTheDocument();
   });
+});
+
+describe('TopBar touch targets (#724)', () => {
+  it.each(['Toggle menu', 'Switch to dark mode', 'Notifications'])(
+    'gives "%s" a 44 px hit area while keeping the small icon button',
+    (name) => {
+      renderTopBar();
+
+      const button = screen.getByRole('button', { name });
+
+      expect(button.className).toMatch(/MuiIconButton-sizeSmall/);
+      expect(hasTouchTarget(button)).toBe(true);
+    },
+  );
 });

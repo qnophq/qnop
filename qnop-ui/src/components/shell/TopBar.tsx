@@ -29,6 +29,7 @@ import Tooltip from '@mui/material/Tooltip';
 import { Bell, Menu as MenuIcon, Moon, PanelLeft, Sun } from 'lucide-react';
 import { useUnreadCount } from '../../api/hooks/useNotifications';
 import { useUiStore } from '../../stores/uiStore';
+import { touchTargetSx } from '../../theme/touchTarget';
 import { NotificationsPopover } from './NotificationsPopover';
 import { Breadcrumbs } from './Breadcrumbs';
 import { GlobalSearch } from './search/GlobalSearch';
@@ -38,7 +39,13 @@ interface TopBarProps {
   onToggleSidebar: () => void;
 }
 
-/** The application top bar: sidebar toggle, breadcrumbs, search and quick actions. */
+/**
+ * The application top bar: sidebar toggle, breadcrumbs, search and quick actions.
+ *
+ * <p>The icon buttons keep their 28 px visual size but carry a 44 px hit area
+ * (issue #724): they are chrome on every screen and the first thing a thumb
+ * reaches for.
+ */
 export function TopBar({ isMobile, onToggleSidebar }: TopBarProps) {
   const themeMode = useUiStore((s) => s.themeMode);
   const toggleTheme = useUiStore((s) => s.toggleTheme);
@@ -55,7 +62,13 @@ export function TopBar({ isMobile, onToggleSidebar }: TopBarProps) {
     >
       <Toolbar sx={{ gap: 1.5, minHeight: { xs: 56, sm: 56 } }}>
         <Tooltip title={isMobile ? 'Menu' : 'Toggle menu'}>
-          <IconButton onClick={onToggleSidebar} size="small" edge="start" aria-label="Toggle menu">
+          <IconButton
+            onClick={onToggleSidebar}
+            size="small"
+            edge="start"
+            aria-label="Toggle menu"
+            sx={touchTargetSx}
+          >
             {isMobile ? <MenuIcon size={18} /> : <PanelLeft size={18} />}
           </IconButton>
         </Tooltip>
@@ -73,6 +86,7 @@ export function TopBar({ isMobile, onToggleSidebar }: TopBarProps) {
           <IconButton
             onClick={toggleTheme}
             size="small"
+            sx={touchTargetSx}
             aria-label={themeMode === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
           >
             {themeMode === 'dark' ? <Sun size={18} /> : <Moon size={18} />}
@@ -88,6 +102,7 @@ export function TopBar({ isMobile, onToggleSidebar }: TopBarProps) {
             aria-haspopup="dialog"
             aria-expanded={notificationsAnchor ? true : undefined}
             onClick={(event) => setNotificationsAnchor(event.currentTarget)}
+            sx={touchTargetSx}
           >
             <Badge
               color="primary"

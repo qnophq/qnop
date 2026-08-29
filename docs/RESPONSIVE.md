@@ -76,6 +76,13 @@ at 768 px, 90+ on admin tables at 320 px), but most of those are table-row
 actions where density is the point. The header is not: it is chrome, present on
 every screen, and the first thing a thumb reaches for.
 
+Fixed in #724 by growing the hit area, not the icon: `touchTargetSx`
+(`src/theme/touchTarget.ts`) lays a transparent `::before` overlay of
+`max(100%, 44px)` on each axis over the control, so the header keeps its 28 px
+visual weight while the box a finger or cursor has to hit is 44 px. Applied to
+the three header controls and the banner dismiss; reusable for any other
+chrome-level control that falls under the target.
+
 ## Support tiers — proposed, pending the rest of the audit
 
 Derived from what was measured. The 375 px line in particular is a

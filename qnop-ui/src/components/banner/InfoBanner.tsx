@@ -27,6 +27,7 @@ import { useTheme } from '@mui/material/styles';
 import { ArrowUpRight, Info, OctagonAlert, TriangleAlert, X } from 'lucide-react';
 import type { InfoBanner as InfoBannerModel } from '../../api/generated';
 import { tokens } from '../../theme/tokens';
+import { touchTargetSx } from '../../theme/touchTarget';
 
 /**
  * Tone per severity: the translucent badge tint (composites over both the light
@@ -127,7 +128,16 @@ export function InfoBanner({ banner, variant = 'bar', onDismiss }: InfoBannerPro
           size="small"
           onClick={onDismiss}
           aria-label="Dismiss this notice"
-          sx={{ color: 'inherit', opacity: 0.7, mt: '-2px', '&:hover': { opacity: 1 } }}
+          // 25 px visually, 44 px to hit (#724). The overlay reaches ~10 px past
+          // the button, so the extra margin keeps it clear of the message link.
+          sx={{
+            ...touchTargetSx,
+            color: 'inherit',
+            opacity: 0.7,
+            mt: '-2px',
+            ml: 1.25,
+            '&:hover': { opacity: 1 },
+          }}
         >
           <X size={15} />
         </IconButton>
