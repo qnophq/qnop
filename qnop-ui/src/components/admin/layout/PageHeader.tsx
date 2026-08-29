@@ -74,7 +74,16 @@ export function PageHeader({
       <Stack direction="row" spacing={1.5} sx={{ minWidth: 0, alignItems: 'center' }}>
         {leading && <Box sx={{ flexShrink: 0 }}>{leading}</Box>}
         <Box sx={{ minWidth: 0 }}>
-          <Stack direction="row" spacing={1.5} sx={{ alignItems: 'center' }}>
+          {/* The title row wraps (issue #775): when the slot gets tight the
+              adornment steps below the title instead of crushing the h1 to a
+              few letters — the ellipsis is reserved for a title that alone
+              exceeds the slot. */}
+          <Stack
+            direction="row"
+            spacing={1.5}
+            useFlexGap
+            sx={{ alignItems: 'center', flexWrap: 'wrap' }}
+          >
             <Typography variant="h1" sx={{ fontSize: 28 }} noWrap={Boolean(titleAdornment)}>
               {title}
             </Typography>
