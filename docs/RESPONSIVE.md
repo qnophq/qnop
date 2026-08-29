@@ -167,9 +167,11 @@ transforms, which cost more than a test's timeout inside the Playwright image.
   hour-of-day greeting and every relative time render the same on every run.
 
 **Running it locally.** Bring the smoke stack up and run the smoke script once
-— the real one, `scripts/smoke-test.sh`, because the screenshots are of its
-data: the users it seeds, the review it uploads, the due date it clears, the
-fixtures it adds. A hand-seeded backend renders a different page. Then from
+— the real one, `scripts/smoke-test.sh`, followed by the OIDC smoke
+(`docker compose -f docker-compose.smoke.yml run --rm smoke-oidc`), because
+the screenshots are of their data: the users seeded, the review uploaded, the
+due date cleared, the fixtures added, the Keycloak provider registered on the
+login page. A hand-seeded backend renders a different page. Then from
 `qnop-ui/`: `pnpm test:e2e` for a run on the host Chromium (it builds the
 bundle first), or `scripts/e2e-docker.sh` for the run CI does. Point `QNOP_API_URL` at the
 backend if it is not on `localhost:8080`.
