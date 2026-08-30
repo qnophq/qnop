@@ -33,6 +33,7 @@ import io.qnop.entity.User;
 import io.qnop.repository.CommentMentionRepository;
 import io.qnop.repository.DocumentRepository;
 import io.qnop.repository.ReviewParticipantRepository;
+import io.qnop.entity.CommentMention;
 import io.qnop.repository.UserRepository;
 import io.qnop.spi.mention.MentionContext;
 import io.qnop.spi.mention.MentionResolver;
@@ -41,6 +42,7 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
 
 /**
  * DB-free unit tests for mention resolution (issue #462): {@code @slug} tokens resolve through the
@@ -232,5 +234,99 @@ class CommentMentionServiceTest {
 
     // The broken resolvers cost their namespace, never the transaction.
     assertThat(persisted).containsExactly(participant);
+  }
+
+  // Issue #600: an edited body is re-resolved in place — rows follow the new token set and the
+  // caller learns only the NEWLY mentioned ids, so an edit never re-pings people mentioned before.
+
+  private void existingMentions(UUID... userIds) {
+    List<CommentMention> rows =
+        java.util.Arrays.stream(userIds).map(id -> new CommentMention(commentId, id)).toList();
+    when(mentions.findByCommentId(commentId)).thenReturn(rows);
+  }
+
+  @SuppressWarnings("unchecked")
+  private static ArgumentCaptor<List<CommentMention>> rowsCaptor() {
+    return ArgumentCaptor.forClass(List.class);
+  }
+
+  @Test
+  void reResolutionReportsOnlyNewlyMentionedIds() {
+    Document document = document(false);
+    when(documents.findById(documentId)).thenReturn(Optional.of(document));
+    slugResolvesTo("petra-part", participant);
+    slugResolvesTo("olivia-owner", owner);
+    when(participants.existsAccessibleParticipant(documentId, participant)).thenReturn(true);
+    existingMentions(participant);
+
+    var added =
+        service.reResolveAndPersist(
+            commentId, documentId, author, "@petra-part and now @olivia-owner");
+
+    assertThat(added).containsExactly(owner);
+    ArgumentCaptor<List<CommentMention>> saved = rowsCaptor();
+    verify(mentions).saveAll(saved.capture());
+    assertThat(saved.getValue())
+        .extracting(CommentMention::getMentionedUserId)
+        .containsExactly(owner);
+    verify(mentions, never()).deleteAll(any());
+  }
+
+  @Test
+  void reResolutionHandlesAddRemoveAndKeepInOneEdit() {
+    Document document = document(false);
+    when(documents.findById(documentId)).thenReturn(Optional.of(document));
+    slugResolvesTo("petra-part", participant);
+    slugResolvesTo("olivia-owner", owner);
+    when(participants.existsAccessibleParticipant(documentId, participant)).thenReturn(true);
+    existingMentions(participant, stranger);
+
+    var added =
+        service.reResolveAndPersist(commentId, documentId, author, "@petra-part meet @olivia-owner");
+
+    assertThat(added).containsExactly(owner);
+    ArgumentCaptor<List<CommentMention>> deleted = rowsCaptor();
+    verify(mentions).deleteAll(deleted.capture());
+    assertThat(deleted.getValue())
+        .extracting(CommentMention::getMentionedUserId)
+        .containsExactly(stranger);
+    ArgumentCaptor<List<CommentMention>> saved = rowsCaptor();
+    verify(mentions).saveAll(saved.capture());
+    assertThat(saved.getValue())
+        .extracting(CommentMention::getMentionedUserId)
+        .containsExactly(owner);
+  }
+
+  @Test
+  void reResolutionDeletesRowsWhoseTokenWasRemovedAndAccessRunsAgain() {
+    Document document = document(false);
+    when(documents.findById(documentId)).thenReturn(Optional.of(document));
+    slugResolvesTo("petra-part", participant);
+    // The participant meanwhile LOST access: survival is not purely textual.
+    when(participants.existsAccessibleParticipant(documentId, participant)).thenReturn(false);
+    existingMentions(participant, owner);
+
+    var added = service.reResolveAndPersist(commentId, documentId, author, "only @petra-part now");
+
+    assertThat(added).isEmpty();
+    ArgumentCaptor<List<CommentMention>> deleted = rowsCaptor();
+    verify(mentions).deleteAll(deleted.capture());
+    assertThat(deleted.getValue())
+        .extracting(CommentMention::getMentionedUserId)
+        .containsExactlyInAnyOrder(participant, owner);
+    verify(mentions, never()).saveAll(any());
+  }
+
+  @Test
+  void reResolutionIsANoOpInAnonymousReviews() {
+    Document document = document(true);
+    when(documents.findById(documentId)).thenReturn(Optional.of(document));
+
+    var added = service.reResolveAndPersist(commentId, documentId, author, "@petra-part");
+
+    assertThat(added).isEmpty();
+    verify(mentions, never()).findByCommentId(any());
+    verify(mentions, never()).deleteAll(any());
+    verify(mentions, never()).saveAll(any());
   }
 }

@@ -19,10 +19,12 @@
  * SPDX-License-Identifier: AGPL-3.0-only
  */
 
+import { Fragment } from 'react';
 import Box from '@mui/material/Box';
 import Stack from '@mui/material/Stack';
 import Typography from '@mui/material/Typography';
 import type { ReactionGroup } from '../../../api/generated';
+import { useExtensionSlot, type MessageRowContext } from '../../../extensions/registry';
 import { useFormatters } from '../../../hooks/useFormatters';
 import type { Notify } from '../../admin/layout/useToast';
 import { UserHoverCard } from '../../people/UserHoverCard';
@@ -63,6 +65,12 @@ interface CommentMessageProps {
   hoverUserId?: string | null;
   /** The author's profile slug (issue #486) — prettifies the trigger's href. */
   hoverUserSlug?: string | null;
+  /**
+   * Feeds the message-row extension slots (issue #600): registered
+   * contributions render extra actions and badges with this context. Callers
+   * that cannot provide it (the hover preview) simply render no contributions.
+   */
+  slotContext?: MessageRowContext;
 }
 
 /**
@@ -88,8 +96,12 @@ export function CommentMessage({
   onToggleReaction,
   hoverUserId,
   hoverUserSlug,
+  slotContext,
 }: CommentMessageProps) {
   const { shortRelativeTime, formatDateTime } = useFormatters();
+  // Empty without registered extensions — the row then renders byte-identically.
+  const actionContributions = useExtensionSlot('messageActions');
+  const badgeContributions = useExtensionSlot('messageBadges');
   return (
     <Stack
       id={domId}
@@ -133,7 +145,11 @@ export function CommentMessage({
           >
             {shortRelativeTime(createdAt)}
           </Typography>
-          {(onToggleReaction || notify) && (
+          {slotContext &&
+            badgeContributions.map((contribution) => (
+              <Fragment key={contribution.id}>{contribution.render(slotContext)}</Fragment>
+            ))}
+          {(onToggleReaction || notify || (slotContext && actionContributions.length > 0)) && (
             <Box className="comment-hover-actions" sx={{ display: 'flex', alignItems: 'center' }}>
               {notify && (
                 <CopyTextButton
@@ -156,6 +172,10 @@ export function CommentMessage({
                   }
                 />
               )}
+              {slotContext &&
+                actionContributions.map((contribution) => (
+                  <Fragment key={contribution.id}>{contribution.render(slotContext)}</Fragment>
+                ))}
             </Box>
           )}
         </Stack>
