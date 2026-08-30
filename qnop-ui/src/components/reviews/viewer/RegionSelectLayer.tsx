@@ -27,6 +27,7 @@ import type { NormalizedBox } from '../../../api/generated';
 import type { ScreenPosition } from './anchoring';
 import { MARKER_YELLOW_BORDER, SELECTION_MARKER_BG } from './markerColors';
 import { visuallyHidden } from '../../../theme/visuallyHidden';
+import { useKeepInView } from './useKeepInView';
 
 /** How the keyboard path is announced to assistive tech (issue #771). */
 const KEYBOARD_HINT =
@@ -200,6 +201,13 @@ export function RegionSelectLayer({
     height: Math.abs(draft.y2 - draft.y1),
   };
   const preview = pointerPreview ?? keyboardBox;
+  // Only the keyboard rectangle needs following — a pointer drag is by
+  // definition where the user is looking (#782).
+  const draftRef = useKeepInView<HTMLDivElement>(
+    !pointerPreview && keyboardBox
+      ? `${keyboardBox.x},${keyboardBox.y},${keyboardBox.width},${keyboardBox.height}`
+      : null,
+  );
 
   return (
     <Box
@@ -231,6 +239,7 @@ export function RegionSelectLayer({
       )}
       {preview && (
         <div
+          ref={draftRef}
           data-testid={`region-draft-${surfaceIndex}`}
           style={{
             position: 'absolute',

@@ -37,6 +37,7 @@ import {
 import { SELECTION_MARKER_BG } from './markerColors';
 import { visuallyHidden } from '../../../theme/visuallyHidden';
 import { keyboardCaretMove, spanAtOffset } from './keyboardSelection';
+import { useKeepInView } from './useKeepInView';
 
 /** How the keyboard path is announced to assistive tech (issue #460). */
 const KEYBOARD_HINT =
@@ -215,6 +216,9 @@ export function TextSpanLayer({
         )
       : null;
 
+  // Follows the caret as it moves so it never leaves the scrolled viewport (#782).
+  const caretRef = useKeepInView<HTMLDivElement>(caretBox ? `${caretBox.x},${caretBox.y}` : null);
+
   return (
     <Box
       ref={rootRef}
@@ -250,6 +254,7 @@ export function TextSpanLayer({
       )}
       {caretBox && (
         <div
+          ref={caretRef}
           data-testid={`keyboard-caret-${surfaceIndex}`}
           style={{
             position: 'absolute',

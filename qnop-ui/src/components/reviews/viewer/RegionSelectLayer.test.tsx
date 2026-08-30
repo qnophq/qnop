@@ -230,6 +230,29 @@ describe('RegionSelectLayer keyboard path (issue #771)', () => {
     expect(screen.queryByTestId('region-draft-0')).toBeNull();
   });
 
+  it('keeps the moving keyboard rectangle in view, but not a pointer drag (issue #782)', () => {
+    const scrollIntoView = vi.fn();
+    Object.defineProperty(HTMLElement.prototype, 'scrollIntoView', {
+      configurable: true,
+      value: scrollIntoView,
+    });
+    vi.useFakeTimers();
+    try {
+      const { layer } = renderLayer();
+      drag(layer, [10, 10], [50, 50]);
+      vi.advanceTimersToNextFrame();
+      expect(scrollIntoView).not.toHaveBeenCalled();
+
+      fireEvent.keyDown(layer, { key: 'ArrowDown' });
+      fireEvent.keyDown(layer, { key: 'ArrowDown' });
+      vi.advanceTimersToNextFrame();
+      expect(scrollIntoView).toHaveBeenCalledTimes(1);
+      expect(scrollIntoView.mock.instances[0]).toBe(screen.getByTestId('region-draft-0'));
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it('ignores keys when disabled', () => {
     const { layer, onRegionSelected } = renderLayer(false);
 
