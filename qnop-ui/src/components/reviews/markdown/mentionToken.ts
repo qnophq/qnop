@@ -25,6 +25,12 @@ export interface MentionCandidate {
   name: string;
   /** The immutable profile slug (issue #486) — the mention token IS this slug. */
   slug: string;
+  /** Namespace of a contributed candidate (issue #598), e.g. `team`; unset for users. */
+  kind?: string;
+  /** Avatar for contributed candidates; users derive theirs from the id. */
+  avatarUrl?: string | null;
+  /** Small picker annotation of a contributed candidate, e.g. "notifies 5 people". */
+  hint?: string;
 }
 
 /**

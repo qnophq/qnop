@@ -598,7 +598,16 @@ export function MarkdownComposer({
                     deterministic initials fallback — so picking a person reads identically
                     everywhere in the app. */}
                 <Box sx={{ display: 'flex', flexShrink: 0, mr: 1 }}>
-                  <UserAvatar name={candidate.name} size={22} imageUrl={avatarSrc(candidate.id)} />
+                  {/* A contributed candidate (issue #598) is not a user, so its id must not
+                      be fed to the user-avatar endpoint; it brings its own image or falls
+                      back to initials. */}
+                  <UserAvatar
+                    name={candidate.name}
+                    size={22}
+                    imageUrl={
+                      candidate.kind ? (candidate.avatarUrl ?? null) : avatarSrc(candidate.id)
+                    }
+                  />
                 </Box>
                 <Typography noWrap sx={{ fontSize: '0.85rem', fontWeight: 500 }}>
                   {candidate.name}
@@ -606,6 +615,15 @@ export function MarkdownComposer({
                 <Typography noWrap color="text.secondary" sx={{ fontSize: '0.75rem', ml: 0.75 }}>
                   @{candidate.slug}
                 </Typography>
+                {candidate.hint && (
+                  <Typography
+                    noWrap
+                    color="text.secondary"
+                    sx={{ fontSize: '0.7rem', ml: 'auto', pl: 1 }}
+                  >
+                    {candidate.hint}
+                  </Typography>
+                )}
               </MenuItem>
             ))}
           </MenuList>

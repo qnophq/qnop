@@ -23,6 +23,7 @@ import { ParticipantKind } from '../../../api/generated';
 import { useDocument } from '../../../api/hooks/useDocuments';
 import { useParticipants } from '../../../api/hooks/useReviews';
 import { replaceMentionTokens } from './mentionToken';
+import { resolveContributedMention, useMentionContributors } from '../../../extensions/mentions';
 
 /**
  * Resolves {@code @slug} mention tokens to display names for the plain-text
@@ -32,11 +33,14 @@ import { replaceMentionTokens } from './mentionToken';
  * of fifty rows costs no extra fetches. Unlike {@link useMentionRoster} the
  * caller themself IS included: your own mention must read as your name too.
  * Matching ignores case, as on the server; a slug outside the roster stays a
- * raw {@code @slug}, mirroring the renderer's fallback.
+ * raw {@code @slug}, mirroring the renderer's fallback. Contributed mention
+ * namespaces (issue #598) resolve through the registered contributors, after
+ * the roster so a user name always wins its own slug.
  */
 export function useMentionNames(documentId: string | null | undefined): (text: string) => string {
   const review = useDocument(documentId ?? '').data;
   const participants = useParticipants(documentId ?? '', Boolean(documentId)).data?.participants;
+  const contributors = useMentionContributors();
   // No manual useMemo: the React Compiler memoizes this against the two cache reads.
   const names = new Map<string, string>();
   for (const participant of participants ?? []) {
@@ -47,8 +51,13 @@ export function useMentionNames(documentId: string | null | undefined): (text: s
   if (review?.ownerSlug && review.ownerDisplayName) {
     names.set(review.ownerSlug.toLowerCase(), review.ownerDisplayName);
   }
-  if (names.size === 0) {
+  if (names.size === 0 && contributors.length === 0) {
     return (text: string) => text;
   }
-  return (text: string) => replaceMentionTokens(text, (slug) => names.get(slug.toLowerCase()));
+  return (text: string) =>
+    replaceMentionTokens(
+      text,
+      (slug) =>
+        names.get(slug.toLowerCase()) ?? resolveContributedMention(contributors, slug)?.name,
+    );
 }
