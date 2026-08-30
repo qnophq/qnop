@@ -20,6 +20,7 @@
  */
 
 import {
+  useCallback,
   useLayoutEffect,
   useMemo,
   useRef,
@@ -53,6 +54,8 @@ import { MarkdownToolbar } from './MarkdownToolbar';
 import { caretViewportRect } from './caretRect';
 import { activeMentionQuery, mentionToken, type MentionCandidate } from './mentionToken';
 import type { UploadedAttachment } from './useCommentAttachmentUpload';
+import { ComposerModeMemory } from './ComposerModeMemory';
+import { useComposerModes, type ComposerModeHandle } from '../../../extensions/composerModes';
 
 /** How many roster matches the @-picker offers at once. */
 const MENTION_LIMIT = 6;
@@ -192,14 +195,24 @@ export function MarkdownComposer({
     const rect = caretViewportRect(mentionAnchor as HTMLTextAreaElement, mention.start);
     return { getBoundingClientRect: () => rect };
   }, [mention, mentionAnchor]);
-  // Write/Preview (issue #445 follow-up) — GitHub's comment-box anatomy.
-  const [previewing, setPreviewing] = useState(false);
+  // Write/Preview (issue #445 follow-up) — GitHub's comment-box anatomy —
+  // plus whatever modes a runtime extension registered (issue #599): the mode
+  // is `write`, `preview` or a contributed id, and a contributed mode renders
+  // its own surface where the textarea would be. The contribution's handle is
+  // how the shared affordances below reach into that surface.
+  const modes = useComposerModes();
+  const [mode, setMode] = useState('write');
+  const contributed = modes.find((candidate) => candidate.id === mode);
+  const previewing = mode === 'preview';
+  const writing = !previewing && !contributed;
+  const modeHandleRef = useRef<ComposerModeHandle | null>(null);
 
   const showWrite = () => {
-    setPreviewing(false);
+    setMode('write');
     // Back to writing means back to the caret.
     requestAnimationFrame(() => inputRef.current?.focus());
   };
+  const restoreMode = useCallback((remembered: string) => setMode(remembered), []);
 
   useLayoutEffect(() => {
     if (!pendingSelection.current || !inputRef.current) return;
@@ -255,8 +268,13 @@ export function MarkdownComposer({
   };
 
   const insertEmoji = (emoji: string) => {
+    if (disabled) return;
+    if (contributed) {
+      insertIntoSurface(emoji);
+      return;
+    }
     const el = inputRef.current;
-    if (!el || disabled) return;
+    if (!el) return;
     const start = el.selectionStart ?? el.value.length;
     const end = el.selectionEnd ?? start;
     const caret = start + emoji.length;
@@ -292,8 +310,25 @@ export function MarkdownComposer({
     setMention(null);
   };
 
+  /**
+   * The contributed surface's caret, or — for a surface that publishes no
+   * handle — the end of the draft, through the controlled value.
+   */
+  const insertIntoSurface = (text: string) => {
+    if (modeHandleRef.current) modeHandleRef.current.insertText(text);
+    else onChange(value + text);
+  };
+  const replaceInSurface = (search: string, replacement: string) => {
+    if (modeHandleRef.current) modeHandleRef.current.replaceText(search, replacement);
+    else onChange(value.replace(search, replacement));
+  };
+
   /** Replaces the first occurrence of `search` in the CURRENT field value. */
   const replaceOnce = (search: string, replacement: string) => {
+    if (contributed) {
+      replaceInSurface(search, replacement);
+      return;
+    }
     const el = inputRef.current;
     if (!el) return;
     const index = el.value.indexOf(search);
@@ -320,19 +355,23 @@ export function MarkdownComposer({
     // The optimistic form follows the browser-declared type; the final form
     // follows the server-sniffed one.
     const placeholder = `${file.type.startsWith('image/') ? '!' : ''}[Uploading ${label}…]()`;
-    const el = inputRef.current;
-    if (!el) return;
-    const start = el.selectionStart ?? el.value.length;
-    const end = el.selectionEnd ?? start;
-    const caret = start + placeholder.length;
-    splice(
-      start,
-      end,
-      placeholder,
-      caret,
-      caret,
-      el.value.slice(0, start) + placeholder + el.value.slice(end),
-    );
+    if (contributed) {
+      insertIntoSurface(placeholder);
+    } else {
+      const el = inputRef.current;
+      if (!el) return;
+      const start = el.selectionStart ?? el.value.length;
+      const end = el.selectionEnd ?? start;
+      const caret = start + placeholder.length;
+      splice(
+        start,
+        end,
+        placeholder,
+        caret,
+        caret,
+        el.value.slice(0, start) + placeholder + el.value.slice(end),
+      );
+    }
     try {
       const uploaded = await upload(file);
       const bang = uploaded.contentType.startsWith('image/') ? '!' : '';
@@ -481,23 +520,32 @@ export function MarkdownComposer({
             flexShrink: 0,
           }}
         >
-          <ButtonBase
-            onClick={showWrite}
-            aria-pressed={!previewing}
-            sx={modeTabSx(theme, !previewing)}
-          >
+          <ButtonBase onClick={showWrite} aria-pressed={writing} sx={modeTabSx(theme, writing)}>
             Write
           </ButtonBase>
-          <ButtonBase
-            onClick={() => setPreviewing(true)}
-            aria-pressed={previewing}
-            sx={modeTabSx(theme, previewing)}
-          >
-            Preview
-          </ButtonBase>
+          {modes.map((candidate) => (
+            <ButtonBase
+              key={candidate.id}
+              data-testid={`composer-mode-${candidate.id}`}
+              onClick={() => setMode(candidate.id)}
+              aria-pressed={mode === candidate.id}
+              sx={modeTabSx(theme, mode === candidate.id)}
+            >
+              {candidate.label}
+            </ButtonBase>
+          ))}
+          {!contributed?.hidesPreview && (
+            <ButtonBase
+              onClick={() => setMode('preview')}
+              aria-pressed={previewing}
+              sx={modeTabSx(theme, previewing)}
+            >
+              Preview
+            </ButtonBase>
+          )}
         </Stack>
         <Stack direction="row" spacing={0.25} sx={{ alignItems: 'center', flexWrap: 'wrap' }}>
-          {!previewing && <MarkdownToolbar onAction={handleAction} disabled={disabled} />}
+          {writing && <MarkdownToolbar onAction={handleAction} disabled={disabled} />}
           {onToggleFullscreen && (
             <Tooltip title={fullscreen ? 'Exit full screen' : 'Full screen'}>
               <IconButton
@@ -533,6 +581,27 @@ export function MarkdownComposer({
               Nothing to preview.
             </Typography>
           )}
+        </Box>
+      ) : contributed ? (
+        <Box
+          data-testid={`composer-surface-${contributed.id}`}
+          sx={bare ? { flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column' } : null}
+        >
+          <contributed.Surface
+            value={value}
+            onChange={onChange}
+            onSubmit={onSubmit}
+            disabled={disabled}
+            placeholder={placeholder}
+            inputAriaLabel={inputAriaLabel}
+            minRows={minRows}
+            maxRows={maxRows}
+            fullscreen={fullscreen}
+            bare={bare}
+            mentionCandidates={mentionCandidates}
+            onUploadAttachment={onUploadAttachment}
+            handleRef={modeHandleRef}
+          />
         </Box>
       ) : (
         <InputBase
@@ -673,6 +742,7 @@ export function MarkdownComposer({
           </Stack>
         )}
       </Stack>
+      {modes.length > 0 && <ComposerModeMemory modes={modes} mode={mode} onRestore={restoreMode} />}
       {dragActive && (
         <Stack
           data-testid="composer-drop-overlay"
