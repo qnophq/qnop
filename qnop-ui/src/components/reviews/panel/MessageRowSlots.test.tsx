@@ -69,8 +69,10 @@ function fakeRegistry(): ExtensionRegistry {
   const registry = createExtensionRegistry();
   registry.register('messageActions', {
     id: 'fake-action',
+    // The contract expects an accessible name on interactive output — query
+    // it by role+name below, the convention contributors should copy.
     render: (ctx: MessageRowContext) => (
-      <button data-testid={`ext-action-${ctx.kind}`}>
+      <button aria-label="Edit message" data-testid={`ext-action-${ctx.kind}`}>
         {`${ctx.commentId}|${ctx.annotationId}|${ctx.own}|${ctx.annotationStatus}|${ctx.workflowState}|${ctx.reviewOpen}`}
       </button>
     ),
@@ -137,7 +139,7 @@ describe('message-row extension slots (#600)', () => {
       />,
     );
 
-    expect(screen.getByTestId('ext-action-comment')).toHaveTextContent(
+    expect(screen.getByRole('button', { name: 'Edit message' })).toHaveTextContent(
       'c9|a1|true|OPEN|IN_REVIEW|true',
     );
     expect(screen.getByTestId('ext-badge-comment')).toHaveTextContent('edited');

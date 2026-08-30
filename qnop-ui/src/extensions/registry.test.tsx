@@ -20,7 +20,7 @@
  */
 
 import { describe, expect, it } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { act, render, screen } from '@testing-library/react';
 import { ExtensionsProvider } from './ExtensionsProvider';
 import { createExtensionRegistry, useExtensionSlot, type MessageRowContext } from './registry';
 
@@ -73,6 +73,46 @@ describe('extension registry (#600)', () => {
     );
 
     expect(screen.getByTestId('ext-badge')).toHaveTextContent('c1');
+  });
+
+  it('rejects a duplicate contribution id within a slot', () => {
+    const registry = createExtensionRegistry();
+    registry.register('messageActions', { id: 'dup', render: () => null });
+
+    expect(() => registry.register('messageActions', { id: 'dup', render: () => null })).toThrow(
+      /duplicate contribution id/,
+    );
+  });
+
+  it('keeps the empty snapshot reference-stable across reads', () => {
+    const registry = createExtensionRegistry();
+
+    expect(registry.get('messageActions')).toBe(registry.get('messageActions'));
+  });
+
+  // The runtime loader (ADR-0039) resolves its dynamic imports AFTER the
+  // first render — slots mounted before a registration must pick it up.
+  it('re-renders consumers when a contribution registers after mount', () => {
+    const registry = createExtensionRegistry();
+    function Probe() {
+      const badges = useExtensionSlot('messageBadges');
+      return <>{badges.map((c) => c.render(context))}</>;
+    }
+    render(
+      <ExtensionsProvider registry={registry}>
+        <Probe />
+      </ExtensionsProvider>,
+    );
+    expect(screen.queryByTestId('ext-badge')).not.toBeInTheDocument();
+
+    act(() => {
+      registry.register('messageBadges', {
+        id: 'late',
+        render: () => <span data-testid="ext-badge">late</span>,
+      });
+    });
+
+    expect(screen.getByTestId('ext-badge')).toBeInTheDocument();
   });
 
   it('defaults to the (empty) host registry without a provider', () => {

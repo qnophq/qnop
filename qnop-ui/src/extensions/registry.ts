@@ -19,7 +19,7 @@
  * SPDX-License-Identifier: AGPL-3.0-only
  */
 
-import { createContext, useContext, type ReactNode } from 'react';
+import { createContext, useContext, useSyncExternalStore, type ReactNode } from 'react';
 
 /**
  * The runtime UI extension registry (ADR-0039, first slots via issue #600).
@@ -66,6 +66,12 @@ export interface MessageRowContext {
 /** One rendered contribution; `id` must be globally unique (it keys the React list). */
 export interface MessageRowContribution {
   id: string;
+  /**
+   * Renders the contribution. Interactive output MUST carry an accessible
+   * name (e.g. an `aria-label` on an icon button) — it stands beside the
+   * host's labelled copy/permalink/reaction affordances and ships to screen
+   * readers exactly like them.
+   */
   render: (context: MessageRowContext) => ReactNode;
 }
 
@@ -79,18 +85,42 @@ interface SlotContributionMap {
 export type ExtensionSlot = keyof SlotContributionMap;
 
 export interface ExtensionRegistry {
+  /** Adds a contribution; throws on a duplicate `id` within the slot. */
   register<S extends ExtensionSlot>(slot: S, contribution: SlotContributionMap[S]): void;
+  /** The slot's contributions; a stable reference until the next `register`. */
   get<S extends ExtensionSlot>(slot: S): readonly SlotContributionMap[S][];
+  /**
+   * Notifies on every `register` — the extension loader (ADR-0039) resolves
+   * its dynamic imports AFTER the first render, so already-mounted slots must
+   * re-read. `useExtensionSlot` subscribes through this; returns the
+   * unsubscribe.
+   */
+  subscribe(listener: () => void): () => void;
 }
+
+/** Shared empty snapshot — `get` must stay reference-stable between registrations. */
+const NO_CONTRIBUTIONS: readonly MessageRowContribution[] = Object.freeze([]);
 
 export function createExtensionRegistry(): ExtensionRegistry {
   const slots = new Map<ExtensionSlot, MessageRowContribution[]>();
+  const listeners = new Set<() => void>();
   return {
     register(slot, contribution) {
-      slots.set(slot, [...(slots.get(slot) ?? []), contribution]);
+      const existing = slots.get(slot) ?? [];
+      if (existing.some((entry) => entry.id === contribution.id)) {
+        throw new Error(`duplicate contribution id "${contribution.id}" in slot "${slot}"`);
+      }
+      // A fresh array per registration: `get` snapshots stay immutable, so
+      // useSyncExternalStore sees a changed reference exactly when content changed.
+      slots.set(slot, [...existing, contribution]);
+      listeners.forEach((listener) => listener());
     },
     get(slot) {
-      return slots.get(slot) ?? [];
+      return slots.get(slot) ?? NO_CONTRIBUTIONS;
+    },
+    subscribe(listener) {
+      listeners.add(listener);
+      return () => listeners.delete(listener);
     },
   };
 }
@@ -105,9 +135,14 @@ export const hostExtensions = createExtensionRegistry();
 /** Internal: the context the provider and hook share; not part of the extension contract. */
 export const ExtensionRegistryContext = createContext<ExtensionRegistry>(hostExtensions);
 
-/** The contributions registered into one slot; empty (and render-stable) without extensions. */
+/**
+ * The contributions registered into one slot; empty (and reference-stable)
+ * without extensions. Subscribed: a contribution registered after mount —
+ * the runtime loader's normal timing (ADR-0039) — re-renders the consumers.
+ */
 export function useExtensionSlot<S extends ExtensionSlot>(
   slot: S,
 ): readonly SlotContributionMap[S][] {
-  return useContext(ExtensionRegistryContext).get(slot);
+  const registry = useContext(ExtensionRegistryContext);
+  return useSyncExternalStore(registry.subscribe, () => registry.get(slot));
 }
