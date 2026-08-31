@@ -38,6 +38,8 @@ export const annotationKeys = {
   all: ['annotations'] as const,
   list: (documentId: string, version?: number) =>
     [...annotationKeys.all, 'list', documentId, version] as const,
+  /** Prefix matching every cached version window of one document (issue #602). */
+  listPrefix: (documentId: string) => [...annotationKeys.all, 'list', documentId] as const,
 };
 
 /** Poll cadence while the server is still re-anchoring placements (issue #553). */

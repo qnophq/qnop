@@ -14,7 +14,7 @@ The live annotation/comment feed over SSE is an enterprise extension (qnop-ee#5)
 
 `io.qnop.spi.review.ReviewFacade`, read-only:
 
-- **`mayView(documentId, principalId)`** — exactly the annotation-listing visibility rule (`DocumentAccessService.isVisible`, admin override deliberately absent: an extension serves regular principals). Covers account-less principals via the ADR-0061 third access leg.
+- **`mayView(documentId, principalId)`** — exactly the annotation-listing visibility rule (`DocumentAccessService.isVisible`, admin override deliberately absent), **review-level only** — PRIVATE thread participation is not expressed (the notification path is equally review-level; a thread-level facade waits for a consumer, ADR-0049). Covers account-less principals via the ADR-0061 third access leg.
 - **`reviewCircle(documentId)`** — the audience the notification path addresses. The computation moved into `ReviewFacadeService.circleOf` and `ReviewNotificationService` now delegates to it: **one implementation**, so the mail audience and an extension's answer cannot drift. Account-less participants stay out (no notification identity — an extension admits them via `ExternalParticipants.hasAccess`); the actor is not pre-excluded (a consumer subtracts the published event's `actorId`).
 - **`displayNameFor` / `exposedAuthorIdFor`** — the ADR-0038 per-viewer identity, delegated to `ReviewIdentityResolver`. What a consumer forwards outward must be these values, never raw ids.
 
@@ -29,7 +29,7 @@ The SSE endpoint, emitter registry, heartbeats, reconnect, and any broker (ADR-0
 ## Consequences
 
 - `qnop-spi` publishes seven contracts; qnop-ee#5 = one `PublishedEventListener` + one authenticated `/api/ext/**` SSE controller consulting `ReviewFacade` + one `LiveChannelContributor`.
-- The facade\'s answers are IT-pinned against the listing endpoint\'s behaviour for owner, participant, team member and outsider.
+- The facade's answers are IT-pinned against the listing endpoint's behaviour for owner, participant, team member and outsider.
 
 ## Alternatives considered
 

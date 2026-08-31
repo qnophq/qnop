@@ -107,6 +107,9 @@ public class ReviewFacadeService implements io.qnop.spi.review.ReviewFacade {
   @Override
   @Transactional(readOnly = true)
   public String displayNameFor(UUID documentId, UUID viewerId, UUID authorId) {
+    if (documentId == null || viewerId == null || authorId == null) {
+      return "A participant"; // the degraded answer of an unknown author (review of #602)
+    }
     String name = identity.forDocument(documentId, viewerId).displayName(authorId);
     return name == null || name.isBlank() ? "A participant" : name;
   }
@@ -114,6 +117,9 @@ public class ReviewFacadeService implements io.qnop.spi.review.ReviewFacade {
   @Override
   @Transactional(readOnly = true)
   public UUID exposedAuthorIdFor(UUID documentId, UUID viewerId, UUID authorId) {
+    if (documentId == null || viewerId == null || authorId == null) {
+      return null; // mirrors mayView's null handling: no identity to expose
+    }
     return identity.forDocument(documentId, viewerId).exposedAuthorId(authorId);
   }
 }

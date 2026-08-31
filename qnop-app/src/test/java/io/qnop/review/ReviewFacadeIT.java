@@ -61,7 +61,7 @@ class ReviewFacadeIT extends SeededIntegrationTest {
 
   private UUID user(String name) {
     String unique = name + "-" + UUID.randomUUID();
-    User user = User.internal(unique, unique + "@example.com", name, "x");
+    User user = User.internal(unique, unique + "@example.com", unique, "x");
     user.setRole(UserRole.MEMBER);
     return users.save(user).getId();
   }
@@ -87,7 +87,14 @@ class ReviewFacadeIT extends SeededIntegrationTest {
     assertThatThrownBy(() -> annotations.list(documentId, null, null, null, outsider, false))
         .isInstanceOf(RuntimeException.class);
 
-    assertThat(facade.reviewCircle(documentId)).containsExactly(owner, direct, teamMember);
+    assertThat(facade.reviewCircle(documentId))
+        .containsExactlyInAnyOrder(owner, direct, teamMember);
+    // ADR-0061: an account-less principal passes mayView via its row id but stays out of the
+    // circle (no notification identity).
+    UUID guest =
+        participants.save(ReviewParticipant.forExternal(documentId, "Guest Reviewer")).getId();
+    assertThat(facade.mayView(documentId, guest)).isTrue();
+    assertThat(facade.reviewCircle(documentId)).doesNotContain(guest);
     // ADR-0038 identity flows through the facade for a normal review: real name visible.
     assertThat(facade.displayNameFor(documentId, direct, owner)).isNotBlank();
   }

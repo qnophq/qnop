@@ -122,7 +122,7 @@ Not an extension point itself, but the channel through which extensions become v
 
 ### 12. Live-channel UI slot + invalidation facade (frontend, in-process)
 
-- **Contract:** `qnop-ui/src/extensions/liveChannel.ts` — a `LiveChannelContributor.onReviewMounted(context)` fires while a review surface is mounted and returns its teardown; `context` carries `documentId`, `invalidateAnnotations()` and `invalidateComments(annotationId)`, closing over the host's query client and keys — a push becomes a normal authorized refetch without the extension importing internals. Migrates to the generic slot registry (§10) at the `qnop-ui-spi` cut.
+- **Contract:** `qnop-ui/src/extensions/liveChannel.ts` — a `LiveChannelContributor.onReviewMounted(context)` fires while a review surface is mounted and returns its teardown; `context` carries `documentId`, `invalidateAnnotations()` and `invalidateComments(annotationId)`, closing over the host's query client and keys — a push becomes a normal authorized refetch without the extension importing internals. Migrates to the generic slot registry (issue #600, PR #805 — its catalogue entry lands as §10 with that PR; whichever of #805/#807 merges second reconciles the section numbers) at the `qnop-ui-spi` cut.
 - **Owned by:** ADR-0062; issue #602. First consumer: qnop-ee#5.
 
 ---

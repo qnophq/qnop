@@ -19,7 +19,7 @@
  * SPDX-License-Identifier: AGPL-3.0-only
  */
 
-import { useEffect } from 'react';
+import { useEffect, useSyncExternalStore } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { annotationKeys } from '../api/hooks/useAnnotations';
 import { commentKeys } from '../api/hooks/useComments';
@@ -53,12 +53,24 @@ export interface LiveChannelContributor {
 }
 
 let contributors: readonly LiveChannelContributor[] = [];
+const listeners = new Set<() => void>();
 
-/** Registers a contributor; returns its deregistration. */
+function emit(): void {
+  for (const listener of listeners) listener();
+}
+
+function subscribe(listener: () => void): () => void {
+  listeners.add(listener);
+  return () => listeners.delete(listener);
+}
+
+/** Registers a contributor; returns its deregistration. Mounted surfaces react immediately. */
 export function registerLiveChannelContributor(contributor: LiveChannelContributor): () => void {
   contributors = [...contributors, contributor];
+  emit();
   return () => {
     contributors = contributors.filter((candidate) => candidate !== contributor);
+    emit();
   };
 }
 
@@ -69,20 +81,21 @@ export function registerLiveChannelContributor(contributor: LiveChannelContribut
  */
 export function useLiveChannel(documentId: string | null | undefined): void {
   const queryClient = useQueryClient();
+  // Subscribed, not snapshotted at mount: the ADR-0039 loader registers contributors AFTER the
+  // first surfaces mounted (issue #602 review) — a late registration must reach an open review.
+  const registered = useSyncExternalStore(subscribe, () => contributors);
   useEffect(() => {
-    if (!documentId || contributors.length === 0) {
+    if (!documentId || registered.length === 0) {
       return;
     }
     const context: LiveReviewContext = {
       documentId,
       invalidateAnnotations: () =>
-        void queryClient.invalidateQueries({
-          queryKey: [...annotationKeys.all, 'list', documentId],
-        }),
+        void queryClient.invalidateQueries({ queryKey: annotationKeys.listPrefix(documentId) }),
       invalidateComments: (annotationId) =>
         void queryClient.invalidateQueries({ queryKey: commentKeys.list(annotationId) }),
     };
-    const teardowns = contributors.map((contributor) => {
+    const teardowns = registered.map((contributor) => {
       try {
         return contributor.onReviewMounted(context);
       } catch {
@@ -99,5 +112,5 @@ export function useLiveChannel(documentId: string | null | undefined): void {
         }
       }
     };
-  }, [documentId, queryClient]);
+  }, [documentId, queryClient, registered]);
 }

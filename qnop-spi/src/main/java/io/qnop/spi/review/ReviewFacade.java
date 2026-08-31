@@ -37,16 +37,23 @@ public interface ReviewFacade {
    * Whether the principal may view the review — exactly the rule the annotation-listing endpoint
    * applies (owner, direct participant, member of a participating team, or an account-less
    * participant's principal id per ADR-0061).
+   *
+   * <p><strong>Review-level only:</strong> finer-grained visibility below the review — notably
+   * PRIVATE thread participation — is NOT expressed here (the notification path is equally
+   * review-level). A consumer fanning out event-granular data must therefore forward identifiers
+   * only and let the API answer content requests, or wait for a thread-level facade to be cut with
+   * a consumer that needs it (ADR-0049).
    */
   boolean mayView(UUID documentId, UUID principalId);
 
   /**
    * The review circle the notification path addresses: the owner, direct user participants and the
-   * members of participating teams — user ids only, in stable order. Account-less participants are
-   * deliberately not included (they have no notification identity); an extension admits them
-   * through {@code ExternalParticipants.hasAccess} instead. The actor of an event is NOT excluded
-   * here — a consumer that must not echo an event to its actor subtracts the {@code actorId} the
-   * published event carries.
+   * members of participating teams — user ids only, in stable order, INCLUDING disabled accounts
+   * (the mail path filters those downstream; a consumer with the same need filters too).
+   * Account-less participants are deliberately not included (they have no notification identity);
+   * an extension admits them through {@code ExternalParticipants.hasAccess} instead. The actor of
+   * an event is NOT excluded here — a consumer that must not echo an event to its actor subtracts
+   * the {@code actorId} the published event carries.
    */
   Set<UUID> reviewCircle(UUID documentId);
 
