@@ -207,7 +207,13 @@ public class ConfigController implements ServerConfigApi {
       types.add(DocumentTypeSniffer.DOCX);
     }
     for (io.qnop.spi.extract.DocumentExtractor extractor : extractors) {
-      types.addAll(extractor.mediaTypes());
+      for (String type : extractor.mediaTypes()) {
+        // Mirror of the gate (issue #601 review): an extractor's DOCX claim is refused there
+        // (Word rides the conversion pipeline, ADR-0010), so it must not be advertised here.
+        if (!DocumentTypeSniffer.DOCX.equals(type)) {
+          types.add(type);
+        }
+      }
     }
     return List.copyOf(types);
   }
