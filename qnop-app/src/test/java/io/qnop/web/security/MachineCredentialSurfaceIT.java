@@ -77,8 +77,10 @@ class MachineCredentialSurfaceIT extends AbstractIntegrationTest {
     // ...role gates refuse it (EXT_ authorities are never ROLE_*)...
     mockMvc.perform(asMachine("/api/v1/admin/settings")).andExpect(status().isForbidden());
     mockMvc.perform(asMachine("/api/v1/audit/events")).andExpect(status().isForbidden());
-    // ...and the auth surface treats it as no user session at all (401, see AuthController).
-    mockMvc.perform(asMachine("/api/v1/users/me")).andExpect(status().isUnauthorized());
+    // ...including the current-user resource: CurrentUserController funnels through
+    // requireUserId() like every user-actor endpoint. (AuthController's 401 divergence lives
+    // on /api/v1/auth/** only.)
+    mockMvc.perform(asMachine("/api/v1/users/me")).andExpect(status().isForbidden());
   }
 
   @Test
