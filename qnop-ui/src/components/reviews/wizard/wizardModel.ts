@@ -61,8 +61,7 @@ export function acceptedUploads(
   return {
     accept: extra.length ? `${base},${extra.join(',')}` : base,
     label: word ? 'PDF or Word' : 'PDF',
-    matches: (file) =>
-      matchesPdf(file) || (word && matchesWord(file)) || extra.includes(file.type),
+    matches: (file) => matchesPdf(file) || (word && matchesWord(file)) || extra.includes(file.type),
   };
 }
 
