@@ -19,6 +19,7 @@
  * SPDX-License-Identifier: AGPL-3.0-only
  */
 
+import { Fragment } from 'react';
 import Box from '@mui/material/Box';
 import Stack from '@mui/material/Stack';
 import Typography from '@mui/material/Typography';
@@ -40,6 +41,8 @@ import { useFormatters } from '../../../hooks/useFormatters';
 import { UserAvatar } from '../../shell/UserAvatar';
 import { avatarSrc } from '../../../utils/avatarUrl';
 import { isDocumentScoped } from '../annotationScope';
+import { isOpenWorkflowState } from '../workflowMeta';
+import { useExtensionSlot, type MessageRowContext } from '../../../extensions/registry';
 import { Markdown } from '../markdown/Markdown';
 import { AnnotationBadgeRow } from './AnnotationBadgeRow';
 
@@ -105,6 +108,22 @@ export function AnnotationHead({
   const review = useDocument(useReviewDocumentId()).data;
   const hoverUserId = realAuthorId(review, userId, annotation.authorId);
   const quote = annotation.anchor?.textQuote?.quote;
+  // The message-row extension slots (issue #600): empty without registered
+  // contributions, so the head renders byte-identically in the community UI.
+  const actionContributions = useExtensionSlot('messageActions');
+  const badgeContributions = useExtensionSlot('messageBadges');
+  const slotContext: MessageRowContext = {
+    kind: 'annotation',
+    documentId: annotation.documentId,
+    annotationId: annotation.id,
+    commentId: cachedComments[0]?.id ?? null,
+    authorId: annotation.authorId,
+    own,
+    annotationStatus: annotation.status,
+    workflowState: review?.workflowState ?? null,
+    reviewOpen: review ? isOpenWorkflowState(review.workflowState) : false,
+    body: openerText ?? '',
+  };
   const fallbackLabel = annotation.anchor?.region
     ? 'Region annotation'
     : 'No placement on this version';
@@ -158,7 +177,13 @@ export function AnnotationHead({
             >
               Started this discussion · {shortRelativeTime(annotation.createdAt)}
             </Typography>
-            {(onToggleReaction || (copyText && notify) || (permalinkUrl && notify)) && (
+            {badgeContributions.map((contribution) => (
+              <Fragment key={contribution.id}>{contribution.render(slotContext)}</Fragment>
+            ))}
+            {(onToggleReaction ||
+              (copyText && notify) ||
+              (permalinkUrl && notify) ||
+              actionContributions.length > 0) && (
               // Directly after the timestamp, exactly like a comment row's
               // link. The negative margin keeps the icon buttons from growing
               // the caption line beyond the avatar's height.
@@ -192,6 +217,9 @@ export function AnnotationHead({
                     }
                   />
                 )}
+                {actionContributions.map((contribution) => (
+                  <Fragment key={contribution.id}>{contribution.render(slotContext)}</Fragment>
+                ))}
               </Box>
             )}
           </Stack>

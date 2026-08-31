@@ -316,6 +316,7 @@ export function AnnotationPanel({
             annotationId={annotation.id}
             documentId={annotation.documentId}
             notify={notify}
+            annotationStatus={annotation.status}
             readOnly={readOnly}
             policyReadOnly={!mayComment(annotation)}
             closed={annotation.status !== AnnotationStatus.Open}

@@ -115,6 +115,13 @@ Not an extension point itself, but the channel through which extensions become v
 - **Core keeps:** validation, the external-only removal guard (an extension can never manage the account-bearing roster), auditing (null actor + detail), anonymity (a guest pseudonymizes exactly like a user, ADR-0038 — a supplied display name cannot pierce it), and the refusal to learn links/credentials/expiry (extension business, ADR-0003). External roster changes publish no ReviewEvent — notifying about guests is the extension's decision.
 - **Owned by:** [ADR-0061](adr/0061-account-less-review-participants.md); issue #684. First consumer: qnop-ee#17 (guest links).
 
+### 10. Message-row actions & badge slots — and the generic slot registry (frontend, in-process)
+
+- **Contract:** `qnop-ui/src/extensions/registry.ts` — the first *generic* slot registry (`createExtensionRegistry`, host singleton `hostExtensions`, React access via `ExtensionsProvider` + `useExtensionSlot(slot)`), typed per slot through `SlotContributionMap`. First slots: `messageActions` and `messageBadges` — a `MessageRowContribution` renders extra per-message actions/badges and receives `MessageRowContext` (comment/annotation id, author id, own-message flag, annotation status, finalization state), so contributors decide visibility without the community row hard-coding policy.
+- **Semantics:** contributions render beside the existing copy/permalink/reaction affordances on comment rows, the annotation head and the focus card; without a registration the rows are byte-identical. The earlier per-feature registries (mentions §6, composer modes) predate this one; new UI slots use the generic registry, and the older ones migrate when `qnop-ui-spi` is cut.
+- **Server sibling (same issue):** `CommentMentionService.reResolveAndPersist(commentId, documentId, authorId, body)` — replayable mention resolution for an edited body: rows follow the re-parsed token set (survivors keep identity/timestamps), only NEWLY mentioned ids are returned (the edit-notification delta), resolution+access run through the registered `MentionResolver`s again, anonymous reviews stay a no-op. Edits per comment must be serialized by the caller.
+- **Owned by:** issue #600 (ADR-0039 status note). First consumer: qnop-ee#3 (edit own messages).
+
 ### 11. `ReviewFacade` — read-only review scoping for extensions (backend, published, core-implemented)
 
 - **Contract:** `io.qnop.spi.review.ReviewFacade` — `mayView(documentId, principalId)` (exactly the annotation-listing rule, no admin override — **review-level only**: PRIVATE thread participation is not expressed, so event-granular fan-out forwards identifiers only), `reviewCircle(documentId)` (the notification audience — one shared implementation with the mail path, so the two cannot drift; account-less principals via `ExternalParticipants.hasAccess` instead), `displayNameFor`/`exposedAuthorIdFor` (the ADR-0038 per-viewer identity — what leaves the process must be these values, never raw ids).
@@ -122,8 +129,9 @@ Not an extension point itself, but the channel through which extensions become v
 
 ### 12. Live-channel UI slot + invalidation facade (frontend, in-process)
 
-- **Contract:** `qnop-ui/src/extensions/liveChannel.ts` — a `LiveChannelContributor.onReviewMounted(context)` fires while a review surface is mounted and returns its teardown; `context` carries `documentId`, `invalidateAnnotations()` and `invalidateComments(annotationId)`, closing over the host's query client and keys — a push becomes a normal authorized refetch without the extension importing internals. Migrates to the generic slot registry (issue #600, PR #805 — its catalogue entry lands as §10 with that PR; whichever of #805/#807 merges second reconciles the section numbers) at the `qnop-ui-spi` cut.
+- **Contract:** `qnop-ui/src/extensions/liveChannel.ts` — a `LiveChannelContributor.onReviewMounted(context)` fires while a review surface is mounted and returns its teardown; `context` carries `documentId`, `invalidateAnnotations()` and `invalidateComments(annotationId)`, closing over the host's query client and keys — a push becomes a normal authorized refetch without the extension importing internals. Migrates to the generic slot registry (§10) at the `qnop-ui-spi` cut.
 - **Owned by:** ADR-0062; issue #602. First consumer: qnop-ee#5.
+
 
 ---
 
@@ -131,9 +139,9 @@ Not an extension point itself, but the channel through which extensions become v
 
 | Seam | What it will extend | Issue | First consumer |
 |---|---|---|---|
-| **Composer-mode contribution** | The Markdown composer's mode strip: a registered mode adds a tab and its own editing surface over the controlled contract (`value` = raw Markdown stays the storage format by construction, `onChange`, submit/disabled/fullscreen, roster/attachment/emoji affordances). | [#599](https://github.com/qnophq/qnop/issues/599) | qnop-ee#2 (WYSIWYG) |
-| **Message-row actions + badge slots** | Per-message icon actions and a timestamp-adjacent badge on comment rows / annotation heads, with message context (ids, own-message flag, status, finalization) so contributors decide visibility without the row hard-coding policy. | [#600](https://github.com/qnophq/qnop/issues/600) | qnop-ee#3 (edit own messages) |
-| **Edit-safe mention re-resolution** | `CommentMentionService` becomes replayable for an edited body: replace the comment's mention rows, report only the newly-mentioned ids (the notify-delta). Creation callers unchanged. | [#600](https://github.com/qnophq/qnop/issues/600) | qnop-ee#3 |
+| **Composer-mode contribution** | ~~Now exists~~ — `src/extensions/composerModes.ts` (issue #599, merged): a registered mode adds a tab to the composer's mode strip over the controlled raw-Markdown contract. | [#599](https://github.com/qnophq/qnop/issues/599) | qnop-ee#2 (WYSIWYG) |
+| **Message-row actions + badge slots** | ~~Now exists~~ — §10 above. | [#600](https://github.com/qnophq/qnop/issues/600) | qnop-ee#3 (edit own messages) |
+| **Edit-safe mention re-resolution** | ~~Now exists~~ — §10 above. | [#600](https://github.com/qnophq/qnop/issues/600) | qnop-ee#3 |
 | **Accepted-format gate from extractors** | Ingest validation + advertised `supportedFormats` derive from registered `DocumentExtractor`s; possibly a "which media types" capability on the SPI contract (ADR amendment if so). | [#601](https://github.com/qnophq/qnop/issues/601) | qnop-ee#4 (image review) |
 | **Review-event projection** | ~~Now exists~~ — §4 (ADR-0059). | [#602](https://github.com/qnophq/qnop/issues/602) | qnop-ee#5 (live feed) |
 | **Audience / identity / access facade** | ~~Now exists~~ — §11 (ADR-0062). | [#602](https://github.com/qnophq/qnop/issues/602) | qnop-ee#5 |
