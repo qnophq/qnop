@@ -21,7 +21,14 @@
 package io.qnop.web.security;
 
 import io.qnop.service.TokenRevocationService;
+import io.qnop.spi.auth.BearerCredentialAuthenticator;
+import io.qnop.spi.auth.MachinePrincipal;
 import java.time.Instant;
+import java.util.List;
+import java.util.Optional;
+import java.util.UUID;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.security.oauth2.jwt.BadJwtException;
 import org.springframework.security.oauth2.jwt.Jwt;
@@ -36,23 +43,59 @@ import org.springframework.stereotype.Component;
  * invalidation. Missing claims fail loudly rather than silently skipping the revocation check.
  *
  * <p>External OIDC provider decoders will be layered in here as a fallback by issue #21.
+ *
+ * <p><strong>Machine credentials (issue #686, ADR-0060):</strong> when the local decode rejects the
+ * credential, the registered {@link BearerCredentialAuthenticator}s are consulted — the seam
+ * through which an add-on authenticates service-account credentials against the existing API. The
+ * placement is the enforcement: the seam sits inside bearer processing, after the rate limiters,
+ * with the core's standard 401 for anything unclaimed. A contributed principal is constrained here,
+ * not by convention: a subject that parses as a UUID is rejected (it could impersonate a user), and
+ * its scopes surface as {@code EXT_}-prefixed authorities only (see {@link
+ * RoleJwtAuthenticationConverter}), so no human role gate can ever pass.
  */
 @Component
 public class DelegatingJwtDecoder implements JwtDecoder {
 
+  private static final Logger log = LoggerFactory.getLogger(DelegatingJwtDecoder.class);
+
+  /** Marker claim of a machine principal; its value is the literal kind. */
+  public static final String ACTOR_KIND_CLAIM = "qnop_actor_kind";
+
+  /** Claim carrying a machine principal's scopes (list of strings). */
+  public static final String EXT_SCOPES_CLAIM = "qnop_ext_scopes";
+
   private final JwtDecoder localDecoder;
   private final TokenRevocationService tokenRevocationService;
+  private final List<BearerCredentialAuthenticator> machineAuthenticators;
 
   public DelegatingJwtDecoder(
       @Qualifier("localJwtDecoder") JwtDecoder localDecoder,
-      TokenRevocationService tokenRevocationService) {
+      TokenRevocationService tokenRevocationService,
+      List<BearerCredentialAuthenticator> machineAuthenticators) {
     this.localDecoder = localDecoder;
     this.tokenRevocationService = tokenRevocationService;
+    this.machineAuthenticators = List.copyOf(machineAuthenticators);
   }
 
   @Override
   public Jwt decode(String token) throws JwtException {
-    Jwt jwt = localDecoder.decode(token); // throws JwtException when signature/expiry invalid
+    Jwt jwt;
+    try {
+      jwt = localDecoder.decode(token); // throws JwtException when signature/expiry invalid
+    } catch (org.springframework.security.oauth2.jwt.JwtValidationException oursButInvalid) {
+      // Signature-valid but failed validation (typically: expired) — this IS one of our user
+      // tokens, and it must never be offered to third-party authenticator code (review of #686:
+      // an expired token still carries subject, role and a valid HMAC).
+      throw oursButInvalid;
+    } catch (JwtException notAUserToken) {
+      // Not one of ours — offer it to the contributed machine authenticators (#686). Anything
+      // unclaimed keeps the original rejection, so the failure shape never changes.
+      Jwt machine = authenticateMachine(token);
+      if (machine != null) {
+        return machine;
+      }
+      throw notAUserToken;
+    }
     String jti = jwt.getId();
     String subject = jwt.getSubject();
     Instant issuedAt = jwt.getIssuedAt();
@@ -65,5 +108,67 @@ public class DelegatingJwtDecoder implements JwtDecoder {
       throw new BadJwtException("Token has been revoked");
     }
     return jwt;
+  }
+
+  private Jwt authenticateMachine(String token) {
+    if (machineAuthenticators.isEmpty()) {
+      return null;
+    }
+    for (BearerCredentialAuthenticator authenticator : machineAuthenticators) {
+      Optional<MachinePrincipal> principal;
+      try {
+        principal = authenticator.authenticate(token);
+      } catch (RuntimeException e) {
+        // A broken add-on must not turn a bad credential into a 500 — it just doesn't claim it.
+        log.warn(
+            "machine authenticator {} failed — treating credential as unclaimed",
+            authenticator.getClass().getName(),
+            e);
+        continue;
+      }
+      if (principal.isEmpty()) {
+        continue;
+      }
+      // Deliberately NOT lenient like the throwing case above: a claimed principal that violates
+      // an impersonation guard (UUID subject) is a loud invariant breach, and silently moving on
+      // would let another authenticator claim a credential one already asserted as its own. The
+      // request fails closed with the standard 401.
+      return toJwt(token, principal.get());
+    }
+    return null;
+  }
+
+  /**
+   * Renders a machine principal as a synthetic {@link Jwt} so it flows through the existing
+   * resource-server pipeline (converter, entry point, {@code PasswordChangeRequiredFilter} — which
+   * ignores it for lack of a {@code pcr} claim). The UUID-subject rejection is the impersonation
+   * guard: user subjects are UUIDs, so no contributed principal can ever resolve as a user.
+   */
+  private Jwt toJwt(String token, MachinePrincipal principal) {
+    String subject = principal.subject();
+    if (subject == null || subject.isBlank()) {
+      throw new BadJwtException("machine principal without a subject");
+    }
+    if (parsesAsUuid(subject)) {
+      throw new BadJwtException("machine principal subject must not be a UUID");
+    }
+    Instant now = Instant.now();
+    return Jwt.withTokenValue(token)
+        .header("alg", "none")
+        .subject(subject)
+        .issuedAt(now)
+        .expiresAt(now.plusSeconds(60)) // validity is re-checked per request by the authenticator
+        .claim(ACTOR_KIND_CLAIM, "machine")
+        .claim(EXT_SCOPES_CLAIM, List.copyOf(principal.scopes()))
+        .build();
+  }
+
+  private static boolean parsesAsUuid(String subject) {
+    try {
+      UUID.fromString(subject);
+      return true;
+    } catch (IllegalArgumentException e) {
+      return false;
+    }
   }
 }

@@ -97,6 +97,9 @@ dependencies {
     annotationProcessor(libs.spring.boot.configuration.processor)
 
     implementation(project(":qnop-core"))
+    // The web security layer consumes the machine-credential seam directly (issue #686,
+    // ADR-0060); spi is intentionally consumable by every layer (ArchUnit rule).
+    implementation(project(":qnop-spi"))
     implementation(project(":qnop-api:qnop-api-endpoint")) // generated Spring interfaces (+ DTOs transitively)
 
     implementation(libs.spring.boot.starter.web)
@@ -153,10 +156,8 @@ dependencies {
     testImplementation(libs.spring.boot.testcontainers)
     testImplementation(libs.testcontainers.postgresql)
     testImplementation(libs.testcontainers.junit.jupiter)
-    // Object-storage integration tests run against a real MinIO (issue #243) and use the
-    // StorageProvider SPI types directly (qnop-core hides qnop-spi behind `implementation`).
+    // Object-storage integration tests run against a real MinIO (issue #243).
     testImplementation(libs.testcontainers.minio)
-    testImplementation(project(":qnop-spi"))
     // The document-ingest ITs (issue #245) generate their PDF fixtures with PDFBox
     // instead of committing binary blobs.
     testImplementation(libs.pdfbox)
