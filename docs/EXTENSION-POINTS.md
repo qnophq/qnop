@@ -84,7 +84,7 @@ in-process registries described below are the seams those bundles will feed.
 ### 5. Enterprise Liquibase changelog seam (schema)
 
 - **Contract:** the master changelog ends with `includeAll: classpath*:db/changelog/enterprise/` with `errorIfMissingOrEmpty: false` — a no-op without enterprise JARs. An extension ships its changesets under that path on its own classpath entry.
-- **Rules:** file names `e####-<feature>-*.yaml`, author `qnop-enterprise`; applied after all community migrations, in filename order. The community fold-rule ("modify the existing changeset") does **not** apply across the boundary — an extension owns its own history.
+- **Rules:** file names `e####-<feature>-*.yaml`, author `qnop-enterprise`; applied after all community migrations, in filename order. Shipped changesets are immutable on both sides of the boundary (working rule 11) — an extension owns its own history and appends to it exactly like the core does.
 - **Owned by:** ADR-0039 §2; issue #254.
 
 ### 6. UI mention contributor registry (frontend, in-process)
