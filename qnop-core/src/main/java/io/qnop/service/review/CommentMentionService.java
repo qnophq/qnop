@@ -121,6 +121,9 @@ public class CommentMentionService {
    * MentionResolver}s, so a row whose user meanwhile lost access is dropped even when the token
    * still stands — the same scoping policy creation applies.
    *
+   * <p>{@code commentId} must be a comment of {@code documentId} — the caller resolves that
+   * ownership (it loaded the comment to edit it); this service does not re-verify it.
+   *
    * <p><strong>Concurrency contract:</strong> two overlapping calls for the same comment can both
    * compute the same "new" row, and the second insert then hits the unique comment/user constraint.
    * The caller (the enterprise edit endpoint) must serialize edits per comment — which it needs

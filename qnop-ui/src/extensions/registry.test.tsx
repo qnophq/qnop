@@ -26,6 +26,7 @@ import { createExtensionRegistry, useExtensionSlot, type MessageRowContext } fro
 
 const context: MessageRowContext = {
   kind: 'comment',
+  documentId: 'd1',
   annotationId: 'a1',
   commentId: 'c1',
   authorId: 'u1',

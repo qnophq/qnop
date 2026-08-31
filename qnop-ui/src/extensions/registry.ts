@@ -43,6 +43,8 @@ import { createContext, useContext, useSyncExternalStore, type ReactNode } from 
 export interface MessageRowContext {
   /** The row's nature: an annotation head (the opening post) or a thread comment. */
   kind: 'annotation' | 'comment';
+  /** The review the message belongs to; null only while the thread's document is not cached. */
+  documentId: string | null;
   annotationId: string;
   /**
    * The comment behind the row. On an annotation head this is the opening
@@ -101,6 +103,12 @@ export interface ExtensionRegistry {
 /** Shared empty snapshot — `get` must stay reference-stable between registrations. */
 const NO_CONTRIBUTIONS: readonly MessageRowContribution[] = Object.freeze([]);
 
+/*
+ * Interim shape (issue #600): the registry's internals are typed to the message-row
+ * contribution because it is the only slot family so far. When the next family (or the
+ * qnop-ui-spi cut) arrives, the internal maps generalize over SlotContributionMap — the
+ * public API already is generic, so callers won't move.
+ */
 export function createExtensionRegistry(): ExtensionRegistry {
   const slots = new Map<ExtensionSlot, MessageRowContribution[]>();
   const listeners = new Set<() => void>();

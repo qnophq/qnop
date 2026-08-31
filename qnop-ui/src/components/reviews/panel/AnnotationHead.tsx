@@ -114,6 +114,7 @@ export function AnnotationHead({
   const badgeContributions = useExtensionSlot('messageBadges');
   const slotContext: MessageRowContext = {
     kind: 'annotation',
+    documentId: annotation.documentId,
     annotationId: annotation.id,
     commentId: cachedComments[0]?.id ?? null,
     authorId: annotation.authorId,

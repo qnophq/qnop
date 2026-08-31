@@ -100,6 +100,7 @@ function renderWith(registry: ExtensionRegistry | null, ui: React.ReactNode) {
 
 const commentContext: MessageRowContext = {
   kind: 'comment',
+  documentId: 'd1',
   annotationId: 'a1',
   commentId: 'c9',
   authorId: 'u-author',

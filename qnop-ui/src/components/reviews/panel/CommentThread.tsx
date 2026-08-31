@@ -288,6 +288,7 @@ export function CommentThread({
                 notify={notify}
                 slotContext={{
                   kind: 'comment',
+                  documentId: review?.id ?? null,
                   annotationId,
                   commentId: comment.id,
                   authorId: comment.authorId,
