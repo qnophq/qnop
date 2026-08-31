@@ -70,8 +70,14 @@ public class ExternalParticipantService implements ExternalParticipants {
       throw new IllegalArgumentException("display name must be 1-" + MAX_DISPLAY_NAME + " chars");
     }
     ReviewParticipant saved = participants.save(ReviewParticipant.forExternal(documentId, name));
+    // detail is a JSON column; identifiers only — the display name is user content and readable
+    // from the participant row while it exists.
     auditEvents.save(
-        new AuditEvent(documentId, "review.participant_added", null, "external: " + name));
+        new AuditEvent(
+            documentId,
+            "review.participant_added",
+            null,
+            "{\"participantId\":\"" + saved.getId() + "\",\"kind\":\"external\"}"));
     return saved.getId();
   }
 
@@ -97,7 +103,7 @@ public class ExternalParticipantService implements ExternalParticipants {
             documentId,
             "review.participant_removed",
             null,
-            "external: " + participant.getExternalDisplayName()));
+            "{\"participantId\":\"" + participantId + "\",\"kind\":\"external\"}"));
     return true;
   }
 
