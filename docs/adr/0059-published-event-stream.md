@@ -31,6 +31,14 @@ A published event says *what happened to which object*. Annotation bodies, docum
 
 `PublishedEventDispatcher` bridges the internal stream: `@TransactionalEventListener(AFTER_COMMIT)` (a rolled-back action is never announced), `@Async` on a dedicated bounded executor (never the request thread), each listener individually wrapped (one that throws costs itself, never its siblings or the action). The executor's full-queue policy is **drop with a warning**, not CallerRuns: the sibling notification executor may fall back to the committing thread for mail, but an extension's slow listener must never be able to slow a request. Delivery is therefore best-effort in-process; a consumer needing durability or retries (the webhook forwarder) queues on its own side — retry, signing and SSRF policy all stay in the extension.
 
+### Anonymity crosses the seam nulled, not raw
+
+In an anonymous review (ADR-0038) the internal consumers pseudonymize the actor per recipient; an external consumer gets no such courtesy and may ship the event out of the process. So the dispatcher nulls {@code actorId} before any listener hears an event of an anonymous review — the flag read from the document, or carried by the deletion event whose subject no longer exists; an unloadable document counts as anonymous, erring toward silence.
+
+### No ordering guarantee
+
+Dispatch is asynchronous on a small pool; once it widens past one thread, events — even of one action — may arrive concurrently or out of order. The contract says so, and consumers needing order reconstruct it from their own data. Pinning to one thread was rejected: it would trade an honest documented property for a hidden throughput ceiling.
+
 ### Beside the sinks, not absorbing them
 
 `ReviewNotificationSink` remains internal and recipient-shaped; the published stream is event-shaped. The two answer different questions ("who should hear, on which channel?" vs "what happened?") and converge on nothing but their source. Absorbing the sinks into the published seam is explicitly not attempted — it would be generalisation ahead of a second consumer (ADR-0049).

@@ -32,10 +32,12 @@ import java.util.UUID;
  *
  * @param type a stable catalogued name from {@link PublishedEventTypes}; new names may appear in
  *     minor releases, so consumers must ignore types they do not know
- * @param occurredAt when the event was published (after the originating commit)
+ * @param occurredAt when the event was dispatched — after the originating commit, so under a
+ *     dispatch backlog it may trail the commit by the queueing delay
  * @param documentId the review the event belongs to — for {@link
  *     PublishedEventTypes#REVIEW_DELETED} the id of the review that no longer exists
- * @param actorId the user whose action raised the event
+ * @param actorId the user whose action raised the event, or {@code null} in an anonymous review —
+ *     the actor's identity never leaves one (ADR-0038)
  * @param attributes per-type identifiers (see the constants' javadoc), immutable; values are
  *     rendered as strings ({@code UUID}s in canonical form, numbers and booleans via {@code
  *     toString})

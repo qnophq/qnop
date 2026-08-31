@@ -20,6 +20,8 @@
  */
 package io.qnop.service.event;
 
+import io.qnop.entity.Document;
+import io.qnop.repository.DocumentRepository;
 import io.qnop.service.review.ReviewEvent;
 import io.qnop.spi.event.PublishedEvent;
 import io.qnop.spi.event.PublishedEventListener;
@@ -38,6 +40,12 @@ import org.springframework.transaction.event.TransactionalEventListener;
  * dedicated bounded executor so no listener ever runs on the request thread; each listener wrapped
  * so one that throws costs itself, never its siblings or the action. With no registered listener
  * (the Community default) the mapping is skipped entirely.
+ *
+ * <p><strong>Anonymity (ADR-0038):</strong> in an anonymous review the actor's identity never
+ * enters the published stream — {@code actorId} is nulled before any listener hears the event. The
+ * flag is read from the document (or carried by {@link ReviewEvent.ReviewDeleted}, whose subject no
+ * longer exists); a document that cannot be loaded is treated as anonymous, erring on the side of
+ * silence.
  */
 @Component
 public class PublishedEventDispatcher {
@@ -45,9 +53,19 @@ public class PublishedEventDispatcher {
   private static final Logger log = LoggerFactory.getLogger(PublishedEventDispatcher.class);
 
   private final List<PublishedEventListener> listeners;
+  private final DocumentRepository documents;
 
-  public PublishedEventDispatcher(List<PublishedEventListener> listeners) {
+  public PublishedEventDispatcher(
+      List<PublishedEventListener> listeners, DocumentRepository documents) {
     this.listeners = List.copyOf(listeners);
+    this.documents = documents;
+  }
+
+  private boolean isAnonymous(ReviewEvent event) {
+    if (event instanceof ReviewEvent.ReviewDeleted deleted) {
+      return deleted.anonymous();
+    }
+    return documents.findById(event.documentId()).map(Document::isAnonymous).orElse(true);
   }
 
   @Async("publishedEventExecutor")
@@ -56,7 +74,7 @@ public class PublishedEventDispatcher {
     if (listeners.isEmpty()) {
       return;
     }
-    PublishedEvent published = PublishedEventMapper.map(event, Instant.now());
+    PublishedEvent published = PublishedEventMapper.map(event, Instant.now(), isAnonymous(event));
     for (PublishedEventListener listener : listeners) {
       try {
         listener.on(published);

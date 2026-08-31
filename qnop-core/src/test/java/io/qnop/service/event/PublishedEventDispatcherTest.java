@@ -22,6 +22,8 @@ package io.qnop.service.event;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import io.qnop.entity.Document;
+import io.qnop.repository.DocumentRepository;
 import io.qnop.service.review.ReviewEvent;
 import io.qnop.spi.event.PublishedEvent;
 import io.qnop.spi.event.PublishedEventListener;
@@ -30,8 +32,10 @@ import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
+import org.mockito.Mockito;
 
 /**
  * DB-free tests for the published event seam (issue #685, ADR-0059): the catalogue mapping and the
@@ -88,7 +92,7 @@ class PublishedEventDispatcherTest {
     assertThat(map(new ReviewEvent.ParticipantAdded(doc, actor, null, team)).attributes())
         .containsExactlyInAnyOrderEntriesOf(Map.of("teamId", team.toString()));
     // Deliberately no title attribute — customer content stays out of the stream.
-    assertThat(map(new ReviewEvent.ReviewDeleted(doc, actor, owner, "Secret contract")))
+    assertThat(map(new ReviewEvent.ReviewDeleted(doc, actor, owner, "Secret contract", false)))
         .satisfies(
             e ->
                 assertThat(e.attributes())
@@ -102,7 +106,8 @@ class PublishedEventDispatcherTest {
         event -> {
           throw new IllegalStateException("extension breakage");
         };
-    PublishedEventDispatcher dispatcher = new PublishedEventDispatcher(List.of(broken, healthy));
+    PublishedEventDispatcher dispatcher =
+        new PublishedEventDispatcher(List.of(broken, healthy), documents(false));
 
     dispatcher.on(new ReviewEvent.AnnotationCreated(doc, actor, annotation));
 
@@ -114,7 +119,8 @@ class PublishedEventDispatcherTest {
   void deliversToEveryListenerInRegistrationOrder() {
     Recorder first = new Recorder();
     Recorder second = new Recorder();
-    PublishedEventDispatcher dispatcher = new PublishedEventDispatcher(List.of(first, second));
+    PublishedEventDispatcher dispatcher =
+        new PublishedEventDispatcher(List.of(first, second), documents(false));
 
     dispatcher.on(new ReviewEvent.CommentAdded(doc, actor, annotation, UUID.randomUUID()));
 
@@ -125,11 +131,52 @@ class PublishedEventDispatcherTest {
   @Test
   void withoutListenersNothingIsMapped() {
     // The Community default: dispatcher present, nobody listening, zero work.
-    new PublishedEventDispatcher(List.of())
+    DocumentRepository repository = Mockito.mock(DocumentRepository.class);
+    new PublishedEventDispatcher(List.of(), repository)
         .on(new ReviewEvent.AnnotationCreated(doc, actor, annotation));
+    Mockito.verifyNoInteractions(repository);
+  }
+
+  @Test
+  void mapsTheUserVariantOfParticipantAdded() {
+    UUID user = UUID.randomUUID();
+    assertThat(map(new ReviewEvent.ParticipantAdded(doc, actor, user, null)).attributes())
+        .containsExactlyInAnyOrderEntriesOf(Map.of("userId", user.toString()));
+  }
+
+  @Test
+  void anonymousReviewsNeverPublishTheActor() {
+    Recorder recorder = new Recorder();
+    new PublishedEventDispatcher(List.of(recorder), documents(true))
+        .on(new ReviewEvent.AnnotationCreated(doc, actor, annotation));
+    assertThat(recorder.heard.getFirst().actorId()).isNull();
+
+    // The deletion event carries the flag itself — nothing is left to load.
+    Recorder deleted = new Recorder();
+    new PublishedEventDispatcher(List.of(deleted), documents(false))
+        .on(new ReviewEvent.ReviewDeleted(doc, actor, UUID.randomUUID(), "t", true));
+    assertThat(deleted.heard.getFirst().actorId()).isNull();
+  }
+
+  @Test
+  void anUnloadableDocumentCountsAsAnonymous() {
+    Recorder recorder = new Recorder();
+    DocumentRepository repository = Mockito.mock(DocumentRepository.class);
+    Mockito.when(repository.findById(doc)).thenReturn(Optional.empty());
+    new PublishedEventDispatcher(List.of(recorder), repository)
+        .on(new ReviewEvent.AnnotationCreated(doc, actor, annotation));
+    assertThat(recorder.heard.getFirst().actorId()).isNull();
+  }
+
+  private DocumentRepository documents(boolean anonymous) {
+    Document document = Mockito.mock(Document.class);
+    Mockito.when(document.isAnonymous()).thenReturn(anonymous);
+    DocumentRepository repository = Mockito.mock(DocumentRepository.class);
+    Mockito.when(repository.findById(doc)).thenReturn(Optional.of(document));
+    return repository;
   }
 
   private PublishedEvent map(ReviewEvent event) {
-    return PublishedEventMapper.map(event, at);
+    return PublishedEventMapper.map(event, at, false);
   }
 }

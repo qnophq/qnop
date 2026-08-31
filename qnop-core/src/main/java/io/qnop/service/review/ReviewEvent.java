@@ -78,6 +78,6 @@ public sealed interface ReviewEvent {
    * names a document the listener then loads; this one has to carry what that load would have
    * provided — who owned it and what it was called — because there is nothing left to ask.
    */
-  record ReviewDeleted(UUID documentId, UUID actorId, UUID ownerId, String title)
+  record ReviewDeleted(UUID documentId, UUID actorId, UUID ownerId, String title, boolean anonymous)
       implements ReviewEvent {}
 }

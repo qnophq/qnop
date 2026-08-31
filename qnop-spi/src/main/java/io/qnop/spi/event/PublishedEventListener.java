@@ -30,7 +30,10 @@ package io.qnop.spi.event;
  * — a consumer needing durability or retries (a webhook forwarder, say) queues on its own side.
  *
  * <p>Implementations must tolerate unknown {@link PublishedEvent#type() types} (the catalogue may
- * grow in minor releases) and must be safe to call from any thread.
+ * grow in minor releases) and must be safe to call from any thread. <strong>No ordering
+ * guarantee:</strong> dispatch may use more than one thread, so two events — even of one action —
+ * can arrive concurrently or out of order; a consumer needing order reconstructs it from its own
+ * data.
  */
 @FunctionalInterface
 public interface PublishedEventListener {

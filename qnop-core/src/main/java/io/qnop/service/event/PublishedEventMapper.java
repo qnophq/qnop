@@ -38,7 +38,21 @@ final class PublishedEventMapper {
 
   private PublishedEventMapper() {}
 
-  static PublishedEvent map(ReviewEvent event, Instant occurredAt) {
+  static PublishedEvent map(ReviewEvent event, Instant occurredAt, boolean anonymous) {
+    PublishedEvent published = map(event, occurredAt);
+    if (!anonymous) {
+      return published;
+    }
+    // ADR-0038: the actor's identity never leaves an anonymous review.
+    return new PublishedEvent(
+        published.type(),
+        published.occurredAt(),
+        published.documentId(),
+        null,
+        published.attributes());
+  }
+
+  private static PublishedEvent map(ReviewEvent event, Instant occurredAt) {
     return switch (event) {
       case ReviewEvent.AnnotationCreated e ->
           publish(

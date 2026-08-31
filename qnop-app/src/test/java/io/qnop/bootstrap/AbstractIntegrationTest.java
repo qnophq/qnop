@@ -75,6 +75,7 @@ public abstract class AbstractIntegrationTest {
     // Review notifications dispatch synchronously in tests (issue #316): deterministic
     // verification, and no async DB reader racing the per-test TRUNCATE cleanup.
     registry.add("qnop.notifications.sync-dispatch", () -> "true");
+    registry.add("qnop.events.sync-dispatch", () -> "true");
     registry.add("qnop.cors.allowed-origins", () -> "http://localhost:5173");
     // Effectively disable the background job poller/reaper in tests (interval == initial delay ==
     // 1h): tests drive the queue via direct poll()/reap() calls, so a stray scheduled tick must not
