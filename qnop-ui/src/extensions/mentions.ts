@@ -55,7 +55,11 @@ export interface MentionContributor {
    * {@link notifyMentionContributionsChanged} when that cache fills.
    */
   candidatesFor(documentId: string): MentionPrincipal[];
-  /** The principal a slug stands for, or undefined when not this namespace. */
+  /**
+   * The principal a slug stands for, or undefined when not this namespace.
+   * Callers pass the slug as it appears in the text; match case-insensitively,
+   * as slugs are (the server's parser lower-cases tokens before resolution).
+   */
   resolve(slug: string): MentionPrincipal | undefined;
 }
 
