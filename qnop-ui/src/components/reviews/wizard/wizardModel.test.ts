@@ -214,6 +214,7 @@ describe('acceptedUploads with server-advertised media types (#601)', () => {
     expect(withPng.accept).toBe('application/pdf,.pdf,image/png');
     expect(withPng.matches(new File([''], 'scan.png', { type: 'image/png' }))).toBe(true);
     expect(withPng.matches(new File([''], 'a.gif', { type: 'image/gif' }))).toBe(false);
+    expect(withPng.label).toBe('PDF and more');
   });
 
   it('is unchanged without advertised extras', () => {

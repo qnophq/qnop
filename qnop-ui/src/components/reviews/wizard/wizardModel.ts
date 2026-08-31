@@ -60,7 +60,9 @@ export function acceptedUploads(
   const base = word ? `application/pdf,.pdf,${DOCX_MIME},.docx` : 'application/pdf,.pdf';
   return {
     accept: extra.length ? `${base},${extra.join(',')}` : base,
-    label: word ? 'PDF or Word' : 'PDF',
+    // Extras match by exact MIME type only (no extension fallback — the server-side
+    // gate is authoritative and the accept filter already narrows the picker).
+    label: (word ? 'PDF or Word' : 'PDF') + (extra.length ? ' and more' : ''),
     matches: (file) => matchesPdf(file) || (word && matchesWord(file)) || extra.includes(file.type),
   };
 }

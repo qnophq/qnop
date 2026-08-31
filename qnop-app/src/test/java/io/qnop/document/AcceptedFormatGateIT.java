@@ -114,6 +114,10 @@ class AcceptedFormatGateIT extends SeededIntegrationTest {
                 .file(new MockMultipartFile("file", "anim.gif", "image/gif", GIF))
                 .param("title", "Not accepted")
                 .header("Authorization", "Bearer " + token(MEMBER_ID)))
-        .andExpect(status().isUnsupportedMediaType());
+        .andExpect(status().isUnsupportedMediaType())
+        // The community copy, not the Word-converter message (issue #601 review).
+        .andExpect(
+            org.springframework.test.web.servlet.result.MockMvcResultMatchers.content()
+                .string(Matchers.containsString("only PDF and Word documents are accepted")));
   }
 }
