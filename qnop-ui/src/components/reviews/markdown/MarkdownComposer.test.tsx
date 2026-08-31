@@ -39,7 +39,7 @@ function Host({
   onUploadAttachment?: (file: File) => Promise<UploadedAttachment>;
   onToggleFullscreen?: () => void;
   initial?: string;
-  mentionCandidates?: { id: string; name: string; slug: string }[];
+  mentionCandidates?: import('./mentionToken').MentionCandidate[];
 }) {
   const [value, setValue] = useState(initial);
   return (
@@ -88,6 +88,37 @@ describe('MarkdownComposer', () => {
 
     fireEvent.mouseDown(option); // mousedown selects without blurring the field
     expect(ta.value).toContain('@alice-smith');
+  });
+
+  it('renders a contributed candidate with its hint and without the user-avatar endpoint (#598)', () => {
+    render(
+      <Host
+        mentionCandidates={[
+          {
+            id: 'team-1',
+            name: 'Platform Team',
+            slug: 'platform-team',
+            kind: 'team',
+            avatarUrl: null,
+            hint: 'notifies 5 people',
+          },
+        ]}
+      />,
+    );
+    const ta = textarea();
+    ta.focus();
+    fireEvent.change(ta, { target: { value: 'hi @Pla' } });
+    ta.setSelectionRange(7, 7);
+    fireEvent.keyUp(ta, { key: 'a' });
+
+    const option = screen.getByTestId('mention-option');
+    expect(option).toHaveTextContent('Platform Team');
+    expect(option).toHaveTextContent('notifies 5 people');
+    // A contributed id is not a user id: initials fallback, never /users/<id>/avatar.
+    expect(option.querySelector('img')).not.toBeInTheDocument();
+
+    fireEvent.mouseDown(screen.getByText('Platform Team'));
+    expect(ta.value).toContain('@platform-team');
   });
 
   it('offers no @ picker without a roster (e.g. anonymous reviews) (#462)', () => {

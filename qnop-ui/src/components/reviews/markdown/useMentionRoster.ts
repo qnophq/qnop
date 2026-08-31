@@ -75,7 +75,8 @@ export function useMentionRoster(documentId: string | null | undefined): Mention
     if (documentId) {
       for (const contributor of contributors) {
         for (const principal of contributor.candidatesFor(documentId)) {
-          if (!roster.some((candidate) => candidate.slug === principal.slug)) {
+          const slugLower = principal.slug.toLowerCase();
+          if (!roster.some((candidate) => candidate.slug.toLowerCase() === slugLower)) {
             roster.push({
               id: principal.id,
               name: principal.name,

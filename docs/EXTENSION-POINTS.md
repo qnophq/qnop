@@ -29,7 +29,7 @@ just a set of such extensions from the private `qnop-ee` repository, which
 builds against the **published, versioned, Spring-free `qnop-spi` artifact
 only** ([ADR-0002](adr/0002-open-core-via-polyrepo-and-published-spi.md),
 [ADR-0003](adr/0003-agpl-boundary-is-the-spi.md) — the SPI is the AGPL line,
-[ADR-0046](adr/0046-publish-spi-api-to-github-packages.md) — publishing).
+[ADR-0046](adr/0046-publish-spi-and-api-to-github-packages.md) — publishing).
 Frontend extensions load at runtime as ESM bundles served by their JAR
 ([ADR-0039](adr/0039-enterprise-packaging-and-runtime-extensions.md)); the
 in-process registries described below are the seams those bundles will feed.
@@ -56,19 +56,19 @@ in-process registries described below are the seams those bundles will feed.
 
 - **Contract:** `io.qnop.spi.storage.StorageProvider` — `put(key, content, length, contentType)`, `get(key) → Optional<StorageContent>`, `exists(key)`, `delete(key)`; throws `StorageException`. Listing via `StorageListing`.
 - **Wiring:** replaceable default. The S3/MinIO adapter (`io.qnop.service.storage`, `S3Configuration`) is `@ConditionalOnMissingBean(StorageProvider.class)` — an extension providing its own bean replaces it entirely.
-- **Core keeps:** the upload-then-commit staging registry and the orphan reaper ([ADR-0036](adr/0036-storage-staging-and-orphan-reaper.md)) sit *above* the provider — a provider stores bytes by opaque key and knows nothing about commit semantics.
-- **Owned by:** [ADR-0005](adr/0005-storage-provider-spi.md), ADR-0036; issue #243.
+- **Core keeps:** the upload-then-commit staging registry and the orphan reaper ([ADR-0036](adr/0036-object-storage-lifecycle-staging-and-reaper.md)) sit *above* the provider — a provider stores bytes by opaque key and knows nothing about commit semantics.
+- **Owned by:** [ADR-0005](adr/0005-binary-documents-in-object-storage.md), ADR-0036; issue #243.
 
 ### 2. `DocumentExtractor` — document formats (backend, published)
 
-- **Contract:** `io.qnop.spi.extract.DocumentExtractor` — `supports(contentType)` against the **server-sniffed** MIME type (never the filename), `extract(InputStream) → RenderedDocument` (surfaces + positioned `TextSpan`s, the canonical extraction of [ADR-0032](adr/0032-server-mediated-ingest-and-canonical-extraction.md)).
-- **Wiring:** contribution beside a default — the extraction job handler iterates the registered list and uses the first extractor whose `supports` claims the sniffed type; none matching fails the version permanently. Community ships the PDF extractor; DOCX arrives as PDF via the out-of-process LibreOffice conversion ([ADR-0010](adr/0010-docx-ingest-via-conversion.md)) *before* this seam.
-- **Known gap, tracked:** the upload accept gate is still hard-coded to PDF, so an extractor for a new format is rejected before it runs — #601 derives the gate (and the `GET /api/v1/config` `supportedFormats` advertisement) from the registered extractors.
+- **Contract:** `io.qnop.spi.extract.DocumentExtractor` — `supports(contentType)` against the **server-sniffed** MIME type (never the filename), `extract(InputStream) → RenderedDocument` (surfaces + positioned `TextSpan`s, the canonical extraction of [ADR-0032](adr/0032-document-representation-and-rendering-pipeline.md)).
+- **Wiring:** contribution beside a default — the extraction job handler iterates the registered list and uses the first extractor whose `supports` claims the sniffed type; none matching fails the version permanently. Community ships the PDF extractor; DOCX arrives as PDF via the out-of-process LibreOffice conversion ([ADR-0010](adr/0010-docx-representation-strategy.md)) *before* this seam.
+- **Known gap, tracked:** the upload accept gate is still hard-coded to PDF and DOCX, so an extractor for a new format is rejected before it runs — #601 derives the gate (and the `GET /api/v1/config` `supportedFormats` advertisement) from the registered extractors.
 - **Owned by:** ADR-0010/0032; the seam promise "a new format is an added implementation, not a core rewrite".
 
 ### 3. `MentionResolver` — mention namespaces (backend, published)
 
-- **Contract:** `io.qnop.spi.mention.MentionResolver` — `resolve(MentionContext, slug) → Set<UUID>`; `MentionContext(documentId, ownerId, authorId)`. **The returned UUIDs are always user ids** (rows of `users`): a resolver for another namespace (a team) *expands* its principal into member user ids — the team's own id never leaves the resolver. Empty set = "not my namespace"; cross-namespace slug uniqueness (#595) guarantees at most one owner per token.
+- **Contract:** `io.qnop.spi.mention.MentionResolver` — `resolve(MentionContext, slug) → Set<UUID>` (slugs arrive lower-cased by the parser); `MentionContext(documentId, ownerId, authorId)`. **The returned UUIDs are always user ids** (rows of `users`): a resolver for another namespace (a team) *expands* its principal into member user ids — the team's own id never leaves the resolver. Empty set = "not my namespace"; cross-namespace slug uniqueness (#595) guarantees at most one owner per token.
 - **Wiring:** contribution beside a default — `UserSlugMentionResolver` (profile slugs, case-insensitive) is always registered; all resolvers see every token and their answers are unioned.
 - **Core keeps:** the document-access rule runs over every resolved id (a resolver can never widen who may be mentioned, only apply a narrower rule of its own); persisted shape stays per-user `comment_mention` rows, so mail/opt-out/dedup are extension-agnostic; anonymity (ADR-0038) is enforced *before* resolvers are called.
 - **Owned by:** [ADR-0058](adr/0058-mention-resolver-spi.md); issue #598. First consumer: qnop-ee#1 (team mentions).

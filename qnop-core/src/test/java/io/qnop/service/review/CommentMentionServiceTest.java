@@ -207,4 +207,30 @@ class CommentMentionServiceTest {
     // A resolver names whom a token stands for; it cannot widen who may be mentioned.
     assertThat(persisted).containsExactly(owner);
   }
+
+  @Test
+  void throwingOrNullReturningResolverDegradesToUnresolved() {
+    Document document = document(false);
+    when(documents.findById(documentId)).thenReturn(Optional.of(document));
+    slugResolvesTo("petra-part", participant);
+    when(users.findBySlugIgnoreCase("platform-team")).thenReturn(Optional.empty());
+    when(participants.existsAccessibleParticipant(documentId, participant)).thenReturn(true);
+    MentionResolver throwing =
+        (context, slug) -> {
+          throw new IllegalStateException("add-on breakage");
+        };
+    MentionResolver nullReturning = (context, slug) -> null;
+    CommentMentionService seamed =
+        new CommentMentionService(
+            mentions,
+            documents,
+            participants,
+            List.of(throwing, nullReturning, new UserSlugMentionResolver(users)));
+
+    var persisted =
+        seamed.resolveAndPersist(commentId, documentId, author, "@petra-part @platform-team");
+
+    // The broken resolvers cost their namespace, never the transaction.
+    assertThat(persisted).containsExactly(participant);
+  }
 }

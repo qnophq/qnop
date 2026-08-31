@@ -45,8 +45,8 @@ public interface MentionResolver {
 
   /**
    * The user ids {@code slug} addresses in the given context, or an empty set when this resolver
-   * does not know the slug. {@code slug} is passed as written (case not normalized); resolvers
-   * match it case-insensitively, as slugs are.
+   * does not know the slug. {@code slug} arrives lower-cased (the mention parser normalizes every
+   * token); a resolver whose slugs are stored with mixed case must match case-insensitively.
    */
   Set<UUID> resolve(MentionContext context, String slug);
 }

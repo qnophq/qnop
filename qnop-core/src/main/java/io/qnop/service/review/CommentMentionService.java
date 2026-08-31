@@ -31,6 +31,8 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Set;
 import java.util.UUID;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -58,6 +60,8 @@ import org.springframework.transaction.annotation.Transactional;
  */
 @Service
 public class CommentMentionService {
+
+  private static final Logger log = LoggerFactory.getLogger(CommentMentionService.class);
 
   private final CommentMentionRepository mentions;
   private final DocumentRepository documents;
@@ -98,7 +102,7 @@ public class CommentMentionService {
     Set<UUID> mentionedIds = new LinkedHashSet<>();
     for (String slug : slugs) {
       for (MentionResolver resolver : resolvers) {
-        for (UUID id : resolver.resolve(context, slug)) {
+        for (UUID id : resolveSafely(resolver, context, slug)) {
           if (hasAccess(documentId, owner, id)) {
             mentionedIds.add(id);
           }
@@ -112,6 +116,24 @@ public class CommentMentionService {
     }
     mentions.saveAll(rows);
     return rows.stream().map(CommentMention::getMentionedUserId).toList();
+  }
+
+  /**
+   * One resolver's answer, defended: a contributed resolver that throws or returns null must
+   * degrade to "no mention" for its namespace, never abort the comment/annotation transaction the
+   * mention resolution rides in (review finding on issue #598, tracked in #795).
+   */
+  private Set<UUID> resolveSafely(MentionResolver resolver, MentionContext context, String slug) {
+    try {
+      Set<UUID> resolved = resolver.resolve(context, slug);
+      return resolved == null ? Set.of() : resolved;
+    } catch (RuntimeException e) {
+      log.warn(
+          "MentionResolver {} failed for a token — treating as unresolved.",
+          resolver.getClass().getName(),
+          e);
+      return Set.of();
+    }
   }
 
   private boolean hasAccess(UUID documentId, UUID owner, UUID userId) {
