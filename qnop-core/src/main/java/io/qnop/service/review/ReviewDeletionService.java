@@ -133,7 +133,7 @@ public class ReviewDeletionService {
         status ->
             events.publishEvent(
                 new ReviewEvent.ReviewDeleted(
-                    documentId, actorId, deleted.ownerId(), deleted.title())));
+                    documentId, actorId, deleted.ownerId(), deleted.title(), deleted.anonymous())));
     // The title is deliberately absent (issue #659): it is user content and
     // routinely carries a name. The audit trail keeps it, behind access control;
     // a log file has neither.
@@ -166,7 +166,8 @@ public class ReviewDeletionService {
           // reactions, mentions, participants, visits, attachments, version diffs and the
           // per-document audit trail) — see DocumentReviewSchemaIT.
           documents.delete(document);
-          return new DeletedAggregate(document.getTitle(), ownerId, referenced);
+          return new DeletedAggregate(
+              document.getTitle(), ownerId, document.isAnonymous(), referenced);
         });
   }
 
@@ -235,5 +236,5 @@ public class ReviewDeletionService {
   public record DeletedReview(UUID documentId, String title, int storageObjectsDeleted) {}
 
   /** What the aggregate was, read before it was deleted — nothing can be looked up afterwards. */
-  record DeletedAggregate(String title, UUID ownerId, Set<String> storageKeys) {}
+  record DeletedAggregate(String title, UUID ownerId, boolean anonymous, Set<String> storageKeys) {}
 }
