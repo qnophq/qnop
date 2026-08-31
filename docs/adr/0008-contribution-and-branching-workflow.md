@@ -40,3 +40,13 @@ Two alignments with the repo working rules (`CLAUDE.md`):
 
 - **Branch types** follow [Conventional Branch](https://conventionalbranch.org/): the set is `{feat, fix, hotfix, release, chore}` (`feat`/`fix` being the accepted short forms of `feature`/`bugfix`), lowercase + hyphens, optional issue number (e.g. `feat/issue-123-new-login`). The `docs/…` prefix sketched in rule 3 is not part of the set; documentation changes ride `chore/…` or `feat/…` branches.
 - **Attribution is English throughout:** commits carry `Co-Authored-By: Claude <noreply@anthropic.com>`; issues and PRs carry `🤖 Co-Author: Claude (Opus 4.x) via Claude Code` (replacing the German `🤖 Mitarbeit: …` example in rule 4).
+
+## Amendment (2026-08-31, issue #793: immediate push + independent agent review)
+
+The approval-gated push in the repo working rules (`CLAUDE.md` rule 10 — "push only with explicit approval") is replaced by an immediate-flow rule:
+
+1. **Push + PR immediately.** When a change is complete and the local gates are green, the feature branch is pushed and its PR opened right away — no per-conversation approval. Rule 2 (never push to `main`) is untouched; destructive rewrites of already-pushed history still require explicit approval.
+2. **Independent agent review.** After the PR is opened, a completely fresh reviewer agent — sharing no context with the authoring agent — reviews the PR, evaluates the code and leaves its findings as PR comments (severity-classified per the code-review standards).
+3. **The author addresses the review.** The original authoring agent works through the reviewer's comments and resolves or rebuts each one on the PR.
+
+This strengthens rule 3's review guarantee: every PR now receives a mandatory independent review pass instead of an optional human one, and turnaround shortens because pushing no longer waits on a human in the loop.
