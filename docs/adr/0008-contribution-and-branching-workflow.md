@@ -48,5 +48,6 @@ The approval-gated push in the repo working rules (`CLAUDE.md` rule 10 — "push
 1. **Push + PR immediately.** When a change is complete and the local gates are green, the feature branch is pushed and its PR opened right away — no per-conversation approval. Rule 2 (never push to `main`) is untouched; destructive rewrites of already-pushed history still require explicit approval.
 2. **Independent agent review.** After the PR is opened, a completely fresh reviewer agent — sharing no context with the authoring agent — reviews the PR, evaluates the code and leaves its findings as PR comments (severity-classified per the code-review standards).
 3. **The author addresses the review.** The original authoring agent works through the reviewer's comments and resolves or rebuts each one on the PR.
+4. **Merging stays human.** Merging a PR remains the user's decision; an agent never merges on its own initiative. (Branch protection on `main` is still convention-only, ADR-0018 — this rule is the compensating control until a ruleset enforces it.)
 
-This strengthens rule 3's review guarantee: every PR now receives a mandatory independent review pass instead of an optional human one, and turnaround shortens because pushing no longer waits on a human in the loop.
+For agent-authored PRs this adds a mandatory independent review pass where review was previously optional (PRs from other sources — e.g. Renovate — are unaffected), and turnaround shortens because pushing no longer waits on a human in the loop.
