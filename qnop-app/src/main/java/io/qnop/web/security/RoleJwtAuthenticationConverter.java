@@ -44,12 +44,28 @@ public class RoleJwtAuthenticationConverter implements Converter<Jwt, AbstractAu
 
   private static final String AUTHORITY_PREFIX = "ROLE_";
 
+  /** Authority prefix of a machine principal's scopes (issue #686, ADR-0060) — never ROLE_. */
+  private static final String EXT_AUTHORITY_PREFIX = "EXT_";
+
   @Override
   public AbstractAuthenticationToken convert(Jwt jwt) {
     return new JwtAuthenticationToken(jwt, authorities(jwt), jwt.getSubject());
   }
 
   private Collection<GrantedAuthority> authorities(Jwt jwt) {
+    // A machine principal (issue #686): its scopes become EXT_-prefixed authorities and its
+    // role claim — should a misbehaving authenticator smuggle one — is ignored entirely, so a
+    // contributed principal can never satisfy a hasRole gate.
+    if (jwt.hasClaim(DelegatingJwtDecoder.ACTOR_KIND_CLAIM)) {
+      List<String> scopes = jwt.getClaimAsStringList(DelegatingJwtDecoder.EXT_SCOPES_CLAIM);
+      return scopes == null
+          ? List.of()
+          : scopes.stream()
+              .filter(scope -> scope != null && !scope.isBlank())
+              .<GrantedAuthority>map(
+                  scope -> new SimpleGrantedAuthority(EXT_AUTHORITY_PREFIX + scope))
+              .toList();
+    }
     String role = jwt.getClaimAsString(JwtTokenService.ROLE_CLAIM);
     if (role == null || role.isBlank()) {
       return List.of();

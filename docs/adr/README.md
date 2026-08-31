@@ -76,6 +76,7 @@ Two refinement conventions (see the 2026-07-16 amendment to [ADR-0001](0001-reco
 | [0057](0057-instance-quotas.md) | Instance quotas and capability switches — deployment properties | Accepted |
 | [0058](0058-mention-resolver-spi.md) | MentionResolver — a third published contract in qnop-spi | Accepted |
 | [0059](0059-published-event-stream.md) | Published review-event stream — a curated catalogue in qnop-spi | Accepted |
+| [0060](0060-machine-credential-authentication.md) | Machine-credential authentication — a decoder fallback, not a filter seam | Accepted |
 
 ## Template
 

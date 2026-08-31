@@ -99,6 +99,14 @@ in-process registries described below are the seams those bundles will feed.
 
 Not an extension point itself, but the channel through which extensions become visible to clients: edition and entitlements (ADR-0012), `supportedFormats` (to be derived from registered extractors, #601), and — per ADR-0039 — the list of frontend extension entry URLs with the `qnop-ui-spi` contract version they were built against.
 
+### 8. `BearerCredentialAuthenticator` — machine credentials on the existing API (backend, published)
+
+- **Contract:** `io.qnop.spi.auth.BearerCredentialAuthenticator` — `authenticate(bearerCredential) → Optional<MachinePrincipal>`; `MachinePrincipal` = opaque non-UUID `subject` (namespace it, e.g. `svc:reporting`) + the extension's own `scopes`. Empty = "not mine", never throw for that.
+- **Wiring:** contribution beside a default of *nobody* — a fallback inside `DelegatingJwtDecoder`, consulted only after the local decode rejected the credential. **The placement is the enforcement:** an extension structurally cannot precede rate limiting/CSRF, observe valid user tokens, or change the 401 shape. A throwing authenticator simply doesn't claim.
+- **Core keeps:** the impersonation guards — a UUID subject is rejected, and scopes surface only as `EXT_`-prefixed authorities (never `ROLE_*`), so `requireUserId()` (403) and every `hasRole` gate refuse machine principals. Authorisation for machine access is the extension's business; opening community read paths to machine actors is the expected re-cut, riding on the #684 principal work.
+- **Also answered here (the #686 scope question):** extension-owned endpoints need no seam at all — a third `SecurityFilterChain` with `securityMatcher("/api/ext/<id>/**")` via `@AutoConfiguration` + `@Order` is standard Spring and touches no core code.
+- **Owned by:** [ADR-0060](adr/0060-machine-credential-authentication.md); issue #686. First consumer: qnop-ee#19 (machine API access).
+
 ---
 
 ## Planned extension points (tracked, not yet built)

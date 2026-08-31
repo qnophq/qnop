@@ -185,18 +185,33 @@ public class AuthController implements AuthApi {
   }
 
   private void revokeAccessToken(Jwt jwt) {
-    if (jwt.getId() != null && jwt.getSubject() != null && jwt.getExpiresAt() != null) {
-      tokenRevocationService.revokeToken(
-          jwt.getId(), UUID.fromString(jwt.getSubject()), jwt.getExpiresAt());
+    UUID userId = asUserId(jwt.getSubject());
+    // A non-UUID subject is a machine principal (issue #686): nothing of it lives in the
+    // user-keyed revocation store, so there is nothing to revoke here.
+    if (jwt.getId() != null && userId != null && jwt.getExpiresAt() != null) {
+      tokenRevocationService.revokeToken(jwt.getId(), userId, jwt.getExpiresAt());
     }
   }
 
   private UUID requireAuthenticatedUserId() {
     return currentAccessToken()
         .map(Jwt::getSubject)
-        .map(UUID::fromString)
+        .map(AuthController::asUserId)
+        .filter(java.util.Objects::nonNull)
         .orElseThrow(
             () -> new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Not authenticated"));
+  }
+
+  /** The subject as a user id, or null for a machine principal's non-UUID subject (#686). */
+  private static UUID asUserId(String subject) {
+    if (subject == null) {
+      return null;
+    }
+    try {
+      return UUID.fromString(subject);
+    } catch (IllegalArgumentException e) {
+      return null;
+    }
   }
 
   private java.util.Optional<Jwt> currentAccessToken() {
