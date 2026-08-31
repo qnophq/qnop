@@ -7195,10 +7195,14 @@ components:
         - size
     ParticipantKind:
       type: string
-      description: What kind of principal a participant is.
+      description: >-
+        What kind of principal a participant is. EXTERNAL is an account-less
+        participant contributed by an extension (issue #684): it has no profile,
+        no slug and no avatar; its display name comes from the participant row.
       enum:
         - USER
         - TEAM
+        - EXTERNAL
     ThreadParticipation:
       type: string
       description: >-

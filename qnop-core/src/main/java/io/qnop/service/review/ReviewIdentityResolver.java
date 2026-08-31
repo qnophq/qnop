@@ -107,9 +107,21 @@ public class ReviewIdentityResolver {
 
     Map<UUID, String> names =
         userIds.isEmpty()
-            ? Map.of()
+            ? new HashMap<>()
             : users.findDisplayNamesByIdIn(userIds).stream()
-                .collect(Collectors.toMap(UserDisplayName::id, UserDisplayName::displayName));
+                .collect(
+                    Collectors.toMap(
+                        UserDisplayName::id,
+                        UserDisplayName::displayName,
+                        (a, b) -> a,
+                        HashMap::new));
+    // Account-less participants (issue #684): their row id is their principal id and their
+    // display name lives on the row. They number into the same ordinal space as everyone else —
+    // an anonymous review pseudonymizes a guest exactly like a user (ADR-0038).
+    for (var external : participants.findExternalByDocumentId(documentId)) {
+      userIds.add(external.getId());
+      names.put(external.getId(), external.getExternalDisplayName());
+    }
     // Profile slugs for pretty profile links (issue #486); shipped under the
     // exact same exposure rule as the real author id.
     Map<UUID, String> slugs =

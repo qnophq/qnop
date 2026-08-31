@@ -59,6 +59,14 @@ public class ReviewParticipant {
   @Column(name = "team_id", updatable = false)
   private UUID teamId;
 
+  /**
+   * Display name of an account-less participant (issue #684, ADR-0061) — set exactly when both
+   * {@code userId} and {@code teamId} are null (three-way XOR, DB-checked). The row's own id is
+   * then the participant's principal id everywhere the review domain names an actor.
+   */
+  @Column(name = "external_display_name", updatable = false)
+  private String externalDisplayName;
+
   @CreationTimestamp
   @Column(name = "created_at", nullable = false, updatable = false)
   private Instant createdAt;
@@ -67,20 +75,26 @@ public class ReviewParticipant {
     // for JPA
   }
 
-  private ReviewParticipant(UUID documentId, UUID userId, UUID teamId) {
+  private ReviewParticipant(UUID documentId, UUID userId, UUID teamId, String externalDisplayName) {
     this.documentId = documentId;
     this.userId = userId;
     this.teamId = teamId;
+    this.externalDisplayName = externalDisplayName;
   }
 
   /** A single user reviews the document. */
   public static ReviewParticipant forUser(UUID documentId, UUID userId) {
-    return new ReviewParticipant(documentId, userId, null);
+    return new ReviewParticipant(documentId, userId, null, null);
   }
 
   /** A whole team reviews the document. */
   public static ReviewParticipant forTeam(UUID documentId, UUID teamId) {
-    return new ReviewParticipant(documentId, null, teamId);
+    return new ReviewParticipant(documentId, null, teamId, null);
+  }
+
+  /** An account-less participant (issue #684): identified by this row's id, named by the caller. */
+  public static ReviewParticipant forExternal(UUID documentId, String displayName) {
+    return new ReviewParticipant(documentId, null, null, displayName);
   }
 
   public UUID getId() {
@@ -97,6 +111,15 @@ public class ReviewParticipant {
 
   public UUID getTeamId() {
     return teamId;
+  }
+
+  public String getExternalDisplayName() {
+    return externalDisplayName;
+  }
+
+  /** Whether this row is an account-less participant (issue #684). */
+  public boolean isExternal() {
+    return externalDisplayName != null;
   }
 
   public Instant getCreatedAt() {

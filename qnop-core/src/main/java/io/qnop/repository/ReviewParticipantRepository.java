@@ -54,20 +54,22 @@ public interface ReviewParticipantRepository extends JpaRepository<ReviewPartici
   boolean existsByDocumentIdAndTeamId(UUID documentId, UUID teamId);
 
   /**
-   * Whether {@code userId} may access {@code documentId} as a reviewer — either a direct
-   * participant or a member of a participating team — resolved in a single query (issue #312).
-   * Replaces the per-team {@code existsByTeamIdAndUserId} loop that made access checks 1+N.
+   * Whether the principal may access {@code documentId} as a reviewer — a direct user participant,
+   * a member of a participating team, or an account-less participant whose row id IS the principal
+   * id (issue #684) — resolved in a single query (issue #312). Replaces the per-team {@code
+   * existsByTeamIdAndUserId} loop that made access checks 1+N.
    */
   @Query(
       "SELECT COUNT(p) > 0 FROM ReviewParticipant p"
           + " LEFT JOIN TeamMembership m ON m.teamId = p.teamId AND m.userId = :userId"
-          + " WHERE p.documentId = :documentId AND (p.userId = :userId OR m.id IS NOT NULL)")
+          + " WHERE p.documentId = :documentId AND (p.userId = :userId OR m.id IS NOT NULL"
+          + " OR (p.id = :userId AND p.externalDisplayName IS NOT NULL))")
   boolean existsAccessibleParticipant(
       @Param("documentId") UUID documentId, @Param("userId") UUID userId);
 
   String VIEW_SELECT =
       "SELECT new io.qnop.repository.ParticipantProjection(p.id, p.documentId, p.userId,"
-          + " p.teamId, COALESCE(u.displayName, t.name), p.createdAt)"
+          + " p.teamId, COALESCE(u.displayName, t.name, p.externalDisplayName), p.createdAt)"
           + " FROM ReviewParticipant p"
           + " LEFT JOIN User u ON u.id = p.userId"
           + " LEFT JOIN Team t ON t.id = p.teamId";
@@ -80,6 +82,12 @@ public interface ReviewParticipantRepository extends JpaRepository<ReviewPartici
   @Query(VIEW_SELECT + " WHERE p.documentId IN :documentIds ORDER BY p.createdAt")
   List<ParticipantProjection> findViewsByDocumentIds(
       @Param("documentIds") Collection<UUID> documentIds);
+
+  /** Account-less participants of one review (issue #684): their row id is their principal id. */
+  @Query(
+      "SELECT p FROM ReviewParticipant p"
+          + " WHERE p.documentId = :documentId AND p.externalDisplayName IS NOT NULL")
+  List<ReviewParticipant> findExternalByDocumentId(@Param("documentId") UUID documentId);
 
   /** Direct participations in NON-anonymous reviews (ADR-0038, issue #473). */
   @Query(
