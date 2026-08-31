@@ -263,7 +263,13 @@ export function ParticipantsDialog({
                           <UserAvatar
                             name={participant.displayName}
                             size={28}
-                            imageUrl={avatarSrc(participant.principalId)}
+                            imageUrl={
+                              // An external participant (issue #684) has no user behind its
+                              // principal id — never ask the user-avatar endpoint; initials it is.
+                              participant.kind === ParticipantKind.External
+                                ? null
+                                : avatarSrc(participant.principalId)
+                            }
                           />
                           <Box sx={{ flex: 1, minWidth: 0 }}>
                             <Typography variant="body2" noWrap sx={{ fontWeight: 500 }}>

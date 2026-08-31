@@ -95,9 +95,20 @@ class ExternalParticipantIT extends AbstractIntegrationTest {
   void anAnonymousReviewPseudonymizesTheGuestLikeAnyReviewer() {
     UUID documentId = review(true);
     UUID principal = externalParticipants.add(documentId, "Guest Reviewer");
+    // The pseudonym rule exempts the owner (ADR-0038 #422) — so the assertion must look through
+    // a NON-owner participant's eyes, where anonymity actually applies.
+    User fellow =
+        User.internal(
+            "fellow-" + UUID.randomUUID(),
+            "f" + UUID.randomUUID() + "@example.com",
+            "Fellow Reviewer",
+            "x");
+    fellow.setRole(UserRole.MEMBER);
+    UUID fellowId = users.save(fellow).getId();
+    participantService.add(documentId, owner, false, fellowId, null);
 
     var listed =
-        participantService.list(documentId, owner, false).stream()
+        participantService.list(documentId, fellowId, false).stream()
             .filter(ReviewParticipantService.ParticipantView::external)
             .toList();
 

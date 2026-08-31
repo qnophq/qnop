@@ -69,6 +69,17 @@ public class ExternalParticipantService implements ExternalParticipants {
     if (name.isEmpty() || name.length() > MAX_DISPLAY_NAME) {
       throw new IllegalArgumentException("display name must be 1-" + MAX_DISPLAY_NAME + " chars");
     }
+    // Rendered verbatim across the review UI: control, zero-width and bidi-override characters
+    // are a spoofing surface, not a name (review of issue #684).
+    if (name.codePoints()
+        .anyMatch(
+            cp ->
+                Character.isISOControl(cp)
+                    || (cp >= 0x200B && cp <= 0x200F)
+                    || (cp >= 0x202A && cp <= 0x202E)
+                    || (cp >= 0x2066 && cp <= 0x2069))) {
+      throw new IllegalArgumentException("display name contains control or directionality marks");
+    }
     ReviewParticipant saved = participants.save(ReviewParticipant.forExternal(documentId, name));
     // detail is a JSON column; identifiers only — the display name is user content and readable
     // from the participant row while it exists.

@@ -29,7 +29,8 @@ ADR-0060 fixed the *authentication* shape (subject string; UUID = user). This AD
 ## Consequences
 
 - qnop-ee#17 = credential lifecycle + invitation UI + an authenticator, calling this facade; no community change.
-- Deliberately absent until a real consumer forces them (ADR-0049): guest-scoped thread-participation levels (`thread_participation` already expresses them when needed), guest authorship endpoints, and the widening of `AuditEvent` actor semantics — machine/guest actors audit as detail text today.
+- Deliberately absent until a real consumer forces them (ADR-0049): guest-scoped thread-participation levels (`thread_participation` already expresses them when needed), guest authorship — `annotation.author_id`/`comment.author_id` still FK to `qnop_user`, so a guest structurally cannot author yet and the re-cut must widen those FKs deliberately — and the widening of `AuditEvent` actor semantics (external roster changes audit with identifier-only JSON detail today).
+- `review_visit.user_id` losing its FK also loses the user-deletion cascade: visit rows of hard-deleted users orphan quietly. Accepted — they are inert (readers join names by id and skip unknowns) and disappear with the document.
 - The `ParticipantKind` enum change is additive (client enums tolerate unknown values poorly in general, but the generated TS client types are string unions — additive is safe).
 
 ## Alternatives considered

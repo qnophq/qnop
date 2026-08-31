@@ -58,6 +58,11 @@ public interface ExternalParticipants {
    */
   boolean remove(UUID documentId, UUID participantId);
 
-  /** Whether the external principal currently participates in the review. */
+  /**
+   * Whether the principal may access the review — the core's one participant access rule, so it
+   * answers {@code true} for any participating principal (an external's row id, but also a user id
+   * or a member of a participating team). Callers gating a guest credential should pass the
+   * principal id they issued via {@link #add}.
+   */
   boolean hasAccess(UUID documentId, UUID participantId);
 }

@@ -546,8 +546,10 @@ databaseChangeLog:
             referencedColumnNames: id
             onDelete: CASCADE
         # No FK on user_id: since issue #684 the column holds a PRINCIPAL id — usually a user id,
-        # but an external participant's row id for account-less visitors (ADR-0061). Stale visit
-        # rows of removed principals are harmless and cascade away with the document.
+        # but an external participant's row id for account-less visitors (ADR-0061). Accepted
+        # consequence: visit rows of hard-deleted users (or removed guests) orphan quietly — they
+        # are inert (readers join names by id and skip unknowns) and cascade away with the
+        # document; a reaper would buy nothing.
         - addUniqueConstraint:
             constraintName: ux_review_visit_pair
             tableName: review_visit
