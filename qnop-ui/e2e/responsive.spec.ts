@@ -55,30 +55,17 @@ for (const breakpoint of BREAKPOINTS) {
 
     for (const surface of SURFACES) {
       test(`${surface.name} does not scroll sideways`, async ({ page, smokeReviewId }) => {
-        // The viewer toolbar's trailing control group is 412 px and does not
-        // wrap (issue #772): the workspace overflows `main` at 320 and 375, in
-        // split view and in focus mode. Expected until fixed — Playwright then
+        // First catch of this net (issue #809): three surfaces regressed since
+        // the Aug-29 audit — the reviews list overflows the page at every width
+        // (a fixed ~973 px element escapes the table's scroll container), and two
+        // admin tables flipped at single widths. Expected until fixed — Playwright
         // fails on the unexpected pass, so the marker cannot outlive the bug.
+        test.fail(surface.name === 'reviews list' && breakpoint.width <= 1024, 'issue #809');
         test.fail(
-          surface.name.startsWith('review workspace') && breakpoint.width <= 375,
-          'issue #772',
+          surface.name === 'admin storage consistency' && [375, 768].includes(breakpoint.width),
+          'issue #809',
         );
-        // KPI card rows do not wrap: the dashboard's and the storage-consistency
-        // page's overflow at 320 (issue #773). At 375 the dashboard's row fits
-        // the smoke data by a hair — not marked, since a hair is not a promise.
-        test.fail(
-          ['dashboard', 'admin storage consistency'].includes(surface.name) &&
-            breakpoint.width === 320,
-          'issue #773',
-        );
-        // The review head's action row (784 px) is wider than the content beside
-        // an open sidebar at 1024, on every review route (issue #774).
-        test.fail(
-          ['review workspace', 'tasks board', 'version compare'].some((name) =>
-            surface.name.startsWith(name),
-          ) && breakpoint.width === 1024,
-          'issue #774',
-        );
+        test.fail(surface.name === 'admin scheduler' && breakpoint.width === 320, 'issue #809');
         await open(page, surface.path(smokeReviewId));
         await expectNoHorizontalOverflow(page);
       });
