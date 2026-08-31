@@ -60,9 +60,8 @@ class ReviewFacadeIT extends SeededIntegrationTest {
   @Autowired ReviewParticipantRepository participants;
 
   private UUID user(String name) {
-    User user =
-        User.internal(
-            name + "-" + UUID.randomUUID(), name + UUID.randomUUID() + "@example.com", name, "x");
+    String unique = name + "-" + UUID.randomUUID();
+    User user = User.internal(unique, unique + "@example.com", name, "x");
     user.setRole(UserRole.MEMBER);
     return users.save(user).getId();
   }
