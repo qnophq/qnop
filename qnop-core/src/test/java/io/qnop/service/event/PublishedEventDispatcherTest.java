@@ -159,6 +159,18 @@ class PublishedEventDispatcherTest {
   }
 
   @Test
+  void anonymousReviewsStripSubjectIdentitiesToo() {
+    // The roster is the one list an anonymous review refuses to reveal (ADR-0038 #422):
+    // participant.added must not hand it to an out-of-process consumer, principal by principal.
+    Recorder recorder = new Recorder();
+    new PublishedEventDispatcher(List.of(recorder), documents(true))
+        .on(new ReviewEvent.ParticipantAdded(doc, actor, UUID.randomUUID(), null));
+    PublishedEvent heard = recorder.heard.getFirst();
+    assertThat(heard.actorId()).isNull();
+    assertThat(heard.attributes()).isEmpty();
+  }
+
+  @Test
   void anUnloadableDocumentCountsAsAnonymous() {
     Recorder recorder = new Recorder();
     DocumentRepository repository = Mockito.mock(DocumentRepository.class);

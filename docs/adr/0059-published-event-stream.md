@@ -33,7 +33,7 @@ A published event says *what happened to which object*. Annotation bodies, docum
 
 ### Anonymity crosses the seam nulled, not raw
 
-In an anonymous review (ADR-0038) the internal consumers pseudonymize the actor per recipient; an external consumer gets no such courtesy and may ship the event out of the process. So the dispatcher nulls {@code actorId} before any listener hears an event of an anonymous review — the flag read from the document, or carried by the deletion event whose subject no longer exists; an unloadable document counts as anonymous, erring toward silence.
+In an anonymous review (ADR-0038) the internal consumers pseudonymize the actor per recipient; an external consumer gets no such courtesy and may ship the event out of the process. So the rule is general: **no identity — actor or subject — crosses the seam in an anonymous review.** The dispatcher nulls `actorId` and strips identity-bearing attributes (`userId`, `teamId` — the roster is exactly the list an anonymous review refuses to reveal) before any listener hears the event; the flag is read from the document, or carried by the deletion event whose subject no longer exists; an unloadable document counts as anonymous, erring toward silence. `ownerId` on `review.deleted` is exempt — ownership is structurally public under ADR-0038. A future principal-bearing event type inherits the rule by adding its key to the stripped set.
 
 ### No ordering guarantee
 

@@ -26,6 +26,7 @@ import io.qnop.spi.event.PublishedEventTypes;
 import java.time.Instant;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Set;
 
 /**
  * The one place internal {@link ReviewEvent}s become catalogued {@link PublishedEvent}s (issue
@@ -38,18 +39,24 @@ final class PublishedEventMapper {
 
   private PublishedEventMapper() {}
 
+  /**
+   * Attribute keys that identify a person or team. In an anonymous review no identity — actor or
+   * subject — crosses the seam (ADR-0038), so these are stripped along with the actor. The owner
+   * ({@code ownerId} on {@code review.deleted}) is exempt: ownership is structurally public under
+   * ADR-0038.
+   */
+  private static final Set<String> IDENTITY_ATTRIBUTES = Set.of("userId", "teamId");
+
   static PublishedEvent map(ReviewEvent event, Instant occurredAt, boolean anonymous) {
     PublishedEvent published = map(event, occurredAt);
     if (!anonymous) {
       return published;
     }
-    // ADR-0038: the actor's identity never leaves an anonymous review.
+    // ADR-0038: no identity — actor or subject — leaves an anonymous review.
+    Map<String, String> attributes = new HashMap<>(published.attributes());
+    attributes.keySet().removeAll(IDENTITY_ATTRIBUTES);
     return new PublishedEvent(
-        published.type(),
-        published.occurredAt(),
-        published.documentId(),
-        null,
-        published.attributes());
+        published.type(), published.occurredAt(), published.documentId(), null, attributes);
   }
 
   private static PublishedEvent map(ReviewEvent event, Instant occurredAt) {
