@@ -93,7 +93,7 @@ export function NewReviewPage() {
   const [submit, setSubmit] = useState<SubmitState>(SUBMIT_IDLE);
 
   const maxSizeMb = config?.upload.maxDocumentSizeMb ?? FALLBACK_MAX_SIZE_MB;
-  const accepted = acceptedUploads(config?.supportedFormats);
+  const accepted = acceptedUploads(config?.supportedFormats, config?.supportedMediaTypes);
   const isSubmitting = submit.phase !== 'idle';
 
   // Until the user edits the slug themselves it mirrors the title (issue #411).

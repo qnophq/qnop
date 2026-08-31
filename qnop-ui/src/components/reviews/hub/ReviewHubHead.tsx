@@ -148,7 +148,7 @@ export function ReviewHubHead({
   const mayTransition = workflowQuery.data?.mayTransition ?? false;
   const transitionOptions = workflowQuery.data?.transitions ?? [];
   const maxSizeMb = config?.upload.maxDocumentSizeMb ?? FALLBACK_MAX_SIZE_MB;
-  const accepted = acceptedUploads(config?.supportedFormats);
+  const accepted = acceptedUploads(config?.supportedFormats, config?.supportedMediaTypes);
 
   const total = annotations.length;
   const resolved = annotations.filter((a) => a.status !== AnnotationStatus.Open).length;

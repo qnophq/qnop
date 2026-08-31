@@ -52,7 +52,7 @@ class DocumentRenditionServiceTest {
   private final DocumentExtractionWriter writer = mock(DocumentExtractionWriter.class);
 
   private final DocumentRenditionService service =
-      new DocumentRenditionService(converter, storage, writer);
+      new DocumentRenditionService(converter, storage, writer, java.util.List.of());
 
   private static DocumentVersion version(String contentType) {
     return new DocumentVersion(
@@ -168,5 +168,59 @@ class DocumentRenditionServiceTest {
     assertThat(service.supports(DocumentTypeSniffer.DOCX)).isTrue();
 
     assertThat(service.supports("image/png")).isFalse();
+  }
+
+  // Issue #601: the accept gate derives from the registered extractors.
+
+  private DocumentRenditionService withExtractor(String claimed) {
+    io.qnop.spi.extract.DocumentExtractor extractor =
+        new io.qnop.spi.extract.DocumentExtractor() {
+          @Override
+          public boolean supports(String contentType) {
+            return claimed.equals(contentType);
+          }
+
+          @Override
+          public java.util.Set<String> mediaTypes() {
+            return java.util.Set.of(claimed);
+          }
+
+          @Override
+          public io.qnop.spi.extract.RenderedDocument extract(java.io.InputStream content) {
+            throw new UnsupportedOperationException("gate test only");
+          }
+        };
+    return new DocumentRenditionService(converter, storage, writer, java.util.List.of(extractor));
+  }
+
+  @org.junit.jupiter.api.Test
+  void anExtractorClaimedTypePassesTheGateAndSkipsConversion() {
+    DocumentRenditionService gate = withExtractor("image/png");
+    org.assertj.core.api.Assertions.assertThat(gate.supports("image/png")).isTrue();
+    // Claimed types are extracted directly — the office converter is only ever for Word.
+    org.assertj.core.api.Assertions.assertThat(gate.needsRendition("image/png")).isFalse();
+  }
+
+  @org.junit.jupiter.api.Test
+  void anUnclaimedRecognizedTypeStaysRefused() {
+    DocumentRenditionService gate = withExtractor("image/png");
+    org.assertj.core.api.Assertions.assertThat(gate.supports("image/gif")).isFalse();
+  }
+
+  @org.junit.jupiter.api.Test
+  void docxNeverRidesAnExtractorClaim() {
+    // Even a misbehaving extractor claiming DOCX cannot bypass the converter requirement
+    // (ADR-0010: Word is converted out-of-process, never extracted directly).
+    DocumentRenditionService gate =
+        withExtractor("application/vnd.openxmlformats-officedocument.wordprocessingml.document");
+    org.mockito.Mockito.when(converter.isAvailable()).thenReturn(false);
+    org.assertj.core.api.Assertions.assertThat(
+            gate.supports(
+                "application/vnd.openxmlformats-officedocument.wordprocessingml.document"))
+        .isFalse();
+    org.assertj.core.api.Assertions.assertThat(
+            gate.needsRendition(
+                "application/vnd.openxmlformats-officedocument.wordprocessingml.document"))
+        .isTrue();
   }
 }

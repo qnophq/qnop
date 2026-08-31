@@ -4879,11 +4879,23 @@ components:
             endpoints (both `multipart/form-data`, deliberately outside this generated
             JSON contract — ADR-0021/0028); the ingest pipeline validates the file by
             magic-byte sniffing and rejects an unsupported type with `415`. Clients
-            should offer only these formats. It reflects the subset whose extractor
-            currently ships — `["PDF"]` today; the Community edition's `DOCX` and
-            Markdown support extends it once their extractors land.
+            should offer only these formats. It reflects what the running deployment
+            can actually process: PDF always, DOCX where an office converter is
+            installed, MD where a registered extractor claims `text/markdown`.
+            Formats outside this enum's vocabulary appear in
+            `supportedMediaTypes` only.
           items:
             $ref: '#/components/schemas/SupportedFormat'
+        supportedMediaTypes:
+          type: array
+          description: |
+            Every MIME type this deployment accepts for upload (issue #601): the
+            enumerable face of the server-side accept gate — the built-in types
+            plus whatever the registered document extractors advertise. Clients
+            build their file filters from this list; `supportedFormats` remains
+            the coarse, enum-typed view for display purposes.
+          items:
+            type: string
         exportFormats:
           type: array
           description: |
