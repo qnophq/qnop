@@ -28,12 +28,12 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import io.qnop.entity.CommentMention;
 import io.qnop.entity.Document;
 import io.qnop.entity.User;
 import io.qnop.repository.CommentMentionRepository;
 import io.qnop.repository.DocumentRepository;
 import io.qnop.repository.ReviewParticipantRepository;
-import io.qnop.entity.CommentMention;
 import io.qnop.repository.UserRepository;
 import io.qnop.spi.mention.MentionContext;
 import io.qnop.spi.mention.MentionResolver;
@@ -282,7 +282,8 @@ class CommentMentionServiceTest {
     existingMentions(participant, stranger);
 
     var added =
-        service.reResolveAndPersist(commentId, documentId, author, "@petra-part meet @olivia-owner");
+        service.reResolveAndPersist(
+            commentId, documentId, author, "@petra-part meet @olivia-owner");
 
     assertThat(added).containsExactly(owner);
     ArgumentCaptor<List<CommentMention>> deleted = rowsCaptor();

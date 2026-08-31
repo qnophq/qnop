@@ -115,20 +115,20 @@ public class CommentMentionService {
    * NEW relative to the previous set are returned. That delta is what an edit's notification path
    * needs: people mentioned before the edit were already told and must never be pinged again.
    *
-   * <p>Anonymous reviews stay a no-op (ADR-0038): nothing was persisted at creation, and nothing
-   * is touched now. A body that lost all its tokens drops every previous row. Survival is not
-   * purely textual: resolution and the access check run again through the registered {@link
+   * <p>Anonymous reviews stay a no-op (ADR-0038): nothing was persisted at creation, and nothing is
+   * touched now. A body that lost all its tokens drops every previous row. Survival is not purely
+   * textual: resolution and the access check run again through the registered {@link
    * MentionResolver}s, so a row whose user meanwhile lost access is dropped even when the token
    * still stands — the same scoping policy creation applies.
    *
    * <p><strong>Concurrency contract:</strong> two overlapping calls for the same comment can both
-   * compute the same "new" row, and the second insert then hits the unique comment/user
-   * constraint. The caller (the enterprise edit endpoint) must serialize edits per comment —
-   * which it needs anyway for the body itself — rather than this service absorbing constraint
-   * violations.
+   * compute the same "new" row, and the second insert then hits the unique comment/user constraint.
+   * The caller (the enterprise edit endpoint) must serialize edits per comment — which it needs
+   * anyway for the body itself — rather than this service absorbing constraint violations.
    */
   @Transactional
-  public List<UUID> reResolveAndPersist(UUID commentId, UUID documentId, UUID authorId, String body) {
+  public List<UUID> reResolveAndPersist(
+      UUID commentId, UUID documentId, UUID authorId, String body) {
     Document document = documents.findById(documentId).orElse(null);
     if (document == null || document.isAnonymous()) {
       return List.of();
