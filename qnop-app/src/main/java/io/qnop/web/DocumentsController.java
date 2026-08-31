@@ -245,10 +245,17 @@ public class DocumentsController implements DocumentsApi {
     return dateTime == null ? null : dateTime.toInstant();
   }
 
+  private static ParticipantKind kindOf(ReviewParticipantService.ParticipantView view) {
+    if (view.external()) {
+      return ParticipantKind.EXTERNAL; // account-less participant (issue #684)
+    }
+    return view.team() ? ParticipantKind.TEAM : ParticipantKind.USER;
+  }
+
   private static ParticipantView toParticipant(ReviewParticipantService.ParticipantView view) {
     return new ParticipantView()
         .id(view.id())
-        .kind(view.team() ? ParticipantKind.TEAM : ParticipantKind.USER)
+        .kind(kindOf(view))
         .principalId(view.principalId())
         .slug(view.slug())
         .displayName(view.displayName());

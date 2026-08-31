@@ -93,6 +93,9 @@ public class PrincipalsController implements PrincipalsApi {
                     view ->
                         new PrincipalView()
                             .id(view.id())
+                            // The workspace directory lists account-bearing principals only;
+                            // external participants (issue #684) are review-scoped and never
+                            // appear here.
                             .kind(view.team() ? ParticipantKind.TEAM : ParticipantKind.USER)
                             .slug(view.slug())
                             .displayName(view.displayName())
