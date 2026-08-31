@@ -65,7 +65,6 @@ for (const breakpoint of BREAKPOINTS) {
               [375, 768, 1440].includes(breakpoint.width)) ||
             (surface.name === 'admin scheduler' && breakpoint.width === 320) ||
             (surface.name === 'dashboard' && breakpoint.width === 320) ||
-            (surface.name === 'admin teams' && breakpoint.width === 1920) ||
             (surface.name === 'review workspace' && breakpoint.width === 1440),
           'issue #809',
         );
