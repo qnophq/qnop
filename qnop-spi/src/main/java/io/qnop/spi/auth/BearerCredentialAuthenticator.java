@@ -36,7 +36,9 @@ import java.util.Optional;
  * the implementation's business: the core's revocation store is user-keyed and does not apply.
  *
  * <p>Implementations must be safe to call from any thread and should be constant-time in their
- * credential comparison.
+ * credential comparison. <strong>Treat every offered credential as a secret:</strong> the core
+ * filters out its own recognisable tokens before consulting authenticators, but an unclaimed
+ * credential may still be sensitive material of another system — never log, store or forward one.
  */
 @FunctionalInterface
 public interface BearerCredentialAuthenticator {

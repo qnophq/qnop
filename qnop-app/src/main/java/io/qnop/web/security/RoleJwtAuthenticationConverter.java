@@ -56,7 +56,7 @@ public class RoleJwtAuthenticationConverter implements Converter<Jwt, AbstractAu
     // A machine principal (issue #686): its scopes become EXT_-prefixed authorities and its
     // role claim — should a misbehaving authenticator smuggle one — is ignored entirely, so a
     // contributed principal can never satisfy a hasRole gate.
-    if (jwt.hasClaim(DelegatingJwtDecoder.ACTOR_KIND_CLAIM)) {
+    if ("machine".equals(jwt.getClaimAsString(DelegatingJwtDecoder.ACTOR_KIND_CLAIM))) {
       List<String> scopes = jwt.getClaimAsStringList(DelegatingJwtDecoder.EXT_SCOPES_CLAIM);
       return scopes == null
           ? List.of()

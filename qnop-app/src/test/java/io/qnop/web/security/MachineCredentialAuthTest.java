@@ -117,6 +117,27 @@ class MachineCredentialAuthTest {
   }
 
   @Test
+  void anExpiredUserTokenNeverReachesTheAuthenticators() {
+    // Signature-valid but expired: still one of ours, still carrying subject/role/jti — it must
+    // never be offered to third-party authenticator code (JwtValidationException is rethrown
+    // before the fallback).
+    when(local.decode("expired-user-token"))
+        .thenThrow(
+            new org.springframework.security.oauth2.jwt.JwtValidationException(
+                "expired",
+                List.of(
+                    new org.springframework.security.oauth2.core.OAuth2Error("invalid_token"))));
+    BearerCredentialAuthenticator authenticator = mock(BearerCredentialAuthenticator.class);
+
+    assertThatThrownBy(
+            () ->
+                new DelegatingJwtDecoder(local, revocation, List.of(authenticator))
+                    .decode("expired-user-token"))
+        .isInstanceOf(org.springframework.security.oauth2.jwt.JwtValidationException.class);
+    verifyNoInteractions(authenticator);
+  }
+
+  @Test
   void aValidUserTokenNeverReachesTheAuthenticators() {
     Jwt user =
         Jwt.withTokenValue("user-token")

@@ -25,7 +25,6 @@ import io.qnop.spi.auth.BearerCredentialAuthenticator;
 import io.qnop.spi.auth.MachinePrincipal;
 import java.time.Instant;
 import java.util.List;
-import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 import org.slf4j.Logger;
@@ -83,6 +82,11 @@ public class DelegatingJwtDecoder implements JwtDecoder {
     Jwt jwt;
     try {
       jwt = localDecoder.decode(token); // throws JwtException when signature/expiry invalid
+    } catch (org.springframework.security.oauth2.jwt.JwtValidationException oursButInvalid) {
+      // Signature-valid but failed validation (typically: expired) — this IS one of our user
+      // tokens, and it must never be offered to third-party authenticator code (review of #686:
+      // an expired token still carries subject, role and a valid HMAC).
+      throw oursButInvalid;
     } catch (JwtException notAUserToken) {
       // Not one of ours — offer it to the contributed machine authenticators (#686). Anything
       // unclaimed keeps the original rejection, so the failure shape never changes.
@@ -125,6 +129,10 @@ public class DelegatingJwtDecoder implements JwtDecoder {
       if (principal.isEmpty()) {
         continue;
       }
+      // Deliberately NOT lenient like the throwing case above: a claimed principal that violates
+      // an impersonation guard (UUID subject) is a loud invariant breach, and silently moving on
+      // would let another authenticator claim a credential one already asserted as its own. The
+      // request fails closed with the standard 401.
       return toJwt(token, principal.get());
     }
     return null;
@@ -152,7 +160,6 @@ public class DelegatingJwtDecoder implements JwtDecoder {
         .expiresAt(now.plusSeconds(60)) // validity is re-checked per request by the authenticator
         .claim(ACTOR_KIND_CLAIM, "machine")
         .claim(EXT_SCOPES_CLAIM, List.copyOf(principal.scopes()))
-        .claims(claims -> claims.putAll(Map.of()))
         .build();
   }
 

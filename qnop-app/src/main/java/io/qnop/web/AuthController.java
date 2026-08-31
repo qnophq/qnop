@@ -202,7 +202,12 @@ public class AuthController implements AuthApi {
             () -> new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Not authenticated"));
   }
 
-  /** The subject as a user id, or null for a machine principal's non-UUID subject (#686). */
+  /**
+   * The subject as a user id, or null for a machine principal's non-UUID subject (#686). Note the
+   * deliberate divergence from {@link CurrentUser#requireUserId()}: there a machine principal is a
+   * <em>forbidden</em> actor (403) on a user resource; here on the auth surface it is simply not an
+   * authenticated user session (401) — /auth/me has nothing to say about it.
+   */
   private static UUID asUserId(String subject) {
     if (subject == null) {
       return null;
