@@ -211,9 +211,6 @@ databaseChangeLog:
                   constraints: { nullable: false }
               - column: { name: user_id, type: UUID }
               - column: { name: team_id, type: UUID }
-              # Account-less participant (issue #684, ADR-0061): set exactly when user_id and
-              # team_id are both null; the row's own id is then the participant's principal id.
-              - column: { name: external_display_name, type: 'VARCHAR(120)' }
               - column:
                   name: created_at
                   type: TIMESTAMP WITH TIME ZONE
@@ -251,12 +248,12 @@ databaseChangeLog:
               - column: { name: team_id }
         - sql:
             comment: |
-              Principal is exactly one of user/team/external (three-way XOR, issue #684).
-              Partial unique indexes stop the same user/team being added to a document twice.
+              Principal is exactly one of user/team (XOR). Partial unique indexes stop the
+              same user/team being added to a document twice.
             splitStatements: true
             sql: |
               ALTER TABLE review_participant ADD CONSTRAINT ck_review_participant_principal
-                CHECK (num_nonnulls(user_id, team_id, external_display_name) = 1);
+                CHECK (num_nonnulls(user_id, team_id) = 1);
               CREATE UNIQUE INDEX ux_review_participant_user
                 ON review_participant (document_id, user_id) WHERE user_id IS NOT NULL;
               CREATE UNIQUE INDEX ux_review_participant_team
@@ -545,11 +542,13 @@ databaseChangeLog:
             referencedTableName: document
             referencedColumnNames: id
             onDelete: CASCADE
-        # No FK on user_id: since issue #684 the column holds a PRINCIPAL id — usually a user id,
-        # but an external participant's row id for account-less visitors (ADR-0061). Accepted
-        # consequence: visit rows of hard-deleted users (or removed guests) orphan quietly — they
-        # are inert (readers join names by id and skip unknowns) and cascade away with the
-        # document; a reaper would buy nothing.
+        - addForeignKeyConstraint:
+            constraintName: fk_review_visit_user
+            baseTableName: review_visit
+            baseColumnNames: user_id
+            referencedTableName: qnop_user
+            referencedColumnNames: id
+            onDelete: CASCADE
         - addUniqueConstraint:
             constraintName: ux_review_visit_pair
             tableName: review_visit
