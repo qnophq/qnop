@@ -79,7 +79,17 @@ public enum UserSettingKey {
       "usage_tracking_opt_out",
       SettingValueType.BOOLEAN,
       "false",
-      "Exclude me from anonymous usage measurement, on every device I sign in from.");
+      "Exclude me from anonymous usage measurement, on every device I sign in from."),
+  // The composer mode the person last wrote in (issue #599): "write" for the Markdown
+  // textarea, or the id of a mode a runtime UI extension contributed (ADR-0039). Free-form
+  // because the set of modes is not known to the server — an extension registers them in the
+  // browser; the frontend ignores a value no registered mode answers to. Empty until an
+  // extension is present and the person picks a mode, so Community installs never write it.
+  COMPOSER_MODE(
+      "composer_mode",
+      SettingValueType.STRING,
+      "",
+      "The editing mode the comment composer opens in; empty follows the default.");
 
   private static final Map<String, UserSettingKey> BY_KEY =
       Arrays.stream(values())

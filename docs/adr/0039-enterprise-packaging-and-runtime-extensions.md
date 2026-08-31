@@ -57,4 +57,6 @@ The Community bundle never contains enterprise JavaScript; enterprise bundles in
 
 ## Status notes
 
+**2026-08-30 — first slot landed (issue #599).** The composer-mode extension point exists in `qnop-ui` (`src/extensions/composerModes.ts`): a registered contribution adds a tab to the shared Markdown composer's mode strip and renders its own editing surface against the controlled contract (raw Markdown in and out, submit chord, disabled/fullscreen state, mention roster, attachment callback, a handle for caret-level insertion). The registry is in-app for now; its types are written as the future `qnop-ui-spi` shape for this slot and move there with the loader. Without a registration the composer's behaviour and DOM are unchanged, and the per-user `composer_mode` setting is neither read nor written.
+
 Finalizes the directions of [ADR-0012](0012-edition-vs-entitlements.md) and [ADR-0014](0014-frontend-enterprise-separation.md); both remain as recorded context. The Liquibase seam (2) lands with issue #254; slots, `qnop-ui-spi` and the extension loader are built with the first enterprise UI feature (first candidate: e-signature, [ADR-0035](0035-esignature-approval-enterprise-feature.md)).
