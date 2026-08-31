@@ -49,6 +49,7 @@ import {
 import { AdminToast } from '../../components/admin/layout/AdminToast';
 import { copyToClipboard } from '../../utils/clipboard';
 import { useToast } from '../../components/admin/layout/useToast';
+import { useLiveChannel } from '../../extensions/liveChannel';
 import { BoundaryFallback } from '../../components/errors/BoundaryFallback';
 import { ErrorBoundary } from '../../components/errors/ErrorBoundary';
 import { ReviewPageHeader } from '../../components/reviews/hub/ReviewPageHeader';
@@ -117,6 +118,8 @@ export function DocumentReviewPage() {
   const documentId = useReviewDocumentId();
   const [searchParams, setSearchParams] = useSearchParams();
   const { toast, notify, clear } = useToast();
+  // The live-channel slot (issue #602): a no-op without registered contributors.
+  useLiveChannel(documentId);
   const uploadAttachment = useCommentAttachmentUpload(documentId, notify);
   const userId = useAuthStore((s) => s.userId);
   const viewerIsAdmin = useAuthStore(selectIsAdmin);

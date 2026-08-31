@@ -25,7 +25,6 @@ import io.qnop.entity.Comment;
 import io.qnop.entity.CommentMention;
 import io.qnop.entity.Document;
 import io.qnop.entity.NotificationType;
-import io.qnop.entity.ReviewParticipant;
 import io.qnop.entity.User;
 import io.qnop.repository.AnnotationRepository;
 import io.qnop.repository.CommentMentionRepository;
@@ -89,6 +88,7 @@ public class ReviewNotificationService {
   private final UserRepository users;
   private final ApplicationSettingsService settings;
   private final ReviewIdentityResolver identity;
+  private final ReviewFacadeService facade;
   private final List<ReviewNotificationSink> sinks;
 
   public ReviewNotificationService(
@@ -101,6 +101,7 @@ public class ReviewNotificationService {
       UserRepository users,
       ApplicationSettingsService settings,
       ReviewIdentityResolver identity,
+      ReviewFacadeService facade,
       List<ReviewNotificationSink> sinks) {
     this.documents = documents;
     this.annotations = annotations;
@@ -111,6 +112,7 @@ public class ReviewNotificationService {
     this.users = users;
     this.settings = settings;
     this.identity = identity;
+    this.facade = facade;
     this.sinks = sinks;
   }
 
@@ -474,20 +476,13 @@ public class ReviewNotificationService {
     return intents;
   }
 
-  /** Everyone attached to the review: the owner, direct participants, and team members. */
+  /**
+   * Everyone attached to the review: the owner, direct participants, and team members. Shared with
+   * the {@link ReviewFacadeService} (issue #602) — one implementation, so an extension's audience
+   * answer and the mail audience cannot drift.
+   */
   private Set<UUID> reviewCircle(Document document) {
-    Set<UUID> circle = new LinkedHashSet<>();
-    circle.add(document.getOwnerId());
-    for (ReviewParticipant participant : participants.findByDocumentId(document.getId())) {
-      if (participant.getUserId() != null) {
-        circle.add(participant.getUserId());
-      } else if (participant.getTeamId() != null) {
-        teamMembers.findMembersByTeamId(participant.getTeamId()).stream()
-            .map(TeamMemberProjection::userId)
-            .forEach(circle::add);
-      }
-    }
-    return circle;
+    return facade.circleOf(document.getId(), document.getOwnerId());
   }
 
   /**

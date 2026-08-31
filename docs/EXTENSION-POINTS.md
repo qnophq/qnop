@@ -115,6 +115,16 @@ Not an extension point itself, but the channel through which extensions become v
 - **Core keeps:** validation, the external-only removal guard (an extension can never manage the account-bearing roster), auditing (null actor + detail), anonymity (a guest pseudonymizes exactly like a user, ADR-0038 — a supplied display name cannot pierce it), and the refusal to learn links/credentials/expiry (extension business, ADR-0003). External roster changes publish no ReviewEvent — notifying about guests is the extension's decision.
 - **Owned by:** [ADR-0061](adr/0061-account-less-review-participants.md); issue #684. First consumer: qnop-ee#17 (guest links).
 
+### 11. `ReviewFacade` — read-only review scoping for extensions (backend, published, core-implemented)
+
+- **Contract:** `io.qnop.spi.review.ReviewFacade` — `mayView(documentId, principalId)` (exactly the annotation-listing rule, no admin override), `reviewCircle(documentId)` (the notification audience — one shared implementation with the mail path, so the two cannot drift; account-less principals via `ExternalParticipants.hasAccess` instead), `displayNameFor`/`exposedAuthorIdFor` (the ADR-0038 per-viewer identity — what leaves the process must be these values, never raw ids).
+- **Owned by:** [ADR-0062](adr/0062-review-facades-and-live-channel-slot.md); issue #602. First consumer: qnop-ee#5 (live feed).
+
+### 12. Live-channel UI slot + invalidation facade (frontend, in-process)
+
+- **Contract:** `qnop-ui/src/extensions/liveChannel.ts` — a `LiveChannelContributor.onReviewMounted(context)` fires while a review surface is mounted and returns its teardown; `context` carries `documentId`, `invalidateAnnotations()` and `invalidateComments(annotationId)`, closing over the host's query client and keys — a push becomes a normal authorized refetch without the extension importing internals. Migrates to the generic slot registry (§10) at the `qnop-ui-spi` cut.
+- **Owned by:** ADR-0062; issue #602. First consumer: qnop-ee#5.
+
 ---
 
 ## Planned extension points (tracked, not yet built)
@@ -125,9 +135,9 @@ Not an extension point itself, but the channel through which extensions become v
 | **Message-row actions + badge slots** | Per-message icon actions and a timestamp-adjacent badge on comment rows / annotation heads, with message context (ids, own-message flag, status, finalization) so contributors decide visibility without the row hard-coding policy. | [#600](https://github.com/qnophq/qnop/issues/600) | qnop-ee#3 (edit own messages) |
 | **Edit-safe mention re-resolution** | `CommentMentionService` becomes replayable for an edited body: replace the comment's mention rows, report only the newly-mentioned ids (the notify-delta). Creation callers unchanged. | [#600](https://github.com/qnophq/qnop/issues/600) | qnop-ee#3 |
 | **Accepted-format gate from extractors** | Ingest validation + advertised `supportedFormats` derive from registered `DocumentExtractor`s; possibly a "which media types" capability on the SPI contract (ADR amendment if so). | [#601](https://github.com/qnophq/qnop/issues/601) | qnop-ee#4 (image review) |
-| **Review-event projection** | ~~Now exists~~ — the published stream above (§4, ADR-0059) covers the event needs; #602 keeps only the facades and UI slot below. | [#602](https://github.com/qnophq/qnop/issues/602) | qnop-ee#5 (live feed) |
-| **Audience / identity / access facade** | Read-only facade over the notification path's recipient resolution, the per-review anonymity identity (ADR-0038) and the `listAnnotations` authorization rule — so extensions reuse, never re-implement, the security-relevant scoping. | [#602](https://github.com/qnophq/qnop/issues/602) | qnop-ee#5 |
-| **Review live-channel UI slot + invalidation facade** | A lifecycle hook while a review surface is mounted (where an SSE client lives) and a small facade over the query keys ("annotations of X changed") so pushes become normal authorized refetches. | [#602](https://github.com/qnophq/qnop/issues/602) | qnop-ee#5 |
+| **Review-event projection** | ~~Now exists~~ — §4 (ADR-0059). | [#602](https://github.com/qnophq/qnop/issues/602) | qnop-ee#5 (live feed) |
+| **Audience / identity / access facade** | ~~Now exists~~ — §11 (ADR-0062). | [#602](https://github.com/qnophq/qnop/issues/602) | qnop-ee#5 |
+| **Review live-channel UI slot + invalidation facade** | ~~Now exists~~ — §12 (ADR-0062). | [#602](https://github.com/qnophq/qnop/issues/602) | qnop-ee#5 |
 | **`qnop-ui-spi` + extension loader** | The published npm contract (slot types + registry) and the import-map/ESM runtime loader with the `/config` compatibility handshake. Built with the first enterprise UI feature. | ADR-0039 | — |
 | **Extension test kit** | Published harness grown from the fake-contributor pattern, so authors verify against the contract without a server checkout. | ADR-0049 (deferred) | — |
 | **Out-of-process untrusted tier** | Marketplace-style extensions against a webhook/REST contract — explicitly deferred, own ADR when wanted. | ADR-0049 §3 | — |

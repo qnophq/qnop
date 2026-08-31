@@ -22,6 +22,7 @@ package io.qnop.service.review;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 import io.qnop.entity.Annotation;
@@ -104,6 +105,12 @@ class ReviewNotificationServiceTest {
         users,
         settings,
         identity,
+        new ReviewFacadeService(
+            mock(io.qnop.service.document.DocumentAccessService.class),
+            documents,
+            participants,
+            teamMembers,
+            identity),
         List.of(sinks));
   }
 

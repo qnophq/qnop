@@ -78,6 +78,7 @@ Two refinement conventions (see the 2026-07-16 amendment to [ADR-0001](0001-reco
 | [0059](0059-published-event-stream.md) | Published review-event stream — a curated catalogue in qnop-spi | Accepted |
 | [0060](0060-machine-credential-authentication.md) | Machine-credential authentication — a decoder fallback, not a filter seam | Accepted |
 | [0061](0061-account-less-review-participants.md) | Account-less review participants — one principal-id space, a core-implemented facade | Accepted |
+| [0062](0062-review-facades-and-live-channel-slot.md) | Review facades and the live-channel UI slot — the last live-feed seams | Accepted |
 
 ## Template
 
