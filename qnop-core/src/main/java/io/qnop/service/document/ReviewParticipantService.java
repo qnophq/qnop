@@ -137,20 +137,28 @@ public class ReviewParticipantService {
     int teamIndex = 0;
     for (ParticipantProjection row : ordered) {
       if (row.teamId() == null) {
+        // An account-less participant's identity key is its own row id (issue #684) — the
+        // resolver numbered it into the same ordinal space, so a guest pseudonymizes exactly
+        // like a user (ADR-0038).
+        boolean external = row.userId() == null;
+        UUID key = external ? row.id() : row.userId();
         out.add(
             new ParticipantView(
                 row.id(),
-                identities.exposedAuthorId(row.userId()),
+                identities.exposedAuthorId(key),
                 false,
-                identities.slug(row.userId()),
-                identities.displayName(row.userId()),
+                external,
+                identities.slug(key),
+                identities.displayName(key),
                 row.createdAt()));
       } else {
         teamIndex++;
         UUID token =
             UUID.nameUUIDFromBytes(
                 (documentId + ":anonteam:" + teamIndex).getBytes(StandardCharsets.UTF_8));
-        out.add(new ParticipantView(row.id(), token, true, null, "Reviewer team", row.createdAt()));
+        out.add(
+            new ParticipantView(
+                row.id(), token, true, false, null, "Reviewer team", row.createdAt()));
       }
     }
     return out;
@@ -183,6 +191,7 @@ public class ReviewParticipantService {
           saved.getId(),
           userId,
           false,
+          false,
           user.getSlug(),
           user.getDisplayName(),
           saved.getCreatedAt());
@@ -199,7 +208,7 @@ public class ReviewParticipantService {
     ReviewParticipant saved = participants.save(ReviewParticipant.forTeam(documentId, teamId));
     events.publishEvent(new ReviewEvent.ParticipantAdded(documentId, actor, null, teamId));
     return new ParticipantView(
-        saved.getId(), teamId, true, null, team.getName(), saved.getCreatedAt());
+        saved.getId(), teamId, true, false, null, team.getName(), saved.getCreatedAt());
   }
 
   /** Removes a reviewer (owner-only); a participant of another document reads as unknown. */
@@ -237,7 +246,13 @@ public class ReviewParticipantService {
    * profile slug — null for teams and on anonymised rosters, where a slug would deanonymise.
    */
   public record ParticipantView(
-      UUID id, UUID principalId, boolean team, String slug, String displayName, Instant createdAt) {
+      UUID id,
+      UUID principalId,
+      boolean team,
+      boolean external,
+      String slug,
+      String displayName,
+      Instant createdAt) {
 
     /**
      * Builds the view, looking the slug up itself so the null-guard lives in ONE place (issue
@@ -246,11 +261,15 @@ public class ReviewParticipantService {
      */
     static ParticipantView of(ParticipantProjection projection, Map<UUID, String> slugById) {
       boolean team = projection.teamId() != null;
+      // An account-less participant (issue #684): no user, no team — its principal id is the
+      // participant row itself.
+      boolean external = !team && projection.userId() == null;
       return new ParticipantView(
           projection.id(),
-          team ? projection.teamId() : projection.userId(),
+          team ? projection.teamId() : external ? projection.id() : projection.userId(),
           team,
-          team ? null : slugById.get(projection.userId()),
+          external,
+          team || external ? null : slugById.get(projection.userId()),
           projection.displayName(),
           projection.createdAt());
     }

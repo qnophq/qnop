@@ -40,6 +40,7 @@ in-process registries described below are the seams those bundles will feed.
 |---|---|
 | **Wiring: contribution beside a default** | When answers are disjoint (mention namespaces, document formats), the seam is a `List<Contract>` and the Community default is always registered; extensions add to the list. Ordering must never matter. |
 | **Wiring: replaceable default** | When exactly one implementation must exist (object storage), the Community default is `@ConditionalOnMissingBean`; an extension bean replaces it wholesale. |
+| **Wiring: core-implemented facade** | When an extension needs a *capability of the core* rather than the core needing the extension (external participants; #602's facades), the `qnop-spi` interface is implemented by the core and called by the extension — invariants stay behind the facade. |
 | **Invariants stay core-side** | Access rules, anonymity (ADR-0038), persistence shapes and notification semantics are enforced by the core *around* the seam. An extension names things; it never widens permissions. |
 | **Purity** | `qnop-spi` types are pure JDK — no Spring, no JPA, no internal modules. ArchUnit-enforced (`pluginContractStaysPure`). |
 | **Compatibility** | `qnop-spi` follows semver (ADR-0015 discipline); "built against `X.y` runs on `X.*`". Growing a contract is minor; changing one is major and ADR territory. |
@@ -106,6 +107,13 @@ Not an extension point itself, but the channel through which extensions become v
 - **Core keeps:** the impersonation guards — a UUID subject is rejected, and scopes surface only as `EXT_`-prefixed authorities (never `ROLE_*`), so `requireUserId()` (403) and every `hasRole` gate refuse machine principals. Authorisation for machine access is the extension's business; opening community read paths to machine actors is the expected re-cut, riding on the #684 principal work.
 - **Also answered here (the #686 scope question):** extension-owned endpoints need no seam at all — a third `SecurityFilterChain` with `securityMatcher("/api/ext/<id>/**")` via `@AutoConfiguration` + `@Order` is standard Spring and touches no core code.
 - **Owned by:** [ADR-0060](adr/0060-machine-credential-authentication.md); issue #686. First consumer: qnop-ee#19 (machine API access).
+
+### 9. `ExternalParticipants` — account-less review participants (backend, published, core-implemented)
+
+- **Contract:** `io.qnop.spi.participant.ExternalParticipants` — `add(documentId, displayName) → UUID`, `remove(documentId, participantId)`, `hasAccess(documentId, participantId)`. The first *core-implemented* contract: the extension calls the core, not the reverse.
+- **Semantics:** the returned UUID is the guest's **principal id** everywhere the review domain names an actor (authorship, access, visits, anonymity ordinals). Not a user: no profile, no slug, no avatar, not mentionable; `ParticipantKind.EXTERNAL` in the API. One principal-id space per ADR-0061 — a user's principal id is their user id, a guest's is its participant row id.
+- **Core keeps:** validation, the external-only removal guard (an extension can never manage the account-bearing roster), auditing (null actor + detail), anonymity (a guest pseudonymizes exactly like a user, ADR-0038 — a supplied display name cannot pierce it), and the refusal to learn links/credentials/expiry (extension business, ADR-0003). External roster changes publish no ReviewEvent — notifying about guests is the extension's decision.
+- **Owned by:** [ADR-0061](adr/0061-account-less-review-participants.md); issue #684. First consumer: qnop-ee#17 (guest links).
 
 ---
 

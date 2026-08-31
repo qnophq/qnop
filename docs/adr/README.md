@@ -77,6 +77,7 @@ Two refinement conventions (see the 2026-07-16 amendment to [ADR-0001](0001-reco
 | [0058](0058-mention-resolver-spi.md) | MentionResolver — a third published contract in qnop-spi | Accepted |
 | [0059](0059-published-event-stream.md) | Published review-event stream — a curated catalogue in qnop-spi | Accepted |
 | [0060](0060-machine-credential-authentication.md) | Machine-credential authentication — a decoder fallback, not a filter seam | Accepted |
+| [0061](0061-account-less-review-participants.md) | Account-less review participants — one principal-id space, a core-implemented facade | Accepted |
 
 ## Template
 
