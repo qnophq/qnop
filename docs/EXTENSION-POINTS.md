@@ -117,7 +117,7 @@ Not an extension point itself, but the channel through which extensions become v
 
 ### 11. `ReviewFacade` — read-only review scoping for extensions (backend, published, core-implemented)
 
-- **Contract:** `io.qnop.spi.review.ReviewFacade` — `mayView(documentId, principalId)` (exactly the annotation-listing rule, no admin override), `reviewCircle(documentId)` (the notification audience — one shared implementation with the mail path, so the two cannot drift; account-less principals via `ExternalParticipants.hasAccess` instead), `displayNameFor`/`exposedAuthorIdFor` (the ADR-0038 per-viewer identity — what leaves the process must be these values, never raw ids).
+- **Contract:** `io.qnop.spi.review.ReviewFacade` — `mayView(documentId, principalId)` (exactly the annotation-listing rule, no admin override — **review-level only**: PRIVATE thread participation is not expressed, so event-granular fan-out forwards identifiers only), `reviewCircle(documentId)` (the notification audience — one shared implementation with the mail path, so the two cannot drift; account-less principals via `ExternalParticipants.hasAccess` instead), `displayNameFor`/`exposedAuthorIdFor` (the ADR-0038 per-viewer identity — what leaves the process must be these values, never raw ids).
 - **Owned by:** [ADR-0062](adr/0062-review-facades-and-live-channel-slot.md); issue #602. First consumer: qnop-ee#5 (live feed).
 
 ### 12. Live-channel UI slot + invalidation facade (frontend, in-process)
