@@ -40,6 +40,7 @@ import type { Notify } from '../../admin/layout/useToast';
 import { isNewComment } from '../newSince';
 import type { BuildPermalink } from '../useReviewPermalink';
 import { useToggleCommentReaction } from '../reactions/useReactions';
+import { isOpenWorkflowState } from '../workflowMeta';
 import { avatarSrc } from '../../../utils/avatarUrl';
 import { FullscreenComposerDialog } from '../markdown/FullscreenComposerDialog';
 import { MarkdownComposer } from '../markdown/MarkdownComposer';
@@ -66,6 +67,8 @@ interface CommentThreadProps {
   policyReadOnly?: boolean;
   /** True on a settled (RESOLVED/DISMISSED) annotation (#403): the thread is a closed record. */
   closed?: boolean;
+  /** The annotation's status verbatim — context for message-row extension slots (issue #600). */
+  annotationStatus?: string;
   /** True when the settlement was a dismissal (issue #408) — the closing line says so. */
   dismissed?: boolean;
   /** Reopens the annotation (issues #394/#408) — set only when the viewer may. */
@@ -101,6 +104,7 @@ export function CommentThread({
   readOnly = false,
   policyReadOnly = false,
   closed = false,
+  annotationStatus,
   dismissed = false,
   onReopen,
   previousSeenAt = null,
@@ -282,6 +286,18 @@ export function CommentThread({
                 domId={`comment-${comment.id}`}
                 permalinkUrl={buildPermalink?.(annotationId, comment.id)}
                 notify={notify}
+                slotContext={{
+                  kind: 'comment',
+                  documentId: review?.id ?? null,
+                  annotationId,
+                  commentId: comment.id,
+                  authorId: comment.authorId,
+                  own,
+                  annotationStatus: annotationStatus ?? null,
+                  workflowState: review?.workflowState ?? null,
+                  reviewOpen: review ? isOpenWorkflowState(review.workflowState) : false,
+                  body: comment.body,
+                }}
                 reactions={comment.reactions}
                 onToggleReaction={
                   readOnly

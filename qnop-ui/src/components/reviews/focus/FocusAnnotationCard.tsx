@@ -409,6 +409,7 @@ export function FocusAnnotationCard({
                       annotationId={annotation.id}
                       documentId={annotation.documentId}
                       notify={notify}
+                      annotationStatus={annotation.status}
                       readOnly={readOnly}
                       policyReadOnly={policyReadOnly}
                       closed={annotation.status !== AnnotationStatus.Open}

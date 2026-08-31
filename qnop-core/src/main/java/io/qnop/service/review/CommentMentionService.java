@@ -31,6 +31,7 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Set;
 import java.util.UUID;
+import java.util.stream.Collectors;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
@@ -97,6 +98,72 @@ public class CommentMentionService {
     if (document == null || document.isAnonymous()) {
       return List.of(); // anonymous reviews: mentions stay plain text (ADR-0038)
     }
+    Set<UUID> mentionedIds = resolveAccessScoped(document, documentId, authorId, slugs);
+    List<CommentMention> rows =
+        mentionedIds.stream().map(userId -> new CommentMention(commentId, userId)).toList();
+    if (rows.isEmpty()) {
+      return List.of();
+    }
+    mentions.saveAll(rows);
+    return rows.stream().map(CommentMention::getMentionedUserId).toList();
+  }
+
+  /**
+   * Replays the resolution for an EDITED body (issue #600): the comment's mention rows are brought
+   * in line with the re-parsed token set — rows whose token disappeared are deleted, rows that
+   * survive keep their identity and timestamp, new ones are inserted — and only the ids that are
+   * NEW relative to the previous set are returned. That delta is what an edit's notification path
+   * needs: people mentioned before the edit were already told and must never be pinged again.
+   *
+   * <p>Anonymous reviews stay a no-op (ADR-0038): nothing was persisted at creation, and nothing is
+   * touched now. A body that lost all its tokens drops every previous row. Survival is not purely
+   * textual: resolution and the access check run again through the registered {@link
+   * MentionResolver}s, so a row whose user meanwhile lost access is dropped even when the token
+   * still stands — the same scoping policy creation applies.
+   *
+   * <p>{@code commentId} must be a comment of {@code documentId} — the caller resolves that
+   * ownership (it loaded the comment to edit it); this service does not re-verify it.
+   *
+   * <p><strong>Concurrency contract:</strong> two overlapping calls for the same comment can both
+   * compute the same "new" row, and the second insert then hits the unique comment/user constraint.
+   * The caller (the enterprise edit endpoint) must serialize edits per comment — which it needs
+   * anyway for the body itself — rather than this service absorbing constraint violations.
+   */
+  @Transactional
+  public List<UUID> reResolveAndPersist(
+      UUID commentId, UUID documentId, UUID authorId, String body) {
+    Document document = documents.findById(documentId).orElse(null);
+    if (document == null || document.isAnonymous()) {
+      return List.of();
+    }
+    Set<UUID> wanted =
+        resolveAccessScoped(document, documentId, authorId, MentionParser.extractSlugs(body));
+    List<CommentMention> existing = mentions.findByCommentId(commentId);
+    Set<UUID> before =
+        existing.stream().map(CommentMention::getMentionedUserId).collect(Collectors.toSet());
+    List<CommentMention> stale =
+        existing.stream().filter(row -> !wanted.contains(row.getMentionedUserId())).toList();
+    if (!stale.isEmpty()) {
+      mentions.deleteAll(stale);
+    }
+    List<CommentMention> added =
+        wanted.stream()
+            .filter(userId -> !before.contains(userId))
+            .map(userId -> new CommentMention(commentId, userId))
+            .toList();
+    if (added.isEmpty()) {
+      return List.of();
+    }
+    mentions.saveAll(added);
+    return added.stream().map(CommentMention::getMentionedUserId).toList();
+  }
+
+  /**
+   * The ids the tokens address after resolver union and the document-access filter — the one
+   * resolution path shared by creation and re-resolution (issue #600), so the two can never drift.
+   */
+  private Set<UUID> resolveAccessScoped(
+      Document document, UUID documentId, UUID authorId, Set<String> slugs) {
     UUID owner = document.getOwnerId();
     MentionContext context = new MentionContext(documentId, owner, authorId);
     Set<UUID> mentionedIds = new LinkedHashSet<>();
@@ -109,13 +176,7 @@ public class CommentMentionService {
         }
       }
     }
-    List<CommentMention> rows =
-        mentionedIds.stream().map(userId -> new CommentMention(commentId, userId)).toList();
-    if (rows.isEmpty()) {
-      return List.of();
-    }
-    mentions.saveAll(rows);
-    return rows.stream().map(CommentMention::getMentionedUserId).toList();
+    return mentionedIds;
   }
 
   /**

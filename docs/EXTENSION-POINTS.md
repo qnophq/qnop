@@ -115,15 +115,22 @@ Not an extension point itself, but the channel through which extensions become v
 - **Core keeps:** validation, the external-only removal guard (an extension can never manage the account-bearing roster), auditing (null actor + detail), anonymity (a guest pseudonymizes exactly like a user, ADR-0038 — a supplied display name cannot pierce it), and the refusal to learn links/credentials/expiry (extension business, ADR-0003). External roster changes publish no ReviewEvent — notifying about guests is the extension's decision.
 - **Owned by:** [ADR-0061](adr/0061-account-less-review-participants.md); issue #684. First consumer: qnop-ee#17 (guest links).
 
+### 10. Message-row actions & badge slots — and the generic slot registry (frontend, in-process)
+
+- **Contract:** `qnop-ui/src/extensions/registry.ts` — the first *generic* slot registry (`createExtensionRegistry`, host singleton `hostExtensions`, React access via `ExtensionsProvider` + `useExtensionSlot(slot)`), typed per slot through `SlotContributionMap`. First slots: `messageActions` and `messageBadges` — a `MessageRowContribution` renders extra per-message actions/badges and receives `MessageRowContext` (comment/annotation id, author id, own-message flag, annotation status, finalization state), so contributors decide visibility without the community row hard-coding policy.
+- **Semantics:** contributions render beside the existing copy/permalink/reaction affordances on comment rows, the annotation head and the focus card; without a registration the rows are byte-identical. The earlier per-feature registries (mentions §6, composer modes) predate this one; new UI slots use the generic registry, and the older ones migrate when `qnop-ui-spi` is cut.
+- **Server sibling (same issue):** `CommentMentionService.reResolveAndPersist(commentId, documentId, authorId, body)` — replayable mention resolution for an edited body: rows follow the re-parsed token set (survivors keep identity/timestamps), only NEWLY mentioned ids are returned (the edit-notification delta), resolution+access run through the registered `MentionResolver`s again, anonymous reviews stay a no-op. Edits per comment must be serialized by the caller.
+- **Owned by:** issue #600 (ADR-0039 status note). First consumer: qnop-ee#3 (edit own messages).
+
 ---
 
 ## Planned extension points (tracked, not yet built)
 
 | Seam | What it will extend | Issue | First consumer |
 |---|---|---|---|
-| **Composer-mode contribution** | The Markdown composer's mode strip: a registered mode adds a tab and its own editing surface over the controlled contract (`value` = raw Markdown stays the storage format by construction, `onChange`, submit/disabled/fullscreen, roster/attachment/emoji affordances). | [#599](https://github.com/qnophq/qnop/issues/599) | qnop-ee#2 (WYSIWYG) |
-| **Message-row actions + badge slots** | Per-message icon actions and a timestamp-adjacent badge on comment rows / annotation heads, with message context (ids, own-message flag, status, finalization) so contributors decide visibility without the row hard-coding policy. | [#600](https://github.com/qnophq/qnop/issues/600) | qnop-ee#3 (edit own messages) |
-| **Edit-safe mention re-resolution** | `CommentMentionService` becomes replayable for an edited body: replace the comment's mention rows, report only the newly-mentioned ids (the notify-delta). Creation callers unchanged. | [#600](https://github.com/qnophq/qnop/issues/600) | qnop-ee#3 |
+| **Composer-mode contribution** | ~~Now exists~~ — `src/extensions/composerModes.ts` (issue #599, merged): a registered mode adds a tab to the composer's mode strip over the controlled raw-Markdown contract. | [#599](https://github.com/qnophq/qnop/issues/599) | qnop-ee#2 (WYSIWYG) |
+| **Message-row actions + badge slots** | ~~Now exists~~ — §10 above. | [#600](https://github.com/qnophq/qnop/issues/600) | qnop-ee#3 (edit own messages) |
+| **Edit-safe mention re-resolution** | ~~Now exists~~ — §10 above. | [#600](https://github.com/qnophq/qnop/issues/600) | qnop-ee#3 |
 | **Accepted-format gate from extractors** | ~~Now exists~~ — §2 above (ADR-0032 amendment). | [#601](https://github.com/qnophq/qnop/issues/601) | qnop-ee#4 (image review) |
 | **Review-event projection** | ~~Now exists~~ — the published stream above (§4, ADR-0059) covers the event needs; #602 keeps only the facades and UI slot below. | [#602](https://github.com/qnophq/qnop/issues/602) | qnop-ee#5 (live feed) |
 | **Audience / identity / access facade** | Read-only facade over the notification path's recipient resolution, the per-review anonymity identity (ADR-0038) and the `listAnnotations` authorization rule — so extensions reuse, never re-implement, the security-relevant scoping. | [#602](https://github.com/qnophq/qnop/issues/602) | qnop-ee#5 |
