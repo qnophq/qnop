@@ -39,7 +39,7 @@ jacksonAnnotations = "2.22"
 #   @JsonUnwrapped properties on deserialisation.
 postgresql = "42.7.13"
 jackson3 = "3.2.2"
-swaggerAnnotations = "2.2.53"
+swaggerAnnotations = "2.2.54"
 jakartaValidation = "3.1.1"
 jakartaAnnotation = "3.0.0"
 # Auth rate limiting (issue #18, ADR-0027). bucket4j is not in the Spring Boot BOM,
