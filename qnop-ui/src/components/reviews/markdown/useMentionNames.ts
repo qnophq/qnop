@@ -35,7 +35,10 @@ import { resolveContributedMention, useMentionContributors } from '../../../exte
  * Matching ignores case, as on the server; a slug outside the roster stays a
  * raw {@code @slug}, mirroring the renderer's fallback. Contributed mention
  * namespaces (issue #598) resolve through the registered contributors, after
- * the roster so a user name always wins its own slug.
+ * the roster so a user name always wins its own slug. In anonymous reviews
+ * user slugs happen to stay raw (empty roster) while contributed slugs still
+ * resolve — a knowing asymmetry: both are workspace-public, nothing hidden
+ * leaks (ADR-0038 is enforced at creation, see docs/EXTENSION-POINTS.md §5).
  */
 export function useMentionNames(documentId: string | null | undefined): (text: string) => string {
   const review = useDocument(documentId ?? '').data;

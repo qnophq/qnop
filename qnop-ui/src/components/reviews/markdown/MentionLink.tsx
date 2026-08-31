@@ -43,7 +43,9 @@ const AVATAR_SIZE = 16;
  * <p>Registered mention contributors (issue #598) are consulted first: a slug one of them owns —
  * a team, say — renders through the contributed principal (name, avatar, link target) and never
  * queries the user-profile endpoint; slug uniqueness across namespaces (#595) means the two
- * sources can never both claim a slug.
+ * sources can never both claim a slug. Like the user pill, a contributed pill resolves
+ * workspace-public identity at render time even in anonymous reviews — ADR-0038 is enforced at
+ * creation/notification (no roster, no server-side resolution), not by blanking public names.
  */
 export function MentionLink({ slug, children }: { slug: string; children: ReactNode }) {
   const theme = useTheme();
