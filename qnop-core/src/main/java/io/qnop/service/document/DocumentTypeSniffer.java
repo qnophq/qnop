@@ -47,6 +47,20 @@ public final class DocumentTypeSniffer {
       "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
 
   private static final byte[] PDF_MAGIC = "%PDF-".getBytes(StandardCharsets.US_ASCII);
+
+  // Recognized-but-not-thereby-accepted (issue #601): sniffing answers "what is this?",
+  // the accept gate separately asks "does anything here take it?" — a registered
+  // DocumentExtractor claiming one of these types is what turns recognition into acceptance.
+  private static final byte[] PNG_MAGIC = {(byte) 0x89, 'P', 'N', 'G', 0x0D, 0x0A, 0x1A, 0x0A};
+  private static final byte[] JPEG_MAGIC = {(byte) 0xFF, (byte) 0xD8, (byte) 0xFF};
+  private static final byte[] GIF_MAGIC = "GIF8".getBytes(StandardCharsets.US_ASCII);
+  private static final byte[] TIFF_LE = {0x49, 0x49, 0x2A, 0x00};
+  private static final byte[] TIFF_BE = {0x4D, 0x4D, 0x00, 0x2A};
+
+  public static final String PNG = "image/png";
+  public static final String JPEG = "image/jpeg";
+  public static final String GIF = "image/gif";
+  public static final String TIFF = "image/tiff";
   private static final byte[] ZIP_MAGIC = {'P', 'K', 0x03, 0x04};
 
   /** The part every Word document has and no other OOXML format does. */
@@ -84,13 +98,25 @@ public final class DocumentTypeSniffer {
    * @param content the upload, positioned at the start; the caller owns and closes the stream
    */
   public static String sniff(InputStream content) throws IOException {
-    byte[] prefix = new byte[PDF_MAGIC.length];
+    byte[] prefix = new byte[PNG_MAGIC.length]; // the longest magic (8 bytes)
     int read = content.readNBytes(prefix, 0, prefix.length);
-    if (read == PDF_MAGIC.length && startsWith(prefix, PDF_MAGIC)) {
+    if (read >= PDF_MAGIC.length && startsWith(prefix, PDF_MAGIC)) {
       return PDF;
     }
+    if (read >= PNG_MAGIC.length && startsWith(prefix, PNG_MAGIC)) {
+      return PNG;
+    }
+    if (read >= JPEG_MAGIC.length && startsWith(prefix, JPEG_MAGIC)) {
+      return JPEG;
+    }
+    if (read >= GIF_MAGIC.length && startsWith(prefix, GIF_MAGIC)) {
+      return GIF;
+    }
+    if (read >= TIFF_LE.length && (startsWith(prefix, TIFF_LE) || startsWith(prefix, TIFF_BE))) {
+      return TIFF;
+    }
     if (read < ZIP_MAGIC.length || !startsWith(prefix, ZIP_MAGIC)) {
-      return null; // too short, or neither format — an empty upload lands here
+      return null; // too short, or no known format — an empty upload lands here
     }
     // The prefix is already consumed and the caller's stream does not rewind, so
     // the archive is read from the two joined back together.

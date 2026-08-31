@@ -71,6 +71,11 @@ public class PdfBoxDocumentExtractor implements DocumentExtractor {
   static final int MAX_PAGES = 2_000;
 
   @Override
+  public java.util.Set<String> mediaTypes() {
+    return java.util.Set.of(DocumentTypeSniffer.PDF);
+  }
+
+  @Override
   public boolean supports(String contentType) {
     return PDF_CONTENT_TYPE.equalsIgnoreCase(contentType);
   }
