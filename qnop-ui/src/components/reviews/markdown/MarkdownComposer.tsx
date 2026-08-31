@@ -521,7 +521,11 @@ export function MarkdownComposer({
           }}
         >
           <ButtonBase onClick={showWrite} aria-pressed={writing} sx={modeTabSx(theme, writing)}>
-            Write
+            {/* Alone, the GitHub-conventional pair Write | Preview carries the
+                meaning. Beside a contributed mode "Write" stops being true —
+                one writes in the other mode too — so each tab then names what
+                you get, not what you do: Markdown | <mode> | Preview (#599). */}
+            {modes.length > 0 ? 'Markdown' : 'Write'}
           </ButtonBase>
           {modes.map((candidate) => (
             <ButtonBase

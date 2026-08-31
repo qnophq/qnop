@@ -116,7 +116,9 @@ afterEach(() => {
 describe('MarkdownComposer — contributed modes (#599)', () => {
   it('shows no extra tab and no surface without a registered mode', () => {
     render(<Host />);
+    // Alone, the tab keeps its conventional name.
     expect(screen.getByRole('button', { name: 'Write' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Markdown' })).not.toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Preview' })).toBeInTheDocument();
     expect(screen.queryByTestId(/composer-mode-/)).not.toBeInTheDocument();
     expect(screen.getByLabelText('Test comment').tagName).toBe('TEXTAREA');
@@ -128,6 +130,10 @@ describe('MarkdownComposer — contributed modes (#599)', () => {
     const tab = screen.getByTestId('composer-mode-fake');
     expect(tab).toHaveTextContent('Fancy');
     expect(tab).toHaveAttribute('aria-pressed', 'false');
+    // Beside a contributed mode the first tab names what you get (#599):
+    // "Write" would claim the other modes are not for writing.
+    expect(screen.getByRole('button', { name: 'Markdown' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Write' })).not.toBeInTheDocument();
 
     fireEvent.click(tab);
 
@@ -138,13 +144,13 @@ describe('MarkdownComposer — contributed modes (#599)', () => {
     expect(screen.queryByRole('button', { name: 'Bold' })).not.toBeInTheDocument();
   });
 
-  it('round-trips the Markdown value through the surface and back to Write', () => {
+  it('round-trips the Markdown value through the surface and back to the Markdown tab', () => {
     registerComposerMode(fake);
     render(<Host />);
     fireEvent.click(screen.getByTestId('composer-mode-fake'));
     fireEvent.change(screen.getByTestId('fake-surface'), { target: { value: '# From fake' } });
 
-    fireEvent.click(screen.getByRole('button', { name: 'Write' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Markdown' }));
 
     expect(screen.getByLabelText('Test comment')).toHaveValue('# From fake');
     expect(screen.queryByTestId('fake-surface')).not.toBeInTheDocument();
@@ -197,7 +203,7 @@ describe('MarkdownComposer — contributed modes (#599)', () => {
     fireEvent.click(screen.getByTestId('composer-mode-wysiwyg'));
     expect(screen.queryByRole('button', { name: 'Preview' })).not.toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole('button', { name: 'Write' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Markdown' }));
     expect(screen.getByRole('button', { name: 'Preview' })).toBeInTheDocument();
   });
 
@@ -218,7 +224,7 @@ describe('MarkdownComposer — contributed modes (#599)', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Preview' }));
     expect(update).not.toHaveBeenCalled();
 
-    fireEvent.click(screen.getByRole('button', { name: 'Write' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Markdown' }));
     await waitFor(() =>
       expect(update).toHaveBeenCalledWith({
         userSettingsUpdateRequest: { values: { composer_mode: 'write' } },
