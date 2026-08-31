@@ -17,6 +17,7 @@ pnpm build          # generate:api + tsc -b + vite build
 pnpm typecheck      # generate:api + tsc -b --noEmit
 pnpm test           # vitest (watch) · pnpm test:run for one-shot
 pnpm test:e2e       # Playwright responsive net against a running backend · scripts/e2e-docker.sh = the CI run (docs/RESPONSIVE.md)
+                    # visual baselines expect the OIDC smoke provider on the login page — run the smoke stack's OIDC step first
 pnpm lint           # eslint
 pnpm format         # prettier --write · pnpm format:check
 pnpm generate:api   # regenerate the typed API client

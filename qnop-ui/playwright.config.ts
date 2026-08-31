@@ -45,6 +45,10 @@ export default defineConfig({
   // one set of images is the point.
   snapshotPathTemplate: '{testDir}/__screenshots__/{testFilePath}/{arg}{ext}',
   fullyParallel: true,
+  // Each worker signs in once at startup; the login endpoint allows ten
+  // attempts a minute per IP (ADR-0027). Four workers keep a many-core dev
+  // machine comfortably under that, matching the CI runner's parallelism.
+  workers: 4,
   // The dev server transforms each route on first request; under several
   // workers that cold start alone can take most of the default 30 s.
   timeout: 60_000,

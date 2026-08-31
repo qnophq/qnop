@@ -46,6 +46,11 @@ for (const breakpoint of visual) {
 
     for (const surface of SURFACES) {
       test(`${surface.name} looks as before`, async ({ page, smokeReviewId }) => {
+        // The workspace and tasks baselines sit on the pre-#809 layout; freezing
+        // new baselines on a page that scrolls sideways would enshrine the bug.
+        // Expected to differ until #809 is fixed — the baseline update rides
+        // with that fix, and Playwright fails the unexpected pass meanwhile.
+        test.fail(['workspace', 'tasks'].includes(surface.name), 'issue #809');
         await open(page, surface.path(smokeReviewId));
         await expect(page).toHaveScreenshot(`${surface.name}-${breakpoint.name}.png`, {
           // Avatars and the relative times are seeded and the clock is

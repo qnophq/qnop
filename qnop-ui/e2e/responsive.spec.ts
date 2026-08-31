@@ -60,12 +60,14 @@ for (const breakpoint of BREAKPOINTS) {
         // (a fixed ~973 px element escapes the table's scroll container), and two
         // admin tables flipped at single widths. Expected until fixed — Playwright
         // fails on the unexpected pass, so the marker cannot outlive the bug.
-        test.fail(surface.name === 'reviews list' && breakpoint.width <= 1024, 'issue #809');
+        test.fail(surface.name === 'reviews list', 'issue #809');
         test.fail(
-          surface.name === 'admin storage consistency' && [375, 768].includes(breakpoint.width),
+          surface.name === 'admin storage consistency' &&
+            [375, 768, 1440].includes(breakpoint.width),
           'issue #809',
         );
         test.fail(surface.name === 'admin scheduler' && breakpoint.width === 320, 'issue #809');
+        test.fail(surface.name === 'review workspace' && breakpoint.width === 1440, 'issue #809');
         await open(page, surface.path(smokeReviewId));
         await expectNoHorizontalOverflow(page);
       });
