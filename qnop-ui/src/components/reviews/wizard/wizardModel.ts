@@ -45,14 +45,25 @@ export interface AcceptedUploads {
   matches: (file: File) => boolean;
 }
 
-export function acceptedUploads(formats: SupportedFormat[] | undefined): AcceptedUploads {
+export function acceptedUploads(
+  formats: SupportedFormat[] | undefined,
+  mediaTypes: string[] | undefined = undefined,
+): AcceptedUploads {
   const word = (formats ?? []).includes('DOCX');
+  // Extension-contributed types (issue #601): whatever the server advertises beyond
+  // the built-in pair widens the filter — the server-side gate stays authoritative.
+  const extra = (mediaTypes ?? []).filter(
+    (type) => type !== 'application/pdf' && type !== DOCX_MIME,
+  );
   const matchesPdf = (file: File) => file.type === 'application/pdf' || /\.pdf$/i.test(file.name);
   const matchesWord = (file: File) => file.type === DOCX_MIME || /\.docx$/i.test(file.name);
+  const base = word ? `application/pdf,.pdf,${DOCX_MIME},.docx` : 'application/pdf,.pdf';
   return {
-    accept: word ? `application/pdf,.pdf,${DOCX_MIME},.docx` : 'application/pdf,.pdf',
-    label: word ? 'PDF or Word' : 'PDF',
-    matches: (file) => matchesPdf(file) || (word && matchesWord(file)),
+    accept: extra.length ? `${base},${extra.join(',')}` : base,
+    // Extras match by exact MIME type only (no extension fallback — the server-side
+    // gate is authoritative and the accept filter already narrows the picker).
+    label: (word ? 'PDF or Word' : 'PDF') + (extra.length ? ' and more' : ''),
+    matches: (file) => matchesPdf(file) || (word && matchesWord(file)) || extra.includes(file.type),
   };
 }
 

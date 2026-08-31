@@ -83,6 +83,7 @@ public class ConfigController implements ServerConfigApi {
   private final BuildProperties buildProperties;
   private final AnnotationExportService exports;
   private final DocumentRenditionService renditions;
+  private final List<io.qnop.spi.extract.DocumentExtractor> extractors;
   private final InfoBannerService banners;
   private final TrackingConfigService tracking;
   private final FeatureToggleProperties features;
@@ -93,6 +94,7 @@ public class ConfigController implements ServerConfigApi {
       BrandingService branding,
       AnnotationExportService exports,
       DocumentRenditionService renditions,
+      List<io.qnop.spi.extract.DocumentExtractor> extractors,
       InfoBannerService banners,
       TrackingConfigService tracking,
       FeatureToggleProperties features,
@@ -102,6 +104,7 @@ public class ConfigController implements ServerConfigApi {
     this.branding = branding;
     this.exports = exports;
     this.renditions = renditions;
+    this.extractors = List.copyOf(extractors);
     this.banners = banners;
     this.tracking = tracking;
     this.features = features;
@@ -153,6 +156,7 @@ public class ConfigController implements ServerConfigApi {
                     .emailTemplates(features.emailTemplates())
                     .deploymentConfiguration(features.deploymentConfiguration()))
             .supportedFormats(supportedFormats())
+            .supportedMediaTypes(supportedMediaTypes())
             .branding(buildBranding());
     // The sign-in notice (issue #664) belongs in the one response the login
     // screen already fetches, and it is public because that screen is. The
@@ -183,7 +187,35 @@ public class ConfigController implements ServerConfigApi {
     if (renditions.supports(DocumentTypeSniffer.DOCX)) {
       formats.add(SupportedFormat.DOCX);
     }
+    // A registered extractor claiming Markdown surfaces the enum value too (issue #601);
+    // media types outside the enum vocabulary appear only in supportedMediaTypes.
+    if (supportedMediaTypes().contains("text/markdown")) {
+      formats.add(SupportedFormat.MD);
+    }
     return formats;
+  }
+
+  /**
+   * Every MIME type this deployment accepts for upload (issue #601): the built-in pair plus
+   * whatever the registered extractors advertise — the enumerable face of the accept gate, so the
+   * upload UI's file filter reflects the running edition instead of hardcoding PDF.
+   */
+  private List<String> supportedMediaTypes() {
+    java.util.TreeSet<String> types = new java.util.TreeSet<>();
+    types.add(DocumentTypeSniffer.PDF);
+    if (renditions.supports(DocumentTypeSniffer.DOCX)) {
+      types.add(DocumentTypeSniffer.DOCX);
+    }
+    for (io.qnop.spi.extract.DocumentExtractor extractor : extractors) {
+      for (String type : extractor.mediaTypes()) {
+        // Mirror of the gate (issue #601 review): an extractor's DOCX claim is refused there
+        // (Word rides the conversion pipeline, ADR-0010), so it must not be advertised here.
+        if (!DocumentTypeSniffer.DOCX.equals(type)) {
+          types.add(type);
+        }
+      }
+    }
+    return List.copyOf(types);
   }
 
   /** Effective branding (custom vs default) per slot, so the SPA can render and badge each logo. */

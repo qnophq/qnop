@@ -386,8 +386,13 @@ public class DocumentIngestService {
       throw DocumentValidationException.unsupportedType("only PDF and Word documents are accepted");
     }
     if (!renditions.supports(contentType)) {
+      // The converter message is Word's alone (issue #343); every other recognized-but-
+      // unclaimed type (an image with no registered extractor, say — issue #601) gets the
+      // same generic copy it always did.
       throw DocumentValidationException.unsupportedType(
-          "this server cannot process Word documents; no office converter is installed");
+          DocumentTypeSniffer.DOCX.equals(contentType)
+              ? "this server cannot process Word documents; no office converter is installed"
+              : "only PDF and Word documents are accepted");
     }
     return contentType;
   }

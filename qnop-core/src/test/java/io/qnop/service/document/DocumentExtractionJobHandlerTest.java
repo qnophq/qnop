@@ -81,7 +81,8 @@ class DocumentExtractionJobHandlerTest {
     // A PDF version needs no conversion, so the real service is used with a
     // converter that is never called; the DOCX path has its own test.
     DocumentRenditionService renditions =
-        new DocumentRenditionService(mock(OfficeConverter.class), storage, writer);
+        new DocumentRenditionService(
+            mock(OfficeConverter.class), storage, writer, java.util.List.of());
     return new DocumentExtractionJobHandler(
         versions, storage, List.of(extractors), writer, renditions);
   }

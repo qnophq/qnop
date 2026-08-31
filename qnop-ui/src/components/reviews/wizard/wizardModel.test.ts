@@ -206,3 +206,18 @@ describe('launchChecklist / launchReadiness (issue #469)', () => {
     expect(onlyBonus.filter((i) => !i.optional).some((i) => !i.done)).toBe(true);
   });
 });
+
+describe('acceptedUploads with server-advertised media types (#601)', () => {
+  const withPng = acceptedUploads(['PDF'], ['application/pdf', 'image/png']);
+
+  it('widens accept and matches by the extra types, deduping the built-ins', () => {
+    expect(withPng.accept).toBe('application/pdf,.pdf,image/png');
+    expect(withPng.matches(new File([''], 'scan.png', { type: 'image/png' }))).toBe(true);
+    expect(withPng.matches(new File([''], 'a.gif', { type: 'image/gif' }))).toBe(false);
+    expect(withPng.label).toBe('PDF and more');
+  });
+
+  it('is unchanged without advertised extras', () => {
+    expect(acceptedUploads(['PDF'], ['application/pdf']).accept).toBe('application/pdf,.pdf');
+  });
+});

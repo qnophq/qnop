@@ -148,4 +148,18 @@ class DocumentTypeSnifferTest {
 
     assertThat(sniff(zip(entries))).isEqualTo(DocumentTypeSniffer.DOCX);
   }
+
+  // Issue #601: common image magics are recognized (acceptance stays the gate's question).
+
+  @Test
+  void sniffsPngJpegGifAndTiff() throws Exception {
+    byte[] png = {(byte) 0x89, 'P', 'N', 'G', 0x0D, 0x0A, 0x1A, 0x0A, 1, 2};
+    byte[] jpeg = {(byte) 0xFF, (byte) 0xD8, (byte) 0xFF, (byte) 0xE0, 0, 0};
+    byte[] gif = {'G', 'I', 'F', '8', '9', 'a'};
+    byte[] tiffLe = {0x49, 0x49, 0x2A, 0x00, 0, 0};
+    org.assertj.core.api.Assertions.assertThat(sniff(png)).isEqualTo(DocumentTypeSniffer.PNG);
+    org.assertj.core.api.Assertions.assertThat(sniff(jpeg)).isEqualTo(DocumentTypeSniffer.JPEG);
+    org.assertj.core.api.Assertions.assertThat(sniff(gif)).isEqualTo(DocumentTypeSniffer.GIF);
+    org.assertj.core.api.Assertions.assertThat(sniff(tiffLe)).isEqualTo(DocumentTypeSniffer.TIFF);
+  }
 }

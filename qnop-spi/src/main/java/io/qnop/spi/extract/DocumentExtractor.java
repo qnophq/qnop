@@ -38,6 +38,20 @@ public interface DocumentExtractor {
   boolean supports(String contentType);
 
   /**
+   * The media types this extractor handles, for the upload gate's advertisement (issue #601): they
+   * surface in {@code GET /config} ({@code supportedMediaTypes}) and make the type pass the upload
+   * accept gate — except the built-in pair: PDF is always accepted anyway, and a DOCX claim is
+   * ignored entirely (Word rides the core's conversion pipeline, ADR-0010). {@link #supports} stays
+   * the authoritative per-upload predicate; this set is the enumerable face of the same claim, so
+   * the two must agree. The default keeps existing implementations compiling (semver minor,
+   * ADR-0032 amendment) — but an extractor that returns an empty set is invisible to the gate and
+   * to clients.
+   */
+  default java.util.Set<String> mediaTypes() {
+    return java.util.Set.of();
+  }
+
+  /**
    * Extracts the canonical representation from the raw content.
    *
    * @param content the original binary; the caller owns and closes the stream

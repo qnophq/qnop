@@ -55,27 +55,56 @@ public class DocumentRenditionService {
   private final OfficeConverter converter;
   private final StorageService storage;
   private final DocumentExtractionWriter writer;
+  private final java.util.List<io.qnop.spi.extract.DocumentExtractor> extractors;
 
   DocumentRenditionService(
-      OfficeConverter converter, StorageService storage, DocumentExtractionWriter writer) {
+      OfficeConverter converter,
+      StorageService storage,
+      DocumentExtractionWriter writer,
+      java.util.List<io.qnop.spi.extract.DocumentExtractor> extractors) {
     this.converter = converter;
     this.storage = storage;
     this.writer = writer;
+    this.extractors = java.util.List.copyOf(extractors);
   }
 
-  /** Whether this server can ingest a document of the given (sniffed) type. */
+  /**
+   * Whether this server can ingest a document of the given (sniffed) type: PDF always, DOCX where
+   * the converter is installed (issue #343) — and any type a registered {@link
+   * io.qnop.spi.extract.DocumentExtractor} claims (issue #601), which is what lets an extension add
+   * a format without a core change (ADR-0032's promise).
+   */
   public boolean supports(String contentType) {
     if (DocumentTypeSniffer.PDF.equals(contentType)) {
       return true;
     }
     // Word needs a converter, and a server without one must say so at upload time
     // rather than accept a document it can never render (issue #343).
-    return DocumentTypeSniffer.DOCX.equals(contentType) && converter.isAvailable();
+    if (DocumentTypeSniffer.DOCX.equals(contentType) && converter.isAvailable()) {
+      return true;
+    }
+    return claimedByExtractor(contentType);
   }
 
-  /** Whether a version of this type is viewed through a converted PDF rather than its upload. */
+  /**
+   * Whether a version of this type is viewed through a converted PDF rather than its upload. A type
+   * a registered extractor claims directly (issue #601) is extracted as-is — the office converter
+   * is only ever for Word.
+   */
   public boolean needsRendition(String contentType) {
-    return !DocumentTypeSniffer.PDF.equals(contentType);
+    return !DocumentTypeSniffer.PDF.equals(contentType) && !claimedByExtractor(contentType);
+  }
+
+  private boolean claimedByExtractor(String contentType) {
+    // PDF is handled above; the extractor list's own PDF claim must not make
+    // needsRendition lie for DOCX, so the claim check skips the PDF extractor's type.
+    if (contentType == null || DocumentTypeSniffer.PDF.equals(contentType)) {
+      return false;
+    }
+    if (DocumentTypeSniffer.DOCX.equals(contentType)) {
+      return false; // DOCX rides the conversion pipeline, never a direct extractor (ADR-0010)
+    }
+    return extractors.stream().anyMatch(extractor -> extractor.supports(contentType));
   }
 
   /**
