@@ -34,7 +34,11 @@ import io.qnop.repository.CommentMentionRepository;
 import io.qnop.repository.DocumentRepository;
 import io.qnop.repository.ReviewParticipantRepository;
 import io.qnop.repository.UserRepository;
+import io.qnop.spi.mention.MentionContext;
+import io.qnop.spi.mention.MentionResolver;
+import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
 
@@ -49,14 +53,17 @@ class CommentMentionServiceTest {
   private final DocumentRepository documents = mock(DocumentRepository.class);
   private final ReviewParticipantRepository participants = mock(ReviewParticipantRepository.class);
   private final UserRepository users = mock(UserRepository.class);
+  // The Community resolver only — the seam (issue #598) must be invisible here.
   private final CommentMentionService service =
-      new CommentMentionService(mentions, documents, participants, users);
+      new CommentMentionService(
+          mentions, documents, participants, List.of(new UserSlugMentionResolver(users)));
 
   private final UUID commentId = UUID.randomUUID();
   private final UUID documentId = UUID.randomUUID();
   private final UUID owner = UUID.randomUUID();
   private final UUID participant = UUID.randomUUID();
   private final UUID stranger = UUID.randomUUID();
+  private final UUID author = UUID.randomUUID();
 
   private Document document(boolean anonymous) {
     Document document = mock(Document.class);
@@ -83,7 +90,7 @@ class CommentMentionServiceTest {
 
     var persisted =
         service.resolveAndPersist(
-            commentId, documentId, "Hi @olivia-owner @petra-part @sven-stranger");
+            commentId, documentId, author, "Hi @olivia-owner @petra-part @sven-stranger");
 
     // Owner (by owner-id) and the participant resolve; the stranger stays plain text.
     assertThat(persisted).containsExactly(owner, participant);
@@ -98,7 +105,7 @@ class CommentMentionServiceTest {
     when(participants.existsAccessibleParticipant(documentId, participant)).thenReturn(true);
 
     var persisted =
-        service.resolveAndPersist(commentId, documentId, "@Petra-Part again @petra-part");
+        service.resolveAndPersist(commentId, documentId, author, "@Petra-Part again @petra-part");
 
     assertThat(persisted).containsExactly(participant);
   }
@@ -108,7 +115,7 @@ class CommentMentionServiceTest {
     Document document = document(true);
     when(documents.findById(documentId)).thenReturn(Optional.of(document));
 
-    var persisted = service.resolveAndPersist(commentId, documentId, "@petra-part");
+    var persisted = service.resolveAndPersist(commentId, documentId, author, "@petra-part");
 
     assertThat(persisted).isEmpty();
     verify(mentions, never()).saveAll(any());
@@ -119,7 +126,7 @@ class CommentMentionServiceTest {
   @Test
   void bodyWithoutTokensNeverTouchesTheDatabase() {
     var persisted =
-        service.resolveAndPersist(commentId, documentId, "mail me at a@b.example — ok?");
+        service.resolveAndPersist(commentId, documentId, author, "mail me at a@b.example — ok?");
 
     assertThat(persisted).isEmpty();
     verify(documents, never()).findById(any());
@@ -135,9 +142,69 @@ class CommentMentionServiceTest {
     when(participants.existsAccessibleParticipant(documentId, stranger)).thenReturn(false);
 
     var persisted =
-        service.resolveAndPersist(commentId, documentId, "@no-such-slug @sven-stranger");
+        service.resolveAndPersist(commentId, documentId, author, "@no-such-slug @sven-stranger");
 
     assertThat(persisted).isEmpty();
     verify(mentions, never()).saveAll(any());
+  }
+
+  /**
+   * A contributed resolver (issue #598): the shape an add-on takes to expand a token — here a
+   * "team" slug — into a set of user ids. Records the context it was handed.
+   */
+  private static final class TeamResolver implements MentionResolver {
+    final Set<UUID> members;
+    MentionContext seen;
+
+    TeamResolver(Set<UUID> members) {
+      this.members = members;
+    }
+
+    @Override
+    public Set<UUID> resolve(MentionContext context, String slug) {
+      seen = context;
+      return slug.equalsIgnoreCase("platform-team") ? members : Set.of();
+    }
+  }
+
+  @Test
+  void contributedResolverExpandsItsTokenToUserIds() {
+    Document document = document(false);
+    when(documents.findById(documentId)).thenReturn(Optional.of(document));
+    slugResolvesTo("petra-part", participant);
+    when(users.findBySlugIgnoreCase("platform-team")).thenReturn(Optional.empty());
+    UUID member = UUID.randomUUID();
+    when(participants.existsAccessibleParticipant(documentId, participant)).thenReturn(true);
+    when(participants.existsAccessibleParticipant(documentId, member)).thenReturn(true);
+    TeamResolver team = new TeamResolver(Set.of(member, participant));
+    CommentMentionService seamed =
+        new CommentMentionService(
+            mentions, documents, participants, List.of(new UserSlugMentionResolver(users), team));
+
+    var persisted =
+        seamed.resolveAndPersist(commentId, documentId, author, "@petra-part @platform-team");
+
+    // The team expands to its members; the participant is deduped across both resolvers.
+    assertThat(persisted).containsExactlyInAnyOrder(participant, member);
+    assertThat(team.seen).isEqualTo(new MentionContext(documentId, owner, author));
+  }
+
+  @Test
+  void accessRuleAppliesToContributedIdsToo() {
+    Document document = document(false);
+    when(documents.findById(documentId)).thenReturn(Optional.of(document));
+    when(users.findBySlugIgnoreCase("platform-team")).thenReturn(Optional.empty());
+    when(participants.existsAccessibleParticipant(documentId, stranger)).thenReturn(false);
+    CommentMentionService seamed =
+        new CommentMentionService(
+            mentions,
+            documents,
+            participants,
+            List.of(new UserSlugMentionResolver(users), new TeamResolver(Set.of(stranger, owner))));
+
+    var persisted = seamed.resolveAndPersist(commentId, documentId, author, "@platform-team");
+
+    // A resolver names whom a token stands for; it cannot widen who may be mentioned.
+    assertThat(persisted).containsExactly(owner);
   }
 }

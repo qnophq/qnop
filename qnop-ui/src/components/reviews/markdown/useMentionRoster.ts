@@ -24,6 +24,7 @@ import { ParticipantKind } from '../../../api/generated';
 import { useDocument } from '../../../api/hooks/useDocuments';
 import { useParticipants } from '../../../api/hooks/useReviews';
 import { useAuthStore } from '../../../stores/authStore';
+import { useMentionContributors } from '../../../extensions/mentions';
 import type { MentionCandidate } from './mentionToken';
 
 /**
@@ -33,17 +34,22 @@ import type { MentionCandidate } from './mentionToken';
  * resolves no mentions there either). Every composer shares this one hook so
  * annotations and comments cannot drift apart; both queries are cache-shared
  * with the surfaces that already load them.
+ *
+ * <p>Registered mention contributors (issue #598) append their candidates —
+ * e.g. a team the composer may ping — after the user roster; anonymity
+ * disables them along with everything else.
  */
 export function useMentionRoster(documentId: string | null | undefined): MentionCandidate[] {
   const review = useDocument(documentId ?? '').data;
   const participantsQuery = useParticipants(documentId ?? '', Boolean(documentId));
   const selfId = useAuthStore((s) => s.userId);
+  const contributors = useMentionContributors();
   return useMemo(() => {
     if (!review || review.anonymous) return [];
     // The token is the profile slug (issue #486), so a slug-less account
     // (predating slugs) cannot be offered. You never ping yourself, so the
     // caller's own row stays out of the picker.
-    const roster = (participantsQuery.data?.participants ?? [])
+    const roster: MentionCandidate[] = (participantsQuery.data?.participants ?? [])
       .filter(
         (participant) =>
           participant.kind === ParticipantKind.User &&
@@ -66,6 +72,22 @@ export function useMentionRoster(documentId: string | null | undefined): Mention
     ) {
       roster.unshift({ id: review.ownerId, name: review.ownerDisplayName, slug: review.ownerSlug });
     }
+    if (documentId) {
+      for (const contributor of contributors) {
+        for (const principal of contributor.candidatesFor(documentId)) {
+          if (!roster.some((candidate) => candidate.slug === principal.slug)) {
+            roster.push({
+              id: principal.id,
+              name: principal.name,
+              slug: principal.slug,
+              kind: principal.kind,
+              avatarUrl: principal.avatarUrl ?? null,
+              hint: principal.hint,
+            });
+          }
+        }
+      }
+    }
     return roster;
-  }, [participantsQuery.data, review, selfId]);
+  }, [contributors, documentId, participantsQuery.data, review, selfId]);
 }

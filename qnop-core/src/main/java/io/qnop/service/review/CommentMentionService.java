@@ -22,14 +22,13 @@ package io.qnop.service.review;
 
 import io.qnop.entity.CommentMention;
 import io.qnop.entity.Document;
-import io.qnop.entity.User;
 import io.qnop.repository.CommentMentionRepository;
 import io.qnop.repository.DocumentRepository;
 import io.qnop.repository.ReviewParticipantRepository;
-import io.qnop.repository.UserRepository;
+import io.qnop.spi.mention.MentionContext;
+import io.qnop.spi.mention.MentionResolver;
 import java.util.LinkedHashSet;
 import java.util.List;
-import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 import org.springframework.stereotype.Service;
@@ -49,6 +48,13 @@ import org.springframework.transaction.annotation.Transactional;
  * roster picker or a rendered {@code @realname} would leak identities the review deliberately
  * hides, so no mention is resolved, persisted, or notified when {@link Document#isAnonymous()} —
  * the tokens simply remain plain text for everyone.
+ *
+ * <p><strong>Resolution seam (issue #598):</strong> the token→principal step is delegated to the
+ * registered {@link MentionResolver}s (published in {@code qnop-spi}, ADR-0058). The Community
+ * default is {@link UserSlugMentionResolver}; an add-on may contribute resolvers for other
+ * namespaces (a team slug expanding to its members). Their answers are unioned, and the access rule
+ * above is applied to every resolved id regardless of which resolver produced it — so a contributor
+ * can name whom a token stands for but never widen who may be mentioned.
  */
 @Service
 public class CommentMentionService {
@@ -56,28 +62,29 @@ public class CommentMentionService {
   private final CommentMentionRepository mentions;
   private final DocumentRepository documents;
   private final ReviewParticipantRepository participants;
-  private final UserRepository users;
+  private final List<MentionResolver> resolvers;
 
   public CommentMentionService(
       CommentMentionRepository mentions,
       DocumentRepository documents,
       ReviewParticipantRepository participants,
-      UserRepository users) {
+      List<MentionResolver> resolvers) {
     this.mentions = mentions;
     this.documents = documents;
     this.participants = participants;
-    this.users = users;
+    this.resolvers = List.copyOf(resolvers);
   }
 
   /**
-   * Parses the {@code @slug} tokens of {@code body}, keeps only mentions of users with access to
-   * {@code documentId}, and persists a row per surviving mention. Returns the mentioned user ids
-   * that were persisted (for the notification path to target); empty when the review is anonymous,
-   * the body has no tokens, or none resolve to a user on the roster — an unknown slug stays plain
-   * text, exactly like a slug without access.
+   * Parses the {@code @slug} tokens of {@code body}, resolves each through the registered {@link
+   * MentionResolver}s, keeps only mentions of users with access to {@code documentId}, and persists
+   * a row per surviving mention. Returns the mentioned user ids that were persisted (for the
+   * notification path to target); empty when the review is anonymous, the body has no tokens, or
+   * none resolve to a user on the roster — an unknown slug stays plain text, exactly like a slug
+   * without access.
    */
   @Transactional
-  public List<UUID> resolveAndPersist(UUID commentId, UUID documentId, String body) {
+  public List<UUID> resolveAndPersist(UUID commentId, UUID documentId, UUID authorId, String body) {
     Set<String> slugs = MentionParser.extractSlugs(body);
     if (slugs.isEmpty()) {
       return List.of();
@@ -87,12 +94,16 @@ public class CommentMentionService {
       return List.of(); // anonymous reviews: mentions stay plain text (ADR-0038)
     }
     UUID owner = document.getOwnerId();
+    MentionContext context = new MentionContext(documentId, owner, authorId);
     Set<UUID> mentionedIds = new LinkedHashSet<>();
     for (String slug : slugs) {
-      Optional<User> user = users.findBySlugIgnoreCase(slug);
-      user.map(User::getId)
-          .filter(id -> hasAccess(documentId, owner, id))
-          .ifPresent(mentionedIds::add);
+      for (MentionResolver resolver : resolvers) {
+        for (UUID id : resolver.resolve(context, slug)) {
+          if (hasAccess(documentId, owner, id)) {
+            mentionedIds.add(id);
+          }
+        }
+      }
     }
     List<CommentMention> rows =
         mentionedIds.stream().map(userId -> new CommentMention(commentId, userId)).toList();

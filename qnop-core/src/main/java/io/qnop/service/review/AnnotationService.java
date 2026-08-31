@@ -206,7 +206,7 @@ public class AnnotationService {
     // Resolve @mentions in the opening comment against the document roster (no-op in anonymous
     // reviews). Persisted here so the AnnotationCreated notification can target mentioned users
     // without re-parsing the body (issue #462).
-    mentions.resolveAndPersist(opening.getId(), documentId, firstComment);
+    mentions.resolveAndPersist(opening.getId(), documentId, author, firstComment);
     int commentCount = 1;
     auditEvents.save(
         new AuditEvent(
@@ -607,7 +607,7 @@ public class AnnotationService {
     Comment saved = comments.saveAndFlush(new Comment(annotationId, author, body));
     // Resolve @mentions against the document roster (no-op in anonymous reviews) so the
     // CommentAdded notification can target them without re-parsing the body (issue #462).
-    mentions.resolveAndPersist(saved.getId(), annotation.getDocumentId(), body);
+    mentions.resolveAndPersist(saved.getId(), annotation.getDocumentId(), author, body);
     events.publishEvent(
         new ReviewEvent.CommentAdded(
             annotation.getDocumentId(), author, annotationId, saved.getId()));
