@@ -68,7 +68,7 @@ A Vite + React + TypeScript + MaterialUI SPA (`qnop-ui/`) talking to the Spring 
 
 ## Current state & deferred
 
-**Shipped:** the identity & administration layer (local JWT auth with rotating refresh tokens, OIDC providers, self-registration/verification/reset, rate limiting, users & teams, settings, mail templates, branding, avatars) and the full **PDF review vertical** — ingest + extraction jobs, anchoring and re-anchoring, the review workflow state machine, inter-version diff, review notifications, dashboard, and the complete review UI. `qnop-spi` publishes three contracts (`StorageProvider`, `DocumentExtractor`, `MentionResolver`) with Community defaults. All extension points — existing and planned — are catalogued in [EXTENSION-POINTS.md](EXTENSION-POINTS.md).
+**Shipped:** the identity & administration layer (local JWT auth with rotating refresh tokens, OIDC providers, self-registration/verification/reset, rate limiting, users & teams, settings, mail templates, branding, avatars) and the full **PDF review vertical** — ingest + extraction jobs, anchoring and re-anchoring, the review workflow state machine, inter-version diff, review notifications, dashboard, and the complete review UI. `qnop-spi` publishes four contracts (`StorageProvider`, `DocumentExtractor`, `MentionResolver`, `PublishedEventListener`) with Community defaults. All extension points — existing and planned — are catalogued in [EXTENSION-POINTS.md](EXTENSION-POINTS.md).
 
 **Deferred:** Redis/search ([ADR-0013](adr/0013-redis-and-search-deferred.md)), enterprise runtime extensions and their packaging ([ADR-0039](adr/0039-enterprise-packaging-and-runtime-extensions.md)).
 

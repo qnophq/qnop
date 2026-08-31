@@ -73,13 +73,20 @@ in-process registries described below are the seams those bundles will feed.
 - **Core keeps:** the document-access rule runs over every resolved id (a resolver can never widen who may be mentioned, only apply a narrower rule of its own); persisted shape stays per-user `comment_mention` rows, so mail/opt-out/dedup are extension-agnostic; anonymity (ADR-0038) is enforced *before* resolvers are called.
 - **Owned by:** [ADR-0058](adr/0058-mention-resolver-spi.md); issue #598. First consumer: qnop-ee#1 (team mentions).
 
-### 4. Enterprise Liquibase changelog seam (schema)
+### 4. `PublishedEventListener` — the review-event stream (backend, published)
+
+- **Contract:** `io.qnop.spi.event.PublishedEventListener` — `on(PublishedEvent)`; `PublishedEvent` carries a stable catalogued `type` (`PublishedEventTypes`, eight names today), `occurredAt`, `documentId`, `actorId` and an identifier-only attribute map. **No customer content** — bodies and titles never enter the stream; whether a consumer may read the subject is the API's permission question.
+- **Wiring:** contribution beside a default of *nobody* — all registered listeners hear every event. Called after commit, off the request thread, each listener isolated (a throwing listener is logged and costs only itself; a full dispatch queue drops with a warning rather than slowing the request). Delivery is best-effort in-process: durability, retries, signing, SSRF policy live in the consumer.
+- **Core keeps:** the catalogue (the internal→published mapping is exhaustive over the sealed `ReviewEvent` hierarchy, so a new internal event is a compile error until someone decides its published fate) and the isolation guarantees. `ReviewNotificationSink` stays internal and recipient-shaped beside this event-shaped seam.
+- **Owned by:** [ADR-0059](adr/0059-published-event-stream.md); issue #685. First consumer: qnop-ee#18 (webhooks).
+
+### 5. Enterprise Liquibase changelog seam (schema)
 
 - **Contract:** the master changelog ends with `includeAll: classpath*:db/changelog/enterprise/` with `errorIfMissingOrEmpty: false` — a no-op without enterprise JARs. An extension ships its changesets under that path on its own classpath entry.
 - **Rules:** file names `e####-<feature>-*.yaml`, author `qnop-enterprise`; applied after all community migrations, in filename order. The community fold-rule ("modify the existing changeset") does **not** apply across the boundary — an extension owns its own history.
 - **Owned by:** ADR-0039 §2; issue #254.
 
-### 5. UI mention contributor registry (frontend, in-process)
+### 6. UI mention contributor registry (frontend, in-process)
 
 - **Contract:** `qnop-ui/src/extensions/mentions.ts` — `MentionContributor` (`candidatesFor(documentId)`, `resolve(slug)`) returning `MentionPrincipal` (`id`, `name`, `slug`, `kind`, optional `avatarUrl`/`href`/`hint`). Register with `registerMentionContributor(c)` (returns the deregistration); announce async data with `notifyMentionContributionsChanged()`; hosts subscribe via `useMentionContributors()` (`useSyncExternalStore`).
 - **Semantics:** here `id` is the **principal's own id** (e.g. the team id) and is presentation-only — `kind` discriminates the namespace, and a contributed id must never be fed to user endpoints (avatar, profile). Contrast with the backend seam (§3), where only user ids cross.
@@ -88,7 +95,7 @@ in-process registries described below are the seams those bundles will feed.
 - **Status:** the in-process seed of the ADR-0039 runtime UI extension model — today filled by tests only; the extension loader (import map + ESM bundles + `qnop-ui-spi`) will feed it. New UI seams (#599/#600/#602) reuse this registry pattern.
 - **Owned by:** issue #598; ADR-0039 is the packaging frame.
 
-### 6. Edition & capability surface — `GET /api/v1/config`
+### 7. Edition & capability surface — `GET /api/v1/config`
 
 Not an extension point itself, but the channel through which extensions become visible to clients: edition and entitlements (ADR-0012), `supportedFormats` (to be derived from registered extractors, #601), and — per ADR-0039 — the list of frontend extension entry URLs with the `qnop-ui-spi` contract version they were built against.
 
@@ -102,7 +109,7 @@ Not an extension point itself, but the channel through which extensions become v
 | **Message-row actions + badge slots** | Per-message icon actions and a timestamp-adjacent badge on comment rows / annotation heads, with message context (ids, own-message flag, status, finalization) so contributors decide visibility without the row hard-coding policy. | [#600](https://github.com/qnophq/qnop/issues/600) | qnop-ee#3 (edit own messages) |
 | **Edit-safe mention re-resolution** | `CommentMentionService` becomes replayable for an edited body: replace the comment's mention rows, report only the newly-mentioned ids (the notify-delta). Creation callers unchanged. | [#600](https://github.com/qnophq/qnop/issues/600) | qnop-ee#3 |
 | **Accepted-format gate from extractors** | Ingest validation + advertised `supportedFormats` derive from registered `DocumentExtractor`s; possibly a "which media types" capability on the SPI contract (ADR amendment if so). | [#601](https://github.com/qnophq/qnop/issues/601) | qnop-ee#4 (image review) |
-| **Review-event projection** | A stable, versioned projection of the committed `ReviewEvent` stream consumable by extensions (vehicle — `qnop-spi` growth vs re-publication — decided with its ADR). | [#602](https://github.com/qnophq/qnop/issues/602) | qnop-ee#5 (live feed) |
+| **Review-event projection** | ~~Now exists~~ — the published stream above (§4, ADR-0059) covers the event needs; #602 keeps only the facades and UI slot below. | [#602](https://github.com/qnophq/qnop/issues/602) | qnop-ee#5 (live feed) |
 | **Audience / identity / access facade** | Read-only facade over the notification path's recipient resolution, the per-review anonymity identity (ADR-0038) and the `listAnnotations` authorization rule — so extensions reuse, never re-implement, the security-relevant scoping. | [#602](https://github.com/qnophq/qnop/issues/602) | qnop-ee#5 |
 | **Review live-channel UI slot + invalidation facade** | A lifecycle hook while a review surface is mounted (where an SSE client lives) and a small facade over the query keys ("annotations of X changed") so pushes become normal authorized refetches. | [#602](https://github.com/qnophq/qnop/issues/602) | qnop-ee#5 |
 | **`qnop-ui-spi` + extension loader** | The published npm contract (slot types + registry) and the import-map/ESM runtime loader with the `/config` compatibility handshake. Built with the first enterprise UI feature. | ADR-0039 | — |

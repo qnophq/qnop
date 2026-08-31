@@ -65,4 +65,35 @@ public class AsyncConfiguration {
   public TaskExecutor syncReviewNotificationExecutor() {
     return new SyncTaskExecutor();
   }
+
+  /**
+   * Dispatches the published event stream (issue #685, ADR-0059). Bounded, and full means DROP
+   * (warn-logged) rather than CallerRuns: an extension's slow listener must never be able to slow
+   * the committing request thread — delivery is best-effort by contract, and a consumer needing
+   * durability queues on its own side.
+   */
+  @Bean(name = "publishedEventExecutor")
+  @ConditionalOnProperty(
+      name = "qnop.events.sync-dispatch",
+      havingValue = "false",
+      matchIfMissing = true)
+  public ThreadPoolTaskExecutor publishedEventExecutor() {
+    ThreadPoolTaskExecutor executor = new ThreadPoolTaskExecutor();
+    executor.setThreadNamePrefix("published-event-");
+    executor.setCorePoolSize(1);
+    executor.setMaxPoolSize(2);
+    executor.setQueueCapacity(500);
+    executor.setRejectedExecutionHandler(
+        (task, pool) ->
+            org.slf4j.LoggerFactory.getLogger(AsyncConfiguration.class)
+                .warn("published-event queue full — dropping one event dispatch"));
+    return executor;
+  }
+
+  /** Synchronous variant for tests that assert on delivered events. */
+  @Bean(name = "publishedEventExecutor")
+  @ConditionalOnProperty(name = "qnop.events.sync-dispatch", havingValue = "true")
+  public TaskExecutor syncPublishedEventExecutor() {
+    return new SyncTaskExecutor();
+  }
 }
