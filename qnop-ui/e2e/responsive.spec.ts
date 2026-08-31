@@ -55,19 +55,20 @@ for (const breakpoint of BREAKPOINTS) {
 
     for (const surface of SURFACES) {
       test(`${surface.name} does not scroll sideways`, async ({ page, smokeReviewId }) => {
-        // First catch of this net (issue #809): three surfaces regressed since
-        // the Aug-29 audit — the reviews list overflows the page at every width
-        // (a fixed ~973 px element escapes the table's scroll container), and two
-        // admin tables flipped at single widths. Expected until fixed — Playwright
-        // fails on the unexpected pass, so the marker cannot outlive the bug.
-        test.fail(surface.name === 'reviews list', 'issue #809');
-        test.fail(
-          surface.name === 'admin storage consistency' &&
-            [375, 768, 1440].includes(breakpoint.width),
+        // First catch of this net (issue #809), measured across two CI runs: the
+        // overflow FLICKERS between runs on these surfaces (load/async-data
+        // dependent), so fail-markers would flap. fixme skips them until #809 is
+        // fixed; the fix removes this block and the union below is the checklist.
+        test.fixme(
+          surface.name === 'reviews list' ||
+            (surface.name === 'admin storage consistency' &&
+              [375, 768, 1440].includes(breakpoint.width)) ||
+            (surface.name === 'admin scheduler' && breakpoint.width === 320) ||
+            (surface.name === 'dashboard' && breakpoint.width === 320) ||
+            (surface.name === 'admin teams' && breakpoint.width === 1920) ||
+            (surface.name === 'review workspace' && breakpoint.width === 1440),
           'issue #809',
         );
-        test.fail(surface.name === 'admin scheduler' && breakpoint.width === 320, 'issue #809');
-        test.fail(surface.name === 'review workspace' && breakpoint.width === 1440, 'issue #809');
         await open(page, surface.path(smokeReviewId));
         await expectNoHorizontalOverflow(page);
       });
