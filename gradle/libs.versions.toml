@@ -23,7 +23,7 @@ cyclonedx = "2.4.1"
 # Spring Boot plugin + BOM. The BOM (spring-boot-dependencies) manages the
 # versions of the Spring stack, JPA/Hibernate, the PostgreSQL driver, Liquibase
 # and Testcontainers — so those artifacts are declared below WITHOUT versions.
-springBoot = "4.1.0"
+springBoot = "4.1.1"
 # OpenAPI-first contract tooling (ADR-0021): the openapi-generator Gradle plugin
 # produces pure DTOs into qnop-api-model and Spring MVC interfaces into
 # qnop-api-endpoint from a single spec. Jackson annotations stay on 2.x
