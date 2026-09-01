@@ -15,6 +15,19 @@ import { fileURLToPath, URL } from 'node:url';
 // SPA is served by the backend itself (ADR-0040), so there this is one origin
 // and no proxying happens at all; without this line measurement works in a
 // deployment and silently 404s in dev, which is the worst of both.
+//
+// `QNOP_API_URL` moves the proxy target (issue #725): the Playwright run points
+// the dev server at whatever backend it has — the CI smoke stack, a local
+// container on another port — without editing this file.
+const apiUrl = process.env.QNOP_API_URL ?? 'http://localhost:8080';
+
+const proxy = {
+  '/api': apiUrl,
+  '/t': apiUrl,
+  '/oauth2': { target: apiUrl, changeOrigin: false },
+  '/login/oauth2': { target: apiUrl, changeOrigin: false },
+};
+
 export default defineConfig({
   plugins: [react()],
   resolve: {
@@ -25,12 +38,9 @@ export default defineConfig({
       url: fileURLToPath(new URL('./src/shims/url.ts', import.meta.url)),
     },
   },
-  server: {
-    proxy: {
-      '/api': 'http://localhost:8080',
-      '/t': 'http://localhost:8080',
-      '/oauth2': { target: 'http://localhost:8080', changeOrigin: false },
-      '/login/oauth2': { target: 'http://localhost:8080', changeOrigin: false },
-    },
-  },
+  server: { proxy },
+  // The Playwright suite (issue #725) serves the built bundle through
+  // `vite preview` — no per-route cold transform, and the same code a
+  // deployment ships — so the preview server proxies the API exactly like dev.
+  preview: { proxy },
 });

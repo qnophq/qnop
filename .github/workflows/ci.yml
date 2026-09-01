@@ -22,7 +22,7 @@ jobs:
       - uses: actions/setup-java@b6effb05e454b25005698d916606bdc6ffcbf961 # v5
         with:
           distribution: temurin
-          java-version: '21'
+          java-version: "21"
       - uses: gradle/actions/setup-gradle@9c971963bec38e04b3d30dcc455b5382be2fdbfb # v6
       # `build` runs spotlessCheck (formatting + SPDX header) and the ArchUnit
       # conformance tests via the `check` task.
@@ -42,7 +42,7 @@ jobs:
       - uses: actions/setup-java@b6effb05e454b25005698d916606bdc6ffcbf961 # v5
         with:
           distribution: temurin
-          java-version: '21'
+          java-version: "21"
       - uses: gradle/actions/setup-gradle@9c971963bec38e04b3d30dcc455b5382be2fdbfb # v6
       # ADR-0007 / issue #498: the dependency-license gate promised once real
       # dependencies landed. `checkLicense` fails on any shipped (runtimeClasspath)
@@ -68,7 +68,7 @@ jobs:
           package_json_file: qnop-ui/package.json
       - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
         with:
-          node-version: '24'
+          node-version: "24"
           cache: pnpm
           cache-dependency-path: qnop-ui/pnpm-lock.yaml
       # The typescript-axios client is generated from the backend openapi.yaml
@@ -76,7 +76,7 @@ jobs:
       - uses: actions/setup-java@b6effb05e454b25005698d916606bdc6ffcbf961 # v5
         with:
           distribution: temurin
-          java-version: '21'
+          java-version: "21"
       - run: pnpm install --frozen-lockfile
       # Per-PR vulnerability gate (#195): fail on a high/critical advisory in the
       # frontend dependency tree, independent of Renovate's scheduled runs.
@@ -106,6 +106,45 @@ jobs:
       # Keycloak. Runs after the basic smoke (which seeds the database).
       - name: Run OIDC login smoke test
         run: docker compose -f docker-compose.smoke.yml run --rm smoke-oidc
+      # Responsive regression net (issue #725, from the #461 audit): Playwright
+      # drives the working-tree SPA (Vite dev server, API proxied to the smoke
+      # stack) against the data the smoke script just seeded and uploaded. It
+      # asserts no horizontal overflow on every audited surface at six widths,
+      # the header touch targets, and screenshot baselines at four widths.
+      - uses: pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86 # v6
+        with:
+          package_json_file: qnop-ui/package.json
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version: "24"
+          cache: pnpm
+          cache-dependency-path: qnop-ui/pnpm-lock.yaml
+      - uses: actions/setup-java@b6effb05e454b25005698d916606bdc6ffcbf961 # v5
+        with:
+          distribution: temurin
+          java-version: "21"
+      - name: Install the frontend
+        working-directory: qnop-ui
+        run: |
+          pnpm install --frozen-lockfile
+          pnpm generate:api
+      # Inside the official Playwright image, not on the runner: the screenshot
+      # baselines are made in that same image, so fonts and antialiasing match
+      # to the pixel here and on a developer machine alike.
+      - name: Run the responsive regression net
+        working-directory: qnop-ui
+        env:
+          QNOP_API_URL: http://localhost:8080
+        run: scripts/e2e-docker.sh
+      # The report carries the diff images and traces of any failure — the only
+      # way to judge a screenshot mismatch, and the input for updating a baseline.
+      - name: Upload the Playwright report
+        if: failure()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: playwright-report
+          path: qnop-ui/playwright-report
+          retention-days: 14
       - name: Dump container logs on failure
         if: failure()
         run: docker compose -f docker-compose.smoke.yml logs --no-color
@@ -131,13 +170,13 @@ jobs:
       - uses: actions/setup-java@b6effb05e454b25005698d916606bdc6ffcbf961 # v5
         with:
           distribution: temurin
-          java-version: '21'
+          java-version: "21"
       - uses: pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86 # v6
         with:
           package_json_file: qnop-ui/package.json
       - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
         with:
-          node-version: '24'
+          node-version: "24"
           cache: pnpm
           cache-dependency-path: qnop-ui/pnpm-lock.yaml
       - uses: gradle/actions/setup-gradle@9c971963bec38e04b3d30dcc455b5382be2fdbfb # v6
