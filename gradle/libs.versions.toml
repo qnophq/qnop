@@ -30,15 +30,21 @@ springBoot = "4.1.1"
 # (com.fasterxml.jackson) — the generated models only carry annotations.
 openapiGenerator = "7.24.0"
 jacksonAnnotations = "2.22"
-# Two pins ahead of the Spring Boot 4.1.0 BOM, both for published advisories
-# (issue #668). Remove them when a Boot release carries these versions or newer;
-# Renovate will offer the bump and the constraint below keeps it honest.
-# - pgjdbc 42.7.12 fixes CVE-2026-54291: with channelBinding=require, a
-#   connection could be silently downgraded to SCRAM without channel binding.
-# - Jackson 3.1.5 fixes CVE-2026-59889: @JsonView was not applied to
-#   @JsonUnwrapped properties on deserialisation.
+# Pins ahead of the Spring Boot BOM, each for published advisories. Remove one
+# when a Boot release carries that version or newer; Renovate will offer the
+# bump and the version.ref below keeps it honest.
+# - pgjdbc 42.7.12 fixes CVE-2026-54291 (issue #668): with channelBinding=require,
+#   a connection could be silently downgraded to SCRAM without channel binding.
+# - Jackson 3.1.5 fixes CVE-2026-59889 (issue #668): @JsonView was not applied
+#   to @JsonUnwrapped properties on deserialisation.
+# - Tomcat 11.0.25 fixes CVE-2026-65182, CVE-2026-65905 and CVE-2026-68525
+#   (issue #817): three authentication/authorization bypasses in the embedded
+#   container (security-constraint bypass, DIGEST replay, FORM login bypass).
+#   Boot 4.1.1 manages 11.0.24; qnop-app constrains all three tomcat-embed
+#   artifacts so core, el and websocket move together.
 postgresql = "42.7.13"
 jackson3 = "3.2.2"
+tomcat = "11.0.25"
 swaggerAnnotations = "2.2.54"
 jakartaValidation = "3.1.1"
 jakartaAnnotation = "3.0.0"
@@ -87,6 +93,12 @@ spring-boot-dependencies = { group = "org.springframework.boot", name = "spring-
 # autocomplete and the effective-configuration page's per-property tooltips (issue #522).
 spring-boot-configuration-processor = { module = "org.springframework.boot:spring-boot-configuration-processor" }
 spring-boot-starter-web = { module = "org.springframework.boot:spring-boot-starter-web" }
+# Embedded Tomcat, pinned ahead of the BOM (the `tomcat` version above says why).
+# Never declared as dependencies — spring-boot-starter-web brings them — but
+# qnop-app uses these coordinates as constraints so the pin lifts the BOM's version.
+tomcat-embed-core = { module = "org.apache.tomcat.embed:tomcat-embed-core", version.ref = "tomcat" }
+tomcat-embed-el = { module = "org.apache.tomcat.embed:tomcat-embed-el", version.ref = "tomcat" }
+tomcat-embed-websocket = { module = "org.apache.tomcat.embed:tomcat-embed-websocket", version.ref = "tomcat" }
 spring-boot-starter-actuator = { module = "org.springframework.boot:spring-boot-starter-actuator" }
 # Prometheus scrape registry for Actuator metrics (issue #348, ADR-0013). Version via the BOM;
 # auto-configured at runtime, so it is a runtime-only dependency (no compile-time symbols).
