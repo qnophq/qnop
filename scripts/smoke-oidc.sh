@@ -42,13 +42,15 @@ fail() {
 # response carried none — deliberately not a pipeline failure, so the caller's
 # `case` reports *what* came back instead of `set -e` killing the run silently.
 location() {
-  { grep -i '^location:' "$1" || true; } | tr -d '\r' | sed -E 's/^[Ll]ocation:[[:space:]]*//'
+  { grep -i '^location:' "$1" || true; } | tr -d '\r' | sed -E 's/^[^:]*:[[:space:]]*//'
 }
 # Cookie header value assembled from every Set-Cookie of a saved response
-# ("name=value; name=value"), attributes stripped.
+# ("name=value; name=value"), attributes stripped. Deletion cookies (an empty
+# value, i.e. `name=; Max-Age=0`) are left out rather than sent back as `name=`.
 cookies_of() {
   { grep -i '^set-cookie:' "$1" || true; } | tr -d '\r' |
-    sed -E 's/^[Ss]et-[Cc]ookie:[[:space:]]*//; s/;.*$//' | paste -sd ';' - | sed 's/;/; /g'
+    sed -E 's/^[^:]*:[[:space:]]*//; s/;.*$//' | { grep -vE '^[^=]*=$' || true; } |
+    paste -sd ';' - | sed 's/;/; /g'
 }
 
 wait_for() {
@@ -110,12 +112,12 @@ log "authorization request initiated"
 # 5) Fetch the Keycloak login page and extract the form POST action.
 #    Keycloak binds the pending login to cookies it sets on this response
 #    (AUTH_SESSION_ID, KC_RESTART) and expects them back on the credential POST.
-#    They travel explicitly, not via the cookie jar: curl 8.22.0 refuses to save
-#    or load jar cookies whose host is a public suffix, and under the PSL
-#    wildcard rule a single-label hostname such as `keycloak` is one — the
-#    round-trip silently dropped them and Keycloak answered the POST with
-#    LOGIN_ERROR cookie_not_found (issue #817). The jar stays in use for the
-#    app hops on localhost, which curl special-cases.
+#    They travel explicitly, not via the cookie jar: curl 8.22.0 still writes
+#    them to the jar but refuses to load jar cookies whose host is a public
+#    suffix, and under the PSL wildcard rule a single-label hostname such as
+#    `keycloak` is one — the round-trip silently dropped them and Keycloak
+#    answered the POST with LOGIN_ERROR cookie_not_found (issue #817). The jar
+#    stays in use for the app hops on localhost, which curl special-cases.
 curl -s -o "${TMP}/login.html" -D "${TMP}/b" "$auth_url"
 kc_cookies="$(cookies_of "${TMP}/b")"
 [ -n "$kc_cookies" ] || fail "Keycloak set no cookies on the login page"
