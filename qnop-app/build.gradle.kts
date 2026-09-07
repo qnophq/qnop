@@ -103,6 +103,16 @@ dependencies {
     implementation(project(":qnop-api:qnop-api-endpoint")) // generated Spring interfaces (+ DTOs transitively)
 
     implementation(libs.spring.boot.starter.web)
+    // Embedded Tomcat ahead of the Boot BOM (issue #817; the `tomcat` pin in the
+    // version catalog names the advisories). Constraints, not dependencies: the
+    // starter still decides *that* Tomcat is on the classpath, this only lifts the
+    // version — Gradle resolves the higher of the BOM's and this one — and all
+    // three tomcat-embed artifacts move together. Drop when Boot catches up.
+    constraints {
+        implementation(libs.tomcat.embed.core)
+        implementation(libs.tomcat.embed.el)
+        implementation(libs.tomcat.embed.websocket)
+    }
     implementation(libs.spring.boot.starter.actuator)
     // Prometheus scrape registry for the /actuator/prometheus endpoint (issue #348). Runtime-only:
     // Boot auto-configures it; the metrics/health code uses micrometer-core (via actuator) directly.
