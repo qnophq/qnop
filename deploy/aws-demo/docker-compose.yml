@@ -80,7 +80,7 @@ services:
     restart: unless-stopped
 
   minio:
-    image: minio/minio:latest@sha256:14cea493d9a34af32f524e538b8346cf79f3321eff8e708c1e2960462bd8936e
+    image: quay.io/minio/minio:latest@sha256:14cea493d9a34af32f524e538b8346cf79f3321eff8e708c1e2960462bd8936e
     command: server /data
     environment:
       MINIO_ROOT_USER: ${QNOP_S3_ACCESS_KEY:?set a real object-storage access key}
@@ -97,7 +97,7 @@ services:
   # One-shot MinIO client used by reset-demo.sh / build-golden-state.sh:
   #   docker compose --profile tools run --rm mc <command…>
   mc:
-    image: minio/mc:latest@sha256:a7fe349ef4bd8521fb8497f55c6042871b2ae640607cf99d9bede5e9bdf11727
+    image: quay.io/minio/mc:latest@sha256:a7fe349ef4bd8521fb8497f55c6042871b2ae640607cf99d9bede5e9bdf11727
     profiles: ['tools']
     entrypoint: ['/bin/sh', '-c']
     environment:
