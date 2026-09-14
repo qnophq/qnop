@@ -54,12 +54,11 @@ public abstract class AbstractIntegrationTest {
   static final PostgreSQLContainer<?> postgres =
       new PostgreSQLContainer<>("postgres:18").withCommand("postgres", "-c", "max_connections=300");
 
-  // MinIO for the object-storage adapter (ADR-0005). No @ServiceConnection: the qnop.s3.* props are
-  // wired manually below. Digest-pinned to match docker-compose.yml, and pulled from quay.io
-  // because
-  // the Docker Hub `minio/minio` repository was removed upstream (issue #825). The registry prefix
-  // is
-  // why asCompatibleSubstituteFor is required: MinIOContainer only accepts the bare `minio/minio`.
+  // MinIO for the object-storage adapter (ADR-0005). No @ServiceConnection: the qnop.s3.* props
+  // are wired manually below. Digest-pinned to match docker-compose.yml, and pulled from quay.io
+  // because the Docker Hub `minio/minio` repository was removed upstream (issue #825). That
+  // registry prefix is also why asCompatibleSubstituteFor is required below: MinIOContainer
+  // accepts only the bare `minio/minio`.
   static final MinIOContainer minio =
       new MinIOContainer(
           DockerImageName.parse(
