@@ -37,7 +37,7 @@
     "axios": "1.20.0",
     "date-fns": "4.4.0",
     "emoji-mart": "5.6.0",
-    "lucide-react": "1.45.0",
+    "lucide-react": "1.46.0",
     "pdfjs-dist": "6.3.289",
     "react": "19.2.8",
     "react-dom": "19.2.8",
