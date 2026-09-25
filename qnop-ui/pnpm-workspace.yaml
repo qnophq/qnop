@@ -21,7 +21,7 @@ allowBuilds:
 # through @openapitools/openapi-generator-cli's proxy chain, which runs when the
 # typed client is regenerated and never ships.
 overrides:
-  'brace-expansion@<5.0.8': 5.0.9
+  'brace-expansion@<5.0.8': 5.0.12
   'shell-quote@<=1.8.4': 1.10.0
-  'ip-address@<10.3.1': 10.7.0
+  'ip-address@<10.3.1': 10.7.2
   'undici@<7.29.0': 7.29.1
