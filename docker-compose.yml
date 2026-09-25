@@ -9,7 +9,7 @@
 
 services:
   postgres:
-    image: postgres:18@sha256:4ef4dbc939d61acea57712655ddb4b4ab27419c913f94cca0cd57cb3ea3c2280
+    image: postgres:18@sha256:5a5a84b19854a9ffaa54082c166ff4ec27473a361e496e5ea167f298f2da9722
     environment:
       POSTGRES_USER: ${QNOP_DB_USERNAME:-qnop}
       POSTGRES_PASSWORD: ${QNOP_DB_PASSWORD:-qnop}
@@ -106,7 +106,7 @@ services:
   # Then use "Send test" there and read the message at http://localhost:8025.
   # Bound to loopback only — this dev sink must never be reachable off-host.
   mailpit:
-    image: axllent/mailpit:latest@sha256:c96991d9bef73594c246d89ca81411d4e916f03e76a7d2d72fa2ab5dd3c9ce24
+    image: axllent/mailpit:latest@sha256:74d609a42ec279aa63c6b4622a6fa9b5408d1ad5b1d76a1c4be40a265ce0863d
     profiles: ['mail']
     environment:
       # Allow unauthenticated/plaintext SMTP from the local app — dev only.
