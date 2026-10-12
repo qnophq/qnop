@@ -175,6 +175,25 @@ class ValueValidatorTest {
   }
 
   @Test
+  void enforcesLanguageFormat() {
+    // Format, not a closed list: mail templates may exist for more locales than the UI ships
+    // (issue #464). Blank stays valid — it means "no preference" / "follow the browser".
+    for (String valid : new String[] {"en", "de", "fr", ""}) {
+      assertDoesNotThrow(
+          () -> ValueValidator.validate(ApplicationSettingKey.GENERAL_DEFAULT_LANGUAGE, valid));
+      assertDoesNotThrow(() -> ValueValidator.validate(UserSettingKey.PREFERRED_LANGUAGE, valid));
+    }
+    for (String invalid : new String[] {"EN", "de-DE", "deu", "german", "e"}) {
+      assertThrows(
+          SettingValidationException.class,
+          () -> ValueValidator.validate(ApplicationSettingKey.GENERAL_DEFAULT_LANGUAGE, invalid));
+      assertThrows(
+          SettingValidationException.class,
+          () -> ValueValidator.validate(UserSettingKey.PREFERRED_LANGUAGE, invalid));
+    }
+  }
+
+  @Test
   void enforcesTimezoneFormatForPerUserSetting() {
     assertDoesNotThrow(() -> ValueValidator.validate(UserSettingKey.TIMEZONE, "UTC"));
     assertDoesNotThrow(() -> ValueValidator.validate(UserSettingKey.TIMEZONE, "Europe/Berlin"));

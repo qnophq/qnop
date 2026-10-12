@@ -33,9 +33,11 @@ import '@fontsource/outfit/700.css';
 import '@fontsource/jetbrains-mono/400.css';
 import '@fontsource/jetbrains-mono/500.css';
 import './index.css';
+import './i18n';
 import { queryClient } from './api/queryClient';
 import { AuthHydrationBoundary } from './components/auth/AuthHydrationBoundary';
 import { FaviconManager } from './components/branding/FaviconManager';
+import { LanguageSync } from './components/LanguageSync';
 import { TimezoneSync } from './components/TimezoneSync';
 import { router } from './router';
 import { buildTheme } from './theme/theme';
@@ -43,9 +45,11 @@ import { useUiStore } from './stores/uiStore';
 
 function Root() {
   const themeMode = useUiStore((s) => s.themeMode);
-  // Rebuild the MUI theme only when the mode changes, not on every Root re-render — a fresh theme
-  // identity would otherwise cascade a re-render through every themed component (issue #170).
-  const theme = useMemo(() => buildTheme(themeMode), [themeMode]);
+  const locale = useUiStore((s) => s.locale);
+  // Rebuild the MUI theme only when the mode or language changes, not on every Root re-render — a
+  // fresh theme identity would otherwise cascade a re-render through every themed component
+  // (issue #170).
+  const theme = useMemo(() => buildTheme(themeMode, locale), [themeMode, locale]);
 
   return (
     <QueryClientProvider client={queryClient}>
@@ -53,6 +57,7 @@ function Root() {
         <CssBaseline />
         <FaviconManager />
         <TimezoneSync />
+        <LanguageSync />
         <AuthHydrationBoundary>
           <RouterProvider router={router} />
         </AuthHydrationBoundary>

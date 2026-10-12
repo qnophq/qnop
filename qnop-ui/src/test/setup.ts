@@ -23,6 +23,9 @@ import '@testing-library/jest-dom/vitest';
 import { afterEach, expect, vi } from 'vitest';
 import { cleanup } from '@testing-library/react';
 import * as axeMatchers from 'vitest-axe/matchers';
+// Initialise i18next with the bundled English catalog (issue #464), as main.tsx does, so every
+// component under test renders real strings rather than raw keys.
+import '../i18n';
 
 // Registers the `toHaveNoViolations` matcher for the form accessibility checks (issue #352).
 expect.extend(axeMatchers);

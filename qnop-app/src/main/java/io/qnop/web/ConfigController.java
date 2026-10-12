@@ -121,7 +121,9 @@ public class ConfigController implements ServerConfigApi {
                 new ServerConfigGeneral()
                     .siteName("qnop")
                     .defaultTimezone(
-                        settings.getString(ApplicationSettingKey.GENERAL_DEFAULT_TIMEZONE)))
+                        settings.getString(ApplicationSettingKey.GENERAL_DEFAULT_TIMEZONE))
+                    .defaultLanguage(
+                        settings.getString(ApplicationSettingKey.GENERAL_DEFAULT_LANGUAGE)))
             .auth(
                 new ServerConfigAuth()
                     .oidcProviders(enabledOidcProviders())

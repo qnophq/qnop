@@ -57,8 +57,7 @@ import {
 import { UserAvatar } from '../components/shell/UserAvatar';
 import { ErrorState } from './errors/ErrorState';
 import { NotFoundIllustration } from './errors/illustrations';
-
-const SINCE_FORMAT = new Intl.DateTimeFormat('en-US', { month: 'long', year: 'numeric' });
+import { useFormatters } from '../hooks/useFormatters';
 
 const STAT_TILES: { key: keyof PublicUserProfile['stats']; label: string; icon: LucideIcon }[] = [
   { key: 'reviewsOwned', label: 'Reviews owned', icon: FileText },
@@ -89,6 +88,7 @@ const UUID_SHAPE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12
  * to the pretty slug URL once the profile is known.
  */
 export function UserProfilePage() {
+  const { formatMonthYear } = useFormatters();
   const theme = useTheme();
   const { userId: segment = '' } = useParams<{ userId: string }>();
   const isId = UUID_SHAPE.test(segment);
@@ -212,7 +212,7 @@ export function UserProfilePage() {
               >
                 <CalendarDays size={14} aria-hidden />
                 <Typography variant="body2">
-                  Member since {SINCE_FORMAT.format(new Date(profile.createdAt))}
+                  Member since {formatMonthYear(profile.createdAt)}
                 </Typography>
               </Stack>
             </Box>

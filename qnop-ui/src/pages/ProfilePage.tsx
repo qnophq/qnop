@@ -52,6 +52,10 @@ import {
 import { useDisplayTimezone } from '../api/hooks/useDisplayTimezone';
 import { TIMEZONE_SETTING_KEY } from '../utils/timezone';
 import { CADENCE_HELP, CADENCE_OPTIONS, normalizeCadence } from '../utils/reviewMailCadence';
+import { useTranslation } from 'react-i18next';
+import { useExplicitLanguage, useInheritedLanguage } from '../api/hooks/useDisplayLanguage';
+import { LanguageSetting } from '../components/profile/LanguageSetting';
+import { PREFERRED_LANGUAGE_SETTING_KEY } from '../i18n/locales';
 
 type Toast = { message: string; severity: 'success' | 'error' } | null;
 
@@ -84,6 +88,7 @@ export function ProfilePage() {
   // so the control shows what will actually happen rather than a guess (#680).
   const reviewMailsCadence = normalizeCadence(reviewMailsSetting?.value);
 
+  const { t } = useTranslation();
   // The zone actually applied (own preference → workspace default → UTC); an empty stored
   // value means the user has made no explicit choice yet (issue #465).
   const displayZone = useDisplayTimezone();
@@ -138,6 +143,18 @@ export function ProfilePage() {
         onError: () =>
           setToast({ message: 'The time zone could not be saved.', severity: 'error' }),
         onSuccess: () => setToast({ message: 'Time zone updated.', severity: 'success' }),
+      },
+    );
+  };
+
+  const explicitLanguage = useExplicitLanguage();
+  const inheritedLanguage = useInheritedLanguage();
+  const onChangeLanguage = (language: string) => {
+    updateSettings.mutate(
+      { [PREFERRED_LANGUAGE_SETTING_KEY]: language },
+      {
+        onError: () => setToast({ message: t('language.saveFailed'), severity: 'error' }),
+        onSuccess: () => setToast({ message: t('language.updated'), severity: 'success' }),
       },
     );
   };
@@ -334,6 +351,13 @@ export function ProfilePage() {
           />
         </Paper>
       )}
+
+      <LanguageSetting
+        explicit={explicitLanguage}
+        inherited={inheritedLanguage}
+        saving={updateSettings.isPending}
+        onChange={onChangeLanguage}
+      />
 
       <TimezoneSetting
         value={displayZone}

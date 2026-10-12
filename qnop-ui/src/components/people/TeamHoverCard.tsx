@@ -32,11 +32,10 @@ import { CalendarDays, Users } from 'lucide-react';
 import { useTeamProfile } from '../../api/hooks/useTeamProfile';
 import { TeamAvatar } from '../shell/TeamAvatar';
 import { HoverCardShell } from './UserHoverCard';
+import { useFormatters } from '../../hooks/useFormatters';
 
 const CARD_WIDTH = 296;
 const CREST_SIZE = 44;
-
-const SINCE_FORMAT = new Intl.DateTimeFormat('en-US', { month: 'long', year: 'numeric' });
 
 interface TeamHoverCardProps {
   /**
@@ -100,6 +99,7 @@ function TeamHoverCardPopover({
   anchorEl: HTMLElement;
   open: boolean;
 }) {
+  const { formatMonthYear } = useFormatters();
   const theme = useTheme();
   // Mounting IS the hover: the cache warms during the intent delay.
   const profileQuery = useTeamProfile(teamId);
@@ -168,7 +168,7 @@ function TeamHoverCardPopover({
                   >
                     <CalendarDays size={11} aria-hidden />
                     <Typography variant="caption" noWrap>
-                      Team since {SINCE_FORMAT.format(new Date(profile.createdAt))}
+                      Team since {formatMonthYear(profile.createdAt)}
                     </Typography>
                   </Stack>
                 </Box>

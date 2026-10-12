@@ -49,8 +49,15 @@ class UserSettingKeyTest {
   }
 
   @Test
-  void freeTextKeysAcceptAnyString() {
+  void formattedStringKeysAcceptWellFormedValues() {
     assertDoesNotThrow(() -> ValueValidator.validate(UserSettingKey.PREFERRED_LANGUAGE, "de"));
     assertDoesNotThrow(() -> ValueValidator.validate(UserSettingKey.TIMEZONE, "Europe/Berlin"));
+  }
+
+  @Test
+  void preferenceKeysDefaultToEmptySoTheFrontendCanFallBack() {
+    // An unset preference must differ from an explicit choice (issue #464, #465).
+    assertEquals("", UserSettingKey.PREFERRED_LANGUAGE.getDefaultValue());
+    assertEquals("", UserSettingKey.TIMEZONE.getDefaultValue());
   }
 }

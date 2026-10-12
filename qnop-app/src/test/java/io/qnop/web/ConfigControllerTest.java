@@ -98,6 +98,7 @@ class ConfigControllerTest {
         .thenReturn(false);
     when(settings.getString(ApplicationSettingKey.GENERAL_DEFAULT_TIMEZONE))
         .thenReturn("Europe/Berlin");
+    when(settings.getString(ApplicationSettingKey.GENERAL_DEFAULT_LANGUAGE)).thenReturn("de");
     // The two formats that need nothing installed; PDF depends on an office
     // converter this deployment may not have (issue #639).
     when(exports.availableFormats())
@@ -121,6 +122,8 @@ class ConfigControllerTest {
         .andExpect(jsonPath("$.version").exists())
         .andExpect(jsonPath("$.general.siteName").value("qnop"))
         .andExpect(jsonPath("$.general.defaultTimezone").value("Europe/Berlin"))
+        // The pre-login pages and the no-preference fallback need it (issue #464).
+        .andExpect(jsonPath("$.general.defaultLanguage").value("de"))
         .andExpect(jsonPath("$.auth.selfRegistrationEnabled").value(false))
         // The login page needs this to decide whether "Forgot password?" leads
         // anywhere (issue #713).

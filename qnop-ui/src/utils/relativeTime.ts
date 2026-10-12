@@ -19,35 +19,31 @@
  * SPDX-License-Identifier: AGPL-3.0-only
  */
 
+import i18n from '../i18n';
+import { FALLBACK_LOCALE, intlLocale, type AppLocale } from '../i18n/locales';
 import { FALLBACK_TIME_ZONE } from './timezone';
 
 const MINUTE = 60_000;
 const HOUR = 60 * MINUTE;
 const DAY = 24 * HOUR;
 
-// Built once per resolved zone and reused (see formatDate.ts for the rationale).
+// Built once per (locale, zone) and reused (see formatDate.ts for the rationale).
 const monthDayCache = new Map<string, Intl.DateTimeFormat>();
 const monthDayYearCache = new Map<string, Intl.DateTimeFormat>();
 
-function monthDayFmt(timeZone: string): Intl.DateTimeFormat {
-  let fmt = monthDayCache.get(timeZone);
+function monthDayFmt(timeZone: string, locale: AppLocale, withYear: boolean): Intl.DateTimeFormat {
+  const cache = withYear ? monthDayYearCache : monthDayCache;
+  const key = `${locale}|${timeZone}`;
+  let fmt = cache.get(key);
   if (!fmt) {
-    fmt = new Intl.DateTimeFormat('en', { month: 'short', day: 'numeric', timeZone });
-    monthDayCache.set(timeZone, fmt);
-  }
-  return fmt;
-}
-
-function monthDayYearFmt(timeZone: string): Intl.DateTimeFormat {
-  let fmt = monthDayYearCache.get(timeZone);
-  if (!fmt) {
-    fmt = new Intl.DateTimeFormat('en', {
+    // English keeps its month-first "Jul 5" here (the feed style), so it formats with plain `en`.
+    fmt = new Intl.DateTimeFormat(locale === 'en' ? 'en' : intlLocale(locale), {
       month: 'short',
       day: 'numeric',
-      year: 'numeric',
+      ...(withYear ? { year: 'numeric' } : {}),
       timeZone,
     });
-    monthDayYearCache.set(timeZone, fmt);
+    cache.set(key, fmt);
   }
   return fmt;
 }
@@ -56,20 +52,22 @@ function monthDayYearFmt(timeZone: string): Intl.DateTimeFormat {
  * The compact relative timestamp of social feeds (issue #403): "now", "5m",
  * "3h", "6d", then the calendar date ("Jul 5", with the year once it
  * differs). Callers put the full timestamp in a tooltip for precision. The
- * calendar-date fallback renders in {@code timeZone} (ADR-0041; default UTC).
+ * calendar-date fallback renders in {@code timeZone} (ADR-0041; default UTC)
+ * and every part in {@code locale} (issue #464; default English).
  */
 export function shortRelativeTime(
   iso: string,
   now: Date = new Date(),
   timeZone: string = FALLBACK_TIME_ZONE,
+  locale: AppLocale = FALLBACK_LOCALE,
 ): string {
   const then = new Date(iso);
   const diff = now.getTime() - then.getTime();
-  if (diff < MINUTE) return 'now';
-  if (diff < HOUR) return `${Math.floor(diff / MINUTE)}m`;
-  if (diff < DAY) return `${Math.floor(diff / HOUR)}h`;
-  if (diff < 7 * DAY) return `${Math.floor(diff / DAY)}d`;
-  return then.getFullYear() === now.getFullYear()
-    ? monthDayFmt(timeZone).format(then)
-    : monthDayYearFmt(timeZone).format(then);
+  const lng = locale;
+  if (diff < MINUTE) return i18n.t('time.compact.now', { lng });
+  if (diff < HOUR) return i18n.t('time.compact.minutes', { lng, count: Math.floor(diff / MINUTE) });
+  if (diff < DAY) return i18n.t('time.compact.hours', { lng, count: Math.floor(diff / HOUR) });
+  if (diff < 7 * DAY) return i18n.t('time.compact.days', { lng, count: Math.floor(diff / DAY) });
+  const withYear = then.getFullYear() !== now.getFullYear();
+  return monthDayFmt(timeZone, locale, withYear).format(then);
 }

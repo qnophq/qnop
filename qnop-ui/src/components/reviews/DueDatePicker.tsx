@@ -23,6 +23,12 @@ import { AdapterDateFns } from '@mui/x-date-pickers/AdapterDateFns';
 import { DatePicker } from '@mui/x-date-pickers/DatePicker';
 import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
 import { endOfDay } from 'date-fns';
+import { de, enGB } from 'date-fns/locale';
+import type { AppLocale } from '../../i18n/locales';
+import { useUiStore } from '../../stores/uiStore';
+
+/** date-fns locales for the picker's month names and field format (issue #464). */
+const DATE_FNS_LOCALES = { en: enGB, de } satisfies Record<AppLocale, unknown>;
 
 interface DueDatePickerProps {
   /** The current due date as an ISO instant, or null when none is set. */
@@ -49,11 +55,12 @@ export function DueDatePicker({
   label = 'Due date',
   disabled,
 }: DueDatePickerProps) {
+  const locale = useUiStore((s) => s.locale);
   const parsed = value ? new Date(value) : null;
   const current = parsed && !Number.isNaN(parsed.getTime()) ? parsed : null;
 
   return (
-    <LocalizationProvider dateAdapter={AdapterDateFns}>
+    <LocalizationProvider dateAdapter={AdapterDateFns} adapterLocale={DATE_FNS_LOCALES[locale]}>
       <DatePicker
         label={label}
         value={current}

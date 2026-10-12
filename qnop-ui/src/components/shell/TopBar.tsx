@@ -33,6 +33,7 @@ import { touchTargetSx } from '../../theme/touchTarget';
 import { NotificationsPopover } from './NotificationsPopover';
 import { Breadcrumbs } from './Breadcrumbs';
 import { GlobalSearch } from './search/GlobalSearch';
+import { AccountLanguageSwitcher } from '../i18n/LanguageSwitcher';
 
 interface TopBarProps {
   isMobile: boolean;
@@ -81,6 +82,8 @@ export function TopBar({ isMobile, onToggleSidebar }: TopBarProps) {
 
         {/* The real global search (issue #540), replacing the #514 trigger. */}
         <GlobalSearch />
+
+        <AccountLanguageSwitcher />
 
         <Tooltip title={themeMode === 'dark' ? 'Light mode' : 'Dark mode'}>
           <IconButton
