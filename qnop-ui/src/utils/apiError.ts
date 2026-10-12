@@ -21,8 +21,7 @@
 
 import { isAxiosError } from 'axios';
 import type { ErrorResponse } from '../api/generated';
-
-const RATE_LIMITED = 'Too many attempts. Please try again later.';
+import i18n from '../i18n';
 
 /**
  * Maps an API/network error to a concise, user-facing message. Rate limits (429)
@@ -30,19 +29,21 @@ const RATE_LIMITED = 'Too many attempts. Please try again later.';
  * (`VALIDATION_ERROR`, e.g. the password policy) surfaces the caller's
  * context-specific fallback, while any other 400 — a consumed or expired
  * token/link in the reset flow — gets the link-expired text. Everything else
- * falls back to the caller's default. Never surfaces server internals.
+ * falls back to the caller's default. Never surfaces server internals. Its own two
+ * texts come from the `common` catalog, resolved per call so they follow the active
+ * language (ADR-0063).
  */
 export function apiErrorMessage(error: unknown, fallback: string): string {
   if (isAxiosError(error)) {
     const status = error.response?.status;
-    if (status === 429) return RATE_LIMITED;
+    if (status === 429) return i18n.t('errors.rateLimited');
     if (status === 400) {
       if (apiErrorCode(error) === 'VALIDATION_ERROR') return fallback;
-      return 'The request is invalid or the link has expired.';
+      return i18n.t('errors.invalidOrExpiredLink');
     }
   }
   if (error instanceof Error && error.message === 'RATE_LIMITED') {
-    return RATE_LIMITED;
+    return i18n.t('errors.rateLimited');
   }
   return fallback;
 }

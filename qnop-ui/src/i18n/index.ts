@@ -23,6 +23,7 @@ import i18n from 'i18next';
 import { initReactI18next } from 'react-i18next';
 import enAuth from './en/auth.json';
 import enCommon from './en/common.json';
+import enNotifications from './en/notifications.json';
 import enProfile from './en/profile.json';
 import enShell from './en/shell.json';
 import { FALLBACK_LOCALE, type AppLocale } from './locales';
@@ -35,7 +36,13 @@ export const DEFAULT_NAMESPACE = 'common';
  * initial bundle does not grow with each language added.
  */
 export const bundledResources = {
-  en: { common: enCommon, auth: enAuth, shell: enShell, profile: enProfile },
+  en: {
+    common: enCommon,
+    auth: enAuth,
+    shell: enShell,
+    profile: enProfile,
+    notifications: enNotifications,
+  },
 } as const;
 
 /** Every catalog namespace; each `src/i18n/<locale>/` folder holds one JSON file per entry. */

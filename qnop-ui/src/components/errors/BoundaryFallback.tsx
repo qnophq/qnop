@@ -25,11 +25,12 @@ import Paper from '@mui/material/Paper';
 import Stack from '@mui/material/Stack';
 import Typography from '@mui/material/Typography';
 import { RotateCcw, TriangleAlert } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 
 interface BoundaryFallbackProps {
   /** Retry callback from the enclosing {@link ErrorBoundary}. */
   onRetry: () => void;
-  /** Short label for what failed, e.g. "The document viewer". */
+  /** Short label for what failed, e.g. "The document viewer"; defaults to a generic one. */
   title?: string;
   /** Compact variant for a small pane (viewer/panel); default is roomier. */
   dense?: boolean;
@@ -40,11 +41,8 @@ interface BoundaryFallbackProps {
  * in-brand "something went wrong" card with a retry, sized to the pane it
  * replaces rather than taking over the page.
  */
-export function BoundaryFallback({
-  onRetry,
-  title = 'Something went wrong',
-  dense = false,
-}: BoundaryFallbackProps) {
+export function BoundaryFallback({ onRetry, title, dense = false }: BoundaryFallbackProps) {
+  const { t } = useTranslation();
   return (
     <Paper
       variant="outlined"
@@ -63,11 +61,10 @@ export function BoundaryFallback({
           <TriangleAlert size={dense ? 24 : 32} aria-hidden />
         </Box>
         <Typography variant={dense ? 'subtitle2' : 'h6'} component="p">
-          {title}
+          {title ?? t('boundary.title')}
         </Typography>
         <Typography variant="body2" color="text.secondary">
-          This part of the page ran into an unexpected error. You can try again, or reload the page
-          if it keeps happening.
+          {t('boundary.message')}
         </Typography>
         <Button
           size="small"
@@ -76,7 +73,7 @@ export function BoundaryFallback({
           onClick={onRetry}
           sx={{ mt: 0.5 }}
         >
-          Try again
+          {t('actions.tryAgain')}
         </Button>
       </Stack>
     </Paper>

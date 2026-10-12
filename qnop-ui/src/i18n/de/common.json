@@ -25,5 +25,76 @@
       "on": "fällig am {{date}}",
       "wasDueOn": "war fällig am {{date}}"
     }
+  },
+  "loading": "Wird geladen…",
+  "actions": {
+    "tryAgain": "Erneut versuchen",
+    "retry": "Wiederholen",
+    "backToDashboard": "Zurück zum Dashboard"
+  },
+  "boundary": {
+    "title": "Etwas ist schiefgelaufen",
+    "message": "In diesem Teil der Seite ist ein unerwarteter Fehler aufgetreten. Du kannst es erneut versuchen oder die Seite neu laden, falls es wieder passiert."
+  },
+  "errors": {
+    "rateLimited": "Zu viele Versuche. Bitte versuch es später erneut.",
+    "invalidOrExpiredLink": "Die Anfrage ist ungültig oder der Link ist abgelaufen.",
+    "notFound": {
+      "title": "Diese Seite hat sich zum Papierflieger gefaltet",
+      "message": "Wo auch immer sie gelandet ist — unter dieser Adresse ist sie nicht. Geh zurück zum Dashboard und setz deine Quest dort fort.",
+      "myReviews": "Meine Reviews"
+    },
+    "forbidden": {
+      "title": "Dieser Ordner ist verschlossen",
+      "message": "Dein Konto hat keinen Zugriff auf diesen Bereich. Falls deine Quest hier entlangführt, kann dir ein Administrator den Schlüssel geben."
+    },
+    "featureUnavailable": {
+      "title": "Nicht Teil dieser Installation",
+      "message": "Diese qnop-Installation bietet diese Funktion nicht an. An deinem Konto liegt das nicht — wer diese Installation betreibt, entscheidet darüber und kann sie wieder einschalten."
+    },
+    "conflict": {
+      "title": "Zwei Pins auf derselben Zeile",
+      "message": "Jemand hat das geändert, während du auf dem Weg dorthin warst. Lade neu, um den aktuellen Stand zu sehen — von dir ist nichts verloren gegangen.",
+      "reload": "Seite neu laden"
+    },
+    "serverError": {
+      "title": "Unser Aktenvernichter hat das falsche Dokument erwischt",
+      "message": "Bei uns ist etwas kaputtgegangen — nicht deine Schuld. Ein neuer Versuch klappt meistens; wenn es immer wieder passiert, will dein Admin davon wissen."
+    },
+    "maintenance": {
+      "title": "Kurz in der Mittagspause — gleich zurück",
+      "message": "qnop flickt sich gerade selbst. Deine Reviews liegen sicher im Aktenschrank; gib uns einen Moment und versuch es dann noch einmal."
+    },
+    "rateLimit": {
+      "title": "Langsam, Stempel-Champion",
+      "message": "Das waren sehr viele Anfragen in sehr kurzer Zeit. Atme kurz durch — gleich funktioniert wieder alles."
+    },
+    "offline": {
+      "title": "Die Schnur zwischen unseren Pappbechern ist gerissen",
+      "message": "Du scheinst offline zu sein. Nichts ist verloren — sobald die Verbindung wieder steht, geht alles dort weiter, wo es aufgehört hat.",
+      "retry": "Verbindung erneut versuchen"
+    }
+  },
+  "search": {
+    "clear": "Suche leeren"
+  },
+  "timezone": {
+    "label": "Zeitzone",
+    "placeholder": "Stadt oder Region suchen…"
+  },
+  "quota": {
+    "ceilingNote": "Diese Obergrenze wird dort festgelegt, wo diese Installation konfiguriert ist — nicht in den Admin-Einstellungen."
+  },
+  "banner": {
+    "dismiss": "Hinweis ausblenden"
+  },
+  "attachments": {
+    "title": "Review-Anhang",
+    "saved": "Gespeichert",
+    "description": "Diese Datei wurde an eine Anmerkung angehängt. Lade sie auf dein Gerät herunter.",
+    "unavailable": "Diese Datei ist nicht verfügbar. Sie wurde vielleicht gelöscht, oder das Review ist nicht mit dir geteilt.",
+    "download": "Herunterladen",
+    "downloadAgain": "Erneut herunterladen",
+    "openReview": "Review öffnen"
   }
 }

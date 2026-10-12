@@ -19,6 +19,7 @@
  * SPDX-License-Identifier: AGPL-3.0-only
  */
 
+import { useTranslation } from 'react-i18next';
 import { ErrorState } from './ErrorState';
 import { MaintenanceIllustration } from './illustrations';
 
@@ -33,13 +34,14 @@ import { MaintenanceIllustration } from './illustrations';
  * again tomorrow.
  */
 export function FeatureUnavailablePage() {
+  const { t } = useTranslation();
   return (
     <ErrorState
       code="403"
-      title="Not part of this deployment"
-      message="This qnop installation doesn't offer this feature. Nothing about your account changes that — whoever operates this deployment decides, and can turn it back on."
+      title={t('errors.featureUnavailable.title')}
+      message={t('errors.featureUnavailable.message')}
       illustration={<MaintenanceIllustration />}
-      primaryAction={{ label: 'Back to dashboard', to: '/' }}
+      primaryAction={{ label: t('actions.backToDashboard'), to: '/' }}
     />
   );
 }

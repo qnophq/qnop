@@ -20,13 +20,15 @@
  */
 
 import { Suspense, type ReactNode } from 'react';
+import { useTranslation } from 'react-i18next';
 import { BoundaryFallback } from './BoundaryFallback';
 import { ErrorBoundary } from './ErrorBoundary';
 
 // Plain inline styling so the placeholder needs no theme while a chunk loads.
-const loadingFallback = (
-  <div style={{ padding: '8px 4px', fontSize: 14, color: '#5E6C7B' }}>Loading…</div>
-);
+function LoadingFallback() {
+  const { t } = useTranslation();
+  return <div style={{ padding: '8px 4px', fontSize: 14, color: '#5E6C7B' }}>{t('loading')}</div>;
+}
 
 /**
  * Wraps a lazily-loaded route in an {@link ErrorBoundary} above a {@link Suspense}
@@ -37,7 +39,7 @@ const loadingFallback = (
 export function LazyBoundary({ children }: { children: ReactNode }) {
   return (
     <ErrorBoundary fallback={(_error, reset) => <BoundaryFallback onRetry={reset} />}>
-      <Suspense fallback={loadingFallback}>{children}</Suspense>
+      <Suspense fallback={<LoadingFallback />}>{children}</Suspense>
     </ErrorBoundary>
   );
 }

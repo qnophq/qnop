@@ -28,6 +28,7 @@ import Skeleton from '@mui/material/Skeleton';
 import Stack from '@mui/material/Stack';
 import Typography from '@mui/material/Typography';
 import { CheckCheck, MailOpen } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import { useNavigate, useSearchParams } from 'react-router';
 import { useMarkAllNotificationsRead, useNotifications } from '../../api/hooks/useNotifications';
 import { PageHeader } from '../../components/admin/layout/PageHeader';
@@ -52,6 +53,7 @@ function parseFilter(raw: string | null): ReadFilter {
  * URL so a filtered view is shareable and survives a reload.
  */
 export function MessagesPage() {
+  const { t } = useTranslation(['notifications', 'common']);
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const filter = parseFilter(searchParams.get('filter'));
@@ -90,12 +92,12 @@ export function MessagesPage() {
     return (
       <ErrorState
         code="500"
-        title="Your messages didn't make it to the desk"
-        message="The inbox could not be loaded. It is almost certainly the connection, not your notifications — they are safe."
+        title={t('inbox.loadError.title')}
+        message={t('inbox.loadError.message')}
         illustration={<ServerErrorIllustration />}
         tone="alert"
-        primaryAction={{ label: 'Try again', onClick: () => refetch() }}
-        secondaryAction={{ label: 'Back to dashboard', to: '/' }}
+        primaryAction={{ label: t('common:actions.tryAgain'), onClick: () => refetch() }}
+        secondaryAction={{ label: t('common:actions.backToDashboard'), to: '/' }}
       />
     );
   }
@@ -103,8 +105,8 @@ export function MessagesPage() {
   return (
     <Stack spacing={3}>
       <PageHeader
-        title="Messages"
-        description="Everything that happened on your reviews — mentions, replies, decisions and new versions."
+        title={t('inbox.title')}
+        description={t('inbox.description')}
         action={
           unreadTotal > 0 ? (
             <Button
@@ -114,7 +116,7 @@ export function MessagesPage() {
               onClick={() => markAllRead.mutate()}
               disabled={markAllRead.isPending}
             >
-              Mark all read
+              {t('inbox.markAllRead')}
             </Button>
           ) : undefined
         }
@@ -126,7 +128,11 @@ export function MessagesPage() {
         <>
           <Stack direction="row" spacing={1} sx={{ flexWrap: 'wrap', rowGap: 1 }}>
             <Chip
-              label={`All${total > 0 && filter === 'all' ? ` (${total})` : ''}`}
+              label={
+                total > 0 && filter === 'all'
+                  ? t('inbox.filters.allCount', { total })
+                  : t('inbox.filters.all')
+              }
               size="small"
               color={filter === 'all' ? 'primary' : 'default'}
               variant={filter === 'all' ? 'filled' : 'outlined'}
@@ -134,7 +140,11 @@ export function MessagesPage() {
               sx={{ fontWeight: filter === 'all' ? 600 : 400 }}
             />
             <Chip
-              label={`Unread${unreadTotal > 0 ? ` (${unreadTotal})` : ''}`}
+              label={
+                unreadTotal > 0
+                  ? t('inbox.filters.unreadCount', { total: unreadTotal })
+                  : t('inbox.filters.unread')
+              }
               size="small"
               color={filter === 'unread' ? 'primary' : 'default'}
               variant={filter === 'unread' ? 'filled' : 'outlined'}
@@ -142,7 +152,7 @@ export function MessagesPage() {
               sx={{ fontWeight: filter === 'unread' ? 600 : 400 }}
             />
             <Chip
-              label="Read"
+              label={t('inbox.filters.read')}
               size="small"
               color={filter === 'read' ? 'primary' : 'default'}
               variant={filter === 'read' ? 'filled' : 'outlined'}
@@ -168,7 +178,7 @@ export function MessagesPage() {
                   py: 0.75,
                   borderBottom: '1px solid',
                   borderColor: 'divider',
-                  bgcolor: (t) => t.qnop.surface2,
+                  bgcolor: (theme) => theme.qnop.surface2,
                   fontSize: 11,
                   fontWeight: 700,
                   letterSpacing: '0.08em',
@@ -177,12 +187,14 @@ export function MessagesPage() {
                 }}
               >
                 <Box sx={{ width: 30, flexShrink: 0 }} />
-                <Box sx={{ flex: '1.1 1 0', minWidth: 0, pl: 1.5 }}>What happened</Box>
+                <Box sx={{ flex: '1.1 1 0', minWidth: 0, pl: 1.5 }}>{t('inbox.columns.what')}</Box>
                 <Box sx={{ flex: '1.4 1 0', minWidth: 0, display: { xs: 'none', md: 'block' } }}>
-                  Excerpt
+                  {t('inbox.columns.excerpt')}
                 </Box>
-                <Box sx={{ width: 190, flexShrink: 0 }}>Review</Box>
-                <Box sx={{ width: 92, flexShrink: 0, textAlign: 'right' }}>When</Box>
+                <Box sx={{ width: 190, flexShrink: 0 }}>{t('inbox.columns.review')}</Box>
+                <Box sx={{ width: 92, flexShrink: 0, textAlign: 'right' }}>
+                  {t('inbox.columns.when')}
+                </Box>
               </Box>
             )}
 
@@ -203,9 +215,9 @@ export function MessagesPage() {
                   spacing={1.25}
                 >
                   <MailOpen size={26} aria-hidden />
-                  <Typography sx={{ fontWeight: 600 }}>Nothing read yet</Typography>
+                  <Typography sx={{ fontWeight: 600 }}>{t('inbox.nothingRead.title')}</Typography>
                   <Typography sx={{ fontSize: 13.5, color: 'text.secondary', maxWidth: 420 }}>
-                    Everything in your inbox is still waiting for you.
+                    {t('inbox.nothingRead.body')}
                   </Typography>
                 </Stack>
               )

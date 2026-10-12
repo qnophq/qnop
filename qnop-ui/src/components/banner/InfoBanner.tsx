@@ -25,6 +25,7 @@ import Link from '@mui/material/Link';
 import Typography from '@mui/material/Typography';
 import { useTheme } from '@mui/material/styles';
 import { ArrowUpRight, Info, OctagonAlert, TriangleAlert, X } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import type { InfoBanner as InfoBannerModel } from '../../api/generated';
 import { tokens } from '../../theme/tokens';
 import { touchTargetSx } from '../../theme/touchTarget';
@@ -63,6 +64,7 @@ interface InfoBannerProps {
  * critical notice cannot rearrange the page it sits on.
  */
 export function InfoBanner({ banner, variant = 'bar', onDismiss }: InfoBannerProps) {
+  const { t } = useTranslation();
   const theme = useTheme();
   const severity = (banner.severity ?? 'info') as Severity;
   const tone = TONES[severity] ?? TONES.info;
@@ -127,7 +129,7 @@ export function InfoBanner({ banner, variant = 'bar', onDismiss }: InfoBannerPro
         <IconButton
           size="small"
           onClick={onDismiss}
-          aria-label="Dismiss this notice"
+          aria-label={t('banner.dismiss')}
           // 25 px visually, 44 px to hit (#724). The overlay reaches ~10 px past
           // the button, so the extra margin keeps it clear of the message link.
           sx={{

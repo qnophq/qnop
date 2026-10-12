@@ -19,18 +19,20 @@
  * SPDX-License-Identifier: AGPL-3.0-only
  */
 
+import { useTranslation } from 'react-i18next';
 import { ErrorState } from './ErrorState';
 import { ForbiddenIllustration } from './illustrations';
 
 /** 403 - a boundary, not an accusation (issue #611). */
 export function ForbiddenPage() {
+  const { t } = useTranslation();
   return (
     <ErrorState
       code="403"
-      title="This binder is locked"
-      message="Your account doesn't have access to this area. If your quest leads through here, an administrator can hand you the key."
+      title={t('errors.forbidden.title')}
+      message={t('errors.forbidden.message')}
       illustration={<ForbiddenIllustration />}
-      primaryAction={{ label: 'Back to dashboard', to: '/' }}
+      primaryAction={{ label: t('actions.backToDashboard'), to: '/' }}
     />
   );
 }

@@ -20,19 +20,21 @@
  */
 
 import { useNavigate } from 'react-router';
+import { useTranslation } from 'react-i18next';
 import { ErrorState } from './ErrorState';
 import { OfflineIllustration } from './illustrations';
 
 /** Offline - calm, not alarming; the string will be re-tied (issue #611). */
 export function OfflinePage() {
+  const { t } = useTranslation();
   const navigate = useNavigate();
   return (
     <ErrorState
-      title="The string between our paper cups snapped"
-      message="You seem to be offline. Nothing is lost - once the connection is back, everything picks up where it stopped."
+      title={t('errors.offline.title')}
+      message={t('errors.offline.message')}
       illustration={<OfflineIllustration />}
       tone="alert"
-      primaryAction={{ label: 'Retry connection', onClick: () => navigate(0) }}
+      primaryAction={{ label: t('errors.offline.retry'), onClick: () => navigate(0) }}
     />
   );
 }

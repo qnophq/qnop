@@ -27,8 +27,10 @@ import Stack from '@mui/material/Stack';
 import Typography from '@mui/material/Typography';
 import { keyframes } from '@mui/material/styles';
 import { AtSign, CheckCircle2, FileText, MessageSquare, PartyPopper } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import { Link as RouterLink } from 'react-router';
 import { InboxIllustration } from '../../components/notifications/InboxIllustration';
+import type { NotificationsKey } from '../../components/notifications/notificationMeta';
 
 const fadeUp = keyframes`
   from { opacity: 0; transform: translateY(12px); }
@@ -44,10 +46,11 @@ function rise(delayMs: number) {
   } as const;
 }
 
-const PERKS: { icon: ReactNode; label: string }[] = [
-  { icon: <AtSign size={15} />, label: 'Mentions that name you' },
-  { icon: <MessageSquare size={15} />, label: 'Replies on your threads' },
-  { icon: <CheckCircle2 size={15} />, label: 'Decisions and new versions' },
+/** Catalog keys, translated at render (ADR-0063). */
+const PERKS: { icon: ReactNode; labelKey: NotificationsKey }[] = [
+  { icon: <AtSign size={15} />, labelKey: 'empty.perks.mentions' },
+  { icon: <MessageSquare size={15} />, labelKey: 'empty.perks.replies' },
+  { icon: <CheckCircle2 size={15} />, labelKey: 'empty.perks.decisions' },
 ];
 
 /**
@@ -61,6 +64,7 @@ const PERKS: { icon: ReactNode; label: string }[] = [
  * notification directly.
  */
 export function MessagesEmptyState() {
+  const { t } = useTranslation('notifications');
   return (
     <Paper
       variant="outlined"
@@ -89,7 +93,7 @@ export function MessagesEmptyState() {
             color: 'primary.main',
           }}
         >
-          Messages
+          {t('empty.eyebrow')}
         </Typography>
 
         <Typography
@@ -102,14 +106,13 @@ export function MessagesEmptyState() {
             textWrap: 'balance',
           }}
         >
-          Your inbox is listening
+          {t('empty.title')}
         </Typography>
 
         <Typography
           sx={{ ...rise(240), color: 'text.secondary', fontSize: 15, lineHeight: 1.6, mt: 1.25 }}
         >
-          Nothing has landed yet. The moment someone names you in a comment, answers one of your
-          annotations or moves a review along, it shows up here — no mailbox required.
+          {t('empty.body')}
         </Typography>
 
         <Stack
@@ -119,7 +122,7 @@ export function MessagesEmptyState() {
         >
           {PERKS.map((perk) => (
             <Box
-              key={perk.label}
+              key={perk.labelKey}
               sx={{
                 display: 'inline-flex',
                 alignItems: 'center',
@@ -130,14 +133,14 @@ export function MessagesEmptyState() {
                 fontSize: 13,
                 fontWeight: 600,
                 color: 'text.secondary',
-                bgcolor: (t) => t.qnop.surface2,
+                bgcolor: (theme) => theme.qnop.surface2,
                 border: 1,
                 borderColor: 'divider',
                 '& svg': { color: 'primary.main' },
               }}
             >
               {perk.icon}
-              {perk.label}
+              {t(perk.labelKey)}
             </Box>
           ))}
         </Stack>
@@ -150,10 +153,10 @@ export function MessagesEmptyState() {
             size="large"
             startIcon={<FileText size={18} />}
           >
-            Go to your reviews
+            {t('empty.cta')}
           </Button>
           <Typography sx={{ mt: 1.25, fontSize: 13, color: 'text.disabled' }}>
-            Activity on a review is what fills this inbox.
+            {t('empty.hint')}
           </Typography>
         </Box>
       </Stack>
@@ -169,6 +172,7 @@ export function MessagesEmptyState() {
  * have never received anything" would be shouting about a chore.
  */
 export function AllCaughtUpState() {
+  const { t } = useTranslation('notifications');
   return (
     <Stack
       sx={{ alignItems: 'center', textAlign: 'center', px: 3, py: { xs: 6, sm: 8 } }}
@@ -184,7 +188,7 @@ export function AllCaughtUpState() {
           justifyContent: 'center',
           borderRadius: '50%',
           color: 'success.main',
-          bgcolor: (t) => t.qnop.surface2,
+          bgcolor: (theme) => theme.qnop.surface2,
           border: 1,
           borderColor: 'divider',
           mb: 0.5,
@@ -193,12 +197,12 @@ export function AllCaughtUpState() {
         <PartyPopper size={24} />
       </Box>
       <Typography component="h2" sx={{ ...rise(140), fontSize: 19, fontWeight: 800 }}>
-        Inbox zero
+        {t('caughtUp.title')}
       </Typography>
       <Typography
         sx={{ ...rise(200), fontSize: 14, color: 'text.secondary', maxWidth: 380, lineHeight: 1.6 }}
       >
-        You have read everything. New activity on your reviews will show up the moment it happens.
+        {t('caughtUp.body')}
       </Typography>
     </Stack>
   );
