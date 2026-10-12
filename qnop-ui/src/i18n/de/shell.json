@@ -1,0 +1,80 @@
+{
+  "brand": {
+    "tagline": "Quality Notes · Souverän"
+  },
+  "nav": {
+    "landmark": "Hauptnavigation",
+    "groups": {
+      "administration": "Administration"
+    },
+    "items": {
+      "dashboard": "Dashboard",
+      "reviews": "Reviews",
+      "myTeams": "Meine Teams",
+      "messages": "Nachrichten",
+      "settings": "Einstellungen",
+      "configuration": "Konfiguration",
+      "users": "Benutzer",
+      "teams": "Teams",
+      "branding": "Branding",
+      "oidcProviders": "OIDC-Anbieter",
+      "email": "E-Mail",
+      "scheduler": "Zeitplaner",
+      "storageConsistency": "Speicherkonsistenz",
+      "audit": "Audit"
+    }
+  },
+  "breadcrumbs": {
+    "landmark": "Navigationspfad",
+    "profile": "Profil"
+  },
+  "topBar": {
+    "menu": "Menü",
+    "toggleMenu": "Menü ein-/ausblenden",
+    "lightMode": "Heller Modus",
+    "darkMode": "Dunkler Modus",
+    "switchToLight": "Zum hellen Modus wechseln",
+    "switchToDark": "Zum dunklen Modus wechseln",
+    "notifications": "Benachrichtigungen",
+    "notificationsUnreadTooltip": "Benachrichtigungen ({{count}} ungelesen)",
+    "notificationsUnreadLabel": "Benachrichtigungen, {{count}} ungelesen"
+  },
+  "notifications": {
+    "title": "Benachrichtigungen",
+    "newCount": "{{count}} neu",
+    "markAllRead": "Alle als gelesen markieren",
+    "loading": "Benachrichtigungen werden geladen",
+    "empty": "Nichts Neues. Aktivitäten in deinen Reviews landen hier.",
+    "seeAll": "Alle Nachrichten anzeigen"
+  },
+  "userMenu": {
+    "trigger": "Benutzermenü",
+    "unknownUser": "Unbekannt",
+    "roles": {
+      "ADMIN": "Administrator",
+      "MEMBER": "Mitglied",
+      "AUDITOR": "Auditor"
+    },
+    "profile": "Profil",
+    "changePassword": "Passwort ändern",
+    "signOut": "Abmelden"
+  },
+  "search": {
+    "placeholder": "Suchen…",
+    "inputLabel": "Reviews, Personen und Teams durchsuchen",
+    "shortcutCtrl": "Strg K",
+    "resultsLabel": "Suchergebnisse",
+    "tooShort": "Tippe weiter — mindestens 2 Zeichen.",
+    "unavailable": "Die Suche ist gerade nicht verfügbar.",
+    "noMatches": "Keine Treffer für „{{query}}“.",
+    "sections": {
+      "reviews": "Reviews",
+      "annotations": "Anmerkungen",
+      "comments": "Kommentare",
+      "people": "Personen",
+      "teams": "Teams"
+    },
+    "inDocument": "in {{title}}",
+    "seeAll": "Alle {{count}} Ergebnisse anzeigen"
+  }
+}

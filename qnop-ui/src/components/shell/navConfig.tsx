@@ -36,11 +36,23 @@ import {
   type LucideIcon,
   Inbox,
 } from 'lucide-react';
+import i18n, { type ParseKeys, type TFunction } from 'i18next';
 import type { ServerConfigFeatures, UserRole } from '../../api/generated';
 
-export interface NavItem {
+/** A key in the `shell` catalog (issue #464): config holds keys, labels resolve at render. */
+export type ShellKey = ParseKeys<'shell'>;
+
+/** Translates a `shell` key; components pass their `useTranslation('shell')` t. */
+export type ShellT = TFunction<'shell'>;
+
+/** The translator for the current language, for callers outside React (and tests). */
+function currentShellT(): ShellT {
+  return i18n.getFixedT(null, 'shell');
+}
+
+interface NavItemConfig {
   id: string;
-  label: string;
+  labelKey: ShellKey;
   path: string;
   icon: LucideIcon;
   /** Roles allowed to see the item; omit for "any authenticated user". */
@@ -57,6 +69,17 @@ export interface NavItem {
   feature?: keyof ServerConfigFeatures | (keyof ServerConfigFeatures)[];
 }
 
+interface NavGroupConfig {
+  /** Group heading key; omitted for the top, label-less group. */
+  labelKey?: ShellKey;
+  items: NavItemConfig[];
+}
+
+/** A nav item with its label resolved in the active language. */
+export interface NavItem extends Omit<NavItemConfig, 'labelKey'> {
+  label: string;
+}
+
 export interface NavGroup {
   /** Group heading; empty for the top, label-less group. */
   label: string;
@@ -70,40 +93,51 @@ export interface NavGroup {
  * Enterprise features add their own entries at runtime via the UI extension
  * slots (ADR-0039) — the Community shell carries no placeholders (#513).
  */
-export const NAV_GROUPS: NavGroup[] = [
+const NAV_GROUPS: NavGroupConfig[] = [
   {
-    label: '',
     items: [
-      { id: 'dashboard', label: 'Dashboard', path: '/', icon: LayoutDashboard },
-      { id: 'reviews', label: 'Reviews', path: '/reviews', icon: FileText },
-      { id: 'my-teams', label: 'My Teams', path: '/my-teams', icon: UsersRound },
+      { id: 'dashboard', labelKey: 'nav.items.dashboard', path: '/', icon: LayoutDashboard },
+      { id: 'reviews', labelKey: 'nav.items.reviews', path: '/reviews', icon: FileText },
+      { id: 'my-teams', labelKey: 'nav.items.myTeams', path: '/my-teams', icon: UsersRound },
       // No roles: the inbox belongs to every authenticated user (issue #538).
-      { id: 'messages', label: 'Messages', path: '/messages', icon: Inbox },
+      { id: 'messages', labelKey: 'nav.items.messages', path: '/messages', icon: Inbox },
     ],
   },
   {
-    label: 'Administration',
+    labelKey: 'nav.groups.administration',
     items: [
       {
         id: 'settings',
-        label: 'Settings',
+        labelKey: 'nav.items.settings',
         path: '/admin/settings',
         icon: Settings,
         roles: ['ADMIN'],
       },
       {
         id: 'configuration',
-        label: 'Configuration',
+        labelKey: 'nav.items.configuration',
         path: '/admin/configuration',
         feature: 'deploymentConfiguration',
         icon: ServerCog,
         roles: ['ADMIN'],
       },
-      { id: 'users', label: 'Users', path: '/admin/users', icon: User, roles: ['ADMIN'] },
-      { id: 'teams', label: 'Teams', path: '/admin/teams', icon: Users, roles: ['ADMIN'] },
+      {
+        id: 'users',
+        labelKey: 'nav.items.users',
+        path: '/admin/users',
+        icon: User,
+        roles: ['ADMIN'],
+      },
+      {
+        id: 'teams',
+        labelKey: 'nav.items.teams',
+        path: '/admin/teams',
+        icon: Users,
+        roles: ['ADMIN'],
+      },
       {
         id: 'branding',
-        label: 'Branding',
+        labelKey: 'nav.items.branding',
         path: '/admin/branding',
         feature: 'customBranding',
         icon: Palette,
@@ -111,7 +145,7 @@ export const NAV_GROUPS: NavGroup[] = [
       },
       {
         id: 'oidc-providers',
-        label: 'OIDC providers',
+        labelKey: 'nav.items.oidcProviders',
         path: '/admin/oidc-providers',
         feature: 'oidc',
         icon: KeyRound,
@@ -119,7 +153,7 @@ export const NAV_GROUPS: NavGroup[] = [
       },
       {
         id: 'email',
-        label: 'Email',
+        labelKey: 'nav.items.email',
         path: '/admin/email',
         feature: ['smtpConfiguration', 'emailTemplates'],
         icon: Mail,
@@ -127,21 +161,21 @@ export const NAV_GROUPS: NavGroup[] = [
       },
       {
         id: 'scheduler',
-        label: 'Scheduler',
+        labelKey: 'nav.items.scheduler',
         path: '/admin/scheduler',
         icon: CalendarClock,
         roles: ['ADMIN'],
       },
       {
         id: 'storage-consistency',
-        label: 'Storage consistency',
+        labelKey: 'nav.items.storageConsistency',
         path: '/admin/storage-consistency',
         icon: HardDrive,
         roles: ['ADMIN'],
       },
       {
         id: 'audit',
-        label: 'Audit',
+        labelKey: 'nav.items.audit',
         path: '/audit',
         icon: ScrollText,
         roles: ['ADMIN', 'AUDITOR'],
@@ -151,23 +185,31 @@ export const NAV_GROUPS: NavGroup[] = [
 ];
 
 /** Whether a nav item is visible to the given role. */
-export function isNavItemVisible(item: NavItem, role: UserRole | null): boolean {
+export function isNavItemVisible(item: Pick<NavItem, 'roles'>, role: UserRole | null): boolean {
   if (!item.roles) {
     return true;
   }
   return role !== null && item.roles.includes(role);
 }
 
-/** The nav groups filtered for a role, dropping any group left with no items. */
+function resolveItem({ labelKey, ...item }: NavItemConfig, t: ShellT): NavItem {
+  return { ...item, label: t(labelKey) };
+}
+
+/**
+ * The nav groups filtered for a role, dropping any group left with no items, with labels in the
+ * language of {@code t} (the caller's `useTranslation('shell')`, so a language switch re-renders).
+ */
 export function visibleNavGroups(
   role: UserRole | null,
   features?: ServerConfigFeatures,
+  t: ShellT = currentShellT(),
 ): NavGroup[] {
   return NAV_GROUPS.map((group) => ({
-    ...group,
-    items: group.items.filter(
-      (item) => isNavItemVisible(item, role) && isFeatureAvailable(item, features),
-    ),
+    label: group.labelKey ? t(group.labelKey) : '',
+    items: group.items
+      .filter((item) => isNavItemVisible(item, role) && isFeatureAvailable(item, features))
+      .map((item) => resolveItem(item, t)),
   })).filter((group) => group.items.length > 0);
 }
 
@@ -177,16 +219,13 @@ export function visibleNavGroups(
  * <p>Absent config means "not known yet", and the item stays — a sidebar that flickers items in as
  * the config arrives is worse than one that occasionally shows a page the server will refuse.
  */
-function isFeatureAvailable(item: NavItem, features?: ServerConfigFeatures): boolean {
+function isFeatureAvailable(item: NavItemConfig, features?: ServerConfigFeatures): boolean {
   if (!item.feature || !features) {
     return true;
   }
   const required = Array.isArray(item.feature) ? item.feature : [item.feature];
   return required.some((name) => features[name]);
 }
-
-/** All items flattened — used to resolve the active item / breadcrumb label. */
-export const ALL_NAV_ITEMS: NavItem[] = NAV_GROUPS.flatMap((g) => g.items);
 
 export interface Crumb {
   label: string;
@@ -198,13 +237,13 @@ export interface Crumb {
  * is just the section context: the (optional) group label plus the current
  * item. "Dashboard" is the root itself, never a prefix on other pages.
  */
-export function crumbsFor(pathname: string): Crumb[] {
+export function crumbsFor(pathname: string, t: ShellT = currentShellT()): Crumb[] {
   if (pathname === '/') {
-    return [{ label: 'Dashboard' }];
+    return [{ label: t('nav.items.dashboard') }];
   }
   // A colleague's public profile (issue #454) — never show the raw id.
   if (pathname.startsWith('/users/')) {
-    return [{ label: 'Profile' }];
+    return [{ label: t('breadcrumbs.profile') }];
   }
   for (const group of NAV_GROUPS) {
     // Exact match, or a detail page nested under an item (e.g. /admin/teams/:id):
@@ -214,14 +253,14 @@ export function crumbsFor(pathname: string): Crumb[] {
     );
     if (item) {
       const trail: Crumb[] = [];
-      if (group.label) {
-        trail.push({ label: group.label });
+      if (group.labelKey) {
+        trail.push({ label: t(group.labelKey) });
       }
-      trail.push({ label: item.label, to: item.path === pathname ? undefined : item.path });
+      trail.push({ label: t(item.labelKey), to: item.path === pathname ? undefined : item.path });
       return trail;
     }
   }
-  // Unknown path: a single humanised last segment.
+  // Unknown path: a single humanised last segment (a URL segment, not translatable text).
   const last = pathname.split('/').filter(Boolean).pop() ?? '';
   return [{ label: last.charAt(0).toUpperCase() + last.slice(1) }];
 }

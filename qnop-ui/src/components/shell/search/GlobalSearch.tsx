@@ -35,6 +35,7 @@ import { SEARCH_MIN_LENGTH, useSearchQuick } from '../../../api/hooks/useSearch'
 import { useAuthStore } from '../../../stores/authStore';
 import { SearchDropdownResults } from './SearchDropdownResults';
 import { flattenSearchActions, searchOptionId } from './searchPaths';
+import { useTranslation } from 'react-i18next';
 
 /** Mirrors the admin lists' debounce (UsersPage) — one query per typing pause. */
 const DEBOUNCE_MS = 300;
@@ -43,10 +44,10 @@ const DEBOUNCE_MS = 300;
 const WIDTH_RESTING = 280;
 const WIDTH_FOCUSED = 440;
 
-/** The platform's search-shortcut label: ⌘K on Apple hardware, Ctrl K elsewhere. */
+/** The platform's search-shortcut label: ⌘K on Apple hardware, Ctrl K (Strg K, …) elsewhere. */
 const IS_APPLE =
   typeof navigator !== 'undefined' && /Mac|iPhone|iPad/.test(navigator.platform || '');
-const SHORTCUT_LABEL = IS_APPLE ? '⌘K' : 'Ctrl K';
+const APPLE_SHORTCUT_LABEL = '⌘K';
 
 /**
  * The top-bar global search (issue #540, ADR-0047), replacing the #514
@@ -63,6 +64,7 @@ const SHORTCUT_LABEL = IS_APPLE ? '⌘K' : 'Ctrl K';
  * prefers-reduced-motion.
  */
 export function GlobalSearch() {
+  const { t } = useTranslation('shell');
   const theme = useTheme();
   const navigate = useNavigate();
   const location = useLocation();
@@ -198,9 +200,9 @@ export function GlobalSearch() {
                 }
               }
             }}
-            placeholder="Search…"
+            placeholder={t('search.placeholder')}
             inputProps={{
-              'aria-label': 'Search reviews, people and teams',
+              'aria-label': t('search.inputLabel'),
               'aria-keyshortcuts': 'Meta+K Control+K',
               role: 'combobox',
               'aria-expanded': showPanel,
@@ -229,7 +231,7 @@ export function GlobalSearch() {
                 flexShrink: 0,
               }}
             >
-              {SHORTCUT_LABEL}
+              {IS_APPLE ? APPLE_SHORTCUT_LABEL : t('search.shortcutCtrl')}
             </Box>
           )}
         </Box>
@@ -246,7 +248,7 @@ export function GlobalSearch() {
               <Paper
                 variant="outlined"
                 role="dialog"
-                aria-label="Search results"
+                aria-label={t('search.resultsLabel')}
                 id="global-search-listbox"
                 data-testid="global-search-dropdown"
                 sx={{
@@ -258,7 +260,7 @@ export function GlobalSearch() {
                 }}
               >
                 {belowMinimum ? (
-                  <Hint text="Keep typing — at least 2 characters." />
+                  <Hint text={t('search.tooShort')} />
                 ) : query.isPending ? (
                   <Box sx={{ p: 2 }} data-testid="global-search-loading">
                     {[0, 1, 2].map((row) => (
@@ -266,7 +268,7 @@ export function GlobalSearch() {
                     ))}
                   </Box>
                 ) : query.isError ? (
-                  <Hint text="Search is unavailable right now." />
+                  <Hint text={t('search.unavailable')} />
                 ) : query.data ? (
                   <SearchDropdownResults
                     query={trimmed}

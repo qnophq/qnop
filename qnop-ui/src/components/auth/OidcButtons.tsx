@@ -28,6 +28,7 @@ import Typography from '@mui/material/Typography';
 import type { OidcProviderLoginInfo } from '../../api/generated';
 import { useConfig } from '../../api/hooks/useConfig';
 import { ProviderIcon } from './ProviderIcon';
+import { Trans, useTranslation } from 'react-i18next';
 
 /**
  * "Sign in with <provider>" buttons for each enabled OIDC provider (from
@@ -37,6 +38,7 @@ import { ProviderIcon } from './ProviderIcon';
  * no provider is enabled. SAML is not supported (backend is OIDC-only).
  */
 export function OidcButtons() {
+  const { t } = useTranslation('auth');
   const { data } = useConfig();
   const providers = data?.auth?.oidcProviders ?? [];
 
@@ -46,7 +48,7 @@ export function OidcButtons() {
 
   return (
     <>
-      <Divider sx={{ my: 2.5, color: 'text.disabled', fontSize: 12 }}>or</Divider>
+      <Divider sx={{ my: 2.5, color: 'text.disabled', fontSize: 12 }}>{t('shared.or')}</Divider>
       <Stack spacing={1.5}>
         {providers.map((provider) => (
           <OidcProviderButton key={provider.id} provider={provider} />
@@ -67,6 +69,7 @@ interface OidcProviderButtonProps {
  * it.
  */
 function OidcProviderButton({ provider }: OidcProviderButtonProps) {
+  const { t } = useTranslation('auth');
   return (
     <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 0.5 }}>
       <Button
@@ -78,7 +81,7 @@ function OidcProviderButton({ provider }: OidcProviderButtonProps) {
         startIcon={<ProviderIcon kind={provider.iconKind} />}
         sx={{ borderColor: 'divider', color: 'text.primary', justifyContent: 'center' }}
       >
-        Sign in with {provider.name}
+        {t('oidc.signInWith', { provider: provider.name })}
       </Button>
       <AccountSwitchAffordance provider={provider} />
     </Box>
@@ -92,6 +95,7 @@ function OidcProviderButton({ provider }: OidcProviderButtonProps) {
  * or nothing when the backend omits both fields (defensive).
  */
 function AccountSwitchAffordance({ provider }: OidcProviderButtonProps) {
+  const { t } = useTranslation('auth');
   if (provider.accountPickerLoginUrl) {
     return (
       <Link
@@ -99,10 +103,10 @@ function AccountSwitchAffordance({ provider }: OidcProviderButtonProps) {
         href={provider.accountPickerLoginUrl}
         variant="caption"
         underline="hover"
-        aria-label={`Sign in with a different ${provider.name} account`}
+        aria-label={t('oidc.differentAccountAria', { provider: provider.name })}
         sx={{ color: 'text.secondary', fontWeight: 500, '&:hover': { color: 'text.secondary' } }}
       >
-        Use a different account
+        {t('oidc.differentAccount')}
       </Link>
     );
   }
@@ -113,19 +117,25 @@ function AccountSwitchAffordance({ provider }: OidcProviderButtonProps) {
         variant="caption"
         sx={{ color: 'text.secondary', textAlign: 'center', lineHeight: 1.4 }}
       >
-        To switch accounts, sign out at{' '}
-        <Link
-          component="a"
-          href={provider.accountSwitchHintUrl}
-          target="_blank"
-          rel="noopener noreferrer"
-          underline="hover"
-          color="inherit"
-          sx={{ fontFamily: 'monospace' }}
-        >
-          {host}
-        </Link>{' '}
-        first.
+        <Trans
+          t={t}
+          i18nKey="oidc.switchHint"
+          values={{ host }}
+          // Not `link`: that is a void HTML element, which Trans would close before the host.
+          components={{
+            hostLink: (
+              <Link
+                component="a"
+                href={provider.accountSwitchHintUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                underline="hover"
+                color="inherit"
+                sx={{ fontFamily: 'monospace' }}
+              />
+            ),
+          }}
+        />
       </Typography>
     );
   }

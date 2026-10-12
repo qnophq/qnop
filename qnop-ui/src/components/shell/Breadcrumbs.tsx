@@ -29,6 +29,7 @@ import { useTeam } from '../../api/hooks/useTeams';
 import { useMyTeam } from '../../api/hooks/useMyTeams';
 import { TeamAvatar } from './TeamAvatar';
 import { crumbsFor } from './navConfig';
+import { useTranslation } from 'react-i18next';
 
 /** The final breadcrumb on a team-detail page: the team's avatar + name (issue #509). */
 function TeamCrumbInner({ name, avatarUrl }: { name: string; avatarUrl?: string | null }) {
@@ -54,7 +55,8 @@ function MyTeamCrumb({ id }: { id: string }) {
 
 export function Breadcrumbs() {
   const { pathname } = useLocation();
-  const crumbs = crumbsFor(pathname);
+  const { t } = useTranslation('shell');
+  const crumbs = crumbsFor(pathname, t);
   // A team-detail page appends a resolved crumb (name + avatar) after the "Teams" link (issue #509).
   const adminTeam = pathname.match(/^\/admin\/teams\/([^/]+)$/);
   const myTeam = pathname.match(/^\/my-teams\/([^/]+)$/);
@@ -62,7 +64,7 @@ export function Breadcrumbs() {
   return (
     <MuiBreadcrumbs
       separator={<ChevronRight size={13} />}
-      aria-label="Breadcrumb"
+      aria-label={t('breadcrumbs.landmark')}
       sx={{ fontSize: 13, '& .MuiBreadcrumbs-separator': { mx: 0.5, color: 'text.disabled' } }}
     >
       {crumbs.map((c, i) => {

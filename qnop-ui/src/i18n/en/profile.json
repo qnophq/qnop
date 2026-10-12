@@ -1,0 +1,136 @@
+{
+  "page": {
+    "title": "Profile",
+    "subtitle": "Manage your account and how you appear across qnop.",
+    "unknownName": "Unknown"
+  },
+  "stats": {
+    "owned": "Owned",
+    "reviewing": "Reviewing",
+    "completed": "Completed"
+  },
+  "achievements": {
+    "heading": "Achievements",
+    "earnedCount": "{{earned}} of {{total}} earned",
+    "tooltip": "{{title}} — {{caption}}",
+    "ariaEarned": "{{title}}: {{caption}}",
+    "ariaLocked": "{{title}}: {{caption}} (locked)",
+    "liftoff": {
+      "title": "Liftoff",
+      "earned": "Started a review",
+      "locked": "Start your first review",
+      "lockedPublic": "No review started yet"
+    },
+    "crew": {
+      "title": "Crew member",
+      "earned": "Joined a review crew",
+      "locked": "Get invited to a review",
+      "lockedPublic": "Not on a crew yet"
+    },
+    "closer": {
+      "title": "Closer",
+      "earned": "Finalized a review",
+      "locked": "See one of your reviews through to finalized",
+      "earnedPublic": "Resolved a raised concern",
+      "lockedPublic": "No concern settled yet"
+    },
+    "face": {
+      "title": "Face on file",
+      "earned": "Teammates recognise you",
+      "locked": "Upload a profile picture"
+    },
+    "tunedIn": {
+      "title": "Tuned in",
+      "earned": "Review mails keep you posted",
+      "locked": "Switch review notifications on"
+    },
+    "voice": {
+      "title": "Voice",
+      "earned": "{{milestone}}+ comments in discussions",
+      "locked": "Earned at {{milestone}} comments"
+    },
+    "sharpEye": {
+      "title": "Sharp eye",
+      "earned": "{{milestone}}+ annotations raised",
+      "locked": "Earned at {{milestone}} annotations"
+    }
+  },
+  "avatar": {
+    "heading": "Profile picture",
+    "description": "Upload a photo so teammates recognise you. It is shown across the app; remove it to fall back to your initials.",
+    "uploadAria": "Upload a profile picture",
+    "dropPrompt": "Drag an image here or <strong>browse</strong>",
+    "constraints": "PNG, JPEG or WebP · up to 1 MB",
+    "remove": "Remove photo",
+    "invalidType": "Please choose a PNG, JPEG or WebP image.",
+    "tooLarge": "That image is larger than 1 MB.",
+    "confirmTitle": "Remove profile picture",
+    "confirmMessage": "This removes the profile picture and falls back to the initials avatar. A new one can be uploaded anytime.",
+    "confirmLabel": "Remove"
+  },
+  "crop": {
+    "title": "Adjust your picture",
+    "zoom": "Zoom",
+    "hint": "Drag to reposition, use the slider to zoom.",
+    "cancel": "Cancel",
+    "apply": "Use photo"
+  },
+  "notifications": {
+    "heading": "Notifications",
+    "description": "Emails about reviews you are part of — being added as a reviewer, new annotations, replies in your discussions, decisions, and status changes.",
+    "cadenceLabel": "Email me about review activity",
+    "mentionsNote": "Mentions reach you straight away either way — being named personally is the one case where waiting costs something.",
+    "cadence": {
+      "IMMEDIATE": {
+        "label": "As it happens",
+        "help": "One email per event."
+      },
+      "DAILY": {
+        "label": "Once a day",
+        "help": "One summary each morning, in your timezone. Nothing is sent on a quiet day."
+      },
+      "OFF": {
+        "label": "Never",
+        "help": "No review emails. In-app notifications are unaffected."
+      }
+    }
+  },
+  "tracking": {
+    "heading": "Usage measurement",
+    "description": "Anonymous counts of which pages get used, so this workspace can be improved with evidence rather than guesswork. Page addresses are reduced to their shape first — never a document, never a name, never a search term. This choice follows your account to every device you sign in from.",
+    "toggle": "Include me in anonymous usage measurement"
+  },
+  "timezone": {
+    "heading": "Time zone",
+    "description": "Dates and times across qnop appear in this zone.",
+    "currentTimeIn": "Current time in {{zone}}",
+    "useDevice": "Use my device zone ({{zone}})",
+    "followingDefault": "Currently following the workspace default.",
+    "now": "now"
+  },
+  "missions": {
+    "sharedCaption": "Reviews you share",
+    "owned": {
+      "title": "Missions commanded",
+      "empty": "No reviews of {{name}}'s command are shared with you yet."
+    },
+    "reviewing": {
+      "title": "Missions joined",
+      "empty": "{{name}} is not reviewing anything you share yet."
+    }
+  },
+  "moves": {
+    "title": "Recent moves",
+    "caption": "In reviews you share",
+    "empty": "No recent moves from {{name}} in reviews you share."
+  },
+  "toast": {
+    "settingSaveFailed": "The setting could not be saved.",
+    "timezoneSaveFailed": "The time zone could not be saved.",
+    "timezoneUpdated": "Time zone updated.",
+    "avatarUpdated": "Profile picture updated.",
+    "avatarUploadFailed": "The picture could not be uploaded. Please try again.",
+    "avatarRemoved": "Profile picture removed.",
+    "avatarRemoveFailed": "The picture could not be removed. Please try again."
+  }
+}

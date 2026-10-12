@@ -20,7 +20,10 @@
  */
 
 import 'i18next';
+import type enAuth from './en/auth.json';
 import type enCommon from './en/common.json';
+import type enProfile from './en/profile.json';
+import type enShell from './en/shell.json';
 
 /**
  * Types every `t()` key against the English catalog (ADR-0063): a misspelt or removed key fails
@@ -31,6 +34,9 @@ declare module 'i18next' {
     defaultNS: 'common';
     resources: {
       common: typeof enCommon;
+      auth: typeof enAuth;
+      shell: typeof enShell;
+      profile: typeof enProfile;
     };
     returnNull: false;
   }

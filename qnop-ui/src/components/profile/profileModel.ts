@@ -19,14 +19,21 @@
  * SPDX-License-Identifier: AGPL-3.0-only
  */
 
+import type { ParseKeys } from 'i18next';
 import type { DashboardActivity, DocumentSummary, PublicUserStats } from '../../api/generated';
+
+/** A key in the `profile` catalog (issue #464) — the model names text, the view translates it. */
+export type ProfileTextKey = ParseKeys<'profile'>;
 
 /** One achievement sticker on the player card (issue #469). */
 export interface Achievement {
   key: string;
-  title: string;
-  /** Earned: what happened. Locked: how to earn it. */
-  caption: string;
+  /** Catalog key of the badge name. */
+  titleKey: ProfileTextKey;
+  /** Catalog key of the caption. Earned: what happened. Locked: how to earn it. */
+  captionKey: ProfileTextKey;
+  /** Interpolation values for the caption, e.g. a milestone. */
+  captionValues?: Record<string, number | string>;
   earned: boolean;
 }
 
@@ -62,35 +69,34 @@ export function profileAchievements(state: {
   return [
     {
       key: 'liftoff',
-      title: 'Liftoff',
-      caption: stats.owned > 0 ? 'Started a review' : 'Start your first review',
+      titleKey: 'achievements.liftoff.title',
+      captionKey: stats.owned > 0 ? 'achievements.liftoff.earned' : 'achievements.liftoff.locked',
       earned: stats.owned > 0,
     },
     {
       key: 'crew',
-      title: 'Crew member',
-      caption: stats.reviewing > 0 ? 'Joined a review crew' : 'Get invited to a review',
+      titleKey: 'achievements.crew.title',
+      captionKey: stats.reviewing > 0 ? 'achievements.crew.earned' : 'achievements.crew.locked',
       earned: stats.reviewing > 0,
     },
     {
       key: 'closer',
-      title: 'Closer',
-      caption:
-        stats.completed > 0 ? 'Finalized a review' : 'See one of your reviews through to finalized',
+      titleKey: 'achievements.closer.title',
+      captionKey: stats.completed > 0 ? 'achievements.closer.earned' : 'achievements.closer.locked',
       earned: stats.completed > 0,
     },
     {
       key: 'face',
-      title: 'Face on file',
-      caption: state.hasAvatar ? 'Teammates recognise you' : 'Upload a profile picture',
+      titleKey: 'achievements.face.title',
+      captionKey: state.hasAvatar ? 'achievements.face.earned' : 'achievements.face.locked',
       earned: state.hasAvatar,
     },
     {
       key: 'tuned-in',
-      title: 'Tuned in',
-      caption: state.notificationsOn
-        ? 'Review mails keep you posted'
-        : 'Switch review notifications on',
+      titleKey: 'achievements.tunedIn.title',
+      captionKey: state.notificationsOn
+        ? 'achievements.tunedIn.earned'
+        : 'achievements.tunedIn.locked',
       earned: state.notificationsOn,
     },
   ];
@@ -109,39 +115,49 @@ export function publicProfileAchievements(stats: PublicUserStats): Achievement[]
   return [
     {
       key: 'liftoff',
-      title: 'Liftoff',
-      caption: stats.reviewsOwned > 0 ? 'Started a review' : 'No review started yet',
+      titleKey: 'achievements.liftoff.title',
+      captionKey:
+        stats.reviewsOwned > 0
+          ? 'achievements.liftoff.earned'
+          : 'achievements.liftoff.lockedPublic',
       earned: stats.reviewsOwned > 0,
     },
     {
       key: 'crew',
-      title: 'Crew member',
-      caption: stats.reviewsParticipating > 0 ? 'Joined a review crew' : 'Not on a crew yet',
+      titleKey: 'achievements.crew.title',
+      captionKey:
+        stats.reviewsParticipating > 0
+          ? 'achievements.crew.earned'
+          : 'achievements.crew.lockedPublic',
       earned: stats.reviewsParticipating > 0,
     },
     {
       key: 'closer',
-      title: 'Closer',
-      caption:
-        stats.annotationsResolved > 0 ? 'Resolved a raised concern' : 'No concern settled yet',
+      titleKey: 'achievements.closer.title',
+      captionKey:
+        stats.annotationsResolved > 0
+          ? 'achievements.closer.earnedPublic'
+          : 'achievements.closer.lockedPublic',
       earned: stats.annotationsResolved > 0,
     },
     {
       key: 'voice',
-      title: 'Voice',
-      caption:
+      titleKey: 'achievements.voice.title',
+      captionKey:
         stats.commentsWritten >= VOICE_MILESTONE
-          ? `${VOICE_MILESTONE}+ comments in discussions`
-          : `Earned at ${VOICE_MILESTONE} comments`,
+          ? 'achievements.voice.earned'
+          : 'achievements.voice.locked',
+      captionValues: { milestone: VOICE_MILESTONE },
       earned: stats.commentsWritten >= VOICE_MILESTONE,
     },
     {
       key: 'sharp-eye',
-      title: 'Sharp eye',
-      caption:
+      titleKey: 'achievements.sharpEye.title',
+      captionKey:
         stats.annotationsRaised >= SHARP_EYE_MILESTONE
-          ? `${SHARP_EYE_MILESTONE}+ annotations raised`
-          : `Earned at ${SHARP_EYE_MILESTONE} annotations`,
+          ? 'achievements.sharpEye.earned'
+          : 'achievements.sharpEye.locked',
+      captionValues: { milestone: SHARP_EYE_MILESTONE },
       earned: stats.annotationsRaised >= SHARP_EYE_MILESTONE,
     },
   ];

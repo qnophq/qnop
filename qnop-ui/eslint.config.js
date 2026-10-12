@@ -6,6 +6,10 @@ import reactRefresh from 'eslint-plugin-react-refresh';
 import tseslint from 'typescript-eslint';
 import { defineConfig, globalIgnores } from 'eslint/config';
 
+// Props whose string value is shown to the user (or read out by assistive technology).
+const TEXT_PROPS =
+  '/^(label|title|placeholder|alt|aria-label|aria-description|helperText|subtitle|description|tooltip|text|message|primary|secondary|confirmLabel|cancelLabel|emptyText|caption|heading)$/';
+
 export default defineConfig([
   // dist: build output. coverage: vitest report. src/api/generated: typescript-axios output.
   globalIgnores(['dist', 'coverage', 'src/api/generated']),
@@ -30,6 +34,41 @@ export default defineConfig([
           caughtErrorsIgnorePattern: '^_',
           ignoreRestSiblings: true,
         },
+      ],
+    },
+  },
+  {
+    // Externalized surfaces (issue #464, ADR-0063): user-facing text comes from the i18n
+    // catalogs, never a literal. Each surface joins this list once it is translated; the
+    // remaining ones follow in the coverage sweep.
+    files: [
+      'src/pages/auth/**/*.tsx',
+      'src/components/auth/**/*.tsx',
+      'src/components/shell/**/*.tsx',
+      'src/components/i18n/**/*.tsx',
+      'src/components/profile/**/*.tsx',
+      'src/pages/ProfilePage.tsx',
+    ],
+    ignores: ['**/*.test.tsx'],
+    rules: {
+      // Literal text reaching the DOM: as a JSX child — directly, in a template literal, or as a
+      // branch of a ternary/&& — or as the value of a text-bearing prop, quoted or in braces.
+      // String concatenation is not caught; review keeps that out (it would be the odd one).
+      'no-restricted-syntax': [
+        'error',
+        ...[
+          'JSXText[value=/[A-Za-z]{2,}/]',
+          'JSXElement > JSXExpressionContainer > Literal[value=/[A-Za-z]{2,}/]',
+          'JSXElement > JSXExpressionContainer > TemplateLiteral > TemplateElement[value.raw=/[A-Za-z]{2,}/]',
+          'JSXElement > JSXExpressionContainer > :matches(ConditionalExpression, LogicalExpression) > Literal[value=/[A-Za-z]{2,}/]',
+          `JSXAttribute[name.name=${TEXT_PROPS}] > Literal[value=/[A-Za-z]{2,}/]`,
+          `JSXAttribute[name.name=${TEXT_PROPS}] > JSXExpressionContainer > Literal[value=/[A-Za-z]{2,}/]`,
+          `JSXAttribute[name.name=${TEXT_PROPS}] > JSXExpressionContainer > TemplateLiteral > TemplateElement[value.raw=/[A-Za-z]{2,}/]`,
+          `JSXAttribute[name.name=${TEXT_PROPS}] > JSXExpressionContainer > :matches(ConditionalExpression, LogicalExpression) > Literal[value=/[A-Za-z]{2,}/]`,
+        ].map((selector) => ({
+          selector,
+          message: 'User-facing text belongs in an i18n catalog — use t() (ADR-0063).',
+        })),
       ],
     },
   },

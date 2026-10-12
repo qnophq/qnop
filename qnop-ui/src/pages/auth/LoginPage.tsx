@@ -38,30 +38,35 @@ import { useConfig } from '../../api/hooks/useConfig';
 import { useAuthStore } from '../../stores/authStore';
 import { apiErrorMessage } from '../../utils/apiError';
 import { safeRedirectPath } from '../../utils/safeRedirectPath';
+import { useTranslation } from 'react-i18next';
 
 /**
- * OIDC redirect-failure codes set by the backend success handler (`/login?error=…`) mapped to
- * user-facing copy. Unknown codes fall back to the generic message.
+ * OIDC redirect-failure codes set by the backend success handler (`/login?error=…`) that have
+ * their own copy (`login.oidcErrors.*`). Unknown codes fall back to the generic `oidc` message.
  */
-const OIDC_LOGIN_ERRORS: Record<string, string> = {
-  account_disabled: 'Your account is disabled. Please contact an administrator.',
-  email_missing:
-    'The identity provider did not share an email address, which qnop requires for an account.',
-  oidc: 'Sign-in via the identity provider failed. Please try again or contact an administrator.',
-};
+const OIDC_LOGIN_ERROR_CODES = ['account_disabled', 'email_missing', 'oidc'] as const;
+type OidcLoginErrorCode = (typeof OIDC_LOGIN_ERROR_CODES)[number];
+
+function oidcErrorCode(code: string | null): OidcLoginErrorCode | null {
+  if (!code) return null;
+  return (OIDC_LOGIN_ERROR_CODES as readonly string[]).includes(code)
+    ? (code as OidcLoginErrorCode)
+    : 'oidc';
+}
 
 /** Login screen: local credentials, OIDC providers, links to register / reset. */
 export function LoginPage() {
+  const { t } = useTranslation('auth');
   const login = useAuthStore((s) => s.login);
   const navigate = useNavigate();
   const [params] = useSearchParams();
   const { data: config } = useConfig();
   const [usernameOrEmail, setUsernameOrEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [error, setError] = useState<string | null>(() => {
-    const code = params.get('error');
-    return code ? (OIDC_LOGIN_ERRORS[code] ?? OIDC_LOGIN_ERRORS.oidc) : null;
-  });
+  const [error, setError] = useState<string | null>(null);
+  // Kept as a code and translated at render, so the message follows a language switch.
+  const [oidcError, setOidcError] = useState(() => oidcErrorCode(params.get('error')));
+  const shownError = error ?? (oidcError ? t(`login.oidcErrors.${oidcError}`) : null);
   const [submitting, setSubmitting] = useState(false);
 
   const canRegister = !!config?.auth?.selfRegistrationEnabled;
@@ -73,6 +78,7 @@ export function LoginPage() {
   const onSubmit = async (event: FormEvent) => {
     event.preventDefault();
     setError(null);
+    setOidcError(null);
     setSubmitting(true);
     try {
       await login(usernameOrEmail, password);
@@ -82,7 +88,7 @@ export function LoginPage() {
       }
       navigate(safeRedirectPath(params.get('from')), { replace: true });
     } catch (err) {
-      setError(apiErrorMessage(err, 'Sign-in failed. Please check your credentials.'));
+      setError(apiErrorMessage(err, t('login.failed')));
     } finally {
       setSubmitting(false);
     }
@@ -90,19 +96,26 @@ export function LoginPage() {
 
   return (
     <AuthLayout
-      title="Welcome back"
-      subtitle="Your reviews are waiting — pick up right where you left off."
+      title={t('login.title')}
+      subtitle={t('login.subtitle')}
       headerSlot={canRegister ? <AuthModeSwitch active="login" /> : undefined}
     >
-      {error && (
-        <Alert severity="error" sx={{ mb: 2 }} onClose={() => setError(null)}>
-          {error}
+      {shownError && (
+        <Alert
+          severity="error"
+          sx={{ mb: 2 }}
+          onClose={() => {
+            setError(null);
+            setOidcError(null);
+          }}
+        >
+          {shownError}
         </Alert>
       )}
       <Box component="form" onSubmit={onSubmit} noValidate>
         <Stack spacing={2}>
           <TextField
-            label="Email or username"
+            label={t('login.usernameOrEmail')}
             value={usernameOrEmail}
             onChange={(e) => setUsernameOrEmail(e.target.value)}
             autoComplete="username"
@@ -120,7 +133,7 @@ export function LoginPage() {
           />
           <Box>
             <PasswordField
-              label="Password"
+              label={t('shared.password')}
               value={password}
               onChange={setPassword}
               autoComplete="current-password"
@@ -134,7 +147,7 @@ export function LoginPage() {
                   underline="hover"
                   sx={{ fontSize: 13 }}
                 >
-                  Forgot password?
+                  {t('login.forgotPassword')}
                 </Link>
               </Box>
             )}
@@ -150,7 +163,7 @@ export function LoginPage() {
               submitting ? <CircularProgress size={16} color="inherit" /> : <ArrowRight size={16} />
             }
           >
-            Sign in
+            {t('login.submit')}
           </Button>
         </Stack>
       </Box>

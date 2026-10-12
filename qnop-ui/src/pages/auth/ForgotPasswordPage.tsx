@@ -33,9 +33,11 @@ import { useConfig } from '../../api/hooks/useConfig';
 import { AuthLayout } from '../../components/auth/AuthLayout';
 import { forgotPassword } from '../../api/auth';
 import { apiErrorMessage } from '../../utils/apiError';
+import { useTranslation } from 'react-i18next';
 
 /** Requests a password-reset email. The response is a uniform acknowledgement. */
 export function ForgotPasswordPage() {
+  const { t } = useTranslation('auth');
   const { data: config, isLoading: configLoading } = useConfig();
   const [email, setEmail] = useState('');
   const [error, setError] = useState<string | null>(null);
@@ -50,7 +52,7 @@ export function ForgotPasswordPage() {
       await forgotPassword(email);
       setDone(true);
     } catch (err) {
-      setError(apiErrorMessage(err, 'Request failed. Please try again later.'));
+      setError(apiErrorMessage(err, t('forgotPassword.failed')));
     } finally {
       setSubmitting(false);
     }
@@ -64,17 +66,14 @@ export function ForgotPasswordPage() {
   }
 
   return (
-    <AuthLayout
-      title="Locked out? It happens."
-      subtitle="Enter your email and we'll send you a secure link to get back to your reviews."
-    >
+    <AuthLayout title={t('forgotPassword.title')} subtitle={t('forgotPassword.subtitle')}>
       {done ? (
         <>
           <Alert severity="success" sx={{ mb: 2 }}>
-            If an account exists for this address, a reset link is on its way — check your inbox.
+            {t('forgotPassword.done')}
           </Alert>
           <Link component={RouterLink} to="/login" underline="hover">
-            Back to sign in
+            {t('shared.backToSignIn')}
           </Link>
         </>
       ) : (
@@ -82,7 +81,7 @@ export function ForgotPasswordPage() {
           <Box component="form" onSubmit={onSubmit} noValidate>
             <Stack spacing={2}>
               <TextField
-                label="Work email"
+                label={t('shared.workEmail')}
                 type="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
@@ -107,13 +106,13 @@ export function ForgotPasswordPage() {
                 disabled={submitting}
                 fullWidth
               >
-                Send link
+                {t('forgotPassword.submit')}
               </Button>
             </Stack>
           </Box>
           <Box sx={{ mt: 3 }}>
             <Link component={RouterLink} to="/login" underline="hover" sx={{ fontSize: 13 }}>
-              Back to sign in
+              {t('shared.backToSignIn')}
             </Link>
           </Box>
         </>

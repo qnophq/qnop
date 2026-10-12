@@ -33,9 +33,11 @@ import { PasswordStrengthMeter } from '../../components/auth/PasswordStrengthMet
 import { resetPassword } from '../../api/auth';
 import { apiErrorMessage } from '../../utils/apiError';
 import { passwordStrength } from '../../utils/passwordStrength';
+import { useTranslation } from 'react-i18next';
 
 /** Completes a password reset using the token from the emailed link. */
 export function ResetPasswordPage() {
+  const { t } = useTranslation('auth');
   // The reset itself keeps working from a valid link even where the self-service
   // request is off — an administrator may still hand somebody a link (#713).
   const canResetPassword = !!useConfig().data?.auth?.passwordResetEnabled;
@@ -58,32 +60,29 @@ export function ResetPasswordPage() {
       await resetPassword(token, password);
       setDone(true);
     } catch (err) {
-      setError(apiErrorMessage(err, 'Reset failed. Please request a new link.'));
+      setError(apiErrorMessage(err, t('resetPassword.failed')));
     } finally {
       setSubmitting(false);
     }
   };
 
   return (
-    <AuthLayout
-      title="Choose a new password"
-      subtitle="Strong and memorable — your reviews are waiting."
-    >
+    <AuthLayout title={t('resetPassword.title')} subtitle={t('resetPassword.subtitle')}>
       {done ? (
         <>
           <Alert severity="success" sx={{ mb: 2 }}>
-            Your password has been changed. You can sign in now.
+            {t('resetPassword.done')}
           </Alert>
           <Link component={RouterLink} to="/login" underline="hover">
-            To sign in
+            {t('shared.toSignIn')}
           </Link>
         </>
       ) : !token ? (
         <>
           <Alert severity="error" sx={{ mb: 2 }}>
             {canResetPassword
-              ? 'This link is invalid or incomplete. Please request a new one.'
-              : 'This link is invalid or incomplete, and this deployment does not offer self-service password reset. An administrator can set a new password for you.'}
+              ? t('resetPassword.invalidLink')
+              : t('resetPassword.invalidLinkNoReset')}
           </Alert>
           {/* Only where there is somewhere to go: pointing at /forgot-password on a
               deployment without reset would send the reader in a circle (#713). */}
@@ -92,7 +91,7 @@ export function ResetPasswordPage() {
             to={canResetPassword ? '/forgot-password' : '/login'}
             underline="hover"
           >
-            {canResetPassword ? 'Request a new link' : 'To sign in'}
+            {canResetPassword ? t('resetPassword.requestNewLink') : t('shared.toSignIn')}
           </Link>
         </>
       ) : (
@@ -100,7 +99,7 @@ export function ResetPasswordPage() {
           <Stack spacing={2}>
             <Box>
               <PasswordField
-                label="New password"
+                label={t('shared.newPassword')}
                 value={password}
                 onChange={setPassword}
                 autoComplete="new-password"
@@ -109,13 +108,13 @@ export function ResetPasswordPage() {
               <PasswordStrengthMeter password={password} />
             </Box>
             <PasswordField
-              label="Confirm password"
+              label={t('resetPassword.confirmPassword')}
               value={confirm}
               onChange={setConfirm}
               autoComplete="new-password"
               required
             />
-            {mismatch && <Alert severity="warning">The passwords don&apos;t match.</Alert>}
+            {mismatch && <Alert severity="warning">{t('shared.passwordsMismatch')}</Alert>}
             {error && <Alert severity="error">{error}</Alert>}
             <Button
               type="submit"
@@ -124,7 +123,7 @@ export function ResetPasswordPage() {
               disabled={submitting || !canSubmit}
               fullWidth
             >
-              Save password
+              {t('resetPassword.submit')}
             </Button>
           </Stack>
         </Box>

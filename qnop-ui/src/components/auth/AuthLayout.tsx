@@ -32,6 +32,8 @@ import { tokens } from '../../theme/tokens';
 import authBg from '../../assets/auth/auth-bg.webp';
 import authDocs from '../../assets/auth/auth-docs.svg';
 import { DeviceLanguageSwitcher } from '../i18n/LanguageSwitcher';
+import { useTranslation } from 'react-i18next';
+import { BRAND_NAME } from './brand';
 
 /** Slow bob for the corner document illustration (it carries its own tilt). */
 const floatDocs = keyframes`
@@ -55,6 +57,7 @@ interface AuthLayoutProps {
  * uses the dark-surface logo variant regardless of theme.
  */
 function MobileBrandBand() {
+  const { t } = useTranslation('auth');
   const logoUrl = useConfig().data?.branding?.logoDark.url;
   // The band's backgrounds fade out through a mask instead of ending on a hard
   // edge, so the navy atmosphere dissolves into whatever the theme's page
@@ -118,7 +121,7 @@ function MobileBrandBand() {
       >
         <BrandLogo
           url={logoUrl}
-          alt="qnop"
+          alt={BRAND_NAME}
           sx={{ height: { xs: 56, sm: 64 }, maxWidth: 300 }}
           fallback={
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
@@ -137,7 +140,7 @@ function MobileBrandBand() {
                 <ShieldCheck size={32} />
               </Box>
               <Typography sx={{ fontWeight: 700, fontSize: 28, letterSpacing: '-0.02em' }}>
-                qnop
+                {BRAND_NAME}
               </Typography>
             </Box>
           }
@@ -151,7 +154,7 @@ function MobileBrandBand() {
             fontWeight: 600,
           }}
         >
-          Sovereign document review
+          {t('brand.tagline')}
         </Typography>
       </Box>
     </Box>

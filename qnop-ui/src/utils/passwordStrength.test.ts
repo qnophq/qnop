@@ -31,7 +31,6 @@ describe('passwordStrength', () => {
     const r = passwordStrength('');
     expect(r.score).toBe(0);
     expect(r.acceptable).toBe(false);
-    expect(r.label).toBe('');
   });
 
   it('marks a short password as not acceptable', () => {
@@ -45,7 +44,6 @@ describe('passwordStrength', () => {
   it('scores a long mixed password as strong', () => {
     const r = passwordStrength('Str0ng#Pass');
     expect(r.score).toBe(4);
-    expect(r.label).toBe('Strong');
     expect(r.acceptable).toBe(true);
   });
 });

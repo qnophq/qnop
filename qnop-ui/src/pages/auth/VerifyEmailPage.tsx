@@ -27,11 +27,13 @@ import Link from '@mui/material/Link';
 import { Link as RouterLink, useSearchParams } from 'react-router';
 import { AuthLayout } from '../../components/auth/AuthLayout';
 import { verifyEmail } from '../../api/auth';
+import { useTranslation } from 'react-i18next';
 
 type Status = 'verifying' | 'success' | 'error';
 
 /** Landing page for the email-verification link; verifies the token on mount. */
 export function VerifyEmailPage() {
+  const { t } = useTranslation('auth');
   const [params] = useSearchParams();
   const token = params.get('token') ?? '';
   const [status, setStatus] = useState<Status>(token ? 'verifying' : 'error');
@@ -48,30 +50,30 @@ export function VerifyEmailPage() {
   }, [token]);
 
   return (
-    <AuthLayout title="Verify email">
+    <AuthLayout title={t('verifyEmail.title')}>
       {status === 'verifying' && (
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, color: 'text.secondary' }}>
           <CircularProgress size={20} />
-          Confirming your address…
+          {t('verifyEmail.verifying')}
         </Box>
       )}
       {status === 'success' && (
         <>
           <Alert severity="success" sx={{ mb: 2 }}>
-            Your email address is confirmed — your reviewer profile is ready. You can sign in now.
+            {t('verifyEmail.success')}
           </Alert>
           <Link component={RouterLink} to="/login" underline="hover">
-            To sign in
+            {t('shared.toSignIn')}
           </Link>
         </>
       )}
       {status === 'error' && (
         <>
           <Alert severity="error" sx={{ mb: 2 }}>
-            The confirmation link is invalid or expired.
+            {t('verifyEmail.error')}
           </Alert>
           <Link component={RouterLink} to="/login" underline="hover">
-            To sign in
+            {t('shared.toSignIn')}
           </Link>
         </>
       )}

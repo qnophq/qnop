@@ -21,6 +21,8 @@
 
 import { describe, expect, it } from 'vitest';
 import type { ServerConfigFeatures } from '../../api/generated';
+import { ensureLocaleLoaded } from '../../i18n';
+import i18n from '../../i18n';
 import { crumbsFor, visibleNavGroups } from './navConfig';
 
 function ids(role: 'ADMIN' | 'MEMBER' | 'AUDITOR' | null): string[] {
@@ -173,5 +175,21 @@ describe('capability-aware navigation (#674)', () => {
     expect(ids).not.toContain('configuration');
     // The quotas it reports keep applying; only the screen is gone (#683).
     expect(ids).toContain('users');
+  });
+});
+
+describe('labels follow the translator (issue #464)', () => {
+  it('resolves nav and breadcrumb labels in the given language', async () => {
+    await ensureLocaleLoaded('de');
+    const t = i18n.getFixedT('de', 'shell');
+    expect(crumbsFor('/admin/users', t)).toEqual([
+      { label: 'Administration' },
+      { label: 'Benutzer' },
+    ]);
+    expect(crumbsFor('/users/someone', t)).toEqual([{ label: 'Profil' }]);
+    const labels = visibleNavGroups('MEMBER', undefined, t).flatMap((g) =>
+      g.items.map((i) => i.label),
+    );
+    expect(labels).toEqual(['Dashboard', 'Reviews', 'Meine Teams', 'Nachrichten']);
   });
 });

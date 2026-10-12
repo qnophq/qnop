@@ -22,16 +22,14 @@
 export interface PasswordStrength {
   /** 0 (empty) … 4 (strong). */
   score: 0 | 1 | 2 | 3 | 4;
-  label: string;
   /** Whether the password is acceptable for submission (length ≥ 8). */
   acceptable: boolean;
 }
 
-const LABELS = ['', 'Weak', 'Fair', 'Good', 'Strong'] as const;
-
 /**
  * A lightweight password-strength estimate for the register/reset meters
- * (mirrors the design prototype). Pure and synchronous — not a security control;
+ * (mirrors the design prototype). The meter names a score through the `auth`
+ * catalog (`password.strength.*`, issue #464). Pure and synchronous — not a security control;
  * the backend enforces the real password policy.
  */
 export function passwordStrength(password: string): PasswordStrength {
@@ -41,7 +39,7 @@ export function passwordStrength(password: string): PasswordStrength {
   if (/[0-9]/.test(password)) raw++;
   if (/[^A-Za-z0-9]/.test(password)) raw++;
   const score = (password.length === 0 ? 0 : raw) as PasswordStrength['score'];
-  return { score, label: LABELS[score], acceptable: password.length >= 8 };
+  return { score, acceptable: password.length >= 8 };
 }
 
 // Readable character classes for self-service generation — ambiguous glyphs

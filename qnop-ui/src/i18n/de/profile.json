@@ -1,0 +1,136 @@
+{
+  "page": {
+    "title": "Profil",
+    "subtitle": "Verwalte dein Konto und wie du in qnop erscheinst.",
+    "unknownName": "Unbekannt"
+  },
+  "stats": {
+    "owned": "Eigene",
+    "reviewing": "Im Review",
+    "completed": "Abgeschlossen"
+  },
+  "achievements": {
+    "heading": "Erfolge",
+    "earnedCount": "{{earned}} von {{total}} erreicht",
+    "tooltip": "{{title}} — {{caption}}",
+    "ariaEarned": "{{title}}: {{caption}}",
+    "ariaLocked": "{{title}}: {{caption}} (gesperrt)",
+    "liftoff": {
+      "title": "Startschuss",
+      "earned": "Ein Review gestartet",
+      "locked": "Starte dein erstes Review",
+      "lockedPublic": "Noch kein Review gestartet"
+    },
+    "crew": {
+      "title": "Crew-Mitglied",
+      "earned": "Einer Review-Crew beigetreten",
+      "locked": "Lass dich zu einem Review einladen",
+      "lockedPublic": "Noch in keiner Crew"
+    },
+    "closer": {
+      "title": "Abschließer",
+      "earned": "Ein Review abgeschlossen",
+      "locked": "Bring eines deiner Reviews bis zum Abschluss",
+      "earnedPublic": "Einen Einwand geklärt",
+      "lockedPublic": "Noch keinen Einwand geklärt"
+    },
+    "face": {
+      "title": "Gesicht zeigen",
+      "earned": "Dein Team erkennt dich",
+      "locked": "Lade ein Profilbild hoch"
+    },
+    "tunedIn": {
+      "title": "Auf Empfang",
+      "earned": "Review-Mails halten dich auf dem Laufenden",
+      "locked": "Schalte Review-Benachrichtigungen ein"
+    },
+    "voice": {
+      "title": "Stimme",
+      "earned": "{{milestone}}+ Kommentare in Diskussionen",
+      "locked": "Erreicht ab {{milestone}} Kommentaren"
+    },
+    "sharpEye": {
+      "title": "Scharfes Auge",
+      "earned": "{{milestone}}+ Anmerkungen erstellt",
+      "locked": "Erreicht ab {{milestone}} Anmerkungen"
+    }
+  },
+  "avatar": {
+    "heading": "Profilbild",
+    "description": "Lade ein Foto hoch, damit dein Team dich erkennt. Es wird in der ganzen App angezeigt; entfernst du es, erscheinen wieder deine Initialen.",
+    "uploadAria": "Profilbild hochladen",
+    "dropPrompt": "Zieh ein Bild hierher oder <strong>durchsuche</strong> deine Dateien",
+    "constraints": "PNG, JPEG oder WebP · bis 1 MB",
+    "remove": "Foto entfernen",
+    "invalidType": "Bitte wähle ein PNG-, JPEG- oder WebP-Bild.",
+    "tooLarge": "Das Bild ist größer als 1 MB.",
+    "confirmTitle": "Profilbild entfernen",
+    "confirmMessage": "Damit wird das Profilbild entfernt und stattdessen der Avatar mit deinen Initialen angezeigt. Du kannst jederzeit ein neues hochladen.",
+    "confirmLabel": "Entfernen"
+  },
+  "crop": {
+    "title": "Bild anpassen",
+    "zoom": "Zoom",
+    "hint": "Zum Verschieben ziehen, mit dem Regler zoomen.",
+    "cancel": "Abbrechen",
+    "apply": "Foto verwenden"
+  },
+  "notifications": {
+    "heading": "Benachrichtigungen",
+    "description": "E-Mails zu Reviews, an denen du beteiligt bist — wenn du als Reviewer hinzugefügt wirst, bei neuen Anmerkungen, Antworten in deinen Diskussionen, Entscheidungen und Statusänderungen.",
+    "cadenceLabel": "Per E-Mail über Review-Aktivität informieren",
+    "mentionsNote": "Erwähnungen erreichen dich so oder so sofort — wer dich persönlich nennt, soll nicht bis morgen warten müssen.",
+    "cadence": {
+      "IMMEDIATE": {
+        "label": "Sofort",
+        "help": "Eine E-Mail pro Ereignis."
+      },
+      "DAILY": {
+        "label": "Einmal am Tag",
+        "help": "Eine Zusammenfassung jeden Morgen, in deiner Zeitzone. An ruhigen Tagen wird nichts verschickt."
+      },
+      "OFF": {
+        "label": "Nie",
+        "help": "Keine Review-E-Mails. Benachrichtigungen in der App bleiben unverändert."
+      }
+    }
+  },
+  "tracking": {
+    "heading": "Nutzungsmessung",
+    "description": "Anonyme Zählung, welche Seiten genutzt werden, damit dieser Workspace auf Basis von Daten statt Vermutungen verbessert werden kann. Seitenadressen werden vorher auf ihre Struktur reduziert — nie ein Dokument, nie ein Name, nie ein Suchbegriff. Diese Wahl gilt für dein Konto auf jedem Gerät, auf dem du dich anmeldest.",
+    "toggle": "Mich in die anonyme Nutzungsmessung einbeziehen"
+  },
+  "timezone": {
+    "heading": "Zeitzone",
+    "description": "Datums- und Zeitangaben in qnop erscheinen in dieser Zeitzone.",
+    "currentTimeIn": "Aktuelle Uhrzeit in {{zone}}",
+    "useDevice": "Zeitzone meines Geräts verwenden ({{zone}})",
+    "followingDefault": "Folgt aktuell dem Workspace-Standard.",
+    "now": "jetzt"
+  },
+  "missions": {
+    "sharedCaption": "Gemeinsame Reviews",
+    "owned": {
+      "title": "Geleitete Missionen",
+      "empty": "{{name}} hat noch keine gemeinsamen Reviews geleitet."
+    },
+    "reviewing": {
+      "title": "Beigetretene Missionen",
+      "empty": "{{name}} ist noch in keinem gemeinsamen Review dabei."
+    }
+  },
+  "moves": {
+    "title": "Letzte Aktivitäten",
+    "caption": "In gemeinsamen Reviews",
+    "empty": "Keine aktuellen Aktivitäten von {{name}} in gemeinsamen Reviews."
+  },
+  "toast": {
+    "settingSaveFailed": "Die Einstellung konnte nicht gespeichert werden.",
+    "timezoneSaveFailed": "Die Zeitzone konnte nicht gespeichert werden.",
+    "timezoneUpdated": "Zeitzone aktualisiert.",
+    "avatarUpdated": "Profilbild aktualisiert.",
+    "avatarUploadFailed": "Das Bild konnte nicht hochgeladen werden. Bitte versuch es noch einmal.",
+    "avatarRemoved": "Profilbild entfernt.",
+    "avatarRemoveFailed": "Das Bild konnte nicht entfernt werden. Bitte versuch es noch einmal."
+  }
+}

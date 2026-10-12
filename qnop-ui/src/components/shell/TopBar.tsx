@@ -34,6 +34,7 @@ import { NotificationsPopover } from './NotificationsPopover';
 import { Breadcrumbs } from './Breadcrumbs';
 import { GlobalSearch } from './search/GlobalSearch';
 import { AccountLanguageSwitcher } from '../i18n/LanguageSwitcher';
+import { useTranslation } from 'react-i18next';
 
 interface TopBarProps {
   isMobile: boolean;
@@ -48,6 +49,7 @@ interface TopBarProps {
  * reaches for.
  */
 export function TopBar({ isMobile, onToggleSidebar }: TopBarProps) {
+  const { t } = useTranslation('shell');
   const themeMode = useUiStore((s) => s.themeMode);
   const toggleTheme = useUiStore((s) => s.toggleTheme);
   const [notificationsAnchor, setNotificationsAnchor] = useState<HTMLElement | null>(null);
@@ -62,12 +64,12 @@ export function TopBar({ isMobile, onToggleSidebar }: TopBarProps) {
       sx={{ borderBottom: 1, borderColor: 'divider', bgcolor: 'background.paper' }}
     >
       <Toolbar sx={{ gap: 1.5, minHeight: { xs: 56, sm: 56 } }}>
-        <Tooltip title={isMobile ? 'Menu' : 'Toggle menu'}>
+        <Tooltip title={isMobile ? t('topBar.menu') : t('topBar.toggleMenu')}>
           <IconButton
             onClick={onToggleSidebar}
             size="small"
             edge="start"
-            aria-label="Toggle menu"
+            aria-label={t('topBar.toggleMenu')}
             sx={touchTargetSx}
           >
             {isMobile ? <MenuIcon size={18} /> : <PanelLeft size={18} />}
@@ -85,23 +87,31 @@ export function TopBar({ isMobile, onToggleSidebar }: TopBarProps) {
 
         <AccountLanguageSwitcher />
 
-        <Tooltip title={themeMode === 'dark' ? 'Light mode' : 'Dark mode'}>
+        <Tooltip title={themeMode === 'dark' ? t('topBar.lightMode') : t('topBar.darkMode')}>
           <IconButton
             onClick={toggleTheme}
             size="small"
             sx={touchTargetSx}
-            aria-label={themeMode === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
+            aria-label={themeMode === 'dark' ? t('topBar.switchToLight') : t('topBar.switchToDark')}
           >
             {themeMode === 'dark' ? <Sun size={18} /> : <Moon size={18} />}
           </IconButton>
         </Tooltip>
 
         <Tooltip
-          title={unreadCount > 0 ? `Notifications (${unreadCount} unread)` : 'Notifications'}
+          title={
+            unreadCount > 0
+              ? t('topBar.notificationsUnreadTooltip', { count: unreadCount })
+              : t('topBar.notifications')
+          }
         >
           <IconButton
             size="small"
-            aria-label={unreadCount > 0 ? `Notifications, ${unreadCount} unread` : 'Notifications'}
+            aria-label={
+              unreadCount > 0
+                ? t('topBar.notificationsUnreadLabel', { count: unreadCount })
+                : t('topBar.notifications')
+            }
             aria-haspopup="dialog"
             aria-expanded={notificationsAnchor ? true : undefined}
             onClick={(event) => setNotificationsAnchor(event.currentTarget)}

@@ -31,6 +31,7 @@ import { BellOff } from 'lucide-react';
 import { useNavigate } from 'react-router';
 import { useMarkAllNotificationsRead, useNotifications } from '../../api/hooks/useNotifications';
 import { NotificationRow } from '../notifications/NotificationRow';
+import { useTranslation } from 'react-i18next';
 
 const QUICKVIEW_SIZE = 6;
 
@@ -47,6 +48,7 @@ export function NotificationsPopover({
   anchorEl: HTMLElement | null;
   onClose: () => void;
 }) {
+  const { t } = useTranslation('shell');
   const navigate = useNavigate();
   const open = Boolean(anchorEl);
   // Only fetched while open — a closed popover has no business polling; the
@@ -75,7 +77,7 @@ export function NotificationsPopover({
         sx={{ alignItems: 'center', justifyContent: 'space-between', px: 2, py: 1.5 }}
       >
         <Typography sx={{ fontWeight: 700, fontSize: 15 }}>
-          Notifications
+          {t('notifications.title')}
           {unread > 0 && (
             <Box
               component="span"
@@ -87,11 +89,11 @@ export function NotificationsPopover({
                 fontSize: 12,
                 fontWeight: 700,
                 color: 'primary.main',
-                bgcolor: (t) =>
-                  alpha(t.palette.primary.main, t.palette.mode === 'dark' ? 0.18 : 0.1),
+                bgcolor: (theme) =>
+                  alpha(theme.palette.primary.main, theme.palette.mode === 'dark' ? 0.18 : 0.1),
               }}
             >
-              {unread} new
+              {t('notifications.newCount', { count: unread })}
             </Box>
           )}
         </Typography>
@@ -102,7 +104,7 @@ export function NotificationsPopover({
             disabled={markAllRead.isPending}
             sx={{ fontSize: 12.5 }}
           >
-            Mark all read
+            {t('notifications.markAllRead')}
           </Button>
         )}
       </Stack>
@@ -110,13 +112,13 @@ export function NotificationsPopover({
 
       {isPending && open ? (
         <Stack sx={{ alignItems: 'center', py: 5 }}>
-          <CircularProgress size={22} aria-label="Loading notifications" />
+          <CircularProgress size={22} aria-label={t('notifications.loading')} />
         </Stack>
       ) : items.length === 0 ? (
         <Stack sx={{ alignItems: 'center', textAlign: 'center', px: 3, py: 5 }} spacing={1}>
           <BellOff size={22} aria-hidden />
           <Typography sx={{ fontSize: 13.5, color: 'text.secondary' }}>
-            Nothing new. Activity on your reviews will land here.
+            {t('notifications.empty')}
           </Typography>
         </Stack>
       ) : (
@@ -135,7 +137,7 @@ export function NotificationsPopover({
       <Divider />
       <Box sx={{ p: 1, textAlign: 'center' }}>
         <Button size="small" fullWidth onClick={() => go('/messages')} sx={{ fontSize: 13 }}>
-          See all messages
+          {t('notifications.seeAll')}
         </Button>
       </Box>
     </Popover>
