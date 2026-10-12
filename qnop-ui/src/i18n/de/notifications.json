@@ -46,9 +46,9 @@
   "empty": {
     "eyebrow": "Nachrichten",
     "title": "Dein Postfach ist auf Empfang",
-    "body": "Noch ist nichts angekommen. Sobald dich jemand in einem Kommentar erwähnt, auf eine deiner Anmerkungen antwortet oder ein Review voranbringt, erscheint es hier — ganz ohne E-Mail-Postfach.",
+    "body": "Noch ist nichts angekommen. Sobald dich jemand in einem Kommentar erwähnt, auf eine deiner Anmerkungen antwortet oder ein Review voranbringt, erscheint es hier — ganz ohne E-Mail.",
     "perks": {
-      "mentions": "Erwähnungen, die dich nennen",
+      "mentions": "Erwähnungen deines Namens",
       "replies": "Antworten in deinen Threads",
       "decisions": "Entscheidungen und neue Versionen"
     },

@@ -73,8 +73,8 @@ describe('profile surfaces in German (issue #464)', () => {
       />,
     );
 
-    // The card heading and the shared picker's field label (issue #836) both read "Zeitzone".
-    expect(screen.getAllByText('Zeitzone').length).toBeGreaterThan(1);
+    // The card title; the shared picker's field label (issue #836) reads the same.
+    expect(screen.getByText('Zeitzone', { selector: 'p' })).toBeInTheDocument();
     expect(screen.getByRole('combobox', { name: 'Zeitzone' })).toBeInTheDocument();
     expect(screen.getByText('Folgt aktuell dem Workspace-Standard.')).toBeInTheDocument();
   });

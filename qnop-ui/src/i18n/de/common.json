@@ -37,7 +37,7 @@
     "message": "In diesem Teil der Seite ist ein unerwarteter Fehler aufgetreten. Du kannst es erneut versuchen oder die Seite neu laden, falls es wieder passiert."
   },
   "errors": {
-    "rateLimited": "Zu viele Versuche. Bitte versuch es später erneut.",
+    "rateLimited": "Zu viele Versuche. Bitte versuche es später noch einmal.",
     "invalidOrExpiredLink": "Die Anfrage ist ungültig oder der Link ist abgelaufen.",
     "notFound": {
       "title": "Diese Seite hat sich zum Papierflieger gefaltet",
@@ -53,7 +53,7 @@
       "message": "Diese qnop-Installation bietet diese Funktion nicht an. An deinem Konto liegt das nicht — wer diese Installation betreibt, entscheidet darüber und kann sie wieder einschalten."
     },
     "conflict": {
-      "title": "Zwei Pins auf derselben Zeile",
+      "title": "Zwei Anmerkungen auf derselben Zeile",
       "message": "Jemand hat das geändert, während du auf dem Weg dorthin warst. Lade neu, um den aktuellen Stand zu sehen — von dir ist nichts verloren gegangen.",
       "reload": "Seite neu laden"
     },
@@ -76,14 +76,14 @@
     }
   },
   "search": {
-    "clear": "Suche leeren"
+    "clear": "Suche zurücksetzen"
   },
   "timezone": {
     "label": "Zeitzone",
     "placeholder": "Stadt oder Region suchen…"
   },
   "quota": {
-    "ceilingNote": "Diese Obergrenze wird dort festgelegt, wo diese Installation konfiguriert ist — nicht in den Admin-Einstellungen."
+    "ceilingNote": "Diese Obergrenze wird dort festgelegt, wo die Installation konfiguriert ist — nicht in den Admin-Einstellungen."
   },
   "banner": {
     "dismiss": "Hinweis ausblenden"
@@ -92,7 +92,7 @@
     "title": "Review-Anhang",
     "saved": "Gespeichert",
     "description": "Diese Datei wurde an eine Anmerkung angehängt. Lade sie auf dein Gerät herunter.",
-    "unavailable": "Diese Datei ist nicht verfügbar. Sie wurde vielleicht gelöscht, oder das Review ist nicht mit dir geteilt.",
+    "unavailable": "Diese Datei ist nicht verfügbar. Sie wurde vielleicht gelöscht, oder das Review ist nicht für dich freigegeben.",
     "download": "Herunterladen",
     "downloadAgain": "Erneut herunterladen",
     "openReview": "Review öffnen"

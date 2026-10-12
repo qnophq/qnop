@@ -59,7 +59,7 @@ describe('apiErrorMessage', () => {
     await applyLocale('de');
     try {
       expect(apiErrorMessage(axiosWithStatus(429), 'fallback')).toBe(
-        'Zu viele Versuche. Bitte versuch es später erneut.',
+        'Zu viele Versuche. Bitte versuche es später noch einmal.',
       );
     } finally {
       await applyLocale('en');

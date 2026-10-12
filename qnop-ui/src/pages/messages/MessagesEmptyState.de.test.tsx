@@ -51,7 +51,7 @@ describe('MessagesEmptyState in German', () => {
     expect(
       screen.getByRole('heading', { name: 'Dein Postfach ist auf Empfang' }),
     ).toBeInTheDocument();
-    expect(screen.getByText('Erwähnungen, die dich nennen')).toBeInTheDocument();
+    expect(screen.getByText('Erwähnungen deines Namens')).toBeInTheDocument();
     expect(screen.getByRole('link', { name: /Zu deinen Reviews/ })).toBeInTheDocument();
     expect(
       screen.getByRole('img', {
