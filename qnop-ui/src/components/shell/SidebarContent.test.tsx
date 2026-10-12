@@ -19,11 +19,12 @@
  * SPDX-License-Identifier: AGPL-3.0-only
  */
 
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import { MemoryRouter } from 'react-router';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { ThemeProvider } from '@mui/material/styles';
+import { applyLocale } from '../../i18n';
 import { buildTheme } from '../../theme/theme';
 import { useAuthStore } from '../../stores/authStore';
 import { checkA11y } from '../../test/axe';
@@ -65,5 +66,26 @@ describe('SidebarContent landmarks (issue #460)', () => {
   it('has no accessibility violations collapsed', async () => {
     const { container } = renderSidebar(true);
     expect(await checkA11y(container)).toHaveNoViolations();
+  });
+});
+
+describe('SidebarContent in German (issue #464)', () => {
+  beforeEach(async () => {
+    useAuthStore.setState({ role: 'ADMIN', userId: 'u1', displayName: 'Ada' });
+    await applyLocale('de');
+  });
+  afterEach(async () => {
+    await applyLocale('en');
+  });
+
+  it('renders the navigation, group heading and role from the German catalog', () => {
+    renderSidebar();
+    const nav = screen.getByRole('navigation', { name: 'Hauptnavigation' });
+    expect(nav).toHaveTextContent('Meine Teams');
+    expect(nav).toHaveTextContent('Nachrichten');
+    expect(nav).toHaveTextContent('Einstellungen');
+    expect(nav).toHaveTextContent('Speicherkonsistenz');
+    expect(screen.getByText('Administrator')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Benutzermenü' })).toBeInTheDocument();
   });
 });

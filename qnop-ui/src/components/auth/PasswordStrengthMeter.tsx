@@ -22,6 +22,7 @@
 import Box from '@mui/material/Box';
 import Typography from '@mui/material/Typography';
 import { passwordStrength } from '../../utils/passwordStrength';
+import { useTranslation } from 'react-i18next';
 
 const COLOR = [
   'transparent',
@@ -33,10 +34,11 @@ const COLOR = [
 
 /** A four-step password-strength bar shown under password fields (register/reset). */
 export function PasswordStrengthMeter({ password }: { password: string }) {
+  const { t } = useTranslation('auth');
   if (!password) {
     return null;
   }
-  const { score, label } = passwordStrength(password);
+  const { score } = passwordStrength(password);
 
   return (
     <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.25, mt: 1 }}>
@@ -55,7 +57,7 @@ export function PasswordStrengthMeter({ password }: { password: string }) {
         ))}
       </Box>
       <Typography sx={{ fontSize: 11.5, fontWeight: 500, color: COLOR[score], minWidth: 44 }}>
-        {label}
+        {score > 0 ? t(`password.strength.${score as 1 | 2 | 3 | 4}`) : ''}
       </Typography>
     </Box>
   );

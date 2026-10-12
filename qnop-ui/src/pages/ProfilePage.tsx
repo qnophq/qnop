@@ -51,11 +51,14 @@ import {
 } from '../api/hooks/useUserSettings';
 import { useDisplayTimezone } from '../api/hooks/useDisplayTimezone';
 import { TIMEZONE_SETTING_KEY } from '../utils/timezone';
-import { CADENCE_HELP, CADENCE_OPTIONS, normalizeCadence } from '../utils/reviewMailCadence';
+import { CADENCE_OPTIONS, normalizeCadence } from '../utils/reviewMailCadence';
 import { useTranslation } from 'react-i18next';
 import { useExplicitLanguage, useInheritedLanguage } from '../api/hooks/useDisplayLanguage';
 import { LanguageSetting } from '../components/profile/LanguageSetting';
 import { PREFERRED_LANGUAGE_SETTING_KEY } from '../i18n/locales';
+
+/** A review-mail cadence value, the key segment of its catalog label and help text. */
+type Cadence = (typeof CADENCE_OPTIONS)[number]['value'];
 
 type Toast = { message: string; severity: 'success' | 'error' } | null;
 
@@ -88,7 +91,7 @@ export function ProfilePage() {
   // so the control shows what will actually happen rather than a guess (#680).
   const reviewMailsCadence = normalizeCadence(reviewMailsSetting?.value);
 
-  const { t } = useTranslation();
+  const { t } = useTranslation(['profile', 'common']);
   // The zone actually applied (own preference → workspace default → UTC); an empty stored
   // value means the user has made no explicit choice yet (issue #465).
   const displayZone = useDisplayTimezone();
@@ -111,7 +114,7 @@ export function ProfilePage() {
     updateSettings.mutate(
       { [EMAIL_REVIEW_NOTIFICATIONS_KEY]: cadence },
       {
-        onError: () => setToast({ message: 'The setting could not be saved.', severity: 'error' }),
+        onError: () => setToast({ message: t('toast.settingSaveFailed'), severity: 'error' }),
       },
     );
   };
@@ -126,7 +129,7 @@ export function ProfilePage() {
     updateSettings.mutate(
       { [OPT_OUT_KEY]: String(!measured) },
       {
-        onError: () => setToast({ message: 'The setting could not be saved.', severity: 'error' }),
+        onError: () => setToast({ message: t('toast.settingSaveFailed'), severity: 'error' }),
       },
     );
     // Opting back in means the browser question is asked again rather than
@@ -140,9 +143,8 @@ export function ProfilePage() {
     updateSettings.mutate(
       { [TIMEZONE_SETTING_KEY]: zone },
       {
-        onError: () =>
-          setToast({ message: 'The time zone could not be saved.', severity: 'error' }),
-        onSuccess: () => setToast({ message: 'Time zone updated.', severity: 'success' }),
+        onError: () => setToast({ message: t('toast.timezoneSaveFailed'), severity: 'error' }),
+        onSuccess: () => setToast({ message: t('toast.timezoneUpdated'), severity: 'success' }),
       },
     );
   };
@@ -153,8 +155,8 @@ export function ProfilePage() {
     updateSettings.mutate(
       { [PREFERRED_LANGUAGE_SETTING_KEY]: language },
       {
-        onError: () => setToast({ message: t('language.saveFailed'), severity: 'error' }),
-        onSuccess: () => setToast({ message: t('language.updated'), severity: 'success' }),
+        onError: () => setToast({ message: t('common:language.saveFailed'), severity: 'error' }),
+        onSuccess: () => setToast({ message: t('common:language.updated'), severity: 'success' }),
       },
     );
   };
@@ -162,24 +164,18 @@ export function ProfilePage() {
   const onSelect = async (blob: Blob) => {
     try {
       await upload.mutateAsync(blob);
-      setToast({ message: 'Profile picture updated.', severity: 'success' });
+      setToast({ message: t('toast.avatarUpdated'), severity: 'success' });
     } catch {
-      setToast({
-        message: 'The picture could not be uploaded. Please try again.',
-        severity: 'error',
-      });
+      setToast({ message: t('toast.avatarUploadFailed'), severity: 'error' });
     }
   };
 
   const onRemove = async () => {
     try {
       await remove.mutateAsync();
-      setToast({ message: 'Profile picture removed.', severity: 'success' });
+      setToast({ message: t('toast.avatarRemoved'), severity: 'success' });
     } catch {
-      setToast({
-        message: 'The picture could not be removed. Please try again.',
-        severity: 'error',
-      });
+      setToast({ message: t('toast.avatarRemoveFailed'), severity: 'error' });
     }
   };
 
@@ -187,10 +183,10 @@ export function ProfilePage() {
     <Stack spacing={3}>
       <Box>
         <Typography variant="h1" sx={{ fontSize: 28 }}>
-          Profile
+          {t('page.title')}
         </Typography>
         <Typography color="text.secondary" sx={{ mt: 0.5 }}>
-          Manage your account and how you appear across qnop.
+          {t('page.subtitle')}
         </Typography>
       </Box>
 
@@ -228,7 +224,7 @@ export function ProfilePage() {
             </Box>
             <Box sx={{ minWidth: 0 }}>
               <Typography sx={{ fontSize: 22, fontWeight: 600, lineHeight: 1.2 }} noWrap>
-                {displayName ?? 'Unknown'}
+                {displayName ?? t('page.unknownName')}
               </Typography>
               <Typography color="text.secondary" noWrap>
                 {email}
@@ -243,9 +239,9 @@ export function ProfilePage() {
           {/* The reviewer scoreboard — the dashboard's numbers language. */}
           <Stack direction="row" spacing={3} sx={{ pr: { md: 1 } }}>
             {[
-              { label: 'Owned', value: stats.owned },
-              { label: 'Reviewing', value: stats.reviewing },
-              { label: 'Completed', value: stats.completed },
+              { label: t('stats.owned'), value: stats.owned },
+              { label: t('stats.reviewing'), value: stats.reviewing },
+              { label: t('stats.completed'), value: stats.completed },
             ].map(({ label, value }) => (
               <Box key={label} sx={{ textAlign: 'center' }}>
                 <Typography
@@ -273,19 +269,20 @@ export function ProfilePage() {
           spacing={1}
           sx={{ alignItems: 'baseline', justifyContent: 'space-between', mb: 1.5 }}
         >
-          <Typography sx={{ fontSize: 14, fontWeight: 700 }}>Achievements</Typography>
+          <Typography sx={{ fontSize: 14, fontWeight: 700 }}>
+            {t('achievements.heading')}
+          </Typography>
           <Typography variant="caption" color="text.secondary">
-            {earnedCount} of {achievements.length} earned
+            {t('achievements.earnedCount', { earned: earnedCount, total: achievements.length })}
           </Typography>
         </Stack>
         <AchievementRow achievements={achievements} />
       </Paper>
 
       <Paper variant="outlined" sx={{ p: { xs: 2.5, sm: 3 } }}>
-        <Typography sx={{ fontSize: 16, fontWeight: 600 }}>Profile picture</Typography>
+        <Typography sx={{ fontSize: 16, fontWeight: 600 }}>{t('avatar.heading')}</Typography>
         <Typography color="text.secondary" sx={{ fontSize: 14, mt: 0.5, mb: 2.5 }}>
-          Upload a photo so teammates recognise you. It is shown across the app; remove it to fall
-          back to your initials.
+          {t('avatar.description')}
         </Typography>
         <Divider sx={{ mb: 2.5 }} />
         <AvatarUploader
@@ -298,10 +295,9 @@ export function ProfilePage() {
       </Paper>
 
       <Paper variant="outlined" sx={{ p: { xs: 2.5, sm: 3 } }}>
-        <Typography sx={{ fontSize: 16, fontWeight: 600 }}>Notifications</Typography>
+        <Typography sx={{ fontSize: 16, fontWeight: 600 }}>{t('notifications.heading')}</Typography>
         <Typography color="text.secondary" sx={{ fontSize: 14, mt: 0.5, mb: 2.5 }}>
-          Emails about reviews you are part of — being added as a reviewer, new annotations, replies
-          in your discussions, decisions, and status changes.
+          {t('notifications.description')}
         </Typography>
         <Divider sx={{ mb: 1.5 }} />
         {/* Three choices rather than a switch (issue #680): with on/off, the only
@@ -309,33 +305,29 @@ export function ProfilePage() {
             mattered was missed along with the ninety that did not. */}
         <TextField
           select
-          label="Email me about review activity"
+          label={t('notifications.cadenceLabel')}
           value={reviewMailsCadence}
           onChange={(event) => onChangeReviewMails(event.target.value)}
           disabled={settingsQuery.isPending}
-          helperText={CADENCE_HELP[reviewMailsCadence]}
+          helperText={t(`notifications.cadence.${reviewMailsCadence as Cadence}.help`)}
           sx={{ maxWidth: 420 }}
         >
           {CADENCE_OPTIONS.map((option) => (
             <MenuItem key={option.value} value={option.value}>
-              {option.label}
+              {t(`notifications.cadence.${option.value}.label`)}
             </MenuItem>
           ))}
         </TextField>
         <Typography color="text.secondary" sx={{ fontSize: 13, mt: 1.5 }}>
-          Mentions reach you straight away either way — being named personally is the one case where
-          waiting costs something.
+          {t('notifications.mentionsNote')}
         </Typography>
       </Paper>
 
       {trackingConfigured && (
         <Paper variant="outlined" sx={{ p: { xs: 2.5, sm: 3 } }}>
-          <Typography sx={{ fontSize: 16, fontWeight: 600 }}>Usage measurement</Typography>
+          <Typography sx={{ fontSize: 16, fontWeight: 600 }}>{t('tracking.heading')}</Typography>
           <Typography color="text.secondary" sx={{ fontSize: 14, mt: 0.5, mb: 2.5 }}>
-            Anonymous counts of which pages get used, so this workspace can be improved with
-            evidence rather than guesswork. Page addresses are reduced to their shape first — never
-            a document, never a name, never a search term. This choice follows your account to every
-            device you sign in from.
+            {t('tracking.description')}
           </Typography>
           <Divider sx={{ mb: 1.5 }} />
           <FormControlLabel
@@ -344,10 +336,10 @@ export function ProfilePage() {
                 checked={!optedOut}
                 onChange={(event) => onToggleTracking(event.target.checked)}
                 disabled={settingsQuery.isPending}
-                slotProps={{ input: { 'aria-label': 'Include me in anonymous usage measurement' } }}
+                slotProps={{ input: { 'aria-label': t('tracking.toggle') } }}
               />
             }
-            label="Include me in anonymous usage measurement"
+            label={t('tracking.toggle')}
           />
         </Paper>
       )}

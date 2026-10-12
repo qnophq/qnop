@@ -36,6 +36,10 @@ import { useAuthStore } from '../../stores/authStore';
 import { BrandLogo } from '../branding/BrandLogo';
 import { visibleNavGroups } from './navConfig';
 import { UserFooter } from './UserFooter';
+import { useTranslation } from 'react-i18next';
+
+/** The product name — a brand, the same in every language. */
+const BRAND_NAME = 'qnop';
 
 interface SidebarContentProps {
   collapsed: boolean;
@@ -53,7 +57,8 @@ export function SidebarContent({ collapsed, onNavigate }: SidebarContentProps) {
   // A page whose every action the deployment refuses does not belong in the
   // sidebar (issue #674).
   const features = useConfig().data?.features;
-  const groups = visibleNavGroups(role, features);
+  const { t } = useTranslation('shell');
+  const groups = visibleNavGroups(role, features, t);
   const theme = useTheme();
   const branding = useConfig().data?.branding;
   const logomarkUrl = branding?.logomark.url;
@@ -92,7 +97,7 @@ export function SidebarContent({ collapsed, onNavigate }: SidebarContentProps) {
         {collapsed ? (
           <BrandLogo
             url={logomarkUrl}
-            alt="qnop"
+            alt={BRAND_NAME}
             fallback={
               <Box sx={markBoxSx}>
                 <ShieldCheck size={18} />
@@ -103,7 +108,7 @@ export function SidebarContent({ collapsed, onNavigate }: SidebarContentProps) {
         ) : (
           <BrandLogo
             url={fullLogoUrl}
-            alt="qnop"
+            alt={BRAND_NAME}
             sx={{ height: 30, maxWidth: 180 }}
             fallback={
               <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.25 }}>
@@ -114,7 +119,7 @@ export function SidebarContent({ collapsed, onNavigate }: SidebarContentProps) {
                   <Typography
                     sx={{ fontWeight: 700, fontSize: 15, letterSpacing: '-0.015em', lineHeight: 1 }}
                   >
-                    qnop
+                    {BRAND_NAME}
                   </Typography>
                   <Typography
                     sx={{
@@ -126,7 +131,7 @@ export function SidebarContent({ collapsed, onNavigate }: SidebarContentProps) {
                       fontWeight: 500,
                     }}
                   >
-                    Quality Notes · Sovereign
+                    {t('brand.tagline')}
                   </Typography>
                 </Box>
               </Box>
@@ -139,7 +144,7 @@ export function SidebarContent({ collapsed, onNavigate }: SidebarContentProps) {
           it instead of walking the rail (issue #460). */}
       <Box
         component="nav"
-        aria-label="Main navigation"
+        aria-label={t('nav.landmark')}
         sx={{ flex: 1, overflowY: 'auto', overflowX: 'hidden', py: 1 }}
       >
         {groups.map((group, gi) => (

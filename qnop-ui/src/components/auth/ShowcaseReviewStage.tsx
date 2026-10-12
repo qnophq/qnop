@@ -25,6 +25,7 @@ import Typography from '@mui/material/Typography';
 import { alpha, keyframes } from '@mui/material/styles';
 import { CheckCheck, FileText } from 'lucide-react';
 import { tokens } from '../../theme/tokens';
+import { useTranslation } from 'react-i18next';
 
 const float = keyframes`
   from { transform: translateY(0); }
@@ -117,6 +118,7 @@ function HighlightLine({ color, marker, width }: { color: string; marker: string
  * markers sit in the margin, exactly like the real viewer's annotation layer.
  */
 function DocumentReviewCard() {
+  const { t } = useTranslation('auth');
   const blue = tokens.brand.blue;
   return (
     <Box
@@ -147,7 +149,7 @@ function DocumentReviewCard() {
           <FileText size={15} />
         </Box>
         <Typography sx={{ fontWeight: 800, fontSize: 13.5, color: tokens.light.fg, flex: 1 }}>
-          Release notes
+          {t('showcase.releaseNotes')}
         </Typography>
         <Box
           sx={{
@@ -264,6 +266,7 @@ function BackgroundDocumentCard({
  * Reviewer role and an abstract comment, with the resolve affordance.
  */
 function ReviewerThreadCard() {
+  const { t } = useTranslation('auth');
   const blue = tokens.brand.blue;
   return (
     <Box
@@ -292,11 +295,11 @@ function ReviewerThreadCard() {
             flexShrink: 0,
           }}
         >
-          MN
+          {t('showcase.reviewerInitials')}
         </Box>
         <Box sx={{ minWidth: 0, flex: 1 }}>
           <Typography sx={{ fontWeight: 700, fontSize: 12.5, color: tokens.light.fg }}>
-            Mira Novak
+            {t('showcase.reviewerName')}
           </Typography>
         </Box>
         <Box
@@ -310,7 +313,7 @@ function ReviewerThreadCard() {
             color: tokens.brand.blueDeep,
           }}
         >
-          Reviewer
+          {t('showcase.reviewerRole')}
         </Box>
       </Stack>
       <Stack spacing={0.75} sx={{ mt: 1.25, mb: 1.25 }}>
@@ -336,7 +339,7 @@ function ReviewerThreadCard() {
       >
         <CheckCheck size={12} style={{ color: tokens.semantic.success }} />
         <Typography sx={{ fontSize: 11, fontWeight: 700, color: tokens.badge.green.fg }}>
-          Resolve
+          {t('showcase.resolve')}
         </Typography>
       </Stack>
     </Box>
@@ -349,18 +352,24 @@ function ReviewerThreadCard() {
  * annotations and their margin markers — while the user appears as the
  * reviewer working annotation 1's thread. A resolved-annotation toast keeps
  * the gamified tone. Purely presentational:
- * static markup, no data, no hooks; hidden from assistive tech. The panel
+ * static markup and translated copy, no data; hidden from assistive tech. The panel
  * behind it is always dark, so the cards use fixed light-surface tokens.
  */
 export function ShowcaseReviewStage() {
+  const { t } = useTranslation('auth');
   return (
     <Box aria-hidden sx={{ position: 'relative', width: 330, pointerEvents: 'none' }}>
       {/* Two more documents deepen the stack behind the hero */}
       <Floating tilt={7} delay={3.4} sx={{ position: 'absolute', top: -34, right: -76, zIndex: 0 }}>
-        <BackgroundDocumentCard title="Audit report" version="v1" width={182} />
+        <BackgroundDocumentCard title={t('showcase.auditReport')} version="v1" width={182} />
       </Floating>
       <Floating tilt={-9} delay={2.6} sx={{ position: 'absolute', top: -42, left: -66, zIndex: 0 }}>
-        <BackgroundDocumentCard title="Master agreement" version="v2" width={206} highlight />
+        <BackgroundDocumentCard
+          title={t('showcase.masterAgreement')}
+          version="v2"
+          width={206}
+          highlight
+        />
       </Floating>
 
       {/* The reviewed document — the hero */}
@@ -411,10 +420,10 @@ export function ShowcaseReviewStage() {
           </Box>
           <Box>
             <Typography sx={{ fontSize: 12.5, fontWeight: 700, color: tokens.light.fg }}>
-              Annotation resolved
+              {t('showcase.annotationResolved')}
             </Typography>
             <Typography sx={{ fontSize: 10.5, color: tokens.light.fg3 }}>
-              Release notes v4 · just now
+              {t('showcase.resolvedMeta')}
             </Typography>
           </Box>
         </Stack>

@@ -42,6 +42,7 @@ import { register } from '../../api/auth';
 import { useConfig } from '../../api/hooks/useConfig';
 import { apiErrorMessage } from '../../utils/apiError';
 import { passwordStrength } from '../../utils/passwordStrength';
+import { useTranslation } from 'react-i18next';
 
 const startIcon = (icon: ReactNode) => ({
   input: { startAdornment: <InputAdornment position="start">{icon}</InputAdornment> },
@@ -49,6 +50,7 @@ const startIcon = (icon: ReactNode) => ({
 
 /** Registration screen, available only when self-registration is enabled. */
 export function RegisterPage() {
+  const { t } = useTranslation('auth');
   const { data: config, isLoading } = useConfig();
   const [displayName, setDisplayName] = useState('');
   const [username, setUsername] = useState('');
@@ -71,7 +73,7 @@ export function RegisterPage() {
       await register({ displayName, username, email, password });
       setDone(true);
     } catch (err) {
-      setError(apiErrorMessage(err, 'Registration failed. Please try again later.'));
+      setError(apiErrorMessage(err, t('register.failed')));
     } finally {
       setSubmitting(false);
     }
@@ -79,13 +81,12 @@ export function RegisterPage() {
 
   if (done) {
     return (
-      <AuthLayout title="Almost there" subtitle="One click left before your first review.">
+      <AuthLayout title={t('register.doneTitle')} subtitle={t('register.doneSubtitle')}>
         <Alert severity="success" sx={{ mb: 2 }}>
-          If the details are valid, we&apos;ve sent you a confirmation email. Confirm your address
-          to activate your reviewer profile.
+          {t('register.doneMessage')}
         </Alert>
         <Link component={RouterLink} to="/login" underline="hover">
-          To sign in
+          {t('shared.toSignIn')}
         </Link>
       </AuthLayout>
     );
@@ -95,14 +96,14 @@ export function RegisterPage() {
 
   return (
     <AuthLayout
-      title="Create your reviewer profile"
-      subtitle="Two minutes to set up — your first review is waiting."
+      title={t('register.title')}
+      subtitle={t('register.subtitle')}
       headerSlot={<AuthModeSwitch active="register" />}
     >
       <Box component="form" onSubmit={onSubmit} noValidate>
         <Stack spacing={2}>
           <TextField
-            label="Full name"
+            label={t('register.fullName')}
             value={displayName}
             onChange={(e) => setDisplayName(e.target.value)}
             autoComplete="name"
@@ -111,7 +112,7 @@ export function RegisterPage() {
             slotProps={startIcon(<User size={17} />)}
           />
           <TextField
-            label="Username"
+            label={t('register.username')}
             value={username}
             onChange={(e) => setUsername(e.target.value)}
             autoComplete="username"
@@ -120,7 +121,7 @@ export function RegisterPage() {
             slotProps={startIcon(<AtSign size={17} />)}
           />
           <TextField
-            label="Work email"
+            label={t('shared.workEmail')}
             type="email"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
@@ -131,7 +132,7 @@ export function RegisterPage() {
           />
           <Box>
             <PasswordField
-              label="Password"
+              label={t('shared.password')}
               value={password}
               onChange={setPassword}
               autoComplete="new-password"
@@ -146,7 +147,7 @@ export function RegisterPage() {
             }
             label={
               <Typography sx={{ fontSize: 12.5, color: 'text.secondary' }}>
-                I accept the terms of service and the privacy policy (GDPR).
+                {t('register.terms')}
               </Typography>
             }
           />
@@ -163,7 +164,7 @@ export function RegisterPage() {
               submitting ? <CircularProgress size={16} color="inherit" /> : <ArrowRight size={16} />
             }
           >
-            Create account
+            {t('register.submit')}
           </Button>
         </Stack>
       </Box>

@@ -37,6 +37,7 @@ import { changePassword } from '../../api/auth';
 import { useAuthStore } from '../../stores/authStore';
 import { apiErrorMessage } from '../../utils/apiError';
 import { generateStrongPassword, passwordStrength } from '../../utils/passwordStrength';
+import { useTranslation } from 'react-i18next';
 
 /**
  * Change-password screen — used both for a forced first-login change and for a
@@ -44,6 +45,7 @@ import { generateStrongPassword, passwordStrength } from '../../utils/passwordSt
  * current session, so the user is signed out and asked to log in again.
  */
 export function ChangePasswordPage() {
+  const { t } = useTranslation('auth');
   const accessToken = useAuthStore((s) => s.accessToken);
   const forced = useAuthStore((s) => s.passwordChangeRequired);
   const source = useAuthStore((s) => s.source);
@@ -100,12 +102,7 @@ export function ChangePasswordPage() {
       clearAuth();
       setDone(true);
     } catch (err) {
-      setError(
-        apiErrorMessage(
-          err,
-          'The current password is wrong, or the new password does not meet the requirements.',
-        ),
-      );
+      setError(apiErrorMessage(err, t('changePassword.failed')));
     } finally {
       setSubmitting(false);
     }
@@ -113,23 +110,23 @@ export function ChangePasswordPage() {
 
   return (
     <AuthLayout
-      title="Change password"
-      subtitle={forced ? 'For your security, choose a fresh password before diving in.' : undefined}
+      title={t('changePassword.title')}
+      subtitle={forced ? t('changePassword.forcedSubtitle') : undefined}
     >
       {done ? (
         <>
           <Alert severity="success" sx={{ mb: 2 }}>
-            Your password has been changed. Please sign in with the new password.
+            {t('changePassword.done')}
           </Alert>
           <Link component={RouterLink} to="/login" underline="hover">
-            To sign in
+            {t('shared.toSignIn')}
           </Link>
         </>
       ) : (
         <Box component="form" onSubmit={onSubmit} noValidate>
           <Stack spacing={2}>
             <PasswordField
-              label="Current password"
+              label={t('changePassword.currentPassword')}
               value={current}
               onChange={setCurrent}
               autoComplete="current-password"
@@ -137,7 +134,7 @@ export function ChangePasswordPage() {
             />
             <Box>
               <PasswordField
-                label="New password"
+                label={t('shared.newPassword')}
                 value={password}
                 onChange={(value) => {
                   setPassword(value);
@@ -154,7 +151,7 @@ export function ChangePasswordPage() {
                 onClick={onGenerate}
                 sx={{ mt: 0.5, textTransform: 'none' }}
               >
-                Generate strong password
+                {t('changePassword.generate')}
               </Button>
               {generated && (
                 <Stack
@@ -174,10 +171,10 @@ export function ChangePasswordPage() {
                   >
                     {generated}
                   </Typography>
-                  <Tooltip title={copied ? 'Copied' : 'Copy'}>
+                  <Tooltip title={copied ? t('changePassword.copied') : t('changePassword.copy')}>
                     <IconButton
                       size="small"
-                      aria-label="Copy generated password"
+                      aria-label={t('changePassword.copyAria')}
                       onClick={copyGenerated}
                     >
                       {copied ? <Check size={15} /> : <Copy size={15} />}
@@ -187,12 +184,12 @@ export function ChangePasswordPage() {
               )}
               {generated && (
                 <Typography sx={{ fontSize: 12, color: 'text.secondary', mt: 0.5 }}>
-                  Save this somewhere safe — it now fills the new-password fields.
+                  {t('changePassword.generatedHint')}
                 </Typography>
               )}
             </Box>
             <PasswordField
-              label="Confirm new password"
+              label={t('changePassword.confirmPassword')}
               value={confirm}
               onChange={(value) => {
                 setConfirm(value);
@@ -201,7 +198,7 @@ export function ChangePasswordPage() {
               autoComplete="new-password"
               required
             />
-            {mismatch && <Alert severity="warning">The passwords don&apos;t match.</Alert>}
+            {mismatch && <Alert severity="warning">{t('shared.passwordsMismatch')}</Alert>}
             {error && <Alert severity="error">{error}</Alert>}
             <Button
               type="submit"
@@ -210,12 +207,12 @@ export function ChangePasswordPage() {
               disabled={submitting || !canSubmit}
               fullWidth
             >
-              Change password
+              {t('changePassword.submit')}
             </Button>
             {!forced && (
               <Typography sx={{ fontSize: 13 }}>
                 <Link component={RouterLink} to="/" underline="hover">
-                  Cancel
+                  {t('changePassword.cancel')}
                 </Link>
               </Typography>
             )}

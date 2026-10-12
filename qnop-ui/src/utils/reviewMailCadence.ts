@@ -20,22 +20,17 @@
  */
 
 /**
- * The three cadences for review mail (issue #680), and how to read a stored value.
+ * The three cadences for review mail (issue #680), and how to read a stored value. Their labels
+ * and help texts live in the `profile` catalog (`notifications.cadence.<value>.*`, issue #464).
  *
  * <p>Its own module rather than living beside the profile screen: a file that exports both
  * components and plain functions breaks fast refresh, and this is needed by a test as well.
  */
 export const CADENCE_OPTIONS = [
-  { value: 'IMMEDIATE', label: 'As it happens' },
-  { value: 'DAILY', label: 'Once a day' },
-  { value: 'OFF', label: 'Never' },
+  { value: 'IMMEDIATE' },
+  { value: 'DAILY' },
+  { value: 'OFF' },
 ] as const;
-
-export const CADENCE_HELP: Record<string, string> = {
-  IMMEDIATE: 'One email per event.',
-  DAILY: 'One summary each morning, in your timezone. Nothing is sent on a quiet day.',
-  OFF: 'No review emails. In-app notifications are unaffected.',
-};
 
 /**
  * Reads a stored value, tolerating the booleans this setting held before it became three-valued.

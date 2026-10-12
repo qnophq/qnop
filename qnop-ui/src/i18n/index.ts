@@ -21,7 +21,10 @@
 
 import i18n from 'i18next';
 import { initReactI18next } from 'react-i18next';
+import enAuth from './en/auth.json';
 import enCommon from './en/common.json';
+import enProfile from './en/profile.json';
+import enShell from './en/shell.json';
 import { FALLBACK_LOCALE, type AppLocale } from './locales';
 
 export const DEFAULT_NAMESPACE = 'common';
@@ -31,14 +34,21 @@ export const DEFAULT_NAMESPACE = 'common';
  * Every other language is code-split and fetched on first use (issue #464, ADR-0063), so the
  * initial bundle does not grow with each language added.
  */
-export const bundledResources = { en: { common: enCommon } } as const;
+export const bundledResources = {
+  en: { common: enCommon, auth: enAuth, shell: enShell, profile: enProfile },
+} as const;
+
+/** Every catalog namespace; each `src/i18n/<locale>/` folder holds one JSON file per entry. */
+export const NAMESPACES = Object.keys(bundledResources.en) as Array<
+  keyof (typeof bundledResources)['en']
+>;
 
 const lazyCatalogs = import.meta.glob<{ default: Record<string, unknown> }>('./*/*.json');
 
 void i18n.use(initReactI18next).init({
   lng: FALLBACK_LOCALE,
   fallbackLng: FALLBACK_LOCALE,
-  ns: [DEFAULT_NAMESPACE],
+  ns: NAMESPACES,
   defaultNS: DEFAULT_NAMESPACE,
   resources: bundledResources,
   partialBundledLanguages: true,

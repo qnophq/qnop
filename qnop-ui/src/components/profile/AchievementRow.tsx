@@ -27,6 +27,7 @@ import { alpha, useTheme } from '@mui/material/styles';
 import type { LucideIcon } from 'lucide-react';
 import { BellRing, Eye, MessagesSquare, Rocket, Smile, Trophy, Users } from 'lucide-react';
 import type { Achievement } from './profileModel';
+import { useTranslation } from 'react-i18next';
 
 const BADGE_ICONS: Record<string, LucideIcon> = {
   liftoff: Rocket,
@@ -66,6 +67,7 @@ export function AchievementRow({
   size = 'medium',
   spread = false,
 }: AchievementRowProps) {
+  const { t } = useTranslation('profile');
   const theme = useTheme();
   const dark = theme.qnop.mode === 'dark';
   const large = size === 'large';
@@ -86,16 +88,21 @@ export function AchievementRow({
       {achievements.map((achievement) => {
         const Icon = BADGE_ICONS[achievement.key] ?? Rocket;
         const color = toneColor(BADGE_TONE[achievement.key] ?? 'blue');
+        const title = t(achievement.titleKey);
+        const caption = t(achievement.captionKey, achievement.captionValues);
         return (
           <Tooltip
             key={achievement.key}
-            title={`${achievement.title} — ${achievement.caption}`}
+            title={t('achievements.tooltip', { title, caption })}
             placement="top"
           >
             <Stack
               spacing={0.5}
               tabIndex={0}
-              aria-label={`${achievement.title}: ${achievement.caption}${achievement.earned ? '' : ' (locked)'}`}
+              aria-label={t(
+                achievement.earned ? 'achievements.ariaEarned' : 'achievements.ariaLocked',
+                { title, caption },
+              )}
               sx={{
                 alignItems: 'center',
                 width: large ? 'auto' : 74,
@@ -136,7 +143,7 @@ export function AchievementRow({
                   color: achievement.earned ? 'text.primary' : 'text.disabled',
                 }}
               >
-                {achievement.title}
+                {title}
               </Typography>
             </Stack>
           </Tooltip>

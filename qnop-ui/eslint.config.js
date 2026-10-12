@@ -34,6 +34,38 @@ export default defineConfig([
     },
   },
   {
+    // Externalized surfaces (issue #464, ADR-0063): user-facing text comes from the i18n
+    // catalogs, never a literal. Each surface joins this list once it is translated; the
+    // remaining ones follow in the coverage sweep.
+    files: [
+      'src/pages/auth/**/*.tsx',
+      'src/components/auth/**/*.tsx',
+      'src/components/shell/**/*.tsx',
+      'src/components/i18n/**/*.tsx',
+      'src/components/profile/**/*.tsx',
+      'src/pages/ProfilePage.tsx',
+    ],
+    ignores: ['**/*.test.tsx'],
+    rules: {
+      'no-restricted-syntax': [
+        'error',
+        {
+          selector: 'JSXText[value=/[A-Za-z]{2,}/]',
+          message: 'User-facing text belongs in an i18n catalog — use t() (ADR-0063).',
+        },
+        {
+          selector: 'JSXElement > JSXExpressionContainer > Literal[value=/[A-Za-z]{2,}/]',
+          message: 'User-facing text belongs in an i18n catalog — use t() (ADR-0063).',
+        },
+        {
+          selector:
+            'JSXAttribute[name.name=/^(label|title|placeholder|alt|aria-label|helperText|subtitle|description|tooltip)$/] > Literal[value=/[A-Za-z]{2,}/]',
+          message: 'User-facing attribute text belongs in an i18n catalog — use t() (ADR-0063).',
+        },
+      ],
+    },
+  },
+  {
     // These modules legitimately export non-components alongside components
     // (router config, Zustand stores, theme helpers, tests), so the
     // Fast-Refresh-only rule does not apply.

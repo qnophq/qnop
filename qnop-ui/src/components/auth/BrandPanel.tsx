@@ -28,12 +28,14 @@ import { BrandLogo } from '../branding/BrandLogo';
 import { tokens } from '../../theme/tokens';
 import { ShowcaseReviewStage } from './ShowcaseReviewStage';
 import authBg from '../../assets/auth/auth-bg.webp';
+import { useTranslation } from 'react-i18next';
+import { BRAND_NAME } from './brand';
 
 const FEATURES = [
-  { icon: Highlighter, label: 'Line-precise annotations' },
-  { icon: GitCompareArrows, label: 'Version-aware reviews' },
-  { icon: Trophy, label: 'Streaks & scoreboards' },
-];
+  { icon: Highlighter, key: 'annotations' },
+  { icon: GitCompareArrows, key: 'versions' },
+  { icon: Trophy, key: 'streaks' },
+] as const;
 
 /** Film-grain texture (inline SVG turbulence) that keeps the navy from reading flat. */
 const GRAIN =
@@ -48,6 +50,7 @@ const GRAIN =
  * instead).
  */
 export function BrandPanel() {
+  const { t } = useTranslation('auth');
   // The panel is always dark, so use the dark-surface (light) logo variant (issue #154).
   const logoUrl = useConfig().data?.branding?.logoDark.url;
   return (
@@ -141,7 +144,7 @@ export function BrandPanel() {
       <Box sx={{ position: 'relative', zIndex: 1 }}>
         <BrandLogo
           url={logoUrl}
-          alt="qnop"
+          alt={BRAND_NAME}
           sx={{ height: 80, maxWidth: 420 }}
           fallback={
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.75 }}>
@@ -163,7 +166,7 @@ export function BrandPanel() {
                 <Typography
                   sx={{ fontWeight: 700, fontSize: 30, letterSpacing: '-0.02em', lineHeight: 1 }}
                 >
-                  qnop
+                  {BRAND_NAME}
                 </Typography>
                 <Typography
                   sx={{
@@ -174,7 +177,7 @@ export function BrandPanel() {
                     mt: 0.75,
                   }}
                 >
-                  Quality Notes · Sovereign
+                  {t('brand.logoTagline')}
                 </Typography>
               </Box>
             </Box>
@@ -209,7 +212,7 @@ export function BrandPanel() {
             mb: 2.5,
           }}
         >
-          Sovereign document review
+          {t('brand.tagline')}
         </Typography>
         <Typography
           component="h2"
@@ -222,17 +225,15 @@ export function BrandPanel() {
             mb: 2.5,
           }}
         >
-          Reviews your team actually wants to finish.
+          {t('brand.headline')}
         </Typography>
         <Typography sx={{ color: '#B9C6D4', fontSize: 15.5, lineHeight: 1.65, maxWidth: 430 }}>
-          Annotate, discuss and approve documents together — with streaks, scoreboards and profiles
-          that celebrate every closed review. And your data stays under your control — wherever qnop
-          runs.
+          {t('brand.body')}
         </Typography>
         <Stack direction="row" sx={{ flexWrap: 'nowrap', gap: { md: 0.75, lg: 1.25 }, mt: 4 }}>
-          {FEATURES.map(({ icon: Icon, label }) => (
+          {FEATURES.map(({ icon: Icon, key }) => (
             <Stack
-              key={label}
+              key={key}
               direction="row"
               sx={{
                 alignItems: 'center',
@@ -249,7 +250,7 @@ export function BrandPanel() {
               }}
             >
               <Icon size={13} />
-              {label}
+              {t(`brand.features.${key}`)}
             </Stack>
           ))}
         </Stack>

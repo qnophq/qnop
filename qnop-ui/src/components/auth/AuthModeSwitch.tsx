@@ -21,12 +21,13 @@
 
 import Box from '@mui/material/Box';
 import { Link as RouterLink } from 'react-router';
+import { useTranslation } from 'react-i18next';
 
 type Mode = 'login' | 'register';
 
-const SEGMENTS: { mode: Mode; label: string; to: string }[] = [
-  { mode: 'login', label: 'Sign in', to: '/login' },
-  { mode: 'register', label: 'Create account', to: '/register' },
+const SEGMENTS: { mode: Mode; to: string }[] = [
+  { mode: 'login', to: '/login' },
+  { mode: 'register', to: '/register' },
 ];
 
 /**
@@ -36,6 +37,7 @@ const SEGMENTS: { mode: Mode; label: string; to: string }[] = [
  * segment is raised on a white surface.
  */
 export function AuthModeSwitch({ active }: { active: Mode }) {
+  const { t } = useTranslation('auth');
   return (
     <Box
       sx={{
@@ -47,7 +49,7 @@ export function AuthModeSwitch({ active }: { active: Mode }) {
         bgcolor: (t) => (t.palette.mode === 'dark' ? 'rgba(255,255,255,0.06)' : '#EEF2F7'),
       }}
     >
-      {SEGMENTS.map(({ mode, label, to }) => {
+      {SEGMENTS.map(({ mode, to }) => {
         const isActive = mode === active;
         return (
           <Box
@@ -77,7 +79,7 @@ export function AuthModeSwitch({ active }: { active: Mode }) {
               '&:hover': { color: isActive ? 'text.primary' : 'text.primary' },
             })}
           >
-            {label}
+            {t(`modeSwitch.${mode}`)}
           </Box>
         );
       })}

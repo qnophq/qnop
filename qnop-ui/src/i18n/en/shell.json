@@ -1,0 +1,80 @@
+{
+  "brand": {
+    "tagline": "Quality Notes · Sovereign"
+  },
+  "nav": {
+    "landmark": "Main navigation",
+    "groups": {
+      "administration": "Administration"
+    },
+    "items": {
+      "dashboard": "Dashboard",
+      "reviews": "Reviews",
+      "myTeams": "My Teams",
+      "messages": "Messages",
+      "settings": "Settings",
+      "configuration": "Configuration",
+      "users": "Users",
+      "teams": "Teams",
+      "branding": "Branding",
+      "oidcProviders": "OIDC providers",
+      "email": "Email",
+      "scheduler": "Scheduler",
+      "storageConsistency": "Storage consistency",
+      "audit": "Audit"
+    }
+  },
+  "breadcrumbs": {
+    "landmark": "Breadcrumb",
+    "profile": "Profile"
+  },
+  "topBar": {
+    "menu": "Menu",
+    "toggleMenu": "Toggle menu",
+    "lightMode": "Light mode",
+    "darkMode": "Dark mode",
+    "switchToLight": "Switch to light mode",
+    "switchToDark": "Switch to dark mode",
+    "notifications": "Notifications",
+    "notificationsUnreadTooltip": "Notifications ({{count}} unread)",
+    "notificationsUnreadLabel": "Notifications, {{count}} unread"
+  },
+  "notifications": {
+    "title": "Notifications",
+    "newCount": "{{count}} new",
+    "markAllRead": "Mark all read",
+    "loading": "Loading notifications",
+    "empty": "Nothing new. Activity on your reviews will land here.",
+    "seeAll": "See all messages"
+  },
+  "userMenu": {
+    "trigger": "User menu",
+    "unknownUser": "Unknown",
+    "roles": {
+      "ADMIN": "Administrator",
+      "MEMBER": "Member",
+      "AUDITOR": "Auditor"
+    },
+    "profile": "Profile",
+    "changePassword": "Change password",
+    "signOut": "Sign out"
+  },
+  "search": {
+    "placeholder": "Search…",
+    "inputLabel": "Search reviews, people and teams",
+    "shortcutCtrl": "Ctrl K",
+    "resultsLabel": "Search results",
+    "tooShort": "Keep typing — at least 2 characters.",
+    "unavailable": "Search is unavailable right now.",
+    "noMatches": "No matches for “{{query}}”.",
+    "sections": {
+      "reviews": "Reviews",
+      "annotations": "Annotations",
+      "comments": "Comments",
+      "people": "People",
+      "teams": "Teams"
+    },
+    "inDocument": "in {{title}}",
+    "seeAll": "See all {{count}} results"
+  }
+}

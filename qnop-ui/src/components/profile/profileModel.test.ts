@@ -74,7 +74,9 @@ describe('profileModel (issue #469)', () => {
       notificationsOn: false,
     });
     expect(achievements.every((a) => !a.earned)).toBe(true);
-    expect(achievements.find((a) => a.key === 'liftoff')?.caption).toBe('Start your first review');
+    expect(achievements.find((a) => a.key === 'liftoff')?.captionKey).toBe(
+      'achievements.liftoff.locked',
+    );
   });
 });
 
@@ -91,7 +93,9 @@ describe('publicProfileAchievements (issue #473)', () => {
   it('locks everything for an inactive user with third-person captions', () => {
     const achievements = publicProfileAchievements(stats());
     expect(achievements.every((a) => !a.earned)).toBe(true);
-    expect(achievements.find((a) => a.key === 'liftoff')?.caption).toBe('No review started yet');
+    expect(achievements.find((a) => a.key === 'liftoff')?.captionKey).toBe(
+      'achievements.liftoff.lockedPublic',
+    );
   });
 
   it('applies the milestone thresholds for voice and sharp eye', () => {

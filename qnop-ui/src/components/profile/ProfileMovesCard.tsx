@@ -38,6 +38,7 @@ import { Link as RouterLink } from 'react-router';
 import type { DashboardActivity } from '../../api/generated';
 import { activityPhrase, reviewPath } from '../dashboard/dashboardModel';
 import { useFormatters } from '../../hooks/useFormatters';
+import { useTranslation } from 'react-i18next';
 
 const TYPE_ICONS: Record<string, LucideIcon> = {
   'annotation.created': MessageSquarePlus,
@@ -60,6 +61,7 @@ interface ProfileMovesCardProps {
  * anonymity-safe activity ever shows.
  */
 export function ProfileMovesCard({ firstName, moves }: ProfileMovesCardProps) {
+  const { t } = useTranslation('profile');
   const theme = useTheme();
   const blue = theme.qnop.brand.blue;
   const dark = theme.qnop.mode === 'dark';
@@ -88,7 +90,7 @@ export function ProfileMovesCard({ firstName, moves }: ProfileMovesCardProps) {
         >
           <Activity size={15} />
         </Box>
-        <Typography sx={{ fontSize: 14, fontWeight: 700, flex: 1 }}>Recent moves</Typography>
+        <Typography sx={{ fontSize: 14, fontWeight: 700, flex: 1 }}>{t('moves.title')}</Typography>
         {moves.length > 0 && (
           <Typography
             variant="caption"
@@ -99,7 +101,7 @@ export function ProfileMovesCard({ firstName, moves }: ProfileMovesCardProps) {
         )}
       </Stack>
       <Typography variant="caption" color="text.secondary" component="p" sx={{ mb: 1.25 }}>
-        In reviews you share
+        {t('moves.caption')}
       </Typography>
 
       {moves.length === 0 ? (
@@ -110,7 +112,7 @@ export function ProfileMovesCard({ firstName, moves }: ProfileMovesCardProps) {
         >
           <Sparkles size={15} aria-hidden />
           <Typography variant="body2" color="text.secondary">
-            No recent moves from {firstName} in reviews you share.
+            {t('moves.empty', { name: firstName })}
           </Typography>
         </Stack>
       ) : (

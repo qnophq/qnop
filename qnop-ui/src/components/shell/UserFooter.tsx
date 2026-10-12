@@ -30,12 +30,7 @@ import { KeyRound, LogOut, UserRound } from 'lucide-react';
 import { useNavigate } from 'react-router';
 import { useAuthStore } from '../../stores/authStore';
 import { UserAvatar } from './UserAvatar';
-
-const ROLE_LABEL: Record<string, string> = {
-  ADMIN: 'Administrator',
-  MEMBER: 'Member',
-  AUDITOR: 'Auditor',
-};
+import { useTranslation } from 'react-i18next';
 
 interface UserFooterProps {
   collapsed: boolean;
@@ -43,6 +38,7 @@ interface UserFooterProps {
 
 /** Sidebar footer: the signed-in user with a menu (profile, change password, logout). */
 export function UserFooter({ collapsed }: UserFooterProps) {
+  const { t } = useTranslation('shell');
   const displayName = useAuthStore((s) => s.displayName);
   const role = useAuthStore((s) => s.role);
   const source = useAuthStore((s) => s.source);
@@ -61,7 +57,7 @@ export function UserFooter({ collapsed }: UserFooterProps) {
     <Box sx={{ borderTop: 1, borderColor: 'divider', p: collapsed ? 1 : 1.5 }}>
       <ButtonBase
         onClick={(e: MouseEvent<HTMLElement>) => setAnchor(e.currentTarget)}
-        aria-label="User menu"
+        aria-label={t('userMenu.trigger')}
         sx={{
           width: '100%',
           gap: 1.25,
@@ -75,10 +71,10 @@ export function UserFooter({ collapsed }: UserFooterProps) {
         {!collapsed && (
           <Box sx={{ minWidth: 0, textAlign: 'left', flex: 1 }}>
             <Typography noWrap sx={{ fontSize: 13, fontWeight: 500, lineHeight: 1.2 }}>
-              {displayName ?? 'Unknown'}
+              {displayName ?? t('userMenu.unknownUser')}
             </Typography>
             <Typography noWrap sx={{ fontSize: 11, color: 'text.disabled' }}>
-              {role ? ROLE_LABEL[role] : ''}
+              {role ? t(`userMenu.roles.${role}`) : ''}
             </Typography>
           </Box>
         )}
@@ -100,7 +96,7 @@ export function UserFooter({ collapsed }: UserFooterProps) {
           <ListItemIcon>
             <UserRound size={16} />
           </ListItemIcon>
-          Profile
+          {t('userMenu.profile')}
         </MenuItem>
         {/* External (OIDC) accounts have no local password — only local users can change it. */}
         {source !== 'EXTERNAL' && (
@@ -113,14 +109,14 @@ export function UserFooter({ collapsed }: UserFooterProps) {
             <ListItemIcon>
               <KeyRound size={16} />
             </ListItemIcon>
-            Change password
+            {t('userMenu.changePassword')}
           </MenuItem>
         )}
         <MenuItem onClick={onLogout}>
           <ListItemIcon>
             <LogOut size={16} />
           </ListItemIcon>
-          Sign out
+          {t('userMenu.signOut')}
         </MenuItem>
       </Menu>
     </Box>

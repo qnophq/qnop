@@ -46,6 +46,7 @@ import { useEffect, useRef } from 'react';
 import { STATUS_CUES } from '../../reviews/panel/statusCues';
 import { UserAvatar } from '../UserAvatar';
 import { discussionHitPath, searchOptionId } from './searchPaths';
+import { useTranslation } from 'react-i18next';
 
 /** The results page's type segment for a group's "see all" continuation. */
 type ResultType = 'reviews' | 'annotations' | 'comments' | 'users' | 'teams';
@@ -68,6 +69,7 @@ export function SearchDropdownResults({
   /** The keyboard-highlighted row's action key (issue #540 roving). */
   highlightKey?: string | null;
 }) {
+  const { t } = useTranslation('shell');
   const theme = useTheme();
   const navigate = useNavigate();
   const userId = useAuthStore((s) => s.userId);
@@ -83,7 +85,7 @@ export function SearchDropdownResults({
       <Stack spacing={1} sx={{ p: 3, alignItems: 'center' }} data-testid="global-search-empty">
         <SearchX size={22} aria-hidden style={{ color: theme.palette.text.disabled }} />
         <Typography sx={{ fontSize: 13, color: 'text.secondary', textAlign: 'center' }}>
-          No matches for “{query}”.
+          {t('search.noMatches', { query })}
         </Typography>
       </Stack>
     );
@@ -95,7 +97,7 @@ export function SearchDropdownResults({
   return (
     <Box sx={{ py: 0.75 }}>
       {data.reviews.items.length > 0 && (
-        <Section icon={FileText} label="Reviews" total={data.reviews.total}>
+        <Section icon={FileText} label={t('search.sections.reviews')} total={data.reviews.total}>
           {data.reviews.items.map((hit) => (
             <HitRow
               key={hit.id}
@@ -120,7 +122,11 @@ export function SearchDropdownResults({
         </Section>
       )}
       {data.annotations.items.length > 0 && (
-        <Section icon={NotebookPen} label="Annotations" total={data.annotations.total}>
+        <Section
+          icon={NotebookPen}
+          label={t('search.sections.annotations')}
+          total={data.annotations.total}
+        >
           {data.annotations.items.map((hit) => (
             <HitRow
               key={hit.commentId}
@@ -130,7 +136,7 @@ export function SearchDropdownResults({
               onClick={() => navigate(discussionHitPath(hit, false))}
               start={<StatusCueIcon status={hit.annotationStatus} />}
               primary={hit.excerpt}
-              secondary={`in ${hit.documentTitle}`}
+              secondary={t('search.inDocument', { title: hit.documentTitle })}
             />
           ))}
           {data.annotations.total > data.annotations.items.length && (
@@ -144,7 +150,11 @@ export function SearchDropdownResults({
         </Section>
       )}
       {data.comments.items.length > 0 && (
-        <Section icon={MessageSquareText} label="Comments" total={data.comments.total}>
+        <Section
+          icon={MessageSquareText}
+          label={t('search.sections.comments')}
+          total={data.comments.total}
+        >
           {data.comments.items.map((hit) => (
             <HitRow
               key={hit.commentId}
@@ -154,7 +164,7 @@ export function SearchDropdownResults({
               onClick={() => navigate(discussionHitPath(hit, true))}
               start={<StatusCueIcon status={hit.annotationStatus} />}
               primary={hit.excerpt}
-              secondary={`in ${hit.documentTitle}`}
+              secondary={t('search.inDocument', { title: hit.documentTitle })}
             />
           ))}
           {data.comments.total > data.comments.items.length && (
@@ -168,7 +178,7 @@ export function SearchDropdownResults({
         </Section>
       )}
       {data.users.items.length > 0 && (
-        <Section icon={Users} label="People" total={data.users.total}>
+        <Section icon={Users} label={t('search.sections.people')} total={data.users.total}>
           {data.users.items.map((hit) => (
             <HitRow
               key={hit.userId}
@@ -193,7 +203,7 @@ export function SearchDropdownResults({
         </Section>
       )}
       {data.teams.items.length > 0 && (
-        <Section icon={UsersRound} label="Teams" total={data.teams.total}>
+        <Section icon={UsersRound} label={t('search.sections.teams')} total={data.teams.total}>
           {data.teams.items.map((hit) => (
             // Every team hit links to the public team profile (issue #586) —
             // members reach the roster from there; non-members see exactly
@@ -344,6 +354,7 @@ function SeeAllRow({
   total: number;
   onClick: () => void;
 }) {
+  const { t } = useTranslation('shell');
   const ref = useRevealWhenHighlighted(highlighted);
   return (
     <ButtonBase
@@ -367,7 +378,7 @@ function SeeAllRow({
         '&:hover, &:focus-visible': { bgcolor: (t) => t.qnop.surface2 },
       }}
     >
-      See all {total} results
+      {t('search.seeAll', { count: total })}
       <ArrowRight size={13} aria-hidden />
     </ButtonBase>
   );

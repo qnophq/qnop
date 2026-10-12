@@ -31,6 +31,7 @@ import { reviewPath } from '../dashboard/dashboardModel';
 import { ToneBadge } from '../admin/ToneBadge';
 import { ProgressBar } from '../reviews/list/ReviewListParts';
 import { WORKFLOW_TONES, workflowLabel } from '../reviews/workflowMeta';
+import { useTranslation } from 'react-i18next';
 
 interface ProfileMissionListProps {
   /** Owned missions wear the commander's crown; joined ones the crew mark. */
@@ -40,17 +41,6 @@ interface ProfileMissionListProps {
   reviews: DocumentSummary[];
 }
 
-const COPY = {
-  owned: {
-    title: 'Missions commanded',
-    empty: (name: string) => `No reviews of ${name}'s command are shared with you yet.`,
-  },
-  reviewing: {
-    title: 'Missions joined',
-    empty: (name: string) => `${name} is not reviewing anything you share yet.`,
-  },
-} as const;
-
 /**
  * The profiled person's reviews in the campaign's mission language (issue
  * #482 polish): commanded (owner) or joined (reviewer), each row linking into
@@ -58,6 +48,7 @@ const COPY = {
  * VIEWER's own overview, so only shared, anonymity-safe reviews ever appear.
  */
 export function ProfileMissionList({ variant, firstName, reviews }: ProfileMissionListProps) {
+  const { t } = useTranslation('profile');
   const theme = useTheme();
   const blue = theme.qnop.brand.blue;
   const dark = theme.qnop.mode === 'dark';
@@ -89,7 +80,7 @@ export function ProfileMissionList({ variant, firstName, reviews }: ProfileMissi
           <Icon size={15} />
         </Box>
         <Typography sx={{ fontSize: 14, fontWeight: 700, flex: 1 }}>
-          {COPY[variant].title}
+          {t(owned ? 'missions.owned.title' : 'missions.reviewing.title')}
         </Typography>
         {reviews.length > 0 && (
           <Typography
@@ -101,7 +92,7 @@ export function ProfileMissionList({ variant, firstName, reviews }: ProfileMissi
         )}
       </Stack>
       <Typography variant="caption" color="text.secondary" component="p" sx={{ mb: 1.25 }}>
-        Reviews you share
+        {t('missions.sharedCaption')}
       </Typography>
 
       {reviews.length === 0 ? (
@@ -112,7 +103,9 @@ export function ProfileMissionList({ variant, firstName, reviews }: ProfileMissi
         >
           <Telescope size={15} aria-hidden />
           <Typography variant="body2" color="text.secondary">
-            {COPY[variant].empty(firstName)}
+            {t(owned ? 'missions.owned.empty' : 'missions.reviewing.empty', {
+              name: firstName,
+            })}
           </Typography>
         </Stack>
       ) : (

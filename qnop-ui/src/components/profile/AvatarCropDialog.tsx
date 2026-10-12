@@ -32,6 +32,7 @@ import Stack from '@mui/material/Stack';
 import Typography from '@mui/material/Typography';
 import { ZoomIn } from 'lucide-react';
 import { getCroppedAvatarBlob } from '../../utils/cropImage';
+import { useTranslation } from 'react-i18next';
 
 interface AvatarCropDialogProps {
   open: boolean;
@@ -55,6 +56,7 @@ export function AvatarCropDialog({
   onCancel,
   onCropped,
 }: AvatarCropDialogProps) {
+  const { t } = useTranslation('profile');
   const [crop, setCrop] = useState({ x: 0, y: 0 });
   const [zoom, setZoom] = useState(1);
   const [area, setArea] = useState<Area | null>(null);
@@ -76,7 +78,7 @@ export function AvatarCropDialog({
 
   return (
     <Dialog open={open} onClose={disabled ? undefined : onCancel} maxWidth="xs" fullWidth>
-      <DialogTitle>Adjust your picture</DialogTitle>
+      <DialogTitle>{t('crop.title')}</DialogTitle>
       <DialogContent>
         <Box
           sx={{
@@ -108,20 +110,20 @@ export function AvatarCropDialog({
             step={0.01}
             value={zoom}
             onChange={(_, value) => setZoom(value as number)}
-            aria-label="Zoom"
+            aria-label={t('crop.zoom')}
             disabled={disabled}
           />
         </Stack>
         <Typography sx={{ fontSize: 12, color: 'text.secondary', mt: 0.5 }}>
-          Drag to reposition, use the slider to zoom.
+          {t('crop.hint')}
         </Typography>
       </DialogContent>
       <DialogActions sx={{ px: 3, pb: 2.5 }}>
         <Button onClick={onCancel} color="inherit" disabled={disabled}>
-          Cancel
+          {t('crop.cancel')}
         </Button>
         <Button onClick={apply} variant="contained" disabled={disabled || !area}>
-          Use photo
+          {t('crop.apply')}
         </Button>
       </DialogActions>
     </Dialog>

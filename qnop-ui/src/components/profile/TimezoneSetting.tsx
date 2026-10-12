@@ -30,6 +30,7 @@ import { alpha, useTheme } from '@mui/material/styles';
 import { Globe, LocateFixed } from 'lucide-react';
 import { TimezonePicker } from '../TimezonePicker';
 import { zoneOffsetLabel } from '../../utils/timezoneOptions';
+import { useTranslation } from 'react-i18next';
 
 const MONO = '"JetBrains Mono", ui-monospace, monospace';
 
@@ -60,6 +61,7 @@ function deviceZone(): string {
  * no restless ticking seconds; the pulse honours reduced-motion.
  */
 function ClockPreview({ zone, now }: { zone: string; now: Date }) {
+  const { t } = useTranslation('profile');
   const theme = useTheme();
   const brand = theme.qnop.brand.blue;
 
@@ -81,7 +83,7 @@ function ClockPreview({ zone, now }: { zone: string; now: Date }) {
     <Stack
       direction="row"
       spacing={1.25}
-      title={`Current time in ${zone.replace(/_/g, ' ')}`}
+      title={t('timezone.currentTimeIn', { zone: zone.replace(/_/g, ' ') })}
       sx={{
         flex: { sm: '1 1 0' },
         minWidth: 0,
@@ -138,6 +140,7 @@ function ClockPreview({ zone, now }: { zone: string; now: Date }) {
  * stays understated so the picker leads.
  */
 export function TimezoneSetting({ value, isExplicit, saving, onChange }: TimezoneSettingProps) {
+  const { t } = useTranslation('profile');
   const theme = useTheme();
   const brand = theme.qnop.brand.blue;
   const dark = theme.qnop.mode === 'dark';
@@ -170,9 +173,9 @@ export function TimezoneSetting({ value, isExplicit, saving, onChange }: Timezon
           <Globe size={19} />
         </Box>
         <Box sx={{ minWidth: 0 }}>
-          <Typography sx={{ fontSize: 16, fontWeight: 600 }}>Time zone</Typography>
+          <Typography sx={{ fontSize: 16, fontWeight: 600 }}>{t('timezone.heading')}</Typography>
           <Typography color="text.secondary" sx={{ fontSize: 14, mt: 0.25 }}>
-            Dates and times across qnop appear in this zone.
+            {t('timezone.description')}
           </Typography>
         </Box>
       </Stack>
@@ -205,12 +208,12 @@ export function TimezoneSetting({ value, isExplicit, saving, onChange }: Timezon
             onClick={() => onChange(device)}
             sx={{ textTransform: 'none' }}
           >
-            Use my device zone ({device.replace(/_/g, ' ')})
+            {t('timezone.useDevice', { zone: device.replace(/_/g, ' ') })}
           </Button>
         )}
         {!isExplicit && (
           <Typography color="text.secondary" sx={{ fontSize: 12.5 }}>
-            Currently following the workspace default.
+            {t('timezone.followingDefault')}
           </Typography>
         )}
       </Stack>

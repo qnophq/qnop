@@ -24,6 +24,7 @@ import IconButton from '@mui/material/IconButton';
 import InputAdornment from '@mui/material/InputAdornment';
 import TextField from '@mui/material/TextField';
 import { Eye, EyeOff, Lock } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 
 interface PasswordFieldProps {
   label: string;
@@ -45,6 +46,7 @@ export function PasswordField({
   error,
   helperText,
 }: PasswordFieldProps) {
+  const { t } = useTranslation('auth');
   const [show, setShow] = useState(false);
 
   return (
@@ -71,7 +73,7 @@ export function PasswordField({
                 onClick={() => setShow((s) => !s)}
                 edge="end"
                 size="small"
-                aria-label={show ? 'Hide password' : 'Show password'}
+                aria-label={show ? t('password.hide') : t('password.show')}
                 tabIndex={-1}
               >
                 {show ? <EyeOff size={18} /> : <Eye size={18} />}

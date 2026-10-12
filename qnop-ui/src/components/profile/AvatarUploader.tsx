@@ -31,6 +31,7 @@ import { TeamAvatar } from '../shell/TeamAvatar';
 import { UserAvatar } from '../shell/UserAvatar';
 import { ConfirmDialog } from '../admin/ConfirmDialog';
 import { AvatarCropDialog } from './AvatarCropDialog';
+import { Trans, useTranslation } from 'react-i18next';
 
 /** Accepted types and size cap — mirror the server (AvatarLimits) for fast, local feedback. */
 const ACCEPTED_TYPES = ['image/png', 'image/jpeg', 'image/webp'];
@@ -70,6 +71,7 @@ export function AvatarUploader({
   onRemove,
   variant = 'user',
 }: AvatarUploaderProps) {
+  const { t } = useTranslation('profile');
   const inputRef = useRef<HTMLInputElement>(null);
   const [error, setError] = useState<string | null>(null);
   const [dragOver, setDragOver] = useState(false);
@@ -79,11 +81,11 @@ export function AvatarUploader({
   const accept = (file: File) => {
     setError(null);
     if (!ACCEPTED_TYPES.includes(file.type)) {
-      setError('Please choose a PNG, JPEG or WebP image.');
+      setError(t('avatar.invalidType'));
       return;
     }
     if (file.size > MAX_BYTES) {
-      setError('That image is larger than 1 MB.');
+      setError(t('avatar.tooLarge'));
       return;
     }
     setCropSrc(URL.createObjectURL(file));
@@ -156,7 +158,7 @@ export function AvatarUploader({
           <Box
             role="button"
             tabIndex={0}
-            aria-label="Upload a profile picture"
+            aria-label={t('avatar.uploadAria')}
             onClick={() => !busy && inputRef.current?.click()}
             onKeyDown={(e) => {
               if ((e.key === 'Enter' || e.key === ' ') && !busy) {
@@ -192,13 +194,14 @@ export function AvatarUploader({
           >
             <ImagePlus size={22} />
             <Typography sx={{ fontSize: 14 }}>
-              Drag an image here or{' '}
-              <Box component="span" sx={{ fontWeight: 600 }}>
-                browse
-              </Box>
+              <Trans
+                t={t}
+                i18nKey="avatar.dropPrompt"
+                components={{ strong: <Box component="span" sx={{ fontWeight: 600 }} /> }}
+              />
             </Typography>
             <Typography sx={{ fontSize: 12, color: 'text.disabled' }}>
-              PNG, JPEG or WebP · up to 1 MB
+              {t('avatar.constraints')}
             </Typography>
           </Box>
 
@@ -211,7 +214,7 @@ export function AvatarUploader({
               disabled={busy}
               sx={{ mt: 1, textTransform: 'none' }}
             >
-              Remove photo
+              {t('avatar.remove')}
             </Button>
           )}
         </Box>
@@ -243,9 +246,9 @@ export function AvatarUploader({
 
       <ConfirmDialog
         open={confirmRemove}
-        title="Remove profile picture"
-        message="This removes the profile picture and falls back to the initials avatar. A new one can be uploaded anytime."
-        confirmLabel="Remove"
+        title={t('avatar.confirmTitle')}
+        message={t('avatar.confirmMessage')}
+        confirmLabel={t('avatar.confirmLabel')}
         destructive
         onConfirm={() => {
           setConfirmRemove(false);
