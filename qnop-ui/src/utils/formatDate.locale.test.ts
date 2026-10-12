@@ -62,6 +62,21 @@ describe('formatters in German (issue #464)', () => {
     expect(formatDueDate(NOW.toISOString(), 'UTC', 'de')).toBe('heute fällig');
   });
 
+  it('renders the hook-level date styles in en-GB for English, de-DE for German', () => {
+    // English deliberately uses the en-GB style everywhere (day before month), matching
+    // formatDateTime; the former en-US masthead and browser-locale deadline dates were the
+    // odd ones out (issue #464).
+    const longDay = (locale: string) =>
+      new Intl.DateTimeFormat(locale, {
+        weekday: 'long',
+        day: 'numeric',
+        month: 'long',
+        timeZone: 'UTC',
+      }).format(NOW);
+    expect(longDay('en-GB')).toBe('Monday 12 October');
+    expect(longDay('de-DE')).toBe('Montag, 12. Oktober');
+  });
+
   it('renders the compact feed timestamps in German', () => {
     const iso = new Date(NOW.getTime() - 5 * 60_000).toISOString();
     expect(shortRelativeTime(iso, NOW, 'UTC', 'de')).toBe('5 Min.');

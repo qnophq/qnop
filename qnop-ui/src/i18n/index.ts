@@ -62,16 +62,25 @@ export async function ensureLocaleLoaded(locale: AppLocale): Promise<void> {
   await Promise.all(pending);
 }
 
+// Each applyLocale call takes a ticket; only the newest may switch. Without it, a slow catalog
+// chunk for a language the user already moved away from (a fast flip, or the optimistic rollback
+// after a failed save) would land last and switch the UI back to it.
+let latestRequest = 0;
+
 /**
  * Makes {@code locale} the active UI language: loads its catalogs, switches i18next (every
- * `useTranslation` consumer re-renders) and sets `<html lang>` for assistive technology.
+ * `useTranslation` consumer re-renders) and sets `<html lang>` for assistive technology. Resolves
+ * `false` without switching when a newer call superseded this one while its catalogs loaded.
  */
-export async function applyLocale(locale: AppLocale): Promise<void> {
+export async function applyLocale(locale: AppLocale): Promise<boolean> {
+  const request = ++latestRequest;
   await ensureLocaleLoaded(locale);
+  if (request !== latestRequest) return false;
   if (i18n.language !== locale) {
     await i18n.changeLanguage(locale);
   }
   document.documentElement.lang = locale;
+  return true;
 }
 
 export default i18n;

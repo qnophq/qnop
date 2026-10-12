@@ -37,8 +37,8 @@ export function LanguageSync() {
   useEffect(() => {
     let cancelled = false;
     applyLocale(locale)
-      .then(() => {
-        if (!cancelled) setLocale(locale);
+      .then((applied) => {
+        if (applied && !cancelled) setLocale(locale);
       })
       .catch(() => {
         // A catalog chunk failed to load (offline, stale deploy): stay on the current language
