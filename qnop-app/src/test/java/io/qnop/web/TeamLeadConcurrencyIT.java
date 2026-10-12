@@ -50,9 +50,12 @@ import org.springframework.test.web.servlet.MvcResult;
  * *different* membership rows that would each read a lead count of 2 and both commit under READ
  * COMMITTED, leaving the team with zero leads. {@code TeamService} takes a pessimistic write lock
  * on the team ({@code TeamRepository.findByIdForUpdate}) before the last-lead count, so the two
- * requests serialize: exactly one commits (2xx) and the other re-reads the fresh count and is
- * denied with {@code 409 LAST_LEAD}. The observable guarantee — one winner, one conflict, and a
- * team that still has a lead — is what the guard promises.
+ * requests serialize: exactly one commits (2xx) and the other is denied. How the loser is denied
+ * depends on timing (issue #833): if both pass the lead check before either commits, the loser
+ * re-reads the fresh count under the lock and gets {@code 409 LAST_LEAD}; if the winner commits
+ * first, the loser is no longer a lead and the access check refuses it with {@code 403
+ * TEAM_ACCESS_FORBIDDEN}. The observable guarantee — one winner, one denial, and a team that still
+ * has a lead — is what the guard promises.
  *
  * <p>The base class is deliberately not {@code @Transactional}, so each request commits on its own
  * connection and the winner's commit is visible to the loser's {@code SELECT … FOR UPDATE}.
@@ -101,23 +104,23 @@ class TeamLeadConcurrencyIT extends SeededIntegrationTest {
               }));
 
       int successCount = 0;
-      int conflictCount = 0;
+      int deniedCount = 0;
       for (Future<MvcResult> future : futures) {
         MvcResult result = future.get(15, TimeUnit.SECONDS);
         int status = result.getResponse().getStatus();
         if (status == 200 || status == 204) {
           successCount++;
-        } else if (status == 409) {
-          conflictCount++;
+        } else if (status == 409 || status == 403) {
+          deniedCount++;
           assertThat(JsonPath.<String>read(result.getResponse().getContentAsString(), "$.code"))
-              .isEqualTo("LAST_LEAD");
+              .isEqualTo(status == 409 ? "LAST_LEAD" : "TEAM_ACCESS_FORBIDDEN");
         } else {
           throw new AssertionError("Unexpected status " + status);
         }
       }
 
       assertThat(successCount).isEqualTo(1);
-      assertThat(conflictCount).isEqualTo(1);
+      assertThat(deniedCount).isEqualTo(1);
     } finally {
       pool.shutdownNow();
     }
