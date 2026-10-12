@@ -57,9 +57,43 @@ describe.each(SUPPORTED_LOCALES.filter((locale) => locale !== 'en'))('%s catalog
     expect(translated).toEqual(english);
   });
 
+  it.each(namespaces)('%s keeps every placeholder and markup tag', (namespace) => {
+    // A translation that drops {{name}} or a <Trans> tag passes the key check but renders
+    // a sentence with a hole in it (or loses its link).
+    const english = flatten(catalog('en', namespace));
+    const translated = flatten(catalog(locale, namespace));
+    const mismatches = Object.entries(english)
+      .filter(([key, text]) => key in translated && tokensOf(text) !== tokensOf(translated[key]))
+      .map(([key]) => key);
+    expect(mismatches).toEqual([]);
+  });
+
   it.each(namespaces)('%s has no empty strings', (namespace) => {
     const empty = Object.entries(flatten(catalog(locale, namespace))).filter(([, v]) => !v.trim());
     expect(empty).toEqual([]);
+  });
+});
+
+/** The interpolations and Trans tags a string uses, as a sorted signature. */
+function tokensOf(text: string): string {
+  const tokens = text.match(/\{\{[^}]+\}\}|<\/?[A-Za-z][\w-]*\s*\/?>/g) ?? [];
+  return tokens
+    .map((token) => token.replace(/\s+/g, ''))
+    .sort()
+    .join(' ');
+}
+
+describe('catalog files', () => {
+  it('exist only for supported languages and English namespaces', () => {
+    const stray = Object.keys(catalogs).filter((path) => {
+      const [, locale, file] = path.split('/');
+      const namespace = file.slice(0, -'.json'.length);
+      return (
+        !(SUPPORTED_LOCALES as readonly string[]).includes(locale) ||
+        !namespaces.includes(namespace)
+      );
+    });
+    expect(stray).toEqual([]);
   });
 });
 

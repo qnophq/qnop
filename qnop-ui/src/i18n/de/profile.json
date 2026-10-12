@@ -105,23 +105,24 @@
     "description": "Datums- und Zeitangaben in qnop erscheinen in dieser Zeitzone.",
     "currentTimeIn": "Aktuelle Uhrzeit in {{zone}}",
     "useDevice": "Zeitzone meines Geräts verwenden ({{zone}})",
-    "followingDefault": "Folgt aktuell dem Workspace-Standard."
+    "followingDefault": "Folgt aktuell dem Workspace-Standard.",
+    "now": "jetzt"
   },
   "missions": {
-    "sharedCaption": "Reviews, die ihr teilt",
+    "sharedCaption": "Gemeinsame Reviews",
     "owned": {
       "title": "Geleitete Missionen",
-      "empty": "{{name}} hat noch keine Reviews geleitet, die ihr teilt."
+      "empty": "{{name}} hat noch keine gemeinsamen Reviews geleitet."
     },
     "reviewing": {
       "title": "Beigetretene Missionen",
-      "empty": "{{name}} reviewt noch nichts, was ihr teilt."
+      "empty": "{{name}} ist noch in keinem gemeinsamen Review dabei."
     }
   },
   "moves": {
     "title": "Letzte Aktivitäten",
-    "caption": "In Reviews, die ihr teilt",
-    "empty": "Keine aktuellen Aktivitäten von {{name}} in Reviews, die ihr teilt."
+    "caption": "In gemeinsamen Reviews",
+    "empty": "Keine aktuellen Aktivitäten von {{name}} in gemeinsamen Reviews."
   },
   "toast": {
     "settingSaveFailed": "Die Einstellung konnte nicht gespeichert werden.",

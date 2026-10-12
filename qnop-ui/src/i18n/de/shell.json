@@ -64,7 +64,7 @@
     "inputLabel": "Reviews, Personen und Teams durchsuchen",
     "shortcutCtrl": "Strg K",
     "resultsLabel": "Suchergebnisse",
-    "tooShort": "Tippe weiter – mindestens 2 Zeichen.",
+    "tooShort": "Tippe weiter — mindestens 2 Zeichen.",
     "unavailable": "Die Suche ist gerade nicht verfügbar.",
     "noMatches": "Keine Treffer für „{{query}}“.",
     "sections": {

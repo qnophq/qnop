@@ -126,7 +126,7 @@ function ClockPreview({ zone, now }: { zone: string; now: Date }) {
           {time}
         </Typography>
         <Typography sx={{ fontSize: 11, color: 'text.disabled', letterSpacing: '0.02em' }}>
-          {offset ? `${offset} · now` : 'now'}
+          {offset ? `${offset} · ${t('timezone.now')}` : t('timezone.now')}
         </Typography>
       </Box>
     </Stack>

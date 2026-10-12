@@ -6,6 +6,10 @@ import reactRefresh from 'eslint-plugin-react-refresh';
 import tseslint from 'typescript-eslint';
 import { defineConfig, globalIgnores } from 'eslint/config';
 
+// Props whose string value is shown to the user (or read out by assistive technology).
+const TEXT_PROPS =
+  '/^(label|title|placeholder|alt|aria-label|aria-description|helperText|subtitle|description|tooltip|text|message|primary|secondary|confirmLabel|cancelLabel|emptyText|caption|heading)$/';
+
 export default defineConfig([
   // dist: build output. coverage: vitest report. src/api/generated: typescript-axios output.
   globalIgnores(['dist', 'coverage', 'src/api/generated']),
@@ -47,21 +51,24 @@ export default defineConfig([
     ],
     ignores: ['**/*.test.tsx'],
     rules: {
+      // Literal text reaching the DOM: as a JSX child — directly, in a template literal, or as a
+      // branch of a ternary/&& — or as the value of a text-bearing prop, quoted or in braces.
+      // String concatenation is not caught; review keeps that out (it would be the odd one).
       'no-restricted-syntax': [
         'error',
-        {
-          selector: 'JSXText[value=/[A-Za-z]{2,}/]',
+        ...[
+          'JSXText[value=/[A-Za-z]{2,}/]',
+          'JSXElement > JSXExpressionContainer > Literal[value=/[A-Za-z]{2,}/]',
+          'JSXElement > JSXExpressionContainer > TemplateLiteral > TemplateElement[value.raw=/[A-Za-z]{2,}/]',
+          'JSXElement > JSXExpressionContainer > :matches(ConditionalExpression, LogicalExpression) > Literal[value=/[A-Za-z]{2,}/]',
+          `JSXAttribute[name.name=${TEXT_PROPS}] > Literal[value=/[A-Za-z]{2,}/]`,
+          `JSXAttribute[name.name=${TEXT_PROPS}] > JSXExpressionContainer > Literal[value=/[A-Za-z]{2,}/]`,
+          `JSXAttribute[name.name=${TEXT_PROPS}] > JSXExpressionContainer > TemplateLiteral > TemplateElement[value.raw=/[A-Za-z]{2,}/]`,
+          `JSXAttribute[name.name=${TEXT_PROPS}] > JSXExpressionContainer > :matches(ConditionalExpression, LogicalExpression) > Literal[value=/[A-Za-z]{2,}/]`,
+        ].map((selector) => ({
+          selector,
           message: 'User-facing text belongs in an i18n catalog — use t() (ADR-0063).',
-        },
-        {
-          selector: 'JSXElement > JSXExpressionContainer > Literal[value=/[A-Za-z]{2,}/]',
-          message: 'User-facing text belongs in an i18n catalog — use t() (ADR-0063).',
-        },
-        {
-          selector:
-            'JSXAttribute[name.name=/^(label|title|placeholder|alt|aria-label|helperText|subtitle|description|tooltip)$/] > Literal[value=/[A-Za-z]{2,}/]',
-          message: 'User-facing attribute text belongs in an i18n catalog — use t() (ADR-0063).',
-        },
+        })),
       ],
     },
   },

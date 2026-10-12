@@ -105,7 +105,8 @@
     "description": "Dates and times across qnop appear in this zone.",
     "currentTimeIn": "Current time in {{zone}}",
     "useDevice": "Use my device zone ({{zone}})",
-    "followingDefault": "Currently following the workspace default."
+    "followingDefault": "Currently following the workspace default.",
+    "now": "now"
   },
   "missions": {
     "sharedCaption": "Reviews you share",
