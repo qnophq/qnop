@@ -20,8 +20,16 @@ allowBuilds:
 # check and the resolver disagree) join them (issue #701). Both are reachable only
 # through @openapitools/openapi-generator-cli's proxy chain, which runs when the
 # typed client is regenerated and never ships.
+#
+# The 2026-10 advisories raise two floors and add two packages (all dev-only):
+# brace-expansion GHSA-qhr7-859c-m2p7 / GHSA-6j4f-fj2g-mc7p (>= 5.0.11), shell-quote
+# GHSA-pqg4-j6r4-53mv (>= 1.11.0), basic-ftp GHSA-c475-qrg2-pj4r (openapi-generator-cli's
+# proxy chain; the fix exists only on the 6.x line) and source-map-js
+# GHSA-68fv-2mgg-jv7q (vite/postcss build tooling).
 overrides:
-  'brace-expansion@<5.0.8': 5.0.9
-  'shell-quote@<=1.8.4': 1.10.0
+  'brace-expansion@<5.0.11': 5.0.12
+  'shell-quote@<1.11.0': 1.12.0
+  'basic-ftp@<6.2.1': 6.2.3
+  'source-map-js@<1.2.2': 1.2.2
   'ip-address@<10.3.1': 10.7.0
   'undici@<7.29.0': 7.29.1
