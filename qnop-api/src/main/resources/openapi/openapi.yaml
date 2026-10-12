@@ -202,6 +202,7 @@ paths:
                 general:
                   siteName: qnop
                   defaultTimezone: UTC
+                  defaultLanguage: en
                 auth:
                   oidcProviders: []
                   selfRegistrationEnabled: false
@@ -4782,9 +4783,17 @@ components:
           description: |
             Server default timezone (IANA id, e.g. `UTC`, `Europe/Berlin`) used as
             the display fallback for users without a personal preference.
+        defaultLanguage:
+          type: string
+          description: |
+            Server default UI language (ISO 639-1, e.g. `en`, `de`) used when a
+            user has no stored preference and on the pre-login pages (issue #464).
+            Empty when the operator cleared it; the frontend then falls back to
+            the browser language, then English.
       required:
         - siteName
         - defaultTimezone
+        - defaultLanguage
     ServerConfigAuth:
       type: object
       description: |

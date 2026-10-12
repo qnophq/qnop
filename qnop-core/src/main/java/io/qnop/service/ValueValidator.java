@@ -37,6 +37,8 @@ public final class ValueValidator {
 
   private static final Pattern EMAIL_PATTERN = Pattern.compile("^[^@\\s]+@[^@\\s]+\\.[^@\\s]+$");
 
+  private static final Pattern LANGUAGE_PATTERN = Pattern.compile("^[a-z]{2}$");
+
   public static void validate(ApplicationSettingKey key, String value) {
     validate(key.getType(), key.getEnumOptions(), value, key.getKey());
     validateConstraints(key.getConstraints(), value, key.getKey());
@@ -111,6 +113,7 @@ public final class ValueValidator {
         case EMAIL -> requireEmail(keyForError, value);
         case URL -> requireHttpUrl(keyForError, value);
         case TIMEZONE -> requireTimezone(keyForError, value);
+        case LANGUAGE -> requireLanguage(keyForError, value);
       }
     }
   }
@@ -131,6 +134,18 @@ public final class ValueValidator {
       ZoneId.of(value.trim());
     } catch (DateTimeException e) {
       throw new SettingValidationException(keyForError, "must be a valid IANA timezone id");
+    }
+  }
+
+  /**
+   * Requires a lowercase ISO 639-1 code. Deliberately a format check, not a closed list of the UI's
+   * catalogs: mail templates may exist for more locales than the frontend ships, and the frontend
+   * skips an unsupported code in its resolution chain anyway (issue #464).
+   */
+  private static void requireLanguage(String keyForError, String value) {
+    if (!LANGUAGE_PATTERN.matcher(value.trim()).matches()) {
+      throw new SettingValidationException(
+          keyForError, "must be a two-letter ISO 639-1 language code");
     }
   }
 

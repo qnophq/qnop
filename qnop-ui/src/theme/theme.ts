@@ -22,6 +22,15 @@
 import { createTheme, type Theme, type ThemeOptions } from '@mui/material/styles';
 import type { PaletteMode, Shadows } from '@mui/material';
 import { surfaces, tokens } from './tokens';
+import { deDE as coreDeDE, enUS as coreEnUS } from '@mui/material/locale';
+import { deDE as pickersDeDE, enUS as pickersEnUS } from '@mui/x-date-pickers/locales';
+import { FALLBACK_LOCALE, type AppLocale } from '../i18n/locales';
+
+/** MUI's built-in translations per UI language: core components and the date pickers. */
+const MUI_LOCALES = {
+  en: { core: coreEnUS, pickers: pickersEnUS },
+  de: { core: coreDeDE, pickers: pickersDeDE },
+} satisfies Record<AppLocale, { core: object; pickers: object }>;
 
 /**
  * Brand tokens that have no native MUI slot, exposed on the theme as `theme.qnop`
@@ -65,9 +74,11 @@ function buildShadows(): Shadows {
 /**
  * Builds the devtank42 MUI theme for the given mode (#101). All values come from
  * {@link tokens}; light and dark use the matching surface set. The same shape is
- * returned for both modes, so `main.tsx` simply rebuilds on a theme toggle.
+ * returned for both modes, so `main.tsx` simply rebuilds on a theme toggle — and on a
+ * language switch, since MUI's own strings (pagination, pickers) come from the
+ * locale bundles merged in last (issue #464).
  */
-export function buildTheme(mode: PaletteMode): Theme {
+export function buildTheme(mode: PaletteMode, locale: AppLocale = FALLBACK_LOCALE): Theme {
   const s = surfaces[mode];
 
   const qnop: QnopTokens = {
@@ -222,5 +233,6 @@ export function buildTheme(mode: PaletteMode): Theme {
     },
   };
 
-  return createTheme(options);
+  const { core, pickers } = MUI_LOCALES[locale];
+  return createTheme(options, core, pickers);
 }

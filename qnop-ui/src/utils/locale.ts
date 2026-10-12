@@ -44,3 +44,16 @@ export function localeShortCode(locale: string): string {
   const primary = locale.split('-')[0];
   return (primary || locale).toUpperCase();
 }
+
+/**
+ * A language's name in that language, capitalised for a menu ("Deutsch", "English") — how a
+ * language switcher lists its options, so a reader finds theirs whatever is active (issue #464).
+ */
+export function nativeLocaleName(locale: string): string {
+  try {
+    const name = new Intl.DisplayNames([locale], { type: 'language' }).of(locale) ?? locale;
+    return name.charAt(0).toLocaleUpperCase(locale) + name.slice(1);
+  } catch {
+    return locale.toUpperCase();
+  }
+}

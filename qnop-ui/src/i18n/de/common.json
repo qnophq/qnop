@@ -1,0 +1,29 @@
+{
+  "language": {
+    "label": "Sprache",
+    "description": "Die Sprache, in der qnop angezeigt wird.",
+    "switcherTooltip": "Sprache ändern",
+    "followDefault": "Systemstandard ({{language}})",
+    "followingDefault": "Folgt aktuell dem Workspace-Standard.",
+    "updated": "Sprache aktualisiert.",
+    "saveFailed": "Deine Sprachwahl konnte nicht gespeichert werden."
+  },
+  "time": {
+    "justNow": "gerade eben",
+    "compact": {
+      "now": "jetzt",
+      "minutes": "{{count}} Min.",
+      "hours": "{{count}} Std.",
+      "days": "{{count}} T."
+    },
+    "due": {
+      "today": "heute fällig",
+      "inDays_one": "fällig in {{count}} Tag",
+      "inDays_other": "fällig in {{count}} Tagen",
+      "overdueBy_one": "seit {{count}} Tag überfällig",
+      "overdueBy_other": "seit {{count}} Tagen überfällig",
+      "on": "fällig am {{date}}",
+      "wasDueOn": "war fällig am {{date}}"
+    }
+  }
+}

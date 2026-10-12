@@ -1,0 +1,29 @@
+{
+  "language": {
+    "label": "Language",
+    "description": "The language qnop's interface appears in.",
+    "switcherTooltip": "Change language",
+    "followDefault": "System default ({{language}})",
+    "followingDefault": "Currently following the workspace default.",
+    "updated": "Language updated.",
+    "saveFailed": "Your language choice could not be saved."
+  },
+  "time": {
+    "justNow": "just now",
+    "compact": {
+      "now": "now",
+      "minutes": "{{count}}m",
+      "hours": "{{count}}h",
+      "days": "{{count}}d"
+    },
+    "due": {
+      "today": "due today",
+      "inDays_one": "due in {{count}} day",
+      "inDays_other": "due in {{count}} days",
+      "overdueBy_one": "overdue by {{count}} day",
+      "overdueBy_other": "overdue by {{count}} days",
+      "on": "due {{date}}",
+      "wasDueOn": "was due {{date}}"
+    }
+  }
+}

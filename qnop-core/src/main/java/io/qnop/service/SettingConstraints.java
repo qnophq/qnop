@@ -32,7 +32,9 @@ public record SettingConstraints(Integer min, Integer max, ValueFormat format, I
   public enum ValueFormat {
     EMAIL,
     URL,
-    TIMEZONE
+    TIMEZONE,
+    /** A lowercase ISO 639-1 language code, e.g. {@code en} or {@code de} (issue #464). */
+    LANGUAGE
   }
 
   /** No extra constraints beyond the declared type. */

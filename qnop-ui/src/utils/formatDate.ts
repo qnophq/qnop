@@ -19,33 +19,56 @@
  * SPDX-License-Identifier: AGPL-3.0-only
  */
 
+import i18n from '../i18n';
+import { FALLBACK_LOCALE, intlLocale, type AppLocale } from '../i18n/locales';
 import { FALLBACK_TIME_ZONE } from './timezone';
 
-// Each Intl.DateTimeFormat is built once per resolved zone and reused, so switching a display zone
-// costs a Map lookup, not a fresh formatter on every render. The zone defaults to UTC (ADR-0041):
-// callers render through useFormatters(), which passes the user's resolved zone.
+// Each Intl formatter is built once per (locale, zone) and reused, so switching a display zone or
+// language costs a Map lookup, not a fresh formatter on every render. The zone defaults to UTC
+// (ADR-0041) and the language to English (issue #464): callers render through useFormatters(),
+// which passes the viewer's resolved zone and language.
 const dateTimeCache = new Map<string, Intl.DateTimeFormat>();
 const dateOnlyCache = new Map<string, Intl.DateTimeFormat>();
+const relativeCache = new Map<AppLocale, Intl.RelativeTimeFormat>();
 
-function dateTimeFmt(timeZone: string): Intl.DateTimeFormat {
-  let fmt = dateTimeCache.get(timeZone);
+function cached<T>(cache: Map<string, T>, key: string, create: () => T): T {
+  let value = cache.get(key);
+  if (!value) {
+    value = create();
+    cache.set(key, value);
+  }
+  return value;
+}
+
+function dateTimeFmt(timeZone: string, locale: AppLocale): Intl.DateTimeFormat {
+  return cached(
+    dateTimeCache,
+    `${locale}|${timeZone}`,
+    () =>
+      new Intl.DateTimeFormat(intlLocale(locale), {
+        dateStyle: 'medium',
+        timeStyle: 'short',
+        timeZone,
+      }),
+  );
+}
+
+function dateOnlyFmt(timeZone: string, locale: AppLocale): Intl.DateTimeFormat {
+  return cached(
+    dateOnlyCache,
+    `${locale}|${timeZone}`,
+    () => new Intl.DateTimeFormat(intlLocale(locale), { dateStyle: 'medium', timeZone }),
+  );
+}
+
+function relativeFmt(locale: AppLocale): Intl.RelativeTimeFormat {
+  let fmt = relativeCache.get(locale);
   if (!fmt) {
-    fmt = new Intl.DateTimeFormat('en-GB', { dateStyle: 'medium', timeStyle: 'short', timeZone });
-    dateTimeCache.set(timeZone, fmt);
+    fmt = new Intl.RelativeTimeFormat(locale, { numeric: 'auto' });
+    relativeCache.set(locale, fmt);
   }
   return fmt;
 }
-
-function dateOnlyFmt(timeZone: string): Intl.DateTimeFormat {
-  let fmt = dateOnlyCache.get(timeZone);
-  if (!fmt) {
-    fmt = new Intl.DateTimeFormat('en-GB', { dateStyle: 'medium', timeZone });
-    dateOnlyCache.set(timeZone, fmt);
-  }
-  return fmt;
-}
-
-const RELATIVE = new Intl.RelativeTimeFormat('en', { numeric: 'auto' });
 
 const MINUTE_MS = 60_000;
 const HOUR_MS = 60 * MINUTE_MS;
@@ -55,10 +78,11 @@ const DAY_MS = 24 * HOUR_MS;
 export function formatDateTime(
   iso: string | null | undefined,
   timeZone: string = FALLBACK_TIME_ZONE,
+  locale: AppLocale = FALLBACK_LOCALE,
 ): string {
   if (!iso) return '—';
   const date = new Date(iso);
-  return Number.isNaN(date.getTime()) ? '—' : dateTimeFmt(timeZone).format(date);
+  return Number.isNaN(date.getTime()) ? '—' : dateTimeFmt(timeZone, locale).format(date);
 }
 
 /**
@@ -68,17 +92,19 @@ export function formatDateTime(
 export function formatRelative(
   iso: string | null | undefined,
   timeZone: string = FALLBACK_TIME_ZONE,
+  locale: AppLocale = FALLBACK_LOCALE,
 ): string {
   if (!iso) return '—';
   const date = new Date(iso);
   if (Number.isNaN(date.getTime())) return '—';
   const diffMs = date.getTime() - Date.now();
   const absMs = Math.abs(diffMs);
-  if (absMs < MINUTE_MS) return 'just now';
-  if (absMs < HOUR_MS) return RELATIVE.format(Math.round(diffMs / MINUTE_MS), 'minute');
-  if (absMs < DAY_MS) return RELATIVE.format(Math.round(diffMs / HOUR_MS), 'hour');
-  if (absMs < 30 * DAY_MS) return RELATIVE.format(Math.round(diffMs / DAY_MS), 'day');
-  return dateTimeFmt(timeZone).format(date);
+  const relative = relativeFmt(locale);
+  if (absMs < MINUTE_MS) return i18n.t('time.justNow', { lng: locale });
+  if (absMs < HOUR_MS) return relative.format(Math.round(diffMs / MINUTE_MS), 'minute');
+  if (absMs < DAY_MS) return relative.format(Math.round(diffMs / HOUR_MS), 'hour');
+  if (absMs < 30 * DAY_MS) return relative.format(Math.round(diffMs / DAY_MS), 'day');
+  return dateTimeFmt(timeZone, locale).format(date);
 }
 
 /** Whether an ISO timestamp is in the past relative to {@code now} (default: now). */
@@ -96,17 +122,21 @@ export function isPast(iso: string | null | undefined, now: number = Date.now())
 export function formatDueDate(
   iso: string | null | undefined,
   timeZone: string = FALLBACK_TIME_ZONE,
+  locale: AppLocale = FALLBACK_LOCALE,
 ): string {
   if (!iso) return '—';
   const date = new Date(iso);
   if (Number.isNaN(date.getTime())) return '—';
   const diffMs = date.getTime() - Date.now();
+  const lng = locale;
   if (Math.abs(diffMs) >= 30 * DAY_MS) {
-    return `${diffMs < 0 ? 'was due' : 'due'} ${dateOnlyFmt(timeZone).format(date)}`;
+    const formatted = dateOnlyFmt(timeZone, locale).format(date);
+    return diffMs < 0
+      ? i18n.t('time.due.wasDueOn', { lng, date: formatted })
+      : i18n.t('time.due.on', { lng, date: formatted });
   }
   const days = Math.round(diffMs / DAY_MS);
-  if (days === 0) return 'due today';
-  if (days > 0) return `due in ${days} day${days === 1 ? '' : 's'}`;
-  const overdueDays = -days;
-  return `overdue by ${overdueDays} day${overdueDays === 1 ? '' : 's'}`;
+  if (days === 0) return i18n.t('time.due.today', { lng });
+  if (days > 0) return i18n.t('time.due.inDays', { lng, count: days });
+  return i18n.t('time.due.overdueBy', { lng, count: -days });
 }

@@ -31,6 +31,7 @@ import { BrandPanel } from './BrandPanel';
 import { tokens } from '../../theme/tokens';
 import authBg from '../../assets/auth/auth-bg.webp';
 import authDocs from '../../assets/auth/auth-docs.svg';
+import { DeviceLanguageSwitcher } from '../i18n/LanguageSwitcher';
 
 /** Slow bob for the corner document illustration (it carries its own tilt). */
 const floatDocs = keyframes`
@@ -186,6 +187,20 @@ export function AuthLayout({ title, subtitle, headerSlot, children }: AuthLayout
         }}
       >
         <MobileBrandBand />
+        {/* Pre-login language choice (issue #464): kept on this device only, and outranked by a
+            signed-in user's own preference. */}
+        <Box
+          sx={{
+            display: 'flex',
+            justifyContent: 'flex-end',
+            px: { xs: 1.5, sm: 2.5 },
+            pt: { xs: 1, sm: 2 },
+            position: 'relative',
+            zIndex: 2,
+          }}
+        >
+          <DeviceLanguageSwitcher />
+        </Box>
         {/* decorative corner accent: the annotated-document motif from the logomark */}
         <Box
           aria-hidden

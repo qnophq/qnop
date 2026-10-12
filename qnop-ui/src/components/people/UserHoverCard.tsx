@@ -36,14 +36,13 @@ import type { PublicUserProfile } from '../../api/generated';
 import { useUserProfile } from '../../api/hooks/useUsers';
 import { useAuthStore } from '../../stores/authStore';
 import { UserAvatar } from '../shell/UserAvatar';
+import { useFormatters } from '../../hooks/useFormatters';
 
 /** Hover intent: the card appears only after the pointer settles (issue #482). */
 const SHOW_DELAY_MS = 320;
 
 const CARD_WIDTH = 296;
 const AVATAR_SIZE = 44;
-
-const SINCE_FORMAT = new Intl.DateTimeFormat('en-US', { month: 'long', year: 'numeric' });
 
 /** The compact scoreboard slice — the same numbers language as `/users/:slug`. */
 const STAT_CELLS: { key: keyof PublicUserProfile['stats']; label: string }[] = [
@@ -256,6 +255,7 @@ function HoverCardPopover({
   anchorEl: HTMLElement;
   open: boolean;
 }) {
+  const { formatMonthYear } = useFormatters();
   const theme = useTheme();
   // Mounting IS the hover: the cache warms during the intent delay.
   const profileQuery = useUserProfile(userId);
@@ -327,7 +327,7 @@ function HoverCardPopover({
                   >
                     <CalendarDays size={11} aria-hidden />
                     <Typography variant="caption" noWrap>
-                      Member since {SINCE_FORMAT.format(new Date(profile.createdAt))}
+                      Member since {formatMonthYear(profile.createdAt)}
                     </Typography>
                   </Stack>
                 </Box>

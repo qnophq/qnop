@@ -32,8 +32,7 @@ import { CardEmptyState } from './CardEmptyState';
 import { CardScroller } from './CardScroller';
 import { CountPill } from './CountPill';
 import { dueUrgency, reviewPath } from './dashboardModel';
-
-const DATE_FORMAT = new Intl.DateTimeFormat(undefined, { dateStyle: 'medium' });
+import { useFormatters } from '../../hooks/useFormatters';
 
 interface DeadlinesCardProps {
   reviews: DocumentSummary[];
@@ -45,6 +44,7 @@ interface DeadlinesCardProps {
  * today in warning, the rest quiet.
  */
 export function DeadlinesCard({ reviews }: DeadlinesCardProps) {
+  const { formatDate } = useFormatters();
   const theme = useTheme();
   const navigate = useNavigate();
 
@@ -106,7 +106,7 @@ export function DeadlinesCard({ reviews }: DeadlinesCardProps) {
                       {review.title}
                     </Typography>
                     <Typography variant="caption" color="text.secondary" noWrap component="p">
-                      {DATE_FORMAT.format(new Date(review.dueAt as string))}
+                      {formatDate(review.dueAt)}
                     </Typography>
                   </Box>
                   <Typography

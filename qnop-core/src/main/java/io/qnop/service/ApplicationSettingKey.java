@@ -287,6 +287,9 @@ public enum ApplicationSettingKey {
           Map.entry(
               GENERAL_DEFAULT_TIMEZONE,
               SettingConstraints.format(SettingConstraints.ValueFormat.TIMEZONE)),
+          Map.entry(
+              GENERAL_DEFAULT_LANGUAGE,
+              SettingConstraints.format(SettingConstraints.ValueFormat.LANGUAGE)),
           // The banner texts land in a layout (issue #664), so they are bounded rather
           // than trusted: one line that wraps to two, not a paragraph that pushes the
           // sign-in form off the screen. The link is bounded and must be http(s), which

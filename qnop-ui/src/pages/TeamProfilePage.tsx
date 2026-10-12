@@ -49,8 +49,6 @@ import { useFormatters } from '../hooks/useFormatters';
 import { ErrorState } from './errors/ErrorState';
 import { NotFoundIllustration } from './errors/illustrations';
 
-const SINCE_FORMAT = new Intl.DateTimeFormat('en-US', { month: 'long', year: 'numeric' });
-
 const fadeUp = {
   '@keyframes teamProfileFadeUp': {
     from: { opacity: 0, transform: 'translateY(10px)' },
@@ -90,7 +88,7 @@ export function TeamProfilePage() {
   const isId = UUID_SHAPE.test(segment);
   const navigate = useNavigate();
   const queryClient = useQueryClient();
-  const { shortRelativeTime } = useFormatters();
+  const { shortRelativeTime, formatMonthYear } = useFormatters();
   // Shared with the team hover card: one cache entry per team.
   const profileQuery = useTeamProfile(segment);
 
@@ -198,7 +196,7 @@ export function TeamProfilePage() {
               >
                 <CalendarDays size={14} aria-hidden />
                 <Typography variant="body2">
-                  Team since {SINCE_FORMAT.format(new Date(profile.createdAt))}
+                  Team since {formatMonthYear(profile.createdAt)}
                 </Typography>
                 {profile.viewerIsMember && (
                   <Chip

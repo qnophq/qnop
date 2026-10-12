@@ -58,12 +58,7 @@ import { ReviewListCard } from '../components/dashboard/ReviewListCard';
 import { StatStrip } from '../components/dashboard/StatStrip';
 import { isOpenWorkflowState } from '../components/reviews/workflowMeta';
 import { useAuthStore } from '../stores/authStore';
-
-const DATE_FORMAT = new Intl.DateTimeFormat('en-US', {
-  weekday: 'long',
-  day: 'numeric',
-  month: 'long',
-});
+import { useFormatters } from '../hooks/useFormatters';
 
 /**
  * The command-centre dashboard (issue #454, prototype `dashboard.jsx`): a
@@ -75,6 +70,7 @@ const DATE_FORMAT = new Intl.DateTimeFormat('en-US', {
  * the caller's public profile.
  */
 export function HomePage() {
+  const { formatLongDay } = useFormatters();
   const navigate = useNavigate();
   // Shares its cache entry with the reviews list, so this costs no extra call
   // on a page that already lists reviews (issue #692).
@@ -113,7 +109,7 @@ export function HomePage() {
             {greetingEmoji(new Date().getHours())}
           </Box>
         }
-        description={DATE_FORMAT.format(new Date())}
+        description={formatLongDay(new Date())}
         action={
           <Button
             variant="contained"

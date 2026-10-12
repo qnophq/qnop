@@ -19,6 +19,12 @@
  * SPDX-License-Identifier: AGPL-3.0-only
  */
 
+import {
+  FALLBACK_LOCALE,
+  readDeviceLocale,
+  writeDeviceLocale,
+  type AppLocale,
+} from '../i18n/locales';
 import { create } from 'zustand';
 import type { PaletteMode } from '@mui/material';
 import { FALLBACK_TIME_ZONE } from '../utils/timezone';
@@ -52,6 +58,18 @@ interface UiState {
    */
   displayTimeZone: string;
   setDisplayTimeZone: (zone: string) => void;
+  /**
+   * The active UI language (issue #464, ADR-0063), mirrored here by LanguageSync once its catalogs
+   * are loaded, so formatters render in it without each depending on a QueryClient.
+   */
+  locale: AppLocale;
+  setLocale: (locale: AppLocale) => void;
+  /**
+   * The device-wide language chosen on the pre-login pages (localStorage), or `undefined`. It ranks
+   * below a signed-in user's stored preference and is never written to the profile by itself.
+   */
+  deviceLocale: AppLocale | undefined;
+  setDeviceLocale: (locale: AppLocale) => void;
 }
 
 export const useUiStore = create<UiState>((set, get) => ({
@@ -67,4 +85,11 @@ export const useUiStore = create<UiState>((set, get) => ({
   toggleTheme: () => get().setThemeMode(get().themeMode === 'dark' ? 'light' : 'dark'),
   displayTimeZone: FALLBACK_TIME_ZONE,
   setDisplayTimeZone: (zone) => set({ displayTimeZone: zone }),
+  locale: FALLBACK_LOCALE,
+  setLocale: (locale) => set({ locale }),
+  deviceLocale: readDeviceLocale(),
+  setDeviceLocale: (locale) => {
+    writeDeviceLocale(locale);
+    set({ deviceLocale: locale });
+  },
 }));

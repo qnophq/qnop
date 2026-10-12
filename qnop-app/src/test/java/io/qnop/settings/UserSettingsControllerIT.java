@@ -107,6 +107,35 @@ class UserSettingsControllerIT extends AbstractIntegrationTest {
   }
 
   @Test
+  void preferredLanguageIsEmptyUntilChosenAndValidated() throws Exception {
+    // No stored row: empty, so the UI falls back to the default language (issue #464).
+    mockMvc
+        .perform(
+            get("/api/v1/users/me/settings").with(jwt().jwt(j -> j.subject(userId.toString()))))
+        .andExpect(status().isOk())
+        .andExpect(
+            jsonPath("$.settings[?(@.key=='preferred_language')].value")
+                .value(org.hamcrest.Matchers.hasItem("")));
+    mockMvc
+        .perform(
+            patch("/api/v1/users/me/settings")
+                .with(jwt().jwt(j -> j.subject(userId.toString())))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"values\":{\"preferred_language\":\"de\"}}"))
+        .andExpect(status().isOk())
+        .andExpect(
+            jsonPath("$.settings[?(@.key=='preferred_language')].value")
+                .value(org.hamcrest.Matchers.hasItem("de")));
+    mockMvc
+        .perform(
+            patch("/api/v1/users/me/settings")
+                .with(jwt().jwt(j -> j.subject(userId.toString())))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"values\":{\"preferred_language\":\"de-DE\"}}"))
+        .andExpect(status().isBadRequest());
+  }
+
+  @Test
   void patchRejectsInvalidValue() throws Exception {
     mockMvc
         .perform(

@@ -43,8 +43,14 @@ public enum UserSettingKey {
       "system",
       "Preferred UI theme.",
       List.of("system", "light", "dark")),
+  // Empty by default for the same reason as TIMEZONE below: an unset preference must be
+  // distinguishable from an explicit "en", so the frontend can fall back to the application
+  // default language, then the browser language, then English (issue #464).
   PREFERRED_LANGUAGE(
-      "preferred_language", SettingValueType.STRING, "en", "Preferred UI language (ISO 639-1)."),
+      "preferred_language",
+      SettingValueType.STRING,
+      "",
+      "Preferred UI language (ISO 639-1); empty follows the application default."),
   // Empty by default so an unset preference is distinguishable from an explicit choice: the
   // frontend then falls back to the application default timezone, then UTC (issue #465, ADR-0041).
   TIMEZONE(
@@ -99,10 +105,15 @@ public enum UserSettingKey {
    * Beyond-type value constraints per key (mirrors {@link ApplicationSettingKey}); {@link
    * ValueValidator} enforces them at the setting boundary. The display timezone must be a real IANA
    * zone id so a future backend consumer of the per-user zone (server-rendered export, scheduled
-   * mail) can trust it (issue #465, ADR-0041).
+   * mail) can trust it (issue #465, ADR-0041); the preferred language must be an ISO 639-1 code,
+   * since the digest mail resolves its template by it (issue #464).
    */
   private static final Map<UserSettingKey, SettingConstraints> CONSTRAINTS =
-      Map.of(TIMEZONE, SettingConstraints.format(SettingConstraints.ValueFormat.TIMEZONE));
+      Map.of(
+          TIMEZONE,
+          SettingConstraints.format(SettingConstraints.ValueFormat.TIMEZONE),
+          PREFERRED_LANGUAGE,
+          SettingConstraints.format(SettingConstraints.ValueFormat.LANGUAGE));
 
   private final String key;
   private final SettingValueType type;
