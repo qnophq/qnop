@@ -1,0 +1,159 @@
+{
+  "language": {
+    "label": "Langue",
+    "description": "La langue dans laquelle s’affiche l’interface de qnop.",
+    "switcherTooltip": "Changer de langue",
+    "followDefault": "Langue par défaut du système ({{language}})",
+    "followingDefault": "Suit actuellement la langue par défaut de l’espace de travail.",
+    "updated": "Langue mise à jour.",
+    "saveFailed": "Votre choix de langue n’a pas pu être enregistré."
+  },
+  "time": {
+    "justNow": "à l’instant",
+    "compact": {
+      "now": "maintenant",
+      "minutes": "{{count}} min",
+      "hours": "{{count}} h",
+      "days": "{{count}} j"
+    },
+    "due": {
+      "today": "échéance aujourd’hui",
+      "inDays_one": "échéance dans {{count}} jour",
+      "inDays_many": "échéance dans {{count}} jours",
+      "inDays_other": "échéance dans {{count}} jours",
+      "overdueBy_one": "en retard de {{count}} jour",
+      "overdueBy_many": "en retard de {{count}} jours",
+      "overdueBy_other": "en retard de {{count}} jours",
+      "on": "échéance le {{date}}",
+      "wasDueOn": "échéance dépassée ({{date}})"
+    }
+  },
+  "loading": "Chargement…",
+  "actions": {
+    "tryAgain": "Réessayer",
+    "retry": "Réessayer",
+    "backToDashboard": "Retour au tableau de bord",
+    "cancel": "Annuler",
+    "save": "Enregistrer",
+    "delete": "Supprimer",
+    "close": "Fermer",
+    "confirm": "Confirmer",
+    "edit": "Modifier",
+    "remove": "Retirer",
+    "create": "Créer",
+    "add": "Ajouter",
+    "copy": "Copier",
+    "copied": "Copié",
+    "reset": "Réinitialiser",
+    "done": "Terminé",
+    "discard": "Abandonner"
+  },
+  "boundary": {
+    "title": "Un problème est survenu",
+    "message": "Cette partie de la page a rencontré une erreur inattendue. Vous pouvez réessayer, ou recharger la page si le problème persiste."
+  },
+  "errors": {
+    "rateLimited": "Trop de tentatives. Veuillez réessayer plus tard.",
+    "invalidOrExpiredLink": "La demande n’est pas valide ou le lien a expiré.",
+    "notFound": {
+      "title": "Cette page s’est pliée en avion de papier",
+      "message": "Où qu’elle ait atterri, ce n’est pas à cette adresse. Retournez au tableau de bord et reprenez votre quête à partir de là.",
+      "myReviews": "Mes révisions"
+    },
+    "forbidden": {
+      "title": "Ce classeur est fermé à clé",
+      "message": "Votre compte n’a pas accès à cette zone. Si votre quête passe par ici, un administrateur peut vous remettre la clé."
+    },
+    "featureUnavailable": {
+      "title": "Non disponible sur cette installation",
+      "message": "Cette installation de qnop ne propose pas cette fonctionnalité. Votre compte n’y est pour rien — c’est l’exploitant de cette installation qui en décide, et il peut la réactiver."
+    },
+    "conflict": {
+      "title": "Deux punaises plantées sur la même ligne",
+      "message": "Quelqu’un a modifié cet élément pendant que vous le consultiez. Rechargez pour voir l’état actuel — rien de ce que vous avez fait n’a été perdu.",
+      "reload": "Recharger cette page"
+    },
+    "serverError": {
+      "title": "Notre broyeuse a avalé le mauvais document",
+      "message": "Quelque chose s’est cassé de notre côté — vous n’y êtes pour rien. Une nouvelle tentative suffit généralement ; si le problème persiste, votre administrateur voudra le savoir."
+    },
+    "maintenance": {
+      "title": "Partis déjeuner — de retour très vite",
+      "message": "qnop se refait une beauté. Vos révisions sont en sécurité dans l’armoire ; patientez un instant, puis réessayez."
+    },
+    "rateLimit": {
+      "title": "Doucement, champion du tampon",
+      "message": "Cela fait beaucoup de requêtes en très peu de temps. Respirez un instant — dans un moment, tout fonctionnera de nouveau."
+    },
+    "offline": {
+      "title": "Le fil entre nos gobelets téléphoniques a cassé",
+      "message": "Vous semblez être hors ligne. Rien n’est perdu — dès que la connexion sera rétablie, tout reprendra là où cela s’est arrêté.",
+      "retry": "Réessayer la connexion"
+    }
+  },
+  "search": {
+    "clear": "Effacer la recherche",
+    "title": "Recherche",
+    "description": "Révisions, personnes et équipes de votre espace de travail — limitées à ce que vous avez le droit de voir.",
+    "placeholder": "Rechercher des révisions, des personnes et des équipes…",
+    "inputLabel": "Rechercher des révisions, des personnes et des équipes",
+    "tooShort_one": "Saisissez au moins {{count}} caractère pour lancer la recherche.",
+    "tooShort_many": "Saisissez au moins {{count}} caractères pour lancer la recherche.",
+    "tooShort_other": "Saisissez au moins {{count}} caractères pour lancer la recherche.",
+    "groups": {
+      "reviews": "Révisions",
+      "annotations": "Annotations",
+      "comments": "Commentaires",
+      "users": "Personnes",
+      "teams": "Équipes"
+    },
+    "resultsFor": "Résultats pour « {{query}} »",
+    "resultsHint": "Chaque résultat renvoie directement à sa page.",
+    "searching": "Recherche en cours…",
+    "unavailable": "La recherche n’est pas disponible pour le moment.",
+    "noMatches": "Aucun résultat dans ce groupe.",
+    "inDocument": "dans {{title}}"
+  },
+  "timezone": {
+    "label": "Fuseau horaire",
+    "placeholder": "Rechercher une ville ou une région…"
+  },
+  "quota": {
+    "ceilingNote": "Ce plafond est défini là où l’installation est configurée, et non dans les paramètres d’administration."
+  },
+  "banner": {
+    "dismiss": "Masquer cet avis"
+  },
+  "attachments": {
+    "title": "Pièce jointe de la révision",
+    "saved": "Enregistré",
+    "description": "Ce fichier a été joint à une annotation. Téléchargez-le sur votre appareil.",
+    "unavailable": "Ce fichier n’est pas disponible. Il a peut-être été supprimé, ou la révision n’est pas partagée avec vous.",
+    "download": "Télécharger",
+    "downloadAgain": "Télécharger à nouveau",
+    "openReview": "Ouvrir la révision"
+  },
+  "fieldErrors": {
+    "REQUIRED": "est obligatoire",
+    "NOT_AN_INTEGER": "doit être un nombre entier",
+    "NOT_A_BOOLEAN": "doit valoir « true » ou « false »",
+    "NOT_AN_OPTION": "doit être l’une des valeurs suivantes : {{options}}",
+    "TOO_LONG": "doit comporter au maximum {{max}} caractères",
+    "TOO_SHORT": "doit comporter au moins {{min}} caractères",
+    "LENGTH_OUT_OF_RANGE": "doit comporter entre {{min}} et {{max}} caractères",
+    "TOO_SMALL": "doit être au moins égal à {{min}}",
+    "TOO_LARGE": "doit être au plus égal à {{max}}",
+    "INVALID_EMAIL": "doit être une adresse e-mail valide",
+    "INVALID_URL": "doit être une URL http(s) valide",
+    "INVALID_TIMEZONE": "doit être un identifiant de fuseau horaire IANA valide",
+    "INVALID_LANGUAGE": "doit être un code de langue ISO 639-1 à deux lettres",
+    "INVALID_FORMAT": "a un format non valide",
+    "UNKNOWN_SETTING": "n’est pas une clé de paramètre connue"
+  },
+  "consent": {
+    "label": "Mesure d’audience",
+    "question": "Pouvons-nous compter quelles pages sont utilisées ? Aucun profil, aucun nom de document — les adresses des pages sont réduites à leur forme avant d’être comptées, et la mesure ne quitte jamais directement ce serveur.",
+    "deny": "Non merci",
+    "allow": "Autoriser"
+  }
+}

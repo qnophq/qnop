@@ -22,11 +22,17 @@
 import { createTheme, type Theme, type ThemeOptions } from '@mui/material/styles';
 import type { PaletteMode, Shadows } from '@mui/material';
 import { surfaces, tokens } from './tokens';
-import { deDE as coreDeDE, enUS as coreEnUS, esES as coreEsES } from '@mui/material/locale';
+import {
+  deDE as coreDeDE,
+  enUS as coreEnUS,
+  esES as coreEsES,
+  frFR as coreFrFR,
+} from '@mui/material/locale';
 import {
   deDE as pickersDeDE,
   enUS as pickersEnUS,
   esES as pickersEsES,
+  frFR as pickersFrFR,
 } from '@mui/x-date-pickers/locales';
 import { FALLBACK_LOCALE, type AppLocale } from '../i18n/locales';
 
@@ -35,6 +41,7 @@ const MUI_LOCALES = {
   en: { core: coreEnUS, pickers: pickersEnUS },
   de: { core: coreDeDE, pickers: pickersDeDE },
   es: { core: coreEsES, pickers: pickersEsES },
+  fr: { core: coreFrFR, pickers: pickersFrFR },
 } satisfies Record<AppLocale, { core: object; pickers: object }>;
 
 /**

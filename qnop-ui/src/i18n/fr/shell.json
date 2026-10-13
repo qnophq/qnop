@@ -1,0 +1,80 @@
+{
+  "brand": {
+    "tagline": "Quality Notes · Souverain"
+  },
+  "nav": {
+    "landmark": "Navigation principale",
+    "groups": {
+      "administration": "Administration"
+    },
+    "items": {
+      "dashboard": "Tableau de bord",
+      "reviews": "Révisions",
+      "myTeams": "Mes équipes",
+      "messages": "Messages",
+      "settings": "Paramètres",
+      "configuration": "Configuration du serveur",
+      "users": "Utilisateurs",
+      "teams": "Équipes",
+      "branding": "Image de marque",
+      "oidcProviders": "Fournisseurs OIDC",
+      "email": "E-mail",
+      "scheduler": "Planificateur",
+      "storageConsistency": "Cohérence du stockage",
+      "audit": "Audit"
+    }
+  },
+  "breadcrumbs": {
+    "landmark": "Fil d’Ariane",
+    "profile": "Profil"
+  },
+  "topBar": {
+    "menu": "Menu",
+    "toggleMenu": "Afficher ou masquer le menu",
+    "lightMode": "Mode clair",
+    "darkMode": "Mode sombre",
+    "switchToLight": "Passer en mode clair",
+    "switchToDark": "Passer en mode sombre",
+    "notifications": "Notifications",
+    "notificationsUnreadTooltip": "Notifications (non lues : {{count}})",
+    "notificationsUnreadLabel": "Notifications, non lues : {{count}}"
+  },
+  "notifications": {
+    "title": "Notifications",
+    "newCount": "Nouvelles : {{count}}",
+    "markAllRead": "Tout marquer comme lu",
+    "loading": "Chargement des notifications",
+    "empty": "Rien de nouveau. L’activité de vos révisions s’affichera ici.",
+    "seeAll": "Voir tous les messages"
+  },
+  "userMenu": {
+    "trigger": "Menu utilisateur",
+    "unknownUser": "Inconnu",
+    "roles": {
+      "ADMIN": "Administrateur",
+      "MEMBER": "Membre",
+      "AUDITOR": "Auditeur"
+    },
+    "profile": "Profil",
+    "changePassword": "Changer de mot de passe",
+    "signOut": "Se déconnecter"
+  },
+  "search": {
+    "placeholder": "Rechercher…",
+    "inputLabel": "Rechercher des révisions, des personnes et des équipes",
+    "shortcutCtrl": "Ctrl K",
+    "resultsLabel": "Résultats de recherche",
+    "tooShort": "Continuez à saisir — au moins 2 caractères.",
+    "unavailable": "La recherche n’est pas disponible pour le moment.",
+    "noMatches": "Aucun résultat pour « {{query}} ».",
+    "sections": {
+      "reviews": "Révisions",
+      "annotations": "Annotations",
+      "comments": "Commentaires",
+      "people": "Personnes",
+      "teams": "Équipes"
+    },
+    "inDocument": "dans {{title}}",
+    "seeAll": "Voir tous les résultats ({{count}})"
+  }
+}

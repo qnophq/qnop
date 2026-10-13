@@ -49,6 +49,7 @@ describe('LanguageSwitcher', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Change language' }));
     expect(screen.getByRole('menuitem', { name: 'Deutsch' })).toHaveAttribute('lang', 'de');
     expect(screen.getByRole('menuitem', { name: 'Español' })).toHaveAttribute('lang', 'es');
+    expect(screen.getByRole('menuitem', { name: 'Français' })).toHaveAttribute('lang', 'fr');
     expect(screen.getByRole('menuitem', { name: 'English' })).toHaveClass('Mui-selected');
   });
 
