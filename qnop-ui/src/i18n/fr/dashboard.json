@@ -20,10 +20,10 @@
     "dueSoon": "Échéance proche",
     "resolvedThisWeek": "Résolues cette semaine"
   },
-  "continue": "Reprenez là où vous vous étiez arrêté :",
+  "continue": "Reprenez là où vous en étiez :",
   "waiting": {
     "title": "En attente de vous",
-    "description": "Les révisions sur lesquelles vous êtes invité à travailler.",
+    "description": "Les révisions qui attendent votre contribution.",
     "empty": "Rien ne vous attend — profitez du calme."
   },
   "mine": {
@@ -70,7 +70,7 @@
     "empty": "Lorsque vos coéquipiers agissent sur vos révisions, cela s’affiche ici.",
     "someone": "Quelqu’un",
     "phrases": {
-      "annotationCreated": "<actor/> a ouvert une annotation dans <review/>",
+      "annotationCreated": "<actor/> a créé une annotation dans <review/>",
       "annotationResolved": "<actor/> a résolu une annotation dans <review/>",
       "annotationReopened": "<actor/> a rouvert une annotation dans <review/>",
       "workflowTransition": "<actor/> a changé le statut de <review/>",
@@ -84,7 +84,7 @@
     "viewProfile": "Voir le profil",
     "unavailable": "Les statistiques de votre profil ne sont pas disponibles pour le moment.",
     "stats": {
-      "reviewsOwned": "Dirigées",
+      "reviewsOwned": "Responsable",
       "reviewsParticipating": "En cours",
       "annotationsRaised": "Créées",
       "annotationsResolved": "Résolues"
@@ -95,7 +95,7 @@
   },
   "empty": {
     "title": "Votre centre de commande est prêt pour sa première mission.",
-    "body": "Chaque révision que vous dirigez ou rejoignez s’affiche ici — échéances, réponses à vos commentaires et les succès que vous remportez. Il ne manque plus qu’un document à se mettre sous la dent.",
+    "body": "Chaque révision dont vous êtes responsable ou à laquelle vous participez s’affiche ici — échéances, réponses à vos commentaires et les succès que vous remportez. Il ne manque plus qu’un document à se mettre sous la dent.",
     "cta": "Lancez votre première révision",
     "stepsTitle": "Trois étapes vers votre première révision",
     "steps": {

@@ -62,16 +62,16 @@ describe.each(SUPPORTED_LOCALES.filter((locale) => locale !== 'en'))('%s catalog
     // a sentence with a hole in it (or loses its link).
     const english = flatten(catalog('en', namespace));
     const translated = flatten(catalog(locale, namespace));
-    // A plural form may also take the tokens of the English `_other` form: i18next always passes
-    // `count`, and a language whose "one" covers 0 (French) must show the number where English
-    // writes "One more …" without it.
-    const accepted = (key: string, text: string) => {
+    // Every translated value is checked, including plural forms English lacks (Spanish and French
+    // `_many`): against the English value of the same key, or — for a plural form — the English
+    // `_other`. That second option also lets a plural form show `{{count}}` where English writes
+    // "One more …" without it: i18next always passes `count`, and French "one" covers 0.
+    const accepted = (key: string): string[] => {
       const other = english[key.replace(/_(zero|one|two|few|many)$/, '_other')];
-      return [tokensOf(text), ...(other === undefined ? [] : [tokensOf(other)])];
+      return [english[key], other].filter((text) => text !== undefined).map(tokensOf);
     };
-    const mismatches = Object.entries(english)
-      .filter(([key]) => key in translated)
-      .filter(([key, text]) => !accepted(key, text).includes(tokensOf(translated[key])))
+    const mismatches = Object.entries(translated)
+      .filter(([key, text]) => !accepted(key).includes(tokensOf(text)))
       .map(([key]) => key);
     expect(mismatches).toEqual([]);
   });
@@ -107,6 +107,30 @@ function tokensOf(text: string): string {
     .sort()
     .join(' ');
 }
+
+/**
+ * French typography (issue #851): a narrow no-break space before ; ? ! and a no-break space before
+ * a colon, guillemets with no-break spaces inside. A plain or missing space renders a line break or
+ * a cramped sign that French readers notice at once.
+ */
+describe.each(SUPPORTED_LOCALES.filter((locale) => locale === 'fr'))('%s typography', (locale) => {
+  it.each(namespaces)('%s spaces its punctuation the French way', (namespace) => {
+    const offending = Object.entries(flatten(catalog(locale, namespace))).filter(([, text]) => {
+      // Placeholders and tags are code, not prose; URLs and clock times keep their colons.
+      const prose = text
+        .replace(/\{\{[^}]+\}\}|<[^>]+>/g, '')
+        .replace(/https?:\/\/\S+/g, '')
+        .replace(/\d{1,2}:\d{2}/g, '');
+      return (
+        /[^\u202F\s][;?!]|[ \u00A0][;?!]/.test(prose) ||
+        /[^\u00A0\s]:|[ \u202F]:/.test(prose) ||
+        /«(?!\u00A0)|(?<!\u00A0)»/.test(prose) ||
+        /[A-Za-zÀ-ÿ]'[A-Za-zÀ-ÿ]/.test(prose)
+      );
+    });
+    expect(offending.map(([key]) => key)).toEqual([]);
+  });
+});
 
 describe('catalog files', () => {
   it('exist only for supported languages and English namespaces', () => {

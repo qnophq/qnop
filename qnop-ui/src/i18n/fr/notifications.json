@@ -76,8 +76,8 @@
   "text": {
     "aReview": "une révision",
     "title": {
-      "mention": "{{actor}} vous a mentionné",
-      "participantAdded": "Vous avez été ajouté à une révision",
+      "mention": "{{actor}} vous mentionne",
+      "participantAdded": "Nouvelle invitation à une révision",
       "annotationCreated": "{{actor}} a créé une annotation",
       "annotationDecided": {
         "resolved": "Une annotation a été résolue",
@@ -92,8 +92,8 @@
       "tombstone": "Une révision à laquelle vous n’avez plus accès"
     },
     "body": {
-      "mention": "{{actor}} vous a mentionné dans un commentaire sur « {{review}} ».",
-      "participantAdded": "{{actor}} vous a ajouté comme réviseur de « {{review}} ».",
+      "mention": "{{actor}} vous mentionne dans un commentaire sur « {{review}} ».",
+      "participantAdded": "{{actor}} vous invite à réviser « {{review}} ».",
       "annotationCreated": "{{actor}} a créé une nouvelle annotation sur « {{review}} ».",
       "annotationDecided": {
         "resolved": "{{actor}} a résolu une annotation sur « {{review}} ».",

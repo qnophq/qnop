@@ -37,9 +37,9 @@
       "progressOpen_one": "{{state}} — {{resolved}} sur {{count}} annotation résolue, à traiter : {{open}}",
       "progressOpen_many": "{{state}} — {{resolved}} sur {{count}} annotations résolues, à traiter : {{open}}",
       "progressOpen_other": "{{state}} — {{resolved}} sur {{count}} annotations résolues, à traiter : {{open}}",
-      "progressReady_one": "{{state}} — {{resolved}} sur {{count}} annotation résolue, prête à être finalisée",
-      "progressReady_many": "{{state}} — {{resolved}} sur {{count}} annotations résolues, prête à être finalisée",
-      "progressReady_other": "{{state}} — {{resolved}} sur {{count}} annotations résolues, prête à être finalisée",
+      "progressReady_one": "{{state}} — {{resolved}} sur {{count}} annotation résolue — révision prête à être finalisée",
+      "progressReady_many": "{{state}} — {{resolved}} sur {{count}} annotations résolues — révision prête à être finalisée",
+      "progressReady_other": "{{state}} — {{resolved}} sur {{count}} annotations résolues — révision prête à être finalisée",
       "noAnnotations": "{{state}} — aucune annotation pour l’instant"
     }
   },
@@ -59,7 +59,7 @@
   },
   "resizer": {
     "label": "Redimensionner le panneau des annotations",
-    "valueText": "{{percent}} % de l’espace de travail"
+    "valueText": "{{percent}} % de l’espace de travail"
   },
   "paramGate": {
     "resolving": "Recherche de la révision",
@@ -92,7 +92,7 @@
       "annotations_many": "{{count}} annotations",
       "annotations_other": "{{count}} annotations",
       "scopeBoth": "{{versions}} et {{annotations}}",
-      "archiveHint": "Pour l’archiver plutôt — c’est réversible et l’historique est conservé —, fermez cette fenêtre et utilisez « Archiver ».",
+      "archiveHint": "Pour l’archiver plutôt (c’est réversible et l’historique est conservé), fermez cette fenêtre et utilisez « Archiver ».",
       "confirmLabel": "Saisissez le titre de la révision pour confirmer",
       "failed": "Impossible de supprimer la révision.",
       "deleting": "Suppression…",
@@ -162,7 +162,7 @@
     },
     "sort": {
       "label": "Trier",
-      "updated": "Mises à jour récemment",
+      "updated": "Modifiées récemment",
       "name": "Nom",
       "due": "Échéance"
     },
@@ -246,10 +246,10 @@
   "emptyState": {
     "eyebrow": "Révisions",
     "title": "Lancez votre première révision",
-    "body": "Une révision, c’est un document annoté ligne par ligne — soulevez des points, réglez-les ensemble et finalisez avec un historique net. Il n’y a encore rien ici.",
+    "body": "Une révision, c’est un document annoté ligne par ligne — soulevez des points, résolvez-les ensemble et finalisez avec un historique net. Il n’y a encore rien ici.",
     "perks": {
       "annotate": "Annoter ligne par ligne",
-      "resolve": "Régler les points ouverts",
+      "resolve": "Résoudre les points ouverts",
       "finalize": "Finaliser avec un historique"
     },
     "noSlots": "Cette installation n’a plus de place libre pour une révision ouverte.",
@@ -417,12 +417,12 @@
   },
   "newVersion": {
     "title": "Téléverser une nouvelle version",
-    "body": "Elle devient la version que tout le monde révise. Les annotations existantes sont reprises et réancrées dans le nouveau document ; celles qui ne correspondent plus sont signalées pour que vous les replaciez.",
+    "body": "Elle devient la version que tout le monde révise. Les annotations existantes sont reprises et réancrées dans le nouveau document ; celles qui ne correspondent plus sont signalées pour que vous les repositionniez.",
     "uploaded": "Version {{version}} téléversée.",
     "failed": "Impossible de téléverser la nouvelle version.",
     "progressLabel": "Progression du téléversement",
     "processing": "Traitement du document…",
-    "uploadingPercent": "Téléversement… {{percent}} %",
+    "uploadingPercent": "Téléversement… {{percent}} %",
     "uploading": "Téléversement…",
     "submit": "Téléverser la version"
   },
@@ -462,7 +462,7 @@
     "sections": {
       "format": "Format",
       "annotations": "Quelles annotations",
-      "savedAs": "Enregistrer sous",
+      "savedAs": "Enregistré sous",
       "dateTime": "Date et heure"
     },
     "unavailable": "Indisponible",

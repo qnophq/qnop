@@ -5,7 +5,7 @@
     "unknownName": "Inconnu"
   },
   "stats": {
-    "owned": "Dirigées",
+    "owned": "Responsable",
     "reviewing": "En cours de révision",
     "completed": "Terminées"
   },
@@ -111,8 +111,8 @@
   "missions": {
     "sharedCaption": "Révisions en commun",
     "owned": {
-      "title": "Missions dirigées",
-      "empty": "{{name}} ne dirige encore aucune révision partagée avec vous."
+      "title": "Missions en tant que responsable",
+      "empty": "{{name}} n’est encore responsable d’aucune révision partagée avec vous."
     },
     "reviewing": {
       "title": "Missions rejointes",
@@ -124,7 +124,7 @@
     "caption": "Dans les révisions en commun",
     "empty": "Aucune activité récente de {{name}} dans les révisions en commun.",
     "phrases": {
-      "annotationCreated": "A ouvert une annotation dans <review/>",
+      "annotationCreated": "A créé une annotation dans <review/>",
       "annotationResolved": "A résolu une annotation dans <review/>",
       "annotationReopened": "A rouvert une annotation dans <review/>",
       "workflowTransition": "A changé le statut de <review/>",

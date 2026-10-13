@@ -49,7 +49,8 @@ describe('French', () => {
   });
 
   it('treats zero and one as singular, as French does, and covers millions', () => {
-    // CLDR French: one (0 and 1), many (e.g. 1 000 000), other.
+    // CLDR French: one (0 and 1), many (e.g. 1 000 000), other. The count is interpolated
+    // unformatted in every language; this asserts the plural form, not number formatting.
     expect(i18n.t('time.due.inDays', { count: 0 })).toMatch(/\b0 jour\b/);
     expect(i18n.t('time.due.inDays', { count: 1 })).toMatch(/\b1 jour\b/);
     expect(i18n.t('time.due.inDays', { count: 3 })).toMatch(/\b3 jours\b/);

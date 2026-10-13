@@ -21,7 +21,7 @@
     "leads": "Responsable de {{team}}",
     "memberOf": "Membre de {{team}}",
     "stats": {
-      "reviewsOwned": "Révisions dirigées",
+      "reviewsOwned": "Révisions en tant que responsable",
       "reviewsParticipating": "En cours de révision",
       "annotationsRaised": "Annotations créées",
       "annotationsResolved": "Résolues",
@@ -66,7 +66,7 @@
     },
     "hero": {
       "eyebrow": "Quartier général",
-      "summary": "Vous dirigez {{teams}} · {{teammates}} au total",
+      "summary": "Vous êtes responsable de {{teams}} · {{teammates}} au total",
       "teams_one": "{{count}} équipe",
       "teams_many": "{{count}} équipes",
       "teams_other": "{{count}} équipes",
@@ -74,7 +74,7 @@
       "teammates_many": "{{count}} coéquipiers",
       "teammates_other": "{{count}} coéquipiers",
       "stats": {
-        "teamsLed": "Équipes dirigées",
+        "teamsLed": "Équipes sous votre responsabilité",
         "teammates": "Coéquipiers",
         "largestTeam": "Plus grande équipe"
       }
@@ -97,11 +97,11 @@
       "locked": "Verrouillé · {{hint}}",
       "firstTeam": {
         "label": "Première équipe",
-        "hint": "Dirigez votre première équipe"
+        "hint": "Devenez responsable de votre première équipe"
       },
       "multiTeam": {
         "label": "Responsable multi-équipes",
-        "hint": "Dirigez au moins deux équipes"
+        "hint": "Soyez responsable d’au moins deux équipes"
       },
       "teamBuilder": {
         "label": "Bâtisseur d’équipe",
@@ -113,7 +113,7 @@
       },
       "fullHouse": {
         "label": "Salle comble",
-        "hint": "Dirigez {{size}} coéquipiers au total"
+        "hint": "Soyez responsable de {{size}} coéquipiers au total"
       }
     },
     "card": {

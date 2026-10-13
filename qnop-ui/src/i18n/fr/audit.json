@@ -43,7 +43,7 @@
   },
   "events": {
     "annotationCreated": {
-      "label": "Annotation ouverte",
+      "label": "Annotation créée",
       "description": "Un réviseur a créé une nouvelle annotation sur le document — un commentaire ou un problème."
     },
     "annotationResolved": {
@@ -67,8 +67,8 @@
       "description": "L’emplacement d’une annotation sur la page a été confirmé pour une version du document."
     },
     "placementReattached": {
-      "label": "Emplacement réancré",
-      "description": "Une annotation a été réancrée à un nouvel endroit — p. ex. après qu’une nouvelle version a déplacé le texte."
+      "label": "Emplacement corrigé",
+      "description": "Une annotation a été repositionnée manuellement à un nouvel endroit — p. ex. après qu’une nouvelle version a déplacé le texte."
     },
     "annotationAutoClosed": {
       "label": "Annotation fermée automatiquement",
@@ -76,7 +76,7 @@
     },
     "placementRepositioned": {
       "label": "Emplacement repositionné",
-      "description": "Une annotation correctement ancrée a été délibérément déplacée vers un autre passage (réancrage libre, issue #562)."
+      "description": "Une annotation correctement ancrée a été délibérément déplacée vers un autre passage (repositionnement libre, issue #562)."
     },
     "workflowTransition": {
       "label": "Statut modifié",

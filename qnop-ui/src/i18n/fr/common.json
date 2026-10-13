@@ -70,7 +70,7 @@
     },
     "conflict": {
       "title": "Deux punaises plantées sur la même ligne",
-      "message": "Quelqu’un a modifié cet élément pendant que vous y accédiez. Rechargez pour voir l’état actuel — rien de ce que vous avez fait n’a été perdu.",
+      "message": "Quelqu’un a modifié cet élément pendant que vous le consultiez. Rechargez pour voir l’état actuel — rien de ce que vous avez fait n’a été perdu.",
       "reload": "Recharger cette page"
     },
     "serverError": {
@@ -94,7 +94,7 @@
   "search": {
     "clear": "Effacer la recherche",
     "title": "Recherche",
-    "description": "Révisions, personnes et équipes de votre espace de travail — limitées à ce que vous êtes autorisé à voir.",
+    "description": "Révisions, personnes et équipes de votre espace de travail — limitées à ce que vous avez le droit de voir.",
     "placeholder": "Rechercher des révisions, des personnes et des équipes…",
     "inputLabel": "Rechercher des révisions, des personnes et des équipes",
     "tooShort_one": "Saisissez au moins {{count}} caractère pour lancer la recherche.",
