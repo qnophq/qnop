@@ -19,111 +19,111 @@
  * SPDX-License-Identifier: AGPL-3.0-only
  */
 
-import type { ReactNode } from 'react';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { fireEvent, render, screen } from '@testing-library/react';
-import { ThemeProvider } from '@mui/material/styles';
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import type { MailTemplateResponse } from '../../api/generated';
-import { buildTheme } from '../../theme/theme';
+import { describe, expect, it, vi } from 'vitest';
+import { screen, within } from '@testing-library/react';
+import type { MailTemplateResponse, MailTemplateVariant } from '../../api/generated';
+import { renderWithProviders } from '../../test/renderWithProviders';
 import { MailTemplatesListPage } from './MailTemplatesListPage';
 
-const { navigateMock } = vi.hoisted(() => ({ navigateMock: vi.fn() }));
+const variant = (
+  locale: string,
+  overrides: Partial<MailTemplateVariant> = {},
+): MailTemplateVariant => ({
+  locale,
+  source: 'DEFAULT',
+  shipped: true,
+  instanceDefault: false,
+  subject: `Subject ${locale}`,
+  ...overrides,
+});
+
+const template = (
+  key: string,
+  friendlyName: string,
+  variants: MailTemplateVariant[],
+): MailTemplateResponse => ({
+  key,
+  friendlyName,
+  locale: 'de',
+  subject: 'Subject de',
+  bodyPlain: 'Body',
+  source: 'DEFAULT',
+  placeholders: ['siteName'],
+  defaultSubject: 'Subject de',
+  defaultBodyPlain: 'Body',
+  variants,
+});
 
 const TEMPLATES: MailTemplateResponse[] = [
-  {
-    key: 'auth.password_reset',
-    friendlyName: 'Password reset',
-    locale: 'en',
-    subject: 'Reset your {{siteName}} password',
-    bodyPlain: 'Hi {{recipientName}}',
-    source: 'DATABASE',
-    placeholders: ['actionUrl', 'recipientName', 'siteName'],
-    defaultSubject: 'Reset your {{siteName}} password',
-    defaultBodyPlain: 'Hi {{recipientName}}',
-    updatedAt: new Date().toISOString(),
-    updatedByName: 'Ada Admin',
-  },
-  {
-    key: 'auth.registration_verification',
-    friendlyName: 'Account verification',
-    locale: 'en',
-    subject: 'Verify your {{siteName}} account',
-    bodyPlain: 'Welcome {{recipientName}}',
-    source: 'DEFAULT',
-    placeholders: ['actionUrl', 'recipientName', 'siteName'],
-    defaultSubject: 'Verify your {{siteName}} account',
-    defaultBodyPlain: 'Welcome {{recipientName}}',
-  },
+  template('auth.password_reset', 'Password reset', [
+    variant('en'),
+    variant('de', {
+      instanceDefault: true,
+      source: 'DATABASE',
+      updatedAt: new Date().toISOString(),
+      updatedByName: 'Ada Admin',
+    }),
+    variant('it', { shipped: false }),
+  ]),
+  template('auth.registration_verification', 'Account verification', [
+    variant('en'),
+    variant('de', { instanceDefault: true }),
+    variant('it', { shipped: false }),
+  ]),
 ];
 
 vi.mock('../../api/hooks/useMailTemplates', () => ({
   useMailTemplates: () => ({
-    data: { templates: TEMPLATES },
+    data: { templates: TEMPLATES, locales: ['en', 'de', 'it'], defaultLocale: 'de' },
     isLoading: false,
     isFetching: false,
     isError: false,
   }),
-  useSendTestEmail: () => ({ mutateAsync: vi.fn(), isPending: false }),
 }));
-
-vi.mock('react-router', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('react-router')>()),
-  useNavigate: () => navigateMock,
-}));
-
-beforeEach(() => navigateMock.mockReset());
-
-function wrapper({ children }: { children: ReactNode }) {
-  const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
-  return (
-    <QueryClientProvider client={queryClient}>
-      <ThemeProvider theme={buildTheme('light')}>{children}</ThemeProvider>
-    </QueryClientProvider>
-  );
-}
 
 describe('MailTemplatesListPage', () => {
-  it('renders a row per template with friendly name, key and subject', () => {
-    render(<MailTemplatesListPage />, { wrapper });
+  it('lays the templates out against every offered language', () => {
+    renderWithProviders(<MailTemplatesListPage />);
 
-    expect(screen.getByText('Password reset')).toBeTruthy();
+    const headers = screen.getAllByRole('columnheader').map((cell) => cell.textContent);
+    expect(headers).toEqual(['Template', 'ENEnglish', 'DEGerman', 'ITItalian']);
+    expect(screen.getAllByRole('row')).toHaveLength(3);
     expect(screen.getByText('auth.password_reset')).toBeTruthy();
-    expect(screen.getByText('Reset your {{siteName}} password')).toBeTruthy();
-    expect(screen.getByText('Account verification')).toBeTruthy();
   });
 
-  it('shows the template language as a locale badge', () => {
-    render(<MailTemplatesListPage />, { wrapper });
+  it('stars the default language', () => {
+    renderWithProviders(<MailTemplatesListPage />);
 
-    expect(screen.getByText('Language')).toBeTruthy();
-    expect(screen.getAllByText('EN')).toHaveLength(2);
+    const german = screen.getAllByRole('columnheader')[2];
+    expect(within(german).getByLabelText('Default language')).toBeTruthy();
   });
 
-  it('attributes a customised template and marks a built-in as a default', () => {
-    render(<MailTemplatesListPage />, { wrapper });
+  it('names each cell by its status and links it to the editor in that language', () => {
+    renderWithProviders(<MailTemplatesListPage />);
 
-    expect(screen.getByText('just now')).toBeTruthy();
-    expect(screen.getByText('by Ada Admin')).toBeTruthy();
-    expect(screen.getByText('Custom')).toBeTruthy();
-    expect(screen.getByText('Default')).toBeTruthy();
+    const custom = screen.getByRole('link', { name: 'Password reset in German: Customised' });
+    expect(custom.getAttribute('href')).toBe('/admin/email/templates/auth.password_reset/de');
+    expect(screen.getByRole('link', { name: 'Password reset in English: Built-in' })).toBeTruthy();
+    const missing = screen.getByRole('link', {
+      name: 'Password reset in Italian: Missing — English is sent',
+    });
+    expect(missing.getAttribute('href')).toBe('/admin/email/templates/auth.password_reset/it');
+    expect(within(missing).getByText('→ EN')).toBeTruthy();
   });
 
-  it('navigates to the editor when a row is clicked', () => {
-    render(<MailTemplatesListPage />, { wrapper });
+  it('links the template name to its default language', () => {
+    renderWithProviders(<MailTemplatesListPage />);
 
-    fireEvent.click(screen.getByText('Password reset'));
-
-    expect(navigateMock).toHaveBeenCalledWith('/admin/email/templates/auth.password_reset');
-  });
-
-  it('navigates to the editor when a focused row is activated with the keyboard', () => {
-    render(<MailTemplatesListPage />, { wrapper });
-
-    fireEvent.keyDown(screen.getByText('Account verification').closest('tr')!, { key: 'Enter' });
-
-    expect(navigateMock).toHaveBeenCalledWith(
-      '/admin/email/templates/auth.registration_verification',
+    expect(screen.getByRole('link', { name: 'Account verification' }).getAttribute('href')).toBe(
+      '/admin/email/templates/auth.registration_verification/de',
     );
+  });
+
+  it('explains the marks in a legend', () => {
+    renderWithProviders(<MailTemplatesListPage />);
+
+    expect(screen.getByText('Customised')).toBeTruthy();
+    expect(screen.getByText('Built-in')).toBeTruthy();
+    expect(screen.getByText('Missing — English is sent')).toBeTruthy();
   });
 });

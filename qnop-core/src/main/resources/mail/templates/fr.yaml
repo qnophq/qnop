@@ -1,0 +1,249 @@
+# Copyright (c) 2026-present devtank42 GmbH
+# SPDX-License-Identifier: AGPL-3.0-only
+#
+# Shipped French defaults of every mail template (issue #853). English is
+# authoritative in io.qnop.service.mail.MailTemplateKey; this file mirrors it key
+# for key, with the same placeholders and the same HTML structure and inline
+# styles. Loaded and validated at startup by MailTemplateDefaults: every template
+# key and field must be present, and only the key's own placeholders may appear.
+#
+# Style: formal "vous", terminology as in qnop-ui/src/i18n/fr, « … » guillemets
+# (&laquo;&nbsp;…&nbsp;&raquo; in HTML), a no-break space (U+00A0, &nbsp;) before
+# ":" and a narrow no-break space (U+202F, &#8239;) before ";", "?" and "!", em
+# dash with spaces. {{decision}} is a feminine past participle (it agrees with
+# "une annotation"), so review.annotation_decided uses the passive throughout.
+# An admin-edited row in the mail_template table still wins over these defaults.
+
+auth.registration_verification:
+  subject: "Confirmez votre compte {{siteName}}"
+  bodyPlain: |
+    Bonjour {{recipientName}},
+
+    Confirmez votre adresse e-mail pour activer votre compte {{siteName}} :
+
+    {{actionUrl}}
+
+    Ce lien expire {{expiresAtHuman}}. Si vous n’avez pas créé ce compte, vous pouvez ignorer ce message en toute sécurité.
+  bodyHtmlContent: |
+    <h1 style="margin:0 0 14px;color:#18191f;font-size:22px;font-weight:700;letter-spacing:-0.01em;line-height:1.3;">Confirmez votre adresse e-mail</h1>
+    <p style="margin:0 0 14px;">Bonjour {{recipientName}},</p>
+    <p style="margin:0 0 14px;">Confirmez cette adresse pour activer votre compte <strong style="color:#18191f;">{{siteName}}</strong>.</p>
+    <p style="margin:0;color:#9a9ea8;font-size:13px;">Ce lien expire {{expiresAtHuman}}. Si vous n’avez pas créé ce compte, vous pouvez ignorer cet e-mail.</p>
+  ctaLabel: "Confirmer l’adresse e-mail"
+  preheader: "Confirmez votre adresse e-mail pour activer votre compte {{siteName}}."
+
+auth.password_reset:
+  subject: "Réinitialisez votre mot de passe {{siteName}}"
+  bodyPlain: |
+    Bonjour {{recipientName}},
+
+    Nous avons reçu une demande de réinitialisation de votre mot de passe {{siteName}}. Choisissez-en un nouveau ici :
+
+    {{actionUrl}}
+
+    Ce lien expire {{expiresAtHuman}}. Si vous n’êtes pas à l’origine de cette demande, vous pouvez ignorer ce message en toute sécurité ; votre mot de passe reste inchangé.
+  bodyHtmlContent: |
+    <h1 style="margin:0 0 14px;color:#18191f;font-size:22px;font-weight:700;letter-spacing:-0.01em;line-height:1.3;">Réinitialisez votre mot de passe</h1>
+    <p style="margin:0 0 14px;">Bonjour {{recipientName}},</p>
+    <p style="margin:0 0 14px;">Nous avons reçu une demande de réinitialisation de votre mot de passe <strong style="color:#18191f;">{{siteName}}</strong>. Choisissez-en un nouveau ci-dessous.</p>
+    <p style="margin:0;color:#9a9ea8;font-size:13px;">Ce lien expire {{expiresAtHuman}}. Si vous n’êtes pas à l’origine de cette demande, ignorez cet e-mail — votre mot de passe reste inchangé.</p>
+  ctaLabel: "Choisir un nouveau mot de passe"
+  preheader: "Réinitialisez votre mot de passe {{siteName}}."
+
+auth.admin_password_reset:
+  subject: "Un administrateur a réinitialisé votre mot de passe {{siteName}}"
+  bodyPlain: |
+    Bonjour {{recipientName}},
+
+    Un administrateur a réinitialisé votre mot de passe {{siteName}}. Définissez-en un nouveau pour vous reconnecter :
+
+    {{actionUrl}}
+
+    Ce lien expire {{expiresAtHuman}}.
+  bodyHtmlContent: |
+    <h1 style="margin:0 0 14px;color:#18191f;font-size:22px;font-weight:700;letter-spacing:-0.01em;line-height:1.3;">Définissez un nouveau mot de passe</h1>
+    <p style="margin:0 0 14px;">Bonjour {{recipientName}},</p>
+    <p style="margin:0 0 14px;">Un administrateur a réinitialisé votre mot de passe <strong style="color:#18191f;">{{siteName}}</strong>. Définissez-en un nouveau pour vous reconnecter.</p>
+    <p style="margin:0;color:#9a9ea8;font-size:13px;">Ce lien expire {{expiresAtHuman}}.</p>
+  ctaLabel: "Définir un nouveau mot de passe"
+  preheader: "Un administrateur a réinitialisé votre mot de passe {{siteName}}."
+
+review.participant_added:
+  subject: "Invitation à réviser « {{documentTitle}} »"
+  bodyPlain: |
+    Bonjour {{recipientName}},
+
+    {{actorName}} vous invite à réviser « {{documentTitle}} » ({{siteName}}).
+
+    Ouvrez la révision pour consulter le document et sa discussion :
+
+    {{actionUrl}}
+  bodyHtmlContent: |
+    <h1 style="margin:0 0 14px;color:#18191f;font-size:22px;font-weight:700;letter-spacing:-0.01em;line-height:1.3;">Vous participez à une révision</h1>
+    <p style="margin:0 0 14px;">Bonjour {{recipientName}},</p>
+    <p style="margin:0 0 14px;"><strong style="color:#18191f;">{{actorName}}</strong> vous invite à réviser <strong style="color:#18191f;">&laquo;&nbsp;{{documentTitle}}&nbsp;&raquo;</strong>.</p>
+    <p style="margin:0;color:#9a9ea8;font-size:13px;">Ouvrez la révision pour consulter le document et sa discussion.</p>
+  ctaLabel: "Ouvrir la révision"
+  preheader: "{{actorName}} vous invite à réviser « {{documentTitle}} »."
+
+review.daily_digest:
+  subject: "Résumé quotidien : {{totalPhrase}} dans vos révisions"
+  bodyPlain: |
+    Bonjour {{recipientName}},
+
+    Voici ce qui s’est passé dans vos révisions depuis votre dernier résumé — {{totalPhrase}} au total :
+
+    {{digestBody}}
+
+    Ouvrez vos révisions :
+
+    {{actionUrl}}
+
+    Vous recevez un résumé par jour, car c’est votre réglage de notification ; vous pouvez passer à un e-mail par événement ou désactiver ces e-mails dans votre profil.
+  bodyHtmlContent: |
+    <h1 style="margin:0 0 14px;color:#18191f;font-size:22px;font-weight:700;letter-spacing:-0.01em;line-height:1.3;">Votre résumé des révisions</h1>
+    <p style="margin:0 0 14px;color:#3d3f47;font-size:15px;line-height:1.6;">Bonjour {{recipientName}}, voici ce qui s’est passé dans vos révisions depuis votre dernier résumé — {{totalPhrase}} au total.</p>
+    {{{digestBodyHtml}}}
+    <p style="margin:22px 0 0;"><a href="{{actionUrl}}" style="display:inline-block;padding:11px 18px;border-radius:8px;background:#18191f;color:#ffffff;font-size:15px;font-weight:600;text-decoration:none;">Ouvrir vos révisions</a></p>
+    <p style="margin:22px 0 0;color:#6b6d76;font-size:13px;line-height:1.6;">Vous recevez un résumé par jour, car c’est votre réglage de notification&#8239;; vous pouvez passer à un e-mail par événement ou désactiver ces e-mails dans votre profil.</p>
+  ctaLabel: "Ouvrir vos révisions"
+  preheader: "{{totalPhrase}} dans vos révisions depuis votre dernier résumé."
+
+review.annotation_created:
+  subject: "Nouvelle annotation sur « {{documentTitle}} »"
+  bodyPlain: |
+    Bonjour {{recipientName}},
+
+    {{actorName}} a créé une nouvelle annotation sur « {{documentTitle}} » ({{siteName}}) :
+
+    « {{annotationExcerpt}} »
+
+    Ouvrez l’annotation :
+
+    {{actionUrl}}
+  bodyHtmlContent: |
+    <h1 style="margin:0 0 14px;color:#18191f;font-size:22px;font-weight:700;letter-spacing:-0.01em;line-height:1.3;">Nouvelle annotation</h1>
+    <p style="margin:0 0 14px;">Bonjour {{recipientName}},</p>
+    <p style="margin:0 0 14px;"><strong style="color:#18191f;">{{actorName}}</strong> a créé une nouvelle annotation sur <strong style="color:#18191f;">&laquo;&nbsp;{{documentTitle}}&nbsp;&raquo;</strong>&nbsp;:</p>
+    <p style="margin:0 0 14px;padding:10px 14px;border-left:3px solid #d5d9e0;color:#5a5f6a;">{{annotationExcerpt}}</p>
+    <p style="margin:0;color:#9a9ea8;font-size:13px;">Ouvrez l’annotation pour y répondre ou la résoudre.</p>
+  ctaLabel: "Ouvrir l’annotation"
+  preheader: "{{actorName}} a créé une nouvelle annotation sur « {{documentTitle}} »."
+
+review.annotation_decided:
+  subject: "Une annotation sur « {{documentTitle}} » a été {{decision}}"
+  bodyPlain: |
+    Bonjour {{recipientName}},
+
+    Une annotation sur « {{documentTitle}} » ({{siteName}}) a été {{decision}} par {{actorName}} :
+
+    « {{annotationExcerpt}} »
+
+    Ouvrez l’annotation :
+
+    {{actionUrl}}
+  bodyHtmlContent: |
+    <h1 style="margin:0 0 14px;color:#18191f;font-size:22px;font-weight:700;letter-spacing:-0.01em;line-height:1.3;">Annotation {{decision}}</h1>
+    <p style="margin:0 0 14px;">Bonjour {{recipientName}},</p>
+    <p style="margin:0 0 14px;">Une annotation sur <strong style="color:#18191f;">&laquo;&nbsp;{{documentTitle}}&nbsp;&raquo;</strong> a été {{decision}} par <strong style="color:#18191f;">{{actorName}}</strong>&nbsp;:</p>
+    <p style="margin:0 0 14px;padding:10px 14px;border-left:3px solid #d5d9e0;color:#5a5f6a;">{{annotationExcerpt}}</p>
+    <p style="margin:0;color:#9a9ea8;font-size:13px;">Ouvrez l’annotation pour consulter la discussion.</p>
+  ctaLabel: "Ouvrir l’annotation"
+  preheader: "Une annotation sur « {{documentTitle}} » a été {{decision}}."
+
+review.comment_added:
+  subject: "Nouvelle réponse sur « {{documentTitle}} »"
+  bodyPlain: |
+    Bonjour {{recipientName}},
+
+    {{actorName}} a répondu dans une discussion que vous suivez sur « {{documentTitle}} » ({{siteName}}) :
+
+    « {{commentExcerpt}} »
+
+    Ouvrez la réponse :
+
+    {{actionUrl}}
+  bodyHtmlContent: |
+    <h1 style="margin:0 0 14px;color:#18191f;font-size:22px;font-weight:700;letter-spacing:-0.01em;line-height:1.3;">Nouvelle réponse</h1>
+    <p style="margin:0 0 14px;">Bonjour {{recipientName}},</p>
+    <p style="margin:0 0 14px;"><strong style="color:#18191f;">{{actorName}}</strong> a répondu dans une discussion que vous suivez sur <strong style="color:#18191f;">&laquo;&nbsp;{{documentTitle}}&nbsp;&raquo;</strong>&nbsp;:</p>
+    <p style="margin:0 0 14px;padding:10px 14px;border-left:3px solid #d5d9e0;color:#5a5f6a;">{{commentExcerpt}}</p>
+    <p style="margin:0;color:#9a9ea8;font-size:13px;">Ouvrez la discussion pour répondre.</p>
+  ctaLabel: "Ouvrir la réponse"
+  preheader: "{{actorName}} a répondu sur « {{documentTitle}} »."
+
+review.workflow_changed:
+  subject: "« {{documentTitle}} » : nouveau statut « {{newState}} »"
+  bodyPlain: |
+    Bonjour {{recipientName}},
+
+    La révision « {{documentTitle}} » ({{siteName}}) a changé de statut : {{oldState}} -> {{newState}}.
+
+    Ouvrez la révision :
+
+    {{actionUrl}}
+  bodyHtmlContent: |
+    <h1 style="margin:0 0 14px;color:#18191f;font-size:22px;font-weight:700;letter-spacing:-0.01em;line-height:1.3;">Changement de statut de la révision</h1>
+    <p style="margin:0 0 14px;">Bonjour {{recipientName}},</p>
+    <p style="margin:0 0 14px;"><strong style="color:#18191f;">&laquo;&nbsp;{{documentTitle}}&nbsp;&raquo;</strong> a changé de statut&nbsp;: {{oldState}} &#8594; <strong style="color:#18191f;">{{newState}}</strong>.</p>
+    <p style="margin:0;color:#9a9ea8;font-size:13px;">Ouvrez la révision pour en voir les détails.</p>
+  ctaLabel: "Ouvrir la révision"
+  preheader: "« {{documentTitle}} » : nouveau statut « {{newState}} »."
+
+review.deleted:
+  subject: "La révision « {{documentTitle}} » a été supprimée"
+  bodyPlain: |
+    Bonjour {{recipientName}},
+
+    Votre révision « {{documentTitle}} » ({{siteName}}) a été définitivement supprimée par un administrateur.
+
+    Tout son contenu a disparu : chaque version, chaque annotation et chaque discussion. Cette action est irréversible.
+
+    Si vous ne vous y attendiez pas, adressez-vous à votre administrateur — la suppression est consignée dans le journal d’audit.
+  bodyHtmlContent: |
+    <h1 style="margin:0 0 14px;color:#18191f;font-size:22px;font-weight:700;letter-spacing:-0.01em;line-height:1.3;">Révision supprimée</h1>
+    <p style="margin:0 0 14px;">Bonjour {{recipientName}},</p>
+    <p style="margin:0 0 14px;">Votre révision <strong style="color:#18191f;">&laquo;&nbsp;{{documentTitle}}&nbsp;&raquo;</strong> a été définitivement supprimée par un administrateur.</p>
+    <p style="margin:0 0 14px;">Tout son contenu a disparu &#8212; chaque version, chaque annotation et chaque discussion. Cette action est irréversible.</p>
+    <p style="margin:0;color:#9a9ea8;font-size:13px;">Si vous ne vous y attendiez pas, adressez-vous à votre administrateur&#8239;; la suppression est consignée dans le journal d’audit.</p>
+  # No call to action, as in English: there is nothing left to open (issue #421).
+  preheader: "La révision « {{documentTitle}} » a été définitivement supprimée."
+
+review.version_uploaded:
+  subject: "Nouvelle version de « {{documentTitle}} » — v{{versionNumber}}"
+  bodyPlain: |
+    Bonjour {{recipientName}},
+
+    {{actorName}} a téléversé la version {{versionNumber}} de « {{documentTitle}} » ({{siteName}}).
+
+    Les annotations existantes sont en cours de réancrage sur le nouveau texte. Ouvrez la révision pour continuer :
+
+    {{actionUrl}}
+  bodyHtmlContent: |
+    <h1 style="margin:0 0 14px;color:#18191f;font-size:22px;font-weight:700;letter-spacing:-0.01em;line-height:1.3;">Nouvelle version du document</h1>
+    <p style="margin:0 0 14px;">Bonjour {{recipientName}},</p>
+    <p style="margin:0 0 14px;"><strong style="color:#18191f;">{{actorName}}</strong> a téléversé la version <strong style="color:#18191f;">v{{versionNumber}}</strong> de <strong style="color:#18191f;">&laquo;&nbsp;{{documentTitle}}&nbsp;&raquo;</strong>.</p>
+    <p style="margin:0;color:#9a9ea8;font-size:13px;">Les annotations existantes sont en cours de réancrage sur le nouveau texte. Ouvrez la révision pour continuer.</p>
+  ctaLabel: "Ouvrir la nouvelle version"
+  preheader: "{{actorName}} a téléversé la v{{versionNumber}} de « {{documentTitle}} »."
+
+review.mention:
+  subject: "{{actorName}} vous mentionne dans « {{documentTitle}} »"
+  bodyPlain: |
+    Bonjour {{recipientName}},
+
+    {{actorName}} vous mentionne dans une discussion sur « {{documentTitle}} » ({{siteName}}) :
+
+    « {{commentExcerpt}} »
+
+    Ouvrez le commentaire pour répondre :
+
+    {{actionUrl}}
+  bodyHtmlContent: |
+    <h1 style="margin:0 0 14px;color:#18191f;font-size:22px;font-weight:700;letter-spacing:-0.01em;line-height:1.3;">Nouvelle mention</h1>
+    <p style="margin:0 0 14px;">Bonjour {{recipientName}},</p>
+    <p style="margin:0 0 14px;"><strong style="color:#18191f;">{{actorName}}</strong> vous mentionne dans une discussion sur <strong style="color:#18191f;">&laquo;&nbsp;{{documentTitle}}&nbsp;&raquo;</strong>&nbsp;:</p>
+    <p style="margin:0 0 14px;padding:10px 14px;border-left:3px solid #d5d9e0;color:#5a5f6a;">{{commentExcerpt}}</p>
+    <p style="margin:0;color:#9a9ea8;font-size:13px;">Ouvrez le commentaire pour répondre.</p>
+  ctaLabel: "Ouvrir le commentaire"
+  preheader: "{{actorName}} vous mentionne dans « {{documentTitle}} »."

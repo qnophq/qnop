@@ -30,6 +30,8 @@ import io.qnop.service.ApplicationSettingsService;
 import io.qnop.service.limits.FeatureDisabledException;
 import io.qnop.service.limits.FeatureToggleProperties;
 import java.time.Instant;
+import java.util.ArrayList;
+import java.util.EnumMap;
 import java.util.HashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -37,7 +39,10 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.SortedSet;
+import java.util.TreeSet;
 import java.util.UUID;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -248,7 +253,7 @@ public class MailTemplateService {
    * the shipped ones of {@code locale}, so resetting returns to that language's built-in text.
    */
   public MailTemplateView getEffective(MailTemplateKey key, String locale) {
-    String language = requestedOrDefault(locale);
+    String language = requireEditorLocale(locale);
     MailTemplateContent content = defaults.findOrEnglish(key, language);
     return findRow(key, language)
         .map(
@@ -287,8 +292,8 @@ public class MailTemplateService {
       String bodyHtml,
       UUID actor) {
     requireEditable();
+    String language = requireEditorLocale(locale);
     validatePlaceholders(key, subject, bodyPlain, bodyHtml);
-    String language = requestedOrDefault(locale);
     MailTemplate row =
         findRow(key, language)
             .orElseGet(() -> new MailTemplate(key.key(), language, subject, bodyPlain));
@@ -315,13 +320,130 @@ public class MailTemplateService {
   @Transactional
   public boolean reset(MailTemplateKey key, String locale) {
     requireEditable();
-    return findRow(key, requestedOrDefault(locale))
+    return findRow(key, requireEditorLocale(locale))
         .map(
             row -> {
               repository.delete(row);
               return true;
             })
         .orElse(false);
+  }
+
+  /**
+   * The languages the editor offers (issue #853): every language qnop ships mail in, plus the
+   * configured default language — which counts for mail even when nothing ships in it ({@link
+   * MailLocaleResolver}). English first, then alphabetical.
+   */
+  public List<String> editorLocales() {
+    SortedSet<String> others = new TreeSet<>(defaults.locales());
+    others.add(defaultLocale());
+    others.remove(MailLocaleResolver.FALLBACK_LOCALE);
+    List<String> locales = new ArrayList<>();
+    locales.add(MailLocaleResolver.FALLBACK_LOCALE);
+    locales.addAll(others);
+    return List.copyOf(locales);
+  }
+
+  /** The configured default language, as the editor marks it. */
+  public String editorDefaultLocale() {
+    return defaultLocale();
+  }
+
+  /**
+   * {@code locale} normalized, or the default language when blank.
+   *
+   * @throws UnsupportedMailLocaleException when the editor does not offer that language
+   */
+  public String requireEditorLocale(String locale) {
+    String language = requestedOrDefault(locale);
+    List<String> offered = editorLocales();
+    if (!offered.contains(language)) {
+      throw new UnsupportedMailLocaleException(language, offered);
+    }
+    return language;
+  }
+
+  /**
+   * The status of every template in every offered language, from one query of the stored rows and
+   * one batch lookup of the editing admins' names.
+   */
+  @Transactional(readOnly = true)
+  public Map<MailTemplateKey, List<MailTemplateVariant>> variants() {
+    return variantsOf(repository.findAll());
+  }
+
+  /** The status of {@code key} in every offered language, in {@link #editorLocales()} order. */
+  @Transactional(readOnly = true)
+  public List<MailTemplateVariant> variants(MailTemplateKey key) {
+    return variantsOf(repository.findByTemplateKey(key.key())).getOrDefault(key, List.of());
+  }
+
+  private Map<MailTemplateKey, List<MailTemplateVariant>> variantsOf(List<MailTemplate> rows) {
+    Map<String, MailTemplate> rowsByKeyAndLocale =
+        rows.stream()
+            .collect(
+                Collectors.toMap(
+                    row -> row.getTemplateKey() + "|" + row.getLocale(),
+                    Function.identity(),
+                    (first, second) -> first));
+    Map<UUID, String> names = userNames(rows);
+    List<String> locales = editorLocales();
+    String instanceDefault = defaultLocale();
+    Map<MailTemplateKey, List<MailTemplateVariant>> variants = new EnumMap<>(MailTemplateKey.class);
+    for (MailTemplateKey key : MailTemplateKey.values()) {
+      List<MailTemplateVariant> perLocale = new ArrayList<>();
+      for (String locale : locales) {
+        Optional<MailTemplateContent> shipped = defaults.find(key, locale);
+        MailTemplate row = rowsByKeyAndLocale.get(key.key() + "|" + locale);
+        perLocale.add(
+            row != null
+                ? new MailTemplateVariant(
+                    locale,
+                    MailTemplateView.Source.DATABASE,
+                    shipped.isPresent(),
+                    locale.equals(instanceDefault),
+                    row.getSubject(),
+                    row.getUpdatedAt(),
+                    names.get(parseUserId(row.getUpdatedBy())))
+                : new MailTemplateVariant(
+                    locale,
+                    MailTemplateView.Source.DEFAULT,
+                    shipped.isPresent(),
+                    locale.equals(instanceDefault),
+                    shipped.orElseGet(() -> MailTemplateContent.english(key)).subject(),
+                    null,
+                    null));
+      }
+      variants.put(key, List.copyOf(perLocale));
+    }
+    return variants;
+  }
+
+  /** Display names of the admins who saved {@code rows}, keyed by their id. */
+  private Map<UUID, String> userNames(List<MailTemplate> rows) {
+    List<UUID> ids =
+        rows.stream().map(row -> parseUserId(row.getUpdatedBy())).filter(id -> id != null).toList();
+    // A HashMap, not Map.of(): built-in defaults look up a null id.
+    Map<UUID, String> names = new HashMap<>();
+    if (ids.isEmpty()) {
+      return names;
+    }
+    for (User user : userRepository.findAllById(ids)) {
+      names.put(user.getId(), user.getDisplayName());
+    }
+    return names;
+  }
+
+  /** The editing admin's id, or {@code null} for a built-in default or a non-UUID value. */
+  private static UUID parseUserId(String updatedBy) {
+    if (updatedBy == null) {
+      return null;
+    }
+    try {
+      return UUID.fromString(updatedBy);
+    } catch (IllegalArgumentException e) {
+      return null;
+    }
   }
 
   /** The effective view for one template at the configured default locale. */

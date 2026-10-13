@@ -39,8 +39,10 @@ import io.qnop.service.mail.MailTemplateKey;
 import io.qnop.service.mail.MailTemplateService;
 import io.qnop.service.mail.MailTemplateService.MailPreview;
 import io.qnop.service.mail.MailTemplateValidationException;
+import io.qnop.service.mail.MailTemplateVariant;
 import io.qnop.service.mail.MailTemplateView;
 import io.qnop.service.mail.RenderedMail;
+import io.qnop.service.mail.UnsupportedMailLocaleException;
 import java.time.ZoneOffset;
 import java.util.HashMap;
 import java.util.List;
@@ -138,13 +140,34 @@ public class AdminEmailController implements AdminEmailApi {
 
   @Override
   public ResponseEntity<MailTemplateListResponse> listMailTemplates() {
-    List<MailTemplateResponse> all = templates.listAll().stream().map(this::toResponse).toList();
-    return ResponseEntity.ok(new MailTemplateListResponse().templates(all));
+    Map<MailTemplateKey, List<MailTemplateVariant>> variants = templates.variants();
+    List<MailTemplateResponse> all =
+        templates.listAll().stream()
+            .map(
+                view ->
+                    toResponse(view)
+                        .variants(
+                            toVariants(
+                                variants.getOrDefault(
+                                    MailTemplateKey.fromKey(view.key()).orElseThrow(), List.of()))))
+            .toList();
+    return ResponseEntity.ok(
+        new MailTemplateListResponse()
+            .templates(all)
+            .locales(templates.editorLocales())
+            .defaultLocale(templates.editorDefaultLocale()));
   }
 
   @Override
-  public ResponseEntity<MailTemplateResponse> getMailTemplate(String key) {
-    return ResponseEntity.ok(toResponse(templates.getEffective(resolveKey(key))));
+  public ResponseEntity<MailTemplateResponse> getMailTemplate(String key, String locale) {
+    MailTemplateKey templateKey = resolveKey(key);
+    try {
+      return ResponseEntity.ok(
+          toResponse(templates.getEffective(templateKey, locale))
+              .variants(toVariants(templates.variants(templateKey))));
+    } catch (UnsupportedMailLocaleException e) {
+      throw new ResponseStatusException(HttpStatus.BAD_REQUEST, e.getMessage());
+    }
   }
 
   @Override
@@ -161,14 +184,19 @@ public class AdminEmailController implements AdminEmailApi {
               request.getBodyHtml(),
               currentActor());
       return ResponseEntity.ok(toResponse(saved));
-    } catch (MailTemplateValidationException e) {
+    } catch (MailTemplateValidationException | UnsupportedMailLocaleException e) {
       throw new ResponseStatusException(HttpStatus.BAD_REQUEST, e.getMessage());
     }
   }
 
   @Override
-  public ResponseEntity<Void> resetMailTemplate(String key) {
-    templates.reset(resolveKey(key));
+  public ResponseEntity<Void> resetMailTemplate(String key, String locale) {
+    MailTemplateKey templateKey = resolveKey(key);
+    try {
+      templates.reset(templateKey, locale);
+    } catch (UnsupportedMailLocaleException e) {
+      throw new ResponseStatusException(HttpStatus.BAD_REQUEST, e.getMessage());
+    }
     return ResponseEntity.noContent().build();
   }
 
@@ -235,6 +263,25 @@ public class AdminEmailController implements AdminEmailApi {
     } catch (IllegalArgumentException e) {
       return null;
     }
+  }
+
+  private List<io.qnop.api.v1.model.MailTemplateVariant> toVariants(
+      List<MailTemplateVariant> variants) {
+    return variants.stream()
+        .map(
+            variant ->
+                new io.qnop.api.v1.model.MailTemplateVariant()
+                    .locale(variant.locale())
+                    .source(MailTemplateSource.valueOf(variant.source().name()))
+                    .shipped(variant.shipped())
+                    .instanceDefault(variant.instanceDefault())
+                    .subject(variant.subject())
+                    .updatedAt(
+                        variant.updatedAt() == null
+                            ? null
+                            : variant.updatedAt().atOffset(ZoneOffset.UTC))
+                    .updatedByName(variant.updatedByName()))
+        .toList();
   }
 
   private MailTemplateResponse toResponse(MailTemplateView view) {

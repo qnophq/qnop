@@ -712,21 +712,33 @@
       "custom": "Personalizada",
       "default": "Predeterminada"
     },
+    "localeStatus": {
+      "custom": "Personalizada",
+      "shipped": "Integrada",
+      "fallback": "Falta: se envía en inglés"
+    },
     "list": {
       "columns": {
-        "template": "Plantilla",
-        "subject": "Asunto",
-        "language": "Idioma",
-        "source": "Origen",
-        "lastEdited": "Última edición"
+        "template": "Plantilla"
       },
-      "rowAria": "Editar la plantilla {{name}}",
-      "editedBy": "por {{name}}",
       "loadError": "No se pudieron cargar las plantillas de correo.",
       "empty": "No hay plantillas de correo."
     },
+    "matrix": {
+      "cellAria": "{{name}} en {{language}}: {{status}}",
+      "edited": "Editada {{when}}",
+      "editedBy": "Editada {{when}} por {{name}}",
+      "fallbackShort": "→ {{code}}",
+      "defaultLanguage": "Idioma predeterminado",
+      "defaultLanguageLegend": "Idioma predeterminado (para destinatarios sin idioma propio)"
+    },
     "edit": {
       "loadError": "No se pudo cargar esta plantilla. <back>Volver a las plantillas</back>",
+      "languages": "Idioma de la plantilla",
+      "languageTooltip": "{{language}} — {{status}}",
+      "languageTooltipDefault": "{{language}} (idioma predeterminado) — {{status}}",
+      "languageAria": "{{language}}, {{status}}",
+      "fallbackNotice": "qnop no incluye esta plantilla en {{language}}, así que los correos en {{language}} se envían ahora con el texto en inglés que ves aquí. Al guardar se crea una versión en {{language}}.",
       "edited": "— editada {{when}}",
       "editedBy": "— editada {{when}} por {{name}}",
       "variables": {
@@ -759,9 +771,14 @@
       "resetFailed": "No se pudo restablecer la plantilla.",
       "reset": {
         "title": "Restablecer plantilla",
-        "message": "¿Descartar la plantilla personalizada «{{name}}» y volver a la predeterminada integrada? Esta acción no se puede deshacer."
+        "message": "¿Descartar la versión personalizada en {{language}} de «{{name}}» y volver a la predeterminada integrada? Esta acción no se puede deshacer."
       },
-      "testHelper": "Envía esta plantilla renderizada con el borrador actual y datos de ejemplo."
+      "testHelper": "Envía esta plantilla renderizada con el borrador actual y datos de ejemplo.",
+      "switchLanguage": {
+        "title": "¿Descartar los cambios sin guardar?",
+        "message": "Tus cambios en la versión en {{language}} no están guardados. ¿Cambiar a {{target}} y descartarlos?",
+        "confirm": "Descartar y cambiar"
+      }
     },
     "compare": "Comparar con {{target}}",
     "preview": {

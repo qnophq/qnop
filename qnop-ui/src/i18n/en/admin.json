@@ -700,21 +700,33 @@
       "custom": "Custom",
       "default": "Default"
     },
+    "localeStatus": {
+      "custom": "Customised",
+      "shipped": "Built-in",
+      "fallback": "Missing — English is sent"
+    },
     "list": {
       "columns": {
-        "template": "Template",
-        "subject": "Subject",
-        "language": "Language",
-        "source": "Source",
-        "lastEdited": "Last edited"
+        "template": "Template"
       },
-      "rowAria": "Edit the {{name}} template",
-      "editedBy": "by {{name}}",
       "loadError": "The mail templates could not be loaded.",
       "empty": "No mail templates."
     },
+    "matrix": {
+      "cellAria": "{{name}} in {{language}}: {{status}}",
+      "edited": "Edited {{when}}",
+      "editedBy": "Edited {{when}} by {{name}}",
+      "fallbackShort": "→ {{code}}",
+      "defaultLanguage": "Default language",
+      "defaultLanguageLegend": "Default language (used when a recipient has no language of their own)"
+    },
     "edit": {
       "loadError": "This template could not be loaded. <back>Back to templates</back>",
+      "languages": "Template language",
+      "languageTooltip": "{{language}} — {{status}}",
+      "languageTooltipDefault": "{{language}} (default language) — {{status}}",
+      "languageAria": "{{language}}, {{status}}",
+      "fallbackNotice": "qnop ships no {{language}} version of this template, so {{language}} mail currently goes out with the English text shown here. Saving creates a {{language}} version.",
       "edited": "— edited {{when}}",
       "editedBy": "— edited {{when}} by {{name}}",
       "variables": {
@@ -747,9 +759,14 @@
       "resetFailed": "The template could not be reset.",
       "reset": {
         "title": "Reset template",
-        "message": "Discard the customised \"{{name}}\" and revert to the built-in default? This cannot be undone."
+        "message": "Discard the customised {{language}} version of \"{{name}}\" and revert to its built-in default? This cannot be undone."
       },
-      "testHelper": "Sends this template rendered with the current draft and sample data."
+      "testHelper": "Sends this template rendered with the current draft and sample data.",
+      "switchLanguage": {
+        "title": "Discard unsaved changes?",
+        "message": "Your changes to the {{language}} version are not saved. Switch to {{target}} and discard them?",
+        "confirm": "Discard and switch"
+      }
     },
     "compare": "Compare with {{target}}",
     "preview": {

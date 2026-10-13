@@ -700,21 +700,33 @@
       "custom": "Angepasst",
       "default": "Standard"
     },
+    "localeStatus": {
+      "custom": "Angepasst",
+      "shipped": "Mitgeliefert",
+      "fallback": "Fehlt — Englisch wird verschickt"
+    },
     "list": {
       "columns": {
-        "template": "Vorlage",
-        "subject": "Betreff",
-        "language": "Sprache",
-        "source": "Quelle",
-        "lastEdited": "Zuletzt bearbeitet"
+        "template": "Vorlage"
       },
-      "rowAria": "Vorlage {{name}} bearbeiten",
-      "editedBy": "von {{name}}",
       "loadError": "Die E-Mail-Vorlagen konnten nicht geladen werden.",
       "empty": "Keine E-Mail-Vorlagen."
     },
+    "matrix": {
+      "cellAria": "{{name}} auf {{language}}: {{status}}",
+      "edited": "Bearbeitet {{when}}",
+      "editedBy": "Bearbeitet {{when}} von {{name}}",
+      "fallbackShort": "→ {{code}}",
+      "defaultLanguage": "Standardsprache",
+      "defaultLanguageLegend": "Standardsprache (für Empfänger ohne eigene Sprache)"
+    },
     "edit": {
       "loadError": "Diese Vorlage konnte nicht geladen werden. <back>Zurück zu den Vorlagen</back>",
+      "languages": "Sprache der Vorlage",
+      "languageTooltip": "{{language}} — {{status}}",
+      "languageTooltipDefault": "{{language}} (Standardsprache) — {{status}}",
+      "languageAria": "{{language}}, {{status}}",
+      "fallbackNotice": "Für diese Vorlage gibt es keine mitgelieferte Fassung auf {{language}}. Mails auf {{language}} gehen deshalb zurzeit mit dem hier gezeigten englischen Text raus. Beim Speichern entsteht eine eigene Fassung auf {{language}}.",
       "edited": "— bearbeitet {{when}}",
       "editedBy": "— bearbeitet {{when}} von {{name}}",
       "variables": {
@@ -747,9 +759,14 @@
       "resetFailed": "Die Vorlage konnte nicht zurückgesetzt werden.",
       "reset": {
         "title": "Vorlage zurücksetzen",
-        "message": "Die angepasste Vorlage „{{name}}“ verwerfen und zum eingebauten Standard zurückkehren? Das lässt sich nicht rückgängig machen."
+        "message": "Die angepasste Fassung auf {{language}} von „{{name}}“ verwerfen und zum eingebauten Standard zurückkehren? Das lässt sich nicht rückgängig machen."
       },
-      "testHelper": "Sendet diese Vorlage, gerendert mit dem aktuellen Entwurf und den Beispieldaten."
+      "testHelper": "Sendet diese Vorlage, gerendert mit dem aktuellen Entwurf und den Beispieldaten.",
+      "switchLanguage": {
+        "title": "Ungespeicherte Änderungen verwerfen?",
+        "message": "Deine Änderungen an der Fassung auf {{language}} sind nicht gespeichert. Zu {{target}} wechseln und sie verwerfen?",
+        "confirm": "Verwerfen und wechseln"
+      }
     },
     "compare": "Mit {{target}} vergleichen",
     "preview": {

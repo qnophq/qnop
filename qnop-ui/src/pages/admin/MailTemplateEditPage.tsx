@@ -35,7 +35,7 @@ import TextField from '@mui/material/TextField';
 import Typography from '@mui/material/Typography';
 import { Send, Eye, RotateCcw, Variable } from 'lucide-react';
 import { Trans, useTranslation } from 'react-i18next';
-import { Link as RouterLink, useParams } from 'react-router';
+import { Link as RouterLink, useNavigate, useParams } from 'react-router';
 import type { MailTemplateResponse } from '../../api/generated';
 import {
   useMailTemplate,
@@ -57,7 +57,12 @@ import {
   MustacheCodeEditor,
   type MustacheEditorHandle,
 } from '../../components/admin/mail/mustache/MustacheCodeEditor';
+import { MailLocaleSwitcher } from '../../components/admin/mail/locale/MailLocaleSwitcher';
+import { mailLocaleStatus } from '../../components/admin/mail/locale/mailLocaleStatus';
+import { mailTemplatePath } from '../../components/admin/mail/locale/mailTemplatePath';
 import { useFormatters } from '../../hooks/useFormatters';
+import { useUiStore } from '../../stores/uiStore';
+import { localeDisplayName } from '../../utils/locale';
 import { apiErrorMessage } from '../../utils/apiError';
 
 /** Inserts text at the caret of a plain input, then restores focus and caret after re-render. */
@@ -77,12 +82,16 @@ function insertIntoInput(
   });
 }
 
-/** Loads one template and renders its editor; remounts when the key or its saved state changes. */
+/**
+ * Loads one template in one language and renders its editor; remounts when the key, the language
+ * or the saved state changes. Without a language in the URL the server answers with the default
+ * language.
+ */
 export function MailTemplateEditPage() {
   const { t } = useTranslation(['admin', 'common']);
-  const { key = '' } = useParams();
+  const { key = '', locale } = useParams();
   // React Router already decodes dynamic segments — don't decode again (avoids a double-decode).
-  const { data, isLoading, isError, isFetching } = useMailTemplate(key);
+  const { data, isLoading, isError, isFetching } = useMailTemplate(key, locale);
 
   if (isLoading) {
     return (
@@ -106,7 +115,7 @@ export function MailTemplateEditPage() {
   }
   return (
     <EditForm
-      key={`${data.key}:${data.updatedAt ?? 'default'}`}
+      key={`${data.key}:${data.locale}:${data.updatedAt ?? 'default'}`}
       template={data}
       refreshing={isFetching}
     />
@@ -127,6 +136,14 @@ function EditForm({
   const resetTemplate = useResetMailTemplate();
   const { toast, notify, clear } = useToast();
   const { formatRelative } = useFormatters();
+  const navigate = useNavigate();
+  const uiLocale = useUiStore((s) => s.locale);
+  const language = localeDisplayName(template.locale, uiLocale);
+  const variants = template.variants ?? [];
+  const currentVariant = variants.find((variant) => variant.locale === template.locale);
+  const isFallback = currentVariant != null && mailLocaleStatus(currentVariant) === 'fallback';
+  // The language a switch with unsaved changes is waiting on, until the admin confirms.
+  const [pendingLocale, setPendingLocale] = useState<string | null>(null);
 
   const [subject, setSubject] = useState(template.subject);
   const [bodyPlain, setBodyPlain] = useState(template.bodyPlain);
@@ -173,6 +190,7 @@ function EditForm({
       key: template.key,
       templateTestEmailRequest: {
         recipient,
+        locale: template.locale,
         subject,
         bodyPlain,
         bodyHtml: htmlEnabled ? bodyHtml : undefined,
@@ -222,7 +240,7 @@ function EditForm({
   const onReset = async () => {
     setConfirmReset(false);
     try {
-      await resetTemplate.mutateAsync(template.key);
+      await resetTemplate.mutateAsync({ key: template.key, locale: template.locale });
       notify(t('mailTemplates.edit.reverted'));
     } catch (err) {
       notify(apiErrorMessage(err, t('mailTemplates.edit.resetFailed')), 'error');
@@ -247,7 +265,7 @@ function EditForm({
           </Stack>
           <Typography color="text.secondary" sx={{ mt: 0.5 }}>
             <Box component="span" sx={{ fontFamily: 'monospace', fontSize: 13 }}>
-              {template.key} · {template.locale}
+              {template.key}
               {isCustomised && (
                 <Box component="span" sx={{ fontFamily: 'body1.fontFamily', ml: 1 }}>
                   {template.updatedByName
@@ -261,6 +279,27 @@ function EditForm({
             </Box>
           </Typography>
         </Box>
+
+        {variants.length > 0 && (
+          <Stack spacing={1.5}>
+            <MailLocaleSwitcher
+              templateKey={template.key}
+              variants={variants}
+              current={template.locale}
+              onLeave={(target, event) => {
+                if (dirty) {
+                  event.preventDefault();
+                  setPendingLocale(target);
+                }
+              }}
+            />
+            {isFallback && (
+              <Alert severity="warning">
+                {t('mailTemplates.edit.fallbackNotice', { language })}
+              </Alert>
+            )}
+          </Stack>
+        )}
 
         <Box
           sx={{
@@ -455,11 +494,27 @@ function EditForm({
       <ConfirmDialog
         open={confirmReset}
         title={t('mailTemplates.edit.reset.title')}
-        message={t('mailTemplates.edit.reset.message', { name: template.friendlyName })}
+        message={t('mailTemplates.edit.reset.message', { name: template.friendlyName, language })}
         confirmLabel={t('common:actions.reset')}
         destructive
         onConfirm={onReset}
         onClose={() => setConfirmReset(false)}
+      />
+
+      <ConfirmDialog
+        open={pendingLocale != null}
+        title={t('mailTemplates.edit.switchLanguage.title')}
+        message={t('mailTemplates.edit.switchLanguage.message', {
+          language,
+          target: pendingLocale ? localeDisplayName(pendingLocale, uiLocale) : '',
+        })}
+        confirmLabel={t('mailTemplates.edit.switchLanguage.confirm')}
+        destructive
+        onConfirm={() => {
+          if (pendingLocale) navigate(mailTemplatePath(template.key, pendingLocale));
+          setPendingLocale(null);
+        }}
+        onClose={() => setPendingLocale(null)}
       />
 
       <SendTestEmailDialog

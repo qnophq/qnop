@@ -278,7 +278,8 @@ export const router = createBrowserRouter([
               {
                 // Guarded here too: the editor is a deep link people bookmark,
                 // and it is the screen where a refused save costs the most work.
-                path: 'templates/:key',
+                // `:locale` picks the template language (issue #853); absent, the default one.
+                path: 'templates/:key/:locale?',
                 element: (
                   <FeatureRoute feature="emailTemplates">
                     <LazyBoundary>

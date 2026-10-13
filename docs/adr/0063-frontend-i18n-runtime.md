@@ -154,22 +154,30 @@ decision is recorded here, beside the UI's.
   with the English chrome wording.
 - **Reachable languages.** Admin rows count only in a language the resolver can choose: a shipped
   language, or the application default. A row saved for a language that is neither shipped nor
-  the default is never used until that language ships (Spanish, French and Portuguese follow in
-  the second change) — sending it would mix admin text with English phrases.
+  the default is never used until that language ships — sending it would mix admin text with
+  English phrases. The admin API therefore refuses to read, save or reset a template in any other
+  language (`400`).
 - **Upgrade note — customised templates.** Before this change every recipient got the rows of the
   default language. Now an admin row in the default language no longer reaches a recipient whose
   own language is shipped: an installation that customised its English templates (wording, a
   legal footer, branding) sends German recipients the stock German defaults instead. This is
   intended — the recipient's language wins — but operators who customised templates should review
-  them per language. The second change adds per-language editing to the admin template editor so
-  each language can be customised; until then a German row can be stored through the admin API
-  (`locale: de`).
+  them per language in the admin template editor.
+- **Editing per language.** The editor offers exactly the reachable languages: every shipped
+  language plus the application default, English first. The template list is a matrix of
+  templates against those languages; each cell shows whether the language is customised, built
+  in, or — only possible for an unshipped default language — missing, so the English default
+  stands in. The list and single-template responses carry this as `variants`, built from one query
+  of the stored rows. Read, reset, preview and test send take the language as a parameter; the
+  editor keeps it in the URL (`/admin/email/templates/<key>/<language>`).
 - **Server-rendered phrases.** A small `java.util.ResourceBundle` per language,
   `mail/messages[_<language>].properties` (UTF-8, English root, no fallback to the JVM's default
   locale), holds the layout's footer, CTA fallback and link hint, the relative expiry time, the
   decision words, workflow state names, actor fallbacks, and the digest's counts, sentences,
   headings and date format. Plurals use `MessageFormat` choice formats; counted phrases print the
   count as plain digits so no language groups them. English values are the former literals.
+- **Shipped languages:** German, Spanish, French and Brazilian Portuguese — the UI's languages,
+  written with the same register (du, tú, vous, você) and terminology as its catalogs.
 - **Adding a mail language** is adding `mail/templates/<language>.yaml` and
   `mail/messages_<language>.properties` — no code. Parity tests require every shipped language to
   define every template, field and phrase, with the same placeholders as English part by part.

@@ -34,7 +34,7 @@ import {
 } from './useMailTemplates';
 import { adminEmailApi } from '../config';
 
-const EMPTY: MailTemplateListResponse = { templates: [] };
+const EMPTY: MailTemplateListResponse = { templates: [], locales: ['en'], defaultLocale: 'en' };
 
 vi.mock('../config', () => ({
   adminEmailApi: {
@@ -85,7 +85,10 @@ describe('useMailTemplate', () => {
     const { result } = renderHook(() => useMailTemplate('auth.password_reset'), { wrapper });
 
     await waitFor(() => expect(result.current.isSuccess).toBe(true));
-    expect(adminEmailApi.getMailTemplate).toHaveBeenCalledWith({ key: 'auth.password_reset' });
+    expect(adminEmailApi.getMailTemplate).toHaveBeenCalledWith({
+      key: 'auth.password_reset',
+      locale: undefined,
+    });
     expect(result.current.data?.key).toBe('auth.password_reset');
   });
 });
@@ -110,15 +113,18 @@ describe('useUpdateMailTemplate', () => {
 });
 
 describe('useResetMailTemplate', () => {
-  it('resets by key', async () => {
+  it('resets one language of a template', async () => {
     vi.mocked(adminEmailApi.resetMailTemplate).mockResolvedValue({ data: undefined } as Awaited<
       ReturnType<typeof adminEmailApi.resetMailTemplate>
     >);
 
     const { result } = renderHook(() => useResetMailTemplate(), { wrapper });
-    await result.current.mutateAsync('auth.password_reset');
+    await result.current.mutateAsync({ key: 'auth.password_reset', locale: 'de' });
 
-    expect(adminEmailApi.resetMailTemplate).toHaveBeenCalledWith({ key: 'auth.password_reset' });
+    expect(adminEmailApi.resetMailTemplate).toHaveBeenCalledWith({
+      key: 'auth.password_reset',
+      locale: 'de',
+    });
   });
 });
 

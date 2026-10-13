@@ -30,7 +30,11 @@ import { adminEmailApi } from '../config';
 
 export const mailTemplateKeys = {
   all: ['admin', 'mail-templates'] as const,
+  /** Every language of one template; the prefix of {@link mailTemplateKeys.localized}. */
   detail: (key: string) => ['admin', 'mail-templates', key] as const,
+  /** One template in one language; `undefined` is the configured default language. */
+  localized: (key: string, locale: string | undefined) =>
+    ['admin', 'mail-templates', key, locale ?? 'default'] as const,
 };
 
 /** All mail templates with their current (override or built-in) content. */
@@ -45,11 +49,11 @@ export function useMailTemplates() {
 }
 
 /** One template's effective content + editor metadata (issue #144), for the edit page. */
-export function useMailTemplate(key: string) {
+export function useMailTemplate(key: string, locale?: string) {
   return useQuery<MailTemplateResponse>({
-    queryKey: mailTemplateKeys.detail(key),
+    queryKey: mailTemplateKeys.localized(key, locale),
     queryFn: async () => {
-      const response = await adminEmailApi.getMailTemplate({ key });
+      const response = await adminEmailApi.getMailTemplate({ key, locale });
       return response.data;
     },
     enabled: key.length > 0,
@@ -75,14 +79,14 @@ export function useUpdateMailTemplate() {
   });
 }
 
-/** Removes a template override, reverting to the built-in default, then refreshes. */
+/** Removes one language's override, reverting it to that language's default, then refreshes. */
 export function useResetMailTemplate() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: async (key: string) => {
-      await adminEmailApi.resetMailTemplate({ key });
+    mutationFn: async ({ key, locale }: { key: string; locale: string }) => {
+      await adminEmailApi.resetMailTemplate({ key, locale });
     },
-    onSuccess: (_data, key) => {
+    onSuccess: (_data, { key }) => {
       queryClient.invalidateQueries({ queryKey: mailTemplateKeys.all });
       queryClient.invalidateQueries({ queryKey: mailTemplateKeys.detail(key) });
     },
