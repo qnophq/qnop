@@ -30,11 +30,12 @@ import Tooltip from '@mui/material/Tooltip';
 import Typography from '@mui/material/Typography';
 import { useTheme } from '@mui/material/styles';
 import { FileText, Upload, X } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import { formatFileSize, type AcceptedUploads } from '../wizard/wizardModel';
 
 interface DocumentDropzoneProps {
   file: File | null;
-  /** Validation error from the last pick, if any. */
+  /** Validation error from the last pick, if any — already translated by the caller. */
   error?: string | null;
   maxSizeMb: number;
   /** Which formats this server takes, and how to name them (issue #343). */
@@ -84,6 +85,7 @@ export function DocumentDropzone({
   testId = 'document-dropzone',
 }: DocumentDropzoneProps) {
   const theme = useTheme();
+  const { t } = useTranslation('reviews');
   const inputRef = useRef<HTMLInputElement>(null);
   const [isDragOver, setIsDragOver] = useState(false);
   const staged = variant === 'stage';
@@ -106,7 +108,7 @@ export function DocumentDropzone({
       data-testid={testId}
       role="button"
       tabIndex={disabled ? -1 : 0}
-      aria-label={file ? 'Choose a different document' : 'Choose a document'}
+      aria-label={file ? t('upload.chooseDifferentDocument') : t('upload.chooseDocument')}
       aria-disabled={disabled || undefined}
       onClick={openPicker}
       onKeyDown={(event) => {
@@ -165,14 +167,12 @@ export function DocumentDropzone({
       >
         <Upload size={26} aria-hidden />
       </Box>
-      <Typography sx={{ fontWeight: 600, fontSize: 18, mb: 0.5 }}>
-        Drop your document here or choose a file
-      </Typography>
+      <Typography sx={{ fontWeight: 600, fontSize: 18, mb: 0.5 }}>{t('upload.prompt')}</Typography>
       <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-        {accepted.label} · max. {maxSizeMb} MB
+        {t('upload.limits', { formats: t(accepted.labelKey), max: maxSizeMb })}
       </Typography>
       <Button variant="contained" startIcon={<Upload size={16} />} disabled={disabled}>
-        Choose file
+        {t('upload.chooseFile')}
       </Button>
     </>
   );
@@ -211,7 +211,7 @@ export function DocumentDropzone({
           onFileCleared();
         }}
       >
-        Choose a different file
+        {t('upload.chooseDifferentFile')}
       </Button>
     </>
   );
@@ -246,12 +246,12 @@ export function DocumentDropzone({
           {formatFileSize(file.size)}
         </Typography>
       </Box>
-      <Tooltip title="Remove file">
+      <Tooltip title={t('upload.removeFile')}>
         <span>
           <IconButton
             size="small"
             onClick={onFileCleared}
-            aria-label="Remove file"
+            aria-label={t('upload.removeFile')}
             disabled={disabled}
           >
             <X size={16} />

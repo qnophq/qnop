@@ -27,6 +27,7 @@ import type enCommon from './en/common.json';
 import type enDashboard from './en/dashboard.json';
 import type enNotifications from './en/notifications.json';
 import type enProfile from './en/profile.json';
+import type enReviews from './en/reviews.json';
 import type enShell from './en/shell.json';
 import type enTeams from './en/teams.json';
 
@@ -47,6 +48,7 @@ declare module 'i18next' {
       teams: typeof enTeams;
       audit: typeof enAudit;
       admin: typeof enAdmin;
+      reviews: typeof enReviews;
     };
     returnNull: false;
   }

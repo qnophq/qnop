@@ -37,6 +37,7 @@ import Tooltip from '@mui/material/Tooltip';
 import Typography from '@mui/material/Typography';
 import { useTheme } from '@mui/material/styles';
 import { ChevronRight, Plus, Search, X } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import type { ParticipantView, PrincipalView } from '../../../api/generated';
 import { ParticipantKind } from '../../../api/generated';
 import {
@@ -53,10 +54,11 @@ import { UserAvatar } from '../../shell/UserAvatar';
 import { avatarSrc, teamAvatarSrc } from '../../../utils/avatarUrl';
 import { TeamAvatar } from '../../shell/TeamAvatar';
 import { apiErrorCode } from '../../../utils/apiError';
+import type { ReviewsKey } from '../reviewsI18n';
 
-/** Known participant conflicts — codes map to friendly text (never server prose). */
-const PARTICIPANT_CONFLICTS: Record<string, string> = {
-  DUPLICATE_PARTICIPANT: 'Already a reviewer on this document.',
+/** Known participant conflicts — codes map to catalog keys (never server prose). */
+const PARTICIPANT_CONFLICTS: Record<string, ReviewsKey> = {
+  DUPLICATE_PARTICIPANT: 'participants.conflicts.DUPLICATE_PARTICIPANT',
 };
 
 interface ParticipantsDialogProps {
@@ -90,19 +92,20 @@ function PrincipalIcon({
 /** View & (owner-only) manage the reviewers of one document. */
 /** The unfolded team: its members as quiet indented rows on a thin branch. */
 function TeamMemberList({ teamId }: { teamId: string }) {
+  const { t } = useTranslation('reviews');
   const membersQuery = useTeamMembers(teamId, true);
   const members = membersQuery.data?.principals ?? [];
   if (membersQuery.isPending) {
     return (
       <Stack sx={{ alignItems: 'flex-start', pl: 7, py: 0.5 }}>
-        <CircularProgress size={14} aria-label="Loading team members" />
+        <CircularProgress size={14} aria-label={t('participants.loadingMembers')} />
       </Stack>
     );
   }
   if (members.length === 0) {
     return (
       <Typography variant="caption" color="text.secondary" sx={{ display: 'block', pl: 7 }}>
-        No members in this team.
+        {t('participants.noMembers')}
       </Typography>
     );
   }
@@ -142,6 +145,7 @@ export function ParticipantsDialog({
   notify,
 }: ParticipantsDialogProps) {
   const theme = useTheme();
+  const { t } = useTranslation(['reviews', 'common']);
   const [query, setQuery] = useState('');
   // Teams unfold to show who reviews behind them (issue #403).
   const [expandedTeams, setExpandedTeams] = useState<Set<string>>(new Set());
@@ -170,31 +174,30 @@ export function ParticipantsDialog({
     addParticipant.mutate(
       principal.kind === ParticipantKind.Team ? { teamId: principal.id } : { userId: principal.id },
       {
-        onSuccess: () => notify(`${principal.displayName} added.`),
-        onError: (error) =>
-          notify(
-            PARTICIPANT_CONFLICTS[apiErrorCode(error) ?? ''] ?? 'The reviewer could not be added.',
-            'error',
-          ),
+        onSuccess: () => notify(t('participants.added', { name: principal.displayName })),
+        onError: (error) => {
+          const conflictKey = PARTICIPANT_CONFLICTS[apiErrorCode(error) ?? ''];
+          notify(conflictKey ? t(conflictKey) : t('participants.addFailed'), 'error');
+        },
       },
     );
   };
 
   const handleRemove = (participant: ParticipantView) => {
     removeParticipant.mutate(participant.id, {
-      onSuccess: () => notify(`${participant.displayName} removed.`),
-      onError: () => notify('The reviewer could not be removed.', 'error'),
+      onSuccess: () => notify(t('participants.removed', { name: participant.displayName })),
+      onError: () => notify(t('participants.removeFailed'), 'error'),
     });
   };
 
   return (
     <Dialog open={open} onClose={onClose} maxWidth="xs" fullWidth>
-      <DialogTitle>Participants</DialogTitle>
+      <DialogTitle>{t('participants.title')}</DialogTitle>
       <DialogContent>
         <Stack spacing={2.5}>
           {participants.length === 0 ? (
             <Typography variant="body2" color="text.secondary">
-              {participantsQuery.isPending ? 'Loading…' : 'No reviewers on this review yet.'}
+              {participantsQuery.isPending ? t('common:loading') : t('participants.empty')}
             </Typography>
           ) : (
             <Stack spacing={0.5} data-testid="participants-list">
@@ -210,7 +213,9 @@ export function ParticipantsDialog({
                       {canUnfold ? (
                         <IconButton
                           size="small"
-                          aria-label={`Show members of ${participant.displayName}`}
+                          aria-label={t('participants.showMembers', {
+                            name: participant.displayName,
+                          })}
                           aria-expanded={expanded}
                           onClick={() => toggleTeam(participant.principalId)}
                           sx={{ ml: -1, mr: -0.75 }}
@@ -246,7 +251,7 @@ export function ParticipantsDialog({
                               {participant.displayName}
                             </Typography>
                             <Typography variant="caption" color="text.secondary">
-                              Team
+                              {t('principal.team')}
                             </Typography>
                           </Box>
                         </TeamHoverCard>
@@ -276,16 +281,16 @@ export function ParticipantsDialog({
                               {participant.displayName}
                             </Typography>
                             <Typography variant="caption" color="text.secondary">
-                              User
+                              {t('principal.user')}
                             </Typography>
                           </Box>
                         </UserHoverCard>
                       )}
                       {isOwner && (
-                        <Tooltip title={`Remove ${participant.displayName}`}>
+                        <Tooltip title={t('principal.remove', { name: participant.displayName })}>
                           <IconButton
                             size="small"
-                            aria-label={`Remove ${participant.displayName}`}
+                            aria-label={t('principal.remove', { name: participant.displayName })}
                             disabled={removeParticipant.isPending}
                             onClick={() => handleRemove(participant)}
                           >
@@ -310,7 +315,7 @@ export function ParticipantsDialog({
               <TextField
                 size="small"
                 fullWidth
-                placeholder="Add people or teams…"
+                placeholder={t('participants.addPlaceholder')}
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
                 sx={{ mb: 1 }}
@@ -335,7 +340,7 @@ export function ParticipantsDialog({
               >
                 {candidates.length === 0 ? (
                   <Typography variant="body2" color="text.disabled" sx={{ px: 2, py: 1.5 }}>
-                    {searchQuery.isPending ? 'Searching…' : 'No matching people or teams.'}
+                    {searchQuery.isPending ? t('principal.searching') : t('principal.noMatches')}
                   </Typography>
                 ) : (
                   candidates.map((principal, i) => (
@@ -388,7 +393,7 @@ export function ParticipantsDialog({
       </DialogContent>
       <DialogActions sx={{ px: 3, pb: 2 }}>
         <Button onClick={onClose} color="inherit">
-          Close
+          {t('common:actions.close')}
         </Button>
       </DialogActions>
     </Dialog>

@@ -28,31 +28,37 @@ import TextField from '@mui/material/TextField';
 import Typography from '@mui/material/Typography';
 import { useTheme } from '@mui/material/styles';
 import { EyeOff, FileText, Play } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import type { PrincipalView } from '../../../api/generated';
 import { ParticipantKind, ThreadParticipation } from '../../../api/generated';
-
-/** The three thread-participation levels with a one-line explanation each (issue #413). */
-const PARTICIPATION_OPTIONS: { value: ThreadParticipation; label: string; hint: string }[] = [
-  {
-    value: ThreadParticipation.Open,
-    label: 'Open discussion',
-    hint: 'Every reviewer can read and reply to any thread.',
-  },
-  {
-    value: ThreadParticipation.ReadOnly,
-    label: 'Read-only threads',
-    hint: 'Everyone sees every thread, but only its author and the owner may reply.',
-  },
-  {
-    value: ThreadParticipation.Private,
-    label: 'Private threads',
-    hint: 'Reviewers see only their own threads; the owner sees all.',
-  },
-];
 import { DueDatePicker } from '../DueDatePicker';
+import type { ReviewsKey } from '../reviewsI18n';
 import { UserAvatar } from '../../shell/UserAvatar';
 import { TeamAvatar } from '../../shell/TeamAvatar';
 import { formatFileSize } from './wizardModel';
+
+/**
+ * The three thread-participation levels with a one-line explanation each (issue #413), as
+ * `reviews` catalog keys.
+ */
+const PARTICIPATION_OPTIONS: { value: ThreadParticipation; label: ReviewsKey; hint: ReviewsKey }[] =
+  [
+    {
+      value: ThreadParticipation.Open,
+      label: 'wizard.summary.participationOptions.OPEN.label',
+      hint: 'wizard.summary.participationOptions.OPEN.hint',
+    },
+    {
+      value: ThreadParticipation.ReadOnly,
+      label: 'wizard.summary.participationOptions.READ_ONLY.label',
+      hint: 'wizard.summary.participationOptions.READ_ONLY.hint',
+    },
+    {
+      value: ThreadParticipation.Private,
+      label: 'wizard.summary.participationOptions.PRIVATE.label',
+      hint: 'wizard.summary.participationOptions.PRIVATE.hint',
+    },
+  ];
 
 export type SubmitPhase = 'idle' | 'uploading' | 'finalizing';
 
@@ -113,14 +119,16 @@ export function SummaryStep({
   progress,
 }: SummaryStepProps) {
   const theme = useTheme();
+  const { t } = useTranslation('reviews');
   const isSubmitting = phase !== 'idle';
-  const participationHint = PARTICIPATION_OPTIONS.find(
+  const participationHintKey = PARTICIPATION_OPTIONS.find(
     (option) => option.value === threadParticipation,
   )?.hint;
+  const participationHint = participationHintKey ? t(participationHintKey) : undefined;
 
   return (
     <Stack spacing={3}>
-      <SummaryRow label="Document">
+      <SummaryRow label={t('wizard.summary.document')}>
         <Stack direction="row" spacing={1.25} sx={{ alignItems: 'center' }}>
           <FileText size={16} aria-hidden style={{ color: theme.palette.text.secondary }} />
           <Typography variant="body2" sx={{ fontWeight: 500 }}>
@@ -132,10 +140,10 @@ export function SummaryStep({
         </Stack>
       </SummaryRow>
 
-      <SummaryRow label="Reviewers">
+      <SummaryRow label={t('wizard.summary.reviewers')}>
         {reviewers.length === 0 ? (
           <Typography variant="body2" color="text.secondary">
-            None yet — the review starts with you only; reviewers can be added any time.
+            {t('wizard.summary.noReviewers')}
           </Typography>
         ) : (
           <Stack direction="row" spacing={1} sx={{ flexWrap: 'wrap', rowGap: 1 }}>
@@ -168,7 +176,7 @@ export function SummaryStep({
         )}
       </SummaryRow>
 
-      <SummaryRow label="Due date">
+      <SummaryRow label={t('wizard.summary.dueDate')}>
         <Box sx={{ maxWidth: 280 }}>
           <DueDatePicker value={dueAt} onChange={onDueAtChange} disabled={isSubmitting} />
         </Box>
@@ -206,23 +214,22 @@ export function SummaryStep({
         </Box>
         <Box sx={{ flex: 1 }}>
           <Typography variant="body2" sx={{ fontWeight: 500 }}>
-            Anonymous review
+            {t('wizard.summary.anonymous')}
           </Typography>
           <Typography variant="caption" color="text.secondary">
-            Reviewers' names are hidden — foreign authors show as stable "Participant N". Can't be
-            changed later.
+            {t('wizard.summary.anonymousHint')}
           </Typography>
         </Box>
         <Switch
           checked={anonymous}
           disabled={isSubmitting}
           onChange={(e) => onAnonymousChange(e.target.checked)}
-          slotProps={{ input: { 'aria-label': 'Anonymous review' } }}
+          slotProps={{ input: { 'aria-label': t('wizard.summary.anonymous') } }}
         />
       </Stack>
 
       {/* Thread participation policy (issue #413): fixed at creation. */}
-      <SummaryRow label="Thread participation">
+      <SummaryRow label={t('wizard.summary.participation')}>
         <TextField
           select
           fullWidth
@@ -232,12 +239,12 @@ export function SummaryStep({
           onChange={(event) =>
             onThreadParticipationChange(event.target.value as ThreadParticipation)
           }
-          helperText={`${participationHint} Can't be changed later.`}
-          slotProps={{ htmlInput: { 'aria-label': 'Thread participation' } }}
+          helperText={t('wizard.summary.participationHelper', { hint: participationHint })}
+          slotProps={{ htmlInput: { 'aria-label': t('wizard.summary.participation') } }}
         >
           {PARTICIPATION_OPTIONS.map((option) => (
             <MenuItem key={option.value} value={option.value}>
-              {option.label}
+              {t(option.label)}
             </MenuItem>
           ))}
         </TextField>
@@ -274,17 +281,17 @@ export function SummaryStep({
         </Box>
         <Box sx={{ flex: 1 }}>
           <Typography variant="body2" sx={{ fontWeight: 500 }}>
-            Start review immediately
+            {t('wizard.summary.start')}
           </Typography>
           <Typography variant="caption" color="text.secondary">
-            Moves the review from Draft to In review so reviewers can annotate right away.
+            {t('wizard.summary.startHint')}
           </Typography>
         </Box>
         <Switch
           checked={startImmediately}
           disabled={isSubmitting}
           onChange={(e) => onStartImmediatelyChange(e.target.checked)}
-          slotProps={{ input: { 'aria-label': 'Start review immediately' } }}
+          slotProps={{ input: { 'aria-label': t('wizard.summary.start') } }}
         />
       </Stack>
 
@@ -292,7 +299,9 @@ export function SummaryStep({
         <Box data-testid="wizard-upload-progress">
           <Stack direction="row" sx={{ justifyContent: 'space-between', mb: 0.75 }}>
             <Typography variant="caption" color="text.secondary">
-              {phase === 'uploading' ? 'Uploading document…' : 'Setting up the review…'}
+              {phase === 'uploading'
+                ? t('wizard.summary.uploading')
+                : t('wizard.summary.finalizing')}
             </Typography>
             {phase === 'uploading' && (
               <Typography variant="caption" color="text.secondary">

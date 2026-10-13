@@ -26,6 +26,7 @@ import Typography from '@mui/material/Typography';
 import { useTheme } from '@mui/material/styles';
 import type { Theme } from '@mui/material/styles';
 import { Eye, ShieldCheck, User } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import type { ParticipantView } from '../../../api/generated';
 import type { ReviewRole } from './reviewListModel';
 import { ToneBadge } from '../../admin/ToneBadge';
@@ -39,11 +40,12 @@ import { tokens } from '../../../theme/tokens';
 /** Shared bits of the reviews overview: role badge, doc icon, progress, reviewer stack. */
 
 export function RoleBadge({ role }: { role: ReviewRole }) {
-  if (role === 'owner') return <ToneBadge tone="blue" label="Owner" />;
+  const { t } = useTranslation('reviews');
+  if (role === 'owner') return <ToneBadge tone="blue" label={t('roles.owner')} />;
   // The moderation listing (issue #563) shows reviews the admin has no part in;
   // saying so plainly is what makes the row's context obvious.
-  if (role === 'observer') return <ToneBadge tone="amber" label="Not participating" />;
-  return <ToneBadge tone="neutral" label="Reviewer" />;
+  if (role === 'observer') return <ToneBadge tone="amber" label={t('roles.observer')} />;
+  return <ToneBadge tone="neutral" label={t('roles.reviewer')} />;
 }
 
 export function RoleIcon({ role }: { role: ReviewRole }) {
@@ -52,7 +54,10 @@ export function RoleIcon({ role }: { role: ReviewRole }) {
   return <Eye size={12} aria-hidden />;
 }
 
-/** Known document MIME types and their ribbon label + tone (issue #509 follow-up). */
+/**
+ * Known document MIME types and their ribbon label + tone (issue #509 follow-up). The labels are
+ * format names, the same in every language.
+ */
 const DOC_TYPE_META: Record<string, { label: string; tone: 'red' | 'blue' | 'neutral' }> = {
   'application/pdf': { label: 'PDF', tone: 'red' },
   'application/vnd.openxmlformats-officedocument.wordprocessingml.document': {
@@ -89,6 +94,7 @@ export function DocumentIcon({
   contentType?: string | null;
 }) {
   const theme = useTheme();
+  const { t } = useTranslation('reviews');
   // MIME parameters (e.g. "; charset=utf-8") never change the format family.
   const normalized = contentType?.split(';')[0].trim().toLowerCase() ?? '';
   const meta = DOC_TYPE_META[normalized];
@@ -113,7 +119,7 @@ export function DocumentIcon({
       component="svg"
       viewBox="0 0 40 48"
       role={meta ? 'img' : undefined}
-      aria-label={meta ? `${meta.label} document` : undefined}
+      aria-label={meta ? t('list.documentType', { format: meta.label }) : undefined}
       aria-hidden={!meta}
       data-testid="document-icon"
       sx={{ width: size, height: size * 1.2, display: 'block', flexShrink: 0 }}
@@ -159,7 +165,11 @@ export function DocumentIcon({
       )}
     </Box>
   );
-  return meta ? <Tooltip title={`${meta.label} document`}>{sheet}</Tooltip> : sheet;
+  return meta ? (
+    <Tooltip title={t('list.documentType', { format: meta.label })}>{sheet}</Tooltip>
+  ) : (
+    sheet
+  );
 }
 
 /**
@@ -179,6 +189,7 @@ export function ProgressBar({
   discussion?: number;
 }) {
   const theme = useTheme();
+  const { t } = useTranslation('reviews');
   return (
     <Stack direction="row" spacing={1} sx={{ alignItems: 'center' }}>
       <Box
@@ -194,7 +205,7 @@ export function ProgressBar({
         aria-valuemin={0}
         aria-valuemax={total}
         aria-valuenow={resolved}
-        aria-label={`${resolved} of ${total} annotations resolved`}
+        aria-label={t('list.progressLabel', { resolved, count: total })}
       >
         <Box sx={{ width: `${(resolved / total) * 100}%`, height: '100%', bgcolor: color }} />
         {discussion > 0 && (
@@ -227,10 +238,11 @@ export function ReviewerStack({
   /** True for an anonymous review — its roster ids are synthetic (issue #422), so no hover cards. */
   anonymous?: boolean;
 }) {
+  const { t } = useTranslation('reviews');
   if (participants.length === 0) {
     return (
       <Typography variant="caption" color="text.secondary">
-        no reviewers
+        {t('list.noReviewers')}
       </Typography>
     );
   }

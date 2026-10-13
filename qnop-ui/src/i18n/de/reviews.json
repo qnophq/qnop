@@ -1,0 +1,534 @@
+{
+  "actions": {
+    "back": "Zurück",
+    "next": "Weiter",
+    "clear": "Leeren",
+    "backToReviews": "Zurück zu den Reviews"
+  },
+  "you": "Du",
+  "roles": {
+    "owner": "Review-Leitung",
+    "reviewer": "Reviewer",
+    "observer": "Nicht beteiligt"
+  },
+  "principal": {
+    "team": "Team",
+    "user": "Person",
+    "remove": "{{name}} entfernen",
+    "searching": "Suche läuft…",
+    "noMatches": "Keine passenden Personen oder Teams."
+  },
+  "workflow": {
+    "states": {
+      "DRAFT": "Entwurf",
+      "IN_REVIEW": "Im Review",
+      "CHANGES_REQUESTED": "Änderungen angefordert",
+      "FINALIZED": "Abgeschlossen",
+      "CANCELLED": "Abgebrochen"
+    },
+    "archived": "Archiviert · {{state}}",
+    "milestones": {
+      "cancelled": "Review abgebrochen",
+      "cancelledAutoClosed_one": "Review abgebrochen — {{count}} Anmerkung wurde automatisch geschlossen",
+      "cancelledAutoClosed_other": "Review abgebrochen — {{count}} Anmerkungen wurden automatisch geschlossen",
+      "finalized": "Review abgeschlossen — alle Punkte geklärt",
+      "draft": "Entwurf — noch nicht im Review",
+      "progressOpen_one": "{{state}} — {{resolved}} von {{count}} Anmerkung erledigt, noch {{open}} offen",
+      "progressOpen_other": "{{state}} — {{resolved}} von {{count}} Anmerkungen erledigt, noch {{open}} offen",
+      "progressReady_one": "{{state}} — {{resolved}} von {{count}} Anmerkung erledigt, bereit zum Abschließen",
+      "progressReady_other": "{{state}} — {{resolved}} von {{count}} Anmerkungen erledigt, bereit zum Abschließen",
+      "noAnnotations": "{{state}} — noch keine Anmerkungen"
+    }
+  },
+  "anonymous": {
+    "tooltip": "Anonymes Review — die Namen der Reviewer sind verborgen",
+    "label": "Anonym",
+    "compact": "Anon"
+  },
+  "wholeDocument": {
+    "tooltip": "Gilt für das ganze Dokument — nicht an eine Textstelle gebunden",
+    "label": "Ganzes Dokument",
+    "compact": "Ganzes Dok."
+  },
+  "copy": {
+    "copied": "In die Zwischenablage kopiert.",
+    "failed": "Kopieren in die Zwischenablage fehlgeschlagen."
+  },
+  "resizer": {
+    "label": "Breite des Anmerkungsbereichs ändern",
+    "valueText": "{{percent}} % des Arbeitsbereichs"
+  },
+  "paramGate": {
+    "resolving": "Review wird aufgerufen",
+    "title": "Dieses Review hat sich zum Papierflieger gefaltet",
+    "message": "Unter „{{segment}}“ ist kein Review zu finden — vielleicht ist der Link veraltet oder das Review ist weitergezogen. Deine anderen Quests warten schon."
+  },
+  "due": {
+    "picker": {
+      "label": "Fälligkeitsdatum",
+      "helper": "Optional — eine reine Orientierungsfrist; überfällige Reviews werden nur markiert."
+    },
+    "dialog": {
+      "title": "Fälligkeitsdatum des Reviews",
+      "body": "Eine optionale Frist zur Orientierung. Überfällige offene Reviews werden in der Übersicht markiert, aber nie blockiert oder abgebrochen.",
+      "updated": "Fälligkeitsdatum aktualisiert.",
+      "cleared": "Fälligkeitsdatum entfernt.",
+      "failed": "Das Fälligkeitsdatum konnte nicht aktualisiert werden.",
+      "saving": "Wird gespeichert…"
+    }
+  },
+  "delete": {
+    "single": {
+      "title": "Dieses Review löschen?",
+      "body": "<title/> wird endgültig gelöscht, für alle. Das lässt sich nicht rückgängig machen.",
+      "bodyWithScope": "<title/> wird mit {{scope}} endgültig gelöscht, für alle. Das lässt sich nicht rückgängig machen.",
+      "versions_one": "{{count}} Version",
+      "versions_other": "{{count}} Versionen",
+      "annotations_one": "{{count}} Anmerkung",
+      "annotations_other": "{{count}} Anmerkungen",
+      "scopeBoth": "{{versions}} und {{annotations}}",
+      "archiveHint": "Willst du es stattdessen archivieren — umkehrbar, und der Verlauf bleibt erhalten —, schließ diesen Dialog und nutze „Archivieren“.",
+      "confirmLabel": "Gib zur Bestätigung den Titel des Reviews ein",
+      "failed": "Das Review konnte nicht gelöscht werden.",
+      "deleting": "Wird gelöscht…",
+      "submit": "Endgültig löschen"
+    },
+    "bulk": {
+      "title_one": "{{count}} Review löschen?",
+      "title_other": "{{count}} Reviews löschen?",
+      "body": "Die Reviews werden endgültig gelöscht, für alle — mit allen Versionen, Anmerkungen und Diskussionen darin. Das lässt sich nicht rückgängig machen. Willst du den Verlauf behalten, schließ diesen Dialog und archiviere sie stattdessen.",
+      "phrase": "löschen",
+      "confirmLabel": "Gib zur Bestätigung „{{phrase}}“ ein",
+      "progress": "Wird gelöscht… {{done}} von {{total}}",
+      "failedHeading_one": "{{failed}} von {{count}} konnte nicht gelöscht werden",
+      "failedHeading_other": "{{failed}} von {{count}} konnten nicht gelöscht werden",
+      "itemFailed": "konnte nicht gelöscht werden",
+      "submit": "{{total}} endgültig löschen"
+    }
+  },
+  "list": {
+    "documentType": "{{format}}-Dokument",
+    "progressLabel_one": "{{resolved}} von {{count}} Anmerkung erledigt",
+    "progressLabel_other": "{{resolved}} von {{count}} Anmerkungen erledigt",
+    "noReviewers": "keine Reviewer",
+    "readyToFinalize": "Bereit zum Abschließen",
+    "resolvedCount": "{{resolved}}/{{total}} erledigt",
+    "columns": {
+      "document": "Dokument",
+      "role": "Rolle",
+      "owner": "Review-Leitung",
+      "status": "Status",
+      "progress": "Fortschritt",
+      "reviewers": "Reviewer",
+      "due": "Fällig",
+      "updated": "Aktualisiert",
+      "actions": "Aktionen"
+    },
+    "selectAll": "Alle Reviews auf dieser Seite auswählen",
+    "select": "{{title}} auswählen",
+    "deletePermanently": "Endgültig löschen",
+    "deleteNamed": "{{title}} löschen",
+    "illustration": "Ein frisches Dokument wartet auf sein erstes Review"
+  },
+  "page": {
+    "title": "Reviews",
+    "description": "Dokumente, die du leitest oder reviewst — mach dort weiter, wo sie gerade stehen.",
+    "descriptionModerating": "Alle Reviews im Workspace — du moderierst, statt mitzuwirken.",
+    "newReview": "Neues Review",
+    "quotaFull_one": "Diese Installation erlaubt {{count}} gleichzeitig offenes Review, und {{used}} sind offen. Wenn du ein Review abschließt oder archivierst, wird ein Platz frei; erledigte Arbeit belegt keinen.",
+    "quotaFull_other": "Diese Installation erlaubt {{count}} gleichzeitig offene Reviews, und {{used}} sind offen. Wenn du ein Review abschließt oder archivierst, wird ein Platz frei; erledigte Arbeit belegt keinen.",
+    "loadError": {
+      "title": "Deine Reviews haben es nicht bis auf den Schreibtisch geschafft",
+      "message": "Das Laden ist bei uns fehlgeschlagen — nicht deine Schuld. Versuch es noch einmal; wenn es immer wieder passiert, will dein Admin davon wissen."
+    },
+    "participation": {
+      "label": "Welche Reviews",
+      "mine": "Meine Reviews",
+      "all": "Alle Reviews"
+    },
+    "searchPlaceholder": "Nach Titel oder Review-Leitung suchen…",
+    "selection": {
+      "count": "{{n}} ausgewählt",
+      "deleteSelected": "Auswahl löschen ({{n}})"
+    },
+    "sort": {
+      "label": "Sortierung",
+      "updated": "Zuletzt aktualisiert",
+      "name": "Name",
+      "due": "Fälligkeitsdatum"
+    },
+    "view": {
+      "label": "Ansicht",
+      "table": "Tabellenansicht",
+      "cards": "Kartenansicht"
+    },
+    "filters": {
+      "button": "Reviews filtern",
+      "menu": "Review-Filter",
+      "due": "Fälligkeitsdatum",
+      "state": "Workflow-Status",
+      "format": "Format",
+      "owner": "Review-Leitung",
+      "anyone": "Alle",
+      "anyState": "Jeder Status",
+      "unknownOwner": "Unbekannt",
+      "dueOptions": {
+        "any": "Beliebiges Fälligkeitsdatum",
+        "overdue": "Überfällig",
+        "soon": "In {{days}} Tagen fällig",
+        "none": "Kein Fälligkeitsdatum"
+      },
+      "formatOptions": {
+        "any": "Beliebiges Format",
+        "pdf": "PDF",
+        "docx": "Word (DOCX)",
+        "md": "Markdown"
+      }
+    },
+    "chips": {
+      "all": {
+        "label": "Alle",
+        "hint": "Jedes Review, das du sehen kannst — ganz gleich, welche Rolle du darin hast"
+      },
+      "owner": {
+        "label": "Von mir geleitet",
+        "hint": "Reviews, die du leitest und steuerst"
+      },
+      "reviewer": {
+        "label": "Als Reviewer",
+        "hint": "Reviews, in denen du als Reviewer eingetragen bist"
+      },
+      "observer": {
+        "label": "Nicht beteiligt",
+        "hint": "Reviews, die du weder leitest noch reviewst — die du von außen moderierst"
+      },
+      "active": {
+        "label": "Aktiv",
+        "hint": "Die gesamte laufende Arbeit — jeder Workflow-Status außer archivierten Reviews (Standard)"
+      },
+      "open": {
+        "label": "Offen",
+        "hint": "Laufende Reviews, die der Workflow noch nicht geschlossen hat"
+      },
+      "closed": {
+        "label": "Geschlossen",
+        "hint": "Abgeschlossene oder abgebrochene Reviews, die noch nicht archiviert sind"
+      },
+      "archived": {
+        "label": "Archiviert",
+        "hint": "Nur die Reviews, die aus den aktiven Listen archiviert wurden"
+      },
+      "every": {
+        "label": "Jeder Status",
+        "hint": "Alles auf einmal — jeder Workflow-Status, archivierte Reviews eingeschlossen"
+      }
+    },
+    "clearFilters": "Filter zurücksetzen",
+    "empty": {
+      "onlyArchived": "Keine aktiven Reviews — alles hier wurde archiviert.",
+      "noMatches": "Keine Reviews passen zu deinen Filtern.",
+      "showArchived": "Archivierte anzeigen ({{n}})"
+    },
+    "pagination": {
+      "range": "{{from}}–{{to}} von {{total}}",
+      "previous": "Zurück"
+    }
+  },
+  "emptyState": {
+    "eyebrow": "Reviews",
+    "title": "Starte dein erstes Review",
+    "body": "Ein Review ist ein Dokument, das Zeile für Zeile kommentiert wird — Punkte ansprechen, gemeinsam klären und mit einem sauberen Verlauf abschließen. Hier ist noch nichts.",
+    "perks": {
+      "annotate": "Zeile für Zeile anmerken",
+      "resolve": "Offene Punkte klären",
+      "finalize": "Nachvollziehbar abschließen"
+    },
+    "noSlots": "Auf dieser Installation sind keine Plätze für offene Reviews mehr frei.",
+    "hint": "Lade ein Dokument hoch, um zu beginnen."
+  },
+  "wizard": {
+    "description": "Geführte Einrichtung in drei Schritten: Dokument, Reviewer, Start.",
+    "steps": {
+      "document": "Dokument",
+      "reviewers": "Reviewer",
+      "summary": "Zusammenfassung & Start"
+    },
+    "stepNumber": "Schritt {{n}}",
+    "stepDone": "{{label}} erledigt",
+    "stepOf": "Schritt {{step}} von {{total}}",
+    "create": "Review erstellen",
+    "createAndStart": "Review erstellen & starten",
+    "uploadFailed": "Der Upload ist fehlgeschlagen. Bitte versuche es noch einmal.",
+    "quotaFull_one": "Diese Installation erlaubt {{count}} gleichzeitig offenes Review, und {{used}} sind offen. Wenn du eines abschließt oder archivierst, wird ein Platz frei; erledigte Arbeit belegt keinen.",
+    "quotaFull_other": "Diese Installation erlaubt {{count}} gleichzeitig offene Reviews, und {{used}} sind offen. Wenn du eines abschließt oder archivierst, wird ein Platz frei; erledigte Arbeit belegt keinen.",
+    "created": {
+      "title": "Review erstellt",
+      "partial": "Das Review wurde erstellt, aber einige Schritte ließen sich nicht abschließen: {{failures}}. Du kannst sie auf der Review-Seite nachholen.",
+      "addReviewer": "Reviewer „{{name}}“ hinzufügen",
+      "start": "das Review starten",
+      "openReview": "Review öffnen"
+    },
+    "document": {
+      "titleLabel": "Titel des Reviews",
+      "titlePlaceholder": "z. B. NDA Acme Corp",
+      "titleHelper": "Wird in der Übersicht und für alle Reviewer angezeigt.",
+      "slugLabel": "URL-Kürzel (optional)",
+      "slugPlaceholder": "z. B. nda-acme-corp",
+      "slugHelper": "Eine lesbare Adresse für dieses Review: Kleinbuchstaben, Ziffern und Bindestriche. Lässt sich später nicht mehr ändern."
+    },
+    "validation": {
+      "slugLength": "Das Kürzel muss {{min}}–{{max}} Zeichen lang sein.",
+      "slugPattern": "Erlaubt sind nur Kleinbuchstaben, Ziffern und einzelne Bindestriche.",
+      "slugUuid": "Das Kürzel darf nicht wie eine Dokument-ID aussehen."
+    },
+    "reviewers": {
+      "selected": "Ausgewählte Reviewer",
+      "none": "Noch keine Reviewer — du kannst sie auch später hinzufügen.",
+      "searchPlaceholder": "Personen oder Teams suchen…"
+    },
+    "summary": {
+      "document": "Dokument",
+      "reviewers": "Reviewer",
+      "dueDate": "Fälligkeitsdatum",
+      "noReviewers": "Noch keine — das Review startet nur mit dir; Reviewer kannst du jederzeit hinzufügen.",
+      "anonymous": "Anonymes Review",
+      "anonymousHint": "Die Namen der Reviewer sind verborgen — fremde Autoren erscheinen unter einem festen Pseudonym wie „Participant N“. Lässt sich später nicht mehr ändern.",
+      "participation": "Beteiligung an Diskussionen",
+      "participationHelper": "{{hint}} Lässt sich später nicht mehr ändern.",
+      "participationOptions": {
+        "OPEN": {
+          "label": "Offene Diskussion",
+          "hint": "Alle Reviewer können jede Diskussion lesen und darauf antworten."
+        },
+        "READ_ONLY": {
+          "label": "Nur-Lesen-Diskussionen",
+          "hint": "Alle sehen jede Diskussion, aber nur wer sie begonnen hat und die Review-Leitung dürfen antworten."
+        },
+        "PRIVATE": {
+          "label": "Private Diskussionen",
+          "hint": "Reviewer sehen nur ihre eigenen Diskussionen; die Review-Leitung sieht alle."
+        }
+      },
+      "start": "Review sofort starten",
+      "startHint": "Setzt das Review von „Entwurf“ auf „Im Review“, damit Reviewer sofort Anmerkungen machen können.",
+      "uploading": "Dokument wird hochgeladen…",
+      "finalizing": "Review wird eingerichtet…"
+    },
+    "commander": {
+      "eyebrow": "Missionsleitung",
+      "note": "Du leitest dieses Review — Crew, Frist und die letzte Entscheidung liegen bei dir."
+    },
+    "checklist": {
+      "title": "Startbereitschaft",
+      "ready": "Bereit zum Abheben — die Extras sind Bonuspunkte.",
+      "notReady": "Füll das Wichtigste aus, um zu starten.",
+      "bonus": "Bonus",
+      "items": {
+        "document": "Dokument an Bord",
+        "title": "Titel gesetzt",
+        "slug": "Sprechender Link",
+        "crew": "Crew eingeladen",
+        "deadline": "Frist festgelegt",
+        "ignition": "Zündung beim Erstellen"
+      },
+      "details": {
+        "reviewers_one": "{{count}} Reviewer",
+        "reviewers_other": "{{count}} Reviewer",
+        "startsNow": "startet sofort",
+        "startsLater": "startet später, von Hand"
+      }
+    }
+  },
+  "upload": {
+    "formats": {
+      "pdf": "PDF",
+      "pdfOrWord": "PDF oder Word",
+      "pdfMore": "PDF und mehr",
+      "pdfOrWordMore": "PDF oder Word und mehr"
+    },
+    "validation": {
+      "type": "Unterstützte Formate: {{formats}}.",
+      "size": "Die Datei überschreitet die maximale Größe von {{max}} MB."
+    },
+    "chooseDocument": "Dokument auswählen",
+    "chooseDifferentDocument": "Anderes Dokument auswählen",
+    "prompt": "Leg dein Dokument hier ab oder wähle eine Datei",
+    "limits": "{{formats}} · max. {{max}} MB",
+    "chooseFile": "Datei auswählen",
+    "chooseDifferentFile": "Andere Datei auswählen",
+    "removeFile": "Datei entfernen"
+  },
+  "hub": {
+    "progress": {
+      "inDiscussion_one": "Review-Fortschritt: {{resolved}} von {{count}} Anmerkung erledigt · {{discussion}} offen in Diskussion",
+      "inDiscussion_other": "Review-Fortschritt: {{resolved}} von {{count}} Anmerkungen erledigt · {{discussion}} offen in Diskussion",
+      "stillOpen_one": "Review-Fortschritt: {{resolved}} von {{count}} Anmerkung erledigt · {{open}} noch offen",
+      "stillOpen_other": "Review-Fortschritt: {{resolved}} von {{count}} Anmerkungen erledigt · {{open}} noch offen",
+      "ready_one": "Review-Fortschritt: {{resolved}} von {{count}} Anmerkung erledigt — bereit zum Abschließen",
+      "ready_other": "Review-Fortschritt: {{resolved}} von {{count}} Anmerkungen erledigt — bereit zum Abschließen"
+    },
+    "dueDate": {
+      "set": "Fälligkeitsdatum des Reviews festlegen",
+      "placeholder": "Fälligkeit festlegen"
+    },
+    "participants": {
+      "manage": "Beteiligte verwalten",
+      "view": "Beteiligte anzeigen",
+      "add": "Reviewer hinzufügen",
+      "none": "Keine Reviewer"
+    },
+    "workflow": {
+      "change": "Status ändern",
+      "moveTo": "Auf „{{state}}“ setzen",
+      "moved": "Review auf „{{state}}“ gesetzt.",
+      "failed": "Der Status konnte nicht geändert werden.",
+      "confirmTitle": "Review-Status ändern",
+      "confirmMessage": "Dieses Review auf „{{state}}“ setzen? Reviewer sehen den neuen Status sofort.",
+      "autoClose_one": "{{count}} offene Anmerkung wird automatisch mit einem Standardkommentar geschlossen.",
+      "autoClose_other": "{{count}} offene Anmerkungen werden automatisch mit einem Standardkommentar geschlossen.",
+      "conflicts": {
+        "INVALID_TRANSITION": "Diese Statusänderung ist gerade nicht möglich — womöglich gibt es noch offene Anmerkungen oder ausstehende Positionierungen."
+      }
+    },
+    "archive": {
+      "archive": "Archivieren",
+      "unarchive": "Wiederherstellen",
+      "archived": "Review archiviert.",
+      "restored": "Review in die aktiven Listen zurückgeholt.",
+      "archiveFailed": "Das Review konnte nicht archiviert werden.",
+      "unarchiveFailed": "Das Review konnte nicht wiederhergestellt werden."
+    },
+    "newVersion": "Neue Version"
+  },
+  "newVersion": {
+    "title": "Neue Version hochladen",
+    "body": "Sie wird zur Version, die alle reviewen. Bestehende Anmerkungen werden übernommen und im neuen Dokument neu verankert; was nicht mehr passt, wird markiert, damit du es neu platzieren kannst.",
+    "uploaded": "Version {{version}} hochgeladen.",
+    "failed": "Die neue Version konnte nicht hochgeladen werden.",
+    "progressLabel": "Upload-Fortschritt",
+    "processing": "Dokument wird verarbeitet…",
+    "uploadingPercent": "Wird hochgeladen… {{percent}} %",
+    "uploading": "Wird hochgeladen…",
+    "submit": "Version hochladen"
+  },
+  "participants": {
+    "title": "Beteiligte",
+    "loadingMembers": "Teammitglieder werden geladen",
+    "noMembers": "Dieses Team hat keine Mitglieder.",
+    "empty": "Dieses Review hat noch keine Reviewer.",
+    "showMembers": "Mitglieder von {{name}} anzeigen",
+    "addPlaceholder": "Personen oder Teams hinzufügen…",
+    "added": "{{name}} hinzugefügt.",
+    "removed": "{{name}} entfernt.",
+    "addFailed": "Der Reviewer konnte nicht hinzugefügt werden.",
+    "removeFailed": "Der Reviewer konnte nicht entfernt werden.",
+    "conflicts": {
+      "DUPLICATE_PARTICIPANT": "Ist bereits Reviewer dieses Dokuments."
+    }
+  },
+  "tabs": {
+    "label": "Review-Ansichten",
+    "document": "Dokument",
+    "tasks": "Aufgaben",
+    "compare": "Vergleich",
+    "compareDisabled": "Braucht zwei extrahierte Versionen"
+  },
+  "export": {
+    "title": "Export",
+    "failed": "Der Export konnte nicht erstellt werden. Bitte versuche es noch einmal.",
+    "headings": {
+      "format": "Was brauchst du?",
+      "details": "Welche Details?"
+    },
+    "steps": {
+      "formatAndFile": "Format & Datei",
+      "content": "Inhalt"
+    },
+    "sections": {
+      "format": "Format",
+      "annotations": "Welche Anmerkungen",
+      "savedAs": "Speichern als",
+      "dateTime": "Datum und Uhrzeit"
+    },
+    "unavailable": "Nicht verfügbar",
+    "scopes": {
+      "all": {
+        "label": "Alles",
+        "hint": "Jede Anmerkung in diesem Review"
+      },
+      "open": {
+        "label": "Nur offene",
+        "hint": "Was noch Arbeit braucht"
+      },
+      "resolved": {
+        "label": "Nur erledigte",
+        "hint": "Was bereits geklärt ist"
+      }
+    },
+    "formats": {
+      "xlsx": "Sortierbar, filterbar — für Triage und Reporting.",
+      "docx": "Ein lesbarer Bericht — für Besprechungen und Freigaben.",
+      "html": "Eine eigenständige Seite — in jedem Browser durchsuchbar, keine Anhänge zu öffnen.",
+      "pdf": "Sieht überall gleich aus — zum Drucken und Archivieren."
+    },
+    "commentsHint": {
+      "sheet": "Ein zweites Tabellenblatt mit dem vollständigen Text jedes Kommentars und wer ihn geschrieben hat. In einem anonymen Review bleiben die Autoren auch hier pseudonym.",
+      "discussion": "Die vollständige Diskussion unter jeder Anmerkung — jede Antwort, mit Autor und Zeitpunkt. In einem anonymen Review bleiben die Autoren auch hier pseudonym."
+    },
+    "vocabulary": {
+      "columns": {
+        "heading": "Spalten",
+        "count": "{{selected}} von {{total}} Spalten"
+      },
+      "details": {
+        "heading": "Details",
+        "count": "{{selected}} von {{total}} Details"
+      },
+      "fields": {
+        "heading": "Felder",
+        "count": "{{selected}} von {{total}} Feldern"
+      }
+    },
+    "fileName": "Dateiname",
+    "logo": {
+      "title": "Branding-Logo",
+      "hint": "Wird im Dokument platziert, sofern ein Branding hochgeladen wurde."
+    },
+    "comments": "Diskussionen",
+    "all": "Alle",
+    "none": "Keine",
+    "always": "(immer)",
+    "timezone": "Zeitzone",
+    "groups": {
+      "Identity": "Kennung",
+      "Classification": "Einordnung",
+      "Content": "Inhalt",
+      "History": "Verlauf"
+    },
+    "fields": {
+      "taskKey": "Aufgabenschlüssel (#)",
+      "page": "Seite",
+      "author": "Autor",
+      "status": "Status",
+      "type": "Typ",
+      "priority": "Priorität",
+      "placement": "Positionsstatus",
+      "summary": "Zusammenfassung",
+      "replies": "Antworten",
+      "created": "Erstellt",
+      "updated": "Aktualisiert"
+    },
+    "dateFormats": {
+      "iso": "ISO",
+      "isoSeconds": "ISO mit Sekunden",
+      "european": "Europäisch",
+      "us": "US",
+      "dateOnly": "Nur Datum"
+    },
+    "summary": {
+      "rows_one": "{{count}} Anmerkung",
+      "rows_other": "{{count}} Anmerkungen",
+      "withComments": "mit Diskussionen"
+    }
+  }
+}

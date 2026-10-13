@@ -29,6 +29,7 @@ import TextField from '@mui/material/TextField';
 import Typography from '@mui/material/Typography';
 import { useTheme } from '@mui/material/styles';
 import { Plus, Search, X } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import type { PrincipalView } from '../../../api/generated';
 import { ParticipantKind } from '../../../api/generated';
 import { usePrincipalSearch } from '../../../api/hooks/useReviews';
@@ -50,6 +51,7 @@ function principalKey(p: PrincipalView): string {
 /** Step 2 — pick reviewers (users or teams) from the principal directory. */
 export function ReviewerStep({ selected, ownUserId, onAdd, onRemove }: ReviewerStepProps) {
   const theme = useTheme();
+  const { t } = useTranslation('reviews');
   const [query, setQuery] = useState('');
   const { data, isPending } = usePrincipalSearch(query.trim());
 
@@ -64,11 +66,11 @@ export function ReviewerStep({ selected, ownUserId, onAdd, onRemove }: ReviewerS
     <Stack spacing={3}>
       <Box>
         <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
-          Selected reviewers
+          {t('wizard.reviewers.selected')}
         </Typography>
         {selected.length === 0 ? (
           <Typography variant="body2" color="text.disabled">
-            No reviewers yet — you can also add them later.
+            {t('wizard.reviewers.none')}
           </Typography>
         ) : (
           <Stack direction="row" spacing={1} sx={{ flexWrap: 'wrap', rowGap: 1 }}>
@@ -106,7 +108,7 @@ export function ReviewerStep({ selected, ownUserId, onAdd, onRemove }: ReviewerS
                 <IconButton
                   size="small"
                   onClick={() => onRemove(principal)}
-                  aria-label={`Remove ${principal.displayName}`}
+                  aria-label={t('principal.remove', { name: principal.displayName })}
                   sx={{ width: 20, height: 20 }}
                 >
                   <X size={12} />
@@ -121,7 +123,7 @@ export function ReviewerStep({ selected, ownUserId, onAdd, onRemove }: ReviewerS
         <TextField
           size="small"
           fullWidth
-          placeholder="Search people or teams…"
+          placeholder={t('wizard.reviewers.searchPlaceholder')}
           value={query}
           onChange={(e) => setQuery(e.target.value)}
           sx={{ mb: 1.25 }}
@@ -148,7 +150,7 @@ export function ReviewerStep({ selected, ownUserId, onAdd, onRemove }: ReviewerS
         >
           {candidates.length === 0 ? (
             <Typography variant="body2" color="text.disabled" sx={{ px: 2, py: 1.75 }}>
-              {isPending ? 'Searching…' : 'No matching people or teams.'}
+              {isPending ? t('principal.searching') : t('principal.noMatches')}
             </Typography>
           ) : (
             candidates.map((principal, i) => (
@@ -188,7 +190,9 @@ export function ReviewerStep({ selected, ownUserId, onAdd, onRemove }: ReviewerS
                     {principal.displayName}
                   </Typography>
                   <Typography variant="caption" color="text.secondary">
-                    {principal.kind === ParticipantKind.Team ? 'Team' : 'User'}
+                    {principal.kind === ParticipantKind.Team
+                      ? t('principal.team')
+                      : t('principal.user')}
                   </Typography>
                 </Box>
                 <Plus size={14} aria-hidden style={{ color: theme.palette.text.disabled }} />

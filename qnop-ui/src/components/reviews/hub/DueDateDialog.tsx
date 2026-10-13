@@ -27,6 +27,7 @@ import DialogContent from '@mui/material/DialogContent';
 import DialogTitle from '@mui/material/DialogTitle';
 import Stack from '@mui/material/Stack';
 import Typography from '@mui/material/Typography';
+import { useTranslation } from 'react-i18next';
 import { useUpdateDueDate } from '../../../api/hooks/useReviews';
 import type { ToastSeverity } from '../../admin/layout/useToast';
 import { apiErrorMessage } from '../../../utils/apiError';
@@ -47,6 +48,7 @@ interface DueDateDialogProps {
  * Mirrors {@link ParticipantsDialog} as the review hub's small owner affordance.
  */
 export function DueDateDialog({ documentId, open, onClose, dueAt, notify }: DueDateDialogProps) {
+  const { t } = useTranslation(['reviews', 'common']);
   const [value, setValue] = useState<string | null>(dueAt);
   const [wasOpen, setWasOpen] = useState(open);
   const update = useUpdateDueDate(documentId);
@@ -61,22 +63,20 @@ export function DueDateDialog({ documentId, open, onClose, dueAt, notify }: DueD
   const save = () => {
     update.mutate(value, {
       onSuccess: () => {
-        notify(value ? 'Due date updated.' : 'Due date cleared.');
+        notify(value ? t('due.dialog.updated') : t('due.dialog.cleared'));
         onClose();
       },
-      onError: (error) =>
-        notify(apiErrorMessage(error, 'The due date could not be updated.'), 'error'),
+      onError: (error) => notify(apiErrorMessage(error, t('due.dialog.failed')), 'error'),
     });
   };
 
   return (
     <Dialog open={open} onClose={onClose} fullWidth maxWidth="xs">
-      <DialogTitle>Review due date</DialogTitle>
+      <DialogTitle>{t('due.dialog.title')}</DialogTitle>
       <DialogContent>
         <Stack spacing={2} sx={{ pt: 1 }}>
           <Typography variant="body2" color="text.secondary">
-            An optional, informational deadline. Overdue open reviews are flagged in the overview,
-            never blocked or cancelled.
+            {t('due.dialog.body')}
           </Typography>
           <DueDatePicker value={value} onChange={setValue} disablePast={false} />
         </Stack>
@@ -89,14 +89,14 @@ export function DueDateDialog({ documentId, open, onClose, dueAt, notify }: DueD
             disabled={update.isPending}
             sx={{ mr: 'auto' }}
           >
-            Clear
+            {t('actions.clear')}
           </Button>
         )}
         <Button color="inherit" onClick={onClose} disabled={update.isPending}>
-          Cancel
+          {t('common:actions.cancel')}
         </Button>
         <Button variant="contained" onClick={save} disabled={update.isPending}>
-          {update.isPending ? 'Saving…' : 'Save'}
+          {update.isPending ? t('due.dialog.saving') : t('common:actions.save')}
         </Button>
       </DialogActions>
     </Dialog>

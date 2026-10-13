@@ -30,7 +30,8 @@ import type { DocumentSummary } from '../../api/generated';
 import { reviewPath } from '../dashboard/dashboardModel';
 import { ToneBadge } from '../admin/ToneBadge';
 import { ProgressBar } from '../reviews/list/ReviewListParts';
-import { WORKFLOW_TONES, workflowLabel } from '../reviews/workflowMeta';
+import { workflowTone } from '../reviews/workflowMeta';
+import { useWorkflowLabel } from '../reviews/useWorkflowLabel';
 import { useTranslation } from 'react-i18next';
 
 interface ProfileMissionListProps {
@@ -49,6 +50,7 @@ interface ProfileMissionListProps {
  */
 export function ProfileMissionList({ variant, firstName, reviews }: ProfileMissionListProps) {
   const { t } = useTranslation('profile');
+  const workflowLabel = useWorkflowLabel();
   const theme = useTheme();
   const blue = theme.qnop.brand.blue;
   const dark = theme.qnop.mode === 'dark';
@@ -143,7 +145,7 @@ export function ProfileMissionList({ variant, firstName, reviews }: ProfileMissi
                   )}
                 </Box>
                 <ToneBadge
-                  tone={WORKFLOW_TONES[review.workflowState] ?? 'neutral'}
+                  tone={workflowTone(review.workflowState)}
                   label={workflowLabel(review.workflowState)}
                 />
               </Stack>

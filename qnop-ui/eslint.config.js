@@ -70,6 +70,17 @@ export default defineConfig([
       'src/pages/search/**/*.tsx',
       'src/components/admin/**/*.tsx',
       'src/pages/admin/**/*.tsx',
+      // Review management (issue #836). Only the files directly in components/reviews: the
+      // review workspace subfolders (viewer, panel, focus, …) join in their own slice.
+      'src/components/reviews/*.tsx',
+      'src/components/reviews/list/**/*.tsx',
+      'src/components/reviews/wizard/**/*.tsx',
+      'src/components/reviews/upload/**/*.tsx',
+      'src/components/reviews/hub/**/*.tsx',
+      'src/components/reviews/export/**/*.tsx',
+      'src/pages/reviews/ReviewsPage.tsx',
+      'src/pages/reviews/NewReviewPage.tsx',
+      'src/pages/reviews/ReviewsEmptyState.tsx',
     ],
     ignores: ['**/*.test.tsx'],
     rules: {
@@ -88,9 +99,12 @@ export default defineConfig([
           `JSXAttribute[name.name=${TEXT_PROPS}] > JSXExpressionContainer > Literal[value=/[A-Za-z]{2,}/]`,
           `JSXAttribute[name.name=${TEXT_PROPS}] > JSXExpressionContainer > TemplateLiteral > TemplateElement[value.raw=/[A-Za-z]{2,}/]`,
           `JSXAttribute[name.name=${TEXT_PROPS}] > JSXExpressionContainer > :matches(ConditionalExpression, LogicalExpression) > Literal[value=/[A-Za-z]{2,}/]`,
-          // Text inside an object passed as a prop, e.g. primaryAction={{ label: 'Retry' }}.
+          // Text inside an object passed as a prop, e.g. primaryAction={{ label: 'Retry' }} — the
+          // key bare (key.name) or quoted (key.value), e.g. {{ 'aria-label': 'Close' }}.
           `JSXAttribute ObjectExpression > Property[key.name=${TEXT_PROPS}] > Literal[value=/[A-Za-z]{2,}/]`,
           `JSXAttribute ObjectExpression > Property[key.name=${TEXT_PROPS}] > TemplateLiteral > TemplateElement[value.raw=/[A-Za-z]{2,}/]`,
+          `JSXAttribute ObjectExpression > Property[key.value=${TEXT_PROPS}] > Literal.value[value=/[A-Za-z]{2,}/]`,
+          `JSXAttribute ObjectExpression > Property[key.value=${TEXT_PROPS}] > TemplateLiteral.value > TemplateElement[value.raw=/[A-Za-z]{2,}/]`,
         ].map((selector) => ({
           selector,
           message: 'User-facing text belongs in an i18n catalog — use t() (ADR-0063).',

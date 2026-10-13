@@ -30,6 +30,7 @@ import Stack from '@mui/material/Stack';
 import TextField from '@mui/material/TextField';
 import Typography from '@mui/material/Typography';
 import { Trash2 } from 'lucide-react';
+import { Trans, useTranslation } from 'react-i18next';
 import { useDeleteReview } from '../../api/hooks/useReviews';
 import { apiErrorMessage } from '../../utils/apiError';
 
@@ -42,11 +43,6 @@ interface DeleteReviewDialogProps {
   versionCount?: number;
   annotationCount?: number;
   onDeleted: () => void;
-}
-
-/** Plural-aware "3 versions" / "1 version". */
-function count(value: number, noun: string): string {
-  return `${value} ${noun}${value === 1 ? '' : 's'}`;
 }
 
 /**
@@ -69,8 +65,10 @@ export function DeleteReviewDialog({
   annotationCount,
   onDeleted,
 }: DeleteReviewDialogProps) {
+  const { t } = useTranslation(['reviews', 'common']);
   const [typed, setTyped] = useState('');
-  const [error, setError] = useState<string | null>(null);
+  // The failure's cause, worded at render so the message follows a language switch.
+  const [error, setError] = useState<{ cause: unknown } | null>(null);
   const [wasOpen, setWasOpen] = useState(open);
   const remove = useDeleteReview(documentId);
 
@@ -87,35 +85,44 @@ export function DeleteReviewDialog({
   const confirmed = typed.trim() === title.trim();
   const pending = remove.isPending;
 
-  const scope = [
-    versionCount === undefined ? null : count(versionCount, 'version'),
-    annotationCount === undefined ? null : count(annotationCount, 'annotation'),
-  ].filter(Boolean);
+  const versions =
+    versionCount === undefined ? null : t('delete.single.versions', { count: versionCount });
+  const annotationsText =
+    annotationCount === undefined
+      ? null
+      : t('delete.single.annotations', { count: annotationCount });
+  const scope =
+    versions && annotationsText
+      ? t('delete.single.scopeBoth', { versions, annotations: annotationsText })
+      : (versions ?? annotationsText);
 
   const handleDelete = () => {
     remove.mutate(undefined, {
       onSuccess: onDeleted,
-      onError: (deleteError) =>
-        setError(apiErrorMessage(deleteError, 'The review could not be deleted.')),
+      onError: (deleteError) => setError({ cause: deleteError }),
     });
   };
 
   return (
     <Dialog open={open} onClose={pending ? undefined : onClose} fullWidth maxWidth="xs">
-      <DialogTitle>Delete this review?</DialogTitle>
+      <DialogTitle>{t('delete.single.title')}</DialogTitle>
       <DialogContent>
         <Stack spacing={2}>
           <Typography variant="body2" color="text.secondary">
-            <strong>{title}</strong>
-            {scope.length > 0 && <> and its {scope.join(' and ')}</>} will be removed permanently,
-            for everyone. This cannot be undone.
+            {/* The title goes in as a child, never an interpolated value: Trans parses the
+                string for tags, so a title like "<b>…" would otherwise turn into markup. */}
+            <Trans
+              t={t}
+              i18nKey={scope ? 'delete.single.bodyWithScope' : 'delete.single.body'}
+              values={scope ? { scope } : undefined}
+              components={{ title: <strong>{title}</strong> }}
+            />
           </Typography>
           <Typography variant="body2" color="text.secondary">
-            To archive it instead — reversible, and it keeps the record — close this and use
-            Archive.
+            {t('delete.single.archiveHint')}
           </Typography>
           <TextField
-            label="Type the review title to confirm"
+            label={t('delete.single.confirmLabel')}
             value={typed}
             onChange={(event) => setTyped(event.target.value)}
             disabled={pending}
@@ -124,12 +131,16 @@ export function DeleteReviewDialog({
             size="small"
             slotProps={{ htmlInput: { 'data-testid': 'delete-confirm-input' } }}
           />
-          {error && <Alert severity="error">{error}</Alert>}
+          {error && (
+            <Alert severity="error">
+              {apiErrorMessage(error.cause, t('delete.single.failed'))}
+            </Alert>
+          )}
         </Stack>
       </DialogContent>
       <DialogActions sx={{ px: 3, pb: 2 }}>
         <Button onClick={onClose} disabled={pending} color="inherit">
-          Cancel
+          {t('common:actions.cancel')}
         </Button>
         <Button
           variant="contained"
@@ -138,7 +149,7 @@ export function DeleteReviewDialog({
           disabled={!confirmed || pending}
           onClick={handleDelete}
         >
-          {pending ? 'Deleting…' : 'Delete permanently'}
+          {pending ? t('delete.single.deleting') : t('delete.single.submit')}
         </Button>
       </DialogActions>
     </Dialog>

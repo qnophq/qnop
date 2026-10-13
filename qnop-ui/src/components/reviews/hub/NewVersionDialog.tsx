@@ -29,11 +29,16 @@ import LinearProgress from '@mui/material/LinearProgress';
 import Stack from '@mui/material/Stack';
 import Typography from '@mui/material/Typography';
 import { Upload } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import { useUploadVersion } from '../../../api/hooks/useReviews';
 import { apiErrorMessage } from '../../../utils/apiError';
 import type { ToastSeverity } from '../../admin/layout/useToast';
 import { DocumentDropzone } from '../upload/DocumentDropzone';
 import { validateDocumentFile, type AcceptedUploads } from '../wizard/wizardModel';
+import { renderReviewsPhrase, type ReviewsPhrase } from '../reviewsI18n';
+
+/** Why the dialog refuses: a rejected pick, or a failed upload — worded at render. */
+type UploadError = { rejection: ReviewsPhrase } | { cause: unknown };
 
 interface NewVersionDialogProps {
   documentId: string;
@@ -70,8 +75,9 @@ export function NewVersionDialog({
   notify,
   onUploaded,
 }: NewVersionDialogProps) {
+  const { t } = useTranslation(['reviews', 'common']);
   const [file, setFile] = useState<File | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<UploadError | null>(null);
   const [progress, setProgress] = useState(0);
   const [wasOpen, setWasOpen] = useState(open);
   const upload = useUploadVersion(documentId);
@@ -93,7 +99,7 @@ export function NewVersionDialog({
     const rejection = validateDocumentFile(picked, maxSizeMb, accepted);
     // A rejected file is still shown as the error, not silently ignored: the
     // reader needs to know which pick was refused.
-    setError(rejection);
+    setError(rejection ? { rejection } : null);
     setFile(rejection ? null : picked);
   };
 
@@ -104,16 +110,23 @@ export function NewVersionDialog({
       { file, onProgress: setProgress },
       {
         onSuccess: (result) => {
-          notify(`Version ${result.versionNumber} uploaded.`);
+          notify(t('newVersion.uploaded', { version: result.versionNumber }));
           onUploaded(result.versionNumber);
           onClose();
         },
         onError: (uploadError) => {
-          setError(apiErrorMessage(uploadError, 'The new version could not be uploaded.'));
+          setError({ cause: uploadError });
         },
       },
     );
   };
+
+  const errorText =
+    error === null
+      ? null
+      : 'rejection' in error
+        ? renderReviewsPhrase(error.rejection, t)
+        : apiErrorMessage(error.cause, t('newVersion.failed'));
 
   return (
     <Dialog
@@ -124,18 +137,16 @@ export function NewVersionDialog({
       fullWidth
       maxWidth="sm"
     >
-      <DialogTitle>Upload a new version</DialogTitle>
+      <DialogTitle>{t('newVersion.title')}</DialogTitle>
       <DialogContent>
         <Stack spacing={2.5}>
           <Typography variant="body2" color="text.secondary">
-            It becomes the version everyone reviews. Existing annotations are carried over and
-            re-anchored to the new document; any that no longer fit are flagged for you to place
-            again.
+            {t('newVersion.body')}
           </Typography>
 
           <DocumentDropzone
             file={file}
-            error={error}
+            error={errorText}
             maxSizeMb={maxSizeMb}
             accepted={accepted}
             onFilePicked={handleFilePicked}
@@ -155,12 +166,12 @@ export function NewVersionDialog({
               <LinearProgress
                 variant={progress > 0 && progress < 1 ? 'determinate' : 'indeterminate'}
                 value={Math.round(progress * 100)}
-                aria-label="Upload progress"
+                aria-label={t('newVersion.progressLabel')}
               />
               <Typography variant="caption" color="text.secondary">
                 {progress >= 1
-                  ? 'Processing the document…'
-                  : `Uploading… ${Math.round(progress * 100)}%`}
+                  ? t('newVersion.processing')
+                  : t('newVersion.uploadingPercent', { percent: Math.round(progress * 100) })}
               </Typography>
             </Stack>
           )}
@@ -168,7 +179,7 @@ export function NewVersionDialog({
       </DialogContent>
       <DialogActions sx={{ px: 3, pb: 2 }}>
         <Button onClick={onClose} disabled={pending} color="inherit">
-          Cancel
+          {t('common:actions.cancel')}
         </Button>
         <Button
           variant="contained"
@@ -176,7 +187,7 @@ export function NewVersionDialog({
           onClick={handleUpload}
           disabled={!file || pending}
         >
-          {pending ? 'Uploading…' : 'Upload version'}
+          {pending ? t('newVersion.uploading') : t('newVersion.submit')}
         </Button>
       </DialogActions>
     </Dialog>

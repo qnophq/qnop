@@ -25,8 +25,10 @@ import Stack from '@mui/material/Stack';
 import Typography from '@mui/material/Typography';
 import { useTheme } from '@mui/material/styles';
 import { Check } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 
 export interface WizardStep {
+  /** The step's name, already translated by the caller. */
   label: string;
 }
 
@@ -39,6 +41,7 @@ interface WizardStepsHeaderProps {
 /** The wizard's progress strip (prototype `wizard.jsx`): numbered dots + connectors. */
 export function WizardStepsHeader({ steps, active }: WizardStepsHeaderProps) {
   const theme = useTheme();
+  const { t } = useTranslation('reviews');
   return (
     <Paper variant="outlined" sx={{ px: 2.5, py: 2 }}>
       <Stack direction="row" spacing={2} sx={{ alignItems: 'center' }}>
@@ -85,7 +88,11 @@ export function WizardStepsHeader({ steps, active }: WizardStepsHeaderProps) {
                 }}
                 aria-current={isActive ? 'step' : undefined}
               >
-                {isDone ? <Check size={14} aria-label={`${step.label} done`} /> : n}
+                {isDone ? (
+                  <Check size={14} aria-label={t('wizard.stepDone', { label: step.label })} />
+                ) : (
+                  n
+                )}
               </Box>
               <Box sx={{ minWidth: 0 }}>
                 <Typography
@@ -99,7 +106,7 @@ export function WizardStepsHeader({ steps, active }: WizardStepsHeaderProps) {
                     lineHeight: 1.4,
                   }}
                 >
-                  Step {n}
+                  {t('wizard.stepNumber', { n })}
                 </Typography>
                 <Typography
                   variant="body2"

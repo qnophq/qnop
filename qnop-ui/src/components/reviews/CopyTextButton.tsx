@@ -23,6 +23,7 @@ import type { MouseEvent } from 'react';
 import IconButton from '@mui/material/IconButton';
 import Tooltip from '@mui/material/Tooltip';
 import { Copy } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import { copyToClipboard } from '../../utils/clipboard';
 import type { Notify } from '../admin/layout/useToast';
 
@@ -32,7 +33,7 @@ interface CopyTextButtonProps {
   notify: Notify;
   /** Tooltip + accessible label, e.g. "Copy quote" / "Copy comment". */
   label: string;
-  /** Success toast; the error message is shared. */
+  /** Success toast (defaults to the translated "Copied to clipboard."); the error message is shared. */
   copiedMessage?: string;
   iconSize?: number;
 }
@@ -47,13 +48,14 @@ export function CopyTextButton({
   text,
   notify,
   label,
-  copiedMessage = 'Copied to clipboard.',
+  copiedMessage,
   iconSize = 13,
 }: CopyTextButtonProps) {
+  const { t } = useTranslation('reviews');
   const handleCopy = async (event: MouseEvent<HTMLButtonElement>) => {
     event.stopPropagation();
     const ok = await copyToClipboard(text);
-    notify(ok ? copiedMessage : 'Could not copy to the clipboard.', ok ? 'success' : 'error');
+    notify(ok ? (copiedMessage ?? t('copy.copied')) : t('copy.failed'), ok ? 'success' : 'error');
   };
   return (
     <Tooltip title={label}>
