@@ -11,10 +11,7 @@
   "packageRules": [
     {
       "description": "OpenAPI Generator — the Gradle plugin (Java DTOs + Spring interfaces) and the npm CLI (TypeScript client) run against the same openapi.yaml, so they must move in lockstep to avoid template/serialization drift",
-      "matchPackageNames": [
-        "/^org\\.openapi\\.generator/",
-        "/^@openapitools/"
-      ],
+      "matchPackageNames": ["/^org\\.openapi\\.generator/", "/^@openapitools/"],
       "groupName": "OpenAPI Generator",
       "groupSlug": "openapi-generator"
     },
@@ -32,10 +29,7 @@
     {
       "description": "JUnit 5 and ArchUnit",
       "matchManagers": ["gradle"],
-      "matchPackageNames": [
-        "/^org\\.junit/",
-        "/^com\\.tngtech\\.archunit/"
-      ],
+      "matchPackageNames": ["/^org\\.junit/", "/^com\\.tngtech\\.archunit/"],
       "groupName": "Test dependencies",
       "groupSlug": "test-deps"
     },
@@ -87,11 +81,7 @@
       "description": "Frontend — React and its type definitions",
       "matchManagers": ["npm"],
       "matchFileNames": ["qnop-ui/**"],
-      "matchPackageNames": [
-        "/^react$/",
-        "/^react-dom$/",
-        "/^@types\\/react/"
-      ],
+      "matchPackageNames": ["/^react$/", "/^react-dom$/", "/^@types\\/react/"],
       "groupName": "React",
       "groupSlug": "react"
     },
@@ -99,10 +89,7 @@
       "description": "Frontend — MUI and Emotion",
       "matchManagers": ["npm"],
       "matchFileNames": ["qnop-ui/**"],
-      "matchPackageNames": [
-        "/^@mui\\//",
-        "/^@emotion\\//"
-      ],
+      "matchPackageNames": ["/^@mui\\//", "/^@emotion\\//"],
       "groupName": "MUI",
       "groupSlug": "mui"
     },
@@ -110,10 +97,7 @@
       "description": "Frontend — Vite and the React plugin",
       "matchManagers": ["npm"],
       "matchFileNames": ["qnop-ui/**"],
-      "matchPackageNames": [
-        "/^vite$/",
-        "/^@vitejs\\//"
-      ],
+      "matchPackageNames": ["/^vite$/", "/^@vitejs\\//"],
       "groupName": "Vite",
       "groupSlug": "vite"
     },
@@ -130,6 +114,18 @@
       ],
       "groupName": "Frontend lint/types tooling",
       "groupSlug": "frontend-lint-types"
+    },
+    {
+      "description": "CodeMirror — the editor needs one instance of @codemirror/state and @codemirror/view (issue #857); pnpm overrides force transitive packages onto the catalog version, so every CodeMirror/Lezer package must move together or a newer extension could expect a newer state/view than the catalog holds",
+      "matchManagers": ["npm"],
+      "matchPackageNames": [
+        "/^@codemirror\\//",
+        "/^@lezer\\//",
+        "codemirror",
+        "/^@uiw\\/.*codemirror/"
+      ],
+      "groupName": "CodeMirror",
+      "groupSlug": "codemirror"
     }
   ]
 }

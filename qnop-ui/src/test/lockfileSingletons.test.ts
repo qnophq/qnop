@@ -27,21 +27,33 @@ import { describe, expect, it } from 'vitest';
  * Packages that must resolve to exactly one version (issue #857). CodeMirror's extension system
  * relies on instanceof checks across @codemirror/state and @codemirror/view; a second copy — which
  * a dependency update can introduce through lagging transitive packages — makes the mail template
- * editor crash on load. The pnpm overrides in pnpm-workspace.yaml keep them single; this guards it.
+ * editor crash on load. The pnpm overrides in pnpm-workspace.yaml keep those two single; the others
+ * here (CodeMirror's language layer, Lezer, React) are just as instance-sensitive and are not
+ * forced, so this is their only guard.
  */
-const SINGLETONS = ['@codemirror/state', '@codemirror/view'];
+const SINGLETONS = [
+  '@codemirror/state',
+  '@codemirror/view',
+  '@codemirror/language',
+  '@lezer/common',
+  'react',
+  'react-dom',
+];
 
 const lockfile = readFileSync(resolve(import.meta.dirname, '../../pnpm-lock.yaml'), 'utf8');
 
 /** Every version of `name` the lockfile's package section resolves. */
 function resolvedVersions(name: string): string[] {
   const escaped = name.replace(/[/@]/g, (c) => `\\${c}`);
-  const pattern = new RegExp(`^  '${escaped}@([^'(]+)':`, 'gm');
+  // Scoped names are quoted in the lockfile, unscoped ones are not; a peer-resolved snapshot key
+  // carries a "(peer@x)" suffix, which the version capture stops at.
+  const pattern = new RegExp(`^  '?${escaped}@([^':(]+)`, 'gm');
   return [...new Set([...lockfile.matchAll(pattern)].map((match) => match[1]))];
 }
 
 describe('lockfile singletons', () => {
   it.each(SINGLETONS)('resolves exactly one version of %s', (name) => {
+    // Not zero either: a regex that matched nothing would pass silently.
     expect(resolvedVersions(name)).toHaveLength(1);
   });
 });
