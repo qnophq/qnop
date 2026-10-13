@@ -552,7 +552,9 @@ export function DocumentReviewPage() {
               </Alert>
             )}
             {pdfError && (
-              <Alert severity="error">{t('review.pdfError', { error: pdfError })}</Alert>
+              <Alert severity="error">
+                {t('review.pdfError', { error: pdfError.detail ?? t('viewer.pdfParseFailed') })}
+              </Alert>
             )}
             {pdfQuery.isError && <Alert severity="error">{t('review.originalLoadError')}</Alert>}
             {(pdfQuery.isPending || (!pdf && !pdfError && !pdfQuery.isError)) && (

@@ -204,7 +204,7 @@
     "attachFile": "Datei anhängen",
     "dropFiles": "Dateien zum Anhängen hier ablegen",
     "uploading": "{{name}} wird hochgeladen…",
-    "attachmentName": "anhang",
+    "attachmentName": "Anhang",
     "toolbar": {
       "label": "Textformatierung",
       "withShortcut": "{{label}} ({{shortcut}})",
@@ -258,6 +258,7 @@
     "pageOf": "Seite {{page}} / {{count}}",
     "processing": "Dokument wird verarbeitet…",
     "extractionFailed": "Extraktion fehlgeschlagen",
+    "pdfParseFailed": "Die Datei ist nicht lesbar",
     "tool": "Anmerkungswerkzeug",
     "selectText": "Text markieren",
     "selectTextHint": "Markiere Text, um ein Zitat zu kommentieren",
@@ -266,7 +267,7 @@
     "layout": "Dokumentlayout",
     "panel": "Seitenleiste",
     "panelView": "Ansicht mit Seitenleiste",
-    "panelHint": "Dokument neben der Anmerkungsleiste",
+    "panelHint": "Dokument mit den Anmerkungen in der Seitenleiste",
     "focus": "Fokus",
     "focusView": "Fokusansicht",
     "focusHint": "Dokument in voller Breite mit Spotlight-Overlay",
@@ -294,7 +295,7 @@
     "next": "Nächste Anmerkung",
     "nextHint": "Nächste Anmerkung (↓)",
     "close": "Anmerkung schließen",
-    "resizeDrawer": "Anmerkungsleiste in der Breite anpassen"
+    "resizeDrawer": "Seitenleiste in der Breite anpassen"
   },
   "review": {
     "notFound": "Dieses Dokument gibt es nicht, oder du nimmst nicht an seinem Review teil.",
@@ -308,7 +309,7 @@
     "originalLoadError": "Das Originaldokument konnte nicht geladen werden.",
     "loadingDocument": "Dokument wird geladen",
     "viewerFailed": "Die Dokumentansicht ist ausgefallen",
-    "panelFailed": "Die Anmerkungsleiste ist ausgefallen",
+    "panelFailed": "Die Seitenleiste ist ausgefallen",
     "panelLabel": "Anmerkungen",
     "createAnnotation": "Anmerkung erstellen",
     "copyText": "Text kopieren",

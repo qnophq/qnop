@@ -200,7 +200,13 @@ export function ReviewTasksPage() {
   const visible = annotations
     .filter((annotation) => filter === 'all' || columnOf(annotation) === filter)
     .filter((annotation) =>
-      matchesFilters(annotation, facets, authorNameOf(annotation.authorId), resolveMentions),
+      matchesFilters(
+        annotation,
+        facets,
+        authorNameOf(annotation.authorId),
+        resolveMentions,
+        t('annotation.fallbackTitle'),
+      ),
     );
 
   const openTask = annotations.find((annotation) => annotation.id === openTaskId) ?? null;

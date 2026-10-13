@@ -8,7 +8,7 @@ import { defineConfig, globalIgnores } from 'eslint/config';
 
 // Props whose string value is shown to the user (or read out by assistive technology).
 const TEXT_PROPS =
-  '/^(label|title|placeholder|alt|aria-label|aria-description|helperText|subtitle|description|tooltip|text|message|primary|secondary|confirmLabel|cancelLabel|emptyText|caption|heading)$/';
+  '/^(label|title|placeholder|alt|aria-label|aria-description|helperText|subtitle|description|tooltip|text|message|primary|secondary|confirmLabel|cancelLabel|emptyText|caption|heading|ariaLabel|handleAriaLabel|contextTitle|copiedMessage|metaText|trailingText|searchLabel)$/';
 
 export default defineConfig([
   // dist: build output. coverage: vitest report. src/api/generated: typescript-axios output.

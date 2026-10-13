@@ -56,7 +56,7 @@
       "reposition": "Re-position",
       "repositionHint": "Re-position this annotation"
     },
-    "commentCount_one": "{{count}} comments",
+    "commentCount_one": "{{count}} comment",
     "commentCount_other": "{{count}} comments",
     "page": "Page {{page}}",
     "pageShort": "p. {{page}}",
@@ -258,6 +258,7 @@
     "pageOf": "Page {{page}} / {{count}}",
     "processing": "Processing document…",
     "extractionFailed": "Extraction failed",
+    "pdfParseFailed": "Failed to parse PDF",
     "tool": "Annotation tool",
     "selectText": "Select text",
     "selectTextHint": "Select text to annotate a quote",

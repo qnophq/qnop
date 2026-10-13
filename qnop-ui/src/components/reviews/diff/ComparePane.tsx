@@ -32,6 +32,7 @@ import type { PDFDocumentProxy } from 'pdfjs-dist';
 import type { DiffChange, RenderedSurface } from '../../../api/generated';
 import { tokens } from '../../../theme/tokens';
 import { PageCanvas } from '../viewer/PageCanvas';
+import type { PdfLoadError } from '../viewer/usePdfDocument';
 import { DiffHighlightLayer } from './DiffHighlightLayer';
 import type { DiffSide } from './diffModel';
 
@@ -46,7 +47,7 @@ interface ComparePaneProps {
   trailingText?: string;
   /** Parsed pdf.js document; null while the original is still loading/parsing. */
   pdf: PDFDocumentProxy | null;
-  pdfError: string | null;
+  pdfError: PdfLoadError | null;
   /** Server surfaces of this version — page aspect + line pitch for the bands. */
   surfaces?: RenderedSurface[];
   changes: DiffChange[];
@@ -187,7 +188,9 @@ export function ComparePane({
         <Stack spacing={2} sx={{ width: 'max-content', minWidth: '100%', alignItems: 'center' }}>
           {pdfError && (
             <Typography variant="body2" color="error" sx={{ py: 4 }}>
-              {t('diff.renderError', { error: pdfError })}
+              {t('diff.renderError', {
+                error: pdfError.detail ?? t('viewer.pdfParseFailed'),
+              })}
             </Typography>
           )}
           {!pdf && !pdfError && <CircularProgress size={24} sx={{ my: 6 }} />}

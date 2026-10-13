@@ -74,18 +74,19 @@ describe('usePdfDocument', () => {
 
     const { result } = renderHook(() => usePdfDocument(data));
 
-    await waitFor(() => expect(result.current.error).toBe('bad header'));
+    await waitFor(() => expect(result.current.error).toEqual({ detail: 'bad header' }));
     expect(result.current.pdf).toBeNull();
   });
 
-  it('falls back to a generic message when the rejection is not an Error', async () => {
+  it('records a failure without detail when the rejection is not an Error', async () => {
     const { task } = loadingTask(Promise.reject('nope'));
     getDocumentMock.mockReturnValue(task);
     const data = new Uint8Array([1]).buffer;
 
     const { result } = renderHook(() => usePdfDocument(data));
 
-    await waitFor(() => expect(result.current.error).toBe('Failed to parse PDF'));
+    // The renderer supplies the translated generic text (issue #836).
+    await waitFor(() => expect(result.current.error).toEqual({ detail: null }));
   });
 
   it('destroys the loading task on unmount so the worker handle is released', async () => {

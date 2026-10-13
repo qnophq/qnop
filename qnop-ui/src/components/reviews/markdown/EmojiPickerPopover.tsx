@@ -26,6 +26,7 @@ import Popover from '@mui/material/Popover';
 import Typography from '@mui/material/Typography';
 import { useTheme } from '@mui/material/styles';
 import { useTranslation } from 'react-i18next';
+import { toSupportedLocale, type AppLocale } from '../../../i18n/locales';
 
 /** The picker's footprint, reserved so the popover doesn't jump when it loads. */
 const PICKER_WIDTH = 352;
@@ -33,10 +34,11 @@ const PICKER_HEIGHT = 420;
 
 /**
  * emoji-mart's own UI strings (search, categories) per non-English UI language,
- * loaded lazily alongside the picker. Without an entry the picker stays English —
- * it would otherwise fetch the strings from a CDN.
+ * loaded lazily alongside the picker. Keyed by every supported locale, so a new
+ * language cannot silently get an English picker; never left to emoji-mart, which
+ * would fetch them from a CDN.
  */
-const PICKER_I18N: Record<string, () => Promise<{ default: unknown }>> = {
+const PICKER_I18N: Record<Exclude<AppLocale, 'en'>, () => Promise<{ default: unknown }>> = {
   de: () => import('@emoji-mart/data/i18n/de.json'),
 };
 
@@ -97,16 +99,17 @@ function PickerHost({ onClose, onSelect }: Omit<EmojiPickerPopoverProps, 'anchor
     let cancelled = false;
     (async () => {
       try {
-        const loadStrings = PICKER_I18N[language];
+        const locale = toSupportedLocale(language) ?? 'en';
         const [{ Picker }, { default: data }, strings] = await Promise.all([
           import('emoji-mart'),
           import('@emoji-mart/data'),
-          loadStrings ? loadStrings() : Promise.resolve(null),
+          // A failed strings chunk degrades to the English picker, not to the load error.
+          locale === 'en' ? Promise.resolve(null) : PICKER_I18N[locale]().catch(() => null),
         ]);
         if (cancelled || !hostRef.current) return;
         const picker = new Picker({
           data,
-          ...(strings ? { locale: language, i18n: strings.default } : {}),
+          ...(strings ? { locale, i18n: strings.default } : {}),
           set: 'native',
           theme: theme.qnop.mode,
           previewPosition: 'none',

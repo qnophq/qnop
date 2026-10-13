@@ -30,9 +30,18 @@ pdfjs.GlobalWorkerOptions.workerSrc = new URL(
   import.meta.url,
 ).toString();
 
+/**
+ * A failed parse. `detail` is pdf.js's own message — data, shown as is — or null
+ * when the rejection carried none; the renderer then supplies its translated
+ * generic text (ADR-0063), so no UI text is stored here.
+ */
+export interface PdfLoadError {
+  detail: string | null;
+}
+
 export interface PdfDocumentState {
   pdf: PDFDocumentProxy | null;
-  error: string | null;
+  error: PdfLoadError | null;
 }
 
 /**
@@ -57,7 +66,7 @@ export function usePdfDocument(data: ArrayBuffer | undefined): PdfDocumentState 
         if (!cancelled) {
           setState({
             pdf: null,
-            error: error instanceof Error ? error.message : 'Failed to parse PDF',
+            error: { detail: error instanceof Error ? error.message : null },
           });
         }
       },

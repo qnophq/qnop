@@ -83,17 +83,19 @@ export function taskKeys(annotations: AnnotationView[]): Map<string, string> {
 
 /**
  * The free-text search of the sub-toolbar — title, quoted passage and the
- * resolved author name, mirroring the prototype's task search.
+ * resolved author name, mirroring the prototype's task search. An untitled card
+ * matches by the translated fallback title it displays.
  */
 export function matchesQuery(
   annotation: AnnotationView,
   authorName: string,
   query: string,
+  fallbackTitle: string,
 ): boolean {
   const q = query.trim().toLowerCase();
   if (!q) return true;
   return (
-    taskTitle(annotation).toLowerCase().includes(q) ||
+    (taskTitle(annotation) || fallbackTitle).toLowerCase().includes(q) ||
     (annotation.anchor?.textQuote?.quote ?? '').toLowerCase().includes(q) ||
     authorName.toLowerCase().includes(q)
   );
