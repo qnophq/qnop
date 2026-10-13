@@ -24,11 +24,11 @@ import { computeAchievements, leadershipRank, leadershipStats, teamTier } from '
 
 describe('teamTier', () => {
   it('names the tier for the team size', () => {
-    expect(teamTier(1).name).toBe('Solo');
-    expect(teamTier(3).name).toBe('Squad');
-    expect(teamTier(7).name).toBe('Crew');
-    expect(teamTier(12).name).toBe('Guild');
-    expect(teamTier(40).name).toBe('Chapter');
+    expect(teamTier(1).nameKey).toBe('myTeams.tiers.solo');
+    expect(teamTier(3).nameKey).toBe('myTeams.tiers.squad');
+    expect(teamTier(7).nameKey).toBe('myTeams.tiers.crew');
+    expect(teamTier(12).nameKey).toBe('myTeams.tiers.guild');
+    expect(teamTier(40).nameKey).toBe('myTeams.tiers.chapter');
   });
 
   it('reports progress toward the next tier', () => {
@@ -45,18 +45,18 @@ describe('teamTier', () => {
   });
 
   it('is robust to zero and fractional counts', () => {
-    expect(teamTier(0).name).toBe('Solo');
+    expect(teamTier(0).nameKey).toBe('myTeams.tiers.solo');
     expect(teamTier(0).progress).toBe(0);
-    expect(teamTier(4.9).name).toBe('Squad');
+    expect(teamTier(4.9).nameKey).toBe('myTeams.tiers.squad');
   });
 });
 
 describe('leadershipRank', () => {
   it('scales with the number of teams led', () => {
-    expect(leadershipRank(0)).toBe('Member');
-    expect(leadershipRank(1)).toBe('Team Lead');
-    expect(leadershipRank(2)).toBe('Multi-team Lead');
-    expect(leadershipRank(5)).toBe('Program Lead');
+    expect(leadershipRank(0)).toBe('myTeams.ranks.member');
+    expect(leadershipRank(1)).toBe('myTeams.ranks.teamLead');
+    expect(leadershipRank(2)).toBe('myTeams.ranks.multiTeamLead');
+    expect(leadershipRank(5)).toBe('myTeams.ranks.programLead');
   });
 });
 
@@ -66,12 +66,17 @@ describe('leadershipStats', () => {
     expect(stats.teamsLed).toBe(2);
     expect(stats.totalTeammates).toBe(13);
     expect(stats.largestTeam).toBe(9);
-    expect(stats.rank).toBe('Multi-team Lead');
+    expect(stats.rankKey).toBe('myTeams.ranks.multiTeamLead');
   });
 
   it('handles leading no team', () => {
     const stats = leadershipStats([]);
-    expect(stats).toEqual({ teamsLed: 0, totalTeammates: 0, largestTeam: 0, rank: 'Member' });
+    expect(stats).toEqual({
+      teamsLed: 0,
+      totalTeammates: 0,
+      largestTeam: 0,
+      rankKey: 'myTeams.ranks.member',
+    });
   });
 });
 
@@ -96,6 +101,7 @@ describe('computeAchievements', () => {
   it('always returns the full ladder with hints for locked goals', () => {
     const all = computeAchievements([]);
     expect(all).toHaveLength(5);
-    expect(all.every((a) => a.hint.length > 0)).toBe(true);
+    expect(all.every((a) => a.hintKey.length > 0)).toBe(true);
+    expect(all.find((a) => a.id === 'team-builder')?.hintValues).toEqual({ size: 5 });
   });
 });

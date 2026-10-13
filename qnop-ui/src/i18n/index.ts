@@ -21,11 +21,14 @@
 
 import i18n from 'i18next';
 import { initReactI18next } from 'react-i18next';
+import enAudit from './en/audit.json';
 import enAuth from './en/auth.json';
 import enCommon from './en/common.json';
+import enDashboard from './en/dashboard.json';
 import enNotifications from './en/notifications.json';
 import enProfile from './en/profile.json';
 import enShell from './en/shell.json';
+import enTeams from './en/teams.json';
 import { FALLBACK_LOCALE, type AppLocale } from './locales';
 
 export const DEFAULT_NAMESPACE = 'common';
@@ -42,6 +45,9 @@ export const bundledResources = {
     shell: enShell,
     profile: enProfile,
     notifications: enNotifications,
+    dashboard: enDashboard,
+    teams: enTeams,
+    audit: enAudit,
   },
 } as const;
 

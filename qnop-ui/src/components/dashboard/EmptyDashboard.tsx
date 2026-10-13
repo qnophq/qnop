@@ -36,21 +36,27 @@ import {
   UserCheck,
   Users,
 } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router';
+import type { DashboardKey } from './dashboardModel';
 
 /** The quest path — the three moves from empty workspace to running review. */
-const STEPS: { icon: LucideIcon; title: string; hint: string }[] = [
-  { icon: Upload, title: 'Upload a document', hint: 'PDF in, review out.' },
-  { icon: Users, title: 'Invite reviewers', hint: 'People or whole teams.' },
-  { icon: MessagesSquare, title: 'Discuss & resolve', hint: 'Annotate, reply, settle.' },
+const STEPS: { icon: LucideIcon; titleKey: DashboardKey; hintKey: DashboardKey }[] = [
+  { icon: Upload, titleKey: 'empty.steps.upload.title', hintKey: 'empty.steps.upload.hint' },
+  { icon: Users, titleKey: 'empty.steps.invite.title', hintKey: 'empty.steps.invite.hint' },
+  {
+    icon: MessagesSquare,
+    titleKey: 'empty.steps.discuss.title',
+    hintKey: 'empty.steps.discuss.hint',
+  },
 ];
 
 /** The scoreboard the filled dashboard shows — previewed here as ghosts. */
-const GHOST_TILES: { icon: LucideIcon; label: string }[] = [
-  { icon: Inbox, label: 'Open reviews' },
-  { icon: UserCheck, label: 'Waiting on you' },
-  { icon: CalendarClock, label: 'Due soon' },
-  { icon: Trophy, label: 'Resolved this week' },
+const GHOST_TILES: { icon: LucideIcon; labelKey: DashboardKey }[] = [
+  { icon: Inbox, labelKey: 'stats.openReviews' },
+  { icon: UserCheck, labelKey: 'stats.waitingOnYou' },
+  { icon: CalendarClock, labelKey: 'stats.dueSoon' },
+  { icon: Trophy, labelKey: 'stats.resolvedThisWeek' },
 ];
 
 const fadeUp = {
@@ -69,6 +75,7 @@ const fadeUp = {
  * reduced-motion users get everything in place, still.
  */
 export function EmptyDashboard() {
+  const { t } = useTranslation('dashboard');
   const theme = useTheme();
   const navigate = useNavigate();
   const blue = theme.qnop.brand.blue;
@@ -116,11 +123,10 @@ export function EmptyDashboard() {
                 lineHeight: 1.2,
               }}
             >
-              Your command centre is ready for its first mission.
+              {t('empty.title')}
             </Typography>
             <Typography color="text.secondary" sx={{ mt: 1, maxWidth: 520 }}>
-              Every review you run or join lands here — deadlines, replies to your comments, and the
-              wins you resolve. It just needs a document to chew on.
+              {t('empty.body')}
             </Typography>
             <Button
               variant="contained"
@@ -129,7 +135,7 @@ export function EmptyDashboard() {
               onClick={() => navigate('/reviews/new')}
               sx={{ mt: 3 }}
             >
-              Start your first review
+              {t('empty.cta')}
             </Button>
           </Box>
 
@@ -207,7 +213,7 @@ export function EmptyDashboard() {
 
       {/* Quest path: step 1 armed, the rest visibly upcoming. */}
       <Paper variant="outlined" sx={{ ...stagger(1), borderRadius: '16px', p: { xs: 2.5, md: 3 } }}>
-        <Typography sx={{ fontWeight: 700, mb: 2 }}>Three moves to your first review</Typography>
+        <Typography sx={{ fontWeight: 700, mb: 2 }}>{t('empty.stepsTitle')}</Typography>
         <Box
           sx={{
             display: 'grid',
@@ -215,11 +221,11 @@ export function EmptyDashboard() {
             gridTemplateColumns: { xs: '1fr', sm: 'repeat(3, 1fr)' },
           }}
         >
-          {STEPS.map(({ icon: Icon, title, hint }, index) => {
+          {STEPS.map(({ icon: Icon, titleKey, hintKey }, index) => {
             const armed = index === 0;
             const stepColor = armed ? blue : theme.palette.text.secondary;
             return (
-              <Stack key={title} direction="row" spacing={1.5} sx={{ alignItems: 'flex-start' }}>
+              <Stack key={titleKey} direction="row" spacing={1.5} sx={{ alignItems: 'flex-start' }}>
                 <Box
                   aria-hidden
                   sx={{
@@ -253,10 +259,10 @@ export function EmptyDashboard() {
                     <Box component="span" sx={{ color: stepColor, fontWeight: 800, mr: 0.75 }}>
                       {index + 1}
                     </Box>
-                    {title}
+                    {t(titleKey)}
                   </Typography>
                   <Typography variant="body2" color="text.secondary">
-                    {hint}
+                    {t(hintKey)}
                   </Typography>
                 </Box>
               </Stack>
@@ -274,9 +280,9 @@ export function EmptyDashboard() {
             gap: 1.5,
           }}
         >
-          {GHOST_TILES.map(({ icon: Icon, label }) => (
+          {GHOST_TILES.map(({ icon: Icon, labelKey }) => (
             <Paper
-              key={label}
+              key={labelKey}
               variant="outlined"
               sx={{
                 px: 2,
@@ -311,7 +317,7 @@ export function EmptyDashboard() {
                     0
                   </Typography>
                   <Typography variant="caption" color="text.secondary" noWrap component="p">
-                    {label}
+                    {t(labelKey)}
                   </Typography>
                 </Box>
               </Stack>
@@ -319,7 +325,7 @@ export function EmptyDashboard() {
           ))}
         </Box>
         <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 1 }}>
-          Your scoreboard — it starts counting with your first review.
+          {t('empty.scoreboardHint')}
         </Typography>
       </Box>
     </Stack>

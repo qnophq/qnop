@@ -1,0 +1,197 @@
+{
+  "people": {
+    "viewProfile": "View {{name}}'s profile",
+    "viewProfilePlain": "View profile",
+    "memberSince": "Member since {{date}}",
+    "teamSince": "Team since {{date}}",
+    "memberCount_one": "{{count}} member",
+    "memberCount_other": "{{count}} members",
+    "stats": {
+      "reviewsOwned": "Reviews",
+      "annotationsRaised": "Annotations",
+      "commentsWritten": "Comments"
+    }
+  },
+  "userProfile": {
+    "notFound": {
+      "title": "This player card went for a walk",
+      "message": "No profile answers to this address — the link may be outdated. The rest of the roster is right where you left it."
+    },
+    "leads": "Leads {{team}}",
+    "memberOf": "Member of {{team}}",
+    "stats": {
+      "reviewsOwned": "Reviews owned",
+      "reviewsParticipating": "Reviewing",
+      "annotationsRaised": "Annotations raised",
+      "annotationsResolved": "Resolved",
+      "commentsWritten": "Comments"
+    }
+  },
+  "teamProfile": {
+    "notFound": {
+      "title": "This team packed up its crest",
+      "message": "No team answers to this address — the link may be outdated, or the team moved on. The guild hall is back on the dashboard.",
+      "myTeams": "My teams"
+    },
+    "yourTeam": "Your team",
+    "stats": {
+      "members": "Members",
+      "activeReviews": "Active reviews",
+      "completed": "Completed"
+    },
+    "roster": {
+      "title": "Roster",
+      "private": "This team keeps its roster private.",
+      "empty": "No members yet.",
+      "lead": "Team lead"
+    },
+    "reviews": {
+      "title": "Review missions",
+      "private": "This team keeps its review activity private.",
+      "empty": "No reviews you can see — the list only shows reviews you have access to."
+    }
+  },
+  "myTeams": {
+    "title": "My Teams",
+    "description": "The teams you belong to — manage the ones you lead, and see the members of the rest.",
+    "loadError": "Your teams could not be loaded.",
+    "sections": {
+      "led_one": "Team you lead",
+      "led_other": "Teams you lead",
+      "member_one": "Team you're in",
+      "member_other": "Teams you're in"
+    },
+    "hero": {
+      "eyebrow": "Leadership HQ",
+      "summary": "You lead {{teams}} · {{teammates}} in total",
+      "teams_one": "{{count}} team",
+      "teams_other": "{{count}} teams",
+      "teammates_one": "{{count}} teammate",
+      "teammates_other": "{{count}} teammates",
+      "stats": {
+        "teamsLed": "Teams led",
+        "teammates": "Teammates",
+        "largestTeam": "Largest team"
+      }
+    },
+    "ranks": {
+      "programLead": "Program Lead",
+      "multiTeamLead": "Multi-team Lead",
+      "teamLead": "Team Lead",
+      "member": "Member"
+    },
+    "tiers": {
+      "solo": "Solo",
+      "squad": "Squad",
+      "crew": "Crew",
+      "guild": "Guild",
+      "chapter": "Chapter"
+    },
+    "achievements": {
+      "unlocked": "Unlocked · {{hint}}",
+      "locked": "Locked · {{hint}}",
+      "firstTeam": {
+        "label": "First team",
+        "hint": "Lead your first team"
+      },
+      "multiTeam": {
+        "label": "Multi-team lead",
+        "hint": "Lead two or more teams"
+      },
+      "teamBuilder": {
+        "label": "Team builder",
+        "hint": "Grow a team to {{size}} members"
+      },
+      "bigRoster": {
+        "label": "Big roster",
+        "hint": "Grow a team to {{size}} members"
+      },
+      "fullHouse": {
+        "label": "Full house",
+        "hint": "Lead {{size}} teammates in total"
+      }
+    },
+    "card": {
+      "manageAria": "Manage {{name}}",
+      "viewAria": "View {{name}}",
+      "toNextTier": "{{remaining}} to {{tier}}",
+      "topTier": "Top tier",
+      "tierProgress": "{{tier}} tier progress",
+      "manageMembers": "Manage members",
+      "viewMembers": "View members"
+    },
+    "empty": {
+      "eyebrow": "Teams",
+      "title": "Your seat is waiting",
+      "body": "Teams are how reviewers band together — share the workload, keep each other in the loop, and climb the ranks. You’re not on one yet.",
+      "perks": {
+        "collaborate": "Collaborate on reviews",
+        "share": "Share the workload",
+        "rise": "Rise through the ranks"
+      },
+      "hint": "A team lead or an administrator can add you — your teams appear here the moment they do.",
+      "illustration": "An open seat waiting in a team"
+    }
+  },
+  "teamDetail": {
+    "loadError": "This team could not be loaded, or you are not a member of it. <back>Back to my teams</back>",
+    "publicProfile": "Public profile",
+    "editTeam": "Edit team",
+    "addMember": "Add member",
+    "columns": {
+      "member": "Member",
+      "role": "Role",
+      "joined": "Joined",
+      "actions": "Actions"
+    },
+    "emptyManage": "No members yet. Add the first one.",
+    "emptyView": "This team has no members.",
+    "actionsFor": "Actions for {{name}}",
+    "makeMember": "Make member",
+    "makeLead": "Make lead",
+    "removeFromTeam": "Remove from team",
+    "remove": {
+      "title": "Remove member",
+      "message": "Remove {{name}} from this team?",
+      "confirm": "Remove"
+    },
+    "errors": {
+      "role": "Could not change the role.",
+      "remove": "Could not remove the member."
+    }
+  },
+  "editTeam": {
+    "title": "Edit team",
+    "description": "Description",
+    "descriptionHelper": "What this team reviews — shown wherever the team appears.",
+    "publicProfile": "Public profile",
+    "publicProfileHint": "Name, crest and description are always visible on the team's profile page. Choose what non-members may see beyond that.",
+    "showMembers": "Show members",
+    "showMembersAria": "Show members on the public profile",
+    "showReviews": "Show review participation",
+    "showReviewsAria": "Show review participation on the public profile",
+    "cancel": "Cancel",
+    "save": "Save",
+    "errors": {
+      "upload": "Could not upload the team picture.",
+      "remove": "Could not remove the team picture.",
+      "save": "Could not save the team."
+    }
+  },
+  "addMember": {
+    "title": "Add members",
+    "noOptions": "No matching users",
+    "users": "Users",
+    "searchPlaceholder": "Search by name",
+    "role": "Team role",
+    "roleHelper": "Applied to everyone added in this batch.",
+    "roles": {
+      "MEMBER": "Member",
+      "LEAD": "Lead"
+    },
+    "cancel": "Cancel",
+    "submit": "Add",
+    "submitCount": "Add {{number}}",
+    "failed": "Could not add: {{names}}."
+  }
+}

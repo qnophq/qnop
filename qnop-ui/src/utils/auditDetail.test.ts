@@ -20,7 +20,51 @@
  */
 
 import { describe, expect, it } from 'vitest';
-import { formatAuditDetail } from './auditDetail';
+import i18n from '../i18n';
+import {
+  formatAuditDetail as formatAuditPhrase,
+  isEmptyAuditDetail,
+  renderAuditPhrase,
+} from './auditDetail';
+
+const english = i18n.getFixedT('en', 'audit');
+
+/** The phrase rendered against the English catalog — what the table shows. */
+function formatAuditDetail(...args: Parameters<typeof formatAuditPhrase>): string {
+  return renderAuditPhrase(formatAuditPhrase(...args), english);
+}
+
+describe('formatAuditDetail phrases', () => {
+  it('names catalog keys, nesting translated workflow states', () => {
+    expect(formatAuditPhrase('workflow.transition', '{"from":"DRAFT","to":"CUSTOM"}')).toEqual({
+      key: 'detail.change',
+      values: {
+        from: { key: 'workflowStates.DRAFT' },
+        to: { key: 'detail.raw', values: { text: 'CUSTOM' } },
+      },
+    });
+  });
+
+  it('counts a purge with plural keys and keeps titles verbatim', () => {
+    expect(
+      formatAuditPhrase('review.purged', '{"reviews":2,"purged":[{"id":"d1","title":"Q3"}]}'),
+    ).toEqual({
+      join: [
+        { key: 'detail.purge.reviews', values: { count: 2 } },
+        { key: 'detail.raw', values: { text: 'Q3' } },
+      ],
+      separator: ' · ',
+    });
+  });
+
+  it('flags the em-dash detail as empty', () => {
+    expect(isEmptyAuditDetail(formatAuditPhrase('annotation.created', null))).toBe(true);
+    expect(isEmptyAuditDetail(formatAuditPhrase('annotation.created', 'null'))).toBe(true);
+    expect(isEmptyAuditDetail(formatAuditPhrase('extraction.failed', '{"reason":"X"}'))).toBe(
+      false,
+    );
+  });
+});
 
 describe('formatAuditDetail', () => {
   it('renders a workflow transition with human state labels', () => {

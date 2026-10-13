@@ -14,7 +14,7 @@
     "earnedCount": "{{earned}} von {{total}} erreicht",
     "tooltip": "{{title}} — {{caption}}",
     "ariaEarned": "{{title}}: {{caption}}",
-    "ariaLocked": "{{title}}: {{caption}} (gesperrt)",
+    "ariaLocked": "{{title}}: {{caption}} (noch nicht erreicht)",
     "liftoff": {
       "title": "Startschuss",
       "earned": "Ein Review gestartet",
@@ -122,7 +122,15 @@
   "moves": {
     "title": "Letzte Aktivitäten",
     "caption": "In gemeinsamen Reviews",
-    "empty": "Keine aktuellen Aktivitäten von {{name}} in gemeinsamen Reviews."
+    "empty": "Keine aktuellen Aktivitäten von {{name}} in gemeinsamen Reviews.",
+    "phrases": {
+      "annotationCreated": "Anmerkung in <review/> erstellt",
+      "annotationResolved": "Anmerkung in <review/> erledigt",
+      "annotationReopened": "Anmerkung in <review/> wieder geöffnet",
+      "workflowTransition": "Status von <review/> geändert",
+      "dueDateChanged": "Fälligkeitsdatum von <review/> geändert",
+      "other": "<review/> aktualisiert"
+    }
   },
   "toast": {
     "settingSaveFailed": "Die Einstellung konnte nicht gespeichert werden.",

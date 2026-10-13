@@ -1,0 +1,197 @@
+{
+  "people": {
+    "viewProfile": "Profil von {{name}} ansehen",
+    "viewProfilePlain": "Profil ansehen",
+    "memberSince": "Mitglied seit {{date}}",
+    "teamSince": "Team seit {{date}}",
+    "memberCount_one": "{{count}} Mitglied",
+    "memberCount_other": "{{count}} Mitglieder",
+    "stats": {
+      "reviewsOwned": "Reviews",
+      "annotationsRaised": "Anmerkungen",
+      "commentsWritten": "Kommentare"
+    }
+  },
+  "userProfile": {
+    "notFound": {
+      "title": "Diese Spielerkarte ist spazieren gegangen",
+      "message": "Unter dieser Adresse gibt es kein Profil — vielleicht ist der Link veraltet. Der Rest der Mannschaft ist noch genau dort, wo du ihn verlassen hast."
+    },
+    "leads": "Leitet {{team}}",
+    "memberOf": "Mitglied von {{team}}",
+    "stats": {
+      "reviewsOwned": "Eigene Reviews",
+      "reviewsParticipating": "Im Review",
+      "annotationsRaised": "Erstellte Anmerkungen",
+      "annotationsResolved": "Erledigt",
+      "commentsWritten": "Kommentare"
+    }
+  },
+  "teamProfile": {
+    "notFound": {
+      "title": "Dieses Team hat sein Wappen eingepackt",
+      "message": "Unter dieser Adresse gibt es kein Team — vielleicht ist der Link veraltet oder das Team hat sich aufgelöst. Die Gildenhalle findest du auf dem Dashboard.",
+      "myTeams": "Meine Teams"
+    },
+    "yourTeam": "Dein Team",
+    "stats": {
+      "members": "Mitglieder",
+      "activeReviews": "Aktive Reviews",
+      "completed": "Abgeschlossen"
+    },
+    "roster": {
+      "title": "Mitglieder",
+      "private": "Dieses Team hält seine Mitgliederliste privat.",
+      "empty": "Noch keine Mitglieder.",
+      "lead": "Teamleitung"
+    },
+    "reviews": {
+      "title": "Review-Missionen",
+      "private": "Dieses Team hält seine Review-Aktivität privat.",
+      "empty": "Keine Reviews, die du sehen kannst — die Liste zeigt nur Reviews, auf die du Zugriff hast."
+    }
+  },
+  "myTeams": {
+    "title": "Meine Teams",
+    "description": "Die Teams, zu denen du gehörst — verwalte die, die du leitest, und sieh dir die Mitglieder der übrigen an.",
+    "loadError": "Deine Teams konnten nicht geladen werden.",
+    "sections": {
+      "led_one": "Team, das du leitest",
+      "led_other": "Teams, die du leitest",
+      "member_one": "Team, in dem du bist",
+      "member_other": "Teams, in denen du bist"
+    },
+    "hero": {
+      "eyebrow": "Leitungszentrale",
+      "summary": "Du leitest {{teams}} · insgesamt {{teammates}}",
+      "teams_one": "{{count}} Team",
+      "teams_other": "{{count}} Teams",
+      "teammates_one": "{{count}} Teammitglied",
+      "teammates_other": "{{count}} Teammitglieder",
+      "stats": {
+        "teamsLed": "Geleitete Teams",
+        "teammates": "Teammitglieder",
+        "largestTeam": "Größtes Team"
+      }
+    },
+    "ranks": {
+      "programLead": "Programmleitung",
+      "multiTeamLead": "Multi-Team-Leitung",
+      "teamLead": "Teamleitung",
+      "member": "Mitglied"
+    },
+    "tiers": {
+      "solo": "Solo",
+      "squad": "Trupp",
+      "crew": "Crew",
+      "guild": "Gilde",
+      "chapter": "Chapter"
+    },
+    "achievements": {
+      "unlocked": "Freigeschaltet · {{hint}}",
+      "locked": "Noch nicht erreicht · {{hint}}",
+      "firstTeam": {
+        "label": "Erstes Team",
+        "hint": "Leite dein erstes Team"
+      },
+      "multiTeam": {
+        "label": "Multi-Team-Leitung",
+        "hint": "Leite zwei oder mehr Teams"
+      },
+      "teamBuilder": {
+        "label": "Teambauer",
+        "hint": "Bring ein Team auf {{size}} Mitglieder"
+      },
+      "bigRoster": {
+        "label": "Große Truppe",
+        "hint": "Bring ein Team auf {{size}} Mitglieder"
+      },
+      "fullHouse": {
+        "label": "Volles Haus",
+        "hint": "Leite insgesamt {{size}} Teammitglieder"
+      }
+    },
+    "card": {
+      "manageAria": "{{name}} verwalten",
+      "viewAria": "{{name}} ansehen",
+      "toNextTier": "Noch {{remaining}} bis {{tier}}",
+      "topTier": "Höchste Stufe",
+      "tierProgress": "Fortschritt der Stufe {{tier}}",
+      "manageMembers": "Mitglieder verwalten",
+      "viewMembers": "Mitglieder ansehen"
+    },
+    "empty": {
+      "eyebrow": "Teams",
+      "title": "Dein Platz wartet schon",
+      "body": "In Teams schließen sich Reviewer zusammen — sie teilen die Arbeit, halten sich gegenseitig auf dem Laufenden und steigen gemeinsam auf. Du bist noch in keinem.",
+      "perks": {
+        "collaborate": "Gemeinsam reviewen",
+        "share": "Arbeit aufteilen",
+        "rise": "Im Rang aufsteigen"
+      },
+      "hint": "Eine Teamleitung oder ein Administrator kann dich hinzufügen — deine Teams erscheinen hier, sobald das passiert.",
+      "illustration": "Ein freier Platz, der in einem Team wartet"
+    }
+  },
+  "teamDetail": {
+    "loadError": "Dieses Team konnte nicht geladen werden, oder du bist kein Mitglied. <back>Zurück zu meinen Teams</back>",
+    "publicProfile": "Öffentliches Profil",
+    "editTeam": "Team bearbeiten",
+    "addMember": "Mitglied hinzufügen",
+    "columns": {
+      "member": "Mitglied",
+      "role": "Rolle",
+      "joined": "Beigetreten",
+      "actions": "Aktionen"
+    },
+    "emptyManage": "Noch keine Mitglieder. Füge das erste hinzu.",
+    "emptyView": "Dieses Team hat keine Mitglieder.",
+    "actionsFor": "Aktionen für {{name}}",
+    "makeMember": "Zum Mitglied machen",
+    "makeLead": "Zur Teamleitung machen",
+    "removeFromTeam": "Aus dem Team entfernen",
+    "remove": {
+      "title": "Mitglied entfernen",
+      "message": "{{name}} aus diesem Team entfernen?",
+      "confirm": "Entfernen"
+    },
+    "errors": {
+      "role": "Die Rolle konnte nicht geändert werden.",
+      "remove": "Das Mitglied konnte nicht entfernt werden."
+    }
+  },
+  "editTeam": {
+    "title": "Team bearbeiten",
+    "description": "Beschreibung",
+    "descriptionHelper": "Was dieses Team reviewt — wird überall angezeigt, wo das Team erscheint.",
+    "publicProfile": "Öffentliches Profil",
+    "publicProfileHint": "Name, Wappen und Beschreibung sind auf der Profilseite des Teams immer sichtbar. Wähle, was Nicht-Mitglieder darüber hinaus sehen dürfen.",
+    "showMembers": "Mitglieder anzeigen",
+    "showMembersAria": "Mitglieder im öffentlichen Profil anzeigen",
+    "showReviews": "Review-Beteiligung anzeigen",
+    "showReviewsAria": "Review-Beteiligung im öffentlichen Profil anzeigen",
+    "cancel": "Abbrechen",
+    "save": "Speichern",
+    "errors": {
+      "upload": "Das Teambild konnte nicht hochgeladen werden.",
+      "remove": "Das Teambild konnte nicht entfernt werden.",
+      "save": "Das Team konnte nicht gespeichert werden."
+    }
+  },
+  "addMember": {
+    "title": "Mitglieder hinzufügen",
+    "noOptions": "Keine passenden Benutzer",
+    "users": "Benutzer",
+    "searchPlaceholder": "Nach Namen suchen",
+    "role": "Teamrolle",
+    "roleHelper": "Gilt für alle, die du in diesem Schritt hinzufügst.",
+    "roles": {
+      "MEMBER": "Mitglied",
+      "LEAD": "Teamleitung"
+    },
+    "cancel": "Abbrechen",
+    "submit": "Hinzufügen",
+    "submitCount": "{{number}} hinzufügen",
+    "failed": "Konnte nicht hinzugefügt werden: {{names}}."
+  }
+}

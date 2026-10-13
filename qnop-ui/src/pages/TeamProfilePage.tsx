@@ -29,7 +29,9 @@ import Typography from '@mui/material/Typography';
 import { alpha, useTheme } from '@mui/material/styles';
 import type { LucideIcon } from 'lucide-react';
 import { CalendarDays, CheckCircle2, Crown, FileText, Lock, Users } from 'lucide-react';
+import type { ParseKeys } from 'i18next';
 import { useEffect } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Link as RouterLink, useNavigate, useParams } from 'react-router';
 import { useQueryClient } from '@tanstack/react-query';
 import type { PublicTeamProfileMember, PublicTeamReview } from '../api/generated';
@@ -83,6 +85,7 @@ function PrivateNote({ text }: { text: string }) {
  * an id visit is canonicalised to the pretty slug URL once the team is known.
  */
 export function TeamProfilePage() {
+  const { t } = useTranslation(['teams', 'common']);
   const theme = useTheme();
   const { teamId: segment = '' } = useParams<{ teamId: string }>();
   const isId = UUID_SHAPE.test(segment);
@@ -126,11 +129,11 @@ export function TeamProfilePage() {
     return (
       <ErrorState
         code="404"
-        title="This team packed up its crest"
-        message="No team answers to this address — the link may be outdated, or the team moved on. The guild hall is back on the dashboard."
+        title={t('teamProfile.notFound.title')}
+        message={t('teamProfile.notFound.message')}
         illustration={<NotFoundIllustration />}
-        primaryAction={{ label: 'Back to dashboard', to: '/' }}
-        secondaryAction={{ label: 'My teams', to: '/my-teams' }}
+        primaryAction={{ label: t('common:actions.backToDashboard'), to: '/' }}
+        secondaryAction={{ label: t('teamProfile.notFound.myTeams'), to: '/my-teams' }}
       />
     );
   }
@@ -144,13 +147,21 @@ export function TeamProfilePage() {
 
   // The scoreboard shows only what this caller may see — a hidden section
   // contributes no tile rather than a fake zero.
-  const tiles: { label: string; value: number; icon: LucideIcon }[] = [];
+  const tiles: { labelKey: ParseKeys<'teams'>; value: number; icon: LucideIcon }[] = [];
   if (members !== null) {
-    tiles.push({ label: 'Members', value: members.length, icon: Users });
+    tiles.push({ labelKey: 'teamProfile.stats.members', value: members.length, icon: Users });
   }
   if (activeReviews !== null && completedCount !== null) {
-    tiles.push({ label: 'Active reviews', value: activeReviews.length, icon: FileText });
-    tiles.push({ label: 'Completed', value: completedCount, icon: CheckCircle2 });
+    tiles.push({
+      labelKey: 'teamProfile.stats.activeReviews',
+      value: activeReviews.length,
+      icon: FileText,
+    });
+    tiles.push({
+      labelKey: 'teamProfile.stats.completed',
+      value: completedCount,
+      icon: CheckCircle2,
+    });
   }
 
   return (
@@ -196,12 +207,12 @@ export function TeamProfilePage() {
               >
                 <CalendarDays size={14} aria-hidden />
                 <Typography variant="body2">
-                  Team since {formatMonthYear(profile.createdAt)}
+                  {t('people.teamSince', { date: formatMonthYear(profile.createdAt) })}
                 </Typography>
                 {profile.viewerIsMember && (
                   <Chip
                     size="small"
-                    label="Your team"
+                    label={t('teamProfile.yourTeam')}
                     component={RouterLink}
                     to={`/my-teams/${profile.slug ?? profile.id}`}
                     clickable
@@ -230,8 +241,8 @@ export function TeamProfilePage() {
             gap: 1.5,
           }}
         >
-          {tiles.map(({ label, value, icon: Icon }) => (
-            <Paper key={label} variant="outlined" sx={{ px: 2, py: 1.5, borderRadius: '12px' }}>
+          {tiles.map(({ labelKey, value, icon: Icon }) => (
+            <Paper key={labelKey} variant="outlined" sx={{ px: 2, py: 1.5, borderRadius: '12px' }}>
               <Stack direction="row" spacing={1.5} sx={{ alignItems: 'center' }}>
                 <Box
                   aria-hidden
@@ -265,7 +276,7 @@ export function TeamProfilePage() {
                     {value}
                   </Typography>
                   <Typography variant="caption" color="text.secondary" noWrap component="p">
-                    {label}
+                    {t(labelKey)}
                   </Typography>
                 </Box>
               </Stack>
@@ -277,13 +288,13 @@ export function TeamProfilePage() {
       {/* The roster — or the quiet lock note when the team keeps it private. */}
       <Paper variant="outlined" sx={{ ...stagger(2), borderRadius: '16px', px: 2.5, py: 2 }}>
         <Typography variant="h3" sx={{ fontSize: '1rem', mb: 1.5 }}>
-          Roster
+          {t('teamProfile.roster.title')}
         </Typography>
         {members === null ? (
-          <PrivateNote text="This team keeps its roster private." />
+          <PrivateNote text={t('teamProfile.roster.private')} />
         ) : members.length === 0 ? (
           <Typography variant="body2" color="text.secondary">
-            No members yet.
+            {t('teamProfile.roster.empty')}
           </Typography>
         ) : (
           <Box
@@ -325,10 +336,10 @@ export function TeamProfilePage() {
                       {member.displayName}
                     </Typography>
                     {lead && (
-                      <Tooltip title="Team lead">
+                      <Tooltip title={t('teamProfile.roster.lead')}>
                         <Crown
                           size={14}
-                          aria-label="Team lead"
+                          aria-label={t('teamProfile.roster.lead')}
                           style={{ color: theme.palette.warning.main, flexShrink: 0 }}
                         />
                       </Tooltip>
@@ -344,13 +355,13 @@ export function TeamProfilePage() {
       {/* The team's missions — reviews the CALLER may see (server-intersected). */}
       <Paper variant="outlined" sx={{ ...stagger(3), borderRadius: '16px', px: 2.5, py: 2 }}>
         <Typography variant="h3" sx={{ fontSize: '1rem', mb: 1.5 }}>
-          Review missions
+          {t('teamProfile.reviews.title')}
         </Typography>
         {reviews === null ? (
-          <PrivateNote text="This team keeps its review activity private." />
+          <PrivateNote text={t('teamProfile.reviews.private')} />
         ) : reviews.length === 0 ? (
           <Typography variant="body2" color="text.secondary">
-            No reviews you can see — the list only shows reviews you have access to.
+            {t('teamProfile.reviews.empty')}
           </Typography>
         ) : (
           <Stack spacing={0.5} data-testid="team-profile-reviews">

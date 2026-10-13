@@ -1,0 +1,159 @@
+{
+  "page": {
+    "title": "Audit-Trail",
+    "description": "Jede aufgezeichnete Aktion in allen Dokument-Reviews — wer was wann getan hat.",
+    "legendToggle": "Was bedeuten diese Ereignisse?",
+    "legendTitle": "Ereignis-Übersicht",
+    "loadError": "Der Audit-Trail konnte nicht geladen werden."
+  },
+  "filters": {
+    "eventType": "Ereignistyp",
+    "allEvents": "Alle Ereignisse",
+    "searchDetails": "Details durchsuchen",
+    "clearSearch": "Detailsuche zurücksetzen",
+    "searchPlaceholder": "z. B. ein Speicherschlüssel oder Workflow-Status",
+    "from": "Von",
+    "to": "Bis",
+    "actorChip": "Akteur: {{name}}",
+    "documentChip": "Dokument: {{title}}"
+  },
+  "pagination": {
+    "rowsPerPage": "Ereignisse pro Seite",
+    "displayedRows": "{{from}}–{{to}} von {{total}}"
+  },
+  "table": {
+    "columns": {
+      "time": "Zeit",
+      "actor": "Akteur",
+      "event": "Ereignis",
+      "document": "Dokument",
+      "details": "Details"
+    },
+    "empty": "Keine Audit-Ereignisse gefunden.",
+    "unknownUser": "Unbekannter Benutzer",
+    "filterBy": "Nach {{name}} filtern",
+    "filterBySystem": "Nach System filtern",
+    "noDocument": "Kein Dokument",
+    "copy": "Details kopieren",
+    "copied": "Kopiert"
+  },
+  "system": {
+    "name": "System",
+    "tooltip": "Automatische Systemaktion — kein menschlicher Akteur"
+  },
+  "events": {
+    "annotationCreated": {
+      "label": "Anmerkung erstellt",
+      "description": "Ein Reviewer hat eine neue Anmerkung zum Dokument erstellt — einen Kommentar oder ein Problem."
+    },
+    "annotationResolved": {
+      "label": "Anmerkung erledigt",
+      "description": "Eine Anmerkung wurde als erledigt markiert: Der angesprochene Punkt wurde umgesetzt."
+    },
+    "annotationReopened": {
+      "label": "Anmerkung wieder geöffnet",
+      "description": "Eine bereits geklärte Anmerkung wurde wieder geöffnet, weil sie noch Arbeit brauchte."
+    },
+    "annotationDismissed": {
+      "label": "Anmerkung verworfen",
+      "description": "Die Review-Leitung oder ein Admin hat eine offene Anmerkung mit verpflichtender Begründung verworfen (Issue #408); wer sie verfasst hat, kann sie wieder öffnen."
+    },
+    "annotationClassified": {
+      "label": "Anmerkung eingeordnet",
+      "description": "Eine Anmerkung wurde eingeordnet — ihr Typ und/oder ihre Priorität wurden gesetzt."
+    },
+    "placementConfirmed": {
+      "label": "Position bestätigt",
+      "description": "Die Position einer Anmerkung auf der Seite wurde für eine Dokumentversion bestätigt."
+    },
+    "placementReattached": {
+      "label": "Position neu verankert",
+      "description": "Eine Anmerkung wurde an einer neuen Stelle verankert — etwa weil eine neue Version den Text verschoben hat."
+    },
+    "annotationAutoClosed": {
+      "label": "Anmerkung automatisch geschlossen",
+      "description": "Ein abschließender Review-Übergang (abgebrochen/abgeschlossen) hat eine noch offene Anmerkung automatisch geschlossen (Issue #568)."
+    },
+    "placementRepositioned": {
+      "label": "Position verschoben",
+      "description": "Eine intakte Anmerkung wurde bewusst an eine andere Textstelle verschoben (freies Neuverankern, Issue #562)."
+    },
+    "workflowTransition": {
+      "label": "Status geändert",
+      "description": "Das Review hat einen neuen Workflow-Status erreicht (z. B. Entwurf → Im Review)."
+    },
+    "dueDateChanged": {
+      "label": "Fälligkeitsdatum geändert",
+      "description": "Das Fälligkeitsdatum des Reviews wurde gesetzt, geändert oder entfernt."
+    },
+    "extractionSucceeded": {
+      "label": "Text extrahiert",
+      "description": "Der Text einer hochgeladenen Version wurde erfolgreich extrahiert und ist bereit fürs Review."
+    },
+    "extractionFailed": {
+      "label": "Extraktion fehlgeschlagen",
+      "description": "Die Textextraktion einer hochgeladenen Version ist fehlgeschlagen; den Grund findest du in den Details."
+    },
+    "storageOrphanDeleted": {
+      "label": "Verwaistes Objekt gelöscht",
+      "description": "Bei einer Konsistenzbereinigung wurde ein nicht mehr referenziertes Objekt aus dem Speicher gelöscht (Issue #523); den Objektschlüssel findest du in den Details."
+    },
+    "schedulerJobRun": {
+      "label": "Zeitplaner-Job ausgeführt",
+      "description": "Ein Administrator hat einen geplanten Wartungsjob manuell gestartet („Jetzt ausführen“, Issue #524); Job und Ergebnis stehen in den Details."
+    },
+    "settingsUpdated": {
+      "label": "Einstellung geändert",
+      "description": "Ein Administrator hat eine Anwendungseinstellung geändert; die Details nennen die Einstellung und die Werte davor und danach. Passwörter und andere Geheimnisse werden nur als geändert erfasst, ohne einen der Werte."
+    },
+    "schedulerJobUpdated": {
+      "label": "Zeitplaner-Job aktualisiert",
+      "description": "Ein Administrator hat die Einstellungen eines geplanten Jobs geändert — ihn aktiviert oder deaktiviert oder seinen Probelauf-Modus umgeschaltet (Issue #524)."
+    },
+    "reviewArchived": {
+      "label": "Review archiviert",
+      "description": "Ein abgeschlossenes oder abgebrochenes Review hat die Aufbewahrungsfrist überschritten (oder die Review-Leitung bzw. ein Admin hat es archiviert) und die aktiven Listen verlassen (Issue #576); den vorherigen Zustand findest du in den Details."
+    },
+    "reviewUnarchived": {
+      "label": "Review wiederhergestellt",
+      "description": "Die Review-Leitung oder ein Admin hat ein archiviertes Review in die aktiven Listen zurückgeholt (Issue #576)."
+    },
+    "reviewPurged": {
+      "label": "Reviews endgültig gelöscht",
+      "description": "Archivierte Reviews haben die Löschfrist überschritten und wurden endgültig gelöscht, einschließlich Speicherobjekten, auf die kein anderes Dokument verwies (Issue #577). Dies ist der einzige verbliebene Nachweis — ihr eigener Audit-Trail wurde mit ihnen gelöscht; die Details listen auf, was entfernt wurde."
+    },
+    "fallback": {
+      "label": "{{type}}",
+      "description": "Ein aufgezeichnetes Review-Ereignis."
+    }
+  },
+  "workflowStates": {
+    "DRAFT": "Entwurf",
+    "IN_REVIEW": "Im Review",
+    "CHANGES_REQUESTED": "Änderungen angefordert",
+    "FINALIZED": "Abgeschlossen",
+    "CANCELLED": "Abgebrochen"
+  },
+  "detail": {
+    "none": "—",
+    "raw": "{{text}}",
+    "change": "{{from}} → {{to}}",
+    "classified": "Als {{parts}}",
+    "priority": "Priorität {{priority}}",
+    "reason": "Grund: {{reason}}",
+    "onVersion": "In Version {{version}}",
+    "object": "Objekt {{objectKey}}",
+    "was": "War {{state}}",
+    "dueDate": {
+      "set": "Gesetzt auf {{date}}",
+      "cleared": "Entfernt (war {{date}})"
+    },
+    "purge": {
+      "reviews_one": "{{count}} Review",
+      "reviews_other": "{{count}} Reviews",
+      "storageObjects_one": "{{count}} Speicherobjekt",
+      "storageObjects_other": "{{count}} Speicherobjekte",
+      "more": "{{titles}} +{{remaining}} weitere"
+    }
+  }
+}

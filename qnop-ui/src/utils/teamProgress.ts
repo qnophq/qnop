@@ -25,11 +25,17 @@
  * tier per team, a leadership rank, and a set of achievements with progress. No
  * invented metrics; every number traces back to the API. Kept as pure functions
  * so the motivational layer is unit-tested independently of the React tree.
+ * Names are `teams` catalog keys (issue #836), translated at render.
  */
 
+import type { ParseKeys } from 'i18next';
+
+/** A key in the `teams` catalog. */
+export type TeamsKey = ParseKeys<'teams'>;
+
 export interface TeamTier {
-  /** The tier name for the team's current size. */
-  name: string;
+  /** Catalog key of the tier name for the team's current size. */
+  nameKey: TeamsKey;
   /** Members at which this tier starts. */
   floor: number;
   /** Members at which the next tier starts, or null at the top tier. */
@@ -39,17 +45,17 @@ export interface TeamTier {
 }
 
 interface TierBand {
-  name: string;
+  nameKey: TeamsKey;
   floor: number;
 }
 
 /** Roster tiers by team size — a small, tasteful ladder, not an XP grind. */
 const TIERS: readonly TierBand[] = [
-  { name: 'Solo', floor: 1 },
-  { name: 'Squad', floor: 2 },
-  { name: 'Crew', floor: 5 },
-  { name: 'Guild', floor: 10 },
-  { name: 'Chapter', floor: 25 },
+  { nameKey: 'myTeams.tiers.solo', floor: 1 },
+  { nameKey: 'myTeams.tiers.squad', floor: 2 },
+  { nameKey: 'myTeams.tiers.crew', floor: 5 },
+  { nameKey: 'myTeams.tiers.guild', floor: 10 },
+  { nameKey: 'myTeams.tiers.chapter', floor: 25 },
 ];
 
 function clamp01(value: number): number {
@@ -68,15 +74,15 @@ export function teamTier(memberCount: number): TeamTier {
   const nextFloor = next ? next.floor : null;
   const progress =
     nextFloor === null ? 1 : clamp01((count - tier.floor) / (nextFloor - tier.floor));
-  return { name: tier.name, floor: tier.floor, nextFloor, progress };
+  return { nameKey: tier.nameKey, floor: tier.floor, nextFloor, progress };
 }
 
-/** A leadership rank from how many teams the caller leads. */
-export function leadershipRank(teamsLed: number): string {
-  if (teamsLed >= 3) return 'Program Lead';
-  if (teamsLed === 2) return 'Multi-team Lead';
-  if (teamsLed === 1) return 'Team Lead';
-  return 'Member';
+/** A leadership rank (its catalog key) from how many teams the caller leads. */
+export function leadershipRank(teamsLed: number): TeamsKey {
+  if (teamsLed >= 3) return 'myTeams.ranks.programLead';
+  if (teamsLed === 2) return 'myTeams.ranks.multiTeamLead';
+  if (teamsLed === 1) return 'myTeams.ranks.teamLead';
+  return 'myTeams.ranks.member';
 }
 
 export interface LeadershipStats {
@@ -85,7 +91,8 @@ export interface LeadershipStats {
   totalTeammates: number;
   /** The size of the caller's largest led team. */
   largestTeam: number;
-  rank: string;
+  /** Catalog key of the leadership rank. */
+  rankKey: TeamsKey;
 }
 
 /** Headline leadership stats derived from the caller's led teams. */
@@ -96,17 +103,25 @@ export function leadershipStats(led: readonly { memberCount: number }[]): Leader
     teamsLed: led.length,
     totalTeammates,
     largestTeam,
-    rank: leadershipRank(led.length),
+    rankKey: leadershipRank(led.length),
   };
 }
 
 export interface Achievement {
   id: string;
-  label: string;
-  /** What earns it — shown when locked, as the next goal to aim for. */
-  hint: string;
+  /** Catalog key of the achievement name. */
+  labelKey: TeamsKey;
+  /** Catalog key of what earns it — shown when locked, as the next goal to aim for. */
+  hintKey: TeamsKey;
+  /** Interpolation values for the hint, e.g. the size milestone. */
+  hintValues?: Record<string, number>;
   earned: boolean;
 }
+
+/** Milestones of the size-based achievements. */
+const TEAM_BUILDER_SIZE = 5;
+const BIG_ROSTER_SIZE = 10;
+const FULL_HOUSE_TEAMMATES = 25;
 
 /** The achievement set, each flagged earned/locked from the caller's led teams. */
 export function computeAchievements(led: readonly { memberCount: number }[]): Achievement[] {
@@ -116,33 +131,36 @@ export function computeAchievements(led: readonly { memberCount: number }[]): Ac
   return [
     {
       id: 'first-team',
-      label: 'First team',
-      hint: 'Lead your first team',
+      labelKey: 'myTeams.achievements.firstTeam.label',
+      hintKey: 'myTeams.achievements.firstTeam.hint',
       earned: teamsLed >= 1,
     },
     {
       id: 'multi-team',
-      label: 'Multi-team lead',
-      hint: 'Lead two or more teams',
+      labelKey: 'myTeams.achievements.multiTeam.label',
+      hintKey: 'myTeams.achievements.multiTeam.hint',
       earned: teamsLed >= 2,
     },
     {
       id: 'team-builder',
-      label: 'Team builder',
-      hint: 'Grow a team to 5 members',
-      earned: largest >= 5,
+      labelKey: 'myTeams.achievements.teamBuilder.label',
+      hintKey: 'myTeams.achievements.teamBuilder.hint',
+      hintValues: { size: TEAM_BUILDER_SIZE },
+      earned: largest >= TEAM_BUILDER_SIZE,
     },
     {
       id: 'big-roster',
-      label: 'Big roster',
-      hint: 'Grow a team to 10 members',
-      earned: largest >= 10,
+      labelKey: 'myTeams.achievements.bigRoster.label',
+      hintKey: 'myTeams.achievements.bigRoster.hint',
+      hintValues: { size: BIG_ROSTER_SIZE },
+      earned: largest >= BIG_ROSTER_SIZE,
     },
     {
       id: 'full-house',
-      label: 'Full house',
-      hint: 'Lead 25 teammates in total',
-      earned: totalTeammates >= 25,
+      labelKey: 'myTeams.achievements.fullHouse.label',
+      hintKey: 'myTeams.achievements.fullHouse.hint',
+      hintValues: { size: FULL_HOUSE_TEAMMATES },
+      earned: totalTeammates >= FULL_HOUSE_TEAMMATES,
     },
   ];
 }

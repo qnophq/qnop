@@ -21,6 +21,7 @@
 
 import Box from '@mui/material/Box';
 import { keyframes, useTheme } from '@mui/material/styles';
+import { useTranslation } from 'react-i18next';
 
 const floaty = keyframes`
   0%, 100% { transform: translateY(0); }
@@ -73,6 +74,7 @@ function Teammate({
  * scene pops in on load — all disabled under reduced-motion.
  */
 export function JoinTeamIllustration() {
+  const { t } = useTranslation('teams');
   const theme = useTheme();
   const p = theme.qnop.avatarPalette;
   const accent = theme.palette.primary.main;
@@ -83,7 +85,7 @@ export function JoinTeamIllustration() {
       component="svg"
       viewBox="0 0 320 210"
       role="img"
-      aria-label="An open seat waiting in a team"
+      aria-label={t('myTeams.empty.illustration')}
       sx={{
         width: '100%',
         maxWidth: 340,

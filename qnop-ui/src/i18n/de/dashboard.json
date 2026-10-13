@@ -1,0 +1,115 @@
+{
+  "greeting": {
+    "morning": {
+      "named": "Guten Morgen, {{name}}.",
+      "plain": "Guten Morgen."
+    },
+    "afternoon": {
+      "named": "Guten Tag, {{name}}.",
+      "plain": "Guten Tag."
+    },
+    "evening": {
+      "named": "Guten Abend, {{name}}.",
+      "plain": "Guten Abend."
+    }
+  },
+  "newReview": "Neues Review",
+  "stats": {
+    "openReviews": "Offene Reviews",
+    "waitingOnYou": "Warten auf dich",
+    "dueSoon": "Bald fällig",
+    "resolvedThisWeek": "Diese Woche erledigt"
+  },
+  "continue": "Weitermachen, wo du aufgehört hast:",
+  "waiting": {
+    "title": "Warten auf dich",
+    "description": "Reviews, die du durcharbeiten sollst.",
+    "empty": "Nichts wartet auf dich — genieß die Ruhe."
+  },
+  "mine": {
+    "title": "Meine Reviews",
+    "description": "Reviews, die dir gehören — laufende zuerst.",
+    "emptyTitle": "Noch keine Reviews",
+    "empty": "Starte dein erstes mit „Neues Review“."
+  },
+  "reviewList": {
+    "emptyTitle": "Hier ist noch nichts",
+    "caughtUp": "Alles erledigt!",
+    "readyToFinalize": "Bereit zum Abschließen",
+    "resolved": "{{resolved}}/{{total}} erledigt",
+    "noAnnotations": "Noch keine Anmerkungen"
+  },
+  "deadlines": {
+    "title": "Fristen",
+    "description": "Wann deine laufenden Reviews fällig sind.",
+    "emptyTitle": "Keine Uhr tickt",
+    "empty": "Fälligkeitsdaten deiner offenen Reviews landen hier."
+  },
+  "due": {
+    "overdue_one": "Seit {{count}} Tag überfällig",
+    "overdue_other": "Seit {{count}} Tagen überfällig",
+    "today": "Heute fällig",
+    "tomorrow": "Morgen fällig",
+    "daysLeft_one": "Noch {{count}} Tag",
+    "daysLeft_other": "Noch {{count}} Tage"
+  },
+  "replies": {
+    "title": "Antworten an dich",
+    "description": "Die neuesten Antworten in Diskussionen, die du begonnen hast oder denen du beigetreten bist.",
+    "emptyTitle": "Noch keine Antworten",
+    "empty": "Antworten in Diskussionen, die du begonnen hast oder denen du beigetreten bist, landen hier.",
+    "participant": "Teilnehmer",
+    "context": "in {{review}} · {{time}}"
+  },
+  "activity": {
+    "title": "Letzte Aktivitäten",
+    "description": "Was in deinen Reviews passiert ist.",
+    "emptyTitle": "Alles ruhig",
+    "empty": "Sobald dein Team in deinen Reviews aktiv wird, erscheint es hier.",
+    "someone": "Jemand",
+    "phrases": {
+      "annotationCreated": "<actor/> hat in <review/> eine Anmerkung erstellt",
+      "annotationResolved": "<actor/> hat in <review/> eine Anmerkung erledigt",
+      "annotationReopened": "<actor/> hat in <review/> eine Anmerkung wieder geöffnet",
+      "workflowTransition": "<actor/> hat den Status von <review/> geändert",
+      "dueDateChanged": "<actor/> hat das Fälligkeitsdatum von <review/> geändert",
+      "other": "<actor/> hat <review/> aktualisiert"
+    }
+  },
+  "playerCard": {
+    "title": "Deine Reviewer-Karte",
+    "description": "Was dein Profil dem Workspace zeigt.",
+    "viewProfile": "Profil ansehen",
+    "unavailable": "Deine Profilstatistik ist gerade nicht verfügbar.",
+    "stats": {
+      "reviewsOwned": "Eigene",
+      "reviewsParticipating": "Im Review",
+      "annotationsRaised": "Erstellt",
+      "annotationsResolved": "Erledigt"
+    }
+  },
+  "person": {
+    "viewProfile": "Profil von {{name}} ansehen"
+  },
+  "empty": {
+    "title": "Deine Kommandozentrale ist bereit für ihre erste Mission.",
+    "body": "Jedes Review, das du leitest oder dem du beitrittst, landet hier — Fristen, Antworten auf deine Kommentare und die Erfolge, die du verbuchst. Es fehlt nur noch ein Dokument.",
+    "cta": "Starte dein erstes Review",
+    "stepsTitle": "Drei Schritte zu deinem ersten Review",
+    "steps": {
+      "upload": {
+        "title": "Dokument hochladen",
+        "hint": "PDF rein, Review raus."
+      },
+      "invite": {
+        "title": "Reviewer einladen",
+        "hint": "Einzelne Personen oder ganze Teams."
+      },
+      "discuss": {
+        "title": "Diskutieren & klären",
+        "hint": "Anmerken, antworten, abschließen."
+      }
+    },
+    "scoreboardHint": "Deine Anzeigetafel — sie beginnt mit deinem ersten Review zu zählen."
+  }
+}

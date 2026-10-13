@@ -37,6 +37,7 @@ import TableHead from '@mui/material/TableHead';
 import TableRow from '@mui/material/TableRow';
 import Typography from '@mui/material/Typography';
 import { ArrowLeftRight, Globe, MoreVertical, Pencil, UserMinus, UserPlus } from 'lucide-react';
+import { Trans, useTranslation } from 'react-i18next';
 import { Link as RouterLink, useParams } from 'react-router';
 import type { TeamMember, TeamRole } from '../../api/generated';
 import {
@@ -71,6 +72,7 @@ import { apiErrorMessage } from '../../utils/apiError';
  * as a toast.
  */
 export function MyTeamDetailPage() {
+  const { t } = useTranslation(['teams', 'common']);
   const { id = '' } = useParams();
   const { data: team, isLoading, isError } = useMyTeam(id);
   const setRole = useSetMyTeamMemberRole();
@@ -90,15 +92,18 @@ export function MyTeamDetailPage() {
   if (isError) {
     return (
       <Alert severity="error">
-        This team could not be loaded, or you are not a member of it.{' '}
-        <Link component={RouterLink} to="/my-teams" underline="hover">
-          Back to my teams
-        </Link>
+        <Trans
+          t={t}
+          i18nKey="teamDetail.loadError"
+          components={{
+            back: <Link component={RouterLink} to="/my-teams" underline="hover" />,
+          }}
+        />
       </Alert>
     );
   }
   if (isLoading || !team) {
-    return <Typography color="text.secondary">Loading…</Typography>;
+    return <Typography color="text.secondary">{t('common:loading')}</Typography>;
   }
 
   const canManage = team.viewerCanManage;
@@ -120,7 +125,9 @@ export function MyTeamDetailPage() {
     const next: TeamRole = member.teamRole === 'LEAD' ? 'MEMBER' : 'LEAD';
     setRole.mutate(
       { teamId, userId: member.userId, teamRole: next },
-      { onError: (error) => notify(apiErrorMessage(error, 'Could not change the role.'), 'error') },
+      {
+        onError: (error) => notify(apiErrorMessage(error, t('teamDetail.errors.role')), 'error'),
+      },
     );
   };
 
@@ -140,7 +147,7 @@ export function MyTeamDetailPage() {
               to={`/teams/${team.slug ?? team.id}`}
               startIcon={<Globe size={16} />}
             >
-              Public profile
+              {t('teamDetail.publicProfile')}
             </Button>
             {canManage && (
               <>
@@ -154,10 +161,10 @@ export function MyTeamDetailPage() {
                     setEditSeq((n) => n + 1);
                   }}
                 >
-                  Edit team
+                  {t('teamDetail.editTeam')}
                 </Button>
                 <Button variant="contained" startIcon={<UserPlus size={18} />} onClick={openAdd}>
-                  Add member
+                  {t('teamDetail.addMember')}
                 </Button>
               </>
             )}
@@ -178,10 +185,10 @@ export function MyTeamDetailPage() {
         <Table size="medium" sx={{ '& td, & th': { borderColor: 'divider' } }}>
           <TableHead>
             <TableRow>
-              <TableCell>Member</TableCell>
-              <TableCell>Role</TableCell>
-              <TableCell>Joined</TableCell>
-              {canManage && <TableCell align="right">Actions</TableCell>}
+              <TableCell>{t('teamDetail.columns.member')}</TableCell>
+              <TableCell>{t('teamDetail.columns.role')}</TableCell>
+              <TableCell>{t('teamDetail.columns.joined')}</TableCell>
+              {canManage && <TableCell align="right">{t('teamDetail.columns.actions')}</TableCell>}
             </TableRow>
           </TableHead>
           <TableBody>
@@ -189,7 +196,7 @@ export function MyTeamDetailPage() {
               <TableRow>
                 <TableCell colSpan={canManage ? 4 : 3}>
                   <Typography color="text.secondary" sx={{ py: 4, textAlign: 'center' }}>
-                    {canManage ? 'No members yet. Add the first one.' : 'This team has no members.'}
+                    {canManage ? t('teamDetail.emptyManage') : t('teamDetail.emptyView')}
                   </Typography>
                 </TableCell>
               </TableRow>
@@ -221,7 +228,7 @@ export function MyTeamDetailPage() {
                     {member.userId !== currentUserId && (
                       <IconButton
                         size="small"
-                        aria-label={`Actions for ${member.displayName}`}
+                        aria-label={t('teamDetail.actionsFor', { name: member.displayName })}
                         onClick={(e) => openMenu(e, member)}
                       >
                         <MoreVertical size={18} />
@@ -248,7 +255,9 @@ export function MyTeamDetailPage() {
                 <ArrowLeftRight size={16} />
               </ListItemIcon>
               <ListItemText>
-                {active?.teamRole === 'LEAD' ? 'Make member' : 'Make lead'}
+                {active?.teamRole === 'LEAD'
+                  ? t('teamDetail.makeMember')
+                  : t('teamDetail.makeLead')}
               </ListItemText>
             </MenuItem>
             <MenuItem
@@ -260,7 +269,7 @@ export function MyTeamDetailPage() {
               <ListItemIcon>
                 <UserMinus size={16} />
               </ListItemIcon>
-              <ListItemText>Remove from team</ListItemText>
+              <ListItemText>{t('teamDetail.removeFromTeam')}</ListItemText>
             </MenuItem>
           </Menu>
 
@@ -274,9 +283,9 @@ export function MyTeamDetailPage() {
 
           <ConfirmDialog
             open={removeTarget !== null}
-            title="Remove member"
-            message={`Remove ${removeTarget?.displayName} from this team?`}
-            confirmLabel="Remove"
+            title={t('teamDetail.remove.title')}
+            message={t('teamDetail.remove.message', { name: removeTarget?.displayName ?? '' })}
+            confirmLabel={t('teamDetail.remove.confirm')}
             destructive
             onConfirm={() => {
               if (removeTarget) {
@@ -284,7 +293,7 @@ export function MyTeamDetailPage() {
                   { teamId, userId: removeTarget.userId },
                   {
                     onError: (error) =>
-                      notify(apiErrorMessage(error, 'Could not remove the member.'), 'error'),
+                      notify(apiErrorMessage(error, t('teamDetail.errors.remove')), 'error'),
                   },
                 );
               }

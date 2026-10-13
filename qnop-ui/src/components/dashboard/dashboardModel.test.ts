@@ -22,10 +22,10 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 import type { DocumentSummary } from '../../api/generated';
 import {
-  activityPhrase,
+  activityKind,
   deadlines,
   dueUrgency,
-  greeting,
+  greetingKey,
   myReviews,
   readyToFinalize,
   reviewPath,
@@ -57,7 +57,8 @@ describe('dueUrgency (issue #454)', () => {
   it('flags overdue with the day count', () => {
     expect(dueUrgency('2026-07-08T12:00:00Z', now)).toEqual({
       level: 'overdue',
-      label: 'Overdue by 3 days',
+      labelKey: 'due.overdue',
+      count: 3,
     });
   });
 
@@ -68,12 +69,13 @@ describe('dueUrgency (issue #454)', () => {
   it('counts down nearby deadlines as soon, distant ones as later', () => {
     expect(dueUrgency('2026-07-12T12:00:00Z', now)).toEqual({
       level: 'soon',
-      label: 'Due tomorrow',
+      labelKey: 'due.tomorrow',
     });
     expect(dueUrgency('2026-07-14T12:00:00Z', now).level).toBe('soon');
     expect(dueUrgency('2026-07-25T12:00:00Z', now)).toEqual({
       level: 'later',
-      label: '14 days left',
+      labelKey: 'due.daysLeft',
+      count: 14,
     });
   });
 });
@@ -137,9 +139,9 @@ describe('role split (issue #454)', () => {
 
 describe('labels & paths', () => {
   it('greets by the hour, as the prototype does', () => {
-    expect(greeting(8)).toBe('Good morning');
-    expect(greeting(14)).toBe('Good afternoon');
-    expect(greeting(21)).toBe('Good evening');
+    expect(greetingKey(8, true)).toBe('greeting.morning.named');
+    expect(greetingKey(14, true)).toBe('greeting.afternoon.named');
+    expect(greetingKey(21, false)).toBe('greeting.evening.plain');
   });
 
   it('prefers the slug in review paths', () => {
@@ -147,9 +149,10 @@ describe('labels & paths', () => {
     expect(reviewPath({ id: 'uuid', slug: null })).toBe('/reviews/uuid');
   });
 
-  it('maps every audit type to a verb phrase', () => {
-    expect(activityPhrase('annotation.resolved')).toBe('resolved an annotation in');
-    expect(activityPhrase('something.else')).toBe('updated');
+  it('maps every audit type to an activity kind', () => {
+    expect(activityKind('annotation.resolved')).toBe('annotationResolved');
+    expect(activityKind('document.due_date.changed')).toBe('dueDateChanged');
+    expect(activityKind('something.else')).toBe('other');
   });
 });
 

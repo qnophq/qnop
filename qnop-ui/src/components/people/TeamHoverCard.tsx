@@ -29,6 +29,7 @@ import Typography from '@mui/material/Typography';
 import type { SxProps, Theme } from '@mui/material/styles';
 import { alpha, useTheme } from '@mui/material/styles';
 import { CalendarDays, Users } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import { useTeamProfile } from '../../api/hooks/useTeamProfile';
 import { TeamAvatar } from '../shell/TeamAvatar';
 import { HoverCardShell } from './UserHoverCard';
@@ -99,6 +100,7 @@ function TeamHoverCardPopover({
   anchorEl: HTMLElement;
   open: boolean;
 }) {
+  const { t } = useTranslation('teams');
   const { formatMonthYear } = useFormatters();
   const theme = useTheme();
   // Mounting IS the hover: the cache warms during the intent delay.
@@ -168,7 +170,7 @@ function TeamHoverCardPopover({
                   >
                     <CalendarDays size={11} aria-hidden />
                     <Typography variant="caption" noWrap>
-                      Team since {formatMonthYear(profile.createdAt)}
+                      {t('people.teamSince', { date: formatMonthYear(profile.createdAt) })}
                     </Typography>
                   </Stack>
                 </Box>
@@ -199,7 +201,7 @@ function TeamHoverCardPopover({
                 >
                   <Users size={11} aria-hidden />
                   <Typography variant="caption">
-                    {profile.members.length} {profile.members.length === 1 ? 'member' : 'members'}
+                    {t('people.memberCount', { count: profile.members.length })}
                   </Typography>
                 </Stack>
               )}

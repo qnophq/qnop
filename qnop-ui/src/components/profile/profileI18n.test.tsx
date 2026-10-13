@@ -43,7 +43,7 @@ describe('profile surfaces in German (issue #464)', () => {
     expect(screen.getByText('Gesicht zeigen')).toBeInTheDocument();
     expect(screen.getByLabelText('Gesicht zeigen: Dein Team erkennt dich')).toBeInTheDocument();
     expect(
-      screen.getByLabelText('Startschuss: Starte dein erstes Review (gesperrt)'),
+      screen.getByLabelText('Startschuss: Starte dein erstes Review (noch nicht erreicht)'),
     ).toBeInTheDocument();
   });
 
@@ -59,7 +59,7 @@ describe('profile surfaces in German (issue #464)', () => {
 
     expect(screen.getByLabelText('Stimme: 10+ Kommentare in Diskussionen')).toBeInTheDocument();
     expect(
-      screen.getByLabelText('Scharfes Auge: Erreicht ab 25 Anmerkungen (gesperrt)'),
+      screen.getByLabelText('Scharfes Auge: Erreicht ab 25 Anmerkungen (noch nicht erreicht)'),
     ).toBeInTheDocument();
   });
 

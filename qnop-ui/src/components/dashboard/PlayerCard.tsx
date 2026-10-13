@@ -25,17 +25,19 @@ import Skeleton from '@mui/material/Skeleton';
 import Stack from '@mui/material/Stack';
 import Typography from '@mui/material/Typography';
 import { Medal } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router';
 import { useUserProfile } from '../../api/hooks/useUsers';
 import { AchievementRow } from '../profile/AchievementRow';
 import { publicProfileAchievements } from '../profile/profileModel';
 import { SectionCard } from '../admin/layout/SectionCard';
 
-const STAT_LABELS = [
-  ['reviewsOwned', 'Owned'],
-  ['reviewsParticipating', 'Reviewing'],
-  ['annotationsRaised', 'Raised'],
-  ['annotationsResolved', 'Resolved'],
+/** The four contribution numbers, each labelled by its `dashboard` catalog key. */
+const STAT_KEYS = [
+  'reviewsOwned',
+  'reviewsParticipating',
+  'annotationsRaised',
+  'annotationsResolved',
 ] as const;
 
 /**
@@ -46,6 +48,7 @@ const STAT_LABELS = [
  * the public profile shows (ADR-0038).
  */
 export function PlayerCard({ userId }: { userId: string }) {
+  const { t } = useTranslation('dashboard');
   const navigate = useNavigate();
   const profileQuery = useUserProfile(userId);
   const profile = profileQuery.data;
@@ -54,11 +57,11 @@ export function PlayerCard({ userId }: { userId: string }) {
   return (
     <SectionCard
       icon={Medal}
-      title="Your reviewer card"
-      description="What your profile shows the workspace."
+      title={t('playerCard.title')}
+      description={t('playerCard.description')}
       action={
         <Button size="small" onClick={() => navigate(`/users/${profile?.slug ?? userId}`)}>
-          View profile
+          {t('playerCard.viewProfile')}
         </Button>
       }
     >
@@ -77,7 +80,7 @@ export function PlayerCard({ userId }: { userId: string }) {
               textAlign: 'center',
             }}
           >
-            {STAT_LABELS.map(([key, label]) => (
+            {STAT_KEYS.map((key) => (
               <Box key={key}>
                 <Typography sx={{ fontWeight: 700, fontSize: 26, lineHeight: 1.2 }}>
                   {stats[key]}
@@ -91,7 +94,7 @@ export function PlayerCard({ userId }: { userId: string }) {
                     fontWeight: 600,
                   }}
                 >
-                  {label}
+                  {t(`playerCard.stats.${key}`)}
                 </Typography>
               </Box>
             ))}
@@ -100,7 +103,7 @@ export function PlayerCard({ userId }: { userId: string }) {
         </Stack>
       ) : (
         <Typography color="text.secondary" sx={{ fontSize: 13.5 }}>
-          Your profile stats are unavailable right now.
+          {t('playerCard.unavailable')}
         </Typography>
       )}
     </SectionCard>

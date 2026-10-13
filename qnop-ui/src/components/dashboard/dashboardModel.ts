@@ -19,16 +19,23 @@
  * SPDX-License-Identifier: AGPL-3.0-only
  */
 
+import type { ParseKeys } from 'i18next';
 import type { DocumentSummary } from '../../api/generated';
 import { isOpenWorkflowState } from '../reviews/workflowMeta';
 import { roleOf } from '../reviews/list/reviewListModel';
 
 const DAY_MS = 86_400_000;
 
+/** A key in the `dashboard` catalog (issue #836) — the model names text, the view translates it. */
+export type DashboardKey = ParseKeys<'dashboard'>;
+
 /** The dashboard's shared urgency language (prototype: overdue / today / soon). */
 export interface DueUrgency {
   level: 'overdue' | 'today' | 'soon' | 'later';
-  label: string;
+  /** Catalog key of the label; plural keys take {@link count}. */
+  labelKey: DashboardKey;
+  /** The day count for the overdue / days-left labels. */
+  count?: number;
 }
 
 /**
@@ -41,12 +48,11 @@ export function dueUrgency(dueAt: string, now: Date = new Date()): DueUrgency {
     new Date(date.getFullYear(), date.getMonth(), date.getDate()).getTime();
   const diffDays = Math.round((startOfDay(new Date(dueAt)) - startOfDay(now)) / DAY_MS);
   if (diffDays < 0) {
-    const days = -diffDays;
-    return { level: 'overdue', label: `Overdue by ${days} ${days === 1 ? 'day' : 'days'}` };
+    return { level: 'overdue', labelKey: 'due.overdue', count: -diffDays };
   }
-  if (diffDays === 0) return { level: 'today', label: 'Due today' };
-  if (diffDays === 1) return { level: 'soon', label: 'Due tomorrow' };
-  return { level: diffDays <= 3 ? 'soon' : 'later', label: `${diffDays} days left` };
+  if (diffDays === 0) return { level: 'today', labelKey: 'due.today' };
+  if (diffDays === 1) return { level: 'soon', labelKey: 'due.tomorrow' };
+  return { level: diffDays <= 3 ? 'soon' : 'later', labelKey: 'due.daysLeft', count: diffDays };
 }
 
 /** By due-date urgency first (missing dates last), then most recently updated. */
@@ -98,29 +104,37 @@ export function readyToFinalize(review: DocumentSummary): boolean {
   );
 }
 
-/** The activity feed's verb phrase per audit event type (issue #454). */
-export function activityPhrase(type: string): string {
+/** What an activity-feed entry did — each surface phrases it from its own catalog. */
+export type ActivityKind =
+  | 'annotationCreated'
+  | 'annotationResolved'
+  | 'annotationReopened'
+  | 'workflowTransition'
+  | 'dueDateChanged'
+  | 'other';
+
+/** The activity feed's kind per audit event type (issue #454). */
+export function activityKind(type: string): ActivityKind {
   switch (type) {
     case 'annotation.created':
-      return 'opened an annotation in';
+      return 'annotationCreated';
     case 'annotation.resolved':
-      return 'resolved an annotation in';
+      return 'annotationResolved';
     case 'annotation.reopened':
-      return 'reopened an annotation in';
+      return 'annotationReopened';
     case 'workflow.transition':
-      return 'changed the state of';
+      return 'workflowTransition';
     case 'document.due_date.changed':
-      return 'changed the due date of';
+      return 'dueDateChanged';
     default:
-      return 'updated';
+      return 'other';
   }
 }
 
-/** The prototype's time-of-day greeting. */
-export function greeting(hour: number): string {
-  if (hour < 11) return 'Good morning';
-  if (hour < 18) return 'Good afternoon';
-  return 'Good evening';
+/** The prototype's time-of-day greeting, as its catalog key. */
+export function greetingKey(hour: number, named: boolean): DashboardKey {
+  const part = hour < 11 ? 'morning' : hour < 18 ? 'afternoon' : 'evening';
+  return named ? `greeting.${part}.named` : `greeting.${part}.plain`;
 }
 
 /** The greeting's small companion — one emoji, matched to the hour. */

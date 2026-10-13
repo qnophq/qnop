@@ -30,6 +30,7 @@ import Tooltip from '@mui/material/Tooltip';
 import Typography from '@mui/material/Typography';
 import type { SxProps, Theme } from '@mui/material/styles';
 import { alpha, useTheme } from '@mui/material/styles';
+import { useTranslation } from 'react-i18next';
 import { Link as RouterLink } from 'react-router';
 import { CalendarDays, Crown, Users } from 'lucide-react';
 import type { PublicUserProfile } from '../../api/generated';
@@ -44,12 +45,15 @@ const SHOW_DELAY_MS = 320;
 const CARD_WIDTH = 296;
 const AVATAR_SIZE = 44;
 
-/** The compact scoreboard slice — the same numbers language as `/users/:slug`. */
-const STAT_CELLS: { key: keyof PublicUserProfile['stats']; label: string }[] = [
-  { key: 'reviewsOwned', label: 'Reviews' },
-  { key: 'annotationsRaised', label: 'Annotations' },
-  { key: 'commentsWritten', label: 'Comments' },
-];
+/**
+ * The compact scoreboard slice — the same numbers language as `/users/:slug`; each
+ * cell is labelled by `people.stats.<key>` in the `teams` catalog.
+ */
+const STAT_CELLS = [
+  'reviewsOwned',
+  'annotationsRaised',
+  'commentsWritten',
+] as const satisfies readonly (keyof PublicUserProfile['stats'])[];
 
 interface UserHoverCardProps {
   /**
@@ -127,6 +131,7 @@ interface TriggerFrameProps {
 
 /** The hoverable trigger shell — a profile link when `to` is set, else a span. */
 function TriggerFrame({ children, to, profileName, sx, ...events }: TriggerFrameProps) {
+  const { t } = useTranslation('teams');
   return (
     <Box
       component={to ? RouterLink : 'span'}
@@ -139,7 +144,9 @@ function TriggerFrame({ children, to, profileName, sx, ...events }: TriggerFrame
             // Always named: the trigger is often a bare avatar with an empty
             // `alt`, which leaves a focusable link with no accessible name
             // when the profile name is unknown (issue #460).
-            'aria-label': profileName ? `View ${profileName}'s profile` : 'View profile',
+            'aria-label': profileName
+              ? t('people.viewProfile', { name: profileName })
+              : t('people.viewProfilePlain'),
           }
         : {})}
       sx={{
@@ -255,6 +262,7 @@ function HoverCardPopover({
   anchorEl: HTMLElement;
   open: boolean;
 }) {
+  const { t } = useTranslation('teams');
   const { formatMonthYear } = useFormatters();
   const theme = useTheme();
   // Mounting IS the hover: the cache warms during the intent delay.
@@ -327,7 +335,7 @@ function HoverCardPopover({
                   >
                     <CalendarDays size={11} aria-hidden />
                     <Typography variant="caption" noWrap>
-                      Member since {formatMonthYear(profile.createdAt)}
+                      {t('people.memberSince', { date: formatMonthYear(profile.createdAt) })}
                     </Typography>
                   </Stack>
                 </Box>
@@ -395,7 +403,7 @@ function HoverCardPopover({
                   '& > *': { flex: 1, minWidth: 0 },
                 }}
               >
-                {STAT_CELLS.map(({ key, label }) => {
+                {STAT_CELLS.map((key) => {
                   const value = profile.stats[key];
                   return (
                     <Box key={key}>
@@ -411,7 +419,7 @@ function HoverCardPopover({
                         {value}
                       </Typography>
                       <Typography variant="caption" color="text.secondary" noWrap component="p">
-                        {label}
+                        {t(`people.stats.${key}`)}
                       </Typography>
                     </Box>
                   );

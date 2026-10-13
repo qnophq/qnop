@@ -20,6 +20,7 @@
  */
 
 import { describe, expect, it } from 'vitest';
+import i18n from '../i18n';
 import {
   AUDIT_EVENT_TYPES,
   auditEventMeta,
@@ -27,12 +28,14 @@ import {
   humanizeWorkflowState,
 } from './auditEvents';
 
+const english = i18n.getFixedT('en', 'audit');
+
 describe('auditEventMeta', () => {
-  it('returns a label, description and tone for every known event type', () => {
+  it('returns a translated label, description and tone for every known event type', () => {
     for (const type of AUDIT_EVENT_TYPES) {
       const meta = auditEventMeta(type);
-      expect(meta.label.length).toBeGreaterThan(0);
-      expect(meta.description.length).toBeGreaterThan(0);
+      expect(english(meta.labelKey, { type })).not.toBe(meta.labelKey);
+      expect(english(meta.descriptionKey, { type })).not.toBe(meta.descriptionKey);
       expect(meta.tone).toBeDefined();
     }
   });
@@ -62,8 +65,8 @@ describe('auditEventMeta', () => {
         'scheduler.job.updated',
       ]),
     );
-    expect(auditEventMeta('scheduler.job.run').label).toBe('Scheduler job run');
-    expect(auditEventMeta('scheduler.job.updated').label).toBe('Scheduler job updated');
+    expect(auditEventMeta('scheduler.job.run').labelKey).toBe('events.schedulerJobRun.label');
+    expect(english(auditEventMeta('scheduler.job.updated').labelKey)).toBe('Scheduler job updated');
   });
 
   it('knows the review lifecycle, and flags the irreversible purge in red', () => {
@@ -77,20 +80,24 @@ describe('auditEventMeta', () => {
 
   it('falls back to the raw type and a neutral tone for an unknown event', () => {
     const meta = auditEventMeta('some.future.event');
-    expect(meta.label).toBe('some.future.event');
+    expect(meta.labelKey).toBe('events.fallback.label');
+    expect(english(meta.labelKey, { type: 'some.future.event' })).toBe('some.future.event');
     expect(meta.tone).toBe('neutral');
-    expect(meta.description).toBe('A recorded review event.');
+    expect(english(meta.descriptionKey)).toBe('A recorded review event.');
   });
 });
 
 describe('humanizeWorkflowState', () => {
-  it('maps known states to readable labels', () => {
-    expect(humanizeWorkflowState('IN_REVIEW')).toBe('In review');
-    expect(humanizeWorkflowState('CHANGES_REQUESTED')).toBe('Changes requested');
+  it('maps known states to their catalog labels', () => {
+    expect(humanizeWorkflowState('IN_REVIEW')).toEqual({ key: 'workflowStates.IN_REVIEW' });
+    expect(english('workflowStates.CHANGES_REQUESTED')).toBe('Changes requested');
   });
 
   it('passes an unknown (enterprise) state through unchanged', () => {
-    expect(humanizeWorkflowState('CUSTOM_STATE')).toBe('CUSTOM_STATE');
+    expect(humanizeWorkflowState('CUSTOM_STATE')).toEqual({
+      key: 'detail.raw',
+      values: { text: 'CUSTOM_STATE' },
+    });
   });
 });
 

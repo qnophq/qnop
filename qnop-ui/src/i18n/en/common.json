@@ -76,7 +76,26 @@
     }
   },
   "search": {
-    "clear": "Clear search"
+    "clear": "Clear search",
+    "title": "Search",
+    "description": "Reviews, people and teams across your workspace — scoped to what you may see.",
+    "placeholder": "Search reviews, people and teams…",
+    "inputLabel": "Search reviews, people and teams",
+    "tooShort_one": "Type at least {{count}} character to search.",
+    "tooShort_other": "Type at least {{count}} characters to search.",
+    "groups": {
+      "reviews": "Reviews",
+      "annotations": "Annotations",
+      "comments": "Comments",
+      "users": "People",
+      "teams": "Teams"
+    },
+    "resultsFor": "Results for “{{query}}”",
+    "resultsHint": "Every hit deep-links to its page.",
+    "searching": "Searching…",
+    "unavailable": "Search is unavailable right now.",
+    "noMatches": "No matches in this group.",
+    "inDocument": "in {{title}}"
   },
   "timezone": {
     "label": "Time zone",

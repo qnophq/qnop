@@ -32,11 +32,18 @@ import MenuItem from '@mui/material/MenuItem';
 import Stack from '@mui/material/Stack';
 import TextField from '@mui/material/TextField';
 import Typography from '@mui/material/Typography';
+import { useTranslation } from 'react-i18next';
 import type { PrincipalView, TeamRole } from '../../api/generated';
 import { usePrincipalSearch } from '../../api/hooks/useReviews';
 import { UserAvatar } from '../shell/UserAvatar';
 import { useAddMyTeamMember } from '../../api/hooks/useMyTeams';
 import { apiErrorMessage } from '../../utils/apiError';
+
+/** A partially failed batch: the first error and who could not be added. */
+interface AddError {
+  cause: unknown;
+  names: string[];
+}
 
 interface AddMyTeamMemberDialogProps {
   open: boolean;
@@ -58,12 +65,14 @@ export function AddMyTeamMemberDialog({
   existingMemberIds,
   onClose,
 }: AddMyTeamMemberDialogProps) {
+  const { t } = useTranslation('teams');
   const addMember = useAddMyTeamMember();
   const [search, setSearch] = useState('');
   const [debounced, setDebounced] = useState('');
   const [selected, setSelected] = useState<PrincipalView[]>([]);
   const [teamRole, setTeamRole] = useState<TeamRole>('MEMBER');
-  const [error, setError] = useState<string | null>(null);
+  // The cause, not its message: resolved at render, so it follows a language switch.
+  const [error, setError] = useState<AddError | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
   useEffect(() => {
@@ -94,18 +103,13 @@ export function AddMyTeamMemberDialog({
     setSelected(failed);
     const firstError = results.find((r) => r.status === 'rejected') as
       PromiseRejectedResult | undefined;
-    setError(
-      apiErrorMessage(
-        firstError?.reason,
-        `Could not add: ${failed.map((u) => u.displayName).join(', ')}.`,
-      ),
-    );
+    setError({ cause: firstError?.reason, names: failed.map((u) => u.displayName) });
   };
 
   return (
     <Dialog open={open} onClose={onClose} fullWidth maxWidth="sm">
       <Box component="form" onSubmit={onSubmit} noValidate>
-        <DialogTitle>Add members</DialogTitle>
+        <DialogTitle>{t('addMember.title')}</DialogTitle>
         <DialogContent>
           <Stack spacing={2.5} sx={{ mt: 1 }}>
             <Autocomplete
@@ -119,7 +123,7 @@ export function AddMyTeamMemberDialog({
               getOptionLabel={(u) => u.displayName}
               isOptionEqualToValue={(a, b) => a.id === b.id}
               filterOptions={(x) => x}
-              noOptionsText="No matching users"
+              noOptionsText={t('addMember.noOptions')}
               // The person, not just a string - the app-wide picker recipe
               // (avatar + name), as in the review wizard and the lead picker.
               renderOption={({ key, ...optionProps }, option) => (
@@ -134,29 +138,42 @@ export function AddMyTeamMemberDialog({
                 </Box>
               )}
               renderInput={(params) => (
-                <TextField {...params} label="Users" placeholder="Search by name" />
+                <TextField
+                  {...params}
+                  label={t('addMember.users')}
+                  placeholder={t('addMember.searchPlaceholder')}
+                />
               )}
             />
             <TextField
-              label="Team role"
+              label={t('addMember.role')}
               select
               value={teamRole}
               onChange={(e) => setTeamRole(e.target.value as TeamRole)}
               fullWidth
-              helperText="Applied to everyone added in this batch."
+              helperText={t('addMember.roleHelper')}
             >
-              <MenuItem value="MEMBER">Member</MenuItem>
-              <MenuItem value="LEAD">Lead</MenuItem>
+              <MenuItem value="MEMBER">{t('addMember.roles.MEMBER')}</MenuItem>
+              <MenuItem value="LEAD">{t('addMember.roles.LEAD')}</MenuItem>
             </TextField>
-            {error && <Alert severity="error">{error}</Alert>}
+            {error && (
+              <Alert severity="error">
+                {apiErrorMessage(
+                  error.cause,
+                  t('addMember.failed', { names: error.names.join(', ') }),
+                )}
+              </Alert>
+            )}
           </Stack>
         </DialogContent>
         <DialogActions sx={{ px: 3, pb: 2.5 }}>
           <Button onClick={onClose} color="inherit">
-            Cancel
+            {t('addMember.cancel')}
           </Button>
           <Button type="submit" variant="contained" disabled={submitting || selected.length === 0}>
-            {selected.length > 1 ? `Add ${selected.length}` : 'Add'}
+            {selected.length > 1
+              ? t('addMember.submitCount', { number: selected.length })
+              : t('addMember.submit')}
           </Button>
         </DialogActions>
       </Box>

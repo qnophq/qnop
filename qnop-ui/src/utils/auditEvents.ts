@@ -19,14 +19,37 @@
  * SPDX-License-Identifier: AGPL-3.0-only
  */
 
+import type { ParseKeys } from 'i18next';
 import type { BadgeTone } from '../components/admin/ToneBadge';
 
-/** Human-facing metadata for one audit event type (issue #466). */
+/** A key in the `audit` catalog (issue #836) — the utils name text, the views translate it. */
+export type AuditKey = ParseKeys<'audit'>;
+
+/**
+ * A piece of audit text as data: a catalog key with its interpolation values (a value may
+ * itself be a phrase, e.g. a translated workflow state inside a transition), or several phrases
+ * joined by a separator. Resolved at render by `renderAuditPhrase`, so it follows a language
+ * switch.
+ */
+export type AuditPhrase =
+  | { key: AuditKey; values?: Record<string, string | number | AuditPhrase> }
+  | { join: AuditPhrase[]; separator: string };
+
+/** Verbatim text — a server value or a technical token that is not translated. */
+export function rawPhrase(text: string): AuditPhrase {
+  return { key: 'detail.raw', values: { text } };
+}
+
+/**
+ * Human-facing metadata for one audit event type (issue #466). Label and description are
+ * `audit` catalog keys; both take the raw event type as `type`, which only the fallback for an
+ * unknown event shows.
+ */
 export interface AuditEventMeta {
   /** A short, plain-language name shown in place of the dotted machine type. */
-  label: string;
+  labelKey: AuditKey;
   /** One sentence explaining what the event means, for the tooltip and the legend. */
-  description: string;
+  descriptionKey: AuditKey;
   /** The semantic colour tone — grouped by domain so a scan reads at a glance. */
   tone: BadgeTone;
 }
@@ -45,114 +68,103 @@ export interface AuditEventMeta {
  */
 export const AUDIT_EVENT_META: Record<string, AuditEventMeta> = {
   'annotation.created': {
-    label: 'Annotation opened',
-    description: 'A reviewer raised a new annotation — a comment or issue — on the document.',
+    labelKey: 'events.annotationCreated.label',
+    descriptionKey: 'events.annotationCreated.description',
     tone: 'blue',
   },
   'annotation.resolved': {
-    label: 'Annotation resolved',
-    description: 'An annotation was marked resolved: the point it raised was addressed.',
+    labelKey: 'events.annotationResolved.label',
+    descriptionKey: 'events.annotationResolved.description',
     tone: 'green',
   },
   'annotation.reopened': {
-    label: 'Annotation reopened',
-    description: 'A previously settled annotation was reopened because it needed more work.',
+    labelKey: 'events.annotationReopened.label',
+    descriptionKey: 'events.annotationReopened.description',
     tone: 'amber',
   },
   'annotation.dismissed': {
-    label: 'Annotation dismissed',
-    description:
-      'The review owner or an admin dismissed an open annotation with a mandatory justification (issue #408); the author may reopen it.',
+    labelKey: 'events.annotationDismissed.label',
+    descriptionKey: 'events.annotationDismissed.description',
     tone: 'amber',
   },
   'annotation.classified': {
-    label: 'Annotation classified',
-    description: 'An annotation was categorised — its type and/or priority were set.',
+    labelKey: 'events.annotationClassified.label',
+    descriptionKey: 'events.annotationClassified.description',
     tone: 'blue',
   },
   'placement.confirmed': {
-    label: 'Placement confirmed',
-    description: "An annotation's position on the page was confirmed on a document version.",
+    labelKey: 'events.placementConfirmed.label',
+    descriptionKey: 'events.placementConfirmed.description',
     tone: 'green',
   },
   'placement.reattached': {
-    label: 'Placement re-attached',
-    description:
-      'An annotation was re-anchored to a new spot — e.g. after a new version shifted the text.',
+    labelKey: 'events.placementReattached.label',
+    descriptionKey: 'events.placementReattached.description',
     tone: 'amber',
   },
   'annotation.auto_closed': {
-    label: 'Annotation auto-closed',
-    description:
-      'A terminal review transition (cancelled/finalized) closed a still-open annotation automatically (issue #568).',
+    labelKey: 'events.annotationAutoClosed.label',
+    descriptionKey: 'events.annotationAutoClosed.description',
     tone: 'amber',
   },
   'placement.repositioned': {
-    label: 'Placement re-positioned',
-    description:
-      'A healthy annotation was deliberately moved to a different passage (free re-attach, issue #562).',
+    labelKey: 'events.placementRepositioned.label',
+    descriptionKey: 'events.placementRepositioned.description',
     tone: 'amber',
   },
   'workflow.transition': {
-    label: 'Status changed',
-    description: 'The review moved to a new workflow status (e.g. Draft → In review).',
+    labelKey: 'events.workflowTransition.label',
+    descriptionKey: 'events.workflowTransition.description',
     tone: 'blue',
   },
   'document.due_date.changed': {
-    label: 'Due date changed',
-    description: "The review's due date was set, changed or cleared.",
+    labelKey: 'events.dueDateChanged.label',
+    descriptionKey: 'events.dueDateChanged.description',
     tone: 'neutral',
   },
   'extraction.succeeded': {
-    label: 'Text extracted',
-    description: "An uploaded version's text was extracted successfully and is ready to review.",
+    labelKey: 'events.extractionSucceeded.label',
+    descriptionKey: 'events.extractionSucceeded.description',
     tone: 'green',
   },
   'extraction.failed': {
-    label: 'Extraction failed',
-    description:
-      'Extracting the text from an uploaded version failed; the reason is shown in the details.',
+    labelKey: 'events.extractionFailed.label',
+    descriptionKey: 'events.extractionFailed.description',
     tone: 'red',
   },
   'storage.orphan.deleted': {
-    label: 'Orphaned object deleted',
-    description:
-      'An unreferenced object was deleted from storage during a consistency cleanup (issue #523); the object key is shown in the details.',
+    labelKey: 'events.storageOrphanDeleted.label',
+    descriptionKey: 'events.storageOrphanDeleted.description',
     tone: 'amber',
   },
   'scheduler.job.run': {
-    label: 'Scheduler job run',
-    description:
-      'An administrator manually triggered a scheduled maintenance job (“Run now”, issue #524); the job and its outcome are shown in the details.',
+    labelKey: 'events.schedulerJobRun.label',
+    descriptionKey: 'events.schedulerJobRun.description',
     tone: 'amber',
   },
   'settings.updated': {
-    label: 'Setting changed',
-    description:
-      'An administrator changed an application setting; the details name the setting and the values before and after. Passwords and other secrets are recorded as changed without either value.',
+    labelKey: 'events.settingsUpdated.label',
+    descriptionKey: 'events.settingsUpdated.description',
     tone: 'amber',
   },
   'scheduler.job.updated': {
-    label: 'Scheduler job updated',
-    description:
-      'An administrator changed a scheduled job’s settings — enabled or disabled it, or toggled its dry-run mode (issue #524).',
+    labelKey: 'events.schedulerJobUpdated.label',
+    descriptionKey: 'events.schedulerJobUpdated.description',
     tone: 'neutral',
   },
   'review.archived': {
-    label: 'Review archived',
-    description:
-      'A finalized or cancelled review passed the retention window (or an owner/admin archived it) and left the active lists (issue #576); the outcome it was archived from is shown in the details.',
+    labelKey: 'events.reviewArchived.label',
+    descriptionKey: 'events.reviewArchived.description',
     tone: 'neutral',
   },
   'review.unarchived': {
-    label: 'Review unarchived',
-    description: 'An owner or admin restored an archived review to the active lists (issue #576).',
+    labelKey: 'events.reviewUnarchived.label',
+    descriptionKey: 'events.reviewUnarchived.description',
     tone: 'blue',
   },
   'review.purged': {
-    label: 'Reviews purged',
-    description:
-      'Archived reviews passed the purge retention window and were deleted permanently, including storage objects no other document referenced (issue #577). This is the only surviving record of them — their own audit trail was deleted with them; the details list what went.',
+    labelKey: 'events.reviewPurged.label',
+    descriptionKey: 'events.reviewPurged.description',
     tone: 'red',
   },
 };
@@ -164,27 +176,31 @@ export const AUDIT_EVENT_TYPES = Object.keys(AUDIT_EVENT_META);
 export function auditEventMeta(eventType: string): AuditEventMeta {
   return (
     AUDIT_EVENT_META[eventType] ?? {
-      label: eventType,
-      description: 'A recorded review event.',
+      labelKey: 'events.fallback.label',
+      descriptionKey: 'events.fallback.description',
       tone: 'neutral',
     }
   );
 }
 
-const WORKFLOW_STATE_LABELS: Record<string, string> = {
-  DRAFT: 'Draft',
-  IN_REVIEW: 'In review',
-  CHANGES_REQUESTED: 'Changes requested',
-  FINALIZED: 'Finalized',
-  CANCELLED: 'Cancelled',
+const WORKFLOW_STATE_KEYS: Record<string, AuditKey> = {
+  DRAFT: 'workflowStates.DRAFT',
+  IN_REVIEW: 'workflowStates.IN_REVIEW',
+  CHANGES_REQUESTED: 'workflowStates.CHANGES_REQUESTED',
+  FINALIZED: 'workflowStates.FINALIZED',
+  CANCELLED: 'workflowStates.CANCELLED',
 };
 
-/** A workflow state as shown to a human; unknown (enterprise) states pass through. */
-export function humanizeWorkflowState(state: string): string {
-  return WORKFLOW_STATE_LABELS[state] ?? state;
+/** A workflow state as shown to a human; unknown (enterprise) states pass through verbatim. */
+export function humanizeWorkflowState(state: string): AuditPhrase {
+  const key = WORKFLOW_STATE_KEYS[state];
+  return key ? { key } : rawPhrase(state);
 }
 
-/** Turns an enum-ish token (`CHANGES_REQUESTED`, `HIGH`) into `Changes requested` / `High`. */
+/**
+ * Turns an enum-ish token (`CHANGES_REQUESTED`, `HIGH`) into `Changes requested` / `High`. A
+ * technical fallback for open-vocabulary tokens, so its output is not translated.
+ */
 export function humanizeToken(token: string): string {
   const spaced = token.replace(/_/g, ' ').toLowerCase().trim();
   return spaced ? spaced.charAt(0).toUpperCase() + spaced.slice(1) : token;
