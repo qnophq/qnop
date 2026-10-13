@@ -1,0 +1,144 @@
+{
+  "page": {
+    "title": "Profil",
+    "subtitle": "Gérez votre compte et la façon dont vous apparaissez dans qnop.",
+    "unknownName": "Inconnu"
+  },
+  "stats": {
+    "owned": "Dirigées",
+    "reviewing": "En cours de révision",
+    "completed": "Terminées"
+  },
+  "achievements": {
+    "heading": "Succès",
+    "earnedCount": "Obtenus : {{earned}} sur {{total}}",
+    "tooltip": "{{title}} — {{caption}}",
+    "ariaEarned": "{{title}} : {{caption}}",
+    "ariaLocked": "{{title}} : {{caption}} (verrouillé)",
+    "liftoff": {
+      "title": "Décollage",
+      "earned": "Révision lancée",
+      "locked": "Lancez votre première révision",
+      "lockedPublic": "Aucune révision lancée pour l’instant"
+    },
+    "crew": {
+      "title": "Membre d’équipage",
+      "earned": "A rejoint l’équipage d’une révision",
+      "locked": "Faites-vous inviter à une révision",
+      "lockedPublic": "Pas encore membre d’un équipage"
+    },
+    "closer": {
+      "title": "Mission accomplie",
+      "earned": "Révision finalisée",
+      "locked": "Menez l’une de vos révisions jusqu’à sa finalisation",
+      "earnedPublic": "Objection soulevée résolue",
+      "lockedPublic": "Aucune objection réglée pour l’instant"
+    },
+    "face": {
+      "title": "Visage connu",
+      "earned": "Vos coéquipiers vous reconnaissent",
+      "locked": "Téléversez une photo de profil"
+    },
+    "tunedIn": {
+      "title": "À l’écoute",
+      "earned": "Les e-mails de révision vous tiennent informé",
+      "locked": "Activez les notifications de révision"
+    },
+    "voice": {
+      "title": "Porte-parole",
+      "earned": "{{milestone}}+ commentaires dans les discussions",
+      "locked": "Obtenu à partir de {{milestone}} commentaires"
+    },
+    "sharpEye": {
+      "title": "Œil de lynx",
+      "earned": "{{milestone}}+ annotations créées",
+      "locked": "Obtenu à partir de {{milestone}} annotations"
+    }
+  },
+  "avatar": {
+    "heading": "Photo de profil",
+    "description": "Téléversez une photo pour que vos coéquipiers vous reconnaissent. Elle s’affiche dans toute l’application ; si vous la retirez, vos initiales s’afficheront à nouveau.",
+    "uploadAria": "Téléverser une photo de profil",
+    "dropPrompt": "Faites glisser une image ici ou <strong>parcourez</strong> vos fichiers",
+    "constraints": "PNG, JPEG ou WebP · 1 Mo maximum",
+    "remove": "Retirer la photo",
+    "invalidType": "Veuillez choisir une image PNG, JPEG ou WebP.",
+    "tooLarge": "Cette image dépasse 1 Mo.",
+    "confirmTitle": "Retirer la photo de profil",
+    "confirmMessage": "La photo de profil sera retirée et remplacée par l’avatar avec vos initiales. Vous pourrez en téléverser une nouvelle à tout moment.",
+    "confirmLabel": "Retirer"
+  },
+  "crop": {
+    "title": "Ajustez votre photo",
+    "zoom": "Zoom",
+    "hint": "Faites glisser pour repositionner, utilisez le curseur pour zoomer.",
+    "cancel": "Annuler",
+    "apply": "Utiliser la photo"
+  },
+  "notifications": {
+    "heading": "Notifications",
+    "description": "E-mails sur les révisions auxquelles vous participez — ajout en tant que réviseur, nouvelles annotations, réponses dans vos discussions, décisions et changements de statut.",
+    "cadenceLabel": "M’informer par e-mail de l’activité des révisions",
+    "mentionsNote": "Les mentions vous parviennent immédiatement dans tous les cas — quand on vous nomme personnellement, attendre a un coût.",
+    "cadence": {
+      "IMMEDIATE": {
+        "label": "En temps réel",
+        "help": "Un e-mail par événement."
+      },
+      "DAILY": {
+        "label": "Une fois par jour",
+        "help": "Un récapitulatif chaque matin, dans votre fuseau horaire. Rien n’est envoyé les jours calmes."
+      },
+      "OFF": {
+        "label": "Jamais",
+        "help": "Aucun e-mail de révision. Les notifications dans l’application ne sont pas concernées."
+      }
+    }
+  },
+  "tracking": {
+    "heading": "Mesure d’audience",
+    "description": "Comptage anonyme des pages utilisées, pour que cet espace de travail puisse être amélioré sur la base de données concrètes plutôt que de suppositions. Les adresses des pages sont d’abord réduites à leur forme — jamais un document, jamais un nom, jamais un terme de recherche. Ce choix suit votre compte sur tous les appareils depuis lesquels vous vous connectez.",
+    "toggle": "M’inclure dans la mesure d’audience anonyme"
+  },
+  "timezone": {
+    "heading": "Fuseau horaire",
+    "description": "Les dates et heures de qnop s’affichent dans ce fuseau horaire.",
+    "currentTimeIn": "Heure actuelle à {{zone}}",
+    "useDevice": "Utiliser le fuseau horaire de mon appareil ({{zone}})",
+    "followingDefault": "Suit actuellement le fuseau par défaut de l’espace de travail.",
+    "now": "maintenant"
+  },
+  "missions": {
+    "sharedCaption": "Révisions en commun",
+    "owned": {
+      "title": "Missions dirigées",
+      "empty": "{{name}} ne dirige encore aucune révision partagée avec vous."
+    },
+    "reviewing": {
+      "title": "Missions rejointes",
+      "empty": "{{name}} ne participe encore à aucune révision que vous partagez."
+    }
+  },
+  "moves": {
+    "title": "Activité récente",
+    "caption": "Dans les révisions en commun",
+    "empty": "Aucune activité récente de {{name}} dans les révisions en commun.",
+    "phrases": {
+      "annotationCreated": "A ouvert une annotation dans <review/>",
+      "annotationResolved": "A résolu une annotation dans <review/>",
+      "annotationReopened": "A rouvert une annotation dans <review/>",
+      "workflowTransition": "A changé le statut de <review/>",
+      "dueDateChanged": "A modifié l’échéance de <review/>",
+      "other": "A mis à jour <review/>"
+    }
+  },
+  "toast": {
+    "settingSaveFailed": "Le paramètre n’a pas pu être enregistré.",
+    "timezoneSaveFailed": "Le fuseau horaire n’a pas pu être enregistré.",
+    "timezoneUpdated": "Fuseau horaire mis à jour.",
+    "avatarUpdated": "Photo de profil mise à jour.",
+    "avatarUploadFailed": "La photo n’a pas pu être téléversée. Veuillez réessayer.",
+    "avatarRemoved": "Photo de profil retirée.",
+    "avatarRemoveFailed": "La photo n’a pas pu être retirée. Veuillez réessayer."
+  }
+}

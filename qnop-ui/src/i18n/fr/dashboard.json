@@ -1,0 +1,117 @@
+{
+  "greeting": {
+    "morning": {
+      "named": "Bonjour, {{name}}.",
+      "plain": "Bonjour."
+    },
+    "afternoon": {
+      "named": "Bonjour, {{name}}.",
+      "plain": "Bonjour."
+    },
+    "evening": {
+      "named": "Bonsoir, {{name}}.",
+      "plain": "Bonsoir."
+    }
+  },
+  "newReview": "Nouvelle révision",
+  "stats": {
+    "openReviews": "Révisions ouvertes",
+    "waitingOnYou": "En attente de vous",
+    "dueSoon": "Échéance proche",
+    "resolvedThisWeek": "Résolues cette semaine"
+  },
+  "continue": "Reprenez là où vous vous étiez arrêté :",
+  "waiting": {
+    "title": "En attente de vous",
+    "description": "Les révisions sur lesquelles vous êtes invité à travailler.",
+    "empty": "Rien ne vous attend — profitez du calme."
+  },
+  "mine": {
+    "title": "Mes révisions",
+    "description": "Les révisions dont vous êtes responsable, celles en cours d’abord.",
+    "emptyTitle": "Aucune révision pour l’instant",
+    "empty": "Lancez votre première révision avec « Nouvelle révision »."
+  },
+  "reviewList": {
+    "emptyTitle": "Rien ici pour l’instant",
+    "caughtUp": "Tout est à jour !",
+    "readyToFinalize": "Prête à être finalisée",
+    "resolved": "Résolues : {{resolved}}/{{total}}",
+    "noAnnotations": "Aucune annotation pour l’instant"
+  },
+  "deadlines": {
+    "title": "Échéances",
+    "description": "Les échéances de vos révisions en cours.",
+    "emptyTitle": "Aucun compte à rebours",
+    "empty": "Les échéances de vos révisions ouvertes s’affichent ici."
+  },
+  "due": {
+    "overdue_one": "En retard de {{count}} jour",
+    "overdue_many": "En retard de {{count}} jours",
+    "overdue_other": "En retard de {{count}} jours",
+    "today": "Échéance aujourd’hui",
+    "tomorrow": "Échéance demain",
+    "daysLeft_one": "{{count}} jour restant",
+    "daysLeft_many": "{{count}} jours restants",
+    "daysLeft_other": "{{count}} jours restants"
+  },
+  "replies": {
+    "title": "Réponses qui vous sont adressées",
+    "description": "Les dernières réponses dans les discussions que vous avez lancées ou rejointes.",
+    "emptyTitle": "Aucune réponse pour l’instant",
+    "empty": "Les réponses dans les discussions que vous avez lancées ou rejointes s’affichent ici.",
+    "participant": "Participant",
+    "context": "dans {{review}} · {{time}}"
+  },
+  "activity": {
+    "title": "Activité récente",
+    "description": "Ce qui s’est passé dans vos révisions.",
+    "emptyTitle": "Tout est calme",
+    "empty": "Lorsque vos coéquipiers agissent sur vos révisions, cela s’affiche ici.",
+    "someone": "Quelqu’un",
+    "phrases": {
+      "annotationCreated": "<actor/> a ouvert une annotation dans <review/>",
+      "annotationResolved": "<actor/> a résolu une annotation dans <review/>",
+      "annotationReopened": "<actor/> a rouvert une annotation dans <review/>",
+      "workflowTransition": "<actor/> a changé le statut de <review/>",
+      "dueDateChanged": "<actor/> a modifié l’échéance de <review/>",
+      "other": "<actor/> a mis à jour <review/>"
+    }
+  },
+  "playerCard": {
+    "title": "Votre carte de réviseur",
+    "description": "Ce que votre profil montre à l’espace de travail.",
+    "viewProfile": "Voir le profil",
+    "unavailable": "Les statistiques de votre profil ne sont pas disponibles pour le moment.",
+    "stats": {
+      "reviewsOwned": "Dirigées",
+      "reviewsParticipating": "En cours",
+      "annotationsRaised": "Créées",
+      "annotationsResolved": "Résolues"
+    }
+  },
+  "person": {
+    "viewProfile": "Voir le profil de {{name}}"
+  },
+  "empty": {
+    "title": "Votre centre de commande est prêt pour sa première mission.",
+    "body": "Chaque révision que vous dirigez ou rejoignez s’affiche ici — échéances, réponses à vos commentaires et les succès que vous remportez. Il ne manque plus qu’un document à se mettre sous la dent.",
+    "cta": "Lancez votre première révision",
+    "stepsTitle": "Trois étapes vers votre première révision",
+    "steps": {
+      "upload": {
+        "title": "Téléversez un document",
+        "hint": "Un PDF en entrée, une révision en sortie."
+      },
+      "invite": {
+        "title": "Invitez des réviseurs",
+        "hint": "Des personnes ou des équipes entières."
+      },
+      "discuss": {
+        "title": "Discutez et résolvez",
+        "hint": "Annotez, répondez, tranchez."
+      }
+    },
+    "scoreboardHint": "Votre tableau des scores — il commence à compter avec votre première révision."
+  }
+}

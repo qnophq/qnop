@@ -1,0 +1,115 @@
+{
+  "types": {
+    "mention": "Mention",
+    "participantAdded": "Invitation",
+    "annotationCreated": "Nouvelle annotation",
+    "annotationDecided": "Décision",
+    "commentAdded": "Réponse",
+    "versionUploaded": "Nouvelle version",
+    "workflowChanged": "Workflow",
+    "reviewDeleted": "Révision supprimée",
+    "fallback": "Notification"
+  },
+  "quoted": "« {{text}} »",
+  "unread": "Non lue",
+  "actor": {
+    "unknown": "Inconnu",
+    "viewProfile": "Voir le profil de {{name}}"
+  },
+  "illustration": "Une corbeille de réception vide qui attend sa première notification",
+  "inbox": {
+    "title": "Messages",
+    "description": "Tout ce qui s’est passé dans vos révisions — mentions, réponses, décisions et nouvelles versions.",
+    "markAllRead": "Tout marquer comme lu",
+    "filters": {
+      "all": "Tous",
+      "allCount": "Tous ({{total}})",
+      "unread": "Non lus",
+      "unreadCount": "Non lus ({{total}})",
+      "read": "Lus"
+    },
+    "columns": {
+      "what": "Événement",
+      "excerpt": "Extrait",
+      "review": "Révision",
+      "when": "Date"
+    },
+    "nothingRead": {
+      "title": "Rien de lu pour l’instant",
+      "body": "Tout ce qui se trouve dans votre boîte de réception vous attend encore."
+    },
+    "loadError": {
+      "title": "Vos messages ne sont pas arrivés jusqu’au bureau",
+      "message": "La boîte de réception n’a pas pu être chargée. C’est presque certainement la connexion, pas vos notifications — elles sont en sécurité."
+    }
+  },
+  "empty": {
+    "eyebrow": "Messages",
+    "title": "Votre boîte de réception est à l’écoute",
+    "body": "Rien n’est encore arrivé. Dès que quelqu’un vous mentionne dans un commentaire, répond à l’une de vos annotations ou fait avancer une révision, cela apparaît ici — sans passer par la messagerie.",
+    "perks": {
+      "mentions": "Les mentions qui vous citent",
+      "replies": "Les réponses dans vos discussions",
+      "decisions": "Les décisions et nouvelles versions"
+    },
+    "cta": "Accéder à vos révisions",
+    "hint": "C’est l’activité dans les révisions qui remplit cette boîte de réception."
+  },
+  "caughtUp": {
+    "title": "Boîte de réception à jour",
+    "body": "Vous avez tout lu. La nouvelle activité de vos révisions s’affichera ici dès qu’elle se produira."
+  },
+  "detail": {
+    "notFound": {
+      "title": "Ce message a déjà été classé",
+      "message": "Aucune notification ne correspond à ce lien. Elle concernait peut-être une révision qui a depuis été supprimée.",
+      "backToMessages": "Retour aux messages",
+      "toDashboard": "Accéder au tableau de bord"
+    },
+    "unavailable": "Plus disponible",
+    "context": "Contexte",
+    "from": "De",
+    "review": "Révision",
+    "received": "Reçu",
+    "openReview": "Ouvrir la révision"
+  },
+  "text": {
+    "aReview": "une révision",
+    "title": {
+      "mention": "{{actor}} vous a mentionné",
+      "participantAdded": "Vous avez été ajouté à une révision",
+      "annotationCreated": "{{actor}} a créé une annotation",
+      "annotationDecided": {
+        "resolved": "Une annotation a été résolue",
+        "reopened": "Une annotation a été rouverte",
+        "dismissed": "Une annotation a été écartée",
+        "decided": "Une décision a été prise sur une annotation"
+      },
+      "commentAdded": "{{actor}} a répondu",
+      "versionUploaded": "Nouvelle version téléversée",
+      "workflowChanged": "La révision est passée à l’état « {{state}} »",
+      "reviewDeleted": "Une révision a été supprimée",
+      "tombstone": "Une révision à laquelle vous n’avez plus accès"
+    },
+    "body": {
+      "mention": "{{actor}} vous a mentionné dans un commentaire sur « {{review}} ».",
+      "participantAdded": "{{actor}} vous a ajouté comme réviseur de « {{review}} ».",
+      "annotationCreated": "{{actor}} a créé une nouvelle annotation sur « {{review}} ».",
+      "annotationDecided": {
+        "resolved": "{{actor}} a résolu une annotation sur « {{review}} ».",
+        "reopened": "{{actor}} a rouvert une annotation sur « {{review}} ».",
+        "dismissed": "{{actor}} a écarté une annotation sur « {{review}} ».",
+        "decided": "{{actor}} a pris une décision sur une annotation de « {{review}} »."
+      },
+      "commentAdded": "{{actor}} a répondu dans une discussion sur « {{review}} ».",
+      "versionUploaded": "{{actor}} a téléversé la version {{version}} de « {{review}} ».",
+      "workflowChanged": "« {{review}} » est passée de « {{from}} » à « {{to}} ».",
+      "reviewDeleted": "« {{review}} » a été définitivement supprimée par un administrateur.",
+      "tombstone": "Cette notification concerne une révision qui ne vous est plus accessible."
+    },
+    "action": {
+      "openAnnotation": "Ouvrir l’annotation",
+      "openReview": "Ouvrir la révision"
+    }
+  }
+}

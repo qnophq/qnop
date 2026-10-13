@@ -74,3 +74,12 @@ the application-setting catalog test cover the new language automatically.
   "resuelta" / "descartada" / "reabierta"; the review owner is "Responsable", the team lead role is
   "Responsable del equipo"; upload → "subir" / "subida"; an annotation's placement → "ubicación";
   user seats and team or quota slots → "plaza".
+
+## Amendment — French (2026-10-13, issue #851)
+
+French (`fr`) is the fourth UI language. Unlike the German and Spanish catalogs, it addresses the
+user formally ("vous"): French business software does, and "tu" would read as unprofessional in an
+enterprise tool. Wording is neutral (no Québec-specific vocabulary), formatting is `fr-FR`, and the
+catalogs follow French typography — guillemets with no-break spaces, a narrow no-break space before
+`; ? !` and a no-break space before `:`. French plurals have the CLDR categories one (which includes
+0), many and other; the parity test requires all three.

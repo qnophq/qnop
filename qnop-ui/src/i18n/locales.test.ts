@@ -55,9 +55,9 @@ describe('resolveLocale', () => {
   });
 
   it('skips a step that names a language the UI does not ship', () => {
-    // `fr` is a valid preference for mail templates, but there is no French catalog.
-    expect(resolveLocale({ preferred: 'fr', applicationDefault: 'de' })).toBe('de');
-    expect(resolveLocale({ applicationDefault: 'fr', browser: ['fr-FR', 'de-DE'] })).toBe('de');
+    // `it` is a valid preference for mail templates, but there is no Italian catalog.
+    expect(resolveLocale({ preferred: 'it', applicationDefault: 'de' })).toBe('de');
+    expect(resolveLocale({ applicationDefault: 'it', browser: ['it-IT', 'de-DE'] })).toBe('de');
   });
 });
 
@@ -65,8 +65,9 @@ describe('toSupportedLocale', () => {
   it('narrows region tags and casing to the primary language', () => {
     expect(toSupportedLocale('de-AT')).toBe('de');
     expect(toSupportedLocale('es-MX')).toBe('es');
+    expect(toSupportedLocale('fr-CA')).toBe('fr');
     expect(toSupportedLocale('EN_gb')).toBe('en');
-    expect(toSupportedLocale('fr')).toBeUndefined();
+    expect(toSupportedLocale('it')).toBeUndefined();
     expect(toSupportedLocale('')).toBeUndefined();
     expect(toSupportedLocale(undefined)).toBeUndefined();
   });
@@ -87,6 +88,6 @@ describe('device locale storage', () => {
 
 describe('missing keys', () => {
   it('fall back to the English catalog for a language without a translation', () => {
-    expect(i18n.t('language.label', { lng: 'fr' })).toBe('Language');
+    expect(i18n.t('language.label', { lng: 'it' })).toBe('Language');
   });
 });

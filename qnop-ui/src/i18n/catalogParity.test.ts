@@ -62,8 +62,16 @@ describe.each(SUPPORTED_LOCALES.filter((locale) => locale !== 'en'))('%s catalog
     // a sentence with a hole in it (or loses its link).
     const english = flatten(catalog('en', namespace));
     const translated = flatten(catalog(locale, namespace));
+    // A plural form may also take the tokens of the English `_other` form: i18next always passes
+    // `count`, and a language whose "one" covers 0 (French) must show the number where English
+    // writes "One more …" without it.
+    const accepted = (key: string, text: string) => {
+      const other = english[key.replace(/_(zero|one|two|few|many)$/, '_other')];
+      return [tokensOf(text), ...(other === undefined ? [] : [tokensOf(other)])];
+    };
     const mismatches = Object.entries(english)
-      .filter(([key, text]) => key in translated && tokensOf(text) !== tokensOf(translated[key]))
+      .filter(([key]) => key in translated)
+      .filter(([key, text]) => !accepted(key, text).includes(tokensOf(translated[key])))
       .map(([key]) => key);
     expect(mismatches).toEqual([]);
   });

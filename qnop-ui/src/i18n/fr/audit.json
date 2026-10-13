@@ -1,0 +1,161 @@
+{
+  "page": {
+    "title": "Journal d’audit",
+    "description": "Chaque action enregistrée dans l’ensemble des révisions de documents — qui a fait quoi, et quand.",
+    "legendToggle": "Que signifient ces événements ?",
+    "legendTitle": "Guide des événements",
+    "loadError": "Le journal d’audit n’a pas pu être chargé."
+  },
+  "filters": {
+    "eventType": "Type d’événement",
+    "allEvents": "Tous les événements",
+    "searchDetails": "Rechercher dans les détails",
+    "clearSearch": "Effacer la recherche dans les détails",
+    "searchPlaceholder": "p. ex. une clé de stockage ou un statut de workflow",
+    "from": "Du",
+    "to": "Au",
+    "actorChip": "Auteur : {{name}}",
+    "documentChip": "Document : {{title}}"
+  },
+  "pagination": {
+    "rowsPerPage": "Événements par page",
+    "displayedRows": "{{from}}–{{to}} sur {{total}}"
+  },
+  "table": {
+    "columns": {
+      "time": "Heure",
+      "actor": "Auteur",
+      "event": "Événement",
+      "document": "Document",
+      "details": "Détails"
+    },
+    "empty": "Aucun événement d’audit trouvé.",
+    "unknownUser": "Utilisateur inconnu",
+    "filterBy": "Filtrer par {{name}}",
+    "filterBySystem": "Filtrer par Système",
+    "noDocument": "Aucun document",
+    "copy": "Copier les détails",
+    "copied": "Copié"
+  },
+  "system": {
+    "name": "Système",
+    "tooltip": "Action automatique du système — aucun auteur humain"
+  },
+  "events": {
+    "annotationCreated": {
+      "label": "Annotation ouverte",
+      "description": "Un réviseur a créé une nouvelle annotation sur le document — un commentaire ou un problème."
+    },
+    "annotationResolved": {
+      "label": "Annotation résolue",
+      "description": "Une annotation a été marquée comme résolue : le point soulevé a été traité."
+    },
+    "annotationReopened": {
+      "label": "Annotation rouverte",
+      "description": "Une annotation déjà réglée a été rouverte, car elle nécessitait encore du travail."
+    },
+    "annotationDismissed": {
+      "label": "Annotation écartée",
+      "description": "Le responsable de la révision ou un administrateur a écarté une annotation ouverte avec une justification obligatoire (issue #408) ; son auteur peut la rouvrir."
+    },
+    "annotationClassified": {
+      "label": "Annotation classée",
+      "description": "Une annotation a été classée — son type et/ou sa priorité ont été définis."
+    },
+    "placementConfirmed": {
+      "label": "Emplacement confirmé",
+      "description": "L’emplacement d’une annotation sur la page a été confirmé pour une version du document."
+    },
+    "placementReattached": {
+      "label": "Emplacement réancré",
+      "description": "Une annotation a été réancrée à un nouvel endroit — p. ex. après qu’une nouvelle version a déplacé le texte."
+    },
+    "annotationAutoClosed": {
+      "label": "Annotation fermée automatiquement",
+      "description": "Une transition finale de la révision (annulée/finalisée) a fermé automatiquement une annotation encore ouverte (issue #568)."
+    },
+    "placementRepositioned": {
+      "label": "Emplacement repositionné",
+      "description": "Une annotation correctement ancrée a été délibérément déplacée vers un autre passage (réancrage libre, issue #562)."
+    },
+    "workflowTransition": {
+      "label": "Statut modifié",
+      "description": "La révision est passée à un nouveau statut de workflow (p. ex. Brouillon → En révision)."
+    },
+    "dueDateChanged": {
+      "label": "Échéance modifiée",
+      "description": "L’échéance de la révision a été définie, modifiée ou supprimée."
+    },
+    "extractionSucceeded": {
+      "label": "Texte extrait",
+      "description": "Le texte d’une version téléversée a été extrait avec succès et est prêt à être révisé."
+    },
+    "extractionFailed": {
+      "label": "Échec de l’extraction",
+      "description": "L’extraction du texte d’une version téléversée a échoué ; la raison figure dans les détails."
+    },
+    "storageOrphanDeleted": {
+      "label": "Objet orphelin supprimé",
+      "description": "Un objet qui n’était plus référencé a été supprimé du stockage lors d’un nettoyage de cohérence (issue #523) ; la clé de l’objet figure dans les détails."
+    },
+    "schedulerJobRun": {
+      "label": "Tâche planifiée exécutée",
+      "description": "Un administrateur a déclenché manuellement une tâche de maintenance planifiée (« Exécuter maintenant », issue #524) ; la tâche et son résultat figurent dans les détails."
+    },
+    "settingsUpdated": {
+      "label": "Paramètre modifié",
+      "description": "Un administrateur a modifié un paramètre de l’application ; les détails indiquent le paramètre ainsi que les valeurs avant et après. Les mots de passe et autres secrets sont enregistrés comme modifiés, sans aucune des deux valeurs."
+    },
+    "schedulerJobUpdated": {
+      "label": "Tâche planifiée mise à jour",
+      "description": "Un administrateur a modifié les paramètres d’une tâche planifiée — il l’a activée ou désactivée, ou a basculé son mode simulation (issue #524)."
+    },
+    "reviewArchived": {
+      "label": "Révision archivée",
+      "description": "Une révision finalisée ou annulée a dépassé la durée de conservation (ou son responsable ou un administrateur l’a archivée) et a quitté les listes actives (issue #576) ; l’issue à partir de laquelle elle a été archivée figure dans les détails."
+    },
+    "reviewUnarchived": {
+      "label": "Révision restaurée",
+      "description": "Le responsable de la révision ou un administrateur a restauré une révision archivée dans les listes actives (issue #576)."
+    },
+    "reviewPurged": {
+      "label": "Révisions purgées",
+      "description": "Des révisions archivées ont dépassé la durée de conservation avant purge et ont été définitivement supprimées, y compris les objets de stockage qu’aucun autre document ne référençait (issue #577). C’est la seule trace qui en subsiste — leur propre journal d’audit a été supprimé avec elles ; les détails indiquent ce qui a été supprimé."
+    },
+    "fallback": {
+      "label": "{{type}}",
+      "description": "Un événement de révision enregistré."
+    }
+  },
+  "workflowStates": {
+    "DRAFT": "Brouillon",
+    "IN_REVIEW": "En révision",
+    "CHANGES_REQUESTED": "Modifications demandées",
+    "FINALIZED": "Finalisée",
+    "CANCELLED": "Annulée"
+  },
+  "detail": {
+    "none": "—",
+    "raw": "{{text}}",
+    "change": "{{from}} → {{to}}",
+    "classified": "Classée comme {{parts}}",
+    "priority": "Priorité {{priority}}",
+    "reason": "Motif : {{reason}}",
+    "onVersion": "Sur la version {{version}}",
+    "object": "Objet {{objectKey}}",
+    "was": "Auparavant : {{state}}",
+    "dueDate": {
+      "set": "Définie au {{date}}",
+      "cleared": "Supprimée (auparavant : {{date}})"
+    },
+    "purge": {
+      "reviews_one": "{{count}} révision",
+      "reviews_many": "{{count}} révisions",
+      "reviews_other": "{{count}} révisions",
+      "storageObjects_one": "{{count}} objet de stockage",
+      "storageObjects_many": "{{count}} objets de stockage",
+      "storageObjects_other": "{{count}} objets de stockage",
+      "more": "{{titles}} et {{remaining}} de plus"
+    }
+  }
+}

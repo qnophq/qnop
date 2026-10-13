@@ -1,0 +1,202 @@
+{
+  "people": {
+    "viewProfile": "Voir le profil de {{name}}",
+    "viewProfilePlain": "Voir le profil",
+    "memberSince": "Membre depuis le {{date}}",
+    "teamSince": "Équipe depuis le {{date}}",
+    "memberCount_one": "{{count}} membre",
+    "memberCount_many": "{{count}} membres",
+    "memberCount_other": "{{count}} membres",
+    "stats": {
+      "reviewsOwned": "Révisions",
+      "annotationsRaised": "Annotations",
+      "commentsWritten": "Commentaires"
+    }
+  },
+  "userProfile": {
+    "notFound": {
+      "title": "Cette carte de joueur est partie se promener",
+      "message": "Aucun profil ne correspond à cette adresse — le lien est peut-être obsolète. Le reste de l’effectif est toujours là où vous l’avez laissé."
+    },
+    "leads": "Responsable de {{team}}",
+    "memberOf": "Membre de {{team}}",
+    "stats": {
+      "reviewsOwned": "Révisions dirigées",
+      "reviewsParticipating": "En cours de révision",
+      "annotationsRaised": "Annotations créées",
+      "annotationsResolved": "Résolues",
+      "commentsWritten": "Commentaires"
+    }
+  },
+  "teamProfile": {
+    "notFound": {
+      "title": "Cette équipe a remballé son blason",
+      "message": "Aucune équipe ne correspond à cette adresse — le lien est peut-être obsolète, ou l’équipe a tourné la page. Le quartier général de la guilde vous attend sur le tableau de bord.",
+      "myTeams": "Mes équipes"
+    },
+    "yourTeam": "Votre équipe",
+    "stats": {
+      "members": "Membres",
+      "activeReviews": "Révisions actives",
+      "completed": "Terminées"
+    },
+    "roster": {
+      "title": "Effectif",
+      "private": "Cette équipe garde la liste de ses membres privée.",
+      "empty": "Aucun membre pour l’instant.",
+      "lead": "Responsable d’équipe"
+    },
+    "reviews": {
+      "title": "Missions de révision",
+      "private": "Cette équipe garde son activité de révision privée.",
+      "empty": "Aucune révision visible — la liste n’affiche que les révisions auxquelles vous avez accès."
+    }
+  },
+  "myTeams": {
+    "title": "Mes équipes",
+    "description": "Les équipes dont vous faites partie — gérez celles dont vous êtes responsable et consultez les membres des autres.",
+    "loadError": "Vos équipes n’ont pas pu être chargées.",
+    "sections": {
+      "led_one": "Équipe dont vous êtes responsable",
+      "led_many": "Équipes dont vous êtes responsable",
+      "led_other": "Équipes dont vous êtes responsable",
+      "member_one": "Équipe dont vous êtes membre",
+      "member_many": "Équipes dont vous êtes membre",
+      "member_other": "Équipes dont vous êtes membre"
+    },
+    "hero": {
+      "eyebrow": "Quartier général",
+      "summary": "Vous dirigez {{teams}} · {{teammates}} au total",
+      "teams_one": "{{count}} équipe",
+      "teams_many": "{{count}} équipes",
+      "teams_other": "{{count}} équipes",
+      "teammates_one": "{{count}} coéquipier",
+      "teammates_many": "{{count}} coéquipiers",
+      "teammates_other": "{{count}} coéquipiers",
+      "stats": {
+        "teamsLed": "Équipes dirigées",
+        "teammates": "Coéquipiers",
+        "largestTeam": "Plus grande équipe"
+      }
+    },
+    "ranks": {
+      "programLead": "Responsable de programme",
+      "multiTeamLead": "Responsable multi-équipes",
+      "teamLead": "Responsable d’équipe",
+      "member": "Membre"
+    },
+    "tiers": {
+      "solo": "Solo",
+      "squad": "Escouade",
+      "crew": "Équipage",
+      "guild": "Guilde",
+      "chapter": "Chapitre"
+    },
+    "achievements": {
+      "unlocked": "Débloqué · {{hint}}",
+      "locked": "Verrouillé · {{hint}}",
+      "firstTeam": {
+        "label": "Première équipe",
+        "hint": "Dirigez votre première équipe"
+      },
+      "multiTeam": {
+        "label": "Responsable multi-équipes",
+        "hint": "Dirigez au moins deux équipes"
+      },
+      "teamBuilder": {
+        "label": "Bâtisseur d’équipe",
+        "hint": "Faites grandir une équipe jusqu’à {{size}} membres"
+      },
+      "bigRoster": {
+        "label": "Grand effectif",
+        "hint": "Faites grandir une équipe jusqu’à {{size}} membres"
+      },
+      "fullHouse": {
+        "label": "Salle comble",
+        "hint": "Dirigez {{size}} coéquipiers au total"
+      }
+    },
+    "card": {
+      "manageAria": "Gérer {{name}}",
+      "viewAria": "Voir {{name}}",
+      "toNextTier": "Encore {{remaining}} avant {{tier}}",
+      "topTier": "Niveau maximal",
+      "tierProgress": "Progression du niveau {{tier}}",
+      "manageMembers": "Gérer les membres",
+      "viewMembers": "Voir les membres"
+    },
+    "empty": {
+      "eyebrow": "Équipes",
+      "title": "Votre place vous attend",
+      "body": "Les équipes permettent aux réviseurs d’unir leurs forces — partager la charge de travail, se tenir mutuellement informés et gravir les échelons. Vous ne faites encore partie d’aucune équipe.",
+      "perks": {
+        "collaborate": "Collaborez sur les révisions",
+        "share": "Partagez la charge de travail",
+        "rise": "Gravissez les échelons"
+      },
+      "hint": "Un responsable d’équipe ou un administrateur peut vous ajouter — vos équipes apparaîtront ici dès que ce sera fait.",
+      "illustration": "Une place libre qui attend dans une équipe"
+    }
+  },
+  "teamDetail": {
+    "loadError": "Cette équipe n’a pas pu être chargée, ou vous n’en êtes pas membre. <back>Retour à mes équipes</back>",
+    "publicProfile": "Profil public",
+    "editTeam": "Modifier l’équipe",
+    "addMember": "Ajouter un membre",
+    "columns": {
+      "member": "Membre",
+      "role": "Rôle",
+      "joined": "Arrivée",
+      "actions": "Actions"
+    },
+    "emptyManage": "Aucun membre pour l’instant. Ajoutez le premier.",
+    "emptyView": "Cette équipe n’a aucun membre.",
+    "actionsFor": "Actions pour {{name}}",
+    "makeMember": "Définir comme membre",
+    "makeLead": "Définir comme responsable",
+    "removeFromTeam": "Retirer de l’équipe",
+    "remove": {
+      "title": "Retirer le membre",
+      "message": "Retirer {{name}} de cette équipe ?",
+      "confirm": "Retirer"
+    },
+    "errors": {
+      "role": "Le rôle n’a pas pu être modifié.",
+      "remove": "Le membre n’a pas pu être retiré."
+    }
+  },
+  "editTeam": {
+    "title": "Modifier l’équipe",
+    "description": "Description",
+    "descriptionHelper": "Ce que cette équipe révise — affiché partout où l’équipe apparaît.",
+    "publicProfile": "Profil public",
+    "publicProfileHint": "Le nom, le blason et la description sont toujours visibles sur la page de profil de l’équipe. Choisissez ce que les non-membres peuvent voir en plus.",
+    "showMembers": "Afficher les membres",
+    "showMembersAria": "Afficher les membres sur le profil public",
+    "showReviews": "Afficher la participation aux révisions",
+    "showReviewsAria": "Afficher la participation aux révisions sur le profil public",
+    "cancel": "Annuler",
+    "save": "Enregistrer",
+    "errors": {
+      "upload": "L’image de l’équipe n’a pas pu être téléversée.",
+      "remove": "L’image de l’équipe n’a pas pu être retirée.",
+      "save": "L’équipe n’a pas pu être enregistrée."
+    }
+  },
+  "addMember": {
+    "title": "Ajouter des membres",
+    "noOptions": "Aucun utilisateur correspondant",
+    "users": "Utilisateurs",
+    "searchPlaceholder": "Rechercher par nom",
+    "role": "Rôle dans l’équipe",
+    "roleHelper": "S’applique à toutes les personnes ajoutées dans ce lot.",
+    "roles": {
+      "MEMBER": "Membre",
+      "LEAD": "Responsable d’équipe"
+    },
+    "cancel": "Annuler",
+    "submit": "Ajouter",
+    "submitCount": "Ajouter ({{number}})",
+    "failed": "Impossible d’ajouter : {{names}}."
+  }
+}
