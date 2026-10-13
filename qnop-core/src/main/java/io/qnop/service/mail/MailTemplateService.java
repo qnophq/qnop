@@ -71,6 +71,10 @@ public class MailTemplateService {
   private final EmailLayoutBuilder layoutBuilder;
   private final FeatureToggleProperties features;
   private final MailTemplateDefaults defaults;
+
+  /** The demo expiry of the preview's {@code expiresAtHuman}, as in the English demo value. */
+  private static final int SAMPLE_EXPIRY_MINUTES = 30;
+
   private final Mustache.Compiler plainCompiler = Mustache.compiler().escapeHTML(false);
   private final Mustache.Compiler htmlCompiler = Mustache.compiler().escapeHTML(true);
 
@@ -192,7 +196,7 @@ public class MailTemplateService {
    */
   public MailPreview preview(
       MailTemplateKey key, String locale, Map<String, Object> overrides, MailTemplateDraft draft) {
-    Map<String, String> sampleVars = effectiveSampleVars(key, overrides);
+    Map<String, String> sampleVars = effectiveSampleVars(key, locale, overrides);
     RenderedMail rendered;
     if (draft == null) {
       validateEffectivePlaceholders(key, locale);
@@ -215,10 +219,22 @@ public class MailTemplateService {
   /** Unsaved editor content rendered in place of the stored version for a live preview (#145). */
   public record MailTemplateDraft(String subject, String bodyPlain, String bodyHtml) {}
 
-  /** The per-key demo values overlaid with caller overrides scoped to the key's placeholder set. */
+  /**
+   * The per-key demo values overlaid with caller overrides scoped to the key's placeholder set. The
+   * values a real mail gets from the server's phrase bundle — the expiry time, the decision word
+   * and the workflow states — are phrased in the preview's language, as a sender would (issue
+   * #853).
+   */
   private Map<String, String> effectiveSampleVars(
-      MailTemplateKey key, Map<String, Object> overrides) {
+      MailTemplateKey key, String locale, Map<String, Object> overrides) {
     Map<String, String> vars = key.sampleVars();
+    MailMessages messages = MailMessages.forLocale(requestedOrDefault(locale));
+    vars.computeIfPresent(
+        "expiresAtHuman",
+        (name, value) -> messages.count("time.in.minutes", SAMPLE_EXPIRY_MINUTES));
+    vars.computeIfPresent("decision", (name, value) -> messages.decision("resolved"));
+    vars.computeIfPresent("oldState", (name, value) -> messages.workflowState("IN_REVIEW"));
+    vars.computeIfPresent("newState", (name, value) -> messages.workflowState("CHANGES_REQUESTED"));
     if (overrides != null) {
       for (String placeholder : key.placeholders()) {
         Object override = overrides.get(placeholder);

@@ -645,4 +645,31 @@ class MailTemplateServiceTest {
     assertThat(it.subject()).isEqualTo("Reset your {{siteName}} password");
     assertThat(reset.get(0).instanceDefault()).isFalse();
   }
+
+  @Test
+  @DisplayName("preview demo values from the phrase bundle speak the preview's language")
+  void previewSampleValuesAreLocalized() {
+    noRows();
+
+    Map<String, String> german =
+        service.preview(MailTemplateKey.PASSWORD_RESET, "de", Map.of()).sampleVars();
+    assertThat(german).containsEntry("expiresAtHuman", "in 30 Minuten");
+    Map<String, String> workflow =
+        service.preview(MailTemplateKey.REVIEW_WORKFLOW_CHANGED, "de", Map.of()).sampleVars();
+    assertThat(workflow)
+        .containsEntry("oldState", "Im Review")
+        .containsEntry("newState", "Änderungen angefordert");
+    assertThat(
+            service.preview(MailTemplateKey.REVIEW_ANNOTATION_DECIDED, "de", Map.of()).sampleVars())
+        .containsEntry("decision", "erledigt");
+    // English keeps its former demo values exactly.
+    assertThat(service.preview(MailTemplateKey.PASSWORD_RESET, "en", Map.of()).sampleVars())
+        .containsEntry("expiresAtHuman", "in 30 minutes");
+    // An explicit override still wins.
+    assertThat(
+            service
+                .preview(MailTemplateKey.PASSWORD_RESET, "de", Map.of("expiresAtHuman", "bald"))
+                .sampleVars())
+        .containsEntry("expiresAtHuman", "bald");
+  }
 }

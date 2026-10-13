@@ -59,6 +59,8 @@ export function MailLocaleSwitcher({
       aria-label={t('mailTemplates.edit.languages')}
       sx={{
         display: 'inline-flex',
+        // Sized to its segments, also as an item of a column stack.
+        alignSelf: 'flex-start',
         flexWrap: 'wrap',
         border: '1px solid',
         borderColor: 'divider',
