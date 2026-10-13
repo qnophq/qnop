@@ -20,6 +20,7 @@
  */
 package io.qnop.service.mail;
 
+import com.samskivert.mustache.Mustache;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
@@ -52,9 +53,11 @@ import org.yaml.snakeyaml.constructor.SafeConstructor;
  * <p>Loaded once at startup and validated strictly; a bad resource fails the application start
  * rather than a mail at send time. Each file must define every template key with every field, must
  * name no unknown key or field, and may only reference placeholders from the key's closed set
- * ({@link MailPlaceholderValidator}). A template without a call to action in English must not have
- * one in a translation either. Adding a mail language is adding a file here (plus its {@code
- * mail/messages_<language>.properties}); no code changes.
+ * ({@link MailPlaceholderValidator}); every field must compile and render as Mustache with the
+ * key's demo variables. A template without a call to action in English must not have one in a
+ * translation either, and a language may be shipped only once across the classpath. Adding a mail
+ * language is adding a file here (plus its {@code mail/messages_<language>.properties}); no code
+ * changes. An add-on jar may ship one too — see {@code docs/EXTENSION-POINTS.md}.
  */
 @Component
 public class MailTemplateDefaults {
@@ -62,6 +65,12 @@ public class MailTemplateDefaults {
   static final String LOCATION_PATTERN = "classpath*:mail/templates/*.yaml";
 
   private static final Pattern LANGUAGE = Pattern.compile("^[a-z]{2}$");
+
+  /** The same strict compilers the template service renders with. */
+  private static final Mustache.Compiler PLAIN = Mustache.compiler().escapeHTML(false);
+
+  private static final Mustache.Compiler HTML = Mustache.compiler().escapeHTML(true);
+
   private static final Set<String> FIELDS =
       Set.of("subject", "bodyPlain", "bodyHtmlContent", "ctaLabel", "preheader");
 
@@ -117,15 +126,38 @@ public class MailTemplateDefaults {
     } catch (IOException e) {
       throw new IllegalStateException("Cannot list the shipped mail templates", e);
     }
+    return load(resources);
+  }
+
+  /** Builds the defaults from explicit resources — the classpath load's logic, for tests. */
+  static MailTemplateDefaults fromResources(Resource... resources) {
+    return new MailTemplateDefaults(load(resources));
+  }
+
+  /**
+   * Parses every resource. Two resources for the same language — say a second {@code de.yaml} in an
+   * add-on jar — fail the start rather than merge: which text wins would otherwise depend on
+   * classpath order. The error names both resources.
+   */
+  private static Map<String, Map<MailTemplateKey, MailTemplateContent>> load(
+      Resource... resources) {
     Map<String, Map<MailTemplateKey, MailTemplateContent>> parsed = new TreeMap<>();
+    Map<String, String> sources = new TreeMap<>();
     for (Resource resource : resources) {
       String filename = resource.getFilename();
-      if (filename == null) {
+      if (filename == null || !filename.endsWith(".yaml")) {
         continue;
       }
       String locale = filename.substring(0, filename.length() - ".yaml".length());
-      if (parsed.containsKey(locale)) {
-        throw new IllegalStateException("Mail templates for '" + locale + "' are shipped twice");
+      String previous = sources.putIfAbsent(locale, resource.getDescription());
+      if (previous != null) {
+        throw new IllegalStateException(
+            "Mail templates for '"
+                + locale
+                + "' are shipped twice: "
+                + previous
+                + " and "
+                + resource.getDescription());
       }
       try (InputStream in = resource.getInputStream()) {
         parsed.put(locale, parse(locale, new String(in.readAllBytes(), StandardCharsets.UTF_8)));
@@ -193,8 +225,26 @@ public class MailTemplateDefaults {
     if (!unknown.isEmpty()) {
       throw invalid(locale, key.key() + ": unknown placeholders " + unknown);
     }
+    compiles(locale, key, "subject", subject, PLAIN);
+    compiles(locale, key, "bodyPlain", bodyPlain, PLAIN);
+    compiles(locale, key, "bodyHtmlContent", bodyHtmlContent, HTML);
+    compiles(locale, key, "preheader", preheader, PLAIN);
     return new MailTemplateContent(
         locale, subject, bodyPlain, bodyHtmlContent, ctaLabel, preheader);
+  }
+
+  /**
+   * Compiles and renders one field with the key's demo variables, as a send would: an unbalanced
+   * section, a broken delimiter or a triple-stache outside the key's set fails here, at startup,
+   * instead of silently dropping a mail later (the placeholder check skips those tags).
+   */
+  private static void compiles(
+      String locale, MailTemplateKey key, String field, String template, Mustache.Compiler with) {
+    try {
+      with.compile(template).execute(new java.util.HashMap<String, Object>(key.sampleVars()));
+    } catch (RuntimeException e) {
+      throw invalid(locale, key.key() + ": '" + field + "' does not render: " + e.getMessage());
+    }
   }
 
   private static String required(

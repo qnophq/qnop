@@ -256,6 +256,45 @@ class ReviewNotificationServiceTest {
                     .containsEntry("newState", "Änderungen angefordert"));
   }
 
+  @Test
+  @DisplayName("every notification's mail variables cover its template's placeholders")
+  void everyIntentCoversItsTemplatesPlaceholders() {
+    // Strict Mustache drops a mail whose variables miss a placeholder — which is how the
+    // review-deleted mail silently never went out before #853. Every intent type is built
+    // here and checked against its template's closed placeholder set.
+    seedMentionedFollower();
+    UUID other = UUID.randomUUID();
+    User follower = users.findAllById(List.of()).getFirst();
+    when(users.findById(FOLLOWER_ID)).thenReturn(Optional.of(follower));
+    List<ReviewEvent> events =
+        List.of(
+            new ReviewEvent.ParticipantAdded(DOCUMENT_ID, other, FOLLOWER_ID, null),
+            new ReviewEvent.AnnotationCreated(DOCUMENT_ID, other, ANNOTATION_ID),
+            new ReviewEvent.AnnotationDecided(DOCUMENT_ID, other, ANNOTATION_ID, true),
+            new ReviewEvent.AnnotationDismissed(DOCUMENT_ID, other, ANNOTATION_ID),
+            new ReviewEvent.CommentAdded(DOCUMENT_ID, other, ANNOTATION_ID, COMMENT_ID),
+            new ReviewEvent.VersionUploaded(DOCUMENT_ID, other, 2),
+            new ReviewEvent.WorkflowChanged(DOCUMENT_ID, other, "IN_REVIEW", "FINALIZED", true),
+            new ReviewEvent.ReviewDeleted(DOCUMENT_ID, other, FOLLOWER_ID, "Contract", false));
+    java.util.Set<NotificationType> seen = java.util.EnumSet.noneOf(NotificationType.class);
+    for (ReviewEvent event : events) {
+      // Once as is, once refusing mentions so the intent ranked below a mention shows up too.
+      for (NotificationType refused : new NotificationType[] {null, NotificationType.MENTION}) {
+        RecordingSink sink = new RecordingSink();
+        sink.refuse = refused;
+        service(sink).dispatch(event);
+        for (ReviewNotificationIntent intent : sink.delivered) {
+          seen.add(intent.type());
+          assertThat(intent.mailVars().keySet())
+              .as("%s variables", intent.type())
+              .containsAll(intent.template().placeholders());
+          assertThat(intent.mailLocale()).as("%s language", intent.type()).isEqualTo("en");
+        }
+      }
+    }
+    assertThat(seen).containsExactlyInAnyOrder(NotificationType.values());
+  }
+
   // --- fixtures ------------------------------------------------------------
 
   private static final UUID DOCUMENT_ID = UUID.randomUUID();

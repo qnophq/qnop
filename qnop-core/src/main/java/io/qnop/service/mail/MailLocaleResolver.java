@@ -92,15 +92,31 @@ public class MailLocaleResolver {
   }
 
   /**
-   * The first non-blank candidate, trimmed and lower-cased, or {@link #FALLBACK_LOCALE} when every
-   * candidate is blank.
+   * The first candidate that normalizes to a language ({@link #normalize}), or {@link
+   * #FALLBACK_LOCALE} when none does.
    */
   public static String firstOf(String... candidates) {
     for (String candidate : candidates) {
-      if (candidate != null && !candidate.isBlank()) {
-        return candidate.trim().toLowerCase(Locale.ROOT);
+      String language = normalize(candidate);
+      if (language != null) {
+        return language;
       }
     }
     return FALLBACK_LOCALE;
+  }
+
+  /**
+   * The one mail-language normalisation, as the UI's {@code toSupportedLocale} does it: trimmed,
+   * reduced to the primary subtag and lower-cased — {@code de-AT}, {@code de_DE} and {@code DE} are
+   * all {@code de}. {@code null} for a blank value. Used for stored preferences, the application
+   * default and every locale the template service is handed, so a row is always stored and found
+   * under the same key.
+   */
+  public static String normalize(String locale) {
+    if (locale == null || locale.isBlank()) {
+      return null;
+    }
+    String primary = locale.trim().split("[-_]", 2)[0].trim();
+    return primary.isEmpty() ? null : primary.toLowerCase(Locale.ROOT);
   }
 }

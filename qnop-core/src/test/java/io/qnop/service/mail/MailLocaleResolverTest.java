@@ -139,4 +139,23 @@ class MailLocaleResolverTest {
     assertThat(MailLocaleResolver.firstOf(null, " DE ")).isEqualTo("de");
     assertThat(MailLocaleResolver.firstOf()).isEqualTo("en");
   }
+
+  @Test
+  @DisplayName("region tags and casing reduce to the primary language (#853 review)")
+  void regionTagsAndCasing() {
+    assertThat(MailLocaleResolver.normalize("de-AT")).isEqualTo("de");
+    assertThat(MailLocaleResolver.normalize("de_DE")).isEqualTo("de");
+    assertThat(MailLocaleResolver.normalize(" DE ")).isEqualTo("de");
+    assertThat(MailLocaleResolver.normalize("  ")).isNull();
+    assertThat(MailLocaleResolver.normalize(null)).isNull();
+
+    preferred("de-AT");
+    applicationDefault("en");
+    assertThat(resolver().forUser(USER)).isEqualTo("de");
+
+    preferred("");
+    applicationDefault("de_DE");
+    assertThat(resolver().forUser(USER)).isEqualTo("de");
+    assertThat(resolver().defaultLanguage()).isEqualTo("de");
+  }
 }

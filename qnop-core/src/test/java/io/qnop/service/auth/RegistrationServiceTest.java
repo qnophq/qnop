@@ -101,12 +101,21 @@ class RegistrationServiceTest {
     verify(userService)
         .createSelfRegistered("jane", "jane@example.com", "password1", "Jane", UserRole.AUDITOR);
     verify(verificationTokens).issue(user);
+    @SuppressWarnings("unchecked")
+    org.mockito.ArgumentCaptor<java.util.Map<String, Object>> vars =
+        org.mockito.ArgumentCaptor.forClass(java.util.Map.class);
     verify(mailService)
         .sendMailFromTemplate(
             eq(MailTemplateKey.REGISTRATION_VERIFICATION),
             eq("jane@example.com"),
-            anyMap(),
+            vars.capture(),
             eq("en"));
+    // Every placeholder the template uses is supplied (strict Mustache drops the mail otherwise),
+    // and the English expiry phrase is unchanged.
+    org.assertj.core.api.Assertions.assertThat(vars.getValue().keySet())
+        .containsAll(MailTemplateKey.REGISTRATION_VERIFICATION.placeholders());
+    org.assertj.core.api.Assertions.assertThat(vars.getValue().get("expiresAtHuman"))
+        .isEqualTo("in 1 minute");
   }
 
   @Test

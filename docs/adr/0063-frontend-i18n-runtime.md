@@ -119,9 +119,14 @@ decision is recorded here, beside the UI's.
   preference counts only if mail is shipped in that language, so one mail is never a mix of a
   fallback template and fallback phrases; the application default always counts, so an instance
   whose admins customised the templates in an unshipped default language keeps sending those.
-  A brand-new account
-  has no preference yet, so its verification mail uses the application default; the registration
-  API carries no language (a later change may send the sign-up page's language).
+  A brand-new account has no preference yet, so its verification mail uses the application
+  default; the registration API carries no language (a later change may send the sign-up page's
+  language).
+- **One normalisation.** Every language value — a stored preference, the default-language
+  setting, and the locale handed to any template-service entry point (render, preview, editor
+  view, update, reset) — is reduced to its primary subtag, trimmed and lower-cased, as the UI's
+  `toSupportedLocale` does: `de-AT`, `de_DE` and `DE` are all `de`. Rows are therefore stored and
+  found under the same key.
 - **One language per mail.** The sender resolves the language *before* it builds the template
   variables, and passes that language to the renderer, so the words around a variable and the
   variable agree. Review notifications carry it on the intent (`mailLocale`); the persisted inbox
@@ -133,14 +138,32 @@ decision is recorded here, beside the UI's.
   fragments readable for a translator, without escaped quotes. `MailTemplateDefaults` loads them
   at startup and fails the start on a bad file: an unknown or missing key or field, a placeholder
   outside the key's closed set, a call to action where English has none (or none where English
-  has one). No Liquibase seeding — released changesets stay untouched.
+  has one), a field that does not compile and render as Mustache with the key's demo variables,
+  or the same language shipped twice (the error names both resources; files are never merged).
+  The resources are loaded from `classpath*:`, so an add-on may ship a language — a resource seam,
+  catalogued in `docs/EXTENSION-POINTS.md`. No Liquibase seeding — released changesets stay
+  untouched.
 - **Resolution order** (render, preview, editor view): for the requested language, then the
   default language, then `en`, try the admin-edited `mail_template` row first and the shipped
   default second. So an admin row in the recipient's language wins, but an admin row in another
   language never beats the shipped default in the recipient's own language. English output for an
   English recipient is byte-identical to before (pinned by golden files). Where a row carries no
   HTML of its own, the branded HTML is built from the shipped default of the row's language (or
-  English where that language ships none), and the layout chrome follows that content's language.
+  English where that language ships none). The layout's chrome and its `lang` attribute follow the
+  language the mail is rendered in; a language with rows but no phrase bundle gets its own `lang`
+  with the English chrome wording.
+- **Reachable languages.** Admin rows count only in a language the resolver can choose: a shipped
+  language, or the application default. A row saved for a language that is neither shipped nor
+  the default is never used until that language ships (Spanish, French and Portuguese follow in
+  the second change) — sending it would mix admin text with English phrases.
+- **Upgrade note — customised templates.** Before this change every recipient got the rows of the
+  default language. Now an admin row in the default language no longer reaches a recipient whose
+  own language is shipped: an installation that customised its English templates (wording, a
+  legal footer, branding) sends German recipients the stock German defaults instead. This is
+  intended — the recipient's language wins — but operators who customised templates should review
+  them per language. The second change adds per-language editing to the admin template editor so
+  each language can be customised; until then a German row can be stored through the admin API
+  (`locale: de`).
 - **Server-rendered phrases.** A small `java.util.ResourceBundle` per language,
   `mail/messages[_<language>].properties` (UTF-8, English root, no fallback to the JVM's default
   locale), holds the layout's footer, CTA fallback and link hint, the relative expiry time, the

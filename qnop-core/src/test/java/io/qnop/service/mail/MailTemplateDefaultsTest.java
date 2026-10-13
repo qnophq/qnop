@@ -162,4 +162,54 @@ class MailTemplateDefaultsTest {
         .isInstanceOf(IllegalStateException.class);
     assertThatThrownBy(() -> load("de", "- a list")).hasMessageContaining("expected a mapping");
   }
+
+  @Test
+  @DisplayName("a field that does not compile as Mustache fails the load (#853 review)")
+  void brokenMustacheIsRejected() {
+    String yaml =
+        german.replace(
+            "subject: \"Setze dein {{siteName}}-Passwort zurück\"",
+            "subject: \"Setze dein {{#siteName}}-Passwort zurück\"");
+
+    assertThatThrownBy(() -> load("de", yaml))
+        .hasMessageContaining("auth.password_reset: 'subject' does not render");
+  }
+
+  @Test
+  @DisplayName("a triple-stache outside the key's set fails the load, though the checker skips it")
+  void unknownTripleStacheIsRejected() {
+    String yaml =
+        german.replace(
+            "    {{{digestBodyHtml}}}\n", "    {{{digestBodyHtml}}}\n    {{{bogusHtml}}}\n");
+
+    assertThatThrownBy(() -> load("de", yaml))
+        .hasMessageContaining("review.daily_digest: 'bodyHtmlContent' does not render");
+  }
+
+  @Test
+  @DisplayName("the same language shipped twice fails, naming both resources")
+  void duplicateLanguageNamesBothResources() {
+    assertThatThrownBy(
+            () ->
+                MailTemplateDefaults.fromResources(
+                    named("core de.yaml", german), named("add-on de.yaml", german)))
+        .isInstanceOf(IllegalStateException.class)
+        .hasMessageContaining("core de.yaml")
+        .hasMessageContaining("add-on de.yaml");
+  }
+
+  private static org.springframework.core.io.Resource named(String description, String yaml) {
+    return new org.springframework.core.io.ByteArrayResource(
+        yaml.getBytes(StandardCharsets.UTF_8), description) {
+      @Override
+      public String getFilename() {
+        return "de.yaml";
+      }
+
+      @Override
+      public String getDescription() {
+        return description;
+      }
+    };
+  }
 }

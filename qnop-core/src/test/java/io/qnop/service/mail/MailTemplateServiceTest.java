@@ -530,4 +530,56 @@ class MailTemplateServiceTest {
     assertThat(preview.rendered().subject())
         .isEqualTo("Alex Reviewer hat dich in „Q3 contract draft“ erwähnt");
   }
+
+  @Test
+  @DisplayName(
+      "every entry point normalizes the language: de-AT, de_DE and DE are de (#853 review)")
+  void entryPointsNormalizeTheLanguage() {
+    noRows();
+
+    for (String tag : new String[] {"de-AT", "de_DE", "DE", " de "}) {
+      assertThat(service.render(MailTemplateKey.PASSWORD_RESET, FLOW_VARS, tag).subject())
+          .as(tag)
+          .isEqualTo("Setze dein qnop-Passwort zurück");
+      assertThat(service.getEffective(MailTemplateKey.PASSWORD_RESET, tag).locale())
+          .as(tag)
+          .isEqualTo("de");
+      assertThat(
+              service.preview(MailTemplateKey.PASSWORD_RESET, tag, Map.of()).rendered().subject())
+          .as(tag)
+          .isEqualTo("Setze dein qnop-Passwort zurück");
+    }
+
+    when(repository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
+    MailTemplateView saved =
+        service.update(MailTemplateKey.PASSWORD_RESET, "DE-at", "Betreff", "Text", null, null);
+    assertThat(saved.locale()).isEqualTo("de");
+
+    service.reset(MailTemplateKey.PASSWORD_RESET, "de_DE");
+    verify(repository, org.mockito.Mockito.atLeastOnce())
+        .findByTemplateKeyAndLocale("auth.password_reset", "de");
+  }
+
+  @Test
+  @DisplayName("a regional default-language setting reaches the shipped language")
+  void regionalDefaultLanguage() {
+    noRows();
+    when(settings.getString(ApplicationSettingKey.GENERAL_DEFAULT_LANGUAGE)).thenReturn("de-DE");
+
+    assertThat(service.render(MailTemplateKey.PASSWORD_RESET, FLOW_VARS, null).subject())
+        .isEqualTo("Setze dein qnop-Passwort zurück");
+  }
+
+  @Test
+  @DisplayName("a row-only language gets its own lang attribute; English chrome text by fallback")
+  void rowOnlyLanguageKeepsItsLang() {
+    noRows();
+    when(settings.getString(ApplicationSettingKey.GENERAL_DEFAULT_LANGUAGE)).thenReturn("fr");
+    row(MailTemplateKey.PASSWORD_RESET, "fr", "Réinitialiser {{siteName}}");
+
+    RenderedMail mail = service.render(MailTemplateKey.PASSWORD_RESET, FLOW_VARS, null);
+
+    assertThat(mail.subject()).isEqualTo("Réinitialiser qnop");
+    assertThat(mail.bodyHtml()).contains("<html lang=\"fr\">");
+  }
 }

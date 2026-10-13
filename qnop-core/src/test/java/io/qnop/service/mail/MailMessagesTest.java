@@ -144,4 +144,28 @@ class MailMessagesTest {
     }
     return properties;
   }
+
+  /** A single quote that is not part of a doubled {@code ''} pair. */
+  private static final java.util.regex.Pattern LONE_APOSTROPHE =
+      java.util.regex.Pattern.compile("(?<!')'(?!')");
+
+  @Test
+  @DisplayName("no phrase that takes arguments has a lone apostrophe MessageFormat would swallow")
+  void noLoneApostropheInFormattedPhrases() throws IOException {
+    for (String language : new MailTemplateDefaults().locales()) {
+      String resource =
+          language.equals("en")
+              ? "mail/messages.properties"
+              : "mail/messages_" + language + ".properties";
+      Properties phrases = load(resource);
+      for (String key : phrases.stringPropertyNames()) {
+        String value = phrases.getProperty(key);
+        if (value.contains("{")) {
+          assertThat(LONE_APOSTROPHE.matcher(value).find())
+              .as("%s %s: double the apostrophe ('') in a formatted phrase", resource, key)
+              .isFalse();
+        }
+      }
+    }
+  }
 }

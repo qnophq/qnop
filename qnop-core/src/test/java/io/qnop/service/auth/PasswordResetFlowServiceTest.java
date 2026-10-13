@@ -120,6 +120,10 @@ class PasswordResetFlowServiceTest {
             vars.capture(),
             eq("de"));
     assertThat(vars.getValue()).containsEntry("expiresAtHuman", "in 24 Stunden");
+    // Every placeholder the template uses is supplied (strict Mustache drops the mail otherwise).
+    assertThat(vars.getValue().keySet())
+        .containsAll(MailTemplateKey.ADMIN_PASSWORD_RESET.placeholders())
+        .containsAll(MailTemplateKey.PASSWORD_RESET.placeholders());
   }
 
   @Test

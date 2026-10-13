@@ -132,6 +132,13 @@ Not an extension point itself, but the channel through which extensions become v
 - **Contract:** `qnop-ui/src/extensions/liveChannel.ts` — a `LiveChannelContributor.onReviewMounted(context)` fires while a review surface is mounted and returns its teardown; `context` carries `documentId`, `invalidateAnnotations()` and `invalidateComments(annotationId)`, closing over the host's query client and keys — a push becomes a normal authorized refetch without the extension importing internals. Migrates to the generic slot registry (§10) at the `qnop-ui-spi` cut.
 - **Owned by:** ADR-0062; issue #602. First consumer: qnop-ee#5.
 
+### 13. Shipped mail languages (resources, classpath)
+
+- **Contract:** a classpath resource pair per language — `mail/templates/<language>.yaml` (per `MailTemplateKey`: `subject`, `bodyPlain`, `bodyHtmlContent`, `ctaLabel`, `preheader`) and `mail/messages_<language>.properties` (the server-rendered phrases: layout footer and CTA fallback, expiry time, decision words, workflow states, actor fallbacks, digest wording). Loaded from `classpath*:`, so an add-on jar may ship a language the core does not. `<language>` is an ISO 639-1 code; English is not a resource but the `MailTemplateKey` catalog and the root `mail/messages.properties`.
+- **Wiring:** contribution beside the core languages. A shipped language becomes eligible as a recipient's mail language (`MailLocaleResolver`), and its defaults sit in the template resolution order between admin-edited rows (ADR-0063 "Localized mail").
+- **Core keeps — and fails fast:** every template file is validated at startup (`MailTemplateDefaults`): every key and field present, no unknown key or field, placeholders within the key's closed set, a call to action exactly where English has one, and every field must compile and render as Mustache. A bad file **blocks boot**, as does the same language shipped twice (core and add-on alike) — the error names both resources; there is no merging, because which text wins would otherwise depend on classpath order. An add-on that wants to change core wording ships no file; admins edit the template rows instead.
+- **Owned by:** ADR-0063 (amendment "Localized mail"); issue #853.
+
 
 ---
 
