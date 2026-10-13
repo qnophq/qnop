@@ -24,6 +24,7 @@ import io.qnop.api.v1.model.ErrorResponse;
 import io.qnop.api.v1.model.FieldError;
 import io.qnop.service.limits.FeatureDisabledException;
 import io.qnop.service.limits.InstanceLimitExceededException;
+import jakarta.validation.ConstraintViolation;
 import jakarta.validation.ConstraintViolationException;
 import jakarta.validation.Path;
 import java.time.OffsetDateTime;
@@ -54,12 +55,14 @@ public class ApiExceptionHandler {
         ex.getBindingResult().getFieldErrors().stream()
             .map(
                 error ->
-                    new FieldError()
-                        .field(error.getField())
-                        .message(
-                            error.getDefaultMessage() != null
-                                ? error.getDefaultMessage()
-                                : "is invalid"))
+                    ConstraintFieldErrors.withReason(
+                        new FieldError()
+                            .field(error.getField())
+                            .message(
+                                error.getDefaultMessage() != null
+                                    ? error.getDefaultMessage()
+                                    : "is invalid"),
+                        violationOf(error)))
             .toList();
     return validationError(fieldErrors);
   }
@@ -78,14 +81,26 @@ public class ApiExceptionHandler {
         ex.getConstraintViolations().stream()
             .map(
                 violation ->
-                    new FieldError()
-                        .field(leafNode(violation.getPropertyPath()))
-                        .message(
-                            violation.getMessage() != null ? violation.getMessage() : "is invalid"))
+                    ConstraintFieldErrors.withReason(
+                        new FieldError()
+                            .field(leafNode(violation.getPropertyPath()))
+                            .message(
+                                violation.getMessage() != null
+                                    ? violation.getMessage()
+                                    : "is invalid"),
+                        violation))
             .toList();
     return fieldErrors.isEmpty()
         ? badRequest("request parameter validation failed")
         : validationError(fieldErrors);
+  }
+
+  /** The Bean Validation violation behind a binding error, or null when it has none. */
+  private static ConstraintViolation<?> violationOf(
+      org.springframework.validation.FieldError error) {
+    return error.contains(ConstraintViolation.class)
+        ? error.unwrap(ConstraintViolation.class)
+        : null;
   }
 
   /**

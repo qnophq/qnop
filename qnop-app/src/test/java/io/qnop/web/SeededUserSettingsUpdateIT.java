@@ -57,7 +57,8 @@ class SeededUserSettingsUpdateIT extends SeededIntegrationTest {
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("{\"values\":{\"does.not.exist\":\"x\"}}"))
         .andExpect(status().isBadRequest())
-        .andExpect(jsonPath("$.code").value("INVALID_SETTING"));
+        .andExpect(jsonPath("$.code").value("INVALID_SETTING"))
+        .andExpect(jsonPath("$.fieldErrors[0].code").value("UNKNOWN_SETTING"));
   }
 
   @Test
@@ -68,7 +69,10 @@ class SeededUserSettingsUpdateIT extends SeededIntegrationTest {
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("{\"values\":{\"theme\":\"purple\"}}"))
         .andExpect(status().isBadRequest())
-        .andExpect(jsonPath("$.code").value("INVALID_SETTING"));
+        .andExpect(jsonPath("$.code").value("INVALID_SETTING"))
+        .andExpect(jsonPath("$.fieldErrors[0].field").value("theme"))
+        .andExpect(jsonPath("$.fieldErrors[0].code").value("NOT_AN_OPTION"))
+        .andExpect(jsonPath("$.fieldErrors[0].params.options").isNotEmpty());
   }
 
   @Test

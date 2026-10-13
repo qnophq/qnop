@@ -20,7 +20,7 @@
  */
 
 import { isAxiosError } from 'axios';
-import type { ErrorResponse } from '../api/generated';
+import type { ErrorResponse, FieldError } from '../api/generated';
 import i18n from '../i18n';
 
 /**
@@ -65,7 +65,10 @@ export function apiErrorCode(error: unknown): string | undefined {
  * Per-field validation failures from the API's `ErrorResponse.fieldErrors`,
  * keyed by field name (e.g. `smtp.port` → "must be at most 65535"). Returns an
  * empty object when the error carries none, so a form can mark each offending
- * field from a single server response.
+ * field from a single server response. A failure with a known reason `code`
+ * (issue #836) is worded from the `common` catalog in the active language, with
+ * its `params` interpolated; an unknown or missing code shows the server's
+ * message as-is.
  */
 export function apiFieldErrors(error: unknown): Record<string, string> {
   const map: Record<string, string> = {};
@@ -74,10 +77,18 @@ export function apiFieldErrors(error: unknown): Record<string, string> {
     if (Array.isArray(fieldErrors)) {
       for (const entry of fieldErrors) {
         if (typeof entry?.field === 'string' && typeof entry?.message === 'string') {
-          map[entry.field] = entry.message;
+          map[entry.field] = fieldErrorText(entry);
         }
       }
     }
   }
   return map;
+}
+
+function fieldErrorText(entry: FieldError): string {
+  const key = `fieldErrors.${entry.code ?? ''}`;
+  if (!entry.code || !i18n.exists(key)) return entry.message;
+  // The key is dynamic (a server code), so exists() checks it instead of the key types.
+  const translate = i18n.t as (key: string, options: Record<string, string>) => string;
+  return translate(key, entry.params ?? {});
 }

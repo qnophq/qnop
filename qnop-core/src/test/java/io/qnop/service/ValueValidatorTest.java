@@ -20,9 +20,11 @@
  */
 package io.qnop.service;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
+import java.util.Map;
 import org.junit.jupiter.api.Test;
 
 /** Unit tests for {@link ValueValidator} across the setting value types. */
@@ -203,5 +205,46 @@ class ValueValidatorTest {
     assertThrows(
         SettingValidationException.class,
         () -> ValueValidator.validate(UserSettingKey.TIMEZONE, "Mars/Olympus_Mons"));
+  }
+
+  /** Each failure names its stable reason and the values the message mentions (issue #836). */
+  @Test
+  void reportsStableReasonCodesWithParams() {
+    SettingValidationException tooLarge =
+        assertThrows(
+            SettingValidationException.class,
+            () -> ValueValidator.validate(ApplicationSettingKey.SMTP_PORT, "70000"));
+    assertThat(tooLarge.getCode()).isEqualTo(FieldErrorCode.TOO_LARGE);
+    assertThat(tooLarge.getParams()).isEqualTo(Map.of("max", "65535"));
+    assertThat(tooLarge.getReason()).isEqualTo("must be at most 65535");
+
+    SettingValidationException tooSmall =
+        assertThrows(
+            SettingValidationException.class,
+            () -> ValueValidator.validate(ApplicationSettingKey.SMTP_PORT, "0"));
+    assertThat(tooSmall.getCode()).isEqualTo(FieldErrorCode.TOO_SMALL);
+    assertThat(tooSmall.getParams()).isEqualTo(Map.of("min", "1"));
+
+    SettingValidationException notAnOption =
+        assertThrows(
+            SettingValidationException.class,
+            () -> ValueValidator.validate(ApplicationSettingKey.SMTP_ENCRYPTION, "ssl"));
+    assertThat(notAnOption.getCode()).isEqualTo(FieldErrorCode.NOT_AN_OPTION);
+    assertThat(notAnOption.getParams().get("options"))
+        .isEqualTo(String.join(", ", ApplicationSettingKey.SMTP_ENCRYPTION.getEnumOptions()))
+        .doesNotContain("[");
+
+    assertThat(
+            assertThrows(
+                    SettingValidationException.class,
+                    () -> ValueValidator.validate(ApplicationSettingKey.SMTP_FROM, "nope"))
+                .getCode())
+        .isEqualTo(FieldErrorCode.INVALID_EMAIL);
+    assertThat(
+            assertThrows(
+                    SettingValidationException.class,
+                    () -> ValueValidator.validate(ApplicationSettingKey.SMTP_ENABLED, "yes"))
+                .getCode())
+        .isEqualTo(FieldErrorCode.NOT_A_BOOLEAN);
   }
 }

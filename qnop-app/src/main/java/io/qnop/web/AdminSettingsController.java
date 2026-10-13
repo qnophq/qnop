@@ -88,7 +88,13 @@ public class AdminSettingsController implements AdminSettingsApi {
   public ResponseEntity<ErrorResponse> onInvalidSettings(SettingsValidationException ex) {
     List<FieldError> fieldErrors =
         ex.getFieldErrors().stream()
-            .map(error -> new FieldError().field(error.field()).message(error.message()))
+            .map(
+                error ->
+                    new FieldError()
+                        .field(error.field())
+                        .message(error.message())
+                        .code(error.code().name())
+                        .params(error.params().isEmpty() ? null : error.params()))
             .toList();
     String message =
         fieldErrors.size() == 1
