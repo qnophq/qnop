@@ -1,0 +1,117 @@
+{
+  "greeting": {
+    "morning": {
+      "named": "Buenos días, {{name}}.",
+      "plain": "Buenos días."
+    },
+    "afternoon": {
+      "named": "Buenas tardes, {{name}}.",
+      "plain": "Buenas tardes."
+    },
+    "evening": {
+      "named": "Buenas noches, {{name}}.",
+      "plain": "Buenas noches."
+    }
+  },
+  "newReview": "Nueva revisión",
+  "stats": {
+    "openReviews": "Revisiones abiertas",
+    "waitingOnYou": "Te esperan",
+    "dueSoon": "Vencen pronto",
+    "resolvedThisWeek": "Resueltas esta semana"
+  },
+  "continue": "Sigue donde lo dejaste:",
+  "waiting": {
+    "title": "Te esperan",
+    "description": "Revisiones en las que se te pide trabajar.",
+    "empty": "Nada te espera — disfruta de la calma."
+  },
+  "mine": {
+    "title": "Mis revisiones",
+    "description": "Revisiones de las que eres responsable, primero las que están en curso.",
+    "emptyTitle": "Todavía no hay revisiones",
+    "empty": "Empieza la primera con «Nueva revisión»."
+  },
+  "reviewList": {
+    "emptyTitle": "Todavía no hay nada aquí",
+    "caughtUp": "¡Todo al día!",
+    "readyToFinalize": "Lista para finalizar",
+    "resolved": "Resueltas: {{resolved}}/{{total}}",
+    "noAnnotations": "Todavía no hay anotaciones"
+  },
+  "deadlines": {
+    "title": "Fechas límite",
+    "description": "Cuándo vencen tus revisiones en curso.",
+    "emptyTitle": "Sin relojes en marcha",
+    "empty": "Las fechas límite de tus revisiones abiertas aparecerán aquí."
+  },
+  "due": {
+    "overdue_one": "Vencida hace {{count}} día",
+    "overdue_other": "Vencida hace {{count}} días",
+    "overdue_many": "Vencida hace {{count}} días",
+    "today": "Vence hoy",
+    "tomorrow": "Vence mañana",
+    "daysLeft_one": "Queda {{count}} día",
+    "daysLeft_other": "Quedan {{count}} días",
+    "daysLeft_many": "Quedan {{count}} días"
+  },
+  "replies": {
+    "title": "Respuestas para ti",
+    "description": "Las respuestas más recientes en conversaciones que iniciaste o en las que participas.",
+    "emptyTitle": "Todavía no hay respuestas",
+    "empty": "Las respuestas en conversaciones que iniciaste o en las que participas aparecerán aquí.",
+    "participant": "Participante",
+    "context": "en {{review}} · {{time}}"
+  },
+  "activity": {
+    "title": "Actividad reciente",
+    "description": "Lo que pasó en tus revisiones.",
+    "emptyTitle": "Todo tranquilo",
+    "empty": "Cuando tu equipo actúe en tus revisiones, aparecerá aquí.",
+    "someone": "Alguien",
+    "phrases": {
+      "annotationCreated": "<actor/> abrió una anotación en <review/>",
+      "annotationResolved": "<actor/> resolvió una anotación en <review/>",
+      "annotationReopened": "<actor/> reabrió una anotación en <review/>",
+      "workflowTransition": "<actor/> cambió el estado de <review/>",
+      "dueDateChanged": "<actor/> cambió la fecha límite de <review/>",
+      "other": "<actor/> actualizó <review/>"
+    }
+  },
+  "playerCard": {
+    "title": "Tu tarjeta de revisor",
+    "description": "Lo que tu perfil muestra al espacio de trabajo.",
+    "viewProfile": "Ver perfil",
+    "unavailable": "Las estadísticas de tu perfil no están disponibles en este momento.",
+    "stats": {
+      "reviewsOwned": "Propias",
+      "reviewsParticipating": "Revisando",
+      "annotationsRaised": "Creadas",
+      "annotationsResolved": "Resueltas"
+    }
+  },
+  "person": {
+    "viewProfile": "Ver el perfil de {{name}}"
+  },
+  "empty": {
+    "title": "Tu centro de mando está listo para su primera misión.",
+    "body": "Cada revisión que diriges o en la que participas aparece aquí — fechas límite, respuestas a tus comentarios y los logros que resuelves. Solo le falta un documento.",
+    "cta": "Inicia tu primera revisión",
+    "stepsTitle": "Tres pasos hacia tu primera revisión",
+    "steps": {
+      "upload": {
+        "title": "Sube un documento",
+        "hint": "Entra un PDF, sale una revisión."
+      },
+      "invite": {
+        "title": "Invita a revisores",
+        "hint": "Personas o equipos completos."
+      },
+      "discuss": {
+        "title": "Comenta y resuelve",
+        "hint": "Anota, responde, cierra."
+      }
+    },
+    "scoreboardHint": "Tu marcador — empieza a contar con tu primera revisión."
+  }
+}

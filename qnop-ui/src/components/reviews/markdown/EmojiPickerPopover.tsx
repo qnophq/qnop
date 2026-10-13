@@ -40,6 +40,7 @@ const PICKER_HEIGHT = 420;
  */
 const PICKER_I18N: Record<Exclude<AppLocale, 'en'>, () => Promise<{ default: unknown }>> = {
   de: () => import('@emoji-mart/data/i18n/de.json'),
+  es: () => import('@emoji-mart/data/i18n/es.json'),
 };
 
 interface EmojiPickerPopoverProps {

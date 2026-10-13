@@ -20,6 +20,8 @@
  */
 
 import type { ParseKeys } from 'i18next';
+import { SUPPORTED_LOCALES } from '../../../i18n/locales';
+import { nativeLocaleName } from '../../../utils/locale';
 
 type AdminKey = ParseKeys<'admin'>;
 
@@ -43,10 +45,11 @@ const SEVERITY_OPTIONS: SelectOption[] = [
 ];
 
 export const SELECT_OPTIONS: Record<string, SelectOption[]> = {
-  'general.default_language': [
-    { value: 'en', label: 'English' },
-    { value: 'de', label: 'Deutsch' },
-  ],
+  // Every UI language, each named in itself.
+  'general.default_language': SUPPORTED_LOCALES.map((value) => ({
+    value,
+    label: nativeLocaleName(value),
+  })),
   'tracking.provider': [
     { value: 'none', labelKey: 'settings.options.trackingProvider.none' },
     { value: 'matomo', label: 'Matomo' },

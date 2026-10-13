@@ -180,7 +180,7 @@ class ValueValidatorTest {
   void enforcesLanguageFormat() {
     // Format, not a closed list: mail templates may exist for more locales than the UI ships
     // (issue #464). Blank stays valid — it means "no preference" / "follow the browser".
-    for (String valid : new String[] {"en", "de", "fr", ""}) {
+    for (String valid : new String[] {"en", "de", "es", "fr", ""}) {
       assertDoesNotThrow(
           () -> ValueValidator.validate(ApplicationSettingKey.GENERAL_DEFAULT_LANGUAGE, valid));
       assertDoesNotThrow(() -> ValueValidator.validate(UserSettingKey.PREFERRED_LANGUAGE, valid));

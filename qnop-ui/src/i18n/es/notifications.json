@@ -1,0 +1,115 @@
+{
+  "types": {
+    "mention": "Mención",
+    "participantAdded": "Invitación",
+    "annotationCreated": "Nueva anotación",
+    "annotationDecided": "Decisión",
+    "commentAdded": "Respuesta",
+    "versionUploaded": "Nueva versión",
+    "workflowChanged": "Flujo de trabajo",
+    "reviewDeleted": "Revisión eliminada",
+    "fallback": "Notificación"
+  },
+  "quoted": "«{{text}}»",
+  "unread": "Sin leer",
+  "actor": {
+    "unknown": "Desconocido",
+    "viewProfile": "Ver el perfil de {{name}}"
+  },
+  "illustration": "Una bandeja de entrada vacía esperando su primera notificación",
+  "inbox": {
+    "title": "Mensajes",
+    "description": "Todo lo que pasó en tus revisiones — menciones, respuestas, decisiones y nuevas versiones.",
+    "markAllRead": "Marcar todo como leído",
+    "filters": {
+      "all": "Todos",
+      "allCount": "Todos ({{total}})",
+      "unread": "Sin leer",
+      "unreadCount": "Sin leer ({{total}})",
+      "read": "Leídos"
+    },
+    "columns": {
+      "what": "Qué pasó",
+      "excerpt": "Extracto",
+      "review": "Revisión",
+      "when": "Cuándo"
+    },
+    "nothingRead": {
+      "title": "Todavía no has leído nada",
+      "body": "Todo lo que hay en tu bandeja de entrada sigue esperándote."
+    },
+    "loadError": {
+      "title": "Tus mensajes no llegaron al escritorio",
+      "message": "No se pudo cargar la bandeja de entrada. Casi seguro que es la conexión, no tus notificaciones — esas están a salvo."
+    }
+  },
+  "empty": {
+    "eyebrow": "Mensajes",
+    "title": "Tu bandeja de entrada está atenta",
+    "body": "Todavía no ha llegado nada. En cuanto alguien te mencione en un comentario, responda a una de tus anotaciones o haga avanzar una revisión, aparecerá aquí — sin necesidad de correo.",
+    "perks": {
+      "mentions": "Menciones con tu nombre",
+      "replies": "Respuestas en tus conversaciones",
+      "decisions": "Decisiones y nuevas versiones"
+    },
+    "cta": "Ir a tus revisiones",
+    "hint": "La actividad en una revisión es lo que llena esta bandeja de entrada."
+  },
+  "caughtUp": {
+    "title": "Bandeja al día",
+    "body": "Ya lo leíste todo. La nueva actividad en tus revisiones aparecerá aquí en cuanto ocurra."
+  },
+  "detail": {
+    "notFound": {
+      "title": "Este mensaje ya se archivó",
+      "message": "Ninguna notificación corresponde a ese enlace. Puede que fuera sobre una revisión que ya se eliminó.",
+      "backToMessages": "Volver a los mensajes",
+      "toDashboard": "Ir al panel"
+    },
+    "unavailable": "Ya no está disponible",
+    "context": "Contexto",
+    "from": "De",
+    "review": "Revisión",
+    "received": "Recibido",
+    "openReview": "Abrir revisión"
+  },
+  "text": {
+    "aReview": "una revisión",
+    "title": {
+      "mention": "{{actor}} te mencionó",
+      "participantAdded": "Te añadieron a una revisión",
+      "annotationCreated": "{{actor}} creó una anotación",
+      "annotationDecided": {
+        "resolved": "Se resolvió una anotación",
+        "reopened": "Se reabrió una anotación",
+        "dismissed": "Se descartó una anotación",
+        "decided": "Se tomó una decisión sobre una anotación"
+      },
+      "commentAdded": "{{actor}} respondió",
+      "versionUploaded": "Se subió una nueva versión",
+      "workflowChanged": "La revisión pasó a «{{state}}»",
+      "reviewDeleted": "Se eliminó una revisión",
+      "tombstone": "Una revisión a la que ya no tienes acceso"
+    },
+    "body": {
+      "mention": "{{actor}} te mencionó en un comentario de «{{review}}».",
+      "participantAdded": "{{actor}} te añadió como revisor de «{{review}}».",
+      "annotationCreated": "{{actor}} creó una nueva anotación en «{{review}}».",
+      "annotationDecided": {
+        "resolved": "{{actor}} resolvió una anotación en «{{review}}».",
+        "reopened": "{{actor}} reabrió una anotación en «{{review}}».",
+        "dismissed": "{{actor}} descartó una anotación en «{{review}}».",
+        "decided": "{{actor}} tomó una decisión sobre una anotación en «{{review}}»."
+      },
+      "commentAdded": "{{actor}} respondió en una conversación de «{{review}}».",
+      "versionUploaded": "{{actor}} subió la versión {{version}} de «{{review}}».",
+      "workflowChanged": "«{{review}}» pasó de «{{from}}» a «{{to}}».",
+      "reviewDeleted": "Un administrador eliminó «{{review}}» de forma permanente.",
+      "tombstone": "Esta notificación se refiere a una revisión que ya no está disponible para ti."
+    },
+    "action": {
+      "openAnnotation": "Abrir anotación",
+      "openReview": "Abrir revisión"
+    }
+  }
+}

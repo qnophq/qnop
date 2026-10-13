@@ -24,7 +24,7 @@
  * its code here plus a `src/i18n/<code>/` catalog folder; everything else (switchers, resolution,
  * MUI locales) derives from this list.
  */
-export const SUPPORTED_LOCALES = ['en', 'de'] as const;
+export const SUPPORTED_LOCALES = ['en', 'de', 'es'] as const;
 
 export type AppLocale = (typeof SUPPORTED_LOCALES)[number];
 
@@ -41,7 +41,7 @@ export const DEVICE_LOCALE_STORAGE_KEY = 'qnop.locale';
  * The BCP 47 tag each UI language formats with. English keeps the day-month-year `en-GB` style the
  * UI has always shown (ADR-0041 era), rather than the US month-first order.
  */
-const INTL_TAGS: Record<AppLocale, string> = { en: 'en-GB', de: 'de-DE' };
+const INTL_TAGS: Record<AppLocale, string> = { en: 'en-GB', de: 'de-DE', es: 'es-ES' };
 
 export function intlLocale(locale: AppLocale): string {
   return INTL_TAGS[locale];

@@ -68,6 +68,23 @@ describe.each(SUPPORTED_LOCALES.filter((locale) => locale !== 'en'))('%s catalog
     expect(mismatches).toEqual([]);
   });
 
+  it.each(namespaces)('%s covers every plural category of the language', (namespace) => {
+    // i18next picks the form by Intl.PluralRules; a category the catalog lacks (Spanish "many",
+    // e.g. 1 000 000) does not fall back to "other" but to the English catalog.
+    const categories = new Intl.PluralRules(locale).resolvedOptions().pluralCategories;
+    const keys = Object.keys(flatten(catalog(locale, namespace)));
+    const plural = /_(zero|one|two|few|many|other)$/;
+    const bases = new Set(
+      keys.filter((key) => plural.test(key)).map((key) => key.replace(plural, '')),
+    );
+    const missing = [...bases].flatMap((base) =>
+      categories
+        .filter((category) => !keys.includes(`${base}_${category}`))
+        .map((c) => `${base}_${c}`),
+    );
+    expect(missing).toEqual([]);
+  });
+
   it.each(namespaces)('%s has no empty strings', (namespace) => {
     const empty = Object.entries(flatten(catalog(locale, namespace))).filter(([, v]) => !v.trim());
     expect(empty).toEqual([]);

@@ -1,0 +1,80 @@
+{
+  "brand": {
+    "tagline": "Quality Notes · Soberano"
+  },
+  "nav": {
+    "landmark": "Navegación principal",
+    "groups": {
+      "administration": "Administración"
+    },
+    "items": {
+      "dashboard": "Panel",
+      "reviews": "Revisiones",
+      "myTeams": "Mis equipos",
+      "messages": "Mensajes",
+      "settings": "Configuración",
+      "configuration": "Configuración del servidor",
+      "users": "Usuarios",
+      "teams": "Equipos",
+      "branding": "Imagen de marca",
+      "oidcProviders": "Proveedores OIDC",
+      "email": "Correo electrónico",
+      "scheduler": "Planificador",
+      "storageConsistency": "Consistencia del almacenamiento",
+      "audit": "Auditoría"
+    }
+  },
+  "breadcrumbs": {
+    "landmark": "Ruta de navegación",
+    "profile": "Perfil"
+  },
+  "topBar": {
+    "menu": "Menú",
+    "toggleMenu": "Mostrar u ocultar el menú",
+    "lightMode": "Modo claro",
+    "darkMode": "Modo oscuro",
+    "switchToLight": "Cambiar al modo claro",
+    "switchToDark": "Cambiar al modo oscuro",
+    "notifications": "Notificaciones",
+    "notificationsUnreadTooltip": "Notificaciones ({{count}} sin leer)",
+    "notificationsUnreadLabel": "Notificaciones, {{count}} sin leer"
+  },
+  "notifications": {
+    "title": "Notificaciones",
+    "newCount": "Nuevas: {{count}}",
+    "markAllRead": "Marcar todo como leído",
+    "loading": "Cargando notificaciones",
+    "empty": "Nada nuevo. La actividad de tus revisiones aparecerá aquí.",
+    "seeAll": "Ver todos los mensajes"
+  },
+  "userMenu": {
+    "trigger": "Menú de usuario",
+    "unknownUser": "Desconocido",
+    "roles": {
+      "ADMIN": "Administrador",
+      "MEMBER": "Miembro",
+      "AUDITOR": "Auditor"
+    },
+    "profile": "Perfil",
+    "changePassword": "Cambiar contraseña",
+    "signOut": "Cerrar sesión"
+  },
+  "search": {
+    "placeholder": "Buscar…",
+    "inputLabel": "Buscar revisiones, personas y equipos",
+    "shortcutCtrl": "Ctrl K",
+    "resultsLabel": "Resultados de búsqueda",
+    "tooShort": "Sigue escribiendo — al menos 2 caracteres.",
+    "unavailable": "La búsqueda no está disponible en este momento.",
+    "noMatches": "No hay coincidencias para «{{query}}».",
+    "sections": {
+      "reviews": "Revisiones",
+      "annotations": "Anotaciones",
+      "comments": "Comentarios",
+      "people": "Personas",
+      "teams": "Equipos"
+    },
+    "inDocument": "en {{title}}",
+    "seeAll": "Ver todos los resultados ({{count}})"
+  }
+}
