@@ -27,12 +27,14 @@ import {
   enUS as coreEnUS,
   esES as coreEsES,
   frFR as coreFrFR,
+  ptBR as corePtBR,
 } from '@mui/material/locale';
 import {
   deDE as pickersDeDE,
   enUS as pickersEnUS,
   esES as pickersEsES,
   frFR as pickersFrFR,
+  ptBR as pickersPtBR,
 } from '@mui/x-date-pickers/locales';
 import { FALLBACK_LOCALE, type AppLocale } from '../i18n/locales';
 
@@ -42,6 +44,7 @@ const MUI_LOCALES = {
   de: { core: coreDeDE, pickers: pickersDeDE },
   es: { core: coreEsES, pickers: pickersEsES },
   fr: { core: coreFrFR, pickers: pickersFrFR },
+  pt: { core: corePtBR, pickers: pickersPtBR },
 } satisfies Record<AppLocale, { core: object; pickers: object }>;
 
 /**

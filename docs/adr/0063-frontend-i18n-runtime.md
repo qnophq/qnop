@@ -91,3 +91,18 @@ design, and a typography test pins the French spacing rules.
   responsable d’équipe (team lead), téléverser / téléversement (upload), emplacement (placement),
   repositionner (moving an annotation) vs réancrer (automatic re-anchoring across versions),
   places (seats), Configuration du serveur.
+
+## Amendment — Portuguese (2026-10-13, issue #854)
+
+Portuguese is the fifth UI language, shipped in its **Brazilian** variant under the language code
+`pt` (so `pt-BR`, `pt-PT` and plain `pt` browsers all resolve to it) with `pt-BR` formatting. The
+catalogs address the user with "você", the usual friendly-but-neutral form in Brazilian software,
+and prefer phrasings that do not gender the reader. Portuguese plurals, like French, put 0 in the
+"one" category; the parity test requires one, many and other, with `_many` mirroring `_other`.
+A count of 0 therefore reads in the singular ("0 dia"), which is correct Portuguese; the
+Portuguese test pins it. E-mails stay English until mail templates are localized (#853).
+
+- Glossary: revisão (f.), anotação, resolvida / descartada / reaberta, Responsável (review owner)
+  vs Líder da equipe (team lead), enviar / envio (upload), posição (placement), reposicionar (free
+  move) vs reassociar (choosing the passage again) vs reancorar (automatic re-anchoring across
+  versions), ponto (a concern raised), vagas (seats), Configuração do servidor.

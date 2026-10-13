@@ -1,0 +1,159 @@
+{
+  "language": {
+    "label": "Idioma",
+    "description": "O idioma em que a interface do qnop é exibida.",
+    "switcherTooltip": "Alterar idioma",
+    "followDefault": "Padrão do sistema ({{language}})",
+    "followingDefault": "Seguindo no momento o padrão do espaço de trabalho.",
+    "updated": "Idioma atualizado.",
+    "saveFailed": "Não foi possível salvar sua escolha de idioma."
+  },
+  "time": {
+    "justNow": "agora mesmo",
+    "compact": {
+      "now": "agora",
+      "minutes": "{{count}} min",
+      "hours": "{{count}} h",
+      "days": "{{count}} d"
+    },
+    "due": {
+      "today": "prazo hoje",
+      "inDays_one": "prazo em {{count}} dia",
+      "inDays_many": "prazo em {{count}} dias",
+      "inDays_other": "prazo em {{count}} dias",
+      "overdueBy_one": "{{count}} dia de atraso",
+      "overdueBy_many": "{{count}} dias de atraso",
+      "overdueBy_other": "{{count}} dias de atraso",
+      "on": "prazo em {{date}}",
+      "wasDueOn": "prazo encerrado em {{date}}"
+    }
+  },
+  "loading": "Carregando…",
+  "actions": {
+    "tryAgain": "Tentar novamente",
+    "retry": "Tentar de novo",
+    "backToDashboard": "Voltar ao painel",
+    "cancel": "Cancelar",
+    "save": "Salvar",
+    "delete": "Excluir",
+    "close": "Fechar",
+    "confirm": "Confirmar",
+    "edit": "Editar",
+    "remove": "Remover",
+    "create": "Criar",
+    "add": "Adicionar",
+    "copy": "Copiar",
+    "copied": "Copiado",
+    "reset": "Redefinir",
+    "done": "Concluído",
+    "discard": "Descartar"
+  },
+  "boundary": {
+    "title": "Algo deu errado",
+    "message": "Esta parte da página encontrou um erro inesperado. Você pode tentar novamente ou recarregar a página se isso continuar acontecendo."
+  },
+  "errors": {
+    "rateLimited": "Tentativas demais. Tente novamente mais tarde.",
+    "invalidOrExpiredLink": "A solicitação é inválida ou o link expirou.",
+    "notFound": {
+      "title": "Esta página virou um aviãozinho de papel",
+      "message": "Onde quer que tenha pousado, não foi neste endereço. Volte ao painel e retome sua missão a partir de lá.",
+      "myReviews": "Minhas revisões"
+    },
+    "forbidden": {
+      "title": "Este fichário está trancado",
+      "message": "Sua conta não tem acesso a esta área. Se sua missão passa por aqui, um administrador pode entregar a chave a você."
+    },
+    "featureUnavailable": {
+      "title": "Não faz parte desta instalação",
+      "message": "Esta instalação do qnop não oferece este recurso. Não tem nada a ver com sua conta — quem opera esta instalação decide e pode reativá-lo."
+    },
+    "conflict": {
+      "title": "Dois alfinetes caíram na mesma linha",
+      "message": "Alguém alterou isto enquanto você estava a caminho. Recarregue para ver o estado atual — nada seu foi perdido.",
+      "reload": "Recarregar esta página"
+    },
+    "serverError": {
+      "title": "Nossa fragmentadora pegou o documento errado",
+      "message": "Algo quebrou do nosso lado — não foi culpa sua. Tentar novamente costuma funcionar; se continuar acontecendo, seu administrador vai querer saber."
+    },
+    "maintenance": {
+      "title": "Saímos para almoçar — voltamos já",
+      "message": "O qnop está passando por uns ajustes. Suas revisões estão seguras no arquivo; aguarde um momento e tente novamente."
+    },
+    "rateLimit": {
+      "title": "Calma lá, campeão do carimbo",
+      "message": "Foram muitas solicitações em pouquíssimo tempo. Respire fundo — daqui a pouco tudo volta a funcionar."
+    },
+    "offline": {
+      "title": "O barbante do nosso telefone de lata arrebentou",
+      "message": "Parece que você está sem conexão. Nada foi perdido — assim que a conexão voltar, tudo continua de onde parou.",
+      "retry": "Tentar reconectar"
+    }
+  },
+  "search": {
+    "clear": "Limpar pesquisa",
+    "title": "Pesquisa",
+    "description": "Revisões, pessoas e equipes do seu espaço de trabalho — limitadas ao que você pode ver.",
+    "placeholder": "Pesquisar revisões, pessoas e equipes…",
+    "inputLabel": "Pesquisar revisões, pessoas e equipes",
+    "tooShort_one": "Digite pelo menos {{count}} caractere para pesquisar.",
+    "tooShort_many": "Digite pelo menos {{count}} caracteres para pesquisar.",
+    "tooShort_other": "Digite pelo menos {{count}} caracteres para pesquisar.",
+    "groups": {
+      "reviews": "Revisões",
+      "annotations": "Anotações",
+      "comments": "Comentários",
+      "users": "Pessoas",
+      "teams": "Equipes"
+    },
+    "resultsFor": "Resultados para “{{query}}”",
+    "resultsHint": "Cada resultado leva direto à sua página.",
+    "searching": "Pesquisando…",
+    "unavailable": "A pesquisa não está disponível no momento.",
+    "noMatches": "Nenhum resultado neste grupo.",
+    "inDocument": "em {{title}}"
+  },
+  "timezone": {
+    "label": "Fuso horário",
+    "placeholder": "Pesquise uma cidade ou região…"
+  },
+  "quota": {
+    "ceilingNote": "O limite é definido onde esta instalação é configurada, não nas configurações de administração."
+  },
+  "banner": {
+    "dismiss": "Ocultar este aviso"
+  },
+  "attachments": {
+    "title": "Anexo da revisão",
+    "saved": "Salvo",
+    "description": "Este arquivo foi anexado a uma anotação. Baixe-o para o seu dispositivo.",
+    "unavailable": "Este arquivo não está disponível. Ele pode ter sido excluído, ou a revisão pode não estar compartilhada com você.",
+    "download": "Baixar",
+    "downloadAgain": "Baixar novamente",
+    "openReview": "Abrir a revisão"
+  },
+  "fieldErrors": {
+    "REQUIRED": "é obrigatório",
+    "NOT_AN_INTEGER": "deve ser um número inteiro",
+    "NOT_A_BOOLEAN": "deve ser “true” ou “false”",
+    "NOT_AN_OPTION": "deve ser um destes valores: {{options}}",
+    "TOO_LONG": "deve ter no máximo {{max}} caracteres",
+    "TOO_SHORT": "deve ter pelo menos {{min}} caracteres",
+    "LENGTH_OUT_OF_RANGE": "deve ter entre {{min}} e {{max}} caracteres",
+    "TOO_SMALL": "deve ser no mínimo {{min}}",
+    "TOO_LARGE": "deve ser no máximo {{max}}",
+    "INVALID_EMAIL": "deve ser um endereço de e-mail válido",
+    "INVALID_URL": "deve ser uma URL http(s) válida",
+    "INVALID_TIMEZONE": "deve ser um identificador de fuso horário IANA válido",
+    "INVALID_LANGUAGE": "deve ser um código de idioma ISO 639-1 de duas letras",
+    "INVALID_FORMAT": "tem um formato inválido",
+    "UNKNOWN_SETTING": "não é uma chave de configuração conhecida"
+  },
+  "consent": {
+    "label": "Medição de uso",
+    "question": "Podemos contar quais páginas são usadas? Sem perfis, sem nomes de documentos — os endereços das páginas são reduzidos à sua estrutura antes da contagem, e a medição nunca sai diretamente deste servidor.",
+    "deny": "Recusar",
+    "allow": "Permitir"
+  }
+}

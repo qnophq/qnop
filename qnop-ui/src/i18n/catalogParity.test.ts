@@ -62,10 +62,10 @@ describe.each(SUPPORTED_LOCALES.filter((locale) => locale !== 'en'))('%s catalog
     // a sentence with a hole in it (or loses its link).
     const english = flatten(catalog('en', namespace));
     const translated = flatten(catalog(locale, namespace));
-    // Every translated value is checked, including plural forms English lacks (Spanish and French
+    // Every translated value is checked, including plural forms English lacks (Spanish, French and Portuguese
     // `_many`): against the English value of the same key, or — for a plural form — the English
     // `_other`. That second option also lets a plural form show `{{count}}` where English writes
-    // "One more …" without it: i18next always passes `count`, and French "one" covers 0.
+    // "One more …" without it: i18next always passes `count`, and French and Portuguese "one" cover 0.
     const accepted = (key: string): string[] => {
       const other = english[key.replace(/_(zero|one|two|few|many)$/, '_other')];
       return [english[key], other].filter((text) => text !== undefined).map(tokensOf);

@@ -1,0 +1,382 @@
+{
+  "people": {
+    "you": "Você",
+    "participant": "Participante"
+  },
+  "quoted": "“{{text}}”",
+  "annotation": {
+    "fallbackTitle": "Anotação",
+    "regionAnnotation": "Anotação de região",
+    "wholeDocument": "Documento inteiro",
+    "noPlacement": "Sem posição nesta versão",
+    "noTextAnchor": "Sem âncora de texto",
+    "highlight": "Anotação: {{quote}}",
+    "types": {
+      "CHANGE": "Alteração",
+      "PROPOSAL": "Proposta",
+      "CONFLICT": "Conflito",
+      "QUESTION": "Pergunta",
+      "RISK": "Risco"
+    },
+    "priorities": {
+      "HIGH": "Alta",
+      "MEDIUM": "Média",
+      "LOW": "Baixa"
+    },
+    "priority": "Prioridade: {{priority}}",
+    "noPriority": "Sem prioridade",
+    "status": {
+      "OPEN": "Aberta",
+      "RESOLVED": "Resolvida",
+      "DISMISSED": "Descartada"
+    },
+    "placement": {
+      "PENDING": {
+        "label": "Reancorando…",
+        "hint": "A nova versão ainda está sendo comparada com esta anotação."
+      },
+      "MOVED": {
+        "label": "Movida",
+        "hint": "O texto ancorado mudou com a nova versão — verifique o destaque."
+      },
+      "ORPHANED": {
+        "label": "Órfã",
+        "hint": "Nenhuma correspondência confiável nesta versão — a anotação precisa ser tratada manualmente."
+      },
+      "FAILED": {
+        "label": "Com falha",
+        "hint": "A reancoragem desta anotação falhou."
+      }
+    },
+    "placementActions": {
+      "confirm": "Está correto",
+      "confirmHint": "Aceitar o destaque realocado",
+      "reattach": "Reassociar",
+      "reattachHint": "Escolha o trecho correto manualmente",
+      "reposition": "Reposicionar",
+      "repositionHint": "Mover esta anotação para outro trecho"
+    },
+    "commentCount_one": "{{count}} comentário",
+    "commentCount_many": "{{count}} comentários",
+    "commentCount_other": "{{count}} comentários",
+    "page": "Página {{page}}",
+    "pageShort": "p. {{page}}",
+    "new": "Nova",
+    "newSinceLastVisit": "Nova desde sua última visita",
+    "collapse": "Recolher",
+    "collapseAnnotation": "Recolher a anotação"
+  },
+  "head": {
+    "started": "Iniciou esta discussão · {{time}}",
+    "copyQuote": "Copiar citação",
+    "copyText": "Copiar texto",
+    "quoteCopied": "Citação copiada.",
+    "textCopied": "Texto copiado.",
+    "copyLink": "Copiar link para a anotação"
+  },
+  "placement": {
+    "confirmed": "Posição confirmada.",
+    "confirmFailed": "Não foi possível confirmar a posição.",
+    "reattached": "Anotação reassociada.",
+    "reattachFailed": "Não foi possível reassociar a anotação."
+  },
+  "panel": {
+    "title": "Anotações ({{count}})",
+    "description": "Marcações e suas discussões nesta versão.",
+    "newCount": "Novas: {{count}}",
+    "globalAnnotation": "Anotação global",
+    "empty": "Nenhuma anotação ainda.",
+    "emptyCanAnnotate": "Nenhuma anotação ainda. Selecione um texto ou desenhe uma região no documento para adicionar uma.",
+    "noMatch": "Nenhuma anotação corresponde a este filtro.",
+    "noMatchPinned": "Nenhuma anotação corresponde a este filtro — a que está aberta permanece até você selecionar outra."
+  },
+  "filters": {
+    "searchAnnotations": "Pesquisar anotações",
+    "searchTasks": "Pesquisar tarefas",
+    "filter": "Filtrar anotações",
+    "status": "Status",
+    "placement": "Posição",
+    "type": "Tipo",
+    "priority": "Prioridade",
+    "author": "Autor",
+    "any": "Qualquer",
+    "anyone": "Qualquer pessoa",
+    "reset": "Redefinir filtros",
+    "statusOptions": {
+      "all": "Todas",
+      "open": "Abertas",
+      "resolved": "Resolvidas"
+    },
+    "placementOptions": {
+      "all": "Qualquer posição",
+      "attention": "Precisam de atenção",
+      "moved": "Movidas",
+      "orphaned": "Órfãs"
+    }
+  },
+  "reanchor": {
+    "summary": "Reancoragem na v{{version}} — {{parts}}.",
+    "moved": "movidas: {{count}}",
+    "orphaned": "órfãs: {{count}}",
+    "review": "Revisar",
+    "dismiss": "Ocultar o aviso de reancoragem"
+  },
+  "resolve": {
+    "notePlaceholder": "Nota de encerramento opcional…",
+    "noteLabel": "Nota de encerramento opcional",
+    "action": "Resolver",
+    "done": "Anotação resolvida.",
+    "failed": "Não foi possível resolver a anotação.",
+    "conflicts": {
+      "ANNOTATION_ALREADY_RESOLVED": "Esta anotação já estava resolvida."
+    }
+  },
+  "reopen": {
+    "action": "Reabrir",
+    "done": "Anotação reaberta.",
+    "failed": "Não foi possível reabrir a anotação.",
+    "conflicts": {
+      "REVIEW_CLOSED": "A revisão está finalizada — anotações encerradas continuam encerradas.",
+      "ANNOTATION_NOT_RESOLVED": "Esta anotação já está aberta."
+    }
+  },
+  "dismiss": {
+    "open": "Descartar…",
+    "placeholder": "Por que este ponto está sendo descartado? (obrigatório)",
+    "label": "Justificativa do descarte (obrigatória)",
+    "action": "Descartar",
+    "note": "A justificativa é publicada na discussão; o autor pode reabri-la.",
+    "done": "Anotação descartada.",
+    "failed": "Não foi possível descartar a anotação.",
+    "conflicts": {
+      "ANNOTATION_NOT_OPEN": "Esta anotação já foi encerrada.",
+      "REVIEW_CLOSED": "A revisão está encerrada — não há mais nada para descartar."
+    }
+  },
+  "thread": {
+    "send": "Enviar ({{shortcut}})",
+    "comment": "Comentar",
+    "commentWithShortcut": "Comentar ({{shortcut}})",
+    "addComment": "Adicionar um comentário",
+    "loading": "Carregando os comentários",
+    "loadError": "Não foi possível carregar os comentários.",
+    "noReplies": "Sem respostas.",
+    "noRepliesYet": "Nenhuma resposta ainda.",
+    "noComments": "Nenhum comentário ainda. Inicie a discussão.",
+    "closedResolved": "Resolvida — esta discussão está encerrada.",
+    "closedDismissed": "Descartada — esta discussão está encerrada.",
+    "policyReadOnly": "Nesta revisão, só o autor e o responsável podem responder.",
+    "writeReply": "Escreva uma resposta",
+    "discussion": "Discussão ({{count}})",
+    "commentGone": "Este comentário não existe mais.",
+    "copyComment": "Copiar comentário",
+    "commentCopied": "Comentário copiado.",
+    "copyLink": "Copiar link para o comentário",
+    "errors": {
+      "ANNOTATION_ALREADY_RESOLVED": "A anotação foi encerrada — a discussão também.",
+      "THREAD_READ_ONLY": "Nesta revisão, só o autor e o responsável podem responder.",
+      "fallback": "Não foi possível adicionar o comentário."
+    }
+  },
+  "composer": {
+    "title": "Nova anotação",
+    "typeLabel": "Tipo de anotação",
+    "priorityLabel": "Prioridade da anotação",
+    "none": "Nenhuma",
+    "create": "Criar anotação ({{shortcut}})",
+    "regionOnPage": "Região na página {{page}}",
+    "commentLabel": "Comentário da anotação",
+    "contextTitle": "Você está anotando",
+    "contextRegion": "Uma região na página {{page}}.",
+    "contextDocument": "Uma observação geral sobre o documento inteiro — não está fixada a um trecho."
+  },
+  "markdown": {
+    "write": "Escrever",
+    "markdown": "Markdown",
+    "preview": "Visualizar",
+    "nothingToPreview": "Nada para visualizar.",
+    "placeholder": "Adicione um comentário",
+    "fullScreen": "Tela cheia",
+    "exitFullScreen": "Sair da tela cheia",
+    "exitHint": "para sair",
+    "discussion": "Discussão",
+    "resizeRail": "Redimensionar a barra de contexto",
+    "mentionMenu": "Mencionar um participante",
+    "attachFile": "Anexar arquivo",
+    "dropFiles": "Solte os arquivos para anexar",
+    "uploading": "Enviando {{name}}…",
+    "attachmentName": "anexo",
+    "toolbar": {
+      "label": "Formatação de texto",
+      "withShortcut": "{{label}} ({{shortcut}})",
+      "bold": "Negrito",
+      "italic": "Itálico",
+      "strikethrough": "Tachado",
+      "heading": "Título",
+      "quote": "Citação",
+      "link": "Link",
+      "image": "Imagem",
+      "table": "Tabela",
+      "orderedList": "Lista numerada",
+      "bulletList": "Lista com marcadores",
+      "code": "Código",
+      "codeBlock": "Bloco de código"
+    },
+    "hint": {
+      "label": "Aceita Markdown",
+      "syntax": "Markdown: **negrito**, _itálico_, `código`, listas, > citação, [link](url)"
+    },
+    "emoji": {
+      "tooltip": "Emoji",
+      "insert": "Inserir emoji",
+      "loading": "Carregando o seletor de emojis",
+      "loadError": "Não foi possível carregar o seletor de emojis."
+    },
+    "attachment": {
+      "download": "Baixar anexo",
+      "retry": "Falha no download — clique para tentar novamente",
+      "downloading": "Baixando",
+      "imageUnavailable": "Imagem indisponível",
+      "loadingImage": "Carregando a imagem",
+      "tooLarge": "O arquivo é grande demais.",
+      "uploadFailed": "Não foi possível enviar o arquivo."
+    }
+  },
+  "reactions": {
+    "add": "Adicionar reação",
+    "closed": "A revisão está encerrada — as reações são somente leitura.",
+    "failed": "Não foi possível atualizar a reação."
+  },
+  "permalink": {
+    "copy": "Copiar link",
+    "copied": "Link copiado.",
+    "failed": "Não foi possível copiar o link."
+  },
+  "viewer": {
+    "version": "Versão",
+    "previousPage": "Página anterior",
+    "nextPage": "Próxima página",
+    "pageOf": "Página {{page}} / {{count}}",
+    "processing": "Processando o documento…",
+    "extractionFailed": "Falha na extração",
+    "pdfParseFailed": "Não foi possível ler o PDF",
+    "tool": "Ferramenta de anotação",
+    "selectText": "Selecionar texto",
+    "selectTextHint": "Selecione um texto para anotar uma citação",
+    "drawRegion": "Desenhar região",
+    "drawRegionHint": "Desenhe um retângulo para anotar uma região",
+    "layout": "Layout do documento",
+    "panel": "Painel",
+    "panelView": "Visualização com painel",
+    "panelHint": "Documento ao lado do painel de anotações",
+    "focus": "Foco",
+    "focusView": "Modo foco",
+    "focusHint": "Documento em largura total com a sobreposição de destaque",
+    "showListHint": "Mostrar a lista de anotações",
+    "showList": "Mostrar anotações ({{count}})",
+    "zoomOut": "Diminuir zoom",
+    "zoomIn": "Aumentar zoom",
+    "zoomReset": "Redefinir o zoom para ajustar à largura",
+    "pages": "Páginas do documento",
+    "page": "Página {{page}}",
+    "textLayer": "Texto selecionável do documento, página {{page}}",
+    "textKeyboardHint": "As teclas de seta movem o cursor pelo texto, Shift com uma seta amplia a seleção, Enter anota a seleção e Escape a limpa.",
+    "regionLayer": "Seleção de região, página {{page}}",
+    "regionKeyboardHint": "O primeiro toque em uma tecla de seta coloca um retângulo de seleção no meio da página. Depois, as setas o movem, Shift com uma seta o move em passos maiores, Alt com uma seta o aumenta ou diminui, Enter anota a região e Escape a limpa.",
+    "hoverNoComments": "Nenhum comentário ainda.",
+    "hoverOpen": "Clique para abrir a discussão",
+    "placingQuote": "Posicionando <quote/> — selecione o novo trecho",
+    "placing": "Posicionando a anotação — selecione a nova posição",
+    "cancelReattach": "Cancelar a reassociação"
+  },
+  "focus": {
+    "position": "Anotação {{index}} de {{count}}",
+    "previous": "Anotação anterior",
+    "previousHint": "Anotação anterior (↑)",
+    "next": "Próxima anotação",
+    "nextHint": "Próxima anotação (↓)",
+    "close": "Fechar a anotação",
+    "resizeDrawer": "Redimensionar o painel de anotações"
+  },
+  "review": {
+    "notFound": "Este documento não existe ou você não participa da revisão dele.",
+    "noVersion": "Esta revisão ainda não tem nenhuma versão de documento enviada.",
+    "olderVersion": "Você está vendo uma versão anterior — somente leitura. Anote na v{{version}}.",
+    "goToLatest": "Ir para a v{{version}}",
+    "processing": "O documento está sendo processado — será possível anotar assim que a camada de texto for extraída.",
+    "extractionFailedWithPdf": "A extração falhou nesta versão, então ela não pode ser anotada. O documento original continua sendo exibido abaixo.",
+    "extractionFailedNoPdf": "A extração falhou nesta versão, então ela não pode ser anotada. Baixe-a para lê-la.",
+    "pdfError": "Não foi possível exibir o PDF: {{error}}",
+    "originalLoadError": "Não foi possível carregar o documento original.",
+    "loadingDocument": "Carregando o documento",
+    "viewerFailed": "O visualizador de documentos falhou",
+    "panelFailed": "O painel de anotações falhou",
+    "panelLabel": "Anotações",
+    "createAnnotation": "Criar anotação",
+    "copyText": "Copiar texto",
+    "textCopied": "Texto copiado.",
+    "copyFailed": "Não foi possível copiar para a área de transferência.",
+    "annotationGone": "Esta anotação não existe mais.",
+    "created": "Anotação criada.",
+    "createFailed": "Não foi possível criar a anotação.",
+    "createConflicts": {
+      "VERSION_READ_ONLY": "Uma versão mais recente foi enviada nesse meio-tempo — as anotações vão na versão mais recente.",
+      "REVIEW_CLOSED": "Esta revisão está encerrada — não é possível adicionar novas anotações."
+    }
+  },
+  "diff": {
+    "baseline": "Versão base",
+    "compare": "Comparar com",
+    "swap": "Inverter lados",
+    "swapLabel": "Inverter as versões comparadas",
+    "comparing": "Comparando…",
+    "wordsAdded": "Palavras +",
+    "wordsRemoved": "Palavras −",
+    "changes": "Alterações",
+    "pagesLabel_one": "Página",
+    "pagesLabel_many": "Páginas",
+    "pagesLabel_other": "Páginas",
+    "pageCount": "Páginas: {{count}}",
+    "syncScroll": "Rolagem sincronizada",
+    "kinds": {
+      "INSERTED": "Inclusão",
+      "DELETED": "Exclusão",
+      "CHANGED": "Modificação"
+    },
+    "changeLabel": "Tipo de alteração: {{kind}}",
+    "summaryTitle": "Alterações ({{count}})",
+    "collapseRail": "Recolher a barra de alterações",
+    "expandRail": "Expandir a barra de alterações",
+    "identical": "As versões comparadas têm o mesmo conteúdo de texto.",
+    "renderError": "Não foi possível renderizar o documento. {{error}}",
+    "pageLabel": "Versão {{version}}, página {{page}}",
+    "pending": "Uma das versões ainda está sendo processada — tente novamente em instantes.",
+    "needsTwoVersions": "A comparação exige pelo menos duas versões com camada de texto extraída. Envie uma nova versão primeiro.",
+    "failed": "Não foi possível calcular a comparação.",
+    "changeCount_one": "{{count}} alteração",
+    "changeCount_many": "{{count}} alterações",
+    "changeCount_other": "{{count}} alterações"
+  },
+  "tasks": {
+    "columns": {
+      "open": "Abertas",
+      "discussion": "Em discussão",
+      "done": "Resolvidas"
+    },
+    "all": "Todas",
+    "filterChip": "{{label}} {{count}}",
+    "columnBadge": "{{label}} ({{count}})",
+    "dropToResolve": "Solte seu cartão aqui para resolvê-lo",
+    "emptyColumn": "Nada por aqui",
+    "presentation": "Apresentação das tarefas",
+    "board": "Quadro",
+    "list": "Lista",
+    "unavailable": "Esta revisão não está disponível",
+    "noMatch": "Nenhuma anotação corresponde ao filtro atual.",
+    "resizeDrawer": "Redimensionar o painel de tarefas",
+    "showInDocument": "Mostrar no documento",
+    "close": "Fechar a tarefa",
+    "newTitle": "Nova anotação global",
+    "newDescription": "Uma observação geral que vale para o documento inteiro — não está fixada a um trecho e continua válida em todas as versões."
+  }
+}

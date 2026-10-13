@@ -1,0 +1,144 @@
+{
+  "page": {
+    "title": "Perfil",
+    "subtitle": "Gerencie sua conta e como você aparece no qnop.",
+    "unknownName": "Desconhecido"
+  },
+  "stats": {
+    "owned": "Próprias",
+    "reviewing": "Revisando",
+    "completed": "Concluídas"
+  },
+  "achievements": {
+    "heading": "Conquistas",
+    "earnedCount": "{{earned}} de {{total}} conquistadas",
+    "tooltip": "{{title}} — {{caption}}",
+    "ariaEarned": "{{title}}: {{caption}}",
+    "ariaLocked": "{{title}}: {{caption}} (bloqueada)",
+    "liftoff": {
+      "title": "Decolagem",
+      "earned": "Iniciou uma revisão",
+      "locked": "Inicie sua primeira revisão",
+      "lockedPublic": "Nenhuma revisão iniciada ainda"
+    },
+    "crew": {
+      "title": "Parte da tripulação",
+      "earned": "Entrou na tripulação de uma revisão",
+      "locked": "Receba um convite para uma revisão",
+      "lockedPublic": "Ainda não faz parte de nenhuma tripulação"
+    },
+    "closer": {
+      "title": "Missão cumprida",
+      "earned": "Finalizou uma revisão",
+      "locked": "Leve uma das suas revisões até a finalização",
+      "earnedPublic": "Resolveu um ponto levantado",
+      "lockedPublic": "Nenhum ponto resolvido ainda"
+    },
+    "face": {
+      "title": "Rosto conhecido",
+      "earned": "A equipe reconhece você",
+      "locked": "Envie uma foto de perfil"
+    },
+    "tunedIn": {
+      "title": "Antenado",
+      "earned": "Os e-mails de revisão mantêm você informado",
+      "locked": "Ative as notificações de revisão"
+    },
+    "voice": {
+      "title": "Voz ativa",
+      "earned": "{{milestone}}+ comentários em discussões",
+      "locked": "Conquistada com {{milestone}} comentários"
+    },
+    "sharpEye": {
+      "title": "Olho de lince",
+      "earned": "{{milestone}}+ anotações criadas",
+      "locked": "Conquistada com {{milestone}} anotações"
+    }
+  },
+  "avatar": {
+    "heading": "Foto de perfil",
+    "description": "Envie uma foto para que sua equipe reconheça você. Ela aparece em todo o aplicativo; se você a remover, suas iniciais voltam a ser exibidas.",
+    "uploadAria": "Enviar uma foto de perfil",
+    "dropPrompt": "Arraste uma imagem para cá ou <strong>escolha um arquivo</strong>",
+    "constraints": "PNG, JPEG ou WebP · até 1 MB",
+    "remove": "Remover foto",
+    "invalidType": "Escolha uma imagem PNG, JPEG ou WebP.",
+    "tooLarge": "Essa imagem tem mais de 1 MB.",
+    "confirmTitle": "Remover foto de perfil",
+    "confirmMessage": "A foto de perfil será removida e o avatar com as iniciais voltará a ser exibido. Você pode enviar uma nova a qualquer momento.",
+    "confirmLabel": "Remover"
+  },
+  "crop": {
+    "title": "Ajuste sua foto",
+    "zoom": "Zoom",
+    "hint": "Arraste para reposicionar e use o controle deslizante para dar zoom.",
+    "cancel": "Cancelar",
+    "apply": "Usar foto"
+  },
+  "notifications": {
+    "heading": "Notificações",
+    "description": "E-mails sobre as revisões de que você participa — quando alguém adiciona você como revisor, novas anotações, respostas nas suas discussões, decisões e mudanças de status.",
+    "cadenceLabel": "Receber e-mails sobre a atividade das revisões",
+    "mentionsNote": "As menções chegam imediatamente de qualquer forma — quando alguém cita você pessoalmente, esperar tem um custo.",
+    "cadence": {
+      "IMMEDIATE": {
+        "label": "Na hora",
+        "help": "Um e-mail por evento."
+      },
+      "DAILY": {
+        "label": "Uma vez por dia",
+        "help": "Um resumo toda manhã, no seu fuso horário. Nos dias tranquilos, nada é enviado."
+      },
+      "OFF": {
+        "label": "Nunca",
+        "help": "Nenhum e-mail de revisão. As notificações no aplicativo continuam iguais."
+      }
+    }
+  },
+  "tracking": {
+    "heading": "Medição de uso",
+    "description": "Contagens anônimas de quais páginas são usadas, para que este espaço de trabalho possa ser melhorado com dados em vez de suposições. Os endereços das páginas são antes reduzidos à sua estrutura — nunca um documento, nunca um nome, nunca um termo de pesquisa. Essa escolha acompanha sua conta em todos os dispositivos em que você entrar.",
+    "toggle": "Incluir-me na medição anônima de uso"
+  },
+  "timezone": {
+    "heading": "Fuso horário",
+    "description": "As datas e horas do qnop são exibidas neste fuso horário.",
+    "currentTimeIn": "Hora atual em {{zone}}",
+    "useDevice": "Usar o fuso horário do meu dispositivo ({{zone}})",
+    "followingDefault": "Seguindo no momento o padrão do espaço de trabalho.",
+    "now": "agora"
+  },
+  "missions": {
+    "sharedCaption": "Revisões em comum",
+    "owned": {
+      "title": "Missões no comando",
+      "empty": "Nenhuma revisão sob o comando de {{name}} é compartilhada com você ainda."
+    },
+    "reviewing": {
+      "title": "Missões em andamento",
+      "empty": "{{name}} ainda não está revisando nada em comum com você."
+    }
+  },
+  "moves": {
+    "title": "Atividade recente",
+    "caption": "Em revisões em comum",
+    "empty": "Nenhuma atividade recente de {{name}} em revisões em comum.",
+    "phrases": {
+      "annotationCreated": "Criou uma anotação em <review/>",
+      "annotationResolved": "Resolveu uma anotação em <review/>",
+      "annotationReopened": "Reabriu uma anotação em <review/>",
+      "workflowTransition": "Alterou o status de <review/>",
+      "dueDateChanged": "Alterou o prazo de <review/>",
+      "other": "Atualizou <review/>"
+    }
+  },
+  "toast": {
+    "settingSaveFailed": "Não foi possível salvar a configuração.",
+    "timezoneSaveFailed": "Não foi possível salvar o fuso horário.",
+    "timezoneUpdated": "Fuso horário atualizado.",
+    "avatarUpdated": "Foto de perfil atualizada.",
+    "avatarUploadFailed": "Não foi possível enviar a foto. Tente novamente.",
+    "avatarRemoved": "Foto de perfil removida.",
+    "avatarRemoveFailed": "Não foi possível remover a foto. Tente novamente."
+  }
+}

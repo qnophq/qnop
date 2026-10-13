@@ -1,0 +1,550 @@
+{
+  "actions": {
+    "back": "Voltar",
+    "next": "Próximo",
+    "clear": "Limpar",
+    "backToReviews": "Voltar às revisões"
+  },
+  "you": "Você",
+  "roles": {
+    "owner": "Responsável",
+    "reviewer": "Revisor",
+    "observer": "Sem participação"
+  },
+  "principal": {
+    "team": "Equipe",
+    "user": "Usuário",
+    "remove": "Remover {{name}}",
+    "searching": "Pesquisando…",
+    "noMatches": "Nenhuma pessoa ou equipe encontrada."
+  },
+  "workflow": {
+    "states": {
+      "DRAFT": "Rascunho",
+      "IN_REVIEW": "Em revisão",
+      "CHANGES_REQUESTED": "Alterações solicitadas",
+      "FINALIZED": "Finalizada",
+      "CANCELLED": "Cancelada"
+    },
+    "archived": "Arquivada · {{state}}",
+    "milestones": {
+      "cancelled": "Revisão cancelada",
+      "cancelledAutoClosed_one": "Revisão cancelada — {{count}} anotação foi encerrada automaticamente",
+      "cancelledAutoClosed_many": "Revisão cancelada — {{count}} anotações foram encerradas automaticamente",
+      "cancelledAutoClosed_other": "Revisão cancelada — {{count}} anotações foram encerradas automaticamente",
+      "finalized": "Revisão finalizada — todos os pontos levantados resolvidos",
+      "draft": "Rascunho — ainda não está em revisão",
+      "progressOpen_one": "{{state}} — {{resolved}} de {{count}} anotação resolvida, pendentes: {{open}}",
+      "progressOpen_many": "{{state}} — {{resolved}} de {{count}} anotações resolvidas, pendentes: {{open}}",
+      "progressOpen_other": "{{state}} — {{resolved}} de {{count}} anotações resolvidas, pendentes: {{open}}",
+      "progressReady_one": "{{state}} — {{resolved}} de {{count}} anotação resolvida, pronta para finalizar",
+      "progressReady_many": "{{state}} — {{resolved}} de {{count}} anotações resolvidas, pronta para finalizar",
+      "progressReady_other": "{{state}} — {{resolved}} de {{count}} anotações resolvidas, pronta para finalizar",
+      "noAnnotations": "{{state}} — nenhuma anotação ainda"
+    }
+  },
+  "anonymous": {
+    "tooltip": "Revisão anônima — os nomes dos revisores ficam ocultos",
+    "label": "Anônima",
+    "compact": "Anôn."
+  },
+  "wholeDocument": {
+    "tooltip": "Vale para o documento inteiro — não está fixada a um trecho",
+    "label": "Documento inteiro",
+    "compact": "Doc. inteiro"
+  },
+  "copy": {
+    "copied": "Copiado para a área de transferência.",
+    "failed": "Não foi possível copiar para a área de transferência."
+  },
+  "resizer": {
+    "label": "Redimensionar o painel de anotações",
+    "valueText": "{{percent}}% do espaço de trabalho"
+  },
+  "paramGate": {
+    "resolving": "Localizando a revisão",
+    "title": "Esta revisão virou um aviãozinho de papel",
+    "message": "Nenhuma revisão corresponde a “{{segment}}” — o link pode estar desatualizado, ou a revisão seguiu seu caminho. Suas outras missões estão esperando por você."
+  },
+  "due": {
+    "picker": {
+      "label": "Prazo",
+      "helper": "Opcional — um prazo informativo; revisões atrasadas são apenas sinalizadas."
+    },
+    "dialog": {
+      "title": "Prazo da revisão",
+      "body": "Um prazo opcional e informativo. Revisões abertas atrasadas são sinalizadas na visão geral, mas nunca bloqueadas nem canceladas.",
+      "updated": "Prazo atualizado.",
+      "cleared": "Prazo removido.",
+      "failed": "Não foi possível atualizar o prazo.",
+      "saving": "Salvando…"
+    }
+  },
+  "delete": {
+    "single": {
+      "title": "Excluir esta revisão?",
+      "body": "<title/> será excluída permanentemente, para todos. Esta ação não pode ser desfeita.",
+      "bodyWithScope": "<title/> será excluída permanentemente junto com {{scope}}, para todos. Esta ação não pode ser desfeita.",
+      "versions_one": "{{count}} versão",
+      "versions_many": "{{count}} versões",
+      "versions_other": "{{count}} versões",
+      "annotations_one": "{{count}} anotação",
+      "annotations_many": "{{count}} anotações",
+      "annotations_other": "{{count}} anotações",
+      "scopeBoth": "{{versions}} e {{annotations}}",
+      "archiveHint": "Para arquivá-la em vez disso — é reversível e preserva o registro —, feche esta janela e use “Arquivar”.",
+      "confirmLabel": "Digite o título da revisão para confirmar",
+      "failed": "Não foi possível excluir a revisão.",
+      "deleting": "Excluindo…",
+      "submit": "Excluir permanentemente"
+    },
+    "bulk": {
+      "title_one": "Excluir {{count}} revisão?",
+      "title_many": "Excluir {{count}} revisões?",
+      "title_other": "Excluir {{count}} revisões?",
+      "body": "Elas serão excluídas permanentemente, para todos — com todas as versões, anotações e discussões. Esta ação não pode ser desfeita. Para preservar o registro, feche esta janela e arquive-as.",
+      "phrase": "excluir",
+      "confirmLabel": "Digite “{{phrase}}” para confirmar",
+      "progress": "Excluindo… {{done}} de {{total}}",
+      "failedHeading_one": "Não foi possível excluir {{failed}} de {{count}}",
+      "failedHeading_many": "Não foi possível excluir {{failed}} de {{count}}",
+      "failedHeading_other": "Não foi possível excluir {{failed}} de {{count}}",
+      "itemFailed": "não foi possível excluir",
+      "submit": "Excluir {{total}} permanentemente"
+    }
+  },
+  "list": {
+    "documentType": "Documento {{format}}",
+    "progressLabel_one": "{{resolved}} de {{count}} anotação resolvida",
+    "progressLabel_many": "{{resolved}} de {{count}} anotações resolvidas",
+    "progressLabel_other": "{{resolved}} de {{count}} anotações resolvidas",
+    "noReviewers": "sem revisores",
+    "readyToFinalize": "Pronta para finalizar",
+    "resolvedCount": "Resolvidas: {{resolved}}/{{total}}",
+    "columns": {
+      "document": "Documento",
+      "role": "Função",
+      "owner": "Responsável",
+      "status": "Status",
+      "progress": "Progresso",
+      "reviewers": "Revisores",
+      "due": "Prazo",
+      "updated": "Atualizada",
+      "actions": "Ações"
+    },
+    "selectAll": "Selecionar todas as revisões desta página",
+    "select": "Selecionar {{title}}",
+    "deletePermanently": "Excluir permanentemente",
+    "deleteNamed": "Excluir {{title}}",
+    "illustration": "Um documento novo esperando sua primeira revisão"
+  },
+  "page": {
+    "title": "Revisões",
+    "description": "Documentos pelos quais você é responsável ou que você revisa — retome de onde parou.",
+    "descriptionModerating": "Todas as revisões do espaço de trabalho — você está moderando, não participando.",
+    "newReview": "Nova revisão",
+    "quotaFull_one": "Esta instalação permite {{count}} revisão aberta por vez (abertas agora: {{used}}). Finalizar ou arquivar uma revisão libera uma vaga; trabalho concluído não ocupa nenhuma.",
+    "quotaFull_many": "Esta instalação permite {{count}} revisões abertas por vez (abertas agora: {{used}}). Finalizar ou arquivar uma revisão libera uma vaga; trabalho concluído não ocupa nenhuma.",
+    "quotaFull_other": "Esta instalação permite {{count}} revisões abertas por vez (abertas agora: {{used}}). Finalizar ou arquivar uma revisão libera uma vaga; trabalho concluído não ocupa nenhuma.",
+    "loadError": {
+      "title": "Suas revisões não chegaram à mesa",
+      "message": "O carregamento falhou do nosso lado — não foi culpa sua. Tente novamente; se continuar acontecendo, avise o administrador."
+    },
+    "participation": {
+      "label": "Quais revisões",
+      "mine": "Minhas revisões",
+      "all": "Todas as revisões"
+    },
+    "searchPlaceholder": "Pesquisar por título ou responsável…",
+    "selection": {
+      "count": "Selecionadas: {{n}}",
+      "deleteSelected": "Excluir selecionadas ({{n}})"
+    },
+    "sort": {
+      "label": "Ordenar",
+      "updated": "Atualizadas recentemente",
+      "name": "Nome",
+      "due": "Prazo"
+    },
+    "view": {
+      "label": "Modo de visualização",
+      "table": "Visualização em tabela",
+      "cards": "Visualização em cartões"
+    },
+    "filters": {
+      "button": "Filtrar revisões",
+      "menu": "Filtros de revisões",
+      "due": "Prazo",
+      "state": "Status do fluxo de trabalho",
+      "format": "Formato",
+      "owner": "Responsável",
+      "anyone": "Qualquer pessoa",
+      "anyState": "Qualquer status",
+      "unknownOwner": "Desconhecido",
+      "dueOptions": {
+        "any": "Qualquer prazo",
+        "overdue": "Atrasadas",
+        "soon": "Prazo nos próximos {{days}} dias",
+        "none": "Sem prazo"
+      },
+      "formatOptions": {
+        "any": "Qualquer formato",
+        "pdf": "PDF",
+        "docx": "Word (DOCX)",
+        "md": "Markdown"
+      }
+    },
+    "chips": {
+      "all": {
+        "label": "Todas",
+        "hint": "Todas as revisões que você pode ver, seja qual for o seu papel nelas"
+      },
+      "owner": {
+        "label": "Sou responsável",
+        "hint": "Revisões pelas quais você é responsável e que você conduz"
+      },
+      "reviewer": {
+        "label": "Revisando",
+        "hint": "Revisões em que você está na lista de revisores"
+      },
+      "observer": {
+        "label": "Sem participação",
+        "hint": "Revisões pelas quais você não é responsável nem revisor — as que você modera de fora"
+      },
+      "active": {
+        "label": "Ativas",
+        "hint": "Todo o trabalho em andamento — todos os status do fluxo de trabalho, exceto registros arquivados (padrão)"
+      },
+      "open": {
+        "label": "Abertas",
+        "hint": "Revisões em andamento que o fluxo de trabalho ainda não encerrou"
+      },
+      "closed": {
+        "label": "Encerradas",
+        "hint": "Revisões finalizadas ou canceladas que ainda não foram arquivadas"
+      },
+      "archived": {
+        "label": "Arquivadas",
+        "hint": "Somente os registros arquivados, fora das listas ativas"
+      },
+      "every": {
+        "label": "Todos os status",
+        "hint": "Tudo de uma vez — todos os status do fluxo de trabalho, incluindo registros arquivados"
+      }
+    },
+    "clearFilters": "Limpar filtros",
+    "empty": {
+      "onlyArchived": "Nenhuma revisão ativa — tudo aqui foi arquivado.",
+      "noMatches": "Nenhuma revisão corresponde aos seus filtros.",
+      "showArchived": "Mostrar arquivadas ({{n}})"
+    },
+    "pagination": {
+      "range": "{{from}}–{{to}} de {{total}}",
+      "previous": "Anterior"
+    }
+  },
+  "emptyState": {
+    "eyebrow": "Revisões",
+    "title": "Comece sua primeira revisão",
+    "body": "Uma revisão é um documento anotado linha por linha — levante pontos, resolva-os em conjunto e finalize com um histórico limpo. Ainda não há nada aqui.",
+    "perks": {
+      "annotate": "Anote linha por linha",
+      "resolve": "Resolva os pontos abertos",
+      "finalize": "Finalize com histórico"
+    },
+    "noSlots": "Esta instalação não tem mais vagas para revisões abertas.",
+    "hint": "Envie um documento para começar."
+  },
+  "wizard": {
+    "description": "Configuração guiada em três etapas: documento, revisores, início.",
+    "steps": {
+      "document": "Documento",
+      "reviewers": "Revisores",
+      "summary": "Resumo e início"
+    },
+    "stepNumber": "Etapa {{n}}",
+    "stepDone": "{{label}}: concluído",
+    "stepOf": "Etapa {{step}} de {{total}}",
+    "create": "Criar revisão",
+    "createAndStart": "Criar e iniciar revisão",
+    "uploadFailed": "Falha no envio. Tente novamente.",
+    "quotaFull_one": "Esta instalação permite {{count}} revisão aberta por vez (abertas agora: {{used}}). Finalizar ou arquivar uma delas libera uma vaga; trabalho concluído não ocupa nenhuma.",
+    "quotaFull_many": "Esta instalação permite {{count}} revisões abertas por vez (abertas agora: {{used}}). Finalizar ou arquivar uma delas libera uma vaga; trabalho concluído não ocupa nenhuma.",
+    "quotaFull_other": "Esta instalação permite {{count}} revisões abertas por vez (abertas agora: {{used}}). Finalizar ou arquivar uma delas libera uma vaga; trabalho concluído não ocupa nenhuma.",
+    "created": {
+      "title": "Revisão criada",
+      "partial": "A revisão foi criada, mas algumas etapas não puderam ser concluídas: {{failures}}. Você pode concluí-las na página da revisão.",
+      "addReviewer": "adicionar “{{name}}” como revisor",
+      "start": "iniciar a revisão",
+      "openReview": "Abrir revisão"
+    },
+    "document": {
+      "titleLabel": "Título da revisão",
+      "titlePlaceholder": "ex.: NDA Acme Corp",
+      "titleHelper": "Exibido na visão geral e para todos os revisores.",
+      "slugLabel": "Identificador de URL (opcional)",
+      "slugPlaceholder": "ex.: nda-acme-corp",
+      "slugHelper": "Um endereço legível para esta revisão: letras minúsculas, dígitos e hifens. Não pode ser alterado depois."
+    },
+    "validation": {
+      "slugLength": "O identificador de URL deve ter de {{min}} a {{max}} caracteres.",
+      "slugPattern": "Somente letras minúsculas, dígitos e hifens simples são permitidos.",
+      "slugUuid": "O identificador de URL não pode parecer um ID de documento."
+    },
+    "reviewers": {
+      "selected": "Revisores selecionados",
+      "none": "Nenhum revisor ainda — você também pode adicioná-los depois.",
+      "searchPlaceholder": "Pesquisar pessoas ou equipes…"
+    },
+    "summary": {
+      "document": "Documento",
+      "reviewers": "Revisores",
+      "dueDate": "Prazo",
+      "noReviewers": "Nenhum ainda — a revisão começa só com você; revisores podem ser adicionados a qualquer momento.",
+      "anonymous": "Revisão anônima",
+      "anonymousHint": "Os nomes dos revisores ficam ocultos — outros autores aparecem com um pseudônimo fixo como “Participant N”. Não pode ser alterado depois.",
+      "participation": "Participação nas discussões",
+      "participationHelper": "{{hint}} Não pode ser alterado depois.",
+      "participationOptions": {
+        "OPEN": {
+          "label": "Discussão aberta",
+          "hint": "Todos os revisores podem ler e responder em qualquer discussão."
+        },
+        "READ_ONLY": {
+          "label": "Discussões somente leitura",
+          "hint": "Todos veem todas as discussões, mas só quem a iniciou e o responsável podem responder."
+        },
+        "PRIVATE": {
+          "label": "Discussões privadas",
+          "hint": "Os revisores veem apenas as próprias discussões; o responsável vê todas."
+        }
+      },
+      "start": "Iniciar a revisão imediatamente",
+      "startHint": "Move a revisão de “Rascunho” para “Em revisão” para que os revisores possam anotar imediatamente.",
+      "uploading": "Enviando o documento…",
+      "finalizing": "Preparando a revisão…"
+    },
+    "commander": {
+      "eyebrow": "Comando da missão",
+      "note": "Você é responsável por esta revisão — a tripulação, o prazo e a palavra final são seus."
+    },
+    "checklist": {
+      "title": "Prontidão para o lançamento",
+      "ready": "Tudo pronto para a decolagem — os extras valem pontos bônus.",
+      "notReady": "Preencha o essencial para decolar.",
+      "bonus": "bônus",
+      "items": {
+        "document": "Documento a bordo",
+        "title": "Título definido",
+        "slug": "Link amigável",
+        "crew": "Tripulação convidada",
+        "deadline": "Prazo fixado",
+        "ignition": "Ignição ao criar"
+      },
+      "details": {
+        "reviewers_one": "{{count}} revisor",
+        "reviewers_many": "{{count}} revisores",
+        "reviewers_other": "{{count}} revisores",
+        "startsNow": "começa imediatamente",
+        "startsLater": "começa depois, manualmente"
+      }
+    }
+  },
+  "upload": {
+    "formats": {
+      "pdf": "PDF",
+      "pdfOrWord": "PDF ou Word",
+      "pdfMore": "PDF e mais",
+      "pdfOrWordMore": "PDF ou Word e mais"
+    },
+    "validation": {
+      "type": "Só são aceitos documentos {{formats}}.",
+      "size": "O arquivo excede o tamanho máximo de {{max}} MB."
+    },
+    "chooseDocument": "Escolher um documento",
+    "chooseDifferentDocument": "Escolher outro documento",
+    "prompt": "Solte seu documento aqui ou escolha um arquivo",
+    "limits": "{{formats}} · máx. {{max}} MB",
+    "chooseFile": "Escolher arquivo",
+    "chooseDifferentFile": "Escolher outro arquivo",
+    "removeFile": "Remover arquivo"
+  },
+  "hub": {
+    "progress": {
+      "inDiscussion_one": "Progresso da revisão: {{resolved}} de {{count}} anotação resolvida · em discussão: {{discussion}}",
+      "inDiscussion_many": "Progresso da revisão: {{resolved}} de {{count}} anotações resolvidas · em discussão: {{discussion}}",
+      "inDiscussion_other": "Progresso da revisão: {{resolved}} de {{count}} anotações resolvidas · em discussão: {{discussion}}",
+      "stillOpen_one": "Progresso da revisão: {{resolved}} de {{count}} anotação resolvida · ainda abertas: {{open}}",
+      "stillOpen_many": "Progresso da revisão: {{resolved}} de {{count}} anotações resolvidas · ainda abertas: {{open}}",
+      "stillOpen_other": "Progresso da revisão: {{resolved}} de {{count}} anotações resolvidas · ainda abertas: {{open}}",
+      "ready_one": "Progresso da revisão: {{resolved}} de {{count}} anotação resolvida — pronta para finalizar",
+      "ready_many": "Progresso da revisão: {{resolved}} de {{count}} anotações resolvidas — pronta para finalizar",
+      "ready_other": "Progresso da revisão: {{resolved}} de {{count}} anotações resolvidas — pronta para finalizar"
+    },
+    "dueDate": {
+      "set": "Definir o prazo da revisão",
+      "placeholder": "Definir prazo"
+    },
+    "participants": {
+      "manage": "Gerenciar participantes",
+      "view": "Ver participantes",
+      "add": "Adicionar revisores",
+      "none": "Sem revisores"
+    },
+    "workflow": {
+      "change": "Alterar status",
+      "moveTo": "Mover para “{{state}}”",
+      "moved": "Revisão movida para “{{state}}”.",
+      "failed": "Não foi possível alterar o status.",
+      "confirmTitle": "Alterar o status da revisão",
+      "confirmMessage": "Mover esta revisão para “{{state}}”? Os revisores verão o novo status imediatamente.",
+      "autoClose_one": "{{count}} anotação aberta será encerrada automaticamente com um comentário padrão.",
+      "autoClose_many": "{{count}} anotações abertas serão encerradas automaticamente com um comentário padrão.",
+      "autoClose_other": "{{count}} anotações abertas serão encerradas automaticamente com um comentário padrão.",
+      "conflicts": {
+        "INVALID_TRANSITION": "Esta mudança de status não é possível agora — talvez ainda haja anotações abertas ou posições pendentes."
+      }
+    },
+    "archive": {
+      "archive": "Arquivar",
+      "unarchive": "Restaurar",
+      "archived": "Revisão arquivada.",
+      "restored": "Revisão restaurada nas listas ativas.",
+      "archiveFailed": "Não foi possível arquivar a revisão.",
+      "unarchiveFailed": "Não foi possível restaurar a revisão."
+    },
+    "newVersion": "Nova versão"
+  },
+  "newVersion": {
+    "title": "Enviar uma nova versão",
+    "body": "Ela passa a ser a versão que todos revisam. As anotações existentes são transferidas e reancoradas no novo documento; as que não se encaixarem mais ficam sinalizadas para você reposicioná-las.",
+    "uploaded": "Versão {{version}} enviada.",
+    "failed": "Não foi possível enviar a nova versão.",
+    "progressLabel": "Progresso do envio",
+    "processing": "Processando o documento…",
+    "uploadingPercent": "Enviando… {{percent}}%",
+    "uploading": "Enviando…",
+    "submit": "Enviar versão"
+  },
+  "participants": {
+    "title": "Participantes",
+    "loadingMembers": "Carregando os membros da equipe",
+    "noMembers": "Esta equipe não tem membros.",
+    "empty": "Esta revisão ainda não tem revisores.",
+    "showMembers": "Mostrar os membros de {{name}}",
+    "addPlaceholder": "Adicionar pessoas ou equipes…",
+    "added": "{{name}} agora participa da revisão.",
+    "removed": "{{name}} não participa mais da revisão.",
+    "addFailed": "Não foi possível adicionar o revisor.",
+    "removeFailed": "Não foi possível remover o revisor.",
+    "conflicts": {
+      "DUPLICATE_PARTICIPANT": "Já participa como revisor deste documento."
+    }
+  },
+  "tabs": {
+    "label": "Visualizações da revisão",
+    "document": "Documento",
+    "tasks": "Tarefas",
+    "compare": "Comparar",
+    "compareDisabled": "Requer duas versões extraídas"
+  },
+  "export": {
+    "title": "Exportar",
+    "failed": "Não foi possível gerar a exportação. Tente novamente.",
+    "headings": {
+      "format": "Do que você precisa?",
+      "details": "Quais detalhes?"
+    },
+    "steps": {
+      "formatAndFile": "Formato e arquivo",
+      "content": "Conteúdo"
+    },
+    "sections": {
+      "format": "Formato",
+      "annotations": "Quais anotações",
+      "savedAs": "Salvo como",
+      "dateTime": "Data e hora"
+    },
+    "unavailable": "Indisponível",
+    "scopes": {
+      "all": {
+        "label": "Tudo",
+        "hint": "Todas as anotações desta revisão"
+      },
+      "open": {
+        "label": "Somente abertas",
+        "hint": "O que ainda precisa de trabalho"
+      },
+      "resolved": {
+        "label": "Somente resolvidas",
+        "hint": "O que já foi resolvido"
+      }
+    },
+    "formats": {
+      "xlsx": "Ordenável e filtrável — para triagem e relatórios.",
+      "docx": "Um relatório legível — para reuniões e aprovações.",
+      "html": "Uma única página independente — pesquisável em qualquer navegador, sem anexos para abrir.",
+      "pdf": "Fica igual em qualquer lugar — para impressão e arquivamento."
+    },
+    "commentsHint": {
+      "sheet": "Uma segunda planilha com o texto completo de cada comentário e quem o escreveu. Em uma revisão anônima, os autores também aparecem aqui com pseudônimo.",
+      "discussion": "A discussão completa de cada anotação — cada resposta, com quem a escreveu e quando. Em uma revisão anônima, os autores também aparecem aqui com pseudônimo."
+    },
+    "vocabulary": {
+      "columns": {
+        "heading": "Colunas",
+        "count": "Colunas: {{selected}} de {{total}}"
+      },
+      "details": {
+        "heading": "Detalhes",
+        "count": "Detalhes: {{selected}} de {{total}}"
+      },
+      "fields": {
+        "heading": "Campos",
+        "count": "Campos: {{selected}} de {{total}}"
+      }
+    },
+    "fileName": "Nome do arquivo",
+    "logo": {
+      "title": "Logotipo da marca",
+      "hint": "Inserido no documento, se uma identidade visual tiver sido enviada."
+    },
+    "comments": "Discussões",
+    "all": "Todos",
+    "none": "Nenhum",
+    "always": "(sempre)",
+    "timezone": "Fuso horário",
+    "groups": {
+      "Identity": "Identificação",
+      "Classification": "Classificação",
+      "Content": "Conteúdo",
+      "History": "Histórico"
+    },
+    "fields": {
+      "taskKey": "Chave da tarefa (#)",
+      "page": "Página",
+      "author": "Autor",
+      "status": "Status",
+      "type": "Tipo",
+      "priority": "Prioridade",
+      "placement": "Status da posição",
+      "summary": "Resumo",
+      "replies": "Respostas",
+      "created": "Criada",
+      "updated": "Atualizada"
+    },
+    "dateFormats": {
+      "iso": "ISO",
+      "isoSeconds": "ISO com segundos",
+      "european": "Europeu",
+      "us": "EUA",
+      "dateOnly": "Somente data"
+    },
+    "summary": {
+      "rows_one": "{{count}} anotação",
+      "rows_many": "{{count}} anotações",
+      "rows_other": "{{count}} anotações",
+      "withComments": "com discussões"
+    }
+  }
+}
