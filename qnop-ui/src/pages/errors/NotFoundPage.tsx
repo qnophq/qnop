@@ -19,19 +19,21 @@
  * SPDX-License-Identifier: AGPL-3.0-only
  */
 
+import { useTranslation } from 'react-i18next';
 import { ErrorState } from './ErrorState';
 import { NotFoundIllustration } from './illustrations';
 
 /** 404 - the page went for a walk; the user did nothing wrong (issue #611). */
 export function NotFoundPage() {
+  const { t } = useTranslation();
   return (
     <ErrorState
       code="404"
-      title="This page folded itself into a paper plane"
-      message="Wherever it landed, it isn't at this address. Head back to the dashboard and pick up your quest from there."
+      title={t('errors.notFound.title')}
+      message={t('errors.notFound.message')}
       illustration={<NotFoundIllustration />}
-      primaryAction={{ label: 'Back to dashboard', to: '/' }}
-      secondaryAction={{ label: 'My reviews', to: '/reviews' }}
+      primaryAction={{ label: t('actions.backToDashboard'), to: '/' }}
+      secondaryAction={{ label: t('errors.notFound.myReviews'), to: '/reviews' }}
     />
   );
 }

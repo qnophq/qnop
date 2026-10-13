@@ -1,0 +1,76 @@
+{
+  "types": {
+    "mention": "Erwähnung",
+    "participantAdded": "Einladung",
+    "annotationCreated": "Neue Anmerkung",
+    "annotationDecided": "Entscheidung",
+    "commentAdded": "Antwort",
+    "versionUploaded": "Neue Version",
+    "workflowChanged": "Workflow",
+    "reviewDeleted": "Review gelöscht",
+    "fallback": "Benachrichtigung"
+  },
+  "quoted": "„{{text}}“",
+  "unread": "Ungelesen",
+  "actor": {
+    "unknown": "Unbekannt",
+    "viewProfile": "Profil von {{name}} ansehen"
+  },
+  "illustration": "Ein leeres Postfach, das auf seine erste Benachrichtigung wartet",
+  "inbox": {
+    "title": "Nachrichten",
+    "description": "Alles, was in deinen Reviews passiert ist — Erwähnungen, Antworten, Entscheidungen und neue Versionen.",
+    "markAllRead": "Alle als gelesen markieren",
+    "filters": {
+      "all": "Alle",
+      "allCount": "Alle ({{total}})",
+      "unread": "Ungelesen",
+      "unreadCount": "Ungelesen ({{total}})",
+      "read": "Gelesen"
+    },
+    "columns": {
+      "what": "Was passiert ist",
+      "excerpt": "Auszug",
+      "review": "Review",
+      "when": "Wann"
+    },
+    "nothingRead": {
+      "title": "Noch nichts gelesen",
+      "body": "Alles in deinem Postfach wartet noch auf dich."
+    },
+    "loadError": {
+      "title": "Deine Nachrichten haben es nicht auf den Schreibtisch geschafft",
+      "message": "Das Postfach konnte nicht geladen werden. Das liegt mit ziemlicher Sicherheit an der Verbindung, nicht an deinen Benachrichtigungen — die sind sicher."
+    }
+  },
+  "empty": {
+    "eyebrow": "Nachrichten",
+    "title": "Dein Postfach ist auf Empfang",
+    "body": "Noch ist nichts angekommen. Sobald dich jemand in einem Kommentar erwähnt, auf eine deiner Anmerkungen antwortet oder ein Review voranbringt, erscheint es hier — ganz ohne E-Mail.",
+    "perks": {
+      "mentions": "Erwähnungen deines Namens",
+      "replies": "Antworten in deinen Threads",
+      "decisions": "Entscheidungen und neue Versionen"
+    },
+    "cta": "Zu deinen Reviews",
+    "hint": "Aktivität in einem Review füllt dieses Postfach."
+  },
+  "caughtUp": {
+    "title": "Inbox Zero",
+    "body": "Du hast alles gelesen. Neue Aktivität in deinen Reviews erscheint hier, sobald sie passiert."
+  },
+  "detail": {
+    "notFound": {
+      "title": "Diese Nachricht wurde bereits abgelegt",
+      "message": "Zu diesem Link gibt es keine Benachrichtigung. Vielleicht ging es um ein Review, das inzwischen entfernt wurde.",
+      "backToMessages": "Zurück zu den Nachrichten",
+      "toDashboard": "Zum Dashboard"
+    },
+    "unavailable": "Nicht mehr verfügbar",
+    "context": "Kontext",
+    "from": "Von",
+    "review": "Review",
+    "received": "Empfangen",
+    "openReview": "Review öffnen"
+  }
+}

@@ -48,11 +48,22 @@ export default defineConfig([
       'src/components/i18n/**/*.tsx',
       'src/components/profile/**/*.tsx',
       'src/pages/ProfilePage.tsx',
+      'src/components/banner/**/*.tsx',
+      'src/components/limits/**/*.tsx',
+      'src/components/errors/**/*.tsx',
+      'src/components/notifications/**/*.tsx',
+      'src/components/branding/**/*.tsx',
+      'src/components/ClearableSearchField.tsx',
+      'src/components/TimezonePicker.tsx',
+      'src/pages/errors/**/*.tsx',
+      'src/pages/messages/**/*.tsx',
+      'src/pages/attachments/**/*.tsx',
     ],
     ignores: ['**/*.test.tsx'],
     rules: {
       // Literal text reaching the DOM: as a JSX child — directly, in a template literal, or as a
-      // branch of a ternary/&& — or as the value of a text-bearing prop, quoted or in braces.
+      // branch of a ternary/&& — or as the value of a text-bearing prop, quoted, in braces or as a
+      // text-bearing key of an object prop.
       // String concatenation is not caught; review keeps that out (it would be the odd one).
       'no-restricted-syntax': [
         'error',
@@ -65,6 +76,9 @@ export default defineConfig([
           `JSXAttribute[name.name=${TEXT_PROPS}] > JSXExpressionContainer > Literal[value=/[A-Za-z]{2,}/]`,
           `JSXAttribute[name.name=${TEXT_PROPS}] > JSXExpressionContainer > TemplateLiteral > TemplateElement[value.raw=/[A-Za-z]{2,}/]`,
           `JSXAttribute[name.name=${TEXT_PROPS}] > JSXExpressionContainer > :matches(ConditionalExpression, LogicalExpression) > Literal[value=/[A-Za-z]{2,}/]`,
+          // Text inside an object passed as a prop, e.g. primaryAction={{ label: 'Retry' }}.
+          `JSXAttribute ObjectExpression > Property[key.name=${TEXT_PROPS}] > Literal[value=/[A-Za-z]{2,}/]`,
+          `JSXAttribute ObjectExpression > Property[key.name=${TEXT_PROPS}] > TemplateLiteral > TemplateElement[value.raw=/[A-Za-z]{2,}/]`,
         ].map((selector) => ({
           selector,
           message: 'User-facing text belongs in an i18n catalog — use t() (ADR-0063).',

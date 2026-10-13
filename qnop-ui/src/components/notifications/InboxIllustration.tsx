@@ -21,6 +21,7 @@
 
 import Box from '@mui/material/Box';
 import { keyframes, useTheme } from '@mui/material/styles';
+import { useTranslation } from 'react-i18next';
 
 const floaty = keyframes`
   0%, 100% { transform: translateY(0); }
@@ -89,6 +90,7 @@ function Signal({
  * inviting accent beacon. All motion is disabled under reduced-motion.
  */
 export function InboxIllustration() {
+  const { t } = useTranslation('notifications');
   const theme = useTheme();
   const palette = theme.qnop.avatarPalette;
   const accent = theme.palette.primary.main;
@@ -103,7 +105,7 @@ export function InboxIllustration() {
       component="svg"
       viewBox="0 0 320 210"
       role="img"
-      aria-label="An empty inbox tray waiting for its first notification"
+      aria-label={t('illustration')}
       sx={{
         width: '100%',
         maxWidth: 340,

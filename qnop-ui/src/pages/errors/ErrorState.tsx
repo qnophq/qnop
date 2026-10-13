@@ -25,6 +25,7 @@ import Button from '@mui/material/Button';
 import Stack from '@mui/material/Stack';
 import Typography from '@mui/material/Typography';
 import { alpha, useTheme } from '@mui/material/styles';
+import { useTranslation } from 'react-i18next';
 import { Link as RouterLink } from 'react-router';
 import { tokens } from '../../theme/tokens';
 
@@ -49,6 +50,7 @@ interface ErrorStateProps {
   message: string;
   /** The motif from {@code illustrations.tsx} - decorative, hidden from AT. */
   illustration: ReactNode;
+  /** Defaults to "Back to dashboard". */
   primaryAction?: ErrorAction;
   secondaryAction?: ErrorAction;
   /**
@@ -85,10 +87,11 @@ export function ErrorState({
   title,
   message,
   illustration,
-  primaryAction = { label: 'Back to dashboard', to: '/' },
+  primaryAction,
   secondaryAction,
   tone = 'route',
 }: ErrorStateProps) {
+  const { t } = useTranslation();
   const theme = useTheme();
   const stagger = (index: number) => ({
     ...fadeUp,
@@ -135,7 +138,10 @@ export function ErrorState({
           <Typography color="text.secondary">{message}</Typography>
         </Stack>
         <Stack direction="row" spacing={1.5} sx={{ ...stagger(2), pt: 0.5 }}>
-          <ActionButton action={primaryAction} primary />
+          <ActionButton
+            action={primaryAction ?? { label: t('actions.backToDashboard'), to: '/' }}
+            primary
+          />
           {secondaryAction && <ActionButton action={secondaryAction} primary={false} />}
         </Stack>
       </Stack>

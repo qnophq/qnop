@@ -25,6 +25,7 @@ import ButtonBase from '@mui/material/ButtonBase';
 import Stack from '@mui/material/Stack';
 import Typography from '@mui/material/Typography';
 import { alpha, useTheme } from '@mui/material/styles';
+import { useTranslation } from 'react-i18next';
 import type { NotificationSummary } from '../../api/generated';
 import { useFormatters } from '../../hooks/useFormatters';
 import { NotificationActor } from './NotificationActor';
@@ -70,6 +71,7 @@ export function NotificationRow({
   onOpen: () => void;
   dense?: boolean;
 }) {
+  const { t } = useTranslation('notifications');
   const theme = useTheme();
   const { formatRelative } = useFormatters();
   const unread = !notification.readAt;
@@ -90,7 +92,7 @@ export function NotificationRow({
       </Typography>
       {unread && (
         <Box
-          aria-label="Unread"
+          aria-label={t('unread')}
           sx={{
             width: 7,
             height: 7,
@@ -116,7 +118,8 @@ export function NotificationRow({
         transition: 'background-color 150ms',
         '&:last-of-type': { borderBottom: 'none' },
         '&:hover, &:focus-within': {
-          bgcolor: (t) => alpha(t.palette.primary.main, t.palette.mode === 'dark' ? 0.1 : 0.05),
+          bgcolor: (theme) =>
+            alpha(theme.palette.primary.main, theme.palette.mode === 'dark' ? 0.1 : 0.05),
         },
       }}
     >
@@ -181,7 +184,7 @@ export function NotificationRow({
                 display: { xs: 'none', md: 'block' },
               }}
             >
-              {notification.preview ? `“${notification.preview}”` : ''}
+              {notification.preview ? t('quoted', { text: notification.preview }) : ''}
             </Typography>
             <Typography
               sx={{
@@ -224,6 +227,7 @@ function StackedBody({
   title: ReactNode;
   time: string;
 }) {
+  const { t } = useTranslation('notifications');
   return (
     <>
       {title}
@@ -236,7 +240,7 @@ function StackedBody({
         <Typography
           sx={{ ...CLAMP, mt: 0.25, fontSize: 12.5, color: 'text.secondary', fontStyle: 'italic' }}
         >
-          “{notification.preview}”
+          {t('quoted', { text: notification.preview })}
         </Typography>
       )}
       <Typography sx={{ mt: 0.25, fontSize: 11.5, color: 'text.disabled' }}>{time}</Typography>

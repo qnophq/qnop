@@ -20,20 +20,22 @@
  */
 
 import { useNavigate } from 'react-router';
+import { useTranslation } from 'react-i18next';
 import { ErrorState } from './ErrorState';
 import { MaintenanceIllustration } from './illustrations';
 
 /** 503 - the boss is patching itself; reassuring, back shortly (issue #611). */
 export function MaintenancePage() {
+  const { t } = useTranslation();
   const navigate = useNavigate();
   return (
     <ErrorState
       code="503"
-      title="Out to lunch - back shortly"
-      message="qnop is patching itself up. Your reviews are safe in the cabinet; give it a moment and try again."
+      title={t('errors.maintenance.title')}
+      message={t('errors.maintenance.message')}
       illustration={<MaintenanceIllustration />}
       tone="alert"
-      primaryAction={{ label: 'Retry', onClick: () => navigate(0) }}
+      primaryAction={{ label: t('actions.retry'), onClick: () => navigate(0) }}
     />
   );
 }

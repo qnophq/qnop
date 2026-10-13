@@ -23,6 +23,7 @@ import { useMemo } from 'react';
 import Autocomplete from '@mui/material/Autocomplete';
 import TextField from '@mui/material/TextField';
 import { styled } from '@mui/material/styles';
+import { useTranslation } from 'react-i18next';
 import { buildTimezoneOptions, type TimezoneOption } from '../utils/timezoneOptions';
 
 const MONO = '"JetBrains Mono", ui-monospace, monospace';
@@ -63,7 +64,7 @@ interface TimezonePickerProps {
   /** The current IANA zone id. */
   value: string;
   onChange: (zone: string) => void;
-  /** Field label; defaults to "Time zone". */
+  /** Field label; defaults to "Time zone" in the active language. */
   label?: string;
   helperText?: string;
   error?: boolean;
@@ -82,12 +83,13 @@ interface TimezonePickerProps {
 export function TimezonePicker({
   value,
   onChange,
-  label = 'Time zone',
+  label,
   helperText,
   error,
   disabled,
   maxWidth,
 }: TimezonePickerProps) {
+  const { t } = useTranslation();
   const options = useMemo(() => buildTimezoneOptions(value), [value]);
   // `value` is folded into the options, so a match always exists; the [0] guard
   // keeps the type non-null for the clear-disabled Autocomplete.
@@ -107,8 +109,8 @@ export function TimezonePicker({
       renderInput={(params) => (
         <TextField
           {...params}
-          label={label}
-          placeholder="Search a city or region…"
+          label={label ?? t('timezone.label')}
+          placeholder={t('timezone.placeholder')}
           error={error}
           helperText={helperText}
         />

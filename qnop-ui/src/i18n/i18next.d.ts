@@ -22,6 +22,7 @@
 import 'i18next';
 import type enAuth from './en/auth.json';
 import type enCommon from './en/common.json';
+import type enNotifications from './en/notifications.json';
 import type enProfile from './en/profile.json';
 import type enShell from './en/shell.json';
 
@@ -37,6 +38,7 @@ declare module 'i18next' {
       auth: typeof enAuth;
       shell: typeof enShell;
       profile: typeof enProfile;
+      notifications: typeof enNotifications;
     };
     returnNull: false;
   }

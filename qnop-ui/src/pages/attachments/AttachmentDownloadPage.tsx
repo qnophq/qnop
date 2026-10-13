@@ -20,6 +20,7 @@
  */
 
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Link as RouterLink, useParams } from 'react-router';
 import Box from '@mui/material/Box';
 import Button from '@mui/material/Button';
@@ -35,7 +36,7 @@ type State =
   | { phase: 'idle' }
   | { phase: 'running' }
   | { phase: 'done'; fileName: string }
-  | { phase: 'failed'; message: string };
+  | { phase: 'failed' };
 
 /**
  * The landing page an exported report's attachment link points at (issue #635).
@@ -54,6 +55,7 @@ type State =
  */
 export function AttachmentDownloadPage() {
   const { documentId, attachmentId } = useParams<{ documentId: string; attachmentId: string }>();
+  const { t } = useTranslation();
   const [state, setState] = useState<State>({ phase: 'idle' });
 
   const start = async () => {
@@ -65,11 +67,7 @@ export function AttachmentDownloadPage() {
     } catch {
       // 404 covers both "gone" and "not yours" — the API refuses to distinguish
       // them, so neither does this page.
-      setState({
-        phase: 'failed',
-        message:
-          'This file is not available. It may have been deleted, or the review may not be shared with you.',
-      });
+      setState({ phase: 'failed' });
     }
   };
 
@@ -83,7 +81,7 @@ export function AttachmentDownloadPage() {
           borderRadius: 3,
           border: '1px solid',
           borderColor: 'divider',
-          bgcolor: (t) => t.qnop.surface2,
+          bgcolor: (theme) => theme.qnop.surface2,
           textAlign: 'center',
         }}
       >
@@ -96,7 +94,7 @@ export function AttachmentDownloadPage() {
             display: 'grid',
             placeItems: 'center',
             borderRadius: '50%',
-            bgcolor: (t) => alpha(t.palette.primary.main, 0.1),
+            bgcolor: (theme) => alpha(theme.palette.primary.main, 0.1),
             color: 'primary.main',
           }}
         >
@@ -104,13 +102,11 @@ export function AttachmentDownloadPage() {
         </Box>
 
         <Typography component="h1" sx={{ fontSize: 20, fontWeight: 800, mb: 0.5 }}>
-          {state.phase === 'done' ? 'Saved' : 'Review attachment'}
+          {state.phase === 'done' ? t('attachments.saved') : t('attachments.title')}
         </Typography>
 
         <Typography sx={{ fontSize: 14, color: 'text.secondary', mb: 3 }}>
-          {state.phase === 'done'
-            ? state.fileName
-            : 'This file was attached to an annotation. Download it to your device.'}
+          {state.phase === 'done' ? state.fileName : t('attachments.description')}
         </Typography>
 
         {state.phase === 'failed' && (
@@ -129,7 +125,7 @@ export function AttachmentDownloadPage() {
             }}
           >
             <TriangleAlert size={16} style={{ flexShrink: 0, marginTop: 2 }} />
-            <Typography sx={{ fontSize: 13 }}>{state.message}</Typography>
+            <Typography sx={{ fontSize: 13 }}>{t('attachments.unavailable')}</Typography>
           </Stack>
         )}
 
@@ -147,12 +143,12 @@ export function AttachmentDownloadPage() {
           }
           onClick={() => void start()}
         >
-          {state.phase === 'done' ? 'Download again' : 'Download'}
+          {state.phase === 'done' ? t('attachments.downloadAgain') : t('attachments.download')}
         </Button>
 
         <Typography sx={{ fontSize: 12.5, color: 'text.secondary', mt: 2 }}>
           <Link component={RouterLink} to={`/reviews/${documentId ?? ''}`} underline="hover">
-            Open the review
+            {t('attachments.openReview')}
           </Link>
         </Typography>
       </Box>

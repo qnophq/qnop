@@ -22,24 +22,24 @@
 import { describe, expect, it } from 'vitest';
 import { NotificationType } from '../../api/generated';
 import { buildTheme } from '../../theme/theme';
-import { notificationLabel, notificationTone } from './notificationMeta';
+import { notificationLabelKey, notificationTone } from './notificationMeta';
 
 const THEME = buildTheme('light');
 const ALL_TYPES = Object.values(NotificationType);
 
-describe('notificationLabel', () => {
+describe('notificationLabelKey', () => {
   it('names every type in the contract', () => {
     for (const type of ALL_TYPES) {
-      expect(notificationLabel(type)).not.toBe('Notification');
+      expect(notificationLabelKey(type)).not.toBe('types.fallback');
     }
-    expect(notificationLabel(NotificationType.Mention)).toBe('Mention');
-    expect(notificationLabel(NotificationType.ParticipantAdded)).toBe('Invitation');
+    expect(notificationLabelKey(NotificationType.Mention)).toBe('types.mention');
+    expect(notificationLabelKey(NotificationType.ParticipantAdded)).toBe('types.participantAdded');
   });
 
   it('falls back rather than rendering nothing for an unknown type', () => {
     // The contract can gain a type before the UI knows it — a new enum value
     // must degrade to a generic label, never to `undefined`.
-    expect(notificationLabel('SOMETHING_NEW' as NotificationType)).toBe('Notification');
+    expect(notificationLabelKey('SOMETHING_NEW' as NotificationType)).toBe('types.fallback');
   });
 });
 

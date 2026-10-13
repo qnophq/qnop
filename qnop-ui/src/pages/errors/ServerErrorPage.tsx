@@ -20,21 +20,23 @@
  */
 
 import { useNavigate } from 'react-router';
+import { useTranslation } from 'react-i18next';
 import { ErrorState } from './ErrorState';
 import { ServerErrorIllustration } from './illustrations';
 
 /** 500 - our shredder, our fault; self-deprecating, never blaming (issue #611). */
 export function ServerErrorPage() {
+  const { t } = useTranslation();
   const navigate = useNavigate();
   return (
     <ErrorState
       code="500"
-      title="Our shredder grabbed the wrong document"
-      message="Something broke on our side - not your doing. Trying again usually works; if it keeps happening, your admin will want to know."
+      title={t('errors.serverError.title')}
+      message={t('errors.serverError.message')}
       illustration={<ServerErrorIllustration />}
       tone="alert"
-      primaryAction={{ label: 'Try again', onClick: () => navigate(0) }}
-      secondaryAction={{ label: 'Back to dashboard', to: '/' }}
+      primaryAction={{ label: t('actions.tryAgain'), onClick: () => navigate(0) }}
+      secondaryAction={{ label: t('actions.backToDashboard'), to: '/' }}
     />
   );
 }

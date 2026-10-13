@@ -21,6 +21,7 @@
 
 import { AxiosError, type AxiosResponse } from 'axios';
 import { describe, expect, it } from 'vitest';
+import { applyLocale } from '../i18n';
 import { apiErrorCode, apiErrorMessage, apiFieldErrors } from './apiError';
 
 function axiosWithStatus(status: number): AxiosError {
@@ -52,6 +53,20 @@ describe('apiErrorMessage', () => {
   it('falls back for unknown errors', () => {
     expect(apiErrorMessage(new Error('boom'), 'fallback')).toBe('fallback');
     expect(apiErrorMessage(axiosWithStatus(500), 'fallback')).toBe('fallback');
+  });
+
+  it('resolves its own texts in the active language at call time', async () => {
+    await applyLocale('de');
+    try {
+      expect(apiErrorMessage(axiosWithStatus(429), 'fallback')).toBe(
+        'Zu viele Versuche. Bitte versuche es später noch einmal.',
+      );
+    } finally {
+      await applyLocale('en');
+    }
+    expect(apiErrorMessage(axiosWithStatus(429), 'fallback')).toBe(
+      'Too many attempts. Please try again later.',
+    );
   });
 });
 

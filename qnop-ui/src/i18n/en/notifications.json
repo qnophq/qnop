@@ -1,0 +1,76 @@
+{
+  "types": {
+    "mention": "Mention",
+    "participantAdded": "Invitation",
+    "annotationCreated": "New annotation",
+    "annotationDecided": "Decision",
+    "commentAdded": "Reply",
+    "versionUploaded": "New version",
+    "workflowChanged": "Workflow",
+    "reviewDeleted": "Review deleted",
+    "fallback": "Notification"
+  },
+  "quoted": "“{{text}}”",
+  "unread": "Unread",
+  "actor": {
+    "unknown": "Unknown",
+    "viewProfile": "View {{name}}'s profile"
+  },
+  "illustration": "An empty inbox tray waiting for its first notification",
+  "inbox": {
+    "title": "Messages",
+    "description": "Everything that happened on your reviews — mentions, replies, decisions and new versions.",
+    "markAllRead": "Mark all read",
+    "filters": {
+      "all": "All",
+      "allCount": "All ({{total}})",
+      "unread": "Unread",
+      "unreadCount": "Unread ({{total}})",
+      "read": "Read"
+    },
+    "columns": {
+      "what": "What happened",
+      "excerpt": "Excerpt",
+      "review": "Review",
+      "when": "When"
+    },
+    "nothingRead": {
+      "title": "Nothing read yet",
+      "body": "Everything in your inbox is still waiting for you."
+    },
+    "loadError": {
+      "title": "Your messages didn't make it to the desk",
+      "message": "The inbox could not be loaded. It is almost certainly the connection, not your notifications — they are safe."
+    }
+  },
+  "empty": {
+    "eyebrow": "Messages",
+    "title": "Your inbox is listening",
+    "body": "Nothing has landed yet. The moment someone names you in a comment, answers one of your annotations or moves a review along, it shows up here — no mailbox required.",
+    "perks": {
+      "mentions": "Mentions that name you",
+      "replies": "Replies on your threads",
+      "decisions": "Decisions and new versions"
+    },
+    "cta": "Go to your reviews",
+    "hint": "Activity on a review is what fills this inbox."
+  },
+  "caughtUp": {
+    "title": "Inbox zero",
+    "body": "You have read everything. New activity on your reviews will show up the moment it happens."
+  },
+  "detail": {
+    "notFound": {
+      "title": "This message has already been filed away",
+      "message": "No notification answers to that link. It may have been about a review that has since been removed.",
+      "backToMessages": "Back to messages",
+      "toDashboard": "Go to dashboard"
+    },
+    "unavailable": "No longer available",
+    "context": "Context",
+    "from": "From",
+    "review": "Review",
+    "received": "Received",
+    "openReview": "Open review"
+  }
+}

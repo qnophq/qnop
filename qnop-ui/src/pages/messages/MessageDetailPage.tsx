@@ -29,12 +29,13 @@ import Stack from '@mui/material/Stack';
 import Typography from '@mui/material/Typography';
 import { alpha, keyframes, useTheme } from '@mui/material/styles';
 import { ArrowRight } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import { useNavigate, useParams } from 'react-router';
 import { useMarkNotificationRead, useNotification } from '../../api/hooks/useNotifications';
 import { NotificationTypeIcon } from '../../components/notifications/NotificationTypeIcon';
 import { NotificationActor } from '../../components/notifications/NotificationActor';
 import {
-  notificationLabel,
+  notificationLabelKey,
   notificationTone,
 } from '../../components/notifications/notificationMeta';
 import { useFormatters } from '../../hooks/useFormatters';
@@ -76,6 +77,7 @@ function RailFact({ label, value }: { label: string; value: string }) {
  * silently clear the badge.
  */
 export function MessageDetailPage() {
+  const { t } = useTranslation('notifications');
   const { notificationId = '' } = useParams();
   const navigate = useNavigate();
   const theme = useTheme();
@@ -97,11 +99,11 @@ export function MessageDetailPage() {
     return (
       <ErrorState
         code="404"
-        title="This message has already been filed away"
-        message="No notification answers to that link. It may have been about a review that has since been removed."
+        title={t('detail.notFound.title')}
+        message={t('detail.notFound.message')}
         illustration={<NotFoundIllustration />}
-        primaryAction={{ label: 'Back to messages', to: '/messages' }}
-        secondaryAction={{ label: 'Go to dashboard', to: '/' }}
+        primaryAction={{ label: t('detail.notFound.backToMessages'), to: '/messages' }}
+        secondaryAction={{ label: t('detail.notFound.toDashboard'), to: '/' }}
       />
     );
   }
@@ -187,7 +189,7 @@ export function MessageDetailPage() {
                       color: tone,
                     }}
                   >
-                    {notificationLabel(data.type)}
+                    {t(notificationLabelKey(data.type))}
                   </Typography>
                   <Typography variant="h1" sx={{ fontSize: 22, lineHeight: 1.25, mt: 0.25 }}>
                     {data.title}
@@ -197,7 +199,7 @@ export function MessageDetailPage() {
 
               {!data.accessible && (
                 <Chip
-                  label="No longer available"
+                  label={t('detail.unavailable')}
                   size="small"
                   variant="outlined"
                   sx={{ mt: 1.5 }}
@@ -226,7 +228,7 @@ export function MessageDetailPage() {
                   }}
                 >
                   <Typography sx={{ fontSize: 14, fontStyle: 'italic', color: 'text.secondary' }}>
-                    “{data.preview}”
+                    {t('quoted', { text: data.preview })}
                   </Typography>
                 </Box>
               )}
@@ -254,13 +256,15 @@ export function MessageDetailPage() {
                   color: 'text.disabled',
                 }}
               >
-                Context
+                {t('detail.context')}
               </Typography>
 
               <Stack spacing={1.75} sx={{ mt: 1.75 }}>
                 {data.actorName && (
                   <Box>
-                    <Typography sx={{ fontSize: 12, color: 'text.secondary' }}>From</Typography>
+                    <Typography sx={{ fontSize: 12, color: 'text.secondary' }}>
+                      {t('detail.from')}
+                    </Typography>
                     <Box sx={{ mt: 0.5 }}>
                       <NotificationActor
                         name={data.actorName}
@@ -271,8 +275,10 @@ export function MessageDetailPage() {
                     </Box>
                   </Box>
                 )}
-                {data.documentTitle && <RailFact label="Review" value={data.documentTitle} />}
-                <RailFact label="Received" value={formatDateTime(data.createdAt)} />
+                {data.documentTitle && (
+                  <RailFact label={t('detail.review')} value={data.documentTitle} />
+                )}
+                <RailFact label={t('detail.received')} value={formatDateTime(data.createdAt)} />
               </Stack>
 
               {data.actionPath && (
@@ -283,7 +289,7 @@ export function MessageDetailPage() {
                   onClick={() => navigate(data.actionPath as string)}
                   sx={{ mt: 3 }}
                 >
-                  {data.actionLabel ?? 'Open review'}
+                  {data.actionLabel ?? t('detail.openReview')}
                 </Button>
               )}
             </Box>

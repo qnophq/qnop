@@ -23,6 +23,7 @@ import IconButton from '@mui/material/IconButton';
 import InputAdornment from '@mui/material/InputAdornment';
 import TextField, { type TextFieldProps } from '@mui/material/TextField';
 import { Search, X } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 
 interface ClearableSearchFieldProps extends Omit<
   TextFieldProps,
@@ -37,7 +38,7 @@ interface ClearableSearchFieldProps extends Omit<
    * Provide one when clearing must do more — e.g. skip a debounce or reset paging.
    */
   onClear?: () => void;
-  /** aria-label of the clear button. */
+  /** aria-label of the clear button; defaults to "Clear search" in the active language. */
   clearLabel?: string;
   /** Hide the leading search icon (e.g. when the field's label already says "Search"). */
   hideSearchIcon?: boolean;
@@ -57,12 +58,13 @@ export function ClearableSearchField({
   value,
   onValueChange,
   onClear,
-  clearLabel = 'Clear search',
+  clearLabel,
   hideSearchIcon = false,
   inputAriaLabel,
   maxLength,
   ...textFieldProps
 }: ClearableSearchFieldProps) {
+  const { t } = useTranslation();
   return (
     <TextField
       size="small"
@@ -80,7 +82,7 @@ export function ClearableSearchField({
           endAdornment: value ? (
             <InputAdornment position="end">
               <IconButton
-                aria-label={clearLabel}
+                aria-label={clearLabel ?? t('search.clear')}
                 size="small"
                 edge="end"
                 onClick={onClear ?? (() => onValueChange(''))}

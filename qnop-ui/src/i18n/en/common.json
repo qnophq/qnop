@@ -25,5 +25,76 @@
       "on": "due {{date}}",
       "wasDueOn": "was due {{date}}"
     }
+  },
+  "loading": "Loading…",
+  "actions": {
+    "tryAgain": "Try again",
+    "retry": "Retry",
+    "backToDashboard": "Back to dashboard"
+  },
+  "boundary": {
+    "title": "Something went wrong",
+    "message": "This part of the page ran into an unexpected error. You can try again, or reload the page if it keeps happening."
+  },
+  "errors": {
+    "rateLimited": "Too many attempts. Please try again later.",
+    "invalidOrExpiredLink": "The request is invalid or the link has expired.",
+    "notFound": {
+      "title": "This page folded itself into a paper plane",
+      "message": "Wherever it landed, it isn't at this address. Head back to the dashboard and pick up your quest from there.",
+      "myReviews": "My reviews"
+    },
+    "forbidden": {
+      "title": "This binder is locked",
+      "message": "Your account doesn't have access to this area. If your quest leads through here, an administrator can hand you the key."
+    },
+    "featureUnavailable": {
+      "title": "Not part of this deployment",
+      "message": "This qnop installation doesn't offer this feature. Nothing about your account changes that — whoever operates this deployment decides, and can turn it back on."
+    },
+    "conflict": {
+      "title": "Two pins landed on the same line",
+      "message": "Someone changed this while you were on your way to it. Reload to see the current state - nothing of yours was lost.",
+      "reload": "Reload this page"
+    },
+    "serverError": {
+      "title": "Our shredder grabbed the wrong document",
+      "message": "Something broke on our side - not your doing. Trying again usually works; if it keeps happening, your admin will want to know."
+    },
+    "maintenance": {
+      "title": "Out to lunch - back shortly",
+      "message": "qnop is patching itself up. Your reviews are safe in the cabinet; give it a moment and try again."
+    },
+    "rateLimit": {
+      "title": "Easy there, stamp champion",
+      "message": "That was a lot of requests in a very short time. Take a breath - a moment from now everything works again."
+    },
+    "offline": {
+      "title": "The string between our paper cups snapped",
+      "message": "You seem to be offline. Nothing is lost - once the connection is back, everything picks up where it stopped.",
+      "retry": "Retry connection"
+    }
+  },
+  "search": {
+    "clear": "Clear search"
+  },
+  "timezone": {
+    "label": "Time zone",
+    "placeholder": "Search a city or region…"
+  },
+  "quota": {
+    "ceilingNote": "The ceiling is set where this deployment is configured, not in the admin settings."
+  },
+  "banner": {
+    "dismiss": "Dismiss this notice"
+  },
+  "attachments": {
+    "title": "Review attachment",
+    "saved": "Saved",
+    "description": "This file was attached to an annotation. Download it to your device.",
+    "unavailable": "This file is not available. It may have been deleted, or the review may not be shared with you.",
+    "download": "Download",
+    "downloadAgain": "Download again",
+    "openReview": "Open the review"
   }
 }

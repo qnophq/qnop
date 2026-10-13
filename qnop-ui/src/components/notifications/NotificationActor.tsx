@@ -20,6 +20,7 @@
  */
 
 import Box from '@mui/material/Box';
+import { useTranslation } from 'react-i18next';
 import { Link as RouterLink } from 'react-router';
 import { useUserProfile } from '../../api/hooks/useUsers';
 import { UserHoverCard } from '../people/UserHoverCard';
@@ -51,8 +52,9 @@ export function NotificationActor({
   size?: number;
   showName?: boolean;
 }) {
+  const { t } = useTranslation('notifications');
   const profile = useUserProfile(slug ?? '', Boolean(slug)).data;
-  const displayName = profile?.displayName ?? name ?? 'Unknown';
+  const displayName = profile?.displayName ?? name ?? t('actor.unknown');
 
   const avatar = (
     <UserAvatar name={displayName} size={size} imageUrl={profile?.avatarUrl ?? null} />
@@ -86,14 +88,14 @@ export function NotificationActor({
     <Box
       component={RouterLink}
       to={`/users/${slug}`}
-      aria-label={`View ${displayName}'s profile`}
+      aria-label={t('actor.viewProfile', { name: displayName })}
       sx={{
         display: 'inline-flex',
         alignItems: 'center',
         minWidth: 0,
         textDecoration: 'none',
         borderRadius: '999px',
-        '&:focus-visible': { outline: 'none', boxShadow: (t) => t.qnop.focusRing },
+        '&:focus-visible': { outline: 'none', boxShadow: (theme) => theme.qnop.focusRing },
       }}
     >
       {face}

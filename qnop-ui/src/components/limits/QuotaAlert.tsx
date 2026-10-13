@@ -21,6 +21,7 @@
 
 import type { ReactNode } from 'react';
 import Alert from '@mui/material/Alert';
+import { useTranslation } from 'react-i18next';
 
 /**
  * A quota that has been reached (issue #690).
@@ -37,9 +38,10 @@ import Alert from '@mui/material/Alert';
  * administer, so looking for it there is wasted time.
  */
 export function QuotaAlert({ children }: { children: ReactNode }) {
+  const { t } = useTranslation();
   return (
     <Alert severity="warning">
-      {children} The ceiling is set where this deployment is configured, not in the admin settings.
+      {children} {t('quota.ceilingNote')}
     </Alert>
   );
 }

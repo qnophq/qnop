@@ -20,6 +20,7 @@
  */
 
 import type { Theme } from '@mui/material/styles';
+import type { ParseKeys } from 'i18next';
 import { NotificationType } from '../../api/generated';
 
 /**
@@ -30,16 +31,21 @@ import { NotificationType } from '../../api/generated';
  * green, a new version always amber. The detail page then wears that colour as
  * a crest, so "what happened" is legible before a single word is read. Colours
  * come from the brand's avatar ramp, so nothing new enters the palette.
+ *
+ * The names are catalog keys (ADR-0063), translated at render so they follow a
+ * language switch.
  */
-const LABELS: Record<NotificationType, string> = {
-  [NotificationType.Mention]: 'Mention',
-  [NotificationType.ParticipantAdded]: 'Invitation',
-  [NotificationType.AnnotationCreated]: 'New annotation',
-  [NotificationType.AnnotationDecided]: 'Decision',
-  [NotificationType.CommentAdded]: 'Reply',
-  [NotificationType.VersionUploaded]: 'New version',
-  [NotificationType.WorkflowChanged]: 'Workflow',
-  [NotificationType.ReviewDeleted]: 'Review deleted',
+export type NotificationsKey = ParseKeys<'notifications'>;
+
+const LABEL_KEYS: Record<NotificationType, NotificationsKey> = {
+  [NotificationType.Mention]: 'types.mention',
+  [NotificationType.ParticipantAdded]: 'types.participantAdded',
+  [NotificationType.AnnotationCreated]: 'types.annotationCreated',
+  [NotificationType.AnnotationDecided]: 'types.annotationDecided',
+  [NotificationType.CommentAdded]: 'types.commentAdded',
+  [NotificationType.VersionUploaded]: 'types.versionUploaded',
+  [NotificationType.WorkflowChanged]: 'types.workflowChanged',
+  [NotificationType.ReviewDeleted]: 'types.reviewDeleted',
 };
 
 /** Index into the brand's avatar ramp — see `tokens.ts`. */
@@ -56,8 +62,9 @@ const TONE_INDEX: Record<NotificationType, number> = {
   [NotificationType.ReviewDeleted]: 4,
 };
 
-export function notificationLabel(type: NotificationType): string {
-  return LABELS[type] ?? 'Notification';
+/** The `notifications` catalog key naming the type; a type the UI does not know yet gets a generic one. */
+export function notificationLabelKey(type: NotificationType): NotificationsKey {
+  return LABEL_KEYS[type] ?? 'types.fallback';
 }
 
 /** The type's colour, resolved against the current theme's avatar ramp. */

@@ -20,6 +20,7 @@
  */
 
 import { useNavigate } from 'react-router';
+import { useTranslation } from 'react-i18next';
 import { ErrorState } from './ErrorState';
 import { ConflictIllustration } from './illustrations';
 
@@ -29,16 +30,17 @@ import { ConflictIllustration } from './illustrations';
  * in-page conflicts stay inline where they are handled today.
  */
 export function ConflictPage() {
+  const { t } = useTranslation();
   const navigate = useNavigate();
   return (
     <ErrorState
       code="409"
-      title="Two pins landed on the same line"
-      message="Someone changed this while you were on your way to it. Reload to see the current state - nothing of yours was lost."
+      title={t('errors.conflict.title')}
+      message={t('errors.conflict.message')}
       illustration={<ConflictIllustration />}
       tone="alert"
-      primaryAction={{ label: 'Reload this page', onClick: () => navigate(0) }}
-      secondaryAction={{ label: 'Back to dashboard', to: '/' }}
+      primaryAction={{ label: t('errors.conflict.reload'), onClick: () => navigate(0) }}
+      secondaryAction={{ label: t('actions.backToDashboard'), to: '/' }}
     />
   );
 }

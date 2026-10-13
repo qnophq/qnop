@@ -20,21 +20,23 @@
  */
 
 import { useNavigate } from 'react-router';
+import { useTranslation } from 'react-i18next';
 import { ErrorState } from './ErrorState';
 import { RateLimitIllustration } from './illustrations';
 
 /** 429 - easy there; the rate limit (ADR-0027) asked for a breather (issue #611). */
 export function RateLimitPage() {
+  const { t } = useTranslation();
   const navigate = useNavigate();
   return (
     <ErrorState
       code="429"
-      title="Easy there, stamp champion"
-      message="That was a lot of requests in a very short time. Take a breath - a moment from now everything works again."
+      title={t('errors.rateLimit.title')}
+      message={t('errors.rateLimit.message')}
       illustration={<RateLimitIllustration />}
       tone="alert"
-      primaryAction={{ label: 'Try again', onClick: () => navigate(0) }}
-      secondaryAction={{ label: 'Back to dashboard', to: '/' }}
+      primaryAction={{ label: t('actions.tryAgain'), onClick: () => navigate(0) }}
+      secondaryAction={{ label: t('actions.backToDashboard'), to: '/' }}
     />
   );
 }
