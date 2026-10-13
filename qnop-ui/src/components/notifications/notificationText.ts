@@ -40,20 +40,27 @@ type NotificationFields = Pick<
 > &
   Partial<Pick<NotificationDetail, 'body' | 'actionLabel'>>;
 
-/** The types whose headline or body names who did it. */
-const ACTOR_LED = new Set<NotificationType>([
+/** The types whose headline names who did it. */
+const ACTOR_TITLES = new Set<NotificationType>([
   NotificationType.Mention,
-  NotificationType.ParticipantAdded,
   NotificationType.AnnotationCreated,
-  NotificationType.AnnotationDecided,
   NotificationType.CommentAdded,
+]);
+
+/** The types whose body names who did it. */
+const ACTOR_BODIES = new Set<NotificationType>([
+  ...ACTOR_TITLES,
+  NotificationType.ParticipantAdded,
+  NotificationType.AnnotationDecided,
   NotificationType.VersionUploaded,
 ]);
 
 const DECISIONS = ['resolved', 'reopened', 'dismissed'] as const;
-type Decision = (typeof DECISIONS)[number];
+type Decision = (typeof DECISIONS)[number] | 'decided';
 
+/** A decision the catalog words; none recorded reads "decided", as on the server. */
 function knownDecision(decision: string | null | undefined): Decision | null {
+  if (!decision) return 'decided';
   return DECISIONS.find((known) => known === decision) ?? null;
 }
 
@@ -78,13 +85,14 @@ export function useNotificationText() {
       review: n.documentTitle ?? t('text.aReview'),
     });
 
-    // The actor-led sentences need a name; without one, keep the server's text.
-    const needsActor = (n: NotificationFields) => ACTOR_LED.has(n.type) && !n.actorName;
+    // A sentence that names who did it needs the name; without one, keep the server's text.
+    const missingActor = (n: NotificationFields, sentences: Set<NotificationType>) =>
+      sentences.has(n.type) && !n.actorName;
 
     const title = (n: NotificationFields): string => {
       if (n.type === NotificationType.ReviewDeleted) return t('text.title.reviewDeleted');
       if (!n.accessible) return t('text.title.tombstone');
-      if (needsActor(n)) return n.title;
+      if (missingActor(n, ACTOR_TITLES)) return n.title;
       const v = values(n);
       switch (n.type) {
         case NotificationType.Mention:
@@ -115,7 +123,7 @@ export function useNotificationText() {
       const v = values(n);
       if (n.type === NotificationType.ReviewDeleted) return t('text.body.reviewDeleted', v);
       if (!n.accessible) return t('text.body.tombstone');
-      if (needsActor(n)) return fallback;
+      if (missingActor(n, ACTOR_BODIES)) return fallback;
       switch (n.type) {
         case NotificationType.Mention:
           return t('text.body.mention', v);

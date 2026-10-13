@@ -82,7 +82,8 @@
       "annotationDecided": {
         "resolved": "Eine Anmerkung wurde erledigt",
         "reopened": "Eine Anmerkung wurde wieder geöffnet",
-        "dismissed": "Eine Anmerkung wurde verworfen"
+        "dismissed": "Eine Anmerkung wurde verworfen",
+        "decided": "Über eine Anmerkung wurde entschieden"
       },
       "commentAdded": "{{actor}} hat geantwortet",
       "versionUploaded": "Neue Version hochgeladen",
@@ -97,7 +98,8 @@
       "annotationDecided": {
         "resolved": "{{actor}} hat eine Anmerkung zu „{{review}}“ erledigt.",
         "reopened": "{{actor}} hat eine Anmerkung zu „{{review}}“ wieder geöffnet.",
-        "dismissed": "{{actor}} hat eine Anmerkung zu „{{review}}“ verworfen."
+        "dismissed": "{{actor}} hat eine Anmerkung zu „{{review}}“ verworfen.",
+        "decided": "{{actor}} hat über eine Anmerkung zu „{{review}}“ entschieden."
       },
       "commentAdded": "{{actor}} hat in einer Diskussion zu „{{review}}“ geantwortet.",
       "versionUploaded": "{{actor}} hat Version {{version}} von „{{review}}“ hochgeladen.",

@@ -80,6 +80,42 @@ describe('useNotificationText', () => {
     });
   });
 
+  it('matches the server for the remaining types and states', () => {
+    expect(words(detail({ type: 'ANNOTATION_CREATED' }))).toMatchObject({
+      title: 'Ada Admin raised an annotation',
+      body: 'Ada Admin raised a new annotation on “NDA Acme Corp”.',
+    });
+    expect(words(detail({ type: 'COMMENT_ADDED' }))).toMatchObject({
+      title: 'Ada Admin replied',
+      body: 'Ada Admin replied to a discussion on “NDA Acme Corp”.',
+    });
+    expect(words(detail({ type: 'ANNOTATION_DECIDED', decision: 'resolved' }))).toMatchObject({
+      title: 'An annotation was resolved',
+      body: 'Ada Admin resolved an annotation on “NDA Acme Corp”.',
+    });
+    expect(words(detail({ type: 'ANNOTATION_DECIDED', decision: 'reopened' })).title).toBe(
+      'An annotation was reopened',
+    );
+    // No decision recorded reads "decided", as on the server.
+    expect(words(detail({ type: 'ANNOTATION_DECIDED' }))).toMatchObject({
+      title: 'An annotation was decided',
+      body: 'Ada Admin decided an annotation on “NDA Acme Corp”.',
+    });
+    expect(words(detail({ type: 'COMMENT_ADDED', accessible: false }))).toMatchObject({
+      title: 'A review you no longer have access to',
+      body: 'This notification refers to a review that is no longer available to you.',
+    });
+    expect(
+      words(detail({ type: 'REVIEW_DELETED', accessible: false, documentTitle: undefined })),
+    ).toMatchObject({
+      title: 'A review was deleted',
+      body: '“a review” was permanently deleted by an administrator.',
+    });
+    expect(
+      words(detail({ type: 'REVIEW_DELETED', accessible: false, documentTitle: 'Old NDA' })).body,
+    ).toBe('“Old NDA” was permanently deleted by an administrator.');
+  });
+
   it('words them in German', async () => {
     await act(() => applyLocale('de'));
     expect(words(detail({ type: 'COMMENT_ADDED' }))).toEqual({
@@ -122,6 +158,23 @@ describe('useNotificationText', () => {
       'server title',
     );
     expect(words(detail({ type: 'MENTION', actorName: undefined })).body).toBe('server body');
+    // A headline that does not name the actor still translates without one.
+    expect(words(detail({ type: 'VERSION_UPLOADED', actorName: undefined })).title).toBe(
+      'Neue Version hochgeladen',
+    );
+    expect(words(detail({ type: 'VERSION_UPLOADED', versionNumber: undefined })).body).toBe(
+      'server body',
+    );
+    // An edition-specific state the catalog does not know is humanized, not dropped.
+    expect(
+      words(detail({ type: 'WORKFLOW_CHANGED', fromState: 'DRAFT', toState: 'LEGAL_HOLD' })).title,
+    ).toBe('Das Review ist jetzt „Legal hold“');
+    expect(
+      words(detail({ type: 'ANNOTATION_DECIDED', decision: undefined, actionTarget: undefined })),
+    ).toMatchObject({
+      title: 'Über eine Anmerkung wurde entschieden',
+      action: 'Review öffnen',
+    });
     expect(
       words(
         detail({ type: 'SOMETHING_NEW' as NotificationDetail['type'], actionTarget: undefined }),

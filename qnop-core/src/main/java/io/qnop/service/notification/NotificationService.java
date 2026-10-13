@@ -173,7 +173,8 @@ public class NotificationService {
    * it.
    */
   private NotificationView deletedReview(Notification notification) {
-    String title = notification.getExcerpt() == null ? "a review" : notification.getExcerpt();
+    String excerpt = blankToNull(notification.getExcerpt());
+    String title = excerpt == null ? "a review" : excerpt;
     return new NotificationView(
         notification.getId(),
         notification.getType().name(),
@@ -184,9 +185,10 @@ public class NotificationService {
         null,
         null,
         // No id — the row never had one — but the name, which is the whole point
-        // of the notice.
+        // of the notice. Null when it was never recorded: the "a review" stand-in
+        // belongs to the English body, not to the data (issue #836).
         null,
-        title,
+        excerpt,
         // No path and no label either: there is nothing left to open, and a link
         // that 404s would be worse than none. `accessible` false says exactly
         // that to the client.
@@ -286,13 +288,16 @@ public class NotificationService {
    * recipient's language instead of showing the English text rendered here.
    */
   private NotificationFacts facts(Notification notification) {
+    boolean workflow = notification.getType() == NotificationType.WORKFLOW_CHANGED;
     return new NotificationFacts(
         notification.getType() == NotificationType.ANNOTATION_DECIDED
             ? blankToNull(notification.getDecision())
             : null,
-        blankToNull(notification.getFromState()),
-        blankToNull(notification.getToState()),
-        notification.getVersionNumber(),
+        workflow ? blankToNull(notification.getFromState()) : null,
+        workflow ? blankToNull(notification.getToState()) : null,
+        notification.getType() == NotificationType.VERSION_UPLOADED
+            ? notification.getVersionNumber()
+            : null,
         notification.getAnnotationId() != null ? "ANNOTATION" : "REVIEW");
   }
 

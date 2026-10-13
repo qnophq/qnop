@@ -82,7 +82,8 @@
       "annotationDecided": {
         "resolved": "An annotation was resolved",
         "reopened": "An annotation was reopened",
-        "dismissed": "An annotation was dismissed"
+        "dismissed": "An annotation was dismissed",
+        "decided": "An annotation was decided"
       },
       "commentAdded": "{{actor}} replied",
       "versionUploaded": "New version uploaded",
@@ -97,7 +98,8 @@
       "annotationDecided": {
         "resolved": "{{actor}} resolved an annotation on “{{review}}”.",
         "reopened": "{{actor}} reopened an annotation on “{{review}}”.",
-        "dismissed": "{{actor}} dismissed an annotation on “{{review}}”."
+        "dismissed": "{{actor}} dismissed an annotation on “{{review}}”.",
+        "decided": "{{actor}} decided an annotation on “{{review}}”."
       },
       "commentAdded": "{{actor}} replied to a discussion on “{{review}}”.",
       "versionUploaded": "{{actor}} uploaded version {{version}} of “{{review}}”.",
