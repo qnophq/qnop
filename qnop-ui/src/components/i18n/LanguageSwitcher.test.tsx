@@ -50,6 +50,7 @@ describe('LanguageSwitcher', () => {
     expect(screen.getByRole('menuitem', { name: 'Deutsch' })).toHaveAttribute('lang', 'de');
     expect(screen.getByRole('menuitem', { name: 'Español' })).toHaveAttribute('lang', 'es');
     expect(screen.getByRole('menuitem', { name: 'Français' })).toHaveAttribute('lang', 'fr');
+    expect(screen.getByRole('menuitem', { name: 'Português' })).toHaveAttribute('lang', 'pt');
     expect(screen.getByRole('menuitem', { name: 'English' })).toHaveClass('Mui-selected');
   });
 

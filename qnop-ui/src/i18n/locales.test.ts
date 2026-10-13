@@ -66,6 +66,7 @@ describe('toSupportedLocale', () => {
     expect(toSupportedLocale('de-AT')).toBe('de');
     expect(toSupportedLocale('es-MX')).toBe('es');
     expect(toSupportedLocale('fr-CA')).toBe('fr');
+    expect(toSupportedLocale('pt-PT')).toBe('pt');
     expect(toSupportedLocale('EN_gb')).toBe('en');
     expect(toSupportedLocale('it')).toBeUndefined();
     expect(toSupportedLocale('')).toBeUndefined();

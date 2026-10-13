@@ -148,6 +148,17 @@ class UserSettingsControllerIT extends AbstractIntegrationTest {
         .andExpect(
             jsonPath("$.settings[?(@.key=='preferred_language')].value")
                 .value(org.hamcrest.Matchers.hasItem("fr")));
+    // Portuguese, the fifth (issue #854).
+    mockMvc
+        .perform(
+            patch("/api/v1/users/me/settings")
+                .with(jwt().jwt(j -> j.subject(userId.toString())))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"values\":{\"preferred_language\":\"pt\"}}"))
+        .andExpect(status().isOk())
+        .andExpect(
+            jsonPath("$.settings[?(@.key=='preferred_language')].value")
+                .value(org.hamcrest.Matchers.hasItem("pt")));
     mockMvc
         .perform(
             patch("/api/v1/users/me/settings")

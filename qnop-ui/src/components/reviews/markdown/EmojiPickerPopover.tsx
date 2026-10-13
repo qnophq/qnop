@@ -42,6 +42,7 @@ const PICKER_I18N: Record<Exclude<AppLocale, 'en'>, () => Promise<{ default: unk
   de: () => import('@emoji-mart/data/i18n/de.json'),
   es: () => import('@emoji-mart/data/i18n/es.json'),
   fr: () => import('@emoji-mart/data/i18n/fr.json'),
+  pt: () => import('@emoji-mart/data/i18n/pt.json'),
 };
 
 interface EmojiPickerPopoverProps {

@@ -1,0 +1,117 @@
+{
+  "greeting": {
+    "morning": {
+      "named": "Bom dia, {{name}}.",
+      "plain": "Bom dia."
+    },
+    "afternoon": {
+      "named": "Boa tarde, {{name}}.",
+      "plain": "Boa tarde."
+    },
+    "evening": {
+      "named": "Boa noite, {{name}}.",
+      "plain": "Boa noite."
+    }
+  },
+  "newReview": "Nova revisão",
+  "stats": {
+    "openReviews": "Revisões abertas",
+    "waitingOnYou": "Esperando por você",
+    "dueSoon": "Prazo próximo",
+    "resolvedThisWeek": "Resolvidas nesta semana"
+  },
+  "continue": "Continue de onde parou:",
+  "waiting": {
+    "title": "Esperando por você",
+    "description": "Revisões em que pedem sua participação.",
+    "empty": "Nada está esperando por você — aproveite a calma."
+  },
+  "mine": {
+    "title": "Minhas revisões",
+    "description": "Revisões pelas quais você é responsável, as em andamento primeiro.",
+    "emptyTitle": "Nenhuma revisão ainda",
+    "empty": "Comece a primeira com “Nova revisão”."
+  },
+  "reviewList": {
+    "emptyTitle": "Nada aqui ainda",
+    "caughtUp": "Tudo em dia!",
+    "readyToFinalize": "Pronta para finalizar",
+    "resolved": "Resolvidas: {{resolved}}/{{total}}",
+    "noAnnotations": "Nenhuma anotação ainda"
+  },
+  "deadlines": {
+    "title": "Prazos",
+    "description": "Quando vencem suas revisões em andamento.",
+    "emptyTitle": "Nenhum relógio correndo",
+    "empty": "Os prazos das suas revisões abertas aparecem aqui."
+  },
+  "due": {
+    "overdue_one": "{{count}} dia de atraso",
+    "overdue_many": "{{count}} dias de atraso",
+    "overdue_other": "{{count}} dias de atraso",
+    "today": "Prazo hoje",
+    "tomorrow": "Prazo amanhã",
+    "daysLeft_one": "Falta {{count}} dia",
+    "daysLeft_many": "Faltam {{count}} dias",
+    "daysLeft_other": "Faltam {{count}} dias"
+  },
+  "replies": {
+    "title": "Respostas para você",
+    "description": "As respostas mais recentes em discussões que você iniciou ou das quais participa.",
+    "emptyTitle": "Nenhuma resposta ainda",
+    "empty": "As respostas em discussões que você iniciou ou das quais participa aparecem aqui.",
+    "participant": "Participante",
+    "context": "em {{review}} · {{time}}"
+  },
+  "activity": {
+    "title": "Atividade recente",
+    "description": "O que aconteceu nas suas revisões.",
+    "emptyTitle": "Tudo tranquilo",
+    "empty": "Quando colegas agirem nas suas revisões, isso aparecerá aqui.",
+    "someone": "Alguém",
+    "phrases": {
+      "annotationCreated": "<actor/> criou uma anotação em <review/>",
+      "annotationResolved": "<actor/> resolveu uma anotação em <review/>",
+      "annotationReopened": "<actor/> reabriu uma anotação em <review/>",
+      "workflowTransition": "<actor/> alterou o status de <review/>",
+      "dueDateChanged": "<actor/> alterou o prazo de <review/>",
+      "other": "<actor/> atualizou <review/>"
+    }
+  },
+  "playerCard": {
+    "title": "Seu cartão de revisor",
+    "description": "O que seu perfil mostra ao espaço de trabalho.",
+    "viewProfile": "Ver perfil",
+    "unavailable": "As estatísticas do seu perfil não estão disponíveis no momento.",
+    "stats": {
+      "reviewsOwned": "Próprias",
+      "reviewsParticipating": "Revisando",
+      "annotationsRaised": "Criadas",
+      "annotationsResolved": "Resolvidas"
+    }
+  },
+  "person": {
+    "viewProfile": "Ver o perfil de {{name}}"
+  },
+  "empty": {
+    "title": "Sua central de comando está pronta para a primeira missão.",
+    "body": "Cada revisão que você conduz ou de que participa aparece aqui — prazos, respostas aos seus comentários e as conquistas que você resolve. Só falta um documento para começar.",
+    "cta": "Inicie sua primeira revisão",
+    "stepsTitle": "Três passos até sua primeira revisão",
+    "steps": {
+      "upload": {
+        "title": "Envie um documento",
+        "hint": "Entra um PDF, sai uma revisão."
+      },
+      "invite": {
+        "title": "Convide revisores",
+        "hint": "Pessoas ou equipes inteiras."
+      },
+      "discuss": {
+        "title": "Discuta e resolva",
+        "hint": "Anote, responda, decida."
+      }
+    },
+    "scoreboardHint": "Seu placar — ele começa a contar com sua primeira revisão."
+  }
+}

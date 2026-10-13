@@ -1,0 +1,80 @@
+{
+  "brand": {
+    "tagline": "Quality Notes · Soberano"
+  },
+  "nav": {
+    "landmark": "Navegação principal",
+    "groups": {
+      "administration": "Administração"
+    },
+    "items": {
+      "dashboard": "Painel",
+      "reviews": "Revisões",
+      "myTeams": "Minhas equipes",
+      "messages": "Mensagens",
+      "settings": "Configurações",
+      "configuration": "Configuração do servidor",
+      "users": "Usuários",
+      "teams": "Equipes",
+      "branding": "Identidade visual",
+      "oidcProviders": "Provedores OIDC",
+      "email": "E-mail",
+      "scheduler": "Agendador",
+      "storageConsistency": "Consistência do armazenamento",
+      "audit": "Auditoria"
+    }
+  },
+  "breadcrumbs": {
+    "landmark": "Trilha de navegação",
+    "profile": "Perfil"
+  },
+  "topBar": {
+    "menu": "Menu",
+    "toggleMenu": "Mostrar ou ocultar o menu",
+    "lightMode": "Modo claro",
+    "darkMode": "Modo escuro",
+    "switchToLight": "Mudar para o modo claro",
+    "switchToDark": "Mudar para o modo escuro",
+    "notifications": "Notificações",
+    "notificationsUnreadTooltip": "Notificações (não lidas: {{count}})",
+    "notificationsUnreadLabel": "Notificações, não lidas: {{count}}"
+  },
+  "notifications": {
+    "title": "Notificações",
+    "newCount": "Novas: {{count}}",
+    "markAllRead": "Marcar tudo como lido",
+    "loading": "Carregando notificações",
+    "empty": "Nada de novo. A atividade nas suas revisões aparecerá aqui.",
+    "seeAll": "Ver todas as mensagens"
+  },
+  "userMenu": {
+    "trigger": "Menu do usuário",
+    "unknownUser": "Desconhecido",
+    "roles": {
+      "ADMIN": "Administrador",
+      "MEMBER": "Membro",
+      "AUDITOR": "Auditor"
+    },
+    "profile": "Perfil",
+    "changePassword": "Alterar senha",
+    "signOut": "Sair"
+  },
+  "search": {
+    "placeholder": "Pesquisar…",
+    "inputLabel": "Pesquisar revisões, pessoas e equipes",
+    "shortcutCtrl": "Ctrl K",
+    "resultsLabel": "Resultados da pesquisa",
+    "tooShort": "Continue digitando — pelo menos 2 caracteres.",
+    "unavailable": "A pesquisa não está disponível no momento.",
+    "noMatches": "Nenhum resultado para “{{query}}”.",
+    "sections": {
+      "reviews": "Revisões",
+      "annotations": "Anotações",
+      "comments": "Comentários",
+      "people": "Pessoas",
+      "teams": "Equipes"
+    },
+    "inDocument": "em {{title}}",
+    "seeAll": "Ver todos os resultados ({{count}})"
+  }
+}
