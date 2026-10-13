@@ -84,6 +84,18 @@ describe('WorkflowMilestones', () => {
     );
   });
 
+  it('uses the singular for one auto-closed or one resolved annotation', () => {
+    renderStrip({ state: 'CANCELLED', total: 1, resolved: 0 });
+    expect(screen.getByTestId('workflow-milestones')).toHaveAccessibleName(
+      'Review cancelled — 1 annotation was closed automatically',
+    );
+
+    renderStrip({ state: 'IN_REVIEW', total: 1, resolved: 1 });
+    expect(screen.getAllByTestId('workflow-milestones')[1]).toHaveAccessibleName(
+      'In review — 1 of 1 annotation resolved, ready to finalize',
+    );
+  });
+
   it('announces a draft as not yet in review, in both themes', () => {
     renderStrip({ state: 'DRAFT' });
     expect(screen.getByTestId('workflow-milestones')).toHaveAccessibleName(

@@ -39,7 +39,7 @@ import { teamProfileKeys, useTeamProfile } from '../api/hooks/useTeamProfile';
 import { ToneBadge } from '../components/admin/ToneBadge';
 import { DocumentIcon } from '../components/reviews/list/ReviewListParts';
 import { UserHoverCard } from '../components/people/UserHoverCard';
-import { WORKFLOW_TONES, isOpenWorkflowState } from '../components/reviews/workflowMeta';
+import { isOpenWorkflowState, workflowTone } from '../components/reviews/workflowMeta';
 import { useWorkflowLabel } from '../components/reviews/useWorkflowLabel';
 import { TeamAvatar } from '../components/shell/TeamAvatar';
 import { UserAvatar } from '../components/shell/UserAvatar';
@@ -387,7 +387,7 @@ export function TeamProfilePage() {
                   {review.title}
                 </Typography>
                 <ToneBadge
-                  tone={WORKFLOW_TONES[review.workflowState] ?? 'neutral'}
+                  tone={workflowTone(review.workflowState)}
                   label={workflowLabel(review.workflowState)}
                 />
                 <Typography

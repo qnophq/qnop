@@ -42,11 +42,10 @@ import { documentKeys } from '../../api/hooks/useDocuments';
 import { reviewKeys } from '../../api/hooks/useReviews';
 import { apiErrorMessage } from '../../utils/apiError';
 
-/**
- * What the caller must type to arm the button, in English. The dialog asks for the word in the
- * active language (`delete.bulk.phrase`), so a German reader types „löschen“.
- */
-export const BULK_DELETE_PHRASE = 'delete';
+/** Trimmed, lower-cased and NFC-normalized, so the typed confirmation compares reliably. */
+function normalizePhrase(text: string): string {
+  return text.normalize('NFC').trim().toLowerCase();
+}
 
 /** A review that refused to go, with the cause — worded at render, in the active language. */
 interface DeleteFailure {
@@ -104,8 +103,11 @@ export function DeleteReviewsDialog({
     }
   }
 
+  // The word to type, in the active language (`delete.bulk.phrase`) — a German reader types
+  // „löschen“. Both sides are NFC-normalized, so a decomposed umlaut still matches.
   const phrase = t('delete.bulk.phrase');
-  const confirmed = typed.trim().toLowerCase() === phrase.toLowerCase();
+  const expected = normalizePhrase(phrase);
+  const confirmed = expected !== '' && normalizePhrase(typed) === expected;
 
   const handleDelete = async () => {
     setBusy(true);
@@ -188,7 +190,7 @@ export function DeleteReviewsDialog({
               <Typography variant="body2" sx={{ fontWeight: 600, mb: 0.5 }}>
                 {t('delete.bulk.failedHeading', {
                   failed: failures.length,
-                  total: reviews.length,
+                  count: reviews.length,
                 })}
               </Typography>
               {failures.map((failure) => (

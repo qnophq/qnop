@@ -22,7 +22,7 @@
 import { useTranslation } from 'react-i18next';
 import { ToneBadge } from '../admin/ToneBadge';
 import { useWorkflowLabel } from './useWorkflowLabel';
-import { WORKFLOW_TONES } from './workflowMeta';
+import { workflowTone } from './workflowMeta';
 
 /**
  * The review's status badge. An archived review (issue #576) reads neutrally as
@@ -43,5 +43,5 @@ export function WorkflowBadge({
       <ToneBadge tone="neutral" label={t('workflow.archived', { state: workflowLabel(state) })} />
     );
   }
-  return <ToneBadge tone={WORKFLOW_TONES[state] ?? 'neutral'} label={workflowLabel(state)} />;
+  return <ToneBadge tone={workflowTone(state)} label={workflowLabel(state)} />;
 }

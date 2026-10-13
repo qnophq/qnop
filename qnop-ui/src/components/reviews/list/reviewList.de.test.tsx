@@ -139,12 +139,30 @@ describe('reviews list in German', () => {
     expect(screen.getByRole('button', { name: '2 endgültig löschen' })).toBeDisabled();
   });
 
-  it('summarizes the milestone path with a plural', () => {
-    renderWithProviders(<WorkflowMilestones state="IN_REVIEW" total={3} resolved={1} />);
+  it('summarizes the milestone path with plural and singular forms', () => {
+    renderWithProviders(
+      <>
+        <WorkflowMilestones state="IN_REVIEW" total={3} resolved={1} />
+        <WorkflowMilestones state="IN_REVIEW" total={1} resolved={0} />
+        <WorkflowMilestones state="CANCELLED" total={1} resolved={0} />
+        <WorkflowMilestones state="CANCELLED" total={4} resolved={1} />
+      </>,
+    );
 
     expect(
+      screen.getByRole('img', { name: 'Im Review — 1 von 3 Anmerkungen erledigt, noch 2 offen' }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole('img', { name: 'Im Review — 0 von 1 Anmerkung erledigt, noch 1 offen' }),
+    ).toBeInTheDocument();
+    expect(
       screen.getByRole('img', {
-        name: 'Im Review — 1 von 3 Anmerkungen erledigt, noch 2 offen',
+        name: 'Review abgebrochen — 1 Anmerkung wurde automatisch geschlossen',
+      }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole('img', {
+        name: 'Review abgebrochen — 3 Anmerkungen wurden automatisch geschlossen',
       }),
     ).toBeInTheDocument();
   });

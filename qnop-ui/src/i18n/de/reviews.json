@@ -96,18 +96,20 @@
     "bulk": {
       "title_one": "{{count}} Review löschen?",
       "title_other": "{{count}} Reviews löschen?",
-      "body": "Sie werden endgültig gelöscht, für alle — mit allen Versionen, Anmerkungen und Diskussionen darin. Das lässt sich nicht rückgängig machen. Willst du den Verlauf behalten, schließ diesen Dialog und archiviere sie stattdessen.",
+      "body": "Die Reviews werden endgültig gelöscht, für alle — mit allen Versionen, Anmerkungen und Diskussionen darin. Das lässt sich nicht rückgängig machen. Willst du den Verlauf behalten, schließ diesen Dialog und archiviere sie stattdessen.",
       "phrase": "löschen",
       "confirmLabel": "Gib zur Bestätigung „{{phrase}}“ ein",
       "progress": "Wird gelöscht… {{done}} von {{total}}",
-      "failedHeading": "{{failed}} von {{total}} konnten nicht gelöscht werden",
+      "failedHeading_one": "{{failed}} von {{count}} konnte nicht gelöscht werden",
+      "failedHeading_other": "{{failed}} von {{count}} konnten nicht gelöscht werden",
       "itemFailed": "konnte nicht gelöscht werden",
       "submit": "{{total}} endgültig löschen"
     }
   },
   "list": {
     "documentType": "{{format}}-Dokument",
-    "progressLabel": "{{resolved}} von {{total}} Anmerkungen erledigt",
+    "progressLabel_one": "{{resolved}} von {{count}} Anmerkung erledigt",
+    "progressLabel_other": "{{resolved}} von {{count}} Anmerkungen erledigt",
     "noReviewers": "keine Reviewer",
     "readyToFinalize": "Bereit zum Abschließen",
     "resolvedCount": "{{resolved}}/{{total}} erledigt",
@@ -269,7 +271,7 @@
     "document": {
       "titleLabel": "Titel des Reviews",
       "titlePlaceholder": "z. B. NDA Acme Corp",
-      "titleHelper": "Wird in der Übersicht und allen Reviewern angezeigt.",
+      "titleHelper": "Wird in der Übersicht und für alle Reviewer angezeigt.",
       "slugLabel": "URL-Kürzel (optional)",
       "slugPlaceholder": "z. B. nda-acme-corp",
       "slugHelper": "Eine lesbare Adresse für dieses Review: Kleinbuchstaben, Ziffern und Bindestriche. Lässt sich später nicht mehr ändern."
@@ -345,7 +347,7 @@
       "pdfOrWordMore": "PDF oder Word und mehr"
     },
     "validation": {
-      "type": "Unterstützt werden nur Dokumente im Format {{formats}}.",
+      "type": "Unterstützte Formate: {{formats}}.",
       "size": "Die Datei überschreitet die maximale Größe von {{max}} MB."
     },
     "chooseDocument": "Dokument auswählen",
@@ -377,8 +379,8 @@
     },
     "workflow": {
       "change": "Status ändern",
-      "moveTo": "Auf {{state}} setzen",
-      "moved": "Review auf {{state}} gesetzt.",
+      "moveTo": "Auf „{{state}}“ setzen",
+      "moved": "Review auf „{{state}}“ gesetzt.",
       "failed": "Der Status konnte nicht geändert werden.",
       "confirmTitle": "Review-Status ändern",
       "confirmMessage": "Dieses Review auf „{{state}}“ setzen? Reviewer sehen den neuen Status sofort.",

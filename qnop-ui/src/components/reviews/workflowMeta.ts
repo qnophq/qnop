@@ -51,7 +51,13 @@ const WORKFLOW_LABEL_KEYS: Record<string, ReviewsKey> = {
  * extension), which falls back to {@link workflowLabel}.
  */
 export function workflowLabelKey(state: string): ReviewsKey | undefined {
-  return WORKFLOW_LABEL_KEYS[state];
+  // Own keys only: the state comes from the server, and `constructor` must not resolve.
+  return Object.hasOwn(WORKFLOW_LABEL_KEYS, state) ? WORKFLOW_LABEL_KEYS[state] : undefined;
+}
+
+/** The badge tone for a workflow state; unknown (enterprise) states render neutrally. */
+export function workflowTone(state: string): BadgeTone {
+  return Object.hasOwn(WORKFLOW_TONES, state) ? WORKFLOW_TONES[state] : 'neutral';
 }
 
 /**

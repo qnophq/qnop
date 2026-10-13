@@ -30,7 +30,7 @@ import type { DocumentSummary } from '../../api/generated';
 import { reviewPath } from '../dashboard/dashboardModel';
 import { ToneBadge } from '../admin/ToneBadge';
 import { ProgressBar } from '../reviews/list/ReviewListParts';
-import { WORKFLOW_TONES } from '../reviews/workflowMeta';
+import { workflowTone } from '../reviews/workflowMeta';
 import { useWorkflowLabel } from '../reviews/useWorkflowLabel';
 import { useTranslation } from 'react-i18next';
 
@@ -145,7 +145,7 @@ export function ProfileMissionList({ variant, firstName, reviews }: ProfileMissi
                   )}
                 </Box>
                 <ToneBadge
-                  tone={WORKFLOW_TONES[review.workflowState] ?? 'neutral'}
+                  tone={workflowTone(review.workflowState)}
                   label={workflowLabel(review.workflowState)}
                 />
               </Stack>

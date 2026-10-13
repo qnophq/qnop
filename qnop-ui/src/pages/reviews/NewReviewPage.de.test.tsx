@@ -95,7 +95,7 @@ describe('new-review wizard in German', () => {
 
     pick(new File(['hi'], 'notes.odt', { type: 'application/vnd.oasis.opendocument.text' }));
 
-    expect(screen.getByText('Unterstützt werden nur Dokumente im Format PDF.')).toBeInTheDocument();
+    expect(screen.getByText('Unterstützte Formate: PDF.')).toBeInTheDocument();
   });
 
   it('validates the slug in German when leaving step 1', () => {

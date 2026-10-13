@@ -36,7 +36,7 @@ import { CountPill } from './CountPill';
 import { DueDateLabel } from '../reviews/DueDateLabel';
 import { DocumentIcon, ProgressBar, ReviewerStack } from '../reviews/list/ReviewListParts';
 import { progressOf } from '../reviews/list/reviewListModel';
-import { WORKFLOW_TONES } from '../reviews/workflowMeta';
+import { workflowTone } from '../reviews/workflowMeta';
 import { useWorkflowLabel } from '../reviews/useWorkflowLabel';
 import { readyToFinalize, reviewPath } from './dashboardModel';
 
@@ -133,7 +133,7 @@ export function ReviewListCard({
                           />
                         ) : (
                           <ToneBadge
-                            tone={WORKFLOW_TONES[review.workflowState] ?? 'neutral'}
+                            tone={workflowTone(review.workflowState)}
                             label={workflowLabel(review.workflowState)}
                           />
                         )}

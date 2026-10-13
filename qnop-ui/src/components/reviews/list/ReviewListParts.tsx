@@ -205,7 +205,7 @@ export function ProgressBar({
         aria-valuemin={0}
         aria-valuemax={total}
         aria-valuenow={resolved}
-        aria-label={t('list.progressLabel', { resolved, total })}
+        aria-label={t('list.progressLabel', { resolved, count: total })}
       >
         <Box sx={{ width: `${(resolved / total) * 100}%`, height: '100%', bgcolor: color }} />
         {discussion > 0 && (

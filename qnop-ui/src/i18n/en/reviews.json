@@ -29,7 +29,7 @@
     "archived": "Archived · {{state}}",
     "milestones": {
       "cancelled": "Review cancelled",
-      "cancelledAutoClosed_one": "Review cancelled — {{count}} annotation were closed automatically",
+      "cancelledAutoClosed_one": "Review cancelled — {{count}} annotation was closed automatically",
       "cancelledAutoClosed_other": "Review cancelled — {{count}} annotations were closed automatically",
       "finalized": "Review finalized — every concern settled",
       "draft": "Draft — not yet in review",
@@ -100,14 +100,16 @@
       "phrase": "delete",
       "confirmLabel": "Type \"{{phrase}}\" to confirm",
       "progress": "Deleting… {{done}} of {{total}}",
-      "failedHeading": "{{failed}} of {{total}} could not be deleted",
+      "failedHeading_one": "{{failed}} of {{count}} could not be deleted",
+      "failedHeading_other": "{{failed}} of {{count}} could not be deleted",
       "itemFailed": "could not be deleted",
       "submit": "Delete {{total}} permanently"
     }
   },
   "list": {
     "documentType": "{{format}} document",
-    "progressLabel": "{{resolved}} of {{total}} annotations resolved",
+    "progressLabel_one": "{{resolved}} of {{count}} annotation resolved",
+    "progressLabel_other": "{{resolved}} of {{count}} annotations resolved",
     "noReviewers": "no reviewers",
     "readyToFinalize": "Ready to finalize",
     "resolvedCount": "{{resolved}}/{{total}} resolved",
@@ -133,7 +135,7 @@
     "description": "Documents you own or review — pick one up where it stands.",
     "descriptionModerating": "Every review in the workspace — you are moderating, not participating.",
     "newReview": "New review",
-    "quotaFull_one": "This instance allows {{count}} reviews open at once, and {{used}} are open. Finalizing or archiving a review frees a slot; finished work occupies nothing.",
+    "quotaFull_one": "This instance allows {{count}} review open at once, and {{used}} are open. Finalizing or archiving a review frees a slot; finished work occupies nothing.",
     "quotaFull_other": "This instance allows {{count}} reviews open at once, and {{used}} are open. Finalizing or archiving a review frees a slot; finished work occupies nothing.",
     "loadError": {
       "title": "Your reviews didn't make it to the desk",
@@ -257,7 +259,7 @@
     "create": "Create review",
     "createAndStart": "Create & start review",
     "uploadFailed": "The upload failed. Please try again.",
-    "quotaFull_one": "This instance allows {{count}} reviews open at once, and {{used}} are open. Finalizing or archiving one frees a slot; finished work occupies nothing.",
+    "quotaFull_one": "This instance allows {{count}} review open at once, and {{used}} are open. Finalizing or archiving one frees a slot; finished work occupies nothing.",
     "quotaFull_other": "This instance allows {{count}} reviews open at once, and {{used}} are open. Finalizing or archiving one frees a slot; finished work occupies nothing.",
     "created": {
       "title": "Review created",
