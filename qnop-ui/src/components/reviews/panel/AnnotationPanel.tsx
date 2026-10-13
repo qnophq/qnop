@@ -25,6 +25,7 @@ import Collapse from '@mui/material/Collapse';
 import Stack from '@mui/material/Stack';
 import Typography from '@mui/material/Typography';
 import { NotebookPen, Plus } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import type {
   AnnotationPriority,
   AnnotationType,
@@ -166,6 +167,7 @@ export function AnnotationPanel({
   onScrolledToComment,
   onNewDocumentNote,
 }: AnnotationPanelProps) {
+  const { t } = useTranslation('workspace');
   const [filters, setFilters] = useState<AnnotationFilters>(EMPTY_FILTERS);
   // The card the reviewer has open must never be yanked out of the list by an
   // action taken ON it (issue #548): confirming a moved placement flips the
@@ -206,8 +208,8 @@ export function AnnotationPanel({
   const displayName = useAuthStore((state) => state.displayName);
   const authorNameOf = (annotation: AnnotationView) =>
     annotation.authorId === userId
-      ? (displayName ?? 'You')
-      : (annotation.authorDisplayName ?? 'Participant');
+      ? (displayName ?? t('people.you'))
+      : (annotation.authorDisplayName ?? t('people.participant'));
   // The author facet is meaningless (and would leak nothing useful) in an
   // anonymous review, so it is dropped entirely there.
   const authors: FilterAuthor[] = useMemo(() => {
@@ -218,7 +220,7 @@ export function AnnotationPanel({
     }
     return [...byId].map(([id, name]) => ({ id, name }));
     // eslint-disable-next-line react-hooks/exhaustive-deps -- names derive from the inputs below
-  }, [annotations, anonymous, userId, displayName]);
+  }, [annotations, anonymous, userId, displayName, t]);
 
   // The search needle must hit mentioned names too (issue #462).
   const resolveMentions = useMentionNames(useReviewDocumentId());
@@ -246,7 +248,7 @@ export function AnnotationPanel({
       pinnedOut: pinnedDropped,
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps -- authorNameOf derives from the inputs below
-  }, [annotations, filters, pinnedId, userId, displayName, resolveMentions]);
+  }, [annotations, filters, pinnedId, userId, displayName, resolveMentions, t]);
   const newCount = visible.filter((a) => isUnseen(a, previousSeenAt, userId)).length;
 
   // Under a non-OPEN policy (issue #413) only the annotation's author and the
@@ -340,8 +342,8 @@ export function AnnotationPanel({
   return (
     <SectionCard
       icon={NotebookPen}
-      title={`Annotations (${annotations.length})`}
-      description="Marks and their discussion on this version."
+      title={t('panel.title', { count: annotations.length })}
+      description={t('panel.description')}
       frameless={frameless}
       action={
         <Stack direction="row" spacing={1} sx={{ alignItems: 'center' }}>
@@ -359,7 +361,7 @@ export function AnnotationPanel({
                 '@media (prefers-reduced-motion: reduce)': { animation: 'none' },
               }}
             >
-              <ToneBadge tone="blue" label={`${newCount} new`} />
+              <ToneBadge tone="blue" label={t('panel.newCount', { count: newCount })} />
             </Box>
           )}
           {
@@ -378,7 +380,7 @@ export function AnnotationPanel({
             // text-selection gesture, offered while the latest version is open for review.
             onNewDocumentNote && !readOnly && !reviewClosed ? (
               <ToolbarIconButton
-                label="Global annotation"
+                label={t('panel.globalAnnotation')}
                 icon={Plus}
                 onClick={onNewDocumentNote}
               />
@@ -415,8 +417,7 @@ export function AnnotationPanel({
         )}
         {annotations.length === 0 && !pendingAnchor && (
           <Typography variant="body2" color="text.secondary">
-            No annotations yet.
-            {canAnnotate && ' Select text or draw a region on the document to add one.'}
+            {canAnnotate ? t('panel.emptyCanAnnotate') : t('panel.empty')}
           </Typography>
         )}
         {hiddenByFilter && (
@@ -424,8 +425,8 @@ export function AnnotationPanel({
             {pinnedOut
               ? // The one card left on screen is the one being read (issue #548) —
                 // say so, or the filter would look broken.
-                'No annotations match this filter — the one you have open stays until you select another.'
-              : 'No annotations match this filter.'}
+                t('panel.noMatchPinned')
+              : t('panel.noMatch')}
           </Typography>
         )}
         {visible.map(renderItem)}

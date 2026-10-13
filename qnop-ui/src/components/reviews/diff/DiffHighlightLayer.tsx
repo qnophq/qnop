@@ -22,6 +22,7 @@
 import { Fragment } from 'react';
 import Box from '@mui/material/Box';
 import { alpha, useTheme } from '@mui/material/styles';
+import { useTranslation } from 'react-i18next';
 import type { DiffChange, RenderedTextSpan } from '../../../api/generated';
 import { DiffChangeType } from '../../../api/generated';
 import { markerLineBox, surfaceLinePitch } from '../viewer/anchoring';
@@ -56,6 +57,7 @@ export function DiffHighlightLayer({
   activeChangeIndex,
   onSelectChange,
 }: DiffHighlightLayerProps) {
+  const { t } = useTranslation('workspace');
   const theme = useTheme();
   const entries = surfaceChangeBoxes(changes, side, surfaceIndex);
   if (entries.length === 0) return null;
@@ -86,7 +88,11 @@ export function DiffHighlightLayer({
                   role={primary ? 'button' : undefined}
                   tabIndex={primary ? 0 : undefined}
                   aria-pressed={primary ? active : undefined}
-                  aria-label={primary ? `${CHANGE_KIND[type].label} change` : undefined}
+                  aria-label={
+                    primary
+                      ? t('diff.changeLabel', { kind: t(CHANGE_KIND[type].labelKey) })
+                      : undefined
+                  }
                   aria-hidden={primary ? undefined : true}
                   onClick={() => onSelectChange(changeIndex)}
                   onKeyDown={(event) => {

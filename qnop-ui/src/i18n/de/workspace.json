@@ -1,0 +1,378 @@
+{
+  "people": {
+    "you": "Du",
+    "participant": "Teilnehmer"
+  },
+  "quoted": "„{{text}}“",
+  "annotation": {
+    "fallbackTitle": "Anmerkung",
+    "regionAnnotation": "Bereichsanmerkung",
+    "wholeDocument": "Ganzes Dokument",
+    "noPlacement": "Keine Position in dieser Version",
+    "noTextAnchor": "Kein Textanker",
+    "highlight": "Anmerkung: {{quote}}",
+    "types": {
+      "CHANGE": "Änderung",
+      "PROPOSAL": "Vorschlag",
+      "CONFLICT": "Konflikt",
+      "QUESTION": "Frage",
+      "RISK": "Risiko"
+    },
+    "priorities": {
+      "HIGH": "Hoch",
+      "MEDIUM": "Mittel",
+      "LOW": "Niedrig"
+    },
+    "priority": "Priorität {{priority}}",
+    "noPriority": "Keine Priorität",
+    "status": {
+      "OPEN": "Offen",
+      "RESOLVED": "Erledigt",
+      "DISMISSED": "Verworfen"
+    },
+    "placement": {
+      "PENDING": {
+        "label": "Wird neu verankert…",
+        "hint": "Die neue Version wird noch mit dieser Anmerkung abgeglichen."
+      },
+      "MOVED": {
+        "label": "Verschoben",
+        "hint": "Der verankerte Text hat sich mit der neuen Version geändert — bitte prüfe die Markierung."
+      },
+      "ORPHANED": {
+        "label": "Verwaist",
+        "hint": "In dieser Version gibt es keine sichere Übereinstimmung — die Anmerkung muss von Hand zugeordnet werden."
+      },
+      "FAILED": {
+        "label": "Fehlgeschlagen",
+        "hint": "Das Neuverankern dieser Anmerkung ist fehlgeschlagen."
+      }
+    },
+    "placementActions": {
+      "confirm": "Passt",
+      "confirmHint": "Die verschobene Markierung übernehmen",
+      "reattach": "Neu verankern",
+      "reattachHint": "Wähle die richtige Textstelle selbst aus",
+      "reposition": "Verschieben",
+      "repositionHint": "Diese Anmerkung an eine andere Stelle verschieben"
+    },
+    "commentCount_one": "{{count}} Kommentar",
+    "commentCount_other": "{{count}} Kommentare",
+    "page": "Seite {{page}}",
+    "pageShort": "S. {{page}}",
+    "new": "Neu",
+    "newSinceLastVisit": "Neu seit deinem letzten Besuch",
+    "collapse": "Einklappen",
+    "collapseAnnotation": "Anmerkung einklappen"
+  },
+  "head": {
+    "started": "Hat diese Diskussion begonnen · {{time}}",
+    "copyQuote": "Zitat kopieren",
+    "copyText": "Text kopieren",
+    "quoteCopied": "Zitat kopiert.",
+    "textCopied": "Text kopiert.",
+    "copyLink": "Link zur Anmerkung kopieren"
+  },
+  "placement": {
+    "confirmed": "Position bestätigt.",
+    "confirmFailed": "Die Position konnte nicht bestätigt werden.",
+    "reattached": "Anmerkung neu verankert.",
+    "reattachFailed": "Die Anmerkung konnte nicht neu verankert werden."
+  },
+  "panel": {
+    "title": "Anmerkungen ({{count}})",
+    "description": "Markierungen und ihre Diskussion in dieser Version.",
+    "newCount": "{{count}} neu",
+    "globalAnnotation": "Globale Anmerkung",
+    "empty": "Noch keine Anmerkungen.",
+    "emptyCanAnnotate": "Noch keine Anmerkungen. Markiere Text oder ziehe einen Bereich im Dokument auf, um eine hinzuzufügen.",
+    "noMatch": "Keine Anmerkungen passen zu diesem Filter.",
+    "noMatchPinned": "Keine Anmerkungen passen zu diesem Filter — die geöffnete bleibt sichtbar, bis du eine andere auswählst."
+  },
+  "filters": {
+    "searchAnnotations": "Anmerkungen durchsuchen",
+    "searchTasks": "Aufgaben durchsuchen",
+    "filter": "Anmerkungen filtern",
+    "status": "Status",
+    "placement": "Position",
+    "type": "Typ",
+    "priority": "Priorität",
+    "author": "Verfasser",
+    "any": "Beliebig",
+    "anyone": "Alle",
+    "reset": "Filter zurücksetzen",
+    "statusOptions": {
+      "all": "Alle",
+      "open": "Offen",
+      "resolved": "Erledigt"
+    },
+    "placementOptions": {
+      "all": "Jede Position",
+      "attention": "Braucht Aufmerksamkeit",
+      "moved": "Verschoben",
+      "orphaned": "Verwaist"
+    }
+  },
+  "reanchor": {
+    "summary": "Neuverankerung in v{{version}}: {{parts}}.",
+    "moved": "{{count}} verschoben",
+    "orphaned": "{{count}} verwaist",
+    "review": "Prüfen",
+    "dismiss": "Hinweis zur Neuverankerung ausblenden"
+  },
+  "resolve": {
+    "notePlaceholder": "Optionale Abschlussnotiz…",
+    "noteLabel": "Optionale Abschlussnotiz",
+    "action": "Erledigen",
+    "done": "Anmerkung erledigt.",
+    "failed": "Die Anmerkung konnte nicht erledigt werden.",
+    "conflicts": {
+      "ANNOTATION_ALREADY_RESOLVED": "Diese Anmerkung wurde bereits erledigt."
+    }
+  },
+  "reopen": {
+    "action": "Wieder öffnen",
+    "done": "Anmerkung wieder geöffnet.",
+    "failed": "Die Anmerkung konnte nicht wieder geöffnet werden.",
+    "conflicts": {
+      "REVIEW_CLOSED": "Das Review ist abgeschlossen — geklärte Anmerkungen bleiben geschlossen.",
+      "ANNOTATION_NOT_RESOLVED": "Diese Anmerkung ist bereits offen."
+    }
+  },
+  "dismiss": {
+    "open": "Verwerfen…",
+    "placeholder": "Warum wird dieser Punkt verworfen? (Pflichtfeld)",
+    "label": "Begründung für das Verwerfen (Pflichtfeld)",
+    "action": "Verwerfen",
+    "note": "Die Begründung wird im Thread veröffentlicht; der Verfasser kann die Anmerkung wieder öffnen.",
+    "done": "Anmerkung verworfen.",
+    "failed": "Die Anmerkung konnte nicht verworfen werden.",
+    "conflicts": {
+      "ANNOTATION_NOT_OPEN": "Diese Anmerkung ist bereits geklärt.",
+      "REVIEW_CLOSED": "Das Review ist geschlossen — es gibt nichts mehr zu verwerfen."
+    }
+  },
+  "thread": {
+    "send": "Senden ({{shortcut}})",
+    "comment": "Kommentieren",
+    "commentWithShortcut": "Kommentieren ({{shortcut}})",
+    "addComment": "Kommentar hinzufügen",
+    "loading": "Kommentare werden geladen",
+    "loadError": "Die Kommentare konnten nicht geladen werden.",
+    "noReplies": "Keine Antworten.",
+    "noRepliesYet": "Noch keine Antworten.",
+    "noComments": "Noch keine Kommentare. Starte die Diskussion.",
+    "closedResolved": "Erledigt — dieser Thread ist geschlossen.",
+    "closedDismissed": "Verworfen — dieser Thread ist geschlossen.",
+    "policyReadOnly": "In diesem Review können nur der Verfasser und die Review-Leitung antworten.",
+    "writeReply": "Antwort schreiben",
+    "discussion": "Diskussion ({{count}})",
+    "commentGone": "Diesen Kommentar gibt es nicht mehr.",
+    "copyComment": "Kommentar kopieren",
+    "commentCopied": "Kommentar kopiert.",
+    "copyLink": "Link zum Kommentar kopieren",
+    "errors": {
+      "ANNOTATION_ALREADY_RESOLVED": "Die Anmerkung ist geklärt — ihr Thread ist geschlossen.",
+      "THREAD_READ_ONLY": "In diesem Review können nur der Verfasser und die Review-Leitung antworten.",
+      "fallback": "Der Kommentar konnte nicht hinzugefügt werden."
+    }
+  },
+  "composer": {
+    "title": "Neue Anmerkung",
+    "typeLabel": "Typ der Anmerkung",
+    "priorityLabel": "Priorität der Anmerkung",
+    "none": "Keine",
+    "create": "Anmerkung erstellen ({{shortcut}})",
+    "regionOnPage": "Bereich auf Seite {{page}}",
+    "commentLabel": "Kommentar zur Anmerkung",
+    "contextTitle": "Du kommentierst",
+    "contextRegion": "Einen Bereich auf Seite {{page}}.",
+    "contextDocument": "Eine allgemeine Anmerkung zum ganzen Dokument — nicht an eine Textstelle geheftet."
+  },
+  "markdown": {
+    "write": "Schreiben",
+    "markdown": "Markdown",
+    "preview": "Vorschau",
+    "nothingToPreview": "Nichts für die Vorschau.",
+    "placeholder": "Kommentar hinzufügen",
+    "fullScreen": "Vollbild",
+    "exitFullScreen": "Vollbild verlassen",
+    "exitHint": "zum Verlassen",
+    "discussion": "Diskussion",
+    "resizeRail": "Kontextleiste in der Breite anpassen",
+    "mentionMenu": "Teilnehmer erwähnen",
+    "attachFile": "Datei anhängen",
+    "dropFiles": "Dateien zum Anhängen hier ablegen",
+    "uploading": "{{name}} wird hochgeladen…",
+    "attachmentName": "anhang",
+    "toolbar": {
+      "label": "Textformatierung",
+      "withShortcut": "{{label}} ({{shortcut}})",
+      "bold": "Fett",
+      "italic": "Kursiv",
+      "strikethrough": "Durchgestrichen",
+      "heading": "Überschrift",
+      "quote": "Zitat",
+      "link": "Link",
+      "image": "Bild",
+      "table": "Tabelle",
+      "orderedList": "Nummerierte Liste",
+      "bulletList": "Aufzählung",
+      "code": "Code",
+      "codeBlock": "Codeblock"
+    },
+    "hint": {
+      "label": "Markdown wird unterstützt",
+      "syntax": "Markdown: **fett**, _kursiv_, `Code`, Listen, > Zitat, [Link](URL)"
+    },
+    "emoji": {
+      "tooltip": "Emoji",
+      "insert": "Emoji einfügen",
+      "loading": "Emoji-Auswahl wird geladen",
+      "loadError": "Die Emoji-Auswahl konnte nicht geladen werden."
+    },
+    "attachment": {
+      "download": "Anhang herunterladen",
+      "retry": "Download fehlgeschlagen — klicke, um es erneut zu versuchen",
+      "downloading": "Wird heruntergeladen",
+      "imageUnavailable": "Bild nicht verfügbar",
+      "loadingImage": "Bild wird geladen",
+      "tooLarge": "Die Datei ist zu groß.",
+      "uploadFailed": "Die Datei konnte nicht hochgeladen werden."
+    }
+  },
+  "reactions": {
+    "add": "Reaktion hinzufügen",
+    "closed": "Das Review ist geschlossen — Reaktionen sind nur noch lesbar.",
+    "failed": "Die Reaktion konnte nicht aktualisiert werden."
+  },
+  "permalink": {
+    "copy": "Link kopieren",
+    "copied": "Link kopiert.",
+    "failed": "Der Link konnte nicht kopiert werden."
+  },
+  "viewer": {
+    "version": "Version",
+    "previousPage": "Vorherige Seite",
+    "nextPage": "Nächste Seite",
+    "pageOf": "Seite {{page}} / {{count}}",
+    "processing": "Dokument wird verarbeitet…",
+    "extractionFailed": "Extraktion fehlgeschlagen",
+    "tool": "Anmerkungswerkzeug",
+    "selectText": "Text markieren",
+    "selectTextHint": "Markiere Text, um ein Zitat zu kommentieren",
+    "drawRegion": "Bereich aufziehen",
+    "drawRegionHint": "Ziehe ein Rechteck auf, um einen Bereich zu kommentieren",
+    "layout": "Dokumentlayout",
+    "panel": "Seitenleiste",
+    "panelView": "Ansicht mit Seitenleiste",
+    "panelHint": "Dokument neben der Anmerkungsleiste",
+    "focus": "Fokus",
+    "focusView": "Fokusansicht",
+    "focusHint": "Dokument in voller Breite mit Spotlight-Overlay",
+    "showListHint": "Anmerkungsliste anzeigen",
+    "showList": "Anmerkungen anzeigen ({{count}})",
+    "zoomOut": "Verkleinern",
+    "zoomIn": "Vergrößern",
+    "zoomReset": "Zoom auf Seitenbreite zurücksetzen",
+    "pages": "Dokumentseiten",
+    "page": "Seite {{page}}",
+    "textLayer": "Markierbarer Dokumenttext, Seite {{page}}",
+    "textKeyboardHint": "Pfeiltasten bewegen die Einfügemarke durch den Text, Umschalt mit einer Pfeiltaste erweitert die Auswahl, Enter kommentiert die Auswahl, Escape hebt sie auf.",
+    "regionLayer": "Bereichsauswahl, Seite {{page}}",
+    "regionKeyboardHint": "Der erste Druck auf eine Pfeiltaste setzt ein Auswahlrechteck in die Seitenmitte. Danach verschieben es die Pfeiltasten, Umschalt mit einer Pfeiltaste verschiebt in größeren Schritten, Alt mit einer Pfeiltaste vergrößert oder verkleinert es, Enter kommentiert den Bereich, Escape hebt die Auswahl auf.",
+    "hoverNoComments": "Noch keine Kommentare.",
+    "hoverOpen": "Klicke, um den Thread zu öffnen",
+    "placingQuote": "<quote/> wird neu verankert — markiere die neue Textstelle",
+    "placing": "Die Anmerkung wird neu verankert — wähle ihre neue Position",
+    "cancelReattach": "Neuverankern abbrechen"
+  },
+  "focus": {
+    "position": "Anmerkung {{index}} von {{count}}",
+    "previous": "Vorherige Anmerkung",
+    "previousHint": "Vorherige Anmerkung (↑)",
+    "next": "Nächste Anmerkung",
+    "nextHint": "Nächste Anmerkung (↓)",
+    "close": "Anmerkung schließen",
+    "resizeDrawer": "Anmerkungsleiste in der Breite anpassen"
+  },
+  "review": {
+    "notFound": "Dieses Dokument gibt es nicht, oder du nimmst nicht an seinem Review teil.",
+    "noVersion": "Für dieses Review wurde noch keine Dokumentversion hochgeladen.",
+    "olderVersion": "Du siehst eine ältere Version — nur zum Lesen. Anmerken kannst du in v{{version}}.",
+    "goToLatest": "Zu v{{version}}",
+    "processing": "Das Dokument wird verarbeitet — Anmerkungen sind möglich, sobald die Textebene extrahiert ist.",
+    "extractionFailedWithPdf": "Die Extraktion ist für diese Version fehlgeschlagen, daher kann sie nicht kommentiert werden. Das Originaldokument wird unten weiterhin angezeigt.",
+    "extractionFailedNoPdf": "Die Extraktion ist für diese Version fehlgeschlagen, daher kann sie nicht kommentiert werden. Lade sie herunter, um sie zu lesen.",
+    "pdfError": "Das PDF konnte nicht angezeigt werden: {{error}}",
+    "originalLoadError": "Das Originaldokument konnte nicht geladen werden.",
+    "loadingDocument": "Dokument wird geladen",
+    "viewerFailed": "Die Dokumentansicht ist ausgefallen",
+    "panelFailed": "Die Anmerkungsleiste ist ausgefallen",
+    "panelLabel": "Anmerkungen",
+    "createAnnotation": "Anmerkung erstellen",
+    "copyText": "Text kopieren",
+    "textCopied": "Text kopiert.",
+    "copyFailed": "Kopieren in die Zwischenablage fehlgeschlagen.",
+    "annotationGone": "Diese Anmerkung gibt es nicht mehr.",
+    "created": "Anmerkung erstellt.",
+    "createFailed": "Die Anmerkung konnte nicht erstellt werden.",
+    "createConflicts": {
+      "VERSION_READ_ONLY": "Inzwischen wurde eine neuere Version hochgeladen — Anmerkungen sind nur in der neuesten Version möglich.",
+      "REVIEW_CLOSED": "Dieses Review ist geschlossen — es können keine neuen Anmerkungen hinzugefügt werden."
+    }
+  },
+  "diff": {
+    "baseline": "Ausgangsversion",
+    "compare": "Vergleich",
+    "swap": "Seiten tauschen",
+    "swapLabel": "Die verglichenen Versionen tauschen",
+    "comparing": "Wird verglichen…",
+    "wordsAdded": "Wörter +",
+    "wordsRemoved": "Wörter −",
+    "changes": "Änderungen",
+    "pagesLabel_one": "Seite",
+    "pagesLabel_other": "Seiten",
+    "pageCount": "{{count}} Seiten",
+    "syncScroll": "Synchron scrollen",
+    "kinds": {
+      "INSERTED": "Hinzugefügt",
+      "DELETED": "Gelöscht",
+      "CHANGED": "Geändert"
+    },
+    "changeLabel": "Änderung: {{kind}}",
+    "summaryTitle": "Änderungen ({{count}})",
+    "collapseRail": "Änderungsleiste einklappen",
+    "expandRail": "Änderungsleiste ausklappen",
+    "identical": "Die verglichenen Versionen haben denselben Textinhalt.",
+    "renderError": "Das Dokument konnte nicht dargestellt werden. {{error}}",
+    "pageLabel": "Version {{version}}, Seite {{page}}",
+    "pending": "Eine der Versionen wird noch verarbeitet — versuche es gleich noch einmal.",
+    "needsTwoVersions": "Für einen Vergleich braucht es mindestens zwei Versionen mit extrahierter Textebene. Lade zuerst eine neue Version hoch.",
+    "failed": "Der Vergleich konnte nicht berechnet werden.",
+    "changeCount_one": "{{count}} Änderung",
+    "changeCount_other": "{{count}} Änderungen"
+  },
+  "tasks": {
+    "columns": {
+      "open": "Offen",
+      "discussion": "In Diskussion",
+      "done": "Erledigt"
+    },
+    "all": "Alle",
+    "filterChip": "{{label}} {{count}}",
+    "columnBadge": "{{label}} ({{count}})",
+    "dropToResolve": "Leg deine Karte hier ab, um sie zu erledigen",
+    "emptyColumn": "Hier ist nichts",
+    "presentation": "Darstellung der Aufgaben",
+    "board": "Board",
+    "list": "Liste",
+    "unavailable": "Dieses Review ist nicht verfügbar",
+    "noMatch": "Keine Anmerkungen passen zum aktuellen Filter.",
+    "resizeDrawer": "Aufgabenleiste in der Breite anpassen",
+    "showInDocument": "Im Dokument zeigen",
+    "close": "Aufgabe schließen",
+    "newTitle": "Neue globale Anmerkung",
+    "newDescription": "Eine allgemeine Anmerkung, die für das ganze Dokument gilt — sie ist an keine Textstelle geheftet und bleibt in jeder Version gültig."
+  }
+}

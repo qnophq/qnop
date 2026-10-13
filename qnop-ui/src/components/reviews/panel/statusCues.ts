@@ -22,6 +22,7 @@
 import type { LucideIcon } from 'lucide-react';
 import { CircleCheck, CircleDot, CircleSlash } from 'lucide-react';
 import type { Theme } from '@mui/material/styles';
+import type { ParseKeys } from 'i18next';
 import { AnnotationStatus } from '../../../api/generated';
 import type { BadgeTone } from '../../admin/ToneBadge';
 
@@ -30,27 +31,33 @@ import type { BadgeTone } from '../../admin/ToneBadge';
  * items and the focus overlay card (#291), so both surfaces read identically.
  * DISMISSED (issue #408) is deliberately NOT the resolved green: the author
  * did not settle this concern — the owner/admin closed it over their head,
- * and every list must show the difference.
+ * and every list must show the difference. The label is a `workspace` catalog
+ * key (ADR-0063), translated where the cue renders.
  */
 export const STATUS_CUES: Record<
   AnnotationStatus,
-  { tone: BadgeTone; label: string; icon: LucideIcon; color: (theme: Theme) => string }
+  {
+    tone: BadgeTone;
+    labelKey: ParseKeys<'workspace'>;
+    icon: LucideIcon;
+    color: (theme: Theme) => string;
+  }
 > = {
   [AnnotationStatus.Open]: {
     tone: 'blue',
-    label: 'Open',
+    labelKey: 'annotation.status.OPEN',
     icon: CircleDot,
     color: (theme) => theme.qnop.brand.blue,
   },
   [AnnotationStatus.Resolved]: {
     tone: 'green',
-    label: 'Resolved',
+    labelKey: 'annotation.status.RESOLVED',
     icon: CircleCheck,
     color: (theme) => theme.palette.success.main,
   },
   [AnnotationStatus.Dismissed]: {
     tone: 'amber',
-    label: 'Dismissed',
+    labelKey: 'annotation.status.DISMISSED',
     icon: CircleSlash,
     color: (theme) => theme.palette.warning.main,
   },

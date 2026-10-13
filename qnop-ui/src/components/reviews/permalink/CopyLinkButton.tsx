@@ -23,6 +23,7 @@ import type { MouseEvent } from 'react';
 import IconButton from '@mui/material/IconButton';
 import Tooltip from '@mui/material/Tooltip';
 import { Link as LinkIcon } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import { copyToClipboard } from '../../../utils/clipboard';
 import type { Notify } from '../../admin/layout/useToast';
 
@@ -30,7 +31,10 @@ interface CopyLinkButtonProps {
   /** The absolute permalink to copy. */
   url: string;
   notify: Notify;
-  /** Tooltip + accessible label; the meta variant distinguishes annotation vs comment. */
+  /**
+   * Tooltip + accessible label; the meta variant distinguishes annotation vs comment.
+   * Defaults to "Copy link".
+   */
   label?: string;
   iconSize?: number;
 }
@@ -45,13 +49,15 @@ interface CopyLinkButtonProps {
 export function CopyLinkButton({
   url,
   notify,
-  label = 'Copy link',
+  label: labelProp,
   iconSize = 13,
 }: CopyLinkButtonProps) {
+  const { t } = useTranslation('workspace');
+  const label = labelProp ?? t('permalink.copy');
   const handleCopy = async (event: MouseEvent<HTMLButtonElement>) => {
     event.stopPropagation();
     const ok = await copyToClipboard(url);
-    notify(ok ? 'Link copied.' : 'Could not copy the link.', ok ? 'success' : 'error');
+    notify(ok ? t('permalink.copied') : t('permalink.failed'), ok ? 'success' : 'error');
   };
   return (
     <Tooltip title={label}>

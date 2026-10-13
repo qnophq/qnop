@@ -23,6 +23,7 @@ import { Fragment } from 'react';
 import type { KeyboardEvent } from 'react';
 import Box from '@mui/material/Box';
 import { alpha, keyframes, useTheme } from '@mui/material/styles';
+import { useTranslation } from 'react-i18next';
 import type {
   Anchor,
   AnnotationView,
@@ -96,6 +97,7 @@ export function HighlightLayer({
   onHover,
   pendingAnchor,
 }: HighlightLayerProps) {
+  const { t } = useTranslation('workspace');
   const theme = useTheme();
 
   // The predicate narrows the survivors to a guaranteed-anchored shape, so the
@@ -151,8 +153,8 @@ export function HighlightLayer({
                   aria-label={
                     primary
                       ? quote
-                        ? `Annotation: ${quote.slice(0, 60)}`
-                        : 'Region annotation'
+                        ? t('annotation.highlight', { quote: quote.slice(0, 60) })
+                        : t('annotation.regionAnnotation')
                       : undefined
                   }
                   aria-hidden={primary ? undefined : true}

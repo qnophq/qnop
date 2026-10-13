@@ -32,6 +32,7 @@ import MenuItem from '@mui/material/MenuItem';
 import Popper from '@mui/material/Popper';
 import Stack from '@mui/material/Stack';
 import { Copy, NotebookPen } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import type { Anchor, AnnotationView, NormalizedBox } from '../../api/generated';
 import { ExtractionStatus } from '../../api/generated';
 import type { AnnotationPriority, AnnotationType } from '../../api/generated';
@@ -111,6 +112,7 @@ const LEGACY_PANEL_WIDTH_KEY = 'qnop-review-panel-width';
  * search param, defaulting to the latest.
  */
 export function DocumentReviewPage() {
+  const { t } = useTranslation('workspace');
   // The raw segment may be a slug (issue #411) — sibling links keep it, while
   // all data access below uses the canonical id resolved by the route gate.
   const { documentId: routeSegment = '' } = useParams();
@@ -296,11 +298,11 @@ export function DocumentReviewPage() {
     if (!target || annotationsQuery.isPending || annotationsQuery.isError) return;
     deepLinkAnnotationRef.current = null;
     if (!annotations.some((a) => a.id === target)) {
-      notify('This annotation no longer exists.', 'error');
+      notify(t('review.annotationGone'), 'error');
       setActiveAnnotationId(null);
       setScrollToCommentId(null);
     }
-  }, [annotations, annotationsQuery.isPending, annotationsQuery.isError, notify]);
+  }, [annotations, annotationsQuery.isPending, annotationsQuery.isError, notify, t]);
   const composingPending = Boolean(pending && !pending.menuPosition);
   const focusSpotlight = !focusMode
     ? null
@@ -340,12 +342,12 @@ export function DocumentReviewPage() {
       if (domSelection && !domSelection.isCollapsed) return;
       event.preventDefault();
       void copyToClipboard(pendingQuote).then((ok) =>
-        notify(ok ? 'Text copied.' : 'Could not copy to the clipboard.', ok ? 'success' : 'error'),
+        notify(ok ? t('review.textCopied') : t('review.copyFailed'), ok ? 'success' : 'error'),
       );
     };
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);
-  }, [pendingQuote, notify]);
+  }, [pendingQuote, notify, t]);
 
   const closeFocusCard = () => {
     setActiveAnnotationId(null);
@@ -422,13 +424,13 @@ export function DocumentReviewPage() {
           // trap yanks the viewport to a mark that hasn't rendered yet (issue
           // #403). Creating is a closing gesture there: page stays put, sharp.
           if (!focusMode) setActiveAnnotationId(created.id);
-          notify('Annotation created.');
+          notify(t('review.created'));
         },
         onError: (error) =>
           notify(
             apiErrorCode(error) === 'VERSION_READ_ONLY'
-              ? 'A newer version was uploaded in the meantime — annotations go on the latest version.'
-              : 'Could not create the annotation.',
+              ? t('review.createConflicts.VERSION_READ_ONLY')
+              : t('review.createFailed'),
             'error',
           ),
       },
@@ -457,11 +459,7 @@ export function DocumentReviewPage() {
   }
 
   if (documentQuery.isError || !documentQuery.data) {
-    return (
-      <Alert severity="error">
-        This document does not exist, or you are not a participant of its review.
-      </Alert>
-    );
+    return <Alert severity="error">{t('review.notFound')}</Alert>;
   }
 
   const document = documentQuery.data;
@@ -497,7 +495,7 @@ export function DocumentReviewPage() {
         }
       />
       {versionNumber === undefined ? (
-        <Alert severity="info">This review has no uploaded document version yet.</Alert>
+        <Alert severity="info">{t('review.noVersion')}</Alert>
       ) : (
         <Stack
           direction={{ xs: 'column', md: 'row' }}
@@ -535,35 +533,31 @@ export function DocumentReviewPage() {
                     size="small"
                     onClick={() => handleVersionChange(knownLatest)}
                   >
-                    Go to v{knownLatest}
+                    {t('review.goToLatest', { version: knownLatest })}
                   </Button>
                 }
               >
-                You are viewing an older version — reading only. Annotate on v{knownLatest}.
+                {t('review.olderVersion', { version: knownLatest })}
               </Alert>
             )}
             {extractionStatus === ExtractionStatus.Pending && (
-              <Alert severity="info">
-                The document is being processed — annotating becomes available once the text layer
-                is extracted.
-              </Alert>
+              <Alert severity="info">{t('review.processing')}</Alert>
             )}
             {extractionStatus === ExtractionStatus.Failed && (
               <Alert severity="error">
-                Extraction failed for this version, so it cannot be annotated.
                 {/* A PDF still displays — it is its own viewable copy. A Word file
                     is viewed through a conversion that never happened, so there is
                     nothing to show and promising otherwise would be a lie. */}
-                {pdf ? ' The original document is still shown below.' : ' Download it to read it.'}
+                {pdf ? t('review.extractionFailedWithPdf') : t('review.extractionFailedNoPdf')}
               </Alert>
             )}
-            {pdfError && <Alert severity="error">The PDF could not be displayed: {pdfError}</Alert>}
-            {pdfQuery.isError && (
-              <Alert severity="error">The original document could not be loaded.</Alert>
+            {pdfError && (
+              <Alert severity="error">{t('review.pdfError', { error: pdfError })}</Alert>
             )}
+            {pdfQuery.isError && <Alert severity="error">{t('review.originalLoadError')}</Alert>}
             {(pdfQuery.isPending || (!pdf && !pdfError && !pdfQuery.isError)) && (
               <Stack sx={{ alignItems: 'center', py: 6 }}>
-                <CircularProgress aria-label="Loading document" />
+                <CircularProgress aria-label={t('review.loadingDocument')} />
               </Stack>
             )}
             {pdf && (
@@ -588,7 +582,7 @@ export function DocumentReviewPage() {
                 <ErrorBoundary
                   resetKeys={[versionNumber, pdf]}
                   fallback={(_error, reset) => (
-                    <BoundaryFallback title="The document viewer failed" onRetry={reset} />
+                    <BoundaryFallback title={t('review.viewerFailed')} onRetry={reset} />
                   )}
                 >
                   <DocumentViewer
@@ -649,7 +643,7 @@ export function DocumentReviewPage() {
           {!focusMode && (
             <Box
               component="aside"
-              aria-label="Annotations"
+              aria-label={t('review.panelLabel')}
               sx={{
                 // The divider's width is off the top, so the split reads
                 // exactly document : panel = (1 - f) : f.
@@ -663,7 +657,7 @@ export function DocumentReviewPage() {
               <ErrorBoundary
                 resetKeys={[versionNumber]}
                 fallback={(_error, reset) => (
-                  <BoundaryFallback title="The annotations panel failed" onRetry={reset} dense />
+                  <BoundaryFallback title={t('review.panelFailed')} onRetry={reset} dense />
                 )}
               >
                 <AnnotationPanel
@@ -706,7 +700,7 @@ export function DocumentReviewPage() {
           <ErrorBoundary
             resetKeys={[versionNumber]}
             fallback={(_error, reset) => (
-              <BoundaryFallback title="The annotations panel failed" onRetry={reset} dense />
+              <BoundaryFallback title={t('review.panelFailed')} onRetry={reset} dense />
             )}
           >
             <AnnotationPanel
@@ -838,14 +832,14 @@ export function DocumentReviewPage() {
           <ListItemIcon>
             <NotebookPen size={16} />
           </ListItemIcon>
-          <ListItemText>Create annotation</ListItemText>
+          <ListItemText>{t('review.createAnnotation')}</ListItemText>
         </MenuItem>
         {pendingQuote && (
           <MenuItem
             onClick={() => {
               void copyToClipboard(pendingQuote).then((ok) =>
                 notify(
-                  ok ? 'Text copied.' : 'Could not copy to the clipboard.',
+                  ok ? t('review.textCopied') : t('review.copyFailed'),
                   ok ? 'success' : 'error',
                 ),
               );
@@ -855,7 +849,7 @@ export function DocumentReviewPage() {
             <ListItemIcon>
               <Copy size={16} />
             </ListItemIcon>
-            <ListItemText>Copy text</ListItemText>
+            <ListItemText>{t('review.copyText')}</ListItemText>
           </MenuItem>
         )}
       </Menu>

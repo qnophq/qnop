@@ -26,6 +26,7 @@ import Skeleton from '@mui/material/Skeleton';
 import Stack from '@mui/material/Stack';
 import Typography from '@mui/material/Typography';
 import { useTheme } from '@mui/material/styles';
+import { useTranslation } from 'react-i18next';
 import type { AnnotationView } from '../../../api/generated';
 import type { ScreenPosition } from './anchoring';
 import { useComments } from '../../../api/hooks/useComments';
@@ -55,6 +56,7 @@ interface AnnotationHoverCardProps {
  * events pass through — the card never traps the mouse.
  */
 export function AnnotationHoverCard({ annotation, getAnchorPosition }: AnnotationHoverCardProps) {
+  const { t } = useTranslation('workspace');
   const theme = useTheme();
   const userId = useAuthStore((state) => state.userId);
   const displayName = useAuthStore((state) => state.displayName);
@@ -82,8 +84,8 @@ export function AnnotationHoverCard({ annotation, getAnchorPosition }: Annotatio
   const own = authorId === userId;
   // Server-resolved name, honouring per-review anonymity (issue #413).
   const authorName = own
-    ? (displayName ?? 'You')
-    : (firstComment?.authorDisplayName ?? annotation.authorDisplayName ?? 'Participant');
+    ? (displayName ?? t('people.you'))
+    : (firstComment?.authorDisplayName ?? annotation.authorDisplayName ?? t('people.participant'));
 
   return (
     <Popover
@@ -134,12 +136,12 @@ export function AnnotationHoverCard({ annotation, getAnchorPosition }: Annotatio
             )
           ) : (
             <Typography variant="body2" color="text.secondary" sx={{ fontStyle: 'italic' }}>
-              No comments yet.
+              {t('viewer.hoverNoComments')}
             </Typography>
           )}
 
           <Typography variant="caption" color="text.secondary" sx={{ textAlign: 'right' }}>
-            Click to open the thread
+            {t('viewer.hoverOpen')}
           </Typography>
         </Stack>
       </Box>

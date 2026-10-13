@@ -29,6 +29,8 @@ import Stack from '@mui/material/Stack';
 import ToggleButton from '@mui/material/ToggleButton';
 import ToggleButtonGroup from '@mui/material/ToggleButtonGroup';
 import { LayoutGrid, List as ListIcon, Plus } from 'lucide-react';
+import type { ParseKeys } from 'i18next';
+import { useTranslation } from 'react-i18next';
 import { AnnotationStatus } from '../../api/generated';
 import { useAnnotations } from '../../api/hooks/useAnnotations';
 import { useDocument, useDocumentVersions } from '../../api/hooks/useDocuments';
@@ -62,11 +64,12 @@ import { isOpenWorkflowState } from '../../components/reviews/workflowMeta';
 import { AnnotationPriority, AnnotationType, ExtractionStatus } from '../../api/generated';
 import { useAuthStore } from '../../stores/authStore';
 
-const FILTERS: { key: TaskFilter; label: string }[] = [
-  { key: 'all', label: 'All' },
-  { key: 'open', label: 'Open' },
-  { key: 'discussion', label: 'In discussion' },
-  { key: 'done', label: 'Resolved' },
+/** The status chips; labels are `workspace` catalog keys (ADR-0063). */
+const FILTERS: { key: TaskFilter; labelKey: ParseKeys<'workspace'> }[] = [
+  { key: 'all', labelKey: 'tasks.all' },
+  { key: 'open', labelKey: 'tasks.columns.open' },
+  { key: 'discussion', labelKey: 'tasks.columns.discussion' },
+  { key: 'done', labelKey: 'tasks.columns.done' },
 ];
 
 /**
@@ -78,6 +81,7 @@ const FILTERS: { key: TaskFilter; label: string }[] = [
  * task drawer, which reuses the panel's thread and resolve pieces.
  */
 export function ReviewTasksPage() {
+  const { t } = useTranslation('workspace');
   // The raw segment may be a slug (issue #411) — sibling links keep it, while
   // all data access below uses the canonical id resolved by the route gate.
   const { documentId: routeSegment = '' } = useParams();
@@ -172,13 +176,13 @@ export function ReviewTasksPage() {
   const authorNameById = new Map(
     annotations.map((annotation) => [
       annotation.authorId,
-      annotation.authorDisplayName ?? 'Participant',
+      annotation.authorDisplayName ?? t('people.participant'),
     ]),
   );
   const authorNameOf = (authorId: string) =>
     authorId === userId
-      ? (ownDisplayName ?? 'You')
-      : (authorNameById.get(authorId) ?? 'Participant');
+      ? (ownDisplayName ?? t('people.you'))
+      : (authorNameById.get(authorId) ?? t('people.participant'));
 
   const countOf = (key: TaskFilter) =>
     key === 'all'
@@ -224,7 +228,7 @@ export function ReviewTasksPage() {
     );
   }
   if (documentQuery.isError || !document) {
-    return <PageHeader title="This review is not available" />;
+    return <PageHeader title={t('tasks.unavailable')} />;
   }
 
   return (
@@ -254,21 +258,21 @@ export function ReviewTasksPage() {
           size="small"
           value={view}
           onChange={(_event, next: 'board' | 'list' | null) => next && setView(next)}
-          aria-label="Tasks presentation"
+          aria-label={t('tasks.presentation')}
         >
-          <ToggleButton value="board" aria-label="Board">
-            <LayoutGrid size={14} style={{ marginRight: 6 }} /> Board
+          <ToggleButton value="board" aria-label={t('tasks.board')}>
+            <LayoutGrid size={14} style={{ marginRight: 6 }} /> {t('tasks.board')}
           </ToggleButton>
-          <ToggleButton value="list" aria-label="List">
-            <ListIcon size={14} style={{ marginRight: 6 }} /> List
+          <ToggleButton value="list" aria-label={t('tasks.list')}>
+            <ListIcon size={14} style={{ marginRight: 6 }} /> {t('tasks.list')}
           </ToggleButton>
         </ToggleButtonGroup>
         <Divider orientation="vertical" flexItem sx={{ my: 0.5 }} />
-        {FILTERS.map(({ key, label }) => (
+        {FILTERS.map(({ key, labelKey }) => (
           <Chip
             key={key}
             size="small"
-            label={`${label} ${countOf(key)}`}
+            label={t('tasks.filterChip', { label: t(labelKey), count: countOf(key) })}
             color={filter === key ? 'primary' : 'default'}
             variant={filter === key ? 'filled' : 'outlined'}
             onClick={() => setParam('filter', key)}
@@ -289,7 +293,7 @@ export function ReviewTasksPage() {
             authors={authors}
             statusFacet={false}
             authorFacet={!anonymous}
-            searchLabel="Search tasks"
+            searchLabel={t('filters.searchTasks')}
           />
         </Box>
         {/* Reporting hand-off (issue #547): the server builds the workbook, so the
@@ -304,7 +308,7 @@ export function ReviewTasksPage() {
             open and has a version to author against; the server refuses a closed review anyway. */}
         {isOpenWorkflowState(document.workflowState) && latestVersion >= 1 && (
           <ToolbarIconButton
-            label="Global annotation"
+            label={t('panel.globalAnnotation')}
             icon={Plus}
             onClick={() => setNewTaskOpen(true)}
           />

@@ -27,6 +27,7 @@ import Stack from '@mui/material/Stack';
 import Typography from '@mui/material/Typography';
 import { alpha, useTheme } from '@mui/material/styles';
 import { Anchor, X } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import type { AnnotationView } from '../../../api/generated';
 import { reanchorSummary } from './panelFilters';
 
@@ -49,6 +50,7 @@ interface ReanchorBannerProps {
  * outcome is handled.
  */
 export function ReanchorBanner({ annotations, versionNumber, onReview }: ReanchorBannerProps) {
+  const { t } = useTranslation('workspace');
   const theme = useTheme();
   const documentId = annotations[0]?.documentId;
   const [dismissed, setDismissed] = useState<boolean>(() => {
@@ -65,8 +67,8 @@ export function ReanchorBanner({ annotations, versionNumber, onReview }: Reancho
   if (summary.total === 0 || dismissed || !documentId) return null;
 
   const parts = [
-    summary.moved > 0 ? `${summary.moved} moved` : null,
-    summary.orphaned > 0 ? `${summary.orphaned} orphaned` : null,
+    summary.moved > 0 ? t('reanchor.moved', { count: summary.moved }) : null,
+    summary.orphaned > 0 ? t('reanchor.orphaned', { count: summary.orphaned }) : null,
   ].filter(Boolean);
 
   const dismiss = () => {
@@ -97,12 +99,12 @@ export function ReanchorBanner({ annotations, versionNumber, onReview }: Reancho
         <Anchor size={14} />
       </Box>
       <Typography variant="body2" sx={{ flex: 1, minWidth: 0 }}>
-        Re-anchoring on v{versionNumber}: {parts.join(', ')}.
+        {t('reanchor.summary', { version: versionNumber, parts: parts.join(', ') })}
       </Typography>
       <Button size="small" variant="text" onClick={onReview} sx={{ flexShrink: 0 }}>
-        Review
+        {t('reanchor.review')}
       </Button>
-      <IconButton size="small" aria-label="Dismiss re-anchoring notice" onClick={dismiss}>
+      <IconButton size="small" aria-label={t('reanchor.dismiss')} onClick={dismiss}>
         <X size={13} />
       </IconButton>
     </Stack>

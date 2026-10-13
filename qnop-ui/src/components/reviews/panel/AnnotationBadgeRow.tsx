@@ -26,6 +26,7 @@ import Tooltip from '@mui/material/Tooltip';
 import Typography from '@mui/material/Typography';
 import { useTheme } from '@mui/material/styles';
 import { Check, Crosshair, MessageSquare } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import type { AnnotationView } from '../../../api/generated';
 import { PlacementStatus } from '../../../api/generated';
 import { ToneBadge } from '../../admin/ToneBadge';
@@ -63,6 +64,7 @@ export function AnnotationBadgeRow({
   onConfirmPlacement,
   onReattachPlacement,
 }: AnnotationBadgeRowProps) {
+  const { t } = useTranslation('workspace');
   const theme = useTheme();
   const statusCue = STATUS_CUES[annotation.status];
   const typeCue = annotation.type ? TYPE_CUES[annotation.type] : null;
@@ -72,8 +74,8 @@ export function AnnotationBadgeRow({
 
   return (
     <Stack direction="row" spacing={1} sx={{ alignItems: 'center', flexWrap: 'wrap' }}>
-      <ToneBadge tone={statusCue.tone} label={statusCue.label} />
-      {unseen && <ToneBadge tone="blue" label="New" />}
+      <ToneBadge tone={statusCue.tone} label={t(statusCue.labelKey)} />
+      {unseen && <ToneBadge tone="blue" label={t('annotation.new')} />}
       {typeCue && TypeIcon && (
         <Stack
           direction="row"
@@ -82,12 +84,12 @@ export function AnnotationBadgeRow({
         >
           <TypeIcon size={12} aria-hidden />
           <Typography component="span" sx={{ fontSize: 11, fontWeight: 600 }}>
-            {typeCue.label}
+            {t(typeCue.labelKey)}
           </Typography>
         </Stack>
       )}
       {priorityCue && (
-        <Tooltip title={`${priorityCue.label} priority`}>
+        <Tooltip title={t('annotation.priority', { priority: t(priorityCue.labelKey) })}>
           <Box
             sx={{
               width: 7,
@@ -103,7 +105,7 @@ export function AnnotationBadgeRow({
       {onConfirmPlacement && annotation.placementStatus === PlacementStatus.Moved && (
         <Tooltip
           // describeChild: the title is a description — the visible text stays the accessible name.
-          title="Accept the relocated highlight"
+          title={t('annotation.placementActions.confirmHint')}
           describeChild
         >
           <Button
@@ -117,7 +119,7 @@ export function AnnotationBadgeRow({
             }}
             sx={{ py: 0, minHeight: 0, fontSize: 12 }}
           >
-            Looks right
+            {t('annotation.placementActions.confirm')}
           </Button>
         </Tooltip>
       )}
@@ -126,7 +128,7 @@ export function AnnotationBadgeRow({
         (annotation.placementStatus === PlacementStatus.Orphaned ||
           annotation.placementStatus === PlacementStatus.Failed ||
           annotation.placementStatus === PlacementStatus.Moved) && (
-          <Tooltip title="Pick the correct passage yourself" describeChild>
+          <Tooltip title={t('annotation.placementActions.reattachHint')} describeChild>
             <Button
               size="small"
               variant="text"
@@ -138,7 +140,7 @@ export function AnnotationBadgeRow({
               }}
               sx={{ py: 0, minHeight: 0, fontSize: 12 }}
             >
-              Re-attach
+              {t('annotation.placementActions.reattach')}
             </Button>
           </Tooltip>
         )}
@@ -146,7 +148,7 @@ export function AnnotationBadgeRow({
         // Free re-position of a healthy placement (#562) — the caller decides
         // who gets the handler (admins always, authors under the switch); the
         // distinct label separates it from the lost-placement rescue.
-        <Tooltip title="Re-position this annotation" describeChild>
+        <Tooltip title={t('annotation.placementActions.repositionHint')} describeChild>
           <Button
             size="small"
             variant="text"
@@ -158,7 +160,7 @@ export function AnnotationBadgeRow({
             }}
             sx={{ py: 0, minHeight: 0, fontSize: 12 }}
           >
-            Re-position
+            {t('annotation.placementActions.reposition')}
           </Button>
         </Tooltip>
       )}
@@ -170,11 +172,18 @@ export function AnnotationBadgeRow({
         {isDocumentScoped(annotation) ? (
           <WholeDocumentChip compact />
         ) : (
-          region && <Typography variant="caption">Page {region.surfaceIndex + 1}</Typography>
+          region && (
+            <Typography variant="caption">
+              {t('annotation.page', { page: region.surfaceIndex + 1 })}
+            </Typography>
+          )
         )}
         <Stack direction="row" spacing={0.5} sx={{ alignItems: 'center' }}>
           <MessageSquare size={13} aria-hidden />
-          <Typography variant="caption" aria-label={`${annotation.commentCount} comments`}>
+          <Typography
+            variant="caption"
+            aria-label={t('annotation.commentCount', { count: annotation.commentCount })}
+          >
             {annotation.commentCount}
           </Typography>
         </Stack>

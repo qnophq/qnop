@@ -24,6 +24,7 @@ import Box from '@mui/material/Box';
 import Stack from '@mui/material/Stack';
 import Typography from '@mui/material/Typography';
 import { ImageOff } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import { axiosInstance } from '../../../api/config';
 import { API_URL_PREFIX } from './attachmentSources';
 
@@ -42,6 +43,7 @@ interface AttachmentImageProps {
  * cache headers make refetches hit the HTTP cache.
  */
 export function AttachmentImage({ src, alt }: AttachmentImageProps) {
+  const { t } = useTranslation('workspace');
   // Keyed by src: a stale result is simply ignored on render, so switching
   // sources needs no synchronous state reset inside the effect.
   const [result, setResult] = useState<{ src: string; url: string | null } | null>(null);
@@ -91,7 +93,7 @@ export function AttachmentImage({ src, alt }: AttachmentImageProps) {
       >
         <ImageOff size={14} aria-hidden />
         <Typography component="span" variant="caption">
-          {alt || 'Image unavailable'}
+          {alt || t('markdown.attachment.imageUnavailable')}
         </Typography>
       </Stack>
     );
@@ -103,7 +105,7 @@ export function AttachmentImage({ src, alt }: AttachmentImageProps) {
       <Box
         component="span"
         role="img"
-        aria-label={alt || 'Loading image'}
+        aria-label={alt || t('markdown.attachment.loadingImage')}
         sx={{
           display: 'block',
           width: 180,

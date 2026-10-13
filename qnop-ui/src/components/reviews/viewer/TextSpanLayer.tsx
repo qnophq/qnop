@@ -23,6 +23,7 @@ import { useId, useRef, useState } from 'react';
 import type { KeyboardEvent, MouseEvent, PointerEvent } from 'react';
 import Box from '@mui/material/Box';
 import { useTheme } from '@mui/material/styles';
+import { useTranslation } from 'react-i18next';
 import type { RenderedTextSpan } from '../../../api/generated';
 import type { ScreenPosition, TextSelectionOffsets } from './anchoring';
 import {
@@ -38,10 +39,6 @@ import { SELECTION_MARKER_BG } from './markerColors';
 import { visuallyHidden } from '../../../theme/visuallyHidden';
 import { keyboardCaretMove, spanAtOffset } from './keyboardSelection';
 import { useKeepInView } from './useKeepInView';
-
-/** How the keyboard path is announced to assistive tech (issue #460). */
-const KEYBOARD_HINT =
-  'Arrow keys move the caret through the text, Shift with an arrow key extends the selection, Enter annotates the selection, Escape clears it.';
 
 interface TextSpanLayerProps {
   spans: RenderedTextSpan[];
@@ -81,6 +78,7 @@ export function TextSpanLayer({
   const [caret, setCaret] = useState<{ anchor: number; focus: number } | null>(null);
   const hintId = useId();
   const theme = useTheme();
+  const { t } = useTranslation('workspace');
 
   const pitch = surfaceLinePitch(spans);
   const textLength = surfaceText(spans).length;
@@ -226,7 +224,7 @@ export function TextSpanLayer({
       // Names the otherwise-generic selection surface for assistive tech (issue #341):
       // the printed glyphs live in the canvas below, so this layer needs its own label.
       role="group"
-      aria-label={`Selectable document text, page ${surfaceIndex + 1}`}
+      aria-label={t('viewer.textLayer', { page: surfaceIndex + 1 })}
       aria-describedby={enabled ? hintId : undefined}
       tabIndex={enabled ? 0 : -1}
       onPointerDown={handlePointerDown}
@@ -249,7 +247,10 @@ export function TextSpanLayer({
     >
       {enabled && (
         <Box component="span" id={hintId} sx={visuallyHidden}>
-          {KEYBOARD_HINT}
+          {
+            // How the keyboard path is announced to assistive tech (issue #460).
+            t('viewer.textKeyboardHint')
+          }
         </Box>
       )}
       {caretBox && (

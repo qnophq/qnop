@@ -1,0 +1,378 @@
+{
+  "people": {
+    "you": "You",
+    "participant": "Participant"
+  },
+  "quoted": "“{{text}}”",
+  "annotation": {
+    "fallbackTitle": "Annotation",
+    "regionAnnotation": "Region annotation",
+    "wholeDocument": "Whole document",
+    "noPlacement": "No placement on this version",
+    "noTextAnchor": "No text anchor",
+    "highlight": "Annotation: {{quote}}",
+    "types": {
+      "CHANGE": "Change",
+      "PROPOSAL": "Proposal",
+      "CONFLICT": "Conflict",
+      "QUESTION": "Question",
+      "RISK": "Risk"
+    },
+    "priorities": {
+      "HIGH": "High",
+      "MEDIUM": "Medium",
+      "LOW": "Low"
+    },
+    "priority": "{{priority}} priority",
+    "noPriority": "No priority",
+    "status": {
+      "OPEN": "Open",
+      "RESOLVED": "Resolved",
+      "DISMISSED": "Dismissed"
+    },
+    "placement": {
+      "PENDING": {
+        "label": "Re-anchoring…",
+        "hint": "The new version is still being matched against this annotation."
+      },
+      "MOVED": {
+        "label": "Moved",
+        "hint": "The anchored text changed with the new version — please verify the highlight."
+      },
+      "ORPHANED": {
+        "label": "Orphaned",
+        "hint": "No confident match on this version — the annotation needs manual handling."
+      },
+      "FAILED": {
+        "label": "Failed",
+        "hint": "Re-anchoring failed for this annotation."
+      }
+    },
+    "placementActions": {
+      "confirm": "Looks right",
+      "confirmHint": "Accept the relocated highlight",
+      "reattach": "Re-attach",
+      "reattachHint": "Pick the correct passage yourself",
+      "reposition": "Re-position",
+      "repositionHint": "Re-position this annotation"
+    },
+    "commentCount_one": "{{count}} comments",
+    "commentCount_other": "{{count}} comments",
+    "page": "Page {{page}}",
+    "pageShort": "p. {{page}}",
+    "new": "New",
+    "newSinceLastVisit": "New since your last visit",
+    "collapse": "Collapse",
+    "collapseAnnotation": "Collapse annotation"
+  },
+  "head": {
+    "started": "Started this discussion · {{time}}",
+    "copyQuote": "Copy quote",
+    "copyText": "Copy text",
+    "quoteCopied": "Quote copied.",
+    "textCopied": "Text copied.",
+    "copyLink": "Copy link to annotation"
+  },
+  "placement": {
+    "confirmed": "Placement confirmed.",
+    "confirmFailed": "Could not confirm the placement.",
+    "reattached": "Annotation re-attached.",
+    "reattachFailed": "Could not re-attach the annotation."
+  },
+  "panel": {
+    "title": "Annotations ({{count}})",
+    "description": "Marks and their discussion on this version.",
+    "newCount": "{{count}} new",
+    "globalAnnotation": "Global annotation",
+    "empty": "No annotations yet.",
+    "emptyCanAnnotate": "No annotations yet. Select text or draw a region on the document to add one.",
+    "noMatch": "No annotations match this filter.",
+    "noMatchPinned": "No annotations match this filter — the one you have open stays until you select another."
+  },
+  "filters": {
+    "searchAnnotations": "Search annotations",
+    "searchTasks": "Search tasks",
+    "filter": "Filter annotations",
+    "status": "Status",
+    "placement": "Placement",
+    "type": "Type",
+    "priority": "Priority",
+    "author": "Author",
+    "any": "Any",
+    "anyone": "Anyone",
+    "reset": "Reset filters",
+    "statusOptions": {
+      "all": "All",
+      "open": "Open",
+      "resolved": "Resolved"
+    },
+    "placementOptions": {
+      "all": "Any placement",
+      "attention": "Needs attention",
+      "moved": "Moved",
+      "orphaned": "Orphaned"
+    }
+  },
+  "reanchor": {
+    "summary": "Re-anchoring on v{{version}}: {{parts}}.",
+    "moved": "{{count}} moved",
+    "orphaned": "{{count}} orphaned",
+    "review": "Review",
+    "dismiss": "Dismiss re-anchoring notice"
+  },
+  "resolve": {
+    "notePlaceholder": "Optional closing note…",
+    "noteLabel": "Optional closing note",
+    "action": "Resolve",
+    "done": "Annotation resolved.",
+    "failed": "The annotation could not be resolved.",
+    "conflicts": {
+      "ANNOTATION_ALREADY_RESOLVED": "This annotation was already resolved."
+    }
+  },
+  "reopen": {
+    "action": "Reopen",
+    "done": "Annotation reopened.",
+    "failed": "The annotation could not be reopened.",
+    "conflicts": {
+      "REVIEW_CLOSED": "The review is finalized — settled annotations stay closed.",
+      "ANNOTATION_NOT_RESOLVED": "This annotation is already open."
+    }
+  },
+  "dismiss": {
+    "open": "Dismiss…",
+    "placeholder": "Why is this concern dismissed? (required)",
+    "label": "Dismissal justification (required)",
+    "action": "Dismiss",
+    "note": "The justification is posted to the thread; the author may reopen.",
+    "done": "Annotation dismissed.",
+    "failed": "The annotation could not be dismissed.",
+    "conflicts": {
+      "ANNOTATION_NOT_OPEN": "This annotation is already settled.",
+      "REVIEW_CLOSED": "The review is closed — nothing left to dismiss."
+    }
+  },
+  "thread": {
+    "send": "Send ({{shortcut}})",
+    "comment": "Comment",
+    "commentWithShortcut": "Comment ({{shortcut}})",
+    "addComment": "Add a comment",
+    "loading": "Loading comments",
+    "loadError": "Could not load the comments.",
+    "noReplies": "No replies.",
+    "noRepliesYet": "No replies yet.",
+    "noComments": "No comments yet. Start the discussion.",
+    "closedResolved": "Resolved — this thread is closed.",
+    "closedDismissed": "Dismissed — this thread is closed.",
+    "policyReadOnly": "Only the author and the owner can reply in this review.",
+    "writeReply": "Write a reply",
+    "discussion": "Discussion ({{count}})",
+    "commentGone": "This comment no longer exists.",
+    "copyComment": "Copy comment",
+    "commentCopied": "Comment copied.",
+    "copyLink": "Copy link to comment",
+    "errors": {
+      "ANNOTATION_ALREADY_RESOLVED": "The annotation is settled — its thread is closed.",
+      "THREAD_READ_ONLY": "Only the author and the owner can reply in this review.",
+      "fallback": "Could not add the comment."
+    }
+  },
+  "composer": {
+    "title": "New annotation",
+    "typeLabel": "Annotation type",
+    "priorityLabel": "Annotation priority",
+    "none": "None",
+    "create": "Create annotation ({{shortcut}})",
+    "regionOnPage": "Region on page {{page}}",
+    "commentLabel": "Annotation comment",
+    "contextTitle": "You are annotating",
+    "contextRegion": "A region on page {{page}}.",
+    "contextDocument": "A general remark on the whole document — not pinned to a passage."
+  },
+  "markdown": {
+    "write": "Write",
+    "markdown": "Markdown",
+    "preview": "Preview",
+    "nothingToPreview": "Nothing to preview.",
+    "placeholder": "Add a comment",
+    "fullScreen": "Full screen",
+    "exitFullScreen": "Exit full screen",
+    "exitHint": "to exit",
+    "discussion": "Discussion",
+    "resizeRail": "Resize the context rail",
+    "mentionMenu": "Mention a participant",
+    "attachFile": "Attach file",
+    "dropFiles": "Drop files to attach",
+    "uploading": "Uploading {{name}}…",
+    "attachmentName": "attachment",
+    "toolbar": {
+      "label": "Text formatting",
+      "withShortcut": "{{label}} ({{shortcut}})",
+      "bold": "Bold",
+      "italic": "Italic",
+      "strikethrough": "Strikethrough",
+      "heading": "Heading",
+      "quote": "Blockquote",
+      "link": "Link",
+      "image": "Image",
+      "table": "Table",
+      "orderedList": "Ordered list",
+      "bulletList": "Bulleted list",
+      "code": "Code",
+      "codeBlock": "Code block"
+    },
+    "hint": {
+      "label": "Markdown supported",
+      "syntax": "Markdown: **bold**, _italic_, `code`, lists, > quote, [link](url)"
+    },
+    "emoji": {
+      "tooltip": "Emoji",
+      "insert": "Insert emoji",
+      "loading": "Loading emoji picker",
+      "loadError": "The emoji picker could not be loaded."
+    },
+    "attachment": {
+      "download": "Download attachment",
+      "retry": "Download failed — click to retry",
+      "downloading": "Downloading",
+      "imageUnavailable": "Image unavailable",
+      "loadingImage": "Loading image",
+      "tooLarge": "The file is too large.",
+      "uploadFailed": "Could not upload the file."
+    }
+  },
+  "reactions": {
+    "add": "Add reaction",
+    "closed": "The review is closed — reactions are read-only.",
+    "failed": "Could not update the reaction."
+  },
+  "permalink": {
+    "copy": "Copy link",
+    "copied": "Link copied.",
+    "failed": "Could not copy the link."
+  },
+  "viewer": {
+    "version": "Version",
+    "previousPage": "Previous page",
+    "nextPage": "Next page",
+    "pageOf": "Page {{page}} / {{count}}",
+    "processing": "Processing document…",
+    "extractionFailed": "Extraction failed",
+    "tool": "Annotation tool",
+    "selectText": "Select text",
+    "selectTextHint": "Select text to annotate a quote",
+    "drawRegion": "Draw region",
+    "drawRegionHint": "Draw a rectangle to annotate a region",
+    "layout": "Document layout",
+    "panel": "Panel",
+    "panelView": "Panel view",
+    "panelHint": "Document beside the annotation panel",
+    "focus": "Focus",
+    "focusView": "Focus view",
+    "focusHint": "Full-width document with the spotlight overlay",
+    "showListHint": "Show the annotation list",
+    "showList": "Show annotations ({{count}})",
+    "zoomOut": "Zoom out",
+    "zoomIn": "Zoom in",
+    "zoomReset": "Reset zoom to fit width",
+    "pages": "Document pages",
+    "page": "Page {{page}}",
+    "textLayer": "Selectable document text, page {{page}}",
+    "textKeyboardHint": "Arrow keys move the caret through the text, Shift with an arrow key extends the selection, Enter annotates the selection, Escape clears it.",
+    "regionLayer": "Region selection, page {{page}}",
+    "regionKeyboardHint": "The first arrow key press places a selection rectangle in the middle of the page. Arrow keys then move it, Shift with an arrow key moves in larger steps, Alt with an arrow key grows or shrinks it, Enter annotates the region, Escape clears it.",
+    "hoverNoComments": "No comments yet.",
+    "hoverOpen": "Click to open the thread",
+    "placingQuote": "Placing <quote/> — select the new passage",
+    "placing": "Placing the annotation — select its new location",
+    "cancelReattach": "Cancel re-attaching"
+  },
+  "focus": {
+    "position": "Annotation {{index}} of {{count}}",
+    "previous": "Previous annotation",
+    "previousHint": "Previous annotation (↑)",
+    "next": "Next annotation",
+    "nextHint": "Next annotation (↓)",
+    "close": "Close annotation",
+    "resizeDrawer": "Resize the annotation drawer"
+  },
+  "review": {
+    "notFound": "This document does not exist, or you are not a participant of its review.",
+    "noVersion": "This review has no uploaded document version yet.",
+    "olderVersion": "You are viewing an older version — reading only. Annotate on v{{version}}.",
+    "goToLatest": "Go to v{{version}}",
+    "processing": "The document is being processed — annotating becomes available once the text layer is extracted.",
+    "extractionFailedWithPdf": "Extraction failed for this version, so it cannot be annotated. The original document is still shown below.",
+    "extractionFailedNoPdf": "Extraction failed for this version, so it cannot be annotated. Download it to read it.",
+    "pdfError": "The PDF could not be displayed: {{error}}",
+    "originalLoadError": "The original document could not be loaded.",
+    "loadingDocument": "Loading document",
+    "viewerFailed": "The document viewer failed",
+    "panelFailed": "The annotations panel failed",
+    "panelLabel": "Annotations",
+    "createAnnotation": "Create annotation",
+    "copyText": "Copy text",
+    "textCopied": "Text copied.",
+    "copyFailed": "Could not copy to the clipboard.",
+    "annotationGone": "This annotation no longer exists.",
+    "created": "Annotation created.",
+    "createFailed": "Could not create the annotation.",
+    "createConflicts": {
+      "VERSION_READ_ONLY": "A newer version was uploaded in the meantime — annotations go on the latest version.",
+      "REVIEW_CLOSED": "This review is closed — no new annotations can be added."
+    }
+  },
+  "diff": {
+    "baseline": "Baseline",
+    "compare": "Compare",
+    "swap": "Swap sides",
+    "swapLabel": "Swap the compared versions",
+    "comparing": "Comparing…",
+    "wordsAdded": "Words +",
+    "wordsRemoved": "Words −",
+    "changes": "Changes",
+    "pagesLabel_one": "Page",
+    "pagesLabel_other": "Pages",
+    "pageCount": "{{count}} pages",
+    "syncScroll": "Sync scroll",
+    "kinds": {
+      "INSERTED": "Added",
+      "DELETED": "Deleted",
+      "CHANGED": "Changed"
+    },
+    "changeLabel": "{{kind}} change",
+    "summaryTitle": "Changes ({{count}})",
+    "collapseRail": "Collapse the changes rail",
+    "expandRail": "Expand the changes rail",
+    "identical": "The compared versions have identical text content.",
+    "renderError": "The document could not be rendered. {{error}}",
+    "pageLabel": "Version {{version}}, page {{page}}",
+    "pending": "One of the versions is still being processed — try again in a moment.",
+    "needsTwoVersions": "Comparing needs at least two versions with an extracted text layer. Upload a new version first.",
+    "failed": "The comparison could not be computed.",
+    "changeCount_one": "{{count}} change",
+    "changeCount_other": "{{count}} changes"
+  },
+  "tasks": {
+    "columns": {
+      "open": "Open",
+      "discussion": "In discussion",
+      "done": "Resolved"
+    },
+    "all": "All",
+    "filterChip": "{{label}} {{count}}",
+    "columnBadge": "{{label}} ({{count}})",
+    "dropToResolve": "Drop your card here to resolve it",
+    "emptyColumn": "Nothing here",
+    "presentation": "Tasks presentation",
+    "board": "Board",
+    "list": "List",
+    "unavailable": "This review is not available",
+    "noMatch": "No annotations match the current filter.",
+    "resizeDrawer": "Resize the task drawer",
+    "showInDocument": "Show in document",
+    "close": "Close task",
+    "newTitle": "New global annotation",
+    "newDescription": "A general remark that applies to the whole document — it is not pinned to a passage and stays valid on every version."
+  }
+}

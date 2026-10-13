@@ -24,6 +24,7 @@ import Box from '@mui/material/Box';
 import CircularProgress from '@mui/material/CircularProgress';
 import { useTheme } from '@mui/material/styles';
 import { Paperclip } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import { axiosInstance } from '../../../api/config';
 import { API_URL_PREFIX } from './attachmentSources';
 
@@ -50,6 +51,7 @@ function labelText(children: ReactNode): string {
  * the app origin).
  */
 export function AttachmentLink({ href, children }: AttachmentLinkProps) {
+  const { t } = useTranslation('workspace');
   const theme = useTheme();
   const [busy, setBusy] = useState(false);
   const [failed, setFailed] = useState(false);
@@ -66,7 +68,7 @@ export function AttachmentLink({ href, children }: AttachmentLinkProps) {
       const url = URL.createObjectURL(response.data);
       const anchor = document.createElement('a');
       anchor.href = url;
-      anchor.download = labelText(children) || 'attachment';
+      anchor.download = labelText(children) || t('markdown.attachmentName');
       anchor.click();
       URL.revokeObjectURL(url);
     } catch {
@@ -82,7 +84,7 @@ export function AttachmentLink({ href, children }: AttachmentLinkProps) {
       href={href}
       onClick={download}
       data-testid="attachment-link"
-      title={failed ? 'Download failed — click to retry' : 'Download attachment'}
+      title={failed ? t('markdown.attachment.retry') : t('markdown.attachment.download')}
       sx={{
         display: 'inline-flex',
         alignItems: 'center',
@@ -106,7 +108,7 @@ export function AttachmentLink({ href, children }: AttachmentLinkProps) {
       }}
     >
       {busy ? (
-        <CircularProgress size={12} aria-label="Downloading" />
+        <CircularProgress size={12} aria-label={t('markdown.attachment.downloading')} />
       ) : (
         <Paperclip size={12} aria-hidden />
       )}

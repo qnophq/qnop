@@ -20,6 +20,8 @@
  */
 
 import { useMutation, useQueryClient } from '@tanstack/react-query';
+import type { ParseKeys } from 'i18next';
+import { useTranslation } from 'react-i18next';
 import type {
   AnnotationListResponse,
   AnnotationView,
@@ -39,13 +41,9 @@ export interface ReactionToggle {
   reacted: boolean;
 }
 
-function notifyToggleError(error: unknown, notify: Notify) {
-  notify(
-    apiErrorCode(error) === 'REVIEW_CLOSED'
-      ? 'The review is closed — reactions are read-only.'
-      : 'Could not update the reaction.',
-    'error',
-  );
+/** The `workspace` catalog key reporting a failed toggle. */
+function toggleErrorKey(error: unknown): ParseKeys<'workspace'> {
+  return apiErrorCode(error) === 'REVIEW_CLOSED' ? 'reactions.closed' : 'reactions.failed';
 }
 
 /**
@@ -55,8 +53,9 @@ function notifyToggleError(error: unknown, notify: Notify) {
  * detail (with its PDF binaries) is deliberately NOT touched (#403 lesson).
  */
 export function useToggleAnnotationReaction(annotationId: string, notify: Notify) {
+  const { t } = useTranslation('workspace');
   const queryClient = useQueryClient();
-  const viewerName = useAuthStore((state) => state.displayName) ?? 'You';
+  const viewerName = useAuthStore((state) => state.displayName) ?? t('people.you');
   return useMutation({
     mutationFn: async ({ emoji, reacted }: ReactionToggle) => {
       if (reacted) {
@@ -88,7 +87,7 @@ export function useToggleAnnotationReaction(annotationId: string, notify: Notify
     },
     onError: (error, _toggle, context) => {
       context?.snapshots.forEach(([key, data]) => queryClient.setQueryData(key, data));
-      notifyToggleError(error, notify);
+      notify(t(toggleErrorKey(error)), 'error');
     },
     onSettled: () => {
       queryClient.invalidateQueries({ queryKey: annotationKeys.all });
@@ -101,8 +100,9 @@ export function useToggleAnnotationReaction(annotationId: string, notify: Notify
  * optimistic flip against the annotation's cached thread.
  */
 export function useToggleCommentReaction(annotationId: string, notify: Notify) {
+  const { t } = useTranslation('workspace');
   const queryClient = useQueryClient();
-  const viewerName = useAuthStore((state) => state.displayName) ?? 'You';
+  const viewerName = useAuthStore((state) => state.displayName) ?? t('people.you');
   return useMutation({
     mutationFn: async ({ commentId, emoji, reacted }: ReactionToggle & { commentId: string }) => {
       if (reacted) {
@@ -132,7 +132,7 @@ export function useToggleCommentReaction(annotationId: string, notify: Notify) {
     },
     onError: (error, _toggle, context) => {
       if (context) queryClient.setQueryData(context.key, context.snapshot);
-      notifyToggleError(error, notify);
+      notify(t(toggleErrorKey(error)), 'error');
     },
     onSettled: () => {
       queryClient.invalidateQueries({ queryKey: commentKeys.list(annotationId) });

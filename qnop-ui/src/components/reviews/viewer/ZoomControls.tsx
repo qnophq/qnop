@@ -23,6 +23,7 @@ import IconButton from '@mui/material/IconButton';
 import Tooltip from '@mui/material/Tooltip';
 import Typography from '@mui/material/Typography';
 import { ZoomIn, ZoomOut } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 
 export const MIN_ZOOM = 0.5;
 export const MAX_ZOOM = 3;
@@ -39,22 +40,23 @@ interface ZoomControlsProps {
  * comparison): step out, click the percentage to reset to fit-width, step in.
  */
 export function ZoomControls({ zoom, onZoomChange }: ZoomControlsProps) {
+  const { t } = useTranslation('workspace');
   return (
     <>
       <IconButton
         size="small"
-        aria-label="Zoom out"
+        aria-label={t('viewer.zoomOut')}
         disabled={zoom <= MIN_ZOOM}
         onClick={() => onZoomChange(Math.max(MIN_ZOOM, zoom - ZOOM_STEP))}
       >
         <ZoomOut size={16} />
       </IconButton>
-      <Tooltip title="Reset zoom to fit width">
+      <Tooltip title={t('viewer.zoomReset')}>
         <Typography
           component="button"
           variant="body2"
           color="text.secondary"
-          aria-label="Reset zoom to fit width"
+          aria-label={t('viewer.zoomReset')}
           onClick={() => onZoomChange(1)}
           sx={{
             minWidth: 44,
@@ -73,7 +75,7 @@ export function ZoomControls({ zoom, onZoomChange }: ZoomControlsProps) {
       </Tooltip>
       <IconButton
         size="small"
-        aria-label="Zoom in"
+        aria-label={t('viewer.zoomIn')}
         disabled={zoom >= MAX_ZOOM}
         onClick={() => onZoomChange(Math.min(MAX_ZOOM, zoom + ZOOM_STEP))}
       >

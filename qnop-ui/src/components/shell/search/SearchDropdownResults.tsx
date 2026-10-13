@@ -235,11 +235,16 @@ export function SearchDropdownResults({
 
 /** The annotation-status cue of a discussion hit — the panel's #405 language at icon scale. */
 export function StatusCueIcon({ status }: { status: AnnotationStatus }) {
+  const { t } = useTranslation('workspace');
   const theme = useTheme();
   const cue = STATUS_CUES[status] ?? STATUS_CUES[AnnotationStatus.Open];
   const Icon = cue.icon;
   return (
-    <Icon size={14} aria-label={cue.label} style={{ color: cue.color(theme), flexShrink: 0 }} />
+    <Icon
+      size={14}
+      aria-label={t(cue.labelKey)}
+      style={{ color: cue.color(theme), flexShrink: 0 }}
+    />
   );
 }
 
@@ -323,8 +328,8 @@ function HitRow({
         py: 0.75,
         textAlign: 'left',
         fontFamily: 'inherit',
-        ...(highlighted && { bgcolor: (t) => t.qnop.surface2 }),
-        '&:hover, &:focus-visible': { bgcolor: (t) => t.qnop.surface2 },
+        ...(highlighted && { bgcolor: (theme) => theme.qnop.surface2 }),
+        '&:hover, &:focus-visible': { bgcolor: (theme) => theme.qnop.surface2 },
       }}
     >
       <Box sx={{ pt: secondary ? 0.4 : 0, display: 'flex', flexShrink: 0 }}>{start}</Box>
@@ -374,8 +379,8 @@ function SeeAllRow({
         color: 'primary.main',
         fontSize: 12.5,
         fontWeight: 600,
-        ...(highlighted && { bgcolor: (t) => t.qnop.surface2 }),
-        '&:hover, &:focus-visible': { bgcolor: (t) => t.qnop.surface2 },
+        ...(highlighted && { bgcolor: (theme) => theme.qnop.surface2 }),
+        '&:hover, &:focus-visible': { bgcolor: (theme) => theme.qnop.surface2 },
       }}
     >
       {t('search.seeAll', { count: total })}

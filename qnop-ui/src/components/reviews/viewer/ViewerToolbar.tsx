@@ -44,6 +44,7 @@ import type { ReviewViewMode } from '../focus/useViewMode';
 import { ExtractionStatus } from '../../../api/generated';
 import { ToneBadge } from '../../admin/ToneBadge';
 import { ZoomControls } from './ZoomControls';
+import { useTranslation } from 'react-i18next';
 
 export type ViewerTool = 'text' | 'region';
 
@@ -100,6 +101,7 @@ export function ViewerToolbar({
   annotationCount,
   onOpenAnnotationList,
 }: ViewerToolbarProps) {
+  const { t } = useTranslation('workspace');
   const focusMode = viewMode === 'focus';
   return (
     <Paper
@@ -116,7 +118,7 @@ export function ViewerToolbar({
       <TextField
         select
         size="small"
-        label="Version"
+        label={t('viewer.version')}
         value={String(currentVersion)}
         onChange={(event) => onVersionChange(Number(event.target.value))}
         sx={{ minWidth: 110 }}
@@ -131,7 +133,7 @@ export function ViewerToolbar({
       <Stack direction="row" spacing={0.25} sx={{ alignItems: 'center' }}>
         <IconButton
           size="small"
-          aria-label="Previous page"
+          aria-label={t('viewer.previousPage')}
           disabled={currentPage <= 0}
           onClick={() => onNavigateToPage(currentPage - 1)}
         >
@@ -143,11 +145,11 @@ export function ViewerToolbar({
           aria-live="polite"
           sx={{ fontVariantNumeric: 'tabular-nums', px: 0.5, whiteSpace: 'nowrap' }}
         >
-          Page {Math.min(currentPage + 1, pageCount)} / {pageCount}
+          {t('viewer.pageOf', { page: Math.min(currentPage + 1, pageCount), count: pageCount })}
         </Typography>
         <IconButton
           size="small"
-          aria-label="Next page"
+          aria-label={t('viewer.nextPage')}
           disabled={currentPage >= pageCount - 1}
           onClick={() => onNavigateToPage(currentPage + 1)}
         >
@@ -159,12 +161,12 @@ export function ViewerToolbar({
         <Stack direction="row" spacing={1} sx={{ alignItems: 'center' }}>
           <CircularProgress size={14} />
           <Typography variant="body2" color="text.secondary">
-            Processing document…
+            {t('viewer.processing')}
           </Typography>
         </Stack>
       )}
       {extractionStatus === ExtractionStatus.Failed && (
-        <ToneBadge tone="red" label="Extraction failed" />
+        <ToneBadge tone="red" label={t('viewer.extractionFailed')} />
       )}
 
       {/* The trailing controls: two sub-groups inside a wrapping, right-aligned
@@ -185,15 +187,19 @@ export function ViewerToolbar({
             value={tool}
             onChange={(_event, next: ViewerTool | null) => next && onToolChange(next)}
             disabled={!canAnnotate}
-            aria-label="Annotation tool"
+            aria-label={t('viewer.tool')}
           >
-            <ToggleButton value="text" disabled={!textToolAvailable} aria-label="Select text">
-              <Tooltip title="Select text to annotate a quote">
+            <ToggleButton
+              value="text"
+              disabled={!textToolAvailable}
+              aria-label={t('viewer.selectText')}
+            >
+              <Tooltip title={t('viewer.selectTextHint')}>
                 <TextCursor size={16} />
               </Tooltip>
             </ToggleButton>
-            <ToggleButton value="region" aria-label="Draw region">
-              <Tooltip title="Draw a rectangle to annotate a region">
+            <ToggleButton value="region" aria-label={t('viewer.drawRegion')}>
+              <Tooltip title={t('viewer.drawRegionHint')}>
                 <BoxSelect size={16} />
               </Tooltip>
             </ToggleButton>
@@ -216,24 +222,24 @@ export function ViewerToolbar({
             size="small"
             value={viewMode}
             onChange={(_event, next: ReviewViewMode | null) => next && onViewModeChange(next)}
-            aria-label="Document layout"
+            aria-label={t('viewer.layout')}
           >
-            <ToggleButton value="panel" aria-label="Panel view" sx={{ gap: 0.5, px: 1 }}>
-              <Tooltip title="Document beside the annotation panel">
+            <ToggleButton value="panel" aria-label={t('viewer.panelView')} sx={{ gap: 0.5, px: 1 }}>
+              <Tooltip title={t('viewer.panelHint')}>
                 <Stack direction="row" spacing={0.5} sx={{ alignItems: 'center' }}>
                   <PanelRight size={15} />
                   <Typography variant="caption" sx={{ fontWeight: 600, lineHeight: 1 }}>
-                    Panel
+                    {t('viewer.panel')}
                   </Typography>
                 </Stack>
               </Tooltip>
             </ToggleButton>
-            <ToggleButton value="focus" aria-label="Focus view" sx={{ gap: 0.5, px: 1 }}>
-              <Tooltip title="Full-width document with the spotlight overlay">
+            <ToggleButton value="focus" aria-label={t('viewer.focusView')} sx={{ gap: 0.5, px: 1 }}>
+              <Tooltip title={t('viewer.focusHint')}>
                 <Stack direction="row" spacing={0.5} sx={{ alignItems: 'center' }}>
                   <Focus size={15} />
                   <Typography variant="caption" sx={{ fontWeight: 600, lineHeight: 1 }}>
-                    Focus
+                    {t('viewer.focus')}
                   </Typography>
                 </Stack>
               </Tooltip>
@@ -241,10 +247,10 @@ export function ViewerToolbar({
           </ToggleButtonGroup>
 
           {focusMode && (
-            <Tooltip title="Show the annotation list">
+            <Tooltip title={t('viewer.showListHint')}>
               <IconButton
                 size="small"
-                aria-label={`Show annotations (${annotationCount})`}
+                aria-label={t('viewer.showList', { count: annotationCount })}
                 onClick={onOpenAnnotationList}
               >
                 <Stack direction="row" spacing={0.5} sx={{ alignItems: 'center' }}>

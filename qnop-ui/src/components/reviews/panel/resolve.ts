@@ -19,6 +19,8 @@
  * SPDX-License-Identifier: AGPL-3.0-only
  */
 
+import type { ParseKeys } from 'i18next';
+import { useTranslation } from 'react-i18next';
 import type { AnnotationView } from '../../../api/generated';
 import { AnnotationStatus } from '../../../api/generated';
 import {
@@ -29,10 +31,20 @@ import {
 import { apiErrorCode } from '../../../utils/apiError';
 import type { Notify } from '../../admin/layout/useToast';
 
-/** Known resolve conflicts (409) — mapped to friendly text, never server prose. */
-const RESOLVE_CONFLICTS: Record<string, string> = {
-  ANNOTATION_ALREADY_RESOLVED: 'This annotation was already resolved.',
+type WorkspaceKey = ParseKeys<'workspace'>;
+
+/**
+ * Known resolve conflicts (409) — mapped to friendly catalog text (ADR-0063),
+ * never server prose.
+ */
+const RESOLVE_CONFLICTS: Record<string, WorkspaceKey> = {
+  ANNOTATION_ALREADY_RESOLVED: 'resolve.conflicts.ANNOTATION_ALREADY_RESOLVED',
 };
+
+/** The `workspace` catalog key reporting a failed resolve. */
+export function resolveErrorKey(error: unknown): WorkspaceKey {
+  return RESOLVE_CONFLICTS[apiErrorCode(error) ?? ''] ?? 'resolve.failed';
+}
 
 /**
  * Only the AUTHOR resolves an OPEN annotation — issue #405 replaced the owner
@@ -52,17 +64,14 @@ export function mayResolveAnnotation(annotation: AnnotationView, userId: string 
  * thread.
  */
 export function useResolveWithFeedback(notify: Notify) {
+  const { t } = useTranslation('workspace');
   const resolve = useResolveAnnotation();
   const resolveWith = (annotation: AnnotationView, note?: string) => {
     resolve.mutate(
       { annotationId: annotation.id, note: note?.trim() || undefined },
       {
-        onSuccess: () => notify('Annotation resolved.'),
-        onError: (error) =>
-          notify(
-            RESOLVE_CONFLICTS[apiErrorCode(error) ?? ''] ?? 'The annotation could not be resolved.',
-            'error',
-          ),
+        onSuccess: () => notify(t('resolve.done')),
+        onError: (error) => notify(t(resolveErrorKey(error)), 'error'),
       },
     );
   };
@@ -105,54 +114,57 @@ export function mayDismissAnnotation(
   return isAdmin || (ownerId !== undefined && ownerId === userId);
 }
 
-/** Known reopen conflicts (409) — mapped to friendly text, never server prose. */
-const REOPEN_CONFLICTS: Record<string, string> = {
-  REVIEW_CLOSED: 'The review is finalized — settled annotations stay closed.',
-  ANNOTATION_NOT_RESOLVED: 'This annotation is already open.',
+/** Known reopen conflicts (409) — mapped to friendly catalog text, never server prose. */
+const REOPEN_CONFLICTS: Record<string, WorkspaceKey> = {
+  REVIEW_CLOSED: 'reopen.conflicts.REVIEW_CLOSED',
+  ANNOTATION_NOT_RESOLVED: 'reopen.conflicts.ANNOTATION_NOT_RESOLVED',
 };
+
+/** The `workspace` catalog key reporting a failed reopen. */
+export function reopenErrorKey(error: unknown): WorkspaceKey {
+  return REOPEN_CONFLICTS[apiErrorCode(error) ?? ''] ?? 'reopen.failed';
+}
 
 /** The reopen mutation with the shared toast feedback (issue #394). */
 export function useReopenWithFeedback(notify: Notify) {
+  const { t } = useTranslation('workspace');
   const reopen = useReopenAnnotation();
   const reopenWith = (annotation: AnnotationView) => {
     reopen.mutate(
       { annotationId: annotation.id },
       {
-        onSuccess: () => notify('Annotation reopened.'),
-        onError: (error) =>
-          notify(
-            REOPEN_CONFLICTS[apiErrorCode(error) ?? ''] ?? 'The annotation could not be reopened.',
-            'error',
-          ),
+        onSuccess: () => notify(t('reopen.done')),
+        onError: (error) => notify(t(reopenErrorKey(error)), 'error'),
       },
     );
   };
   return { reopenWith, isPending: reopen.isPending };
 }
 
-/** Known dismiss conflicts (409) — mapped to friendly text, never server prose. */
-const DISMISS_CONFLICTS: Record<string, string> = {
-  ANNOTATION_NOT_OPEN: 'This annotation is already settled.',
-  REVIEW_CLOSED: 'The review is closed — nothing left to dismiss.',
+/** Known dismiss conflicts (409) — mapped to friendly catalog text, never server prose. */
+const DISMISS_CONFLICTS: Record<string, WorkspaceKey> = {
+  ANNOTATION_NOT_OPEN: 'dismiss.conflicts.ANNOTATION_NOT_OPEN',
+  REVIEW_CLOSED: 'dismiss.conflicts.REVIEW_CLOSED',
 };
+
+/** The `workspace` catalog key reporting a failed dismissal. */
+export function dismissErrorKey(error: unknown): WorkspaceKey {
+  return DISMISS_CONFLICTS[apiErrorCode(error) ?? ''] ?? 'dismiss.failed';
+}
 
 /**
  * The dismiss mutation with the shared toast feedback (issue #408). The
  * mandatory justification travels along and lands in the thread.
  */
 export function useDismissWithFeedback(notify: Notify) {
+  const { t } = useTranslation('workspace');
   const dismiss = useDismissAnnotation();
   const dismissWith = (annotation: AnnotationView, justification: string) => {
     dismiss.mutate(
       { annotationId: annotation.id, justification: justification.trim() },
       {
-        onSuccess: () => notify('Annotation dismissed.'),
-        onError: (error) =>
-          notify(
-            DISMISS_CONFLICTS[apiErrorCode(error) ?? ''] ??
-              'The annotation could not be dismissed.',
-            'error',
-          ),
+        onSuccess: () => notify(t('dismiss.done')),
+        onError: (error) => notify(t(dismissErrorKey(error)), 'error'),
       },
     );
   };

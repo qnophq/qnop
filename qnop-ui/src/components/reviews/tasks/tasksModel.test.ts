@@ -21,8 +21,22 @@
 
 import { describe, expect, it } from 'vitest';
 import type { AnnotationView } from '../../../api/generated';
-import { AnnotationStatus, PlacementStatus } from '../../../api/generated';
-import { columnOf, matchesQuery, parseTaskFilter, taskKeys, taskTitle } from './tasksModel';
+import {
+  AnnotationPriority,
+  AnnotationStatus,
+  AnnotationType,
+  PlacementStatus,
+} from '../../../api/generated';
+import { STATUS_CUES } from '../panel/statusCues';
+import {
+  PRIORITY_CUES,
+  TYPE_CUES,
+  columnOf,
+  matchesQuery,
+  parseTaskFilter,
+  taskKeys,
+  taskTitle,
+} from './tasksModel';
 
 const annotation = (overrides: Partial<AnnotationView> = {}): AnnotationView => ({
   id: 'a1',
@@ -77,9 +91,9 @@ describe('taskTitle', () => {
     expect(taskTitle(annotation())).toBe('Please extend the payment target');
   });
 
-  it('falls back to the quote, then to a generic label', () => {
+  it('falls back to the quote, then to empty for the translated fallback', () => {
     expect(taskTitle(annotation({ firstComment: undefined }))).toBe('the disputed clause');
-    expect(taskTitle(annotation({ firstComment: '  ', anchor: undefined }))).toBe('Annotation');
+    expect(taskTitle(annotation({ firstComment: '  ', anchor: undefined }))).toBe('');
   });
 
   it('strips Markdown so the title reads as prose (#427)', () => {
@@ -127,5 +141,16 @@ describe('matchesQuery', () => {
     expect(matchesQuery(a, 'Maxim', 'terminology')).toBe(true);
     // The asterisks are formatting, not content — a search for them misses.
     expect(matchesQuery(a, 'Maxim', '**terminology**')).toBe(false);
+  });
+});
+
+describe('cue labels (#836)', () => {
+  it('name every type, priority and status by its workspace catalog key', () => {
+    expect(TYPE_CUES[AnnotationType.Risk].labelKey).toBe('annotation.types.RISK');
+    expect(PRIORITY_CUES[AnnotationPriority.Medium].labelKey).toBe('annotation.priorities.MEDIUM');
+    expect(STATUS_CUES[AnnotationStatus.Dismissed].labelKey).toBe('annotation.status.DISMISSED');
+    for (const type of Object.values(AnnotationType)) {
+      expect(TYPE_CUES[type].labelKey).toBe(`annotation.types.${type}`);
+    }
   });
 });

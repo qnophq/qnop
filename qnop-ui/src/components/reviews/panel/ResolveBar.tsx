@@ -26,6 +26,7 @@ import InputBase from '@mui/material/InputBase';
 import Stack from '@mui/material/Stack';
 import { alpha, useTheme } from '@mui/material/styles';
 import { CircleCheck } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 
 /**
  * The author's closing move on their own open annotation (issue #405): one
@@ -40,6 +41,7 @@ export function ResolveBar({
   disabled: boolean;
   onResolve: (note?: string) => void;
 }) {
+  const { t } = useTranslation('workspace');
   const theme = useTheme();
   const [note, setNote] = useState('');
 
@@ -62,8 +64,8 @@ export function ResolveBar({
         value={note}
         onChange={(event) => setNote(event.target.value)}
         onKeyDown={onKeyDown}
-        placeholder="Optional closing note…"
-        inputProps={{ 'aria-label': 'Optional closing note' }}
+        placeholder={t('resolve.notePlaceholder')}
+        inputProps={{ 'aria-label': t('resolve.noteLabel') }}
         sx={{
           flex: 1,
           fontSize: 13,
@@ -91,7 +93,7 @@ export function ResolveBar({
         onClick={resolve}
         sx={{ flexShrink: 0 }}
       >
-        Resolve
+        {t('resolve.action')}
       </Button>
     </Stack>
   );

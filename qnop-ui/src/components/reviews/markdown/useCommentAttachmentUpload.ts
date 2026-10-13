@@ -21,6 +21,8 @@
 
 import { useMemo } from 'react';
 import { isAxiosError } from 'axios';
+import type { ParseKeys } from 'i18next';
+import { useTranslation } from 'react-i18next';
 import { axiosInstance } from '../../../api/config';
 import type { Notify } from '../../admin/layout/useToast';
 
@@ -33,13 +35,14 @@ export interface UploadedAttachment {
   contentType: string;
 }
 
-function uploadErrorMessage(error: unknown): string {
+/** The `workspace` catalog key reporting a failed upload. */
+function uploadErrorKey(error: unknown): ParseKeys<'workspace'> {
   // The cap is admin-configurable (upload.attachment_max_file_size_mb), so the
   // message names no number.
   if (isAxiosError(error) && error.response?.status === 413) {
-    return 'The file is too large.';
+    return 'markdown.attachment.tooLarge';
   }
-  return 'Could not upload the file.';
+  return 'markdown.attachment.uploadFailed';
 }
 
 /**
@@ -54,6 +57,7 @@ export function useCommentAttachmentUpload(
   documentId: string | undefined,
   notify: Notify,
 ): ((file: File) => Promise<UploadedAttachment>) | undefined {
+  const { t } = useTranslation('workspace');
   return useMemo(() => {
     if (!documentId) return undefined;
     return async (file: File): Promise<UploadedAttachment> => {
@@ -66,9 +70,9 @@ export function useCommentAttachmentUpload(
         );
         return response.data;
       } catch (error: unknown) {
-        notify(uploadErrorMessage(error), 'error');
+        notify(t(uploadErrorKey(error)), 'error');
         throw error;
       }
     };
-  }, [documentId, notify]);
+  }, [documentId, notify, t]);
 }

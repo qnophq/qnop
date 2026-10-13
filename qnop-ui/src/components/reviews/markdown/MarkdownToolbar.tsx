@@ -38,12 +38,15 @@ import {
   Table,
   TextQuote,
 } from 'lucide-react';
+import type { ParseKeys } from 'i18next';
+import { useTranslation } from 'react-i18next';
 import { isApplePlatform } from '../../../utils/platform';
 import type { MarkdownAction } from './markdownFormatting';
 
 interface ToolbarItem {
   action: MarkdownAction;
-  label: string;
+  /** The `workspace` catalog key of the button's name (ADR-0063). */
+  labelKey: ParseKeys<'workspace'>;
   icon: LucideIcon;
   /** The shortcut key, spelled platform-aware in the tooltip. */
   shortcut?: string;
@@ -56,26 +59,31 @@ interface ToolbarItem {
  */
 const GROUPS: ToolbarItem[][] = [
   [
-    { action: 'bold', label: 'Bold', icon: Bold, shortcut: 'B' },
-    { action: 'italic', label: 'Italic', icon: Italic, shortcut: 'I' },
-    { action: 'strikethrough', label: 'Strikethrough', icon: Strikethrough, shortcut: '⇧X' },
+    { action: 'bold', labelKey: 'markdown.toolbar.bold', icon: Bold, shortcut: 'B' },
+    { action: 'italic', labelKey: 'markdown.toolbar.italic', icon: Italic, shortcut: 'I' },
+    {
+      action: 'strikethrough',
+      labelKey: 'markdown.toolbar.strikethrough',
+      icon: Strikethrough,
+      shortcut: '⇧X',
+    },
   ],
   [
-    { action: 'heading', label: 'Heading', icon: Heading },
-    { action: 'quote', label: 'Blockquote', icon: TextQuote },
+    { action: 'heading', labelKey: 'markdown.toolbar.heading', icon: Heading },
+    { action: 'quote', labelKey: 'markdown.toolbar.quote', icon: TextQuote },
   ],
   [
-    { action: 'link', label: 'Link', icon: Link, shortcut: 'K' },
-    { action: 'image', label: 'Image', icon: Image },
-    { action: 'table', label: 'Table', icon: Table },
+    { action: 'link', labelKey: 'markdown.toolbar.link', icon: Link, shortcut: 'K' },
+    { action: 'image', labelKey: 'markdown.toolbar.image', icon: Image },
+    { action: 'table', labelKey: 'markdown.toolbar.table', icon: Table },
   ],
   [
-    { action: 'orderedList', label: 'Ordered list', icon: ListOrdered },
-    { action: 'bulletList', label: 'Bulleted list', icon: List },
+    { action: 'orderedList', labelKey: 'markdown.toolbar.orderedList', icon: ListOrdered },
+    { action: 'bulletList', labelKey: 'markdown.toolbar.bulletList', icon: List },
   ],
   [
-    { action: 'code', label: 'Code', icon: Code, shortcut: 'E' },
-    { action: 'codeBlock', label: 'Code block', icon: SquareCode },
+    { action: 'code', labelKey: 'markdown.toolbar.code', icon: Code, shortcut: 'E' },
+    { action: 'codeBlock', labelKey: 'markdown.toolbar.codeBlock', icon: SquareCode },
   ],
 ];
 
@@ -96,12 +104,13 @@ interface MarkdownToolbarProps {
  * field after the action lands.
  */
 export function MarkdownToolbar({ onAction, disabled = false }: MarkdownToolbarProps) {
+  const { t } = useTranslation('workspace');
   return (
     <Stack
       direction="row"
       spacing={0.25}
       role="toolbar"
-      aria-label="Text formatting"
+      aria-label={t('markdown.toolbar.label')}
       sx={{ alignItems: 'center', flexWrap: 'wrap' }}
     >
       {GROUPS.map((group, groupIndex) => (
@@ -112,31 +121,41 @@ export function MarkdownToolbar({ onAction, disabled = false }: MarkdownToolbarP
               sx={{ width: '1px', height: 16, bgcolor: 'divider', mx: 0.5, flexShrink: 0 }}
             />
           )}
-          {group.map(({ action, label, icon: Icon, shortcut }) => (
-            <Tooltip
-              key={action}
-              title={shortcut ? `${label} (${shortcutLabel(shortcut)})` : label}
-            >
-              <span>
-                <IconButton
-                  size="small"
-                  aria-label={label}
-                  disabled={disabled}
-                  onMouseDown={(event) => event.preventDefault()}
-                  onClick={() => onAction(action)}
-                  sx={{
-                    width: 26,
-                    height: 26,
-                    borderRadius: '6px',
-                    color: 'text.secondary',
-                    '&:hover': { color: 'text.primary' },
-                  }}
-                >
-                  <Icon size={15} aria-hidden />
-                </IconButton>
-              </span>
-            </Tooltip>
-          ))}
+          {group.map(({ action, labelKey, icon: Icon, shortcut }) => {
+            const label = t(labelKey);
+            return (
+              <Tooltip
+                key={action}
+                title={
+                  shortcut
+                    ? t('markdown.toolbar.withShortcut', {
+                        label,
+                        shortcut: shortcutLabel(shortcut),
+                      })
+                    : label
+                }
+              >
+                <span>
+                  <IconButton
+                    size="small"
+                    aria-label={label}
+                    disabled={disabled}
+                    onMouseDown={(event) => event.preventDefault()}
+                    onClick={() => onAction(action)}
+                    sx={{
+                      width: 26,
+                      height: 26,
+                      borderRadius: '6px',
+                      color: 'text.secondary',
+                      '&:hover': { color: 'text.primary' },
+                    }}
+                  >
+                    <Icon size={15} aria-hidden />
+                  </IconButton>
+                </span>
+              </Tooltip>
+            );
+          })}
         </Stack>
       ))}
     </Stack>

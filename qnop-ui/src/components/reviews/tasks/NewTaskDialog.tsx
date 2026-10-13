@@ -25,6 +25,7 @@ import DialogTitle from '@mui/material/DialogTitle';
 import Stack from '@mui/material/Stack';
 import Typography from '@mui/material/Typography';
 import { FileText } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import type { AnnotationPriority, AnnotationType } from '../../../api/generated';
 import { useCreateAnnotation } from '../../../api/hooks/useAnnotations';
 import { apiErrorCode } from '../../../utils/apiError';
@@ -57,6 +58,7 @@ export function NewTaskDialog({
   notify,
   onClose,
 }: NewTaskDialogProps) {
+  const { t } = useTranslation('workspace');
   const createAnnotation = useCreateAnnotation(documentId);
   const uploadAttachment = useCommentAttachmentUpload(documentId, notify);
   const mentionCandidates = useMentionRoster(documentId);
@@ -67,14 +69,14 @@ export function NewTaskDialog({
       { versionNumber, comment, type, priority },
       {
         onSuccess: () => {
-          notify('Annotation created.');
+          notify(t('review.created'));
           onClose();
         },
         onError: (error) =>
           notify(
             apiErrorCode(error) === 'REVIEW_CLOSED'
-              ? 'This review is closed — no new annotations can be added.'
-              : 'Could not create the annotation.',
+              ? t('review.createConflicts.REVIEW_CLOSED')
+              : t('review.createFailed'),
             'error',
           ),
       },
@@ -86,13 +88,12 @@ export function NewTaskDialog({
       <DialogTitle>
         <Stack direction="row" spacing={1} sx={{ alignItems: 'center' }}>
           <FileText size={18} aria-hidden />
-          New global annotation
+          {t('tasks.newTitle')}
         </Stack>
       </DialogTitle>
       <DialogContent>
         <Typography variant="body2" color="text.secondary" sx={{ mb: 1.5 }}>
-          A general remark that applies to the whole document — it is not pinned to a passage and
-          stays valid on every version.
+          {t('tasks.newDescription')}
         </Typography>
         <Composer
           pendingAnchor={null}

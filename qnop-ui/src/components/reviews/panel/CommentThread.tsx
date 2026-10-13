@@ -29,6 +29,8 @@ import Tooltip from '@mui/material/Tooltip';
 import Typography from '@mui/material/Typography';
 import { alpha, useTheme } from '@mui/material/styles';
 import { CircleCheck, CircleSlash, Lock, RotateCcw, SendHorizontal } from 'lucide-react';
+import type { ParseKeys } from 'i18next';
+import { useTranslation } from 'react-i18next';
 import { useAddComment, useComments } from '../../../api/hooks/useComments';
 import { useDocument } from '../../../api/hooks/useDocuments';
 import { useMentionRoster } from '../markdown/useMentionRoster';
@@ -52,6 +54,12 @@ import { UserAvatar } from '../../shell/UserAvatar';
 const LINE_LEFT = AVATAR_SIZE / 2 - 1;
 /** Left indent that aligns loose lines (notes, dividers) with the message column. */
 const CONTENT_INDENT = `${AVATAR_SIZE + 10}px`;
+
+/** Known reply refusals — mapped to friendly catalog text (ADR-0063), never server prose. */
+const ADD_COMMENT_ERRORS: Record<string, ParseKeys<'workspace'>> = {
+  ANNOTATION_ALREADY_RESOLVED: 'thread.errors.ANNOTATION_ALREADY_RESOLVED',
+  THREAD_READ_ONLY: 'thread.errors.THREAD_READ_ONLY',
+};
 
 interface CommentThreadProps {
   annotationId: string;
@@ -113,6 +121,7 @@ export function CommentThread({
   scrollToCommentId = null,
   onScrolledToComment,
 }: CommentThreadProps) {
+  const { t } = useTranslation('workspace');
   const theme = useTheme();
   const userId = useAuthStore((state) => state.userId);
   const displayName = useAuthStore((state) => state.displayName);
@@ -142,13 +151,8 @@ export function CommentThread({
         onDone?.();
       },
       onError: (error) => {
-        const code = apiErrorCode(error);
         notify(
-          code === 'ANNOTATION_ALREADY_RESOLVED'
-            ? 'The annotation is settled — its thread is closed.'
-            : code === 'THREAD_READ_ONLY'
-              ? 'Only the author and the owner can reply in this review.'
-              : 'Could not add the comment.',
+          t(ADD_COMMENT_ERRORS[apiErrorCode(error) ?? ''] ?? 'thread.errors.fallback'),
           'error',
         );
       },
@@ -156,11 +160,11 @@ export function CommentThread({
   };
 
   const sendAction = (onDone?: () => void) => (
-    <Tooltip title={`Send (${submitShortcutLabel()})`}>
+    <Tooltip title={t('thread.send', { shortcut: submitShortcutLabel() })}>
       <span>
         <IconButton
           size="small"
-          aria-label="Comment"
+          aria-label={t('thread.comment')}
           color="primary"
           onClick={() => submit(onDone)}
           disabled={!draft.trim() || addComment.isPending}
@@ -192,7 +196,7 @@ export function CommentThread({
 
     const index = comments.findIndex((comment) => comment.id === scrollToCommentId);
     if (index === -1) {
-      notify('This comment no longer exists.', 'error');
+      notify(t('thread.commentGone'), 'error');
     } else if (!(skipOpener && index === 0)) {
       const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
       const el = document.getElementById(`comment-${scrollToCommentId}`);
@@ -220,6 +224,7 @@ export function CommentThread({
     notify,
     onScrolledToComment,
     pulseColor,
+    t,
   ]);
 
   return (
@@ -240,18 +245,20 @@ export function CommentThread({
       <Stack spacing={2} sx={{ pt: 1.25 }}>
         {commentsQuery.isPending && (
           <Stack sx={{ alignItems: 'center', py: 1 }}>
-            <CircularProgress size={18} aria-label="Loading comments" />
+            <CircularProgress size={18} aria-label={t('thread.loading')} />
           </Stack>
         )}
         {commentsQuery.isError && (
           <Typography variant="body2" color="error" sx={{ pl: CONTENT_INDENT }}>
-            Could not load the comments.
+            {t('thread.loadError')}
           </Typography>
         )}
         {visibleComments.map((comment) => {
           const own = comment.authorId === userId;
           // Server-resolved name, honouring per-review anonymity (issue #413).
-          const name = own ? (displayName ?? 'You') : (comment.authorDisplayName ?? 'Participant');
+          const name = own
+            ? (displayName ?? t('people.you'))
+            : (comment.authorDisplayName ?? t('people.participant'));
           return (
             <Fragment key={comment.id}>
               {comment.id === firstNewCommentId && (
@@ -268,7 +275,7 @@ export function CommentThread({
                     variant="caption"
                     sx={{ color: theme.qnop.brand.blue, fontWeight: 600, whiteSpace: 'nowrap' }}
                   >
-                    New since your last visit
+                    {t('annotation.newSinceLastVisit')}
                   </Typography>
                   <Box
                     sx={{ flex: 1, height: '1px', bgcolor: alpha(theme.qnop.brand.blue, 0.4) }}
@@ -313,9 +320,9 @@ export function CommentThread({
           <Typography variant="body2" color="text.secondary" sx={{ pl: CONTENT_INDENT }}>
             {skipOpener
               ? closed
-                ? 'No replies.'
-                : 'No replies yet.'
-              : 'No comments yet. Start the discussion.'}
+                ? t('thread.noReplies')
+                : t('thread.noRepliesYet')
+              : t('thread.noComments')}
           </Typography>
         )}
         {/* A resolved annotation's thread is a record (#403): the composer
@@ -339,9 +346,7 @@ export function CommentThread({
               <CircleCheck size={13} aria-hidden color={theme.palette.success.main} />
             )}
             <Typography variant="caption">
-              {dismissed
-                ? 'Dismissed — this thread is closed.'
-                : 'Resolved — this thread is closed.'}
+              {dismissed ? t('thread.closedDismissed') : t('thread.closedResolved')}
             </Typography>
             {onReopen && (
               <Button
@@ -351,7 +356,7 @@ export function CommentThread({
                 onClick={onReopen}
                 sx={{ ml: 0.5, py: 0, minHeight: 0, fontSize: 12 }}
               >
-                Reopen
+                {t('reopen.action')}
               </Button>
             )}
           </Stack>
@@ -372,9 +377,7 @@ export function CommentThread({
             }}
           >
             <Lock size={13} aria-hidden />
-            <Typography variant="caption">
-              Only the author and the owner can reply in this review.
-            </Typography>
+            <Typography variant="caption">{t('thread.policyReadOnly')}</Typography>
           </Stack>
         )}
         {/* Composer continues the thread rail with the signed-in user's avatar.
@@ -383,7 +386,11 @@ export function CommentThread({
         {!readOnly && !closed && !policyReadOnly && (
           <Stack direction="row" spacing={1.25} sx={{ alignItems: 'flex-start' }}>
             <Box sx={{ position: 'relative', zIndex: 1, pt: 0.5 }}>
-              <UserAvatar name={displayName ?? 'You'} size={AVATAR_SIZE} imageUrl={avatarUrl} />
+              <UserAvatar
+                name={displayName ?? t('people.you')}
+                size={AVATAR_SIZE}
+                imageUrl={avatarUrl}
+              />
             </Box>
             {/* The shared Slack-style writing surface (issue #445): formatting
                 toolbar, roomy auto-growing field, emoji — send bottom-right. */}
@@ -392,7 +399,7 @@ export function CommentThread({
                 value={draft}
                 onChange={setDraft}
                 onSubmit={() => submit()}
-                inputAriaLabel="Add a comment"
+                inputAriaLabel={t('thread.addComment')}
                 minRows={3}
                 onUploadAttachment={uploadAttachment}
                 onToggleFullscreen={() => setWritingFullscreen(true)}
@@ -410,8 +417,8 @@ export function CommentThread({
       <FullscreenComposerDialog
         open={writingFullscreen}
         onClose={() => setWritingFullscreen(false)}
-        title="Write a reply"
-        contextTitle={`Discussion (${comments.length})`}
+        title={t('thread.writeReply')}
+        contextTitle={t('thread.discussion', { count: comments.length })}
         context={
           // documentId travels along so the author hover cards keep their
           // anonymity context in the fullscreen stage too (issue #482).
@@ -428,7 +435,7 @@ export function CommentThread({
           value={draft}
           onChange={setDraft}
           onSubmit={() => submit(() => setWritingFullscreen(false))}
-          inputAriaLabel="Add a comment"
+          inputAriaLabel={t('thread.addComment')}
           bare
           onUploadAttachment={uploadAttachment}
           fullscreen
@@ -441,7 +448,7 @@ export function CommentThread({
               onClick={() => submit(() => setWritingFullscreen(false))}
               disabled={!draft.trim() || addComment.isPending}
             >
-              Comment ({submitShortcutLabel()})
+              {t('thread.commentWithShortcut', { shortcut: submitShortcutLabel() })}
             </Button>
           }
         />

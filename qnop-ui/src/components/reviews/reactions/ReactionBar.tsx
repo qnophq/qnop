@@ -26,6 +26,7 @@ import Stack from '@mui/material/Stack';
 import Tooltip from '@mui/material/Tooltip';
 import { alpha, useTheme } from '@mui/material/styles';
 import { SmilePlus } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import type { ReactionGroup } from '../../../api/generated';
 import { EmojiPickerPopover } from '../markdown/EmojiPickerPopover';
 
@@ -44,6 +45,7 @@ interface ReactionBarProps {
  * ({@link AddReactionButton}), as in Slack.
  */
 export function ReactionBar({ reactions, onToggle }: ReactionBarProps) {
+  const { t } = useTranslation('workspace');
   const theme = useTheme();
   const [pickerAnchor, setPickerAnchor] = useState<HTMLElement | null>(null);
   if (reactions.length === 0) return null;
@@ -108,9 +110,9 @@ export function ReactionBar({ reactions, onToggle }: ReactionBarProps) {
           </ButtonBase>
         </Tooltip>
       ))}
-      <Tooltip title="Add reaction">
+      <Tooltip title={t('reactions.add')}>
         <ButtonBase
-          aria-label="Add reaction"
+          aria-label={t('reactions.add')}
           onClick={(event) => {
             event.stopPropagation();
             setPickerAnchor(event.currentTarget);

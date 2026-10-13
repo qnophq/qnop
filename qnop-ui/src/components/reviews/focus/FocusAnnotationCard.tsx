@@ -33,6 +33,7 @@ import FocusTrap from '@mui/material/Unstable_TrapFocus';
 import useMediaQuery from '@mui/material/useMediaQuery';
 import { useTheme } from '@mui/material/styles';
 import { ChevronDown, ChevronUp, X } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import type { AnnotationView } from '../../../api/generated';
 import { AnnotationStatus } from '../../../api/generated';
 import { tokens } from '../../../theme/tokens';
@@ -126,6 +127,7 @@ export function FocusAnnotationCard({
   scrollToCommentId = null,
   onScrolledToComment,
 }: FocusAnnotationCardProps) {
+  const { t } = useTranslation('workspace');
   const theme = useTheme();
   const reducedMotion = useMediaQuery('(prefers-reduced-motion: reduce)');
   // READ_ONLY policy (issue #413): only the author and the owner may reply.
@@ -300,15 +302,15 @@ export function FocusAnnotationCard({
                     }}
                   >
                     {position
-                      ? `Annotation ${position.index + 1} of ${position.count}`
-                      : 'Annotation'}
+                      ? t('focus.position', { index: position.index + 1, count: position.count })
+                      : t('annotation.fallbackTitle')}
                   </Typography>
                   <Box sx={{ flex: 1 }} />
-                  <Tooltip title="Previous annotation (↑)">
+                  <Tooltip title={t('focus.previousHint')}>
                     <span>
                       <IconButton
                         size="small"
-                        aria-label="Previous annotation"
+                        aria-label={t('focus.previous')}
                         disabled={!position?.prevId}
                         onClick={() => position?.prevId && onNavigate(position.prevId)}
                       >
@@ -316,11 +318,11 @@ export function FocusAnnotationCard({
                       </IconButton>
                     </span>
                   </Tooltip>
-                  <Tooltip title="Next annotation (↓)">
+                  <Tooltip title={t('focus.nextHint')}>
                     <span>
                       <IconButton
                         size="small"
-                        aria-label="Next annotation"
+                        aria-label={t('focus.next')}
                         disabled={!position?.nextId}
                         onClick={() => position?.nextId && onNavigate(position.nextId)}
                       >
@@ -328,7 +330,7 @@ export function FocusAnnotationCard({
                       </IconButton>
                     </span>
                   </Tooltip>
-                  <IconButton size="small" aria-label="Close annotation" onClick={onClose}>
+                  <IconButton size="small" aria-label={t('focus.close')} onClick={onClose}>
                     <X size={16} />
                   </IconButton>
                 </Stack>

@@ -25,6 +25,7 @@ import IconButton from '@mui/material/IconButton';
 import Stack from '@mui/material/Stack';
 import Typography from '@mui/material/Typography';
 import { ExternalLink, X } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import type { AnnotationView } from '../../../api/generated';
 import { AnnotationStatus } from '../../../api/generated';
 import { selectIsAdmin, useAuthStore } from '../../../stores/authStore';
@@ -86,6 +87,7 @@ export function TaskDrawer({
   onShowInDocument,
   buildPermalink,
 }: TaskDrawerProps) {
+  const { t } = useTranslation('workspace');
   const userId = useAuthStore((state) => state.userId);
   const viewerIsAdmin = useAuthStore(selectIsAdmin);
   const { resolveWith, isPending } = useResolveWithFeedback(notify);
@@ -104,7 +106,7 @@ export function TaskDrawer({
       onClose={onClose}
       storageKey="qnop-task-drawer-width"
       defaultWidth={460}
-      handleAriaLabel="Resize the task drawer"
+      handleAriaLabel={t('tasks.resizeDrawer')}
       handleTestId="task-drawer-resize-handle"
       drawerTestId="task-drawer"
     >
@@ -130,9 +132,9 @@ export function TaskDrawer({
               startIcon={<ExternalLink size={13} />}
               onClick={() => onShowInDocument(annotation.id)}
             >
-              Show in document
+              {t('tasks.showInDocument')}
             </Button>
-            <IconButton size="small" onClick={onClose} aria-label="Close task">
+            <IconButton size="small" onClick={onClose} aria-label={t('tasks.close')}>
               <X size={16} />
             </IconButton>
           </Stack>

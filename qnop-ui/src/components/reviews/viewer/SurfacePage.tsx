@@ -21,6 +21,7 @@
 
 import { useState } from 'react';
 import Paper from '@mui/material/Paper';
+import { useTranslation } from 'react-i18next';
 import type { PDFDocumentProxy } from 'pdfjs-dist';
 import type {
   Anchor,
@@ -91,6 +92,7 @@ export function SurfacePage({
   onRegionSelected,
   focusScrim,
 }: SurfacePageProps) {
+  const { t } = useTranslation('workspace');
   const [fallbackAspect, setFallbackAspect] = useState<number | null>(null);
 
   const aspect = surface ? surface.width / surface.height : (fallbackAspect ?? Math.SQRT1_2);
@@ -117,7 +119,7 @@ export function SurfacePage({
         pdf={pdf}
         pageIndex={pageIndex}
         width={width}
-        ariaLabel={`Page ${pageIndex + 1}`}
+        ariaLabel={t('viewer.page', { page: pageIndex + 1 })}
         onAspect={surface ? undefined : setFallbackAspect}
       />
       {surface && (

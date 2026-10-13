@@ -27,6 +27,7 @@ import Stack from '@mui/material/Stack';
 import Typography from '@mui/material/Typography';
 import { useTheme } from '@mui/material/styles';
 import { History } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import type { PDFDocumentProxy } from 'pdfjs-dist';
 import type { DiffChange, RenderedSurface } from '../../../api/generated';
 import { tokens } from '../../../theme/tokens';
@@ -79,6 +80,7 @@ export function ComparePane({
   scrollRef,
   zoom,
 }: ComparePaneProps) {
+  const { t } = useTranslation('workspace');
   const theme = useTheme();
   const scrollElRef = useRef<HTMLDivElement | null>(null);
   const [paneWidth, setPaneWidth] = useState(0);
@@ -185,7 +187,7 @@ export function ComparePane({
         <Stack spacing={2} sx={{ width: 'max-content', minWidth: '100%', alignItems: 'center' }}>
           {pdfError && (
             <Typography variant="body2" color="error" sx={{ py: 4 }}>
-              The document could not be rendered. {pdfError}
+              {t('diff.renderError', { error: pdfError })}
             </Typography>
           )}
           {!pdf && !pdfError && <CircularProgress size={24} sx={{ my: 6 }} />}
@@ -220,7 +222,7 @@ export function ComparePane({
                     pdf={pdf}
                     pageIndex={pageIndex}
                     width={pageWidth}
-                    ariaLabel={`Version ${versionNumber}, page ${pageIndex + 1}`}
+                    ariaLabel={t('diff.pageLabel', { version: versionNumber, page: pageIndex + 1 })}
                     onAspect={
                       surface
                         ? undefined

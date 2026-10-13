@@ -22,6 +22,7 @@
 import type { LucideIcon } from 'lucide-react';
 import { Flag, MessageCircleQuestion, Pencil, Plus, TriangleAlert } from 'lucide-react';
 import type { Theme } from '@mui/material/styles';
+import type { ParseKeys } from 'i18next';
 import type { AnnotationView } from '../../../api/generated';
 import { AnnotationPriority, AnnotationStatus, AnnotationType } from '../../../api/generated';
 import { stripMarkdown } from '../../../utils/markdown';
@@ -50,7 +51,8 @@ export function parseTaskFilter(raw: string | null): TaskFilter {
 }
 
 /**
- * The card's title: the thread's opening comment; quote/fallback otherwise. The
+ * The card's title: the thread's opening comment, else the quoted passage — empty
+ * when neither exists, so the caller renders its translated fallback. The
  * opener is Markdown (issue #427), so it is stripped to plain text — a title is
  * a one-liner, never `**bold**`. The quoted passage is already plain text.
  * Callers inside a review pass the roster's mention resolver (issue #462) so
@@ -63,7 +65,7 @@ export function taskTitle(
   return (
     stripMarkdown(resolveMentions(annotation.firstComment ?? '')) ||
     annotation.anchor?.textQuote?.quote ||
-    'Annotation'
+    ''
   );
 }
 
@@ -104,45 +106,55 @@ const RISK_AMBER = '#B77F00';
 
 /**
  * Type → label/icon/colour, the tasks view's visual language (prototype
- * `typeMeta`). Colours lean on the semantic palette where one fits.
+ * `typeMeta`). Colours lean on the semantic palette where one fits. Labels are
+ * `workspace` catalog keys (ADR-0063), translated at render.
  */
 export const TYPE_CUES: Record<
   AnnotationType,
-  { label: string; icon: LucideIcon; color: (theme: Theme) => string }
+  { labelKey: ParseKeys<'workspace'>; icon: LucideIcon; color: (theme: Theme) => string }
 > = {
   [AnnotationType.Change]: {
-    label: 'Change',
+    labelKey: 'annotation.types.CHANGE',
     icon: Pencil,
     color: (theme) => theme.qnop.brand.blue,
   },
   [AnnotationType.Proposal]: {
-    label: 'Proposal',
+    labelKey: 'annotation.types.PROPOSAL',
     icon: Plus,
     color: () => PROPOSAL_VIOLET,
   },
   [AnnotationType.Conflict]: {
-    label: 'Conflict',
+    labelKey: 'annotation.types.CONFLICT',
     icon: TriangleAlert,
     color: (theme) => theme.palette.error.main,
   },
   [AnnotationType.Question]: {
-    label: 'Question',
+    labelKey: 'annotation.types.QUESTION',
     icon: MessageCircleQuestion,
     color: (theme) => theme.palette.text.secondary,
   },
   [AnnotationType.Risk]: {
-    label: 'Risk',
+    labelKey: 'annotation.types.RISK',
     icon: Flag,
     color: () => RISK_AMBER,
   },
 };
 
-/** Priority → label/colour for the card's leading dot (prototype `prioMeta`). */
+/** Priority → label key/colour for the card's leading dot (prototype `prioMeta`). */
 export const PRIORITY_CUES: Record<
   AnnotationPriority,
-  { label: string; color: (theme: Theme) => string }
+  { labelKey: ParseKeys<'workspace'>; color: (theme: Theme) => string }
 > = {
-  [AnnotationPriority.High]: { label: 'High', color: (theme) => theme.palette.error.main },
-  [AnnotationPriority.Medium]: { label: 'Medium', color: (theme) => theme.palette.warning.main },
-  [AnnotationPriority.Low]: { label: 'Low', color: (theme) => theme.palette.text.disabled },
+  [AnnotationPriority.High]: {
+    labelKey: 'annotation.priorities.HIGH',
+    color: (theme) => theme.palette.error.main,
+  },
+  [AnnotationPriority.Medium]: {
+    labelKey: 'annotation.priorities.MEDIUM',
+    color: (theme) => theme.palette.warning.main,
+  },
+  [AnnotationPriority.Low]: {
+    labelKey: 'annotation.priorities.LOW',
+    color: (theme) => theme.palette.text.disabled,
+  },
 };
