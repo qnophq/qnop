@@ -20,6 +20,7 @@
  */
 
 import { forwardRef, useImperativeHandle, type ReactNode } from 'react';
+import { AxiosError, type AxiosResponse } from 'axios';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { MemoryRouter } from 'react-router';
@@ -29,10 +30,16 @@ import type { MailTemplateResponse } from '../../api/generated';
 import { buildTheme } from '../../theme/theme';
 import { MailTemplateEditPage } from './MailTemplateEditPage';
 
-const { updateMutate, resetMutate, navigateMock } = vi.hoisted(() => ({
+const { updateMutate, resetMutate, navigateMock, sendTemplateTestEmail } = vi.hoisted(() => ({
   updateMutate: vi.fn(),
   resetMutate: vi.fn(),
   navigateMock: vi.fn(),
+  sendTemplateTestEmail: vi.fn(),
+}));
+
+vi.mock('../../api/config', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../api/config')>()),
+  adminEmailApi: { sendTemplateTestEmail },
 }));
 
 const TEMPLATE: MailTemplateResponse = {
@@ -62,9 +69,15 @@ const TEMPLATE: MailTemplateResponse = {
 
 /** The template the page loads; a test may swap it before rendering. */
 let current: MailTemplateResponse = TEMPLATE;
+/** A load failure to simulate instead, and the route parameters. */
+let loadError: unknown = null;
+let params: { key: string; locale?: string } = { key: 'auth.password_reset' };
 
 vi.mock('../../api/hooks/useMailTemplates', () => ({
-  useMailTemplate: () => ({ data: current, isLoading: false, isError: false, isFetching: false }),
+  useMailTemplate: () =>
+    loadError
+      ? { data: undefined, error: loadError, isLoading: false, isError: true, isFetching: false }
+      : { data: current, error: null, isLoading: false, isError: false, isFetching: false },
   useUpdateMailTemplate: () => ({ mutateAsync: updateMutate, isPending: false }),
   useResetMailTemplate: () => ({ mutateAsync: resetMutate, isPending: false }),
   useSendTestEmail: () => ({ mutateAsync: vi.fn(), isPending: false }),
@@ -76,7 +89,7 @@ vi.mock('../../api/hooks/useMailTemplatePreview', () => ({
 
 vi.mock('react-router', async (importOriginal) => ({
   ...(await importOriginal<typeof import('react-router')>()),
-  useParams: () => ({ key: 'auth.password_reset' }),
+  useParams: () => params,
   useNavigate: () => navigateMock,
 }));
 
@@ -105,6 +118,8 @@ vi.mock('../../components/admin/mail/mustache/MustacheCodeEditor', () => ({
 
 beforeEach(() => {
   current = TEMPLATE;
+  loadError = null;
+  params = { key: 'auth.password_reset' };
   navigateMock.mockReset();
   updateMutate.mockReset().mockResolvedValue(TEMPLATE);
   resetMutate.mockReset().mockResolvedValue(undefined);
@@ -184,7 +199,9 @@ describe('MailTemplateEditPage', () => {
     renderPage();
 
     const nav = screen.getByRole('navigation', { name: 'Template language' });
-    const english = within(nav).getByRole('link', { name: 'English, Customised' });
+    const english = within(nav).getByRole('link', {
+      name: 'English (default language), Customised',
+    });
     expect(english.getAttribute('aria-current')).toBe('page');
     const german = within(nav).getByRole('link', { name: 'German, Built-in' });
     expect(german.getAttribute('href')).toBe('/admin/email/templates/auth.password_reset/de');
@@ -215,5 +232,65 @@ describe('MailTemplateEditPage', () => {
     renderPage();
 
     expect(screen.getByText(/qnop ships no Italian version of this template/)).toBeTruthy();
+  });
+
+  it('switches language without asking when nothing is unsaved', () => {
+    renderPage();
+
+    fireEvent.click(screen.getByRole('link', { name: 'German, Built-in' }));
+
+    expect(screen.queryByText('Discard unsaved changes?')).toBeNull();
+  });
+
+  it('keeps the draft when a language switch is cancelled', () => {
+    renderPage();
+
+    fireEvent.change(screen.getByLabelText(/Subject/), { target: { value: 'Changed' } });
+    fireEvent.click(screen.getByRole('link', { name: 'German, Built-in' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
+
+    expect(navigateMock).not.toHaveBeenCalled();
+    expect((screen.getByLabelText(/Subject/) as HTMLInputElement).value).toBe('Changed');
+  });
+
+  it('names the default language for screen readers', () => {
+    renderPage();
+
+    expect(
+      screen.getByRole('link', { name: 'English (default language), Customised' }),
+    ).toBeTruthy();
+  });
+
+  it('sends the test mail in the edited language', async () => {
+    current = { ...TEMPLATE, locale: 'de' };
+    sendTemplateTestEmail.mockResolvedValue({ data: { status: 'SENT', detail: 'ok' } });
+    renderPage();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Send test email' }));
+    fireEvent.change(screen.getByRole('textbox', { name: /Recipient/i }), {
+      target: { value: 'ada@qnop.test' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Send' }));
+
+    await waitFor(() =>
+      expect(sendTemplateTestEmail).toHaveBeenCalledWith(
+        expect.objectContaining({
+          templateTestEmailRequest: expect.objectContaining({ locale: 'de' }),
+        }),
+      ),
+    );
+  });
+
+  it('points a refused language back to the default language', () => {
+    params = { key: 'auth.password_reset', locale: 'it' };
+    loadError = new AxiosError('Bad Request', '400', undefined, undefined, {
+      status: 400,
+    } as AxiosResponse);
+    renderPage();
+
+    expect(screen.getByText(/not offered in this language/)).toBeTruthy();
+    expect(
+      screen.getByRole('link', { name: 'Open the default language' }).getAttribute('href'),
+    ).toBe('/admin/email/templates/auth.password_reset');
   });
 });

@@ -714,6 +714,7 @@
     },
     "matrix": {
       "cellAria": "{{name}} auf {{language}}: {{status}}",
+      "cellAriaDefault": "{{name}} auf {{language}} (Standardsprache): {{status}}",
       "edited": "Bearbeitet {{when}}",
       "editedBy": "Bearbeitet {{when}} von {{name}}",
       "fallbackShort": "→ {{code}}",
@@ -722,10 +723,12 @@
     },
     "edit": {
       "loadError": "Diese Vorlage konnte nicht geladen werden. <back>Zurück zu den Vorlagen</back>",
+      "unsupportedLanguage": "Für diese Sprache gibt es keine Mail-Vorlagen. <back>Standardsprache öffnen</back>",
       "languages": "Sprache der Vorlage",
       "languageTooltip": "{{language}} — {{status}}",
       "languageTooltipDefault": "{{language}} (Standardsprache) — {{status}}",
       "languageAria": "{{language}}, {{status}}",
+      "languageAriaDefault": "{{language}} (Standardsprache), {{status}}",
       "fallbackNotice": "Für diese Vorlage gibt es keine mitgelieferte Fassung auf {{language}}. Mails auf {{language}} gehen deshalb zurzeit mit dem hier gezeigten englischen Text raus. Beim Speichern entsteht eine eigene Fassung auf {{language}}.",
       "edited": "— bearbeitet {{when}}",
       "editedBy": "— bearbeitet {{when}} von {{name}}",

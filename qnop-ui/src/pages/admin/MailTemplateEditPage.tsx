@@ -34,6 +34,7 @@ import Switch from '@mui/material/Switch';
 import TextField from '@mui/material/TextField';
 import Typography from '@mui/material/Typography';
 import { Send, Eye, RotateCcw, Variable } from 'lucide-react';
+import { isAxiosError } from 'axios';
 import { Trans, useTranslation } from 'react-i18next';
 import { Link as RouterLink, useNavigate, useParams } from 'react-router';
 import type { MailTemplateResponse } from '../../api/generated';
@@ -91,13 +92,27 @@ export function MailTemplateEditPage() {
   const { t } = useTranslation(['admin', 'common']);
   const { key = '', locale } = useParams();
   // React Router already decodes dynamic segments — don't decode again (avoids a double-decode).
-  const { data, isLoading, isError, isFetching } = useMailTemplate(key, locale);
+  const { data, error, isLoading, isError, isFetching } = useMailTemplate(key, locale);
 
   if (isLoading) {
     return (
       <Typography color="text.secondary" sx={{ p: 1, fontSize: 14 }}>
         {t('common:loading')}
       </Typography>
+    );
+  }
+  // A stale or mistyped language in the URL: the server refuses it with a 400 (issue #853).
+  if (locale && isAxiosError(error) && error.response?.status === 400) {
+    return (
+      <Alert severity="warning">
+        <Trans
+          t={t}
+          i18nKey="mailTemplates.edit.unsupportedLanguage"
+          components={{
+            back: <Link component={RouterLink} to={mailTemplatePath(key)} underline="hover" />,
+          }}
+        />
+      </Alert>
     );
   }
   if (isError || !data) {

@@ -714,6 +714,7 @@
     },
     "matrix": {
       "cellAria": "{{name}} in {{language}}: {{status}}",
+      "cellAriaDefault": "{{name}} in {{language}} (default language): {{status}}",
       "edited": "Edited {{when}}",
       "editedBy": "Edited {{when}} by {{name}}",
       "fallbackShort": "→ {{code}}",
@@ -722,10 +723,12 @@
     },
     "edit": {
       "loadError": "This template could not be loaded. <back>Back to templates</back>",
+      "unsupportedLanguage": "Mail templates are not offered in this language. <back>Open the default language</back>",
       "languages": "Template language",
       "languageTooltip": "{{language}} — {{status}}",
       "languageTooltipDefault": "{{language}} (default language) — {{status}}",
       "languageAria": "{{language}}, {{status}}",
+      "languageAriaDefault": "{{language}} (default language), {{status}}",
       "fallbackNotice": "qnop ships no {{language}} version of this template, so {{language}} mail currently goes out with the English text shown here. Saving creates a {{language}} version.",
       "edited": "— edited {{when}}",
       "editedBy": "— edited {{when}} by {{name}}",

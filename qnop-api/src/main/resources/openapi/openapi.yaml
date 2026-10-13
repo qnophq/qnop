@@ -747,7 +747,9 @@ paths:
               schema:
                 $ref: '#/components/schemas/MailTemplateResponse'
         '400':
-          description: Invalid template content
+          description: >-
+            Invalid template content, or a language the editor does not offer
+            (see `MailTemplateListResponse.locales`)
           content:
             application/json:
               schema:

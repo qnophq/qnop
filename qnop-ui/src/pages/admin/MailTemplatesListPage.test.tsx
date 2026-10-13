@@ -101,7 +101,9 @@ describe('MailTemplatesListPage', () => {
   it('names each cell by its status and links it to the editor in that language', () => {
     renderWithProviders(<MailTemplatesListPage />);
 
-    const custom = screen.getByRole('link', { name: 'Password reset in German: Customised' });
+    const custom = screen.getByRole('link', {
+      name: 'Password reset in German (default language): Customised',
+    });
     expect(custom.getAttribute('href')).toBe('/admin/email/templates/auth.password_reset/de');
     expect(screen.getByRole('link', { name: 'Password reset in English: Built-in' })).toBeTruthy();
     const missing = screen.getByRole('link', {

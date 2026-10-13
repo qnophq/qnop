@@ -156,6 +156,15 @@ class AdminEmailControllerTest {
     mockMvc
         .perform(delete("/api/v1/admin/email/templates/auth.password_reset").param("locale", "it"))
         .andExpect(status().isBadRequest());
+
+    when(templates.update(any(), eq("it"), any(), any(), any(), any()))
+        .thenThrow(new UnsupportedMailLocaleException("it", List.of("en", "de")));
+    mockMvc
+        .perform(
+            put("/api/v1/admin/email/templates/auth.password_reset")
+                .contentType("application/json")
+                .content("{\"locale\":\"it\",\"subject\":\"S\",\"bodyPlain\":\"B\"}"))
+        .andExpect(status().isBadRequest());
   }
 
   @Test

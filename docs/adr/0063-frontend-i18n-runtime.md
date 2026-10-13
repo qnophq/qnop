@@ -156,7 +156,10 @@ decision is recorded here, beside the UI's.
   language, or the application default. A row saved for a language that is neither shipped nor
   the default is never used until that language ships — sending it would mix admin text with
   English phrases. The admin API therefore refuses to read, save or reset a template in any other
-  language (`400`).
+  language (`400`). Rows are never deleted behind the admin's back: a row customised while an
+  unshipped language was the default drops out of the editor when the default changes, stays
+  stored and unused, and reappears — editable and resettable — if that language becomes the
+  default again or ships.
 - **Upgrade note — customised templates.** Before this change every recipient got the rows of the
   default language. Now an admin row in the default language no longer reaches a recipient whose
   own language is shipped: an installation that customised its English templates (wording, a

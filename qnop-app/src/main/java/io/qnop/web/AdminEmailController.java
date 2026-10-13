@@ -183,7 +183,8 @@ public class AdminEmailController implements AdminEmailApi {
               request.getBodyPlain(),
               request.getBodyHtml(),
               currentActor());
-      return ResponseEntity.ok(toResponse(saved));
+      return ResponseEntity.ok(
+          toResponse(saved).variants(toVariants(templates.variants(templateKey))));
     } catch (MailTemplateValidationException | UnsupportedMailLocaleException e) {
       throw new ResponseStatusException(HttpStatus.BAD_REQUEST, e.getMessage());
     }

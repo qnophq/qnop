@@ -88,7 +88,12 @@ export function MailLocaleSwitcher({
               component={RouterLink}
               to={mailTemplatePath(templateKey, variant.locale)}
               aria-current={selected ? 'page' : undefined}
-              aria-label={t('mailTemplates.edit.languageAria', { language, status: statusLabel })}
+              aria-label={t(
+                variant.instanceDefault
+                  ? 'mailTemplates.edit.languageAriaDefault'
+                  : 'mailTemplates.edit.languageAria',
+                { language, status: statusLabel },
+              )}
               onClick={(event: MouseEvent<HTMLAnchorElement>) => {
                 if (!selected) onLeave?.(variant.locale, event);
               }}

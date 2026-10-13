@@ -726,6 +726,7 @@
     },
     "matrix": {
       "cellAria": "{{name}} em {{language}}: {{status}}",
+      "cellAriaDefault": "{{name}} em {{language}} (idioma padrão): {{status}}",
       "edited": "Editado {{when}}",
       "editedBy": "Editado {{when}} por {{name}}",
       "fallbackShort": "→ {{code}}",
@@ -734,10 +735,12 @@
     },
     "edit": {
       "loadError": "Não foi possível carregar este modelo. <back>Voltar para os modelos</back>",
+      "unsupportedLanguage": "Os modelos de e-mail não estão disponíveis neste idioma. <back>Abrir o idioma padrão</back>",
       "languages": "Idioma do modelo",
       "languageTooltip": "{{language}} — {{status}}",
       "languageTooltipDefault": "{{language}} (idioma padrão) — {{status}}",
       "languageAria": "{{language}}, {{status}}",
+      "languageAriaDefault": "{{language}} (idioma padrão), {{status}}",
       "fallbackNotice": "O qnop não inclui este modelo em {{language}}, então os e-mails em {{language}} saem agora com o texto em inglês mostrado aqui. Ao salvar, você cria uma versão em {{language}}.",
       "edited": "— editado {{when}}",
       "editedBy": "— editado {{when}} por {{name}}",

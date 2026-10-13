@@ -70,11 +70,12 @@ function useVariantDescription() {
           : t('mailTemplates.matrix.edited', { when: formatRelative(variant.updatedAt) })
         : null;
     return {
-      label: t('mailTemplates.matrix.cellAria', {
-        name: template.friendlyName,
-        language,
-        status,
-      }),
+      label: t(
+        variant.instanceDefault
+          ? 'mailTemplates.matrix.cellAriaDefault'
+          : 'mailTemplates.matrix.cellAria',
+        { name: template.friendlyName, language, status },
+      ),
       language,
       status,
       edited,
@@ -329,6 +330,15 @@ function TemplateCards({
               >
                 <LocaleStatusMark status={mailLocaleStatus(variant)} />
                 {localeShortCode(variant.locale)}
+                {variant.instanceDefault && (
+                  <Box
+                    component="span"
+                    aria-hidden
+                    sx={{ display: 'inline-flex', color: (theme) => theme.qnop.brand.blue }}
+                  >
+                    <Star size={11} fill="currentColor" />
+                  </Box>
+                )}
               </Box>
             ))}
           </Stack>
