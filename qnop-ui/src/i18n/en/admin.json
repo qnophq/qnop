@@ -354,6 +354,11 @@
         "anonymized": "Anonymised (recommended)",
         "none": "Do not forward",
         "full": "Full address (personal data)"
+      },
+      "severity": {
+        "info": "Info",
+        "warning": "Warning",
+        "critical": "Critical"
       }
     },
     "validation": {

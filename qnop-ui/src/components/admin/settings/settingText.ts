@@ -45,7 +45,8 @@ export function fieldLabel(key: string): string {
  * The label and description of an application setting (issue #836): from the `admin` catalog
  * (`settings.fields.<id>.label|description`), falling back to the humanised key and the
  * server's registry description — so a setting the backend adds later still renders, in
- * English, until it gets a catalog entry.
+ * English, until it gets a catalog entry. The English catalog therefore duplicates the backend
+ * descriptions and wins over them; `settingCatalog.test.ts` fails when the two drift apart.
  */
 export function useSettingText() {
   const { t, i18n } = useTranslation('admin');

@@ -144,6 +144,8 @@ export function TeamFormDialog({ open, mode, team, onClose }: TeamFormDialogProp
   const onSubmit = async (event: FormEvent) => {
     event.preventDefault();
     setError(null);
+    // A name conflict belongs to the previous response; this one decides afresh.
+    setNameTaken(false);
     if (Object.keys(clientErrors).length > 0) {
       setSubmitAttempted(true);
       return;

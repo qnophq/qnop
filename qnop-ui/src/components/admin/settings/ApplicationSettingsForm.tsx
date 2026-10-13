@@ -47,6 +47,7 @@ import type { AdminSetting } from '../../../api/generated';
 import { useSettings, useUpdateSettings } from '../../../api/hooks/useSettings';
 import { TimezonePicker } from '../../TimezonePicker';
 import { SectionCard } from '../layout/SectionCard';
+import { SELECT_OPTIONS, type SelectOption } from './settingOptions';
 import { fieldLabel, useSettingText } from './settingText';
 import { trackingStatus } from './trackingStatus';
 import { AdminToast } from '../layout/AdminToast';
@@ -106,43 +107,6 @@ const GROUP_DESCRIPTIONS: Record<string, AdminKey> = {
  * surface. SMTP lives on the Email / SMTP page (issue #142).
  */
 const HIDDEN_GROUPS = new Set<string>(['smtp']);
-
-/**
- * A dropdown option: a catalog key for words that translate, or a verbatim label
- * for proper names (language endonyms, product names) and raw enum values.
- */
-type SelectOption = { value: string; labelKey: AdminKey } | { value: string; label: string };
-
-/**
- * Curated dropdown labels keyed by setting key. ENUM option *sets* now come from
- * the API contract (`allowedValues`); this map only supplies nicer labels and
- * covers STRING settings with a known, closed value set (e.g. the default
- * language) that are not modelled as ENUM server-side. Language names stay in
- * their own language, product names stay as they are.
- */
-const SELECT_OPTIONS: Record<string, SelectOption[]> = {
-  'general.default_language': [
-    { value: 'en', label: 'English' },
-    { value: 'de', label: 'Deutsch' },
-  ],
-  'tracking.provider': [
-    { value: 'none', labelKey: 'settings.options.trackingProvider.none' },
-    { value: 'matomo', label: 'Matomo' },
-    { value: 'plausible', label: 'Plausible' },
-    { value: 'umami', label: 'Umami' },
-    { value: 'posthog', label: 'PostHog' },
-    { value: 'pirsch', label: 'Pirsch' },
-  ],
-  'tracking.forward_client_ip': [
-    { value: 'anonymized', labelKey: 'settings.options.forwardClientIp.anonymized' },
-    { value: 'none', labelKey: 'settings.options.forwardClientIp.none' },
-    { value: 'full', labelKey: 'settings.options.forwardClientIp.full' },
-  ],
-  'auth.self_registration_default_role': [
-    { value: 'MEMBER', labelKey: 'roles.global.MEMBER' },
-    { value: 'AUDITOR', labelKey: 'roles.global.AUDITOR' },
-  ],
-};
 
 /** Humanises a raw enum value for display, e.g. `starttls` → "Starttls". */
 function humaniseOption(value: string): string {

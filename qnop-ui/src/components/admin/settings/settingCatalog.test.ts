@@ -24,9 +24,12 @@ import { resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import deAdmin from '../../../i18n/de/admin.json';
 import enAdmin from '../../../i18n/en/admin.json';
+import { SELECT_OPTIONS } from './settingOptions';
 import { fieldLabel, settingCatalogId } from './settingText';
 
-// Read from the backend source (Vite refuses `?raw` imports outside the UI project root).
+// Read from the backend source (Vite refuses `?raw` imports outside the UI project root). The UI is
+// tested inside the monorepo checkout, so the sibling qnop-core module is always there; if it is
+// not, the read fails loudly rather than letting the catalog drift unchecked.
 const registrySource = readFileSync(
   resolve(
     import.meta.dirname,
@@ -38,6 +41,28 @@ const registrySource = readFileSync(
 /** Every setting key the backend registry declares: `NAME("some.key", SettingValueType.X, …)`. */
 const registryKeys = [...registrySource.matchAll(/\(\s*"([^"]+)",\s*SettingValueType\./g)].map(
   (match) => match[1],
+);
+
+/** The ENUM settings: `NAME("some.key", SettingValueType.ENUM, …)`. */
+const enumKeys = [...registrySource.matchAll(/\(\s*"([^"]+)",\s*SettingValueType\.ENUM\b/g)].map(
+  (match) => match[1],
+);
+
+/**
+ * Each setting's English description as the registry declares it: the string literals after the
+ * key, type and default, joined where the source splits them with `+`.
+ */
+const registryDescriptions = new Map(
+  [
+    ...registrySource.matchAll(
+      /\(\s*"([^"]+)",\s*SettingValueType\.\w+,\s*"(?:[^"\\]|\\.)*",\s*((?:"(?:[^"\\]|\\.)*"\s*\+?\s*)+)/g,
+    ),
+  ].map((match) => [
+    match[1],
+    [...match[2].matchAll(/"((?:[^"\\]|\\.)*)"/g)]
+      .map((part) => part[1].replace(/\\(.)/g, '$1'))
+      .join(''),
+  ]),
 );
 
 type Fields = Record<string, { label?: string; description?: string }>;
@@ -75,5 +100,22 @@ describe('application setting catalog', () => {
       (key) => fields[settingCatalogId(key)]?.label !== fieldLabel(key),
     );
     expect(drifted).toEqual([]);
+  });
+
+  it('keeps the English descriptions identical to the backend registry', () => {
+    // The catalog wins over the server's description, so it must not drift from it.
+    expect(registryDescriptions.size).toBe(registryKeys.length);
+    const fields = enAdmin.settings.fields as Fields;
+    const drifted = registryKeys.filter(
+      (key) => fields[settingCatalogId(key)]?.description !== registryDescriptions.get(key),
+    );
+    expect(drifted).toEqual([]);
+  });
+
+  it('curates the options of every ENUM setting the form renders', () => {
+    // A raw, humanised enum value would stay English in every language. SMTP has its own page.
+    const uncurated = enumKeys.filter((key) => !key.startsWith('smtp.') && !SELECT_OPTIONS[key]);
+    expect(enumKeys).toContain('banner.app_severity');
+    expect(uncurated).toEqual([]);
   });
 });

@@ -25,8 +25,8 @@
       "descriptionWithSeats_one": "Verwalte Konten, Rollen und Zugriffe. {{used}} von {{count}} Platz belegt.",
       "descriptionWithSeats_other": "Verwalte Konten, Rollen und Zugriffe. {{used}} von {{count}} Plätzen belegt.",
       "addUser": "Benutzer hinzufügen",
-      "seatsFull_one": "Diese Instanz ist für {{count}} Konto konfiguriert und enthält {{used}}. Wenn du ein Konto löschst, wird ein Platz frei — deaktivieren reicht dafür nicht.",
-      "seatsFull_other": "Diese Instanz ist für {{count}} Konten konfiguriert und enthält {{used}}. Wenn du ein Konto löschst, wird ein Platz frei — deaktivieren reicht dafür nicht.",
+      "seatsFull_one": "Diese Installation ist für {{count}} Konto konfiguriert und enthält {{used}}. Wenn du ein Konto löschst, wird ein Platz frei — deaktivieren reicht dafür nicht.",
+      "seatsFull_other": "Diese Installation ist für {{count}} Konten konfiguriert und enthält {{used}}. Wenn du ein Konto löschst, wird ein Platz frei — deaktivieren reicht dafür nicht.",
       "searchPlaceholder": "Nach Name, E-Mail oder Benutzername suchen",
       "searchLabel": "Benutzer durchsuchen",
       "roleFilter": "Rolle",
@@ -354,6 +354,11 @@
         "anonymized": "Anonymisiert (empfohlen)",
         "none": "Nicht weiterleiten",
         "full": "Vollständige Adresse (personenbezogene Daten)"
+      },
+      "severity": {
+        "info": "Info",
+        "warning": "Warnung",
+        "critical": "Kritisch"
       }
     },
     "validation": {
@@ -579,7 +584,7 @@
     "none": "keine"
   },
   "quota": {
-    "title": "Instanz-Kontingente",
+    "title": "Installations-Kontingente",
     "description": "Was diese Installation aufnehmen darf. Festgelegt dort, wo sie installiert ist, nicht in den Einstellungen — ein Administrator kann die Werte lesen, aber nicht erhöhen.",
     "rows": {
       "users": {
@@ -588,7 +593,7 @@
       },
       "teams": {
         "label": "Teams",
-        "hint": "Teams auf dieser Instanz"
+        "hint": "Teams in dieser Installation"
       },
       "teamMembers": {
         "label": "Mitglieder pro Team",
