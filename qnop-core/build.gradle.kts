@@ -62,6 +62,8 @@ dependencies {
     // Mustache rendering of DB-stored, admin-editable templates.
     implementation(libs.spring.boot.starter.mail)
     implementation(libs.jmustache)
+    // The shipped per-language template defaults (issue #853) are YAML resources.
+    implementation(libs.snakeyaml)
 
     // Distributed scheduler locks (issue #52, ADR-0029): the @SchedulerLock
     // annotation on the @Scheduled cleanup sweeps. The Postgres-backed LockProvider

@@ -106,3 +106,53 @@ Portuguese test pins it. E-mails stay English until mail templates are localized
   vs Líder da equipe (team lead), enviar / envio (upload), posição (placement), reposicionar (free
   move) vs reassociar (choosing the passage again) vs reancorar (automatic re-anchoring across
   versions), ponto (a concern raised), vagas (seats), Configuração do servidor.
+
+## Amendment — Localized mail (2026-10-13, issue #853)
+
+Outgoing mail now follows the recipient's language too. There is no separate mail ADR, so the
+decision is recorded here, beside the UI's.
+
+- **Recipient language.** One resolver, `MailLocaleResolver`, used by every sender (review
+  notifications, the daily digest, registration, password reset and the admin reset/setup link):
+  the recipient's `preferred_language` → `general.default_language` → `en`, blank values skipped.
+  It is the UI order without the device step, which a mail has no device for. As in the UI, a
+  preference counts only if mail is shipped in that language, so one mail is never a mix of a
+  fallback template and fallback phrases; the application default always counts, so an instance
+  whose admins customised the templates in an unshipped default language keeps sending those.
+  A brand-new account
+  has no preference yet, so its verification mail uses the application default; the registration
+  API carries no language (a later change may send the sign-up page's language).
+- **One language per mail.** The sender resolves the language *before* it builds the template
+  variables, and passes that language to the renderer, so the words around a variable and the
+  variable agree. Review notifications carry it on the intent (`mailLocale`); the persisted inbox
+  row keeps the raw decision and states, never the translated words.
+- **Shipped defaults.** English stays authoritative in the `MailTemplateKey` enum, unchanged.
+  Every other language is one classpath resource, `qnop-core/src/main/resources/mail/templates/
+  <language>.yaml`, with `subject`, `bodyPlain`, `bodyHtmlContent`, `ctaLabel` and `preheader` per
+  template key. YAML rather than JSON: block scalars keep the multi-line bodies and the HTML
+  fragments readable for a translator, without escaped quotes. `MailTemplateDefaults` loads them
+  at startup and fails the start on a bad file: an unknown or missing key or field, a placeholder
+  outside the key's closed set, a call to action where English has none (or none where English
+  has one). No Liquibase seeding — released changesets stay untouched.
+- **Resolution order** (render, preview, editor view): for the requested language, then the
+  default language, then `en`, try the admin-edited `mail_template` row first and the shipped
+  default second. So an admin row in the recipient's language wins, but an admin row in another
+  language never beats the shipped default in the recipient's own language. English output for an
+  English recipient is byte-identical to before (pinned by golden files). Where a row carries no
+  HTML of its own, the branded HTML is built from the shipped default of the row's language (or
+  English where that language ships none), and the layout chrome follows that content's language.
+- **Server-rendered phrases.** A small `java.util.ResourceBundle` per language,
+  `mail/messages[_<language>].properties` (UTF-8, English root, no fallback to the JVM's default
+  locale), holds the layout's footer, CTA fallback and link hint, the relative expiry time, the
+  decision words, workflow state names, actor fallbacks, and the digest's counts, sentences,
+  headings and date format. Plurals use `MessageFormat` choice formats; counted phrases print the
+  count as plain digits so no language groups them. English values are the former literals.
+- **Adding a mail language** is adding `mail/templates/<language>.yaml` and
+  `mail/messages_<language>.properties` — no code. Parity tests require every shipped language to
+  define every template, field and phrase, with the same placeholders as English part by part.
+- **German** is the first mail language (informal "du", the UI's terminology, „…“ quotes). Spanish,
+  French and Portuguese defaults and a per-language selector in the admin template editor follow
+  in a second change; until then those recipients get the application default's mail (English
+  unless configured otherwise), and the admin editor still edits the default language only.
+- Out of scope, as in the issue: the server-generated pseudonyms of anonymous reviews
+  ("Participant N"), and the in-app inbox's server-side fallbacks, which the UI renders itself.

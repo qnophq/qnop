@@ -179,4 +179,23 @@ class MailNotificationSinkTest {
     stored(UserSettingKey.EMAIL_REVIEW_NOTIFICATIONS, "false");
     assertThat(sink().accepts(intent(NotificationType.COMMENT_ADDED, "a@qnop.test"))).isFalse();
   }
+
+  @Test
+  @DisplayName("the mail goes out in the language its variables were written in (#853)")
+  void deliversInTheIntentsLanguage() {
+    User recipient = mock(User.class);
+    when(recipient.getEmail()).thenReturn("a@qnop.test");
+    ReviewNotificationIntent intent =
+        ReviewNotificationIntent.to(
+                recipient, NotificationType.COMMENT_ADDED, MailTemplateKey.REVIEW_COMMENT_ADDED)
+            .var("actorName", "Ada")
+            .mailLocale("de")
+            .build();
+
+    sink().deliver(intent);
+
+    org.mockito.Mockito.verify(mail)
+        .sendMailFromTemplate(
+            MailTemplateKey.REVIEW_COMMENT_ADDED, "a@qnop.test", intent.mailVars(), "de");
+  }
 }

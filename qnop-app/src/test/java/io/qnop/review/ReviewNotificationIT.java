@@ -24,7 +24,6 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyMap;
 import static org.mockito.ArgumentMatchers.eq;
-import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.after;
 import static org.mockito.Mockito.timeout;
 import static org.mockito.Mockito.verify;
@@ -150,7 +149,7 @@ class ReviewNotificationIT extends SeededIntegrationTest {
             eq(MailTemplateKey.REVIEW_PARTICIPANT_ADDED),
             eq(emailOf(MEMBER2_ID)),
             vars.capture(),
-            isNull());
+            eq("en"));
     assertThat(vars.getValue())
         .containsEntry("documentTitle", "Master services agreement")
         .containsKey("actionUrl");
@@ -171,7 +170,7 @@ class ReviewNotificationIT extends SeededIntegrationTest {
             eq(MailTemplateKey.REVIEW_ANNOTATION_CREATED),
             eq(emailOf(MEMBER_ID)),
             anyMap(),
-            isNull());
+            eq("en"));
     // The raise derived IN_REVIEW -> CHANGES_REQUESTED — announced by the annotation
     // mail itself, not a second workflow mail.
     verify(mail, after(300).never())
@@ -198,7 +197,7 @@ class ReviewNotificationIT extends SeededIntegrationTest {
             eq(MailTemplateKey.REVIEW_COMMENT_ADDED),
             eq(emailOf(AUDITOR_ID)),
             vars.capture(),
-            isNull());
+            eq("en"));
     assertThat(vars.getValue()).containsEntry("commentExcerpt", "Capping at 12 months works.");
     assertThat((String) vars.getValue().get("actionUrl")).contains("annotation=", "comment=");
   }
@@ -220,7 +219,7 @@ class ReviewNotificationIT extends SeededIntegrationTest {
             eq(MailTemplateKey.REVIEW_ANNOTATION_DECIDED),
             eq(emailOf(MEMBER_ID)),
             vars.capture(),
-            isNull());
+            eq("en"));
     assertThat(vars.getValue()).containsEntry("decision", "resolved");
   }
 
@@ -245,7 +244,7 @@ class ReviewNotificationIT extends SeededIntegrationTest {
             eq(MailTemplateKey.REVIEW_ANNOTATION_DECIDED),
             eq(emailOf(AUDITOR_ID)),
             vars.capture(),
-            isNull());
+            eq("en"));
     assertThat(vars.getValue()).containsEntry("decision", "dismissed");
   }
 
@@ -272,7 +271,7 @@ class ReviewNotificationIT extends SeededIntegrationTest {
             eq(MailTemplateKey.REVIEW_WORKFLOW_CHANGED),
             eq(emailOf(AUDITOR_ID)),
             vars.capture(),
-            isNull());
+            eq("en"));
     assertThat(vars.getValue())
         .containsEntry("oldState", "In review")
         .containsEntry("newState", "Cancelled");
@@ -315,7 +314,7 @@ class ReviewNotificationIT extends SeededIntegrationTest {
             eq(MailTemplateKey.REVIEW_VERSION_UPLOADED),
             eq(emailOf(AUDITOR_ID)),
             vars.capture(),
-            isNull());
+            eq("en"));
     assertThat(vars.getValue()).containsEntry("versionNumber", "2");
     assertThat((String) vars.getValue().get("actionUrl")).endsWith("?version=2");
   }
@@ -334,7 +333,7 @@ class ReviewNotificationIT extends SeededIntegrationTest {
             eq(MailTemplateKey.REVIEW_ANNOTATION_CREATED),
             eq(emailOf(MEMBER_ID)),
             vars.capture(),
-            isNull());
+            eq("en"));
     String actorName = (String) vars.getValue().get("actorName");
     String realName = users.findById(AUDITOR_ID).map(User::getDisplayName).orElseThrow();
     assertThat(actorName).isNotEqualTo(realName).startsWith("Participant");

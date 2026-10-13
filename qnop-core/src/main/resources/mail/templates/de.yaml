@@ -1,0 +1,246 @@
+# Copyright (c) 2026-present devtank42 GmbH
+# SPDX-License-Identifier: AGPL-3.0-only
+#
+# Shipped German defaults of every mail template (issue #853). English is
+# authoritative in io.qnop.service.mail.MailTemplateKey; this file mirrors it key
+# for key, with the same placeholders and the same HTML structure and inline
+# styles. Loaded and validated at startup by MailTemplateDefaults: every template
+# key and field must be present, and only the key's own placeholders may appear.
+#
+# Style: informal "du", terminology as in qnop-ui/src/i18n/de, „…“ quotes
+# (&#8222;…&#8220; in HTML), em dash with spaces. An admin-edited row in the
+# mail_template table still wins over these defaults.
+
+auth.registration_verification:
+  subject: "Bestätige dein {{siteName}}-Konto"
+  bodyPlain: |
+    Hallo {{recipientName}},
+
+    bestätige deine E-Mail-Adresse, um dein {{siteName}}-Konto zu aktivieren:
+
+    {{actionUrl}}
+
+    Dieser Link läuft {{expiresAtHuman}} ab. Falls du dieses Konto nicht angelegt hast, kannst du diese Nachricht einfach ignorieren.
+  bodyHtmlContent: |
+    <h1 style="margin:0 0 14px;color:#18191f;font-size:22px;font-weight:700;letter-spacing:-0.01em;line-height:1.3;">Bestätige deine E-Mail-Adresse</h1>
+    <p style="margin:0 0 14px;">Hallo {{recipientName}},</p>
+    <p style="margin:0 0 14px;">bestätige diese Adresse, um dein <strong style="color:#18191f;">{{siteName}}</strong>-Konto zu aktivieren.</p>
+    <p style="margin:0;color:#9a9ea8;font-size:13px;">Dieser Link läuft {{expiresAtHuman}} ab. Falls du dieses Konto nicht angelegt hast, kannst du diese E-Mail ignorieren.</p>
+  ctaLabel: "E-Mail-Adresse bestätigen"
+  preheader: "Bestätige deine E-Mail-Adresse, um dein {{siteName}}-Konto zu aktivieren."
+
+auth.password_reset:
+  subject: "Setze dein {{siteName}}-Passwort zurück"
+  bodyPlain: |
+    Hallo {{recipientName}},
+
+    wir haben eine Anfrage erhalten, dein {{siteName}}-Passwort zurückzusetzen. Hier kannst du ein neues wählen:
+
+    {{actionUrl}}
+
+    Dieser Link läuft {{expiresAtHuman}} ab. Falls du das nicht angefordert hast, kannst du diese Nachricht einfach ignorieren; dein Passwort bleibt unverändert.
+  bodyHtmlContent: |
+    <h1 style="margin:0 0 14px;color:#18191f;font-size:22px;font-weight:700;letter-spacing:-0.01em;line-height:1.3;">Setze dein Passwort zurück</h1>
+    <p style="margin:0 0 14px;">Hallo {{recipientName}},</p>
+    <p style="margin:0 0 14px;">wir haben eine Anfrage erhalten, dein <strong style="color:#18191f;">{{siteName}}</strong>-Passwort zurückzusetzen. Wähle unten ein neues.</p>
+    <p style="margin:0;color:#9a9ea8;font-size:13px;">Dieser Link läuft {{expiresAtHuman}} ab. Falls du das nicht angefordert hast, ignoriere diese E-Mail — dein Passwort bleibt unverändert.</p>
+  ctaLabel: "Neues Passwort wählen"
+  preheader: "Setze dein {{siteName}}-Passwort zurück."
+
+auth.admin_password_reset:
+  subject: "Ein Administrator hat dein {{siteName}}-Passwort zurückgesetzt"
+  bodyPlain: |
+    Hallo {{recipientName}},
+
+    ein Administrator hat dein {{siteName}}-Passwort zurückgesetzt. Lege ein neues fest, um dich wieder anzumelden:
+
+    {{actionUrl}}
+
+    Dieser Link läuft {{expiresAtHuman}} ab.
+  bodyHtmlContent: |
+    <h1 style="margin:0 0 14px;color:#18191f;font-size:22px;font-weight:700;letter-spacing:-0.01em;line-height:1.3;">Lege ein neues Passwort fest</h1>
+    <p style="margin:0 0 14px;">Hallo {{recipientName}},</p>
+    <p style="margin:0 0 14px;">ein Administrator hat dein <strong style="color:#18191f;">{{siteName}}</strong>-Passwort zurückgesetzt. Lege ein neues fest, um dich wieder anzumelden.</p>
+    <p style="margin:0;color:#9a9ea8;font-size:13px;">Dieser Link läuft {{expiresAtHuman}} ab.</p>
+  ctaLabel: "Neues Passwort festlegen"
+  preheader: "Ein Administrator hat dein {{siteName}}-Passwort zurückgesetzt."
+
+review.participant_added:
+  subject: "Du wurdest als Reviewer zu „{{documentTitle}}“ hinzugefügt"
+  bodyPlain: |
+    Hallo {{recipientName}},
+
+    {{actorName}} hat dich als Reviewer zu „{{documentTitle}}“ ({{siteName}}) hinzugefügt.
+
+    Öffne das Review, um das Dokument und die Diskussion zu sehen:
+
+    {{actionUrl}}
+  bodyHtmlContent: |
+    <h1 style="margin:0 0 14px;color:#18191f;font-size:22px;font-weight:700;letter-spacing:-0.01em;line-height:1.3;">Du bist Teil eines Reviews</h1>
+    <p style="margin:0 0 14px;">Hallo {{recipientName}},</p>
+    <p style="margin:0 0 14px;"><strong style="color:#18191f;">{{actorName}}</strong> hat dich als Reviewer zu <strong style="color:#18191f;">&#8222;{{documentTitle}}&#8220;</strong> hinzugefügt.</p>
+    <p style="margin:0;color:#9a9ea8;font-size:13px;">Öffne das Review, um das Dokument und die Diskussion zu sehen.</p>
+  ctaLabel: "Review öffnen"
+  preheader: "{{actorName}} hat dich als Reviewer zu „{{documentTitle}}“ hinzugefügt."
+
+review.daily_digest:
+  subject: "Review-Zusammenfassung: {{totalPhrase}} in deinen Reviews"
+  bodyPlain: |
+    Hallo {{recipientName}},
+
+    hier ist, was seit deiner letzten Zusammenfassung in deinen Reviews passiert ist — insgesamt {{totalPhrase}}:
+
+    {{digestBody}}
+
+    Öffne deine Reviews:
+
+    {{actionUrl}}
+
+    Du bekommst eine Zusammenfassung am Tag, weil das deine Benachrichtigungseinstellung ist; in deinem Profil kannst du auf eine E-Mail pro Ereignis umstellen oder sie ganz abschalten.
+  bodyHtmlContent: |
+    <h1 style="margin:0 0 14px;color:#18191f;font-size:22px;font-weight:700;letter-spacing:-0.01em;line-height:1.3;">Deine Review-Zusammenfassung</h1>
+    <p style="margin:0 0 14px;color:#3d3f47;font-size:15px;line-height:1.6;">Hallo {{recipientName}}, hier ist, was seit deiner letzten Zusammenfassung in deinen Reviews passiert ist — insgesamt {{totalPhrase}}.</p>
+    {{{digestBodyHtml}}}
+    <p style="margin:22px 0 0;"><a href="{{actionUrl}}" style="display:inline-block;padding:11px 18px;border-radius:8px;background:#18191f;color:#ffffff;font-size:15px;font-weight:600;text-decoration:none;">Deine Reviews öffnen</a></p>
+    <p style="margin:22px 0 0;color:#6b6d76;font-size:13px;line-height:1.6;">Du bekommst eine Zusammenfassung am Tag, weil das deine Benachrichtigungseinstellung ist; in deinem Profil kannst du auf eine E-Mail pro Ereignis umstellen oder sie ganz abschalten.</p>
+  ctaLabel: "Deine Reviews öffnen"
+  preheader: "{{totalPhrase}} in deinen Reviews seit deiner letzten Zusammenfassung."
+
+review.annotation_created:
+  subject: "Neue Anmerkung zu „{{documentTitle}}“"
+  bodyPlain: |
+    Hallo {{recipientName}},
+
+    {{actorName}} hat eine neue Anmerkung zu „{{documentTitle}}“ ({{siteName}}) erstellt:
+
+    „{{annotationExcerpt}}“
+
+    Öffne die Anmerkung:
+
+    {{actionUrl}}
+  bodyHtmlContent: |
+    <h1 style="margin:0 0 14px;color:#18191f;font-size:22px;font-weight:700;letter-spacing:-0.01em;line-height:1.3;">Neue Anmerkung</h1>
+    <p style="margin:0 0 14px;">Hallo {{recipientName}},</p>
+    <p style="margin:0 0 14px;"><strong style="color:#18191f;">{{actorName}}</strong> hat eine neue Anmerkung zu <strong style="color:#18191f;">&#8222;{{documentTitle}}&#8220;</strong> erstellt:</p>
+    <p style="margin:0 0 14px;padding:10px 14px;border-left:3px solid #d5d9e0;color:#5a5f6a;">{{annotationExcerpt}}</p>
+    <p style="margin:0;color:#9a9ea8;font-size:13px;">Öffne die Anmerkung, um zu antworten oder sie zu erledigen.</p>
+  ctaLabel: "Anmerkung öffnen"
+  preheader: "{{actorName}} hat eine neue Anmerkung zu „{{documentTitle}}“ erstellt."
+
+review.annotation_decided:
+  subject: "Eine Anmerkung zu „{{documentTitle}}“ wurde {{decision}}"
+  bodyPlain: |
+    Hallo {{recipientName}},
+
+    {{actorName}} hat eine Anmerkung zu „{{documentTitle}}“ ({{siteName}}) {{decision}}:
+
+    „{{annotationExcerpt}}“
+
+    Öffne die Anmerkung:
+
+    {{actionUrl}}
+  bodyHtmlContent: |
+    <h1 style="margin:0 0 14px;color:#18191f;font-size:22px;font-weight:700;letter-spacing:-0.01em;line-height:1.3;">Anmerkung {{decision}}</h1>
+    <p style="margin:0 0 14px;">Hallo {{recipientName}},</p>
+    <p style="margin:0 0 14px;"><strong style="color:#18191f;">{{actorName}}</strong> hat eine Anmerkung zu <strong style="color:#18191f;">&#8222;{{documentTitle}}&#8220;</strong> {{decision}}:</p>
+    <p style="margin:0 0 14px;padding:10px 14px;border-left:3px solid #d5d9e0;color:#5a5f6a;">{{annotationExcerpt}}</p>
+    <p style="margin:0;color:#9a9ea8;font-size:13px;">Öffne die Anmerkung, um die Diskussion zu sehen.</p>
+  ctaLabel: "Anmerkung öffnen"
+  preheader: "Eine Anmerkung zu „{{documentTitle}}“ wurde {{decision}}."
+
+review.comment_added:
+  subject: "Neue Antwort zu „{{documentTitle}}“"
+  bodyPlain: |
+    Hallo {{recipientName}},
+
+    {{actorName}} hat in einer Diskussion zu „{{documentTitle}}“ ({{siteName}}) geantwortet, der du folgst:
+
+    „{{commentExcerpt}}“
+
+    Öffne die Antwort:
+
+    {{actionUrl}}
+  bodyHtmlContent: |
+    <h1 style="margin:0 0 14px;color:#18191f;font-size:22px;font-weight:700;letter-spacing:-0.01em;line-height:1.3;">Neue Antwort</h1>
+    <p style="margin:0 0 14px;">Hallo {{recipientName}},</p>
+    <p style="margin:0 0 14px;"><strong style="color:#18191f;">{{actorName}}</strong> hat in einer Diskussion zu <strong style="color:#18191f;">&#8222;{{documentTitle}}&#8220;</strong> geantwortet, der du folgst:</p>
+    <p style="margin:0 0 14px;padding:10px 14px;border-left:3px solid #d5d9e0;color:#5a5f6a;">{{commentExcerpt}}</p>
+    <p style="margin:0;color:#9a9ea8;font-size:13px;">Öffne die Diskussion, um zu antworten.</p>
+  ctaLabel: "Antwort öffnen"
+  preheader: "{{actorName}} hat zu „{{documentTitle}}“ geantwortet."
+
+review.workflow_changed:
+  subject: "„{{documentTitle}}“ ist jetzt „{{newState}}“"
+  bodyPlain: |
+    Hallo {{recipientName}},
+
+    das Review „{{documentTitle}}“ ({{siteName}}) hat seinen Status geändert: {{oldState}} -> {{newState}}.
+
+    Öffne das Review:
+
+    {{actionUrl}}
+  bodyHtmlContent: |
+    <h1 style="margin:0 0 14px;color:#18191f;font-size:22px;font-weight:700;letter-spacing:-0.01em;line-height:1.3;">Statusänderung im Review</h1>
+    <p style="margin:0 0 14px;">Hallo {{recipientName}},</p>
+    <p style="margin:0 0 14px;"><strong style="color:#18191f;">&#8222;{{documentTitle}}&#8220;</strong> hat seinen Status geändert: {{oldState}} &#8594; <strong style="color:#18191f;">{{newState}}</strong>.</p>
+    <p style="margin:0;color:#9a9ea8;font-size:13px;">Öffne das Review für die Details.</p>
+  ctaLabel: "Review öffnen"
+  preheader: "„{{documentTitle}}“ ist jetzt „{{newState}}“."
+
+review.deleted:
+  subject: "„{{documentTitle}}“ wurde gelöscht"
+  bodyPlain: |
+    Hallo {{recipientName}},
+
+    dein Review „{{documentTitle}}“ ({{siteName}}) wurde von einem Administrator endgültig gelöscht.
+
+    Alles darin ist weg: jede Version, jede Anmerkung und jede Diskussion. Das lässt sich nicht rückgängig machen.
+
+    Falls du damit nicht gerechnet hast, frag deinen Administrator — die Löschung ist im Audit-Trail festgehalten.
+  bodyHtmlContent: |
+    <h1 style="margin:0 0 14px;color:#18191f;font-size:22px;font-weight:700;letter-spacing:-0.01em;line-height:1.3;">Review gelöscht</h1>
+    <p style="margin:0 0 14px;">Hallo {{recipientName}},</p>
+    <p style="margin:0 0 14px;">dein Review <strong style="color:#18191f;">&#8222;{{documentTitle}}&#8220;</strong> wurde von einem Administrator endgültig gelöscht.</p>
+    <p style="margin:0 0 14px;">Alles darin ist weg &#8212; jede Version, jede Anmerkung und jede Diskussion. Das lässt sich nicht rückgängig machen.</p>
+    <p style="margin:0;color:#9a9ea8;font-size:13px;">Falls du damit nicht gerechnet hast, frag deinen Administrator; die Löschung ist im Audit-Trail festgehalten.</p>
+  # No call to action, as in English: there is nothing left to open (issue #421).
+  preheader: "„{{documentTitle}}“ wurde endgültig gelöscht."
+
+review.version_uploaded:
+  subject: "Neue Version von „{{documentTitle}}“ — v{{versionNumber}}"
+  bodyPlain: |
+    Hallo {{recipientName}},
+
+    {{actorName}} hat Version {{versionNumber}} von „{{documentTitle}}“ ({{siteName}}) hochgeladen.
+
+    Bestehende Anmerkungen werden im neuen Text neu verankert. Öffne das Review, um weiterzumachen:
+
+    {{actionUrl}}
+  bodyHtmlContent: |
+    <h1 style="margin:0 0 14px;color:#18191f;font-size:22px;font-weight:700;letter-spacing:-0.01em;line-height:1.3;">Neue Dokumentversion</h1>
+    <p style="margin:0 0 14px;">Hallo {{recipientName}},</p>
+    <p style="margin:0 0 14px;"><strong style="color:#18191f;">{{actorName}}</strong> hat Version <strong style="color:#18191f;">v{{versionNumber}}</strong> von <strong style="color:#18191f;">&#8222;{{documentTitle}}&#8220;</strong> hochgeladen.</p>
+    <p style="margin:0;color:#9a9ea8;font-size:13px;">Bestehende Anmerkungen werden im neuen Text neu verankert. Öffne das Review, um weiterzumachen.</p>
+  ctaLabel: "Neue Version öffnen"
+  preheader: "{{actorName}} hat v{{versionNumber}} von „{{documentTitle}}“ hochgeladen."
+
+review.mention:
+  subject: "{{actorName}} hat dich in „{{documentTitle}}“ erwähnt"
+  bodyPlain: |
+    Hallo {{recipientName}},
+
+    {{actorName}} hat dich in einer Diskussion zu „{{documentTitle}}“ ({{siteName}}) erwähnt:
+
+    „{{commentExcerpt}}“
+
+    Öffne den Kommentar, um zu antworten:
+
+    {{actionUrl}}
+  bodyHtmlContent: |
+    <h1 style="margin:0 0 14px;color:#18191f;font-size:22px;font-weight:700;letter-spacing:-0.01em;line-height:1.3;">Du wurdest erwähnt</h1>
+    <p style="margin:0 0 14px;">Hallo {{recipientName}},</p>
+    <p style="margin:0 0 14px;"><strong style="color:#18191f;">{{actorName}}</strong> hat dich in einer Diskussion zu <strong style="color:#18191f;">&#8222;{{documentTitle}}&#8220;</strong> erwähnt:</p>
+    <p style="margin:0 0 14px;padding:10px 14px;border-left:3px solid #d5d9e0;color:#5a5f6a;">{{commentExcerpt}}</p>
+    <p style="margin:0;color:#9a9ea8;font-size:13px;">Öffne den Kommentar, um zu antworten.</p>
+  ctaLabel: "Kommentar öffnen"
+  preheader: "{{actorName}} hat dich in „{{documentTitle}}“ erwähnt."

@@ -21,12 +21,12 @@
 package io.qnop.service.notification;
 
 import io.qnop.entity.NotificationType;
+import io.qnop.service.mail.MailMessages;
 import java.time.Instant;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Locale;
 import java.util.Map;
 import java.util.UUID;
 import java.util.function.Function;
@@ -47,6 +47,9 @@ import java.util.function.Function;
  * <p>Each document carries its own link, because the digest's job is not to inform but to get
  * somebody back to the right review. One link to the list would make the reader search for what
  * they just read about.
+ *
+ * <p>Every word, plural and date format comes from the recipient's {@link MailMessages} (issue
+ * #853), so the blocks read in the same language as the template around them.
  */
 public final class DigestRenderer {
 
@@ -65,9 +68,6 @@ public final class DigestRenderer {
   /** Long enough to recognise the thread, short enough not to reproduce it. */
   private static final int EXCERPT_LIMIT = 140;
 
-  private static final DateTimeFormatter TIME =
-      DateTimeFormatter.ofPattern("MMM d, HH:mm", Locale.ENGLISH);
-
   private DigestRenderer() {}
 
   /**
@@ -85,24 +85,27 @@ public final class DigestRenderer {
    *     per-review anonymity that is a pseudonym, so the caller owns this and the renderer never
    *     looks a name up itself
    * @param zone the recipient's timezone, so the times read as their own clock
+   * @param messages the recipient's mail language
    */
   public static String plain(
       DigestContent content,
       Map<UUID, Target> targets,
       Function<UUID, String> actorNames,
-      ZoneId zone) {
+      ZoneId zone,
+      MailMessages messages) {
+    DateTimeFormatter time = messages.digestTimeFormat();
     StringBuilder out = new StringBuilder();
     for (DigestContent.DocumentSummary document : content.documents()) {
-      Target target = targetOf(document, targets);
+      Target target = targetOf(document, targets, messages);
       out.append(target.title())
           .append(" — ")
-          .append(String.join(", ", phrases(document)))
+          .append(String.join(", ", phrases(document, messages)))
           .append('\n');
       for (DigestContent.Event event : document.events()) {
         out.append("    ")
-            .append(time(event.at(), zone))
+            .append(time(event.at(), zone, time))
             .append("  ")
-            .append(sentence(event, actorNames))
+            .append(sentence(event, actorNames, messages))
             .append('\n');
         String excerpt = excerptOf(event);
         if (excerpt != null) {
@@ -122,10 +125,12 @@ public final class DigestRenderer {
       DigestContent content,
       Map<UUID, Target> targets,
       Function<UUID, String> actorNames,
-      ZoneId zone) {
+      ZoneId zone,
+      MailMessages messages) {
+    DateTimeFormatter time = messages.digestTimeFormat();
     StringBuilder out = new StringBuilder();
     for (DigestContent.DocumentSummary document : content.documents()) {
-      Target target = targetOf(document, targets);
+      Target target = targetOf(document, targets, messages);
       String label = escape(target.title());
       out.append(
           "<div style=\"margin:0 0 18px;padding:0 0 2px;border-left:3px solid #e4e7ec;"
@@ -142,7 +147,7 @@ public final class DigestRenderer {
       }
       out.append("</p>");
       out.append("<p style=\"margin:0 0 8px;color:#6b6d76;font-size:13px;\">")
-          .append(escape(String.join(", ", phrases(document))))
+          .append(escape(String.join(", ", phrases(document, messages))))
           .append("</p>");
       out.append("<table role=\"presentation\" style=\"border-collapse:collapse;width:100%;\">");
       for (DigestContent.Event event : document.events()) {
@@ -150,10 +155,10 @@ public final class DigestRenderer {
             .append(
                 "<td style=\"padding:2px 10px 2px 0;color:#9a9ea8;font-size:13px;"
                     + "white-space:nowrap;vertical-align:top;\">")
-            .append(escape(time(event.at(), zone)))
+            .append(escape(time(event.at(), zone, time)))
             .append("</td>")
             .append("<td style=\"padding:2px 0;color:#3d3f47;font-size:14px;line-height:1.5;\">")
-            .append(escape(sentence(event, actorNames)));
+            .append(escape(sentence(event, actorNames, messages)));
         String excerpt = excerptOf(event);
         if (excerpt != null) {
           out.append("<br><span style=\"color:#6b6d76;font-style:italic;\">")
@@ -168,26 +173,20 @@ public final class DigestRenderer {
   }
 
   /** e.g. "Aug 3, 09:12" — dated, because a digest may cover more than one day. */
-  private static String time(Instant at, ZoneId zone) {
-    return at == null ? "" : TIME.format(at.atZone(zone));
+  private static String time(Instant at, ZoneId zone, DateTimeFormatter format) {
+    return at == null ? "" : format.format(at.atZone(zone));
   }
 
   /** What happened, as a sentence: who did what. */
-  private static String sentence(DigestContent.Event event, Function<UUID, String> actorNames) {
+  private static String sentence(
+      DigestContent.Event event, Function<UUID, String> actorNames, MailMessages messages) {
     String actor = actorNames.apply(event.actorId());
-    return switch (event.type()) {
-      case ANNOTATION_CREATED -> actor + " raised an annotation";
-      case COMMENT_ADDED -> actor + " replied in a thread";
-      case ANNOTATION_DECIDED -> actor + " decided an annotation";
-      case VERSION_UPLOADED ->
-          actor
-              + " uploaded a new version"
-              + (event.versionNumber() == null ? "" : " (v" + event.versionNumber() + ")");
-      case WORKFLOW_CHANGED -> actor + " changed the review status";
-      case PARTICIPANT_ADDED -> actor + " added you to the review";
-      case REVIEW_DELETED -> actor + " deleted the review";
-      case MENTION -> actor + " mentioned you";
-    };
+    String key = "digest.event." + event.type().name();
+    if (event.type() == NotificationType.VERSION_UPLOADED && event.versionNumber() != null) {
+      // As a string: a number argument would gain a grouping separator past v999.
+      return messages.get(key + ".numbered", actor, String.valueOf(event.versionNumber()));
+    }
+    return messages.get(key, actor);
   }
 
   /** The quoted line under an event, shortened — a digest is not the place to re-read a thread. */
@@ -203,17 +202,22 @@ public final class DigestRenderer {
   }
 
   /** A phrase for the total, pluralised — Mustache cannot, and the subject line needs one. */
-  public static String totalPhrase(int total) {
-    return total + (total == 1 ? " update" : " updates");
+  public static String totalPhrase(int total, MailMessages messages) {
+    return messages.count("digest.total", total);
   }
 
-  /** e.g. ["3 new annotations", "7 comments"] — singular where it is one. */
-  private static List<String> phrases(DigestContent.DocumentSummary document) {
+  /**
+   * e.g. ["3 new annotations", "7 comments"] — singular where it is one. Every type has its own
+   * count phrase, mentions included: they are mailed immediately and so are usually already read by
+   * now, but an unread one still belongs in the summary rather than nowhere.
+   */
+  private static List<String> phrases(
+      DigestContent.DocumentSummary document, MailMessages messages) {
     List<String> phrases = new ArrayList<>();
     for (NotificationType type : ORDER) {
       int count = document.counts().getOrDefault(type, 0);
       if (count > 0) {
-        phrases.add(count + " " + noun(type, count));
+        phrases.add(messages.count("digest.count." + type.name(), count));
       }
     }
     // A type nobody thought to name still gets counted rather than vanishing.
@@ -222,38 +226,22 @@ public final class DigestRenderer {
         .forEach(
             (type, count) -> {
               if (!ORDER.contains(type) && count > 0) {
-                phrases.add(count + " " + (count == 1 ? "update" : "updates"));
+                phrases.add(messages.count("digest.total", count));
               }
             });
     return phrases;
   }
 
-  private static String noun(NotificationType type, int count) {
-    boolean one = count == 1;
-    return switch (type) {
-      case ANNOTATION_CREATED -> one ? "new annotation" : "new annotations";
-      case COMMENT_ADDED -> one ? "comment" : "comments";
-      case ANNOTATION_DECIDED -> one ? "decision" : "decisions";
-      case VERSION_UPLOADED -> one ? "new version" : "new versions";
-      case WORKFLOW_CHANGED -> one ? "status change" : "status changes";
-      case PARTICIPANT_ADDED -> one ? "new participant" : "new participants";
-      case REVIEW_DELETED -> one ? "deleted review" : "deleted reviews";
-      // Mentions are mailed immediately and so are usually already read by now —
-      // but an unread one still belongs in the summary rather than nowhere.
-      case MENTION -> one ? "mention" : "mentions";
-    };
-  }
-
   private static Target targetOf(
-      DigestContent.DocumentSummary document, Map<UUID, Target> targets) {
+      DigestContent.DocumentSummary document, Map<UUID, Target> targets, MailMessages messages) {
     if (document.documentId() == null) {
-      return new Target("Your workspace", null);
+      return new Target(messages.get("digest.target.workspace"), null);
     }
     // A document deleted between the notification and the digest still gets a
     // line, without a link: the count is true, and pretending it did not happen
     // is worse than a line that goes nowhere.
     return targets.getOrDefault(
-        document.documentId(), new Target("A review you take part in", null));
+        document.documentId(), new Target(messages.get("digest.target.unknownReview"), null));
   }
 
   private static String escape(String raw) {

@@ -77,6 +77,9 @@ class MailTemplateServiceTest {
               "digestBodyHtml",
               "<ul><li><strong>Q3 contract draft</strong> — 3 new annotations, 7 comments</li></ul>"));
 
+  /** The shipped defaults, loaded from the classpath like the application does. */
+  private static final MailTemplateDefaults DEFAULTS = new MailTemplateDefaults();
+
   private MailTemplateService service;
 
   @BeforeEach
@@ -87,7 +90,8 @@ class MailTemplateServiceTest {
             userRepository,
             settings,
             new EmailLayoutBuilder(),
-            FeatureToggleProperties.all());
+            FeatureToggleProperties.all(),
+            DEFAULTS);
     lenient()
         .when(settings.getString(ApplicationSettingKey.GENERAL_DEFAULT_LANGUAGE))
         .thenReturn("en");
@@ -118,7 +122,7 @@ class MailTemplateServiceTest {
   void fallsBackToCatalogDefaults() {
     when(repository.findByTemplateKeyAndLocale(any(), any())).thenReturn(Optional.empty());
 
-    RenderedMail mail = service.render(MailTemplateKey.PASSWORD_RESET, FLOW_VARS, "de");
+    RenderedMail mail = service.render(MailTemplateKey.PASSWORD_RESET, FLOW_VARS, "en");
 
     assertThat(mail.subject()).isEqualTo("Reset your qnop password");
     assertThat(mail.bodyPlain()).contains("Jane").contains("in 30 minutes");
@@ -375,7 +379,8 @@ class MailTemplateServiceTest {
             userRepository,
             settings,
             new EmailLayoutBuilder(),
-            FeatureToggleProperties.allExcept(FeatureDisabledException.Feature.EMAIL_TEMPLATES));
+            FeatureToggleProperties.allExcept(FeatureDisabledException.Feature.EMAIL_TEMPLATES),
+            DEFAULTS);
 
     assertThatThrownBy(
             () ->
@@ -388,5 +393,141 @@ class MailTemplateServiceTest {
 
     assertThat(withoutEditing.editable()).isFalse();
     verify(repository, never()).save(any());
+  }
+
+  // --- per-language resolution (issue #853) ------------------------------------
+
+  private void noRows() {
+    when(repository.findByTemplateKeyAndLocale(any(), any())).thenReturn(Optional.empty());
+  }
+
+  private void row(MailTemplateKey key, String locale, String subject) {
+    when(repository.findByTemplateKeyAndLocale(key.key(), locale))
+        .thenReturn(Optional.of(new MailTemplate(key.key(), locale, subject, "plain " + locale)));
+  }
+
+  @Test
+  @DisplayName("a German recipient gets the shipped German default, CTA, footer and lang")
+  void germanRecipientGetsTheShippedGermanDefault() {
+    noRows();
+
+    RenderedMail mail = service.render(MailTemplateKey.PASSWORD_RESET, FLOW_VARS, "de");
+
+    assertThat(mail.subject()).isEqualTo("Setze dein qnop-Passwort zurück");
+    assertThat(mail.bodyPlain()).startsWith("Hallo Jane,");
+    assertThat(mail.bodyHtml())
+        .contains("<html lang=\"de\">")
+        .contains("Setze dein Passwort zurück")
+        .contains("Neues Passwort wählen")
+        .contains("Dies ist eine automatische Nachricht")
+        .contains("Der Button funktioniert nicht?")
+        .doesNotContain("This is an automated message");
+  }
+
+  @Test
+  @DisplayName("an admin row in the recipient's language beats the shipped default")
+  void adminRowInTheRecipientsLanguageWins() {
+    noRows();
+    row(MailTemplateKey.PASSWORD_RESET, "de", "Eigener Betreff {{siteName}}");
+
+    RenderedMail mail = service.render(MailTemplateKey.PASSWORD_RESET, FLOW_VARS, "de");
+
+    assertThat(mail.subject()).isEqualTo("Eigener Betreff qnop");
+    // No HTML of its own: the German branded default is built around it.
+    assertThat(mail.bodyHtml()).contains("Neues Passwort wählen");
+  }
+
+  @Test
+  @DisplayName("an admin row in the default language never beats the recipient's shipped default")
+  void defaultLanguageRowDoesNotBeatTheRecipientsLanguage() {
+    noRows();
+    row(MailTemplateKey.PASSWORD_RESET, "en", "Custom English {{siteName}}");
+
+    assertThat(service.render(MailTemplateKey.PASSWORD_RESET, FLOW_VARS, "de").subject())
+        .isEqualTo("Setze dein qnop-Passwort zurück");
+    // …while an English recipient still gets the customised English row.
+    assertThat(service.render(MailTemplateKey.PASSWORD_RESET, FLOW_VARS, "en").subject())
+        .isEqualTo("Custom English qnop");
+  }
+
+  @Test
+  @DisplayName("an unshipped language falls to the default language: its row, then its default")
+  void unshippedLanguageFallsToTheDefaultLanguage() {
+    noRows();
+    when(settings.getString(ApplicationSettingKey.GENERAL_DEFAULT_LANGUAGE)).thenReturn("de");
+
+    assertThat(service.render(MailTemplateKey.PASSWORD_RESET, FLOW_VARS, "fr").subject())
+        .isEqualTo("Setze dein qnop-Passwort zurück");
+
+    row(MailTemplateKey.PASSWORD_RESET, "de", "Standardsprache {{siteName}}");
+    assertThat(service.render(MailTemplateKey.PASSWORD_RESET, FLOW_VARS, "fr").subject())
+        .isEqualTo("Standardsprache qnop");
+    // No language at all means the default language.
+    assertThat(service.render(MailTemplateKey.PASSWORD_RESET, FLOW_VARS, null).subject())
+        .isEqualTo("Standardsprache qnop");
+  }
+
+  @Test
+  @DisplayName("with an English default an unshipped language reaches the English row, then enum")
+  void unshippedLanguageWithEnglishDefault() {
+    noRows();
+    assertThat(service.render(MailTemplateKey.PASSWORD_RESET, FLOW_VARS, "fr").subject())
+        .isEqualTo("Reset your qnop password");
+
+    row(MailTemplateKey.PASSWORD_RESET, "en", "Custom English {{siteName}}");
+    assertThat(service.render(MailTemplateKey.PASSWORD_RESET, FLOW_VARS, "fr").subject())
+        .isEqualTo("Custom English qnop");
+  }
+
+  @Test
+  @DisplayName("every template renders completely in German, with German chrome")
+  void everyTemplateRendersInGerman() {
+    noRows();
+    MailTemplateDefaults defaults = new MailTemplateDefaults();
+
+    for (MailTemplateKey key : MailTemplateKey.values()) {
+      RenderedMail mail = service.render(key, FLOW_VARS, "de");
+      MailTemplateContent german = defaults.find(key, "de").orElseThrow();
+
+      assertThat(mail.subject())
+          .as(key.key())
+          .doesNotContain("{{")
+          .isNotEqualTo(key.defaultSubject());
+      assertThat(mail.bodyPlain()).as(key.key()).doesNotContain("{{").startsWith("Hallo Jane,");
+      assertThat(mail.bodyHtml())
+          .as(key.key())
+          .doesNotContain("{{")
+          .contains("<html lang=\"de\">")
+          .contains("Dies ist eine automatische Nachricht");
+      if (german.ctaLabel() != null) {
+        assertThat(mail.bodyHtml()).as(key.key()).contains(german.ctaLabel());
+      }
+    }
+  }
+
+  @Test
+  @DisplayName("the editor view of a German default shows German defaults to compare and reset to")
+  void germanEditorView() {
+    noRows();
+
+    MailTemplateView view = service.getEffective(MailTemplateKey.PASSWORD_RESET, "de");
+
+    assertThat(view.source()).isEqualTo(MailTemplateView.Source.DEFAULT);
+    assertThat(view.locale()).isEqualTo("de");
+    assertThat(view.subject()).isEqualTo("Setze dein {{siteName}}-Passwort zurück");
+    assertThat(view.defaultSubject()).isEqualTo("Setze dein {{siteName}}-Passwort zurück");
+    assertThat(view.defaultBodyHtml()).contains("<html lang=\"de\">").contains("{{siteName}}");
+  }
+
+  @Test
+  @DisplayName("a German preview renders the German default with the demo variables")
+  void germanPreview() {
+    noRows();
+
+    MailTemplateService.MailPreview preview =
+        service.preview(MailTemplateKey.REVIEW_MENTION, "de", Map.of());
+
+    assertThat(preview.rendered().subject())
+        .isEqualTo("Alex Reviewer hat dich in „Q3 contract draft“ erwähnt");
   }
 }

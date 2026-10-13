@@ -34,8 +34,11 @@ import org.springframework.stereotype.Component;
  *
  * <p>The {@code contentHtml} fragment is expected to be already rendered and HTML-escaped (the
  * Mustache HTML compiler in {@link MailTemplateService} escapes variables by default). The {@code
- * brandName}, {@code ctaUrl}, {@code ctaText}, {@code preheader} and {@code footerLine} values are
- * escaped here.
+ * brandName}, {@code ctaUrl}, {@code ctaText} and {@code preheader} values are escaped here.
+ *
+ * <p>The chrome's own words — the do-not-reply footer, the CTA fallback label and the "button not
+ * working?" hint — and the document's {@code lang} come from the mail language's {@link
+ * MailMessages} (issue #853).
  */
 @Component
 public class EmailLayoutBuilder {
@@ -54,25 +57,25 @@ public class EmailLayoutBuilder {
   /**
    * Wraps a content fragment in the full branded HTML document.
    *
+   * @param messages the mail language's phrases (footer, CTA fallback, {@code lang})
    * @param brandName the product/site name shown as the wordmark (defaults to {@code qnop})
    * @param preheader the hidden inbox-preview line
    * @param contentHtml the inner content fragment (already rendered + escaped)
    * @param ctaUrl optional call-to-action URL; when blank no button or fallback link is rendered
    * @param ctaText label for the call-to-action button
-   * @param footerLine a short footer line (e.g. a do-not-reply notice)
    */
   public String wrap(
+      MailMessages messages,
       String brandName,
       String preheader,
       String contentHtml,
       String ctaUrl,
-      String ctaText,
-      String footerLine) {
+      String ctaText) {
     String brand = brandName == null || brandName.isBlank() ? "qnop" : brandName;
-    String cta = ctaUrl == null || ctaUrl.isBlank() ? "" : ctaBlock(ctaUrl, ctaText);
+    String cta = ctaUrl == null || ctaUrl.isBlank() ? "" : ctaBlock(messages, ctaUrl, ctaText);
     return """
         <!DOCTYPE html>
-        <html lang="en">
+        <html lang="%s">
           <head>
             <meta charset="utf-8" />
             <meta name="viewport" content="width=device-width, initial-scale=1.0" />
@@ -115,6 +118,7 @@ public class EmailLayoutBuilder {
         </html>
         """
         .formatted(
+            escape(messages.locale()),
             PAPER,
             PAPER,
             escape(preheader),
@@ -129,12 +133,13 @@ public class EmailLayoutBuilder {
             cta,
             HAIRLINE,
             MUTED,
-            escape(footerLine),
+            escape(messages.footer()),
             escape(brand));
   }
 
-  private String ctaBlock(String ctaUrl, String ctaText) {
-    String label = ctaText == null || ctaText.isBlank() ? "Open" : ctaText;
+  private String ctaBlock(MailMessages messages, String ctaUrl, String ctaText) {
+    String label =
+        ctaText == null || ctaText.isBlank() ? messages.get("layout.cta.fallback") : ctaText;
     String url = escape(ctaUrl);
     return """
         <table role="presentation" cellpadding="0" cellspacing="0" border="0" style="margin:26px 0 6px;">
@@ -144,12 +149,21 @@ public class EmailLayoutBuilder {
             </td>
           </tr>
         </table>
-        <p style="margin:16px 0 0;color:%s;font-size:12px;line-height:1.6;">Button not working? Paste this link into your browser:</p>
+        <p style="margin:16px 0 0;color:%s;font-size:12px;line-height:1.6;">%s</p>
         <p style="margin:6px 0 0;">
           <a href="%s" style="color:%s;font-size:12px;word-break:break-all;font-family:%s;text-decoration:none;">%s</a>
         </p>
         """
-        .formatted(ACCENT, url, escape(label), MUTED, url, ACCENT, MONO_FONT, url);
+        .formatted(
+            ACCENT,
+            url,
+            escape(label),
+            MUTED,
+            escape(messages.get("layout.cta.linkHint")),
+            url,
+            ACCENT,
+            MONO_FONT,
+            url);
   }
 
   /** Minimal HTML-attribute/text escaping for the non-fragment values placed into the chrome. */

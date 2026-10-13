@@ -1,0 +1,137 @@
+# Copyright (c) 2026-present devtank42 GmbH
+# SPDX-License-Identifier: AGPL-3.0-only
+#
+# English output of review.workflow_changed as qnop rendered it before issue #853,
+# generated from the pre-#853 MailTemplateKey and EmailLayoutBuilder with the
+# FLOW_VARS of MailTemplateServiceTest. EnglishMailIdentityTest compares the
+# current rendering against it byte for byte. Each part runs from its marker
+# line to the line before the next marker; the final newline is the file's.
+=====SUBJECT=====
+“Q3 contract draft” moved to Changes requested
+=====PLAIN=====
+Hi Jane,
+
+The review "Q3 contract draft" (qnop) changed its status: In review -> Changes requested.
+
+Open the review:
+
+https://qnop.example/reset?token=abc
+
+=====HTML=====
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="color-scheme" content="light only" />
+    <meta name="supported-color-schemes" content="light" />
+  </head>
+  <body style="margin:0;padding:0;background:#eceae3;-webkit-font-smoothing:antialiased;">
+    <div style="display:none;max-height:0;overflow:hidden;opacity:0;color:#eceae3;font-size:1px;line-height:1px;">“Q3 contract draft” moved to Changes requested.</div>
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background:#eceae3;">
+      <tr>
+        <td align="center" style="padding:40px 16px;">
+          <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"
+                 style="max-width:560px;width:100%;background:#ffffff;border:1px solid #e6e3db;
+                        border-radius:16px;overflow:hidden;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;">
+            <tr><td style="height:4px;background:#2b43d0;font-size:0;line-height:0;">&nbsp;</td></tr>
+            <tr>
+              <td style="padding:30px 36px 0;">
+                <span style="font-size:19px;font-weight:700;letter-spacing:-0.02em;color:#18191f;">qnop<span style="color:#2b43d0;">.</span></span>
+              </td>
+            </tr>
+            <tr>
+              <td style="padding:20px 36px 8px;color:#3c3f49;font-size:15px;line-height:1.65;">
+                <h1 style="margin:0 0 14px;color:#18191f;font-size:22px;font-weight:700;letter-spacing:-0.01em;line-height:1.3;">Review status change</h1>
+<p style="margin:0 0 14px;">Hi Jane,</p>
+<p style="margin:0 0 14px;"><strong style="color:#18191f;">&#8220;Q3 contract draft&#8221;</strong> changed its status: In review &#8594; <strong style="color:#18191f;">Changes requested</strong>.</p>
+<p style="margin:0;color:#9a9ea8;font-size:13px;">Open the review for the details.</p>
+
+                <table role="presentation" cellpadding="0" cellspacing="0" border="0" style="margin:26px 0 6px;">
+  <tr>
+    <td style="border-radius:10px;background:#2b43d0;box-shadow:0 1px 2px rgba(20,28,90,0.25);">
+      <a href="https://qnop.example/reset?token=abc" style="display:inline-block;padding:13px 28px;color:#ffffff;text-decoration:none;font-weight:600;font-size:15px;letter-spacing:0.01em;">Open review</a>
+    </td>
+  </tr>
+</table>
+<p style="margin:16px 0 0;color:#9a9ea8;font-size:12px;line-height:1.6;">Button not working? Paste this link into your browser:</p>
+<p style="margin:6px 0 0;">
+  <a href="https://qnop.example/reset?token=abc" style="color:#2b43d0;font-size:12px;word-break:break-all;font-family:'SFMono-Regular',ui-monospace,Menlo,Consolas,'Liberation Mono',monospace;text-decoration:none;">https://qnop.example/reset?token=abc</a>
+</p>
+
+              </td>
+            </tr>
+            <tr>
+              <td style="padding:8px 36px 32px;">
+                <div style="border-top:1px solid #ece9e1;padding-top:18px;color:#9a9ea8;font-size:12px;line-height:1.6;">This is an automated message — please don&#39;t reply.</div>
+              </td>
+            </tr>
+          </table>
+          <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="max-width:560px;width:100%;">
+            <tr><td style="padding:16px 36px 0;text-align:center;color:#b3b6bd;font-size:11px;letter-spacing:0.04em;">qnop · Qualified Notes on Papers</td></tr>
+          </table>
+        </td>
+      </tr>
+    </table>
+  </body>
+</html>
+
+=====DEFAULT_HTML=====
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="color-scheme" content="light only" />
+    <meta name="supported-color-schemes" content="light" />
+  </head>
+  <body style="margin:0;padding:0;background:#eceae3;-webkit-font-smoothing:antialiased;">
+    <div style="display:none;max-height:0;overflow:hidden;opacity:0;color:#eceae3;font-size:1px;line-height:1px;">“{{documentTitle}}” moved to {{newState}}.</div>
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background:#eceae3;">
+      <tr>
+        <td align="center" style="padding:40px 16px;">
+          <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"
+                 style="max-width:560px;width:100%;background:#ffffff;border:1px solid #e6e3db;
+                        border-radius:16px;overflow:hidden;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;">
+            <tr><td style="height:4px;background:#2b43d0;font-size:0;line-height:0;">&nbsp;</td></tr>
+            <tr>
+              <td style="padding:30px 36px 0;">
+                <span style="font-size:19px;font-weight:700;letter-spacing:-0.02em;color:#18191f;">{{siteName}}<span style="color:#2b43d0;">.</span></span>
+              </td>
+            </tr>
+            <tr>
+              <td style="padding:20px 36px 8px;color:#3c3f49;font-size:15px;line-height:1.65;">
+                <h1 style="margin:0 0 14px;color:#18191f;font-size:22px;font-weight:700;letter-spacing:-0.01em;line-height:1.3;">Review status change</h1>
+<p style="margin:0 0 14px;">Hi {{recipientName}},</p>
+<p style="margin:0 0 14px;"><strong style="color:#18191f;">&#8220;{{documentTitle}}&#8221;</strong> changed its status: {{oldState}} &#8594; <strong style="color:#18191f;">{{newState}}</strong>.</p>
+<p style="margin:0;color:#9a9ea8;font-size:13px;">Open the review for the details.</p>
+
+                <table role="presentation" cellpadding="0" cellspacing="0" border="0" style="margin:26px 0 6px;">
+  <tr>
+    <td style="border-radius:10px;background:#2b43d0;box-shadow:0 1px 2px rgba(20,28,90,0.25);">
+      <a href="{{actionUrl}}" style="display:inline-block;padding:13px 28px;color:#ffffff;text-decoration:none;font-weight:600;font-size:15px;letter-spacing:0.01em;">Open review</a>
+    </td>
+  </tr>
+</table>
+<p style="margin:16px 0 0;color:#9a9ea8;font-size:12px;line-height:1.6;">Button not working? Paste this link into your browser:</p>
+<p style="margin:6px 0 0;">
+  <a href="{{actionUrl}}" style="color:#2b43d0;font-size:12px;word-break:break-all;font-family:'SFMono-Regular',ui-monospace,Menlo,Consolas,'Liberation Mono',monospace;text-decoration:none;">{{actionUrl}}</a>
+</p>
+
+              </td>
+            </tr>
+            <tr>
+              <td style="padding:8px 36px 32px;">
+                <div style="border-top:1px solid #ece9e1;padding-top:18px;color:#9a9ea8;font-size:12px;line-height:1.6;">This is an automated message — please don&#39;t reply.</div>
+              </td>
+            </tr>
+          </table>
+          <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="max-width:560px;width:100%;">
+            <tr><td style="padding:16px 36px 0;text-align:center;color:#b3b6bd;font-size:11px;letter-spacing:0.04em;">{{siteName}} · Qualified Notes on Papers</td></tr>
+          </table>
+        </td>
+      </tr>
+    </table>
+  </body>
+</html>
+

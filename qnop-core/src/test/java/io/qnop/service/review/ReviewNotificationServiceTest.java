@@ -69,6 +69,7 @@ class ReviewNotificationServiceTest {
   @Mock private UserRepository users;
   @Mock private ApplicationSettingsService settings;
   @Mock private ReviewIdentityResolver identity;
+  @Mock private io.qnop.repository.UserSettingRepository userSettings;
 
   /** A sink that records what it was handed and can be told to refuse or to blow up. */
   private static final class RecordingSink implements ReviewNotificationSink {
@@ -111,6 +112,8 @@ class ReviewNotificationServiceTest {
             participants,
             teamMembers,
             identity),
+        new io.qnop.service.mail.MailLocaleResolver(
+            userSettings, settings, new io.qnop.service.mail.MailTemplateDefaults()),
         List.of(sinks));
   }
 
@@ -180,9 +183,77 @@ class ReviewNotificationServiceTest {
   @Test
   @DisplayName("workflow states read like sentences")
   void humanStates() {
-    assertThat(ReviewNotificationService.humanState("CHANGES_REQUESTED"))
-        .isEqualTo("Changes requested");
-    assertThat(ReviewNotificationService.humanState(null)).isEmpty();
+    io.qnop.service.mail.MailMessages english = io.qnop.service.mail.MailMessages.forLocale("en");
+    assertThat(english.workflowState("CHANGES_REQUESTED")).isEqualTo("Changes requested");
+    assertThat(english.workflowState(null)).isEmpty();
+  }
+
+  // --- the recipient's mail language (issue #853) ---------------------------
+
+  private void prefersGerman(UUID userId) {
+    io.qnop.entity.UserSetting setting = org.mockito.Mockito.mock(io.qnop.entity.UserSetting.class);
+    when(setting.getSettingValue()).thenReturn("de");
+    when(userSettings.findByUserIdAndSettingKey(
+            userId, io.qnop.service.UserSettingKey.PREFERRED_LANGUAGE.getKey()))
+        .thenReturn(Optional.of(setting));
+  }
+
+  @Test
+  @DisplayName("a German recipient's decision mail speaks German; the stored decision stays raw")
+  void decisionIsWordedInTheRecipientsLanguage() {
+    seedMentionedFollower();
+    prefersGerman(FOLLOWER_ID);
+    RecordingSink sink = new RecordingSink();
+
+    service(sink)
+        .dispatch(new ReviewEvent.AnnotationDismissed(DOCUMENT_ID, ACTOR_ID, ANNOTATION_ID));
+
+    ReviewNotificationIntent intent = sink.delivered.getFirst();
+    assertThat(intent.mailLocale()).isEqualTo("de");
+    assertThat(intent.mailVars()).containsEntry("decision", "verworfen");
+    assertThat(intent.decision()).isEqualTo("dismissed");
+  }
+
+  @Test
+  @DisplayName("an English recipient keeps the English words and an unresolvable actor fallback")
+  void englishRecipientKeepsEnglish() {
+    seedMentionedFollower();
+    ReviewIdentityResolver.ReviewIdentities nobody =
+        org.mockito.Mockito.mock(ReviewIdentityResolver.ReviewIdentities.class);
+    when(identity.forDocument(any(), any())).thenReturn(nobody);
+    RecordingSink sink = new RecordingSink();
+
+    service(sink)
+        .dispatch(new ReviewEvent.AnnotationDecided(DOCUMENT_ID, ACTOR_ID, ANNOTATION_ID, false));
+
+    ReviewNotificationIntent intent = sink.delivered.getFirst();
+    assertThat(intent.mailLocale()).isEqualTo("en");
+    assertThat(intent.mailVars())
+        .containsEntry("decision", "resolved")
+        .containsEntry("actorName", "A participant");
+  }
+
+  @Test
+  @DisplayName("workflow states and the actor fallback are German for a German recipient")
+  void workflowStatesInGerman() {
+    seedMentionedFollower();
+    prefersGerman(FOLLOWER_ID);
+    when(participants.findByDocumentId(DOCUMENT_ID))
+        .thenReturn(List.of(io.qnop.entity.ReviewParticipant.forUser(DOCUMENT_ID, FOLLOWER_ID)));
+    RecordingSink sink = new RecordingSink();
+
+    service(sink)
+        .dispatch(
+            new ReviewEvent.WorkflowChanged(
+                DOCUMENT_ID, ACTOR_ID, "IN_REVIEW", "CHANGES_REQUESTED", true));
+
+    assertThat(sink.delivered)
+        .singleElement()
+        .satisfies(
+            intent ->
+                assertThat(intent.mailVars())
+                    .containsEntry("oldState", "Im Review")
+                    .containsEntry("newState", "Änderungen angefordert"));
   }
 
   // --- fixtures ------------------------------------------------------------

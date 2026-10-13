@@ -23,6 +23,7 @@ package io.qnop.service.notification;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import io.qnop.entity.NotificationType;
+import io.qnop.service.mail.MailMessages;
 import java.time.Instant;
 import java.time.ZoneId;
 import java.util.List;
@@ -49,7 +50,8 @@ class DigestRendererTest {
                     NotificationType.VERSION_UPLOADED, 1)),
             Map.of(DOC, target("Vendor Agreement")),
             NAMES,
-            ZONE);
+            ZONE,
+            EN);
 
     // Annotations before comments before versions, whatever order they arrived in,
     // and the way back on its own line.
@@ -65,7 +67,7 @@ class DigestRendererTest {
     // dropping it would understate what happened.
     String plain =
         DigestRenderer.plain(
-            content(Map.of(NotificationType.COMMENT_ADDED, 1)), Map.of(), NAMES, ZONE);
+            content(Map.of(NotificationType.COMMENT_ADDED, 1)), Map.of(), NAMES, ZONE, EN);
 
     // No link either: a line that goes nowhere beats a link that 404s.
     assertThat(plain).isEqualTo("A review you take part in — 1 comment");
@@ -79,7 +81,8 @@ class DigestRendererTest {
             content(Map.of(NotificationType.COMMENT_ADDED, 1)),
             Map.of(DOC, target("Terms & <Conditions>")),
             NAMES,
-            ZONE);
+            ZONE,
+            EN);
 
     assertThat(html).contains("Terms &amp; &lt;Conditions&gt;").doesNotContain("<Conditions>");
   }
@@ -94,7 +97,8 @@ class DigestRendererTest {
             content(Map.of(NotificationType.COMMENT_ADDED, 2)),
             Map.of(DOC, target("Contract")),
             NAMES,
-            ZONE);
+            ZONE,
+            EN);
 
     assertThat(html).contains("href=\"https://qnop.example/reviews/" + DOC + "\"");
     assertThat(html).contains(">Contract</a>");
@@ -108,7 +112,8 @@ class DigestRendererTest {
             content(Map.of(NotificationType.COMMENT_ADDED, 1)),
             Map.of(DOC, new DigestRenderer.Target("Contract", null)),
             NAMES,
-            ZONE);
+            ZONE,
+            EN);
 
     assertThat(html).contains(">Contract</strong>").doesNotContain("<a href");
   }
@@ -116,8 +121,8 @@ class DigestRendererTest {
   @Test
   @DisplayName("the total is pluralised, since the subject line uses it")
   void totalPhrasePluralises() {
-    assertThat(DigestRenderer.totalPhrase(1)).isEqualTo("1 update");
-    assertThat(DigestRenderer.totalPhrase(11)).isEqualTo("11 updates");
+    assertThat(DigestRenderer.totalPhrase(1, EN)).isEqualTo("1 update");
+    assertThat(DigestRenderer.totalPhrase(11, EN)).isEqualTo("11 updates");
   }
 
   private static DigestRenderer.Target target(String title) {
@@ -136,7 +141,8 @@ class DigestRendererTest {
                     event("2026-08-03T09:40:00Z", NotificationType.COMMENT_ADDED, null))),
             Map.of(DOC, target("Contract")),
             NAMES,
-            ZONE);
+            ZONE,
+            EN);
 
     // Headline first, then the timeline — the counts say whether to read on, the
     // lines say what to expect. Times are the recipient's own clock: 07:12Z is
@@ -161,11 +167,54 @@ class DigestRendererTest {
                         "2026-08-03T09:00:00Z", NotificationType.COMMENT_ADDED, "x".repeat(400)))),
             Map.of(DOC, target("Contract")),
             NAMES,
-            ZONE);
+            ZONE,
+            EN);
 
     // A digest is not the place to re-read a thread.
     assertThat(plain).contains("…").doesNotContain("x".repeat(200));
   }
+
+  @Test
+  @DisplayName("a German recipient reads German counts, sentences, dates and fallbacks (#853)")
+  void rendersInTheRecipientsLanguage() {
+    String plain =
+        DigestRenderer.plain(
+            content(
+                Map.of(
+                    NotificationType.ANNOTATION_CREATED, 1,
+                    NotificationType.COMMENT_ADDED, 2,
+                    NotificationType.VERSION_UPLOADED, 1),
+                List.of(
+                    event("2026-08-03T07:12:00Z", NotificationType.ANNOTATION_CREATED, "The cap"),
+                    new DigestContent.Event(
+                        Instant.parse("2026-08-03T09:40:00Z"),
+                        NotificationType.VERSION_UPLOADED,
+                        UUID.randomUUID(),
+                        null,
+                        3))),
+            Map.of(),
+            NAMES,
+            ZONE,
+            DE);
+
+    assertThat(plain)
+        .containsSubsequence(
+            "Ein Review, an dem du beteiligt bist — 1 neue Anmerkung, 2 Antworten, 1 neue Version",
+            "3. Aug., 09:12  Alex Reviewer hat eine Anmerkung erstellt",
+            "3. Aug., 11:40  Alex Reviewer hat eine neue Version hochgeladen (v3)");
+    assertThat(DigestRenderer.totalPhrase(1, DE)).isEqualTo("1 Neuigkeit");
+    assertThat(DigestRenderer.totalPhrase(3, DE)).isEqualTo("3 Neuigkeiten");
+  }
+
+  @Test
+  @DisplayName("English counts never gain a grouping separator")
+  void largeCountsStayUngrouped() {
+    assertThat(DigestRenderer.totalPhrase(1234, EN)).isEqualTo("1234 updates");
+    assertThat(DigestRenderer.totalPhrase(0, EN)).isEqualTo("0 updates");
+  }
+
+  private static final MailMessages EN = MailMessages.forLocale("en");
+  private static final MailMessages DE = MailMessages.forLocale("de");
 
   private static final ZoneId ZONE = ZoneId.of("Europe/Berlin");
   private static final Function<UUID, String> NAMES =
