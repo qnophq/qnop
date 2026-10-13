@@ -115,5 +115,21 @@
     "download": "Download",
     "downloadAgain": "Download again",
     "openReview": "Open the review"
+  },
+  "fieldErrors": {
+    "REQUIRED": "must not be blank",
+    "NOT_AN_INTEGER": "must be an integer",
+    "NOT_A_BOOLEAN": "must be 'true' or 'false'",
+    "NOT_AN_OPTION": "must be one of {{options}}",
+    "TOO_LONG": "must be at most {{max}} characters",
+    "LENGTH_OUT_OF_RANGE": "must be between {{min}} and {{max}} characters",
+    "TOO_SMALL": "must be at least {{min}}",
+    "TOO_LARGE": "must be at most {{max}}",
+    "INVALID_EMAIL": "must be a valid email address",
+    "INVALID_URL": "must be a valid http(s) URL",
+    "INVALID_TIMEZONE": "must be a valid IANA timezone id",
+    "INVALID_LANGUAGE": "must be a two-letter ISO 639-1 language code",
+    "INVALID_FORMAT": "has an invalid format",
+    "UNKNOWN_SETTING": "unknown setting key"
   }
 }

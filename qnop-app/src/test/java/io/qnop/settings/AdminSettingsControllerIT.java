@@ -123,7 +123,8 @@ class AdminSettingsControllerIT extends io.qnop.testsupport.SeededIntegrationTes
         .andExpect(status().isBadRequest())
         .andExpect(jsonPath("$.code").value("VALIDATION_ERROR"))
         .andExpect(jsonPath("$.fieldErrors[0].field").value("upload.document_max_file_size_mb"))
-        .andExpect(jsonPath("$.fieldErrors[0].message").isNotEmpty());
+        .andExpect(jsonPath("$.fieldErrors[0].message").isNotEmpty())
+        .andExpect(jsonPath("$.fieldErrors[0].code").value("NOT_AN_INTEGER"));
   }
 
   @Test
@@ -135,6 +136,9 @@ class AdminSettingsControllerIT extends io.qnop.testsupport.SeededIntegrationTes
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("{\"values\":{\"smtp.port\":\"70000\",\"smtp.from\":\"nope\"}}"))
         .andExpect(status().isBadRequest())
-        .andExpect(jsonPath("$.fieldErrors.length()").value(2));
+        .andExpect(jsonPath("$.fieldErrors.length()").value(2))
+        .andExpect(jsonPath("$.fieldErrors[?(@.field=='smtp.port')].code").value("TOO_LARGE"))
+        .andExpect(jsonPath("$.fieldErrors[?(@.field=='smtp.port')].params.max").value("65535"))
+        .andExpect(jsonPath("$.fieldErrors[?(@.field=='smtp.from')].code").value("INVALID_EMAIL"));
   }
 }

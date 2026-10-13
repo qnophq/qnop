@@ -71,7 +71,11 @@ public class UserSettingsService {
       UserSettingKey key =
           UserSettingKey.fromKey(entry.getKey())
               .orElseThrow(
-                  () -> new SettingValidationException(entry.getKey(), "unknown user setting key"));
+                  () ->
+                      new SettingValidationException(
+                          entry.getKey(),
+                          "unknown user setting key",
+                          FieldErrorCode.UNKNOWN_SETTING));
       ValueValidator.validate(key, entry.getValue());
 
       UserSetting row =

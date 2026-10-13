@@ -302,7 +302,9 @@ public class ApplicationSettingsService {
     for (Map.Entry<String, String> entry : changes.entrySet()) {
       Optional<ApplicationSettingKey> match = ApplicationSettingKey.fromKey(entry.getKey());
       if (match.isEmpty()) {
-        errors.add(new SettingFieldError(entry.getKey(), "unknown setting key"));
+        errors.add(
+            new SettingFieldError(
+                entry.getKey(), "unknown setting key", FieldErrorCode.UNKNOWN_SETTING, Map.of()));
         continue;
       }
       ApplicationSettingKey key = match.get();
@@ -313,7 +315,7 @@ public class ApplicationSettingsService {
       try {
         ValueValidator.validate(key, value);
       } catch (SettingValidationException e) {
-        errors.add(new SettingFieldError(key.getKey(), e.getReason()));
+        errors.add(SettingFieldError.of(e));
         continue;
       }
       resolved.put(key, value);

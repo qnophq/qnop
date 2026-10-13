@@ -98,6 +98,60 @@ describe('apiFieldErrors', () => {
     });
   });
 
+  it('words a known reason code in the active language, with its params', async () => {
+    const error = axiosWithBody(400, {
+      code: 'VALIDATION_ERROR',
+      message: '2 settings are invalid.',
+      fieldErrors: [
+        {
+          field: 'smtp.port',
+          message: 'must be at most 65535',
+          code: 'TOO_LARGE',
+          params: { max: '65535' },
+        },
+        {
+          field: 'username',
+          message: 'size must be between 3 and 64',
+          code: 'LENGTH_OUT_OF_RANGE',
+          params: { min: '3', max: '64' },
+        },
+      ],
+    });
+    expect(apiFieldErrors(error)).toEqual({
+      'smtp.port': 'must be at most 65535',
+      username: 'must be between 3 and 64 characters',
+    });
+
+    await applyLocale('de');
+    try {
+      expect(apiFieldErrors(error)).toEqual({
+        'smtp.port': 'darf höchstens 65535 sein',
+        username: 'muss zwischen 3 und 64 Zeichen lang sein',
+      });
+    } finally {
+      await applyLocale('en');
+    }
+  });
+
+  it('keeps the server message for an unknown or missing code', async () => {
+    const error = axiosWithBody(400, {
+      code: 'VALIDATION_ERROR',
+      fieldErrors: [
+        { field: 'password', message: 'must contain a digit' },
+        { field: 'slug', message: 'is reserved', code: 'SOMETHING_NEW' },
+      ],
+    });
+    await applyLocale('de');
+    try {
+      expect(apiFieldErrors(error)).toEqual({
+        password: 'must contain a digit',
+        slug: 'is reserved',
+      });
+    } finally {
+      await applyLocale('en');
+    }
+  });
+
   it('returns an empty object when there are no field errors', () => {
     expect(apiFieldErrors(axiosWithBody(400, { code: 'VALIDATION_ERROR' }))).toEqual({});
     expect(apiFieldErrors(new Error('boom'))).toEqual({});

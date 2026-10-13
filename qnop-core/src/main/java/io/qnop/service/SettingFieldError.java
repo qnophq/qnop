@@ -20,9 +20,23 @@
  */
 package io.qnop.service;
 
+import java.util.Map;
+
 /**
  * One field-level validation failure: the offending {@code field} (a setting key) and a
- * human-readable {@code message}. Aggregated by {@link SettingsValidationException} so the admin UI
- * can flag every bad field in a single response.
+ * human-readable {@code message}, plus the stable {@code code} and its {@code params} so a client
+ * can word the reason in the user's language (issue #836). Aggregated by {@link
+ * SettingsValidationException} so the admin UI can flag every bad field in a single response.
  */
-public record SettingFieldError(String field, String message) {}
+public record SettingFieldError(
+    String field, String message, FieldErrorCode code, Map<String, String> params) {
+
+  public SettingFieldError {
+    params = Map.copyOf(params);
+  }
+
+  /** The failure a {@link SettingValidationException} describes for its setting. */
+  public static SettingFieldError of(SettingValidationException e) {
+    return new SettingFieldError(e.getSettingKey(), e.getReason(), e.getCode(), e.getParams());
+  }
+}

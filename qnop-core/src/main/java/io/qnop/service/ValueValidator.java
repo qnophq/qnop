@@ -25,6 +25,7 @@ import java.net.URI;
 import java.time.DateTimeException;
 import java.time.ZoneId;
 import java.util.List;
+import java.util.Map;
 import java.util.regex.Pattern;
 
 /**
@@ -53,7 +54,8 @@ public final class ValueValidator {
   public static void validate(
       SettingValueType type, List<String> enumOptions, String value, String keyForError) {
     if (value == null) {
-      throw new SettingValidationException(keyForError, "value must not be null");
+      throw new SettingValidationException(
+          keyForError, "value must not be null", FieldErrorCode.REQUIRED);
     }
     switch (type) {
       case INTEGER -> requireInteger(keyForError, value);
@@ -69,20 +71,26 @@ public final class ValueValidator {
     try {
       Integer.parseInt(value.trim());
     } catch (NumberFormatException e) {
-      throw new SettingValidationException(keyForError, "must be an integer");
+      throw new SettingValidationException(
+          keyForError, "must be an integer", FieldErrorCode.NOT_AN_INTEGER);
     }
   }
 
   private static void requireBoolean(String keyForError, String value) {
     if (!"true".equals(value) && !"false".equals(value)) {
-      throw new SettingValidationException(keyForError, "must be 'true' or 'false'");
+      throw new SettingValidationException(
+          keyForError, "must be 'true' or 'false'", FieldErrorCode.NOT_A_BOOLEAN);
     }
   }
 
   private static void requireEnumOption(
       String keyForError, List<String> enumOptions, String value) {
     if (!enumOptions.contains(value)) {
-      throw new SettingValidationException(keyForError, "must be one of " + enumOptions);
+      throw new SettingValidationException(
+          keyForError,
+          "must be one of " + enumOptions,
+          FieldErrorCode.NOT_AN_OPTION,
+          Map.of("options", String.valueOf(enumOptions)));
     }
   }
 
@@ -97,15 +105,26 @@ public final class ValueValidator {
       // Checked before the format: "500 characters is too long" is a more useful
       // answer than "that is not a URL" for a value that is both.
       throw new SettingValidationException(
-          keyForError, "must be at most " + constraints.maxLength() + " characters");
+          keyForError,
+          "must be at most " + constraints.maxLength() + " characters",
+          FieldErrorCode.TOO_LONG,
+          Map.of("max", String.valueOf(constraints.maxLength())));
     }
     if (constraints.min() != null || constraints.max() != null) {
       int parsed = Integer.parseInt(value.trim());
       if (constraints.min() != null && parsed < constraints.min()) {
-        throw new SettingValidationException(keyForError, "must be at least " + constraints.min());
+        throw new SettingValidationException(
+            keyForError,
+            "must be at least " + constraints.min(),
+            FieldErrorCode.TOO_SMALL,
+            Map.of("min", String.valueOf(constraints.min())));
       }
       if (constraints.max() != null && parsed > constraints.max()) {
-        throw new SettingValidationException(keyForError, "must be at most " + constraints.max());
+        throw new SettingValidationException(
+            keyForError,
+            "must be at most " + constraints.max(),
+            FieldErrorCode.TOO_LARGE,
+            Map.of("max", String.valueOf(constraints.max())));
       }
     }
     if (constraints.format() != null && !value.isBlank()) {
@@ -120,7 +139,8 @@ public final class ValueValidator {
 
   private static void requireEmail(String keyForError, String value) {
     if (!EMAIL_PATTERN.matcher(value.trim()).matches()) {
-      throw new SettingValidationException(keyForError, "must be a valid email address");
+      throw new SettingValidationException(
+          keyForError, "must be a valid email address", FieldErrorCode.INVALID_EMAIL);
     }
   }
 
@@ -133,7 +153,8 @@ public final class ValueValidator {
     try {
       ZoneId.of(value.trim());
     } catch (DateTimeException e) {
-      throw new SettingValidationException(keyForError, "must be a valid IANA timezone id");
+      throw new SettingValidationException(
+          keyForError, "must be a valid IANA timezone id", FieldErrorCode.INVALID_TIMEZONE);
     }
   }
 
@@ -145,7 +166,9 @@ public final class ValueValidator {
   private static void requireLanguage(String keyForError, String value) {
     if (!LANGUAGE_PATTERN.matcher(value.trim()).matches()) {
       throw new SettingValidationException(
-          keyForError, "must be a two-letter ISO 639-1 language code");
+          keyForError,
+          "must be a two-letter ISO 639-1 language code",
+          FieldErrorCode.INVALID_LANGUAGE);
     }
   }
 
@@ -155,10 +178,12 @@ public final class ValueValidator {
       String scheme = uri.getScheme();
       boolean http = scheme != null && (scheme.equals("http") || scheme.equals("https"));
       if (!http || uri.getHost() == null) {
-        throw new SettingValidationException(keyForError, "must be a valid http(s) URL");
+        throw new SettingValidationException(
+            keyForError, "must be a valid http(s) URL", FieldErrorCode.INVALID_URL);
       }
     } catch (IllegalArgumentException e) {
-      throw new SettingValidationException(keyForError, "must be a valid http(s) URL");
+      throw new SettingValidationException(
+          keyForError, "must be a valid http(s) URL", FieldErrorCode.INVALID_URL);
     }
   }
 }
