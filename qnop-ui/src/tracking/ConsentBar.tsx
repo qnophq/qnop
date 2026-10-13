@@ -26,6 +26,7 @@ import Slide from '@mui/material/Slide';
 import Typography from '@mui/material/Typography';
 import useMediaQuery from '@mui/material/useMediaQuery';
 import { ChartNoAxesColumn } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import { writeConsent } from './consent';
 import { tokens } from '../theme/tokens';
 
@@ -45,6 +46,7 @@ interface ConsentBarProps {
  * through a "manage preferences" screen is not a question, it is an obstacle course.
  */
 export function ConsentBar({ onDecide }: ConsentBarProps) {
+  const { t } = useTranslation();
   const reduceMotion = useMediaQuery('(prefers-reduced-motion: reduce)');
 
   const decide = (decision: 'granted' | 'denied') => {
@@ -57,7 +59,7 @@ export function ConsentBar({ onDecide }: ConsentBarProps) {
       <Paper
         elevation={0}
         role="dialog"
-        aria-label="Usage measurement"
+        aria-label={t('consent.label')}
         sx={{
           position: 'fixed',
           left: { xs: 12, sm: 16 },
@@ -82,16 +84,14 @@ export function ConsentBar({ onDecide }: ConsentBarProps) {
           <ChartNoAxesColumn size={18} />
         </Box>
         <Typography variant="body2" sx={{ flex: 1, minWidth: 220, lineHeight: 1.5 }}>
-          May we count which pages get used? No profiles, no document names — page addresses are
-          reduced to their shape before they are counted, and the measurement never leaves this
-          server directly.
+          {t('consent.question')}
         </Typography>
         <Box sx={{ display: 'flex', gap: 1, ml: 'auto' }}>
           <Button size="small" color="inherit" onClick={() => decide('denied')}>
-            No thanks
+            {t('consent.deny')}
           </Button>
           <Button size="small" variant="contained" onClick={() => decide('granted')}>
-            Allow
+            {t('consent.allow')}
           </Button>
         </Box>
       </Paper>
