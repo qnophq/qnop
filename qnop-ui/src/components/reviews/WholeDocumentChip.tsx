@@ -24,6 +24,7 @@ import Tooltip from '@mui/material/Tooltip';
 import Typography from '@mui/material/Typography';
 import { useTheme } from '@mui/material/styles';
 import { FileText } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 
 interface WholeDocumentChipProps {
   /** Shortens the label to "Whole doc" for tight rows. */
@@ -39,8 +40,9 @@ interface WholeDocumentChipProps {
  */
 export function WholeDocumentChip({ compact = false }: WholeDocumentChipProps) {
   const theme = useTheme();
+  const { t } = useTranslation('reviews');
   return (
-    <Tooltip title="Applies to the whole document — not pinned to a passage">
+    <Tooltip title={t('wholeDocument.tooltip')}>
       <Stack
         direction="row"
         spacing={0.5}
@@ -60,7 +62,7 @@ export function WholeDocumentChip({ compact = false }: WholeDocumentChipProps) {
           component="span"
           sx={{ fontSize: 11, fontWeight: 500, lineHeight: 1, whiteSpace: 'nowrap' }}
         >
-          {compact ? 'Whole doc' : 'Whole document'}
+          {compact ? t('wholeDocument.compact') : t('wholeDocument.label')}
         </Typography>
       </Stack>
     </Tooltip>

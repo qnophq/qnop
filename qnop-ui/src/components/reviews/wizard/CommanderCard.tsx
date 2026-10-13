@@ -25,6 +25,7 @@ import Stack from '@mui/material/Stack';
 import Typography from '@mui/material/Typography';
 import { alpha, useTheme } from '@mui/material/styles';
 import { ShieldCheck } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import { UserAvatar } from '../../shell/UserAvatar';
 import { useAuthStore } from '../../../stores/authStore';
 
@@ -36,6 +37,7 @@ import { useAuthStore } from '../../../stores/authStore';
  */
 export function CommanderCard() {
   const theme = useTheme();
+  const { t } = useTranslation('reviews');
   const displayName = useAuthStore((s) => s.displayName);
   const email = useAuthStore((s) => s.email);
   const avatarUrl = useAuthStore((s) => s.avatarUrl);
@@ -77,10 +79,10 @@ export function CommanderCard() {
               color: blue,
             }}
           >
-            Mission commander
+            {t('wizard.commander.eyebrow')}
           </Typography>
           <Typography sx={{ fontWeight: 700, lineHeight: 1.3 }} noWrap>
-            {displayName ?? 'You'}
+            {displayName ?? t('you')}
           </Typography>
           <Typography variant="caption" color="text.secondary" noWrap component="p">
             {email}
@@ -92,7 +94,7 @@ export function CommanderCard() {
           <ShieldCheck size={14} />
         </Box>
         <Typography variant="caption" color="text.secondary">
-          You own this review — crew, deadline and the final call are yours.
+          {t('wizard.commander.note')}
         </Typography>
       </Stack>
     </Paper>

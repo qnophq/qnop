@@ -21,6 +21,7 @@
 
 import { useState } from 'react';
 import { Download } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import { downloadAnnotationExport } from '../../api/annotationExport';
 import { useConfig } from '../../api/hooks/useConfig';
 import { useDocument } from '../../api/hooks/useDocuments';
@@ -52,6 +53,7 @@ export function ExportAnnotationsButton({
   counts?: ExportCounts;
   onError?: (message: string) => void;
 }) {
+  const { t } = useTranslation('reviews');
   const [open, setOpen] = useState(false);
   const [exporting, setExporting] = useState(false);
   // The title is only needed to prefill the filename, and both surfaces have
@@ -80,7 +82,7 @@ export function ExportAnnotationsButton({
       // it did not — the user retries instead of rebuilding their selection.
       setOpen(false);
     } catch {
-      onError?.('The export could not be generated. Please try again.');
+      onError?.(t('export.failed'));
     } finally {
       setExporting(false);
     }
@@ -107,7 +109,7 @@ export function ExportAnnotationsButton({
   return (
     <>
       <ToolbarIconButton
-        label="Export"
+        label={t('export.title')}
         icon={Download}
         onClick={() => setOpen(true)}
         expanded={open}

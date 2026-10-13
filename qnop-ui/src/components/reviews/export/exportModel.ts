@@ -25,23 +25,28 @@
  */
 
 import { FALLBACK_TIME_ZONE, isValidTimeZone } from '../../../utils/timezone';
+import type { ReviewsKey } from '../reviewsI18n';
 
 export type ExportScope = 'all' | 'open' | 'resolved';
 
+/** What a format calls its selected fields — see {@link ExportFormat.vocabulary}. */
+export type ExportVocabulary = 'columns' | 'details';
+
 export interface ExportFormat {
   id: string;
+  /** The format's name — a product or file-type name, the same in every language. */
   label: string;
   extension: string;
-  /** One line on the format card: why you would pick this one. */
-  hint: string;
+  /** One line on the format card: why you would pick this one (a `reviews` catalog key). */
+  hintKey: ReviewsKey;
   /**
    * What this format calls the selected fields. A spreadsheet has columns; a
    * report has details. The wizard asks the format rather than assuming, so a
    * new format brings its own vocabulary instead of inheriting Excel's.
    */
-  fieldNoun: string;
-  /** What switching the comment threads on actually does in this format. */
-  commentsHint: string;
+  vocabulary: ExportVocabulary;
+  /** What switching the comment threads on actually does in this format (a catalog key). */
+  commentsHintKey: ReviewsKey;
   /**
    * Whether the format can carry an image at all. Mirrors `AnnotationExportFormat`
    * on the server: Markdown and CSV are text, and offering a logo switch there
@@ -67,46 +72,44 @@ export const EXPORT_FORMATS: ExportFormat[] = [
     supportsLogo: true,
     label: 'Excel',
     extension: '.xlsx',
-    hint: 'Sortable, filterable — for triage and reporting.',
-    fieldNoun: 'columns',
-    commentsHint:
-      'A second sheet with the full text of every comment and who wrote it. In an anonymous review the authors stay pseudonymous here too.',
+    hintKey: 'export.formats.xlsx',
+    vocabulary: 'columns',
+    commentsHintKey: 'export.commentsHint.sheet',
   },
   {
     id: 'docx',
     supportsLogo: true,
     label: 'Word',
     extension: '.docx',
-    hint: 'A readable report — for meetings and sign-off.',
-    fieldNoun: 'details',
-    commentsHint:
-      'The full discussion under each annotation — every reply, with who wrote it and when. In an anonymous review the authors stay pseudonymous here too.',
+    hintKey: 'export.formats.docx',
+    vocabulary: 'details',
+    commentsHintKey: 'export.commentsHint.discussion',
   },
   {
     id: 'html',
     supportsLogo: true,
-    fieldNoun: 'details',
-    commentsHint:
-      'The full discussion under each annotation — every reply, with who wrote it and when. In an anonymous review the authors stay pseudonymous here too.',
+    vocabulary: 'details',
+    commentsHintKey: 'export.commentsHint.discussion',
     label: 'HTML',
     extension: '.html',
-    hint: 'One self-contained page — searchable in any browser, no attachments to open.',
+    hintKey: 'export.formats.html',
   },
   {
     id: 'pdf',
     supportsLogo: true,
-    fieldNoun: 'details',
-    commentsHint:
-      'The full discussion under each annotation — every reply, with who wrote it and when. In an anonymous review the authors stay pseudonymous here too.',
+    vocabulary: 'details',
+    commentsHintKey: 'export.commentsHint.discussion',
     label: 'PDF',
     extension: '.pdf',
-    hint: 'Looks the same everywhere — for printing and archiving.',
+    hintKey: 'export.formats.pdf',
   },
 ];
 
 export interface ExportField {
   id: string;
-  label: string;
+  /** The field's name, as a `reviews` catalog key. */
+  labelKey: ReviewsKey;
+  /** The group id; its heading is `export.groups.<group>`. */
   group: 'Identity' | 'Classification' | 'Content' | 'History';
   /** Cannot be switched off — a sheet of rows with nothing to name them is useless. */
   required?: boolean;
@@ -114,17 +117,17 @@ export interface ExportField {
 
 /** Mirrors `AnnotationExportColumn` on the server; ids must match, order need not. */
 export const EXPORT_FIELDS: ExportField[] = [
-  { id: 'taskKey', label: 'Task key (#)', group: 'Identity', required: true },
-  { id: 'page', label: 'Page', group: 'Identity' },
-  { id: 'author', label: 'Author', group: 'Identity' },
-  { id: 'status', label: 'Status', group: 'Classification' },
-  { id: 'type', label: 'Type', group: 'Classification' },
-  { id: 'priority', label: 'Priority', group: 'Classification' },
-  { id: 'placement', label: 'Placement state', group: 'Classification' },
-  { id: 'summary', label: 'Summary', group: 'Content' },
-  { id: 'replies', label: 'Replies', group: 'Content' },
-  { id: 'created', label: 'Created', group: 'History' },
-  { id: 'updated', label: 'Updated', group: 'History' },
+  { id: 'taskKey', labelKey: 'export.fields.taskKey', group: 'Identity', required: true },
+  { id: 'page', labelKey: 'export.fields.page', group: 'Identity' },
+  { id: 'author', labelKey: 'export.fields.author', group: 'Identity' },
+  { id: 'status', labelKey: 'export.fields.status', group: 'Classification' },
+  { id: 'type', labelKey: 'export.fields.type', group: 'Classification' },
+  { id: 'priority', labelKey: 'export.fields.priority', group: 'Classification' },
+  { id: 'placement', labelKey: 'export.fields.placement', group: 'Classification' },
+  { id: 'summary', labelKey: 'export.fields.summary', group: 'Content' },
+  { id: 'replies', labelKey: 'export.fields.replies', group: 'Content' },
+  { id: 'created', labelKey: 'export.fields.created', group: 'History' },
+  { id: 'updated', labelKey: 'export.fields.updated', group: 'History' },
 ];
 
 export const FIELD_GROUPS: ExportField['group'][] = [
@@ -136,7 +139,8 @@ export const FIELD_GROUPS: ExportField['group'][] = [
 
 export interface ExportDateFormat {
   id: string;
-  label: string;
+  /** The format's name, as a `reviews` catalog key. */
+  labelKey: ReviewsKey;
   /** What the choice actually produces — the only description anyone needs. */
   sample: string;
 }
@@ -150,11 +154,15 @@ export interface ExportDateFormat {
  * per entry.
  */
 export const EXPORT_DATE_FORMATS: ExportDateFormat[] = [
-  { id: 'iso', label: 'ISO', sample: '2026-03-04 14:30' },
-  { id: 'iso-seconds', label: 'ISO with seconds', sample: '2026-03-04 14:30:07' },
-  { id: 'european', label: 'European', sample: '04.03.2026 14:30' },
-  { id: 'us', label: 'US', sample: '03/04/2026 02:30 PM' },
-  { id: 'date-only', label: 'Date only', sample: '2026-03-04' },
+  { id: 'iso', labelKey: 'export.dateFormats.iso', sample: '2026-03-04 14:30' },
+  {
+    id: 'iso-seconds',
+    labelKey: 'export.dateFormats.isoSeconds',
+    sample: '2026-03-04 14:30:07',
+  },
+  { id: 'european', labelKey: 'export.dateFormats.european', sample: '04.03.2026 14:30' },
+  { id: 'us', labelKey: 'export.dateFormats.us', sample: '03/04/2026 02:30 PM' },
+  { id: 'date-only', labelKey: 'export.dateFormats.dateOnly', sample: '2026-03-04' },
 ];
 
 export interface ExportSettings {

@@ -28,6 +28,7 @@ import Stack from '@mui/material/Stack';
 import Typography from '@mui/material/Typography';
 import { useQueryClient } from '@tanstack/react-query';
 import { ChevronLeft, ChevronRight, Rocket } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router';
 import type { PrincipalView } from '../../api/generated';
 import { ParticipantKind, ThreadParticipation } from '../../api/generated';
@@ -51,24 +52,44 @@ import {
   validateDocumentFile,
   validateSlug,
 } from '../../components/reviews/wizard/wizardModel';
+import {
+  renderReviewsPhrase,
+  type ReviewsKey,
+  type ReviewsPhrase,
+} from '../../components/reviews/reviewsI18n';
 import { useAuthStore } from '../../stores/authStore';
 import { apiErrorMessage, apiFieldErrors } from '../../utils/apiError';
 
-const STEPS = [{ label: 'Document' }, { label: 'Reviewers' }, { label: 'Summary & start' }];
+const STEPS: ReviewsKey[] = [
+  'wizard.steps.document',
+  'wizard.steps.reviewers',
+  'wizard.steps.summary',
+];
 const FALLBACK_MAX_SIZE_MB = 50;
+
+/** A follow-up step that failed after the review was created — worded at render. */
+type FollowUpFailure = { kind: 'addReviewer'; name: string } | { kind: 'start' };
+
+/**
+ * A slug rejection: the client-side check's phrase, or the server's refusal, whose field error
+ * is worded from the cause at render (issue #836) so it follows a language switch.
+ */
+type SlugError = { phrase: ReviewsPhrase } | { cause: unknown };
 
 interface SubmitState {
   phase: SubmitPhase;
   progress: number;
-  error: string | null;
+  /** The cause of a failed upload, worded at render; null when nothing failed. */
+  error: { cause: unknown } | null;
   /** Set when the review exists but a follow-up step (reviewer, start) failed. */
-  partial: { documentId: string; failures: string[] } | null;
+  partial: { documentId: string; failures: FollowUpFailure[] } | null;
 }
 
 const SUBMIT_IDLE: SubmitState = { phase: 'idle', progress: 0, error: null, partial: null };
 
 /** The guided 3-step new-review wizard at /reviews/new (#251). */
 export function NewReviewPage() {
+  const { t } = useTranslation(['reviews', 'common']);
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const userId = useAuthStore((s) => s.userId);
@@ -78,11 +99,11 @@ export function NewReviewPage() {
 
   const [step, setStep] = useState(1);
   const [file, setFile] = useState<File | null>(null);
-  const [fileError, setFileError] = useState<string | null>(null);
+  const [fileError, setFileError] = useState<ReviewsPhrase | null>(null);
   const [title, setTitle] = useState('');
   const [slug, setSlug] = useState('');
   const [slugTouched, setSlugTouched] = useState(false);
-  const [slugError, setSlugError] = useState<string | null>(null);
+  const [slugError, setSlugError] = useState<SlugError | null>(null);
   const [reviewers, setReviewers] = useState<PrincipalView[]>([]);
   const [dueAt, setDueAt] = useState<string | null>(null);
   const [anonymous, setAnonymous] = useState(false);
@@ -93,6 +114,12 @@ export function NewReviewPage() {
   const [submit, setSubmit] = useState<SubmitState>(SUBMIT_IDLE);
 
   const maxSizeMb = config?.upload.maxDocumentSizeMb ?? FALLBACK_MAX_SIZE_MB;
+  const slugErrorText =
+    slugError === null
+      ? null
+      : 'phrase' in slugError
+        ? renderReviewsPhrase(slugError.phrase, t)
+        : (apiFieldErrors(slugError.cause).slug ?? null);
   const accepted = acceptedUploads(config?.supportedFormats, config?.supportedMediaTypes);
   const isSubmitting = submit.phase !== 'idle';
 
@@ -146,7 +173,7 @@ export function NewReviewPage() {
   const handleNext = () => {
     if (step === 1) {
       const error = validateSlug(slug.trim().toLowerCase());
-      setSlugError(error);
+      setSlugError(error ? { phrase: error } : null);
       if (error) return;
     }
     setStep(step + 1);
@@ -173,22 +200,19 @@ export function NewReviewPage() {
       // jump back to step 1 so the user sees the offending input.
       const slugFieldError = apiFieldErrors(error).slug;
       if (slugFieldError) {
-        setSlugError(slugFieldError);
+        setSlugError({ cause: error });
         setSubmit(SUBMIT_IDLE);
         setStep(1);
         return;
       }
-      setSubmit({
-        ...SUBMIT_IDLE,
-        error: apiErrorMessage(error, 'The upload failed. Please try again.'),
-      });
+      setSubmit({ ...SUBMIT_IDLE, error: { cause: error } });
       return;
     }
 
     // The review now exists — follow-up failures must not look like a failed
     // creation, so they are collected and reported as a partial result.
     setSubmit((s) => ({ ...s, phase: 'finalizing', progress: 1 }));
-    const failures: string[] = [];
+    const failures: FollowUpFailure[] = [];
     for (const principal of reviewers) {
       try {
         await documentsApi.addParticipant({
@@ -199,7 +223,7 @@ export function NewReviewPage() {
               : { userId: principal.id },
         });
       } catch {
-        failures.push(`add reviewer “${principal.displayName}”`);
+        failures.push({ kind: 'addReviewer', name: principal.displayName });
       }
     }
     if (startImmediately) {
@@ -209,7 +233,7 @@ export function NewReviewPage() {
           workflowTransitionRequest: { targetState: 'IN_REVIEW' },
         });
       } catch {
-        failures.push('start the review');
+        failures.push({ kind: 'start' });
       }
     }
     queryClient.invalidateQueries({ queryKey: reviewKeys.all });
@@ -222,19 +246,23 @@ export function NewReviewPage() {
   };
 
   if (submit.partial) {
+    const failures = submit.partial.failures
+      .map((failure) =>
+        failure.kind === 'addReviewer'
+          ? t('wizard.created.addReviewer', { name: failure.name })
+          : t('wizard.created.start'),
+      )
+      .join(', ');
     return (
       <Stack spacing={3} sx={{ maxWidth: 720, mx: 'auto' }}>
-        <PageHeader title="Review created" />
-        <Alert severity="warning">
-          The review was created, but some steps could not be completed:{' '}
-          {submit.partial.failures.join(', ')}. You can finish these from the review page.
-        </Alert>
+        <PageHeader title={t('wizard.created.title')} />
+        <Alert severity="warning">{t('wizard.created.partial', { failures })}</Alert>
         <Box>
           <Button
             variant="contained"
             onClick={() => navigate(`/reviews/${submit.partial?.documentId}`)}
           >
-            Open review
+            {t('wizard.created.openReview')}
           </Button>
         </Box>
       </Stack>
@@ -252,17 +280,13 @@ export function NewReviewPage() {
   if (capacity.full) {
     return (
       <Stack spacing={3}>
-        <PageHeader
-          title="New review"
-          description="Guided three-step setup: document, reviewers, start."
-        />
+        <PageHeader title={t('page.newReview')} description={t('wizard.description')} />
         <QuotaAlert>
-          This instance allows {capacity.limit} reviews open at once, and {capacity.used} are open.
-          Finalizing or archiving one frees a slot; finished work occupies nothing.
+          {t('wizard.quotaFull', { count: capacity.limit, used: capacity.used })}
         </QuotaAlert>
         <Box>
           <Button variant="contained" onClick={() => navigate('/reviews')}>
-            Back to reviews
+            {t('actions.backToReviews')}
           </Button>
         </Box>
       </Stack>
@@ -271,10 +295,7 @@ export function NewReviewPage() {
 
   return (
     <Stack spacing={3}>
-      <PageHeader
-        title="New review"
-        description="Guided three-step setup: document, reviewers, start."
-      />
+      <PageHeader title={t('page.newReview')} description={t('wizard.description')} />
 
       <Box
         sx={{
@@ -285,18 +306,22 @@ export function NewReviewPage() {
         }}
       >
         <Stack spacing={3} sx={{ minWidth: 0 }}>
-          <WizardStepsHeader steps={STEPS} active={step} />
+          <WizardStepsHeader steps={STEPS.map((key) => ({ label: t(key) }))} active={step} />
 
-          {submit.error && <Alert severity="error">{submit.error}</Alert>}
+          {submit.error && (
+            <Alert severity="error">
+              {apiErrorMessage(submit.error.cause, t('wizard.uploadFailed'))}
+            </Alert>
+          )}
 
           <Paper variant="outlined" sx={{ p: { xs: 2.5, sm: 3.5 } }}>
             {step === 1 && (
               <DocumentStep
                 file={file}
                 title={title}
-                fileError={fileError}
+                fileError={fileError && renderReviewsPhrase(fileError, t)}
                 slug={slug}
-                slugError={slugError}
+                slugError={slugErrorText}
                 maxSizeMb={maxSizeMb}
                 accepted={accepted}
                 onFilePicked={handleFilePicked}
@@ -339,10 +364,10 @@ export function NewReviewPage() {
               disabled={isSubmitting}
               onClick={() => (step > 1 ? setStep(step - 1) : navigate('/reviews'))}
             >
-              {step > 1 ? 'Back' : 'Cancel'}
+              {step > 1 ? t('actions.back') : t('common:actions.cancel')}
             </Button>
             <Typography variant="caption" color="text.secondary">
-              Step {step} of {STEPS.length}
+              {t('wizard.stepOf', { step, total: STEPS.length })}
             </Typography>
             {step < STEPS.length ? (
               <Button
@@ -351,7 +376,7 @@ export function NewReviewPage() {
                 disabled={!canProceed}
                 onClick={handleNext}
               >
-                Next
+                {t('actions.next')}
               </Button>
             ) : (
               <Button
@@ -360,7 +385,7 @@ export function NewReviewPage() {
                 disabled={isSubmitting}
                 onClick={handleCreate}
               >
-                {startImmediately ? 'Create & start review' : 'Create review'}
+                {startImmediately ? t('wizard.createAndStart') : t('wizard.create')}
               </Button>
             )}
           </Stack>

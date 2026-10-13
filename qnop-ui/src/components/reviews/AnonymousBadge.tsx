@@ -22,6 +22,7 @@
 import Tooltip from '@mui/material/Tooltip';
 import Box from '@mui/material/Box';
 import { EyeOff } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import { ToneBadge } from '../admin/ToneBadge';
 
 /**
@@ -30,12 +31,13 @@ import { ToneBadge } from '../admin/ToneBadge';
  * card.
  */
 export function AnonymousBadge({ compact = false }: { compact?: boolean }) {
+  const { t } = useTranslation('reviews');
   return (
-    <Tooltip title="Anonymous review — reviewer names are hidden">
+    <Tooltip title={t('anonymous.tooltip')}>
       <Box component="span" sx={{ display: 'inline-flex' }} data-testid="anonymous-badge">
         <ToneBadge
           tone="neutral"
-          label={compact ? 'Anon' : 'Anonymous'}
+          label={compact ? t('anonymous.compact') : t('anonymous.label')}
           icon={<EyeOff size={12} aria-hidden />}
         />
       </Box>

@@ -24,8 +24,10 @@ import Tooltip from '@mui/material/Tooltip';
 import Typography from '@mui/material/Typography';
 import { useTheme } from '@mui/material/styles';
 import { Ban, CircleCheckBig } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import { WorkflowBadge } from './WorkflowBadge';
-import { milestoneIndex, workflowLabel } from './workflowMeta';
+import { useWorkflowLabel } from './useWorkflowLabel';
+import { milestoneIndex } from './workflowMeta';
 
 interface WorkflowMilestonesProps {
   /** The current workflow state (open set — unknown states fall back to the flat badge). */
@@ -62,6 +64,8 @@ export function WorkflowMilestones({
   archivedAt,
 }: WorkflowMilestonesProps) {
   const theme = useTheme();
+  const { t } = useTranslation('reviews');
+  const workflowLabel = useWorkflowLabel();
   const position = milestoneIndex(state);
   if (archivedAt) {
     return <WorkflowBadge state={state} archivedAt={archivedAt} />;
@@ -81,14 +85,21 @@ export function WorkflowMilestones({
       : { bg: theme.qnop.surface2, fg: theme.qnop.brand.blue, border: theme.palette.divider };
 
   const summary = cancelled
-    ? `Review cancelled${open > 0 ? ` — ${open} annotation${open === 1 ? '' : 's'} were closed automatically` : ''}`
+    ? open > 0
+      ? t('workflow.milestones.cancelledAutoClosed', { count: open })
+      : t('workflow.milestones.cancelled')
     : finalized
-      ? 'Review finalized — every concern settled'
+      ? t('workflow.milestones.finalized')
       : position === 0
-        ? 'Draft — not yet in review'
+        ? t('workflow.milestones.draft')
         : total > 0
-          ? `${label} — ${resolved} of ${total} annotation${total === 1 ? '' : 's'} resolved${open > 0 ? `, ${open} to go` : ', ready to finalize'}`
-          : `${label} — no annotations yet`;
+          ? t(open > 0 ? 'workflow.milestones.progressOpen' : 'workflow.milestones.progressReady', {
+              state: label,
+              resolved,
+              count: total,
+              open,
+            })
+          : t('workflow.milestones.noAnnotations', { state: label });
 
   const dot = (index: number) => {
     const done = finalized || index < activeIndex;
@@ -186,7 +197,7 @@ export function WorkflowMilestones({
               color: position === 1 ? activeTone.fg : theme.palette.text.secondary,
             }}
           >
-            {position === 0 ? 'Draft' : label}
+            {position === 0 ? t('workflow.states.DRAFT') : label}
             {position === 1 && total > 0 && (
               <Box component="span" sx={{ fontWeight: 400, color: 'text.secondary', ml: 0.5 }}>
                 {resolved}/{total}
@@ -206,7 +217,7 @@ export function WorkflowMilestones({
               component="span"
               sx={{ fontSize: 12, fontWeight: 600, color: theme.palette.success.main }}
             >
-              Finalized
+              {t('workflow.states.FINALIZED')}
             </Typography>
           </>
         ) : (

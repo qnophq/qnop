@@ -24,6 +24,7 @@ import { DatePicker } from '@mui/x-date-pickers/DatePicker';
 import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
 import { endOfDay } from 'date-fns';
 import { de, enGB } from 'date-fns/locale';
+import { useTranslation } from 'react-i18next';
 import type { AppLocale } from '../../i18n/locales';
 import { useUiStore } from '../../stores/uiStore';
 
@@ -37,6 +38,7 @@ interface DueDatePickerProps {
   onChange: (iso: string | null) => void;
   /** Block past dates (used at creation; editing allows correcting to the past). */
   disablePast?: boolean;
+  /** The field label; defaults to the translated "Due date". */
   label?: string;
   disabled?: boolean;
 }
@@ -52,9 +54,10 @@ export function DueDatePicker({
   value,
   onChange,
   disablePast = true,
-  label = 'Due date',
+  label,
   disabled,
 }: DueDatePickerProps) {
+  const { t } = useTranslation('reviews');
   const locale = useUiStore((s) => s.locale);
   const parsed = value ? new Date(value) : null;
   const current = parsed && !Number.isNaN(parsed.getTime()) ? parsed : null;
@@ -62,7 +65,7 @@ export function DueDatePicker({
   return (
     <LocalizationProvider dateAdapter={AdapterDateFns} adapterLocale={DATE_FNS_LOCALES[locale]}>
       <DatePicker
-        label={label}
+        label={label ?? t('due.picker.label')}
         value={current}
         disabled={disabled}
         disablePast={disablePast}
@@ -78,7 +81,7 @@ export function DueDatePicker({
           textField: {
             size: 'small',
             fullWidth: true,
-            helperText: 'Optional — an informational deadline; overdue reviews are only flagged.',
+            helperText: t('due.picker.helper'),
           },
         }}
       />

@@ -48,6 +48,7 @@ import {
   Image as ImageIcon,
   MessagesSquare,
 } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import { ToneBadge } from '../../admin/ToneBadge';
 import { useUiStore } from '../../../stores/uiStore';
 import { listTimeZones, timeZoneLabel } from '../../../utils/timezone';
@@ -64,8 +65,9 @@ import {
   type ExportScope,
   type ExportSettings,
 } from './exportModel';
+import type { ReviewsKey } from '../reviewsI18n';
 
-const STEPS = ['Format & file', 'Content'];
+const STEPS: ReviewsKey[] = ['export.steps.formatAndFile', 'export.steps.content'];
 
 /**
  * The content area's height.
@@ -81,10 +83,10 @@ const STEPS = ['Format & file', 'Content'];
  */
 const CONTENT_HEIGHT = 'min(400px, 58vh)';
 
-const SCOPES: { id: ExportScope; label: string; hint: string }[] = [
-  { id: 'all', label: 'Everything', hint: 'Every annotation in this review' },
-  { id: 'open', label: 'Open only', hint: 'What still needs work' },
-  { id: 'resolved', label: 'Resolved only', hint: 'What has been settled' },
+const SCOPES: { id: ExportScope; label: ReviewsKey; hint: ReviewsKey }[] = [
+  { id: 'all', label: 'export.scopes.all.label', hint: 'export.scopes.all.hint' },
+  { id: 'open', label: 'export.scopes.open.label', hint: 'export.scopes.open.hint' },
+  { id: 'resolved', label: 'export.scopes.resolved.label', hint: 'export.scopes.resolved.hint' },
 ];
 
 export interface ExportCounts {
@@ -132,6 +134,7 @@ export function ExportWizard({
   // The caller mounts this only while it is open, so the initialisers run on
   // every open: first step, last configuration. A reset effect would do the
   // same thing a render too late, and cascade.
+  const { t } = useTranslation(['reviews', 'common']);
   const [step, setStep] = useState(0);
   // The reader's own zone (ADR-0041), so the wizard opens on the times they
   // actually work in rather than on UTC.
@@ -185,10 +188,10 @@ export function ExportWizard({
             color: 'primary.main',
           }}
         >
-          Export
+          {t('export.title')}
         </Typography>
         <Typography component="span" sx={{ fontSize: 20, fontWeight: 800 }}>
-          {step === 0 ? 'What do you need?' : 'Which details?'}
+          {step === 0 ? t('export.headings.format') : t('export.headings.details')}
         </Typography>
       </DialogTitle>
 
@@ -196,7 +199,7 @@ export function ExportWizard({
         <Stepper activeStep={step} sx={{ '& .MuiStepLabel-label': { fontSize: 13 } }}>
           {STEPS.map((label) => (
             <Step key={label}>
-              <StepLabel>{label}</StepLabel>
+              <StepLabel>{t(label)}</StepLabel>
             </Step>
           ))}
         </Stepper>
@@ -227,7 +230,7 @@ export function ExportWizard({
               }}
             >
               <Box>
-                <SectionLabel>Format</SectionLabel>
+                <SectionLabel>{t('export.sections.format')}</SectionLabel>
                 <Box
                   sx={{
                     display: 'grid',
@@ -253,8 +256,8 @@ export function ExportWizard({
                           borderRadius: 2,
                           border: '1px solid',
                           borderColor: active ? 'primary.main' : 'divider',
-                          bgcolor: (t) =>
-                            active ? alpha(t.palette.primary.main, 0.06) : 'transparent',
+                          bgcolor: (theme) =>
+                            active ? alpha(theme.palette.primary.main, 0.06) : 'transparent',
                           cursor: available ? 'pointer' : 'not-allowed',
                           opacity: available ? 1 : 0.5,
                           transition: 'border-color 150ms, background-color 150ms',
@@ -272,10 +275,12 @@ export function ExportWizard({
                           <Typography sx={{ fontSize: 11.5, color: 'text.disabled' }}>
                             {entry.extension}
                           </Typography>
-                          {!available && <ToneBadge tone="neutral" label="Unavailable" />}
+                          {!available && (
+                            <ToneBadge tone="neutral" label={t('export.unavailable')} />
+                          )}
                         </Stack>
                         <Typography sx={{ fontSize: 12, color: 'text.secondary' }}>
-                          {entry.hint}
+                          {t(entry.hintKey)}
                         </Typography>
                       </Box>
                     );
@@ -284,7 +289,7 @@ export function ExportWizard({
               </Box>
 
               <Box>
-                <SectionLabel>Which annotations</SectionLabel>
+                <SectionLabel>{t('export.sections.annotations')}</SectionLabel>
                 <Stack spacing={0.75} sx={{ mt: 1 }}>
                   {SCOPES.map((scope) => {
                     const active = scope.id === settings.scope;
@@ -306,18 +311,18 @@ export function ExportWizard({
                           borderRadius: 2,
                           border: '1px solid',
                           borderColor: active ? 'primary.main' : 'divider',
-                          bgcolor: (t) =>
-                            active ? alpha(t.palette.primary.main, 0.06) : 'transparent',
+                          bgcolor: (theme) =>
+                            active ? alpha(theme.palette.primary.main, 0.06) : 'transparent',
                           cursor: 'pointer',
                           '&:hover': { borderColor: 'primary.main' },
                         }}
                       >
                         <Box sx={{ flex: 1, minWidth: 0 }}>
                           <Typography sx={{ fontSize: 14, fontWeight: active ? 700 : 500 }}>
-                            {scope.label}
+                            {t(scope.label)}
                           </Typography>
                           <Typography sx={{ fontSize: 12, color: 'text.secondary' }}>
-                            {scope.hint}
+                            {t(scope.hint)}
                           </Typography>
                         </Box>
                         {counts && (
@@ -335,7 +340,7 @@ export function ExportWizard({
             </Box>
 
             <Box>
-              <SectionLabel>Saved as</SectionLabel>
+              <SectionLabel>{t('export.sections.savedAs')}</SectionLabel>
               <Box
                 sx={{
                   display: 'grid',
@@ -347,7 +352,7 @@ export function ExportWizard({
               >
                 <TextField
                   size="small"
-                  label="File name"
+                  label={t('export.fileName')}
                   value={fileName}
                   onChange={(event) => setTypedFileName(event.target.value)}
                   placeholder={defaultFileName(documentTitle)}
@@ -371,8 +376,8 @@ export function ExportWizard({
                     on={settings.includeLogo}
                     onChange={(on) => setSettings((c) => ({ ...c, includeLogo: on }))}
                     icon={<ImageIcon size={14} />}
-                    title="Branding logo"
-                    hint="Placed on the document, if branding has been uploaded."
+                    title={t('export.logo.title')}
+                    hint={t('export.logo.hint')}
                   />
                 )}
               </Box>
@@ -388,13 +393,15 @@ export function ExportWizard({
           >
             <Box>
               <Stack direction="row" sx={{ alignItems: 'center', justifyContent: 'space-between' }}>
-                <SectionLabel>{capitalise(format?.fieldNoun ?? 'fields')}</SectionLabel>
+                <SectionLabel>
+                  {t(`export.vocabulary.${format?.vocabulary ?? 'fields'}.heading`)}
+                </SectionLabel>
                 <Stack direction="row" spacing={0.5}>
                   <Button size="small" onClick={() => setAllFields(true)}>
-                    All
+                    {t('export.all')}
                   </Button>
                   <Button size="small" onClick={() => setAllFields(false)}>
-                    None
+                    {t('export.none')}
                   </Button>
                 </Stack>
               </Stack>
@@ -405,7 +412,7 @@ export function ExportWizard({
                     <Typography
                       sx={{ fontSize: 11.5, fontWeight: 700, color: 'text.disabled', mb: 0.25 }}
                     >
-                      {group}
+                      {t(`export.groups.${group}`)}
                     </Typography>
                     <Box
                       sx={{
@@ -429,13 +436,13 @@ export function ExportWizard({
                           }
                           label={
                             <Typography sx={{ fontSize: 13.5 }}>
-                              {field.label}
+                              {t(field.labelKey)}
                               {field.required && (
                                 <Typography
                                   component="span"
                                   sx={{ fontSize: 11.5, color: 'text.disabled', ml: 0.5 }}
                                 >
-                                  (always)
+                                  {t('export.always')}
                                 </Typography>
                               )}
                             </Typography>
@@ -457,12 +464,12 @@ export function ExportWizard({
                 on={settings.includeComments}
                 onChange={(on) => setSettings((c) => ({ ...c, includeComments: on }))}
                 icon={<MessagesSquare size={14} />}
-                title="Comment threads"
-                hint={format?.commentsHint ?? ''}
+                title={t('export.comments')}
+                hint={format ? t(format.commentsHintKey) : ''}
               />
 
               <Box>
-                <SectionLabel>Date and time</SectionLabel>
+                <SectionLabel>{t('export.sections.dateTime')}</SectionLabel>
                 <Autocomplete
                   size="small"
                   disableClearable
@@ -470,7 +477,7 @@ export function ExportWizard({
                   value={settings.timezone}
                   onChange={(_, zone) => setSettings((c) => ({ ...c, timezone: zone }))}
                   getOptionLabel={(zone) => timeZoneLabel(zone)}
-                  renderInput={(params) => <TextField {...params} label="Timezone" />}
+                  renderInput={(params) => <TextField {...params} label={t('export.timezone')} />}
                   sx={{ mt: 1, mb: 1 }}
                 />
                 <Box
@@ -496,8 +503,8 @@ export function ExportWizard({
                           borderRadius: 2,
                           border: '1px solid',
                           borderColor: active ? 'primary.main' : 'divider',
-                          bgcolor: (t) =>
-                            active ? alpha(t.palette.primary.main, 0.06) : 'transparent',
+                          bgcolor: (theme) =>
+                            active ? alpha(theme.palette.primary.main, 0.06) : 'transparent',
                           cursor: 'pointer',
                           '&:hover': { borderColor: 'primary.main' },
                         }}
@@ -513,7 +520,7 @@ export function ExportWizard({
                           {entry.sample}
                         </Typography>
                         <Typography sx={{ fontSize: 11, color: 'text.secondary' }}>
-                          {entry.label}
+                          {t(entry.labelKey)}
                         </Typography>
                       </Box>
                     );
@@ -527,19 +534,22 @@ export function ExportWizard({
 
       {/* The commitment line: an export has no preview and no undo once it is in
           the downloads folder, so what it will contain is stated before it runs. */}
-      <Box sx={{ px: 3, py: 1.25, bgcolor: (t) => t.qnop.surface2 }}>
+      <Box sx={{ px: 3, py: 1.25, bgcolor: (theme) => theme.qnop.surface2 }}>
         <Typography sx={{ fontSize: 12.5, color: 'text.secondary' }}>
-          {format?.label} {format?.extension} · {selected.length} of {EXPORT_FIELDS.length}{' '}
-          {format?.fieldNoun}
-          {rows !== null && ` · ${rows} annotation${rows === 1 ? '' : 's'}`}
-          {settings.includeComments && ' · with comment threads'}
+          {format?.label} {format?.extension} ·{' '}
+          {t(`export.vocabulary.${format?.vocabulary ?? 'fields'}.count`, {
+            selected: selected.length,
+            total: EXPORT_FIELDS.length,
+          })}
+          {rows !== null && ` · ${t('export.summary.rows', { count: rows })}`}
+          {settings.includeComments && ` · ${t('export.summary.withComments')}`}
         </Typography>
       </Box>
       <Divider />
 
       <DialogActions sx={{ px: 3, py: 2 }}>
         <Button onClick={onClose} disabled={exporting}>
-          Cancel
+          {t('common:actions.cancel')}
         </Button>
         <Box sx={{ flex: 1 }} />
         {step > 0 && (
@@ -548,12 +558,12 @@ export function ExportWizard({
             onClick={() => setStep(0)}
             disabled={exporting}
           >
-            Back
+            {t('actions.back')}
           </Button>
         )}
         {step === 0 ? (
           <Button variant="contained" endIcon={<ArrowRight size={15} />} onClick={() => setStep(1)}>
-            Next
+            {t('actions.next')}
           </Button>
         ) : (
           <Button
@@ -564,7 +574,7 @@ export function ExportWizard({
             disabled={exporting || rows === 0}
             onClick={start}
           >
-            Export
+            {t('export.title')}
           </Button>
         )}
       </DialogActions>
@@ -600,7 +610,7 @@ function ToggleCard({
         borderRadius: 2,
         border: '1px solid',
         borderColor: on ? 'primary.main' : 'divider',
-        bgcolor: (t) => (on ? alpha(t.palette.primary.main, 0.06) : 'transparent'),
+        bgcolor: (theme) => (on ? alpha(theme.palette.primary.main, 0.06) : 'transparent'),
         transition: 'border-color 150ms, background-color 150ms',
       }}
     >
@@ -626,11 +636,6 @@ function ToggleCard({
       />
     </Box>
   );
-}
-
-/** Sentence case for a noun that lives lowercase in the format registry. */
-function capitalise(word: string): string {
-  return word.charAt(0).toUpperCase() + word.slice(1);
 }
 
 function SectionLabel({ children }: { children: React.ReactNode }) {

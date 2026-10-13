@@ -158,4 +158,27 @@ describe('DeleteReviewDialog', () => {
     // Otherwise an abandoned attempt leaves the next review one click from gone.
     expect(deleteButton()).toBeDisabled();
   });
+
+  it('renders a markup-bearing title literally, never as elements (issue #836)', () => {
+    const hostile = '<b>x</b> <title>y</title>';
+    const { baseElement } = render(
+      <DeleteReviewDialog
+        documentId={DOC_ID}
+        title={hostile}
+        open
+        onClose={onClose}
+        versionCount={1}
+        annotationCount={2}
+        onDeleted={onDeleted}
+      />,
+      { wrapper },
+    );
+
+    expect(screen.getByText(hostile, { selector: 'strong' })).toBeInTheDocument();
+    expect(screen.getByText(/and its 1 version and 2 annotations will be removed/)).toBeTruthy();
+    const dialog = screen.getByRole('dialog');
+    expect(dialog.querySelector('b')).toBeNull();
+    expect(dialog.querySelector('title')).toBeNull();
+    expect(baseElement.querySelector('[role="dialog"] strong b')).toBeNull();
+  });
 });

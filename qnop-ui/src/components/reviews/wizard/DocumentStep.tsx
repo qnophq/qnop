@@ -21,17 +21,18 @@
 
 import Stack from '@mui/material/Stack';
 import TextField from '@mui/material/TextField';
+import { useTranslation } from 'react-i18next';
 import { DocumentDropzone } from '../upload/DocumentDropzone';
 import { type AcceptedUploads } from './wizardModel';
 
 interface DocumentStepProps {
   file: File | null;
   title: string;
-  /** Validation error from the last file pick, if any. */
+  /** Validation error from the last file pick, if any — already translated. */
   fileError: string | null;
   /** Optional review slug (issue #411) — auto-suggested from the title. */
   slug: string;
-  /** Client- or server-side slug rejection to attach to the field. */
+  /** Client- or server-side slug rejection to attach to the field — already translated. */
   slugError: string | null;
   maxSizeMb: number;
   /** Which formats this server takes, and how to name them (issue #343). */
@@ -56,6 +57,7 @@ export function DocumentStep({
   onTitleChange,
   onSlugChange,
 }: DocumentStepProps) {
+  const { t } = useTranslation('reviews');
   return (
     <Stack spacing={2.5}>
       <DocumentDropzone
@@ -69,24 +71,21 @@ export function DocumentStep({
       />
 
       <TextField
-        label="Review title"
+        label={t('wizard.document.titleLabel')}
         value={title}
         onChange={(e) => onTitleChange(e.target.value)}
-        placeholder="e.g. NDA Acme Corp"
-        helperText="Shown in the overview and to every reviewer."
+        placeholder={t('wizard.document.titlePlaceholder')}
+        helperText={t('wizard.document.titleHelper')}
         fullWidth
       />
 
       <TextField
-        label="URL slug (optional)"
+        label={t('wizard.document.slugLabel')}
         value={slug}
         onChange={(e) => onSlugChange(e.target.value)}
-        placeholder="e.g. nda-acme-corp"
+        placeholder={t('wizard.document.slugPlaceholder')}
         error={slugError !== null}
-        helperText={
-          slugError ??
-          'A readable address for this review: lowercase letters, digits and hyphens. Cannot be changed later.'
-        }
+        helperText={slugError ?? t('wizard.document.slugHelper')}
         slotProps={{ htmlInput: { 'data-testid': 'wizard-slug-input', maxLength: 64 } }}
         fullWidth
       />

@@ -26,6 +26,8 @@ import Stack from '@mui/material/Stack';
 import Typography from '@mui/material/Typography';
 import { alpha, useTheme } from '@mui/material/styles';
 import { Check, Rocket } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
+import { renderReviewsPhrase } from '../reviewsI18n';
 import type { LaunchItem } from './wizardModel';
 import { launchReadiness } from './wizardModel';
 
@@ -37,6 +39,7 @@ import { launchReadiness } from './wizardModel';
  */
 export function LaunchChecklist({ items }: { items: LaunchItem[] }) {
   const theme = useTheme();
+  const { t } = useTranslation('reviews');
   const blue = theme.qnop.brand.blue;
   const readiness = launchReadiness(items);
   const ready = items.filter((item) => !item.optional).every((item) => item.done);
@@ -64,12 +67,10 @@ export function LaunchChecklist({ items }: { items: LaunchItem[] }) {
         </Box>
         <Box sx={{ minWidth: 0, flex: 1 }}>
           <Typography sx={{ fontWeight: 700, fontSize: 14.5, lineHeight: 1.3 }}>
-            Launch readiness
+            {t('wizard.checklist.title')}
           </Typography>
           <Typography variant="caption" color="text.secondary">
-            {ready
-              ? 'Ready for lift-off — extras are bonus points.'
-              : 'Fill the essentials to launch.'}
+            {ready ? t('wizard.checklist.ready') : t('wizard.checklist.notReady')}
           </Typography>
         </Box>
         <Typography
@@ -88,7 +89,7 @@ export function LaunchChecklist({ items }: { items: LaunchItem[] }) {
       <LinearProgress
         variant="determinate"
         value={readiness}
-        aria-label="Launch readiness"
+        aria-label={t('wizard.checklist.title')}
         sx={{
           height: 6,
           borderRadius: 99,
@@ -104,7 +105,7 @@ export function LaunchChecklist({ items }: { items: LaunchItem[] }) {
 
       <Stack spacing={1.25}>
         {items.map((item) => (
-          <Stack key={item.label} direction="row" spacing={1.25} sx={{ alignItems: 'center' }}>
+          <Stack key={item.labelKey} direction="row" spacing={1.25} sx={{ alignItems: 'center' }}>
             <Box
               aria-hidden
               sx={{
@@ -141,7 +142,7 @@ export function LaunchChecklist({ items }: { items: LaunchItem[] }) {
                   color: item.done ? 'text.primary' : 'text.secondary',
                 }}
               >
-                {item.label}
+                {t(item.labelKey)}
                 {item.optional && (
                   <Box
                     component="span"
@@ -154,13 +155,13 @@ export function LaunchChecklist({ items }: { items: LaunchItem[] }) {
                       color: 'text.disabled',
                     }}
                   >
-                    bonus
+                    {t('wizard.checklist.bonus')}
                   </Box>
                 )}
               </Typography>
               {item.detail && (
                 <Typography variant="caption" color="text.secondary">
-                  {item.detail}
+                  {renderReviewsPhrase(item.detail, t)}
                 </Typography>
               )}
             </Box>

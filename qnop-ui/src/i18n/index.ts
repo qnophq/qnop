@@ -28,6 +28,7 @@ import enCommon from './en/common.json';
 import enDashboard from './en/dashboard.json';
 import enNotifications from './en/notifications.json';
 import enProfile from './en/profile.json';
+import enReviews from './en/reviews.json';
 import enShell from './en/shell.json';
 import enTeams from './en/teams.json';
 import enWorkspace from './en/workspace.json';
@@ -51,6 +52,7 @@ export const bundledResources = {
     teams: enTeams,
     audit: enAudit,
     admin: enAdmin,
+    reviews: enReviews,
     workspace: enWorkspace,
   },
 } as const;

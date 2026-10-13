@@ -36,7 +36,8 @@ import { CountPill } from './CountPill';
 import { DueDateLabel } from '../reviews/DueDateLabel';
 import { DocumentIcon, ProgressBar, ReviewerStack } from '../reviews/list/ReviewListParts';
 import { progressOf } from '../reviews/list/reviewListModel';
-import { WORKFLOW_TONES, workflowLabel } from '../reviews/workflowMeta';
+import { workflowTone } from '../reviews/workflowMeta';
+import { useWorkflowLabel } from '../reviews/useWorkflowLabel';
 import { readyToFinalize, reviewPath } from './dashboardModel';
 
 interface ReviewListCardProps {
@@ -72,6 +73,7 @@ export function ReviewListCard({
   celebrateEmpty = false,
 }: ReviewListCardProps) {
   const { t } = useTranslation('dashboard');
+  const workflowLabel = useWorkflowLabel();
   const theme = useTheme();
   const navigate = useNavigate();
   const visible = reviews;
@@ -131,7 +133,7 @@ export function ReviewListCard({
                           />
                         ) : (
                           <ToneBadge
-                            tone={WORKFLOW_TONES[review.workflowState] ?? 'neutral'}
+                            tone={workflowTone(review.workflowState)}
                             label={workflowLabel(review.workflowState)}
                           />
                         )}

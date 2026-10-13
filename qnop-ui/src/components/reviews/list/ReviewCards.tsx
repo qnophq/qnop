@@ -26,6 +26,7 @@ import Stack from '@mui/material/Stack';
 import Typography from '@mui/material/Typography';
 import { useTheme } from '@mui/material/styles';
 import { History, MessageSquare } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import type { DocumentSummary } from '../../../api/generated';
 import { useFormatters } from '../../../hooks/useFormatters';
 import { DueDateLabel } from '../DueDateLabel';
@@ -45,6 +46,7 @@ interface ReviewCardsProps {
 /** The overview's card view: hover-lift tiles (prototype `rv-card`). */
 export function ReviewCards({ reviews, userId, onOpen }: ReviewCardsProps) {
   const theme = useTheme();
+  const { t } = useTranslation('reviews');
   const { formatRelative } = useFormatters();
   return (
     <Box
@@ -103,7 +105,7 @@ export function ReviewCards({ reviews, userId, onOpen }: ReviewCardsProps) {
               <WorkflowBadge state={review.workflowState} archivedAt={review.archivedAt} />
               {review.anonymous && <AnonymousBadge compact />}
               {roleOf(review, userId) === 'owner' && readyToFinalize(review) && (
-                <ToneBadge tone="green" label="Ready to finalize" />
+                <ToneBadge tone="green" label={t('list.readyToFinalize')} />
               )}
               {progress && (
                 <Typography
@@ -111,7 +113,10 @@ export function ReviewCards({ reviews, userId, onOpen }: ReviewCardsProps) {
                   color="text.secondary"
                   sx={{ fontVariantNumeric: 'tabular-nums' }}
                 >
-                  {progress.resolved}/{progress.total} resolved
+                  {t('list.resolvedCount', {
+                    resolved: progress.resolved,
+                    total: progress.total,
+                  })}
                 </Typography>
               )}
             </Stack>

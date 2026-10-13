@@ -47,9 +47,9 @@ describe('acceptedUploads', () => {
     // It is a property of the deployment, not of the release: Word needs an
     // out-of-process converter (issue #343), and a server without one answers 415.
     expect(withWord.accept).toContain('.docx');
-    expect(withWord.label).toBe('PDF or Word');
+    expect(withWord.labelKey).toBe('upload.formats.pdfOrWord');
     expect(pdfOnly.accept).not.toContain('.docx');
-    expect(pdfOnly.label).toBe('PDF');
+    expect(pdfOnly.labelKey).toBe('upload.formats.pdf');
   });
 
   it('falls back to PDF while the config is still loading', () => {
@@ -70,9 +70,10 @@ describe('validateDocumentFile', () => {
 
   it('accepts a Word document only where the server takes one', () => {
     expect(validateDocumentFile(fileOf('a.docx', DOCX_MIME, 10), 50, withWord)).toBeNull();
-    expect(validateDocumentFile(fileOf('a.docx', DOCX_MIME, 10), 50, pdfOnly)).toBe(
-      'Only PDF documents are supported.',
-    );
+    expect(validateDocumentFile(fileOf('a.docx', DOCX_MIME, 10), 50, pdfOnly)).toEqual({
+      key: 'upload.validation.type',
+      values: { formats: { key: 'upload.formats.pdf' } },
+    });
   });
 
   it('rejects a format nobody offered', () => {
@@ -82,14 +83,18 @@ describe('validateDocumentFile', () => {
         50,
         withWord,
       ),
-    ).toBe('Only PDF or Word documents are supported.');
+    ).toEqual({
+      key: 'upload.validation.type',
+      values: { formats: { key: 'upload.formats.pdfOrWord' } },
+    });
   });
 
   it('rejects files over the configured limit', () => {
     const tooBig = fileOf('big.pdf', 'application/pdf', 51 * 1024 * 1024);
-    expect(validateDocumentFile(tooBig, 50, pdfOnly)).toBe(
-      'The file exceeds the maximum size of 50 MB.',
-    );
+    expect(validateDocumentFile(tooBig, 50, pdfOnly)).toEqual({
+      key: 'upload.validation.size',
+      values: { max: 50 },
+    });
   });
 });
 
@@ -145,22 +150,23 @@ describe('validateSlug', () => {
   });
 
   it('rejects out-of-range lengths', () => {
-    expect(validateSlug('ab')).toBe('The slug must be 3–64 characters long.');
-    expect(validateSlug('x'.repeat(65))).toBe('The slug must be 3–64 characters long.');
+    const message = { key: 'wizard.validation.slugLength', values: { min: 3, max: 64 } };
+    expect(validateSlug('ab')).toEqual(message);
+    expect(validateSlug('x'.repeat(65))).toEqual(message);
   });
 
   it('rejects uppercase, underscores, and hyphen runs', () => {
-    const message = 'Only lowercase letters, digits and single hyphens are allowed.';
-    expect(validateSlug('Nda-Acme')).toBe(message);
-    expect(validateSlug('has_underscore')).toBe(message);
-    expect(validateSlug('double--hyphen')).toBe(message);
-    expect(validateSlug('-leading')).toBe(message);
+    const message = { key: 'wizard.validation.slugPattern' };
+    expect(validateSlug('Nda-Acme')).toEqual(message);
+    expect(validateSlug('has_underscore')).toEqual(message);
+    expect(validateSlug('double--hyphen')).toEqual(message);
+    expect(validateSlug('-leading')).toEqual(message);
   });
 
   it('rejects UUID-shaped slugs, which would shadow id routes', () => {
-    expect(validateSlug('123e4567-e89b-12d3-a456-426614174000')).toBe(
-      'The slug must not look like a document id.',
-    );
+    expect(validateSlug('123e4567-e89b-12d3-a456-426614174000')).toEqual({
+      key: 'wizard.validation.slugUuid',
+    });
   });
 });
 
@@ -191,7 +197,10 @@ describe('launchChecklist / launchReadiness (issue #469)', () => {
       startImmediately: true,
     });
     expect(launchReadiness(all)).toBe(100);
-    expect(all.find((i) => i.label === 'Crew invited')?.detail).toBe('2 reviewers');
+    expect(all.find((i) => i.labelKey === 'wizard.checklist.items.crew')?.detail).toEqual({
+      key: 'wizard.checklist.details.reviewers',
+      values: { count: 2 },
+    });
   });
 
   it('bonus items alone never reach the launch threshold', () => {
@@ -214,7 +223,7 @@ describe('acceptedUploads with server-advertised media types (#601)', () => {
     expect(withPng.accept).toBe('application/pdf,.pdf,image/png');
     expect(withPng.matches(new File([''], 'scan.png', { type: 'image/png' }))).toBe(true);
     expect(withPng.matches(new File([''], 'a.gif', { type: 'image/gif' }))).toBe(false);
-    expect(withPng.label).toBe('PDF and more');
+    expect(withPng.labelKey).toBe('upload.formats.pdfMore');
   });
 
   it('is unchanged without advertised extras', () => {
