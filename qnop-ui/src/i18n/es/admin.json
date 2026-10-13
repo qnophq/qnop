@@ -6,7 +6,7 @@
       "AUDITOR": "Auditor"
     },
     "team": {
-      "LEAD": "Responsable",
+      "LEAD": "Responsable del equipo",
       "MEMBER": "Miembro"
     }
   },
@@ -22,13 +22,13 @@
     "page": {
       "title": "Usuarios",
       "description": "Gestiona cuentas, roles y accesos.",
-      "descriptionWithSeats_one": "Gestiona cuentas, roles y accesos. {{used}} de {{count}} puesto ocupado.",
-      "descriptionWithSeats_other": "Gestiona cuentas, roles y accesos. {{used}} de {{count}} puestos ocupados.",
-      "descriptionWithSeats_many": "Gestiona cuentas, roles y accesos. {{used}} de {{count}} puestos ocupados.",
+      "descriptionWithSeats_one": "Gestiona cuentas, roles y accesos. {{used}} de {{count}} plaza ocupada.",
+      "descriptionWithSeats_other": "Gestiona cuentas, roles y accesos. {{used}} de {{count}} plazas ocupadas.",
+      "descriptionWithSeats_many": "Gestiona cuentas, roles y accesos. {{used}} de {{count}} plazas ocupadas.",
       "addUser": "Añadir usuario",
-      "seatsFull_one": "Esta instalación está configurada para {{count}} cuenta y tiene {{used}}. Eliminar una cuenta libera un puesto; desactivarla no.",
-      "seatsFull_other": "Esta instalación está configurada para {{count}} cuentas y tiene {{used}}. Eliminar una cuenta libera un puesto; desactivarla no.",
-      "seatsFull_many": "Esta instalación está configurada para {{count}} cuentas y tiene {{used}}. Eliminar una cuenta libera un puesto; desactivarla no.",
+      "seatsFull_one": "Esta instalación está configurada para {{count}} cuenta y tiene {{used}}. Eliminar una cuenta libera una plaza; desactivarla no.",
+      "seatsFull_other": "Esta instalación está configurada para {{count}} cuentas y tiene {{used}}. Eliminar una cuenta libera una plaza; desactivarla no.",
+      "seatsFull_many": "Esta instalación está configurada para {{count}} cuentas y tiene {{used}}. Eliminar una cuenta libera una plaza; desactivarla no.",
       "searchPlaceholder": "Buscar por nombre, correo o nombre de usuario",
       "searchLabel": "Buscar usuarios",
       "roleFilter": "Rol",
@@ -48,7 +48,7 @@
     },
     "toasts": {
       "updateFailed": "No se pudo actualizar a {{name}}.",
-      "resetEmailed": "Enlace de restablecimiento enviado a {{email}}. Las sesiones se han cerrado.",
+      "resetEmailed": "Enlace de restablecimiento enviado a {{email}}. Las sesiones se cerraron.",
       "resetNoLink": "Restablecimiento iniciado para {{name}}, pero no se devolvió ningún enlace.",
       "resetFailed": "No se pudo iniciar el restablecimiento.",
       "generateFailed": "No se pudo generar una contraseña.",
@@ -177,7 +177,7 @@
       },
       "identity": {
         "title": "Remitente",
-        "description": "Cómo presentan los mensajes salientes a su remitente."
+        "description": "Cómo se identifica el remitente en los mensajes salientes."
       },
       "delivery": {
         "title": "Estado y envío",
@@ -263,15 +263,15 @@
       "deleted_one": "{{count}} objeto eliminado.",
       "deleted_other": "{{count}} objetos eliminados.",
       "deleted_many": "{{count}} objetos eliminados.",
-      "deletedSkipped_one": "{{count}} objeto eliminado, {{skipped}} omitidos (ahora referenciados)",
-      "deletedSkipped_other": "{{count}} objetos eliminados, {{skipped}} omitidos (ahora referenciados)",
-      "deletedSkipped_many": "{{count}} objetos eliminados, {{skipped}} omitidos (ahora referenciados)",
+      "deletedSkipped_one": "{{count}} objeto eliminado; omitidos (ahora referenciados): {{skipped}}",
+      "deletedSkipped_other": "{{count}} objetos eliminados; omitidos (ahora referenciados): {{skipped}}",
+      "deletedSkipped_many": "{{count}} objetos eliminados; omitidos (ahora referenciados): {{skipped}}",
       "failed": "No se pudieron eliminar los objetos."
     },
     "rescanResult": {
       "stoppedAtLimit": "Comprobación detenida: el bucket contiene más objetos que el límite de comprobación.",
       "complete": "Comprobación completada.",
-      "completeSummary": "Comprobación completada — {{missing}} faltan, {{orphaned}} huérfanos."
+      "completeSummary": "Comprobación completada — faltantes: {{missing}}, huérfanos: {{orphaned}}."
     },
     "key": {
       "copy": "Copiar clave",
@@ -321,19 +321,19 @@
   },
   "settings": {
     "title": "Configuración",
-    "description": "Espacio de trabajo, cargas, medición de uso y autenticación.",
+    "description": "Espacio de trabajo, subidas, medición de uso y autenticación.",
     "groups": {
       "general": {
         "label": "General",
         "description": "Identidad del espacio de trabajo, URL base, idioma predeterminado y zona horaria."
       },
       "upload": {
-        "label": "Cargas",
-        "description": "Restricciones que se aplican a la carga de documentos."
+        "label": "Subidas",
+        "description": "Restricciones que se aplican a la subida de documentos."
       },
       "tracking": {
         "label": "Medición de uso",
-        "description": "Medición de uso anónima a través de este servidor: el navegador carga el script desde qnop y envía sus mediciones a qnop, que las reenvía. Previamente, las direcciones de las páginas se reducen a patrones de ruta, de modo que ningún ID de documento llega nunca al backend."
+        "description": "Medición de uso anónima a través de este servidor: el navegador carga el script desde qnop y envía sus mediciones a qnop, que las reenvía. Antes, las direcciones de las páginas se reducen a patrones de ruta, de modo que ningún ID de documento llega nunca al backend."
       },
       "auth": {
         "label": "Autenticación",
@@ -417,7 +417,7 @@
       },
       "upload__document_max_file_size_mb": {
         "label": "Tamaño máximo de documento (MB)",
-        "description": "Tamaño máximo de carga de un documento, en megabytes."
+        "description": "Tamaño máximo de subida de un documento, en megabytes."
       },
       "upload__attachment_max_file_size_mb": {
         "label": "Tamaño máximo de adjunto (MB)",
@@ -513,7 +513,7 @@
       },
       "review__free_reattach_enabled": {
         "label": "Reubicación libre",
-        "description": "Permite a los autores reubicar sus propias anotaciones aunque su posición sea correcta (los administradores siempre pueden)."
+        "description": "Permite a los autores reubicar sus propias anotaciones aunque su ubicación sea correcta (los administradores siempre pueden)."
       },
       "review__finalize_with_open_annotations": {
         "label": "Finalizar con anotaciones abiertas",
@@ -557,7 +557,7 @@
       },
       "banner__app_text": {
         "label": "Texto del banner de la app",
-        "description": "Texto del banner de la app, p. ej., «Mantenimiento el sábado de 20:00 a 22:00 UTC; las cargas están en pausa.» Si se deja vacío, el banner se oculta aunque esté activado."
+        "description": "Texto del banner de la app, p. ej., «Mantenimiento el sábado de 20:00 a 22:00 UTC; las subidas están en pausa». Si se deja vacío, el banner se oculta aunque esté activado."
       },
       "banner__app_link_label": {
         "label": "Texto del enlace del banner de la app",
@@ -623,9 +623,9 @@
       "descriptionWithLimit_other": "Agrupa a los revisores y gestiona sus roles en el equipo. {{used}} de {{count}} equipos en uso.",
       "descriptionWithLimit_many": "Agrupa a los revisores y gestiona sus roles en el equipo. {{used}} de {{count}} equipos en uso.",
       "create": "Crear equipo",
-      "quotaFull_one": "Esta instalación está configurada para {{count}} equipo y tiene {{used}}. Eliminar un equipo libera un hueco.",
-      "quotaFull_other": "Esta instalación está configurada para {{count}} equipos y tiene {{used}}. Eliminar un equipo libera un hueco.",
-      "quotaFull_many": "Esta instalación está configurada para {{count}} equipos y tiene {{used}}. Eliminar un equipo libera un hueco.",
+      "quotaFull_one": "Esta instalación está configurada para {{count}} equipo y tiene {{used}}. Eliminar un equipo libera una plaza.",
+      "quotaFull_other": "Esta instalación está configurada para {{count}} equipos y tiene {{used}}. Eliminar un equipo libera una plaza.",
+      "quotaFull_many": "Esta instalación está configurada para {{count}} equipos y tiene {{used}}. Eliminar un equipo libera una plaza.",
       "searchPlaceholder": "Buscar por nombre o descripción",
       "loadError": "No se pudo cargar la lista de equipos.",
       "columns": {
@@ -662,8 +662,8 @@
       },
       "empty": "Todavía no hay miembros. Añade el primero.",
       "actionsFor": "Acciones para {{name}}",
-      "makeMember": "Hacer miembro",
-      "makeLead": "Hacer responsable",
+      "makeMember": "Convertir en miembro",
+      "makeLead": "Convertir en responsable",
       "removeFromTeam": "Quitar del equipo",
       "remove": {
         "title": "Quitar miembro",
@@ -755,7 +755,7 @@
       "saveChanges": "Guardar cambios",
       "saved": "Plantilla guardada.",
       "saveFailed": "No se pudo guardar la plantilla.",
-      "reverted": "Se ha restablecido la plantilla predeterminada.",
+      "reverted": "Se restableció la plantilla predeterminada.",
       "resetFailed": "No se pudo restablecer la plantilla.",
       "reset": {
         "title": "Restablecer plantilla",
@@ -885,7 +885,7 @@
     },
     "created": {
       "title": "Proveedor creado",
-      "message": "<name/> se ha creado y está <strong>desactivado</strong>. Registra la URL de callback de abajo en tu proveedor y luego actívalo desde la lista."
+      "message": "<name/> se creó y está <strong>desactivado</strong>. Registra la URL de callback de abajo en tu proveedor y luego actívalo desde la lista."
     },
     "callback": {
       "title": "URL de callback",

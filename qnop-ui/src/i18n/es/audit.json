@@ -44,7 +44,7 @@
   "events": {
     "annotationCreated": {
       "label": "Anotación abierta",
-      "description": "Un revisor creó una nueva anotación en el documento — un comentario o una incidencia."
+      "description": "Un revisor creó una nueva anotación en el documento — un comentario o una objeción."
     },
     "annotationResolved": {
       "label": "Anotación resuelta",
@@ -63,20 +63,20 @@
       "description": "Se clasificó una anotación — se establecieron su tipo o su prioridad, o ambos."
     },
     "placementConfirmed": {
-      "label": "Posición confirmada",
-      "description": "Se confirmó la posición de una anotación en la página en una versión del documento."
+      "label": "Ubicación confirmada",
+      "description": "Se confirmó la ubicación de una anotación en la página en una versión del documento."
     },
     "placementReattached": {
-      "label": "Posición reanclada",
-      "description": "Una anotación se volvió a anclar en otro lugar — p. ej., después de que una nueva versión desplazara el texto."
+      "label": "Anotación reanclada",
+      "description": "Una anotación se reancló en otro lugar — p. ej., después de que una nueva versión desplazara el texto."
     },
     "annotationAutoClosed": {
       "label": "Anotación cerrada automáticamente",
       "description": "Una transición final de la revisión (cancelada/finalizada) cerró automáticamente una anotación que seguía abierta (issue #568)."
     },
     "placementRepositioned": {
-      "label": "Posición recolocada",
-      "description": "Una anotación correctamente anclada se movió deliberadamente a otro pasaje (reanclaje libre, issue #562)."
+      "label": "Anotación reubicada",
+      "description": "Una anotación correctamente anclada se reubicó deliberadamente en otro pasaje (reubicación libre, issue #562)."
     },
     "workflowTransition": {
       "label": "Estado cambiado",

@@ -64,3 +64,13 @@ Spanish (`es`) is the third UI language. Its catalogs address the user informall
 neutral, international wording rather than Spain- or Latin-America-specific vocabulary, and format
 dates and numbers as `es-ES`. No other part of this decision changes; the catalog parity test and
 the application-setting catalog test cover the new language automatically.
+
+- **Plurals:** every `_many` value mirrors its `_other` value by design. i18next resolves a missing
+  plural category from the English fallback catalog, not from `_other`, so the parity test requires
+  every CLDR plural category of each language.
+- **E-mails** stay English for Spanish users until mail templates exist for `es`; the mail-template
+  lookup falls back to `en`.
+- **Glossary:** review → "revisión", annotation → "anotación"; resolved / dismissed / reopened →
+  "resuelta" / "descartada" / "reabierta"; the review owner is "Responsable", the team lead role is
+  "Responsable del equipo"; upload → "subir" / "subida"; an annotation's placement → "ubicación";
+  user seats and team or quota slots → "plaza".

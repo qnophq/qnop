@@ -134,7 +134,7 @@
         "share": "Reparte el trabajo",
         "rise": "Sube de rango"
       },
-      "hint": "Un responsable de equipo o un administrador puede añadirte — tus equipos aparecerán aquí en cuanto lo haga.",
+      "hint": "Un responsable del equipo o un administrador puede añadirte — tus equipos aparecerán aquí en cuanto lo haga.",
       "illustration": "Un lugar libre esperando en un equipo"
     }
   },
@@ -192,7 +192,7 @@
     "roleHelper": "Se aplica a todas las personas que añadas en este paso.",
     "roles": {
       "MEMBER": "Miembro",
-      "LEAD": "Responsable"
+      "LEAD": "Responsable del equipo"
     },
     "cancel": "Cancelar",
     "submit": "Añadir",

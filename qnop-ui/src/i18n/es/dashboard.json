@@ -36,7 +36,7 @@
     "emptyTitle": "Todavía no hay nada aquí",
     "caughtUp": "¡Todo al día!",
     "readyToFinalize": "Lista para finalizar",
-    "resolved": "{{resolved}}/{{total}} resueltas",
+    "resolved": "Resueltas: {{resolved}}/{{total}}",
     "noAnnotations": "Todavía no hay anotaciones"
   },
   "deadlines": {

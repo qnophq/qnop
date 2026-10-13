@@ -122,7 +122,7 @@
     "ceilingNote": "Este límite se fija donde se configura la instalación, no en la configuración de administración."
   },
   "banner": {
-    "dismiss": "Descartar este aviso"
+    "dismiss": "Ocultar este aviso"
   },
   "attachments": {
     "title": "Adjunto de la revisión",
@@ -136,7 +136,7 @@
   "fieldErrors": {
     "REQUIRED": "es obligatorio",
     "NOT_AN_INTEGER": "debe ser un número entero",
-    "NOT_A_BOOLEAN": "debe ser 'true' o 'false'",
+    "NOT_A_BOOLEAN": "debe ser «true» o «false»",
     "NOT_AN_OPTION": "debe ser uno de estos valores: {{options}}",
     "TOO_LONG": "debe tener como máximo {{max}} caracteres",
     "TOO_SHORT": "debe tener al menos {{min}} caracteres",

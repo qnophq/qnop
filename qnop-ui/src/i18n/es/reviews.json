@@ -32,11 +32,11 @@
       "cancelledAutoClosed_one": "Revisión cancelada — {{count}} anotación se cerró automáticamente",
       "cancelledAutoClosed_other": "Revisión cancelada — {{count}} anotaciones se cerraron automáticamente",
       "cancelledAutoClosed_many": "Revisión cancelada — {{count}} anotaciones se cerraron automáticamente",
-      "finalized": "Revisión finalizada — todos los puntos aclarados",
+      "finalized": "Revisión finalizada — todas las objeciones resueltas",
       "draft": "Borrador — todavía no está en revisión",
-      "progressOpen_one": "{{state}} — {{resolved}} de {{count}} anotación resuelta, faltan {{open}}",
-      "progressOpen_other": "{{state}} — {{resolved}} de {{count}} anotaciones resueltas, faltan {{open}}",
-      "progressOpen_many": "{{state}} — {{resolved}} de {{count}} anotaciones resueltas, faltan {{open}}",
+      "progressOpen_one": "{{state}} — {{resolved}} de {{count}} anotación resuelta, pendientes: {{open}}",
+      "progressOpen_other": "{{state}} — {{resolved}} de {{count}} anotaciones resueltas, pendientes: {{open}}",
+      "progressOpen_many": "{{state}} — {{resolved}} de {{count}} anotaciones resueltas, pendientes: {{open}}",
       "progressReady_one": "{{state}} — {{resolved}} de {{count}} anotación resuelta, lista para finalizar",
       "progressReady_other": "{{state}} — {{resolved}} de {{count}} anotaciones resueltas, lista para finalizar",
       "progressReady_many": "{{state}} — {{resolved}} de {{count}} anotaciones resueltas, lista para finalizar",
@@ -120,7 +120,7 @@
     "progressLabel_many": "{{resolved}} de {{count}} anotaciones resueltas",
     "noReviewers": "sin revisores",
     "readyToFinalize": "Lista para finalizar",
-    "resolvedCount": "{{resolved}}/{{total}} resueltas",
+    "resolvedCount": "Resueltas: {{resolved}}/{{total}}",
     "columns": {
       "document": "Documento",
       "role": "Rol",
@@ -143,9 +143,9 @@
     "description": "Documentos de los que eres responsable o que revisas — retómalos donde se quedaron.",
     "descriptionModerating": "Todas las revisiones del espacio de trabajo — estás moderando, no participando.",
     "newReview": "Nueva revisión",
-    "quotaFull_one": "Esta instalación permite {{count}} revisión abierta a la vez, y hay {{used}} abiertas. Al finalizar o archivar una revisión se libera un espacio; el trabajo terminado no ocupa ninguno.",
-    "quotaFull_other": "Esta instalación permite {{count}} revisiones abiertas a la vez, y hay {{used}} abiertas. Al finalizar o archivar una revisión se libera un espacio; el trabajo terminado no ocupa ninguno.",
-    "quotaFull_many": "Esta instalación permite {{count}} revisiones abiertas a la vez, y hay {{used}} abiertas. Al finalizar o archivar una revisión se libera un espacio; el trabajo terminado no ocupa ninguno.",
+    "quotaFull_one": "Esta instalación permite {{count}} revisión abierta a la vez (abiertas ahora: {{used}}). Al finalizar o archivar una revisión se libera una plaza; el trabajo terminado no ocupa ninguna.",
+    "quotaFull_other": "Esta instalación permite {{count}} revisiones abiertas a la vez (abiertas ahora: {{used}}). Al finalizar o archivar una revisión se libera una plaza; el trabajo terminado no ocupa ninguna.",
+    "quotaFull_many": "Esta instalación permite {{count}} revisiones abiertas a la vez (abiertas ahora: {{used}}). Al finalizar o archivar una revisión se libera una plaza; el trabajo terminado no ocupa ninguna.",
     "loadError": {
       "title": "Tus revisiones no llegaron al escritorio",
       "message": "La carga falló de nuestro lado — no es culpa tuya. Vuelve a intentarlo; si sigue pasando, avisa a tu administrador."
@@ -225,7 +225,7 @@
       },
       "archived": {
         "label": "Archivadas",
-        "hint": "Solo las revisiones archivadas fuera de las listas activas"
+        "hint": "Solo las revisiones archivadas, que ya no aparecen en las listas activas"
       },
       "every": {
         "label": "Todos los estados",
@@ -252,7 +252,7 @@
       "resolve": "Resuelve los puntos abiertos",
       "finalize": "Finaliza con historial"
     },
-    "noSlots": "Esta instalación ya no tiene espacios libres para revisiones abiertas.",
+    "noSlots": "Esta instalación ya no tiene plazas libres para revisiones abiertas.",
     "hint": "Sube un documento para empezar."
   },
   "wizard": {
@@ -267,10 +267,10 @@
     "stepOf": "Paso {{step}} de {{total}}",
     "create": "Crear revisión",
     "createAndStart": "Crear e iniciar revisión",
-    "uploadFailed": "La carga falló. Inténtalo de nuevo.",
-    "quotaFull_one": "Esta instalación permite {{count}} revisión abierta a la vez, y hay {{used}} abiertas. Al finalizar o archivar una se libera un espacio; el trabajo terminado no ocupa ninguno.",
-    "quotaFull_other": "Esta instalación permite {{count}} revisiones abiertas a la vez, y hay {{used}} abiertas. Al finalizar o archivar una se libera un espacio; el trabajo terminado no ocupa ninguno.",
-    "quotaFull_many": "Esta instalación permite {{count}} revisiones abiertas a la vez, y hay {{used}} abiertas. Al finalizar o archivar una se libera un espacio; el trabajo terminado no ocupa ninguno.",
+    "uploadFailed": "La subida falló. Inténtalo de nuevo.",
+    "quotaFull_one": "Esta instalación permite {{count}} revisión abierta a la vez (abiertas ahora: {{used}}). Al finalizar o archivar una se libera una plaza; el trabajo terminado no ocupa ninguna.",
+    "quotaFull_other": "Esta instalación permite {{count}} revisiones abiertas a la vez (abiertas ahora: {{used}}). Al finalizar o archivar una se libera una plaza; el trabajo terminado no ocupa ninguna.",
+    "quotaFull_many": "Esta instalación permite {{count}} revisiones abiertas a la vez (abiertas ahora: {{used}}). Al finalizar o archivar una se libera una plaza; el trabajo terminado no ocupa ninguna.",
     "created": {
       "title": "Revisión creada",
       "partial": "La revisión se creó, pero algunos pasos no se pudieron completar: {{failures}}. Puedes terminarlos desde la página de la revisión.",
@@ -371,12 +371,12 @@
   },
   "hub": {
     "progress": {
-      "inDiscussion_one": "Progreso de la revisión: {{resolved}} de {{count}} anotación resuelta · {{discussion}} abiertas en discusión",
-      "inDiscussion_other": "Progreso de la revisión: {{resolved}} de {{count}} anotaciones resueltas · {{discussion}} abiertas en discusión",
-      "inDiscussion_many": "Progreso de la revisión: {{resolved}} de {{count}} anotaciones resueltas · {{discussion}} abiertas en discusión",
-      "stillOpen_one": "Progreso de la revisión: {{resolved}} de {{count}} anotación resuelta · {{open}} aún abiertas",
-      "stillOpen_other": "Progreso de la revisión: {{resolved}} de {{count}} anotaciones resueltas · {{open}} aún abiertas",
-      "stillOpen_many": "Progreso de la revisión: {{resolved}} de {{count}} anotaciones resueltas · {{open}} aún abiertas",
+      "inDiscussion_one": "Progreso de la revisión: {{resolved}} de {{count}} anotación resuelta · en discusión: {{discussion}}",
+      "inDiscussion_other": "Progreso de la revisión: {{resolved}} de {{count}} anotaciones resueltas · en discusión: {{discussion}}",
+      "inDiscussion_many": "Progreso de la revisión: {{resolved}} de {{count}} anotaciones resueltas · en discusión: {{discussion}}",
+      "stillOpen_one": "Progreso de la revisión: {{resolved}} de {{count}} anotación resuelta · aún abiertas: {{open}}",
+      "stillOpen_other": "Progreso de la revisión: {{resolved}} de {{count}} anotaciones resueltas · aún abiertas: {{open}}",
+      "stillOpen_many": "Progreso de la revisión: {{resolved}} de {{count}} anotaciones resueltas · aún abiertas: {{open}}",
       "ready_one": "Progreso de la revisión: {{resolved}} de {{count}} anotación resuelta — lista para finalizar",
       "ready_other": "Progreso de la revisión: {{resolved}} de {{count}} anotaciones resueltas — lista para finalizar",
       "ready_many": "Progreso de la revisión: {{resolved}} de {{count}} anotaciones resueltas — lista para finalizar"
@@ -420,7 +420,7 @@
     "body": "Pasará a ser la versión que todos revisan. Las anotaciones existentes se trasladan y se vuelven a anclar en el nuevo documento; las que ya no encajen se marcan para que las vuelvas a ubicar.",
     "uploaded": "Versión {{version}} subida.",
     "failed": "No se pudo subir la nueva versión.",
-    "progressLabel": "Progreso de la carga",
+    "progressLabel": "Progreso de la subida",
     "processing": "Procesando el documento…",
     "uploadingPercent": "Subiendo… {{percent}} %",
     "uploading": "Subiendo…",

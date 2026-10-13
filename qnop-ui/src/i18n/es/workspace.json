@@ -52,7 +52,7 @@
       "confirm": "Es correcto",
       "confirmHint": "Aceptar el resaltado reubicado",
       "reattach": "Volver a anclar",
-      "reattachHint": "Elige tú mismo el pasaje correcto",
+      "reattachHint": "Elige tú el pasaje correcto",
       "reposition": "Reubicar",
       "repositionHint": "Reubicar esta anotación"
     },
@@ -77,7 +77,7 @@
   "placement": {
     "confirmed": "Ubicación confirmada.",
     "confirmFailed": "No se pudo confirmar la ubicación.",
-    "reattached": "Anotación anclada de nuevo.",
+    "reattached": "Anotación reanclada.",
     "reattachFailed": "No se pudo volver a anclar la anotación."
   },
   "panel": {
@@ -116,8 +116,8 @@
   },
   "reanchor": {
     "summary": "Reanclaje en v{{version}}: {{parts}}.",
-    "moved": "{{count}} movida(s)",
-    "orphaned": "{{count}} huérfana(s)",
+    "moved": "Movidas: {{count}}",
+    "orphaned": "Huérfanas: {{count}}",
     "review": "Revisar",
     "dismiss": "Ocultar el aviso de reanclaje"
   },
@@ -142,7 +142,7 @@
   },
   "dismiss": {
     "open": "Descartar…",
-    "placeholder": "¿Por qué se descarta este punto? (obligatorio)",
+    "placeholder": "¿Por qué se descarta esta objeción? (obligatorio)",
     "label": "Justificación del descarte (obligatoria)",
     "action": "Descartar",
     "note": "La justificación se publica en la conversación; el autor puede reabrirla.",
@@ -271,7 +271,7 @@
     "panelHint": "Documento junto al panel de anotaciones",
     "focus": "Enfoque",
     "focusView": "Modo enfoque",
-    "focusHint": "Documento a ancho completo con la superposición destacada",
+    "focusHint": "Documento a ancho completo con la superposición de foco",
     "showListHint": "Mostrar la lista de anotaciones",
     "showList": "Mostrar anotaciones ({{count}})",
     "zoomOut": "Alejar",
@@ -286,7 +286,7 @@
     "hoverNoComments": "Todavía no hay comentarios.",
     "hoverOpen": "Haz clic para abrir la conversación",
     "placingQuote": "Ubicando <quote/> — selecciona el nuevo pasaje",
-    "placing": "Ubicando la anotación — selecciona su nueva posición",
+    "placing": "Ubicando la anotación — selecciona su nueva ubicación",
     "cancelReattach": "Cancelar el reanclaje"
   },
   "focus": {
@@ -336,7 +336,7 @@
     "pagesLabel_one": "Página",
     "pagesLabel_other": "Páginas",
     "pagesLabel_many": "Páginas",
-    "pageCount": "{{count}} páginas",
+    "pageCount": "Páginas: {{count}}",
     "syncScroll": "Desplazamiento sincronizado",
     "kinds": {
       "INSERTED": "Añadido",

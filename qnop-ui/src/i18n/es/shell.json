@@ -41,7 +41,7 @@
   },
   "notifications": {
     "title": "Notificaciones",
-    "newCount": "{{count}} nuevas",
+    "newCount": "Nuevas: {{count}}",
     "markAllRead": "Marcar todo como leído",
     "loading": "Cargando notificaciones",
     "empty": "Nada nuevo. La actividad de tus revisiones aparecerá aquí.",
@@ -75,6 +75,6 @@
       "teams": "Equipos"
     },
     "inDocument": "en {{title}}",
-    "seeAll": "Ver los {{count}} resultados"
+    "seeAll": "Ver todos los resultados ({{count}})"
   }
 }

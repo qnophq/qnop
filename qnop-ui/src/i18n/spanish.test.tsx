@@ -49,8 +49,8 @@ describe('Spanish', () => {
   });
 
   it('uses the singular for one and the plural for every other count, millions included', () => {
-    // CLDR gives Spanish a "many" category (e.g. 1 000 000); the catalogs only define one/other,
-    // and i18next falls back from many to other.
+    // CLDR gives Spanish a "many" category (e.g. 1 000 000); the catalogs define `_many`
+    // explicitly because a missing category falls back to the English catalog, not to `_other`.
     expect(i18n.t('time.due.inDays', { count: 1 })).toMatch(/1 día/);
     expect(i18n.t('time.due.inDays', { count: 3 })).toMatch(/3 días/);
     expect(i18n.t('time.due.inDays', { count: 1_000_000 })).toMatch(/1000000 días/);
