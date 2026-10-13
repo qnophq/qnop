@@ -117,11 +117,12 @@
     "openReview": "Review öffnen"
   },
   "fieldErrors": {
-    "REQUIRED": "darf nicht leer sein",
+    "REQUIRED": "ist erforderlich",
     "NOT_AN_INTEGER": "muss eine ganze Zahl sein",
     "NOT_A_BOOLEAN": "muss 'true' oder 'false' sein",
     "NOT_AN_OPTION": "muss einer dieser Werte sein: {{options}}",
     "TOO_LONG": "darf höchstens {{max}} Zeichen lang sein",
+    "TOO_SHORT": "muss mindestens {{min}} Zeichen lang sein",
     "LENGTH_OUT_OF_RANGE": "muss zwischen {{min}} und {{max}} Zeichen lang sein",
     "TOO_SMALL": "muss mindestens {{min}} sein",
     "TOO_LARGE": "darf höchstens {{max}} sein",

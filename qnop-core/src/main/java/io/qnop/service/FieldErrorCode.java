@@ -34,10 +34,12 @@ public enum FieldErrorCode {
   NOT_AN_INTEGER,
   /** Neither {@code true} nor {@code false}. */
   NOT_A_BOOLEAN,
-  /** Not one of the allowed values; params: {@code options}. */
+  /** Not one of the allowed values; params: {@code options} (comma-separated). */
   NOT_AN_OPTION,
   /** Longer than allowed; params: {@code max}. */
   TOO_LONG,
+  /** Shorter than allowed; params: {@code min}. */
+  TOO_SHORT,
   /** Length outside a range; params: {@code min}, {@code max}. */
   LENGTH_OUT_OF_RANGE,
   /** Below the minimum; params: {@code min}. */

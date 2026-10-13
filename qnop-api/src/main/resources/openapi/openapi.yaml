@@ -6860,21 +6860,22 @@ components:
           description: >-
             Stable, machine-readable reason (issue #836), so a client can word
             the failure in the user's language: `REQUIRED`, `NOT_AN_INTEGER`,
-            `NOT_A_BOOLEAN`, `NOT_AN_OPTION`, `TOO_LONG`,
+            `NOT_A_BOOLEAN`, `NOT_AN_OPTION`, `TOO_LONG`, `TOO_SHORT`,
             `LENGTH_OUT_OF_RANGE`, `TOO_SMALL`, `TOO_LARGE`, `INVALID_EMAIL`,
             `INVALID_URL`, `INVALID_TIMEZONE`, `INVALID_LANGUAGE`,
-            `INVALID_FORMAT`, `UNKNOWN_SETTING`. Absent when the failure has no
-            stable reason (e.g. a custom constraint message); new codes may be
-            added, so a client falls back to `message` for one it does not
-            know.
+            `INVALID_FORMAT`, `UNKNOWN_SETTING`. Null when the failure has no
+            stable reason (e.g. a custom constraint message, or a size limit on
+            a list); new codes may be added, so a client falls back to `message`
+            for one it does not know.
         params:
           type: object
           additionalProperties:
             type: string
           description: >-
             The values `message` names, keyed per code: `max` (`TOO_LONG`,
-            `TOO_LARGE`), `min` (`TOO_SMALL`), `min` and `max`
-            (`LENGTH_OUT_OF_RANGE`), `options` (`NOT_AN_OPTION`).
+            `TOO_LARGE`), `min` (`TOO_SHORT`, `TOO_SMALL`), `min` and `max`
+            (`LENGTH_OUT_OF_RANGE`), `options` (`NOT_AN_OPTION`, comma-separated).
+            Null when the code has none.
       required:
         - field
         - message

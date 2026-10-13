@@ -40,8 +40,13 @@ final class ConstraintFieldErrors {
 
   private ConstraintFieldErrors() {}
 
-  /** Adds the code and params of {@code violation}'s constraint to {@code error}, if it has any. */
+  /**
+   * Adds the code and params of {@code violation}'s constraint to {@code error}, if it has any.
+   * {@code params} is set only when the code has some, so it is absent (null) otherwise — the same
+   * shape the settings path produces.
+   */
   static FieldError withReason(FieldError error, ConstraintViolation<?> violation) {
+    error.params(null);
     if (violation == null) {
       return error;
     }
@@ -56,28 +61,50 @@ final class ConstraintFieldErrors {
       case "NotNull", "NotBlank", "NotEmpty" -> error.code(FieldErrorCode.REQUIRED.name());
       case "Email" -> error.code(FieldErrorCode.INVALID_EMAIL.name());
       case "Pattern" -> error.code(FieldErrorCode.INVALID_FORMAT.name());
-      case "Min", "DecimalMin" ->
-          error
-              .code(FieldErrorCode.TOO_SMALL.name())
-              .params(Map.of("min", String.valueOf(attributes.get("value"))));
-      case "Max", "DecimalMax" ->
-          error
-              .code(FieldErrorCode.TOO_LARGE.name())
-              .params(Map.of("max", String.valueOf(attributes.get("value"))));
-      case "Size" -> sized(error, attributes);
+      case "Min" -> bound(error, FieldErrorCode.TOO_SMALL, "min", attributes.get("value"));
+      case "Max" -> bound(error, FieldErrorCode.TOO_LARGE, "max", attributes.get("value"));
+      // An exclusive decimal bound ("greater than") is not what "at least"/"at most" say, so it
+      // keeps its English message rather than a code that words it wrongly.
+      case "DecimalMin" ->
+          inclusive(attributes)
+              ? bound(error, FieldErrorCode.TOO_SMALL, "min", attributes.get("value"))
+              : error;
+      case "DecimalMax" ->
+          inclusive(attributes)
+              ? bound(error, FieldErrorCode.TOO_LARGE, "max", attributes.get("value"))
+              : error;
+      // The length codes speak of characters; a sized collection counts items, so it keeps its
+      // English message.
+      case "Size" ->
+          violation.getInvalidValue() instanceof CharSequence ? sized(error, attributes) : error;
       default -> error;
     };
   }
 
-  /** {@code @Size} with only an upper bound reads as "too long"; a real range names both ends. */
+  private static boolean inclusive(Map<String, Object> attributes) {
+    return !Boolean.FALSE.equals(attributes.get("inclusive"));
+  }
+
+  private static FieldError bound(
+      FieldError error, FieldErrorCode code, String name, Object value) {
+    return error.code(code.name()).params(Map.of(name, String.valueOf(value)));
+  }
+
+  /**
+   * A string's {@code @Size}: an upper bound alone reads as "too long", a lower bound alone as "too
+   * short", and a real range names both ends.
+   */
   private static FieldError sized(FieldError error, Map<String, Object> attributes) {
-    String min = String.valueOf(attributes.get("min"));
-    String max = String.valueOf(attributes.get("max"));
-    if ("0".equals(min)) {
-      return error.code(FieldErrorCode.TOO_LONG.name()).params(Map.of("max", max));
+    int min = (Integer) attributes.get("min");
+    int max = (Integer) attributes.get("max");
+    if (min == 0) {
+      return bound(error, FieldErrorCode.TOO_LONG, "max", max);
+    }
+    if (max == Integer.MAX_VALUE) {
+      return bound(error, FieldErrorCode.TOO_SHORT, "min", min);
     }
     return error
         .code(FieldErrorCode.LENGTH_OUT_OF_RANGE.name())
-        .params(Map.of("min", min, "max", max));
+        .params(Map.of("min", String.valueOf(min), "max", String.valueOf(max)));
   }
 }

@@ -90,7 +90,7 @@ public final class ValueValidator {
           keyForError,
           "must be one of " + enumOptions,
           FieldErrorCode.NOT_AN_OPTION,
-          Map.of("options", String.valueOf(enumOptions)));
+          Map.of("options", String.join(", ", enumOptions)));
     }
   }
 
