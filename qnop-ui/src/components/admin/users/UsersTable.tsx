@@ -36,7 +36,9 @@ import TableRow from '@mui/material/TableRow';
 import TableSortLabel from '@mui/material/TableSortLabel';
 import Tooltip from '@mui/material/Tooltip';
 import Typography from '@mui/material/Typography';
+import type { ParseKeys } from 'i18next';
 import { KeyRound, KeySquare, MoreVertical, SquarePen, Trash2 } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import type { AdminUserSummary } from '../../../api/generated';
 import { UserHoverCard } from '../../people/UserHoverCard';
 import { UserAvatar } from '../../shell/UserAvatar';
@@ -57,14 +59,15 @@ interface UsersTableProps {
   onDelete: (user: AdminUserSummary) => void;
 }
 
-const COLUMNS: { key: string; label: string; sortable?: boolean }[] = [
-  { key: 'displayName', label: 'User', sortable: true },
-  { key: 'role', label: 'Role', sortable: true },
-  { key: 'source', label: 'Source' },
-  { key: 'status', label: 'Status' },
-  { key: 'createdAt', label: 'Created', sortable: true },
-  { key: 'lastLoginAt', label: 'Last login', sortable: true },
-  { key: 'actions', label: '' },
+/** Table columns; `labelKey` is an `admin` catalog key, absent for the unlabelled actions column. */
+const COLUMNS: { key: string; labelKey?: ParseKeys<'admin'>; sortable?: boolean }[] = [
+  { key: 'displayName', labelKey: 'users.table.columns.user', sortable: true },
+  { key: 'role', labelKey: 'users.table.columns.role', sortable: true },
+  { key: 'source', labelKey: 'users.table.columns.source' },
+  { key: 'status', labelKey: 'users.table.columns.status' },
+  { key: 'createdAt', labelKey: 'users.table.columns.created', sortable: true },
+  { key: 'lastLoginAt', labelKey: 'users.table.columns.lastLogin', sortable: true },
+  { key: 'actions' },
 ];
 
 export function UsersTable({
@@ -78,6 +81,7 @@ export function UsersTable({
   onToggleEnabled,
   onDelete,
 }: UsersTableProps) {
+  const { t } = useTranslation(['admin', 'common']);
   const { formatDateTime, formatRelative } = useFormatters();
   const [anchorEl, setAnchorEl] = useState<HTMLElement | null>(null);
   const [active, setActive] = useState<AdminUserSummary | null>(null);
@@ -105,10 +109,10 @@ export function UsersTable({
                     direction={sortField === col.key ? direction : 'asc'}
                     onClick={() => onSort(col.key)}
                   >
-                    {col.label}
+                    {col.labelKey && t(col.labelKey)}
                   </TableSortLabel>
                 ) : (
-                  col.label
+                  col.labelKey && t(col.labelKey)
                 )}
               </TableCell>
             ))}
@@ -119,7 +123,7 @@ export function UsersTable({
             <TableRow>
               <TableCell colSpan={COLUMNS.length}>
                 <Typography color="text.secondary" sx={{ py: 4, textAlign: 'center' }}>
-                  No users found.
+                  {t('users.table.empty')}
                 </Typography>
               </TableCell>
             </TableRow>
@@ -143,7 +147,7 @@ export function UsersTable({
                         </Typography>
                       </UserHoverCard>
                       {user.passwordChangeRequired && (
-                        <ToneBadge tone="amber" label="Password change" />
+                        <ToneBadge tone="amber" label={t('users.table.passwordChange')} />
                       )}
                     </Stack>
                     <Typography sx={{ fontSize: 13, color: 'text.secondary' }} noWrap>
@@ -161,7 +165,11 @@ export function UsersTable({
               <TableCell>
                 <Stack direction="row" spacing={1} sx={{ alignItems: 'center' }}>
                   <Tooltip
-                    title={isSelf(user) ? 'You cannot disable your own account' : 'Toggle access'}
+                    title={
+                      isSelf(user)
+                        ? t('users.table.cannotDisableSelf')
+                        : t('users.table.toggleAccess')
+                    }
                   >
                     <span>
                       <Switch
@@ -169,7 +177,11 @@ export function UsersTable({
                         checked={user.enabled}
                         disabled={isSelf(user)}
                         onChange={() => onToggleEnabled(user)}
-                        slotProps={{ input: { 'aria-label': `Toggle ${user.displayName}` } }}
+                        slotProps={{
+                          input: {
+                            'aria-label': t('users.table.toggleUser', { name: user.displayName }),
+                          },
+                        }}
                       />
                     </span>
                   </Tooltip>
@@ -189,7 +201,7 @@ export function UsersTable({
               <TableCell align="right">
                 <IconButton
                   size="small"
-                  aria-label={`Actions for ${user.displayName}`}
+                  aria-label={t('users.table.actionsFor', { name: user.displayName })}
                   onClick={(e) => openMenu(e, user)}
                 >
                   <MoreVertical size={18} />
@@ -210,7 +222,7 @@ export function UsersTable({
           <ListItemIcon>
             <SquarePen size={16} />
           </ListItemIcon>
-          <ListItemText>Edit</ListItemText>
+          <ListItemText>{t('common:actions.edit')}</ListItemText>
         </MenuItem>
         <MenuItem
           disabled={active?.source === 'EXTERNAL'}
@@ -222,7 +234,7 @@ export function UsersTable({
           <ListItemIcon>
             <KeyRound size={16} />
           </ListItemIcon>
-          <ListItemText>Email reset link</ListItemText>
+          <ListItemText>{t('users.table.emailResetLink')}</ListItemText>
         </MenuItem>
         <MenuItem
           disabled={active?.source === 'EXTERNAL'}
@@ -234,7 +246,7 @@ export function UsersTable({
           <ListItemIcon>
             <KeySquare size={16} />
           </ListItemIcon>
-          <ListItemText>Generate password</ListItemText>
+          <ListItemText>{t('users.table.generatePassword')}</ListItemText>
         </MenuItem>
         <MenuItem
           disabled={active ? isSelf(active) : false}
@@ -246,7 +258,7 @@ export function UsersTable({
           <ListItemIcon>
             <Trash2 size={16} />
           </ListItemIcon>
-          <ListItemText>Delete</ListItemText>
+          <ListItemText>{t('common:actions.delete')}</ListItemText>
         </MenuItem>
       </Menu>
     </>

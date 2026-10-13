@@ -19,12 +19,18 @@
  * SPDX-License-Identifier: AGPL-3.0-only
  */
 
+import type { ParseKeys } from 'i18next';
 import type { ServerConfigFeatures } from '../../api/generated';
 
-const EMAIL_TABS = [
-  { path: 'server', label: 'Server', feature: 'smtpConfiguration' },
-  { path: 'templates', label: 'Templates', feature: 'emailTemplates' },
-] as const;
+/** Each tab's label is an `admin` catalog key, translated where the tab renders. */
+const EMAIL_TABS: ReadonlyArray<{
+  path: 'server' | 'templates';
+  labelKey: ParseKeys<'admin'>;
+  feature: 'smtpConfiguration' | 'emailTemplates';
+}> = [
+  { path: 'server', labelKey: 'mail.layout.tabs.server', feature: 'smtpConfiguration' },
+  { path: 'templates', labelKey: 'mail.layout.tabs.templates', feature: 'emailTemplates' },
+];
 
 /**
  * The tabs this deployment offers (issues #678/#679). A withheld capability

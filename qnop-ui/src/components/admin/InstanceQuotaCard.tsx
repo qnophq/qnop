@@ -23,7 +23,9 @@ import Box from '@mui/material/Box';
 import LinearProgress from '@mui/material/LinearProgress';
 import Stack from '@mui/material/Stack';
 import Typography from '@mui/material/Typography';
+import type { ParseKeys } from 'i18next';
 import { Gauge } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import type { InstanceLimitsResponse, InstanceQuota } from '../../api/generated';
 import { useInstanceLimits } from '../../api/hooks/useAdminConfiguration';
 import { SectionCard } from './layout/SectionCard';
@@ -33,8 +35,9 @@ import { tokens } from '../../theme/tokens';
 const NEARLY_FULL = 0.8;
 
 interface Row {
-  label: string;
-  hint: string;
+  /** `admin` catalog keys (issue #836), translated at render. */
+  labelKey: ParseKeys<'admin'>;
+  hintKey: ParseKeys<'admin'>;
   quota: InstanceQuota;
 }
 
@@ -50,34 +53,41 @@ interface Row {
  * empty card explaining that there are no limits would be a row of zeroes to interpret.
  */
 export function InstanceQuotaCard() {
+  const { t } = useTranslation('admin');
   const { data } = useInstanceLimits();
   if (!data || !hasAnyLimit(data)) {
     return null;
   }
 
   const rows: Row[] = [
-    { label: 'User accounts', hint: 'enabled accounts', quota: data.users },
-    { label: 'Teams', hint: 'teams on this instance', quota: data.teams },
-    { label: 'Members per team', hint: 'the largest team', quota: data.teamMembers },
-    { label: 'Active reviews', hint: 'not finished, not archived', quota: data.activeReviews },
+    { labelKey: 'quota.rows.users.label', hintKey: 'quota.rows.users.hint', quota: data.users },
+    { labelKey: 'quota.rows.teams.label', hintKey: 'quota.rows.teams.hint', quota: data.teams },
+    {
+      labelKey: 'quota.rows.teamMembers.label',
+      hintKey: 'quota.rows.teamMembers.hint',
+      quota: data.teamMembers,
+    },
+    {
+      labelKey: 'quota.rows.activeReviews.label',
+      hintKey: 'quota.rows.activeReviews.hint',
+      quota: data.activeReviews,
+    },
   ];
 
   return (
-    <SectionCard
-      icon={Gauge}
-      title="Instance quotas"
-      description="What this deployment may hold. Set where it is deployed, not in the settings — an administrator can read these but not raise them."
-    >
+    <SectionCard icon={Gauge} title={t('quota.title')} description={t('quota.description')}>
       <Stack spacing={2.25}>
         {rows.map((row) => (
-          <QuotaRow key={row.label} {...row} />
+          <QuotaRow key={row.labelKey} {...row} />
         ))}
       </Stack>
     </SectionCard>
   );
 }
 
-function QuotaRow({ label, hint, quota }: Row) {
+function QuotaRow({ labelKey, hintKey, quota }: Row) {
+  const { t } = useTranslation('admin');
+  const label = t(labelKey);
   const unlimited = quota.maximum <= 0;
   const share = unlimited ? 0 : Math.min(1, quota.used / quota.maximum);
   const full = !unlimited && quota.used >= quota.maximum;
@@ -92,7 +102,7 @@ function QuotaRow({ label, hint, quota }: Row) {
       <Box sx={{ display: 'flex', alignItems: 'baseline', gap: 1, mb: 0.75 }}>
         <Typography sx={{ fontSize: 14, fontWeight: 600 }}>{label}</Typography>
         <Typography color="text.secondary" sx={{ fontSize: 12.5 }}>
-          {hint}
+          {t(hintKey)}
         </Typography>
         <Typography
           sx={{
@@ -103,7 +113,9 @@ function QuotaRow({ label, hint, quota }: Row) {
             color: full ? tokens.semantic.danger : 'text.primary',
           }}
         >
-          {unlimited ? `${quota.used} — no limit` : `${quota.used} of ${quota.maximum}`}
+          {unlimited
+            ? t('quota.noLimit', { used: quota.used })
+            : t('quota.usedOf', { used: quota.used, maximum: quota.maximum })}
         </Typography>
       </Box>
       {!unlimited && (
@@ -113,7 +125,11 @@ function QuotaRow({ label, hint, quota }: Row) {
           // lowered it, and a bar past the end would read as a rendering fault
           // rather than as the fact it is.
           value={share * 100}
-          aria-label={`${label}: ${quota.used} of ${quota.maximum}`}
+          aria-label={t('quota.progressLabel', {
+            label,
+            used: quota.used,
+            maximum: quota.maximum,
+          })}
           sx={{
             height: 6,
             borderRadius: 999,

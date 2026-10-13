@@ -26,18 +26,26 @@ import IconButton from '@mui/material/IconButton';
 import Stack from '@mui/material/Stack';
 import Tooltip from '@mui/material/Tooltip';
 import Typography from '@mui/material/Typography';
+import type { ParseKeys } from 'i18next';
 import { Check, Copy, ExternalLink } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import type { OidcProviderTypeDto } from '../../../api/generated';
 
 interface ProviderHelp {
-  /** Where in the provider's admin UI the operator finds the redirect-URI setting. */
-  whereToFind: string;
-  /** What that field is labelled at the upstream provider. */
+  /**
+   * `admin` catalog key: where in the provider's admin UI the operator finds the redirect-URI
+   * setting.
+   */
+  whereToFindKey: ParseKeys<'admin'>;
+  /**
+   * What that field is labelled at the upstream provider — quoted verbatim from the vendor's UI,
+   * so it stays untranslated.
+   */
   fieldLabel: string;
   /** Optional direct link to the provider's console / developer settings. */
   consoleUrl?: string;
-  /** Human-readable label for the console link. */
-  consoleLabel?: string;
+  /** `admin` catalog key of the console link's label. */
+  consoleLabelKey?: ParseKeys<'admin'>;
 }
 
 /**
@@ -47,29 +55,29 @@ interface ProviderHelp {
  */
 const PROVIDER_HELP: Record<OidcProviderTypeDto, ProviderHelp> = {
   GOOGLE: {
-    whereToFind: 'APIs & Services → Credentials → OAuth 2.0 Client IDs → your client',
+    whereToFindKey: 'oidc.callback.help.GOOGLE.whereToFind',
     fieldLabel: 'Authorized redirect URIs',
     consoleUrl: 'https://console.cloud.google.com/apis/credentials',
-    consoleLabel: 'Open Google Cloud Console',
+    consoleLabelKey: 'oidc.callback.help.GOOGLE.console',
   },
   GITHUB: {
-    whereToFind: 'GitHub → Settings → Developer settings → OAuth Apps → your app',
+    whereToFindKey: 'oidc.callback.help.GITHUB.whereToFind',
     fieldLabel: 'Authorization callback URL',
     consoleUrl: 'https://github.com/settings/developers',
-    consoleLabel: 'Open GitHub developer settings',
+    consoleLabelKey: 'oidc.callback.help.GITHUB.console',
   },
   FACEBOOK: {
-    whereToFind: 'Meta for Developers → your app → Facebook Login → Settings',
+    whereToFindKey: 'oidc.callback.help.FACEBOOK.whereToFind',
     fieldLabel: 'Valid OAuth Redirect URIs',
     consoleUrl: 'https://developers.facebook.com/apps',
-    consoleLabel: 'Open Meta for Developers',
+    consoleLabelKey: 'oidc.callback.help.FACEBOOK.console',
   },
   OIDC: {
-    whereToFind: "Your IdP's client configuration (Keycloak, Authentik, Auth0, Dex, …)",
+    whereToFindKey: 'oidc.callback.help.OIDC.whereToFind',
     fieldLabel: 'Valid Redirect URIs',
   },
   OAUTH2: {
-    whereToFind: "Your provider's OAuth2 application settings",
+    whereToFindKey: 'oidc.callback.help.OAUTH2.whereToFind',
     fieldLabel: 'Redirect URI / Callback URL',
   },
 };
@@ -102,6 +110,7 @@ export function ProviderCallbackInstructions({
   providerType,
   variant = 'inline',
 }: ProviderCallbackInstructionsProps) {
+  const { t } = useTranslation(['admin', 'common']);
   const callbackUrl = useMemo(() => buildCallbackUrl(providerId), [providerId]);
   const help = PROVIDER_HELP[providerType];
   const [copied, setCopied] = useState(false);
@@ -141,17 +150,17 @@ export function ProviderCallbackInstructions({
             lineHeight: 1,
           }}
         >
-          Callback URL
+          {t('oidc.callback.title')}
         </Typography>
         <Typography variant="caption" sx={{ color: 'text.secondary' }}>
-          register this at your provider
+          {t('oidc.callback.subtitle')}
         </Typography>
       </Stack>
       <Stack direction="row" spacing={1} sx={{ alignItems: 'stretch' }}>
         <Box
           component="code"
           tabIndex={0}
-          aria-label="OAuth2 callback URL"
+          aria-label={t('oidc.callback.urlLabel')}
           sx={{
             flex: 1,
             minWidth: 0,
@@ -170,10 +179,14 @@ export function ProviderCallbackInstructions({
         >
           {callbackUrl}
         </Box>
-        <Tooltip title={copied ? 'Copied' : 'Copy to clipboard'} placement="top" arrow>
+        <Tooltip
+          title={copied ? t('common:actions.copied') : t('oidc.callback.copyTooltip')}
+          placement="top"
+          arrow
+        >
           <IconButton
             onClick={handleCopy}
-            aria-label="Copy callback URL"
+            aria-label={t('oidc.callback.copy')}
             color={copied ? 'success' : 'default'}
             sx={{
               border: 1,
@@ -199,7 +212,7 @@ export function ProviderCallbackInstructions({
         <Box sx={{ minWidth: 0 }}>
           <Typography variant="body2" sx={{ lineHeight: 1.45 }}>
             <Typography component="span" variant="body2" sx={{ color: 'text.secondary' }}>
-              Paste into:{' '}
+              {t('oidc.callback.pasteInto')}{' '}
             </Typography>
             <Typography component="span" variant="body2" sx={{ fontWeight: 600 }}>
               {help.fieldLabel}
@@ -209,7 +222,7 @@ export function ProviderCallbackInstructions({
             variant="caption"
             sx={{ color: 'text.secondary', display: 'block', lineHeight: 1.4, mt: 0.25 }}
           >
-            {help.whereToFind}
+            {t(help.whereToFindKey)}
           </Typography>
         </Box>
         {help.consoleUrl && (
@@ -223,7 +236,7 @@ export function ProviderCallbackInstructions({
             endIcon={<ExternalLink size={14} />}
             sx={{ flexShrink: 0, whiteSpace: 'nowrap' }}
           >
-            {help.consoleLabel ?? 'Open provider console'}
+            {help.consoleLabelKey ? t(help.consoleLabelKey) : t('oidc.callback.openConsole')}
           </Button>
         )}
       </Stack>

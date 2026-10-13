@@ -32,6 +32,8 @@ import TableRow from '@mui/material/TableRow';
 import Tooltip from '@mui/material/Tooltip';
 import Typography from '@mui/material/Typography';
 import { ChevronRight } from 'lucide-react';
+import type { ParseKeys } from 'i18next';
+import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router';
 import type { MailTemplateResponse } from '../../api/generated';
 import { useMailTemplates } from '../../api/hooks/useMailTemplates';
@@ -39,10 +41,19 @@ import { ToneBadge } from '../../components/admin/ToneBadge';
 import { useFormatters } from '../../hooks/useFormatters';
 import { localeDisplayName, localeShortCode } from '../../utils/locale';
 
-const COLUMNS = ['Template', 'Subject', 'Language', 'Source', 'Last edited', ''];
+/** Column headers as `admin` keys; `null` is the unlabelled chevron column. */
+const COLUMNS: Array<ParseKeys<'admin'> | null> = [
+  'mailTemplates.list.columns.template',
+  'mailTemplates.list.columns.subject',
+  'mailTemplates.list.columns.language',
+  'mailTemplates.list.columns.source',
+  'mailTemplates.list.columns.lastEdited',
+  null,
+];
 
 /** A compact, navigable template row: name + key, subject, language, source and edit attribution. */
 function TemplateRow({ template, onOpen }: { template: MailTemplateResponse; onOpen: () => void }) {
+  const { t } = useTranslation('admin');
   const { formatRelative } = useFormatters();
   const customised = template.source === 'DATABASE';
   const onKeyDown = (event: KeyboardEvent<HTMLTableRowElement>) => {
@@ -58,13 +69,13 @@ function TemplateRow({ template, onOpen }: { template: MailTemplateResponse; onO
       tabIndex={0}
       onClick={onOpen}
       onKeyDown={onKeyDown}
-      aria-label={`Edit the ${template.friendlyName} template`}
+      aria-label={t('mailTemplates.list.rowAria', { name: template.friendlyName })}
       sx={{
         cursor: 'pointer',
         '& td': { borderColor: 'divider' },
         '&:hover .row-chevron': { opacity: 1, transform: 'translateX(2px)' },
         '&:focus-visible': {
-          outline: (t) => `2px solid ${t.qnop.brand.blue}`,
+          outline: (theme) => `2px solid ${theme.qnop.brand.blue}`,
           outlineOffset: '-2px',
         },
       }}
@@ -93,7 +104,7 @@ function TemplateRow({ template, onOpen }: { template: MailTemplateResponse; onO
       <TableCell>
         <ToneBadge
           tone={customised ? 'blue' : 'neutral'}
-          label={customised ? 'Custom' : 'Default'}
+          label={customised ? t('mailTemplates.source.custom') : t('mailTemplates.source.default')}
         />
       </TableCell>
 
@@ -103,7 +114,7 @@ function TemplateRow({ template, onOpen }: { template: MailTemplateResponse; onO
             <Typography sx={{ fontSize: 13 }}>{formatRelative(template.updatedAt)}</Typography>
             {template.updatedByName && (
               <Typography sx={{ fontSize: 12, color: 'text.secondary' }}>
-                by {template.updatedByName}
+                {t('mailTemplates.list.editedBy', { name: template.updatedByName })}
               </Typography>
             )}
           </>
@@ -119,7 +130,7 @@ function TemplateRow({ template, onOpen }: { template: MailTemplateResponse; onO
             display: 'inline-flex',
             color: 'text.secondary',
             opacity: 0.5,
-            transition: (t) => t.transitions.create(['transform', 'opacity']),
+            transition: (theme) => theme.transitions.create(['transform', 'opacity']),
           }}
           aria-hidden
         >
@@ -138,6 +149,7 @@ function TemplateRow({ template, onOpen }: { template: MailTemplateResponse; onO
  * read as factory defaults. Opening a row routes to its editor.
  */
 export function MailTemplatesListPage() {
+  const { t } = useTranslation(['admin', 'common']);
   const { data, isLoading, isFetching, isError } = useMailTemplates();
   const navigate = useNavigate();
 
@@ -148,7 +160,7 @@ export function MailTemplatesListPage() {
       <Box sx={{ height: 3 }}>{isFetching && <LinearProgress />}</Box>
       {isError ? (
         <Alert severity="error" sx={{ m: 2 }}>
-          The mail templates could not be loaded.
+          {t('mailTemplates.list.loadError')}
         </Alert>
       ) : (
         <Table size="medium" sx={{ '& th': { borderColor: 'divider' } }}>
@@ -156,11 +168,11 @@ export function MailTemplatesListPage() {
             <TableRow>
               {COLUMNS.map((col, index) => (
                 <TableCell
-                  key={col || 'chevron'}
+                  key={col ?? 'chevron'}
                   align={index === COLUMNS.length - 1 ? 'right' : 'left'}
                   sx={{ fontSize: 12, color: 'text.secondary', fontWeight: 600 }}
                 >
-                  {col}
+                  {col && t(col)}
                 </TableCell>
               ))}
             </TableRow>
@@ -170,7 +182,7 @@ export function MailTemplatesListPage() {
               <TableRow>
                 <TableCell colSpan={COLUMNS.length}>
                   <Typography color="text.secondary" sx={{ py: 4, textAlign: 'center' }}>
-                    No mail templates.
+                    {t('mailTemplates.list.empty')}
                   </Typography>
                 </TableCell>
               </TableRow>
@@ -189,7 +201,7 @@ export function MailTemplatesListPage() {
       )}
       {isLoading && (
         <Typography color="text.secondary" sx={{ p: 2, fontSize: 14 }}>
-          Loading…
+          {t('common:loading')}
         </Typography>
       )}
     </Paper>

@@ -32,6 +32,7 @@ import TableRow from '@mui/material/TableRow';
 import Tooltip from '@mui/material/Tooltip';
 import Typography from '@mui/material/Typography';
 import { Trash2 } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import type { OrphanedObject } from '../../../api/generated';
 import { useFormatters } from '../../../hooks/useFormatters';
 import { formatBytes } from '../../../utils/formatBytes';
@@ -69,6 +70,7 @@ export function OrphanedObjectsTable({
   onDeleteOne,
   busy,
 }: OrphanedObjectsTableProps) {
+  const { t } = useTranslation('admin');
   const { formatDateTime, formatRelative } = useFormatters();
   const allSelected = objects.length > 0 && selected.size === objects.length;
   const someSelected = selected.size > 0 && !allSelected;
@@ -96,12 +98,12 @@ export function OrphanedObjectsTable({
               indeterminate={someSelected}
               onChange={onToggleAll}
               disabled={busy || objects.length === 0}
-              slotProps={{ input: { 'aria-label': 'Select all orphaned objects' } }}
+              slotProps={{ input: { 'aria-label': t('storage.orphaned.selectAll') } }}
             />
           </TableCell>
-          <TableCell>Object key</TableCell>
-          <TableCell align="right">Size</TableCell>
-          <TableCell>Last modified</TableCell>
+          <TableCell>{t('storage.orphaned.columns.key')}</TableCell>
+          <TableCell align="right">{t('storage.orphaned.columns.size')}</TableCell>
+          <TableCell>{t('storage.orphaned.columns.lastModified')}</TableCell>
           <TableCell padding="checkbox" />
         </TableRow>
       </TableHead>
@@ -110,7 +112,7 @@ export function OrphanedObjectsTable({
           <TableRow>
             <TableCell colSpan={5}>
               <Typography color="text.secondary" sx={{ py: 3, textAlign: 'center' }}>
-                No orphaned objects.
+                {t('storage.orphaned.empty')}
               </Typography>
             </TableCell>
           </TableRow>
@@ -125,7 +127,9 @@ export function OrphanedObjectsTable({
                     checked={checked}
                     onChange={() => onToggle(key)}
                     disabled={busy}
-                    slotProps={{ input: { 'aria-label': `Select ${key}` } }}
+                    slotProps={{
+                      input: { 'aria-label': t('storage.orphaned.selectOne', { key }) },
+                    }}
                   />
                 </TableCell>
                 <TableCell>
@@ -143,14 +147,14 @@ export function OrphanedObjectsTable({
                   </Tooltip>
                 </TableCell>
                 <TableCell padding="checkbox">
-                  <Tooltip title="Delete this object">
+                  <Tooltip title={t('storage.orphaned.deleteOne')}>
                     <span>
                       <IconButton
                         size="small"
                         color="error"
                         onClick={() => onDeleteOne(key)}
                         disabled={busy}
-                        aria-label={`Delete ${key}`}
+                        aria-label={t('storage.orphaned.deleteOneAria', { key })}
                       >
                         <Trash2 size={16} />
                       </IconButton>
@@ -171,13 +175,13 @@ export function OrphanedObjectsTable({
               rowsPerPage={rowsPerPage}
               page={safePage}
               colSpan={5}
-              labelRowsPerPage="Objects per page"
+              labelRowsPerPage={t('storage.orphaned.perPage')}
               onPageChange={(_, next) => setPage(next)}
               onRowsPerPageChange={(event) => {
                 setRowsPerPage(parseInt(event.target.value, 10));
                 setPage(0);
               }}
-              slotProps={{ select: { 'aria-label': 'Objects per page' } }}
+              slotProps={{ select: { 'aria-label': t('storage.orphaned.perPage') } }}
             />
           </TableRow>
         </TableFooter>

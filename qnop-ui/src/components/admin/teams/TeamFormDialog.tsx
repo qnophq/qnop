@@ -33,6 +33,7 @@ import Stack from '@mui/material/Stack';
 import Switch from '@mui/material/Switch';
 import TextField from '@mui/material/TextField';
 import Typography from '@mui/material/Typography';
+import { useTranslation } from 'react-i18next';
 import type { AdminTeamSummary, PrincipalView } from '../../../api/generated';
 import { usePrincipalSearch } from '../../../api/hooks/useReviews';
 import { UserAvatar } from '../../shell/UserAvatar';
@@ -54,6 +55,7 @@ interface TeamFormDialogProps {
  * the dialog per open (key) so there is no reset-via-effect.
  */
 export function TeamFormDialog({ open, mode, team, onClose }: TeamFormDialogProps) {
+  const { t } = useTranslation(['admin', 'common']);
   const createTeam = useCreateTeam();
   const updateTeam = useUpdateTeam();
   const uploadAvatar = useUploadTeamAvatar();
@@ -77,9 +79,12 @@ export function TeamFormDialog({ open, mode, team, onClose }: TeamFormDialogProp
   }, [leadSearch]);
   const leadOptionsQuery = usePrincipalSearch(mode === 'edit' ? '' : debouncedLeadSearch);
   const leadOptions = (leadOptionsQuery.data?.principals ?? []).filter((p) => p.kind === 'USER');
-  const [error, setError] = useState<string | null>(null);
+  // The failed save itself; its message is resolved at render so it follows a language switch.
+  const [error, setError] = useState<{ cause: unknown } | null>(null);
   const [submitAttempted, setSubmitAttempted] = useState(false);
+  // Field messages from the server arrive as text; a taken name is flagged and translated here.
   const [serverErrors, setServerErrors] = useState<Record<string, string>>({});
+  const [nameTaken, setNameTaken] = useState(false);
 
   // Avatar: in edit mode we upload/remove immediately against the existing team; in create mode we
   // hold the chosen image and upload it to the new team after it's created (create-then-upload).
@@ -115,22 +120,26 @@ export function TeamFormDialog({ open, mode, team, onClose }: TeamFormDialogProp
 
   const clientErrors: Record<string, string> = {};
   if (name.trim().length === 0) {
-    clientErrors.name = 'A team name is required.';
+    clientErrors.name = t('teams.form.errors.nameRequired');
   }
   if (!isEdit && lead === null) {
-    clientErrors.leadUserId = 'Every team needs a lead — pick one.';
+    clientErrors.leadUserId = t('teams.form.errors.leadRequired');
   }
 
   const fieldError = (field: string): string | undefined =>
-    serverErrors[field] ?? (submitAttempted ? clientErrors[field] : undefined);
+    (field === 'name' && nameTaken ? t('teams.form.errors.nameTaken') : undefined) ??
+    serverErrors[field] ??
+    (submitAttempted ? clientErrors[field] : undefined);
 
-  const clearServer = (field: string) =>
+  const clearServer = (field: string) => {
+    if (field === 'name') setNameTaken(false);
     setServerErrors((prev) => {
       if (!(field in prev)) return prev;
       const rest = { ...prev };
       delete rest[field];
       return rest;
     });
+  };
 
   const onSubmit = async (event: FormEvent) => {
     event.preventDefault();
@@ -169,13 +178,14 @@ export function TeamFormDialog({ open, mode, team, onClose }: TeamFormDialogProp
       onClose();
     } catch (err) {
       if (apiErrorCode(err) === 'NAME_TAKEN') {
-        setServerErrors({ name: 'A team with that name already exists.' });
+        setServerErrors({});
+        setNameTaken(true);
       } else {
         const serverFieldErrors = apiFieldErrors(err);
         if (Object.keys(serverFieldErrors).length > 0) {
           setServerErrors(serverFieldErrors);
         } else {
-          setError(apiErrorMessage(err, 'Saving failed. Please try again.'));
+          setError({ cause: err });
         }
       }
     }
@@ -184,19 +194,21 @@ export function TeamFormDialog({ open, mode, team, onClose }: TeamFormDialogProp
   return (
     <Dialog open={open} onClose={onClose} fullWidth maxWidth="sm">
       <Box component="form" onSubmit={onSubmit} noValidate>
-        <DialogTitle>{isEdit ? 'Edit team' : 'Create team'}</DialogTitle>
+        <DialogTitle>
+          {isEdit ? t('teams.form.editTitle') : t('teams.form.createTitle')}
+        </DialogTitle>
         <DialogContent>
           <Stack spacing={2.5} sx={{ mt: 1 }}>
             <AvatarUploader
               variant="team"
-              name={name || 'Team'}
+              name={name || t('teams.form.avatarFallbackName')}
               imageUrl={avatarUrl}
               busy={avatarBusy}
               onSelect={onSelectAvatar}
               onRemove={onRemoveAvatar}
             />
             <TextField
-              label="Name"
+              label={t('teams.form.name')}
               value={name}
               onChange={(e) => {
                 setName(e.target.value);
@@ -208,7 +220,7 @@ export function TeamFormDialog({ open, mode, team, onClose }: TeamFormDialogProp
               helperText={fieldError('name')}
             />
             <TextField
-              label="Description"
+              label={t('teams.form.description')}
               value={description}
               onChange={(e) => setDescription(e.target.value)}
               fullWidth
@@ -228,7 +240,7 @@ export function TeamFormDialog({ open, mode, team, onClose }: TeamFormDialogProp
                 getOptionLabel={(u) => u.displayName}
                 isOptionEqualToValue={(a, b) => a.id === b.id}
                 filterOptions={(x) => x}
-                noOptionsText="No matching users"
+                noOptionsText={t('teams.form.noOptions')}
                 // The person, not just a string - the app-wide picker recipe
                 // (avatar + name), as in the review wizard's reviewer step.
                 renderOption={({ key, ...optionProps }, option) => (
@@ -245,14 +257,11 @@ export function TeamFormDialog({ open, mode, team, onClose }: TeamFormDialogProp
                 renderInput={(params) => (
                   <TextField
                     {...params}
-                    label="Team lead"
-                    placeholder="Search by name"
+                    label={t('teams.form.lead')}
+                    placeholder={t('teams.form.leadPlaceholder')}
                     required
                     error={Boolean(fieldError('leadUserId'))}
-                    helperText={
-                      fieldError('leadUserId') ??
-                      'Added as the team\u2019s LEAD - every team starts with one.'
-                    }
+                    helperText={fieldError('leadUserId') ?? t('teams.form.leadHelper')}
                   />
                 )}
               />
@@ -263,17 +272,17 @@ export function TeamFormDialog({ open, mode, team, onClose }: TeamFormDialogProp
                 control={
                   <Switch checked={enabled} onChange={(e) => setEnabled(e.target.checked)} />
                 }
-                label={enabled ? 'Team active' : 'Team disabled'}
+                label={enabled ? t('teams.form.active') : t('teams.form.disabled')}
               />
               <FormControlLabel
                 control={
                   <Switch
                     checked={showMembers}
                     onChange={(e) => setShowMembers(e.target.checked)}
-                    slotProps={{ input: { 'aria-label': 'Show members on the public profile' } }}
+                    slotProps={{ input: { 'aria-label': t('teams.form.showMembersAria') } }}
                   />
                 }
-                label="Public profile: show members"
+                label={t('teams.form.showMembers')}
               />
               <FormControlLabel
                 control={
@@ -281,22 +290,26 @@ export function TeamFormDialog({ open, mode, team, onClose }: TeamFormDialogProp
                     checked={showReviews}
                     onChange={(e) => setShowReviews(e.target.checked)}
                     slotProps={{
-                      input: { 'aria-label': 'Show review participation on the public profile' },
+                      input: { 'aria-label': t('teams.form.showReviewsAria') },
                     }}
                   />
                 }
-                label="Public profile: show review participation"
+                label={t('teams.form.showReviews')}
               />
             </Stack>
-            {error && <Alert severity="error">{error}</Alert>}
+            {error && (
+              <Alert severity="error">
+                {apiErrorMessage(error.cause, t('teams.form.errors.saveFailed'))}
+              </Alert>
+            )}
           </Stack>
         </DialogContent>
         <DialogActions sx={{ px: 3, pb: 2.5 }}>
           <Button onClick={onClose} color="inherit">
-            Cancel
+            {t('common:actions.cancel')}
           </Button>
           <Button type="submit" variant="contained" disabled={submitting}>
-            {isEdit ? 'Save' : 'Create'}
+            {isEdit ? t('common:actions.save') : t('common:actions.create')}
           </Button>
         </DialogActions>
       </Box>

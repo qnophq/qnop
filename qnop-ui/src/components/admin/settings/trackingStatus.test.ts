@@ -34,7 +34,8 @@ describe('trackingStatus', () => {
     });
 
     expect(status?.severity).toBe('warning');
-    expect(status?.message).toMatch(/switched off/i);
+    expect(status?.messageKey).toBe('settings.tracking.switchedOff');
+    expect(status?.values).toEqual({ provider: 'Umami' });
   });
 
   it('confirms a working configuration', () => {
@@ -46,8 +47,8 @@ describe('trackingStatus', () => {
     });
 
     expect(status?.severity).toBe('success');
-    expect(status?.message).toContain('Umami');
-    expect(status?.message).toContain('https://analytics.example');
+    expect(status?.messageKey).toBe('settings.tracking.measuringAt');
+    expect(status?.values).toEqual({ provider: 'Umami', host: 'https://analytics.example' });
   });
 
   it('points at the missing site id', () => {
@@ -58,7 +59,7 @@ describe('trackingStatus', () => {
     });
 
     expect(status?.severity).toBe('warning');
-    expect(status?.message).toMatch(/site id/i);
+    expect(status?.messageKey).toBe('settings.tracking.needsSiteId');
   });
 
   it('asks for a host only where the backend is self-hosted', () => {
@@ -69,7 +70,7 @@ describe('trackingStatus', () => {
       'tracking.host': '',
     });
     expect(selfHosted?.severity).toBe('warning');
-    expect(selfHosted?.message).toMatch(/self-hosted/i);
+    expect(selfHosted?.messageKey).toBe('settings.tracking.needsHost');
 
     // Plausible has a cloud, so an empty host is a complete configuration.
     const cloud = trackingStatus({
@@ -79,6 +80,7 @@ describe('trackingStatus', () => {
       'tracking.host': '',
     });
     expect(cloud?.severity).toBe('success');
+    expect(cloud?.messageKey).toBe('settings.tracking.measuring');
   });
 
   it('says nothing at all when tracking was never set up', () => {
@@ -89,6 +91,6 @@ describe('trackingStatus', () => {
     const status = trackingStatus({ 'tracking.enabled': 'true', 'tracking.provider': 'none' });
 
     expect(status?.severity).toBe('warning');
-    expect(status?.message).toMatch(/no backend/i);
+    expect(status?.messageKey).toBe('settings.tracking.noBackend');
   });
 });

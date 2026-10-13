@@ -32,6 +32,7 @@ import IconButton from '@mui/material/IconButton';
 import TextField from '@mui/material/TextField';
 import Tooltip from '@mui/material/Tooltip';
 import { Check, Copy } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 
 interface GeneratedPasswordDialogProps {
   open: boolean;
@@ -52,6 +53,7 @@ export function GeneratedPasswordDialog({
   password,
   onClose,
 }: GeneratedPasswordDialogProps) {
+  const { t } = useTranslation(['admin', 'common']);
   const [copied, setCopied] = useState(false);
 
   const copy = async () => {
@@ -65,12 +67,9 @@ export function GeneratedPasswordDialog({
 
   return (
     <Dialog open={open} onClose={onClose} fullWidth maxWidth="sm">
-      <DialogTitle>Temporary password for {displayName}</DialogTitle>
+      <DialogTitle>{t('users.generatedPassword.title', { name: displayName })}</DialogTitle>
       <DialogContent>
-        <DialogContentText sx={{ mb: 2 }}>
-          Share this one-time password with the user over a secure channel. They must change it on
-          their next sign-in, and their existing sessions have already been revoked.
-        </DialogContentText>
+        <DialogContentText sx={{ mb: 2 }}>{t('users.generatedPassword.body')}</DialogContentText>
         <TextField
           value={password}
           fullWidth
@@ -81,8 +80,13 @@ export function GeneratedPasswordDialog({
               readOnly: true,
               endAdornment: (
                 <InputAdornment position="end">
-                  <Tooltip title={copied ? 'Copied' : 'Copy'}>
-                    <IconButton aria-label="Copy password" size="small" edge="end" onClick={copy}>
+                  <Tooltip title={copied ? t('common:actions.copied') : t('common:actions.copy')}>
+                    <IconButton
+                      aria-label={t('users.generatedPassword.copyLabel')}
+                      size="small"
+                      edge="end"
+                      onClick={copy}
+                    >
                       {copied ? <Check size={16} /> : <Copy size={16} />}
                     </IconButton>
                   </Tooltip>
@@ -92,13 +96,12 @@ export function GeneratedPasswordDialog({
           }}
         />
         <Alert severity="warning" sx={{ mt: 2 }}>
-          This password is shown only once and cannot be retrieved later. If you lose it, generate a
-          new one.
+          {t('users.generatedPassword.warning')}
         </Alert>
       </DialogContent>
       <DialogActions sx={{ px: 3, pb: 2.5 }}>
         <Button onClick={onClose} variant="contained">
-          Done
+          {t('common:actions.done')}
         </Button>
       </DialogActions>
     </Dialog>

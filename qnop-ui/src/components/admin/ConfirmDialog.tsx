@@ -25,11 +25,13 @@ import DialogActions from '@mui/material/DialogActions';
 import DialogContent from '@mui/material/DialogContent';
 import DialogContentText from '@mui/material/DialogContentText';
 import DialogTitle from '@mui/material/DialogTitle';
+import { useTranslation } from 'react-i18next';
 
 interface ConfirmDialogProps {
   open: boolean;
   title: string;
   message: string;
+  /** The confirm button's label; defaults to the shared `common:actions.confirm`. */
   confirmLabel?: string;
   destructive?: boolean;
   onConfirm: () => void;
@@ -41,11 +43,12 @@ export function ConfirmDialog({
   open,
   title,
   message,
-  confirmLabel = 'Confirm',
+  confirmLabel,
   destructive = false,
   onConfirm,
   onClose,
 }: ConfirmDialogProps) {
+  const { t } = useTranslation('common');
   return (
     <Dialog open={open} onClose={onClose} maxWidth="xs" fullWidth>
       <DialogTitle>{title}</DialogTitle>
@@ -54,10 +57,10 @@ export function ConfirmDialog({
       </DialogContent>
       <DialogActions sx={{ px: 3, pb: 2.5 }}>
         <Button onClick={onClose} color="inherit">
-          Cancel
+          {t('actions.cancel')}
         </Button>
         <Button onClick={onConfirm} variant="contained" color={destructive ? 'error' : 'primary'}>
-          {confirmLabel}
+          {confirmLabel ?? t('actions.confirm')}
         </Button>
       </DialogActions>
     </Dialog>

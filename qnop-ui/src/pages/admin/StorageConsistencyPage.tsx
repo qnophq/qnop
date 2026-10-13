@@ -36,6 +36,7 @@ import {
   RefreshCw,
   Trash2,
 } from 'lucide-react';
+import { Trans, useTranslation } from 'react-i18next';
 import { useDeleteOrphans, useStorageConsistency } from '../../api/hooks/useStorageConsistency';
 import { PageHeader } from '../../components/admin/layout/PageHeader';
 import { SectionCard } from '../../components/admin/layout/SectionCard';
@@ -62,6 +63,7 @@ function isScanLimit(error: unknown): boolean {
  * a reassuring all-clear.
  */
 export function StorageConsistencyPage() {
+  const { t } = useTranslation(['admin', 'common']);
   const { data, isLoading, isFetching, isError, error, refetch } = useStorageConsistency();
   const deleteOrphans = useDeleteOrphans();
   const { formatRelative } = useFormatters();
@@ -93,14 +95,16 @@ export function StorageConsistencyPage() {
     deleteOrphans.mutate(keys, {
       onSuccess: (result) => {
         const skipped = result.skipped.length;
+        const count = result.deleted.length;
         notify(
-          `Deleted ${result.deleted.length} object${result.deleted.length === 1 ? '' : 's'}` +
-            (skipped > 0 ? `, skipped ${skipped} (now referenced)` : '.'),
+          skipped > 0
+            ? t('storage.delete.deletedSkipped', { count, skipped })
+            : t('storage.delete.deleted', { count }),
           skipped > 0 ? 'error' : 'success',
         );
         setSelected(new Set());
       },
-      onError: () => notify('The objects could not be deleted.', 'error'),
+      onError: () => notify(t('storage.delete.failed'), 'error'),
       onSettled: () => setPendingDelete(null),
     });
   };
@@ -110,8 +114,8 @@ export function StorageConsistencyPage() {
       if (result.isError) {
         notify(
           isScanLimit(result.error)
-            ? 'Rescan stopped: the bucket holds more objects than the scan limit.'
-            : 'The storage-consistency scan could not be run.',
+            ? t('storage.rescanResult.stoppedAtLimit')
+            : t('storage.scanFailed'),
           'error',
         );
         return;
@@ -119,22 +123,38 @@ export function StorageConsistencyPage() {
       const s = result.data?.summary;
       notify(
         s
-          ? `Rescan complete — ${s.missingCount} missing, ${s.orphanedCount} orphaned.`
-          : 'Rescan complete.',
+          ? t('storage.rescanResult.completeSummary', {
+              missing: s.missingCount,
+              orphaned: s.orphanedCount,
+            })
+          : t('storage.rescanResult.complete'),
       );
     });
   };
 
   const tiles: StatTile[] = [
-    { label: 'DB references', value: summary?.dbReferencedCount ?? 0, icon: Database },
-    { label: 'Storage objects', value: summary?.storageObjectCount ?? 0, icon: HardDrive },
     {
-      label: 'Missing binaries',
+      label: t('storage.tiles.dbReferences'),
+      value: summary?.dbReferencedCount ?? 0,
+      icon: Database,
+    },
+    {
+      label: t('storage.tiles.storageObjects'),
+      value: summary?.storageObjectCount ?? 0,
+      icon: HardDrive,
+    },
+    {
+      label: t('storage.tiles.missing'),
       value: summary?.missingCount ?? 0,
       icon: FileWarning,
       tone: 'danger',
     },
-    { label: 'Orphaned objects', value: summary?.orphanedCount ?? 0, icon: Boxes, tone: 'warning' },
+    {
+      label: t('storage.tiles.orphaned'),
+      value: summary?.orphanedCount ?? 0,
+      icon: Boxes,
+      tone: 'warning',
+    },
   ];
 
   const consistent = summary != null && summary.missingCount === 0 && summary.orphanedCount === 0;
@@ -142,11 +162,11 @@ export function StorageConsistencyPage() {
   return (
     <Stack spacing={3}>
       <PageHeader
-        title="Storage consistency"
+        title={t('storage.title')}
         description={
           summary
-            ? `Last scanned ${formatRelative(summary.scannedAt)}.`
-            : 'Reconcile document binaries in object storage against the database.'
+            ? t('storage.lastScanned', { when: formatRelative(summary.scannedAt) })
+            : t('storage.description')
         }
         action={
           <Button
@@ -169,40 +189,37 @@ export function StorageConsistencyPage() {
             onClick={handleRescan}
             disabled={isFetching}
           >
-            {isFetching ? 'Scanning…' : 'Rescan'}
+            {isFetching ? t('storage.scanning') : t('storage.rescan')}
           </Button>
         }
       />
 
       {isScanLimit(error) ? (
         <Alert severity="warning">
-          The scan was stopped because the bucket holds more objects than the scan limit. Narrow the
-          scope or raise <code>qnop.s3.consistency-scan-max-keys</code>, then rescan.
+          <Trans t={t} i18nKey="storage.scanLimit" components={{ code: <code /> }} />
         </Alert>
       ) : isError ? (
-        <Alert severity="error">The storage-consistency scan could not be run.</Alert>
+        <Alert severity="error">{t('storage.scanFailed')}</Alert>
       ) : isLoading ? (
         <Typography color="text.secondary" sx={{ p: 1, fontSize: 14 }}>
-          Scanning…
+          {t('storage.scanning')}
         </Typography>
       ) : (
         <>
           <StatStrip tiles={tiles} />
 
           {consistent && (
-            <SectionCard icon={CheckCircle2} title="Everything reconciles">
-              <Typography color="text.secondary">
-                Every referenced binary is present and no stored object is orphaned.
-              </Typography>
+            <SectionCard icon={CheckCircle2} title={t('storage.consistent.title')}>
+              <Typography color="text.secondary">{t('storage.consistent.message')}</Typography>
             </SectionCard>
           )}
 
           {missing.length > 0 && (
             <SectionCard
               icon={FileWarning}
-              title="Missing binaries"
-              description="Referenced objects that are gone — resolve through the affected document."
-              action={<ToneBadge tone="red" label="Data loss" />}
+              title={t('storage.missing.title')}
+              description={t('storage.missing.description')}
+              action={<ToneBadge tone="red" label={t('storage.missing.badge')} />}
             >
               <Box sx={{ overflowX: 'auto' }}>
                 <MissingBinariesTable binaries={missing} />
@@ -213,9 +230,9 @@ export function StorageConsistencyPage() {
           {orphaned.length > 0 && (
             <SectionCard
               icon={Boxes}
-              title="Orphaned objects"
-              description="Stored objects no database row references — safe to delete."
-              action={<ToneBadge tone="amber" label="Unreferenced" />}
+              title={t('storage.orphaned.title')}
+              description={t('storage.orphaned.description')}
+              action={<ToneBadge tone="amber" label={t('storage.orphaned.badge')} />}
             >
               <Stack spacing={1.5}>
                 <Box>
@@ -227,7 +244,7 @@ export function StorageConsistencyPage() {
                     disabled={selected.size === 0 || busy}
                     onClick={() => setPendingDelete([...selected])}
                   >
-                    Delete selected ({selected.size})
+                    {t('storage.orphaned.deleteSelected', { count: selected.size })}
                   </Button>
                 </Box>
                 <Paper variant="outlined" sx={{ overflow: 'hidden' }}>
@@ -251,13 +268,9 @@ export function StorageConsistencyPage() {
 
       <ConfirmDialog
         open={pendingDelete !== null}
-        title="Delete orphaned objects?"
-        message={
-          `This permanently deletes ${pendingDelete?.length ?? 0} object` +
-          `${(pendingDelete?.length ?? 0) === 1 ? '' : 's'} from storage. Any that became ` +
-          `referenced since the scan are skipped automatically.`
-        }
-        confirmLabel="Delete"
+        title={t('storage.delete.title')}
+        message={t('storage.delete.message', { count: pendingDelete?.length ?? 0 })}
+        confirmLabel={t('common:actions.delete')}
         destructive
         onConfirm={confirmDelete}
         onClose={() => setPendingDelete(null)}

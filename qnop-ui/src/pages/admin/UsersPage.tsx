@@ -30,7 +30,9 @@ import Stack from '@mui/material/Stack';
 import TablePagination from '@mui/material/TablePagination';
 import TextField from '@mui/material/TextField';
 import Typography from '@mui/material/Typography';
+import type { ParseKeys } from 'i18next';
 import { UserPlus } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import { ClearableSearchField } from '../../components/ClearableSearchField';
 import type { AdminUserSummary, UserRole } from '../../api/generated';
 import {
@@ -63,14 +65,15 @@ type DialogState =
 
 type StatusFilter = '' | 'active' | 'disabled';
 
-const CONFLICT_MESSAGES: Record<string, string> = {
-  LAST_ADMIN: 'At least one enabled admin must remain.',
-  SELF_LOCKOUT: "You can't disable or change the role of your own account.",
-  SELF_DELETE: "You can't delete your own account.",
+const CONFLICT_MESSAGES: Record<string, ParseKeys<'admin'>> = {
+  LAST_ADMIN: 'users.conflicts.LAST_ADMIN',
+  SELF_LOCKOUT: 'users.conflicts.SELF_LOCKOUT',
+  SELF_DELETE: 'users.conflicts.SELF_DELETE',
 };
 
 /** Admin user management: search/filter/sort, paginate, create, edit, delete and reset (#104/#124). */
 export function UsersPage() {
+  const { t } = useTranslation(['admin', 'common']);
   const currentUserId = useAuthStore((s) => s.userId);
   const updateUser = useUpdateUser();
   const deleteUser = useDeleteUser();
@@ -93,6 +96,13 @@ export function UsersPage() {
     password: string;
   } | null>(null);
   const { toast, notify, clear } = useToast();
+
+  /** Maps a known 409 conflict code to a friendly message, else the generic fallback. */
+  const conflictOr = (err: unknown, fallback: string): string => {
+    const code = apiErrorCode(err);
+    const conflictKey = code ? CONFLICT_MESSAGES[code] : undefined;
+    return conflictKey ? t(conflictKey) : apiErrorMessage(err, fallback);
+  };
 
   const openCreate = () => {
     setDialog({ open: true, mode: 'create' });
@@ -135,7 +145,7 @@ export function UsersPage() {
     try {
       await updateUser.mutateAsync({ id: user.id, request: { enabled: !user.enabled } });
     } catch (err) {
-      notify(conflictOr(err, `Could not update ${user.displayName}.`), 'error');
+      notify(conflictOr(err, t('users.toasts.updateFailed', { name: user.displayName })), 'error');
     }
   };
 
@@ -143,14 +153,14 @@ export function UsersPage() {
     try {
       const outcome = await sendReset.mutateAsync(user.id);
       if (outcome.emailSent) {
-        notify(`Password reset emailed to ${user.email}. Sessions revoked.`);
+        notify(t('users.toasts.resetEmailed', { email: user.email }));
       } else if (outcome.resetUrl) {
         setResetLink({ displayName: user.displayName, url: outcome.resetUrl });
       } else {
-        notify(`Reset triggered for ${user.displayName}, but no link was returned.`, 'error');
+        notify(t('users.toasts.resetNoLink', { name: user.displayName }), 'error');
       }
     } catch (err) {
-      notify(conflictOr(err, 'The reset could not be triggered.'), 'error');
+      notify(conflictOr(err, t('users.toasts.resetFailed')), 'error');
     }
   };
 
@@ -159,7 +169,7 @@ export function UsersPage() {
       const outcome = await generatePassword.mutateAsync(user.id);
       setGeneratedPassword({ displayName: user.displayName, password: outcome.password });
     } catch (err) {
-      notify(conflictOr(err, 'A password could not be generated.'), 'error');
+      notify(conflictOr(err, t('users.toasts.generateFailed')), 'error');
     }
   };
 
@@ -167,9 +177,9 @@ export function UsersPage() {
     if (!deleteTarget) return;
     try {
       await deleteUser.mutateAsync(deleteTarget.id);
-      notify(`User “${deleteTarget.displayName}” deleted.`);
+      notify(t('users.toasts.deleted', { name: deleteTarget.displayName }));
     } catch (err) {
-      notify(conflictOr(err, 'Could not delete the user.'), 'error');
+      notify(conflictOr(err, t('users.toasts.deleteFailed')), 'error');
     } finally {
       setDeleteTarget(null);
     }
@@ -184,11 +194,11 @@ export function UsersPage() {
   return (
     <Stack spacing={3}>
       <PageHeader
-        title="Users"
+        title={t('users.page.title')}
         description={
           seatLimit > 0
-            ? `Manage accounts, roles and access. ${seatsUsed} of ${seatLimit} seats used.`
-            : 'Manage accounts, roles and access.'
+            ? t('users.page.descriptionWithSeats', { used: seatsUsed, count: seatLimit })
+            : t('users.page.description')
         }
         action={
           // Disabled rather than left to fail: filling in a name, an email and a
@@ -201,29 +211,26 @@ export function UsersPage() {
             disabled={seatsFull}
             onClick={openCreate}
           >
-            Add user
+            {t('users.page.addUser')}
           </Button>
         }
       />
 
       {seatsFull && (
-        <QuotaAlert>
-          This instance is configured for {seatLimit} accounts and holds {seatsUsed}. Deleting an
-          account frees a seat; disabling one does not.
-        </QuotaAlert>
+        <QuotaAlert>{t('users.page.seatsFull', { used: seatsUsed, count: seatLimit })}</QuotaAlert>
       )}
 
       <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1.5} sx={{ flexWrap: 'wrap' }}>
         <ClearableSearchField
           value={search}
           onValueChange={setSearch}
-          placeholder="Search by name, email or username"
-          inputAriaLabel="Search users"
+          placeholder={t('users.page.searchPlaceholder')}
+          inputAriaLabel={t('users.page.searchLabel')}
           sx={{ flex: 1, minWidth: 240, maxWidth: 420 }}
         />
         <TextField
           select
-          label="Role"
+          label={t('users.page.roleFilter')}
           value={roleFilter}
           onChange={(e) => {
             setRoleFilter(e.target.value as UserRole | '');
@@ -232,14 +239,14 @@ export function UsersPage() {
           size="small"
           sx={{ minWidth: 150 }}
         >
-          <MenuItem value="">All roles</MenuItem>
-          <MenuItem value="ADMIN">Admin</MenuItem>
-          <MenuItem value="MEMBER">Member</MenuItem>
-          <MenuItem value="AUDITOR">Auditor</MenuItem>
+          <MenuItem value="">{t('users.page.allRoles')}</MenuItem>
+          <MenuItem value="ADMIN">{t('roles.global.ADMIN')}</MenuItem>
+          <MenuItem value="MEMBER">{t('roles.global.MEMBER')}</MenuItem>
+          <MenuItem value="AUDITOR">{t('roles.global.AUDITOR')}</MenuItem>
         </TextField>
         <TextField
           select
-          label="Status"
+          label={t('users.page.statusFilter')}
           value={statusFilter}
           onChange={(e) => {
             setStatusFilter(e.target.value as StatusFilter);
@@ -248,9 +255,9 @@ export function UsersPage() {
           size="small"
           sx={{ minWidth: 150 }}
         >
-          <MenuItem value="">All statuses</MenuItem>
-          <MenuItem value="active">Active</MenuItem>
-          <MenuItem value="disabled">Disabled</MenuItem>
+          <MenuItem value="">{t('users.page.allStatuses')}</MenuItem>
+          <MenuItem value="active">{t('users.status.active')}</MenuItem>
+          <MenuItem value="disabled">{t('users.status.disabled')}</MenuItem>
         </TextField>
       </Stack>
 
@@ -258,7 +265,7 @@ export function UsersPage() {
         <Box sx={{ height: 3 }}>{isFetching && <LinearProgress />}</Box>
         {isError ? (
           <Alert severity="error" sx={{ m: 2 }}>
-            The user list could not be loaded.
+            {t('users.page.loadError')}
           </Alert>
         ) : (
           <>
@@ -284,14 +291,16 @@ export function UsersPage() {
                 setPageSize(parseInt(e.target.value, 10));
                 setPage(0);
               }}
-              labelRowsPerPage="Users per page"
-              labelDisplayedRows={({ from, to, count }) => `${from}–${to} of ${count}`}
+              labelRowsPerPage={t('users.page.rowsPerPage')}
+              labelDisplayedRows={({ from, to, count }) =>
+                t('users.page.displayedRows', { from, to, count })
+              }
             />
           </>
         )}
         {isLoading && (
           <Typography color="text.secondary" sx={{ p: 2, fontSize: 14 }}>
-            Loading…
+            {t('common:loading')}
           </Typography>
         )}
       </Paper>
@@ -306,9 +315,9 @@ export function UsersPage() {
 
       <ConfirmDialog
         open={deleteTarget !== null}
-        title="Delete user"
-        message={`Permanently delete “${deleteTarget?.displayName}”? Their sessions, settings and team memberships are removed. This cannot be undone.`}
-        confirmLabel="Delete"
+        title={t('users.delete.title')}
+        message={t('users.delete.message', { name: deleteTarget?.displayName ?? '' })}
+        confirmLabel={t('common:actions.delete')}
         destructive
         onConfirm={confirmDelete}
         onClose={() => setDeleteTarget(null)}
@@ -331,10 +340,4 @@ export function UsersPage() {
       <AdminToast toast={toast} onClose={clear} />
     </Stack>
   );
-}
-
-/** Maps a known 409 conflict code to a friendly message, else the generic fallback. */
-function conflictOr(err: unknown, fallback: string): string {
-  const code = apiErrorCode(err);
-  return (code && CONFLICT_MESSAGES[code]) ?? apiErrorMessage(err, fallback);
 }

@@ -19,6 +19,7 @@
  * SPDX-License-Identifier: AGPL-3.0-only
  */
 
+import type { ReactNode } from 'react';
 import Box from '@mui/material/Box';
 import Button from '@mui/material/Button';
 import CircularProgress from '@mui/material/CircularProgress';
@@ -29,7 +30,9 @@ import Stack from '@mui/material/Stack';
 import Switch from '@mui/material/Switch';
 import Typography from '@mui/material/Typography';
 import { useTheme } from '@mui/material/styles';
+import type { ParseKeys } from 'i18next';
 import { CheckCircle2, MinusCircle, Play, XCircle } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import type { SchedulerJob } from '../../../api/generated';
 import { useFormatters } from '../../../hooks/useFormatters';
 import { ToneBadge, type BadgeTone } from '../ToneBadge';
@@ -58,15 +61,30 @@ interface SchedulerJobCardProps {
   jobSettingsEditable: boolean;
 }
 
-/** The last-run outcome as a coloured pill: green success, red failure, neutral "never run". */
-function outcomeBadge(job: SchedulerJob) {
+/**
+ * The last-run outcome as a coloured pill: green success, red failure, neutral "never run".
+ * The label is an `admin` catalog key, translated at render.
+ */
+function outcomeBadge(job: SchedulerJob): {
+  tone: BadgeTone;
+  labelKey: ParseKeys<'admin'>;
+  icon: ReactNode;
+} {
   if (job.lastOutcome === 'SUCCESS') {
-    return { tone: 'green' as BadgeTone, label: 'Success', icon: <CheckCircle2 size={13} /> };
+    return {
+      tone: 'green',
+      labelKey: 'scheduler.card.outcome.success',
+      icon: <CheckCircle2 size={13} />,
+    };
   }
   if (job.lastOutcome === 'FAILURE') {
-    return { tone: 'red' as BadgeTone, label: 'Failed', icon: <XCircle size={13} /> };
+    return { tone: 'red', labelKey: 'scheduler.card.outcome.failed', icon: <XCircle size={13} /> };
   }
-  return { tone: 'neutral' as BadgeTone, label: 'Never run', icon: <MinusCircle size={13} /> };
+  return {
+    tone: 'neutral',
+    labelKey: 'scheduler.card.outcome.neverRun',
+    icon: <MinusCircle size={13} />,
+  };
 }
 
 /**
@@ -85,6 +103,7 @@ export function SchedulerJobCard({
   manualRunEnabled,
   jobSettingsEditable,
 }: SchedulerJobCardProps) {
+  const { t } = useTranslation('admin');
   const theme = useTheme();
   const { formatRelative } = useFormatters();
   const badge = outcomeBadge(job);
@@ -135,11 +154,17 @@ export function SchedulerJobCard({
             spacing={1}
             sx={{ alignItems: 'center', mt: 1.25, flexWrap: 'wrap', rowGap: 0.5 }}
           >
-            <ToneBadge tone={badge.tone} label={badge.label} icon={badge.icon} />
+            <ToneBadge tone={badge.tone} label={t(badge.labelKey)} icon={badge.icon} />
             {job.lastRunAt && (
               <Typography color="text.secondary" sx={{ fontSize: 12.5 }}>
-                {job.lastTrigger === 'MANUAL' ? 'Ran manually' : 'Last run'}{' '}
-                {formatRelative(job.lastRunAt)}
+                {t(
+                  job.lastTrigger === 'MANUAL'
+                    ? 'scheduler.card.ranManually'
+                    : 'scheduler.card.lastRun',
+                  {
+                    when: formatRelative(job.lastRunAt),
+                  },
+                )}
               </Typography>
             )}
             {job.lastDetail && (
@@ -180,12 +205,16 @@ export function SchedulerJobCard({
                   checked={job.enabled}
                   disabled={saving || !jobSettingsEditable}
                   onChange={() => onToggleEnabled(job)}
-                  slotProps={{ input: { 'aria-label': `Enable ${job.displayName}` } }}
+                  slotProps={{
+                    input: {
+                      'aria-label': t('scheduler.card.enableAria', { job: job.displayName }),
+                    },
+                  }}
                 />
               }
               label={
                 <Typography sx={{ fontSize: 13, mr: 1 }}>
-                  {job.enabled ? 'Enabled' : 'Disabled'}
+                  {job.enabled ? t('scheduler.card.enabled') : t('scheduler.card.disabled')}
                 </Typography>
               }
             />
@@ -199,10 +228,16 @@ export function SchedulerJobCard({
                     checked={job.dryRun}
                     disabled={saving || !jobSettingsEditable}
                     onChange={() => onToggleDryRun(job)}
-                    slotProps={{ input: { 'aria-label': `Dry-run ${job.displayName}` } }}
+                    slotProps={{
+                      input: {
+                        'aria-label': t('scheduler.card.dryRunAria', { job: job.displayName }),
+                      },
+                    }}
                   />
                 }
-                label={<Typography sx={{ fontSize: 13, mr: 1 }}>Dry run</Typography>}
+                label={
+                  <Typography sx={{ fontSize: 13, mr: 1 }}>{t('scheduler.card.dryRun')}</Typography>
+                }
               />
             )}
           </Stack>
@@ -216,7 +251,7 @@ export function SchedulerJobCard({
               }
               onClick={() => onRunNow(job)}
             >
-              Run now
+              {t('scheduler.card.runNow')}
             </Button>
           )}
         </Stack>

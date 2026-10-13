@@ -1,0 +1,966 @@
+{
+  "roles": {
+    "global": {
+      "ADMIN": "Admin",
+      "MEMBER": "Mitglied",
+      "AUDITOR": "Auditor"
+    },
+    "team": {
+      "LEAD": "Teamleitung",
+      "MEMBER": "Mitglied"
+    }
+  },
+  "users": {
+    "status": {
+      "active": "Aktiv",
+      "disabled": "Deaktiviert"
+    },
+    "source": {
+      "external": "Extern",
+      "local": "Lokal"
+    },
+    "page": {
+      "title": "Benutzer",
+      "description": "Verwalte Konten, Rollen und Zugriffe.",
+      "descriptionWithSeats_one": "Verwalte Konten, Rollen und Zugriffe. {{used}} von {{count}} Platz belegt.",
+      "descriptionWithSeats_other": "Verwalte Konten, Rollen und Zugriffe. {{used}} von {{count}} Plätzen belegt.",
+      "addUser": "Benutzer hinzufügen",
+      "seatsFull_one": "Diese Instanz ist für {{count}} Konto konfiguriert und enthält {{used}}. Wenn du ein Konto löschst, wird ein Platz frei — deaktivieren reicht dafür nicht.",
+      "seatsFull_other": "Diese Instanz ist für {{count}} Konten konfiguriert und enthält {{used}}. Wenn du ein Konto löschst, wird ein Platz frei — deaktivieren reicht dafür nicht.",
+      "searchPlaceholder": "Nach Name, E-Mail oder Benutzername suchen",
+      "searchLabel": "Benutzer durchsuchen",
+      "roleFilter": "Rolle",
+      "allRoles": "Alle Rollen",
+      "statusFilter": "Status",
+      "allStatuses": "Alle Status",
+      "loadError": "Die Benutzerliste konnte nicht geladen werden.",
+      "rowsPerPage": "Benutzer pro Seite",
+      "displayedRows": "{{from}}–{{to}} von {{count}}"
+    },
+    "conflicts": {
+      "LAST_ADMIN": "Mindestens ein aktiver Admin muss erhalten bleiben.",
+      "SELF_LOCKOUT": "Du kannst dein eigenes Konto nicht deaktivieren und seine Rolle nicht ändern.",
+      "SELF_DELETE": "Du kannst dein eigenes Konto nicht löschen.",
+      "EMAIL_TAKEN": "Es gibt bereits ein Konto mit dieser E-Mail-Adresse.",
+      "USERNAME_TAKEN": "Dieser Benutzername ist bereits vergeben."
+    },
+    "toasts": {
+      "updateFailed": "{{name}} konnte nicht aktualisiert werden.",
+      "resetEmailed": "Link zum Zurücksetzen an {{email}} gesendet. Sitzungen wurden beendet.",
+      "resetNoLink": "Zurücksetzen für {{name}} ausgelöst, aber es wurde kein Link zurückgegeben.",
+      "resetFailed": "Das Zurücksetzen konnte nicht ausgelöst werden.",
+      "generateFailed": "Es konnte kein Passwort erzeugt werden.",
+      "deleted": "Benutzer „{{name}}“ gelöscht.",
+      "deleteFailed": "Der Benutzer konnte nicht gelöscht werden."
+    },
+    "delete": {
+      "title": "Benutzer löschen",
+      "message": "„{{name}}“ endgültig löschen? Sitzungen, Einstellungen und Teammitgliedschaften werden entfernt. Das lässt sich nicht rückgängig machen."
+    },
+    "table": {
+      "columns": {
+        "user": "Benutzer",
+        "role": "Rolle",
+        "source": "Herkunft",
+        "status": "Status",
+        "created": "Erstellt",
+        "lastLogin": "Letzte Anmeldung"
+      },
+      "empty": "Keine Benutzer gefunden.",
+      "passwordChange": "Passwortänderung",
+      "cannotDisableSelf": "Du kannst dein eigenes Konto nicht deaktivieren",
+      "toggleAccess": "Zugriff umschalten",
+      "toggleUser": "{{name}} umschalten",
+      "actionsFor": "Aktionen für {{name}}",
+      "emailResetLink": "Link zum Zurücksetzen senden",
+      "generatePassword": "Passwort erzeugen"
+    },
+    "resetLink": {
+      "title": "Link zum Zurücksetzen für {{name}}",
+      "body": "Die E-Mail zum Zurücksetzen konnte nicht gesendet werden. Kopiere diesen einmalig gültigen Link und gib ihn an den Benutzer weiter. Die bestehenden Sitzungen wurden bereits beendet.",
+      "copyLabel": "Link zum Zurücksetzen kopieren"
+    },
+    "generatedPassword": {
+      "title": "Temporäres Passwort für {{name}}",
+      "body": "Gib dieses Einmalpasswort über einen sicheren Kanal an den Benutzer weiter. Bei der nächsten Anmeldung muss es geändert werden; die bestehenden Sitzungen wurden bereits beendet.",
+      "copyLabel": "Passwort kopieren",
+      "warning": "Dieses Passwort wird nur einmal angezeigt und lässt sich später nicht mehr abrufen. Wenn du es verlierst, erzeuge ein neues."
+    },
+    "form": {
+      "createTitle": "Benutzer hinzufügen",
+      "editTitle": "Benutzer bearbeiten",
+      "fullName": "Vollständiger Name",
+      "username": "Benutzername",
+      "usernameHelper": "Mindestens 3 Zeichen, eindeutig.",
+      "email": "E-Mail",
+      "role": "Rolle",
+      "accountActive": "Konto aktiv",
+      "accountDisabled": "Konto deaktiviert",
+      "methodInvite": "Einladung per E-Mail senden (der Benutzer legt sein Passwort selbst fest)",
+      "methodPassword": "Jetzt ein Passwort festlegen (muss bei der ersten Anmeldung geändert werden)",
+      "initialPassword": "Anfangspasswort",
+      "errors": {
+        "fullNameRequired": "Ein vollständiger Name ist erforderlich.",
+        "usernameTooShort": "Gib mindestens 3 Zeichen ein.",
+        "emailRequired": "Eine E-Mail-Adresse ist erforderlich.",
+        "emailInvalid": "Gib eine gültige E-Mail-Adresse ein.",
+        "passwordWeak": "Wähle ein stärkeres Passwort (mindestens 8 Zeichen).",
+        "avatarUpload": "Das Bild konnte nicht hochgeladen werden.",
+        "avatarRemove": "Das Bild konnte nicht entfernt werden.",
+        "save": "Speichern fehlgeschlagen. Bitte versuche es noch einmal."
+      }
+    }
+  },
+  "mail": {
+    "layout": {
+      "title": "E-Mail",
+      "description": "Ausgehende E-Mails: der SMTP-Server und die Systemvorlagen, die qnop verschickt. Änderungen greifen ohne Neustart.",
+      "tabsLabel": "Unterseiten der E-Mail-Verwaltung",
+      "tabs": {
+        "server": "Server",
+        "templates": "Vorlagen"
+      }
+    },
+    "fields": {
+      "host": "Host",
+      "port": "Port",
+      "username": "Benutzername",
+      "password": "Passwort",
+      "encryption": "Verschlüsselung",
+      "from": "Absenderadresse",
+      "fromName": "Absendername"
+    },
+    "encryption": {
+      "none": {
+        "label": "Keine",
+        "hint": "Reines SMTP — keine Transportverschlüsselung"
+      },
+      "starttls": {
+        "label": "STARTTLS",
+        "hint": "Erzwungenes Upgrade · meist Port 587"
+      },
+      "tls": {
+        "label": "Implizites TLS",
+        "hint": "SSL ab Verbindungsaufbau · meist Port 465"
+      }
+    },
+    "status": {
+      "disabled": {
+        "label": "Deaktiviert",
+        "detail": "Ausgehende E-Mails sind ausgeschaltet. Nachrichten werden übersprungen, bis du sie aktivierst."
+      },
+      "incomplete": {
+        "label": "Unvollständig",
+        "detail": "Aktiviert, aber noch kein SMTP-Host eingetragen — trage einen Host ein, um mit dem Versand zu beginnen."
+      },
+      "ready": {
+        "label": "Bereit",
+        "detail": "Ausgehende E-Mails sind aktiviert und ein Host ist konfiguriert."
+      }
+    },
+    "validation": {
+      "hostRequired": "Für den E-Mail-Versand ist ein Host erforderlich.",
+      "port": "Gib einen Port zwischen 1 und 65535 ein.",
+      "email": "Gib eine gültige E-Mail-Adresse ein.",
+      "recipient": "Gib eine gültige Empfängeradresse ein."
+    },
+    "server": {
+      "saved": "SMTP-Einstellungen gespeichert.",
+      "saveFailed": "Die SMTP-Einstellungen konnten nicht gespeichert werden.",
+      "loadFailed": "Die SMTP-Einstellungen konnten nicht geladen werden.",
+      "passwordStored": "Verschlüsselt gespeichert. Lass das Feld leer, um das aktuelle Passwort zu behalten.",
+      "connection": {
+        "title": "Verbindung",
+        "description": "Wo und wie qnop deinen SMTP-Server erreicht."
+      },
+      "identity": {
+        "title": "Absender",
+        "description": "Wie ausgehende Nachrichten ihren Absender anzeigen."
+      },
+      "delivery": {
+        "title": "Status & Versand",
+        "description": "Schalte ausgehende E-Mails ein und prüfe sie mit einer Testnachricht.",
+        "enable": "Ausgehende E-Mails aktivieren",
+        "testTitle": "Testnachricht senden",
+        "testDescription": "Wird mit den gespeicherten SMTP-Einstellungen an die Adresse unten zugestellt.",
+        "sendTest": "Test senden",
+        "saveFirst": "Speichere deine Änderungen, bevor du eine Testnachricht sendest."
+      },
+      "saveChanges": "Änderungen speichern",
+      "saving": "Wird gespeichert…",
+      "unsavedChanges_one": "{{count}} ungespeicherte Änderung.",
+      "unsavedChanges_other": "{{count}} ungespeicherte Änderungen.",
+      "noUnsavedChanges": "Keine ungespeicherten Änderungen."
+    },
+    "test": {
+      "title": "Test-E-Mail senden",
+      "recipient": "Empfänger",
+      "recipientPlaceholder": "du@example.com",
+      "recipientHelper": "Verwendet die konfigurierten SMTP-Einstellungen.",
+      "send": "Senden",
+      "sending": "Wird gesendet…",
+      "failed": "Die Test-E-Mail konnte nicht gesendet werden."
+    }
+  },
+  "storage": {
+    "title": "Speicherkonsistenz",
+    "description": "Gleiche die Dokument-Binärdateien im Objektspeicher mit der Datenbank ab.",
+    "lastScanned": "Zuletzt geprüft {{when}}.",
+    "rescan": "Erneut prüfen",
+    "scanning": "Wird geprüft…",
+    "scanLimit": "Die Prüfung wurde abgebrochen, weil der Bucket mehr Objekte enthält, als das Prüflimit erlaubt. Schränke den Umfang ein oder erhöhe <code>qnop.s3.consistency-scan-max-keys</code> und prüfe dann erneut.",
+    "scanFailed": "Die Prüfung der Speicherkonsistenz konnte nicht ausgeführt werden.",
+    "tiles": {
+      "dbReferences": "DB-Referenzen",
+      "storageObjects": "Speicherobjekte",
+      "missing": "Fehlende Binärdateien",
+      "orphaned": "Verwaiste Objekte"
+    },
+    "consistent": {
+      "title": "Alles stimmt überein",
+      "message": "Jede referenzierte Binärdatei ist vorhanden, und kein gespeichertes Objekt ist verwaist."
+    },
+    "missing": {
+      "title": "Fehlende Binärdateien",
+      "description": "Referenzierte Objekte, die nicht mehr existieren — kläre das über das betroffene Dokument.",
+      "badge": "Datenverlust",
+      "columns": {
+        "document": "Dokument",
+        "context": "Kontext",
+        "storageKey": "Speicherschlüssel"
+      },
+      "empty": "Keine fehlenden Binärdateien.",
+      "version": "Version",
+      "versionNumber": "Version {{number}}",
+      "attachment": "Anhang",
+      "attachmentNamed": "Anhang · {{name}}"
+    },
+    "orphaned": {
+      "title": "Verwaiste Objekte",
+      "description": "Gespeicherte Objekte, auf die keine Datenbankzeile verweist — sie können gefahrlos gelöscht werden.",
+      "badge": "Nicht referenziert",
+      "deleteSelected": "Auswahl löschen ({{count}})",
+      "selectAll": "Alle verwaisten Objekte auswählen",
+      "selectOne": "{{key}} auswählen",
+      "columns": {
+        "key": "Objektschlüssel",
+        "size": "Größe",
+        "lastModified": "Zuletzt geändert"
+      },
+      "empty": "Keine verwaisten Objekte.",
+      "deleteOne": "Dieses Objekt löschen",
+      "deleteOneAria": "{{key}} löschen",
+      "perPage": "Objekte pro Seite"
+    },
+    "delete": {
+      "title": "Verwaiste Objekte löschen?",
+      "message_one": "Damit wird {{count}} Objekt endgültig aus dem Speicher gelöscht. Objekte, die seit der Prüfung wieder referenziert werden, werden automatisch übersprungen.",
+      "message_other": "Damit werden {{count}} Objekte endgültig aus dem Speicher gelöscht. Objekte, die seit der Prüfung wieder referenziert werden, werden automatisch übersprungen.",
+      "deleted_one": "{{count}} Objekt gelöscht.",
+      "deleted_other": "{{count}} Objekte gelöscht.",
+      "deletedSkipped_one": "{{count}} Objekt gelöscht, {{skipped}} übersprungen (inzwischen referenziert)",
+      "deletedSkipped_other": "{{count}} Objekte gelöscht, {{skipped}} übersprungen (inzwischen referenziert)",
+      "failed": "Die Objekte konnten nicht gelöscht werden."
+    },
+    "rescanResult": {
+      "stoppedAtLimit": "Prüfung abgebrochen: Der Bucket enthält mehr Objekte, als das Prüflimit erlaubt.",
+      "complete": "Prüfung abgeschlossen.",
+      "completeSummary": "Prüfung abgeschlossen — {{missing}} fehlend, {{orphaned}} verwaist."
+    },
+    "key": {
+      "copy": "Schlüssel kopieren",
+      "copyAria": "Speicherschlüssel kopieren"
+    }
+  },
+  "scheduler": {
+    "title": "Zeitplaner",
+    "description": "Wartungsläufe im Hintergrund — Token-Bereinigung und das Aufräumen verwaister Speicherobjekte. Deaktiviere einen Lauf, schalte das Aufräumen in den Probelauf oder starte einen Lauf sofort.",
+    "loadError": "Die geplanten Jobs konnten nicht geladen werden.",
+    "tiles": {
+      "jobs": "Jobs",
+      "enabled": "Aktiviert",
+      "dryRun": "Probelauf",
+      "failing": "Fehlerhaft"
+    },
+    "notice": {
+      "settingsFixed": "Die Job-Einstellungen sind in dieser Installation festgelegt: Die Schalter für Aktivierung und Probelauf lassen sich hier nicht ändern. Die Zeitpläne unten laufen wie konfiguriert weiter.",
+      "manualRunDisabled": "Das manuelle Starten von Jobs ist in dieser Installation deaktiviert. Die Zeitpläne unten sind davon nicht betroffen und laufen weiter.",
+      "managed": "Diese Installation verwaltet ihren Zeitplaner selbst: Jobs lassen sich hier weder manuell starten noch aktivieren oder in den Probelauf schalten. Die Zeitpläne unten laufen wie konfiguriert weiter."
+    },
+    "toast": {
+      "enabled": "{{job}} aktiviert.",
+      "disabled": "{{job}} deaktiviert.",
+      "dryRunOn": "Probelauf für {{job}} eingeschaltet.",
+      "dryRunOff": "Probelauf für {{job}} ausgeschaltet.",
+      "saveFailed": "Die Änderung konnte nicht gespeichert werden.",
+      "ranWithFailure": "{{job}} wurde ausgeführt, hat aber einen Fehler gemeldet.",
+      "ran": "{{job}} wurde ausgeführt.",
+      "startFailed": "Der Job konnte nicht gestartet werden."
+    },
+    "card": {
+      "outcome": {
+        "success": "Erfolgreich",
+        "failed": "Fehlgeschlagen",
+        "neverRun": "Noch nie ausgeführt"
+      },
+      "ranManually": "Manuell ausgeführt {{when}}",
+      "lastRun": "Zuletzt ausgeführt {{when}}",
+      "enableAria": "{{job}} aktivieren",
+      "dryRunAria": "Probelauf für {{job}}",
+      "enabled": "Aktiviert",
+      "disabled": "Deaktiviert",
+      "dryRun": "Probelauf",
+      "runNow": "Jetzt ausführen"
+    }
+  },
+  "settings": {
+    "title": "Einstellungen",
+    "description": "Workspace, Uploads, Nutzungsmessung und Authentifizierung.",
+    "groups": {
+      "general": {
+        "label": "Allgemein",
+        "description": "Identität des Workspace, Basis-URL, Standardsprache und Zeitzone."
+      },
+      "upload": {
+        "label": "Uploads",
+        "description": "Vorgaben für das Hochladen von Dokumenten."
+      },
+      "tracking": {
+        "label": "Nutzungsmessung",
+        "description": "Anonyme Nutzungsmessung über diesen Server: Der Browser lädt das Skript von qnop und schickt seine Messwerte an qnop, das sie weiterleitet. Seitenadressen werden vorher auf Routenmuster reduziert, sodass keine Dokument-ID je beim Backend ankommt."
+      },
+      "auth": {
+        "label": "Authentifizierung",
+        "description": "Verhalten von Selbstregistrierung und Passwort-Zurücksetzen."
+      },
+      "review": {
+        "label": "Review",
+        "description": "Verhalten des Review-Workflows für Dokumente."
+      },
+      "notifications": {
+        "label": "Benachrichtigungen",
+        "description": "Review-E-Mails und wie lange der Posteingang in der App seine Einträge aufbewahrt."
+      },
+      "banner": {
+        "label": "Info-Banner",
+        "description": "Zwei Hinweise, die du einschalten kannst: einer auf den Anmeldeseiten — lesbar für alle, die diesen Server erreichen — und einer für angemeldete Benutzer, die ihn ausblenden können, bis du den Text änderst."
+      }
+    },
+    "options": {
+      "trackingProvider": {
+        "none": "Keiner"
+      },
+      "forwardClientIp": {
+        "anonymized": "Anonymisiert (empfohlen)",
+        "none": "Nicht weiterleiten",
+        "full": "Vollständige Adresse (personenbezogene Daten)"
+      }
+    },
+    "validation": {
+      "baseUrl": "Gib eine gültige http(s)-URL ein, z. B. https://qnop.example.",
+      "trackingHost": "Gib eine gültige http(s)-URL ein, z. B. https://matomo.internal.",
+      "wholeNumberBetween": "Gib eine ganze Zahl zwischen {{min}} und {{max}} ein.",
+      "minutesBetween": "Gib eine ganze Zahl an Minuten zwischen {{min}} und {{max}} ein.",
+      "loginText": "Höchstens {{max}} Zeichen — der Text muss über das Anmeldeformular passen.",
+      "appText": "Höchstens {{max}} Zeichen — der Text ist eine Zeile über jeder Seite.",
+      "linkLabel": "Die Beschriftung darf höchstens {{max}} Zeichen lang sein.",
+      "wholeNumber": "Gib eine ganze Zahl ein."
+    },
+    "lockNote": "Von dieser Installation festgelegt.",
+    "passwordKeep": "Leer lassen, um den aktuellen Wert zu behalten.",
+    "passwordUnchanged": "•••••• (unverändert)",
+    "fullAddressWarning": "Exakte Adressen sind personenbezogene Daten. Rechtsgrundlage, Einwilligungsnachweis und Aufbewahrungsfrist liegen bei dir — dieser Server leitet nur weiter, was du hier konfigurierst. Einwilligung und Do-Not-Track gelten weiterhin so, wie du sie eingestellt hast.",
+    "saved": "Einstellungen gespeichert.",
+    "saveFailed": "Die Einstellungen konnten nicht gespeichert werden.",
+    "loadFailed": "Die Einstellungen konnten nicht geladen werden.",
+    "saveChanges": "Änderungen speichern",
+    "saving": "Wird gespeichert…",
+    "noUnsavedChanges": "Keine ungespeicherten Änderungen.",
+    "unsavedChanges_one": "{{count}} ungespeicherte Änderung.",
+    "unsavedChanges_other": "{{count}} ungespeicherte Änderungen.",
+    "tracking": {
+      "noBackend": "Die Messung ist eingeschaltet, aber es ist kein Backend ausgewählt.",
+      "switchedOff": "Es wird nichts gemessen — „{{provider}}“ ist konfiguriert, aber die Nutzungsmessung ist oben ausgeschaltet.",
+      "needsSiteId": "Es wird nichts gemessen — {{provider}} braucht die Site-ID, unter der es diesen Workspace kennt.",
+      "needsHost": "Es wird nichts gemessen — {{provider}} wird selbst gehostet und braucht daher die Adresse deines Servers.",
+      "measuring": "Messung läuft über {{provider}}. Seitenadressen werden vor dem Weiterleiten auf Routenmuster reduziert.",
+      "measuringAt": "Messung läuft über {{provider}} unter {{host}}. Seitenadressen werden vor dem Weiterleiten auf Routenmuster reduziert."
+    },
+    "fields": {
+      "general__application_name": {
+        "label": "Anwendungsname",
+        "description": "Anzeigename dieser qnop-Installation."
+      },
+      "general__base_url": {
+        "label": "Basis-URL",
+        "description": "Öffentliche Basis-URL, verwendet in erzeugten Links und E-Mails."
+      },
+      "general__default_language": {
+        "label": "Standardsprache",
+        "description": "Standardsprache der Oberfläche (ISO 639-1)."
+      },
+      "general__default_timezone": {
+        "label": "Standardzeitzone",
+        "description": "Standardzeitzone für die Anzeige (IANA-ID, z. B. UTC, Europe/Berlin); gilt für alle Benutzer ohne eigene Einstellung."
+      },
+      "upload__document_max_file_size_mb": {
+        "label": "Maximale Dokumentgröße (MB)",
+        "description": "Maximale Größe eines hochgeladenen Dokuments in Megabyte."
+      },
+      "upload__attachment_max_file_size_mb": {
+        "label": "Maximale Anhangsgröße (MB)",
+        "description": "Maximale Größe eines Kommentaranhangs in Megabyte."
+      },
+      "tracking__enabled": {
+        "label": "Aktiviert",
+        "description": "Ob die anonyme Nutzungsmessung eingeschaltet ist. Die Messung läuft über diesen Server, nie an ihm vorbei: Der Browser lädt das Analyse-Skript von qnop und schickt seine Ereignisse an qnop, das sie weiterleitet. Besucher sprechen nie direkt mit dem Analyse-Backend."
+      },
+      "tracking__provider": {
+        "label": "Anbieter",
+        "description": "Welches Analyse-Backend die weitergeleiteten Messwerte empfängt."
+      },
+      "tracking__host": {
+        "label": "Host",
+        "description": "Basis-URL des Analyse-Backends, z. B. https://matomo.internal. Leer nutzt die Cloud des Anbieters, sofern es eine gibt (Plausible, PostHog, Pirsch); Matomo und Umami werden selbst gehostet und brauchen den Wert immer."
+      },
+      "tracking__site_id": {
+        "label": "Site-ID",
+        "description": "Die Kennung dieser Website im Backend: Matomo idSite, Plausible-Domain, Umami-Website-ID, PostHog-Projekt-API-Key, Pirsch-Identifikationscode."
+      },
+      "tracking__respect_dnt": {
+        "label": "Do-Not-Track respektieren",
+        "description": "Für Browser, die Do-Not-Track oder Global Privacy Control senden, überhaupt nichts laden."
+      },
+      "tracking__consent_required": {
+        "label": "Einwilligung erforderlich",
+        "description": "Vor jeder Messung um Einwilligung bitten. Ausgeschaltet ist das nur vertretbar, wenn das Backend keine Cookies setzt und deine Rechtsgrundlage es hergibt — das entscheidest du, nicht der Server."
+      },
+      "tracking__track_privileged_roles": {
+        "label": "Privilegierte Rollen messen",
+        "description": "Auch Administratoren und Auditoren messen. Standardmäßig aus: Eine Handvoll privilegierter Personen ist kaum eine Statistik, aber sehr wohl personenbezogene Daten."
+      },
+      "tracking__forward_client_ip": {
+        "label": "Client-IP weiterleiten",
+        "description": "Wie viel von der IP-Adresse eines Besuchers an dein Analyse-Backend weitergegeben wird. Anonymisiert kürzt sie, sodass Besucher zählbar bleiben, ohne identifizierbar zu sein. Nicht weiterleiten heißt, das Backend zählt alle als einen einzigen Besucher. Vollständig sendet die genaue Adresse — das sind personenbezogene Daten, für die du eine eigene Rechtsgrundlage brauchst."
+      },
+      "smtp__enabled": {
+        "label": "Aktiviert",
+        "description": "Hauptschalter für ausgehende E-Mails; ist er aus, werden Nachrichten nicht versendet."
+      },
+      "smtp__host": {
+        "label": "Host",
+        "description": "Host des SMTP-Servers."
+      },
+      "smtp__port": {
+        "label": "Port",
+        "description": "Port des SMTP-Servers."
+      },
+      "smtp__username": {
+        "label": "Benutzername",
+        "description": "Benutzername für die SMTP-Authentifizierung."
+      },
+      "smtp__password": {
+        "label": "Passwort",
+        "description": "Passwort für die SMTP-Authentifizierung (verschlüsselt gespeichert, in der API geschwärzt)."
+      },
+      "smtp__encryption": {
+        "label": "Verschlüsselung",
+        "description": "Transportverschlüsselung für SMTP: none, starttls (Port 587) oder tls (implizites SSL, Port 465)."
+      },
+      "smtp__from": {
+        "label": "Absender",
+        "description": "Standard-Absenderadresse für ausgehende E-Mails."
+      },
+      "smtp__from_name": {
+        "label": "Absendername",
+        "description": "Anzeigename im From-Header ausgehender E-Mails."
+      },
+      "auth__self_registration_enabled": {
+        "label": "Selbstregistrierung aktiviert",
+        "description": "Ob Besucher selbst lokale Konten registrieren dürfen."
+      },
+      "auth__self_registration_default_role": {
+        "label": "Standardrolle bei Selbstregistrierung",
+        "description": "Globale Rolle für selbst registrierte Benutzer (ADMIN ist bewusst nicht wählbar)."
+      },
+      "auth__password_reset_enabled": {
+        "label": "Passwort-Zurücksetzen aktiviert",
+        "description": "Ob lokale Benutzer ihr Passwort per E-Mail zurücksetzen dürfen."
+      },
+      "auth__password_reset_token_ttl_minutes": {
+        "label": "Gültigkeit des Reset-Tokens (Minuten)",
+        "description": "Wie lange ein Token zum Zurücksetzen des Passworts gültig ist, in Minuten."
+      },
+      "notifications__review_emails_enabled": {
+        "label": "Review-E-Mails aktiviert",
+        "description": "E-Mail-Benachrichtigungen bei Review-Aktivität senden (Reviewer hinzugefügt, Anmerkungen, Antworten, Statusänderungen)."
+      },
+      "notifications__retain_days": {
+        "label": "Aufbewahrung (Tage)",
+        "description": "Tage, die eine In-App-Benachrichtigung aufbewahrt wird, bevor der Job „Notification sweep“ sie löscht, ob gelesen oder nicht (0 schaltet das Aufräumen ab). Gelöscht wird nur der Eintrag der Benachrichtigung — das Review, die Anmerkung oder der Kommentar, auf die sie verweist, bleibt unberührt."
+      },
+      "review__free_reattach_enabled": {
+        "label": "Freies Neuverankern",
+        "description": "Autoren dürfen ihre eigenen Anmerkungen neu positionieren, auch wenn die Platzierung intakt ist (Admins dürfen das immer)."
+      },
+      "review__finalize_with_open_annotations": {
+        "label": "Abschluss mit offenen Anmerkungen",
+        "description": "Das Review darf abgeschlossen werden, während noch Anmerkungen offen sind; sie werden automatisch mit einem Standardkommentar geschlossen."
+      },
+      "review__archive_after_days": {
+        "label": "Archivieren nach (Tagen)",
+        "description": "Tage, die ein abgeschlossenes Review bleibt, bevor es aus den aktiven Listen archiviert wird (0 schaltet die automatische Archivierung ab)."
+      },
+      "review__purge_archived_after_days": {
+        "label": "Archivierte löschen nach (Tagen)",
+        "description": "Tage, die ein archiviertes Review aufbewahrt wird, bevor es endgültig gelöscht wird, samt Speicherobjekten, auf die kein anderes Dokument verweist (0 schaltet das Löschen ab). Unumkehrbar — der Job „Review purge“ muss ebenfalls aktiviert sein."
+      },
+      "banner__login_enabled": {
+        "label": "Anmelde-Banner aktiviert",
+        "description": "Zeigt ein Banner auf der Anmeldeseite und den übrigen Authentifizierungsseiten. Für alle lesbar, die diesen Server erreichen, ob angemeldet oder nicht — trag hier nie interne Details ein."
+      },
+      "banner__login_severity": {
+        "label": "Stil des Anmelde-Banners",
+        "description": "Tonalität des Anmelde-Banners."
+      },
+      "banner__login_text": {
+        "label": "Text des Anmelde-Banners",
+        "description": "Text des Anmelde-Banners, z. B. „Demo-Installation — melde dich mit demo@qnop.io / demo an“. Leer blendet das Banner aus, auch wenn es aktiviert ist."
+      },
+      "banner__login_link_label": {
+        "label": "Linktext des Anmelde-Banners",
+        "description": "Optionaler Link nach dem Text des Anmelde-Banners; leer heißt: kein Link."
+      },
+      "banner__login_link_url": {
+        "label": "Link-URL des Anmelde-Banners",
+        "description": "Wohin der Link des Anmelde-Banners führt (http/https)."
+      },
+      "banner__app_enabled": {
+        "label": "App-Banner aktiviert",
+        "description": "Zeigt angemeldeten Benutzern ein Banner — Wartungsfenster, eine gestörte Integration, ein globales Problem. Nur nach der Anmeldung sichtbar; alle können es ausblenden, bis sich der Text ändert."
+      },
+      "banner__app_severity": {
+        "label": "Stil des App-Banners",
+        "description": "Tonalität des In-App-Banners."
+      },
+      "banner__app_text": {
+        "label": "Text des App-Banners",
+        "description": "Text des In-App-Banners, z. B. „Wartung am Samstag 20:00–22:00 UTC; Uploads sind pausiert.“ Leer blendet das Banner aus, auch wenn es aktiviert ist."
+      },
+      "banner__app_link_label": {
+        "label": "Linktext des App-Banners",
+        "description": "Optionaler Link nach dem Text des In-App-Banners; leer heißt: kein Link."
+      },
+      "banner__app_link_url": {
+        "label": "Link-URL des App-Banners",
+        "description": "Wohin der Link des In-App-Banners führt (http/https)."
+      }
+    }
+  },
+  "configuration": {
+    "title": "Konfiguration",
+    "description": "Die wirksamen qnop.*-Einstellungen, die dieser Server beim Start übernommen hat — aus application.yml und QNOP_*-Umgebungsvariablen.",
+    "readOnly": "Nur lesbar. Diese Werte werden in deiner Installation festgelegt — um einen zu ändern, passe die Umgebung (oder <code>application.yml</code>) an und starte den Server neu. Geheimnisse werden hier nie angezeigt, nur ob sie konfiguriert sind.",
+    "filterPlaceholder": "Nach Property-Pfad oder Umgebungsvariable filtern…",
+    "clearFilter": "Filter zurücksetzen",
+    "loadFailed": "Die Serverkonfiguration konnte nicht geladen werden. Bitte versuche es noch einmal.",
+    "noMatches": "Keine Einstellungen passen zu „{{query}}“.",
+    "columns": {
+      "path": "Pfad",
+      "envVar": "Umgebungsvariable",
+      "value": "Wert"
+    },
+    "copyPath": "Pfad {{path}} kopieren",
+    "copyEnvVar": "Umgebungsvariable {{envVar}} kopieren",
+    "copied": "{{text}} kopiert",
+    "configured": "Konfiguriert",
+    "notConfigured": "Nicht konfiguriert",
+    "notSet": "nicht gesetzt",
+    "none": "keine"
+  },
+  "quota": {
+    "title": "Instanz-Kontingente",
+    "description": "Was diese Installation aufnehmen darf. Festgelegt dort, wo sie installiert ist, nicht in den Einstellungen — ein Administrator kann die Werte lesen, aber nicht erhöhen.",
+    "rows": {
+      "users": {
+        "label": "Benutzerkonten",
+        "hint": "aktivierte Konten"
+      },
+      "teams": {
+        "label": "Teams",
+        "hint": "Teams auf dieser Instanz"
+      },
+      "teamMembers": {
+        "label": "Mitglieder pro Team",
+        "hint": "das größte Team"
+      },
+      "activeReviews": {
+        "label": "Aktive Reviews",
+        "hint": "nicht abgeschlossen, nicht archiviert"
+      }
+    },
+    "noLimit": "{{used}} — kein Limit",
+    "usedOf": "{{used}} von {{maximum}}",
+    "progressLabel": "{{label}}: {{used}} von {{maximum}}"
+  },
+  "teams": {
+    "list": {
+      "title": "Teams",
+      "description": "Fasse Reviewer zu Teams zusammen und verwalte ihre Teamrollen.",
+      "descriptionWithLimit_one": "Fasse Reviewer zu Teams zusammen und verwalte ihre Teamrollen. {{used}} von {{count}} Team belegt.",
+      "descriptionWithLimit_other": "Fasse Reviewer zu Teams zusammen und verwalte ihre Teamrollen. {{used}} von {{count}} Teams belegt.",
+      "create": "Team erstellen",
+      "quotaFull_one": "Diese Installation ist für {{count}} Team ausgelegt und hat {{used}}. Wenn du ein Team löschst, wird ein Platz frei.",
+      "quotaFull_other": "Diese Installation ist für {{count}} Teams ausgelegt und hat {{used}}. Wenn du ein Team löschst, wird ein Platz frei.",
+      "searchPlaceholder": "Nach Name oder Beschreibung suchen",
+      "loadError": "Die Teamliste konnte nicht geladen werden.",
+      "columns": {
+        "name": "Name",
+        "description": "Beschreibung",
+        "members": "Mitglieder",
+        "status": "Status",
+        "actions": "Aktionen"
+      },
+      "empty": "Keine Teams gefunden.",
+      "actionsFor": "Aktionen für {{name}}",
+      "displayedRows": "{{from}}–{{to}} von {{total}}",
+      "delete": {
+        "title": "Team löschen",
+        "message": "„{{name}}“ mit allen Mitgliedschaften löschen? Das lässt sich nicht rückgängig machen."
+      },
+      "deleted": "Team „{{name}}“ gelöscht.",
+      "deleteFailed": "Das Team konnte nicht gelöscht werden."
+    },
+    "detail": {
+      "loadError": "Dieses Team konnte nicht geladen werden. <back>Zurück zu den Teams</back>",
+      "memberSlots_one": "{{used}} von {{count}} Mitgliedsplatz belegt.",
+      "memberSlots_other": "{{used}} von {{count}} Mitgliedsplätzen belegt.",
+      "addMember": "Mitglied hinzufügen",
+      "quotaFull_one": "Diese Installation erlaubt {{count}} Mitglied pro Team, und dieses hat {{used}}. Wenn du ein Mitglied entfernst, wird ein Platz frei.",
+      "quotaFull_other": "Diese Installation erlaubt {{count}} Mitglieder pro Team, und dieses hat {{used}}. Wenn du ein Mitglied entfernst, wird ein Platz frei.",
+      "columns": {
+        "member": "Mitglied",
+        "role": "Rolle",
+        "joined": "Beigetreten",
+        "actions": "Aktionen"
+      },
+      "empty": "Noch keine Mitglieder. Füge das erste hinzu.",
+      "actionsFor": "Aktionen für {{name}}",
+      "makeMember": "Zum Mitglied machen",
+      "makeLead": "Zur Teamleitung machen",
+      "removeFromTeam": "Aus dem Team entfernen",
+      "remove": {
+        "title": "Mitglied entfernen",
+        "message": "{{name}} aus diesem Team entfernen?"
+      }
+    },
+    "form": {
+      "createTitle": "Team erstellen",
+      "editTitle": "Team bearbeiten",
+      "avatarFallbackName": "Team",
+      "name": "Name",
+      "description": "Beschreibung",
+      "lead": "Teamleitung",
+      "leadPlaceholder": "Nach Namen suchen",
+      "leadHelper": "Wird als Teamleitung hinzugefügt — jedes Team startet mit einer.",
+      "noOptions": "Keine passenden Benutzer",
+      "active": "Team aktiv",
+      "disabled": "Team deaktiviert",
+      "showMembers": "Öffentliches Profil: Mitglieder anzeigen",
+      "showMembersAria": "Mitglieder im öffentlichen Profil anzeigen",
+      "showReviews": "Öffentliches Profil: Review-Beteiligung anzeigen",
+      "showReviewsAria": "Review-Beteiligung im öffentlichen Profil anzeigen",
+      "errors": {
+        "nameRequired": "Ein Teamname ist erforderlich.",
+        "leadRequired": "Jedes Team braucht eine Teamleitung — wähle eine aus.",
+        "nameTaken": "Ein Team mit diesem Namen gibt es bereits.",
+        "saveFailed": "Speichern fehlgeschlagen. Bitte versuche es noch einmal."
+      }
+    },
+    "addMember": {
+      "title": "Mitglieder hinzufügen",
+      "remainingSlots_one": "Ein weiteres Mitglied passt in dieses Team.",
+      "remainingSlots_other": "{{count}} weitere Mitglieder passen in dieses Team.",
+      "noOptions": "Keine passenden Benutzer",
+      "users": "Benutzer",
+      "searchPlaceholder": "Nach Name oder E-Mail suchen",
+      "role": "Teamrolle",
+      "roleHelper": "Gilt für alle, die du in diesem Schritt hinzufügst.",
+      "submitCount": "{{number}} hinzufügen",
+      "failed": "Konnte nicht hinzugefügt werden: {{names}}."
+    }
+  },
+  "mailTemplates": {
+    "source": {
+      "custom": "Angepasst",
+      "default": "Standard"
+    },
+    "list": {
+      "columns": {
+        "template": "Vorlage",
+        "subject": "Betreff",
+        "language": "Sprache",
+        "source": "Quelle",
+        "lastEdited": "Zuletzt bearbeitet"
+      },
+      "rowAria": "Vorlage {{name}} bearbeiten",
+      "editedBy": "von {{name}}",
+      "loadError": "Die E-Mail-Vorlagen konnten nicht geladen werden.",
+      "empty": "Keine E-Mail-Vorlagen."
+    },
+    "edit": {
+      "loadError": "Diese Vorlage konnte nicht geladen werden. <back>Zurück zu den Vorlagen</back>",
+      "edited": "— bearbeitet {{when}}",
+      "editedBy": "— bearbeitet {{when}} von {{name}}",
+      "variables": {
+        "title": "Verfügbare Variablen",
+        "description": "Klicke auf einen Chip, um ihn an der Cursorposition des zuletzt bearbeiteten Felds einzufügen — oder zieh ihn direkt in ein Feld.",
+        "none": "Diese Vorlage verwendet keine Variablen."
+      },
+      "content": {
+        "title": "Inhalt",
+        "description": "Betreff und Text dieser E-Mail."
+      },
+      "subject": "Betreff",
+      "subjectHelper": "Mustache-Syntax, z. B. {{example}}.",
+      "subjectRequired": "Ein Betreff ist erforderlich.",
+      "bodyPlain": "Nur-Text-Version",
+      "bodyPlainRequired": "Eine Nur-Text-Version ist erforderlich.",
+      "addHtml": "HTML-Alternative hinzufügen",
+      "compareTargets": {
+        "subject": "dem Standard-Betreff",
+        "bodyPlain": "der Standard-Nur-Text-Version",
+        "bodyHtml": "der Standard-HTML-Version"
+      },
+      "resetToDefault": "Auf Standard zurücksetzen",
+      "sendTest": "Test-E-Mail senden",
+      "saving": "Wird gespeichert…",
+      "saveChanges": "Änderungen speichern",
+      "saved": "Vorlage gespeichert.",
+      "saveFailed": "Die Vorlage konnte nicht gespeichert werden.",
+      "reverted": "Auf den Standard zurückgesetzt.",
+      "resetFailed": "Die Vorlage konnte nicht zurückgesetzt werden.",
+      "reset": {
+        "title": "Vorlage zurücksetzen",
+        "message": "Die angepasste Vorlage „{{name}}“ verwerfen und zum eingebauten Standard zurückkehren? Das lässt sich nicht rückgängig machen."
+      },
+      "testHelper": "Sendet diese Vorlage, gerendert mit dem aktuellen Entwurf und den Beispieldaten."
+    },
+    "compare": "Mit {{target}} vergleichen",
+    "preview": {
+      "title": "Live-Vorschau",
+      "description": "Wird beim Tippen mit Beispieldaten gerendert.",
+      "refreshTooltip": "Vorschau jetzt aktualisieren",
+      "refresh": "Vorschau aktualisieren",
+      "empty": "Füge einen Betreff und eine Nur-Text-Version hinzu, um die Vorschau zu sehen.",
+      "subject": "Betreff",
+      "plainText": "Nur-Text",
+      "html": "HTML",
+      "htmlFrame": "HTML-Vorschau",
+      "noHtml": "Keine HTML-Alternative — Empfänger erhalten das gebrandete Standardlayout.",
+      "status": {
+        "idle": "Inaktiv",
+        "stale": "Ausstehend",
+        "syncing": "Wird gerendert",
+        "live": "Live",
+        "error": "Fehler"
+      },
+      "variables": "Variablen",
+      "sampleVariables": "Beispielvariablen"
+    }
+  },
+  "oidc": {
+    "page": {
+      "title": "OIDC-Anbieter",
+      "description": "Konfiguriere Identitätsanbieter für Single Sign-on. Neue Anbieter sind zunächst deaktiviert.",
+      "add": "Anbieter hinzufügen"
+    },
+    "types": {
+      "OIDC": "Generisches OIDC",
+      "GOOGLE": "Google",
+      "GITHUB": "GitHub",
+      "FACEBOOK": "Facebook",
+      "OAUTH2": "Generisches OAuth2"
+    },
+    "status": {
+      "enabled": "Aktiviert",
+      "disabled": "Deaktiviert"
+    },
+    "table": {
+      "columns": {
+        "provider": "Anbieter",
+        "type": "Typ",
+        "issuer": "Issuer",
+        "clientId": "Client-ID",
+        "status": "Status",
+        "created": "Erstellt"
+      },
+      "empty": "Noch keine Identitätsanbieter konfiguriert.",
+      "enableForLogin": "Für die Anmeldung aktivieren",
+      "disableForLogin": "Für die Anmeldung deaktivieren",
+      "toggle": "{{name}} ein-/ausschalten",
+      "actionsFor": "Aktionen für {{name}}"
+    },
+    "toast": {
+      "enabled": "{{name}} aktiviert.",
+      "disabled": "{{name}} deaktiviert.",
+      "deleted": "{{name}} gelöscht."
+    },
+    "errors": {
+      "load": "Die Anbieter konnten nicht geladen werden.",
+      "toggle": "Die Änderung konnte nicht gespeichert werden.",
+      "delete": "Der Anbieter konnte nicht gelöscht werden."
+    },
+    "delete": {
+      "title": "Anbieter löschen",
+      "message": "„{{name}}“ löschen? Danach kann sich niemand mehr damit anmelden. Das lässt sich nicht rückgängig machen."
+    },
+    "form": {
+      "addTitle": "Anbieter hinzufügen",
+      "editTitle": "Anbieter bearbeiten",
+      "displayName": "Anzeigename",
+      "displayNameHelper": "Erscheint auf dem Anmelde-Button, z. B. „Google“ oder „Firmen-SSO“.",
+      "providerType": "Anbietertyp",
+      "providerTypeLocked": "Der Anbietertyp lässt sich nach dem Erstellen nicht mehr ändern.",
+      "clientId": "Client-ID",
+      "clientIdChangeWarning": "Mit einer anderen Client-ID verbindet sich qnop mit einer anderen App beim Anbieter. Bereits verknüpfte Konten passen dann womöglich nicht mehr.",
+      "clientIdChangeAcknowledge": "Verstanden, Client-ID ändern.",
+      "clientSecret": "Client-Secret",
+      "clientSecretKeep": "Client-Secret (leer lassen, um es zu behalten)",
+      "issuer": "Issuer-URL",
+      "issuerHelper": "Mit „Ermitteln“ werden die Endpunkte automatisch vom Issuer übernommen.",
+      "discover": "Ermitteln",
+      "discovering": "Wird ermittelt…",
+      "scopes": "Scopes",
+      "scopesLocked": "Die Scopes für diesen Anbieter verwaltet qnop; sie lassen sich nicht ändern.",
+      "scopesHelper": "Durch Leerzeichen getrennt, z. B. „openid email profile“.",
+      "endpointsRequired": "Endpunkte & Attributzuordnung (erforderlich)",
+      "endpointsAdvanced": "Endpunkte & Attributzuordnung (erweitert)",
+      "endpointsRequiredHint": "Für einen generischen OAuth2-Anbieter erforderlich — qnop kann sie nicht selbst ermitteln.",
+      "endpointsOptionalHint": "Optional — wird meist über „Ermitteln“ vom Issuer ausgefüllt; überschreibe sie nur bei Bedarf.",
+      "authorizationUrl": "Autorisierungs-URL",
+      "tokenUrl": "Token-URL",
+      "userInfoUrl": "User-Info-URL",
+      "jwkSetUrl": "JWK-Set-URL",
+      "userNameAttribute": "Attribut für den Benutzernamen",
+      "emailAttribute": "Attribut für die E-Mail-Adresse",
+      "displayNameAttribute": "Attribut für den Anzeigenamen",
+      "enabledForLogin": "Für die Anmeldung aktiviert",
+      "errors": {
+        "nameRequired": "Ein Anzeigename ist erforderlich.",
+        "clientIdRequired": "Eine Client-ID ist erforderlich.",
+        "clientSecretRequired": "Ein Client-Secret ist erforderlich.",
+        "issuerRequired": "Für OIDC ist eine Issuer-URL erforderlich.",
+        "invalidUrl": "Gib eine gültige http(s)-URL ein.",
+        "openidScope": "OIDC-Scopes müssen „openid“ enthalten.",
+        "endpointRequired": "Für einen generischen OAuth2-Anbieter erforderlich.",
+        "discoverUnreachable": "Der Issuer war nicht erreichbar, um seine Endpunkte zu ermitteln.",
+        "save": "Der Anbieter konnte nicht gespeichert werden. Bitte prüfe die Angaben."
+      },
+      "discovery": {
+        "failed": "Die Ermittlung ist für diesen Issuer fehlgeschlagen.",
+        "succeeded": "Endpunkte ermittelt und eingetragen:",
+        "authorization": "Autorisierung",
+        "token": "Token",
+        "userInfo": "User-Info",
+        "jwkSet": "JWK-Set"
+      }
+    },
+    "created": {
+      "title": "Anbieter erstellt",
+      "message": "<name/> wurde erstellt und ist derzeit <strong>deaktiviert</strong>. Trage die Callback-URL unten bei deinem Anbieter ein und aktiviere ihn dann in der Liste."
+    },
+    "callback": {
+      "title": "Callback-URL",
+      "subtitle": "trage sie bei deinem Anbieter ein",
+      "urlLabel": "OAuth2-Callback-URL",
+      "copy": "Callback-URL kopieren",
+      "copyTooltip": "In die Zwischenablage kopieren",
+      "pasteInto": "Einfügen in:",
+      "openConsole": "Konsole des Anbieters öffnen",
+      "help": {
+        "GOOGLE": {
+          "whereToFind": "APIs & Services → Credentials → OAuth 2.0 Client IDs → dein Client",
+          "console": "Google Cloud Console öffnen"
+        },
+        "GITHUB": {
+          "whereToFind": "GitHub → Settings → Developer settings → OAuth Apps → deine App",
+          "console": "GitHub-Entwicklereinstellungen öffnen"
+        },
+        "FACEBOOK": {
+          "whereToFind": "Meta for Developers → deine App → Facebook Login → Settings",
+          "console": "Meta for Developers öffnen"
+        },
+        "OIDC": {
+          "whereToFind": "Die Client-Konfiguration deines IdP (Keycloak, Authentik, Auth0, Dex, …)"
+        },
+        "OAUTH2": {
+          "whereToFind": "Die OAuth2-Anwendungseinstellungen deines Anbieters"
+        }
+      }
+    }
+  },
+  "branding": {
+    "page": {
+      "title": "Branding",
+      "description": "Ersetze die Standardlogos, die überall in der App erscheinen — zieh ein Bild hierher oder wähle eine Datei aus. Bei Rastergrafiken öffnet sich ein Zuschnitt-Werkzeug für den genauen Bildausschnitt; SVG wird unverändert hochgeladen. PNG, WebP oder SVG, bis 512 KiB; jeder Platz zeigt das qnop-Standardlogo, bis du ein eigenes hochlädst."
+    },
+    "slots": {
+      "logoLight": {
+        "label": "Logo (hell)",
+        "inline": "Logo (hell)",
+        "description": "Wird auf hellen Hintergründen angezeigt."
+      },
+      "logoDark": {
+        "label": "Logo (dunkel)",
+        "inline": "Logo (dunkel)",
+        "description": "Wird auf dunklen Hintergründen angezeigt."
+      },
+      "logomark": {
+        "label": "Bildmarke",
+        "inline": "Bildmarke",
+        "description": "Kompaktes Zeichen / Favicon."
+      }
+    },
+    "source": {
+      "custom": "Eigenes",
+      "default": "Standard"
+    },
+    "card": {
+      "previewUnavailable": "Vorschau nicht verfügbar",
+      "previewAlt": "Vorschau: {{label}}",
+      "dropToUpload": "Zum Hochladen loslassen",
+      "upload": "Hochladen",
+      "replace": "Ersetzen",
+      "orDragAndDrop": "oder per Drag & Drop",
+      "uploadAria": "{{label}} hochladen"
+    },
+    "toast": {
+      "updated": "{{label}} aktualisiert.",
+      "updatedSvg": "{{label}} aktualisiert — SVG ist eine Vektorgrafik und wird unverändert verwendet (kein Zuschnitt).",
+      "reset": "{{label}} auf den Standard zurückgesetzt."
+    },
+    "errors": {
+      "load": "Die Branding-Konfiguration konnte nicht geladen werden.",
+      "upload": "Das Hochladen ist fehlgeschlagen.",
+      "remove": "Die Datei konnte nicht entfernt werden.",
+      "unsupportedType": "Dateityp wird nicht unterstützt. Verwende PNG, WebP oder SVG.",
+      "tooLarge": "Die Datei ist zu groß (max. 512 KiB).",
+      "croppedTooLarge": "Das zugeschnittene Bild ist zu groß (max. 512 KiB). Versuche einen engeren Ausschnitt."
+    },
+    "remove": {
+      "title": "Logo entfernen",
+      "message": "Eigenes Bild für „{{name}}“ entfernen? Die App nutzt dann wieder das Standardbild für „{{name}}“."
+    },
+    "crop": {
+      "title": "{{name}} zuschneiden",
+      "hintSquare": "Zieh die quadratischen Anfasser über dein Zeichen.",
+      "hintFree": "Zieh einen Rahmen genau um den Teil, den du verwenden möchtest.",
+      "recommendedWordmark": "Wortmarken-Logos sind breit — gespeichert mit bis zu 1024 × 384 px.",
+      "recommendedLogomark": "Die Bildmarke ist quadratisch — gespeichert mit bis zu 512 × 512 px.",
+      "savedSize": "Gespeicherte Größe (transparentes PNG)",
+      "dimensions": "{{width}} × {{height}} px",
+      "useSelection": "Auswahl übernehmen"
+    }
+  }
+}

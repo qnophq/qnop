@@ -25,9 +25,10 @@ import ButtonBase from '@mui/material/ButtonBase';
 import Collapse from '@mui/material/Collapse';
 import Typography from '@mui/material/Typography';
 import { ChevronDown, ChevronRight } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 
 interface CompareWithDefaultProps {
-  /** What the panel reveals, e.g. "default subject". */
+  /** What the panel reveals, already translated (e.g. the default subject). */
   label: string;
   /** The built-in default content to show. */
   value: string;
@@ -38,6 +39,7 @@ interface CompareWithDefaultProps {
  * they're overriding before saving or resetting. Always monospaced and scrollable for long bodies.
  */
 export function CompareWithDefault({ label, value }: CompareWithDefaultProps) {
+  const { t } = useTranslation('admin');
   const [open, setOpen] = useState(false);
   return (
     <Box sx={{ mt: 0.75 }}>
@@ -57,7 +59,9 @@ export function CompareWithDefault({ label, value }: CompareWithDefaultProps) {
         }}
       >
         {open ? <ChevronDown size={15} /> : <ChevronRight size={15} />}
-        <Typography sx={{ fontSize: 13 }}>Compare with {label}</Typography>
+        <Typography sx={{ fontSize: 13 }}>
+          {t('mailTemplates.compare', { target: label })}
+        </Typography>
       </ButtonBase>
       <Collapse in={open}>
         <Box

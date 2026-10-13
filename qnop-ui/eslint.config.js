@@ -68,6 +68,8 @@ export default defineConfig([
       'src/components/audit/**/*.tsx',
       'src/pages/audit/**/*.tsx',
       'src/pages/search/**/*.tsx',
+      'src/components/admin/**/*.tsx',
+      'src/pages/admin/**/*.tsx',
     ],
     ignores: ['**/*.test.tsx'],
     rules: {

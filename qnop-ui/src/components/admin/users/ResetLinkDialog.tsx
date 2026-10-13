@@ -31,6 +31,7 @@ import IconButton from '@mui/material/IconButton';
 import TextField from '@mui/material/TextField';
 import Tooltip from '@mui/material/Tooltip';
 import { Check, Copy } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 
 interface ResetLinkDialogProps {
   open: boolean;
@@ -44,6 +45,7 @@ interface ResetLinkDialogProps {
  * so the operator can deliver it out of band. Sessions are already revoked.
  */
 export function ResetLinkDialog({ open, displayName, url, onClose }: ResetLinkDialogProps) {
+  const { t } = useTranslation(['admin', 'common']);
   const [copied, setCopied] = useState(false);
 
   const copy = async () => {
@@ -57,12 +59,9 @@ export function ResetLinkDialog({ open, displayName, url, onClose }: ResetLinkDi
 
   return (
     <Dialog open={open} onClose={onClose} fullWidth maxWidth="sm">
-      <DialogTitle>Reset link for {displayName}</DialogTitle>
+      <DialogTitle>{t('users.resetLink.title', { name: displayName })}</DialogTitle>
       <DialogContent>
-        <DialogContentText sx={{ mb: 2 }}>
-          The reset email could not be sent. Copy this single-use link and deliver it to the user.
-          Their existing sessions have already been revoked.
-        </DialogContentText>
+        <DialogContentText sx={{ mb: 2 }}>{t('users.resetLink.body')}</DialogContentText>
         <TextField
           value={url}
           fullWidth
@@ -72,8 +71,13 @@ export function ResetLinkDialog({ open, displayName, url, onClose }: ResetLinkDi
               readOnly: true,
               endAdornment: (
                 <InputAdornment position="end">
-                  <Tooltip title={copied ? 'Copied' : 'Copy'}>
-                    <IconButton aria-label="Copy reset link" size="small" edge="end" onClick={copy}>
+                  <Tooltip title={copied ? t('common:actions.copied') : t('common:actions.copy')}>
+                    <IconButton
+                      aria-label={t('users.resetLink.copyLabel')}
+                      size="small"
+                      edge="end"
+                      onClick={copy}
+                    >
                       {copied ? <Check size={16} /> : <Copy size={16} />}
                     </IconButton>
                   </Tooltip>
@@ -85,7 +89,7 @@ export function ResetLinkDialog({ open, displayName, url, onClose }: ResetLinkDi
       </DialogContent>
       <DialogActions sx={{ px: 3, pb: 2.5 }}>
         <Button onClick={onClose} variant="contained">
-          Done
+          {t('common:actions.done')}
         </Button>
       </DialogActions>
     </Dialog>

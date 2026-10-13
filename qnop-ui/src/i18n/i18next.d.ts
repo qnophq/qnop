@@ -20,6 +20,7 @@
  */
 
 import 'i18next';
+import type enAdmin from './en/admin.json';
 import type enAudit from './en/audit.json';
 import type enAuth from './en/auth.json';
 import type enCommon from './en/common.json';
@@ -45,6 +46,7 @@ declare module 'i18next' {
       dashboard: typeof enDashboard;
       teams: typeof enTeams;
       audit: typeof enAudit;
+      admin: typeof enAdmin;
     };
     returnNull: false;
   }

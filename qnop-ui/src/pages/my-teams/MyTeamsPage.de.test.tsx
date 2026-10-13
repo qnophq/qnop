@@ -70,7 +70,8 @@ describe('MyTeamsPage in German', () => {
     renderPage();
 
     expect(screen.getByRole('heading', { name: 'Meine Teams' })).toBeInTheDocument();
-    expect(screen.getByText('Teamleitung')).toBeInTheDocument();
+    // The hero rank and the LEAD role badge on the Platform card (admin:roles.team.LEAD).
+    expect(screen.getAllByText('Teamleitung')).toHaveLength(2);
     expect(screen.getByText('Du leitest 1 Team · insgesamt 7 Teammitglieder')).toBeInTheDocument();
   });
 

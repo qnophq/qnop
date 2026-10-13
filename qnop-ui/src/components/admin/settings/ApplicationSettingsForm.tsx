@@ -31,6 +31,8 @@ import Stack from '@mui/material/Stack';
 import Switch from '@mui/material/Switch';
 import TextField from '@mui/material/TextField';
 import Typography from '@mui/material/Typography';
+import type { ParseKeys } from 'i18next';
+import { useTranslation } from 'react-i18next';
 import {
   BarChart3,
   Bell,
@@ -45,11 +47,15 @@ import type { AdminSetting } from '../../../api/generated';
 import { useSettings, useUpdateSettings } from '../../../api/hooks/useSettings';
 import { TimezonePicker } from '../../TimezonePicker';
 import { SectionCard } from '../layout/SectionCard';
+import { fieldLabel, useSettingText } from './settingText';
 import { trackingStatus } from './trackingStatus';
 import { AdminToast } from '../layout/AdminToast';
 import { useToast } from '../layout/useToast';
 import { apiErrorMessage, apiFieldErrors } from '../../../utils/apiError';
 import { isHttpUrl, isInteger, isIntegerInRange } from '../../../utils/validation';
+
+/** A key in the `admin` catalog (issue #836) — module-level config names text, the view translates. */
+type AdminKey = ParseKeys<'admin'>;
 
 /** Group prefixes in display order; unknown groups are appended alphabetically. */
 const GROUP_ORDER = [
@@ -62,14 +68,14 @@ const GROUP_ORDER = [
   'banner',
 ] as const;
 
-const GROUP_LABELS: Record<string, string> = {
-  general: 'General',
-  upload: 'Uploads',
-  tracking: 'Usage tracking',
-  auth: 'Authentication',
-  review: 'Review',
-  notifications: 'Notifications',
-  banner: 'Info banners',
+const GROUP_LABELS: Record<string, AdminKey> = {
+  general: 'settings.groups.general.label',
+  upload: 'settings.groups.upload.label',
+  tracking: 'settings.groups.tracking.label',
+  auth: 'settings.groups.auth.label',
+  review: 'settings.groups.review.label',
+  notifications: 'settings.groups.notifications.label',
+  banner: 'settings.groups.banner.label',
 };
 
 /** Brand-tint section icon per group, matching the Email / SMTP page's language. */
@@ -83,18 +89,16 @@ const GROUP_ICONS: Record<string, LucideIcon> = {
   banner: Megaphone,
 };
 
-const GROUP_DESCRIPTIONS: Record<string, string> = {
-  general: 'Workspace identity, base URL, default language and time zone.',
-  upload: 'Constraints applied to document uploads.',
-  tracking:
-    'Anonymous usage measurement through this server: the browser loads the script from qnop and sends its measurements to qnop, which forwards them. Page addresses are reduced to route patterns first, so no document id ever reaches the backend.',
-  auth: 'Self-registration and password-reset behaviour.',
-  review: 'Behaviour of the document review workflow.',
-  notifications: 'Review e-mails and how long the in-app inbox keeps its records.',
+const GROUP_DESCRIPTIONS: Record<string, AdminKey> = {
+  general: 'settings.groups.general.description',
+  upload: 'settings.groups.upload.description',
+  tracking: 'settings.groups.tracking.description',
+  auth: 'settings.groups.auth.description',
+  review: 'settings.groups.review.description',
+  notifications: 'settings.groups.notifications.description',
   // The one thing an operator must know before typing: where each banner is
   // read, and by whom (issue #664).
-  banner:
-    'Two notices you can switch on: one on the sign-in screens — readable by anyone who can reach this server — and one for signed-in users, which they may dismiss until you change the text.',
+  banner: 'settings.groups.banner.description',
 };
 
 /**
@@ -104,18 +108,25 @@ const GROUP_DESCRIPTIONS: Record<string, string> = {
 const HIDDEN_GROUPS = new Set<string>(['smtp']);
 
 /**
+ * A dropdown option: a catalog key for words that translate, or a verbatim label
+ * for proper names (language endonyms, product names) and raw enum values.
+ */
+type SelectOption = { value: string; labelKey: AdminKey } | { value: string; label: string };
+
+/**
  * Curated dropdown labels keyed by setting key. ENUM option *sets* now come from
  * the API contract (`allowedValues`); this map only supplies nicer labels and
  * covers STRING settings with a known, closed value set (e.g. the default
- * language) that are not modelled as ENUM server-side.
+ * language) that are not modelled as ENUM server-side. Language names stay in
+ * their own language, product names stay as they are.
  */
-const SELECT_OPTIONS: Record<string, { value: string; label: string }[]> = {
+const SELECT_OPTIONS: Record<string, SelectOption[]> = {
   'general.default_language': [
     { value: 'en', label: 'English' },
     { value: 'de', label: 'Deutsch' },
   ],
   'tracking.provider': [
-    { value: 'none', label: 'None' },
+    { value: 'none', labelKey: 'settings.options.trackingProvider.none' },
     { value: 'matomo', label: 'Matomo' },
     { value: 'plausible', label: 'Plausible' },
     { value: 'umami', label: 'Umami' },
@@ -123,13 +134,13 @@ const SELECT_OPTIONS: Record<string, { value: string; label: string }[]> = {
     { value: 'pirsch', label: 'Pirsch' },
   ],
   'tracking.forward_client_ip': [
-    { value: 'anonymized', label: 'Anonymised (recommended)' },
-    { value: 'none', label: 'Do not forward' },
-    { value: 'full', label: 'Full address (personal data)' },
+    { value: 'anonymized', labelKey: 'settings.options.forwardClientIp.anonymized' },
+    { value: 'none', labelKey: 'settings.options.forwardClientIp.none' },
+    { value: 'full', labelKey: 'settings.options.forwardClientIp.full' },
   ],
   'auth.self_registration_default_role': [
-    { value: 'MEMBER', label: 'Member' },
-    { value: 'AUDITOR', label: 'Auditor' },
+    { value: 'MEMBER', labelKey: 'roles.global.MEMBER' },
+    { value: 'AUDITOR', labelKey: 'roles.global.AUDITOR' },
   ],
 };
 
@@ -143,7 +154,7 @@ function humaniseOption(value: string): string {
  * label list when one exists, otherwise the API's `allowedValues` for ENUMs.
  * Returns `undefined` for free-text fields.
  */
-function optionsFor(setting: AdminSetting): { value: string; label: string }[] | undefined {
+function optionsFor(setting: AdminSetting): SelectOption[] | undefined {
   const curated = SELECT_OPTIONS[setting.key];
   if (curated) {
     return curated;
@@ -154,57 +165,69 @@ function optionsFor(setting: AdminSetting): { value: string; label: string }[] |
   return undefined;
 }
 
+/** A validation message as data: a catalog key and its values, translated at render. */
+interface ValidationMessage {
+  key: AdminKey;
+  values?: Record<string, number>;
+}
+
+/** Whole-number range rule with its message, e.g. "between 1 and 1024". */
+function integerRange(
+  min: number,
+  max: number,
+  key: AdminKey = 'settings.validation.wholeNumberBetween',
+): { test: (value: string) => boolean; message: ValidationMessage } {
+  return {
+    test: (value) => isIntegerInRange(value, min, max),
+    message: { key, values: { min, max } },
+  };
+}
+
+/** Length-ceiling rule with its message. */
+function maxLength(
+  max: number,
+  key: AdminKey,
+): { test: (value: string) => boolean; message: ValidationMessage } {
+  return { test: (value) => value.length <= max, message: { key, values: { max } } };
+}
+
 /**
  * Per-key client-side rules mirroring the server's constraints, for instant
  * feedback before a save round-trips. The server stays the authority; these just
  * catch the obvious mistakes at the field.
  */
-const SETTING_RULES: Record<string, { test: (value: string) => boolean; message: string }> = {
+const SETTING_RULES: Record<
+  string,
+  { test: (value: string) => boolean; message: ValidationMessage }
+> = {
   'general.base_url': {
     test: isHttpUrl,
-    message: 'Enter a valid http(s) URL, e.g. https://qnop.example.',
+    message: { key: 'settings.validation.baseUrl' },
   },
-  'upload.document_max_file_size_mb': {
-    test: (value) => isIntegerInRange(value, 1, 1024),
-    message: 'Enter a whole number between 1 and 1024.',
-  },
-  'upload.attachment_max_file_size_mb': {
-    test: (value) => isIntegerInRange(value, 1, 50),
-    message: 'Enter a whole number between 1 and 50.',
-  },
-  'auth.password_reset_token_ttl_minutes': {
-    test: (value) => isIntegerInRange(value, 1, 1440),
-    message: 'Enter a whole number of minutes between 1 and 1440.',
-  },
+  'upload.document_max_file_size_mb': integerRange(1, 1024),
+  'upload.attachment_max_file_size_mb': integerRange(1, 50),
+  'auth.password_reset_token_ttl_minutes': integerRange(
+    1,
+    1440,
+    'settings.validation.minutesBetween',
+  ),
   // The banner texts and links (issue #664) — the same ceilings the server
   // enforces, said at the field instead of after a failed save.
-  'banner.login_text': {
-    test: (value) => value.length <= 200,
-    message: 'Keep it to 200 characters — it has to fit above the sign-in form.',
-  },
-  'banner.app_text': {
-    test: (value) => value.length <= 300,
-    message: 'Keep it to 300 characters — it is one line across every page.',
-  },
-  'banner.login_link_label': {
-    test: (value) => value.length <= 40,
-    message: 'Keep the label to 40 characters.',
-  },
-  'banner.app_link_label': {
-    test: (value) => value.length <= 40,
-    message: 'Keep the label to 40 characters.',
-  },
+  'banner.login_text': maxLength(200, 'settings.validation.loginText'),
+  'banner.app_text': maxLength(300, 'settings.validation.appText'),
+  'banner.login_link_label': maxLength(40, 'settings.validation.linkLabel'),
+  'banner.app_link_label': maxLength(40, 'settings.validation.linkLabel'),
   'tracking.host': {
     test: isHttpUrl,
-    message: 'Enter a valid http(s) URL, e.g. https://matomo.internal.',
+    message: { key: 'settings.validation.trackingHost' },
   },
   'banner.login_link_url': {
     test: (value) => isHttpUrl(value) && value.length <= 500,
-    message: 'Enter a valid http(s) URL, e.g. https://qnop.example.',
+    message: { key: 'settings.validation.baseUrl' },
   },
   'banner.app_link_url': {
     test: (value) => isHttpUrl(value) && value.length <= 500,
-    message: 'Enter a valid http(s) URL, e.g. https://qnop.example.',
+    message: { key: 'settings.validation.baseUrl' },
   },
 };
 
@@ -213,7 +236,7 @@ const SETTING_RULES: Record<string, { test: (value: string) => boolean; message:
  * Blank values pass — an empty field means "keep the default", and the server is
  * the authority on what is truly required.
  */
-function validateSetting(setting: AdminSetting, value: string): string | undefined {
+function validateSetting(setting: AdminSetting, value: string): ValidationMessage | undefined {
   if (value.trim() === '') {
     return undefined;
   }
@@ -222,7 +245,7 @@ function validateSetting(setting: AdminSetting, value: string): string | undefin
     return rule.test(value) ? undefined : rule.message;
   }
   if (setting.type === 'INTEGER' && !isInteger(value)) {
-    return 'Enter a whole number.';
+    return { key: 'settings.validation.wholeNumber' };
   }
   return undefined;
 }
@@ -230,12 +253,6 @@ function validateSetting(setting: AdminSetting, value: string): string | undefin
 /** The baseline value used for dirty-tracking: secrets always start blank. */
 function baseline(setting: AdminSetting): string {
   return setting.sensitive ? '' : (setting.value ?? '');
-}
-
-/** Humanises the last key segment, e.g. `general.application_name` → "Application name". */
-function fieldLabel(key: string): string {
-  const segment = key.slice(key.lastIndexOf('.') + 1).replace(/_/g, ' ');
-  return segment.charAt(0).toUpperCase() + segment.slice(1);
 }
 
 function groupOf(key: string): string {
@@ -249,6 +266,7 @@ function groupOf(key: string): string {
  * values are write-only — the field stays blank and is sent only when typed.
  */
 export function ApplicationSettingsForm() {
+  const { t } = useTranslation(['admin', 'common']);
   const { data, isLoading, isError } = useSettings();
   const updateSettings = useUpdateSettings();
 
@@ -267,7 +285,8 @@ export function ApplicationSettingsForm() {
     return map;
   }, [settings]);
   const [edits, setEdits] = useState<Record<string, string>>({});
-  const [error, setError] = useState<string | null>(null);
+  // The failed save's cause; its message is resolved at render, so it follows a language switch.
+  const [saveError, setSaveError] = useState<{ cause: unknown } | null>(null);
   const [submitAttempted, setSubmitAttempted] = useState(false);
   const [serverErrors, setServerErrors] = useState<Record<string, string>>({});
   const { toast, notify, clear } = useToast();
@@ -291,7 +310,7 @@ export function ApplicationSettingsForm() {
 
   // Client-side errors for fields the user has touched; surfaced once a save is attempted.
   const clientErrors = useMemo(() => {
-    const map: Record<string, string> = {};
+    const map: Record<string, ValidationMessage> = {};
     for (const setting of settings) {
       if (!(setting.key in edits)) continue;
       const err = validateSetting(setting, edits[setting.key] ?? '');
@@ -300,8 +319,11 @@ export function ApplicationSettingsForm() {
     return map;
   }, [settings, edits]);
 
-  const fieldError = (key: string): string | undefined =>
-    serverErrors[key] ?? (submitAttempted ? clientErrors[key] : undefined);
+  const fieldError = (key: string): string | undefined => {
+    if (serverErrors[key]) return serverErrors[key];
+    const client = submitAttempted ? clientErrors[key] : undefined;
+    return client ? t(client.key, client.values) : undefined;
+  };
 
   const discard = () => {
     setEdits({});
@@ -336,7 +358,7 @@ export function ApplicationSettingsForm() {
 
   const onSubmit = async (event: FormEvent) => {
     event.preventDefault();
-    setError(null);
+    setSaveError(null);
     if (Object.keys(clientErrors).length > 0) {
       setSubmitAttempted(true);
       return;
@@ -347,13 +369,13 @@ export function ApplicationSettingsForm() {
       setEdits({});
       setServerErrors({});
       setSubmitAttempted(false);
-      notify('Settings saved.');
+      notify(t('settings.saved'));
     } catch (err) {
       const serverFieldErrors = apiFieldErrors(err);
       if (Object.keys(serverFieldErrors).length > 0) {
         setServerErrors(serverFieldErrors);
       } else {
-        setError(apiErrorMessage(err, 'The settings could not be saved.'));
+        setSaveError({ cause: err });
       }
     }
   };
@@ -361,12 +383,12 @@ export function ApplicationSettingsForm() {
   if (isLoading) {
     return (
       <Typography color="text.secondary" sx={{ p: 1, fontSize: 14 }}>
-        Loading…
+        {t('common:loading')}
       </Typography>
     );
   }
   if (isError) {
-    return <Alert severity="error">The settings could not be loaded.</Alert>;
+    return <Alert severity="error">{t('settings.loadFailed')}</Alert>;
   }
 
   return (
@@ -376,8 +398,8 @@ export function ApplicationSettingsForm() {
           <SectionCard
             key={group}
             icon={GROUP_ICONS[group]}
-            title={GROUP_LABELS[group] ?? fieldLabel(group)}
-            description={GROUP_DESCRIPTIONS[group]}
+            title={GROUP_LABELS[group] ? t(GROUP_LABELS[group]) : fieldLabel(group)}
+            description={GROUP_DESCRIPTIONS[group] ? t(GROUP_DESCRIPTIONS[group]) : undefined}
           >
             <Stack spacing={2.5}>
               {group === 'tracking' && <TrackingStatusNote values={effectiveValues} />}
@@ -394,7 +416,11 @@ export function ApplicationSettingsForm() {
           </SectionCard>
         ))}
 
-        {error && <Alert severity="error">{error}</Alert>}
+        {saveError && (
+          <Alert severity="error">
+            {apiErrorMessage(saveError.cause, t('settings.saveFailed'))}
+          </Alert>
+        )}
 
         <Divider />
         <Stack direction="row" spacing={1.5} sx={{ alignItems: 'center' }}>
@@ -403,7 +429,7 @@ export function ApplicationSettingsForm() {
             variant="contained"
             disabled={changed.length === 0 || updateSettings.isPending}
           >
-            {updateSettings.isPending ? 'Saving…' : 'Save changes'}
+            {updateSettings.isPending ? t('settings.saving') : t('settings.saveChanges')}
           </Button>
           <Button
             type="button"
@@ -411,12 +437,12 @@ export function ApplicationSettingsForm() {
             disabled={changed.length === 0 || updateSettings.isPending}
             onClick={discard}
           >
-            Discard
+            {t('common:actions.discard')}
           </Button>
           <Typography color="text.secondary" sx={{ fontSize: 14 }}>
             {changed.length === 0
-              ? 'No unsaved changes.'
-              : `${changed.length} unsaved change${changed.length === 1 ? '' : 's'}.`}
+              ? t('settings.noUnsavedChanges')
+              : t('settings.unsavedChanges', { count: changed.length })}
           </Typography>
           <Box sx={{ flex: 1 }} />
           {updateSettings.isPending && <LinearProgress sx={{ width: 120 }} />}
@@ -437,13 +463,16 @@ interface SettingFieldProps {
 
 /** Renders a single setting as the control appropriate to its declared type. */
 function SettingField({ setting, value, error, onChange }: SettingFieldProps) {
-  const label = fieldLabel(setting.key);
+  const { t } = useTranslation('admin');
+  const settingText = useSettingText();
+  const label = settingText.label(setting.key);
+  const description = settingText.description(setting);
   // What the deployment governs (issues #678/#681): shown, but not editable
   // here. The endpoint refuses the change in any case — this keeps the form
   // from inviting one. `editable` is absent on older responses, and absent
   // means editable.
   const locked = setting.editable === false;
-  const lockNote = 'Set by this deployment.';
+  const lockNote = t('settings.lockNote');
   // Issue #712: an opt-in that loosens a privacy floor should say so where it is
   // chosen, not only in a document nobody has open. Shown on the current value
   // rather than as a confirmation dialog — the operator has decided; what they
@@ -464,7 +493,7 @@ function SettingField({ setting, value, error, onChange }: SettingFieldProps) {
           <Box>
             <Typography sx={{ fontSize: 15 }}>{label}</Typography>
             <Typography color="text.secondary" sx={{ fontSize: 13 }}>
-              {locked ? `${setting.description} ${lockNote}` : setting.description}
+              {locked ? `${description} ${lockNote}` : description}
             </Typography>
           </Box>
         }
@@ -481,7 +510,7 @@ function SettingField({ setting, value, error, onChange }: SettingFieldProps) {
         value={value}
         onChange={onChange}
         label={label}
-        helperText={error ?? setting.description}
+        helperText={error ?? description}
         error={Boolean(error)}
         maxWidth={480}
       />
@@ -502,31 +531,23 @@ function SettingField({ setting, value, error, onChange }: SettingFieldProps) {
           disabled={locked}
           onChange={(e) => onChange(e.target.value)}
           error={Boolean(error)}
-          helperText={
-            error ?? (locked ? `${setting.description} ${lockNote}` : setting.description)
-          }
+          helperText={error ?? (locked ? `${description} ${lockNote}` : description)}
         >
           {options.map((option) => (
             <MenuItem key={option.value} value={option.value}>
-              {option.label}
+              {'labelKey' in option ? t(option.labelKey) : option.label}
             </MenuItem>
           ))}
         </TextField>
         {forwardsFullAddress && (
-          <Alert severity="warning">
-            Exact addresses are personal data. The legal basis, the consent record and the retention
-            period are yours to hold — this server only forwards what you configure here. Consent
-            and Do-Not-Track keep applying as you set them.
-          </Alert>
+          <Alert severity="warning">{t('settings.fullAddressWarning')}</Alert>
         )}
       </Stack>
     );
   }
 
   const isPassword = setting.type === 'PASSWORD';
-  const baseHelper = isPassword
-    ? `${setting.description} Leave blank to keep the current value.`
-    : setting.description;
+  const baseHelper = isPassword ? `${description} ${t('settings.passwordKeep')}` : description;
   return (
     <TextField
       label={label}
@@ -534,7 +555,9 @@ function SettingField({ setting, value, error, onChange }: SettingFieldProps) {
       value={value}
       disabled={locked}
       onChange={(e) => onChange(e.target.value)}
-      placeholder={isPassword && setting.value === '***' ? '•••••• (unchanged)' : undefined}
+      placeholder={
+        isPassword && setting.value === '***' ? t('settings.passwordUnchanged') : undefined
+      }
       error={Boolean(error)}
       helperText={error ?? (locked ? `${baseHelper} ${lockNote}` : baseHelper)}
       autoComplete={isPassword ? 'new-password' : undefined}
@@ -549,13 +572,14 @@ function SettingField({ setting, value, error, onChange }: SettingFieldProps) {
  * rather than after a save and a reload.
  */
 function TrackingStatusNote({ values }: { values: Record<string, string> }) {
+  const { t } = useTranslation('admin');
   const status = trackingStatus(values);
   if (!status) {
     return null;
   }
   return (
     <Alert severity={status.severity === 'success' ? 'success' : 'warning'} variant="outlined">
-      {status.message}
+      {t(status.messageKey, status.values)}
     </Alert>
   );
 }

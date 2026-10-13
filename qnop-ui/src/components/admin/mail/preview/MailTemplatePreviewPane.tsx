@@ -27,6 +27,7 @@ import Stack from '@mui/material/Stack';
 import Tooltip from '@mui/material/Tooltip';
 import Typography from '@mui/material/Typography';
 import { Eye, RefreshCw } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import type { MailTemplatePreviewResponse } from '../../../../api/generated';
 import type { PreviewStatus } from '../../../../api/hooks/useMailTemplatePreview';
 import { SectionCard } from '../../layout/SectionCard';
@@ -81,13 +82,14 @@ export function MailTemplatePreviewPane({
   sampleValues,
   onSampleChange,
 }: MailTemplatePreviewPaneProps) {
+  const { t } = useTranslation('admin');
   const pending = status === 'stale' || status === 'syncing';
 
   return (
     <SectionCard
       icon={Eye}
-      title="Live preview"
-      description="Rendered with sample data as you type."
+      title={t('mailTemplates.preview.title')}
+      description={t('mailTemplates.preview.description')}
       action={
         <Stack direction="row" spacing={0.5} sx={{ alignItems: 'center' }}>
           <PreviewStatusBadge status={status} />
@@ -96,8 +98,12 @@ export function MailTemplatePreviewPane({
             values={sampleValues}
             onChange={onSampleChange}
           />
-          <Tooltip title="Refresh preview now">
-            <IconButton size="small" onClick={onRefresh} aria-label="Refresh preview">
+          <Tooltip title={t('mailTemplates.preview.refreshTooltip')}>
+            <IconButton
+              size="small"
+              onClick={onRefresh}
+              aria-label={t('mailTemplates.preview.refresh')}
+            >
               <RefreshCw size={16} />
             </IconButton>
           </Tooltip>
@@ -112,23 +118,23 @@ export function MailTemplatePreviewPane({
 
       {!preview ? (
         <Typography color="text.secondary" sx={{ fontSize: 14, fontStyle: 'italic', py: 2 }}>
-          Add a subject and a plain-text body to see the preview.
+          {t('mailTemplates.preview.empty')}
         </Typography>
       ) : (
         <Stack
           spacing={2.25}
           sx={{
             opacity: pending ? 0.55 : 1,
-            transition: (t) => t.transitions.create('opacity'),
+            transition: (theme) => theme.transitions.create('opacity'),
           }}
         >
-          <Field label="Subject">
+          <Field label={t('mailTemplates.preview.subject')}>
             <Typography sx={{ fontFamily: 'monospace', fontSize: 14, fontWeight: 600 }}>
               {preview.subject}
             </Typography>
           </Field>
 
-          <Field label="Plain text">
+          <Field label={t('mailTemplates.preview.plainText')}>
             <Box
               component="pre"
               sx={{
@@ -146,11 +152,11 @@ export function MailTemplatePreviewPane({
             </Box>
           </Field>
 
-          <Field label="HTML">
+          <Field label={t('mailTemplates.preview.html')}>
             {htmlEnabled && preview.bodyHtml ? (
               <Box
                 component="iframe"
-                title="HTML preview"
+                title={t('mailTemplates.preview.htmlFrame')}
                 srcDoc={preview.bodyHtml}
                 sandbox=""
                 sx={{
@@ -167,7 +173,7 @@ export function MailTemplatePreviewPane({
                 color="text.secondary"
                 sx={{ fontSize: 13.5, fontStyle: 'italic', py: 1 }}
               >
-                No HTML alternative — recipients receive the branded default layout.
+                {t('mailTemplates.preview.noHtml')}
               </Typography>
             )}
           </Field>

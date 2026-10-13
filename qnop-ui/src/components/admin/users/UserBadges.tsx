@@ -19,6 +19,8 @@
  * SPDX-License-Identifier: AGPL-3.0-only
  */
 
+import type { ParseKeys } from 'i18next';
+import { useTranslation } from 'react-i18next';
 import type { UserRole, UserSource } from '../../../api/generated';
 import { ToneBadge, type BadgeTone } from '../ToneBadge';
 
@@ -27,30 +29,32 @@ const ROLE_TONE: Record<UserRole, BadgeTone> = {
   AUDITOR: 'amber',
   MEMBER: 'neutral',
 };
-const ROLE_LABEL: Record<UserRole, string> = {
-  ADMIN: 'Admin',
-  MEMBER: 'Member',
-  AUDITOR: 'Auditor',
+const ROLE_LABEL: Record<UserRole, ParseKeys<'admin'>> = {
+  ADMIN: 'roles.global.ADMIN',
+  MEMBER: 'roles.global.MEMBER',
+  AUDITOR: 'roles.global.AUDITOR',
 };
 
 /** The user's global role as a coloured pill. */
 export function UserRoleBadge({ role }: { role: UserRole }) {
-  return <ToneBadge tone={ROLE_TONE[role]} label={ROLE_LABEL[role]} />;
+  const { t } = useTranslation('admin');
+  return <ToneBadge tone={ROLE_TONE[role]} label={t(ROLE_LABEL[role])} />;
 }
 
 /** Account state: active (green) or disabled (red). */
 export function UserStatusBadge({ enabled }: { enabled: boolean }) {
+  const { t } = useTranslation('admin');
   return enabled ? (
-    <ToneBadge tone="green" label="Active" />
+    <ToneBadge tone="green" label={t('users.status.active')} />
   ) : (
-    <ToneBadge tone="red" label="Disabled" />
+    <ToneBadge tone="red" label={t('users.status.disabled')} />
   );
 }
 
 /**
  * Where the account comes from: a local (INTERNAL) login or an external OIDC
  * provider. External accounts show the provider's name (e.g. "Keycloak") so the
- * operator sees *which* IdP at a glance; local accounts read "Local".
+ * operator sees *which* IdP at a glance; local accounts read as local.
  */
 export function UserSourceBadge({
   source,
@@ -59,9 +63,10 @@ export function UserSourceBadge({
   source: UserSource;
   providerName?: string;
 }) {
+  const { t } = useTranslation('admin');
   return source === 'EXTERNAL' ? (
-    <ToneBadge tone="blue" label={providerName?.trim() || 'External'} />
+    <ToneBadge tone="blue" label={providerName?.trim() || t('users.source.external')} />
   ) : (
-    <ToneBadge tone="neutral" label="Local" />
+    <ToneBadge tone="neutral" label={t('users.source.local')} />
   );
 }

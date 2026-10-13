@@ -22,6 +22,7 @@
 import Stack from '@mui/material/Stack';
 import Tab from '@mui/material/Tab';
 import Tabs from '@mui/material/Tabs';
+import { useTranslation } from 'react-i18next';
 import { Link as RouterLink, Navigate, Outlet, useLocation } from 'react-router';
 import { PageHeader } from '../../components/admin/layout/PageHeader';
 import { useConfig } from '../../api/hooks/useConfig';
@@ -46,6 +47,7 @@ export function EmailIndexRedirect() {
 }
 
 export function EmailLayout() {
+  const { t } = useTranslation('admin');
   const location = useLocation();
   const tabs = offeredEmailTabs(useConfig().data?.features);
 
@@ -53,14 +55,11 @@ export function EmailLayout() {
 
   return (
     <Stack spacing={3}>
-      <PageHeader
-        title="Email"
-        description="Outgoing email: the SMTP server and the transactional templates qnop sends. Changes apply without a restart."
-      />
+      <PageHeader title={t('mail.layout.title')} description={t('mail.layout.description')} />
       {/* Real links, not click handlers, so middle-click / copy-link work like the rest of the nav. */}
       <Tabs
         value={activeTab}
-        aria-label="Email admin sub-pages"
+        aria-label={t('mail.layout.tabsLabel')}
         sx={{ borderBottom: 1, borderColor: 'divider' }}
       >
         {tabs.map((tab) => (
@@ -68,7 +67,7 @@ export function EmailLayout() {
             key={tab.path}
             component={RouterLink}
             to={`/admin/email/${tab.path}`}
-            label={tab.label}
+            label={t(tab.labelKey)}
             value={tab.path}
           />
         ))}

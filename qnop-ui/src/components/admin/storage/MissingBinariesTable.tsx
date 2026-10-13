@@ -26,6 +26,8 @@ import TableCell from '@mui/material/TableCell';
 import TableHead from '@mui/material/TableHead';
 import TableRow from '@mui/material/TableRow';
 import Typography from '@mui/material/Typography';
+import type { TFunction } from 'i18next';
+import { useTranslation } from 'react-i18next';
 import { Link as RouterLink } from 'react-router';
 import type { MissingBinary } from '../../../api/generated';
 import { reviewPath } from '../../dashboard/dashboardModel';
@@ -35,11 +37,15 @@ import { StorageKey } from './StorageKey';
 const EM_DASH = '—';
 
 /** The human context for a missing binary — which version or which attachment. */
-function context(binary: MissingBinary): string {
+function context(binary: MissingBinary, t: TFunction<'admin'>): string {
   if (binary.kind === 'VERSION') {
-    return binary.versionNumber != null ? `Version ${binary.versionNumber}` : 'Version';
+    return binary.versionNumber != null
+      ? t('storage.missing.versionNumber', { number: binary.versionNumber })
+      : t('storage.missing.version');
   }
-  return binary.attachmentName ? `Attachment · ${binary.attachmentName}` : 'Attachment';
+  return binary.attachmentName
+    ? t('storage.missing.attachmentNamed', { name: binary.attachmentName })
+    : t('storage.missing.attachment');
 }
 
 /**
@@ -49,13 +55,14 @@ function context(binary: MissingBinary): string {
  * delete the document through the review flow).
  */
 export function MissingBinariesTable({ binaries }: { binaries: MissingBinary[] }) {
+  const { t } = useTranslation('admin');
   return (
     <Table size="small">
       <TableHead>
         <TableRow>
-          <TableCell>Document</TableCell>
-          <TableCell>Context</TableCell>
-          <TableCell>Storage key</TableCell>
+          <TableCell>{t('storage.missing.columns.document')}</TableCell>
+          <TableCell>{t('storage.missing.columns.context')}</TableCell>
+          <TableCell>{t('storage.missing.columns.storageKey')}</TableCell>
         </TableRow>
       </TableHead>
       <TableBody>
@@ -63,7 +70,7 @@ export function MissingBinariesTable({ binaries }: { binaries: MissingBinary[] }
           <TableRow>
             <TableCell colSpan={3}>
               <Typography color="text.secondary" sx={{ py: 3, textAlign: 'center' }}>
-                No missing binaries.
+                {t('storage.missing.empty')}
               </Typography>
             </TableCell>
           </TableRow>
@@ -83,7 +90,7 @@ export function MissingBinariesTable({ binaries }: { binaries: MissingBinary[] }
               <TableCell>
                 <ToneBadge
                   tone={binary.kind === 'VERSION' ? 'blue' : 'neutral'}
-                  label={context(binary)}
+                  label={context(binary, t)}
                 />
               </TableCell>
               <TableCell>

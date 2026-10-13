@@ -32,11 +32,13 @@ import Stack from '@mui/material/Stack';
 import Typography from '@mui/material/Typography';
 import { useTheme } from '@mui/material/styles';
 import { Crop as CropIcon } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 
 interface BrandingCropDialogProps {
   open: boolean;
   imageSrc: string;
-  label: string;
+  /** The slot's name as it reads inside a sentence, e.g. in the dialog title (already translated). */
+  name: string;
   /** Preview the result on the slot's surface (dark for the dark-mode logo). */
   dark?: boolean;
   /** Locked aspect (e.g. 1 for the square logomark); omit for a free-form crop (wordmark logos). */
@@ -61,7 +63,7 @@ interface BrandingCropDialogProps {
 export function BrandingCropDialog({
   open,
   imageSrc,
-  label,
+  name,
   dark,
   aspect,
   maxWidth,
@@ -71,6 +73,7 @@ export function BrandingCropDialog({
   onCancel,
   onCropped,
 }: BrandingCropDialogProps) {
+  const { t } = useTranslation(['admin', 'common']);
   const theme = useTheme();
   const imgRef = useRef<HTMLImageElement | null>(null);
   const previewRef = useRef<HTMLCanvasElement | null>(null);
@@ -134,13 +137,10 @@ export function BrandingCropDialog({
 
   return (
     <Dialog open={open} onClose={disabled ? undefined : onCancel} maxWidth="sm" fullWidth>
-      <DialogTitle>Crop {label.toLowerCase()}</DialogTitle>
+      <DialogTitle>{t('branding.crop.title', { name })}</DialogTitle>
       <DialogContent>
         <Typography sx={{ fontSize: 13, color: 'text.secondary', mb: 1.5 }}>
-          {aspect
-            ? 'Drag the square handles over your mark. '
-            : 'Drag a box around exactly the part you want. '}
-          {recommended}
+          {aspect ? t('branding.crop.hintSquare') : t('branding.crop.hintFree')} {recommended}
         </Typography>
 
         <Box
@@ -196,17 +196,19 @@ export function BrandingCropDialog({
           </Box>
           <Box>
             <Typography sx={{ fontSize: 12, color: 'text.secondary' }}>
-              Saved size (transparent PNG)
+              {t('branding.crop.savedSize')}
             </Typography>
             <Typography sx={{ fontWeight: 600, fontSize: 15 }}>
-              {output ? `${output.width} × ${output.height} px` : '—'}
+              {output
+                ? t('branding.crop.dimensions', { width: output.width, height: output.height })
+                : '—'}
             </Typography>
           </Box>
         </Stack>
       </DialogContent>
       <DialogActions sx={{ px: 3, pb: 2.5 }}>
         <Button onClick={onCancel} color="inherit" disabled={disabled}>
-          Cancel
+          {t('common:actions.cancel')}
         </Button>
         <Button
           onClick={apply}
@@ -214,7 +216,7 @@ export function BrandingCropDialog({
           startIcon={<CropIcon size={16} />}
           disabled={disabled || !output}
         >
-          Use selection
+          {t('branding.crop.useSelection')}
         </Button>
       </DialogActions>
     </Dialog>

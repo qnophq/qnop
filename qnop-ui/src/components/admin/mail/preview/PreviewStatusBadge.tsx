@@ -19,19 +19,22 @@
  * SPDX-License-Identifier: AGPL-3.0-only
  */
 
+import type { ParseKeys } from 'i18next';
+import { useTranslation } from 'react-i18next';
 import { ToneBadge, type BadgeTone } from '../../ToneBadge';
 import type { PreviewStatus } from '../../../../api/hooks/useMailTemplatePreview';
 
-const TONE_BY_STATUS: Record<PreviewStatus, { tone: BadgeTone; label: string }> = {
-  idle: { tone: 'neutral', label: 'Idle' },
-  stale: { tone: 'amber', label: 'Pending' },
-  syncing: { tone: 'blue', label: 'Rendering' },
-  live: { tone: 'green', label: 'Live' },
-  error: { tone: 'red', label: 'Error' },
+const TONE_BY_STATUS: Record<PreviewStatus, { tone: BadgeTone; labelKey: ParseKeys<'admin'> }> = {
+  idle: { tone: 'neutral', labelKey: 'mailTemplates.preview.status.idle' },
+  stale: { tone: 'amber', labelKey: 'mailTemplates.preview.status.stale' },
+  syncing: { tone: 'blue', labelKey: 'mailTemplates.preview.status.syncing' },
+  live: { tone: 'green', labelKey: 'mailTemplates.preview.status.live' },
+  error: { tone: 'red', labelKey: 'mailTemplates.preview.status.error' },
 };
 
 /** A coloured pill mirroring the live-preview sync lifecycle (issue #145). */
 export function PreviewStatusBadge({ status }: { status: PreviewStatus }) {
-  const { tone, label } = TONE_BY_STATUS[status];
-  return <ToneBadge tone={tone} label={label} />;
+  const { t } = useTranslation('admin');
+  const { tone, labelKey } = TONE_BY_STATUS[status];
+  return <ToneBadge tone={tone} label={t(labelKey)} />;
 }

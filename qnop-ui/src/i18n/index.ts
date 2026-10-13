@@ -21,6 +21,7 @@
 
 import i18n from 'i18next';
 import { initReactI18next } from 'react-i18next';
+import enAdmin from './en/admin.json';
 import enAudit from './en/audit.json';
 import enAuth from './en/auth.json';
 import enCommon from './en/common.json';
@@ -48,6 +49,7 @@ export const bundledResources = {
     dashboard: enDashboard,
     teams: enTeams,
     audit: enAudit,
+    admin: enAdmin,
   },
 } as const;
 

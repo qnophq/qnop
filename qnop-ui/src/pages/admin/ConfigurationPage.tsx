@@ -33,6 +33,7 @@ import Tooltip from '@mui/material/Tooltip';
 import Typography from '@mui/material/Typography';
 import { useTheme } from '@mui/material/styles';
 import { Clock, Info, ServerCog } from 'lucide-react';
+import { Trans, useTranslation } from 'react-i18next';
 import { ClearableSearchField } from '../../components/ClearableSearchField';
 import type { ConfigurationEntry, ConfigurationGroup } from '../../api/generated';
 import { useAdminConfiguration } from '../../api/hooks/useAdminConfiguration';
@@ -55,6 +56,7 @@ function CodeCell({
   copyLabel: string;
   notify: (m: string, s?: 'success' | 'error') => void;
 }) {
+  const { t } = useTranslation('admin');
   return (
     <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, minWidth: 0 }}>
       <Box
@@ -72,7 +74,7 @@ function CodeCell({
         text={text}
         notify={notify}
         label={copyLabel}
-        copiedMessage={`Copied ${text}`}
+        copiedMessage={t('configuration.copied', { text })}
       />
     </Box>
   );
@@ -107,20 +109,27 @@ function PropertyInfo({ description }: { description?: string }) {
   );
 }
 
+/**
+ * A boolean property's value as the machine literal it is in `application.yml` — a technical
+ * token, not prose, so it is not translated.
+ */
+const BOOLEAN_LITERAL = { true: 'true', false: 'false' } as const;
+
 /** The value cell: state as form (chips) for what's scannable, machine text for the rest. */
 function ValueCell({ entry }: { entry: ConfigurationEntry }) {
+  const { t } = useTranslation('admin');
   switch (entry.valueType) {
     case 'SECRET':
       return entry.configured ? (
-        <ToneBadge tone="green" label="Configured" />
+        <ToneBadge tone="green" label={t('configuration.configured')} />
       ) : (
-        <ToneBadge tone="neutral" label="Not configured" />
+        <ToneBadge tone="neutral" label={t('configuration.notConfigured')} />
       );
     case 'BOOLEAN':
       return entry.value === 'true' ? (
-        <ToneBadge tone="green" label="true" />
+        <ToneBadge tone="green" label={BOOLEAN_LITERAL.true} />
       ) : (
-        <ToneBadge tone="neutral" label="false" />
+        <ToneBadge tone="neutral" label={BOOLEAN_LITERAL.false} />
       );
     case 'UNSET':
       return (
@@ -128,7 +137,7 @@ function ValueCell({ entry }: { entry: ConfigurationEntry }) {
           component="span"
           sx={{ fontSize: 13, color: 'text.disabled', fontStyle: 'italic' }}
         >
-          not set
+          {t('configuration.notSet')}
         </Typography>
       );
     case 'LIST': {
@@ -139,7 +148,7 @@ function ValueCell({ entry }: { entry: ConfigurationEntry }) {
             component="span"
             sx={{ fontSize: 13, color: 'text.disabled', fontStyle: 'italic' }}
           >
-            none
+            {t('configuration.none')}
           </Typography>
         );
       }
@@ -176,6 +185,13 @@ function ValueCell({ entry }: { entry: ConfigurationEntry }) {
  */
 const COLUMN_WIDTHS = ['38%', '37%', '25%'] as const;
 
+/** The column headings, as `admin` catalog keys in column order. */
+const COLUMN_HEADS = [
+  'configuration.columns.path',
+  'configuration.columns.envVar',
+  'configuration.columns.value',
+] as const;
+
 /** One namespace's table: Path | Env var | Value. */
 function GroupTable({
   entries,
@@ -184,6 +200,7 @@ function GroupTable({
   entries: ConfigurationEntry[];
   notify: (m: string, s?: 'success' | 'error') => void;
 }) {
+  const { t } = useTranslation('admin');
   const theme = useTheme();
   return (
     <Box sx={{ overflowX: 'auto' }}>
@@ -198,7 +215,7 @@ function GroupTable({
         </colgroup>
         <TableHead>
           <TableRow>
-            {['Path', 'Environment variable', 'Value'].map((head) => (
+            {COLUMN_HEADS.map((head) => (
               <TableCell
                 key={head}
                 sx={{
@@ -209,7 +226,7 @@ function GroupTable({
                   color: 'text.secondary',
                 }}
               >
-                {head}
+                {t(head)}
               </TableCell>
             ))}
           </TableRow>
@@ -221,7 +238,7 @@ function GroupTable({
                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, minWidth: 0 }}>
                   <CodeCell
                     text={entry.path}
-                    copyLabel={`Copy path ${entry.path}`}
+                    copyLabel={t('configuration.copyPath', { path: entry.path })}
                     notify={notify}
                   />
                   <PropertyInfo description={entry.description} />
@@ -230,7 +247,7 @@ function GroupTable({
               <TableCell sx={{ verticalAlign: 'top' }}>
                 <CodeCell
                   text={entry.envVar}
-                  copyLabel={`Copy environment variable ${entry.envVar}`}
+                  copyLabel={t('configuration.copyEnvVar', { envVar: entry.envVar })}
                   notify={notify}
                 />
               </TableCell>
@@ -243,6 +260,11 @@ function GroupTable({
       </Table>
     </Box>
   );
+}
+
+/** A group's property namespace, e.g. `qnop.storage` — a technical identifier, not translated. */
+function namespacePath(groupKey: string): string {
+  return `qnop.${groupKey}`;
 }
 
 /** Case-insensitive substring match on the path or env var. */
@@ -269,6 +291,7 @@ function filterGroups(groups: ConfigurationGroup[], query: string): Configuratio
  * is ever fetched. Operators verify a deployment here instead of shelling into the container.
  */
 export function ConfigurationPage() {
+  const { t } = useTranslation('admin');
   const { data, isLoading, isError } = useAdminConfiguration();
   const { toast, notify, clear } = useToast();
   const [query, setQuery] = useState('');
@@ -277,26 +300,21 @@ export function ConfigurationPage() {
 
   return (
     <Stack spacing={3}>
-      <PageHeader
-        title="Configuration"
-        description="The effective qnop.* settings this server bound at startup, from application.yml and QNOP_* environment variables."
-      />
+      <PageHeader title={t('configuration.title')} description={t('configuration.description')} />
 
       {/* Quotas first (issue #673): what the deployment may hold is the question
           an administrator comes here with far more often than any single property. */}
       <InstanceQuotaCard />
 
       <Alert severity="info" variant="outlined">
-        Read-only. These values are set in your deployment — change one by updating the environment
-        (or <code>application.yml</code>) and restarting the server. Secrets are never shown here,
-        only whether they are configured.
+        <Trans t={t} i18nKey="configuration.readOnly" components={{ code: <code /> }} />
       </Alert>
 
       <ClearableSearchField
         value={query}
         onValueChange={setQuery}
-        placeholder="Filter by property path or environment variable…"
-        clearLabel="Clear filter"
+        placeholder={t('configuration.filterPlaceholder')}
+        clearLabel={t('configuration.clearFilter')}
         fullWidth
         sx={{ maxWidth: 460 }}
       />
@@ -308,16 +326,14 @@ export function ConfigurationPage() {
         </Stack>
       )}
 
-      {isError && (
-        <Alert severity="error">Could not load the server configuration. Please try again.</Alert>
-      )}
+      {isError && <Alert severity="error">{t('configuration.loadFailed')}</Alert>}
 
       {!isLoading && !isError && groups.length === 0 && (
-        <Typography color="text.secondary">No settings match “{query}”.</Typography>
+        <Typography color="text.secondary">{t('configuration.noMatches', { query })}</Typography>
       )}
 
       {groups.map((group) => (
-        <SectionCard key={group.key} icon={ServerCog} title={`qnop.${group.key}`}>
+        <SectionCard key={group.key} icon={ServerCog} title={namespacePath(group.key)}>
           <GroupTable entries={group.entries} notify={notify} />
         </SectionCard>
       ))}

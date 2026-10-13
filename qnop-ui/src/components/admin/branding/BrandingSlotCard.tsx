@@ -27,7 +27,9 @@ import Skeleton from '@mui/material/Skeleton';
 import Stack from '@mui/material/Stack';
 import Typography from '@mui/material/Typography';
 import { useTheme } from '@mui/material/styles';
+import type { ParseKeys } from 'i18next';
 import { ImageOff, Trash2, Upload, UploadCloud } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import { BRANDING_ACCEPT, BRANDING_MAX_SIZE_BYTES, type BrandingSlot } from '../../../api/branding';
 import { useDeleteBrandingAsset, useUploadBrandingAsset } from '../../../api/hooks/useBranding';
 import { apiErrorMessage } from '../../../utils/apiError';
@@ -37,6 +39,7 @@ import { BrandingCropDialog } from './BrandingCropDialog';
 
 interface BrandingSlotCardProps {
   slot: BrandingSlot;
+  /** The slot's display name, e.g. as a card heading (already translated). */
   label: string;
   description: string;
   /** Where the effective asset comes from — drives the badge and the Replace/Remove affordances. */
@@ -58,24 +61,35 @@ const SVG_TYPE = 'image/svg+xml';
  */
 const SLOT_CROP: Record<
   BrandingSlot,
-  { aspect?: number; maxWidth: number; maxHeight: number; recommended: string }
+  { aspect?: number; maxWidth: number; maxHeight: number; recommendedKey: ParseKeys<'admin'> }
 > = {
   'logo-light': {
     maxWidth: 1024,
     maxHeight: 384,
-    recommended: 'Wordmark logos are wide — saved at up to 1024 × 384 px.',
+    recommendedKey: 'branding.crop.recommendedWordmark',
   },
   'logo-dark': {
     maxWidth: 1024,
     maxHeight: 384,
-    recommended: 'Wordmark logos are wide — saved at up to 1024 × 384 px.',
+    recommendedKey: 'branding.crop.recommendedWordmark',
   },
   logomark: {
     aspect: 1,
     maxWidth: 512,
     maxHeight: 512,
-    recommended: 'The logomark is square — saved at up to 512 × 512 px.',
+    recommendedKey: 'branding.crop.recommendedLogomark',
   },
+};
+
+/**
+ * The slot's name as it reads inside a sentence (`admin` catalog key). English lower-cases it
+ * ("the custom logo (light)"); German keeps the noun capitalised — so it is its own key rather
+ * than a `toLowerCase()` of the label.
+ */
+const SLOT_INLINE_NAME: Record<BrandingSlot, ParseKeys<'admin'>> = {
+  'logo-light': 'branding.slots.logoLight.inline',
+  'logo-dark': 'branding.slots.logoDark.inline',
+  logomark: 'branding.slots.logomark.inline',
 };
 
 /**
@@ -94,6 +108,7 @@ export function BrandingSlotCard({
   dark,
   onNotify,
 }: BrandingSlotCardProps) {
+  const { t } = useTranslation(['admin', 'common']);
   const theme = useTheme();
   const upload = useUploadBrandingAsset();
   const remove = useDeleteBrandingAsset();
@@ -112,32 +127,29 @@ export function BrandingSlotCard({
   const isCustom = source === 'CUSTOM';
   const busy = upload.isPending || remove.isPending;
   const cropConfig = SLOT_CROP[slot];
+  const inlineName = t(SLOT_INLINE_NAME[slot]);
 
   const doUpload = async (file: Blob, filename: string, successMessage?: string) => {
     try {
       await upload.mutateAsync({ slot, file, filename });
-      onNotify(successMessage ?? `${label} updated.`, 'success');
+      onNotify(successMessage ?? t('branding.toast.updated', { label }), 'success');
     } catch (err) {
-      onNotify(apiErrorMessage(err, 'The upload failed.'), 'error');
+      onNotify(apiErrorMessage(err, t('branding.errors.upload')), 'error');
     }
   };
 
   const accept = (file: File) => {
     if (!ALLOWED.includes(file.type)) {
-      onNotify('Unsupported file type. Use PNG, WebP or SVG.', 'error');
+      onNotify(t('branding.errors.unsupportedType'), 'error');
       return;
     }
     if (file.size > BRANDING_MAX_SIZE_BYTES) {
-      onNotify('File is too large (max 512 KiB).', 'error');
+      onNotify(t('branding.errors.tooLarge'), 'error');
       return;
     }
     if (file.type === SVG_TYPE) {
       // SVG is vector — rasterizing it to crop would lose quality, so upload it as-is and say so.
-      void doUpload(
-        file,
-        file.name || 'logo.svg',
-        `${label} updated — SVG is vector and used as-is (no cropping).`,
-      );
+      void doUpload(file, file.name || 'logo.svg', t('branding.toast.updatedSvg', { label }));
       return;
     }
     setCropSrc(URL.createObjectURL(file));
@@ -165,7 +177,7 @@ export function BrandingSlotCard({
   const onCropped = async (blob: Blob) => {
     closeCrop();
     if (blob.size > BRANDING_MAX_SIZE_BYTES) {
-      onNotify('The cropped image is too large (max 512 KiB). Try a tighter crop.', 'error');
+      onNotify(t('branding.errors.croppedTooLarge'), 'error');
       return;
     }
     await doUpload(blob, 'logo.png');
@@ -175,9 +187,9 @@ export function BrandingSlotCard({
     setConfirmDelete(false);
     try {
       await remove.mutateAsync(slot);
-      onNotify(`${label} reset to default.`, 'success');
+      onNotify(t('branding.toast.reset', { label }), 'success');
     } catch (err) {
-      onNotify(apiErrorMessage(err, 'The asset could not be removed.'), 'error');
+      onNotify(apiErrorMessage(err, t('branding.errors.remove')), 'error');
     }
   };
 
@@ -194,7 +206,10 @@ export function BrandingSlotCard({
               {description}
             </Typography>
           </Box>
-          <ToneBadge tone={isCustom ? 'blue' : 'neutral'} label={isCustom ? 'Custom' : 'Default'} />
+          <ToneBadge
+            tone={isCustom ? 'blue' : 'neutral'}
+            label={isCustom ? t('branding.source.custom') : t('branding.source.default')}
+          />
         </Stack>
 
         <Box
@@ -223,14 +238,14 @@ export function BrandingSlotCard({
           {failed && (
             <Stack spacing={0.5} sx={{ alignItems: 'center', color: 'text.disabled' }}>
               <ImageOff size={22} />
-              <Typography sx={{ fontSize: 12 }}>Preview unavailable</Typography>
+              <Typography sx={{ fontSize: 12 }}>{t('branding.card.previewUnavailable')}</Typography>
             </Stack>
           )}
           <Box
             component="img"
             key={url}
             src={url}
-            alt={`${label} preview`}
+            alt={t('branding.card.previewAlt', { label })}
             onLoad={() => setLoadedUrl(url)}
             onError={() => setFailedUrl(url)}
             sx={{
@@ -254,7 +269,9 @@ export function BrandingSlotCard({
               }}
             >
               <UploadCloud size={22} />
-              <Typography sx={{ fontSize: 12, fontWeight: 600 }}>Drop to upload</Typography>
+              <Typography sx={{ fontSize: 12, fontWeight: 600 }}>
+                {t('branding.card.dropToUpload')}
+              </Typography>
             </Stack>
           )}
         </Box>
@@ -267,7 +284,7 @@ export function BrandingSlotCard({
             onClick={() => inputRef.current?.click()}
             disabled={busy}
           >
-            {isCustom ? 'Replace' : 'Upload'}
+            {isCustom ? t('branding.card.replace') : t('branding.card.upload')}
           </Button>
           {isCustom && (
             <Button
@@ -277,18 +294,18 @@ export function BrandingSlotCard({
               onClick={() => setConfirmDelete(true)}
               disabled={busy}
             >
-              Remove
+              {t('common:actions.remove')}
             </Button>
           )}
           <Typography sx={{ fontSize: 12, color: 'text.disabled', ml: 'auto' }}>
-            or drag &amp; drop
+            {t('branding.card.orDragAndDrop')}
           </Typography>
           <input
             ref={inputRef}
             type="file"
             accept={BRANDING_ACCEPT}
             hidden
-            aria-label={`Upload ${label}`}
+            aria-label={t('branding.card.uploadAria', { label })}
             onChange={onPick}
           />
         </Stack>
@@ -298,12 +315,12 @@ export function BrandingSlotCard({
         <BrandingCropDialog
           open
           imageSrc={cropSrc}
-          label={label}
+          name={inlineName}
           dark={dark}
           aspect={cropConfig.aspect}
           maxWidth={cropConfig.maxWidth}
           maxHeight={cropConfig.maxHeight}
-          recommended={cropConfig.recommended}
+          recommended={t(cropConfig.recommendedKey)}
           busy={busy}
           onCancel={closeCrop}
           onCropped={onCropped}
@@ -312,9 +329,9 @@ export function BrandingSlotCard({
 
       <ConfirmDialog
         open={confirmDelete}
-        title="Remove logo"
-        message={`Remove the custom ${label.toLowerCase()}? The app falls back to the default ${label.toLowerCase()}.`}
-        confirmLabel="Remove"
+        title={t('branding.remove.title')}
+        message={t('branding.remove.message', { name: inlineName })}
+        confirmLabel={t('common:actions.remove')}
         destructive
         onConfirm={onDelete}
         onClose={() => setConfirmDelete(false)}
