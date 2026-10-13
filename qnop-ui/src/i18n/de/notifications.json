@@ -72,5 +72,44 @@
     "review": "Review",
     "received": "Empfangen",
     "openReview": "Review öffnen"
+  },
+  "text": {
+    "aReview": "ein Review",
+    "title": {
+      "mention": "{{actor}} hat dich erwähnt",
+      "participantAdded": "Du wurdest zu einem Review hinzugefügt",
+      "annotationCreated": "{{actor}} hat eine Anmerkung erstellt",
+      "annotationDecided": {
+        "resolved": "Eine Anmerkung wurde erledigt",
+        "reopened": "Eine Anmerkung wurde wieder geöffnet",
+        "dismissed": "Eine Anmerkung wurde verworfen",
+        "decided": "Über eine Anmerkung wurde entschieden"
+      },
+      "commentAdded": "{{actor}} hat geantwortet",
+      "versionUploaded": "Neue Version hochgeladen",
+      "workflowChanged": "Das Review ist jetzt „{{state}}“",
+      "reviewDeleted": "Ein Review wurde gelöscht",
+      "tombstone": "Ein Review, auf das du keinen Zugriff mehr hast"
+    },
+    "body": {
+      "mention": "{{actor}} hat dich in einem Kommentar zu „{{review}}“ erwähnt.",
+      "participantAdded": "{{actor}} hat dich als Reviewer zu „{{review}}“ hinzugefügt.",
+      "annotationCreated": "{{actor}} hat eine neue Anmerkung zu „{{review}}“ erstellt.",
+      "annotationDecided": {
+        "resolved": "{{actor}} hat eine Anmerkung zu „{{review}}“ erledigt.",
+        "reopened": "{{actor}} hat eine Anmerkung zu „{{review}}“ wieder geöffnet.",
+        "dismissed": "{{actor}} hat eine Anmerkung zu „{{review}}“ verworfen.",
+        "decided": "{{actor}} hat über eine Anmerkung zu „{{review}}“ entschieden."
+      },
+      "commentAdded": "{{actor}} hat in einer Diskussion zu „{{review}}“ geantwortet.",
+      "versionUploaded": "{{actor}} hat Version {{version}} von „{{review}}“ hochgeladen.",
+      "workflowChanged": "„{{review}}“ ist von „{{from}}“ zu „{{to}}“ gewechselt.",
+      "reviewDeleted": "„{{review}}“ wurde von einem Administrator endgültig gelöscht.",
+      "tombstone": "Diese Benachrichtigung bezieht sich auf ein Review, das für dich nicht mehr verfügbar ist."
+    },
+    "action": {
+      "openAnnotation": "Anmerkung öffnen",
+      "openReview": "Review öffnen"
+    }
   }
 }

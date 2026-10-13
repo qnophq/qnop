@@ -49,7 +49,7 @@ function summary(overrides: Partial<NotificationSummary>): NotificationSummary {
 const UNREAD = summary({
   id: 'n1',
   type: 'MENTION',
-  title: 'Ada mentioned you',
+  title: 'Ada Admin mentioned you',
   actorName: 'Ada Admin',
   actorSlug: 'ada-admin',
   documentTitle: 'NDA Acme Corp',
@@ -109,7 +109,7 @@ describe('MessagesPage', () => {
   it('lists notifications with their review and quoted excerpt', () => {
     renderPage();
 
-    expect(screen.getByText('Ada mentioned you')).toBeInTheDocument();
+    expect(screen.getByText('Ada Admin mentioned you')).toBeInTheDocument();
     expect(screen.getByText('NDA Acme Corp')).toBeInTheDocument();
     expect(screen.getByText('“can you confirm the cap?”')).toBeInTheDocument();
     expect(screen.getByText('Mia replied')).toBeInTheDocument();
@@ -144,7 +144,7 @@ describe('MessagesPage', () => {
   it('opens a notification on click', () => {
     renderPage();
 
-    fireEvent.click(screen.getByText('Ada mentioned you'));
+    fireEvent.click(screen.getByText('Ada Admin mentioned you'));
 
     expect(screen.getByTestId('detail-probe')).toBeInTheDocument();
   });

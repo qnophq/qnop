@@ -29,6 +29,7 @@ import { useTranslation } from 'react-i18next';
 import type { NotificationSummary } from '../../api/generated';
 import { useFormatters } from '../../hooks/useFormatters';
 import { NotificationActor } from './NotificationActor';
+import { useNotificationText } from './notificationText';
 import { NotificationTypeIcon } from './NotificationTypeIcon';
 import { notificationTone } from './notificationMeta';
 
@@ -74,6 +75,7 @@ export function NotificationRow({
   const { t } = useTranslation('notifications');
   const theme = useTheme();
   const { formatRelative } = useFormatters();
+  const text = useNotificationText();
   const unread = !notification.readAt;
   const tone = notificationTone(notification.type, theme);
   const avatarSize = dense ? 32 : 30;
@@ -88,7 +90,7 @@ export function NotificationRow({
           color: 'text.primary',
         }}
       >
-        {notification.title}
+        {text.title(notification)}
       </Typography>
       {unread && (
         <Box

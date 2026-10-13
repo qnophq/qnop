@@ -45,7 +45,7 @@ vi.mock('../../api/hooks/useNotifications', () => ({
         {
           id: 'n1',
           type: 'MENTION',
-          title: 'Ada mentioned you',
+          title: 'Ada Admin mentioned you',
           documentTitle: 'NDA Acme Corp',
           accessible: true,
           createdAt: '2026-07-01T10:00:00Z',
@@ -82,14 +82,14 @@ describe('TopBar notifications (#538)', () => {
     unreadCount.mockReturnValue(1);
     renderTopBar();
 
-    expect(screen.queryByText('Ada mentioned you')).not.toBeInTheDocument();
+    expect(screen.queryByText('Ada Admin mentioned you')).not.toBeInTheDocument();
 
     await user.click(screen.getByRole('button', { name: /Notifications/ }));
-    expect(await screen.findByText('Ada mentioned you')).toBeInTheDocument();
+    expect(await screen.findByText('Ada Admin mentioned you')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'See all messages' })).toBeInTheDocument();
 
     await user.keyboard('{Escape}');
-    expect(screen.queryByText('Ada mentioned you')).not.toBeInTheDocument();
+    expect(screen.queryByText('Ada Admin mentioned you')).not.toBeInTheDocument();
   });
 
   it('carries the real unread count on the bell, and announces it', () => {

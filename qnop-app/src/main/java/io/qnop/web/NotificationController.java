@@ -110,7 +110,12 @@ public class NotificationController implements NotificationsApi {
         .actionPath(view.actionPath())
         .accessible(view.accessible())
         .readAt(atUtc(view.readAt()))
-        .createdAt(atUtc(view.createdAt()));
+        .createdAt(atUtc(view.createdAt()))
+        .decision(view.facts().decision())
+        .fromState(view.facts().fromState())
+        .toState(view.facts().toState())
+        .versionNumber(view.facts().versionNumber())
+        .actionTarget(view.facts().actionTarget());
   }
 
   private static NotificationDetail toDetail(NotificationView view) {
@@ -128,7 +133,12 @@ public class NotificationController implements NotificationsApi {
         .actionLabel(view.actionLabel())
         .accessible(view.accessible())
         .readAt(atUtc(view.readAt()))
-        .createdAt(atUtc(view.createdAt()));
+        .createdAt(atUtc(view.createdAt()))
+        .decision(view.facts().decision())
+        .fromState(view.facts().fromState())
+        .toState(view.facts().toState())
+        .versionNumber(view.facts().versionNumber())
+        .actionTarget(view.facts().actionTarget());
   }
 
   /** Nullable {@link Instant} → {@link OffsetDateTime} at UTC for the wire model (#295). */

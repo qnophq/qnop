@@ -48,8 +48,8 @@ function detail(overrides: DetailOverrides = {}): NotificationDetail {
   return {
     id: 'n1',
     type: 'MENTION',
-    title: 'Ada mentioned you',
-    body: 'Ada mentioned you in a comment on “NDA Acme Corp”.',
+    title: 'Ada Admin mentioned you',
+    body: 'Ada Admin mentioned you in a comment on “NDA Acme Corp”.',
     preview: 'can you confirm the cap?',
     actorName: 'Ada Admin',
     actorSlug: 'ada-admin',
@@ -101,9 +101,9 @@ describe('MessageDetailPage', () => {
   it('renders the formatted message, its excerpt and the review it belongs to', () => {
     renderPage();
 
-    expect(screen.getByRole('heading', { name: 'Ada mentioned you' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Ada Admin mentioned you' })).toBeInTheDocument();
     expect(
-      screen.getByText('Ada mentioned you in a comment on “NDA Acme Corp”.'),
+      screen.getByText('Ada Admin mentioned you in a comment on “NDA Acme Corp”.'),
     ).toBeInTheDocument();
     expect(screen.getByText('“can you confirm the cap?”')).toBeInTheDocument();
   });
