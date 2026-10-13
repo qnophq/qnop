@@ -59,6 +59,7 @@ describe('formatAuditDetail phrases', () => {
 
   it('flags the em-dash detail as empty', () => {
     expect(isEmptyAuditDetail(formatAuditPhrase('annotation.created', null))).toBe(true);
+    expect(isEmptyAuditDetail(formatAuditPhrase('annotation.created', 'null'))).toBe(true);
     expect(isEmptyAuditDetail(formatAuditPhrase('extraction.failed', '{"reason":"X"}'))).toBe(
       false,
     );

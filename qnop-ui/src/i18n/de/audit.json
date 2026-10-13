@@ -48,7 +48,7 @@
     },
     "annotationResolved": {
       "label": "Anmerkung erledigt",
-      "description": "Eine Anmerkung wurde als erledigt markiert: Ihr Punkt wurde umgesetzt."
+      "description": "Eine Anmerkung wurde als erledigt markiert: Der angesprochene Punkt wurde umgesetzt."
     },
     "annotationReopened": {
       "label": "Anmerkung wieder geöffnet",

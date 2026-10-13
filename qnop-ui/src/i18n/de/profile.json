@@ -14,7 +14,7 @@
     "earnedCount": "{{earned}} von {{total}} erreicht",
     "tooltip": "{{title}} — {{caption}}",
     "ariaEarned": "{{title}}: {{caption}}",
-    "ariaLocked": "{{title}}: {{caption}} (gesperrt)",
+    "ariaLocked": "{{title}}: {{caption}} (noch nicht erreicht)",
     "liftoff": {
       "title": "Startschuss",
       "earned": "Ein Review gestartet",

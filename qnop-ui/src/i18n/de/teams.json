@@ -89,13 +89,13 @@
     },
     "achievements": {
       "unlocked": "Freigeschaltet · {{hint}}",
-      "locked": "Gesperrt · {{hint}}",
+      "locked": "Noch nicht erreicht · {{hint}}",
       "firstTeam": {
         "label": "Erstes Team",
         "hint": "Leite dein erstes Team"
       },
       "multiTeam": {
-        "label": "Multi-Team-Lead",
+        "label": "Multi-Team-Leitung",
         "hint": "Leite zwei oder mehr Teams"
       },
       "teamBuilder": {
@@ -148,7 +148,7 @@
     "emptyView": "Dieses Team hat keine Mitglieder.",
     "actionsFor": "Aktionen für {{name}}",
     "makeMember": "Zum Mitglied machen",
-    "makeLead": "Zum Lead machen",
+    "makeLead": "Zur Teamleitung machen",
     "removeFromTeam": "Aus dem Team entfernen",
     "remove": {
       "title": "Mitglied entfernen",
@@ -187,7 +187,7 @@
     "roleHelper": "Gilt für alle, die du in diesem Schritt hinzufügst.",
     "roles": {
       "MEMBER": "Mitglied",
-      "LEAD": "Lead"
+      "LEAD": "Teamleitung"
     },
     "cancel": "Abbrechen",
     "submit": "Hinzufügen",

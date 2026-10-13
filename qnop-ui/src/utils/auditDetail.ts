@@ -114,7 +114,9 @@ export function formatAuditDetail(
     return rawPhrase(detail);
   }
 
-  if (parsed === null || typeof parsed !== 'object') {
+  // A JSON null is as empty as no detail at all — same dash, no copy button.
+  if (parsed === null) return NONE;
+  if (typeof parsed !== 'object') {
     return rawPhrase(formatValue(parsed));
   }
 
@@ -190,7 +192,7 @@ export function formatAuditDetail(
 
 /** True for the em-dash detail — nothing worth copying. */
 export function isEmptyAuditDetail(phrase: AuditPhrase): boolean {
-  return 'key' in phrase && phrase.key === 'detail.none';
+  return phrase === NONE;
 }
 
 /** Resolves an {@link AuditPhrase} against the `audit` catalog — nested phrases first. */
