@@ -28,6 +28,7 @@ import Paper from '@mui/material/Paper';
 import Stack from '@mui/material/Stack';
 import Typography from '@mui/material/Typography';
 import { Plus } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import type { OidcProviderDto } from '../../api/generated';
 import {
   useDeleteOidcProvider,
@@ -49,6 +50,7 @@ type DialogState =
 
 /** Admin OIDC/OAuth2 provider management: list, add, edit, enable and delete (#106). */
 export function OidcProvidersPage() {
+  const { t } = useTranslation(['admin', 'common']);
   const { data, isLoading, isFetching, isError } = useOidcProviders();
   const updateProvider = useUpdateOidcProvider();
   const deleteProvider = useDeleteOidcProvider();
@@ -75,9 +77,13 @@ export function OidcProvidersPage() {
         id: provider.id,
         request: { enabled: !provider.enabled },
       });
-      notify(`${provider.name} ${provider.enabled ? 'disabled' : 'enabled'}.`);
+      notify(
+        provider.enabled
+          ? t('oidc.toast.disabled', { name: provider.name })
+          : t('oidc.toast.enabled', { name: provider.name }),
+      );
     } catch (err) {
-      notify(apiErrorMessage(err, 'The change could not be saved.'), 'error');
+      notify(apiErrorMessage(err, t('oidc.errors.toggle')), 'error');
     }
   };
 
@@ -85,9 +91,9 @@ export function OidcProvidersPage() {
     if (!toDelete) return;
     try {
       await deleteProvider.mutateAsync(toDelete.id);
-      notify(`${toDelete.name} deleted.`);
+      notify(t('oidc.toast.deleted', { name: toDelete.name }));
     } catch (err) {
-      notify(apiErrorMessage(err, 'The provider could not be deleted.'), 'error');
+      notify(apiErrorMessage(err, t('oidc.errors.delete')), 'error');
     } finally {
       setToDelete(null);
     }
@@ -96,11 +102,11 @@ export function OidcProvidersPage() {
   return (
     <Stack spacing={3}>
       <PageHeader
-        title="OIDC providers"
-        description="Configure single sign-on identity providers. New providers start disabled."
+        title={t('oidc.page.title')}
+        description={t('oidc.page.description')}
         action={
           <Button variant="contained" startIcon={<Plus size={18} />} onClick={openCreate}>
-            Add provider
+            {t('oidc.page.add')}
           </Button>
         }
       />
@@ -109,7 +115,7 @@ export function OidcProvidersPage() {
         <Box sx={{ height: 3 }}>{isFetching && <LinearProgress />}</Box>
         {isError ? (
           <Alert severity="error" sx={{ m: 2 }}>
-            The providers could not be loaded.
+            {t('oidc.errors.load')}
           </Alert>
         ) : (
           <OidcProvidersTable
@@ -121,7 +127,7 @@ export function OidcProvidersPage() {
         )}
         {isLoading && (
           <Typography color="text.secondary" sx={{ p: 2, fontSize: 14 }}>
-            Loading…
+            {t('common:loading')}
           </Typography>
         )}
       </Paper>
@@ -136,9 +142,9 @@ export function OidcProvidersPage() {
 
       <ConfirmDialog
         open={toDelete !== null}
-        title="Delete provider"
-        message={`Delete “${toDelete?.name}”? Users will no longer be able to sign in with it. This cannot be undone.`}
-        confirmLabel="Delete"
+        title={t('oidc.delete.title')}
+        message={t('oidc.delete.message', { name: toDelete?.name })}
+        confirmLabel={t('common:actions.delete')}
         destructive
         onConfirm={confirmDelete}
         onClose={() => setToDelete(null)}

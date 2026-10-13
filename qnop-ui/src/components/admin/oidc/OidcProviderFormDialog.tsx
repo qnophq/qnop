@@ -38,7 +38,9 @@ import Stack from '@mui/material/Stack';
 import Switch from '@mui/material/Switch';
 import TextField from '@mui/material/TextField';
 import Typography from '@mui/material/Typography';
+import type { ParseKeys } from 'i18next';
 import { ChevronDown } from 'lucide-react';
+import { Trans, useTranslation } from 'react-i18next';
 import type { OidcProviderDto, OidcProviderTypeDto } from '../../../api/generated';
 import { PasswordField } from '../../auth/PasswordField';
 import {
@@ -56,6 +58,21 @@ const LOCKED_SCOPES: Partial<Record<OidcProviderTypeDto, string>> = {
   GITHUB: 'read:user user:email',
   FACEBOOK: 'email public_profile',
 };
+
+/**
+ * Example values for the issuer and the claim-name fields. They are technical identifiers (a URL
+ * and standard OIDC claim names), so they stay untranslated.
+ */
+const ISSUER_PLACEHOLDER = 'https://accounts.example.com';
+const CLAIM_PLACEHOLDERS = { userName: 'sub', email: 'email', displayName: 'name' } as const;
+
+type AdminKey = ParseKeys<'admin'>;
+
+/** A failed request: the error itself and the `admin` catalog key of its fallback message. */
+interface DialogError {
+  cause: unknown;
+  fallbackKey: AdminKey;
+}
 
 interface OidcProviderFormDialogProps {
   open: boolean;
@@ -83,6 +100,7 @@ export function OidcProviderFormDialog({
   provider,
   onClose,
 }: OidcProviderFormDialogProps) {
+  const { t } = useTranslation(['admin', 'common']);
   const createProvider = useCreateOidcProvider();
   const updateProvider = useUpdateOidcProvider();
   const discover = useDiscoverOidcEndpoints();
@@ -113,7 +131,7 @@ export function OidcProviderFormDialog({
     editing ? (provider.displayNameAttribute ?? '') : '',
   );
   const [enabled, setEnabled] = useState(editing ? provider.enabled : false);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<DialogError | null>(null);
   const [submitAttempted, setSubmitAttempted] = useState(false);
   const [acknowledgeClientId, setAcknowledgeClientId] = useState(false);
   const [created, setCreated] = useState<OidcProviderDto | null>(null);
@@ -131,18 +149,19 @@ export function OidcProviderFormDialog({
   const submitting = createProvider.isPending || updateProvider.isPending;
 
   const errors = useMemo(() => {
-    const e: Partial<Record<string, string>> = {};
-    if (!name.trim()) e.name = 'A display name is required.';
-    if (!clientId.trim()) e.clientId = 'A client ID is required.';
-    if (!isEdit && !clientSecret.trim()) e.clientSecret = 'A client secret is required.';
+    // Catalog keys, resolved at render so the messages follow a language switch.
+    const e: Partial<Record<string, AdminKey>> = {};
+    if (!name.trim()) e.name = 'oidc.form.errors.nameRequired';
+    if (!clientId.trim()) e.clientId = 'oidc.form.errors.clientIdRequired';
+    if (!isEdit && !clientSecret.trim()) e.clientSecret = 'oidc.form.errors.clientSecretRequired';
     if (showIssuer && isOidc && !issuerUri.trim()) {
-      e.issuerUri = 'An issuer URL is required for OIDC.';
+      e.issuerUri = 'oidc.form.errors.issuerRequired';
     }
     if (issuerUri.trim() && !isHttpUrl(issuerUri.trim())) {
-      e.issuerUri = 'Enter a valid http(s) URL.';
+      e.issuerUri = 'oidc.form.errors.invalidUrl';
     }
     if (isOidc && effectiveScope.trim() && !effectiveScope.trim().split(/\s+/).includes('openid')) {
-      e.scope = 'OIDC scopes must include "openid".';
+      e.scope = 'oidc.form.errors.openidScope';
     }
     if (showEndpoints) {
       const endpoints = [
@@ -153,9 +172,9 @@ export function OidcProviderFormDialog({
       ] as const;
       for (const [field, value] of endpoints) {
         if (isGeneric && field !== 'jwkSetUri' && !value.trim()) {
-          e[field] = 'Required for a generic OAuth2 provider.';
+          e[field] = 'oidc.form.errors.endpointRequired';
         } else if (value.trim() && !isHttpUrl(value.trim())) {
-          e[field] = 'Enter a valid http(s) URL.';
+          e[field] = 'oidc.form.errors.invalidUrl';
         }
       }
     }
@@ -179,8 +198,10 @@ export function OidcProviderFormDialog({
 
   const canSubmit = Object.keys(errors).length === 0 && (!clientIdChanged || acknowledgeClientId);
 
-  const fieldError = (field: string): string | undefined =>
-    submitAttempted ? errors[field] : undefined;
+  const fieldError = (field: string): string | undefined => {
+    const key = submitAttempted ? errors[field] : undefined;
+    return key ? t(key) : undefined;
+  };
 
   const runDiscover = async () => {
     setError(null);
@@ -195,7 +216,7 @@ export function OidcProviderFormDialog({
       // mutateAsync rethrows on TCP failure / 5xx / rate limit (unlike the
       // endpoint's 200 + success:false). Surface it instead of leaving an
       // unhandled rejection.
-      setError(apiErrorMessage(err, 'Could not reach the issuer to discover its endpoints.'));
+      setError({ cause: err, fallbackKey: 'oidc.form.errors.discoverUnreachable' });
     }
   };
 
@@ -246,7 +267,7 @@ export function OidcProviderFormDialog({
         setCreated(result);
       }
     } catch (err) {
-      setError(apiErrorMessage(err, 'Saving the provider failed. Please check the details.'));
+      setError({ cause: err, fallbackKey: 'oidc.form.errors.save' });
     }
   };
 
@@ -256,39 +277,35 @@ export function OidcProviderFormDialog({
         <CreateSuccessStep provider={created} onClose={onClose} />
       ) : (
         <Box component="form" onSubmit={onSubmit} noValidate>
-          <DialogTitle>{isEdit ? 'Edit provider' : 'Add provider'}</DialogTitle>
+          <DialogTitle>{isEdit ? t('oidc.form.editTitle') : t('oidc.form.addTitle')}</DialogTitle>
           <DialogContent>
             <Stack spacing={2.5} sx={{ mt: 1 }}>
               <TextField
-                label="Display name"
+                label={t('oidc.form.displayName')}
                 value={name}
                 onChange={(e) => setName(e.target.value)}
                 fullWidth
                 required
                 error={Boolean(fieldError('name'))}
-                helperText={
-                  fieldError('name') ?? 'Shown on the login button, e.g. “Google” or “Company SSO”.'
-                }
+                helperText={fieldError('name') ?? t('oidc.form.displayNameHelper')}
               />
               <TextField
-                label="Provider type"
+                label={t('oidc.form.providerType')}
                 select
                 value={providerType}
                 onChange={(e) => setProviderType(e.target.value as OidcProviderTypeDto)}
                 fullWidth
                 disabled={isEdit}
-                helperText={
-                  isEdit ? 'The provider type cannot be changed after creation.' : undefined
-                }
+                helperText={isEdit ? t('oidc.form.providerTypeLocked') : undefined}
               >
                 {PROVIDER_TYPES.map((type) => (
                   <MenuItem key={type.value} value={type.value}>
-                    {type.label}
+                    {t(type.labelKey)}
                   </MenuItem>
                 ))}
               </TextField>
               <TextField
-                label="Client ID"
+                label={t('oidc.form.clientId')}
                 value={clientId}
                 onChange={(e) => setClientId(e.target.value)}
                 fullWidth
@@ -299,8 +316,7 @@ export function OidcProviderFormDialog({
               />
               {clientIdChanged && (
                 <Alert severity="warning">
-                  Changing the client ID points qnop at a different upstream app. Existing linked
-                  accounts may stop matching.
+                  {t('oidc.form.clientIdChangeWarning')}
                   <FormControlLabel
                     sx={{ mt: 0.5, display: 'flex' }}
                     control={
@@ -310,12 +326,12 @@ export function OidcProviderFormDialog({
                         onChange={(e) => setAcknowledgeClientId(e.target.checked)}
                       />
                     }
-                    label="I understand, change the client ID."
+                    label={t('oidc.form.clientIdChangeAcknowledge')}
                   />
                 </Alert>
               )}
               <PasswordField
-                label={isEdit ? 'Client secret (leave blank to keep)' : 'Client secret'}
+                label={isEdit ? t('oidc.form.clientSecretKeep') : t('oidc.form.clientSecret')}
                 value={clientSecret}
                 onChange={setClientSecret}
                 autoComplete="new-password"
@@ -325,17 +341,14 @@ export function OidcProviderFormDialog({
               />
               {showIssuer && (
                 <TextField
-                  label="Issuer URL"
+                  label={t('oidc.form.issuer')}
                   value={issuerUri}
                   onChange={(e) => onIssuerChange(e.target.value)}
                   fullWidth
                   required={isOidc}
-                  placeholder="https://accounts.example.com"
+                  placeholder={ISSUER_PLACEHOLDER}
                   error={Boolean(fieldError('issuerUri'))}
-                  helperText={
-                    fieldError('issuerUri') ??
-                    'Use Discover to fill the endpoints automatically from the issuer.'
-                  }
+                  helperText={fieldError('issuerUri') ?? t('oidc.form.issuerHelper')}
                   slotProps={{
                     input: {
                       endAdornment: (
@@ -345,7 +358,9 @@ export function OidcProviderFormDialog({
                             onClick={runDiscover}
                             disabled={!isHttpUrl(issuerUri.trim()) || discover.isPending}
                           >
-                            {discover.isPending ? 'Discovering…' : 'Discover'}
+                            {discover.isPending
+                              ? t('oidc.form.discovering')
+                              : t('oidc.form.discover')}
                           </Button>
                         </InputAdornment>
                       ),
@@ -355,7 +370,7 @@ export function OidcProviderFormDialog({
               )}
               {discover.data && <DiscoveryBanner result={discover.data} />}
               <TextField
-                label="Scopes"
+                label={t('oidc.form.scopes')}
                 value={effectiveScope}
                 onChange={(e) => setScope(e.target.value)}
                 fullWidth
@@ -363,9 +378,7 @@ export function OidcProviderFormDialog({
                 error={Boolean(fieldError('scope'))}
                 helperText={
                   fieldError('scope') ??
-                  (lockedScope
-                    ? 'Scopes for this provider are managed by qnop and cannot be changed.'
-                    : 'Space-separated, e.g. “openid email profile”.')
+                  (lockedScope ? t('oidc.form.scopesLocked') : t('oidc.form.scopesHelper'))
                 }
               />
 
@@ -378,18 +391,20 @@ export function OidcProviderFormDialog({
                 >
                   <AccordionSummary expandIcon={<ChevronDown size={18} />} sx={{ px: 0 }}>
                     <Typography sx={{ fontSize: 14, fontWeight: 600 }}>
-                      Endpoints &amp; attribute mapping{isGeneric ? ' (required)' : ' (advanced)'}
+                      {isGeneric
+                        ? t('oidc.form.endpointsRequired')
+                        : t('oidc.form.endpointsAdvanced')}
                     </Typography>
                   </AccordionSummary>
                   <AccordionDetails sx={{ px: 0 }}>
                     <Stack spacing={2}>
                       <Typography color="text.secondary" sx={{ fontSize: 13 }}>
                         {isGeneric
-                          ? 'Required for a generic OAuth2 provider — qnop cannot discover these.'
-                          : 'Optional — usually filled in by Discover from the issuer; override only if needed.'}
+                          ? t('oidc.form.endpointsRequiredHint')
+                          : t('oidc.form.endpointsOptionalHint')}
                       </Typography>
                       <TextField
-                        label="Authorization URL"
+                        label={t('oidc.form.authorizationUrl')}
                         value={authorizationUri}
                         onChange={(e) => setAuthorizationUri(e.target.value)}
                         fullWidth
@@ -398,7 +413,7 @@ export function OidcProviderFormDialog({
                         helperText={fieldError('authorizationUri')}
                       />
                       <TextField
-                        label="Token URL"
+                        label={t('oidc.form.tokenUrl')}
                         value={tokenUri}
                         onChange={(e) => setTokenUri(e.target.value)}
                         fullWidth
@@ -407,7 +422,7 @@ export function OidcProviderFormDialog({
                         helperText={fieldError('tokenUri')}
                       />
                       <TextField
-                        label="User info URL"
+                        label={t('oidc.form.userInfoUrl')}
                         value={userInfoUri}
                         onChange={(e) => setUserInfoUri(e.target.value)}
                         fullWidth
@@ -416,7 +431,7 @@ export function OidcProviderFormDialog({
                         helperText={fieldError('userInfoUri')}
                       />
                       <TextField
-                        label="JWK set URL"
+                        label={t('oidc.form.jwkSetUrl')}
                         value={jwkSetUri}
                         onChange={(e) => setJwkSetUri(e.target.value)}
                         fullWidth
@@ -424,25 +439,25 @@ export function OidcProviderFormDialog({
                         helperText={fieldError('jwkSetUri')}
                       />
                       <TextField
-                        label="Username attribute"
+                        label={t('oidc.form.userNameAttribute')}
                         value={userNameAttribute}
                         onChange={(e) => setUserNameAttribute(e.target.value)}
                         fullWidth
-                        placeholder="sub"
+                        placeholder={CLAIM_PLACEHOLDERS.userName}
                       />
                       <TextField
-                        label="Email attribute"
+                        label={t('oidc.form.emailAttribute')}
                         value={emailAttribute}
                         onChange={(e) => setEmailAttribute(e.target.value)}
                         fullWidth
-                        placeholder="email"
+                        placeholder={CLAIM_PLACEHOLDERS.email}
                       />
                       <TextField
-                        label="Display-name attribute"
+                        label={t('oidc.form.displayNameAttribute')}
                         value={displayNameAttribute}
                         onChange={(e) => setDisplayNameAttribute(e.target.value)}
                         fullWidth
-                        placeholder="name"
+                        placeholder={CLAIM_PLACEHOLDERS.displayName}
                       />
                     </Stack>
                   </AccordionDetails>
@@ -462,19 +477,21 @@ export function OidcProviderFormDialog({
                   control={
                     <Switch checked={enabled} onChange={(e) => setEnabled(e.target.checked)} />
                   }
-                  label={enabled ? 'Enabled for login' : 'Disabled'}
+                  label={enabled ? t('oidc.form.enabledForLogin') : t('oidc.status.disabled')}
                 />
               )}
 
-              {error && <Alert severity="error">{error}</Alert>}
+              {error && (
+                <Alert severity="error">{apiErrorMessage(error.cause, t(error.fallbackKey))}</Alert>
+              )}
             </Stack>
           </DialogContent>
           <DialogActions sx={{ px: 3, pb: 2.5 }}>
             <Button onClick={onClose} color="inherit">
-              Cancel
+              {t('common:actions.cancel')}
             </Button>
             <Button type="submit" variant="contained" disabled={submitting || !canSubmit}>
-              {isEdit ? 'Save' : 'Create'}
+              {isEdit ? t('common:actions.save') : t('common:actions.create')}
             </Button>
           </DialogActions>
         </Box>
@@ -496,19 +513,21 @@ interface DiscoveryBannerProps {
 
 /** Shows the outcome of a discovery probe — the four resolved endpoints, or the error. */
 function DiscoveryBanner({ result }: DiscoveryBannerProps) {
+  const { t } = useTranslation('admin');
   if (!result.success) {
-    return <Alert severity="warning">{result.error ?? 'Discovery failed for this issuer.'}</Alert>;
+    // The server's own reason is shown verbatim; only the fallback is ours.
+    return <Alert severity="warning">{result.error ?? t('oidc.form.discovery.failed')}</Alert>;
   }
-  const rows: [string, string | undefined][] = [
-    ['Authorization', result.authorizationUri],
-    ['Token', result.tokenUri],
-    ['User info', result.userInfoUri],
-    ['JWK set', result.jwkSetUri],
+  const rows: [AdminKey, string | undefined][] = [
+    ['oidc.form.discovery.authorization', result.authorizationUri],
+    ['oidc.form.discovery.token', result.tokenUri],
+    ['oidc.form.discovery.userInfo', result.userInfoUri],
+    ['oidc.form.discovery.jwkSet', result.jwkSetUri],
   ];
   return (
     <Alert severity="success" sx={{ '& .MuiAlert-message': { width: '100%' } }}>
       <Typography variant="body2" sx={{ fontWeight: 600, mb: 0.5 }}>
-        Endpoints discovered and filled in:
+        {t('oidc.form.discovery.succeeded')}
       </Typography>
       <Stack spacing={0.25}>
         {rows.map(([label, value]) => (
@@ -517,7 +536,7 @@ function DiscoveryBanner({ result }: DiscoveryBannerProps) {
             variant="caption"
             sx={{ display: 'block', wordBreak: 'break-all', color: 'text.secondary' }}
           >
-            <strong>{label}:</strong> {value ?? '—'}
+            <strong>{t(label)}:</strong> {value ?? '—'}
           </Typography>
         ))}
       </Stack>
@@ -536,14 +555,20 @@ interface CreateSuccessStepProps {
  * focus, followed by a reminder to enable the provider once the IdP side is set.
  */
 function CreateSuccessStep({ provider, onClose }: CreateSuccessStepProps) {
+  const { t } = useTranslation(['admin', 'common']);
   return (
     <>
-      <DialogTitle>Provider created</DialogTitle>
+      <DialogTitle>{t('oidc.created.title')}</DialogTitle>
       <DialogContent>
         <Stack spacing={2} sx={{ mt: 1 }}>
           <Typography variant="body2" color="text.secondary">
-            <strong>{provider.name}</strong> was created and is currently <strong>disabled</strong>.
-            Register the callback URL below at your provider, then enable it from the list.
+            <Trans
+              t={t}
+              i18nKey="oidc.created.message"
+              // The provider name goes in as a child, never an interpolated value: Trans parses
+              // the interpolated string for tags, so a name like "<b>…" would turn into markup.
+              components={{ name: <strong>{provider.name}</strong>, strong: <strong /> }}
+            />
           </Typography>
           <ProviderCallbackInstructions
             providerId={provider.id}
@@ -554,7 +579,7 @@ function CreateSuccessStep({ provider, onClose }: CreateSuccessStepProps) {
       </DialogContent>
       <DialogActions sx={{ px: 3, pb: 2.5 }}>
         <Button onClick={onClose} variant="contained">
-          Done
+          {t('common:actions.done')}
         </Button>
       </DialogActions>
     </>

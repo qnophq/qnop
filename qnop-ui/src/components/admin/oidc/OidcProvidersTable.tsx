@@ -35,11 +35,13 @@ import TableHead from '@mui/material/TableHead';
 import TableRow from '@mui/material/TableRow';
 import Tooltip from '@mui/material/Tooltip';
 import Typography from '@mui/material/Typography';
+import type { ParseKeys } from 'i18next';
 import { MoreVertical, SquarePen, Trash2 } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import type { OidcProviderDto } from '../../../api/generated';
 import { useFormatters } from '../../../hooks/useFormatters';
 import { ToneBadge } from '../ToneBadge';
-import { providerTypeLabel } from './oidcProviderTypes';
+import { providerTypeLabelKey } from './oidcProviderTypes';
 
 interface OidcProvidersTableProps {
   providers: OidcProviderDto[];
@@ -48,7 +50,16 @@ interface OidcProvidersTableProps {
   onDelete: (provider: OidcProviderDto) => void;
 }
 
-const COLUMNS = ['Provider', 'Type', 'Issuer', 'Client ID', 'Status', 'Created', ''];
+/** Column header keys; `null` is the unlabelled actions column. */
+const COLUMNS: (ParseKeys<'admin'> | null)[] = [
+  'oidc.table.columns.provider',
+  'oidc.table.columns.type',
+  'oidc.table.columns.issuer',
+  'oidc.table.columns.clientId',
+  'oidc.table.columns.status',
+  'oidc.table.columns.created',
+  null,
+];
 
 export function OidcProvidersTable({
   providers,
@@ -56,6 +67,7 @@ export function OidcProvidersTable({
   onToggleEnabled,
   onDelete,
 }: OidcProvidersTableProps) {
+  const { t } = useTranslation(['admin', 'common']);
   const { formatDateTime } = useFormatters();
   const [anchorEl, setAnchorEl] = useState<HTMLElement | null>(null);
   const [active, setActive] = useState<OidcProviderDto | null>(null);
@@ -65,6 +77,10 @@ export function OidcProvidersTable({
     setActive(provider);
   };
   const closeMenu = () => setAnchorEl(null);
+  const providerTypeLabelOf = (type: OidcProviderDto['providerType']) => {
+    const key = providerTypeLabelKey(type);
+    return key ? t(key) : type;
+  };
 
   return (
     <>
@@ -73,10 +89,10 @@ export function OidcProvidersTable({
           <TableRow>
             {COLUMNS.map((col, index) => (
               <TableCell
-                key={col || 'actions'}
+                key={col ?? 'actions'}
                 align={index === COLUMNS.length - 1 ? 'right' : 'left'}
               >
-                {col}
+                {col && t(col)}
               </TableCell>
             ))}
           </TableRow>
@@ -86,7 +102,7 @@ export function OidcProvidersTable({
             <TableRow>
               <TableCell colSpan={COLUMNS.length}>
                 <Typography color="text.secondary" sx={{ py: 4, textAlign: 'center' }}>
-                  No identity providers configured yet.
+                  {t('oidc.table.empty')}
                 </Typography>
               </TableCell>
             </TableRow>
@@ -98,7 +114,7 @@ export function OidcProvidersTable({
               </TableCell>
               <TableCell>
                 <Chip
-                  label={providerTypeLabel(provider.providerType)}
+                  label={providerTypeLabelOf(provider.providerType)}
                   size="small"
                   variant="outlined"
                 />
@@ -127,17 +143,25 @@ export function OidcProvidersTable({
               </TableCell>
               <TableCell>
                 <Stack direction="row" spacing={1} sx={{ alignItems: 'center' }}>
-                  <Tooltip title={provider.enabled ? 'Disable for login' : 'Enable for login'}>
+                  <Tooltip
+                    title={
+                      provider.enabled
+                        ? t('oidc.table.disableForLogin')
+                        : t('oidc.table.enableForLogin')
+                    }
+                  >
                     <Switch
                       size="small"
                       checked={provider.enabled}
                       onChange={() => onToggleEnabled(provider)}
-                      slotProps={{ input: { 'aria-label': `Toggle ${provider.name}` } }}
+                      slotProps={{
+                        input: { 'aria-label': t('oidc.table.toggle', { name: provider.name }) },
+                      }}
                     />
                   </Tooltip>
                   <ToneBadge
                     tone={provider.enabled ? 'green' : 'neutral'}
-                    label={provider.enabled ? 'Enabled' : 'Disabled'}
+                    label={provider.enabled ? t('oidc.status.enabled') : t('oidc.status.disabled')}
                   />
                 </Stack>
               </TableCell>
@@ -149,7 +173,7 @@ export function OidcProvidersTable({
               <TableCell align="right">
                 <IconButton
                   size="small"
-                  aria-label={`Actions for ${provider.name}`}
+                  aria-label={t('oidc.table.actionsFor', { name: provider.name })}
                   onClick={(e) => openMenu(e, provider)}
                 >
                   <MoreVertical size={18} />
@@ -170,7 +194,7 @@ export function OidcProvidersTable({
           <ListItemIcon>
             <SquarePen size={16} />
           </ListItemIcon>
-          <ListItemText>Edit</ListItemText>
+          <ListItemText>{t('common:actions.edit')}</ListItemText>
         </MenuItem>
         <MenuItem
           onClick={() => {
@@ -181,7 +205,7 @@ export function OidcProvidersTable({
           <ListItemIcon>
             <Trash2 size={16} />
           </ListItemIcon>
-          <ListItemText>Delete</ListItemText>
+          <ListItemText>{t('common:actions.delete')}</ListItemText>
         </MenuItem>
       </Menu>
     </>

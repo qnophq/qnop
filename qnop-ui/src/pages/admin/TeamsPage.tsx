@@ -39,6 +39,7 @@ import TableHead from '@mui/material/TableHead';
 import TablePagination from '@mui/material/TablePagination';
 import TableRow from '@mui/material/TableRow';
 import Typography from '@mui/material/Typography';
+import { useTranslation } from 'react-i18next';
 import { MoreVertical, SquarePen, Trash2, UsersRound } from 'lucide-react';
 import { ClearableSearchField } from '../../components/ClearableSearchField';
 import { TeamAvatar } from '../../components/shell/TeamAvatar';
@@ -63,6 +64,7 @@ type DialogState =
 
 /** Admin team management: search, paginate, create / edit / delete, open a team (#105). */
 export function TeamsPage() {
+  const { t } = useTranslation(['admin', 'common']);
   const navigate = useNavigate();
   const deleteTeam = useDeleteTeam();
   const [search, setSearch] = useState('');
@@ -114,9 +116,9 @@ export function TeamsPage() {
     if (!deleteTarget) return;
     try {
       await deleteTeam.mutateAsync(deleteTarget.id);
-      notify(`Team “${deleteTarget.name}” deleted.`);
+      notify(t('teams.list.deleted', { name: deleteTarget.name }));
     } catch (err) {
-      notify(apiErrorMessage(err, 'Could not delete the team.'), 'error');
+      notify(apiErrorMessage(err, t('teams.list.deleteFailed')), 'error');
     } finally {
       setDeleteTarget(null);
     }
@@ -125,11 +127,11 @@ export function TeamsPage() {
   return (
     <Stack spacing={3}>
       <PageHeader
-        title="Teams"
+        title={t('teams.list.title')}
         description={
           teamLimit > 0
-            ? `Group reviewers and manage their team roles. ${teamsUsed} of ${teamLimit} teams used.`
-            : 'Group reviewers and manage their team roles.'
+            ? t('teams.list.descriptionWithLimit', { count: teamLimit, used: teamsUsed })
+            : t('teams.list.description')
         }
         action={
           // Disabled rather than left to fail (issue #688): the refusal is
@@ -141,22 +143,19 @@ export function TeamsPage() {
             disabled={teamsFull}
             onClick={openCreate}
           >
-            Create team
+            {t('teams.list.create')}
           </Button>
         }
       />
 
       {teamsFull && (
-        <QuotaAlert>
-          This instance is configured for {teamLimit} teams and holds {teamsUsed}. Deleting a team
-          frees a slot.
-        </QuotaAlert>
+        <QuotaAlert>{t('teams.list.quotaFull', { count: teamLimit, used: teamsUsed })}</QuotaAlert>
       )}
 
       <ClearableSearchField
         value={search}
         onValueChange={setSearch}
-        placeholder="Search by name or description"
+        placeholder={t('teams.list.searchPlaceholder')}
         sx={{ maxWidth: 420 }}
       />
 
@@ -164,18 +163,18 @@ export function TeamsPage() {
         <Box sx={{ height: 3 }}>{isFetching && <LinearProgress />}</Box>
         {isError ? (
           <Alert severity="error" sx={{ m: 2 }}>
-            The team list could not be loaded.
+            {t('teams.list.loadError')}
           </Alert>
         ) : (
           <>
             <Table size="medium" sx={{ '& td, & th': { borderColor: 'divider' } }}>
               <TableHead>
                 <TableRow>
-                  <TableCell>Name</TableCell>
-                  <TableCell>Description</TableCell>
-                  <TableCell>Members</TableCell>
-                  <TableCell>Status</TableCell>
-                  <TableCell align="right">Actions</TableCell>
+                  <TableCell>{t('teams.list.columns.name')}</TableCell>
+                  <TableCell>{t('teams.list.columns.description')}</TableCell>
+                  <TableCell>{t('teams.list.columns.members')}</TableCell>
+                  <TableCell>{t('teams.list.columns.status')}</TableCell>
+                  <TableCell align="right">{t('teams.list.columns.actions')}</TableCell>
                 </TableRow>
               </TableHead>
               <TableBody>
@@ -183,7 +182,7 @@ export function TeamsPage() {
                   <TableRow>
                     <TableCell colSpan={5}>
                       <Typography color="text.secondary" sx={{ py: 4, textAlign: 'center' }}>
-                        No teams found.
+                        {t('teams.list.empty')}
                       </Typography>
                     </TableCell>
                   </TableRow>
@@ -222,7 +221,7 @@ export function TeamsPage() {
                     <TableCell align="right">
                       <IconButton
                         size="small"
-                        aria-label={`Actions for ${team.name}`}
+                        aria-label={t('teams.list.actionsFor', { name: team.name })}
                         onClick={(e) => openMenu(e, team)}
                       >
                         <MoreVertical size={18} />
@@ -239,13 +238,15 @@ export function TeamsPage() {
               rowsPerPage={PAGE_SIZE}
               rowsPerPageOptions={[PAGE_SIZE]}
               onPageChange={(_, next) => setPage(next)}
-              labelDisplayedRows={({ from, to, count }) => `${from}–${to} of ${count}`}
+              labelDisplayedRows={({ from, to, count }) =>
+                t('teams.list.displayedRows', { from, to, total: count })
+              }
             />
           </>
         )}
         {isLoading && (
           <Typography color="text.secondary" sx={{ p: 2, fontSize: 14 }}>
-            Loading…
+            {t('common:loading')}
           </Typography>
         )}
       </Paper>
@@ -260,7 +261,7 @@ export function TeamsPage() {
           <ListItemIcon>
             <SquarePen size={16} />
           </ListItemIcon>
-          <ListItemText>Edit</ListItemText>
+          <ListItemText>{t('common:actions.edit')}</ListItemText>
         </MenuItem>
         <MenuItem
           onClick={() => {
@@ -271,7 +272,7 @@ export function TeamsPage() {
           <ListItemIcon>
             <Trash2 size={16} />
           </ListItemIcon>
-          <ListItemText>Delete</ListItemText>
+          <ListItemText>{t('common:actions.delete')}</ListItemText>
         </MenuItem>
       </Menu>
 
@@ -285,9 +286,9 @@ export function TeamsPage() {
 
       <ConfirmDialog
         open={deleteTarget !== null}
-        title="Delete team"
-        message={`Delete “${deleteTarget?.name}” and all its memberships? This cannot be undone.`}
-        confirmLabel="Delete"
+        title={t('teams.list.delete.title')}
+        message={t('teams.list.delete.message', { name: deleteTarget?.name })}
+        confirmLabel={t('common:actions.delete')}
         destructive
         onConfirm={confirmDelete}
         onClose={() => setDeleteTarget(null)}

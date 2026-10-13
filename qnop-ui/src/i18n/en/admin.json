@@ -1,0 +1,971 @@
+{
+  "roles": {
+    "global": {
+      "ADMIN": "Admin",
+      "MEMBER": "Member",
+      "AUDITOR": "Auditor"
+    },
+    "team": {
+      "LEAD": "Lead",
+      "MEMBER": "Member"
+    }
+  },
+  "users": {
+    "status": {
+      "active": "Active",
+      "disabled": "Disabled"
+    },
+    "source": {
+      "external": "External",
+      "local": "Local"
+    },
+    "page": {
+      "title": "Users",
+      "description": "Manage accounts, roles and access.",
+      "descriptionWithSeats_one": "Manage accounts, roles and access. {{used}} of {{count}} seats used.",
+      "descriptionWithSeats_other": "Manage accounts, roles and access. {{used}} of {{count}} seats used.",
+      "addUser": "Add user",
+      "seatsFull_one": "This instance is configured for {{count}} accounts and holds {{used}}. Deleting an account frees a seat; disabling one does not.",
+      "seatsFull_other": "This instance is configured for {{count}} accounts and holds {{used}}. Deleting an account frees a seat; disabling one does not.",
+      "searchPlaceholder": "Search by name, email or username",
+      "searchLabel": "Search users",
+      "roleFilter": "Role",
+      "allRoles": "All roles",
+      "statusFilter": "Status",
+      "allStatuses": "All statuses",
+      "loadError": "The user list could not be loaded.",
+      "rowsPerPage": "Users per page",
+      "displayedRows": "{{from}}–{{to}} of {{count}}"
+    },
+    "conflicts": {
+      "LAST_ADMIN": "At least one enabled admin must remain.",
+      "SELF_LOCKOUT": "You can't disable or change the role of your own account.",
+      "SELF_DELETE": "You can't delete your own account.",
+      "EMAIL_TAKEN": "An account with this email already exists.",
+      "USERNAME_TAKEN": "This username is already taken."
+    },
+    "toasts": {
+      "updateFailed": "Could not update {{name}}.",
+      "resetEmailed": "Password reset emailed to {{email}}. Sessions revoked.",
+      "resetNoLink": "Reset triggered for {{name}}, but no link was returned.",
+      "resetFailed": "The reset could not be triggered.",
+      "generateFailed": "A password could not be generated.",
+      "deleted": "User “{{name}}” deleted.",
+      "deleteFailed": "Could not delete the user."
+    },
+    "delete": {
+      "title": "Delete user",
+      "message": "Permanently delete “{{name}}”? Their sessions, settings and team memberships are removed. This cannot be undone."
+    },
+    "table": {
+      "columns": {
+        "user": "User",
+        "role": "Role",
+        "source": "Source",
+        "status": "Status",
+        "created": "Created",
+        "lastLogin": "Last login"
+      },
+      "empty": "No users found.",
+      "passwordChange": "Password change",
+      "cannotDisableSelf": "You cannot disable your own account",
+      "toggleAccess": "Toggle access",
+      "toggleUser": "Toggle {{name}}",
+      "actionsFor": "Actions for {{name}}",
+      "emailResetLink": "Email reset link",
+      "generatePassword": "Generate password"
+    },
+    "resetLink": {
+      "title": "Reset link for {{name}}",
+      "body": "The reset email could not be sent. Copy this single-use link and deliver it to the user. Their existing sessions have already been revoked.",
+      "copyLabel": "Copy reset link"
+    },
+    "generatedPassword": {
+      "title": "Temporary password for {{name}}",
+      "body": "Share this one-time password with the user over a secure channel. They must change it on their next sign-in, and their existing sessions have already been revoked.",
+      "copyLabel": "Copy password",
+      "warning": "This password is shown only once and cannot be retrieved later. If you lose it, generate a new one."
+    },
+    "form": {
+      "createTitle": "Add user",
+      "editTitle": "Edit user",
+      "fullName": "Full name",
+      "username": "Username",
+      "usernameHelper": "At least 3 characters, unique.",
+      "email": "Email",
+      "role": "Role",
+      "accountActive": "Account active",
+      "accountDisabled": "Account disabled",
+      "methodInvite": "Send an email invitation (the user sets their own password)",
+      "methodPassword": "Set a password now (must be changed on first login)",
+      "initialPassword": "Initial password",
+      "errors": {
+        "fullNameRequired": "A full name is required.",
+        "usernameTooShort": "Enter at least 3 characters.",
+        "emailRequired": "An email address is required.",
+        "emailInvalid": "Enter a valid email address.",
+        "passwordWeak": "Choose a stronger password (at least 8 characters).",
+        "avatarUpload": "The picture could not be uploaded.",
+        "avatarRemove": "The picture could not be removed.",
+        "save": "Saving failed. Please try again."
+      }
+    }
+  },
+  "mail": {
+    "layout": {
+      "title": "Email",
+      "description": "Outgoing email: the SMTP server and the transactional templates qnop sends. Changes apply without a restart.",
+      "tabsLabel": "Email admin sub-pages",
+      "tabs": {
+        "server": "Server",
+        "templates": "Templates"
+      }
+    },
+    "fields": {
+      "host": "Host",
+      "port": "Port",
+      "username": "Username",
+      "password": "Password",
+      "encryption": "Encryption",
+      "from": "From address",
+      "fromName": "From name"
+    },
+    "encryption": {
+      "none": {
+        "label": "None",
+        "hint": "Plain SMTP — no transport encryption"
+      },
+      "starttls": {
+        "label": "STARTTLS",
+        "hint": "Required upgrade · typically port 587"
+      },
+      "tls": {
+        "label": "Implicit TLS",
+        "hint": "SSL from connect · typically port 465"
+      }
+    },
+    "status": {
+      "disabled": {
+        "label": "Disabled",
+        "detail": "Outgoing mail is turned off. Messages are skipped until you enable it."
+      },
+      "incomplete": {
+        "label": "Incomplete",
+        "detail": "Enabled, but no SMTP host is set yet — add a host to start sending."
+      },
+      "ready": {
+        "label": "Ready",
+        "detail": "Outgoing mail is enabled and a host is configured."
+      }
+    },
+    "validation": {
+      "hostRequired": "A host is required to send mail.",
+      "port": "Enter a port between 1 and 65535.",
+      "email": "Enter a valid email address.",
+      "recipient": "Enter a valid recipient email address."
+    },
+    "server": {
+      "saved": "SMTP settings saved.",
+      "saveFailed": "The SMTP settings could not be saved.",
+      "loadFailed": "The SMTP settings could not be loaded.",
+      "passwordStored": "Stored encrypted. Leave blank to keep the current password.",
+      "connection": {
+        "title": "Connection",
+        "description": "Where and how qnop reaches your SMTP server."
+      },
+      "identity": {
+        "title": "Identity",
+        "description": "How outgoing messages present their sender."
+      },
+      "delivery": {
+        "title": "Status & delivery",
+        "description": "Turn outgoing mail on and verify it with a test message.",
+        "enable": "Enable outgoing mail",
+        "testTitle": "Send a test message",
+        "testDescription": "Delivers to the address below using the saved SMTP settings.",
+        "sendTest": "Send test",
+        "saveFirst": "Save your changes before sending a test message."
+      },
+      "saveChanges": "Save changes",
+      "saving": "Saving…",
+      "unsavedChanges_one": "{{count}} unsaved change.",
+      "unsavedChanges_other": "{{count}} unsaved changes.",
+      "noUnsavedChanges": "No unsaved changes."
+    },
+    "test": {
+      "title": "Send test email",
+      "recipient": "Recipient",
+      "recipientPlaceholder": "you@example.com",
+      "recipientHelper": "Uses the configured SMTP settings.",
+      "send": "Send",
+      "sending": "Sending…",
+      "failed": "The test email could not be sent."
+    }
+  },
+  "storage": {
+    "title": "Storage consistency",
+    "description": "Reconcile document binaries in object storage against the database.",
+    "lastScanned": "Last scanned {{when}}.",
+    "rescan": "Rescan",
+    "scanning": "Scanning…",
+    "scanLimit": "The scan was stopped because the bucket holds more objects than the scan limit. Narrow the scope or raise <code>qnop.s3.consistency-scan-max-keys</code>, then rescan.",
+    "scanFailed": "The storage-consistency scan could not be run.",
+    "tiles": {
+      "dbReferences": "DB references",
+      "storageObjects": "Storage objects",
+      "missing": "Missing binaries",
+      "orphaned": "Orphaned objects"
+    },
+    "consistent": {
+      "title": "Everything reconciles",
+      "message": "Every referenced binary is present and no stored object is orphaned."
+    },
+    "missing": {
+      "title": "Missing binaries",
+      "description": "Referenced objects that are gone — resolve through the affected document.",
+      "badge": "Data loss",
+      "columns": {
+        "document": "Document",
+        "context": "Context",
+        "storageKey": "Storage key"
+      },
+      "empty": "No missing binaries.",
+      "version": "Version",
+      "versionNumber": "Version {{number}}",
+      "attachment": "Attachment",
+      "attachmentNamed": "Attachment · {{name}}"
+    },
+    "orphaned": {
+      "title": "Orphaned objects",
+      "description": "Stored objects no database row references — safe to delete.",
+      "badge": "Unreferenced",
+      "deleteSelected": "Delete selected ({{count}})",
+      "selectAll": "Select all orphaned objects",
+      "selectOne": "Select {{key}}",
+      "columns": {
+        "key": "Object key",
+        "size": "Size",
+        "lastModified": "Last modified"
+      },
+      "empty": "No orphaned objects.",
+      "deleteOne": "Delete this object",
+      "deleteOneAria": "Delete {{key}}",
+      "perPage": "Objects per page"
+    },
+    "delete": {
+      "title": "Delete orphaned objects?",
+      "message_one": "This permanently deletes {{count}} object from storage. Any that became referenced since the scan are skipped automatically.",
+      "message_other": "This permanently deletes {{count}} objects from storage. Any that became referenced since the scan are skipped automatically.",
+      "deleted_one": "Deleted {{count}} object.",
+      "deleted_other": "Deleted {{count}} objects.",
+      "deletedSkipped_one": "Deleted {{count}} object, skipped {{skipped}} (now referenced)",
+      "deletedSkipped_other": "Deleted {{count}} objects, skipped {{skipped}} (now referenced)",
+      "failed": "The objects could not be deleted."
+    },
+    "rescanResult": {
+      "stoppedAtLimit": "Rescan stopped: the bucket holds more objects than the scan limit.",
+      "complete": "Rescan complete.",
+      "completeSummary": "Rescan complete — {{missing}} missing, {{orphaned}} orphaned."
+    },
+    "key": {
+      "copy": "Copy key",
+      "copyAria": "Copy storage key"
+    }
+  },
+  "scheduler": {
+    "title": "Scheduler",
+    "description": "Background maintenance sweeps — token purges and the storage orphan reaper. Disable a sweep, put the reaper in dry-run, or run one on demand.",
+    "loadError": "The scheduled jobs could not be loaded.",
+    "tiles": {
+      "jobs": "Jobs",
+      "enabled": "Enabled",
+      "dryRun": "Dry run",
+      "failing": "Failing"
+    },
+    "notice": {
+      "settingsFixed": "Job settings are fixed on this deployment: the enabled and dry-run switches cannot be changed here. The schedules below keep running as configured.",
+      "manualRunDisabled": "Running a job by hand is disabled on this deployment. The schedules below are unaffected and keep running.",
+      "managed": "This deployment manages its own scheduler: jobs cannot be started by hand, enabled, or put in dry-run from here. The schedules below keep running as configured."
+    },
+    "toast": {
+      "enabled": "{{job}} enabled.",
+      "disabled": "{{job}} disabled.",
+      "dryRunOn": "Dry run on for {{job}}.",
+      "dryRunOff": "Dry run off for {{job}}.",
+      "saveFailed": "The change could not be saved.",
+      "ranWithFailure": "{{job}} ran but reported a failure.",
+      "ran": "{{job}} ran.",
+      "startFailed": "The job could not be started."
+    },
+    "card": {
+      "outcome": {
+        "success": "Success",
+        "failed": "Failed",
+        "neverRun": "Never run"
+      },
+      "ranManually": "Ran manually {{when}}",
+      "lastRun": "Last run {{when}}",
+      "enableAria": "Enable {{job}}",
+      "dryRunAria": "Dry-run {{job}}",
+      "enabled": "Enabled",
+      "disabled": "Disabled",
+      "dryRun": "Dry run",
+      "runNow": "Run now"
+    }
+  },
+  "settings": {
+    "title": "Settings",
+    "description": "Workspace, uploads, usage tracking and authentication.",
+    "groups": {
+      "general": {
+        "label": "General",
+        "description": "Workspace identity, base URL, default language and time zone."
+      },
+      "upload": {
+        "label": "Uploads",
+        "description": "Constraints applied to document uploads."
+      },
+      "tracking": {
+        "label": "Usage tracking",
+        "description": "Anonymous usage measurement through this server: the browser loads the script from qnop and sends its measurements to qnop, which forwards them. Page addresses are reduced to route patterns first, so no document id ever reaches the backend."
+      },
+      "auth": {
+        "label": "Authentication",
+        "description": "Self-registration and password-reset behaviour."
+      },
+      "review": {
+        "label": "Review",
+        "description": "Behaviour of the document review workflow."
+      },
+      "notifications": {
+        "label": "Notifications",
+        "description": "Review e-mails and how long the in-app inbox keeps its records."
+      },
+      "banner": {
+        "label": "Info banners",
+        "description": "Two notices you can switch on: one on the sign-in screens — readable by anyone who can reach this server — and one for signed-in users, which they may dismiss until you change the text."
+      }
+    },
+    "options": {
+      "trackingProvider": {
+        "none": "None"
+      },
+      "forwardClientIp": {
+        "anonymized": "Anonymised (recommended)",
+        "none": "Do not forward",
+        "full": "Full address (personal data)"
+      },
+      "severity": {
+        "info": "Info",
+        "warning": "Warning",
+        "critical": "Critical"
+      }
+    },
+    "validation": {
+      "baseUrl": "Enter a valid http(s) URL, e.g. https://qnop.example.",
+      "trackingHost": "Enter a valid http(s) URL, e.g. https://matomo.internal.",
+      "wholeNumberBetween": "Enter a whole number between {{min}} and {{max}}.",
+      "minutesBetween": "Enter a whole number of minutes between {{min}} and {{max}}.",
+      "loginText": "Keep it to {{max}} characters — it has to fit above the sign-in form.",
+      "appText": "Keep it to {{max}} characters — it is one line across every page.",
+      "linkLabel": "Keep the label to {{max}} characters.",
+      "wholeNumber": "Enter a whole number."
+    },
+    "lockNote": "Set by this deployment.",
+    "passwordKeep": "Leave blank to keep the current value.",
+    "passwordUnchanged": "•••••• (unchanged)",
+    "fullAddressWarning": "Exact addresses are personal data. The legal basis, the consent record and the retention period are yours to hold — this server only forwards what you configure here. Consent and Do-Not-Track keep applying as you set them.",
+    "saved": "Settings saved.",
+    "saveFailed": "The settings could not be saved.",
+    "loadFailed": "The settings could not be loaded.",
+    "saveChanges": "Save changes",
+    "saving": "Saving…",
+    "noUnsavedChanges": "No unsaved changes.",
+    "unsavedChanges_one": "{{count}} unsaved change.",
+    "unsavedChanges_other": "{{count}} unsaved changes.",
+    "tracking": {
+      "noBackend": "Measurement is on, but no backend is selected.",
+      "switchedOff": "Nothing is being measured — “{{provider}}” is configured, but usage tracking is switched off above.",
+      "needsSiteId": "Nothing is being measured — {{provider}} needs the site id it knows this workspace by.",
+      "needsHost": "Nothing is being measured — {{provider}} is self-hosted, so it needs the address of your server.",
+      "measuring": "Measuring into {{provider}}. Page addresses are reduced to route patterns before they are forwarded.",
+      "measuringAt": "Measuring into {{provider}} at {{host}}. Page addresses are reduced to route patterns before they are forwarded."
+    },
+    "fields": {
+      "general__application_name": {
+        "label": "Application name",
+        "description": "Display name of this qnop instance."
+      },
+      "general__base_url": {
+        "label": "Base url",
+        "description": "Public base URL, used in generated links and emails."
+      },
+      "general__default_language": {
+        "label": "Default language",
+        "description": "Default UI language (ISO 639-1)."
+      },
+      "general__default_timezone": {
+        "label": "Default timezone",
+        "description": "Default display timezone (IANA id, e.g. UTC, Europe/Berlin), used as the fallback for users without a personal preference."
+      },
+      "upload__document_max_file_size_mb": {
+        "label": "Document max file size mb",
+        "description": "Maximum document upload size in megabytes."
+      },
+      "upload__attachment_max_file_size_mb": {
+        "label": "Attachment max file size mb",
+        "description": "Maximum comment attachment size in megabytes."
+      },
+      "tracking__enabled": {
+        "label": "Enabled",
+        "description": "Whether anonymous usage tracking is enabled. Measurement runs through this server, never past it: the browser loads the analytics script from qnop and sends its events to qnop, which forwards them. Visitors never talk to the analytics backend directly."
+      },
+      "tracking__provider": {
+        "label": "Provider",
+        "description": "Which analytics backend receives the forwarded measurements."
+      },
+      "tracking__host": {
+        "label": "Host",
+        "description": "Base URL of the analytics backend, e.g. https://matomo.internal. Empty uses the provider's own cloud where it has one (Plausible, PostHog, Pirsch); Matomo and Umami are self-hosted and always need this."
+      },
+      "tracking__site_id": {
+        "label": "Site id",
+        "description": "The backend's identifier for this site: Matomo idSite, Plausible domain, Umami website id, PostHog project API key, Pirsch identification code."
+      },
+      "tracking__respect_dnt": {
+        "label": "Respect dnt",
+        "description": "Load nothing at all for browsers that send Do-Not-Track or Global Privacy Control."
+      },
+      "tracking__consent_required": {
+        "label": "Consent required",
+        "description": "Ask before measuring anything. Off is defensible only where the backend sets no cookies and your legal basis says so — that call is yours, not this server's."
+      },
+      "tracking__track_privileged_roles": {
+        "label": "Track privileged roles",
+        "description": "Also measure administrators and auditors. Off by default: a handful of privileged people is barely a statistic and very much personal data."
+      },
+      "tracking__forward_client_ip": {
+        "label": "Forward client ip",
+        "description": "How much of a visitor's IP address is passed on to your analytics backend. Anonymised shortens it, so visitors stay countable without being identifiable. Not forwarded means the backend counts everyone as a single visitor. Full sends the exact address, which is personal data — you need your own legal basis for it."
+      },
+      "smtp__enabled": {
+        "label": "Enabled",
+        "description": "Master switch for outgoing mail; when off, message sends are skipped."
+      },
+      "smtp__host": {
+        "label": "Host",
+        "description": "SMTP server host."
+      },
+      "smtp__port": {
+        "label": "Port",
+        "description": "SMTP server port."
+      },
+      "smtp__username": {
+        "label": "Username",
+        "description": "SMTP authentication username."
+      },
+      "smtp__password": {
+        "label": "Password",
+        "description": "SMTP authentication password (stored encrypted, redacted in API)."
+      },
+      "smtp__encryption": {
+        "label": "Encryption",
+        "description": "SMTP transport encryption: none, starttls (port 587), or tls (implicit SSL, port 465)."
+      },
+      "smtp__from": {
+        "label": "From",
+        "description": "Default From address for outgoing mail."
+      },
+      "smtp__from_name": {
+        "label": "From name",
+        "description": "Display name used in the From header of outgoing mail."
+      },
+      "auth__self_registration_enabled": {
+        "label": "Self registration enabled",
+        "description": "Whether visitors may register their own local accounts."
+      },
+      "auth__self_registration_default_role": {
+        "label": "Self registration default role",
+        "description": "Global role assigned to self-registered users (ADMIN is intentionally not selectable)."
+      },
+      "auth__password_reset_enabled": {
+        "label": "Password reset enabled",
+        "description": "Whether local users may reset their password by email."
+      },
+      "auth__password_reset_token_ttl_minutes": {
+        "label": "Password reset token ttl minutes",
+        "description": "Validity window of a password-reset token, in minutes."
+      },
+      "notifications__review_emails_enabled": {
+        "label": "Review emails enabled",
+        "description": "Send email notifications for review activity (reviewer added, annotations, replies, status changes)."
+      },
+      "notifications__retain_days": {
+        "label": "Retain days",
+        "description": "Days an in-app notification is kept before the Notification sweep deletes it, read or not (0 disables pruning). Only the record of the announcement goes — the review, annotation or comment it points at is untouched."
+      },
+      "review__free_reattach_enabled": {
+        "label": "Free reattach enabled",
+        "description": "Let authors re-position their own annotations even when the placement is healthy (admins always may)."
+      },
+      "review__finalize_with_open_annotations": {
+        "label": "Finalize with open annotations",
+        "description": "Let the review be finalized while annotations are still open; they are closed automatically with a standard comment."
+      },
+      "review__archive_after_days": {
+        "label": "Archive after days",
+        "description": "Days a completed review stays before it is archived out of the active lists (0 disables auto-archiving)."
+      },
+      "review__purge_archived_after_days": {
+        "label": "Purge archived after days",
+        "description": "Days an archived review is kept before it is deleted permanently, including storage objects no other document references (0 disables purging). Irreversible — the Review purge job must be enabled as well."
+      },
+      "banner__login_enabled": {
+        "label": "Login enabled",
+        "description": "Show a banner on the sign-in and other authentication screens. Readable by anyone who can reach this server, signed in or not — never put internal detail here."
+      },
+      "banner__login_severity": {
+        "label": "Login severity",
+        "description": "Tone of the sign-in banner."
+      },
+      "banner__login_text": {
+        "label": "Login text",
+        "description": "Text of the sign-in banner, e.g. \"Demo installation — sign in with demo@qnop.io / demo\". Empty hides the banner even when it is enabled."
+      },
+      "banner__login_link_label": {
+        "label": "Login link label",
+        "description": "Optional link shown after the sign-in banner's text; empty means no link."
+      },
+      "banner__login_link_url": {
+        "label": "Login link url",
+        "description": "Where the sign-in banner's link points (http/https)."
+      },
+      "banner__app_enabled": {
+        "label": "App enabled",
+        "description": "Show a banner to signed-in users — maintenance windows, a degraded integration, a global problem. Visible only after sign-in, and each user may dismiss it until the text changes."
+      },
+      "banner__app_severity": {
+        "label": "App severity",
+        "description": "Tone of the in-app banner."
+      },
+      "banner__app_text": {
+        "label": "App text",
+        "description": "Text of the in-app banner, e.g. \"Maintenance on Saturday 20:00–22:00 UTC; uploads are paused.\" Empty hides the banner even when it is enabled."
+      },
+      "banner__app_link_label": {
+        "label": "App link label",
+        "description": "Optional link shown after the in-app banner's text; empty means no link."
+      },
+      "banner__app_link_url": {
+        "label": "App link url",
+        "description": "Where the in-app banner's link points (http/https)."
+      }
+    }
+  },
+  "configuration": {
+    "title": "Configuration",
+    "description": "The effective qnop.* settings this server bound at startup, from application.yml and QNOP_* environment variables.",
+    "readOnly": "Read-only. These values are set in your deployment — change one by updating the environment (or <code>application.yml</code>) and restarting the server. Secrets are never shown here, only whether they are configured.",
+    "filterPlaceholder": "Filter by property path or environment variable…",
+    "clearFilter": "Clear filter",
+    "loadFailed": "Could not load the server configuration. Please try again.",
+    "noMatches": "No settings match “{{query}}”.",
+    "columns": {
+      "path": "Path",
+      "envVar": "Environment variable",
+      "value": "Value"
+    },
+    "copyPath": "Copy path {{path}}",
+    "copyEnvVar": "Copy environment variable {{envVar}}",
+    "copied": "Copied {{text}}",
+    "configured": "Configured",
+    "notConfigured": "Not configured",
+    "notSet": "not set",
+    "none": "none"
+  },
+  "quota": {
+    "title": "Instance quotas",
+    "description": "What this deployment may hold. Set where it is deployed, not in the settings — an administrator can read these but not raise them.",
+    "rows": {
+      "users": {
+        "label": "User accounts",
+        "hint": "enabled accounts"
+      },
+      "teams": {
+        "label": "Teams",
+        "hint": "teams on this instance"
+      },
+      "teamMembers": {
+        "label": "Members per team",
+        "hint": "the largest team"
+      },
+      "activeReviews": {
+        "label": "Active reviews",
+        "hint": "not finished, not archived"
+      }
+    },
+    "noLimit": "{{used}} — no limit",
+    "usedOf": "{{used}} of {{maximum}}",
+    "progressLabel": "{{label}}: {{used}} of {{maximum}}"
+  },
+  "teams": {
+    "list": {
+      "title": "Teams",
+      "description": "Group reviewers and manage their team roles.",
+      "descriptionWithLimit_one": "Group reviewers and manage their team roles. {{used}} of {{count}} teams used.",
+      "descriptionWithLimit_other": "Group reviewers and manage their team roles. {{used}} of {{count}} teams used.",
+      "create": "Create team",
+      "quotaFull_one": "This instance is configured for {{count}} teams and holds {{used}}. Deleting a team frees a slot.",
+      "quotaFull_other": "This instance is configured for {{count}} teams and holds {{used}}. Deleting a team frees a slot.",
+      "searchPlaceholder": "Search by name or description",
+      "loadError": "The team list could not be loaded.",
+      "columns": {
+        "name": "Name",
+        "description": "Description",
+        "members": "Members",
+        "status": "Status",
+        "actions": "Actions"
+      },
+      "empty": "No teams found.",
+      "actionsFor": "Actions for {{name}}",
+      "displayedRows": "{{from}}–{{to}} of {{total}}",
+      "delete": {
+        "title": "Delete team",
+        "message": "Delete “{{name}}” and all its memberships? This cannot be undone."
+      },
+      "deleted": "Team “{{name}}” deleted.",
+      "deleteFailed": "Could not delete the team."
+    },
+    "detail": {
+      "loadError": "This team could not be loaded. <back>Back to teams</back>",
+      "memberSlots_one": "{{used}} of {{count}} member slots used.",
+      "memberSlots_other": "{{used}} of {{count}} member slots used.",
+      "addMember": "Add member",
+      "quotaFull_one": "This deployment allows {{count}} members per team, and this one has {{used}}. Removing a member frees a slot.",
+      "quotaFull_other": "This deployment allows {{count}} members per team, and this one has {{used}}. Removing a member frees a slot.",
+      "columns": {
+        "member": "Member",
+        "role": "Role",
+        "joined": "Joined",
+        "actions": "Actions"
+      },
+      "empty": "No members yet. Add the first one.",
+      "actionsFor": "Actions for {{name}}",
+      "makeMember": "Make member",
+      "makeLead": "Make lead",
+      "removeFromTeam": "Remove from team",
+      "remove": {
+        "title": "Remove member",
+        "message": "Remove {{name}} from this team?"
+      }
+    },
+    "form": {
+      "createTitle": "Create team",
+      "editTitle": "Edit team",
+      "avatarFallbackName": "Team",
+      "name": "Name",
+      "description": "Description",
+      "lead": "Team lead",
+      "leadPlaceholder": "Search by name",
+      "leadHelper": "Added as the team’s LEAD - every team starts with one.",
+      "noOptions": "No matching users",
+      "active": "Team active",
+      "disabled": "Team disabled",
+      "showMembers": "Public profile: show members",
+      "showMembersAria": "Show members on the public profile",
+      "showReviews": "Public profile: show review participation",
+      "showReviewsAria": "Show review participation on the public profile",
+      "errors": {
+        "nameRequired": "A team name is required.",
+        "leadRequired": "Every team needs a lead — pick one.",
+        "nameTaken": "A team with that name already exists.",
+        "saveFailed": "Saving failed. Please try again."
+      }
+    },
+    "addMember": {
+      "title": "Add members",
+      "remainingSlots_one": "One more member fits in this team.",
+      "remainingSlots_other": "{{count}} more members fit in this team.",
+      "noOptions": "No matching users",
+      "users": "Users",
+      "searchPlaceholder": "Search by name or email",
+      "role": "Team role",
+      "roleHelper": "Applied to everyone added in this batch.",
+      "submitCount": "Add {{number}}",
+      "failed": "Could not add: {{names}}."
+    }
+  },
+  "mailTemplates": {
+    "source": {
+      "custom": "Custom",
+      "default": "Default"
+    },
+    "list": {
+      "columns": {
+        "template": "Template",
+        "subject": "Subject",
+        "language": "Language",
+        "source": "Source",
+        "lastEdited": "Last edited"
+      },
+      "rowAria": "Edit the {{name}} template",
+      "editedBy": "by {{name}}",
+      "loadError": "The mail templates could not be loaded.",
+      "empty": "No mail templates."
+    },
+    "edit": {
+      "loadError": "This template could not be loaded. <back>Back to templates</back>",
+      "edited": "— edited {{when}}",
+      "editedBy": "— edited {{when}} by {{name}}",
+      "variables": {
+        "title": "Available variables",
+        "description": "Click a chip to insert it at the caret of the last field you edited — or drag it straight into a field.",
+        "none": "This template takes no variables."
+      },
+      "content": {
+        "title": "Content",
+        "description": "Subject and body for this email."
+      },
+      "subject": "Subject",
+      "subjectHelper": "Mustache syntax, e.g. {{example}}.",
+      "subjectRequired": "A subject is required.",
+      "bodyPlain": "Plain-text body",
+      "bodyPlainRequired": "A plain-text body is required.",
+      "addHtml": "Add HTML alternative",
+      "compareTargets": {
+        "subject": "default subject",
+        "bodyPlain": "default plain-text body",
+        "bodyHtml": "default HTML body"
+      },
+      "resetToDefault": "Reset to default",
+      "sendTest": "Send test email",
+      "saving": "Saving…",
+      "saveChanges": "Save changes",
+      "saved": "Template saved.",
+      "saveFailed": "The template could not be saved.",
+      "reverted": "Reverted to the default.",
+      "resetFailed": "The template could not be reset.",
+      "reset": {
+        "title": "Reset template",
+        "message": "Discard the customised \"{{name}}\" and revert to the built-in default? This cannot be undone."
+      },
+      "testHelper": "Sends this template rendered with the current draft and sample data."
+    },
+    "compare": "Compare with {{target}}",
+    "preview": {
+      "title": "Live preview",
+      "description": "Rendered with sample data as you type.",
+      "refreshTooltip": "Refresh preview now",
+      "refresh": "Refresh preview",
+      "empty": "Add a subject and a plain-text body to see the preview.",
+      "subject": "Subject",
+      "plainText": "Plain text",
+      "html": "HTML",
+      "htmlFrame": "HTML preview",
+      "noHtml": "No HTML alternative — recipients receive the branded default layout.",
+      "status": {
+        "idle": "Idle",
+        "stale": "Pending",
+        "syncing": "Rendering",
+        "live": "Live",
+        "error": "Error"
+      },
+      "variables": "Variables",
+      "sampleVariables": "Sample variables"
+    }
+  },
+  "oidc": {
+    "page": {
+      "title": "OIDC providers",
+      "description": "Configure single sign-on identity providers. New providers start disabled.",
+      "add": "Add provider"
+    },
+    "types": {
+      "OIDC": "Generic OIDC",
+      "GOOGLE": "Google",
+      "GITHUB": "GitHub",
+      "FACEBOOK": "Facebook",
+      "OAUTH2": "Generic OAuth2"
+    },
+    "status": {
+      "enabled": "Enabled",
+      "disabled": "Disabled"
+    },
+    "table": {
+      "columns": {
+        "provider": "Provider",
+        "type": "Type",
+        "issuer": "Issuer",
+        "clientId": "Client ID",
+        "status": "Status",
+        "created": "Created"
+      },
+      "empty": "No identity providers configured yet.",
+      "enableForLogin": "Enable for login",
+      "disableForLogin": "Disable for login",
+      "toggle": "Toggle {{name}}",
+      "actionsFor": "Actions for {{name}}"
+    },
+    "toast": {
+      "enabled": "{{name}} enabled.",
+      "disabled": "{{name}} disabled.",
+      "deleted": "{{name}} deleted."
+    },
+    "errors": {
+      "load": "The providers could not be loaded.",
+      "toggle": "The change could not be saved.",
+      "delete": "The provider could not be deleted."
+    },
+    "delete": {
+      "title": "Delete provider",
+      "message": "Delete “{{name}}”? Users will no longer be able to sign in with it. This cannot be undone."
+    },
+    "form": {
+      "addTitle": "Add provider",
+      "editTitle": "Edit provider",
+      "displayName": "Display name",
+      "displayNameHelper": "Shown on the login button, e.g. “Google” or “Company SSO”.",
+      "providerType": "Provider type",
+      "providerTypeLocked": "The provider type cannot be changed after creation.",
+      "clientId": "Client ID",
+      "clientIdChangeWarning": "Changing the client ID points qnop at a different upstream app. Existing linked accounts may stop matching.",
+      "clientIdChangeAcknowledge": "I understand, change the client ID.",
+      "clientSecret": "Client secret",
+      "clientSecretKeep": "Client secret (leave blank to keep)",
+      "issuer": "Issuer URL",
+      "issuerHelper": "Use Discover to fill the endpoints automatically from the issuer.",
+      "discover": "Discover",
+      "discovering": "Discovering…",
+      "scopes": "Scopes",
+      "scopesLocked": "Scopes for this provider are managed by qnop and cannot be changed.",
+      "scopesHelper": "Space-separated, e.g. “openid email profile”.",
+      "endpointsRequired": "Endpoints & attribute mapping (required)",
+      "endpointsAdvanced": "Endpoints & attribute mapping (advanced)",
+      "endpointsRequiredHint": "Required for a generic OAuth2 provider — qnop cannot discover these.",
+      "endpointsOptionalHint": "Optional — usually filled in by Discover from the issuer; override only if needed.",
+      "authorizationUrl": "Authorization URL",
+      "tokenUrl": "Token URL",
+      "userInfoUrl": "User info URL",
+      "jwkSetUrl": "JWK set URL",
+      "userNameAttribute": "Username attribute",
+      "emailAttribute": "Email attribute",
+      "displayNameAttribute": "Display-name attribute",
+      "enabledForLogin": "Enabled for login",
+      "errors": {
+        "nameRequired": "A display name is required.",
+        "clientIdRequired": "A client ID is required.",
+        "clientSecretRequired": "A client secret is required.",
+        "issuerRequired": "An issuer URL is required for OIDC.",
+        "invalidUrl": "Enter a valid http(s) URL.",
+        "openidScope": "OIDC scopes must include \"openid\".",
+        "endpointRequired": "Required for a generic OAuth2 provider.",
+        "discoverUnreachable": "Could not reach the issuer to discover its endpoints.",
+        "save": "Saving the provider failed. Please check the details."
+      },
+      "discovery": {
+        "failed": "Discovery failed for this issuer.",
+        "succeeded": "Endpoints discovered and filled in:",
+        "authorization": "Authorization",
+        "token": "Token",
+        "userInfo": "User info",
+        "jwkSet": "JWK set"
+      }
+    },
+    "created": {
+      "title": "Provider created",
+      "message": "<name/> was created and is currently <strong>disabled</strong>. Register the callback URL below at your provider, then enable it from the list."
+    },
+    "callback": {
+      "title": "Callback URL",
+      "subtitle": "register this at your provider",
+      "urlLabel": "OAuth2 callback URL",
+      "copy": "Copy callback URL",
+      "copyTooltip": "Copy to clipboard",
+      "pasteInto": "Paste into:",
+      "openConsole": "Open provider console",
+      "help": {
+        "GOOGLE": {
+          "whereToFind": "APIs & Services → Credentials → OAuth 2.0 Client IDs → your client",
+          "console": "Open Google Cloud Console"
+        },
+        "GITHUB": {
+          "whereToFind": "GitHub → Settings → Developer settings → OAuth Apps → your app",
+          "console": "Open GitHub developer settings"
+        },
+        "FACEBOOK": {
+          "whereToFind": "Meta for Developers → your app → Facebook Login → Settings",
+          "console": "Open Meta for Developers"
+        },
+        "OIDC": {
+          "whereToFind": "Your IdP's client configuration (Keycloak, Authentik, Auth0, Dex, …)"
+        },
+        "OAUTH2": {
+          "whereToFind": "Your provider's OAuth2 application settings"
+        }
+      }
+    }
+  },
+  "branding": {
+    "page": {
+      "title": "Branding",
+      "description": "Replace the default logos shown across the app — drag an image in or browse. Raster uploads open a cropper to cut the exact framing; SVG uploads as-is. PNG, WebP or SVG, up to 512 KiB; each slot falls back to the qnop default until you upload your own."
+    },
+    "slots": {
+      "logoLight": {
+        "label": "Logo (light)",
+        "inline": "logo (light)",
+        "description": "Shown on light backgrounds."
+      },
+      "logoDark": {
+        "label": "Logo (dark)",
+        "inline": "logo (dark)",
+        "description": "Shown on dark backgrounds."
+      },
+      "logomark": {
+        "label": "Logomark",
+        "inline": "logomark",
+        "description": "Compact mark / favicon."
+      }
+    },
+    "source": {
+      "custom": "Custom",
+      "default": "Default"
+    },
+    "card": {
+      "previewUnavailable": "Preview unavailable",
+      "previewAlt": "{{label}} preview",
+      "dropToUpload": "Drop to upload",
+      "upload": "Upload",
+      "replace": "Replace",
+      "orDragAndDrop": "or drag & drop",
+      "uploadAria": "Upload {{label}}"
+    },
+    "toast": {
+      "updated": "{{label}} updated.",
+      "updatedSvg": "{{label}} updated — SVG is vector and used as-is (no cropping).",
+      "reset": "{{label}} reset to default."
+    },
+    "errors": {
+      "load": "The branding configuration could not be loaded.",
+      "upload": "The upload failed.",
+      "remove": "The asset could not be removed.",
+      "unsupportedType": "Unsupported file type. Use PNG, WebP or SVG.",
+      "tooLarge": "File is too large (max 512 KiB).",
+      "croppedTooLarge": "The cropped image is too large (max 512 KiB). Try a tighter crop."
+    },
+    "remove": {
+      "title": "Remove logo",
+      "message": "Remove the custom {{name}}? The app falls back to the default {{name}}."
+    },
+    "crop": {
+      "title": "Crop {{name}}",
+      "hintSquare": "Drag the square handles over your mark.",
+      "hintFree": "Drag a box around exactly the part you want.",
+      "recommendedWordmark": "Wordmark logos are wide — saved at up to 1024 × 384 px.",
+      "recommendedLogomark": "The logomark is square — saved at up to 512 × 512 px.",
+      "savedSize": "Saved size (transparent PNG)",
+      "dimensions": "{{width}} × {{height}} px",
+      "useSelection": "Use selection"
+    }
+  }
+}

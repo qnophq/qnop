@@ -25,6 +25,7 @@ import IconButton from '@mui/material/IconButton';
 import Stack from '@mui/material/Stack';
 import Tooltip from '@mui/material/Tooltip';
 import { Check, Copy } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 
 const HEAD = 16;
 const TAIL = 10;
@@ -40,6 +41,7 @@ function shorten(value: string): string {
  * an admin often needs to paste one, so it is never shown as bare cut-off text.
  */
 export function StorageKey({ value }: { value: string }) {
+  const { t } = useTranslation(['admin', 'common']);
   const [copied, setCopied] = useState(false);
 
   const copy = () => {
@@ -64,8 +66,8 @@ export function StorageKey({ value }: { value: string }) {
           {shorten(value)}
         </Box>
       </Tooltip>
-      <Tooltip title={copied ? 'Copied' : 'Copy key'}>
-        <IconButton size="small" onClick={copy} aria-label="Copy storage key">
+      <Tooltip title={copied ? t('common:actions.copied') : t('storage.key.copy')}>
+        <IconButton size="small" onClick={copy} aria-label={t('storage.key.copyAria')}>
           {copied ? <Check size={13} /> : <Copy size={13} />}
         </IconButton>
       </Tooltip>

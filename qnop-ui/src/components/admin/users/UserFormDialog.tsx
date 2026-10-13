@@ -34,6 +34,8 @@ import RadioGroup from '@mui/material/RadioGroup';
 import Stack from '@mui/material/Stack';
 import Switch from '@mui/material/Switch';
 import TextField from '@mui/material/TextField';
+import type { ParseKeys } from 'i18next';
+import { useTranslation } from 'react-i18next';
 import type { AdminUserSummary, UserRole } from '../../../api/generated';
 import { PasswordField } from '../../auth/PasswordField';
 import { PasswordStrengthMeter } from '../../auth/PasswordStrengthMeter';
@@ -51,18 +53,32 @@ interface UserFormDialogProps {
   onClose: () => void;
 }
 
-const ROLES: { value: UserRole; label: string }[] = [
-  { value: 'MEMBER', label: 'Member' },
-  { value: 'AUDITOR', label: 'Auditor' },
-  { value: 'ADMIN', label: 'Admin' },
+type AdminKey = ParseKeys<'admin'>;
+
+const ROLES: { value: UserRole; labelKey: AdminKey }[] = [
+  { value: 'MEMBER', labelKey: 'roles.global.MEMBER' },
+  { value: 'AUDITOR', labelKey: 'roles.global.AUDITOR' },
+  { value: 'ADMIN', labelKey: 'roles.global.ADMIN' },
 ];
 
-const CONFLICT_MESSAGES: Record<string, string> = {
-  EMAIL_TAKEN: 'An account with this email already exists.',
-  USERNAME_TAKEN: 'This username is already taken.',
-  SELF_LOCKOUT: "You can't disable or change the role of your own account.",
-  LAST_ADMIN: 'At least one enabled admin must remain.',
+const CONFLICT_MESSAGES: Record<string, AdminKey> = {
+  EMAIL_TAKEN: 'users.conflicts.EMAIL_TAKEN',
+  USERNAME_TAKEN: 'users.conflicts.USERNAME_TAKEN',
+  SELF_LOCKOUT: 'users.conflicts.SELF_LOCKOUT',
+  LAST_ADMIN: 'users.conflicts.LAST_ADMIN',
 };
+
+/**
+ * A failed action, resolved at render so it follows a language switch: a catalog message, or the
+ * server's message for {@code cause} with the catalog key as its fallback.
+ */
+interface DialogError {
+  key: AdminKey;
+  cause?: unknown;
+}
+
+/** A field message: the server's own text, or a catalog key for a known conflict. */
+type FieldMessage = { text: string } | { key: AdminKey };
 
 /**
  * Create/invite a user (mode "create") or edit name, role and status (mode "edit").
@@ -72,6 +88,7 @@ const CONFLICT_MESSAGES: Record<string, string> = {
  * renders), which is the React-recommended way to reset form state on prop change.
  */
 export function UserFormDialog({ open, mode, user, onClose }: UserFormDialogProps) {
+  const { t } = useTranslation(['admin', 'common']);
   const createUser = useCreateUser();
   const updateUser = useUpdateUser();
   const uploadAvatar = useUploadUserAvatar();
@@ -88,9 +105,9 @@ export function UserFormDialog({ open, mode, user, onClose }: UserFormDialogProp
   const [enabled, setEnabled] = useState(editing ? user.enabled : true);
   const [method, setMethod] = useState<'invite' | 'password'>('invite');
   const [password, setPassword] = useState('');
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<DialogError | null>(null);
   const [submitAttempted, setSubmitAttempted] = useState(false);
-  const [serverErrors, setServerErrors] = useState<Record<string, string>>({});
+  const [serverErrors, setServerErrors] = useState<Record<string, FieldMessage>>({});
 
   const submitting = createUser.isPending || updateUser.isPending;
   const avatarBusy = uploadAvatar.isPending || removeAvatar.isPending;
@@ -102,7 +119,7 @@ export function UserFormDialog({ open, mode, user, onClose }: UserFormDialogProp
       const result = await uploadAvatar.mutateAsync({ userId: user.id, file: blob });
       setAvatarUrl(result.avatarUrl ?? null);
     } catch (err) {
-      setError(apiErrorMessage(err, 'The picture could not be uploaded.'));
+      setError({ key: 'users.form.errors.avatarUpload', cause: err });
     }
   };
 
@@ -113,7 +130,7 @@ export function UserFormDialog({ open, mode, user, onClose }: UserFormDialogProp
       await removeAvatar.mutateAsync(user.id);
       setAvatarUrl(null);
     } catch (err) {
-      setError(apiErrorMessage(err, 'The picture could not be removed.'));
+      setError({ key: 'users.form.errors.avatarRemove', cause: err });
     }
   };
   const isEdit = mode === 'edit';
@@ -121,24 +138,30 @@ export function UserFormDialog({ open, mode, user, onClose }: UserFormDialogProp
   // Per-field client errors; shown once a save is attempted (the OIDC dialog pattern).
   const clientErrors: Record<string, string> = {};
   if (displayName.trim().length === 0) {
-    clientErrors.displayName = 'A full name is required.';
+    clientErrors.displayName = t('users.form.errors.fullNameRequired');
   }
   if (!isEdit) {
     if (username.trim().length < 3) {
-      clientErrors.username = 'Enter at least 3 characters.';
+      clientErrors.username = t('users.form.errors.usernameTooShort');
     }
     if (email.trim().length === 0) {
-      clientErrors.email = 'An email address is required.';
+      clientErrors.email = t('users.form.errors.emailRequired');
     } else if (!isEmail(email)) {
-      clientErrors.email = 'Enter a valid email address.';
+      clientErrors.email = t('users.form.errors.emailInvalid');
     }
     if (method === 'password' && !passwordStrength(password).acceptable) {
-      clientErrors.password = 'Choose a stronger password (at least 8 characters).';
+      clientErrors.password = t('users.form.errors.passwordWeak');
     }
   }
 
+  const serverError = (field: string): string | undefined => {
+    const message = serverErrors[field];
+    if (!message) return undefined;
+    return 'key' in message ? t(message.key) : message.text;
+  };
+
   const fieldError = (field: string): string | undefined =>
-    serverErrors[field] ?? (submitAttempted ? clientErrors[field] : undefined);
+    serverError(field) ?? (submitAttempted ? clientErrors[field] : undefined);
 
   const clearServer = (field: string) =>
     setServerErrors((prev) => {
@@ -171,17 +194,21 @@ export function UserFormDialog({ open, mode, user, onClose }: UserFormDialogProp
     } catch (err) {
       const code = apiErrorCode(err);
       if (code === 'EMAIL_TAKEN') {
-        setServerErrors({ email: CONFLICT_MESSAGES.EMAIL_TAKEN });
+        setServerErrors({ email: { key: CONFLICT_MESSAGES.EMAIL_TAKEN } });
       } else if (code === 'USERNAME_TAKEN') {
-        setServerErrors({ username: CONFLICT_MESSAGES.USERNAME_TAKEN });
+        setServerErrors({ username: { key: CONFLICT_MESSAGES.USERNAME_TAKEN } });
       } else {
         const serverFieldErrors = apiFieldErrors(err);
         if (Object.keys(serverFieldErrors).length > 0) {
-          setServerErrors(serverFieldErrors);
+          setServerErrors(
+            Object.fromEntries(
+              Object.entries(serverFieldErrors).map(([field, text]) => [field, { text }]),
+            ),
+          );
         } else {
+          const conflictKey = code ? CONFLICT_MESSAGES[code] : undefined;
           setError(
-            (code && CONFLICT_MESSAGES[code]) ??
-              apiErrorMessage(err, 'Saving failed. Please try again.'),
+            conflictKey ? { key: conflictKey } : { key: 'users.form.errors.save', cause: err },
           );
         }
       }
@@ -191,7 +218,9 @@ export function UserFormDialog({ open, mode, user, onClose }: UserFormDialogProp
   return (
     <Dialog open={open} onClose={onClose} fullWidth maxWidth="sm">
       <Box component="form" onSubmit={onSubmit} noValidate>
-        <DialogTitle>{isEdit ? 'Edit user' : 'Add user'}</DialogTitle>
+        <DialogTitle>
+          {isEdit ? t('users.form.editTitle') : t('users.form.createTitle')}
+        </DialogTitle>
         <DialogContent>
           <Stack spacing={2.5} sx={{ mt: 1 }}>
             {isEdit && user && (
@@ -205,7 +234,7 @@ export function UserFormDialog({ open, mode, user, onClose }: UserFormDialogProp
             )}
 
             <TextField
-              label="Full name"
+              label={t('users.form.fullName')}
               value={displayName}
               onChange={(e) => {
                 setDisplayName(e.target.value);
@@ -221,7 +250,7 @@ export function UserFormDialog({ open, mode, user, onClose }: UserFormDialogProp
             {!isEdit && (
               <>
                 <TextField
-                  label="Username"
+                  label={t('users.form.username')}
                   value={username}
                   onChange={(e) => {
                     setUsername(e.target.value);
@@ -231,10 +260,10 @@ export function UserFormDialog({ open, mode, user, onClose }: UserFormDialogProp
                   fullWidth
                   required
                   error={Boolean(fieldError('username'))}
-                  helperText={fieldError('username') ?? 'At least 3 characters, unique.'}
+                  helperText={fieldError('username') ?? t('users.form.usernameHelper')}
                 />
                 <TextField
-                  label="Email"
+                  label={t('users.form.email')}
                   type="email"
                   value={email}
                   onChange={(e) => {
@@ -251,7 +280,7 @@ export function UserFormDialog({ open, mode, user, onClose }: UserFormDialogProp
             )}
 
             <TextField
-              label="Role"
+              label={t('users.form.role')}
               select
               value={role}
               onChange={(e) => setRole(e.target.value as UserRole)}
@@ -259,7 +288,7 @@ export function UserFormDialog({ open, mode, user, onClose }: UserFormDialogProp
             >
               {ROLES.map((r) => (
                 <MenuItem key={r.value} value={r.value}>
-                  {r.label}
+                  {t(r.labelKey)}
                 </MenuItem>
               ))}
             </TextField>
@@ -269,7 +298,7 @@ export function UserFormDialog({ open, mode, user, onClose }: UserFormDialogProp
                 control={
                   <Switch checked={enabled} onChange={(e) => setEnabled(e.target.checked)} />
                 }
-                label={enabled ? 'Account active' : 'Account disabled'}
+                label={enabled ? t('users.form.accountActive') : t('users.form.accountDisabled')}
               />
             )}
 
@@ -282,18 +311,18 @@ export function UserFormDialog({ open, mode, user, onClose }: UserFormDialogProp
                   <FormControlLabel
                     value="invite"
                     control={<Radio size="small" />}
-                    label="Send an email invitation (the user sets their own password)"
+                    label={t('users.form.methodInvite')}
                   />
                   <FormControlLabel
                     value="password"
                     control={<Radio size="small" />}
-                    label="Set a password now (must be changed on first login)"
+                    label={t('users.form.methodPassword')}
                   />
                 </RadioGroup>
                 {method === 'password' && (
                   <Box sx={{ mt: 1 }}>
                     <PasswordField
-                      label="Initial password"
+                      label={t('users.form.initialPassword')}
                       value={password}
                       onChange={(next) => {
                         setPassword(next);
@@ -310,15 +339,21 @@ export function UserFormDialog({ open, mode, user, onClose }: UserFormDialogProp
               </Box>
             )}
 
-            {error && <Alert severity="error">{error}</Alert>}
+            {error && (
+              <Alert severity="error">
+                {error.cause === undefined
+                  ? t(error.key)
+                  : apiErrorMessage(error.cause, t(error.key))}
+              </Alert>
+            )}
           </Stack>
         </DialogContent>
         <DialogActions sx={{ px: 3, pb: 2.5 }}>
           <Button onClick={onClose} color="inherit">
-            Cancel
+            {t('common:actions.cancel')}
           </Button>
           <Button type="submit" variant="contained" disabled={submitting}>
-            {isEdit ? 'Save' : 'Create'}
+            {isEdit ? t('common:actions.save') : t('common:actions.create')}
           </Button>
         </DialogActions>
       </Box>

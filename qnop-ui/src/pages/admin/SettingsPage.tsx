@@ -20,6 +20,7 @@
  */
 
 import Stack from '@mui/material/Stack';
+import { useTranslation } from 'react-i18next';
 import { ApplicationSettingsForm } from '../../components/admin/settings/ApplicationSettingsForm';
 import { PageHeader } from '../../components/admin/layout/PageHeader';
 
@@ -29,12 +30,10 @@ import { PageHeader } from '../../components/admin/layout/PageHeader';
  * branding are separate Administration menu items, each with its own screen.
  */
 export function SettingsPage() {
+  const { t } = useTranslation('admin');
   return (
     <Stack spacing={3}>
-      <PageHeader
-        title="Settings"
-        description="Workspace, uploads, usage tracking and authentication."
-      />
+      <PageHeader title={t('settings.title')} description={t('settings.description')} />
       <ApplicationSettingsForm />
     </Stack>
   );

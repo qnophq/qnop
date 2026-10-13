@@ -112,7 +112,8 @@ describe('ApplicationSettingsForm — default timezone', () => {
     // and it names the duties rather than second-guessing the decision.
     const warning = screen.getByText(/Exact addresses are personal data/);
     expect(warning).toBeInTheDocument();
-    expect(screen.getByText(/legal basis/)).toBeInTheDocument();
+    // Scoped to the warning: the field's catalog description mentions a legal basis too.
+    expect(warning).toHaveTextContent(/legal basis/);
     // The other gates are explicitly said to survive, which is the promise the
     // opt-in was granted on.
     expect(screen.getByText(/Do-Not-Track keep applying/)).toBeInTheDocument();

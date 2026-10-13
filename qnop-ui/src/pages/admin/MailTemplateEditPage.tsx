@@ -34,6 +34,7 @@ import Switch from '@mui/material/Switch';
 import TextField from '@mui/material/TextField';
 import Typography from '@mui/material/Typography';
 import { Send, Eye, RotateCcw, Variable } from 'lucide-react';
+import { Trans, useTranslation } from 'react-i18next';
 import { Link as RouterLink, useParams } from 'react-router';
 import type { MailTemplateResponse } from '../../api/generated';
 import {
@@ -78,6 +79,7 @@ function insertIntoInput(
 
 /** Loads one template and renders its editor; remounts when the key or its saved state changes. */
 export function MailTemplateEditPage() {
+  const { t } = useTranslation(['admin', 'common']);
   const { key = '' } = useParams();
   // React Router already decodes dynamic segments — don't decode again (avoids a double-decode).
   const { data, isLoading, isError, isFetching } = useMailTemplate(key);
@@ -85,17 +87,20 @@ export function MailTemplateEditPage() {
   if (isLoading) {
     return (
       <Typography color="text.secondary" sx={{ p: 1, fontSize: 14 }}>
-        Loading…
+        {t('common:loading')}
       </Typography>
     );
   }
   if (isError || !data) {
     return (
       <Alert severity="error">
-        This template could not be loaded.{' '}
-        <Link component={RouterLink} to="/admin/email/templates" underline="hover">
-          Back to templates
-        </Link>
+        <Trans
+          t={t}
+          i18nKey="mailTemplates.edit.loadError"
+          components={{
+            back: <Link component={RouterLink} to="/admin/email/templates" underline="hover" />,
+          }}
+        />
       </Alert>
     );
   }
@@ -117,6 +122,7 @@ function EditForm({
   template: MailTemplateResponse;
   refreshing: boolean;
 }) {
+  const { t } = useTranslation(['admin', 'common']);
   const updateTemplate = useUpdateMailTemplate();
   const resetTemplate = useResetMailTemplate();
   const { toast, notify, clear } = useToast();
@@ -136,9 +142,10 @@ function EditForm({
   const htmlRef = useRef<MustacheEditorHandle>(null);
 
   const isCustomised = template.source === 'DATABASE';
-  const subjectError = submitAttempted && subject.trim() === '' ? 'A subject is required.' : '';
+  const subjectError =
+    submitAttempted && subject.trim() === '' ? t('mailTemplates.edit.subjectRequired') : '';
   const plainError =
-    submitAttempted && bodyPlain.trim() === '' ? 'A plain-text body is required.' : '';
+    submitAttempted && bodyPlain.trim() === '' ? t('mailTemplates.edit.bodyPlainRequired') : '';
   const dirty =
     subject !== template.subject ||
     bodyPlain !== template.bodyPlain ||
@@ -206,9 +213,9 @@ function EditForm({
           bodyHtml: showHtml && bodyHtml.trim() !== '' ? bodyHtml : undefined,
         },
       });
-      notify('Template saved.');
+      notify(t('mailTemplates.edit.saved'));
     } catch (err) {
-      notify(apiErrorMessage(err, 'The template could not be saved.'), 'error');
+      notify(apiErrorMessage(err, t('mailTemplates.edit.saveFailed')), 'error');
     }
   };
 
@@ -216,9 +223,9 @@ function EditForm({
     setConfirmReset(false);
     try {
       await resetTemplate.mutateAsync(template.key);
-      notify('Reverted to the default.');
+      notify(t('mailTemplates.edit.reverted'));
     } catch (err) {
-      notify(apiErrorMessage(err, 'The template could not be reset.'), 'error');
+      notify(apiErrorMessage(err, t('mailTemplates.edit.resetFailed')), 'error');
     }
   };
 
@@ -233,7 +240,9 @@ function EditForm({
             </Typography>
             <ToneBadge
               tone={isCustomised ? 'blue' : 'neutral'}
-              label={isCustomised ? 'Custom' : 'Default'}
+              label={
+                isCustomised ? t('mailTemplates.source.custom') : t('mailTemplates.source.default')
+              }
             />
           </Stack>
           <Typography color="text.secondary" sx={{ mt: 0.5 }}>
@@ -241,8 +250,12 @@ function EditForm({
               {template.key} · {template.locale}
               {isCustomised && (
                 <Box component="span" sx={{ fontFamily: 'body1.fontFamily', ml: 1 }}>
-                  — edited {formatRelative(template.updatedAt)}
-                  {template.updatedByName ? ` by ${template.updatedByName}` : ''}
+                  {template.updatedByName
+                    ? t('mailTemplates.edit.editedBy', {
+                        when: formatRelative(template.updatedAt),
+                        name: template.updatedByName,
+                      })
+                    : t('mailTemplates.edit.edited', { when: formatRelative(template.updatedAt) })}
                 </Box>
               )}
             </Box>
@@ -260,12 +273,12 @@ function EditForm({
           <Stack spacing={3}>
             <SectionCard
               icon={Variable}
-              title="Available variables"
-              description="Click a chip to insert it at the caret of the last field you edited — or drag it straight into a field."
+              title={t('mailTemplates.edit.variables.title')}
+              description={t('mailTemplates.edit.variables.description')}
             >
               {template.placeholders.length === 0 ? (
                 <Typography color="text.secondary" sx={{ fontSize: 14, fontStyle: 'italic' }}>
-                  This template takes no variables.
+                  {t('mailTemplates.edit.variables.none')}
                 </Typography>
               ) : (
                 <Stack direction="row" spacing={0.75} useFlexGap sx={{ flexWrap: 'wrap' }}>
@@ -296,11 +309,15 @@ function EditForm({
               )}
             </SectionCard>
 
-            <SectionCard icon={Eye} title="Content" description="Subject and body for this email.">
+            <SectionCard
+              icon={Eye}
+              title={t('mailTemplates.edit.content.title')}
+              description={t('mailTemplates.edit.content.description')}
+            >
               <Stack spacing={2.5}>
                 <Box>
                   <TextField
-                    label="Subject"
+                    label={t('mailTemplates.edit.subject')}
                     value={subject}
                     onChange={(e) => setSubject(e.target.value)}
                     onFocus={() => (lastFocused.current = 'subject')}
@@ -308,15 +325,21 @@ function EditForm({
                     fullWidth
                     required
                     error={Boolean(subjectError)}
-                    helperText={subjectError || 'Mustache syntax, e.g. {{siteName}}.'}
+                    helperText={
+                      subjectError ||
+                      t('mailTemplates.edit.subjectHelper', { example: '{{siteName}}' })
+                    }
                     slotProps={{ input: { sx: { fontFamily: 'monospace' } } }}
                   />
-                  <CompareWithDefault label="default subject" value={template.defaultSubject} />
+                  <CompareWithDefault
+                    label={t('mailTemplates.edit.compareTargets.subject')}
+                    value={template.defaultSubject}
+                  />
                 </Box>
 
                 <Box>
                   <Typography sx={{ fontSize: 13.5, fontWeight: 500, mb: 0.5 }}>
-                    Plain-text body{' '}
+                    {t('mailTemplates.edit.bodyPlain')}{' '}
                     <Box component="span" sx={{ color: 'error.main' }}>
                       *
                     </Box>
@@ -335,7 +358,7 @@ function EditForm({
                     </Typography>
                   )}
                   <CompareWithDefault
-                    label="default plain-text body"
+                    label={t('mailTemplates.edit.compareTargets.bodyPlain')}
                     value={template.defaultBodyPlain}
                   />
                 </Box>
@@ -345,7 +368,7 @@ function EditForm({
                     control={
                       <Switch checked={showHtml} onChange={(e) => toggleHtml(e.target.checked)} />
                     }
-                    label="Add HTML alternative"
+                    label={t('mailTemplates.edit.addHtml')}
                     sx={{ m: 0, gap: 1 }}
                   />
                   <Collapse in={showHtml} unmountOnExit>
@@ -361,7 +384,7 @@ function EditForm({
                       />
                       {template.defaultBodyHtml && (
                         <CompareWithDefault
-                          label="default HTML body"
+                          label={t('mailTemplates.edit.compareTargets.bodyHtml')}
                           value={template.defaultBodyHtml}
                         />
                       )}
@@ -386,14 +409,14 @@ function EditForm({
                     disabled={!isCustomised || resetTemplate.isPending}
                     onClick={() => setConfirmReset(true)}
                   >
-                    Reset to default
+                    {t('mailTemplates.edit.resetToDefault')}
                   </Button>
                   <Button
                     type="button"
                     startIcon={<Send size={16} />}
                     onClick={() => setTestOpen(true)}
                   >
-                    Send test email
+                    {t('mailTemplates.edit.sendTest')}
                   </Button>
                 </Stack>
                 <Stack direction="row" spacing={1.5} sx={{ alignItems: 'center' }}>
@@ -403,7 +426,9 @@ function EditForm({
                     variant="contained"
                     disabled={!dirty || updateTemplate.isPending || refreshing}
                   >
-                    {updateTemplate.isPending ? 'Saving…' : 'Save changes'}
+                    {updateTemplate.isPending
+                      ? t('mailTemplates.edit.saving')
+                      : t('mailTemplates.edit.saveChanges')}
                   </Button>
                 </Stack>
               </Stack>
@@ -429,9 +454,9 @@ function EditForm({
 
       <ConfirmDialog
         open={confirmReset}
-        title="Reset template"
-        message={`Discard the customised "${template.friendlyName}" and revert to the built-in default? This cannot be undone.`}
-        confirmLabel="Reset"
+        title={t('mailTemplates.edit.reset.title')}
+        message={t('mailTemplates.edit.reset.message', { name: template.friendlyName })}
+        confirmLabel={t('common:actions.reset')}
         destructive
         onConfirm={onReset}
         onClose={() => setConfirmReset(false)}
@@ -442,7 +467,7 @@ function EditForm({
         onClose={() => setTestOpen(false)}
         initialRecipient={ownEmail ?? ''}
         send={sendTemplateTest}
-        helperText="Sends this template rendered with the current draft and sample data."
+        helperText={t('mailTemplates.edit.testHelper')}
       />
       <AdminToast toast={toast} onClose={clear} />
     </Box>

@@ -31,7 +31,9 @@ import Stack from '@mui/material/Stack';
 import Switch from '@mui/material/Switch';
 import TextField, { type TextFieldProps } from '@mui/material/TextField';
 import Typography from '@mui/material/Typography';
+import type { ParseKeys } from 'i18next';
 import { AtSign, SendHorizonal, Server, Zap } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import type { AdminSetting, SendTestEmailResponse } from '../../api/generated';
 import { useSettings, useUpdateSettings } from '../../api/hooks/useSettings';
 import { useSendTestEmail } from '../../api/hooks/useMailTemplates';
@@ -41,6 +43,7 @@ import { SectionCard } from '../../components/admin/layout/SectionCard';
 import { AdminToast } from '../../components/admin/layout/AdminToast';
 import { useToast } from '../../components/admin/layout/useToast';
 import { ToneBadge } from '../../components/admin/ToneBadge';
+import { useSettingText } from '../../components/admin/settings/settingText';
 import {
   ENCRYPTION_FALLBACK,
   ENCRYPTION_META,
@@ -58,6 +61,18 @@ const TEST_SEVERITY: Record<SendTestEmailResponse['status'], 'success' | 'info' 
   FAILED: 'error',
 };
 
+/** A key in the `admin` catalog. */
+type AdminKey = ParseKeys<'admin'>;
+
+/** A failed save or test send: the error itself and the catalog key of its fallback message. */
+interface FailedRequest {
+  cause: unknown;
+  fallbackKey: AdminKey;
+}
+
+/** The test-send problem: a failed request, or a recipient that is not an address. */
+type TestError = FailedRequest | { invalidRecipient: true };
+
 /** Secrets start blank (the API masks them); everything else baselines on its value. */
 function baselineOf(setting: AdminSetting): string {
   return setting.sensitive ? '' : (setting.value ?? '');
@@ -71,6 +86,8 @@ function baselineOf(setting: AdminSetting): string {
  * `allowedValues`, rendered with curated labels and port hints.
  */
 export function EmailServerPage() {
+  const { t } = useTranslation(['admin', 'common']);
+  const settingText = useSettingText();
   const { data, isLoading, isError } = useSettings();
   const updateSettings = useUpdateSettings();
   const sendTest = useSendTestEmail();
@@ -95,7 +112,7 @@ export function EmailServerPage() {
   }, [smtpSettings]);
 
   const [edits, setEdits] = useState<Record<string, string>>({});
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<FailedRequest | null>(null);
   const [submitAttempted, setSubmitAttempted] = useState(false);
   const [serverErrors, setServerErrors] = useState<Record<string, string>>({});
   const { toast, notify, clear } = useToast();
@@ -103,7 +120,7 @@ export function EmailServerPage() {
   const adminEmail = useAuthStore((s) => s.email);
   const [testRecipient, setTestRecipient] = useState(adminEmail ?? '');
   const [testResult, setTestResult] = useState<SendTestEmailResponse | null>(null);
-  const [testError, setTestError] = useState<string | null>(null);
+  const [testError, setTestError] = useState<TestError | null>(null);
 
   const valueOf = (key: string): string => edits[key] ?? baselines[key] ?? '';
   const setValue = (key: string, next: string) => {
@@ -134,26 +151,29 @@ export function EmailServerPage() {
       ? allowedEncryption
       : [...ENCRYPTION_FALLBACK];
 
-  // Client-side field errors mirroring the server's SMTP constraints.
+  // Client-side field errors mirroring the server's SMTP constraints, as catalog keys.
   const clientErrors = useMemo(() => {
     const valueAt = (key: string) => edits[key] ?? baselines[key] ?? '';
-    const map: Record<string, string> = {};
+    const map: Record<string, AdminKey> = {};
     if (enabled && valueAt(SMTP_KEYS.host).trim() === '') {
-      map[SMTP_KEYS.host] = 'A host is required to send mail.';
+      map[SMTP_KEYS.host] = 'mail.validation.hostRequired';
     }
     const port = valueAt(SMTP_KEYS.port);
     if (port.trim() !== '' && !isPort(port)) {
-      map[SMTP_KEYS.port] = 'Enter a port between 1 and 65535.';
+      map[SMTP_KEYS.port] = 'mail.validation.port';
     }
     const from = valueAt(SMTP_KEYS.from);
     if (from.trim() !== '' && !isEmail(from)) {
-      map[SMTP_KEYS.from] = 'Enter a valid email address.';
+      map[SMTP_KEYS.from] = 'mail.validation.email';
     }
     return map;
   }, [edits, baselines, enabled]);
 
-  const fieldError = (key: string): string | undefined =>
-    serverErrors[key] ?? (submitAttempted ? clientErrors[key] : undefined);
+  const fieldError = (key: string): string | undefined => {
+    if (serverErrors[key]) return serverErrors[key];
+    const clientKey = submitAttempted ? clientErrors[key] : undefined;
+    return clientKey ? t(clientKey) : undefined;
+  };
 
   const discard = () => {
     setEdits({});
@@ -174,13 +194,13 @@ export function EmailServerPage() {
       setEdits({});
       setServerErrors({});
       setSubmitAttempted(false);
-      notify('SMTP settings saved.');
+      notify(t('mail.server.saved'));
     } catch (err) {
       const serverFieldErrors = apiFieldErrors(err);
       if (Object.keys(serverFieldErrors).length > 0) {
         setServerErrors(serverFieldErrors);
       } else {
-        setError(apiErrorMessage(err, 'The SMTP settings could not be saved.'));
+        setError({ cause: err, fallbackKey: 'mail.server.saveFailed' });
       }
     }
   };
@@ -189,13 +209,13 @@ export function EmailServerPage() {
     setTestError(null);
     setTestResult(null);
     if (!isEmail(testRecipient)) {
-      setTestError('Enter a valid recipient email address.');
+      setTestError({ invalidRecipient: true });
       return;
     }
     try {
       setTestResult(await sendTest.mutateAsync(testRecipient.trim()));
     } catch (err) {
-      setTestError(apiErrorMessage(err, 'The test email could not be sent.'));
+      setTestError({ cause: err, fallbackKey: 'mail.test.failed' });
     }
   };
 
@@ -206,12 +226,12 @@ export function EmailServerPage() {
     const err = fieldError(key);
     return (
       <TextField
-        label={SMTP_FIELD[key]?.label ?? key}
+        label={SMTP_FIELD[key] ? t(SMTP_FIELD[key].labelKey) : key}
         value={valueOf(key)}
         onChange={(e) => setValue(key, e.target.value)}
         placeholder={SMTP_FIELD[key]?.placeholder}
         error={Boolean(err)}
-        helperText={err ?? setting.description}
+        helperText={err ?? settingText.description(setting)}
         fullWidth
         {...extra}
       />
@@ -221,13 +241,20 @@ export function EmailServerPage() {
   if (isLoading) {
     return (
       <Typography color="text.secondary" sx={{ p: 1, fontSize: 14 }}>
-        Loading…
+        {t('common:loading')}
       </Typography>
     );
   }
   if (isError) {
-    return <Alert severity="error">The SMTP settings could not be loaded.</Alert>;
+    return <Alert severity="error">{t('mail.server.loadFailed')}</Alert>;
   }
+
+  const testErrorMessage =
+    testError === null
+      ? null
+      : 'invalidRecipient' in testError
+        ? t('mail.validation.recipient')
+        : apiErrorMessage(testError.cause, t(testError.fallbackKey));
 
   const passwordSetting = byKey[SMTP_KEYS.password];
   const passwordSet = passwordSetting?.value === '***';
@@ -237,8 +264,8 @@ export function EmailServerPage() {
       <Stack spacing={3}>
         <SectionCard
           icon={Server}
-          title="Connection"
-          description="Where and how qnop reaches your SMTP server."
+          title={t('mail.server.connection.title')}
+          description={t('mail.server.connection.description')}
         >
           <Stack spacing={2.5} sx={{ maxWidth: 480 }}>
             <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2}>
@@ -249,14 +276,17 @@ export function EmailServerPage() {
             {byKey[SMTP_KEYS.encryption] && (
               <TextField
                 select
-                label={SMTP_FIELD[SMTP_KEYS.encryption].label}
+                label={t(SMTP_FIELD[SMTP_KEYS.encryption].labelKey)}
                 value={valueOf(SMTP_KEYS.encryption)}
                 onChange={(e) => setValue(SMTP_KEYS.encryption, e.target.value)}
-                helperText={byKey[SMTP_KEYS.encryption].description}
+                helperText={settingText.description(byKey[SMTP_KEYS.encryption])}
                 fullWidth
                 slotProps={{
                   select: {
-                    renderValue: (value) => ENCRYPTION_META[String(value)]?.label ?? String(value),
+                    renderValue: (value) => {
+                      const meta = ENCRYPTION_META[String(value)];
+                      return meta ? t(meta.labelKey) : String(value);
+                    },
                   },
                 }}
               >
@@ -265,10 +295,12 @@ export function EmailServerPage() {
                   return (
                     <MenuItem key={option} value={option}>
                       <Box>
-                        <Typography sx={{ fontSize: 14 }}>{meta?.label ?? option}</Typography>
+                        <Typography sx={{ fontSize: 14 }}>
+                          {meta ? t(meta.labelKey) : option}
+                        </Typography>
                         {meta && (
                           <Typography color="text.secondary" sx={{ fontSize: 12 }}>
-                            {meta.hint}
+                            {t(meta.hintKey)}
                           </Typography>
                         )}
                       </Box>
@@ -282,14 +314,14 @@ export function EmailServerPage() {
 
             {passwordSetting && (
               <PasswordField
-                label={SMTP_FIELD[SMTP_KEYS.password].label}
+                label={t(SMTP_FIELD[SMTP_KEYS.password].labelKey)}
                 value={valueOf(SMTP_KEYS.password)}
                 onChange={(next) => setValue(SMTP_KEYS.password, next)}
                 autoComplete="new-password"
                 helperText={
                   passwordSet
-                    ? 'Stored encrypted. Leave blank to keep the current password.'
-                    : passwordSetting.description
+                    ? t('mail.server.passwordStored')
+                    : settingText.description(passwordSetting)
                 }
               />
             )}
@@ -298,8 +330,8 @@ export function EmailServerPage() {
 
         <SectionCard
           icon={AtSign}
-          title="Identity"
-          description="How outgoing messages present their sender."
+          title={t('mail.server.identity.title')}
+          description={t('mail.server.identity.description')}
         >
           <Stack spacing={2.5} sx={{ maxWidth: 480 }}>
             {textField(SMTP_KEYS.from, { type: 'email', autoComplete: 'off' })}
@@ -309,9 +341,9 @@ export function EmailServerPage() {
 
         <SectionCard
           icon={Zap}
-          title="Status & delivery"
-          description="Turn outgoing mail on and verify it with a test message."
-          action={<ToneBadge tone={status.tone} label={status.label} />}
+          title={t('mail.server.delivery.title')}
+          description={t('mail.server.delivery.description')}
+          action={<ToneBadge tone={status.tone} label={t(status.labelKey)} />}
         >
           <Stack spacing={2.5} sx={{ maxWidth: 480 }}>
             {byKey[SMTP_KEYS.enabled] && (
@@ -326,9 +358,11 @@ export function EmailServerPage() {
                 }
                 label={
                   <Box>
-                    <Typography sx={{ fontSize: 15 }}>Enable outgoing mail</Typography>
+                    <Typography sx={{ fontSize: 15 }}>
+                      {t('mail.server.delivery.enable')}
+                    </Typography>
                     <Typography color="text.secondary" sx={{ fontSize: 13 }}>
-                      {status.detail}
+                      {t(status.detailKey)}
                     </Typography>
                   </Box>
                 }
@@ -339,9 +373,11 @@ export function EmailServerPage() {
             <Divider />
 
             <Box>
-              <Typography sx={{ fontSize: 15, fontWeight: 600 }}>Send a test message</Typography>
+              <Typography sx={{ fontSize: 15, fontWeight: 600 }}>
+                {t('mail.server.delivery.testTitle')}
+              </Typography>
               <Typography color="text.secondary" sx={{ fontSize: 13, mt: 0.25, mb: 1.5 }}>
-                Delivers to the address below using the saved SMTP settings.
+                {t('mail.server.delivery.testDescription')}
               </Typography>
               <Stack
                 direction={{ xs: 'column', sm: 'row' }}
@@ -349,11 +385,11 @@ export function EmailServerPage() {
                 sx={{ alignItems: { sm: 'flex-start' } }}
               >
                 <TextField
-                  label="Recipient"
+                  label={t('mail.test.recipient')}
                   type="email"
                   value={testRecipient}
                   onChange={(e) => setTestRecipient(e.target.value)}
-                  placeholder="you@example.com"
+                  placeholder={t('mail.test.recipientPlaceholder')}
                   autoComplete="off"
                   sx={{ flex: 1 }}
                 />
@@ -364,12 +400,12 @@ export function EmailServerPage() {
                   disabled={sendTest.isPending || testRecipient.trim().length === 0 || hasChanges}
                   sx={{ height: 40, flexShrink: 0 }}
                 >
-                  {sendTest.isPending ? 'Sending…' : 'Send test'}
+                  {sendTest.isPending ? t('mail.test.sending') : t('mail.server.delivery.sendTest')}
                 </Button>
               </Stack>
               {hasChanges && (
                 <Typography color="text.secondary" sx={{ fontSize: 13, mt: 1 }}>
-                  Save your changes before sending a test message.
+                  {t('mail.server.delivery.saveFirst')}
                 </Typography>
               )}
               {testResult && (
@@ -377,16 +413,18 @@ export function EmailServerPage() {
                   {testResult.detail}
                 </Alert>
               )}
-              {testError && (
+              {testErrorMessage && (
                 <Alert severity="error" sx={{ mt: 1.5 }}>
-                  {testError}
+                  {testErrorMessage}
                 </Alert>
               )}
             </Box>
           </Stack>
         </SectionCard>
 
-        {error && <Alert severity="error">{error}</Alert>}
+        {error && (
+          <Alert severity="error">{apiErrorMessage(error.cause, t(error.fallbackKey))}</Alert>
+        )}
 
         <Divider />
         <Stack direction="row" spacing={1.5} sx={{ alignItems: 'center' }}>
@@ -395,7 +433,7 @@ export function EmailServerPage() {
             variant="contained"
             disabled={!hasChanges || updateSettings.isPending}
           >
-            {updateSettings.isPending ? 'Saving…' : 'Save changes'}
+            {updateSettings.isPending ? t('mail.server.saving') : t('mail.server.saveChanges')}
           </Button>
           <Button
             type="button"
@@ -403,12 +441,12 @@ export function EmailServerPage() {
             disabled={!hasChanges || updateSettings.isPending}
             onClick={discard}
           >
-            Discard
+            {t('common:actions.discard')}
           </Button>
           <Typography color="text.secondary" sx={{ fontSize: 14 }}>
             {hasChanges
-              ? `${changed.length} unsaved change${changed.length === 1 ? '' : 's'}.`
-              : 'No unsaved changes.'}
+              ? t('mail.server.unsavedChanges', { count: changed.length })
+              : t('mail.server.noUnsavedChanges')}
           </Typography>
           <Box sx={{ flex: 1 }} />
           {updateSettings.isPending && <LinearProgress sx={{ width: 120 }} />}

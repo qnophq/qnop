@@ -25,7 +25,9 @@ import Box from '@mui/material/Box';
 import LinearProgress from '@mui/material/LinearProgress';
 import Stack from '@mui/material/Stack';
 import Typography from '@mui/material/Typography';
+import type { ParseKeys } from 'i18next';
 import { FlaskConical, ListChecks, Power, TriangleAlert } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import type { SchedulerJob } from '../../api/generated';
 import {
   useRunSchedulerJob,
@@ -46,6 +48,7 @@ import { apiErrorMessage } from '../../utils/apiError';
  * run-now go straight to the SYSTEM audit stream.
  */
 export function SchedulerPage() {
+  const { t } = useTranslation(['admin', 'common']);
   const { data, isLoading, isFetching, isError } = useSchedulerJobs();
   const updateJob = useUpdateSchedulerJob();
   const runJob = useRunSchedulerJob();
@@ -60,16 +63,21 @@ export function SchedulerPage() {
   const manualRunEnabled = data?.manualRunEnabled ?? true;
   const jobSettingsEditable = data?.jobSettingsEditable ?? true;
   const tiles: StatTile[] = [
-    { label: 'Jobs', value: jobs.length, icon: ListChecks },
-    { label: 'Enabled', value: jobs.filter((j) => j.enabled).length, icon: Power, tone: 'success' },
+    { label: t('scheduler.tiles.jobs'), value: jobs.length, icon: ListChecks },
     {
-      label: 'Dry run',
+      label: t('scheduler.tiles.enabled'),
+      value: jobs.filter((j) => j.enabled).length,
+      icon: Power,
+      tone: 'success',
+    },
+    {
+      label: t('scheduler.tiles.dryRun'),
       value: jobs.filter((j) => j.dryRun).length,
       icon: FlaskConical,
       tone: 'accent',
     },
     {
-      label: 'Failing',
+      label: t('scheduler.tiles.failing'),
       value: jobs.filter((j) => j.lastOutcome === 'FAILURE').length,
       icon: TriangleAlert,
       tone: 'danger',
@@ -86,7 +94,7 @@ export function SchedulerPage() {
       await updateJob.mutateAsync({ jobId: job.jobId, ...change });
       notify(message);
     } catch (err) {
-      notify(apiErrorMessage(err, 'The change could not be saved.'), 'error');
+      notify(apiErrorMessage(err, t('scheduler.toast.saveFailed')), 'error');
     } finally {
       setSavingId(null);
     }
@@ -96,14 +104,18 @@ export function SchedulerPage() {
     applyUpdate(
       job,
       { enabled: !job.enabled },
-      `${job.displayName} ${job.enabled ? 'disabled' : 'enabled'}.`,
+      t(job.enabled ? 'scheduler.toast.disabled' : 'scheduler.toast.enabled', {
+        job: job.displayName,
+      }),
     );
 
   const onToggleDryRun = (job: SchedulerJob) =>
     applyUpdate(
       job,
       { dryRun: !job.dryRun },
-      `Dry run ${job.dryRun ? 'off' : 'on'} for ${job.displayName}.`,
+      t(job.dryRun ? 'scheduler.toast.dryRunOff' : 'scheduler.toast.dryRunOn', {
+        job: job.displayName,
+      }),
     );
 
   const onRunNow = async (job: SchedulerJob) => {
@@ -111,12 +123,12 @@ export function SchedulerPage() {
     try {
       const result = await runJob.mutateAsync(job.jobId);
       if (result.lastOutcome === 'FAILURE') {
-        notify(`${job.displayName} ran but reported a failure.`, 'error');
+        notify(t('scheduler.toast.ranWithFailure', { job: job.displayName }), 'error');
       } else {
-        notify(`${job.displayName} ran.`);
+        notify(t('scheduler.toast.ran', { job: job.displayName }));
       }
     } catch (err) {
-      notify(apiErrorMessage(err, 'The job could not be started.'), 'error');
+      notify(apiErrorMessage(err, t('scheduler.toast.startFailed')), 'error');
     } finally {
       setRunningId(null);
     }
@@ -124,20 +136,17 @@ export function SchedulerPage() {
 
   // What this deployment withholds, in one sentence rather than two stacked
   // alerts — an operator who fixed both settings made a single decision.
-  const notice = manualRunEnabled
+  const notice: ParseKeys<'admin'> | null = manualRunEnabled
     ? jobSettingsEditable
       ? null
-      : 'Job settings are fixed on this deployment: the enabled and dry-run switches cannot be changed here. The schedules below keep running as configured.'
+      : 'scheduler.notice.settingsFixed'
     : jobSettingsEditable
-      ? 'Running a job by hand is disabled on this deployment. The schedules below are unaffected and keep running.'
-      : 'This deployment manages its own scheduler: jobs cannot be started by hand, enabled, or put in dry-run from here. The schedules below keep running as configured.';
+      ? 'scheduler.notice.manualRunDisabled'
+      : 'scheduler.notice.managed';
 
   return (
     <Stack spacing={3}>
-      <PageHeader
-        title="Scheduler"
-        description="Background maintenance sweeps — token purges and the storage orphan reaper. Disable a sweep, put the reaper in dry-run, or run one on demand."
-      />
+      <PageHeader title={t('scheduler.title')} description={t('scheduler.description')} />
 
       {!isError && jobs.length > 0 && <StatStrip tiles={tiles} />}
 
@@ -146,17 +155,17 @@ export function SchedulerPage() {
           missing buttons and dead switches reads as a broken scheduler. */}
       {notice && !isError && (
         <Alert severity="info" variant="outlined">
-          {notice}
+          {t(notice)}
         </Alert>
       )}
 
       <Box sx={{ height: 3 }}>{isFetching && !isLoading && <LinearProgress />}</Box>
 
       {isError ? (
-        <Alert severity="error">The scheduled jobs could not be loaded.</Alert>
+        <Alert severity="error">{t('scheduler.loadError')}</Alert>
       ) : isLoading ? (
         <Typography color="text.secondary" sx={{ fontSize: 14 }}>
-          Loading…
+          {t('common:loading')}
         </Typography>
       ) : (
         <Stack spacing={1.5}>

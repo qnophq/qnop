@@ -22,6 +22,8 @@
 import Alert from '@mui/material/Alert';
 import Skeleton from '@mui/material/Skeleton';
 import Stack from '@mui/material/Stack';
+import type { ParseKeys } from 'i18next';
+import { useTranslation } from 'react-i18next';
 import type { ServerConfigBrandingSlot } from '../../api/generated';
 import { useConfig } from '../../api/hooks/useConfig';
 import { BrandingSlotCard } from '../../components/admin/branding/BrandingSlotCard';
@@ -32,14 +34,15 @@ import type { BrandingSlot } from '../../api/branding';
 
 interface SlotDef {
   slot: BrandingSlot;
-  label: string;
-  description: string;
+  labelKey: ParseKeys<'admin'>;
+  descriptionKey: ParseKeys<'admin'>;
   dark?: boolean;
   asset?: ServerConfigBrandingSlot;
 }
 
 /** Admin branding: upload/replace/remove the light & dark logos and the logomark (#106). */
 export function BrandingPage() {
+  const { t } = useTranslation('admin');
   const { data: config, isLoading, isError } = useConfig();
   const { toast, notify, clear } = useToast();
 
@@ -47,34 +50,31 @@ export function BrandingPage() {
   const slots: SlotDef[] = [
     {
       slot: 'logo-light',
-      label: 'Logo (light)',
-      description: 'Shown on light backgrounds.',
+      labelKey: 'branding.slots.logoLight.label',
+      descriptionKey: 'branding.slots.logoLight.description',
       asset: branding?.logoLight,
     },
     {
       slot: 'logo-dark',
-      label: 'Logo (dark)',
-      description: 'Shown on dark backgrounds.',
+      labelKey: 'branding.slots.logoDark.label',
+      descriptionKey: 'branding.slots.logoDark.description',
       dark: true,
       asset: branding?.logoDark,
     },
     {
       slot: 'logomark',
-      label: 'Logomark',
-      description: 'Compact mark / favicon.',
+      labelKey: 'branding.slots.logomark.label',
+      descriptionKey: 'branding.slots.logomark.description',
       asset: branding?.logomark,
     },
   ];
 
   return (
     <Stack spacing={3}>
-      <PageHeader
-        title="Branding"
-        description="Replace the default logos shown across the app — drag an image in or browse. Raster uploads open a cropper to cut the exact framing; SVG uploads as-is. PNG, WebP or SVG, up to 512 KiB; each slot falls back to the qnop default until you upload your own."
-      />
+      <PageHeader title={t('branding.page.title')} description={t('branding.page.description')} />
 
       {isError ? (
-        <Alert severity="error">The branding configuration could not be loaded.</Alert>
+        <Alert severity="error">{t('branding.errors.load')}</Alert>
       ) : (
         <Stack direction={{ xs: 'column', md: 'row' }} spacing={2} sx={{ alignItems: 'stretch' }}>
           {slots.map((s) =>
@@ -89,8 +89,8 @@ export function BrandingPage() {
               <BrandingSlotCard
                 key={s.slot}
                 slot={s.slot}
-                label={s.label}
-                description={s.description}
+                label={t(s.labelKey)}
+                description={t(s.descriptionKey)}
                 dark={s.dark}
                 source={s.asset.source}
                 url={s.asset.url}

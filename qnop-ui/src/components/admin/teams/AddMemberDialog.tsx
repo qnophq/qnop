@@ -32,6 +32,7 @@ import MenuItem from '@mui/material/MenuItem';
 import Stack from '@mui/material/Stack';
 import TextField from '@mui/material/TextField';
 import Typography from '@mui/material/Typography';
+import { useTranslation } from 'react-i18next';
 import { UserAvatar } from '../../shell/UserAvatar';
 import type { AdminUserSummary, TeamRole } from '../../../api/generated';
 import { useAdminUsers } from '../../../api/hooks/useAdminUsers';
@@ -63,6 +64,7 @@ export function AddMemberDialog({
   remainingSlots,
   onClose,
 }: AddMemberDialogProps) {
+  const { t } = useTranslation(['admin', 'common']);
   const addMember = useAddTeamMember();
   const [search, setSearch] = useState('');
   const [debounced, setDebounced] = useState('');
@@ -70,7 +72,8 @@ export function AddMemberDialog({
   const [teamRole, setTeamRole] = useState<TeamRole>('MEMBER');
   // null where the deployment sets no per-team ceiling, which is the usual case.
   const atMost = remainingSlots ?? null;
-  const [error, setError] = useState<string | null>(null);
+  // The display names that could not be added; the message is rendered from them.
+  const [failedNames, setFailedNames] = useState<string[] | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
   useEffect(() => {
@@ -85,7 +88,7 @@ export function AddMemberDialog({
   const onSubmit = async (event: FormEvent) => {
     event.preventDefault();
     if (selected.length === 0) return;
-    setError(null);
+    setFailedNames(null);
     setSubmitting(true);
     const results = await Promise.allSettled(
       selected.map((user) => addMember.mutateAsync({ teamId, userId: user.id, teamRole })),
@@ -99,20 +102,18 @@ export function AddMemberDialog({
     }
     // Keep only the users that could not be added so the admin can retry them.
     setSelected(failed);
-    setError(`Could not add: ${failed.map((u) => u.displayName).join(', ')}.`);
+    setFailedNames(failed.map((u) => u.displayName));
   };
 
   return (
     <Dialog open={open} onClose={onClose} fullWidth maxWidth="sm">
       <Box component="form" onSubmit={onSubmit} noValidate>
-        <DialogTitle>Add members</DialogTitle>
+        <DialogTitle>{t('teams.addMember.title')}</DialogTitle>
         <DialogContent>
           <Stack spacing={2.5} sx={{ mt: 1 }}>
             {atMost !== null && (
               <Typography color="text.secondary" sx={{ fontSize: 13 }}>
-                {atMost === 1
-                  ? 'One more member fits in this team.'
-                  : `${atMost} more members fit in this team.`}
+                {t('teams.addMember.remainingSlots', { count: atMost })}
               </Typography>
             )}
             <Autocomplete
@@ -132,7 +133,7 @@ export function AddMemberDialog({
               getOptionLabel={(u) => `${u.displayName} (${u.email})`}
               isOptionEqualToValue={(a, b) => a.id === b.id}
               filterOptions={(x) => x}
-              noOptionsText="No matching users"
+              noOptionsText={t('teams.addMember.noOptions')}
               // The person, not just a string - the app-wide picker recipe
               // (avatar + name), as in the review wizard and the lead picker.
               renderOption={({ key, ...optionProps }, option) => (
@@ -154,29 +155,39 @@ export function AddMemberDialog({
                 </Box>
               )}
               renderInput={(params) => (
-                <TextField {...params} label="Users" placeholder="Search by name or email" />
+                <TextField
+                  {...params}
+                  label={t('teams.addMember.users')}
+                  placeholder={t('teams.addMember.searchPlaceholder')}
+                />
               )}
             />
             <TextField
-              label="Team role"
+              label={t('teams.addMember.role')}
               select
               value={teamRole}
               onChange={(e) => setTeamRole(e.target.value as TeamRole)}
               fullWidth
-              helperText="Applied to everyone added in this batch."
+              helperText={t('teams.addMember.roleHelper')}
             >
-              <MenuItem value="MEMBER">Member</MenuItem>
-              <MenuItem value="LEAD">Lead</MenuItem>
+              <MenuItem value="MEMBER">{t('roles.team.MEMBER')}</MenuItem>
+              <MenuItem value="LEAD">{t('roles.team.LEAD')}</MenuItem>
             </TextField>
-            {error && <Alert severity="error">{error}</Alert>}
+            {failedNames && (
+              <Alert severity="error">
+                {t('teams.addMember.failed', { names: failedNames.join(', ') })}
+              </Alert>
+            )}
           </Stack>
         </DialogContent>
         <DialogActions sx={{ px: 3, pb: 2.5 }}>
           <Button onClick={onClose} color="inherit">
-            Cancel
+            {t('common:actions.cancel')}
           </Button>
           <Button type="submit" variant="contained" disabled={submitting || selected.length === 0}>
-            {selected.length > 1 ? `Add ${selected.length}` : 'Add'}
+            {selected.length > 1
+              ? t('teams.addMember.submitCount', { number: selected.length })
+              : t('common:actions.add')}
           </Button>
         </DialogActions>
       </Box>

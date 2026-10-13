@@ -19,13 +19,19 @@
  * SPDX-License-Identifier: AGPL-3.0-only
  */
 
+import type { ParseKeys } from 'i18next';
+import { useTranslation } from 'react-i18next';
 import type { TeamRole } from '../../../api/generated';
 import { ToneBadge, type BadgeTone } from '../ToneBadge';
 
 const TONE: Record<TeamRole, BadgeTone> = { LEAD: 'blue', MEMBER: 'neutral' };
-const LABEL: Record<TeamRole, string> = { LEAD: 'Lead', MEMBER: 'Member' };
+const LABEL: Record<TeamRole, ParseKeys<'admin'>> = {
+  LEAD: 'roles.team.LEAD',
+  MEMBER: 'roles.team.MEMBER',
+};
 
 /** A team member's per-team role as a coloured pill. */
 export function TeamRoleBadge({ role }: { role: TeamRole }) {
-  return <ToneBadge tone={TONE[role]} label={LABEL[role]} />;
+  const { t } = useTranslation('admin');
+  return <ToneBadge tone={TONE[role]} label={t(LABEL[role])} />;
 }

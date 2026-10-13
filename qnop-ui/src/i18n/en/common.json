@@ -30,7 +30,21 @@
   "actions": {
     "tryAgain": "Try again",
     "retry": "Retry",
-    "backToDashboard": "Back to dashboard"
+    "backToDashboard": "Back to dashboard",
+    "cancel": "Cancel",
+    "save": "Save",
+    "delete": "Delete",
+    "close": "Close",
+    "confirm": "Confirm",
+    "edit": "Edit",
+    "remove": "Remove",
+    "create": "Create",
+    "add": "Add",
+    "copy": "Copy",
+    "copied": "Copied",
+    "reset": "Reset",
+    "done": "Done",
+    "discard": "Discard"
   },
   "boundary": {
     "title": "Something went wrong",

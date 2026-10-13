@@ -19,12 +19,17 @@
  * SPDX-License-Identifier: AGPL-3.0-only
  */
 
+import type { ParseKeys } from 'i18next';
+
 /** Backends that exist only self-hosted, so a host is not optional (TrackingProvider). */
 const SELF_HOSTED = new Set(['matomo', 'umami']);
 
 export interface TrackingStatus {
   severity: 'success' | 'warning';
-  message: string;
+  /** The `admin` catalog key of the status line (issue #836); the view translates it. */
+  messageKey: ParseKeys<'admin'>;
+  /** Interpolation values for the message: the backend's display name and, if set, its host. */
+  values?: { provider: string; host?: string };
 }
 
 /**
@@ -49,30 +54,34 @@ export function trackingStatus(values: Record<string, string>): TrackingStatus |
     return null;
   }
   if (provider === 'none') {
-    return { severity: 'warning', message: 'Measurement is on, but no backend is selected.' };
+    return { severity: 'warning', messageKey: 'settings.tracking.noBackend' };
   }
   if (!enabled) {
     // The case that prompted this: everything filled in, nothing measured.
     return {
       severity: 'warning',
-      message: `Nothing is being measured — “${label(provider)}” is configured, but usage tracking is switched off above.`,
+      messageKey: 'settings.tracking.switchedOff',
+      values: { provider: label(provider) },
     };
   }
   if (!siteId) {
     return {
       severity: 'warning',
-      message: `Nothing is being measured — ${label(provider)} needs the site id it knows this workspace by.`,
+      messageKey: 'settings.tracking.needsSiteId',
+      values: { provider: label(provider) },
     };
   }
   if (!host && SELF_HOSTED.has(provider)) {
     return {
       severity: 'warning',
-      message: `Nothing is being measured — ${label(provider)} is self-hosted, so it needs the address of your server.`,
+      messageKey: 'settings.tracking.needsHost',
+      values: { provider: label(provider) },
     };
   }
   return {
     severity: 'success',
-    message: `Measuring into ${label(provider)}${host ? ` at ${host}` : ''}. Page addresses are reduced to route patterns before they are forwarded.`,
+    messageKey: host ? 'settings.tracking.measuringAt' : 'settings.tracking.measuring',
+    values: host ? { provider: label(provider), host } : { provider: label(provider) },
   };
 }
 

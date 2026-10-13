@@ -27,6 +27,7 @@ import Stack from '@mui/material/Stack';
 import TextField from '@mui/material/TextField';
 import Typography from '@mui/material/Typography';
 import { SlidersHorizontal } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 
 interface SampleVariablesPopoverProps {
   placeholders: string[];
@@ -45,6 +46,7 @@ export function SampleVariablesPopover({
   values,
   onChange,
 }: SampleVariablesPopoverProps) {
+  const { t } = useTranslation('admin');
   const [anchorEl, setAnchorEl] = useState<HTMLElement | null>(null);
 
   if (placeholders.length === 0) {
@@ -61,7 +63,7 @@ export function SampleVariablesPopover({
         onClick={(event: MouseEvent<HTMLElement>) => setAnchorEl(event.currentTarget)}
         sx={{ fontSize: 12.5 }}
       >
-        Variables
+        {t('mailTemplates.preview.variables')}
       </Button>
       <Popover
         open={Boolean(anchorEl)}
@@ -72,7 +74,7 @@ export function SampleVariablesPopover({
       >
         <Box sx={{ p: 2, width: 290 }}>
           <Typography sx={{ fontSize: 12, fontWeight: 600, color: 'text.secondary', mb: 1.5 }}>
-            Sample variables
+            {t('mailTemplates.preview.sampleVariables')}
           </Typography>
           <Stack spacing={1.5}>
             {placeholders.map((name) => (

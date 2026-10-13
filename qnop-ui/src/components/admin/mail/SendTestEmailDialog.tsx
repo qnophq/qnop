@@ -29,6 +29,7 @@ import DialogContent from '@mui/material/DialogContent';
 import DialogTitle from '@mui/material/DialogTitle';
 import Stack from '@mui/material/Stack';
 import TextField from '@mui/material/TextField';
+import { useTranslation } from 'react-i18next';
 import type { SendTestEmailResponse } from '../../../api/generated';
 import { useSendTestEmail } from '../../../api/hooks/useMailTemplates';
 import { apiErrorMessage } from '../../../utils/apiError';
@@ -43,7 +44,7 @@ interface SendTestEmailDialogProps {
    * Defaults to the generic SMTP test message.
    */
   send?: (recipient: string) => Promise<SendTestEmailResponse>;
-  /** Replaces the default helper line under the recipient field. */
+  /** Replaces the default helper line (the configured-SMTP note) under the recipient field. */
   helperText?: string;
 }
 
@@ -59,7 +60,7 @@ export function SendTestEmailDialog({
   onClose,
   initialRecipient = '',
   send,
-  helperText = 'Uses the configured SMTP settings.',
+  helperText,
 }: SendTestEmailDialogProps) {
   return (
     <Dialog open={open} onClose={onClose} fullWidth maxWidth="xs">
@@ -81,12 +82,14 @@ function SendTestEmailForm({
   initialRecipient,
   send,
   helperText,
-}: Omit<SendTestEmailDialogProps, 'open'> & { initialRecipient: string; helperText: string }) {
+}: Omit<SendTestEmailDialogProps, 'open'> & { initialRecipient: string }) {
+  const { t } = useTranslation(['admin', 'common']);
   const sendTest = useSendTestEmail();
   const [recipient, setRecipient] = useState(initialRecipient);
   const [sending, setSending] = useState(false);
   const [result, setResult] = useState<SendTestEmailResponse | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  // The failure itself; its message is resolved at render so it follows a language switch.
+  const [error, setError] = useState<{ cause: unknown } | null>(null);
 
   const onSubmit = async (event: FormEvent) => {
     event.preventDefault();
@@ -101,7 +104,7 @@ function SendTestEmailForm({
       const to = recipient.trim();
       setResult(await (send ? send(to) : sendTest.mutateAsync(to)));
     } catch (err) {
-      setError(apiErrorMessage(err, 'The test email could not be sent.'));
+      setError({ cause: err });
     } finally {
       setSending(false);
     }
@@ -109,33 +112,35 @@ function SendTestEmailForm({
 
   return (
     <Box component="form" onSubmit={onSubmit} noValidate>
-      <DialogTitle>Send test email</DialogTitle>
+      <DialogTitle>{t('mail.test.title')}</DialogTitle>
       <DialogContent>
         <Stack spacing={2} sx={{ mt: 1 }}>
           <TextField
-            label="Recipient"
+            label={t('mail.test.recipient')}
             type="email"
             value={recipient}
             onChange={(e) => setRecipient(e.target.value)}
             fullWidth
             required
             autoComplete="off"
-            helperText={helperText}
+            helperText={helperText ?? t('mail.test.recipientHelper')}
           />
           {result && <Alert severity={SEVERITY[result.status]}>{result.detail}</Alert>}
-          {error && <Alert severity="error">{error}</Alert>}
+          {error && (
+            <Alert severity="error">{apiErrorMessage(error.cause, t('mail.test.failed'))}</Alert>
+          )}
         </Stack>
       </DialogContent>
       <DialogActions sx={{ px: 3, pb: 2.5 }}>
         <Button onClick={onClose} color="inherit">
-          Close
+          {t('common:actions.close')}
         </Button>
         <Button
           type="submit"
           variant="contained"
           disabled={sending || recipient.trim().length === 0}
         >
-          {sending ? 'Sending…' : 'Send'}
+          {sending ? t('mail.test.sending') : t('mail.test.send')}
         </Button>
       </DialogActions>
     </Box>

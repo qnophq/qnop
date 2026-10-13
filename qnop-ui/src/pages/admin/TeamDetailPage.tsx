@@ -36,6 +36,7 @@ import TableCell from '@mui/material/TableCell';
 import TableHead from '@mui/material/TableHead';
 import TableRow from '@mui/material/TableRow';
 import Typography from '@mui/material/Typography';
+import { Trans, useTranslation } from 'react-i18next';
 import { ArrowLeftRight, MoreVertical, SquarePen, UserMinus, UserPlus } from 'lucide-react';
 import { Link as RouterLink, useParams } from 'react-router';
 import type { AdminTeamMember } from '../../api/generated';
@@ -53,6 +54,7 @@ import { useFormatters } from '../../hooks/useFormatters';
 
 /** Team detail with member management: add, change role, remove (#105). */
 export function TeamDetailPage() {
+  const { t } = useTranslation(['admin', 'common']);
   const { id = '' } = useParams();
   const { data: team, isLoading, isError } = useTeam(id);
   const setRole = useSetTeamMemberRole();
@@ -70,15 +72,18 @@ export function TeamDetailPage() {
   if (isError) {
     return (
       <Alert severity="error">
-        This team could not be loaded.{' '}
-        <Link component={RouterLink} to="/admin/teams" underline="hover">
-          Back to teams
-        </Link>
+        <Trans
+          t={t}
+          i18nKey="teams.detail.loadError"
+          components={{
+            back: <Link component={RouterLink} to="/admin/teams" underline="hover" />,
+          }}
+        />
       </Alert>
     );
   }
   if (isLoading || !team) {
-    return <Typography color="text.secondary">Loading…</Typography>;
+    return <Typography color="text.secondary">{t('common:loading')}</Typography>;
   }
 
   const openMenu = (event: MouseEvent<HTMLElement>, member: AdminTeamMember) => {
@@ -113,7 +118,10 @@ export function TeamDetailPage() {
         titleAdornment={<UserStatusBadge enabled={team.enabled} />}
         description={
           memberLimit > 0
-            ? [team.description, `${members.length} of ${memberLimit} member slots used.`]
+            ? [
+                team.description,
+                t('teams.detail.memberSlots', { count: memberLimit, used: members.length }),
+              ]
                 .filter(Boolean)
                 .join(' — ')
             : team.description || undefined
@@ -121,7 +129,7 @@ export function TeamDetailPage() {
         action={
           <Stack direction="row" spacing={1.5}>
             <Button color="inherit" startIcon={<SquarePen size={16} />} onClick={openEdit}>
-              Edit
+              {t('common:actions.edit')}
             </Button>
             <Button
               variant="contained"
@@ -129,7 +137,7 @@ export function TeamDetailPage() {
               disabled={membersFull}
               onClick={openAdd}
             >
-              Add member
+              {t('teams.detail.addMember')}
             </Button>
           </Stack>
         }
@@ -137,8 +145,7 @@ export function TeamDetailPage() {
 
       {membersFull && (
         <QuotaAlert>
-          This deployment allows {memberLimit} members per team, and this one has {members.length}.
-          Removing a member frees a slot.
+          {t('teams.detail.quotaFull', { count: memberLimit, used: members.length })}
         </QuotaAlert>
       )}
 
@@ -146,10 +153,10 @@ export function TeamDetailPage() {
         <Table size="medium" sx={{ '& td, & th': { borderColor: 'divider' } }}>
           <TableHead>
             <TableRow>
-              <TableCell>Member</TableCell>
-              <TableCell>Role</TableCell>
-              <TableCell>Joined</TableCell>
-              <TableCell align="right">Actions</TableCell>
+              <TableCell>{t('teams.detail.columns.member')}</TableCell>
+              <TableCell>{t('teams.detail.columns.role')}</TableCell>
+              <TableCell>{t('teams.detail.columns.joined')}</TableCell>
+              <TableCell align="right">{t('teams.detail.columns.actions')}</TableCell>
             </TableRow>
           </TableHead>
           <TableBody>
@@ -157,7 +164,7 @@ export function TeamDetailPage() {
               <TableRow>
                 <TableCell colSpan={4}>
                   <Typography color="text.secondary" sx={{ py: 4, textAlign: 'center' }}>
-                    No members yet. Add the first one.
+                    {t('teams.detail.empty')}
                   </Typography>
                 </TableCell>
               </TableRow>
@@ -184,7 +191,7 @@ export function TeamDetailPage() {
                 <TableCell align="right">
                   <IconButton
                     size="small"
-                    aria-label={`Actions for ${member.displayName}`}
+                    aria-label={t('teams.detail.actionsFor', { name: member.displayName })}
                     onClick={(e) => openMenu(e, member)}
                   >
                     <MoreVertical size={18} />
@@ -206,7 +213,11 @@ export function TeamDetailPage() {
           <ListItemIcon>
             <ArrowLeftRight size={16} />
           </ListItemIcon>
-          <ListItemText>{active?.teamRole === 'LEAD' ? 'Make member' : 'Make lead'}</ListItemText>
+          <ListItemText>
+            {active?.teamRole === 'LEAD'
+              ? t('teams.detail.makeMember')
+              : t('teams.detail.makeLead')}
+          </ListItemText>
         </MenuItem>
         <MenuItem
           onClick={() => {
@@ -217,7 +228,7 @@ export function TeamDetailPage() {
           <ListItemIcon>
             <UserMinus size={16} />
           </ListItemIcon>
-          <ListItemText>Remove from team</ListItemText>
+          <ListItemText>{t('teams.detail.removeFromTeam')}</ListItemText>
         </MenuItem>
       </Menu>
 
@@ -251,9 +262,9 @@ export function TeamDetailPage() {
 
       <ConfirmDialog
         open={removeTarget !== null}
-        title="Remove member"
-        message={`Remove ${removeTarget?.displayName} from this team?`}
-        confirmLabel="Remove"
+        title={t('teams.detail.remove.title')}
+        message={t('teams.detail.remove.message', { name: removeTarget?.displayName })}
+        confirmLabel={t('common:actions.remove')}
         destructive
         onConfirm={() => {
           if (removeTarget) {
