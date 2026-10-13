@@ -115,5 +115,22 @@
     "download": "Herunterladen",
     "downloadAgain": "Erneut herunterladen",
     "openReview": "Review öffnen"
+  },
+  "fieldErrors": {
+    "REQUIRED": "ist erforderlich",
+    "NOT_AN_INTEGER": "muss eine ganze Zahl sein",
+    "NOT_A_BOOLEAN": "muss 'true' oder 'false' sein",
+    "NOT_AN_OPTION": "muss einer dieser Werte sein: {{options}}",
+    "TOO_LONG": "darf höchstens {{max}} Zeichen lang sein",
+    "TOO_SHORT": "muss mindestens {{min}} Zeichen lang sein",
+    "LENGTH_OUT_OF_RANGE": "muss zwischen {{min}} und {{max}} Zeichen lang sein",
+    "TOO_SMALL": "muss mindestens {{min}} sein",
+    "TOO_LARGE": "darf höchstens {{max}} sein",
+    "INVALID_EMAIL": "muss eine gültige E-Mail-Adresse sein",
+    "INVALID_URL": "muss eine gültige http(s)-URL sein",
+    "INVALID_TIMEZONE": "muss eine gültige IANA-Zeitzone sein",
+    "INVALID_LANGUAGE": "muss ein zweistelliger Sprachcode nach ISO 639-1 sein",
+    "INVALID_FORMAT": "hat ein ungültiges Format",
+    "UNKNOWN_SETTING": "ist keine bekannte Einstellung"
   }
 }

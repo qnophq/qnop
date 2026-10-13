@@ -87,4 +87,26 @@ class SeededErrorEnvelopeIT extends SeededIntegrationTest {
         .andExpect(jsonPath("$.fieldErrors[0].field").isNotEmpty())
         .andExpect(jsonPath("$.fieldErrors[0].message").isNotEmpty());
   }
+
+  /**
+   * Built-in constraints carry a stable reason code and its params (issue #836), so the UI can word
+   * them in the user's language.
+   */
+  @Test
+  void validationFieldErrorsCarryReasonCodes() throws Exception {
+    mockMvc
+        .perform(
+            post(USERS)
+                .header("Authorization", "Bearer " + token(ADMIN_ID))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(
+                    "{\"displayName\":\"Ada\",\"username\":\"ab\","
+                        + "\"email\":\"not-an-email\",\"role\":\"MEMBER\"}"))
+        .andExpect(status().isBadRequest())
+        .andExpect(jsonPath("$.fieldErrors[?(@.field=='email')].code").value("INVALID_EMAIL"))
+        .andExpect(
+            jsonPath("$.fieldErrors[?(@.field=='username')].code").value("LENGTH_OUT_OF_RANGE"))
+        .andExpect(jsonPath("$.fieldErrors[?(@.field=='username')].params.min").value("3"))
+        .andExpect(jsonPath("$.fieldErrors[?(@.field=='username')].params.max").value("64"));
+  }
 }

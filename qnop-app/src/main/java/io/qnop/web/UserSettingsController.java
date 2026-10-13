@@ -22,6 +22,7 @@ package io.qnop.web;
 
 import io.qnop.api.v1.endpoint.UserSettingsApi;
 import io.qnop.api.v1.model.ErrorResponse;
+import io.qnop.api.v1.model.FieldError;
 import io.qnop.api.v1.model.SettingValueType;
 import io.qnop.api.v1.model.UserSettingItem;
 import io.qnop.api.v1.model.UserSettingsResponse;
@@ -83,6 +84,15 @@ public class UserSettingsController implements UserSettingsApi {
             new ErrorResponse()
                 .code("INVALID_SETTING")
                 .message(ex.getMessage())
+                // The field-level reason too (issue #836), so the UI can word it in the user's
+                // language and attach it to the setting.
+                .fieldErrors(
+                    List.of(
+                        new FieldError()
+                            .field(ex.getSettingKey())
+                            .message(ex.getReason())
+                            .code(ex.getCode().name())
+                            .params(ex.getParams().isEmpty() ? null : ex.getParams())))
                 .timestamp(OffsetDateTime.now()));
   }
 }
