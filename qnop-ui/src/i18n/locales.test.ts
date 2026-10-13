@@ -64,6 +64,7 @@ describe('resolveLocale', () => {
 describe('toSupportedLocale', () => {
   it('narrows region tags and casing to the primary language', () => {
     expect(toSupportedLocale('de-AT')).toBe('de');
+    expect(toSupportedLocale('es-MX')).toBe('es');
     expect(toSupportedLocale('EN_gb')).toBe('en');
     expect(toSupportedLocale('fr')).toBeUndefined();
     expect(toSupportedLocale('')).toBeUndefined();

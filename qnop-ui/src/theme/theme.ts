@@ -22,14 +22,19 @@
 import { createTheme, type Theme, type ThemeOptions } from '@mui/material/styles';
 import type { PaletteMode, Shadows } from '@mui/material';
 import { surfaces, tokens } from './tokens';
-import { deDE as coreDeDE, enUS as coreEnUS } from '@mui/material/locale';
-import { deDE as pickersDeDE, enUS as pickersEnUS } from '@mui/x-date-pickers/locales';
+import { deDE as coreDeDE, enUS as coreEnUS, esES as coreEsES } from '@mui/material/locale';
+import {
+  deDE as pickersDeDE,
+  enUS as pickersEnUS,
+  esES as pickersEsES,
+} from '@mui/x-date-pickers/locales';
 import { FALLBACK_LOCALE, type AppLocale } from '../i18n/locales';
 
 /** MUI's built-in translations per UI language: core components and the date pickers. */
 const MUI_LOCALES = {
   en: { core: coreEnUS, pickers: pickersEnUS },
   de: { core: coreDeDE, pickers: pickersDeDE },
+  es: { core: coreEsES, pickers: pickersEsES },
 } satisfies Record<AppLocale, { core: object; pickers: object }>;
 
 /**

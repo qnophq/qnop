@@ -22,8 +22,8 @@
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
-import deAdmin from '../../../i18n/de/admin.json';
 import enAdmin from '../../../i18n/en/admin.json';
+import { SUPPORTED_LOCALES } from '../../../i18n/locales';
 import { SELECT_OPTIONS } from './settingOptions';
 import { fieldLabel, settingCatalogId } from './settingText';
 
@@ -65,6 +65,17 @@ const registryDescriptions = new Map(
   ]),
 );
 
+/** Every language's admin catalog, so a newly supported language is checked too. */
+const adminCatalogs = import.meta.glob<{ settings: { fields: unknown } }>(
+  '../../../i18n/*/admin.json',
+  { eager: true, import: 'default' },
+);
+
+function adminFields(locale: string): Fields {
+  const catalog = adminCatalogs[`../../../i18n/${locale}/admin.json`];
+  return (catalog?.settings.fields ?? {}) as Fields;
+}
+
 type Fields = Record<string, { label?: string; description?: string }>;
 
 /**
@@ -78,16 +89,16 @@ describe('application setting catalog', () => {
     expect(registryKeys).toContain('smtp.port');
   });
 
-  it.each([
-    ['en', enAdmin.settings.fields as Fields],
-    ['de', deAdmin.settings.fields as Fields],
-  ])('%s has a label and description for every registry key', (_locale, fields) => {
-    const missing = registryKeys.filter((key) => {
-      const entry = fields[settingCatalogId(key)];
-      return !entry?.label?.trim() || !entry.description?.trim();
-    });
-    expect(missing).toEqual([]);
-  });
+  it.each(SUPPORTED_LOCALES.map((locale) => [locale, adminFields(locale)] as const))(
+    '%s has a label and description for every registry key',
+    (_locale, fields) => {
+      const missing = registryKeys.filter((key) => {
+        const entry = fields[settingCatalogId(key)];
+        return !entry?.label?.trim() || !entry.description?.trim();
+      });
+      expect(missing).toEqual([]);
+    },
+  );
 
   it('has no entries for keys the registry no longer declares', () => {
     const known = new Set(registryKeys.map(settingCatalogId));

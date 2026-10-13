@@ -1,0 +1,159 @@
+{
+  "language": {
+    "label": "Idioma",
+    "description": "El idioma en el que se muestra la interfaz de qnop.",
+    "switcherTooltip": "Cambiar idioma",
+    "followDefault": "Predeterminado del sistema ({{language}})",
+    "followingDefault": "Actualmente sigue el idioma predeterminado del espacio de trabajo.",
+    "updated": "Idioma actualizado.",
+    "saveFailed": "No se pudo guardar tu elección de idioma."
+  },
+  "time": {
+    "justNow": "justo ahora",
+    "compact": {
+      "now": "ahora",
+      "minutes": "{{count}} min",
+      "hours": "{{count}} h",
+      "days": "{{count}} d"
+    },
+    "due": {
+      "today": "vence hoy",
+      "inDays_one": "vence en {{count}} día",
+      "inDays_other": "vence en {{count}} días",
+      "inDays_many": "vence en {{count}} días",
+      "overdueBy_one": "con {{count}} día de retraso",
+      "overdueBy_other": "con {{count}} días de retraso",
+      "overdueBy_many": "con {{count}} días de retraso",
+      "on": "vence el {{date}}",
+      "wasDueOn": "venció el {{date}}"
+    }
+  },
+  "loading": "Cargando…",
+  "actions": {
+    "tryAgain": "Intentar de nuevo",
+    "retry": "Reintentar",
+    "backToDashboard": "Volver al panel",
+    "cancel": "Cancelar",
+    "save": "Guardar",
+    "delete": "Eliminar",
+    "close": "Cerrar",
+    "confirm": "Confirmar",
+    "edit": "Editar",
+    "remove": "Quitar",
+    "create": "Crear",
+    "add": "Añadir",
+    "copy": "Copiar",
+    "copied": "Copiado",
+    "reset": "Restablecer",
+    "done": "Listo",
+    "discard": "Descartar"
+  },
+  "boundary": {
+    "title": "Algo salió mal",
+    "message": "Esta parte de la página encontró un error inesperado. Puedes intentarlo de nuevo o recargar la página si vuelve a ocurrir."
+  },
+  "errors": {
+    "rateLimited": "Demasiados intentos. Vuelve a intentarlo más tarde.",
+    "invalidOrExpiredLink": "La solicitud no es válida o el enlace ha caducado.",
+    "notFound": {
+      "title": "Esta página se dobló en un avión de papel",
+      "message": "Dondequiera que haya aterrizado, no está en esta dirección. Vuelve al panel y retoma tu misión desde allí.",
+      "myReviews": "Mis revisiones"
+    },
+    "forbidden": {
+      "title": "Esta carpeta está bajo llave",
+      "message": "Tu cuenta no tiene acceso a esta área. Si tu misión pasa por aquí, un administrador puede darte la llave."
+    },
+    "featureUnavailable": {
+      "title": "No forma parte de esta instalación",
+      "message": "Esta instalación de qnop no ofrece esta función. No tiene nada que ver con tu cuenta — quien opera esta instalación lo decide y puede volver a activarla."
+    },
+    "conflict": {
+      "title": "Dos marcas cayeron en la misma línea",
+      "message": "Alguien cambió esto mientras ibas de camino. Recarga para ver el estado actual — no se perdió nada tuyo.",
+      "reload": "Recargar esta página"
+    },
+    "serverError": {
+      "title": "Nuestra trituradora agarró el documento equivocado",
+      "message": "Algo falló de nuestro lado — no es culpa tuya. Volver a intentarlo suele funcionar; si sigue pasando, tu administrador querrá saberlo."
+    },
+    "maintenance": {
+      "title": "Salimos a almorzar — volvemos enseguida",
+      "message": "qnop se está poniendo a punto. Tus revisiones están a salvo en el archivador; danos un momento y vuelve a intentarlo."
+    },
+    "rateLimit": {
+      "title": "Con calma, campeón del sello",
+      "message": "Fueron muchas solicitudes en muy poco tiempo. Respira — en un momento todo vuelve a funcionar."
+    },
+    "offline": {
+      "title": "Se rompió el hilo entre nuestros vasos de papel",
+      "message": "Parece que no tienes conexión. No se perdió nada — en cuanto vuelva la conexión, todo seguirá donde se quedó.",
+      "retry": "Reintentar conexión"
+    }
+  },
+  "search": {
+    "clear": "Borrar búsqueda",
+    "title": "Búsqueda",
+    "description": "Revisiones, personas y equipos de tu espacio de trabajo — limitados a lo que puedes ver.",
+    "placeholder": "Buscar revisiones, personas y equipos…",
+    "inputLabel": "Buscar revisiones, personas y equipos",
+    "tooShort_one": "Escribe al menos {{count}} carácter para buscar.",
+    "tooShort_other": "Escribe al menos {{count}} caracteres para buscar.",
+    "tooShort_many": "Escribe al menos {{count}} caracteres para buscar.",
+    "groups": {
+      "reviews": "Revisiones",
+      "annotations": "Anotaciones",
+      "comments": "Comentarios",
+      "users": "Personas",
+      "teams": "Equipos"
+    },
+    "resultsFor": "Resultados para «{{query}}»",
+    "resultsHint": "Cada resultado enlaza directamente a su página.",
+    "searching": "Buscando…",
+    "unavailable": "La búsqueda no está disponible en este momento.",
+    "noMatches": "No hay coincidencias en este grupo.",
+    "inDocument": "en {{title}}"
+  },
+  "timezone": {
+    "label": "Zona horaria",
+    "placeholder": "Busca una ciudad o región…"
+  },
+  "quota": {
+    "ceilingNote": "Este límite se fija donde se configura la instalación, no en la configuración de administración."
+  },
+  "banner": {
+    "dismiss": "Descartar este aviso"
+  },
+  "attachments": {
+    "title": "Adjunto de la revisión",
+    "saved": "Guardado",
+    "description": "Este archivo se adjuntó a una anotación. Descárgalo en tu dispositivo.",
+    "unavailable": "Este archivo no está disponible. Puede que se haya eliminado o que la revisión no se haya compartido contigo.",
+    "download": "Descargar",
+    "downloadAgain": "Descargar de nuevo",
+    "openReview": "Abrir la revisión"
+  },
+  "fieldErrors": {
+    "REQUIRED": "es obligatorio",
+    "NOT_AN_INTEGER": "debe ser un número entero",
+    "NOT_A_BOOLEAN": "debe ser 'true' o 'false'",
+    "NOT_AN_OPTION": "debe ser uno de estos valores: {{options}}",
+    "TOO_LONG": "debe tener como máximo {{max}} caracteres",
+    "TOO_SHORT": "debe tener al menos {{min}} caracteres",
+    "LENGTH_OUT_OF_RANGE": "debe tener entre {{min}} y {{max}} caracteres",
+    "TOO_SMALL": "debe ser al menos {{min}}",
+    "TOO_LARGE": "debe ser como máximo {{max}}",
+    "INVALID_EMAIL": "debe ser una dirección de correo electrónico válida",
+    "INVALID_URL": "debe ser una URL http(s) válida",
+    "INVALID_TIMEZONE": "debe ser un identificador de zona horaria IANA válido",
+    "INVALID_LANGUAGE": "debe ser un código de idioma ISO 639-1 de dos letras",
+    "INVALID_FORMAT": "tiene un formato no válido",
+    "UNKNOWN_SETTING": "no es una clave de configuración conocida"
+  },
+  "consent": {
+    "label": "Medición de uso",
+    "question": "¿Podemos contar qué páginas se usan? Sin perfiles ni nombres de documentos — las direcciones de las páginas se reducen a su forma antes de contarlas, y la medición nunca sale directamente de este servidor.",
+    "deny": "No, gracias",
+    "allow": "Permitir"
+  }
+}
