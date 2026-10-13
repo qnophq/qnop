@@ -32,7 +32,7 @@
       "cancelledAutoClosed_one": "Revisão cancelada — {{count}} anotação foi encerrada automaticamente",
       "cancelledAutoClosed_many": "Revisão cancelada — {{count}} anotações foram encerradas automaticamente",
       "cancelledAutoClosed_other": "Revisão cancelada — {{count}} anotações foram encerradas automaticamente",
-      "finalized": "Revisão finalizada — todas as objeções resolvidas",
+      "finalized": "Revisão finalizada — todos os pontos levantados resolvidos",
       "draft": "Rascunho — ainda não está em revisão",
       "progressOpen_one": "{{state}} — {{resolved}} de {{count}} anotação resolvida, pendentes: {{open}}",
       "progressOpen_many": "{{state}} — {{resolved}} de {{count}} anotações resolvidas, pendentes: {{open}}",
@@ -175,11 +175,11 @@
       "button": "Filtrar revisões",
       "menu": "Filtros de revisões",
       "due": "Prazo",
-      "state": "Estado do fluxo de trabalho",
+      "state": "Status do fluxo de trabalho",
       "format": "Formato",
       "owner": "Responsável",
       "anyone": "Qualquer pessoa",
-      "anyState": "Qualquer estado",
+      "anyState": "Qualquer status",
       "unknownOwner": "Desconhecido",
       "dueOptions": {
         "any": "Qualquer prazo",
@@ -213,7 +213,7 @@
       },
       "active": {
         "label": "Ativas",
-        "hint": "Todo o trabalho em andamento — todos os estados do fluxo de trabalho, exceto registros arquivados (padrão)"
+        "hint": "Todo o trabalho em andamento — todos os status do fluxo de trabalho, exceto registros arquivados (padrão)"
       },
       "open": {
         "label": "Abertas",
@@ -228,8 +228,8 @@
         "hint": "Somente os registros arquivados, fora das listas ativas"
       },
       "every": {
-        "label": "Todos os estados",
-        "hint": "Tudo de uma vez — todos os estados do fluxo de trabalho, incluindo registros arquivados"
+        "label": "Todos os status",
+        "hint": "Tudo de uma vez — todos os status do fluxo de trabalho, incluindo registros arquivados"
       }
     },
     "clearFilters": "Limpar filtros",
@@ -358,7 +358,7 @@
       "pdfOrWordMore": "PDF ou Word e mais"
     },
     "validation": {
-      "type": "Somente documentos {{formats}} são suportados.",
+      "type": "Só são aceitos documentos {{formats}}.",
       "size": "O arquivo excede o tamanho máximo de {{max}} MB."
     },
     "chooseDocument": "Escolher um documento",
@@ -462,7 +462,7 @@
     "sections": {
       "format": "Formato",
       "annotations": "Quais anotações",
-      "savedAs": "Salvar como",
+      "savedAs": "Salvo como",
       "dateTime": "Data e hora"
     },
     "unavailable": "Indisponível",
@@ -527,7 +527,7 @@
       "status": "Status",
       "type": "Tipo",
       "priority": "Prioridade",
-      "placement": "Estado da posição",
+      "placement": "Status da posição",
       "summary": "Resumo",
       "replies": "Respostas",
       "created": "Criada",

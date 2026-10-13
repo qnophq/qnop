@@ -44,7 +44,7 @@
       "title": "Integrantes",
       "private": "Esta equipe mantém sua lista de membros privada.",
       "empty": "Nenhum membro ainda.",
-      "lead": "Responsável pela equipe"
+      "lead": "Líder da equipe"
     },
     "reviews": {
       "title": "Missões de revisão",
@@ -80,9 +80,9 @@
       }
     },
     "ranks": {
-      "programLead": "Responsável pelo programa",
-      "multiTeamLead": "Responsável por várias equipes",
-      "teamLead": "Responsável pela equipe",
+      "programLead": "Líder de programa",
+      "multiTeamLead": "Líder de várias equipes",
+      "teamLead": "Líder da equipe",
       "member": "Membro"
     },
     "tiers": {
@@ -134,7 +134,7 @@
         "share": "Divida o trabalho",
         "rise": "Suba de nível"
       },
-      "hint": "Um responsável pela equipe ou um administrador pode adicionar você — suas equipes aparecem aqui assim que isso acontecer.",
+      "hint": "Um líder da equipe ou um administrador pode adicionar você — suas equipes aparecem aqui assim que isso acontecer.",
       "illustration": "Um lugar vago esperando em uma equipe"
     }
   },
@@ -153,7 +153,7 @@
     "emptyView": "Esta equipe não tem membros.",
     "actionsFor": "Ações para {{name}}",
     "makeMember": "Tornar membro",
-    "makeLead": "Tornar responsável",
+    "makeLead": "Tornar líder",
     "removeFromTeam": "Remover da equipe",
     "remove": {
       "title": "Remover membro",
@@ -189,10 +189,10 @@
     "users": "Usuários",
     "searchPlaceholder": "Pesquisar por nome",
     "role": "Função na equipe",
-    "roleHelper": "Aplicada a todas as pessoas adicionadas nesta etapa.",
+    "roleHelper": "Aplicada a todas as pessoas adicionadas neste lote.",
     "roles": {
       "MEMBER": "Membro",
-      "LEAD": "Responsável pela equipe"
+      "LEAD": "Líder da equipe"
     },
     "cancel": "Cancelar",
     "submit": "Adicionar",

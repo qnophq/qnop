@@ -153,7 +153,7 @@
   "consent": {
     "label": "Medição de uso",
     "question": "Podemos contar quais páginas são usadas? Sem perfis, sem nomes de documentos — os endereços das páginas são reduzidos à sua estrutura antes da contagem, e a medição nunca sai diretamente deste servidor.",
-    "deny": "Não, obrigado",
+    "deny": "Recusar",
     "allow": "Permitir"
   }
 }

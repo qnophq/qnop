@@ -77,7 +77,7 @@
     "aReview": "uma revisão",
     "title": {
       "mention": "{{actor}} mencionou você",
-      "participantAdded": "Nova participação em uma revisão",
+      "participantAdded": "Adicionaram você a uma revisão",
       "annotationCreated": "{{actor}} criou uma anotação",
       "annotationDecided": {
         "resolved": "Uma anotação foi resolvida",

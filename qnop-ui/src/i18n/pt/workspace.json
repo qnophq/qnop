@@ -51,7 +51,7 @@
     "placementActions": {
       "confirm": "Está correto",
       "confirmHint": "Aceitar o destaque realocado",
-      "reattach": "Reposicionar",
+      "reattach": "Reassociar",
       "reattachHint": "Escolha o trecho correto manualmente",
       "reposition": "Reposicionar",
       "repositionHint": "Mover esta anotação para outro trecho"
@@ -77,8 +77,8 @@
   "placement": {
     "confirmed": "Posição confirmada.",
     "confirmFailed": "Não foi possível confirmar a posição.",
-    "reattached": "Anotação reposicionada.",
-    "reattachFailed": "Não foi possível reposicionar a anotação."
+    "reattached": "Anotação reassociada.",
+    "reattachFailed": "Não foi possível reassociar a anotação."
   },
   "panel": {
     "title": "Anotações ({{count}})",
@@ -142,7 +142,7 @@
   },
   "dismiss": {
     "open": "Descartar…",
-    "placeholder": "Por que esta objeção está sendo descartada? (obrigatório)",
+    "placeholder": "Por que este ponto está sendo descartado? (obrigatório)",
     "label": "Justificativa do descarte (obrigatória)",
     "action": "Descartar",
     "note": "A justificativa é publicada na discussão; o autor pode reabri-la.",
@@ -223,7 +223,7 @@
       "codeBlock": "Bloco de código"
     },
     "hint": {
-      "label": "Suporte a Markdown",
+      "label": "Aceita Markdown",
       "syntax": "Markdown: **negrito**, _itálico_, `código`, listas, > citação, [link](url)"
     },
     "emoji": {
@@ -285,9 +285,9 @@
     "regionKeyboardHint": "O primeiro toque em uma tecla de seta coloca um retângulo de seleção no meio da página. Depois, as setas o movem, Shift com uma seta o move em passos maiores, Alt com uma seta o aumenta ou diminui, Enter anota a região e Escape a limpa.",
     "hoverNoComments": "Nenhum comentário ainda.",
     "hoverOpen": "Clique para abrir a discussão",
-    "placingQuote": "Reposicionando <quote/> — selecione o novo trecho",
-    "placing": "Reposicionando a anotação — selecione a nova posição",
-    "cancelReattach": "Cancelar o reposicionamento"
+    "placingQuote": "Posicionando <quote/> — selecione o novo trecho",
+    "placing": "Posicionando a anotação — selecione a nova posição",
+    "cancelReattach": "Cancelar a reassociação"
   },
   "focus": {
     "position": "Anotação {{index}} de {{count}}",

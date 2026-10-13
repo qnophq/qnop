@@ -6,7 +6,7 @@
       "AUDITOR": "Auditor"
     },
     "team": {
-      "LEAD": "Responsável pela equipe",
+      "LEAD": "Líder da equipe",
       "MEMBER": "Membro"
     }
   },
@@ -345,7 +345,7 @@
       },
       "notifications": {
         "label": "Notificações",
-        "description": "E-mails de revisão e por quanto tempo a caixa de entrada do app mantém seus registros."
+        "description": "E-mails de revisão e por quanto tempo a caixa de entrada do aplicativo mantém seus registros."
       },
       "banner": {
         "label": "Banners informativos",
@@ -424,7 +424,7 @@
         "description": "Tamanho máximo de um anexo de comentário, em megabytes."
       },
       "tracking__enabled": {
-        "label": "Ativada",
+        "label": "Medição de uso ativada",
         "description": "Se a medição de uso anônima está ativada. A medição passa por este servidor, nunca o contorna: o navegador carrega o script de análise a partir do qnop e envia os eventos ao qnop, que os repassa. Os visitantes nunca se comunicam diretamente com o backend de análise."
       },
       "tracking__provider": {
@@ -449,14 +449,14 @@
       },
       "tracking__track_privileged_roles": {
         "label": "Medir funções privilegiadas",
-        "description": "Medir também administradores e auditores. Desativado por padrão: um punhado de pessoas com privilégios mal chega a ser uma estatística e certamente são dados pessoais."
+        "description": "Medir também administradores e auditores. Desativado por padrão: um punhado de pessoas com privilégios mal chega a ser uma estatística, mas são, sem dúvida, dados pessoais."
       },
       "tracking__forward_client_ip": {
         "label": "Repassar o IP do cliente",
         "description": "Quanto do endereço IP de um visitante é repassado ao seu backend de análise. Anonimizado encurta o endereço, de modo que os visitantes podem ser contados sem ser identificados. Não repassar faz o backend contar todos como um único visitante. Completo envia o endereço exato, que é um dado pessoal — você precisa de uma base legal própria para isso."
       },
       "smtp__enabled": {
-        "label": "Ativado",
+        "label": "Envio de e-mail ativado",
         "description": "Chave geral do e-mail de saída; quando desligada, o envio de mensagens é ignorado."
       },
       "smtp__host": {
@@ -509,10 +509,10 @@
       },
       "notifications__retain_days": {
         "label": "Retenção (dias)",
-        "description": "Dias que uma notificação do app é mantida antes de a tarefa “Notification sweep” excluí-la, lida ou não (0 desativa a limpeza). Só o registro do aviso é removido — a revisão, a anotação ou o comentário a que ele se refere permanece intacto."
+        "description": "Dias que uma notificação do aplicativo é mantida antes de a tarefa “Notification sweep” excluí-la, lida ou não (0 desativa a limpeza). Só o registro do aviso é removido — a revisão, a anotação ou o comentário a que ele se refere permanece intacto."
       },
       "review__free_reattach_enabled": {
-        "label": "Reposicionamento livre",
+        "label": "Reposicionamento livre ativado",
         "description": "Permite que os autores reposicionem as próprias anotações mesmo quando a posição está correta (administradores sempre podem)."
       },
       "review__finalize_with_open_annotations": {
@@ -548,24 +548,24 @@
         "description": "Para onde o link do banner de login aponta (http/https)."
       },
       "banner__app_enabled": {
-        "label": "Banner do app ativado",
+        "label": "Banner do aplicativo ativado",
         "description": "Mostra um banner para usuários conectados — janelas de manutenção, uma integração com problemas, uma falha geral. Visível apenas após o login, e cada usuário pode ocultá-lo até o texto mudar."
       },
       "banner__app_severity": {
-        "label": "Tipo do banner do app",
-        "description": "Tom do banner do app."
+        "label": "Tipo do banner do aplicativo",
+        "description": "Tom do banner do aplicativo."
       },
       "banner__app_text": {
-        "label": "Texto do banner do app",
-        "description": "Texto do banner do app, por exemplo, “Manutenção no sábado, das 20:00 às 22:00 UTC; os envios estão pausados.” Se ficar vazio, o banner fica oculto mesmo quando ativado."
+        "label": "Texto do banner do aplicativo",
+        "description": "Texto do banner do aplicativo, por exemplo, “Manutenção no sábado, das 20:00 às 22:00 UTC; os envios estão pausados.” Se ficar vazio, o banner fica oculto mesmo quando ativado."
       },
       "banner__app_link_label": {
-        "label": "Texto do link do banner do app",
-        "description": "Link opcional exibido após o texto do banner do app; vazio significa sem link."
+        "label": "Texto do link do banner do aplicativo",
+        "description": "Link opcional exibido após o texto do banner do aplicativo; vazio significa sem link."
       },
       "banner__app_link_url": {
-        "label": "URL do link do banner do app",
-        "description": "Para onde o link do banner do app aponta (http/https)."
+        "label": "URL do link do banner do aplicativo",
+        "description": "Para onde o link do banner do aplicativo aponta (http/https)."
       }
     }
   },
@@ -663,7 +663,7 @@
       "empty": "Ainda não há membros. Adicione o primeiro.",
       "actionsFor": "Ações para {{name}}",
       "makeMember": "Tornar membro",
-      "makeLead": "Tornar responsável",
+      "makeLead": "Tornar líder",
       "removeFromTeam": "Remover da equipe",
       "remove": {
         "title": "Remover membro",
@@ -676,9 +676,9 @@
       "avatarFallbackName": "Equipe",
       "name": "Nome",
       "description": "Descrição",
-      "lead": "Responsável pela equipe",
+      "lead": "Líder da equipe",
       "leadPlaceholder": "Pesquisar por nome",
-      "leadHelper": "Adicionado como responsável pela equipe — toda equipe começa com um.",
+      "leadHelper": "Adicionado como líder da equipe — toda equipe começa com um.",
       "noOptions": "Nenhum usuário correspondente",
       "active": "Equipe ativa",
       "disabled": "Equipe desativada",
@@ -688,7 +688,7 @@
       "showReviewsAria": "Mostrar a participação em revisões no perfil público",
       "errors": {
         "nameRequired": "O nome da equipe é obrigatório.",
-        "leadRequired": "Toda equipe precisa de um responsável — escolha um.",
+        "leadRequired": "Toda equipe precisa de um líder — escolha um.",
         "nameTaken": "Já existe uma equipe com esse nome.",
         "saveFailed": "Não foi possível salvar. Tente novamente."
       }
@@ -702,7 +702,7 @@
       "users": "Usuários",
       "searchPlaceholder": "Pesquisar por nome ou e-mail",
       "role": "Função na equipe",
-      "roleHelper": "Aplicada a todas as pessoas adicionadas nesta etapa.",
+      "roleHelper": "Aplicada a todas as pessoas adicionadas neste lote.",
       "submitCount": "Adicionar ({{number}})",
       "failed": "Não foi possível adicionar: {{names}}."
     }
@@ -901,11 +901,11 @@
           "console": "Abrir o Google Cloud Console"
         },
         "GITHUB": {
-          "whereToFind": "GitHub → Settings → Developer settings → OAuth Apps → seu app",
+          "whereToFind": "GitHub → Settings → Developer settings → OAuth Apps → seu aplicativo",
           "console": "Abrir as configurações de desenvolvedor do GitHub"
         },
         "FACEBOOK": {
-          "whereToFind": "Meta for Developers → seu app → Facebook Login → Settings",
+          "whereToFind": "Meta for Developers → seu aplicativo → Facebook Login → Settings",
           "console": "Abrir o Meta for Developers"
         },
         "OIDC": {
@@ -920,7 +920,7 @@
   "branding": {
     "page": {
       "title": "Identidade visual",
-      "description": "Substitua os logotipos padrão exibidos em todo o app — arraste uma imagem para cá ou procure um arquivo. Imagens rasterizadas abrem um recortador para definir o enquadramento exato; SVGs são enviados como estão. PNG, WebP ou SVG, até 512 KiB; cada espaço usa o padrão do qnop até você enviar o seu."
+      "description": "Substitua os logotipos padrão exibidos em todo o aplicativo — arraste uma imagem para cá ou procure um arquivo. Imagens rasterizadas abrem um recortador para definir o enquadramento exato; SVGs são enviados como estão. PNG, WebP ou SVG, até 512 KiB; cada espaço usa o padrão do qnop até você enviar o seu."
     },
     "slots": {
       "logoLight": {
@@ -961,13 +961,13 @@
       "load": "Não foi possível carregar a configuração da identidade visual.",
       "upload": "Falha no envio.",
       "remove": "Não foi possível remover o arquivo.",
-      "unsupportedType": "Tipo de arquivo não suportado. Use PNG, WebP ou SVG.",
+      "unsupportedType": "Tipo de arquivo não aceito. Use PNG, WebP ou SVG.",
       "tooLarge": "O arquivo é grande demais (máx. 512 KiB).",
       "croppedTooLarge": "A imagem recortada é grande demais (máx. 512 KiB). Tente um recorte mais justo."
     },
     "remove": {
       "title": "Remover logotipo",
-      "message": "Remover o {{name}} personalizado? O app volta a usar o {{name}} padrão."
+      "message": "Remover o {{name}} personalizado? O aplicativo volta a usar o {{name}} padrão."
     },
     "crop": {
       "title": "Recortar {{name}}",

@@ -14,7 +14,7 @@
     "searchPlaceholder": "ex.: uma chave de armazenamento ou um status do fluxo de trabalho",
     "from": "De",
     "to": "Até",
-    "actorChip": "Autor: {{name}}",
+    "actorChip": "Executado por: {{name}}",
     "documentChip": "Documento: {{title}}"
   },
   "pagination": {
@@ -24,7 +24,7 @@
   "table": {
     "columns": {
       "time": "Hora",
-      "actor": "Autor",
+      "actor": "Executado por",
       "event": "Evento",
       "document": "Documento",
       "details": "Detalhes"
@@ -39,12 +39,12 @@
   },
   "system": {
     "name": "Sistema",
-    "tooltip": "Ação automática do sistema — sem autor humano"
+    "tooltip": "Ação automática do sistema — sem pessoa envolvida"
   },
   "events": {
     "annotationCreated": {
       "label": "Anotação aberta",
-      "description": "Um revisor criou uma nova anotação no documento — um comentário ou uma objeção."
+      "description": "Um revisor criou uma nova anotação no documento — um comentário ou um ponto levantado."
     },
     "annotationResolved": {
       "label": "Anotação resolvida",
@@ -67,8 +67,8 @@
       "description": "A posição de uma anotação na página foi confirmada em uma versão do documento."
     },
     "placementReattached": {
-      "label": "Anotação reancorada",
-      "description": "Uma anotação foi reancorada em outro lugar — por exemplo, depois que uma nova versão deslocou o texto."
+      "label": "Anotação reassociada",
+      "description": "Uma anotação foi reassociada a outro trecho — por exemplo, depois que uma nova versão deslocou o texto."
     },
     "annotationAutoClosed": {
       "label": "Anotação encerrada automaticamente",
