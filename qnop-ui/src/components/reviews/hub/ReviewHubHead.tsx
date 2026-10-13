@@ -31,6 +31,7 @@ import Tooltip from '@mui/material/Tooltip';
 import Typography from '@mui/material/Typography';
 import { useTheme } from '@mui/material/styles';
 import { Archive, CalendarClock, ChevronDown, Trash2, Upload, UserPlus } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import type { AnnotationView } from '../../../api/generated';
 import { AnnotationStatus, ParticipantKind } from '../../../api/generated';
 import { useConfig } from '../../../api/hooks/useConfig';
@@ -49,7 +50,9 @@ import { avatarSrc, teamAvatarSrc } from '../../../utils/avatarUrl';
 import { TeamAvatar } from '../../shell/TeamAvatar';
 import { DueDateLabel } from '../DueDateLabel';
 import { ProgressBar } from '../list/ReviewListParts';
-import { isOpenWorkflowState, workflowLabel } from '../workflowMeta';
+import { isOpenWorkflowState } from '../workflowMeta';
+import { useWorkflowLabel } from '../useWorkflowLabel';
+import type { ReviewsKey } from '../reviewsI18n';
 import { acceptedUploads } from '../wizard/wizardModel';
 import { apiErrorCode, apiErrorMessage } from '../../../utils/apiError';
 import { DueDateDialog } from './DueDateDialog';
@@ -60,10 +63,9 @@ import { ParticipantsDialog } from './ParticipantsDialog';
 const FALLBACK_MAX_SIZE_MB = 50;
 const MAX_STACK_AVATARS = 3;
 
-/** Known 409 guard vetoes from the workflow choke-point (ADR-0011). */
-const TRANSITION_CONFLICTS: Record<string, string> = {
-  INVALID_TRANSITION:
-    'This status change is not possible right now — open annotations or pending placements may remain.',
+/** Known 409 guard vetoes from the workflow choke-point (ADR-0011), as catalog keys. */
+const TRANSITION_CONFLICTS: Record<string, ReviewsKey> = {
+  INVALID_TRANSITION: 'hub.workflow.conflicts.INVALID_TRANSITION',
 };
 
 interface ReviewHubHeadProps {
@@ -118,6 +120,8 @@ export function ReviewHubHead({
   onDeleted,
 }: ReviewHubHeadProps) {
   const theme = useTheme();
+  const { t } = useTranslation(['reviews', 'common']);
+  const workflowLabel = useWorkflowLabel();
   const [participantsOpen, setParticipantsOpen] = useState(false);
   const [newVersionOpen, setNewVersionOpen] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
@@ -142,7 +146,7 @@ export function ReviewHubHead({
   // document itself (structurally public, #472) — never resolved via the
   // size-capped principal directory, which drops users in big workspaces.
   const ownerName =
-    ownerId === ownUserId ? (ownDisplayName ?? 'You') : (ownerDisplayName ?? 'Owner');
+    ownerId === ownUserId ? (ownDisplayName ?? t('you')) : (ownerDisplayName ?? t('roles.owner'));
   // Actor-scoped capability + guard-evaluated options (issue #568): reviewers
   // never see the affordance; blocked targets explain themselves.
   const mayTransition = workflowQuery.data?.mayTransition ?? false;
@@ -162,8 +166,7 @@ export function ReviewHubHead({
       target === 'CANCELLED' ||
       (target === 'FINALIZED' && (config?.review?.finalizeWithOpenAnnotations ?? false));
     if (!applies) return '';
-    const noun = openCount === 1 ? 'open annotation' : 'open annotations';
-    return ` ${openCount} ${noun} will be closed automatically with a standard comment.`;
+    return ` ${t('hub.workflow.autoClose', { count: openCount })}`;
   };
   const inDiscussion = annotations.filter(
     (a) => a.status === AnnotationStatus.Open && a.commentCount > 1,
@@ -172,13 +175,14 @@ export function ReviewHubHead({
   const handleTransitionConfirmed = (targetState: string) => {
     setConfirmTarget(null);
     transition.mutate(targetState, {
-      onSuccess: () => notify(`Review moved to ${workflowLabel(targetState)}.`),
-      onError: (error) =>
+      onSuccess: () => notify(t('hub.workflow.moved', { state: workflowLabel(targetState) })),
+      onError: (error) => {
+        const conflictKey = TRANSITION_CONFLICTS[apiErrorCode(error) ?? ''];
         notify(
-          TRANSITION_CONFLICTS[apiErrorCode(error) ?? ''] ??
-            apiErrorMessage(error, 'The status could not be changed.'),
+          conflictKey ? t(conflictKey) : apiErrorMessage(error, t('hub.workflow.failed')),
           'error',
-        ),
+        );
+      },
     });
   };
 
@@ -215,7 +219,7 @@ export function ReviewHubHead({
                 lineHeight: 1.1,
               }}
             >
-              Owner
+              {t('roles.owner')}
             </Typography>
             <Typography variant="body2" noWrap sx={{ fontWeight: 600, lineHeight: 1.2 }}>
               {ownerName}
@@ -226,13 +230,14 @@ export function ReviewHubHead({
       <Divider orientation="vertical" flexItem sx={{ my: 0.5 }} />
       {total > 0 && (
         <Tooltip
-          title={`Review progress: ${resolved} of ${total} annotation${total === 1 ? '' : 's'} resolved${
+          title={t(
             inDiscussion > 0
-              ? ` · ${inDiscussion} open in discussion`
-              : total - resolved > 0
-                ? ` · ${total - resolved} still open`
-                : ' — ready to finalize'
-          }`}
+              ? 'hub.progress.inDiscussion'
+              : openCount > 0
+                ? 'hub.progress.stillOpen'
+                : 'hub.progress.ready',
+            { resolved, count: total, discussion: inDiscussion, open: openCount },
+          )}
         >
           <Box sx={{ display: 'flex' }}>
             <ProgressBar
@@ -246,11 +251,11 @@ export function ReviewHubHead({
       )}
 
       {isOwner ? (
-        <Tooltip title="Set review due date">
+        <Tooltip title={t('hub.dueDate.set')}>
           <ButtonBase
             onClick={() => setDueDateOpen(true)}
             data-testid="due-date-button"
-            aria-label="Set review due date"
+            aria-label={t('hub.dueDate.set')}
             sx={{
               display: 'flex',
               alignItems: 'center',
@@ -272,7 +277,7 @@ export function ReviewHubHead({
                   style={{ color: theme.palette.text.secondary }}
                 />
                 <Typography variant="caption" color="text.secondary">
-                  Set due date
+                  {t('hub.dueDate.placeholder')}
                 </Typography>
               </>
             )}
@@ -282,11 +287,11 @@ export function ReviewHubHead({
         dueAt && <DueDateLabel dueAt={dueAt} workflowState={workflowState} />
       )}
 
-      <Tooltip title={isOwner ? 'Manage participants' : 'View participants'}>
+      <Tooltip title={isOwner ? t('hub.participants.manage') : t('hub.participants.view')}>
         <ButtonBase
           onClick={() => setParticipantsOpen(true)}
           data-testid="participants-button"
-          aria-label={isOwner ? 'Manage participants' : 'View participants'}
+          aria-label={isOwner ? t('hub.participants.manage') : t('hub.participants.view')}
           sx={{
             display: 'flex',
             alignItems: 'center',
@@ -334,8 +339,8 @@ export function ReviewHubHead({
           <Typography variant="caption" color="text.secondary">
             {participants.length === 0
               ? isOwner
-                ? 'Add reviewers'
-                : 'No reviewers'
+                ? t('hub.participants.add')
+                : t('hub.participants.none')
               : participants.length}
           </Typography>
         </ButtonBase>
@@ -351,7 +356,7 @@ export function ReviewHubHead({
             disabled={transition.isPending}
             onClick={(e) => setWorkflowMenuAnchor(e.currentTarget)}
           >
-            Change status
+            {t('hub.workflow.change')}
           </Button>
           <Menu
             open={Boolean(workflowMenuAnchor)}
@@ -374,7 +379,7 @@ export function ReviewHubHead({
                       setConfirmTarget(option.targetState);
                     }}
                   >
-                    Move to {workflowLabel(option.targetState)}
+                    {t('hub.workflow.moveTo', { state: workflowLabel(option.targetState) })}
                   </MenuItem>
                 </span>
               </Tooltip>
@@ -393,16 +398,16 @@ export function ReviewHubHead({
           onClick={() =>
             archivedAt
               ? unarchive.mutate(undefined, {
-                  onSuccess: () => notify('Review restored to the active lists.'),
-                  onError: () => notify('The review could not be unarchived.', 'error'),
+                  onSuccess: () => notify(t('hub.archive.restored')),
+                  onError: () => notify(t('hub.archive.unarchiveFailed'), 'error'),
                 })
               : archive.mutate(undefined, {
-                  onSuccess: () => notify('Review archived.'),
-                  onError: () => notify('The review could not be archived.', 'error'),
+                  onSuccess: () => notify(t('hub.archive.archived')),
+                  onError: () => notify(t('hub.archive.archiveFailed'), 'error'),
                 })
           }
         >
-          {archivedAt ? 'Unarchive' : 'Archive'}
+          {archivedAt ? t('hub.archive.unarchive') : t('hub.archive.archive')}
         </Button>
       )}
 
@@ -416,7 +421,7 @@ export function ReviewHubHead({
           startIcon={<Trash2 size={14} />}
           onClick={() => setDeleteOpen(true)}
         >
-          Delete
+          {t('common:actions.delete')}
         </Button>
       )}
 
@@ -428,7 +433,7 @@ export function ReviewHubHead({
             startIcon={<Upload size={14} />}
             onClick={() => setNewVersionOpen(true)}
           >
-            New version
+            {t('hub.newVersion')}
           </Button>
         </>
       )}
@@ -474,13 +479,14 @@ export function ReviewHubHead({
 
       <ConfirmDialog
         open={confirmTarget !== null}
-        title="Change review status"
+        title={t('hub.workflow.confirmTitle')}
         message={
           confirmTarget
-            ? `Move this review to "${workflowLabel(confirmTarget)}"? Reviewers will see the new status immediately.${autoCloseNote(confirmTarget)}`
+            ? t('hub.workflow.confirmMessage', { state: workflowLabel(confirmTarget) }) +
+              autoCloseNote(confirmTarget)
             : ''
         }
-        confirmLabel="Change status"
+        confirmLabel={t('hub.workflow.change')}
         destructive={confirmTarget === 'CANCELLED'}
         onConfirm={() => confirmTarget && handleTransitionConfirmed(confirmTarget)}
         onClose={() => setConfirmTarget(null)}

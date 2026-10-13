@@ -70,6 +70,17 @@ export default defineConfig([
       'src/pages/search/**/*.tsx',
       'src/components/admin/**/*.tsx',
       'src/pages/admin/**/*.tsx',
+      // Review management (issue #836). Only the files directly in components/reviews: the
+      // review workspace subfolders (viewer, panel, focus, …) join in their own slice.
+      'src/components/reviews/*.tsx',
+      'src/components/reviews/list/**/*.tsx',
+      'src/components/reviews/wizard/**/*.tsx',
+      'src/components/reviews/upload/**/*.tsx',
+      'src/components/reviews/hub/**/*.tsx',
+      'src/components/reviews/export/**/*.tsx',
+      'src/pages/reviews/ReviewsPage.tsx',
+      'src/pages/reviews/NewReviewPage.tsx',
+      'src/pages/reviews/ReviewsEmptyState.tsx',
     ],
     ignores: ['**/*.test.tsx'],
     rules: {

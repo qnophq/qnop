@@ -22,6 +22,7 @@
 import type { ReactNode } from 'react';
 import CircularProgress from '@mui/material/CircularProgress';
 import Stack from '@mui/material/Stack';
+import { useTranslation } from 'react-i18next';
 import { useParams } from 'react-router';
 import { useDocumentBySlug } from '../../api/hooks/useDocuments';
 import { ErrorState } from '../../pages/errors/ErrorState';
@@ -37,6 +38,7 @@ const UUID_SHAPE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12
  * canonical id while the pretty URL stays in the address bar.
  */
 export function ReviewParamGate({ children }: { children: ReactNode }) {
+  const { t } = useTranslation(['reviews', 'common']);
   const { documentId: segment = '' } = useParams();
   const isId = UUID_SHAPE.test(segment);
   const bySlug = useDocumentBySlug(segment, !isId && segment !== '');
@@ -46,7 +48,7 @@ export function ReviewParamGate({ children }: { children: ReactNode }) {
   if (bySlug.isPending) {
     return (
       <Stack sx={{ alignItems: 'center', py: 10 }}>
-        <CircularProgress size={28} aria-label="Resolving review" />
+        <CircularProgress size={28} aria-label={t('paramGate.resolving')} />
       </Stack>
     );
   }
@@ -59,11 +61,11 @@ export function ReviewParamGate({ children }: { children: ReactNode }) {
     return (
       <ErrorState
         code="404"
-        title="This review folded itself into a paper plane"
-        message={`No review answers to “${segment}” — the link may be outdated, or the review moved on. Your other quests are waiting.`}
+        title={t('paramGate.title')}
+        message={t('paramGate.message', { segment })}
         illustration={<NotFoundIllustration />}
-        primaryAction={{ label: 'Back to reviews', to: '/reviews' }}
-        secondaryAction={{ label: 'Back to dashboard', to: '/' }}
+        primaryAction={{ label: t('actions.backToReviews'), to: '/reviews' }}
+        secondaryAction={{ label: t('common:actions.backToDashboard'), to: '/' }}
       />
     );
   }

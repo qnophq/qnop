@@ -23,6 +23,7 @@ import { useRef, useState } from 'react';
 import type { KeyboardEvent, PointerEvent } from 'react';
 import Box from '@mui/material/Box';
 import { useTheme } from '@mui/material/styles';
+import { useTranslation } from 'react-i18next';
 
 /** Document : panel = 2 : 1 by default (issue #403). */
 export const DEFAULT_PANEL_FRACTION = 1 / 3;
@@ -53,6 +54,7 @@ function clamp(fraction: number): number {
  */
 export function PanelResizer({ fraction, onFractionChange }: PanelResizerProps) {
   const theme = useTheme();
+  const { t } = useTranslation('reviews');
   // Drag state lives in a ref so pointermove handlers never read a stale
   // closure (moves can arrive before React re-renders); the state mirror only
   // drives the visual dragging style.
@@ -106,11 +108,11 @@ export function PanelResizer({ fraction, onFractionChange }: PanelResizerProps) 
     <Box
       role="separator"
       aria-orientation="vertical"
-      aria-label="Resize annotations panel"
+      aria-label={t('resizer.label')}
       aria-valuemin={Math.round(PANEL_MIN_FRACTION * 100)}
       aria-valuemax={Math.round(PANEL_MAX_FRACTION * 100)}
       aria-valuenow={Math.round(fraction * 100)}
-      aria-valuetext={`${Math.round(fraction * 100)}% of the workspace`}
+      aria-valuetext={t('resizer.valueText', { percent: Math.round(fraction * 100) })}
       tabIndex={0}
       data-dragging={dragging}
       onPointerDown={handlePointerDown}

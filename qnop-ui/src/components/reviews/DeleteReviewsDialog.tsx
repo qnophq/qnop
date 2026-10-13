@@ -35,14 +35,25 @@ import Stack from '@mui/material/Stack';
 import TextField from '@mui/material/TextField';
 import Typography from '@mui/material/Typography';
 import { Trash2 } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import { documentsApi } from '../../api/config';
 import { useQueryClient } from '@tanstack/react-query';
 import { documentKeys } from '../../api/hooks/useDocuments';
 import { reviewKeys } from '../../api/hooks/useReviews';
 import { apiErrorMessage } from '../../utils/apiError';
 
-/** What the caller must type to arm the button. */
+/**
+ * What the caller must type to arm the button, in English. The dialog asks for the word in the
+ * active language (`delete.bulk.phrase`), so a German reader types „löschen“.
+ */
 export const BULK_DELETE_PHRASE = 'delete';
+
+/** A review that refused to go, with the cause — worded at render, in the active language. */
+interface DeleteFailure {
+  id: string;
+  title: string;
+  cause: unknown;
+}
 
 export interface DeletableReview {
   id: string;
@@ -75,11 +86,12 @@ export function DeleteReviewsDialog({
   onClose,
   onDeleted,
 }: DeleteReviewsDialogProps) {
+  const { t } = useTranslation(['reviews', 'common']);
   const queryClient = useQueryClient();
   const [typed, setTyped] = useState('');
   const [busy, setBusy] = useState(false);
   const [done, setDone] = useState(0);
-  const [failures, setFailures] = useState<string[]>([]);
+  const [failures, setFailures] = useState<DeleteFailure[]>([]);
   const [wasOpen, setWasOpen] = useState(open);
 
   if (open !== wasOpen) {
@@ -92,19 +104,20 @@ export function DeleteReviewsDialog({
     }
   }
 
-  const confirmed = typed.trim().toLowerCase() === BULK_DELETE_PHRASE;
+  const phrase = t('delete.bulk.phrase');
+  const confirmed = typed.trim().toLowerCase() === phrase.toLowerCase();
 
   const handleDelete = async () => {
     setBusy(true);
     setFailures([]);
     const deleted: string[] = [];
-    const failed: string[] = [];
+    const failed: DeleteFailure[] = [];
     for (const review of reviews) {
       try {
         await documentsApi.deleteDocument({ documentId: review.id });
         deleted.push(review.id);
       } catch (error) {
-        failed.push(`${review.title}: ${apiErrorMessage(error, 'could not be deleted')}`);
+        failed.push({ id: review.id, title: review.title, cause: error });
       }
       setDone((count) => count + 1);
     }
@@ -126,15 +139,11 @@ export function DeleteReviewsDialog({
 
   return (
     <Dialog open={open} onClose={busy ? undefined : onClose} fullWidth maxWidth="sm">
-      <DialogTitle>
-        Delete {reviews.length} review{reviews.length === 1 ? '' : 's'}?
-      </DialogTitle>
+      <DialogTitle>{t('delete.bulk.title', { count: reviews.length })}</DialogTitle>
       <DialogContent>
         <Stack spacing={2}>
           <Typography variant="body2" color="text.secondary">
-            These will be removed permanently, for everyone — every version, annotation and
-            discussion in them. This cannot be undone. To keep the record instead, close this and
-            archive them.
+            {t('delete.bulk.body')}
           </Typography>
 
           <Paper variant="outlined" sx={{ maxHeight: 220, overflowY: 'auto' }}>
@@ -151,7 +160,7 @@ export function DeleteReviewsDialog({
           </Paper>
 
           <TextField
-            label={`Type "${BULK_DELETE_PHRASE}" to confirm`}
+            label={t('delete.bulk.confirmLabel', { phrase })}
             value={typed}
             onChange={(event) => setTyped(event.target.value)}
             disabled={busy}
@@ -168,7 +177,7 @@ export function DeleteReviewsDialog({
                 value={Math.round((done / reviews.length) * 100)}
               />
               <Typography variant="caption" color="text.secondary">
-                Deleting… {done} of {reviews.length}
+                {t('delete.bulk.progress', { done, total: reviews.length })}
               </Typography>
             </Stack>
           )}
@@ -177,11 +186,14 @@ export function DeleteReviewsDialog({
             <Alert severity="error">
               {/* Named, not counted: "3 failed" leaves the reader to work out which. */}
               <Typography variant="body2" sx={{ fontWeight: 600, mb: 0.5 }}>
-                {failures.length} of {reviews.length} could not be deleted
+                {t('delete.bulk.failedHeading', {
+                  failed: failures.length,
+                  total: reviews.length,
+                })}
               </Typography>
               {failures.map((failure) => (
-                <Typography key={failure} variant="caption" component="div">
-                  {failure}
+                <Typography key={failure.id} variant="caption" component="div">
+                  {failure.title}: {apiErrorMessage(failure.cause, t('delete.bulk.itemFailed'))}
                 </Typography>
               ))}
             </Alert>
@@ -190,7 +202,7 @@ export function DeleteReviewsDialog({
       </DialogContent>
       <DialogActions sx={{ px: 3, pb: 2 }}>
         <Button onClick={onClose} disabled={busy} color="inherit">
-          {failures.length > 0 ? 'Close' : 'Cancel'}
+          {failures.length > 0 ? t('common:actions.close') : t('common:actions.cancel')}
         </Button>
         <Button
           variant="contained"
@@ -199,7 +211,7 @@ export function DeleteReviewsDialog({
           disabled={!confirmed || busy || reviews.length === 0}
           onClick={handleDelete}
         >
-          {busy ? 'Deleting…' : `Delete ${reviews.length} permanently`}
+          {busy ? t('delete.single.deleting') : t('delete.bulk.submit', { total: reviews.length })}
         </Button>
       </DialogActions>
     </Dialog>

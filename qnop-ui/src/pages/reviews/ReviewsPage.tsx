@@ -38,6 +38,7 @@ import Tooltip from '@mui/material/Tooltip';
 import { alpha } from '@mui/material/styles';
 import Typography from '@mui/material/Typography';
 import { LayoutGrid, ListFilter, Plus, Rows3, Trash2 } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import { useNavigate, useSearchParams } from 'react-router';
 import type { DocumentSummary } from '../../api/generated';
 import { useReviews } from '../../api/hooks/useReviews';
@@ -46,7 +47,9 @@ import { ErrorState } from '../errors/ErrorState';
 import { ServerErrorIllustration } from '../errors/illustrations';
 import { ClearableSearchField } from '../../components/ClearableSearchField';
 import { PageHeader } from '../../components/admin/layout/PageHeader';
-import { isOpenWorkflowState, workflowLabel } from '../../components/reviews/workflowMeta';
+import { isOpenWorkflowState } from '../../components/reviews/workflowMeta';
+import { useWorkflowLabel } from '../../components/reviews/useWorkflowLabel';
+import type { ReviewsKey } from '../../components/reviews/reviewsI18n';
 import { roleOf } from '../../components/reviews/list/reviewListModel';
 import { ReviewCards } from '../../components/reviews/list/ReviewCards';
 import { ReviewsTable } from '../../components/reviews/list/ReviewsTable';
@@ -241,18 +244,18 @@ function FilterChip({
   );
 }
 
-const DUE_LABELS: Record<DueFilter, string> = {
-  any: 'Any due date',
-  overdue: 'Overdue',
-  soon: `Due in ${DUE_SOON_DAYS} days`,
-  none: 'No due date',
+const DUE_LABELS: Record<DueFilter, ReviewsKey> = {
+  any: 'page.filters.dueOptions.any',
+  overdue: 'page.filters.dueOptions.overdue',
+  soon: 'page.filters.dueOptions.soon',
+  none: 'page.filters.dueOptions.none',
 };
 
-const FORMAT_LABELS: Record<FormatFilter, string> = {
-  any: 'Any format',
-  pdf: 'PDF',
-  docx: 'Word (DOCX)',
-  md: 'Markdown',
+const FORMAT_LABELS: Record<FormatFilter, ReviewsKey> = {
+  any: 'page.filters.formatOptions.any',
+  pdf: 'page.filters.formatOptions.pdf',
+  docx: 'page.filters.formatOptions.docx',
+  md: 'page.filters.formatOptions.md',
 };
 
 /**
@@ -278,6 +281,8 @@ function ReviewFilterMenu({
   activeCount: number;
   onSet: (key: string, next: string, fallback: string) => void;
 }) {
+  const { t } = useTranslation('reviews');
+  const workflowLabel = useWorkflowLabel();
   const [anchorEl, setAnchorEl] = useState<HTMLElement | null>(null);
   const pick = (key: string, next: string, fallback: string) => {
     onSet(key, next, fallback);
@@ -287,7 +292,7 @@ function ReviewFilterMenu({
     <>
       <Badge badgeContent={activeCount} color="primary" overlap="circular">
         <IconButton
-          aria-label="Filter reviews"
+          aria-label={t('page.filters.button')}
           aria-haspopup="menu"
           aria-expanded={Boolean(anchorEl)}
           onClick={(e) => setAnchorEl(e.currentTarget)}
@@ -301,41 +306,41 @@ function ReviewFilterMenu({
         open={Boolean(anchorEl)}
         anchorEl={anchorEl}
         onClose={() => setAnchorEl(null)}
-        slotProps={{ list: { dense: true, 'aria-label': 'Review filters' } }}
+        slotProps={{ list: { dense: true, 'aria-label': t('page.filters.menu') } }}
       >
-        <ListSubheader disableSticky>Due date</ListSubheader>
+        <ListSubheader disableSticky>{t('page.filters.due')}</ListSubheader>
         {DUE_FILTERS.map((value) => (
           <MenuItem
             key={value}
             selected={dueFilter === value}
             onClick={() => pick('due', value, 'any')}
           >
-            {DUE_LABELS[value]}
+            {t(DUE_LABELS[value], { days: DUE_SOON_DAYS })}
           </MenuItem>
         ))}
-        <ListSubheader disableSticky>Workflow state</ListSubheader>
+        <ListSubheader disableSticky>{t('page.filters.state')}</ListSubheader>
         {STATE_FILTERS.map((value) => (
           <MenuItem
             key={value}
             selected={stateFilter === value}
             onClick={() => pick('state', value, 'any')}
           >
-            {value === 'any' ? 'Any state' : workflowLabel(value)}
+            {value === 'any' ? t('page.filters.anyState') : workflowLabel(value)}
           </MenuItem>
         ))}
-        <ListSubheader disableSticky>Format</ListSubheader>
+        <ListSubheader disableSticky>{t('page.filters.format')}</ListSubheader>
         {FORMAT_FILTERS.map((value) => (
           <MenuItem
             key={value}
             selected={formatFilter === value}
             onClick={() => pick('format', value, 'any')}
           >
-            {FORMAT_LABELS[value]}
+            {t(FORMAT_LABELS[value])}
           </MenuItem>
         ))}
-        <ListSubheader disableSticky>Owner</ListSubheader>
+        <ListSubheader disableSticky>{t('page.filters.owner')}</ListSubheader>
         <MenuItem selected={ownerFilter === null} onClick={() => pick('owner', '', '')}>
-          Anyone
+          {t('page.filters.anyone')}
         </MenuItem>
         {owners.map(([id, name]) => (
           <MenuItem key={id} selected={ownerFilter === id} onClick={() => pick('owner', id, '')}>
@@ -349,6 +354,7 @@ function ReviewFilterMenu({
 
 /** Reviews overview (#251): every review the user owns or participates in. */
 export function ReviewsPage() {
+  const { t } = useTranslation(['reviews', 'common']);
   const navigate = useNavigate();
   const userId = useAuthStore((s) => s.userId);
   const isAdmin = useAuthStore(selectIsAdmin);
@@ -552,7 +558,9 @@ export function ReviewsPage() {
   function ownersFromRows(): [string, string][] {
     const byId = new Map<string, string>();
     for (const r of items) {
-      if (r.ownerId && !byId.has(r.ownerId)) byId.set(r.ownerId, r.ownerDisplayName ?? 'Unknown');
+      if (r.ownerId && !byId.has(r.ownerId)) {
+        byId.set(r.ownerId, r.ownerDisplayName ?? t('page.filters.unknownOwner'));
+      }
     }
     return [...byId].sort((a, b) => a[1].localeCompare(b[1]));
   }
@@ -614,7 +622,7 @@ export function ReviewsPage() {
       disabled={reviewsFull}
       onClick={() => navigate('/reviews/new')}
     >
-      New review
+      {t('page.newReview')}
     </Button>
   );
 
@@ -622,10 +630,7 @@ export function ReviewsPage() {
   // tooltip on the button, which said the same thing in a place only a mouse
   // could reach.
   const reviewQuotaWarning = reviewsFull ? (
-    <QuotaAlert>
-      This instance allows {reviewLimit} reviews open at once, and {reviewsOpen} are open.
-      Finalizing or archiving a review frees a slot; finished work occupies nothing.
-    </QuotaAlert>
+    <QuotaAlert>{t('page.quotaFull', { count: reviewLimit, used: reviewsOpen })}</QuotaAlert>
   ) : null;
 
   // Rendered next to the search field, and again over the empty state — an admin
@@ -636,16 +641,16 @@ export function ReviewsPage() {
       size="small"
       value={moderating ? 'all' : 'mine'}
       onChange={(_e, next: string | null) => next && setModerating(next === 'all')}
-      aria-label="Which reviews"
+      aria-label={t('page.participation.label')}
       // Two words per button, never two lines: wrapped labels read as a broken
       // control, and this row gets crowded once a selection joins it.
       sx={{ flexShrink: 0, '& .MuiToggleButton-root': { whiteSpace: 'nowrap' } }}
     >
       <ToggleButton value="mine" data-testid="participation-mine">
-        My reviews
+        {t('page.participation.mine')}
       </ToggleButton>
       <ToggleButton value="all" data-testid="participation-all">
-        All reviews
+        {t('page.participation.all')}
       </ToggleButton>
     </ToggleButtonGroup>
   ) : null;
@@ -653,12 +658,8 @@ export function ReviewsPage() {
   return (
     <Stack spacing={3}>
       <PageHeader
-        title="Reviews"
-        description={
-          moderating
-            ? 'Every review in the workspace — you are moderating, not participating.'
-            : 'Documents you own or review — pick one up where it stands.'
-        }
+        title={t('page.title')}
+        description={moderating ? t('page.descriptionModerating') : t('page.description')}
         action={newReviewButton}
       />
 
@@ -668,12 +669,12 @@ export function ReviewsPage() {
         // The branded failure shell (issue #611) instead of a bare alert -
         // same voice as the full-page states: our fault, with a way onward.
         <ErrorState
-          title="Your reviews didn't make it to the desk"
-          message="Loading failed on our side - not your doing. Give it another try; if it keeps happening, your admin will want to know."
+          title={t('page.loadError.title')}
+          message={t('page.loadError.message')}
           illustration={<ServerErrorIllustration />}
           tone="alert"
-          primaryAction={{ label: 'Try again', onClick: () => refetch() }}
-          secondaryAction={{ label: 'Back to dashboard', to: '/' }}
+          primaryAction={{ label: t('common:actions.tryAgain'), onClick: () => refetch() }}
+          secondaryAction={{ label: t('common:actions.backToDashboard'), to: '/' }}
         />
       )}
 
@@ -738,7 +739,7 @@ export function ReviewsPage() {
             sx={{ alignItems: { md: 'center' }, flexWrap: 'wrap', rowGap: 2 }}
           >
             <ClearableSearchField
-              placeholder="Search by title or owner…"
+              placeholder={t('page.searchPlaceholder')}
               value={search}
               onValueChange={setSearchAndParam}
               sx={{ width: { xs: '100%', md: 280 }, minWidth: { md: 220 } }}
@@ -762,13 +763,13 @@ export function ReviewsPage() {
                   pr: 0.5,
                   py: 0.25,
                   borderRadius: 1.5,
-                  bgcolor: (t) => alpha(t.palette.primary.main, 0.07),
+                  bgcolor: (theme) => alpha(theme.palette.primary.main, 0.07),
                   border: '1px solid',
-                  borderColor: (t) => alpha(t.palette.primary.main, 0.35),
+                  borderColor: (theme) => alpha(theme.palette.primary.main, 0.35),
                 }}
               >
                 <Typography variant="body2" sx={{ fontWeight: 600, whiteSpace: 'nowrap' }}>
-                  {selectedReviews.length} selected
+                  {t('page.selection.count', { n: selectedReviews.length })}
                 </Typography>
                 <Button
                   size="small"
@@ -776,7 +777,7 @@ export function ReviewsPage() {
                   sx={{ minWidth: 0 }}
                   onClick={() => setSelectedIds(new Set())}
                 >
-                  Clear
+                  {t('actions.clear')}
                 </Button>
                 <Button
                   size="small"
@@ -786,7 +787,7 @@ export function ReviewsPage() {
                   sx={{ whiteSpace: 'nowrap' }}
                   onClick={() => setBulkOpen(true)}
                 >
-                  Delete selected ({selectedReviews.length})
+                  {t('page.selection.deleteSelected', { n: selectedReviews.length })}
                 </Button>
               </Stack>
             )}
@@ -804,28 +805,28 @@ export function ReviewsPage() {
             <TextField
               select
               size="small"
-              label="Sort"
+              label={t('page.sort.label')}
               value={sortBy}
               onChange={(e) => setSortBy(e.target.value as SortBy)}
               // A label truncated to "Re…" is not a control anyone can read; the
               // search field is the one element that shrinks without cost.
               sx={{ width: 180, flexShrink: 0 }}
             >
-              <MenuItem value="updated">Recently updated</MenuItem>
-              <MenuItem value="name">Name</MenuItem>
-              <MenuItem value="due">Due date</MenuItem>
+              <MenuItem value="updated">{t('page.sort.updated')}</MenuItem>
+              <MenuItem value="name">{t('page.sort.name')}</MenuItem>
+              <MenuItem value="due">{t('page.sort.due')}</MenuItem>
             </TextField>
             <ToggleButtonGroup
               exclusive
               size="small"
               value={view}
               onChange={(_e, next: ViewMode | null) => changeView(next)}
-              aria-label="View mode"
+              aria-label={t('page.view.label')}
             >
-              <ToggleButton value="table" aria-label="Table view">
+              <ToggleButton value="table" aria-label={t('page.view.table')}>
                 <Rows3 size={16} />
               </ToggleButton>
-              <ToggleButton value="cards" aria-label="Card view">
+              <ToggleButton value="cards" aria-label={t('page.view.cards')}>
                 <LayoutGrid size={16} />
               </ToggleButton>
             </ToggleButtonGroup>
@@ -833,22 +834,22 @@ export function ReviewsPage() {
 
           <Stack direction="row" spacing={1} sx={{ flexWrap: 'wrap', rowGap: 1 }}>
             <FilterChip
-              label="All"
-              hint="Every review you can see, whatever your part in it"
+              label={t('page.chips.all.label')}
+              hint={t('page.chips.all.hint')}
               count={roleCounts.all}
               selected={roleFilter === 'all'}
               onClick={() => setRoleFilter('all')}
             />
             <FilterChip
-              label="Owned by me"
-              hint="Reviews you own and steer"
+              label={t('page.chips.owner.label')}
+              hint={t('page.chips.owner.hint')}
               count={roleCounts.owner}
               selected={roleFilter === 'owner'}
               onClick={() => setRoleFilter('owner')}
             />
             <FilterChip
-              label="Reviewing"
-              hint="Reviews where you are on the reviewer roster"
+              label={t('page.chips.reviewer.label')}
+              hint={t('page.chips.reviewer.hint')}
               count={roleCounts.reviewer}
               selected={roleFilter === 'reviewer'}
               onClick={() => setRoleFilter('reviewer')}
@@ -857,8 +858,8 @@ export function ReviewsPage() {
               // Only the moderation listing can hold reviews the caller has no part
               // in, so the facet exists exactly where it can match (issue #563).
               <FilterChip
-                label="Not participating"
-                hint="Reviews you neither own nor review — what you are moderating from outside"
+                label={t('page.chips.observer.label')}
+                hint={t('page.chips.observer.hint')}
                 count={roleCounts.observer}
                 selected={roleFilter === 'observer'}
                 onClick={() => setRoleFilter(roleFilter === 'observer' ? 'all' : 'observer')}
@@ -866,43 +867,43 @@ export function ReviewsPage() {
             )}
             <Box sx={{ width: 8 }} />
             <FilterChip
-              label="Active"
-              hint="All live work — every workflow state except archived records (the default)"
+              label={t('page.chips.active.label')}
+              hint={t('page.chips.active.hint')}
               count={statusCounts.active}
               selected={statusFilter === 'active'}
               onClick={() => setStatusFilter('active')}
             />
             <FilterChip
-              label="Open"
-              hint="Live reviews the workflow has not closed yet"
+              label={t('page.chips.open.label')}
+              hint={t('page.chips.open.hint')}
               count={statusCounts.open}
               selected={statusFilter === 'open'}
               onClick={() => setStatusFilter(statusFilter === 'open' ? 'active' : 'open')}
             />
             <FilterChip
-              label="Closed"
-              hint="Finalized or cancelled reviews that are not archived yet"
+              label={t('page.chips.closed.label')}
+              hint={t('page.chips.closed.hint')}
               count={statusCounts.closed}
               selected={statusFilter === 'closed'}
               onClick={() => setStatusFilter(statusFilter === 'closed' ? 'active' : 'closed')}
             />
             <FilterChip
-              label="Archived"
-              hint="Only the records archived out of the active lists"
+              label={t('page.chips.archived.label')}
+              hint={t('page.chips.archived.hint')}
               count={statusCounts.archived}
               selected={statusFilter === 'archived'}
               onClick={() => setStatusFilter(statusFilter === 'archived' ? 'active' : 'archived')}
             />
             <FilterChip
-              label="Every state"
-              hint="Everything at once — every workflow state, archived records included"
+              label={t('page.chips.every.label')}
+              hint={t('page.chips.every.hint')}
               count={statusCounts.all}
               selected={statusFilter === 'all'}
               onClick={() => setStatusFilter(statusFilter === 'all' ? 'active' : 'all')}
             />
             {hasActiveFilters && (
               <Chip
-                label="Clear filters"
+                label={t('page.clearFilters')}
                 size="small"
                 variant="outlined"
                 onDelete={clearFilters}
@@ -915,9 +916,7 @@ export function ReviewsPage() {
           {visible.length === 0 ? (
             <Paper variant="outlined" sx={{ py: 6, px: 3, textAlign: 'center' }}>
               <Typography color="text.secondary">
-                {onlyArchivedLeft
-                  ? 'No active reviews — everything here has been archived.'
-                  : 'No reviews match your filters.'}
+                {onlyArchivedLeft ? t('page.empty.onlyArchived') : t('page.empty.noMatches')}
               </Typography>
               {onlyArchivedLeft && (
                 <Button
@@ -925,12 +924,12 @@ export function ReviewsPage() {
                   onClick={() => setStatusFilter('archived')}
                   sx={{ mt: 1.5, mx: 0.5 }}
                 >
-                  Show archived ({statusCounts.archived})
+                  {t('page.empty.showArchived', { n: statusCounts.archived })}
                 </Button>
               )}
               {hasActiveFilters && (
                 <Button size="small" onClick={clearFilters} sx={{ mt: 1.5, mx: 0.5 }}>
-                  Clear filters
+                  {t('page.clearFilters')}
                 </Button>
               )}
             </Paper>
@@ -959,23 +958,25 @@ export function ReviewsPage() {
               {/* Named counts, not just arrows: a moderator has to know whether
                   they are looking at everything or at page one of twelve. */}
               <Typography variant="body2" color="text.secondary">
-                {serverPage * MODERATION_PAGE_SIZE + 1}–
-                {Math.min((serverPage + 1) * MODERATION_PAGE_SIZE, data?.total ?? 0)} of{' '}
-                {data?.total ?? 0}
+                {t('page.pagination.range', {
+                  from: serverPage * MODERATION_PAGE_SIZE + 1,
+                  to: Math.min((serverPage + 1) * MODERATION_PAGE_SIZE, data?.total ?? 0),
+                  total: data?.total ?? 0,
+                })}
               </Typography>
               <Button
                 size="small"
                 disabled={serverPage === 0}
                 onClick={() => setServerPage((p) => Math.max(0, p - 1))}
               >
-                Previous
+                {t('page.pagination.previous')}
               </Button>
               <Button
                 size="small"
                 disabled={(serverPage + 1) * MODERATION_PAGE_SIZE >= (data?.total ?? 0)}
                 onClick={() => setServerPage((p) => p + 1)}
               >
-                Next
+                {t('actions.next')}
               </Button>
             </Stack>
           )}

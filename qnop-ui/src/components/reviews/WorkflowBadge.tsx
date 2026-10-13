@@ -19,8 +19,10 @@
  * SPDX-License-Identifier: AGPL-3.0-only
  */
 
+import { useTranslation } from 'react-i18next';
 import { ToneBadge } from '../admin/ToneBadge';
-import { WORKFLOW_TONES, workflowLabel } from './workflowMeta';
+import { useWorkflowLabel } from './useWorkflowLabel';
+import { WORKFLOW_TONES } from './workflowMeta';
 
 /**
  * The review's status badge. An archived review (issue #576) reads neutrally as
@@ -34,8 +36,12 @@ export function WorkflowBadge({
   state: string;
   archivedAt?: string | null;
 }) {
+  const { t } = useTranslation('reviews');
+  const workflowLabel = useWorkflowLabel();
   if (archivedAt) {
-    return <ToneBadge tone="neutral" label={`Archived · ${workflowLabel(state)}`} />;
+    return (
+      <ToneBadge tone="neutral" label={t('workflow.archived', { state: workflowLabel(state) })} />
+    );
   }
   return <ToneBadge tone={WORKFLOW_TONES[state] ?? 'neutral'} label={workflowLabel(state)} />;
 }

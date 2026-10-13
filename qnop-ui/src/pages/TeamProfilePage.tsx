@@ -39,11 +39,8 @@ import { teamProfileKeys, useTeamProfile } from '../api/hooks/useTeamProfile';
 import { ToneBadge } from '../components/admin/ToneBadge';
 import { DocumentIcon } from '../components/reviews/list/ReviewListParts';
 import { UserHoverCard } from '../components/people/UserHoverCard';
-import {
-  WORKFLOW_TONES,
-  isOpenWorkflowState,
-  workflowLabel,
-} from '../components/reviews/workflowMeta';
+import { WORKFLOW_TONES, isOpenWorkflowState } from '../components/reviews/workflowMeta';
+import { useWorkflowLabel } from '../components/reviews/useWorkflowLabel';
 import { TeamAvatar } from '../components/shell/TeamAvatar';
 import { UserAvatar } from '../components/shell/UserAvatar';
 import { avatarSrc } from '../utils/avatarUrl';
@@ -86,6 +83,7 @@ function PrivateNote({ text }: { text: string }) {
  */
 export function TeamProfilePage() {
   const { t } = useTranslation(['teams', 'common']);
+  const workflowLabel = useWorkflowLabel();
   const theme = useTheme();
   const { teamId: segment = '' } = useParams<{ teamId: string }>();
   const isId = UUID_SHAPE.test(segment);

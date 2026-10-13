@@ -1,0 +1,532 @@
+{
+  "actions": {
+    "back": "Back",
+    "next": "Next",
+    "clear": "Clear",
+    "backToReviews": "Back to reviews"
+  },
+  "you": "You",
+  "roles": {
+    "owner": "Owner",
+    "reviewer": "Reviewer",
+    "observer": "Not participating"
+  },
+  "principal": {
+    "team": "Team",
+    "user": "User",
+    "remove": "Remove {{name}}",
+    "searching": "Searching…",
+    "noMatches": "No matching people or teams."
+  },
+  "workflow": {
+    "states": {
+      "DRAFT": "Draft",
+      "IN_REVIEW": "In review",
+      "CHANGES_REQUESTED": "Changes requested",
+      "FINALIZED": "Finalized",
+      "CANCELLED": "Cancelled"
+    },
+    "archived": "Archived · {{state}}",
+    "milestones": {
+      "cancelled": "Review cancelled",
+      "cancelledAutoClosed_one": "Review cancelled — {{count}} annotation were closed automatically",
+      "cancelledAutoClosed_other": "Review cancelled — {{count}} annotations were closed automatically",
+      "finalized": "Review finalized — every concern settled",
+      "draft": "Draft — not yet in review",
+      "progressOpen_one": "{{state}} — {{resolved}} of {{count}} annotation resolved, {{open}} to go",
+      "progressOpen_other": "{{state}} — {{resolved}} of {{count}} annotations resolved, {{open}} to go",
+      "progressReady_one": "{{state}} — {{resolved}} of {{count}} annotation resolved, ready to finalize",
+      "progressReady_other": "{{state}} — {{resolved}} of {{count}} annotations resolved, ready to finalize",
+      "noAnnotations": "{{state}} — no annotations yet"
+    }
+  },
+  "anonymous": {
+    "tooltip": "Anonymous review — reviewer names are hidden",
+    "label": "Anonymous",
+    "compact": "Anon"
+  },
+  "wholeDocument": {
+    "tooltip": "Applies to the whole document — not pinned to a passage",
+    "label": "Whole document",
+    "compact": "Whole doc"
+  },
+  "copy": {
+    "copied": "Copied to clipboard.",
+    "failed": "Could not copy to the clipboard."
+  },
+  "resizer": {
+    "label": "Resize annotations panel",
+    "valueText": "{{percent}}% of the workspace"
+  },
+  "paramGate": {
+    "resolving": "Resolving review",
+    "title": "This review folded itself into a paper plane",
+    "message": "No review answers to “{{segment}}” — the link may be outdated, or the review moved on. Your other quests are waiting."
+  },
+  "due": {
+    "picker": {
+      "label": "Due date",
+      "helper": "Optional — an informational deadline; overdue reviews are only flagged."
+    },
+    "dialog": {
+      "title": "Review due date",
+      "body": "An optional, informational deadline. Overdue open reviews are flagged in the overview, never blocked or cancelled.",
+      "updated": "Due date updated.",
+      "cleared": "Due date cleared.",
+      "failed": "The due date could not be updated.",
+      "saving": "Saving…"
+    }
+  },
+  "delete": {
+    "single": {
+      "title": "Delete this review?",
+      "body": "<title/> will be removed permanently, for everyone. This cannot be undone.",
+      "bodyWithScope": "<title/> and its {{scope}} will be removed permanently, for everyone. This cannot be undone.",
+      "versions_one": "{{count}} version",
+      "versions_other": "{{count}} versions",
+      "annotations_one": "{{count}} annotation",
+      "annotations_other": "{{count}} annotations",
+      "scopeBoth": "{{versions}} and {{annotations}}",
+      "archiveHint": "To archive it instead — reversible, and it keeps the record — close this and use Archive.",
+      "confirmLabel": "Type the review title to confirm",
+      "failed": "The review could not be deleted.",
+      "deleting": "Deleting…",
+      "submit": "Delete permanently"
+    },
+    "bulk": {
+      "title_one": "Delete {{count}} review?",
+      "title_other": "Delete {{count}} reviews?",
+      "body": "These will be removed permanently, for everyone — every version, annotation and discussion in them. This cannot be undone. To keep the record instead, close this and archive them.",
+      "phrase": "delete",
+      "confirmLabel": "Type \"{{phrase}}\" to confirm",
+      "progress": "Deleting… {{done}} of {{total}}",
+      "failedHeading": "{{failed}} of {{total}} could not be deleted",
+      "itemFailed": "could not be deleted",
+      "submit": "Delete {{total}} permanently"
+    }
+  },
+  "list": {
+    "documentType": "{{format}} document",
+    "progressLabel": "{{resolved}} of {{total}} annotations resolved",
+    "noReviewers": "no reviewers",
+    "readyToFinalize": "Ready to finalize",
+    "resolvedCount": "{{resolved}}/{{total}} resolved",
+    "columns": {
+      "document": "Document",
+      "role": "Role",
+      "owner": "Owner",
+      "status": "Status",
+      "progress": "Progress",
+      "reviewers": "Reviewers",
+      "due": "Due",
+      "updated": "Updated",
+      "actions": "Actions"
+    },
+    "selectAll": "Select every review on this page",
+    "select": "Select {{title}}",
+    "deletePermanently": "Delete permanently",
+    "deleteNamed": "Delete {{title}}",
+    "illustration": "A fresh document waiting for its first review"
+  },
+  "page": {
+    "title": "Reviews",
+    "description": "Documents you own or review — pick one up where it stands.",
+    "descriptionModerating": "Every review in the workspace — you are moderating, not participating.",
+    "newReview": "New review",
+    "quotaFull_one": "This instance allows {{count}} reviews open at once, and {{used}} are open. Finalizing or archiving a review frees a slot; finished work occupies nothing.",
+    "quotaFull_other": "This instance allows {{count}} reviews open at once, and {{used}} are open. Finalizing or archiving a review frees a slot; finished work occupies nothing.",
+    "loadError": {
+      "title": "Your reviews didn't make it to the desk",
+      "message": "Loading failed on our side - not your doing. Give it another try; if it keeps happening, your admin will want to know."
+    },
+    "participation": {
+      "label": "Which reviews",
+      "mine": "My reviews",
+      "all": "All reviews"
+    },
+    "searchPlaceholder": "Search by title or owner…",
+    "selection": {
+      "count": "{{n}} selected",
+      "deleteSelected": "Delete selected ({{n}})"
+    },
+    "sort": {
+      "label": "Sort",
+      "updated": "Recently updated",
+      "name": "Name",
+      "due": "Due date"
+    },
+    "view": {
+      "label": "View mode",
+      "table": "Table view",
+      "cards": "Card view"
+    },
+    "filters": {
+      "button": "Filter reviews",
+      "menu": "Review filters",
+      "due": "Due date",
+      "state": "Workflow state",
+      "format": "Format",
+      "owner": "Owner",
+      "anyone": "Anyone",
+      "anyState": "Any state",
+      "unknownOwner": "Unknown",
+      "dueOptions": {
+        "any": "Any due date",
+        "overdue": "Overdue",
+        "soon": "Due in {{days}} days",
+        "none": "No due date"
+      },
+      "formatOptions": {
+        "any": "Any format",
+        "pdf": "PDF",
+        "docx": "Word (DOCX)",
+        "md": "Markdown"
+      }
+    },
+    "chips": {
+      "all": {
+        "label": "All",
+        "hint": "Every review you can see, whatever your part in it"
+      },
+      "owner": {
+        "label": "Owned by me",
+        "hint": "Reviews you own and steer"
+      },
+      "reviewer": {
+        "label": "Reviewing",
+        "hint": "Reviews where you are on the reviewer roster"
+      },
+      "observer": {
+        "label": "Not participating",
+        "hint": "Reviews you neither own nor review — what you are moderating from outside"
+      },
+      "active": {
+        "label": "Active",
+        "hint": "All live work — every workflow state except archived records (the default)"
+      },
+      "open": {
+        "label": "Open",
+        "hint": "Live reviews the workflow has not closed yet"
+      },
+      "closed": {
+        "label": "Closed",
+        "hint": "Finalized or cancelled reviews that are not archived yet"
+      },
+      "archived": {
+        "label": "Archived",
+        "hint": "Only the records archived out of the active lists"
+      },
+      "every": {
+        "label": "Every state",
+        "hint": "Everything at once — every workflow state, archived records included"
+      }
+    },
+    "clearFilters": "Clear filters",
+    "empty": {
+      "onlyArchived": "No active reviews — everything here has been archived.",
+      "noMatches": "No reviews match your filters.",
+      "showArchived": "Show archived ({{n}})"
+    },
+    "pagination": {
+      "range": "{{from}}–{{to}} of {{total}}",
+      "previous": "Previous"
+    }
+  },
+  "emptyState": {
+    "eyebrow": "Reviews",
+    "title": "Start your first review",
+    "body": "A review is a document marked up line by line — raise points, resolve them together, and finalize with a clean trail. There’s nothing here yet.",
+    "perks": {
+      "annotate": "Annotate line by line",
+      "resolve": "Resolve open points",
+      "finalize": "Finalize with a trail"
+    },
+    "noSlots": "This instance has no open-review slots left.",
+    "hint": "Upload a document to begin."
+  },
+  "wizard": {
+    "description": "Guided three-step setup: document, reviewers, start.",
+    "steps": {
+      "document": "Document",
+      "reviewers": "Reviewers",
+      "summary": "Summary & start"
+    },
+    "stepNumber": "Step {{n}}",
+    "stepDone": "{{label}} done",
+    "stepOf": "Step {{step}} of {{total}}",
+    "create": "Create review",
+    "createAndStart": "Create & start review",
+    "uploadFailed": "The upload failed. Please try again.",
+    "quotaFull_one": "This instance allows {{count}} reviews open at once, and {{used}} are open. Finalizing or archiving one frees a slot; finished work occupies nothing.",
+    "quotaFull_other": "This instance allows {{count}} reviews open at once, and {{used}} are open. Finalizing or archiving one frees a slot; finished work occupies nothing.",
+    "created": {
+      "title": "Review created",
+      "partial": "The review was created, but some steps could not be completed: {{failures}}. You can finish these from the review page.",
+      "addReviewer": "add reviewer “{{name}}”",
+      "start": "start the review",
+      "openReview": "Open review"
+    },
+    "document": {
+      "titleLabel": "Review title",
+      "titlePlaceholder": "e.g. NDA Acme Corp",
+      "titleHelper": "Shown in the overview and to every reviewer.",
+      "slugLabel": "URL slug (optional)",
+      "slugPlaceholder": "e.g. nda-acme-corp",
+      "slugHelper": "A readable address for this review: lowercase letters, digits and hyphens. Cannot be changed later."
+    },
+    "validation": {
+      "slugLength": "The slug must be {{min}}–{{max}} characters long.",
+      "slugPattern": "Only lowercase letters, digits and single hyphens are allowed.",
+      "slugUuid": "The slug must not look like a document id."
+    },
+    "reviewers": {
+      "selected": "Selected reviewers",
+      "none": "No reviewers yet — you can also add them later.",
+      "searchPlaceholder": "Search people or teams…"
+    },
+    "summary": {
+      "document": "Document",
+      "reviewers": "Reviewers",
+      "dueDate": "Due date",
+      "noReviewers": "None yet — the review starts with you only; reviewers can be added any time.",
+      "anonymous": "Anonymous review",
+      "anonymousHint": "Reviewers' names are hidden — foreign authors show as stable \"Participant N\". Can't be changed later.",
+      "participation": "Thread participation",
+      "participationHelper": "{{hint}} Can't be changed later.",
+      "participationOptions": {
+        "OPEN": {
+          "label": "Open discussion",
+          "hint": "Every reviewer can read and reply to any thread."
+        },
+        "READ_ONLY": {
+          "label": "Read-only threads",
+          "hint": "Everyone sees every thread, but only its author and the owner may reply."
+        },
+        "PRIVATE": {
+          "label": "Private threads",
+          "hint": "Reviewers see only their own threads; the owner sees all."
+        }
+      },
+      "start": "Start review immediately",
+      "startHint": "Moves the review from Draft to In review so reviewers can annotate right away.",
+      "uploading": "Uploading document…",
+      "finalizing": "Setting up the review…"
+    },
+    "commander": {
+      "eyebrow": "Mission commander",
+      "note": "You own this review — crew, deadline and the final call are yours."
+    },
+    "checklist": {
+      "title": "Launch readiness",
+      "ready": "Ready for lift-off — extras are bonus points.",
+      "notReady": "Fill the essentials to launch.",
+      "bonus": "bonus",
+      "items": {
+        "document": "Document aboard",
+        "title": "Title set",
+        "slug": "Friendly link",
+        "crew": "Crew invited",
+        "deadline": "Deadline locked",
+        "ignition": "Ignition on create"
+      },
+      "details": {
+        "reviewers_one": "{{count}} reviewer",
+        "reviewers_other": "{{count}} reviewers",
+        "startsNow": "starts immediately",
+        "startsLater": "starts later, manually"
+      }
+    }
+  },
+  "upload": {
+    "formats": {
+      "pdf": "PDF",
+      "pdfOrWord": "PDF or Word",
+      "pdfMore": "PDF and more",
+      "pdfOrWordMore": "PDF or Word and more"
+    },
+    "validation": {
+      "type": "Only {{formats}} documents are supported.",
+      "size": "The file exceeds the maximum size of {{max}} MB."
+    },
+    "chooseDocument": "Choose a document",
+    "chooseDifferentDocument": "Choose a different document",
+    "prompt": "Drop your document here or choose a file",
+    "limits": "{{formats}} · max. {{max}} MB",
+    "chooseFile": "Choose file",
+    "chooseDifferentFile": "Choose a different file",
+    "removeFile": "Remove file"
+  },
+  "hub": {
+    "progress": {
+      "inDiscussion_one": "Review progress: {{resolved}} of {{count}} annotation resolved · {{discussion}} open in discussion",
+      "inDiscussion_other": "Review progress: {{resolved}} of {{count}} annotations resolved · {{discussion}} open in discussion",
+      "stillOpen_one": "Review progress: {{resolved}} of {{count}} annotation resolved · {{open}} still open",
+      "stillOpen_other": "Review progress: {{resolved}} of {{count}} annotations resolved · {{open}} still open",
+      "ready_one": "Review progress: {{resolved}} of {{count}} annotation resolved — ready to finalize",
+      "ready_other": "Review progress: {{resolved}} of {{count}} annotations resolved — ready to finalize"
+    },
+    "dueDate": {
+      "set": "Set review due date",
+      "placeholder": "Set due date"
+    },
+    "participants": {
+      "manage": "Manage participants",
+      "view": "View participants",
+      "add": "Add reviewers",
+      "none": "No reviewers"
+    },
+    "workflow": {
+      "change": "Change status",
+      "moveTo": "Move to {{state}}",
+      "moved": "Review moved to {{state}}.",
+      "failed": "The status could not be changed.",
+      "confirmTitle": "Change review status",
+      "confirmMessage": "Move this review to \"{{state}}\"? Reviewers will see the new status immediately.",
+      "autoClose_one": "{{count}} open annotation will be closed automatically with a standard comment.",
+      "autoClose_other": "{{count}} open annotations will be closed automatically with a standard comment.",
+      "conflicts": {
+        "INVALID_TRANSITION": "This status change is not possible right now — open annotations or pending placements may remain."
+      }
+    },
+    "archive": {
+      "archive": "Archive",
+      "unarchive": "Unarchive",
+      "archived": "Review archived.",
+      "restored": "Review restored to the active lists.",
+      "archiveFailed": "The review could not be archived.",
+      "unarchiveFailed": "The review could not be unarchived."
+    },
+    "newVersion": "New version"
+  },
+  "newVersion": {
+    "title": "Upload a new version",
+    "body": "It becomes the version everyone reviews. Existing annotations are carried over and re-anchored to the new document; any that no longer fit are flagged for you to place again.",
+    "uploaded": "Version {{version}} uploaded.",
+    "failed": "The new version could not be uploaded.",
+    "progressLabel": "Upload progress",
+    "processing": "Processing the document…",
+    "uploadingPercent": "Uploading… {{percent}}%",
+    "uploading": "Uploading…",
+    "submit": "Upload version"
+  },
+  "participants": {
+    "title": "Participants",
+    "loadingMembers": "Loading team members",
+    "noMembers": "No members in this team.",
+    "empty": "No reviewers on this review yet.",
+    "showMembers": "Show members of {{name}}",
+    "addPlaceholder": "Add people or teams…",
+    "added": "{{name}} added.",
+    "removed": "{{name}} removed.",
+    "addFailed": "The reviewer could not be added.",
+    "removeFailed": "The reviewer could not be removed.",
+    "conflicts": {
+      "DUPLICATE_PARTICIPANT": "Already a reviewer on this document."
+    }
+  },
+  "tabs": {
+    "label": "Review views",
+    "document": "Document",
+    "tasks": "Tasks",
+    "compare": "Compare",
+    "compareDisabled": "Needs two extracted versions"
+  },
+  "export": {
+    "title": "Export",
+    "failed": "The export could not be generated. Please try again.",
+    "headings": {
+      "format": "What do you need?",
+      "details": "Which details?"
+    },
+    "steps": {
+      "formatAndFile": "Format & file",
+      "content": "Content"
+    },
+    "sections": {
+      "format": "Format",
+      "annotations": "Which annotations",
+      "savedAs": "Saved as",
+      "dateTime": "Date and time"
+    },
+    "unavailable": "Unavailable",
+    "scopes": {
+      "all": {
+        "label": "Everything",
+        "hint": "Every annotation in this review"
+      },
+      "open": {
+        "label": "Open only",
+        "hint": "What still needs work"
+      },
+      "resolved": {
+        "label": "Resolved only",
+        "hint": "What has been settled"
+      }
+    },
+    "formats": {
+      "xlsx": "Sortable, filterable — for triage and reporting.",
+      "docx": "A readable report — for meetings and sign-off.",
+      "html": "One self-contained page — searchable in any browser, no attachments to open.",
+      "pdf": "Looks the same everywhere — for printing and archiving."
+    },
+    "commentsHint": {
+      "sheet": "A second sheet with the full text of every comment and who wrote it. In an anonymous review the authors stay pseudonymous here too.",
+      "discussion": "The full discussion under each annotation — every reply, with who wrote it and when. In an anonymous review the authors stay pseudonymous here too."
+    },
+    "vocabulary": {
+      "columns": {
+        "heading": "Columns",
+        "count": "{{selected}} of {{total}} columns"
+      },
+      "details": {
+        "heading": "Details",
+        "count": "{{selected}} of {{total}} details"
+      },
+      "fields": {
+        "heading": "Fields",
+        "count": "{{selected}} of {{total}} fields"
+      }
+    },
+    "fileName": "File name",
+    "logo": {
+      "title": "Branding logo",
+      "hint": "Placed on the document, if branding has been uploaded."
+    },
+    "comments": "Comment threads",
+    "all": "All",
+    "none": "None",
+    "always": "(always)",
+    "timezone": "Timezone",
+    "groups": {
+      "Identity": "Identity",
+      "Classification": "Classification",
+      "Content": "Content",
+      "History": "History"
+    },
+    "fields": {
+      "taskKey": "Task key (#)",
+      "page": "Page",
+      "author": "Author",
+      "status": "Status",
+      "type": "Type",
+      "priority": "Priority",
+      "placement": "Placement state",
+      "summary": "Summary",
+      "replies": "Replies",
+      "created": "Created",
+      "updated": "Updated"
+    },
+    "dateFormats": {
+      "iso": "ISO",
+      "isoSeconds": "ISO with seconds",
+      "european": "European",
+      "us": "US",
+      "dateOnly": "Date only"
+    },
+    "summary": {
+      "rows_one": "{{count}} annotation",
+      "rows_other": "{{count}} annotations",
+      "withComments": "with comment threads"
+    }
+  }
+}

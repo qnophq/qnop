@@ -22,6 +22,7 @@
 /** Pure logic of the new-review wizard — kept DOM-free for direct unit testing. */
 
 import type { SupportedFormat } from '../../../api/generated';
+import type { ReviewsKey, ReviewsPhrase } from '../reviewsI18n';
 
 const BYTES_PER_MB = 1024 * 1024;
 
@@ -39,8 +40,8 @@ const DOCX_MIME = 'application/vnd.openxmlformats-officedocument.wordprocessingm
 export interface AcceptedUploads {
   /** The `accept` attribute of a file input. */
   accept: string;
-  /** How the dropzone names the formats, e.g. `PDF or Word`. */
-  label: string;
+  /** The `reviews` catalog key naming the formats, e.g. `PDF or Word` (issue #836). */
+  labelKey: ReviewsKey;
   /** Whether a picked file passes the client-side type check. */
   matches: (file: File) => boolean;
 }
@@ -62,23 +63,31 @@ export function acceptedUploads(
     accept: extra.length ? `${base},${extra.join(',')}` : base,
     // Extras match by exact MIME type only (no extension fallback — the server-side
     // gate is authoritative and the accept filter already narrows the picker).
-    label: (word ? 'PDF or Word' : 'PDF') + (extra.length ? ' and more' : ''),
+    labelKey: word
+      ? extra.length
+        ? 'upload.formats.pdfOrWordMore'
+        : 'upload.formats.pdfOrWord'
+      : extra.length
+        ? 'upload.formats.pdfMore'
+        : 'upload.formats.pdf',
     matches: (file) => matchesPdf(file) || (word && matchesWord(file)) || extra.includes(file.type),
   };
 }
 
 /**
  * Client-side pre-check of the chosen file (the backend re-validates and is
- * authoritative).
+ * authoritative). The rejection is a phrase, translated at render.
  */
 export function validateDocumentFile(
   file: File,
   maxSizeMb: number,
   accepted: AcceptedUploads,
-): string | null {
-  if (!accepted.matches(file)) return `Only ${accepted.label} documents are supported.`;
+): ReviewsPhrase | null {
+  if (!accepted.matches(file)) {
+    return { key: 'upload.validation.type', values: { formats: { key: accepted.labelKey } } };
+  }
   if (file.size > maxSizeMb * BYTES_PER_MB) {
-    return `The file exceeds the maximum size of ${maxSizeMb} MB.`;
+    return { key: 'upload.validation.size', values: { max: maxSizeMb } };
   }
   return null;
 }
@@ -113,23 +122,31 @@ export function suggestSlug(title: string): string {
 
 /**
  * Client-side mirror of the server's slug rules (issue #411; the backend is
- * authoritative). Empty means "no slug" and is valid.
+ * authoritative). Empty means "no slug" and is valid. The rejection is a phrase,
+ * translated at render.
  */
-export function validateSlug(slug: string): string | null {
+export function validateSlug(slug: string): ReviewsPhrase | null {
   if (slug === '') return null;
   if (slug.length < SLUG_MIN_LENGTH || slug.length > SLUG_MAX_LENGTH) {
-    return `The slug must be ${SLUG_MIN_LENGTH}–${SLUG_MAX_LENGTH} characters long.`;
+    return {
+      key: 'wizard.validation.slugLength',
+      values: { min: SLUG_MIN_LENGTH, max: SLUG_MAX_LENGTH },
+    };
   }
   if (!SLUG_PATTERN.test(slug)) {
-    return 'Only lowercase letters, digits and single hyphens are allowed.';
+    return { key: 'wizard.validation.slugPattern' };
   }
   if (UUID_SHAPE.test(slug)) {
-    return 'The slug must not look like a document id.';
+    return { key: 'wizard.validation.slugUuid' };
   }
   return null;
 }
 
-/** Human-readable file size ("2.4 MB", "412 KB"). */
+/**
+ * Human-readable file size ("2.4 MB", "412 KB"). Units are international and the
+ * number keeps a decimal point in every language for now — the app has no
+ * locale-aware number formatter yet.
+ */
 export function formatFileSize(bytes: number): string {
   if (bytes >= BYTES_PER_MB) return `${(bytes / BYTES_PER_MB).toFixed(1)} MB`;
   return `${Math.max(1, Math.round(bytes / 1024))} KB`;
@@ -137,11 +154,12 @@ export function formatFileSize(bytes: number): string {
 
 /** One line of the launch checklist (issue #469): what, whether it counts, whether it's done. */
 export interface LaunchItem {
-  label: string;
+  /** The `reviews` catalog key naming the item (issue #836). */
+  labelKey: ReviewsKey;
   done: boolean;
   /** Optional items sweeten readiness but never block the launch. */
   optional: boolean;
-  detail?: string;
+  detail?: ReviewsPhrase;
 }
 
 /** The wizard's live launch checklist, derived purely from the form state. */
@@ -154,24 +172,32 @@ export function launchChecklist(state: {
   startImmediately: boolean;
 }): LaunchItem[] {
   return [
-    { label: 'Document aboard', done: state.hasFile, optional: false },
-    { label: 'Title set', done: state.title.trim() !== '', optional: false },
-    { label: 'Friendly link', done: state.slug.trim() !== '', optional: true },
+    { labelKey: 'wizard.checklist.items.document', done: state.hasFile, optional: false },
     {
-      label: 'Crew invited',
+      labelKey: 'wizard.checklist.items.title',
+      done: state.title.trim() !== '',
+      optional: false,
+    },
+    { labelKey: 'wizard.checklist.items.slug', done: state.slug.trim() !== '', optional: true },
+    {
+      labelKey: 'wizard.checklist.items.crew',
       done: state.reviewerCount > 0,
       optional: true,
       detail:
         state.reviewerCount > 0
-          ? `${state.reviewerCount} reviewer${state.reviewerCount === 1 ? '' : 's'}`
+          ? { key: 'wizard.checklist.details.reviewers', values: { count: state.reviewerCount } }
           : undefined,
     },
-    { label: 'Deadline locked', done: state.dueAt !== null, optional: true },
+    { labelKey: 'wizard.checklist.items.deadline', done: state.dueAt !== null, optional: true },
     {
-      label: 'Ignition on create',
+      labelKey: 'wizard.checklist.items.ignition',
       done: state.startImmediately,
       optional: true,
-      detail: state.startImmediately ? 'starts immediately' : 'starts later, manually',
+      detail: {
+        key: state.startImmediately
+          ? 'wizard.checklist.details.startsNow'
+          : 'wizard.checklist.details.startsLater',
+      },
     },
   ];
 }

@@ -23,7 +23,8 @@ import Tooltip from '@mui/material/Tooltip';
 import { useTheme } from '@mui/material/styles';
 import type { LucideIcon } from 'lucide-react';
 import { Archive, Ban, Circle, CircleCheckBig, CircleDashed, CircleDot } from 'lucide-react';
-import { workflowLabel } from './workflowMeta';
+import { useTranslation } from 'react-i18next';
+import { useWorkflowLabel } from './useWorkflowLabel';
 
 /**
  * The review workflow state as ONE glyph (issue #540) — the milestone path of
@@ -48,9 +49,11 @@ export function WorkflowStateIcon({
   archived?: boolean;
 }) {
   const theme = useTheme();
+  const { t } = useTranslation('reviews');
+  const workflowLabel = useWorkflowLabel();
 
   if (archived) {
-    const archivedLabel = `Archived · ${workflowLabel(state)}`;
+    const archivedLabel = t('workflow.archived', { state: workflowLabel(state) });
     return (
       <Tooltip title={archivedLabel} describeChild>
         <Archive

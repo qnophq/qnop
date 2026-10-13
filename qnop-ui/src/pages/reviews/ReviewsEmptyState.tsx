@@ -27,7 +27,9 @@ import Stack from '@mui/material/Stack';
 import Typography from '@mui/material/Typography';
 import { keyframes } from '@mui/material/styles';
 import { CircleCheckBig, PenLine, Plus, ShieldCheck } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import { ReviewIllustration } from '../../components/reviews/list/ReviewIllustration';
+import type { ReviewsKey } from '../../components/reviews/reviewsI18n';
 
 const fadeUp = keyframes`
   from { opacity: 0; transform: translateY(12px); }
@@ -43,10 +45,10 @@ function rise(delayMs: number) {
   } as const;
 }
 
-const PERKS: { icon: ReactNode; label: string }[] = [
-  { icon: <PenLine size={15} />, label: 'Annotate line by line' },
-  { icon: <CircleCheckBig size={15} />, label: 'Resolve open points' },
-  { icon: <ShieldCheck size={15} />, label: 'Finalize with a trail' },
+const PERKS: { icon: ReactNode; label: ReviewsKey }[] = [
+  { icon: <PenLine size={15} />, label: 'emptyState.perks.annotate' },
+  { icon: <CircleCheckBig size={15} />, label: 'emptyState.perks.resolve' },
+  { icon: <ShieldCheck size={15} />, label: 'emptyState.perks.finalize' },
 ];
 
 /**
@@ -64,6 +66,7 @@ export function ReviewsEmptyState({
   /** True where the instance has no open-review slots left (issue #692). */
   disabled?: boolean;
 }) {
+  const { t } = useTranslation('reviews');
   return (
     <Paper
       variant="outlined"
@@ -92,7 +95,7 @@ export function ReviewsEmptyState({
             color: 'primary.main',
           }}
         >
-          Reviews
+          {t('emptyState.eyebrow')}
         </Typography>
 
         <Typography
@@ -105,14 +108,13 @@ export function ReviewsEmptyState({
             textWrap: 'balance',
           }}
         >
-          Start your first review
+          {t('emptyState.title')}
         </Typography>
 
         <Typography
           sx={{ ...rise(240), color: 'text.secondary', fontSize: 15, lineHeight: 1.6, mt: 1.25 }}
         >
-          A review is a document marked up line by line — raise points, resolve them together, and
-          finalize with a clean trail. There’s nothing here yet.
+          {t('emptyState.body')}
         </Typography>
 
         <Stack
@@ -133,14 +135,14 @@ export function ReviewsEmptyState({
                 fontSize: 13,
                 fontWeight: 600,
                 color: 'text.secondary',
-                bgcolor: (t) => t.qnop.surface2,
+                bgcolor: (theme) => theme.qnop.surface2,
                 border: 1,
                 borderColor: 'divider',
                 '& svg': { color: 'primary.main' },
               }}
             >
               {perk.icon}
-              {perk.label}
+              {t(perk.label)}
             </Box>
           ))}
         </Stack>
@@ -153,12 +155,10 @@ export function ReviewsEmptyState({
             disabled={disabled}
             onClick={onNewReview}
           >
-            New review
+            {t('page.newReview')}
           </Button>
           <Typography sx={{ mt: 1.25, fontSize: 13, color: 'text.disabled' }}>
-            {disabled
-              ? 'This instance has no open-review slots left.'
-              : 'Upload a document to begin.'}
+            {disabled ? t('emptyState.noSlots') : t('emptyState.hint')}
           </Typography>
         </Box>
       </Stack>

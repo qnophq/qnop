@@ -28,7 +28,9 @@ import Typography from '@mui/material/Typography';
 import { alpha, useTheme } from '@mui/material/styles';
 import type { LucideIcon } from 'lucide-react';
 import { FileText, GitCompareArrows, SquareKanban } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import { tokens } from '../../../theme/tokens';
+import type { ReviewsKey } from '../reviewsI18n';
 
 /** The review's three ways of working (issue #398; focus folded into Document, issue #403). */
 export type ReviewView = 'document' | 'tasks' | 'compare';
@@ -42,23 +44,27 @@ interface ReviewViewTabsProps {
   compareEnabled: boolean;
 }
 
-const TABS: { view: ReviewView; label: string; icon: LucideIcon; href: (id: string) => string }[] =
-  [
-    {
-      view: 'document',
-      label: 'Document',
-      // No ?view= param: the stored panel/focus preference decides (issue #403).
-      icon: FileText,
-      href: (id) => `/reviews/${id}`,
-    },
-    { view: 'tasks', label: 'Tasks', icon: SquareKanban, href: (id) => `/reviews/${id}/tasks` },
-    {
-      view: 'compare',
-      label: 'Compare',
-      icon: GitCompareArrows,
-      href: (id) => `/reviews/${id}/compare`,
-    },
-  ];
+const TABS: {
+  view: ReviewView;
+  label: ReviewsKey;
+  icon: LucideIcon;
+  href: (id: string) => string;
+}[] = [
+  {
+    view: 'document',
+    label: 'tabs.document',
+    // No ?view= param: the stored panel/focus preference decides (issue #403).
+    icon: FileText,
+    href: (id) => `/reviews/${id}`,
+  },
+  { view: 'tasks', label: 'tabs.tasks', icon: SquareKanban, href: (id) => `/reviews/${id}/tasks` },
+  {
+    view: 'compare',
+    label: 'tabs.compare',
+    icon: GitCompareArrows,
+    href: (id) => `/reviews/${id}/compare`,
+  },
+];
 
 /**
  * The review's view switcher (issue #398, prototype `rh-tab`): one labeled,
@@ -78,10 +84,11 @@ export function ReviewViewTabs({
   compareEnabled,
 }: ReviewViewTabsProps) {
   const theme = useTheme();
+  const { t } = useTranslation('reviews');
   return (
     <Box
       component="nav"
-      aria-label="Review views"
+      aria-label={t('tabs.label')}
       sx={{
         borderBottom: '1px solid',
         borderColor: 'divider',
@@ -136,7 +143,7 @@ export function ReviewViewTabs({
               }}
             >
               <Icon size={15} aria-hidden />
-              {label}
+              {t(label)}
               {view === 'tasks' && openTaskCount !== undefined && (
                 <Typography
                   component="span"
@@ -164,7 +171,7 @@ export function ReviewViewTabs({
             </ButtonBase>
           );
           return isCompareDisabled ? (
-            <Tooltip key={view} title="Needs two extracted versions">
+            <Tooltip key={view} title={t('tabs.compareDisabled')}>
               <span>{tab}</span>
             </Tooltip>
           ) : (

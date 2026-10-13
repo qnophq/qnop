@@ -21,6 +21,7 @@
 
 import Box from '@mui/material/Box';
 import { keyframes, useTheme } from '@mui/material/styles';
+import { useTranslation } from 'react-i18next';
 
 const floaty = keyframes`
   0%, 100% { transform: translateY(0); }
@@ -77,6 +78,7 @@ function Annotation({
  */
 export function ReviewIllustration() {
   const theme = useTheme();
+  const { t } = useTranslation('reviews');
   const p = theme.qnop.avatarPalette;
   const accent = theme.palette.primary.main;
   const ink = theme.palette.text.disabled;
@@ -96,7 +98,7 @@ export function ReviewIllustration() {
       component="svg"
       viewBox="0 0 320 210"
       role="img"
-      aria-label="A fresh document waiting for its first review"
+      aria-label={t('list.illustration')}
       sx={{
         width: '100%',
         maxWidth: 340,

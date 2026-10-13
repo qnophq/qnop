@@ -33,6 +33,7 @@ import Checkbox from '@mui/material/Checkbox';
 import IconButton from '@mui/material/IconButton';
 import Tooltip from '@mui/material/Tooltip';
 import { ChevronRight, Trash2 } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import type { DocumentSummary } from '../../../api/generated';
 import { useFormatters } from '../../../hooks/useFormatters';
 import { DueDateLabel } from '../DueDateLabel';
@@ -43,6 +44,7 @@ import { readyToFinalize } from '../../dashboard/dashboardModel';
 import { DocumentIcon, OwnerChip, ProgressBar, ReviewerStack, RoleBadge } from './ReviewListParts';
 import { progressOf, roleOf } from './reviewListModel';
 import { visuallyHidden } from '../../../theme/visuallyHidden';
+import type { ReviewsKey } from '../reviewsI18n';
 
 /**
  * The column headers. The trailing actions column shows nothing on screen, but
@@ -50,16 +52,16 @@ import { visuallyHidden } from '../../../theme/visuallyHidden';
  * screen reader announces the column as blank. Naming it and hiding the name
  * visually keeps the layout and fixes the announcement (issue #460).
  */
-const HEADERS: { label: string; hidden?: boolean }[] = [
-  { label: 'Document' },
-  { label: 'Role' },
-  { label: 'Owner' },
-  { label: 'Status' },
-  { label: 'Progress' },
-  { label: 'Reviewers' },
-  { label: 'Due' },
-  { label: 'Updated' },
-  { label: 'Actions', hidden: true },
+const HEADERS: { labelKey: ReviewsKey; hidden?: boolean }[] = [
+  { labelKey: 'list.columns.document' },
+  { labelKey: 'list.columns.role' },
+  { labelKey: 'list.columns.owner' },
+  { labelKey: 'list.columns.status' },
+  { labelKey: 'list.columns.progress' },
+  { labelKey: 'list.columns.reviewers' },
+  { labelKey: 'list.columns.due' },
+  { labelKey: 'list.columns.updated' },
+  { labelKey: 'list.columns.actions', hidden: true },
 ];
 
 interface ReviewsTableProps {
@@ -91,6 +93,7 @@ export function ReviewsTable({
   onToggleAll,
 }: ReviewsTableProps) {
   const theme = useTheme();
+  const { t } = useTranslation('reviews');
   const { formatRelative } = useFormatters();
   const selectable = selectedIds !== undefined && onToggleSelected !== undefined;
   const selectedHere = selectable ? reviews.filter((r) => selectedIds.has(r.id)).length : 0;
@@ -109,13 +112,13 @@ export function ReviewsTable({
                     checked={selectedHere > 0 && selectedHere === reviews.length}
                     indeterminate={selectedHere > 0 && selectedHere < reviews.length}
                     onChange={onToggleAll}
-                    slotProps={{ input: { 'aria-label': 'Select every review on this page' } }}
+                    slotProps={{ input: { 'aria-label': t('list.selectAll') } }}
                   />
                 </TableCell>
               )}
-              {HEADERS.map(({ label, hidden }) => (
+              {HEADERS.map(({ labelKey, hidden }) => (
                 <TableCell
-                  key={label}
+                  key={labelKey}
                   sx={{
                     fontSize: 10.5,
                     fontWeight: 500,
@@ -127,10 +130,10 @@ export function ReviewsTable({
                 >
                   {hidden ? (
                     <Box component="span" sx={visuallyHidden}>
-                      {label}
+                      {t(labelKey)}
                     </Box>
                   ) : (
-                    label
+                    t(labelKey)
                   )}
                 </TableCell>
               ))}
@@ -156,7 +159,9 @@ export function ReviewsTable({
                         // The row opens the review; ticking it must not.
                         onClick={(event) => event.stopPropagation()}
                         onChange={() => onToggleSelected(review.id)}
-                        slotProps={{ input: { 'aria-label': `Select ${review.title}` } }}
+                        slotProps={{
+                          input: { 'aria-label': t('list.select', { title: review.title }) },
+                        }}
                       />
                     </TableCell>
                   )}
@@ -193,7 +198,7 @@ export function ReviewsTable({
                       <WorkflowBadge state={review.workflowState} archivedAt={review.archivedAt} />
                       {review.anonymous && <AnonymousBadge compact />}
                       {roleOf(review, userId) === 'owner' && readyToFinalize(review) && (
-                        <ToneBadge tone="green" label="Ready to finalize" />
+                        <ToneBadge tone="green" label={t('list.readyToFinalize')} />
                       )}
                     </Stack>
                   </TableCell>
@@ -237,11 +242,11 @@ export function ReviewsTable({
                   </TableCell>
                   <TableCell align="right" sx={{ color: 'text.secondary', whiteSpace: 'nowrap' }}>
                     {onDelete && (
-                      <Tooltip title="Delete permanently">
+                      <Tooltip title={t('list.deletePermanently')}>
                         <IconButton
                           size="small"
                           color="error"
-                          aria-label={`Delete ${review.title}`}
+                          aria-label={t('list.deleteNamed', { title: review.title })}
                           onClick={(event) => {
                             // The row itself opens the review; this must not.
                             event.stopPropagation();

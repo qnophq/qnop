@@ -20,6 +20,7 @@
  */
 
 import type { BadgeTone } from '../admin/ToneBadge';
+import type { ReviewsKey } from './reviewsI18n';
 
 /**
  * Presentation of the review workflow states (ADR-0011). The state set is
@@ -36,7 +37,28 @@ export const WORKFLOW_TONES: Record<string, BadgeTone> = {
 
 const CLOSED_STATES = new Set(['FINALIZED', 'CANCELLED']);
 
-/** Human label for a workflow state: `IN_REVIEW` → `In review`. */
+const WORKFLOW_LABEL_KEYS: Record<string, ReviewsKey> = {
+  DRAFT: 'workflow.states.DRAFT',
+  IN_REVIEW: 'workflow.states.IN_REVIEW',
+  CHANGES_REQUESTED: 'workflow.states.CHANGES_REQUESTED',
+  FINALIZED: 'workflow.states.FINALIZED',
+  CANCELLED: 'workflow.states.CANCELLED',
+};
+
+/**
+ * The `reviews` catalog key naming a known workflow state (issue #836), translated at render —
+ * see `useWorkflowLabel`. Undefined for a state this edition does not know (an enterprise
+ * extension), which falls back to {@link workflowLabel}.
+ */
+export function workflowLabelKey(state: string): ReviewsKey | undefined {
+  return WORKFLOW_LABEL_KEYS[state];
+}
+
+/**
+ * Technical fallback label for a workflow state: `IN_REVIEW` → `In review`. Untranslated, so it
+ * only names states without a catalog key ({@link workflowLabelKey}); views use
+ * `useWorkflowLabel`, which prefers the translation.
+ */
 export function workflowLabel(state: string): string {
   return state
     .toLowerCase()
