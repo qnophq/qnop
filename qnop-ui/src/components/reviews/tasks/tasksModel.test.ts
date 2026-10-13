@@ -21,8 +21,22 @@
 
 import { describe, expect, it } from 'vitest';
 import type { AnnotationView } from '../../../api/generated';
-import { AnnotationStatus, PlacementStatus } from '../../../api/generated';
-import { columnOf, matchesQuery, parseTaskFilter, taskKeys, taskTitle } from './tasksModel';
+import {
+  AnnotationPriority,
+  AnnotationStatus,
+  AnnotationType,
+  PlacementStatus,
+} from '../../../api/generated';
+import { STATUS_CUES } from '../panel/statusCues';
+import {
+  PRIORITY_CUES,
+  TYPE_CUES,
+  columnOf,
+  matchesQuery,
+  parseTaskFilter,
+  taskKeys,
+  taskTitle,
+} from './tasksModel';
 
 const annotation = (overrides: Partial<AnnotationView> = {}): AnnotationView => ({
   id: 'a1',
@@ -77,9 +91,9 @@ describe('taskTitle', () => {
     expect(taskTitle(annotation())).toBe('Please extend the payment target');
   });
 
-  it('falls back to the quote, then to a generic label', () => {
+  it('falls back to the quote, then to empty for the translated fallback', () => {
     expect(taskTitle(annotation({ firstComment: undefined }))).toBe('the disputed clause');
-    expect(taskTitle(annotation({ firstComment: '  ', anchor: undefined }))).toBe('Annotation');
+    expect(taskTitle(annotation({ firstComment: '  ', anchor: undefined }))).toBe('');
   });
 
   it('strips Markdown so the title reads as prose (#427)', () => {
@@ -112,20 +126,41 @@ describe('taskKeys', () => {
 
 describe('matchesQuery', () => {
   it('searches title, quote and author name case-insensitively', () => {
-    expect(matchesQuery(annotation(), 'Maxim', 'PAYMENT')).toBe(true);
-    expect(matchesQuery(annotation(), 'Maxim', 'disputed')).toBe(true);
-    expect(matchesQuery(annotation(), 'Maxim', 'maxim')).toBe(true);
-    expect(matchesQuery(annotation(), 'Maxim', 'liability')).toBe(false);
+    expect(matchesQuery(annotation(), 'Maxim', 'PAYMENT', 'Annotation')).toBe(true);
+    expect(matchesQuery(annotation(), 'Maxim', 'disputed', 'Annotation')).toBe(true);
+    expect(matchesQuery(annotation(), 'Maxim', 'maxim', 'Annotation')).toBe(true);
+    expect(matchesQuery(annotation(), 'Maxim', 'liability', 'Annotation')).toBe(false);
   });
 
   it('matches everything on a blank query', () => {
-    expect(matchesQuery(annotation(), 'Maxim', '  ')).toBe(true);
+    expect(matchesQuery(annotation(), 'Maxim', '  ', 'Annotation')).toBe(true);
   });
 
   it('matches the stripped opening text, not the Markdown syntax (#427)', () => {
     const a = annotation({ firstComment: '**terminology** must be consistent' });
-    expect(matchesQuery(a, 'Maxim', 'terminology')).toBe(true);
+    expect(matchesQuery(a, 'Maxim', 'terminology', 'Annotation')).toBe(true);
     // The asterisks are formatting, not content — a search for them misses.
-    expect(matchesQuery(a, 'Maxim', '**terminology**')).toBe(false);
+    expect(matchesQuery(a, 'Maxim', '**terminology**', 'Annotation')).toBe(false);
+  });
+});
+
+describe('matchesQuery fallback title (#836)', () => {
+  it('finds an untitled card by the translated title it displays', () => {
+    const untitled = annotation({ firstComment: undefined, anchor: undefined });
+    expect(matchesQuery(untitled, 'Maxim', 'annotation', 'Annotation')).toBe(true);
+    expect(matchesQuery(untitled, 'Maxim', 'anmerk', 'Anmerkung')).toBe(true);
+    // A titled card is found by its own title only.
+    expect(matchesQuery(annotation(), 'Maxim', 'anmerk', 'Anmerkung')).toBe(false);
+  });
+});
+
+describe('cue labels (#836)', () => {
+  it('name every type, priority and status by its workspace catalog key', () => {
+    expect(TYPE_CUES[AnnotationType.Risk].labelKey).toBe('annotation.types.RISK');
+    expect(PRIORITY_CUES[AnnotationPriority.Medium].labelKey).toBe('annotation.priorities.MEDIUM');
+    expect(STATUS_CUES[AnnotationStatus.Dismissed].labelKey).toBe('annotation.status.DISMISSED');
+    for (const type of Object.values(AnnotationType)) {
+      expect(TYPE_CUES[type].labelKey).toBe(`annotation.types.${type}`);
+    }
   });
 });

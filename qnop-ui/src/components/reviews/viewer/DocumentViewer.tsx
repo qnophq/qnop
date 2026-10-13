@@ -23,6 +23,7 @@ import { useEffect, useImperativeHandle, useRef, useState } from 'react';
 import type { Ref } from 'react';
 import Box from '@mui/material/Box';
 import Stack from '@mui/material/Stack';
+import { useTranslation } from 'react-i18next';
 import type { PDFDocumentProxy } from 'pdfjs-dist';
 import type {
   Anchor,
@@ -97,6 +98,7 @@ export function DocumentViewer({
   onRegionSelected,
   focusScrim,
 }: DocumentViewerProps) {
+  const { t } = useTranslation('workspace');
   const containerRef = useRef<HTMLDivElement>(null);
   const pageRefs = useRef<(HTMLDivElement | null)[]>([]);
   const [containerWidth, setContainerWidth] = useState(0);
@@ -190,7 +192,7 @@ export function DocumentViewer({
     <Box
       ref={containerRef}
       component="section"
-      aria-label="Document pages"
+      aria-label={t('viewer.pages')}
       onMouseMove={(event) => {
         pointerRef.current = { left: event.clientX, top: event.clientY };
       }}

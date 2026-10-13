@@ -23,6 +23,7 @@ import { Fragment } from 'react';
 import Box from '@mui/material/Box';
 import Stack from '@mui/material/Stack';
 import Typography from '@mui/material/Typography';
+import { useTranslation } from 'react-i18next';
 import type { ReactionGroup } from '../../../api/generated';
 import { useExtensionSlot, type MessageRowContext } from '../../../extensions/registry';
 import { useFormatters } from '../../../hooks/useFormatters';
@@ -98,6 +99,7 @@ export function CommentMessage({
   hoverUserSlug,
   slotContext,
 }: CommentMessageProps) {
+  const { t } = useTranslation('workspace');
   const { shortRelativeTime, formatDateTime } = useFormatters();
   // Empty without registered extensions — the row then renders byte-identically.
   const actionContributions = useExtensionSlot('messageActions');
@@ -134,7 +136,7 @@ export function CommentMessage({
               noWrap
               sx={{ fontWeight: 700, fontSize: '0.875rem', lineHeight: 1.4 }}
             >
-              {own ? 'You' : name}
+              {own ? t('people.you') : name}
             </Typography>
           </UserHoverCard>
           <Typography
@@ -155,12 +157,12 @@ export function CommentMessage({
                 <CopyTextButton
                   text={body}
                   notify={notify}
-                  label="Copy comment"
-                  copiedMessage="Comment copied."
+                  label={t('thread.copyComment')}
+                  copiedMessage={t('thread.commentCopied')}
                 />
               )}
               {permalinkUrl && notify && (
-                <CopyLinkButton url={permalinkUrl} notify={notify} label="Copy link to comment" />
+                <CopyLinkButton url={permalinkUrl} notify={notify} label={t('thread.copyLink')} />
               )}
               {onToggleReaction && (
                 <AddReactionButton

@@ -25,8 +25,11 @@ import Stack from '@mui/material/Stack';
 import Typography from '@mui/material/Typography';
 import { alpha, useTheme } from '@mui/material/styles';
 import { Crosshair, X } from 'lucide-react';
+import { Trans, useTranslation } from 'react-i18next';
 
 const EXCERPT_MAX = 60;
+/** The key cap shown beside the hint — a key name, never translated. */
+const ESCAPE_KEY_LABEL = 'Esc';
 
 interface ReattachHintBarProps {
   /** The lost placement's old quote — null for region-only annotations. */
@@ -41,6 +44,7 @@ interface ReattachHintBarProps {
  * the mode without touching anything.
  */
 export function ReattachHintBar({ excerpt, onCancel }: ReattachHintBarProps) {
+  const { t } = useTranslation('workspace');
   const theme = useTheme();
   const trimmed =
     excerpt && excerpt.length > EXCERPT_MAX ? `${excerpt.slice(0, EXCERPT_MAX)}…` : excerpt;
@@ -89,15 +93,21 @@ export function ReattachHintBar({ excerpt, onCancel }: ReattachHintBarProps) {
       </Box>
       <Typography variant="body2" noWrap sx={{ minWidth: 0 }}>
         {trimmed ? (
-          <>
-            Placing{' '}
-            <Box component="span" sx={{ fontWeight: 600 }}>
-              “{trimmed}”
-            </Box>{' '}
-            — select the new passage
-          </>
+          <Trans
+            t={t}
+            i18nKey="viewer.placingQuote"
+            // The quote goes in as a child, never as an interpolated value: Trans parses
+            // the interpolated string for tags, so a passage like "<b>…" would turn into markup.
+            components={{
+              quote: (
+                <Box component="span" sx={{ fontWeight: 600 }}>
+                  {t('quoted', { text: trimmed })}
+                </Box>
+              ),
+            }}
+          />
         ) : (
-          'Placing the annotation — select its new location'
+          t('viewer.placing')
         )}
       </Typography>
       <Box
@@ -114,9 +124,9 @@ export function ReattachHintBar({ excerpt, onCancel }: ReattachHintBarProps) {
           color: 'text.secondary',
         }}
       >
-        Esc
+        {ESCAPE_KEY_LABEL}
       </Box>
-      <IconButton size="small" aria-label="Cancel re-attaching" onClick={onCancel}>
+      <IconButton size="small" aria-label={t('viewer.cancelReattach')} onClick={onCancel}>
         <X size={13} />
       </IconButton>
     </Stack>

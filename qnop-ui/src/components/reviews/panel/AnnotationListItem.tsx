@@ -28,6 +28,7 @@ import Tooltip from '@mui/material/Tooltip';
 import Typography from '@mui/material/Typography';
 import { alpha, useTheme, type Theme } from '@mui/material/styles';
 import { ChevronUp, MessageSquare, MoveRight, Unlink } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import type { AnnotationView } from '../../../api/generated';
 import { PlacementStatus } from '../../../api/generated';
 import { useComments } from '../../../api/hooks/useComments';
@@ -86,6 +87,7 @@ function ParticipantAvatars({
   /** The review's anonymity context — gates the hover cards (issue #482). */
   review: { anonymous?: boolean; ownerId?: string } | undefined;
 }) {
+  const { t } = useTranslation('workspace');
   const userId = useAuthStore((state) => state.userId);
   const displayName = useAuthStore((state) => state.displayName);
   const avatarUrl = useAuthStore((state) => state.avatarUrl);
@@ -118,7 +120,11 @@ function ParticipantAvatars({
               }}
             >
               <UserAvatar
-                name={own ? (displayName ?? 'You') : (participant.name ?? 'Participant')}
+                name={
+                  own
+                    ? (displayName ?? t('people.you'))
+                    : (participant.name ?? t('people.participant'))
+                }
                 size={20}
                 imageUrl={own ? avatarUrl : avatarSrc(participant.id)}
               />
@@ -188,6 +194,7 @@ function AnnotationListItemBase({
   onConfirmPlacement,
   onReattachPlacement,
 }: AnnotationListItemProps) {
+  const { t } = useTranslation('workspace');
   const theme = useTheme();
   const { shortRelativeTime, formatDateTime } = useFormatters();
   const viewerId = useAuthStore((state) => state.userId);
@@ -202,10 +209,18 @@ function AnnotationListItemBase({
   // relocated highlight, red for one the resolver lost.
   const placementCue =
     annotation.placementStatus === PlacementStatus.Moved
-      ? { icon: MoveRight, label: 'Moved', color: (t: Theme) => t.palette.warning.main }
+      ? {
+          icon: MoveRight,
+          label: t('annotation.placement.MOVED.label'),
+          color: (theme: Theme) => theme.palette.warning.main,
+        }
       : annotation.placementStatus === PlacementStatus.Orphaned ||
           annotation.placementStatus === PlacementStatus.Failed
-        ? { icon: Unlink, label: 'Orphaned', color: (t: Theme) => t.palette.error.main }
+        ? {
+            icon: Unlink,
+            label: t('annotation.placement.ORPHANED.label'),
+            color: (theme: Theme) => theme.palette.error.main,
+          }
         : null;
   const priorityCue = annotation.priority ? PRIORITY_CUES[annotation.priority] : null;
   const viewerAvatarUrl = useAuthStore((state) => state.avatarUrl);
@@ -218,8 +233,8 @@ function AnnotationListItemBase({
   const hoverUserId = realAuthorId(review, viewerId, annotation.authorId);
   const authorName =
     annotation.authorId === viewerId
-      ? (viewerName ?? 'You')
-      : (annotation.authorDisplayName ?? 'Participant');
+      ? (viewerName ?? t('people.you'))
+      : (annotation.authorDisplayName ?? t('people.participant'));
 
   // Participants: the annotation author plus every commenter already known to
   // the cache (enabled: false never fetches — rows stay cheap; the stack
@@ -241,7 +256,7 @@ function AnnotationListItemBase({
 
   // No region means no placement at all → a document-scoped annotation (issue #395); an orphaned
   // annotation keeps its anchor, so it never lands here.
-  const fallbackLabel = region ? 'Region annotation' : 'Whole document';
+  const fallbackLabel = region ? t('annotation.regionAnnotation') : t('annotation.wholeDocument');
 
   // Expanding swaps the row's button for the card's collapse control (and back
   // again), so the element that had focus disappears mid-interaction. Focus
@@ -313,11 +328,11 @@ function AnnotationListItemBase({
               onReattachPlacement={onReattachPlacement}
             />
           </Box>
-          <Tooltip title="Collapse">
+          <Tooltip title={t('annotation.collapse')}>
             <IconButton
               ref={collapseRef}
               size="small"
-              aria-label="Collapse annotation"
+              aria-label={t('annotation.collapseAnnotation')}
               aria-expanded
               aria-controls={`annotation-item-${annotation.id}`}
               onClick={toggle}
@@ -353,7 +368,7 @@ function AnnotationListItemBase({
           <Stack spacing={0.5} sx={{ minWidth: 0 }}>
             {/* Title line: status tile, the content itself, participants. */}
             <Stack direction="row" spacing={1} sx={{ alignItems: 'center', minWidth: 0 }}>
-              <Tooltip title={statusCue.label}>
+              <Tooltip title={t(statusCue.labelKey)}>
                 <Box
                   sx={{
                     position: 'relative',
@@ -367,9 +382,9 @@ function AnnotationListItemBase({
                     flexShrink: 0,
                   }}
                 >
-                  <StatusIcon size={14} aria-label={statusCue.label} />
+                  <StatusIcon size={14} aria-label={t(statusCue.labelKey)} />
                   {unseen && (
-                    <Tooltip title="New since your last visit">
+                    <Tooltip title={t('annotation.newSinceLastVisit')}>
                       <Box
                         data-testid="unseen-dot"
                         sx={{
@@ -399,7 +414,7 @@ function AnnotationListItemBase({
                 }}
               >
                 {quote
-                  ? `“${quote}”`
+                  ? t('quoted', { text: quote })
                   : plainExcerpt(resolveMentions(annotation.firstComment ?? '')) || fallbackLabel}
               </Typography>
               <ParticipantAvatars participants={participants} review={review} />
@@ -457,11 +472,11 @@ function AnnotationListItemBase({
                   sx={{ alignItems: 'center', color: typeCue.color(theme), flexShrink: 0 }}
                 >
                   <typeCue.icon size={11} aria-hidden />
-                  <Typography variant="caption">{typeCue.label}</Typography>
+                  <Typography variant="caption">{t(typeCue.labelKey)}</Typography>
                 </Stack>
               )}
               {priorityCue && (
-                <Tooltip title={`${priorityCue.label} priority`}>
+                <Tooltip title={t('annotation.priority', { priority: t(priorityCue.labelKey) })}>
                   <Box
                     sx={{
                       width: 7,
@@ -486,7 +501,10 @@ function AnnotationListItemBase({
                 }}
               >
                 <MessageSquare size={12} aria-hidden />
-                <Typography variant="caption" aria-label={`${annotation.commentCount} comments`}>
+                <Typography
+                  variant="caption"
+                  aria-label={t('annotation.commentCount', { count: annotation.commentCount })}
+                >
                   {annotation.commentCount}
                 </Typography>
               </Stack>
@@ -496,7 +514,7 @@ function AnnotationListItemBase({
                   color="text.secondary"
                   sx={{ flexShrink: 0, fontVariantNumeric: 'tabular-nums' }}
                 >
-                  p. {region.surfaceIndex + 1}
+                  {t('annotation.pageShort', { page: region.surfaceIndex + 1 })}
                 </Typography>
               ) : (
                 // In the flat list (issue #481) the scope must read per card —

@@ -23,6 +23,7 @@ import { useState } from 'react';
 import IconButton from '@mui/material/IconButton';
 import Tooltip from '@mui/material/Tooltip';
 import { Smile } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import { EmojiPickerPopover } from './EmojiPickerPopover';
 
 interface EmojiPickerButtonProps {
@@ -37,15 +38,16 @@ interface EmojiPickerButtonProps {
  * image sheets, no shortcodes.
  */
 export function EmojiPickerButton({ onSelect, disabled = false }: EmojiPickerButtonProps) {
+  const { t } = useTranslation('workspace');
   const [anchorEl, setAnchorEl] = useState<HTMLElement | null>(null);
 
   return (
     <>
-      <Tooltip title="Emoji">
+      <Tooltip title={t('markdown.emoji.tooltip')}>
         <span>
           <IconButton
             size="small"
-            aria-label="Insert emoji"
+            aria-label={t('markdown.emoji.insert')}
             disabled={disabled}
             onClick={(event) => setAnchorEl(event.currentTarget)}
             sx={{

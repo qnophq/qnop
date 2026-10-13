@@ -86,6 +86,11 @@ export function matchesFilters(
   authorName: string,
   /** The roster's mention resolver (issue #462) — search then hits mentioned names, not just raw @slugs. */
   resolveMentions: (text: string) => string = (text) => text,
+  /**
+   * The translated title an untitled card displays (the tasks views, issue #836) —
+   * searching for it must find the card. Omitted where no such title is shown.
+   */
+  fallbackTitle?: string,
 ): boolean {
   if (filters.status === 'open' && annotation.status !== AnnotationStatus.Open) return false;
   if (filters.status === 'resolved' && annotation.status === AnnotationStatus.Open) return false;
@@ -105,7 +110,11 @@ export function matchesFilters(
     stripMarkdown(resolveMentions(annotation.firstComment ?? ''))
       .toLowerCase()
       .includes(needle) ||
-    authorName.toLowerCase().includes(needle)
+    authorName.toLowerCase().includes(needle) ||
+    (fallbackTitle !== undefined &&
+      !annotation.anchor?.textQuote?.quote &&
+      !stripMarkdown(annotation.firstComment).trim() &&
+      fallbackTitle.toLowerCase().includes(needle))
   );
 }
 

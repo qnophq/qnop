@@ -30,6 +30,7 @@ import type enProfile from './en/profile.json';
 import type enReviews from './en/reviews.json';
 import type enShell from './en/shell.json';
 import type enTeams from './en/teams.json';
+import type enWorkspace from './en/workspace.json';
 
 /**
  * Types every `t()` key against the English catalog (ADR-0063): a misspelt or removed key fails
@@ -49,6 +50,7 @@ declare module 'i18next' {
       audit: typeof enAudit;
       admin: typeof enAdmin;
       reviews: typeof enReviews;
+      workspace: typeof enWorkspace;
     };
     returnNull: false;
   }

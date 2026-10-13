@@ -27,6 +27,7 @@ import Stack from '@mui/material/Stack';
 import Typography from '@mui/material/Typography';
 import { alpha, useTheme } from '@mui/material/styles';
 import { CircleSlash } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 
 /**
  * The owner/admin's escape hatch on someone else's open annotation (issue
@@ -42,6 +43,7 @@ export function DismissControl({
   disabled: boolean;
   onDismiss: (justification: string) => void;
 }) {
+  const { t } = useTranslation(['workspace', 'common']);
   const theme = useTheme();
   const [open, setOpen] = useState(false);
   const [justification, setJustification] = useState('');
@@ -76,7 +78,7 @@ export function DismissControl({
           onClick={() => setOpen(true)}
           sx={{ fontSize: 12, color: 'text.secondary' }}
         >
-          Dismiss…
+          {t('dismiss.open')}
         </Button>
       </Stack>
     );
@@ -90,8 +92,8 @@ export function DismissControl({
           value={justification}
           onChange={(event) => setJustification(event.target.value)}
           onKeyDown={onKeyDown}
-          placeholder="Why is this concern dismissed? (required)"
-          inputProps={{ 'aria-label': 'Dismissal justification (required)' }}
+          placeholder={t('dismiss.placeholder')}
+          inputProps={{ 'aria-label': t('dismiss.label') }}
           sx={{
             flex: 1,
             fontSize: 13,
@@ -118,7 +120,7 @@ export function DismissControl({
           onClick={submit}
           sx={{ flexShrink: 0 }}
         >
-          Dismiss
+          {t('dismiss.action')}
         </Button>
         <Button
           size="small"
@@ -126,11 +128,11 @@ export function DismissControl({
           onClick={() => setOpen(false)}
           sx={{ flexShrink: 0, color: 'text.secondary' }}
         >
-          Cancel
+          {t('common:actions.cancel')}
         </Button>
       </Stack>
       <Typography sx={{ fontSize: 11.5, color: 'text.secondary', pl: 0.5 }}>
-        The justification is posted to the thread; the author may reopen.
+        {t('dismiss.note')}
       </Typography>
     </Stack>
   );

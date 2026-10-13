@@ -29,12 +29,15 @@ import Tooltip from '@mui/material/Tooltip';
 import Typography from '@mui/material/Typography';
 import { alpha, useTheme } from '@mui/material/styles';
 import { Minimize2, PenLine } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import { ResizeHandle } from '../ResizeHandle';
 import { useResizeHandle } from '../useResizeHandle';
 
 /** The context rail never crowds the editor, never vanishes. */
 const RAIL_MIN_WIDTH = 320;
 const RAIL_DEFAULT_WIDTH = 400;
+/** The key cap of the exit hint — a key name, never translated. */
+const ESCAPE_KEY_LABEL = 'esc';
 
 interface FullscreenComposerDialogProps {
   open: boolean;
@@ -43,6 +46,7 @@ interface FullscreenComposerDialogProps {
   title: string;
   /** Right-hand context rail: the discussion so far, the anchored passage, … */
   context?: ReactNode;
+  /** The rail's heading; defaults to "Discussion". */
   contextTitle?: string;
   /** The writing surface — a composer the HOST controls, so drafts survive the mode switch. */
   children: ReactNode;
@@ -62,9 +66,10 @@ export function FullscreenComposerDialog({
   onClose,
   title,
   context,
-  contextTitle = 'Discussion',
+  contextTitle,
   children,
 }: FullscreenComposerDialogProps) {
+  const { t } = useTranslation('workspace');
   const theme = useTheme();
   const stageRef = useRef<HTMLDivElement>(null);
   const rail = useResizeHandle({
@@ -145,12 +150,12 @@ export function FullscreenComposerDialog({
                 bgcolor: theme.qnop.surface2,
               }}
             >
-              esc
+              {ESCAPE_KEY_LABEL}
             </Box>
-            to exit
+            {t('markdown.exitHint')}
           </Typography>
-          <Tooltip title="Exit full screen">
-            <IconButton size="small" aria-label="Exit full screen" onClick={onClose}>
+          <Tooltip title={t('markdown.exitFullScreen')}>
+            <IconButton size="small" aria-label={t('markdown.exitFullScreen')} onClick={onClose}>
               <Minimize2 size={16} />
             </IconButton>
           </Tooltip>
@@ -184,7 +189,7 @@ export function FullscreenComposerDialog({
               }}
             >
               <ResizeHandle
-                ariaLabel="Resize the context rail"
+                ariaLabel={t('markdown.resizeRail')}
                 testId="stage-rail-resize-handle"
                 minWidth={RAIL_MIN_WIDTH}
                 state={rail}
@@ -199,7 +204,7 @@ export function FullscreenComposerDialog({
                   letterSpacing: '0.08em',
                 }}
               >
-                {contextTitle}
+                {contextTitle ?? t('markdown.discussion')}
               </Typography>
               <Box sx={{ flex: 1, overflowY: 'auto', px: 2.5, pb: 2.5 }}>{context}</Box>
             </Box>

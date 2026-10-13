@@ -24,6 +24,7 @@ import Box from '@mui/material/Box';
 import Stack from '@mui/material/Stack';
 import Typography from '@mui/material/Typography';
 import { useTheme } from '@mui/material/styles';
+import { useTranslation } from 'react-i18next';
 import type { AnnotationView } from '../../../api/generated';
 import { useComments } from '../../../api/hooks/useComments';
 import { useDocument } from '../../../api/hooks/useDocuments';
@@ -79,6 +80,7 @@ export function AnnotationHead({
   onConfirmPlacement,
   onReattachPlacement,
 }: AnnotationHeadProps) {
+  const { t } = useTranslation('workspace');
   const theme = useTheme();
   const { shortRelativeTime, formatDateTime } = useFormatters();
   // Reactions on the opener (issue #410) — active wherever notify travels;
@@ -102,7 +104,9 @@ export function AnnotationHead({
   // (issue #413): the real name in a normal review, a stable "Participant N"
   // pseudonym for foreign authors in an anonymous one. Own contributions read
   // "You" from the auth store.
-  const authorName = own ? (displayName ?? 'You') : (annotation.authorDisplayName ?? 'Participant');
+  const authorName = own
+    ? (displayName ?? t('people.you'))
+    : (annotation.authorDisplayName ?? t('people.participant'));
   // The hover card (issue #482) attaches only to guaranteed-real author ids —
   // in an anonymous review a foreign authorId is a pseudonym token.
   const review = useDocument(useReviewDocumentId()).data;
@@ -125,8 +129,8 @@ export function AnnotationHead({
     body: openerText ?? '',
   };
   const fallbackLabel = annotation.anchor?.region
-    ? 'Region annotation'
-    : 'No placement on this version';
+    ? t('annotation.regionAnnotation')
+    : t('annotation.noPlacement');
 
   return (
     <Stack
@@ -175,7 +179,7 @@ export function AnnotationHead({
               title={formatDateTime(annotation.createdAt)}
               sx={{ lineHeight: 1.4 }}
             >
-              Started this discussion · {shortRelativeTime(annotation.createdAt)}
+              {t('head.started', { time: shortRelativeTime(annotation.createdAt) })}
             </Typography>
             {badgeContributions.map((contribution) => (
               <Fragment key={contribution.id}>{contribution.render(slotContext)}</Fragment>
@@ -195,16 +199,12 @@ export function AnnotationHead({
                   <CopyTextButton
                     text={copyText}
                     notify={notify}
-                    label={quote ? 'Copy quote' : 'Copy text'}
-                    copiedMessage={quote ? 'Quote copied.' : 'Text copied.'}
+                    label={quote ? t('head.copyQuote') : t('head.copyText')}
+                    copiedMessage={quote ? t('head.quoteCopied') : t('head.textCopied')}
                   />
                 )}
                 {permalinkUrl && notify && (
-                  <CopyLinkButton
-                    url={permalinkUrl}
-                    notify={notify}
-                    label="Copy link to annotation"
-                  />
+                  <CopyLinkButton url={permalinkUrl} notify={notify} label={t('head.copyLink')} />
                 )}
                 {onToggleReaction && (
                   <AddReactionButton
@@ -257,7 +257,7 @@ export function AnnotationHead({
               overflow: 'hidden',
             }}
           >
-            “{quote}”
+            {t('quoted', { text: quote })}
           </Typography>
         </Box>
       ) : (

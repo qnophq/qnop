@@ -25,10 +25,22 @@ import CircularProgress from '@mui/material/CircularProgress';
 import Popover from '@mui/material/Popover';
 import Typography from '@mui/material/Typography';
 import { useTheme } from '@mui/material/styles';
+import { useTranslation } from 'react-i18next';
+import { toSupportedLocale, type AppLocale } from '../../../i18n/locales';
 
 /** The picker's footprint, reserved so the popover doesn't jump when it loads. */
 const PICKER_WIDTH = 352;
 const PICKER_HEIGHT = 420;
+
+/**
+ * emoji-mart's own UI strings (search, categories) per non-English UI language,
+ * loaded lazily alongside the picker. Keyed by every supported locale, so a new
+ * language cannot silently get an English picker; never left to emoji-mart, which
+ * would fetch them from a CDN.
+ */
+const PICKER_I18N: Record<Exclude<AppLocale, 'en'>, () => Promise<{ default: unknown }>> = {
+  de: () => import('@emoji-mart/data/i18n/de.json'),
+};
 
 interface EmojiPickerPopoverProps {
   anchorEl: HTMLElement | null;
@@ -70,6 +82,8 @@ export function EmojiPickerPopover({ anchorEl, onClose, onSelect }: EmojiPickerP
 }
 
 function PickerHost({ onClose, onSelect }: Omit<EmojiPickerPopoverProps, 'anchorEl'>) {
+  const { t, i18n } = useTranslation('workspace');
+  const language = i18n.language;
   const theme = useTheme();
   const [status, setStatus] = useState<'loading' | 'ready' | 'failed'>('loading');
   const hostRef = useRef<HTMLDivElement | null>(null);
@@ -85,13 +99,17 @@ function PickerHost({ onClose, onSelect }: Omit<EmojiPickerPopoverProps, 'anchor
     let cancelled = false;
     (async () => {
       try {
-        const [{ Picker }, { default: data }] = await Promise.all([
+        const locale = toSupportedLocale(language) ?? 'en';
+        const [{ Picker }, { default: data }, strings] = await Promise.all([
           import('emoji-mart'),
           import('@emoji-mart/data'),
+          // A failed strings chunk degrades to the English picker, not to the load error.
+          locale === 'en' ? Promise.resolve(null) : PICKER_I18N[locale]().catch(() => null),
         ]);
         if (cancelled || !hostRef.current) return;
         const picker = new Picker({
           data,
+          ...(strings ? { locale, i18n: strings.default } : {}),
           set: 'native',
           theme: theme.qnop.mode,
           previewPosition: 'none',
@@ -117,7 +135,7 @@ function PickerHost({ onClose, onSelect }: Omit<EmojiPickerPopoverProps, 'anchor
     return () => {
       cancelled = true;
     };
-  }, [theme.qnop.mode]);
+  }, [theme.qnop.mode, language]);
 
   return (
     <Box
@@ -134,10 +152,12 @@ function PickerHost({ onClose, onSelect }: Omit<EmojiPickerPopoverProps, 'anchor
     >
       {status === 'failed' && (
         <Typography variant="body2" color="text.secondary" sx={{ p: 2 }}>
-          The emoji picker could not be loaded.
+          {t('markdown.emoji.loadError')}
         </Typography>
       )}
-      {status === 'loading' && <CircularProgress size={22} aria-label="Loading emoji picker" />}
+      {status === 'loading' && (
+        <CircularProgress size={22} aria-label={t('markdown.emoji.loading')} />
+      )}
       <Box ref={hostRef} sx={{ alignSelf: 'stretch' }} />
     </Box>
   );

@@ -30,6 +30,7 @@ import Paper from '@mui/material/Paper';
 import Stack from '@mui/material/Stack';
 import Typography from '@mui/material/Typography';
 import { PanelRightOpen } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import { ExtractionStatus } from '../../api/generated';
 import { useDocument, useDocumentVersions } from '../../api/hooks/useDocuments';
 import { useOriginalPdf } from '../../api/hooks/useDocuments';
@@ -59,6 +60,7 @@ import { useFormatters } from '../../hooks/useFormatters';
  * invalid or missing parameters normalise to "previous ↔ latest".
  */
 export function VersionComparePage() {
+  const { t } = useTranslation('workspace');
   // The raw segment may be a slug (issue #411) — sibling links keep it, while
   // all data access below uses the canonical id resolved by the route gate.
   const { documentId: routeSegment = '' } = useParams();
@@ -140,11 +142,7 @@ export function VersionComparePage() {
     );
   }
   if (documentQuery.isError || !documentQuery.data) {
-    return (
-      <Alert severity="error">
-        This document does not exist, or you are not a participant of its review.
-      </Alert>
-    );
+    return <Alert severity="error">{t('review.notFound')}</Alert>;
   }
 
   const document_ = documentQuery.data;
@@ -180,10 +178,7 @@ export function VersionComparePage() {
       />
 
       {from === undefined || to === undefined ? (
-        <Alert severity="info">
-          Comparing needs at least two versions with an extracted text layer. Upload a new version
-          first.
-        </Alert>
+        <Alert severity="info">{t('diff.needsTwoVersions')}</Alert>
       ) : (
         <>
           <CompareToolbar
@@ -200,8 +195,8 @@ export function VersionComparePage() {
           {diffQuery.isError && (
             <Alert severity="error">
               {versionDiffErrorCode(diffQuery.error) === 'EXTRACTION_PENDING'
-                ? 'One of the versions is still being processed — try again in a moment.'
-                : 'The comparison could not be computed.'}
+                ? t('diff.pending')
+                : t('diff.failed')}
             </Alert>
           )}
           <Box
@@ -242,7 +237,7 @@ export function VersionComparePage() {
                   metaText={versionMeta(version)}
                   trailingText={
                     side === 'to' && changes
-                      ? `${changes.length} ${changes.length === 1 ? 'change' : 'changes'}`
+                      ? t('diff.changeCount', { count: changes.length })
                       : undefined
                   }
                   pdf={pdfState.pdf}
@@ -272,7 +267,7 @@ export function VersionComparePage() {
                 <IconButton
                   size="small"
                   onClick={() => setRailCollapsed(false)}
-                  aria-label="Expand the changes rail"
+                  aria-label={t('diff.expandRail')}
                   data-testid="rail-expand"
                 >
                   <PanelRightOpen size={15} />
@@ -289,7 +284,7 @@ export function VersionComparePage() {
                     writingMode: { lg: 'vertical-rl' },
                   }}
                 >
-                  Changes
+                  {t('diff.changes')}
                 </Typography>
               </Paper>
             ) : (

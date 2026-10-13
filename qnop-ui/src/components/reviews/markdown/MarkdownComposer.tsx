@@ -43,6 +43,7 @@ import Tooltip from '@mui/material/Tooltip';
 import Typography from '@mui/material/Typography';
 import { alpha, useTheme, type Theme } from '@mui/material/styles';
 import { Maximize2, Minimize2, Paperclip } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import { isSubmitShortcut } from '../../../utils/platform';
 import { avatarSrc } from '../../../utils/avatarUrl';
 import { UserAvatar } from '../../shell/UserAvatar';
@@ -91,6 +92,7 @@ interface MarkdownComposerProps {
   onChange: (value: string) => void;
   /** Fired by the platform submit chord; the caller guards its own validity. */
   onSubmit?: () => void;
+  /** The field's placeholder; defaults to "Add a comment". */
   placeholder?: string;
   /** The textarea's accessible name — kept caller-specific for the tests. */
   inputAriaLabel: string;
@@ -142,7 +144,7 @@ export function MarkdownComposer({
   value,
   onChange,
   onSubmit,
-  placeholder = 'Add a comment',
+  placeholder: placeholderProp,
   inputAriaLabel,
   minRows = 3,
   maxRows = 12,
@@ -155,7 +157,9 @@ export function MarkdownComposer({
   actions,
   mentionCandidates,
 }: MarkdownComposerProps) {
+  const { t } = useTranslation('workspace');
   const theme = useTheme();
+  const placeholder = placeholderProp ?? t('markdown.placeholder');
   // The full-screen stage reads larger; both the input and the preview's
   // row-derived heights follow the same metrics.
   const fontSize = roomy || bare ? 16 : 14;
@@ -351,33 +355,33 @@ export function MarkdownComposer({
    * when the upload fails (the callback surfaced the error).
    */
   const uploadOne = async (upload: (file: File) => Promise<UploadedAttachment>, file: File) => {
-    const label = file.name || 'attachment';
+    const label = file.name || t('markdown.attachmentName');
     // The optimistic form follows the browser-declared type; the final form
     // follows the server-sniffed one.
-    const placeholder = `${file.type.startsWith('image/') ? '!' : ''}[Uploading ${label}…]()`;
+    const pending = `${file.type.startsWith('image/') ? '!' : ''}[${t('markdown.uploading', { name: label })}]()`;
     if (contributed) {
-      insertIntoSurface(placeholder);
+      insertIntoSurface(pending);
     } else {
       const el = inputRef.current;
       if (!el) return;
       const start = el.selectionStart ?? el.value.length;
       const end = el.selectionEnd ?? start;
-      const caret = start + placeholder.length;
+      const caret = start + pending.length;
       splice(
         start,
         end,
-        placeholder,
+        pending,
         caret,
         caret,
-        el.value.slice(0, start) + placeholder + el.value.slice(end),
+        el.value.slice(0, start) + pending + el.value.slice(end),
       );
     }
     try {
       const uploaded = await upload(file);
       const bang = uploaded.contentType.startsWith('image/') ? '!' : '';
-      replaceOnce(placeholder, `${bang}[${uploaded.fileName}](${uploaded.url})`);
+      replaceOnce(pending, `${bang}[${uploaded.fileName}](${uploaded.url})`);
     } catch {
-      replaceOnce(placeholder, '');
+      replaceOnce(pending, '');
     }
   };
 
@@ -525,7 +529,7 @@ export function MarkdownComposer({
                 meaning. Beside a contributed mode "Write" stops being true —
                 one writes in the other mode too — so each tab then names what
                 you get, not what you do: Markdown | <mode> | Preview (#599). */}
-            {modes.length > 0 ? 'Markdown' : 'Write'}
+            {modes.length > 0 ? t('markdown.markdown') : t('markdown.write')}
           </ButtonBase>
           {modes.map((candidate) => (
             <ButtonBase
@@ -544,17 +548,17 @@ export function MarkdownComposer({
               aria-pressed={previewing}
               sx={modeTabSx(theme, previewing)}
             >
-              Preview
+              {t('markdown.preview')}
             </ButtonBase>
           )}
         </Stack>
         <Stack direction="row" spacing={0.25} sx={{ alignItems: 'center', flexWrap: 'wrap' }}>
           {writing && <MarkdownToolbar onAction={handleAction} disabled={disabled} />}
           {onToggleFullscreen && (
-            <Tooltip title={fullscreen ? 'Exit full screen' : 'Full screen'}>
+            <Tooltip title={fullscreen ? t('markdown.exitFullScreen') : t('markdown.fullScreen')}>
               <IconButton
                 size="small"
-                aria-label={fullscreen ? 'Exit full screen' : 'Full screen'}
+                aria-label={fullscreen ? t('markdown.exitFullScreen') : t('markdown.fullScreen')}
                 onClick={onToggleFullscreen}
               >
                 {fullscreen ? <Minimize2 size={14} /> : <Maximize2 size={14} />}
@@ -582,7 +586,7 @@ export function MarkdownComposer({
             <Markdown>{value}</Markdown>
           ) : (
             <Typography variant="body2" sx={{ color: 'text.disabled', fontStyle: 'italic' }}>
-              Nothing to preview.
+              {t('markdown.nothingToPreview')}
             </Typography>
           )}
         </Box>
@@ -655,7 +659,7 @@ export function MarkdownComposer({
         style={{ zIndex: theme.zIndex.modal }}
       >
         <Paper elevation={6} sx={{ mt: 0.5, minWidth: 240, maxHeight: 240, overflowY: 'auto' }}>
-          <MenuList dense aria-label="Mention a participant">
+          <MenuList dense aria-label={t('markdown.mentionMenu')}>
             {mentionMatches.map((candidate, index) => (
               <MenuItem
                 key={candidate.id}
@@ -735,11 +739,11 @@ export function MarkdownComposer({
                   event.target.value = '';
                 }}
               />
-              <Tooltip title="Attach file">
+              <Tooltip title={t('markdown.attachFile')}>
                 <span>
                   <IconButton
                     size="small"
-                    aria-label="Attach file"
+                    aria-label={t('markdown.attachFile')}
                     disabled={disabled || previewing}
                     onClick={() => fileInputRef.current?.click()}
                     sx={{
@@ -783,7 +787,7 @@ export function MarkdownComposer({
           }}
         >
           <Typography variant="body2" sx={{ fontWeight: 600, color: theme.qnop.brand.blue }}>
-            Drop files to attach
+            {t('markdown.dropFiles')}
           </Typography>
         </Stack>
       )}

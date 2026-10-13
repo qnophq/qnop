@@ -25,6 +25,7 @@ import Stack from '@mui/material/Stack';
 import Typography from '@mui/material/Typography';
 import { alpha, useTheme } from '@mui/material/styles';
 import { ArrowRight, PanelRightClose } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import type { DiffChange } from '../../../api/generated';
 import { DiffChangeType } from '../../../api/generated';
 import { tokens } from '../../../theme/tokens';
@@ -53,6 +54,7 @@ export function ChangeSummaryPanel({
   onSelectChange,
   onCollapse,
 }: ChangeSummaryPanelProps) {
+  const { t } = useTranslation('workspace');
   const theme = useTheme();
   const dark = theme.palette.mode === 'dark';
 
@@ -70,13 +72,13 @@ export function ChangeSummaryPanel({
           variant="overline"
           sx={{ color: 'text.secondary', lineHeight: 1.5, letterSpacing: '0.08em' }}
         >
-          Changes ({changes.length})
+          {t('diff.summaryTitle', { count: changes.length })}
         </Typography>
         {onCollapse && (
           <IconButton
             size="small"
             onClick={onCollapse}
-            aria-label="Collapse the changes rail"
+            aria-label={t('diff.collapseRail')}
             data-testid="rail-collapse"
           >
             <PanelRightClose size={15} />
@@ -86,7 +88,7 @@ export function ChangeSummaryPanel({
 
       {changes.length === 0 && (
         <Typography variant="body2" color="text.secondary">
-          The compared versions have identical text content.
+          {t('diff.identical')}
         </Typography>
       )}
 
@@ -130,7 +132,7 @@ export function ChangeSummaryPanel({
                   color: dark ? badge.fgDark : badge.fg,
                 }}
               >
-                {kind.label}
+                {t(kind.labelKey)}
               </Typography>
               {page !== null && (
                 <Typography
@@ -142,7 +144,7 @@ export function ChangeSummaryPanel({
                     marginLeft: 'auto',
                   }}
                 >
-                  p. {page}
+                  {t('annotation.pageShort', { page })}
                 </Typography>
               )}
             </Stack>

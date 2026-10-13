@@ -21,6 +21,7 @@
 
 import type { ReactNode } from 'react';
 import Box from '@mui/material/Box';
+import { useTranslation } from 'react-i18next';
 import { ResizableDrawer } from '../ResizableDrawer';
 
 interface FocusDrawerProps {
@@ -37,13 +38,14 @@ interface FocusDrawerProps {
  * (issue #403).
  */
 export function FocusDrawer({ open, onClose, children }: FocusDrawerProps) {
+  const { t } = useTranslation('workspace');
   return (
     <ResizableDrawer
       open={open}
       onClose={onClose}
       storageKey="qnop-focus-drawer-width"
       defaultWidth={520}
-      handleAriaLabel="Resize the annotation drawer"
+      handleAriaLabel={t('focus.resizeDrawer')}
       handleTestId="focus-drawer-resize-handle"
     >
       <Box sx={{ p: 2, overflowY: 'auto', height: '100%' }}>{children}</Box>

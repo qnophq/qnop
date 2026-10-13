@@ -23,6 +23,7 @@ import Box from '@mui/material/Box';
 import Stack from '@mui/material/Stack';
 import Tooltip from '@mui/material/Tooltip';
 import Typography from '@mui/material/Typography';
+import { useTranslation } from 'react-i18next';
 
 /**
  * The official Markdown mark (CommonMark's rounded "M▾"), inlined as an SVG so
@@ -63,8 +64,9 @@ function MarkdownMark() {
  * compete with the send/create action beside it.
  */
 export function MarkdownHint() {
+  const { t } = useTranslation('workspace');
   return (
-    <Tooltip title="Markdown: **bold**, _italic_, `code`, lists, > quote, [link](url)">
+    <Tooltip title={t('markdown.hint.syntax')}>
       <Stack
         direction="row"
         spacing={0.625}
@@ -73,7 +75,7 @@ export function MarkdownHint() {
       >
         <MarkdownMark />
         <Typography component="span" variant="caption" sx={{ fontSize: 11 }}>
-          Markdown supported
+          {t('markdown.hint.label')}
         </Typography>
       </Stack>
     </Tooltip>

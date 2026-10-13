@@ -21,6 +21,7 @@
 
 import { useEffect, useRef } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useTranslation } from 'react-i18next';
 import type {
   Anchor,
   AnnotationCreateRequest,
@@ -216,6 +217,7 @@ export function useDismissAnnotation() {
  * author on the version whose highlight was verified.
  */
 export function useConfirmPlacement(notify: Notify) {
+  const { t } = useTranslation('workspace');
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: async (input: { annotationId: string; versionNumber: number }) => {
@@ -223,10 +225,10 @@ export function useConfirmPlacement(notify: Notify) {
       return response.data;
     },
     onSuccess: () => {
-      notify('Placement confirmed.', 'success');
+      notify(t('placement.confirmed'), 'success');
       queryClient.invalidateQueries({ queryKey: annotationKeys.all });
     },
-    onError: () => notify('Could not confirm the placement.', 'error'),
+    onError: () => notify(t('placement.confirmFailed'), 'error'),
   });
 }
 
@@ -237,6 +239,7 @@ export function useConfirmPlacement(notify: Notify) {
  * thread untouched.
  */
 export function useReattachPlacement(notify: Notify) {
+  const { t } = useTranslation('workspace');
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: async (input: { annotationId: string; versionNumber: number; anchor: Anchor }) => {
@@ -248,9 +251,9 @@ export function useReattachPlacement(notify: Notify) {
       return response.data;
     },
     onSuccess: () => {
-      notify('Annotation re-attached.', 'success');
+      notify(t('placement.reattached'), 'success');
       queryClient.invalidateQueries({ queryKey: annotationKeys.all });
     },
-    onError: () => notify('Could not re-attach the annotation.', 'error'),
+    onError: () => notify(t('placement.reattachFailed'), 'error'),
   });
 }

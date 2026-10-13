@@ -32,6 +32,7 @@ import Tooltip from '@mui/material/Tooltip';
 import Typography from '@mui/material/Typography';
 import { useTheme } from '@mui/material/styles';
 import { ArrowLeftRight, MoveRight } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import type { DiffChange, DocumentVersionSummary } from '../../../api/generated';
 import { ExtractionStatus } from '../../../api/generated';
 import { tokens } from '../../../theme/tokens';
@@ -93,6 +94,7 @@ export function CompareToolbar({
   zoom,
   onZoomChange,
 }: CompareToolbarProps) {
+  const { t } = useTranslation('workspace');
   const theme = useTheme();
   const dark = theme.palette.mode === 'dark';
   const stats = changes ? diffStats(changes) : null;
@@ -102,7 +104,7 @@ export function CompareToolbar({
       : stats.pages.length === 0
         ? '—'
         : stats.pages.length > 3
-          ? `${stats.pages.length} pages`
+          ? t('diff.pageCount', { count: stats.pages.length })
           : stats.pages.join(', ');
   const pickerItems = (other: number) =>
     versions.map((version) => (
@@ -125,7 +127,7 @@ export function CompareToolbar({
       <TextField
         select
         size="small"
-        label="Baseline"
+        label={t('diff.baseline')}
         value={String(from)}
         onChange={(event) => onChangePair(Number(event.target.value), to)}
         sx={{ minWidth: 110 }}
@@ -136,17 +138,17 @@ export function CompareToolbar({
       <TextField
         select
         size="small"
-        label="Compare"
+        label={t('diff.compare')}
         value={String(to)}
         onChange={(event) => onChangePair(from, Number(event.target.value))}
         sx={{ minWidth: 110 }}
       >
         {pickerItems(from)}
       </TextField>
-      <Tooltip title="Swap sides">
+      <Tooltip title={t('diff.swap')}>
         <IconButton
           size="small"
-          aria-label="Swap the compared versions"
+          aria-label={t('diff.swapLabel')}
           onClick={() => onChangePair(to, from)}
         >
           <ArrowLeftRight size={15} />
@@ -155,7 +157,7 @@ export function CompareToolbar({
 
       {stats === null ? (
         <Typography variant="body2" color="text.secondary" aria-live="polite" sx={{ ml: 'auto' }}>
-          Comparing…
+          {t('diff.comparing')}
         </Typography>
       ) : (
         <Stack
@@ -166,17 +168,17 @@ export function CompareToolbar({
           sx={{ ml: 'auto', alignItems: 'center' }}
         >
           <Stat
-            label="Words +"
+            label={t('diff.wordsAdded')}
             value={`+${stats.addedWords}`}
             color={dark ? tokens.badge.green.fgDark : tokens.semantic.successStrong}
           />
           <Stat
-            label="Words −"
+            label={t('diff.wordsRemoved')}
             value={`−${stats.removedWords}`}
             color={dark ? tokens.badge.red.fgDark : tokens.semantic.dangerStrong}
           />
-          <Stat label="Changes" value={String(changes?.length ?? 0)} />
-          <Stat label={stats.pages.length === 1 ? 'Page' : 'Pages'} value={pagesValue} />
+          <Stat label={t('diff.changes')} value={String(changes?.length ?? 0)} />
+          <Stat label={t('diff.pagesLabel', { count: stats.pages.length })} value={pagesValue} />
         </Stack>
       )}
 
@@ -192,7 +194,7 @@ export function CompareToolbar({
             onChange={(event) => onSyncScrollChange(event.target.checked)}
           />
         }
-        label="Sync scroll"
+        label={t('diff.syncScroll')}
         slotProps={{ typography: { variant: 'body2', color: 'text.secondary' } }}
         sx={{ mr: 0 }}
       />

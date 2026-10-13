@@ -23,6 +23,7 @@ import { useState } from 'react';
 import IconButton from '@mui/material/IconButton';
 import Tooltip from '@mui/material/Tooltip';
 import { SmilePlus } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import { EmojiPickerPopover } from '../markdown/EmojiPickerPopover';
 
 interface AddReactionButtonProps {
@@ -39,13 +40,14 @@ interface AddReactionButtonProps {
  * "+" chip takes over for the follow-ups.
  */
 export function AddReactionButton({ onPick, iconSize = 13 }: AddReactionButtonProps) {
+  const { t } = useTranslation('workspace');
   const [anchorEl, setAnchorEl] = useState<HTMLElement | null>(null);
   return (
     <>
-      <Tooltip title="Add reaction">
+      <Tooltip title={t('reactions.add')}>
         <IconButton
           size="small"
-          aria-label="Add reaction"
+          aria-label={t('reactions.add')}
           onClick={(event) => {
             // Lives inside clickable cards — opening the picker stays local.
             event.stopPropagation();

@@ -21,6 +21,7 @@
 
 import CircularProgress from '@mui/material/CircularProgress';
 import Tooltip from '@mui/material/Tooltip';
+import { useTranslation } from 'react-i18next';
 import { PlacementStatus } from '../../../api/generated';
 import type { BadgeTone } from '../../admin/ToneBadge';
 import { ToneBadge } from '../../admin/ToneBadge';
@@ -28,41 +29,27 @@ import { ToneBadge } from '../../admin/ToneBadge';
 /**
  * The placement-status cue (ADR-0009): how the annotation's anchor resolved
  * on the version being viewed. PLACED renders nothing — it is the expected
- * state and needs no badge.
+ * state and needs no badge. Label and hint come from the `workspace` catalog
+ * (`annotation.placement.<STATUS>`).
  */
-const CUES: Partial<Record<PlacementStatus, { tone: BadgeTone; label: string; hint: string }>> = {
-  [PlacementStatus.Pending]: {
-    tone: 'neutral',
-    label: 'Re-anchoring…',
-    hint: 'The new version is still being matched against this annotation.',
-  },
-  [PlacementStatus.Moved]: {
-    tone: 'amber',
-    label: 'Moved',
-    hint: 'The anchored text changed with the new version — please verify the highlight.',
-  },
-  [PlacementStatus.Orphaned]: {
-    tone: 'red',
-    label: 'Orphaned',
-    hint: 'No confident match on this version — the annotation needs manual handling.',
-  },
-  [PlacementStatus.Failed]: {
-    tone: 'red',
-    label: 'Failed',
-    hint: 'Re-anchoring failed for this annotation.',
-  },
+const TONES: Partial<Record<PlacementStatus, BadgeTone>> = {
+  [PlacementStatus.Pending]: 'neutral',
+  [PlacementStatus.Moved]: 'amber',
+  [PlacementStatus.Orphaned]: 'red',
+  [PlacementStatus.Failed]: 'red',
 };
 
 export function PlacementStatusChip({ status }: { status?: PlacementStatus }) {
-  if (!status) return null;
-  const cue = CUES[status];
-  if (!cue) return null;
+  const { t } = useTranslation('workspace');
+  const tone = status ? TONES[status] : undefined;
+  if (!status || !tone) return null;
+  const key = status as Exclude<PlacementStatus, 'PLACED'>;
   return (
-    <Tooltip title={cue.hint}>
+    <Tooltip title={t(`annotation.placement.${key}.hint`)}>
       <span>
         <ToneBadge
-          tone={cue.tone}
-          label={cue.label}
+          tone={tone}
+          label={t(`annotation.placement.${key}.label`)}
           icon={
             // Re-anchoring is actively running (issue #552) — a spinner in the
             // badge's own foreground colour signals work-in-progress. The

@@ -34,6 +34,8 @@ import Tooltip from '@mui/material/Tooltip';
 import Typography from '@mui/material/Typography';
 import { alpha, useTheme } from '@mui/material/styles';
 import { ListFilter, Search } from 'lucide-react';
+import type { ParseKeys } from 'i18next';
+import { useTranslation } from 'react-i18next';
 import { AnnotationPriority, AnnotationStatus, AnnotationType } from '../../../api/generated';
 import { UserAvatar } from '../../shell/UserAvatar';
 import { STATUS_CUES } from './statusCues';
@@ -53,18 +55,21 @@ const PILL_SX = {
   '& .MuiChip-icon': { ml: 0.5, mr: -0.25 },
 } as const;
 
-/** The re-anchoring facet (ADR-0009, issue #326). */
-const PLACEMENT_OPTIONS: { value: AnnotationFilters['placement']; label: string }[] = [
-  { value: 'all', label: 'Any placement' },
-  { value: 'attention', label: 'Needs attention' },
-  { value: 'moved', label: 'Moved' },
-  { value: 'orphaned', label: 'Orphaned' },
+/** The re-anchoring facet (ADR-0009, issue #326); labels are `workspace` catalog keys. */
+const PLACEMENT_OPTIONS: {
+  value: AnnotationFilters['placement'];
+  labelKey: ParseKeys<'workspace'>;
+}[] = [
+  { value: 'all', labelKey: 'filters.placementOptions.all' },
+  { value: 'attention', labelKey: 'filters.placementOptions.attention' },
+  { value: 'moved', labelKey: 'filters.placementOptions.moved' },
+  { value: 'orphaned', labelKey: 'filters.placementOptions.orphaned' },
 ];
 
-const STATUS_OPTIONS: { value: AnnotationFilters['status']; label: string }[] = [
-  { value: 'all', label: 'All' },
-  { value: 'open', label: 'Open' },
-  { value: 'resolved', label: 'Resolved' },
+const STATUS_OPTIONS: { value: AnnotationFilters['status']; labelKey: ParseKeys<'workspace'> }[] = [
+  { value: 'all', labelKey: 'filters.statusOptions.all' },
+  { value: 'open', labelKey: 'filters.statusOptions.open' },
+  { value: 'resolved', labelKey: 'filters.statusOptions.resolved' },
 ];
 
 export interface FilterAuthor {
@@ -81,7 +86,7 @@ interface PanelFilterBarProps {
   statusFacet?: boolean;
   /** Hide the author facet — an anonymous review has no meaningful author filter (issue #413). */
   authorFacet?: boolean;
-  /** The search field's placeholder and accessible name. */
+  /** The search field's placeholder and accessible name; defaults to "Search annotations". */
   searchLabel?: string;
 }
 
@@ -99,14 +104,17 @@ export function PanelFilterBar({
   authors,
   statusFacet = true,
   authorFacet = true,
-  searchLabel = 'Search annotations',
+  searchLabel: searchLabelProp,
 }: PanelFilterBarProps) {
+  const { t } = useTranslation('workspace');
   const theme = useTheme();
+  const searchLabel = searchLabelProp ?? t('filters.searchAnnotations');
   const [anchorEl, setAnchorEl] = useState<HTMLButtonElement | null>(null);
   const facets = activeFacetCount(filters);
 
   const set = (patch: Partial<AnnotationFilters>) => onChange({ ...filters, ...patch });
-  const nameOf = (id: string) => authors.find((author) => author.id === id)?.name ?? 'Participant';
+  const nameOf = (id: string) =>
+    authors.find((author) => author.id === id)?.name ?? t('people.participant');
 
   return (
     <Box>
@@ -141,7 +149,10 @@ export function PanelFilterBar({
               {filters.placement !== 'all' && (
                 <Chip
                   size="small"
-                  label={PLACEMENT_OPTIONS.find((o) => o.value === filters.placement)?.label}
+                  label={t(
+                    PLACEMENT_OPTIONS.find((o) => o.value === filters.placement)?.labelKey ??
+                      'filters.placementOptions.all',
+                  )}
                   onDelete={() => set({ placement: 'all' })}
                 />
               )}
@@ -158,7 +169,11 @@ export function PanelFilterBar({
                     const CueIcon = cue.icon;
                     return <CueIcon size={12} color={cue.color(theme)} aria-hidden />;
                   })()}
-                  label={filters.status === 'open' ? 'Open' : 'Resolved'}
+                  label={
+                    filters.status === 'open'
+                      ? t('filters.statusOptions.open')
+                      : t('filters.statusOptions.resolved')
+                  }
                   onDelete={() => set({ status: 'all' })}
                   sx={PILL_SX}
                 />
@@ -171,7 +186,7 @@ export function PanelFilterBar({
                     const CueIcon = cue.icon;
                     return <CueIcon size={12} color={cue.color(theme)} aria-hidden />;
                   })()}
-                  label={TYPE_CUES[filters.type].label}
+                  label={t(TYPE_CUES[filters.type].labelKey)}
                   onDelete={() => set({ type: null })}
                   sx={PILL_SX}
                 />
@@ -190,7 +205,7 @@ export function PanelFilterBar({
                       aria-hidden
                     />
                   }
-                  label={PRIORITY_CUES[filters.priority].label}
+                  label={t(PRIORITY_CUES[filters.priority].labelKey)}
                   onDelete={() => set({ priority: null })}
                   sx={PILL_SX}
                 />
@@ -215,10 +230,10 @@ export function PanelFilterBar({
             sx={{ fontSize: 13, p: 0, color: 'text.primary' }}
           />
         </Stack>
-        <Tooltip title="Filter annotations">
+        <Tooltip title={t('filters.filter')}>
           <IconButton
             size="small"
-            aria-label="Filter annotations"
+            aria-label={t('filters.filter')}
             aria-expanded={Boolean(anchorEl)}
             onClick={(event) => setAnchorEl(event.currentTarget)}
           >
@@ -242,7 +257,7 @@ export function PanelFilterBar({
             <TextField
               select
               size="small"
-              label="Status"
+              label={t('filters.status')}
               value={filters.status}
               onChange={(event) =>
                 set({ status: event.target.value as AnnotationFilters['status'] })
@@ -250,7 +265,7 @@ export function PanelFilterBar({
             >
               {STATUS_OPTIONS.map((option) => (
                 <MenuItem key={option.value} value={option.value}>
-                  {option.label}
+                  {t(option.labelKey)}
                 </MenuItem>
               ))}
             </TextField>
@@ -258,7 +273,7 @@ export function PanelFilterBar({
           <TextField
             select
             size="small"
-            label="Placement"
+            label={t('filters.placement')}
             value={filters.placement}
             onChange={(event) =>
               set({ placement: event.target.value as AnnotationFilters['placement'] })
@@ -266,20 +281,20 @@ export function PanelFilterBar({
           >
             {PLACEMENT_OPTIONS.map((option) => (
               <MenuItem key={option.value} value={option.value}>
-                {option.label}
+                {t(option.labelKey)}
               </MenuItem>
             ))}
           </TextField>
           <TextField
             select
             size="small"
-            label="Type"
+            label={t('filters.type')}
             value={filters.type ?? ''}
             onChange={(event) =>
               set({ type: (event.target.value || null) as AnnotationType | null })
             }
           >
-            <MenuItem value="">Any</MenuItem>
+            <MenuItem value="">{t('filters.any')}</MenuItem>
             {Object.values(AnnotationType).map((type) => {
               const cue = TYPE_CUES[type];
               const CueIcon = cue.icon;
@@ -292,7 +307,7 @@ export function PanelFilterBar({
                   >
                     <CueIcon size={13} aria-hidden />
                     <Typography component="span" variant="body2">
-                      {cue.label}
+                      {t(cue.labelKey)}
                     </Typography>
                   </Stack>
                 </MenuItem>
@@ -302,13 +317,13 @@ export function PanelFilterBar({
           <TextField
             select
             size="small"
-            label="Priority"
+            label={t('filters.priority')}
             value={filters.priority ?? ''}
             onChange={(event) =>
               set({ priority: (event.target.value || null) as AnnotationPriority | null })
             }
           >
-            <MenuItem value="">Any</MenuItem>
+            <MenuItem value="">{t('filters.any')}</MenuItem>
             {Object.values(AnnotationPriority).map((priority) => {
               const cue = PRIORITY_CUES[priority];
               return (
@@ -325,7 +340,7 @@ export function PanelFilterBar({
                       aria-hidden
                     />
                     <Typography component="span" variant="body2">
-                      {cue.label}
+                      {t(cue.labelKey)}
                     </Typography>
                   </Stack>
                 </MenuItem>
@@ -336,11 +351,11 @@ export function PanelFilterBar({
             <TextField
               select
               size="small"
-              label="Author"
+              label={t('filters.author')}
               value={filters.author ?? ''}
               onChange={(event) => set({ author: event.target.value || null })}
             >
-              <MenuItem value="">Anyone</MenuItem>
+              <MenuItem value="">{t('filters.anyone')}</MenuItem>
               {authors.map((author) => (
                 <MenuItem key={author.id} value={author.id}>
                   <Stack direction="row" spacing={0.75} sx={{ alignItems: 'center' }}>
@@ -360,7 +375,7 @@ export function PanelFilterBar({
               onClick={() => onChange({ ...EMPTY_FILTERS, query: filters.query })}
               sx={{ alignSelf: 'flex-end' }}
             >
-              Reset filters
+              {t('filters.reset')}
             </Button>
           )}
         </Stack>

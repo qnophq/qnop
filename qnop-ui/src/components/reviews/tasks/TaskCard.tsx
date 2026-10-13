@@ -27,6 +27,7 @@ import Tooltip from '@mui/material/Tooltip';
 import Typography from '@mui/material/Typography';
 import { alpha, useTheme } from '@mui/material/styles';
 import { MessageSquare } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import type { AnnotationView } from '../../../api/generated';
 import { AnnotationStatus } from '../../../api/generated';
 import { ToneBadge } from '../../admin/ToneBadge';
@@ -71,6 +72,7 @@ export function TaskCard({
   draggable,
   onOpen,
 }: TaskCardProps) {
+  const { t } = useTranslation('workspace');
   const theme = useTheme();
   const viewerId = useAuthStore((state) => state.userId);
   // The title is plain text — mention tokens read as names there too (issue #462).
@@ -122,7 +124,7 @@ export function TaskCard({
     >
       <Stack direction="row" spacing={0.75} sx={{ alignItems: 'center', mb: 0.75 }}>
         {unseen && (
-          <Tooltip title="New since your last visit">
+          <Tooltip title={t('annotation.newSinceLastVisit')}>
             <Box
               data-testid="unseen-dot"
               sx={{
@@ -135,7 +137,13 @@ export function TaskCard({
             />
           </Tooltip>
         )}
-        <Tooltip title={priority ? `${priority.label} priority` : 'No priority'}>
+        <Tooltip
+          title={
+            priority
+              ? t('annotation.priority', { priority: t(priority.labelKey) })
+              : t('annotation.noPriority')
+          }
+        >
           <Typography
             component="span"
             data-testid="task-key"
@@ -158,7 +166,7 @@ export function TaskCard({
           >
             <TypeIcon size={12} aria-hidden />
             <Typography component="span" sx={{ fontSize: 11, fontWeight: 600 }}>
-              {type.label}
+              {t(type.labelKey)}
             </Typography>
           </Stack>
         )}
@@ -172,7 +180,7 @@ export function TaskCard({
               color="text.secondary"
               sx={{ fontVariantNumeric: 'tabular-nums' }}
             >
-              p. {page}
+              {t('annotation.pageShort', { page })}
             </Typography>
           )
         )}
@@ -190,7 +198,7 @@ export function TaskCard({
           overflow: 'hidden',
         }}
       >
-        {taskTitle(annotation, resolveMentions)}
+        {taskTitle(annotation, resolveMentions) || t('annotation.fallbackTitle')}
       </Typography>
       {quote && (
         <Typography
@@ -198,7 +206,7 @@ export function TaskCard({
           noWrap
           sx={{ display: 'block', fontStyle: 'italic', color: 'text.secondary', mb: 1 }}
         >
-          “{quote}”
+          {t('quoted', { text: quote })}
         </Typography>
       )}
 
@@ -209,7 +217,7 @@ export function TaskCard({
         </Typography>
         <Box sx={{ flex: 1 }} />
         {annotation.status !== AnnotationStatus.Open && (
-          <ToneBadge tone={statusCue.tone} label={statusCue.label} />
+          <ToneBadge tone={statusCue.tone} label={t(statusCue.labelKey)} />
         )}
         <Stack
           direction="row"
@@ -217,7 +225,10 @@ export function TaskCard({
           sx={{ alignItems: 'center', color: 'text.secondary', flexShrink: 0 }}
         >
           <MessageSquare size={12} aria-hidden />
-          <Typography variant="caption" aria-label={`${annotation.commentCount} comments`}>
+          <Typography
+            variant="caption"
+            aria-label={t('annotation.commentCount', { count: annotation.commentCount })}
+          >
             {annotation.commentCount}
           </Typography>
         </Stack>

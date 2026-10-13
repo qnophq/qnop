@@ -8,7 +8,7 @@ import { defineConfig, globalIgnores } from 'eslint/config';
 
 // Props whose string value is shown to the user (or read out by assistive technology).
 const TEXT_PROPS =
-  '/^(label|title|placeholder|alt|aria-label|aria-description|helperText|subtitle|description|tooltip|text|message|primary|secondary|confirmLabel|cancelLabel|emptyText|caption|heading)$/';
+  '/^(label|title|placeholder|alt|aria-label|aria-description|helperText|subtitle|description|tooltip|text|message|primary|secondary|confirmLabel|cancelLabel|emptyText|caption|heading|ariaLabel|handleAriaLabel|contextTitle|copiedMessage|metaText|trailingText|searchLabel)$/';
 
 export default defineConfig([
   // dist: build output. coverage: vitest report. src/api/generated: typescript-axios output.
@@ -70,8 +70,8 @@ export default defineConfig([
       'src/pages/search/**/*.tsx',
       'src/components/admin/**/*.tsx',
       'src/pages/admin/**/*.tsx',
-      // Review management (issue #836). Only the files directly in components/reviews: the
-      // review workspace subfolders (viewer, panel, focus, …) join in their own slice.
+      // Reviews (issue #836): management (the files directly in components/reviews and its
+      // list/wizard/upload/hub/export folders) and the review workspace.
       'src/components/reviews/*.tsx',
       'src/components/reviews/list/**/*.tsx',
       'src/components/reviews/wizard/**/*.tsx',
@@ -81,6 +81,17 @@ export default defineConfig([
       'src/pages/reviews/ReviewsPage.tsx',
       'src/pages/reviews/NewReviewPage.tsx',
       'src/pages/reviews/ReviewsEmptyState.tsx',
+      'src/components/reviews/viewer/**/*.tsx',
+      'src/components/reviews/panel/**/*.tsx',
+      'src/components/reviews/markdown/**/*.tsx',
+      'src/components/reviews/focus/**/*.tsx',
+      'src/components/reviews/diff/**/*.tsx',
+      'src/components/reviews/reactions/**/*.tsx',
+      'src/components/reviews/permalink/**/*.tsx',
+      'src/components/reviews/tasks/**/*.tsx',
+      'src/pages/reviews/DocumentReviewPage.tsx',
+      'src/pages/reviews/VersionComparePage.tsx',
+      'src/pages/reviews/ReviewTasksPage.tsx',
     ],
     ignores: ['**/*.test.tsx'],
     rules: {

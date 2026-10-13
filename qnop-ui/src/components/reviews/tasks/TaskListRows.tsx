@@ -27,6 +27,7 @@ import Tooltip from '@mui/material/Tooltip';
 import Typography from '@mui/material/Typography';
 import { useTheme } from '@mui/material/styles';
 import { ChevronRight, MessageSquare } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import type { AnnotationView } from '../../../api/generated';
 import { AnnotationStatus } from '../../../api/generated';
 import { ToneBadge } from '../../admin/ToneBadge';
@@ -53,6 +54,7 @@ interface TaskListRowsProps {
  * chevron — for reviews where scanning beats spatial grouping.
  */
 export function TaskListRows({ annotations, taskKeyOf, authorNameOf, onOpen }: TaskListRowsProps) {
+  const { t } = useTranslation('workspace');
   const theme = useTheme();
   // The title is plain text — mention tokens read as names there too (issue #462).
   const resolveMentions = useMentionNames(useReviewDocumentId());
@@ -84,7 +86,13 @@ export function TaskListRows({ annotations, taskKeyOf, authorNameOf, onOpen }: T
               '&:focus-visible': { boxShadow: theme.qnop.focusRing },
             }}
           >
-            <Tooltip title={priority ? `${priority.label} priority` : 'No priority'}>
+            <Tooltip
+              title={
+                priority
+                  ? t('annotation.priority', { priority: t(priority.labelKey) })
+                  : t('annotation.noPriority')
+              }
+            >
               <Box
                 sx={{
                   width: 8,
@@ -121,20 +129,20 @@ export function TaskListRows({ annotations, taskKeyOf, authorNameOf, onOpen }: T
             >
               {TypeIcon && <TypeIcon size={13} aria-hidden />}
               <Typography component="span" sx={{ fontSize: 11.5, fontWeight: 600 }} noWrap>
-                {type ? type.label : '—'}
+                {type ? t(type.labelKey) : '—'}
               </Typography>
             </Stack>
             <Box sx={{ flex: 1, minWidth: 0 }}>
               <Typography variant="body2" noWrap sx={{ fontWeight: 500 }}>
-                {taskTitle(annotation, resolveMentions)}
+                {taskTitle(annotation, resolveMentions) || t('annotation.fallbackTitle')}
               </Typography>
               <Typography variant="caption" color="text.secondary" noWrap sx={{ display: 'block' }}>
                 {isDocumentScoped(annotation)
-                  ? 'Whole document'
+                  ? t('annotation.wholeDocument')
                   : annotation.anchor?.textQuote?.quote
-                    ? `“${annotation.anchor.textQuote.quote}”`
-                    : 'No text anchor'}
-                {page !== null && ` · p. ${page}`}
+                    ? t('quoted', { text: annotation.anchor.textQuote.quote })
+                    : t('annotation.noTextAnchor')}
+                {page !== null && ` · ${t('annotation.pageShort', { page })}`}
                 {` · ${authorNameOf(annotation.authorId)}`}
               </Typography>
             </Box>
@@ -151,9 +159,9 @@ export function TaskListRows({ annotations, taskKeyOf, authorNameOf, onOpen }: T
               label={
                 annotation.status === AnnotationStatus.Open
                   ? column === 'discussion'
-                    ? 'In discussion'
-                    : 'Open'
-                  : statusCue.label
+                    ? t('tasks.columns.discussion')
+                    : t('tasks.columns.open')
+                  : t(statusCue.labelKey)
               }
             />
             <UserAvatar
@@ -167,7 +175,7 @@ export function TaskListRows({ annotations, taskKeyOf, authorNameOf, onOpen }: T
       })}
       {annotations.length === 0 && (
         <Typography variant="body2" color="text.secondary" sx={{ p: 3, textAlign: 'center' }}>
-          No annotations match the current filter.
+          {t('tasks.noMatch')}
         </Typography>
       )}
     </Paper>

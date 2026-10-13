@@ -25,6 +25,7 @@ import Box from '@mui/material/Box';
 import Stack from '@mui/material/Stack';
 import Typography from '@mui/material/Typography';
 import { alpha, useTheme } from '@mui/material/styles';
+import { useTranslation } from 'react-i18next';
 import type { Theme } from '@mui/material/styles';
 import type { AnnotationView } from '../../../api/generated';
 import { ToneBadge } from '../../admin/ToneBadge';
@@ -32,17 +33,14 @@ import { TaskCard, TASK_DRAG_TYPE } from './TaskCard';
 import type { TaskColumn } from './tasksModel';
 import { TASK_COLUMNS, columnOf } from './tasksModel';
 
+/** Per column: tone and colour; the label is the `workspace` catalog's `tasks.columns.<column>`. */
 const COLUMN_CUES: Record<
   TaskColumn,
-  { label: string; tone: 'blue' | 'amber' | 'green'; color: (theme: Theme) => string }
+  { tone: 'blue' | 'amber' | 'green'; color: (theme: Theme) => string }
 > = {
-  open: { label: 'Open', tone: 'blue', color: (theme) => theme.qnop.brand.blue },
-  discussion: {
-    label: 'In discussion',
-    tone: 'amber',
-    color: (theme) => theme.palette.warning.main,
-  },
-  done: { label: 'Resolved', tone: 'green', color: (theme) => theme.palette.success.main },
+  open: { tone: 'blue', color: (theme) => theme.qnop.brand.blue },
+  discussion: { tone: 'amber', color: (theme) => theme.palette.warning.main },
+  done: { tone: 'green', color: (theme) => theme.palette.success.main },
 };
 
 interface TaskBoardProps {
@@ -76,6 +74,7 @@ export function TaskBoard({
   onOpen,
   onResolve,
 }: TaskBoardProps) {
+  const { t } = useTranslation('workspace');
   const theme = useTheme();
   const [dropActive, setDropActive] = useState(false);
 
@@ -148,7 +147,13 @@ export function TaskBoard({
                 bgcolor: 'background.paper',
               }}
             >
-              <ToneBadge tone={cue.tone} label={`${cue.label} (${items.length})`} />
+              <ToneBadge
+                tone={cue.tone}
+                label={t('tasks.columnBadge', {
+                  label: t(`tasks.columns.${column}`),
+                  count: items.length,
+                })}
+              />
               <Box sx={{ flex: 1 }} />
               <Box
                 sx={{ width: 8, height: 8, borderRadius: '50%', bgcolor: cue.color(theme) }}
@@ -173,7 +178,7 @@ export function TaskBoard({
                   color="text.secondary"
                   sx={{ textAlign: 'center', py: 3 }}
                 >
-                  {isDone ? 'Drop your card here to resolve it' : 'Nothing here'}
+                  {isDone ? t('tasks.dropToResolve') : t('tasks.emptyColumn')}
                 </Typography>
               )}
             </Stack>

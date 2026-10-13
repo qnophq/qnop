@@ -23,15 +23,12 @@ import { useId, useState } from 'react';
 import type { KeyboardEvent, PointerEvent } from 'react';
 import Box from '@mui/material/Box';
 import { useTheme } from '@mui/material/styles';
+import { useTranslation } from 'react-i18next';
 import type { NormalizedBox } from '../../../api/generated';
 import type { ScreenPosition } from './anchoring';
 import { MARKER_YELLOW_BORDER, SELECTION_MARKER_BG } from './markerColors';
 import { visuallyHidden } from '../../../theme/visuallyHidden';
 import { useKeepInView } from './useKeepInView';
-
-/** How the keyboard path is announced to assistive tech (issue #771). */
-const KEYBOARD_HINT =
-  'The first arrow key press places a selection rectangle in the middle of the page. Arrow keys then move it, Shift with an arrow key moves in larger steps, Alt with an arrow key grows or shrinks it, Enter annotates the region, Escape clears it.';
 
 /** One arrow press moves or resizes by this fraction of the page. */
 const MOVE_STEP = 0.02;
@@ -123,6 +120,7 @@ export function RegionSelectLayer({
   const [keyboardBox, setKeyboardBox] = useState<NormalizedBox | null>(null);
   const hintId = useId();
   const theme = useTheme();
+  const { t } = useTranslation('workspace');
 
   // `currentTarget` is the surface Box the handlers are bound to — always the
   // live element during the event, so it needs no ref and no non-null assertion.
@@ -215,7 +213,7 @@ export function RegionSelectLayer({
       // Names the otherwise-generic selection surface for assistive tech, the
       // same way the text layer does (issue #341).
       role="group"
-      aria-label={`Region selection, page ${surfaceIndex + 1}`}
+      aria-label={t('viewer.regionLayer', { page: surfaceIndex + 1 })}
       aria-describedby={enabled ? hintId : undefined}
       tabIndex={enabled ? 0 : -1}
       onPointerDown={handlePointerDown}
@@ -234,7 +232,10 @@ export function RegionSelectLayer({
     >
       {enabled && (
         <Box component="span" id={hintId} sx={visuallyHidden}>
-          {KEYBOARD_HINT}
+          {
+            // How the keyboard path is announced to assistive tech (issue #771).
+            t('viewer.regionKeyboardHint')
+          }
         </Box>
       )}
       {preview && (

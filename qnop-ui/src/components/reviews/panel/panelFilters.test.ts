@@ -118,6 +118,20 @@ describe('matchesFilters', () => {
     expect(matchesFilters(a, { ...EMPTY_FILTERS, query: 'ben-roth' }, 'Paul', resolve)).toBe(true);
     expect(matchesFilters(a, { ...EMPTY_FILTERS, query: 'anna' }, 'Paul', resolve)).toBe(false);
   });
+
+  it('finds an untitled card by its translated fallback title (#836)', () => {
+    const untitled = annotation({ firstComment: undefined, anchor: undefined });
+    const query = (text: string) => ({ ...EMPTY_FILTERS, query: text });
+    expect(matchesFilters(untitled, query('annotation'), 'Paul', undefined, 'Annotation')).toBe(
+      true,
+    );
+    expect(matchesFilters(untitled, query('anmerkung'), 'Paul', undefined, 'Anmerkung')).toBe(true);
+    // Without a displayed fallback (the panel), and for titled cards, it never matches.
+    expect(matchesFilters(untitled, query('annotation'), 'Paul')).toBe(false);
+    expect(matchesFilters(annotation(), query('anmerkung'), 'Paul', undefined, 'Anmerkung')).toBe(
+      false,
+    );
+  });
 });
 
 describe('activeFacetCount', () => {

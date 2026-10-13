@@ -28,6 +28,7 @@ import Stack from '@mui/material/Stack';
 import TextField from '@mui/material/TextField';
 import Typography from '@mui/material/Typography';
 import { useTheme } from '@mui/material/styles';
+import { useTranslation } from 'react-i18next';
 import type { Anchor } from '../../../api/generated';
 import { AnnotationPriority, AnnotationType } from '../../../api/generated';
 import { submitShortcutLabel } from '../../../utils/platform';
@@ -67,6 +68,7 @@ export function Composer({
   /** The document roster the @-picker offers (issue #462); empty in anonymous reviews. */
   mentionCandidates?: MentionCandidate[];
 }) {
+  const { t } = useTranslation(['workspace', 'common']);
   const theme = useTheme();
   const [comment, setComment] = useState('');
   const [type, setType] = useState<AnnotationType | ''>('');
@@ -86,15 +88,15 @@ export function Composer({
       <TextField
         select
         size="small"
-        label="Type"
+        label={t('filters.type')}
         value={type}
         onChange={(event) => setType(event.target.value as AnnotationType | '')}
         sx={compact ? { width: 150 } : { flex: 1 }}
-        slotProps={{ htmlInput: { 'aria-label': 'Annotation type' } }}
+        slotProps={{ htmlInput: { 'aria-label': t('composer.typeLabel') } }}
       >
         <MenuItem value="">
           <Typography component="span" variant="body2" color="text.secondary">
-            None
+            {t('composer.none')}
           </Typography>
         </MenuItem>
         {Object.values(AnnotationType).map((value) => {
@@ -109,7 +111,7 @@ export function Composer({
               >
                 <CueIcon size={13} aria-hidden />
                 <Typography component="span" variant="body2">
-                  {cue.label}
+                  {t(cue.labelKey)}
                 </Typography>
               </Stack>
             </MenuItem>
@@ -119,15 +121,15 @@ export function Composer({
       <TextField
         select
         size="small"
-        label="Priority"
+        label={t('filters.priority')}
         value={priority}
         onChange={(event) => setPriority(event.target.value as AnnotationPriority | '')}
         sx={compact ? { width: 150 } : { flex: 1 }}
-        slotProps={{ htmlInput: { 'aria-label': 'Annotation priority' } }}
+        slotProps={{ htmlInput: { 'aria-label': t('composer.priorityLabel') } }}
       >
         <MenuItem value="">
           <Typography component="span" variant="body2" color="text.secondary">
-            None
+            {t('composer.none')}
           </Typography>
         </MenuItem>
         {Object.values(AnnotationPriority).map((value) => {
@@ -140,7 +142,7 @@ export function Composer({
                   aria-hidden
                 />
                 <Typography component="span" variant="body2">
-                  {cue.label}
+                  {t(cue.labelKey)}
                 </Typography>
               </Stack>
             </MenuItem>
@@ -153,10 +155,10 @@ export function Composer({
   const actionRow = (
     <Stack direction="row" spacing={1} sx={{ justifyContent: 'flex-end', alignItems: 'center' }}>
       <Button size="small" variant="contained" onClick={create} disabled={!canCreate}>
-        Create annotation ({submitShortcutLabel()})
+        {t('composer.create', { shortcut: submitShortcutLabel() })}
       </Button>
       <Button size="small" onClick={onCancel} disabled={creating}>
-        Cancel
+        {t('common:actions.cancel')}
       </Button>
     </Stack>
   );
@@ -169,7 +171,7 @@ export function Composer({
       data-testid="annotation-composer"
     >
       <Stack spacing={1}>
-        {!frameless && <Typography variant="subtitle2">New annotation</Typography>}
+        {!frameless && <Typography variant="subtitle2">{t('composer.title')}</Typography>}
         {!frameless && pendingAnchor && (
           <Typography
             variant="body2"
@@ -182,7 +184,9 @@ export function Composer({
               overflow: 'hidden',
             }}
           >
-            {quote ? `“${quote}”` : `Region on page ${pendingAnchor.region.surfaceIndex + 1}`}
+            {quote
+              ? t('quoted', { text: quote })
+              : t('composer.regionOnPage', { page: pendingAnchor.region.surfaceIndex + 1 })}
           </Typography>
         )}
         <MarkdownComposer
@@ -191,7 +195,7 @@ export function Composer({
           onSubmit={() => {
             if (canCreate) create();
           }}
-          inputAriaLabel="Annotation comment"
+          inputAriaLabel={t('composer.commentLabel')}
           minRows={5}
           disabled={creating}
           onUploadAttachment={onUploadAttachment}
@@ -208,8 +212,8 @@ export function Composer({
       <FullscreenComposerDialog
         open={writingFullscreen}
         onClose={() => setWritingFullscreen(false)}
-        title="New annotation"
-        contextTitle="You are annotating"
+        title={t('composer.title')}
+        contextTitle={t('composer.contextTitle')}
         context={
           quote ? (
             <Box
@@ -223,16 +227,16 @@ export function Composer({
               }}
             >
               <Typography variant="body2" sx={{ fontStyle: 'italic', color: 'text.secondary' }}>
-                “{quote}”
+                {t('quoted', { text: quote })}
               </Typography>
             </Box>
           ) : pendingAnchor?.region ? (
             <Typography variant="body2" color="text.secondary">
-              A region on page {pendingAnchor.region.surfaceIndex + 1}.
+              {t('composer.contextRegion', { page: pendingAnchor.region.surfaceIndex + 1 })}
             </Typography>
           ) : (
             <Typography variant="body2" color="text.secondary">
-              A general remark on the whole document — not pinned to a passage.
+              {t('composer.contextDocument')}
             </Typography>
           )
         }
@@ -243,7 +247,7 @@ export function Composer({
           onSubmit={() => {
             if (canCreate) create();
           }}
-          inputAriaLabel="Annotation comment"
+          inputAriaLabel={t('composer.commentLabel')}
           bare
           disabled={creating}
           onUploadAttachment={onUploadAttachment}
@@ -254,10 +258,10 @@ export function Composer({
             <Stack direction="row" spacing={1} sx={{ alignItems: 'center', flexWrap: 'wrap' }}>
               {classificationRow(true)}
               <Button size="small" variant="contained" onClick={create} disabled={!canCreate}>
-                Create annotation ({submitShortcutLabel()})
+                {t('composer.create', { shortcut: submitShortcutLabel() })}
               </Button>
               <Button size="small" onClick={onCancel} disabled={creating}>
-                Cancel
+                {t('common:actions.cancel')}
               </Button>
             </Stack>
           }

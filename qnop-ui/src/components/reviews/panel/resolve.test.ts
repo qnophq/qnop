@@ -20,9 +20,24 @@
  */
 
 import { describe, expect, it } from 'vitest';
+import { AxiosError, type AxiosResponse } from 'axios';
 import type { AnnotationView } from '../../../api/generated';
 import { AnnotationStatus } from '../../../api/generated';
-import { mayDismissAnnotation, mayReopenAnnotation, mayResolveAnnotation } from './resolve';
+import {
+  dismissErrorKey,
+  mayDismissAnnotation,
+  mayReopenAnnotation,
+  mayResolveAnnotation,
+  reopenErrorKey,
+  resolveErrorKey,
+} from './resolve';
+
+function conflict(code: string): AxiosError {
+  return new AxiosError('x', 'ERR', undefined, undefined, {
+    status: 409,
+    data: { code },
+  } as AxiosResponse);
+}
 
 const AUTHOR = 'author-1';
 const OWNER = 'owner-1';
@@ -92,5 +107,31 @@ describe('mayReopenAnnotation (#394/#408)', () => {
   it('keeps the owner out — a dismissal is not theirs to reverse', () => {
     expect(mayReopenAnnotation(annotation(AnnotationStatus.Dismissed), OWNER, false)).toBe(false);
     expect(mayReopenAnnotation(annotation(AnnotationStatus.Resolved), OWNER, false)).toBe(false);
+  });
+});
+
+describe('conflict messages (#836)', () => {
+  it('maps known resolve conflicts to catalog keys and anything else to the generic failure', () => {
+    expect(resolveErrorKey(conflict('ANNOTATION_ALREADY_RESOLVED'))).toBe(
+      'resolve.conflicts.ANNOTATION_ALREADY_RESOLVED',
+    );
+    expect(resolveErrorKey(conflict('SOMETHING_ELSE'))).toBe('resolve.failed');
+    expect(resolveErrorKey(new Error('offline'))).toBe('resolve.failed');
+  });
+
+  it('maps known reopen conflicts to catalog keys', () => {
+    expect(reopenErrorKey(conflict('REVIEW_CLOSED'))).toBe('reopen.conflicts.REVIEW_CLOSED');
+    expect(reopenErrorKey(conflict('ANNOTATION_NOT_RESOLVED'))).toBe(
+      'reopen.conflicts.ANNOTATION_NOT_RESOLVED',
+    );
+    expect(reopenErrorKey(undefined)).toBe('reopen.failed');
+  });
+
+  it('maps known dismiss conflicts to catalog keys', () => {
+    expect(dismissErrorKey(conflict('ANNOTATION_NOT_OPEN'))).toBe(
+      'dismiss.conflicts.ANNOTATION_NOT_OPEN',
+    );
+    expect(dismissErrorKey(conflict('REVIEW_CLOSED'))).toBe('dismiss.conflicts.REVIEW_CLOSED');
+    expect(dismissErrorKey(conflict('ANNOTATION_ALREADY_RESOLVED'))).toBe('dismiss.failed');
   });
 });

@@ -19,6 +19,7 @@
  * SPDX-License-Identifier: AGPL-3.0-only
  */
 
+import type { ParseKeys } from 'i18next';
 import type { DiffChange, DiffLocation, NormalizedBox } from '../../../api/generated';
 import { DiffChangeType } from '../../../api/generated';
 
@@ -32,18 +33,19 @@ import { DiffChangeType } from '../../../api/generated';
 export type DiffSide = 'from' | 'to';
 
 /**
- * Card/highlight presentation of a change type: the label text and the badge
+ * Card/highlight presentation of a change type: the label (a `workspace`
+ * catalog key, ADR-0063) and the badge
  * tone (mapping onto `theme.qnop.badge` and the MUI palette). Follows the
  * design prototype's diff colour language — insertions green, deletions red,
  * in-place changes amber.
  */
 export const CHANGE_KIND: Record<
   DiffChangeType,
-  { label: string; tone: 'green' | 'red' | 'amber' }
+  { labelKey: ParseKeys<'workspace'>; tone: 'green' | 'red' | 'amber' }
 > = {
-  [DiffChangeType.Inserted]: { label: 'Added', tone: 'green' },
-  [DiffChangeType.Deleted]: { label: 'Deleted', tone: 'red' },
-  [DiffChangeType.Changed]: { label: 'Changed', tone: 'amber' },
+  [DiffChangeType.Inserted]: { labelKey: 'diff.kinds.INSERTED', tone: 'green' },
+  [DiffChangeType.Deleted]: { labelKey: 'diff.kinds.DELETED', tone: 'red' },
+  [DiffChangeType.Changed]: { labelKey: 'diff.kinds.CHANGED', tone: 'amber' },
 };
 
 /** The locations of a change on one side. */

@@ -31,6 +31,7 @@ import enProfile from './en/profile.json';
 import enReviews from './en/reviews.json';
 import enShell from './en/shell.json';
 import enTeams from './en/teams.json';
+import enWorkspace from './en/workspace.json';
 import { FALLBACK_LOCALE, type AppLocale } from './locales';
 
 export const DEFAULT_NAMESPACE = 'common';
@@ -52,6 +53,7 @@ export const bundledResources = {
     audit: enAudit,
     admin: enAdmin,
     reviews: enReviews,
+    workspace: enWorkspace,
   },
 } as const;
 

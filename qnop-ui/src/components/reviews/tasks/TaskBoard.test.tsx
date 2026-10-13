@@ -112,6 +112,12 @@ describe('TaskBoard', () => {
     ).toBeInTheDocument();
   });
 
+  it('names the thread size in the singular for one comment (#836)', () => {
+    renderBoard();
+    expect(screen.getAllByLabelText('1 comment')).toHaveLength(2);
+    expect(screen.getByLabelText('3 comments')).toBeInTheDocument();
+  });
+
   it('opens a task on click', () => {
     const { onOpen } = renderBoard();
     fireEvent.click(screen.getByTestId('task-card-a-open'));
