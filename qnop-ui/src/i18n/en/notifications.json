@@ -72,5 +72,42 @@
     "review": "Review",
     "received": "Received",
     "openReview": "Open review"
+  },
+  "text": {
+    "aReview": "a review",
+    "title": {
+      "mention": "{{actor}} mentioned you",
+      "participantAdded": "You were added to a review",
+      "annotationCreated": "{{actor}} raised an annotation",
+      "annotationDecided": {
+        "resolved": "An annotation was resolved",
+        "reopened": "An annotation was reopened",
+        "dismissed": "An annotation was dismissed"
+      },
+      "commentAdded": "{{actor}} replied",
+      "versionUploaded": "New version uploaded",
+      "workflowChanged": "The review moved to {{state}}",
+      "reviewDeleted": "A review was deleted",
+      "tombstone": "A review you no longer have access to"
+    },
+    "body": {
+      "mention": "{{actor}} mentioned you in a comment on “{{review}}”.",
+      "participantAdded": "{{actor}} added you as a reviewer on “{{review}}”.",
+      "annotationCreated": "{{actor}} raised a new annotation on “{{review}}”.",
+      "annotationDecided": {
+        "resolved": "{{actor}} resolved an annotation on “{{review}}”.",
+        "reopened": "{{actor}} reopened an annotation on “{{review}}”.",
+        "dismissed": "{{actor}} dismissed an annotation on “{{review}}”."
+      },
+      "commentAdded": "{{actor}} replied to a discussion on “{{review}}”.",
+      "versionUploaded": "{{actor}} uploaded version {{version}} of “{{review}}”.",
+      "workflowChanged": "“{{review}}” moved from {{from}} to {{to}}.",
+      "reviewDeleted": "“{{review}}” was permanently deleted by an administrator.",
+      "tombstone": "This notification refers to a review that is no longer available to you."
+    },
+    "action": {
+      "openAnnotation": "Open annotation",
+      "openReview": "Open review"
+    }
   }
 }

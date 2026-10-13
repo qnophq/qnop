@@ -38,6 +38,7 @@ import {
   notificationLabelKey,
   notificationTone,
 } from '../../components/notifications/notificationMeta';
+import { useNotificationText } from '../../components/notifications/notificationText';
 import { useFormatters } from '../../hooks/useFormatters';
 import { ErrorState } from '../errors/ErrorState';
 import { NotFoundIllustration } from '../errors/illustrations';
@@ -82,6 +83,7 @@ export function MessageDetailPage() {
   const navigate = useNavigate();
   const theme = useTheme();
   const { formatDateTime } = useFormatters();
+  const text = useNotificationText();
   const { data, isPending, isError } = useNotification(notificationId);
   const markRead = useMarkNotificationRead();
 
@@ -192,7 +194,7 @@ export function MessageDetailPage() {
                     {t(notificationLabelKey(data.type))}
                   </Typography>
                   <Typography variant="h1" sx={{ fontSize: 22, lineHeight: 1.25, mt: 0.25 }}>
-                    {data.title}
+                    {text.title(data)}
                   </Typography>
                 </Box>
               </Stack>
@@ -210,7 +212,7 @@ export function MessageDetailPage() {
               <Typography
                 sx={{ ...stagger(140), mt: 2.5, fontSize: 15, lineHeight: 1.65, maxWidth: '68ch' }}
               >
-                {data.body}
+                {text.body(data)}
               </Typography>
 
               {data.preview && (
@@ -289,7 +291,7 @@ export function MessageDetailPage() {
                   onClick={() => navigate(data.actionPath as string)}
                   sx={{ mt: 3 }}
                 >
-                  {data.actionLabel ?? t('detail.openReview')}
+                  {text.actionLabel(data)}
                 </Button>
               )}
             </Box>

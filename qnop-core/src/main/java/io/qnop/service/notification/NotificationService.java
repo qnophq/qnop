@@ -160,7 +160,8 @@ public class NotificationService {
         actionLabel(notification),
         true,
         notification.getReadAt(),
-        notification.getCreatedAt());
+        notification.getCreatedAt(),
+        facts(notification));
   }
 
   /**
@@ -193,7 +194,8 @@ public class NotificationService {
         null,
         false,
         notification.getReadAt(),
-        notification.getCreatedAt());
+        notification.getCreatedAt(),
+        NotificationFacts.NONE);
   }
 
   /**
@@ -215,7 +217,8 @@ public class NotificationService {
         null,
         false,
         notification.getReadAt(),
-        notification.getCreatedAt());
+        notification.getCreatedAt(),
+        NotificationFacts.NONE);
   }
 
   private String title(Notification notification, String actorName) {
@@ -276,6 +279,25 @@ public class NotificationService {
       return base + "?version=" + notification.getVersionNumber();
     }
     return base;
+  }
+
+  /**
+   * The parts the headline and body are built from (issue #836), so a client can word them in the
+   * recipient's language instead of showing the English text rendered here.
+   */
+  private NotificationFacts facts(Notification notification) {
+    return new NotificationFacts(
+        notification.getType() == NotificationType.ANNOTATION_DECIDED
+            ? blankToNull(notification.getDecision())
+            : null,
+        blankToNull(notification.getFromState()),
+        blankToNull(notification.getToState()),
+        notification.getVersionNumber(),
+        notification.getAnnotationId() != null ? "ANNOTATION" : "REVIEW");
+  }
+
+  private static String blankToNull(String value) {
+    return value == null || value.isBlank() ? null : value;
   }
 
   private String actionLabel(Notification notification) {
@@ -359,7 +381,24 @@ public class NotificationService {
       String actionLabel,
       boolean accessible,
       Instant readAt,
-      Instant createdAt) {}
+      Instant createdAt,
+      NotificationFacts facts) {}
+
+  /**
+   * The structured parts of a notification (issue #836): what was decided ({@code resolved}, {@code
+   * reopened}, {@code dismissed}), the workflow transition, the uploaded version and what the
+   * action opens ({@code ANNOTATION} or {@code REVIEW}). All null where the type carries none, and
+   * on a tombstone or a deleted review, whose text says everything there is to say.
+   */
+  public record NotificationFacts(
+      String decision,
+      String fromState,
+      String toState,
+      Integer versionNumber,
+      String actionTarget) {
+
+    static final NotificationFacts NONE = new NotificationFacts(null, null, null, null, null);
+  }
 
   /** One page of the caller's inbox plus the inbox-wide unread total. */
   public record NotificationPageView(

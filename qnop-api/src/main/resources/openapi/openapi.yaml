@@ -7616,6 +7616,33 @@ components:
           description: |
             False when the caller has lost access to the referenced review —
             the row still exists as a record but renders as a tombstone.
+        decision:
+          type: string
+          nullable: true
+          description: |
+            What happened to the annotation on `ANNOTATION_DECIDED`:
+            `resolved`, `reopened` or `dismissed` (issue #836). Null for other
+            types. Together with `fromState`, `toState`, `versionNumber` and
+            `actionTarget` it lets a client word the headline and body in the
+            recipient's language; `title`/`body` stay the English rendering.
+        fromState:
+          type: string
+          nullable: true
+          description: The workflow state left on `WORKFLOW_CHANGED`; null otherwise.
+        toState:
+          type: string
+          nullable: true
+          description: The workflow state entered on `WORKFLOW_CHANGED`; null otherwise.
+        versionNumber:
+          type: integer
+          nullable: true
+          description: The uploaded version on `VERSION_UPLOADED`; null otherwise.
+        actionTarget:
+          type: string
+          nullable: true
+          description: |
+            What `actionPath` opens: `ANNOTATION` or `REVIEW`. Null when there
+            is nothing to open (a tombstone or a deleted review).
         readAt:
           type: string
           format: date-time
@@ -7678,6 +7705,33 @@ components:
           description: Call to action for the deep link, e.g. `Open annotation`.
         accessible:
           type: boolean
+        decision:
+          type: string
+          nullable: true
+          description: |
+            What happened to the annotation on `ANNOTATION_DECIDED`:
+            `resolved`, `reopened` or `dismissed` (issue #836). Null for other
+            types. Together with `fromState`, `toState`, `versionNumber` and
+            `actionTarget` it lets a client word the headline and body in the
+            recipient's language; `title`/`body` stay the English rendering.
+        fromState:
+          type: string
+          nullable: true
+          description: The workflow state left on `WORKFLOW_CHANGED`; null otherwise.
+        toState:
+          type: string
+          nullable: true
+          description: The workflow state entered on `WORKFLOW_CHANGED`; null otherwise.
+        versionNumber:
+          type: integer
+          nullable: true
+          description: The uploaded version on `VERSION_UPLOADED`; null otherwise.
+        actionTarget:
+          type: string
+          nullable: true
+          description: |
+            What `actionPath` opens: `ANNOTATION` or `REVIEW`. Null when there
+            is nothing to open (a tombstone or a deleted review).
         readAt:
           type: string
           format: date-time

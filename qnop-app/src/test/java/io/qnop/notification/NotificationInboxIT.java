@@ -179,6 +179,76 @@ class NotificationInboxIT extends SeededIntegrationTest {
   }
 
   @Test
+  @DisplayName(
+      "each notification ships the facts its text is built from, for the client's language")
+  void shipsStructuredFacts() throws Exception {
+    seedDocument(false);
+    UUID workflow =
+        notifications
+            .save(
+                Notification.of(MEMBER_ID, NotificationType.WORKFLOW_CHANGED)
+                    .withDocument(documentId)
+                    .withActor(AUDITOR_ID)
+                    .withTransition("DRAFT", "IN_REVIEW"))
+            .getId();
+    UUID decided =
+        notifications
+            .save(
+                Notification.of(MEMBER_ID, NotificationType.ANNOTATION_DECIDED)
+                    .withDocument(documentId)
+                    .withActor(AUDITOR_ID)
+                    .withAnnotation(UUID.randomUUID())
+                    .withDecision("dismissed"))
+            .getId();
+    UUID version =
+        notifications
+            .save(
+                Notification.of(MEMBER_ID, NotificationType.VERSION_UPLOADED)
+                    .withDocument(documentId)
+                    .withActor(AUDITOR_ID)
+                    .withVersionNumber(3))
+            .getId();
+
+    mockMvc
+        .perform(as(get("/api/v1/notifications/" + workflow), MEMBER_ID))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.fromState").value("DRAFT"))
+        .andExpect(jsonPath("$.toState").value("IN_REVIEW"))
+        .andExpect(jsonPath("$.decision").doesNotExist())
+        .andExpect(jsonPath("$.actionTarget").value("REVIEW"));
+    mockMvc
+        .perform(as(get("/api/v1/notifications/" + decided), MEMBER_ID))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.decision").value("dismissed"))
+        .andExpect(jsonPath("$.actionTarget").value("ANNOTATION"));
+    mockMvc
+        .perform(as(get("/api/v1/notifications"), MEMBER_ID))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.items[?(@.id=='" + version + "')].versionNumber").value(3));
+  }
+
+  @Test
+  @DisplayName("a review the caller lost access to carries no facts, only its tombstone text")
+  void tombstoneCarriesNoFacts() throws Exception {
+    seedDocument(false);
+    UUID tombstone =
+        notifications
+            .save(
+                Notification.of(MEMBER2_ID, NotificationType.WORKFLOW_CHANGED)
+                    .withDocument(documentId)
+                    .withActor(MEMBER_ID)
+                    .withTransition("DRAFT", "IN_REVIEW"))
+            .getId();
+
+    mockMvc
+        .perform(as(get("/api/v1/notifications/" + tombstone), MEMBER2_ID))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.accessible").value(false))
+        .andExpect(jsonPath("$.toState").doesNotExist())
+        .andExpect(jsonPath("$.actionTarget").doesNotExist());
+  }
+
+  @Test
   @DisplayName("another user's notification is indistinguishable from one that does not exist")
   void foreignNotificationIsNotFound() throws Exception {
     seedDocument(false);
