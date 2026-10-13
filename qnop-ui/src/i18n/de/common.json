@@ -76,7 +76,26 @@
     }
   },
   "search": {
-    "clear": "Suche zurücksetzen"
+    "clear": "Suche zurücksetzen",
+    "title": "Suche",
+    "description": "Reviews, Personen und Teams in deinem Workspace — beschränkt auf das, was du sehen darfst.",
+    "placeholder": "Reviews, Personen und Teams durchsuchen…",
+    "inputLabel": "Reviews, Personen und Teams durchsuchen",
+    "tooShort_one": "Gib mindestens {{count}} Zeichen ein, um zu suchen.",
+    "tooShort_other": "Gib mindestens {{count}} Zeichen ein, um zu suchen.",
+    "groups": {
+      "reviews": "Reviews",
+      "annotations": "Anmerkungen",
+      "comments": "Kommentare",
+      "users": "Personen",
+      "teams": "Teams"
+    },
+    "resultsFor": "Ergebnisse für „{{query}}“",
+    "resultsHint": "Jeder Treffer führt direkt zu seiner Seite.",
+    "searching": "Suche läuft…",
+    "unavailable": "Die Suche ist gerade nicht verfügbar.",
+    "noMatches": "Keine Treffer in dieser Gruppe.",
+    "inDocument": "in {{title}}"
   },
   "timezone": {
     "label": "Zeitzone",

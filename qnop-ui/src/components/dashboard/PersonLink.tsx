@@ -22,6 +22,7 @@
 import Stack from '@mui/material/Stack';
 import Typography from '@mui/material/Typography';
 import { alpha, useTheme } from '@mui/material/styles';
+import { useTranslation } from 'react-i18next';
 import { Link as RouterLink } from 'react-router';
 import { useAuthStore } from '../../stores/authStore';
 import { UserHoverCard } from '../people/UserHoverCard';
@@ -61,6 +62,7 @@ export function PersonLink({
   size = 26,
   avatarOnly = false,
 }: PersonLinkProps) {
+  const { t } = useTranslation('dashboard');
   const theme = useTheme();
   const selfId = useAuthStore((s) => s.userId);
   const to = userId ? (userId === selfId ? '/profile' : `/users/${slug ?? userId}`) : null;
@@ -101,7 +103,7 @@ export function PersonLink({
             '& .MuiTypography-root': { color: theme.qnop.brand.blue },
           },
         }}
-        aria-label={`View ${name}'s profile`}
+        aria-label={t('person.viewProfile', { name })}
       >
         {body}
       </Stack>

@@ -1,0 +1,115 @@
+{
+  "greeting": {
+    "morning": {
+      "named": "Good morning, {{name}}.",
+      "plain": "Good morning."
+    },
+    "afternoon": {
+      "named": "Good afternoon, {{name}}.",
+      "plain": "Good afternoon."
+    },
+    "evening": {
+      "named": "Good evening, {{name}}.",
+      "plain": "Good evening."
+    }
+  },
+  "newReview": "New review",
+  "stats": {
+    "openReviews": "Open reviews",
+    "waitingOnYou": "Waiting on you",
+    "dueSoon": "Due soon",
+    "resolvedThisWeek": "Resolved this week"
+  },
+  "continue": "Continue where you left off:",
+  "waiting": {
+    "title": "Waiting on you",
+    "description": "Reviews you are asked to work through.",
+    "empty": "Nothing waits on you — enjoy the quiet."
+  },
+  "mine": {
+    "title": "My reviews",
+    "description": "Reviews you own, running ones first.",
+    "emptyTitle": "No reviews yet",
+    "empty": "Start your first one with “New review”."
+  },
+  "reviewList": {
+    "emptyTitle": "Nothing here yet",
+    "caughtUp": "All caught up!",
+    "readyToFinalize": "Ready to finalize",
+    "resolved": "{{resolved}}/{{total}} resolved",
+    "noAnnotations": "No annotations yet"
+  },
+  "deadlines": {
+    "title": "Deadlines",
+    "description": "When your running reviews are due.",
+    "emptyTitle": "Nothing on the clock",
+    "empty": "Due dates from your open reviews land here."
+  },
+  "due": {
+    "overdue_one": "Overdue by {{count}} day",
+    "overdue_other": "Overdue by {{count}} days",
+    "today": "Due today",
+    "tomorrow": "Due tomorrow",
+    "daysLeft_one": "{{count}} day left",
+    "daysLeft_other": "{{count}} days left"
+  },
+  "replies": {
+    "title": "Replies to you",
+    "description": "The latest answers in discussions you started or joined.",
+    "emptyTitle": "No replies yet",
+    "empty": "Answers in discussions you started or joined land here.",
+    "participant": "Participant",
+    "context": "in {{review}} · {{time}}"
+  },
+  "activity": {
+    "title": "Recent activity",
+    "description": "What happened across your reviews.",
+    "emptyTitle": "All quiet",
+    "empty": "When teammates act on your reviews, it shows up here.",
+    "someone": "Someone",
+    "phrases": {
+      "annotationCreated": "<actor>{{actor}}</actor> opened an annotation in <review>{{review}}</review>",
+      "annotationResolved": "<actor>{{actor}}</actor> resolved an annotation in <review>{{review}}</review>",
+      "annotationReopened": "<actor>{{actor}}</actor> reopened an annotation in <review>{{review}}</review>",
+      "workflowTransition": "<actor>{{actor}}</actor> changed the state of <review>{{review}}</review>",
+      "dueDateChanged": "<actor>{{actor}}</actor> changed the due date of <review>{{review}}</review>",
+      "other": "<actor>{{actor}}</actor> updated <review>{{review}}</review>"
+    }
+  },
+  "playerCard": {
+    "title": "Your reviewer card",
+    "description": "What your profile shows the workspace.",
+    "viewProfile": "View profile",
+    "unavailable": "Your profile stats are unavailable right now.",
+    "stats": {
+      "reviewsOwned": "Owned",
+      "reviewsParticipating": "Reviewing",
+      "annotationsRaised": "Raised",
+      "annotationsResolved": "Resolved"
+    }
+  },
+  "person": {
+    "viewProfile": "View {{name}}'s profile"
+  },
+  "empty": {
+    "title": "Your command centre is ready for its first mission.",
+    "body": "Every review you run or join lands here — deadlines, replies to your comments, and the wins you resolve. It just needs a document to chew on.",
+    "cta": "Start your first review",
+    "stepsTitle": "Three moves to your first review",
+    "steps": {
+      "upload": {
+        "title": "Upload a document",
+        "hint": "PDF in, review out."
+      },
+      "invite": {
+        "title": "Invite reviewers",
+        "hint": "People or whole teams."
+      },
+      "discuss": {
+        "title": "Discuss & resolve",
+        "hint": "Annotate, reply, settle."
+      }
+    },
+    "scoreboardHint": "Your scoreboard — it starts counting with your first review."
+  }
+}

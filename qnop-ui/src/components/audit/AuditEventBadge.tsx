@@ -22,6 +22,7 @@
 import Box from '@mui/material/Box';
 import Tooltip from '@mui/material/Tooltip';
 import Typography from '@mui/material/Typography';
+import { useTranslation } from 'react-i18next';
 import { ToneBadge } from '../admin/ToneBadge';
 import { auditEventMeta } from '../../utils/auditEvents';
 
@@ -32,13 +33,16 @@ import { auditEventMeta } from '../../utils/auditEvents';
  * created` on their own — the same badge is reused in the table and the legend.
  */
 export function AuditEventBadge({ eventType }: { eventType: string }) {
+  const { t } = useTranslation('audit');
   const meta = auditEventMeta(eventType);
   return (
     <Tooltip
       arrow
       title={
         <Box sx={{ py: 0.25 }}>
-          <Typography sx={{ fontSize: 12.5, lineHeight: 1.4 }}>{meta.description}</Typography>
+          <Typography sx={{ fontSize: 12.5, lineHeight: 1.4 }}>
+            {t(meta.descriptionKey, { type: eventType })}
+          </Typography>
           <Typography
             sx={{ fontSize: 11, mt: 0.5, opacity: 0.75, fontFamily: 'ui-monospace, monospace' }}
           >
@@ -48,7 +52,7 @@ export function AuditEventBadge({ eventType }: { eventType: string }) {
       }
     >
       <Box component="span" sx={{ display: 'inline-flex', cursor: 'help' }}>
-        <ToneBadge tone={meta.tone} label={meta.label} />
+        <ToneBadge tone={meta.tone} label={t(meta.labelKey, { type: eventType })} />
       </Box>
     </Tooltip>
   );

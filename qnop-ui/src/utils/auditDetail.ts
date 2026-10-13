@@ -19,9 +19,13 @@
  * SPDX-License-Identifier: AGPL-3.0-only
  */
 
-import { humanizeToken, humanizeWorkflowState } from './auditEvents';
+import type { TFunction } from 'i18next';
+import { humanizeToken, humanizeWorkflowState, rawPhrase, type AuditPhrase } from './auditEvents';
 
 const EM_DASH = '—';
+
+/** The "nothing to show" detail — an em dash. */
+const NONE: AuditPhrase = { key: 'detail.none' };
 
 /** Renders a single JSON value compactly for the fallback detail rendering. */
 function formatValue(value: unknown): string {
@@ -30,8 +34,8 @@ function formatValue(value: unknown): string {
   return String(value);
 }
 
-function transitionSide(value: unknown): string {
-  return value === null || value === undefined ? EM_DASH : humanizeWorkflowState(String(value));
+function transitionSide(value: unknown): AuditPhrase {
+  return value === null || value === undefined ? NONE : humanizeWorkflowState(String(value));
 }
 
 /**
@@ -39,7 +43,7 @@ function transitionSide(value: unknown): string {
  * is the only surviving trace of those reviews — their own audit trail was
  * deleted with them — so the titles are shown, not just how many.
  */
-function purgeSummary(obj: Record<string, unknown>): string {
+function purgeSummary(obj: Record<string, unknown>): AuditPhrase {
   const reviews = typeof obj.reviews === 'number' ? obj.reviews : null;
   const objects = typeof obj.storageObjects === 'number' ? obj.storageObjects : null;
   const titles = Array.isArray(obj.purged)
@@ -52,24 +56,34 @@ function purgeSummary(obj: Record<string, unknown>): string {
         .filter((title): title is string => typeof title === 'string' && title.length > 0)
     : [];
 
-  const bits: string[] = [];
-  if (reviews !== null) bits.push(`${reviews} review${reviews === 1 ? '' : 's'}`);
-  if (objects !== null) bits.push(`${objects} storage object${objects === 1 ? '' : 's'}`);
+  const bits: AuditPhrase[] = [];
+  if (reviews !== null) bits.push({ key: 'detail.purge.reviews', values: { count: reviews } });
+  if (objects !== null) {
+    bits.push({ key: 'detail.purge.storageObjects', values: { count: objects } });
+  }
   const truncated = typeof obj.truncated === 'number' ? obj.truncated : 0;
   if (titles.length > 0) {
     const listed = titles.join(', ');
-    bits.push(truncated > 0 ? `${listed} +${truncated} more` : listed);
+    bits.push(
+      truncated > 0
+        ? { key: 'detail.purge.more', values: { titles: listed, remaining: truncated } }
+        : rawPhrase(listed),
+    );
   }
-  return bits.length > 0 ? bits.join(' · ') : EM_DASH;
+  return bits.length > 0 ? { join: bits, separator: ' · ' } : NONE;
 }
 
-function dueDateChange(from: unknown, to: unknown, formatDate: (iso: string) => string): string {
+function dueDateChange(
+  from: unknown,
+  to: unknown,
+  formatDate: (iso: string) => string,
+): AuditPhrase {
   const before = from === null || from === undefined ? null : formatDate(String(from));
   const after = to === null || to === undefined ? null : formatDate(String(to));
-  if (before === null && after === null) return EM_DASH;
-  if (before === null) return `Set to ${after}`;
-  if (after === null) return `Cleared (was ${before})`;
-  return `${before} → ${after}`;
+  if (before === null && after === null) return NONE;
+  if (before === null) return { key: 'detail.dueDate.set', values: { date: after as string } };
+  if (after === null) return { key: 'detail.dueDate.cleared', values: { date: before } };
+  return { key: 'detail.change', values: { from: before, to: after } };
 }
 
 /**
@@ -82,25 +96,26 @@ function dueDateChange(from: unknown, to: unknown, formatDate: (iso: string) => 
  * its object key. Events whose meaning is fully carried by their label (a
  * raised/resolved/reopened annotation, whose only payload is an internal id)
  * render an em dash. Any unknown shape still degrades to a compact `key: value`
- * list, since the vocabulary is open.
+ * list, since the vocabulary is open. The result is an {@link AuditPhrase} —
+ * catalog keys plus values — that {@link renderAuditPhrase} turns into text.
  */
 export function formatAuditDetail(
   eventType: string,
   detail: string | null | undefined,
   formatDate: (iso: string) => string = (iso) => iso,
-): string {
-  if (!detail) return EM_DASH;
+): AuditPhrase {
+  if (!detail) return NONE;
 
   let parsed: unknown;
   try {
     parsed = JSON.parse(detail);
   } catch {
     // Not JSON (e.g. a bare id) — show it as-is.
-    return detail;
+    return rawPhrase(detail);
   }
 
   if (parsed === null || typeof parsed !== 'object') {
-    return formatValue(parsed);
+    return rawPhrase(formatValue(parsed));
   }
 
   const obj = parsed as Record<string, unknown>;
@@ -113,49 +128,81 @@ export function formatAuditDetail(
     case 'extraction.succeeded':
       // The event label already conveys the meaning; the payload is only an
       // internal id, which is never shown.
-      return EM_DASH;
+      return NONE;
     case 'annotation.classified': {
-      const bits: string[] = [];
-      if (obj.type !== null && obj.type !== undefined) bits.push(humanizeToken(String(obj.type)));
-      if (obj.priority !== null && obj.priority !== undefined) {
-        bits.push(`${humanizeToken(String(obj.priority))} priority`);
+      const bits: AuditPhrase[] = [];
+      if (obj.type !== null && obj.type !== undefined) {
+        bits.push(rawPhrase(humanizeToken(String(obj.type))));
       }
-      return bits.length > 0 ? `As ${bits.join(' · ')}` : EM_DASH;
+      if (obj.priority !== null && obj.priority !== undefined) {
+        bits.push({
+          key: 'detail.priority',
+          values: { priority: humanizeToken(String(obj.priority)) },
+        });
+      }
+      return bits.length > 0
+        ? { key: 'detail.classified', values: { parts: { join: bits, separator: ' · ' } } }
+        : NONE;
     }
     case 'annotation.auto_closed':
       return typeof obj.reason === 'string'
-        ? `Reason: ${humanizeToken(String(obj.reason))}`
-        : EM_DASH;
+        ? { key: 'detail.reason', values: { reason: humanizeToken(String(obj.reason)) } }
+        : NONE;
     case 'placement.confirmed':
     case 'placement.reattached':
     case 'placement.repositioned':
       return obj.versionNumber !== null && obj.versionNumber !== undefined
-        ? `On version ${formatValue(obj.versionNumber)}`
-        : EM_DASH;
+        ? { key: 'detail.onVersion', values: { version: formatValue(obj.versionNumber) } }
+        : NONE;
     case 'workflow.transition':
       if ('from' in obj || 'to' in obj) {
-        return `${transitionSide(obj.from)} → ${transitionSide(obj.to)}`;
+        return {
+          key: 'detail.change',
+          values: { from: transitionSide(obj.from), to: transitionSide(obj.to) },
+        };
       }
       break;
     case 'document.due_date.changed':
       return dueDateChange(obj.from, obj.to, formatDate);
     case 'extraction.failed':
       return obj.reason !== null && obj.reason !== undefined
-        ? `Reason: ${formatValue(obj.reason)}`
-        : EM_DASH;
+        ? { key: 'detail.reason', values: { reason: formatValue(obj.reason) } }
+        : NONE;
     case 'storage.orphan.deleted':
-      return obj.key !== null && obj.key !== undefined ? `Object ${formatValue(obj.key)}` : EM_DASH;
+      return obj.key !== null && obj.key !== undefined
+        ? { key: 'detail.object', values: { objectKey: formatValue(obj.key) } }
+        : NONE;
     case 'review.archived':
       return obj.outcome !== null && obj.outcome !== undefined
-        ? `Was ${humanizeWorkflowState(String(obj.outcome))}`
-        : EM_DASH;
+        ? { key: 'detail.was', values: { state: humanizeWorkflowState(String(obj.outcome)) } }
+        : NONE;
     case 'review.purged':
       return purgeSummary(obj);
     default:
       break;
   }
 
-  // Open-vocabulary fallback: a compact key: value list.
+  // Open-vocabulary fallback: a compact key: value list of the raw payload — technical, so
+  // it is shown verbatim rather than translated.
   const parts = Object.entries(obj).map(([key, value]) => `${key}: ${formatValue(value)}`);
-  return parts.length > 0 ? parts.join(', ') : EM_DASH;
+  return parts.length > 0 ? rawPhrase(parts.join(', ')) : NONE;
+}
+
+/** True for the em-dash detail — nothing worth copying. */
+export function isEmptyAuditDetail(phrase: AuditPhrase): boolean {
+  return 'key' in phrase && phrase.key === 'detail.none';
+}
+
+/** Resolves an {@link AuditPhrase} against the `audit` catalog — nested phrases first. */
+export function renderAuditPhrase(phrase: AuditPhrase, t: TFunction<'audit'>): string {
+  if ('join' in phrase) {
+    return phrase.join.map((part) => renderAuditPhrase(part, t)).join(phrase.separator);
+  }
+  const values = Object.fromEntries(
+    Object.entries(phrase.values ?? {}).map(([name, value]) => [
+      name,
+      typeof value === 'object' ? renderAuditPhrase(value, t) : value,
+    ]),
+  );
+  return t(phrase.key, values);
 }

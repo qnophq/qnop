@@ -35,6 +35,7 @@ import {
   Trophy,
   UserCheck,
 } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router';
 import { useDashboard } from '../api/hooks/useDashboard';
 import { useReviews, useReviewCapacity } from '../api/hooks/useReviews';
@@ -44,8 +45,8 @@ import { PlayerCard } from '../components/dashboard/PlayerCard';
 import {
   deadlines,
   dueUrgency,
-  greeting,
   greetingEmoji,
+  greetingKey,
   myReviews,
   reviewPath,
   waitingOnYou,
@@ -70,6 +71,7 @@ import { useFormatters } from '../hooks/useFormatters';
  * the caller's public profile.
  */
 export function HomePage() {
+  const { t } = useTranslation('dashboard');
   const { formatLongDay } = useFormatters();
   const navigate = useNavigate();
   // Shares its cache entry with the reviews list, so this costs no extra call
@@ -103,7 +105,7 @@ export function HomePage() {
           the canonical PageHeader so the action sits exactly where it does on
           the Reviews page. */}
       <PageHeader
-        title={`${greeting(new Date().getHours())}${firstName ? `, ${firstName}` : ''}.`}
+        title={t(greetingKey(new Date().getHours(), Boolean(firstName)), { name: firstName })}
         titleAdornment={
           <Box component="span" aria-hidden sx={{ fontSize: 22 }}>
             {greetingEmoji(new Date().getHours())}
@@ -117,7 +119,7 @@ export function HomePage() {
             disabled={reviewCapacity.full}
             onClick={() => navigate('/reviews/new')}
           >
-            New review
+            {t('newReview')}
           </Button>
         }
       />
@@ -135,19 +137,24 @@ export function HomePage() {
           <StatStrip
             tiles={[
               {
-                label: 'Open reviews',
+                label: t('stats.openReviews'),
                 value: reviews.filter((r) => isOpenWorkflowState(r.workflowState)).length,
                 icon: Inbox,
               },
-              { label: 'Waiting on you', value: waiting.length, tone: 'accent', icon: UserCheck },
               {
-                label: 'Due soon',
+                label: t('stats.waitingOnYou'),
+                value: waiting.length,
+                tone: 'accent',
+                icon: UserCheck,
+              },
+              {
+                label: t('stats.dueSoon'),
                 value: dueSoonCount,
                 tone: overdueCount > 0 ? 'danger' : 'warning',
                 icon: CalendarClock,
               },
               {
-                label: 'Resolved this week',
+                label: t('stats.resolvedThisWeek'),
                 value: dashboardQuery.data?.stats.resolvedThisWeek ?? 0,
                 tone: 'success',
                 icon: Trophy,
@@ -160,7 +167,7 @@ export function HomePage() {
             <Stack direction="row" spacing={1} sx={{ alignItems: 'center', flexWrap: 'wrap' }}>
               <History size={14} aria-hidden style={{ opacity: 0.6 }} />
               <Typography variant="caption" color="text.secondary">
-                Continue where you left off:
+                {t('continue')}
               </Typography>
               {recents.map((recent) => (
                 <Chip
@@ -185,20 +192,20 @@ export function HomePage() {
           >
             <ReviewListCard
               icon={UserCheck}
-              title="Waiting on you"
-              description="Reviews you are asked to work through."
+              title={t('waiting.title')}
+              description={t('waiting.description')}
               reviews={waiting}
-              emptyText="Nothing waits on you — enjoy the quiet."
+              emptyText={t('waiting.empty')}
               celebrateEmpty
             />
             <DeadlinesCard reviews={due} />
             <ReviewListCard
               icon={FileText}
-              title="My reviews"
-              description="Reviews you own, running ones first."
+              title={t('mine.title')}
+              description={t('mine.description')}
               reviews={owned}
-              emptyTitle="No reviews yet"
-              emptyText="Start your first one with “New review”."
+              emptyTitle={t('mine.emptyTitle')}
+              emptyText={t('mine.empty')}
               emptyIcon={Rocket}
               ownerCues
             />

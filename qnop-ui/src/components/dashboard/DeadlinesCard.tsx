@@ -25,6 +25,7 @@ import Stack from '@mui/material/Stack';
 import Typography from '@mui/material/Typography';
 import { alpha, useTheme } from '@mui/material/styles';
 import { CalendarClock, Hourglass } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router';
 import type { DocumentSummary } from '../../api/generated';
 import { SectionCard } from '../admin/layout/SectionCard';
@@ -44,6 +45,7 @@ interface DeadlinesCardProps {
  * today in warning, the rest quiet.
  */
 export function DeadlinesCard({ reviews }: DeadlinesCardProps) {
+  const { t } = useTranslation('dashboard');
   const { formatDate } = useFormatters();
   const theme = useTheme();
   const navigate = useNavigate();
@@ -58,15 +60,15 @@ export function DeadlinesCard({ reviews }: DeadlinesCardProps) {
   return (
     <SectionCard
       icon={CalendarClock}
-      title="Deadlines"
-      description="When your running reviews are due."
+      title={t('deadlines.title')}
+      description={t('deadlines.description')}
       action={<CountPill value={reviews.length} />}
     >
       {reviews.length === 0 ? (
         <CardEmptyState
           icon={Hourglass}
-          title="Nothing on the clock"
-          text="Due dates from your open reviews land here."
+          title={t('deadlines.emptyTitle')}
+          text={t('deadlines.empty')}
         />
       ) : (
         <CardScroller>
@@ -114,7 +116,7 @@ export function DeadlinesCard({ reviews }: DeadlinesCardProps) {
                     sx={{ color, fontWeight: 700, flexShrink: 0 }}
                     data-urgency={urgency.level}
                   >
-                    {urgency.label}
+                    {t(urgency.labelKey, { count: urgency.count })}
                   </Typography>
                 </ButtonBase>
               );

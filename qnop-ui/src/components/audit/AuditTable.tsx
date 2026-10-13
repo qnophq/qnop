@@ -30,17 +30,25 @@ import TableHead from '@mui/material/TableHead';
 import TableRow from '@mui/material/TableRow';
 import Tooltip from '@mui/material/Tooltip';
 import Typography from '@mui/material/Typography';
+import { useTranslation } from 'react-i18next';
 import { Link as RouterLink } from 'react-router';
 import { Check, Copy, ListFilter } from 'lucide-react';
 import type { AuditEvent } from '../../api/generated';
 import { useFormatters } from '../../hooks/useFormatters';
-import { formatAuditDetail } from '../../utils/auditDetail';
+import { formatAuditDetail, isEmptyAuditDetail, renderAuditPhrase } from '../../utils/auditDetail';
+import type { AuditKey } from '../../utils/auditEvents';
 import { PersonLink } from '../dashboard/PersonLink';
 import { reviewPath } from '../dashboard/dashboardModel';
 import { AuditEventBadge } from './AuditEventBadge';
 import { SystemActor } from './SystemActor';
 
-const COLUMNS = ['Time', 'Actor', 'Event', 'Document', 'Details'];
+const COLUMNS: AuditKey[] = [
+  'table.columns.time',
+  'table.columns.actor',
+  'table.columns.event',
+  'table.columns.document',
+  'table.columns.details',
+];
 const EM_DASH = '—';
 
 interface AuditTableProps {
@@ -71,6 +79,7 @@ function FilterButton({ label, onClick }: { label: string; onClick: () => void }
 
 /** Copies a detail string to the clipboard, briefly confirming with a check. */
 function CopyDetailButton({ text }: { text: string }) {
+  const { t } = useTranslation('audit');
   const [copied, setCopied] = useState(false);
   const onCopy = async () => {
     try {
@@ -82,10 +91,10 @@ function CopyDetailButton({ text }: { text: string }) {
     }
   };
   return (
-    <Tooltip title={copied ? 'Copied' : 'Copy details'}>
+    <Tooltip title={copied ? t('table.copied') : t('table.copy')}>
       <IconButton
         size="small"
-        aria-label="Copy details"
+        aria-label={t('table.copy')}
         onClick={onCopy}
         sx={{ color: 'text.disabled', '&:hover': { color: 'text.secondary' } }}
       >
@@ -115,13 +124,14 @@ export function AuditTable({
   onFilterSystem,
   onFilterDocument,
 }: AuditTableProps) {
+  const { t } = useTranslation('audit');
   const { formatDateTime } = useFormatters();
   return (
     <Table size="medium" sx={{ '& td, & th': { borderColor: 'divider' } }}>
       <TableHead>
         <TableRow>
           {COLUMNS.map((column) => (
-            <TableCell key={column}>{column}</TableCell>
+            <TableCell key={column}>{t(column)}</TableCell>
           ))}
         </TableRow>
       </TableHead>
@@ -130,15 +140,16 @@ export function AuditTable({
           <TableRow>
             <TableCell colSpan={COLUMNS.length}>
               <Typography color="text.secondary" sx={{ py: 3, textAlign: 'center' }}>
-                No audit events found.
+                {t('table.empty')}
               </Typography>
             </TableCell>
           </TableRow>
         ) : (
           events.map((event) => {
-            const actorName = event.actorDisplayName ?? 'Unknown user';
+            const actorName = event.actorDisplayName ?? t('table.unknownUser');
             const documentTitle = event.documentTitle ?? EM_DASH;
-            const detailText = formatAuditDetail(event.eventType, event.detail, formatDateTime);
+            const detail = formatAuditDetail(event.eventType, event.detail, formatDateTime);
+            const detailText = renderAuditPhrase(detail, t);
             return (
               <TableRow key={event.id} hover>
                 <TableCell sx={{ whiteSpace: 'nowrap' }}>
@@ -159,7 +170,7 @@ export function AuditTable({
                         size={24}
                       />
                       <FilterButton
-                        label={`Filter by ${actorName}`}
+                        label={t('table.filterBy', { name: actorName })}
                         onClick={() => onFilterActor(event.actorId!, actorName)}
                       />
                     </Stack>
@@ -170,7 +181,7 @@ export function AuditTable({
                       sx={{ alignItems: 'center', minWidth: 0 }}
                     >
                       <SystemActor />
-                      <FilterButton label="Filter by System" onClick={onFilterSystem} />
+                      <FilterButton label={t('table.filterBySystem')} onClick={onFilterSystem} />
                     </Stack>
                   )}
                 </TableCell>
@@ -194,13 +205,13 @@ export function AuditTable({
                         {documentTitle}
                       </Link>
                       <FilterButton
-                        label={`Filter by ${documentTitle}`}
+                        label={t('table.filterBy', { name: documentTitle })}
                         onClick={() => onFilterDocument(event.documentId!, documentTitle)}
                       />
                     </Stack>
                   ) : (
                     // A SYSTEM-scoped event (e.g. a scheduler action) has no document.
-                    <Typography color="text.secondary" aria-label="No document">
+                    <Typography color="text.secondary" aria-label={t('table.noDocument')}>
                       —
                     </Typography>
                   )}
@@ -210,7 +221,7 @@ export function AuditTable({
                     <Typography variant="body2" color="text.secondary" sx={{ minWidth: 0 }}>
                       {detailText}
                     </Typography>
-                    {detailText !== EM_DASH && <CopyDetailButton text={detailText} />}
+                    {!isEmptyAuditDetail(detail) && <CopyDetailButton text={detailText} />}
                   </Stack>
                 </TableCell>
               </TableRow>

@@ -1,0 +1,159 @@
+{
+  "page": {
+    "title": "Audit trail",
+    "description": "Every recorded action across all document reviews — who did what, and when.",
+    "legendToggle": "What do these events mean?",
+    "legendTitle": "Event guide",
+    "loadError": "The audit trail could not be loaded."
+  },
+  "filters": {
+    "eventType": "Event type",
+    "allEvents": "All events",
+    "searchDetails": "Search details",
+    "clearSearch": "Clear the details search",
+    "searchPlaceholder": "e.g. a storage key or workflow state",
+    "from": "From",
+    "to": "To",
+    "actorChip": "Actor: {{name}}",
+    "documentChip": "Document: {{title}}"
+  },
+  "pagination": {
+    "rowsPerPage": "Events per page",
+    "displayedRows": "{{from}}–{{to}} of {{total}}"
+  },
+  "table": {
+    "columns": {
+      "time": "Time",
+      "actor": "Actor",
+      "event": "Event",
+      "document": "Document",
+      "details": "Details"
+    },
+    "empty": "No audit events found.",
+    "unknownUser": "Unknown user",
+    "filterBy": "Filter by {{name}}",
+    "filterBySystem": "Filter by System",
+    "noDocument": "No document",
+    "copy": "Copy details",
+    "copied": "Copied"
+  },
+  "system": {
+    "name": "System",
+    "tooltip": "Automated system action — no human actor"
+  },
+  "events": {
+    "annotationCreated": {
+      "label": "Annotation opened",
+      "description": "A reviewer raised a new annotation — a comment or issue — on the document."
+    },
+    "annotationResolved": {
+      "label": "Annotation resolved",
+      "description": "An annotation was marked resolved: the point it raised was addressed."
+    },
+    "annotationReopened": {
+      "label": "Annotation reopened",
+      "description": "A previously settled annotation was reopened because it needed more work."
+    },
+    "annotationDismissed": {
+      "label": "Annotation dismissed",
+      "description": "The review owner or an admin dismissed an open annotation with a mandatory justification (issue #408); the author may reopen it."
+    },
+    "annotationClassified": {
+      "label": "Annotation classified",
+      "description": "An annotation was categorised — its type and/or priority were set."
+    },
+    "placementConfirmed": {
+      "label": "Placement confirmed",
+      "description": "An annotation's position on the page was confirmed on a document version."
+    },
+    "placementReattached": {
+      "label": "Placement re-attached",
+      "description": "An annotation was re-anchored to a new spot — e.g. after a new version shifted the text."
+    },
+    "annotationAutoClosed": {
+      "label": "Annotation auto-closed",
+      "description": "A terminal review transition (cancelled/finalized) closed a still-open annotation automatically (issue #568)."
+    },
+    "placementRepositioned": {
+      "label": "Placement re-positioned",
+      "description": "A healthy annotation was deliberately moved to a different passage (free re-attach, issue #562)."
+    },
+    "workflowTransition": {
+      "label": "Status changed",
+      "description": "The review moved to a new workflow status (e.g. Draft → In review)."
+    },
+    "dueDateChanged": {
+      "label": "Due date changed",
+      "description": "The review's due date was set, changed or cleared."
+    },
+    "extractionSucceeded": {
+      "label": "Text extracted",
+      "description": "An uploaded version's text was extracted successfully and is ready to review."
+    },
+    "extractionFailed": {
+      "label": "Extraction failed",
+      "description": "Extracting the text from an uploaded version failed; the reason is shown in the details."
+    },
+    "storageOrphanDeleted": {
+      "label": "Orphaned object deleted",
+      "description": "An unreferenced object was deleted from storage during a consistency cleanup (issue #523); the object key is shown in the details."
+    },
+    "schedulerJobRun": {
+      "label": "Scheduler job run",
+      "description": "An administrator manually triggered a scheduled maintenance job (“Run now”, issue #524); the job and its outcome are shown in the details."
+    },
+    "settingsUpdated": {
+      "label": "Setting changed",
+      "description": "An administrator changed an application setting; the details name the setting and the values before and after. Passwords and other secrets are recorded as changed without either value."
+    },
+    "schedulerJobUpdated": {
+      "label": "Scheduler job updated",
+      "description": "An administrator changed a scheduled job’s settings — enabled or disabled it, or toggled its dry-run mode (issue #524)."
+    },
+    "reviewArchived": {
+      "label": "Review archived",
+      "description": "A finalized or cancelled review passed the retention window (or an owner/admin archived it) and left the active lists (issue #576); the outcome it was archived from is shown in the details."
+    },
+    "reviewUnarchived": {
+      "label": "Review unarchived",
+      "description": "An owner or admin restored an archived review to the active lists (issue #576)."
+    },
+    "reviewPurged": {
+      "label": "Reviews purged",
+      "description": "Archived reviews passed the purge retention window and were deleted permanently, including storage objects no other document referenced (issue #577). This is the only surviving record of them — their own audit trail was deleted with them; the details list what went."
+    },
+    "fallback": {
+      "label": "{{type}}",
+      "description": "A recorded review event."
+    }
+  },
+  "workflowStates": {
+    "DRAFT": "Draft",
+    "IN_REVIEW": "In review",
+    "CHANGES_REQUESTED": "Changes requested",
+    "FINALIZED": "Finalized",
+    "CANCELLED": "Cancelled"
+  },
+  "detail": {
+    "none": "—",
+    "raw": "{{text}}",
+    "change": "{{from}} → {{to}}",
+    "classified": "As {{parts}}",
+    "priority": "{{priority}} priority",
+    "reason": "Reason: {{reason}}",
+    "onVersion": "On version {{version}}",
+    "object": "Object {{objectKey}}",
+    "was": "Was {{state}}",
+    "dueDate": {
+      "set": "Set to {{date}}",
+      "cleared": "Cleared (was {{date}})"
+    },
+    "purge": {
+      "reviews_one": "{{count}} review",
+      "reviews_other": "{{count}} reviews",
+      "storageObjects_one": "{{count}} storage object",
+      "storageObjects_other": "{{count}} storage objects",
+      "more": "{{titles}} +{{remaining}} more"
+    }
+  }
+}

@@ -122,7 +122,15 @@
   "moves": {
     "title": "Letzte Aktivitäten",
     "caption": "In gemeinsamen Reviews",
-    "empty": "Keine aktuellen Aktivitäten von {{name}} in gemeinsamen Reviews."
+    "empty": "Keine aktuellen Aktivitäten von {{name}} in gemeinsamen Reviews.",
+    "phrases": {
+      "annotationCreated": "Anmerkung in <review>{{review}}</review> erstellt",
+      "annotationResolved": "Anmerkung in <review>{{review}}</review> erledigt",
+      "annotationReopened": "Anmerkung in <review>{{review}}</review> wieder geöffnet",
+      "workflowTransition": "Status von <review>{{review}}</review> geändert",
+      "dueDateChanged": "Fälligkeitsdatum von <review>{{review}}</review> geändert",
+      "other": "<review>{{review}}</review> aktualisiert"
+    }
   },
   "toast": {
     "settingSaveFailed": "Die Einstellung konnte nicht gespeichert werden.",

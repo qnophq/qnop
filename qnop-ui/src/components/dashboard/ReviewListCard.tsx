@@ -25,6 +25,7 @@ import Stack from '@mui/material/Stack';
 import Typography from '@mui/material/Typography';
 import { alpha, useTheme } from '@mui/material/styles';
 import { CircleCheck, Inbox, PartyPopper, type LucideIcon } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router';
 import type { DocumentSummary } from '../../api/generated';
 import { ToneBadge } from '../admin/ToneBadge';
@@ -44,7 +45,7 @@ interface ReviewListCardProps {
   description: string;
   reviews: DocumentSummary[];
   emptyText: string;
-  /** Headline over `emptyText` in the designed empty state (issue #588). */
+  /** Headline over `emptyText` in the designed empty state (issue #588); a generic one when absent. */
   emptyTitle?: string;
   /** Medallion glyph of the designed empty state (issue #588). */
   emptyIcon?: LucideIcon;
@@ -65,11 +66,12 @@ export function ReviewListCard({
   description,
   reviews,
   emptyText,
-  emptyTitle = 'Nothing here yet',
+  emptyTitle,
   emptyIcon = Inbox,
   ownerCues = false,
   celebrateEmpty = false,
 }: ReviewListCardProps) {
+  const { t } = useTranslation('dashboard');
   const theme = useTheme();
   const navigate = useNavigate();
   const visible = reviews;
@@ -83,9 +85,18 @@ export function ReviewListCard({
     >
       {visible.length === 0 ? (
         celebrateEmpty ? (
-          <CardEmptyState icon={PartyPopper} tone="green" title="All caught up!" text={emptyText} />
+          <CardEmptyState
+            icon={PartyPopper}
+            tone="green"
+            title={t('reviewList.caughtUp')}
+            text={emptyText}
+          />
         ) : (
-          <CardEmptyState icon={emptyIcon} title={emptyTitle} text={emptyText} />
+          <CardEmptyState
+            icon={emptyIcon}
+            title={emptyTitle ?? t('reviewList.emptyTitle')}
+            text={emptyText}
+          />
         )
       ) : (
         <CardScroller>
@@ -115,7 +126,7 @@ export function ReviewListCard({
                         {ownerCues && readyToFinalize(review) ? (
                           <ToneBadge
                             tone="green"
-                            label="Ready to finalize"
+                            label={t('reviewList.readyToFinalize')}
                             icon={<CircleCheck size={11} aria-hidden />}
                           />
                         ) : (
@@ -142,12 +153,15 @@ export function ReviewListCard({
                               color="text.secondary"
                               sx={{ flexShrink: 0 }}
                             >
-                              {progress.resolved}/{progress.total} resolved
+                              {t('reviewList.resolved', {
+                                resolved: progress.resolved,
+                                total: progress.total,
+                              })}
                             </Typography>
                           </>
                         ) : (
                           <Typography variant="caption" color="text.secondary">
-                            No annotations yet
+                            {t('reviewList.noAnnotations')}
                           </Typography>
                         )}
                         <Box sx={{ flex: 1 }} />

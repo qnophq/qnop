@@ -39,6 +39,7 @@ import {
   Users,
 } from 'lucide-react';
 import { useEffect } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Navigate, useNavigate, useParams } from 'react-router';
 import { useQueryClient } from '@tanstack/react-query';
 import type { PublicUserProfile } from '../api/generated';
@@ -59,12 +60,13 @@ import { ErrorState } from './errors/ErrorState';
 import { NotFoundIllustration } from './errors/illustrations';
 import { useFormatters } from '../hooks/useFormatters';
 
-const STAT_TILES: { key: keyof PublicUserProfile['stats']; label: string; icon: LucideIcon }[] = [
-  { key: 'reviewsOwned', label: 'Reviews owned', icon: FileText },
-  { key: 'reviewsParticipating', label: 'Reviewing', icon: UserCheck },
-  { key: 'annotationsRaised', label: 'Annotations raised', icon: NotebookPen },
-  { key: 'annotationsResolved', label: 'Resolved', icon: CheckCircle2 },
-  { key: 'commentsWritten', label: 'Comments', icon: MessagesSquare },
+/** The scoreboard tiles; each is labelled by `userProfile.stats.<key>` in the `teams` catalog. */
+const STAT_TILES: { key: keyof PublicUserProfile['stats']; icon: LucideIcon }[] = [
+  { key: 'reviewsOwned', icon: FileText },
+  { key: 'reviewsParticipating', icon: UserCheck },
+  { key: 'annotationsRaised', icon: NotebookPen },
+  { key: 'annotationsResolved', icon: CheckCircle2 },
+  { key: 'commentsWritten', icon: MessagesSquare },
 ];
 
 const fadeUp = {
@@ -88,6 +90,7 @@ const UUID_SHAPE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12
  * to the pretty slug URL once the profile is known.
  */
 export function UserProfilePage() {
+  const { t } = useTranslation(['teams', 'profile', 'common']);
   const { formatMonthYear } = useFormatters();
   const theme = useTheme();
   const { userId: segment = '' } = useParams<{ userId: string }>();
@@ -143,10 +146,10 @@ export function UserProfilePage() {
     return (
       <ErrorState
         code="404"
-        title="This player card went for a walk"
-        message="No profile answers to this address — the link may be outdated. The rest of the roster is right where you left it."
+        title={t('userProfile.notFound.title')}
+        message={t('userProfile.notFound.message')}
         illustration={<NotFoundIllustration />}
-        primaryAction={{ label: 'Back to dashboard', to: '/' }}
+        primaryAction={{ label: t('common:actions.backToDashboard'), to: '/' }}
       />
     );
   }
@@ -212,7 +215,7 @@ export function UserProfilePage() {
               >
                 <CalendarDays size={14} aria-hidden />
                 <Typography variant="body2">
-                  Member since {formatMonthYear(profile.createdAt)}
+                  {t('people.memberSince', { date: formatMonthYear(profile.createdAt) })}
                 </Typography>
               </Stack>
             </Box>
@@ -231,7 +234,11 @@ export function UserProfilePage() {
                 return (
                   <Tooltip
                     key={team.id}
-                    title={lead ? `Leads ${team.name}` : `Member of ${team.name}`}
+                    title={
+                      lead
+                        ? t('userProfile.leads', { team: team.name })
+                        : t('userProfile.memberOf', { team: team.name })
+                    }
                   >
                     <Chip
                       size="small"
@@ -269,7 +276,7 @@ export function UserProfilePage() {
           gap: 1.5,
         }}
       >
-        {STAT_TILES.map(({ key, label, icon: Icon }) => {
+        {STAT_TILES.map(({ key, icon: Icon }) => {
           const value = profile.stats[key];
           return (
             <Paper key={key} variant="outlined" sx={{ px: 2, py: 1.5, borderRadius: '12px' }}>
@@ -306,7 +313,7 @@ export function UserProfilePage() {
                     {value}
                   </Typography>
                   <Typography variant="caption" color="text.secondary" noWrap component="p">
-                    {label}
+                    {t(`userProfile.stats.${key}`)}
                   </Typography>
                 </Box>
               </Stack>
@@ -322,9 +329,14 @@ export function UserProfilePage() {
           spacing={1}
           sx={{ alignItems: 'baseline', justifyContent: 'space-between', mb: 1.5 }}
         >
-          <Typography sx={{ fontSize: 14, fontWeight: 700 }}>Achievements</Typography>
+          <Typography sx={{ fontSize: 14, fontWeight: 700 }}>
+            {t('profile:achievements.heading')}
+          </Typography>
           <Typography variant="caption" color="text.secondary">
-            {earnedCount} of {achievements.length} earned
+            {t('profile:achievements.earnedCount', {
+              earned: earnedCount,
+              total: achievements.length,
+            })}
           </Typography>
         </Stack>
         <AchievementRow achievements={achievements} />

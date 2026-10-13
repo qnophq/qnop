@@ -25,6 +25,7 @@ import Tooltip from '@mui/material/Tooltip';
 import Typography from '@mui/material/Typography';
 import { alpha, useTheme } from '@mui/material/styles';
 import { Cpu } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 
 /**
  * A distinct emblem for the audit trail's system actor — an automated action
@@ -78,8 +79,9 @@ export function SystemAvatar({ size = 24 }: { size?: number }) {
  * label, explained on hover. Inert by design — there is no person to visit.
  */
 export function SystemActor() {
+  const { t } = useTranslation('audit');
   return (
-    <Tooltip title="Automated system action — no human actor">
+    <Tooltip title={t('system.tooltip')}>
       <Stack direction="row" spacing={0.75} sx={{ alignItems: 'center', minWidth: 0 }}>
         <SystemAvatar size={24} />
         <Typography
@@ -91,7 +93,7 @@ export function SystemActor() {
             letterSpacing: '0.01em',
           }}
         >
-          System
+          {t('system.name')}
         </Typography>
       </Stack>
     </Tooltip>

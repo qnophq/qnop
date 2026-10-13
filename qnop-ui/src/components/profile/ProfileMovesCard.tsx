@@ -36,9 +36,9 @@ import {
 } from 'lucide-react';
 import { Link as RouterLink } from 'react-router';
 import type { DashboardActivity } from '../../api/generated';
-import { activityPhrase, reviewPath } from '../dashboard/dashboardModel';
+import { activityKind, reviewPath } from '../dashboard/dashboardModel';
 import { useFormatters } from '../../hooks/useFormatters';
-import { useTranslation } from 'react-i18next';
+import { Trans, useTranslation } from 'react-i18next';
 
 const TYPE_ICONS: Record<string, LucideIcon> = {
   'annotation.created': MessageSquarePlus,
@@ -130,20 +130,26 @@ export function ProfileMovesCard({ firstName, moves }: ProfileMovesCardProps) {
                   <Icon size={14} />
                 </Box>
                 <Typography variant="body2" sx={{ minWidth: 0, color: 'text.secondary' }}>
-                  {activityPhrase(item.type).replace(/^./, (c) => c.toUpperCase())}{' '}
-                  <Typography
-                    component={RouterLink}
-                    to={reviewPath({ id: item.documentId, slug: item.documentSlug })}
-                    variant="body2"
-                    sx={{
-                      fontWeight: 600,
-                      color: blue,
-                      textDecoration: 'none',
-                      '&:hover': { textDecoration: 'underline' },
+                  <Trans
+                    t={t}
+                    i18nKey={`moves.phrases.${activityKind(item.type)}`}
+                    values={{ review: item.documentTitle }}
+                    components={{
+                      review: (
+                        <Typography
+                          component={RouterLink}
+                          to={reviewPath({ id: item.documentId, slug: item.documentSlug })}
+                          variant="body2"
+                          sx={{
+                            fontWeight: 600,
+                            color: blue,
+                            textDecoration: 'none',
+                            '&:hover': { textDecoration: 'underline' },
+                          }}
+                        />
+                      ),
                     }}
-                  >
-                    {item.documentTitle}
-                  </Typography>{' '}
+                  />{' '}
                   <Typography component="span" variant="caption" color="text.secondary">
                     · {shortRelativeTime(item.createdAt)}
                   </Typography>

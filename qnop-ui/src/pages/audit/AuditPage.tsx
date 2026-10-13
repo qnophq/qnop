@@ -33,12 +33,13 @@ import TablePagination from '@mui/material/TablePagination';
 import TextField from '@mui/material/TextField';
 import Typography from '@mui/material/Typography';
 import { ChevronDown, HelpCircle } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import { useAuditLog } from '../../api/hooks/useAuditLog';
 import { ClearableSearchField } from '../../components/ClearableSearchField';
 import { AuditTable } from '../../components/audit/AuditTable';
 import { AuditEventBadge } from '../../components/audit/AuditEventBadge';
 import { PageHeader } from '../../components/admin/layout/PageHeader';
-import { AUDIT_EVENT_META, AUDIT_EVENT_TYPES } from '../../utils/auditEvents';
+import { AUDIT_EVENT_TYPES, auditEventMeta } from '../../utils/auditEvents';
 
 const PAGE_SIZE_OPTIONS = [10, 20, 50, 100];
 
@@ -66,6 +67,7 @@ function toIso(value: string): string | undefined {
  * useFormatters seam (issue #465, ADR-0041).
  */
 export function AuditPage() {
+  const { t } = useTranslation(['audit', 'common']);
   const [eventType, setEventType] = useState('');
   const [detailSearch, setDetailSearch] = useState('');
   const [debouncedDetail, setDebouncedDetail] = useState('');
@@ -117,8 +119,8 @@ export function AuditPage() {
   return (
     <Stack spacing={3}>
       <PageHeader
-        title="Audit trail"
-        description="Every recorded action across all document reviews — who did what, and when."
+        title={t('page.title')}
+        description={t('page.description')}
         action={
           <Button
             color="inherit"
@@ -135,7 +137,7 @@ export function AuditPage() {
             onClick={() => setLegendOpen((open) => !open)}
             aria-expanded={legendOpen}
           >
-            What do these events mean?
+            {t('page.legendToggle')}
           </Button>
         }
       />
@@ -153,7 +155,7 @@ export function AuditPage() {
               mb: 2,
             }}
           >
-            Event guide
+            {t('page.legendTitle')}
           </Typography>
           <Box
             sx={{
@@ -174,7 +176,7 @@ export function AuditPage() {
                   <AuditEventBadge eventType={type} />
                 </Box>
                 <Typography variant="body2" color="text.secondary" sx={{ lineHeight: 1.5 }}>
-                  {AUDIT_EVENT_META[type].description}
+                  {t(auditEventMeta(type).descriptionKey, { type })}
                 </Typography>
               </Stack>
             ))}
@@ -190,15 +192,19 @@ export function AuditPage() {
             setEventType(next ?? '');
             setPage(0);
           }}
-          getOptionLabel={(type) => AUDIT_EVENT_META[type]?.label ?? type}
+          getOptionLabel={(type) => t(auditEventMeta(type).labelKey, { type })}
           size="small"
           sx={{ minWidth: 240 }}
           renderInput={(params) => (
-            <TextField {...params} label="Event type" placeholder="All events" />
+            <TextField
+              {...params}
+              label={t('filters.eventType')}
+              placeholder={t('filters.allEvents')}
+            />
           )}
         />
         <ClearableSearchField
-          label="Search details"
+          label={t('filters.searchDetails')}
           value={detailSearch}
           onValueChange={setDetailSearch}
           onClear={() => {
@@ -207,15 +213,15 @@ export function AuditPage() {
             setDebouncedDetail('');
             setPage(0);
           }}
-          clearLabel="Clear the details search"
+          clearLabel={t('filters.clearSearch')}
           hideSearchIcon
           maxLength={256}
-          placeholder="e.g. a storage key or workflow state"
+          placeholder={t('filters.searchPlaceholder')}
           sx={{ minWidth: 240, flexGrow: 1, maxWidth: 360 }}
         />
         <TextField
           type="datetime-local"
-          label="From"
+          label={t('filters.from')}
           value={from}
           onChange={(e) => {
             setFrom(e.target.value);
@@ -226,7 +232,7 @@ export function AuditPage() {
         />
         <TextField
           type="datetime-local"
-          label="To"
+          label={t('filters.to')}
           value={to}
           onChange={(e) => {
             setTo(e.target.value);
@@ -241,14 +247,16 @@ export function AuditPage() {
         <Stack direction="row" spacing={1} sx={{ flexWrap: 'wrap' }}>
           {actor && (
             <Chip
-              label={`Actor: ${actor.kind === 'user' ? actor.label : 'System'}`}
+              label={t('filters.actorChip', {
+                name: actor.kind === 'user' ? actor.label : t('system.name'),
+              })}
               onDelete={() => setActor(null)}
               size="small"
             />
           )}
           {document && (
             <Chip
-              label={`Document: ${document.label}`}
+              label={t('filters.documentChip', { title: document.label })}
               onDelete={() => setDocument(null)}
               size="small"
             />
@@ -260,7 +268,7 @@ export function AuditPage() {
         <Box sx={{ height: 3 }}>{isFetching && <LinearProgress />}</Box>
         {isError ? (
           <Alert severity="error" sx={{ m: 2 }}>
-            The audit trail could not be loaded.
+            {t('page.loadError')}
           </Alert>
         ) : (
           <Box sx={{ overflowX: 'auto' }}>
@@ -281,14 +289,16 @@ export function AuditPage() {
                 setPageSize(parseInt(e.target.value, 10));
                 setPage(0);
               }}
-              labelRowsPerPage="Events per page"
-              labelDisplayedRows={({ from: f, to: t, count }) => `${f}–${t} of ${count}`}
+              labelRowsPerPage={t('pagination.rowsPerPage')}
+              labelDisplayedRows={({ from: first, to: last, count }) =>
+                t('pagination.displayedRows', { from: first, to: last, total: count })
+              }
             />
           </Box>
         )}
         {isLoading && (
           <Typography color="text.secondary" sx={{ p: 2, fontSize: 14 }}>
-            Loading…
+            {t('common:loading')}
           </Typography>
         )}
       </Paper>

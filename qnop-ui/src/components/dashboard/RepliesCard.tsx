@@ -25,6 +25,7 @@ import Stack from '@mui/material/Stack';
 import Typography from '@mui/material/Typography';
 import { alpha, useTheme } from '@mui/material/styles';
 import { MessageCircleDashed, MessagesSquare } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router';
 import type { DashboardReply } from '../../api/generated';
 import { useFormatters } from '../../hooks/useFormatters';
@@ -45,6 +46,7 @@ interface RepliesCardProps {
  * thread via the permalink params (issue #412).
  */
 export function RepliesCard({ replies }: RepliesCardProps) {
+  const { t } = useTranslation('dashboard');
   const theme = useTheme();
   const navigate = useNavigate();
   const { shortRelativeTime } = useFormatters();
@@ -52,15 +54,15 @@ export function RepliesCard({ replies }: RepliesCardProps) {
   return (
     <SectionCard
       icon={MessagesSquare}
-      title="Replies to you"
-      description="The latest answers in discussions you started or joined."
+      title={t('replies.title')}
+      description={t('replies.description')}
       action={<CountPill value={replies.length} />}
     >
       {replies.length === 0 ? (
         <CardEmptyState
           icon={MessageCircleDashed}
-          title="No replies yet"
-          text="Answers in discussions you started or joined land here."
+          title={t('replies.emptyTitle')}
+          text={t('replies.empty')}
         />
       ) : (
         <CardScroller>
@@ -97,11 +99,14 @@ export function RepliesCard({ replies }: RepliesCardProps) {
                       <PersonLink
                         userId={reply.authorId}
                         slug={reply.authorSlug}
-                        name={reply.authorDisplayName ?? 'Participant'}
+                        name={reply.authorDisplayName ?? t('replies.participant')}
                         avatarUrl={reply.authorAvatarUrl}
                       />
                       <Typography component="span" variant="caption" color="text.secondary" noWrap>
-                        in {reply.documentTitle} · {shortRelativeTime(reply.createdAt)}
+                        {t('replies.context', {
+                          review: reply.documentTitle,
+                          time: shortRelativeTime(reply.createdAt),
+                        })}
                       </Typography>
                     </Stack>
                     <Typography

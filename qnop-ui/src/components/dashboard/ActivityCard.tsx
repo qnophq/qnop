@@ -19,6 +19,7 @@
  * SPDX-License-Identifier: AGPL-3.0-only
  */
 
+import type { ReactNode } from 'react';
 import Box from '@mui/material/Box';
 import Stack from '@mui/material/Stack';
 import Typography from '@mui/material/Typography';
@@ -33,6 +34,7 @@ import {
   Workflow,
   type LucideIcon,
 } from 'lucide-react';
+import { Trans, useTranslation } from 'react-i18next';
 import { Link as RouterLink } from 'react-router';
 import Link from '@mui/material/Link';
 import type { DashboardActivity } from '../../api/generated';
@@ -43,7 +45,7 @@ import { CardScroller } from './CardScroller';
 import { CountPill } from './CountPill';
 import { UserHoverCard } from '../people/UserHoverCard';
 import { PersonLink } from './PersonLink';
-import { activityPhrase, reviewPath } from './dashboardModel';
+import { activityKind, reviewPath } from './dashboardModel';
 
 const TYPE_ICONS: Record<string, LucideIcon> = {
   'annotation.created': MessageSquarePlus,
@@ -58,32 +60,66 @@ interface ActivityCardProps {
 }
 
 /**
+ * The actor's name in a feed sentence — it triggers the profile card just like
+ * the avatar (#482); anonymised actors carry no id and stay plain text. Takes
+ * its text as children so the translated sentence decides where it sits.
+ */
+function ActorName({
+  userId,
+  slug,
+  children,
+}: {
+  userId?: string | null;
+  slug?: string | null;
+  children?: ReactNode;
+}) {
+  const theme = useTheme();
+  return (
+    <UserHoverCard userId={userId} slug={slug}>
+      <Typography
+        component="span"
+        variant="body2"
+        sx={{
+          fontWeight: 600,
+          color: 'text.primary',
+          '&:hover': { color: theme.qnop.brand.blue },
+        }}
+      >
+        {children}
+      </Typography>
+    </UserHoverCard>
+  );
+}
+
+/**
  * What moved while the caller was away (issue #454): a slim feed from the
  * audit trail of their reviews, their own actions excluded.
  */
 export function ActivityCard({ activity }: ActivityCardProps) {
+  const { t } = useTranslation('dashboard');
   const theme = useTheme();
   const { shortRelativeTime } = useFormatters();
 
   return (
     <SectionCard
       icon={Activity}
-      title="Recent activity"
-      description="What happened across your reviews."
+      title={t('activity.title')}
+      description={t('activity.description')}
       action={<CountPill value={activity.length} />}
     >
       {activity.length === 0 ? (
         <CardEmptyState
           icon={Sparkles}
           tone="amber"
-          title="All quiet"
-          text="When teammates act on your reviews, it shows up here."
+          title={t('activity.emptyTitle')}
+          text={t('activity.empty')}
         />
       ) : (
         <CardScroller>
           <Stack spacing={1.25}>
             {activity.map((item, index) => {
               const Icon = TYPE_ICONS[item.type] ?? Activity;
+              const actorName = item.actorDisplayName ?? t('activity.someone');
               return (
                 <Stack
                   key={`${item.type}-${item.createdAt}-${index}`}
@@ -101,37 +137,29 @@ export function ActivityCard({ activity }: ActivityCardProps) {
                     <PersonLink
                       userId={item.actorId}
                       slug={item.actorSlug}
-                      name={item.actorDisplayName ?? 'Someone'}
+                      name={actorName}
                       avatarUrl={item.actorAvatarUrl}
                       size={20}
                       avatarOnly
                     />
                   </Box>
                   <Typography variant="body2" sx={{ minWidth: 0, color: 'text.secondary' }}>
-                    {/* The name triggers the card just like the avatar (#482);
-                        anonymised actors carry no id and stay plain text. */}
-                    <UserHoverCard userId={item.actorId} slug={item.actorSlug}>
-                      <Typography
-                        component="span"
-                        variant="body2"
-                        sx={{
-                          fontWeight: 600,
-                          color: 'text.primary',
-                          '&:hover': { color: theme.qnop.brand.blue },
-                        }}
-                      >
-                        {item.actorDisplayName ?? 'Someone'}
-                      </Typography>
-                    </UserHoverCard>{' '}
-                    {activityPhrase(item.type)}{' '}
-                    <Link
-                      component={RouterLink}
-                      to={reviewPath({ id: item.documentId, slug: item.documentSlug })}
-                      underline="hover"
-                      sx={{ fontWeight: 600 }}
-                    >
-                      {item.documentTitle}
-                    </Link>{' '}
+                    <Trans
+                      t={t}
+                      i18nKey={`activity.phrases.${activityKind(item.type)}`}
+                      values={{ actor: actorName, review: item.documentTitle }}
+                      components={{
+                        actor: <ActorName userId={item.actorId} slug={item.actorSlug} />,
+                        review: (
+                          <Link
+                            component={RouterLink}
+                            to={reviewPath({ id: item.documentId, slug: item.documentSlug })}
+                            underline="hover"
+                            sx={{ fontWeight: 600 }}
+                          />
+                        ),
+                      }}
+                    />{' '}
                     · {shortRelativeTime(item.createdAt)}
                   </Typography>
                 </Stack>

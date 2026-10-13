@@ -29,6 +29,7 @@ import Typography from '@mui/material/Typography';
 import { alpha, useTheme } from '@mui/material/styles';
 import type { LucideIcon } from 'lucide-react';
 import { FileText, MessageSquareText, NotebookPen, SearchX, Users, UsersRound } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import { Link as RouterLink, useSearchParams } from 'react-router';
 import {
   SEARCH_MIN_LENGTH,
@@ -68,6 +69,7 @@ function parseType(raw: string | null): ResultType {
  * one staged rise (compositor-only, off under reduced motion).
  */
 export function SearchPage() {
+  const { t } = useTranslation();
   const [params, setParams] = useSearchParams();
   const q = params.get('q') ?? '';
   const type = parseType(params.get('type'));
@@ -150,22 +152,19 @@ export function SearchPage() {
 
   return (
     <Stack spacing={3}>
-      <PageHeader
-        title="Search"
-        description="Reviews, people and teams across your workspace — scoped to what you may see."
-      />
+      <PageHeader title={t('search.title')} description={t('search.description')} />
 
       <ClearableSearchField
         value={input}
         onValueChange={setInput}
-        placeholder="Search reviews, people and teams…"
-        inputAriaLabel="Search reviews, people and teams"
+        placeholder={t('search.placeholder')}
+        inputAriaLabel={t('search.inputLabel')}
         sx={{ maxWidth: 680 }}
       />
 
       {tooShort ? (
         <Typography color="text.secondary" data-testid="search-too-short">
-          Type at least {SEARCH_MIN_LENGTH} characters to search.
+          {t('search.tooShort', { count: SEARCH_MIN_LENGTH })}
         </Typography>
       ) : (
         <Box
@@ -191,35 +190,35 @@ export function SearchPage() {
           >
             <ScoreCard
               icon={FileText}
-              label="Reviews"
+              label={t('search.groups.reviews')}
               count={quick.data?.reviews.total}
               selected={type === 'reviews'}
               onClick={() => setType('reviews')}
             />
             <ScoreCard
               icon={NotebookPen}
-              label="Annotations"
+              label={t('search.groups.annotations')}
               count={quick.data?.annotations.total}
               selected={type === 'annotations'}
               onClick={() => setType('annotations')}
             />
             <ScoreCard
               icon={MessageSquareText}
-              label="Comments"
+              label={t('search.groups.comments')}
               count={quick.data?.comments.total}
               selected={type === 'comments'}
               onClick={() => setType('comments')}
             />
             <ScoreCard
               icon={Users}
-              label="People"
+              label={t('search.groups.users')}
               count={quick.data?.users.total}
               selected={type === 'users'}
               onClick={() => setType('users')}
             />
             <ScoreCard
               icon={UsersRound}
-              label="Teams"
+              label={t('search.groups.teams')}
               count={quick.data?.teams.total}
               selected={type === 'teams'}
               onClick={() => setType('teams')}
@@ -227,21 +226,21 @@ export function SearchPage() {
           </Box>
 
           <SectionCard
-            title={`Results for “${q.trim()}”`}
-            description="Every hit deep-links to its page."
+            title={t('search.resultsFor', { query: q.trim() })}
+            description={t('search.resultsHint')}
           >
             {active.isPending ? (
               <Typography color="text.secondary" sx={{ py: 3, textAlign: 'center' }}>
-                Searching…
+                {t('search.searching')}
               </Typography>
             ) : active.isError ? (
               <Typography color="error" sx={{ py: 3, textAlign: 'center' }}>
-                Search is unavailable right now.
+                {t('search.unavailable')}
               </Typography>
             ) : total === 0 ? (
               <Stack spacing={1} sx={{ py: 4, alignItems: 'center' }} data-testid="search-empty">
                 <SearchX size={24} aria-hidden />
-                <Typography color="text.secondary">No matches in this group.</Typography>
+                <Typography color="text.secondary">{t('search.noMatches')}</Typography>
               </Stack>
             ) : (
               <Stack
@@ -293,7 +292,7 @@ export function SearchPage() {
                             {hit.excerpt}
                           </Link>
                           <Typography sx={{ fontSize: 12.5, color: 'text.secondary' }} noWrap>
-                            in {hit.documentTitle}
+                            {t('search.inDocument', { title: hit.documentTitle })}
                           </Typography>
                         </Box>
                       </Stack>

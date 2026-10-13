@@ -26,7 +26,9 @@ import Stack from '@mui/material/Stack';
 import Typography from '@mui/material/Typography';
 import { keyframes } from '@mui/material/styles';
 import { Handshake, Trophy, UserPlus, Users } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import { JoinTeamIllustration } from '../../components/my-teams/JoinTeamIllustration';
+import type { TeamsKey } from '../../utils/teamProgress';
 
 const fadeUp = keyframes`
   from { opacity: 0; transform: translateY(12px); }
@@ -42,10 +44,10 @@ function rise(delayMs: number) {
   } as const;
 }
 
-const PERKS: { icon: ReactNode; label: string }[] = [
-  { icon: <Users size={15} />, label: 'Collaborate on reviews' },
-  { icon: <Handshake size={15} />, label: 'Share the workload' },
-  { icon: <Trophy size={15} />, label: 'Rise through the ranks' },
+const PERKS: { icon: ReactNode; labelKey: TeamsKey }[] = [
+  { icon: <Users size={15} />, labelKey: 'myTeams.empty.perks.collaborate' },
+  { icon: <Handshake size={15} />, labelKey: 'myTeams.empty.perks.share' },
+  { icon: <Trophy size={15} />, labelKey: 'myTeams.empty.perks.rise' },
 ];
 
 /**
@@ -55,6 +57,7 @@ const PERKS: { icon: ReactNode; label: string }[] = [
  * admin adds them. Styled full-width in the qnop system with a quiet brand glow.
  */
 export function MyTeamsEmptyState() {
+  const { t } = useTranslation('teams');
   return (
     <Paper
       variant="outlined"
@@ -83,7 +86,7 @@ export function MyTeamsEmptyState() {
             color: 'primary.main',
           }}
         >
-          Teams
+          {t('myTeams.empty.eyebrow')}
         </Typography>
 
         <Typography
@@ -96,14 +99,13 @@ export function MyTeamsEmptyState() {
             textWrap: 'balance',
           }}
         >
-          Your seat is waiting
+          {t('myTeams.empty.title')}
         </Typography>
 
         <Typography
           sx={{ ...rise(240), color: 'text.secondary', fontSize: 15, lineHeight: 1.6, mt: 1.25 }}
         >
-          Teams are how reviewers band together — share the workload, keep each other in the loop,
-          and climb the ranks. You’re not on one yet.
+          {t('myTeams.empty.body')}
         </Typography>
 
         <Stack
@@ -113,7 +115,7 @@ export function MyTeamsEmptyState() {
         >
           {PERKS.map((perk) => (
             <Box
-              key={perk.label}
+              key={perk.labelKey}
               sx={{
                 display: 'inline-flex',
                 alignItems: 'center',
@@ -124,14 +126,14 @@ export function MyTeamsEmptyState() {
                 fontSize: 13,
                 fontWeight: 600,
                 color: 'text.secondary',
-                bgcolor: (t) => t.qnop.surface2,
+                bgcolor: (theme) => theme.qnop.surface2,
                 border: 1,
                 borderColor: 'divider',
                 '& svg': { color: 'primary.main' },
               }}
             >
               {perk.icon}
-              {perk.label}
+              {t(perk.labelKey)}
             </Box>
           ))}
         </Stack>
@@ -155,7 +157,7 @@ export function MyTeamsEmptyState() {
         >
           <UserPlus size={16} />
           <Typography sx={{ fontSize: 13.5, fontWeight: 500 }}>
-            A team lead or an administrator can add you — your teams appear here the moment they do.
+            {t('myTeams.empty.hint')}
           </Typography>
         </Stack>
       </Stack>

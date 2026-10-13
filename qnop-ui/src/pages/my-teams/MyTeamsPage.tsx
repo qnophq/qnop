@@ -29,6 +29,7 @@ import Tooltip from '@mui/material/Tooltip';
 import Typography from '@mui/material/Typography';
 import { keyframes } from '@mui/material/styles';
 import { ArrowRight, Crown, Eye, Lock, Trophy, UsersRound } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import { Link as RouterLink } from 'react-router';
 import type { MyTeam } from '../../api/generated';
 import { useMyTeams } from '../../api/hooks/useMyTeams';
@@ -65,26 +66,24 @@ function reveal(index: number) {
  * derived motivation over the real team data — no invented metrics.
  */
 export function MyTeamsPage() {
+  const { t } = useTranslation(['teams', 'common']);
   const { data, isLoading, isError } = useMyTeams();
 
   if (isError) {
-    return <Alert severity="error">Your teams could not be loaded.</Alert>;
+    return <Alert severity="error">{t('myTeams.loadError')}</Alert>;
   }
   if (isLoading || !data) {
-    return <Typography color="text.secondary">Loading…</Typography>;
+    return <Typography color="text.secondary">{t('common:loading')}</Typography>;
   }
 
-  const led = data.items.filter((t) => t.teamRole === 'LEAD');
-  const member = data.items.filter((t) => t.teamRole === 'MEMBER');
+  const led = data.items.filter((team) => team.teamRole === 'LEAD');
+  const member = data.items.filter((team) => team.teamRole === 'MEMBER');
   const stats = leadershipStats(led);
   const achievements = computeAchievements(led);
 
   return (
     <Stack spacing={4}>
-      <PageHeader
-        title="My Teams"
-        description="The teams you belong to — manage the ones you lead, and see the members of the rest."
-      />
+      <PageHeader title={t('myTeams.title')} description={t('myTeams.description')} />
 
       {data.items.length === 0 && <MyTeamsEmptyState />}
 
@@ -92,7 +91,7 @@ export function MyTeamsPage() {
 
       {led.length > 0 && (
         <TeamSection
-          label={led.length === 1 ? 'Team you lead' : 'Teams you lead'}
+          label={t('myTeams.sections.led', { count: led.length })}
           teams={led}
           canManage
           startIndex={1}
@@ -101,7 +100,7 @@ export function MyTeamsPage() {
 
       {member.length > 0 && (
         <TeamSection
-          label={member.length === 1 ? "Team you're in" : "Teams you're in"}
+          label={t('myTeams.sections.member', { count: member.length })}
           teams={member}
           canManage={false}
           startIndex={led.length + 1}
@@ -140,10 +139,6 @@ function TeamSection({
   );
 }
 
-function memberLabel(count: number): string {
-  return `${count} ${count === 1 ? 'member' : 'members'}`;
-}
-
 /** The My Teams detail path — the slug when one exists, the id otherwise (issue #470). */
 function teamPath(team: MyTeam): string {
   return `/my-teams/${team.slug ?? team.teamId}`;
@@ -174,6 +169,7 @@ function LeadershipHero({
   stats: ReturnType<typeof leadershipStats>;
   achievements: Achievement[];
 }) {
+  const { t } = useTranslation('teams');
   return (
     <Paper
       variant="outlined"
@@ -204,7 +200,7 @@ function LeadershipHero({
               placeItems: 'center',
               color: 'primary.main',
               bgcolor: 'primary.light',
-              boxShadow: (t) => `inset 0 0 0 1px ${t.palette.primary.main}22`,
+              boxShadow: (theme) => `inset 0 0 0 1px ${theme.palette.primary.main}22`,
             }}
           >
             <Crown size={26} strokeWidth={2} />
@@ -219,23 +215,24 @@ function LeadershipHero({
                 color: 'text.disabled',
               }}
             >
-              Leadership HQ
+              {t('myTeams.hero.eyebrow')}
             </Typography>
             <Typography sx={{ fontSize: 22, fontWeight: 800, lineHeight: 1.2 }} noWrap>
-              {stats.rank}
+              {t(stats.rankKey)}
             </Typography>
             <Typography sx={{ fontSize: 14, color: 'text.secondary', mt: 0.25 }}>
-              You lead {stats.teamsLed} {stats.teamsLed === 1 ? 'team' : 'teams'} ·{' '}
-              {stats.totalTeammates} {stats.totalTeammates === 1 ? 'teammate' : 'teammates'} in
-              total
+              {t('myTeams.hero.summary', {
+                teams: t('myTeams.hero.teams', { count: stats.teamsLed }),
+                teammates: t('myTeams.hero.teammates', { count: stats.totalTeammates }),
+              })}
             </Typography>
           </Box>
         </Stack>
 
         <Stack direction="row" spacing={1.5} sx={{ flexShrink: 0 }}>
-          <StatTile value={stats.teamsLed} label="Teams led" />
-          <StatTile value={stats.totalTeammates} label="Teammates" />
-          <StatTile value={stats.largestTeam} label="Largest team" />
+          <StatTile value={stats.teamsLed} label={t('myTeams.hero.stats.teamsLed')} />
+          <StatTile value={stats.totalTeammates} label={t('myTeams.hero.stats.teammates')} />
+          <StatTile value={stats.largestTeam} label={t('myTeams.hero.stats.largestTeam')} />
         </Stack>
       </Stack>
 
@@ -267,7 +264,7 @@ function StatTile({ value, label }: { value: number; label: string }) {
         py: 1.25,
         borderRadius: 2,
         textAlign: 'center',
-        bgcolor: (t) => t.qnop.surface2,
+        bgcolor: (theme) => theme.qnop.surface2,
         border: 1,
         borderColor: 'divider',
       }}
@@ -290,9 +287,17 @@ function StatTile({ value, label }: { value: number; label: string }) {
 }
 
 function AchievementPill({ achievement }: { achievement: Achievement }) {
-  const { earned, label, hint } = achievement;
+  const { t } = useTranslation('teams');
+  const { earned, labelKey, hintKey, hintValues } = achievement;
+  const hint = t(hintKey, hintValues);
   return (
-    <Tooltip title={earned ? `Unlocked · ${hint}` : `Locked · ${hint}`}>
+    <Tooltip
+      title={
+        earned
+          ? t('myTeams.achievements.unlocked', { hint })
+          : t('myTeams.achievements.locked', { hint })
+      }
+    >
       <Box
         component="span"
         sx={{
@@ -307,9 +312,9 @@ function AchievementPill({ achievement }: { achievement: Achievement }) {
           border: '1px solid',
           ...(earned
             ? {
-                color: (t) => t.qnop.badge.amber.fg,
-                bgcolor: (t) => t.qnop.badge.amber.bg,
-                borderColor: (t) => t.qnop.badge.amber.border,
+                color: (theme) => theme.qnop.badge.amber.fg,
+                bgcolor: (theme) => theme.qnop.badge.amber.bg,
+                borderColor: (theme) => theme.qnop.badge.amber.border,
               }
             : {
                 color: 'text.disabled',
@@ -320,22 +325,28 @@ function AchievementPill({ achievement }: { achievement: Achievement }) {
         }}
       >
         {earned ? <Trophy size={13} /> : <Lock size={12} />}
-        {label}
+        {t(labelKey)}
       </Box>
     </Tooltip>
   );
 }
 
 function TeamCard({ team, index, canManage }: { team: MyTeam; index: number; canManage: boolean }) {
+  const { t } = useTranslation('teams');
   const tier = teamTier(team.memberCount);
-  const nextTierName = tier.nextFloor === null ? null : teamTier(tier.nextFloor).name;
+  const tierName = t(tier.nameKey);
+  const nextTierName = tier.nextFloor === null ? null : t(teamTier(tier.nextFloor).nameKey);
   const toNext = tier.nextFloor === null ? 0 : tier.nextFloor - team.memberCount;
   return (
     <Paper
       variant="outlined"
       component={RouterLink}
       to={teamPath(team)}
-      aria-label={`${canManage ? 'Manage' : 'View'} ${team.name}`}
+      aria-label={
+        canManage
+          ? t('myTeams.card.manageAria', { name: team.name })
+          : t('myTeams.card.viewAria', { name: team.name })
+      }
       sx={{
         display: 'flex',
         flexDirection: 'column',
@@ -343,8 +354,8 @@ function TeamCard({ team, index, canManage }: { team: MyTeam; index: number; can
         p: 2.5,
         textDecoration: 'none',
         color: 'inherit',
-        transition: (t) =>
-          t.transitions.create(['border-color', 'box-shadow', 'transform'], { duration: 150 }),
+        transition: (theme) =>
+          theme.transitions.create(['border-color', 'box-shadow', 'transform'], { duration: 150 }),
         '&:hover': {
           borderColor: 'primary.main',
           boxShadow: 3,
@@ -353,7 +364,7 @@ function TeamCard({ team, index, canManage }: { team: MyTeam; index: number; can
         '&:focus-visible': {
           outline: 'none',
           borderColor: 'primary.main',
-          boxShadow: (t) => t.qnop.focusRing,
+          boxShadow: (theme) => theme.qnop.focusRing,
         },
         ...reveal(index + 1),
       }}
@@ -376,21 +387,23 @@ function TeamCard({ team, index, canManage }: { team: MyTeam; index: number; can
           sx={{ justifyContent: 'space-between', alignItems: 'baseline', mb: 0.75 }}
         >
           <Stack direction="row" spacing={0.75} sx={{ alignItems: 'center' }}>
-            <Typography sx={{ fontWeight: 700, fontSize: 13.5 }}>{tier.name}</Typography>
+            <Typography sx={{ fontWeight: 700, fontSize: 13.5 }}>{tierName}</Typography>
             <Typography sx={{ fontSize: 12.5, color: 'text.disabled' }}>·</Typography>
             <Typography sx={{ fontSize: 12.5, color: 'text.secondary' }}>
-              {memberLabel(team.memberCount)}
+              {t('people.memberCount', { count: team.memberCount })}
             </Typography>
           </Stack>
           <Typography sx={{ fontSize: 11.5, color: 'text.disabled' }}>
-            {nextTierName ? `${toNext} to ${nextTierName}` : 'Top tier'}
+            {nextTierName
+              ? t('myTeams.card.toNextTier', { remaining: toNext, tier: nextTierName })
+              : t('myTeams.card.topTier')}
           </Typography>
         </Stack>
         <LinearProgress
           variant="determinate"
           value={Math.round(tier.progress * 100)}
-          aria-label={`${tier.name} tier progress`}
-          sx={{ height: 6, borderRadius: 999, bgcolor: (t) => t.qnop.surface2 }}
+          aria-label={t('myTeams.card.tierProgress', { tier: tierName })}
+          sx={{ height: 6, borderRadius: 999, bgcolor: (theme) => theme.qnop.surface2 }}
         />
       </Box>
 
@@ -400,7 +413,7 @@ function TeamCard({ team, index, canManage }: { team: MyTeam; index: number; can
         sx={{ alignItems: 'center', color: 'primary.main', fontWeight: 600, fontSize: 13.5 }}
       >
         {canManage ? <UsersRound size={15} /> : <Eye size={15} />}
-        <span>{canManage ? 'Manage members' : 'View members'}</span>
+        <span>{canManage ? t('myTeams.card.manageMembers') : t('myTeams.card.viewMembers')}</span>
         <ArrowRight size={16} />
       </Stack>
     </Paper>
