@@ -124,12 +124,12 @@
     "caption": "In gemeinsamen Reviews",
     "empty": "Keine aktuellen Aktivitäten von {{name}} in gemeinsamen Reviews.",
     "phrases": {
-      "annotationCreated": "Anmerkung in <review>{{review}}</review> erstellt",
-      "annotationResolved": "Anmerkung in <review>{{review}}</review> erledigt",
-      "annotationReopened": "Anmerkung in <review>{{review}}</review> wieder geöffnet",
-      "workflowTransition": "Status von <review>{{review}}</review> geändert",
-      "dueDateChanged": "Fälligkeitsdatum von <review>{{review}}</review> geändert",
-      "other": "<review>{{review}}</review> aktualisiert"
+      "annotationCreated": "Anmerkung in <review/> erstellt",
+      "annotationResolved": "Anmerkung in <review/> erledigt",
+      "annotationReopened": "Anmerkung in <review/> wieder geöffnet",
+      "workflowTransition": "Status von <review/> geändert",
+      "dueDateChanged": "Fälligkeitsdatum von <review/> geändert",
+      "other": "<review/> aktualisiert"
     }
   },
   "toast": {

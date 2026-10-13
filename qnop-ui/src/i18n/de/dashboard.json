@@ -68,12 +68,12 @@
     "empty": "Sobald dein Team in deinen Reviews aktiv wird, erscheint es hier.",
     "someone": "Jemand",
     "phrases": {
-      "annotationCreated": "<actor>{{actor}}</actor> hat in <review>{{review}}</review> eine Anmerkung erstellt",
-      "annotationResolved": "<actor>{{actor}}</actor> hat in <review>{{review}}</review> eine Anmerkung erledigt",
-      "annotationReopened": "<actor>{{actor}}</actor> hat in <review>{{review}}</review> eine Anmerkung wieder geöffnet",
-      "workflowTransition": "<actor>{{actor}}</actor> hat den Status von <review>{{review}}</review> geändert",
-      "dueDateChanged": "<actor>{{actor}}</actor> hat das Fälligkeitsdatum von <review>{{review}}</review> geändert",
-      "other": "<actor>{{actor}}</actor> hat <review>{{review}}</review> aktualisiert"
+      "annotationCreated": "<actor/> hat in <review/> eine Anmerkung erstellt",
+      "annotationResolved": "<actor/> hat in <review/> eine Anmerkung erledigt",
+      "annotationReopened": "<actor/> hat in <review/> eine Anmerkung wieder geöffnet",
+      "workflowTransition": "<actor/> hat den Status von <review/> geändert",
+      "dueDateChanged": "<actor/> hat das Fälligkeitsdatum von <review/> geändert",
+      "other": "<actor/> hat <review/> aktualisiert"
     }
   },
   "playerCard": {

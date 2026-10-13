@@ -68,12 +68,12 @@
     "empty": "When teammates act on your reviews, it shows up here.",
     "someone": "Someone",
     "phrases": {
-      "annotationCreated": "<actor>{{actor}}</actor> opened an annotation in <review>{{review}}</review>",
-      "annotationResolved": "<actor>{{actor}}</actor> resolved an annotation in <review>{{review}}</review>",
-      "annotationReopened": "<actor>{{actor}}</actor> reopened an annotation in <review>{{review}}</review>",
-      "workflowTransition": "<actor>{{actor}}</actor> changed the state of <review>{{review}}</review>",
-      "dueDateChanged": "<actor>{{actor}}</actor> changed the due date of <review>{{review}}</review>",
-      "other": "<actor>{{actor}}</actor> updated <review>{{review}}</review>"
+      "annotationCreated": "<actor/> opened an annotation in <review/>",
+      "annotationResolved": "<actor/> resolved an annotation in <review/>",
+      "annotationReopened": "<actor/> reopened an annotation in <review/>",
+      "workflowTransition": "<actor/> changed the state of <review/>",
+      "dueDateChanged": "<actor/> changed the due date of <review/>",
+      "other": "<actor/> updated <review/>"
     }
   },
   "playerCard": {

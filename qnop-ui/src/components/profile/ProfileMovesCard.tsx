@@ -133,7 +133,9 @@ export function ProfileMovesCard({ firstName, moves }: ProfileMovesCardProps) {
                   <Trans
                     t={t}
                     i18nKey={`moves.phrases.${activityKind(item.type)}`}
-                    values={{ review: item.documentTitle }}
+                    // The title goes in as a child, never as an interpolated value: Trans parses
+                    // the interpolated string for tags, so a title like "<strong>…" would
+                    // otherwise turn into markup.
                     components={{
                       review: (
                         <Typography
@@ -146,7 +148,9 @@ export function ProfileMovesCard({ firstName, moves }: ProfileMovesCardProps) {
                             textDecoration: 'none',
                             '&:hover': { textDecoration: 'underline' },
                           }}
-                        />
+                        >
+                          {item.documentTitle}
+                        </Typography>
                       ),
                     }}
                   />{' '}

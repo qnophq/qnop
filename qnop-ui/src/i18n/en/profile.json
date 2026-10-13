@@ -124,12 +124,12 @@
     "caption": "In reviews you share",
     "empty": "No recent moves from {{name}} in reviews you share.",
     "phrases": {
-      "annotationCreated": "Opened an annotation in <review>{{review}}</review>",
-      "annotationResolved": "Resolved an annotation in <review>{{review}}</review>",
-      "annotationReopened": "Reopened an annotation in <review>{{review}}</review>",
-      "workflowTransition": "Changed the state of <review>{{review}}</review>",
-      "dueDateChanged": "Changed the due date of <review>{{review}}</review>",
-      "other": "Updated <review>{{review}}</review>"
+      "annotationCreated": "Opened an annotation in <review/>",
+      "annotationResolved": "Resolved an annotation in <review/>",
+      "annotationReopened": "Reopened an annotation in <review/>",
+      "workflowTransition": "Changed the state of <review/>",
+      "dueDateChanged": "Changed the due date of <review/>",
+      "other": "Updated <review/>"
     }
   },
   "toast": {

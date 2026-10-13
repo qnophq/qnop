@@ -147,16 +147,24 @@ export function ActivityCard({ activity }: ActivityCardProps) {
                     <Trans
                       t={t}
                       i18nKey={`activity.phrases.${activityKind(item.type)}`}
-                      values={{ actor: actorName, review: item.documentTitle }}
+                      // Name and title go in as children, never as interpolated values: Trans
+                      // parses the interpolated string for tags, so a title like "<strong>…"
+                      // would otherwise turn into markup.
                       components={{
-                        actor: <ActorName userId={item.actorId} slug={item.actorSlug} />,
+                        actor: (
+                          <ActorName userId={item.actorId} slug={item.actorSlug}>
+                            {actorName}
+                          </ActorName>
+                        ),
                         review: (
                           <Link
                             component={RouterLink}
                             to={reviewPath({ id: item.documentId, slug: item.documentSlug })}
                             underline="hover"
                             sx={{ fontWeight: 600 }}
-                          />
+                          >
+                            {item.documentTitle}
+                          </Link>
                         ),
                       }}
                     />{' '}

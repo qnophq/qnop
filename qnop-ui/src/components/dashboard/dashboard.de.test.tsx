@@ -87,6 +87,19 @@ describe('dashboard cards in German', () => {
     );
   });
 
+  it('renders names and titles as text, never as markup', () => {
+    const hostile = '<strong>Fett</strong> <review>Falle</review>';
+    renderWithProviders(
+      <ActivityCard
+        activity={[{ ...activity, documentTitle: hostile, actorDisplayName: '<actor>X</actor>' }]}
+      />,
+    );
+
+    const review = screen.getByRole('link', { name: hostile });
+    expect(review.querySelector('strong')).toBeNull();
+    expect(review.parentElement).toHaveTextContent(`<actor>X</actor> hat in ${hostile}`);
+  });
+
   it('pluralises the overdue label', () => {
     renderWithProviders(<DeadlinesCard reviews={[overdueReview(3)]} />);
 
