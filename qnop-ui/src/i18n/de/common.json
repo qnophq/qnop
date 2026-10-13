@@ -146,5 +146,11 @@
     "INVALID_LANGUAGE": "muss ein zweistelliger Sprachcode nach ISO 639-1 sein",
     "INVALID_FORMAT": "hat ein ungültiges Format",
     "UNKNOWN_SETTING": "ist keine bekannte Einstellung"
+  },
+  "consent": {
+    "label": "Nutzungsmessung",
+    "question": "Dürfen wir zählen, welche Seiten genutzt werden? Keine Profile, keine Dokumentnamen — Seitenadressen werden vor dem Zählen auf ihre Form reduziert, und die Messung verlässt diesen Server nie direkt.",
+    "deny": "Nein, danke",
+    "allow": "Erlauben"
   }
 }

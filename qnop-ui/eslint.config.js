@@ -48,6 +48,8 @@ export default defineConfig([
       'src/components/i18n/**/*.tsx',
       'src/components/profile/**/*.tsx',
       'src/pages/ProfilePage.tsx',
+      // The usage-measurement consent strip (issue #836).
+      'src/tracking/**/*.tsx',
       'src/components/banner/**/*.tsx',
       'src/components/limits/**/*.tsx',
       'src/components/errors/**/*.tsx',

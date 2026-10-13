@@ -146,5 +146,11 @@
     "INVALID_LANGUAGE": "must be a two-letter ISO 639-1 language code",
     "INVALID_FORMAT": "has an invalid format",
     "UNKNOWN_SETTING": "unknown setting key"
+  },
+  "consent": {
+    "label": "Usage measurement",
+    "question": "May we count which pages get used? No profiles, no document names — page addresses are reduced to their shape before they are counted, and the measurement never leaves this server directly.",
+    "deny": "No thanks",
+    "allow": "Allow"
   }
 }
