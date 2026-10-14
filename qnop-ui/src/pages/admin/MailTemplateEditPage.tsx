@@ -61,6 +61,7 @@ import {
 import { MailLocaleSwitcher } from '../../components/admin/mail/locale/MailLocaleSwitcher';
 import { mailLocaleStatus } from '../../components/admin/mail/locale/mailLocaleStatus';
 import { mailTemplatePath } from '../../components/admin/mail/locale/mailTemplatePath';
+import { useMailTemplateName } from '../../components/admin/mail/mailTemplateName';
 import { useFormatters } from '../../hooks/useFormatters';
 import { useUiStore } from '../../stores/uiStore';
 import { localeDisplayName } from '../../utils/locale';
@@ -154,6 +155,7 @@ function EditForm({
   const navigate = useNavigate();
   const uiLocale = useUiStore((s) => s.locale);
   const language = localeDisplayName(template.locale, uiLocale);
+  const name = useMailTemplateName()(template);
   const variants = template.variants ?? [];
   const currentVariant = variants.find((variant) => variant.locale === template.locale);
   const isFallback = currentVariant != null && mailLocaleStatus(currentVariant) === 'fallback';
@@ -269,7 +271,7 @@ function EditForm({
         <Box sx={{ minWidth: 0 }}>
           <Stack direction="row" spacing={1.5} sx={{ alignItems: 'center' }}>
             <Typography variant="h2" sx={{ fontSize: 22 }} noWrap>
-              {template.friendlyName}
+              {name}
             </Typography>
             <ToneBadge
               tone={isCustomised ? 'blue' : 'neutral'}
@@ -509,7 +511,7 @@ function EditForm({
       <ConfirmDialog
         open={confirmReset}
         title={t('mailTemplates.edit.reset.title')}
-        message={t('mailTemplates.edit.reset.message', { name: template.friendlyName, language })}
+        message={t('mailTemplates.edit.reset.message', { name, language })}
         confirmLabel={t('common:actions.reset')}
         destructive
         onConfirm={onReset}

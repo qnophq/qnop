@@ -45,6 +45,7 @@ import {
   type MailLocaleStatus,
 } from '../../components/admin/mail/locale/mailLocaleStatus';
 import { mailTemplatePath } from '../../components/admin/mail/locale/mailTemplatePath';
+import { useMailTemplateName } from '../../components/admin/mail/mailTemplateName';
 import { useFormatters } from '../../hooks/useFormatters';
 import { useUiStore } from '../../stores/uiStore';
 import { localeDisplayName, localeShortCode } from '../../utils/locale';
@@ -57,6 +58,7 @@ function useVariantDescription() {
   const { t } = useTranslation('admin');
   const { formatRelative } = useFormatters();
   const uiLocale = useUiStore((s) => s.locale);
+  const templateName = useMailTemplateName();
   return (template: MailTemplateResponse, variant: MailTemplateVariant) => {
     const language = localeDisplayName(variant.locale, uiLocale);
     const status = t(MAIL_LOCALE_STATUS_LABELS[mailLocaleStatus(variant)]);
@@ -74,7 +76,7 @@ function useVariantDescription() {
         variant.instanceDefault
           ? 'mailTemplates.matrix.cellAriaDefault'
           : 'mailTemplates.matrix.cellAria',
-        { name: template.friendlyName, language, status },
+        { name: templateName(template), language, status },
       ),
       language,
       status,
@@ -223,6 +225,7 @@ function TemplateName({
   template: MailTemplateResponse;
   defaultLocale: string;
 }) {
+  const templateName = useMailTemplateName();
   return (
     <>
       <Typography
@@ -236,7 +239,7 @@ function TemplateName({
           '&:hover': { textDecoration: 'underline' },
         }}
       >
-        {template.friendlyName}
+        {templateName(template)}
       </Typography>
       <Typography sx={{ fontSize: 12, fontFamily: 'monospace', color: 'text.secondary' }} noWrap>
         {template.key}

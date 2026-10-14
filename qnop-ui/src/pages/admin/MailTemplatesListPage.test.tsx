@@ -19,9 +19,11 @@
  * SPDX-License-Identifier: AGPL-3.0-only
  */
 
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { screen, within } from '@testing-library/react';
 import type { MailTemplateResponse, MailTemplateVariant } from '../../api/generated';
+import { applyLocale } from '../../i18n';
+import { useUiStore } from '../../stores/uiStore';
 import { renderWithProviders } from '../../test/renderWithProviders';
 import { MailTemplatesListPage } from './MailTemplatesListPage';
 
@@ -70,6 +72,12 @@ const TEMPLATES: MailTemplateResponse[] = [
     variant('de', { instanceDefault: true }),
     variant('it', { shipped: false }),
   ]),
+  // A template the catalog does not know, e.g. one an extension adds.
+  template('ext.custom_notice', 'Custom notice', [
+    variant('en'),
+    variant('de', { instanceDefault: true }),
+    variant('it', { shipped: false }),
+  ]),
 ];
 
 vi.mock('../../api/hooks/useMailTemplates', () => ({
@@ -82,12 +90,17 @@ vi.mock('../../api/hooks/useMailTemplates', () => ({
 }));
 
 describe('MailTemplatesListPage', () => {
+  afterEach(async () => {
+    useUiStore.setState({ locale: 'en' });
+    await applyLocale('en');
+  });
+
   it('lays the templates out against every offered language', () => {
     renderWithProviders(<MailTemplatesListPage />);
 
     const headers = screen.getAllByRole('columnheader').map((cell) => cell.textContent);
     expect(headers).toEqual(['Template', 'ENEnglish', 'DEGerman', 'ITItalian']);
-    expect(screen.getAllByRole('row')).toHaveLength(3);
+    expect(screen.getAllByRole('row')).toHaveLength(4);
     expect(screen.getByText('auth.password_reset')).toBeTruthy();
   });
 
@@ -119,6 +132,20 @@ describe('MailTemplatesListPage', () => {
     expect(screen.getByRole('link', { name: 'Account verification' }).getAttribute('href')).toBe(
       '/admin/email/templates/auth.registration_verification/de',
     );
+  });
+
+  it('names the templates in the UI language, the server name for unknown ones', async () => {
+    await applyLocale('de');
+    useUiStore.setState({ locale: 'de' });
+    renderWithProviders(<MailTemplatesListPage />);
+
+    expect(screen.getByRole('link', { name: 'Passwort zurücksetzen' })).toBeTruthy();
+    expect(screen.getByRole('link', { name: 'Kontobestätigung' })).toBeTruthy();
+    expect(screen.getByRole('link', { name: 'Custom notice' })).toBeTruthy();
+    // The cells' accessible names carry the translated name too.
+    expect(
+      screen.getAllByRole('link', { name: /^Passwort zurücksetzen auf .+: Mitgeliefert$/ }),
+    ).toHaveLength(1);
   });
 
   it('explains the marks in a legend', () => {

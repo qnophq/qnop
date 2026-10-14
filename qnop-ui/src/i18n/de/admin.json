@@ -700,6 +700,20 @@
       "custom": "Angepasst",
       "default": "Standard"
     },
+    "names": {
+      "auth__registration_verification": "Kontobestätigung",
+      "auth__password_reset": "Passwort zurücksetzen",
+      "auth__admin_password_reset": "Passwort von Admin zurückgesetzt",
+      "review__participant_added": "Review-Einladung",
+      "review__daily_digest": "Tägliche Review-Übersicht",
+      "review__annotation_created": "Neue Anmerkung",
+      "review__annotation_decided": "Entscheidung zur Anmerkung",
+      "review__comment_added": "Neue Antwort",
+      "review__workflow_changed": "Statuswechsel des Reviews",
+      "review__deleted": "Review gelöscht",
+      "review__version_uploaded": "Neue Dokumentversion",
+      "review__mention": "Du wurdest erwähnt"
+    },
     "localeStatus": {
       "custom": "Angepasst",
       "shipped": "Mitgeliefert",
