@@ -51,7 +51,7 @@
     "placementActions": {
       "confirm": "C’est correct",
       "confirmHint": "Accepter la mise en évidence déplacée",
-      "reattach": "Repositionner",
+      "reattach": "Rattacher",
       "reattachHint": "Choisissez vous-même le bon passage",
       "reposition": "Repositionner",
       "repositionHint": "Déplacer cette annotation vers un autre passage"
@@ -77,8 +77,8 @@
   "placement": {
     "confirmed": "Emplacement confirmé.",
     "confirmFailed": "Impossible de confirmer l’emplacement.",
-    "reattached": "Annotation repositionnée.",
-    "reattachFailed": "Impossible de repositionner l’annotation."
+    "reattached": "Annotation rattachée.",
+    "reattachFailed": "Impossible de rattacher l’annotation."
   },
   "panel": {
     "title": "Annotations ({{count}})",
@@ -285,9 +285,9 @@
     "regionKeyboardHint": "La première pression sur une touche fléchée place un rectangle de sélection au milieu de la page. Les flèches le déplacent ensuite, Shift avec une flèche le déplace par pas plus grands, Alt avec une flèche l’agrandit ou le réduit, Enter annote la zone, Escape l’efface.",
     "hoverNoComments": "Aucun commentaire pour l’instant.",
     "hoverOpen": "Cliquez pour ouvrir la discussion",
-    "placingQuote": "Repositionnement de <quote/> — sélectionnez le nouveau passage",
-    "placing": "Repositionnement de l’annotation — sélectionnez son nouvel emplacement",
-    "cancelReattach": "Annuler le repositionnement"
+    "placingQuote": "Positionnement de <quote/> — sélectionnez le nouveau passage",
+    "placing": "Positionnement de l’annotation — sélectionnez son nouvel emplacement",
+    "cancelReattach": "Annuler le positionnement"
   },
   "focus": {
     "position": "Annotation {{index}} sur {{count}}",

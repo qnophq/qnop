@@ -67,8 +67,8 @@
       "description": "L’emplacement d’une annotation sur la page a été confirmé pour une version du document."
     },
     "placementReattached": {
-      "label": "Emplacement corrigé",
-      "description": "Une annotation a été repositionnée manuellement à un nouvel endroit — p. ex. après qu’une nouvelle version a déplacé le texte."
+      "label": "Emplacement rattaché",
+      "description": "Une annotation a été rattachée à un nouvel endroit — p. ex. après qu’une nouvelle version a déplacé le texte."
     },
     "annotationAutoClosed": {
       "label": "Annotation fermée automatiquement",
