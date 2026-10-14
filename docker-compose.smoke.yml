@@ -32,7 +32,7 @@ services:
   # uploads here and the extraction job reads them back; `auto-create-bucket` on
   # the app side provisions the bucket on first use, so no init job is needed.
   minio:
-    image: cgr.dev/chainguard/minio:latest@sha256:dc455cdd4db6e390b1b26514f15ff37681a777bf8dab41aac445a0259f751e56
+    image: cgr.dev/chainguard/minio:latest@sha256:2136d593beacf4461187035eca949fe49abd589d5079735025c711ca58fee0c8
     command: server /data
     environment:
       MINIO_ROOT_USER: qnop

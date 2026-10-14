@@ -66,7 +66,7 @@ services:
       retries: 5
 
   minio:
-    image: cgr.dev/chainguard/minio:latest@sha256:dc455cdd4db6e390b1b26514f15ff37681a777bf8dab41aac445a0259f751e56
+    image: cgr.dev/chainguard/minio:latest@sha256:2136d593beacf4461187035eca949fe49abd589d5079735025c711ca58fee0c8
     user: '0:0' # keep volumes from the former root-run MinIO image writable
     command: server /data
     environment:
