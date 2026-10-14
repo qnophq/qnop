@@ -36,6 +36,8 @@ import io.qnop.repository.TeamMembershipRepository;
 import io.qnop.repository.UserRepository;
 import io.qnop.service.ApplicationSettingKey;
 import io.qnop.service.ApplicationSettingsService;
+import io.qnop.service.mail.MailLocaleResolver;
+import io.qnop.service.mail.MailMessages;
 import io.qnop.service.mail.MailTemplateKey;
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -68,6 +70,10 @@ import org.springframework.transaction.annotation.Transactional;
  * recipient through {@link ReviewIdentityResolver}, and the persisted row keeps ids only so the
  * inbox re-resolves at read time.
  *
+ * <p>The mail variables are written in each recipient's mail language ({@link MailLocaleResolver},
+ * issue #853): decision words, workflow state names and actor fallbacks come from {@link
+ * MailMessages}, and the intent carries that language so the template is rendered in it too.
+ *
  * <p>Runs on the notification executor after the triggering transaction committed — a failure here
  * is logged and never disturbs the review itself.
  */
@@ -89,6 +95,7 @@ public class ReviewNotificationService {
   private final ApplicationSettingsService settings;
   private final ReviewIdentityResolver identity;
   private final ReviewFacadeService facade;
+  private final MailLocaleResolver mailLocales;
   private final List<ReviewNotificationSink> sinks;
 
   public ReviewNotificationService(
@@ -102,6 +109,7 @@ public class ReviewNotificationService {
       ApplicationSettingsService settings,
       ReviewIdentityResolver identity,
       ReviewFacadeService facade,
+      MailLocaleResolver mailLocales,
       List<ReviewNotificationSink> sinks) {
     this.documents = documents;
     this.annotations = annotations;
@@ -113,6 +121,7 @@ public class ReviewNotificationService {
     this.settings = settings;
     this.identity = identity;
     this.facade = facade;
+    this.mailLocales = mailLocales;
     this.sinks = sinks;
   }
 
@@ -210,9 +219,10 @@ public class ReviewNotificationService {
                 List.of(
                     ReviewNotificationIntent.to(
                             owner, NotificationType.REVIEW_DELETED, MailTemplateKey.REVIEW_DELETED)
+                        .vars(baseVars(owner, event.title()))
+                        .mailLocale(messagesFor(owner).locale())
                         .actor(event.actorId())
                         .excerpt(event.title())
-                        .var("documentTitle", event.title())
                         .build()))
         .orElseGet(List::of);
   }
@@ -246,17 +256,18 @@ public class ReviewNotificationService {
     // The owner is not "added as a reviewer" of their own review, even via a team.
     candidates.remove(document.getOwnerId());
     // Adding is owner/admin-only and both act under their public name — no anonymity concern.
-    String actorName =
-        users.findById(event.actorId()).map(User::getDisplayName).orElse("An administrator");
+    Optional<String> actorName = users.findById(event.actorId()).map(User::getDisplayName);
     List<ReviewNotificationIntent> intents = new ArrayList<>();
     for (User recipient : recipients(candidates, event.actorId())) {
+      MailMessages messages = messagesFor(recipient);
       intents.add(
           ReviewNotificationIntent.to(
                   recipient,
                   NotificationType.PARTICIPANT_ADDED,
                   MailTemplateKey.REVIEW_PARTICIPANT_ADDED)
               .vars(baseVars(document, recipient))
-              .var("actorName", actorName)
+              .mailLocale(messages.locale())
+              .var("actorName", actorName.orElseGet(() -> messages.get("actor.administrator")))
               .var("actionUrl", reviewUrl(document))
               .document(document.getId())
               .actor(event.actorId())
@@ -289,13 +300,15 @@ public class ReviewNotificationService {
               annotationUrl(document, event.annotationId()) + "&comment=" + opening.getId()));
     }
     for (User recipient : recipients(Set.of(document.getOwnerId()), event.actorId())) {
+      MailMessages messages = messagesFor(recipient);
       intents.add(
           ReviewNotificationIntent.to(
                   recipient,
                   NotificationType.ANNOTATION_CREATED,
                   MailTemplateKey.REVIEW_ANNOTATION_CREATED)
               .vars(baseVars(document, recipient))
-              .var("actorName", actorNameFor(document, recipient, event.actorId()))
+              .mailLocale(messages.locale())
+              .var("actorName", actorNameFor(document, recipient, event.actorId(), messages))
               .var("annotationExcerpt", excerpt)
               .var("actionUrl", annotationUrl(document, event.annotationId()))
               .document(document.getId())
@@ -318,15 +331,18 @@ public class ReviewNotificationService {
     String excerpt = firstCommentExcerpt(annotationId);
     List<ReviewNotificationIntent> intents = new ArrayList<>();
     for (User recipient : recipients(candidates, actorId)) {
+      MailMessages messages = messagesFor(recipient);
       intents.add(
           ReviewNotificationIntent.to(
                   recipient,
                   NotificationType.ANNOTATION_DECIDED,
                   MailTemplateKey.REVIEW_ANNOTATION_DECIDED)
               .vars(baseVars(document, recipient))
-              .var("actorName", actorNameFor(document, recipient, actorId))
+              .mailLocale(messages.locale())
+              .var("actorName", actorNameFor(document, recipient, actorId, messages))
               .var("annotationExcerpt", excerpt)
-              .var("decision", decision)
+              // The word in the mail is translated; the persisted decision stays raw.
+              .var("decision", messages.decision(decision))
               .var("actionUrl", annotationUrl(document, annotationId))
               .document(document.getId())
               .actor(actorId)
@@ -367,11 +383,13 @@ public class ReviewNotificationService {
                 excerpt,
                 actionUrl));
     for (User recipient : recipients(candidates, event.actorId())) {
+      MailMessages messages = messagesFor(recipient);
       intents.add(
           ReviewNotificationIntent.to(
                   recipient, NotificationType.COMMENT_ADDED, MailTemplateKey.REVIEW_COMMENT_ADDED)
               .vars(baseVars(document, recipient))
-              .var("actorName", actorNameFor(document, recipient, event.actorId()))
+              .mailLocale(messages.locale())
+              .var("actorName", actorNameFor(document, recipient, event.actorId(), messages))
               .var("commentExcerpt", excerpt)
               .var("actionUrl", actionUrl)
               .document(document.getId())
@@ -392,17 +410,18 @@ public class ReviewNotificationService {
       return List.of();
     }
     // Uploads are owner-only and the owner acts under their public name (issue #413).
-    String actorName =
-        users.findById(event.actorId()).map(User::getDisplayName).orElse("The owner");
+    Optional<String> actorName = users.findById(event.actorId()).map(User::getDisplayName);
     List<ReviewNotificationIntent> intents = new ArrayList<>();
     for (User recipient : recipients(reviewCircle(document), event.actorId())) {
+      MailMessages messages = messagesFor(recipient);
       intents.add(
           ReviewNotificationIntent.to(
                   recipient,
                   NotificationType.VERSION_UPLOADED,
                   MailTemplateKey.REVIEW_VERSION_UPLOADED)
               .vars(baseVars(document, recipient))
-              .var("actorName", actorName)
+              .mailLocale(messages.locale())
+              .var("actorName", actorName.orElseGet(() -> messages.get("actor.owner")))
               .var("versionNumber", String.valueOf(event.versionNumber()))
               .var("actionUrl", reviewUrl(document) + "?version=" + event.versionNumber())
               .document(document.getId())
@@ -422,14 +441,16 @@ public class ReviewNotificationService {
     }
     List<ReviewNotificationIntent> intents = new ArrayList<>();
     for (User recipient : recipients(reviewCircle(document), event.actorId())) {
+      MailMessages messages = messagesFor(recipient);
       intents.add(
           ReviewNotificationIntent.to(
                   recipient,
                   NotificationType.WORKFLOW_CHANGED,
                   MailTemplateKey.REVIEW_WORKFLOW_CHANGED)
               .vars(baseVars(document, recipient))
-              .var("oldState", humanState(event.fromState()))
-              .var("newState", humanState(event.toState()))
+              .mailLocale(messages.locale())
+              .var("oldState", messages.workflowState(event.fromState()))
+              .var("newState", messages.workflowState(event.toState()))
               .var("actionUrl", reviewUrl(document))
               .document(document.getId())
               .actor(event.actorId())
@@ -459,11 +480,13 @@ public class ReviewNotificationService {
     }
     List<ReviewNotificationIntent> intents = new ArrayList<>();
     for (User recipient : recipients(mentioned, actorId)) {
+      MailMessages messages = messagesFor(recipient);
       intents.add(
           ReviewNotificationIntent.to(
                   recipient, NotificationType.MENTION, MailTemplateKey.REVIEW_MENTION)
               .vars(baseVars(document, recipient))
-              .var("actorName", actorNameFor(document, recipient, actorId))
+              .mailLocale(messages.locale())
+              .var("actorName", actorNameFor(document, recipient, actorId, messages))
               .var("commentExcerpt", excerpt)
               .var("actionUrl", actionUrl)
               .document(document.getId())
@@ -503,16 +526,26 @@ public class ReviewNotificationService {
    * The actor's name as THIS recipient is allowed to see it (issue #413): real in normal reviews,
    * pseudonymous in anonymous ones unless the actor is the owner or the recipient themselves.
    */
-  private String actorNameFor(Document document, User recipient, UUID actorId) {
+  private String actorNameFor(
+      Document document, User recipient, UUID actorId, MailMessages messages) {
     String name = identity.forDocument(document.getId(), recipient.getId()).displayName(actorId);
-    return name == null || name.isBlank() ? "A participant" : name;
+    return name == null || name.isBlank() ? messages.get("actor.participant") : name;
+  }
+
+  /** The phrases of {@code recipient}'s mail language (issue #853). */
+  private MailMessages messagesFor(User recipient) {
+    return MailMessages.forLocale(mailLocales.forUser(recipient.getId()));
   }
 
   private Map<String, Object> baseVars(Document document, User recipient) {
+    return baseVars(recipient, document.getTitle());
+  }
+
+  private Map<String, Object> baseVars(User recipient, String documentTitle) {
     Map<String, Object> vars = new LinkedHashMap<>();
     vars.put("siteName", settings.getString(ApplicationSettingKey.GENERAL_APPLICATION_NAME));
     vars.put("recipientName", recipient.getDisplayName());
-    vars.put("documentTitle", document.getTitle());
+    vars.put("documentTitle", documentTitle);
     return vars;
   }
 
@@ -555,14 +588,5 @@ public class ReviewNotificationService {
             .replaceAll("\\s+", " ")
             .trim();
     return flat.length() <= EXCERPT_MAX ? flat : flat.substring(0, EXCERPT_MAX - 1).trim() + "…";
-  }
-
-  /** {@code CHANGES_REQUESTED} → {@code Changes requested} — states as humans read them. */
-  static String humanState(String raw) {
-    if (raw == null || raw.isBlank()) {
-      return "";
-    }
-    String lower = raw.replace('_', ' ').toLowerCase();
-    return Character.toUpperCase(lower.charAt(0)) + lower.substring(1);
   }
 }

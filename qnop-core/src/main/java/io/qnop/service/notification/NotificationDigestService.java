@@ -30,6 +30,8 @@ import io.qnop.repository.UserSettingRepository;
 import io.qnop.service.ApplicationSettingKey;
 import io.qnop.service.ApplicationSettingsService;
 import io.qnop.service.UserSettingKey;
+import io.qnop.service.mail.MailLocaleResolver;
+import io.qnop.service.mail.MailMessages;
 import io.qnop.service.mail.MailService;
 import io.qnop.service.mail.MailTemplateKey;
 import io.qnop.service.scheduler.SchedulerJobCatalog;
@@ -89,6 +91,7 @@ public class NotificationDigestService {
   private final ApplicationSettingsService settings;
   private final io.qnop.service.review.ReviewIdentityResolver identity;
   private final MailService mail;
+  private final MailLocaleResolver mailLocales;
   private final SchedulerService scheduler;
   private final TransactionTemplate tx;
 
@@ -101,6 +104,7 @@ public class NotificationDigestService {
       ApplicationSettingsService settings,
       io.qnop.service.review.ReviewIdentityResolver identity,
       MailService mail,
+      MailLocaleResolver mailLocales,
       SchedulerService scheduler,
       PlatformTransactionManager transactionManager) {
     this.notifications = notifications;
@@ -111,6 +115,7 @@ public class NotificationDigestService {
     this.settings = settings;
     this.identity = identity;
     this.mail = mail;
+    this.mailLocales = mailLocales;
     this.scheduler = scheduler;
     this.tx = new TransactionTemplate(transactionManager);
   }
@@ -197,11 +202,13 @@ public class NotificationDigestService {
       return true;
     }
 
+    // One language for the template and every phrase the renderer writes (issue #853).
+    MailMessages messages = MailMessages.forLocale(mailLocales.forUser(recipientId));
     mail.sendMailFromTemplate(
         MailTemplateKey.REVIEW_DAILY_DIGEST,
         recipient.getEmail(),
-        varsFor(recipient, content, zone),
-        localeFor(recipientId));
+        varsFor(recipient, content, zone, messages),
+        messages.locale());
     // The newest createdAt actually included — never now(), or a notification
     // written while this was being assembled would fall in the gap.
     Instant coveredThrough = content.coveredThrough() == null ? from : content.coveredThrough();
@@ -251,25 +258,18 @@ public class NotificationDigestService {
     }
   }
 
-  private String localeFor(UUID userId) {
-    return userSettings
-        .findByUserIdAndSettingKey(userId, UserSettingKey.PREFERRED_LANGUAGE.getKey())
-        .map(setting -> setting.getSettingValue())
-        .filter(value -> !value.isBlank())
-        .orElse(null);
-  }
-
-  private Map<String, Object> varsFor(User recipient, DigestContent content, ZoneId zone) {
+  private Map<String, Object> varsFor(
+      User recipient, DigestContent content, ZoneId zone, MailMessages messages) {
     Map<String, Object> vars = new HashMap<>();
     vars.put("siteName", settings.getString(ApplicationSettingKey.GENERAL_APPLICATION_NAME));
     vars.put("recipientName", recipient.getDisplayName());
     vars.put("totalCount", content.total());
     Map<UUID, DigestRenderer.Target> targets = targetsFor(content);
     java.util.function.Function<UUID, String> actorNames =
-        actorNamesFor(recipient.getId(), content);
-    vars.put("totalPhrase", DigestRenderer.totalPhrase(content.total()));
-    vars.put("digestBody", DigestRenderer.plain(content, targets, actorNames, zone));
-    vars.put("digestBodyHtml", DigestRenderer.html(content, targets, actorNames, zone));
+        actorNamesFor(recipient.getId(), content, messages);
+    vars.put("totalPhrase", DigestRenderer.totalPhrase(content.total(), messages));
+    vars.put("digestBody", DigestRenderer.plain(content, targets, actorNames, zone, messages));
+    vars.put("digestBodyHtml", DigestRenderer.html(content, targets, actorNames, zone, messages));
     vars.put("actionUrl", reviewsUrl());
     return vars;
   }
@@ -283,7 +283,8 @@ public class NotificationDigestService {
    * the mail, since a digest names the same handful of people repeatedly.
    */
   private java.util.function.Function<UUID, String> actorNamesFor(
-      UUID recipientId, DigestContent content) {
+      UUID recipientId, DigestContent content, MailMessages messages) {
+    String participant = messages.get("actor.participant");
     Map<UUID, io.qnop.service.review.ReviewIdentityResolver.ReviewIdentities> perDocument =
         new LinkedHashMap<>();
     Map<UUID, String> resolved = new LinkedHashMap<>();
@@ -305,11 +306,12 @@ public class NotificationDigestService {
         if (event.actorId() != null) {
           String name = identities.displayName(event.actorId());
           resolved.putIfAbsent(
-              event.actorId(), name == null || name.isBlank() ? "A participant" : name);
+              event.actorId(), name == null || name.isBlank() ? participant : name);
         }
       }
     }
-    return actorId -> actorId == null ? "System" : resolved.getOrDefault(actorId, "A participant");
+    String system = messages.get("actor.system");
+    return actorId -> actorId == null ? system : resolved.getOrDefault(actorId, participant);
   }
 
   /**

@@ -167,6 +167,9 @@ shedlock-provider-jdbc-template = { module = "net.javacrumbs.shedlock:shedlock-p
 # Mail subsystem (issue #19) — JavaMail + logic-less Mustache template rendering.
 spring-boot-starter-mail = { module = "org.springframework.boot:spring-boot-starter-mail" }
 jmustache = { module = "com.samskivert:jmustache", version.ref = "jmustache" }
+# Shipped per-language mail template defaults (issue #853) are YAML resources;
+# SnakeYAML is version-managed by the Spring Boot BOM.
+snakeyaml = { module = "org.yaml:snakeyaml" }
 commonmark = { module = "org.commonmark:commonmark", version.ref = "commonmark" }
 commonmark-ext-tables = { module = "org.commonmark:commonmark-ext-gfm-tables", version.ref = "commonmark" }
 commonmark-ext-strikethrough = { module = "org.commonmark:commonmark-ext-gfm-strikethrough", version.ref = "commonmark" }

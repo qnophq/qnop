@@ -20,10 +20,10 @@
  */
 package io.qnop.service.auth;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyMap;
 import static org.mockito.ArgumentMatchers.eq;
-import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -33,14 +33,17 @@ import io.qnop.entity.User;
 import io.qnop.service.ApplicationSettingKey;
 import io.qnop.service.ApplicationSettingsService;
 import io.qnop.service.UserService;
+import io.qnop.service.mail.MailLocaleResolver;
 import io.qnop.service.mail.MailService;
 import io.qnop.service.mail.MailTemplateKey;
 import java.time.Instant;
+import java.util.Map;
 import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
@@ -51,18 +54,21 @@ class PasswordResetFlowServiceTest {
   @Mock private PasswordResetTokenService resetTokens;
   @Mock private MailService mailService;
   @Mock private ApplicationSettingsService settings;
+  @Mock private MailLocaleResolver mailLocales;
 
   private PasswordResetFlowService service;
 
   @BeforeEach
   void setUp() {
-    service = new PasswordResetFlowService(userService, resetTokens, mailService, settings);
+    service =
+        new PasswordResetFlowService(userService, resetTokens, mailService, settings, mailLocales);
     lenient()
         .when(settings.getString(ApplicationSettingKey.GENERAL_BASE_URL))
         .thenReturn("https://qnop.example");
     lenient()
         .when(settings.getString(ApplicationSettingKey.GENERAL_APPLICATION_NAME))
         .thenReturn("qnop");
+    lenient().when(mailLocales.forUser(any())).thenReturn("en");
   }
 
   @Test
@@ -90,7 +96,34 @@ class PasswordResetFlowServiceTest {
 
     verify(mailService)
         .sendMailFromTemplate(
-            eq(MailTemplateKey.PASSWORD_RESET), eq("jane@example.com"), anyMap(), isNull());
+            eq(MailTemplateKey.PASSWORD_RESET), eq("jane@example.com"), anyMap(), eq("en"));
+  }
+
+  @Test
+  @DisplayName("the reset mail and its expiry phrase use the recipient's mail language (#853)")
+  void resetMailUsesTheRecipientsLanguage() {
+    User user = User.internal("Jane", "jane@example.com", "jane", "hash");
+    when(mailLocales.forUser(user.getId())).thenReturn("de");
+    when(resetTokens.issue(user))
+        .thenReturn(
+            new PasswordResetTokenService.IssuedResetToken(
+                "RAW", Instant.now().plusSeconds(24 * 3600)));
+
+    service.sendSetupLink(user, MailTemplateKey.ADMIN_PASSWORD_RESET);
+
+    @SuppressWarnings("unchecked")
+    ArgumentCaptor<Map<String, Object>> vars = ArgumentCaptor.forClass(Map.class);
+    verify(mailService)
+        .sendMailFromTemplate(
+            eq(MailTemplateKey.ADMIN_PASSWORD_RESET),
+            eq("jane@example.com"),
+            vars.capture(),
+            eq("de"));
+    assertThat(vars.getValue()).containsEntry("expiresAtHuman", "in 24 Stunden");
+    // Every placeholder the template uses is supplied (strict Mustache drops the mail otherwise).
+    assertThat(vars.getValue().keySet())
+        .containsAll(MailTemplateKey.ADMIN_PASSWORD_RESET.placeholders())
+        .containsAll(MailTemplateKey.PASSWORD_RESET.placeholders());
   }
 
   @Test

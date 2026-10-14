@@ -25,6 +25,7 @@ import io.qnop.entity.UserRole;
 import io.qnop.service.ApplicationSettingKey;
 import io.qnop.service.ApplicationSettingsService;
 import io.qnop.service.UserService;
+import io.qnop.service.mail.MailLocaleResolver;
 import io.qnop.service.mail.MailService;
 import io.qnop.service.mail.MailTemplateKey;
 import io.qnop.service.mail.RelativeTimePhrase;
@@ -47,16 +48,19 @@ public class RegistrationService {
   private final EmailVerificationTokenService verificationTokens;
   private final MailService mailService;
   private final ApplicationSettingsService settings;
+  private final MailLocaleResolver mailLocales;
 
   public RegistrationService(
       UserService userService,
       EmailVerificationTokenService verificationTokens,
       MailService mailService,
-      ApplicationSettingsService settings) {
+      ApplicationSettingsService settings,
+      MailLocaleResolver mailLocales) {
     this.userService = userService;
     this.verificationTokens = verificationTokens;
     this.mailService = mailService;
     this.settings = settings;
+    this.mailLocales = mailLocales;
   }
 
   /**
@@ -97,7 +101,13 @@ public class RegistrationService {
     userService.enable(user.getId());
   }
 
+  /**
+   * A brand-new account has no language preference yet, so this resolves to the application default
+   * (issue #853) — through the same resolver as every other mail, so a preference stored in the
+   * same transaction would be honoured too.
+   */
   private void sendVerificationEmail(User user, String rawToken, Instant expiresAt) {
+    String locale = mailLocales.forUser(user.getId());
     String actionUrl =
         baseUrl() + "/verify-email?token=" + URLEncoder.encode(rawToken, StandardCharsets.UTF_8);
     mailService.sendMailFromTemplate(
@@ -107,8 +117,8 @@ public class RegistrationService {
             "siteName", siteName(),
             "recipientName", user.getDisplayName(),
             "actionUrl", actionUrl,
-            "expiresAtHuman", RelativeTimePhrase.until(expiresAt)),
-        null);
+            "expiresAtHuman", RelativeTimePhrase.until(expiresAt, locale)),
+        locale);
   }
 
   private String siteName() {

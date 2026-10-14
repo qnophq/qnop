@@ -31,6 +31,7 @@ import io.qnop.service.limits.FeatureDisabledException;
 import io.qnop.service.limits.FeatureToggleProperties;
 import java.time.Instant;
 import java.util.HashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -42,10 +43,15 @@ import org.springframework.transaction.annotation.Transactional;
 
 /**
  * Renders and administers mail templates (issue #19). Effective content is resolved per request
- * locale through a fallback chain — requested locale → configured default language → {@code en} →
- * the built-in {@link MailTemplateKey} catalog defaults — and rendered with logic-less Mustache
- * (strict: a missing variable raises rather than silently producing a blank). Two compilers keep
- * plain-text bodies unescaped and HTML bodies HTML-escaped.
+ * locale and rendered with logic-less Mustache (strict: a missing variable raises rather than
+ * silently producing a blank). Two compilers keep plain-text bodies unescaped and HTML bodies
+ * HTML-escaped.
+ *
+ * <p>Resolution (issue #853) walks the languages requested locale → configured default language →
+ * {@code en}, and in each one tries the admin-edited row before the shipped default ({@link
+ * MailTemplateDefaults}; English is the {@link MailTemplateKey} catalog). So an admin row in the
+ * recipient's language wins, but an admin row in another language never beats the shipped default
+ * in the recipient's own language. English always has a shipped default, so the walk always ends.
  *
  * <p>The admin operations ({@link #listAll}, {@link #getEffective}, {@link #update}, {@link
  * #reset}, {@link #preview}) back the {@code /api/v1/admin/email/templates} endpoints and never
@@ -54,15 +60,12 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 public class MailTemplateService {
 
-  private static final String FALLBACK_LOCALE = "en";
-  private static final String AUTOMATED_FOOTER =
-      "This is an automated message — please don't reply.";
-
   private final MailTemplateRepository repository;
   private final UserRepository userRepository;
   private final ApplicationSettingsService settings;
   private final EmailLayoutBuilder layoutBuilder;
   private final FeatureToggleProperties features;
+  private final MailTemplateDefaults defaults;
   private final Mustache.Compiler plainCompiler = Mustache.compiler().escapeHTML(false);
   private final Mustache.Compiler htmlCompiler = Mustache.compiler().escapeHTML(true);
 
@@ -71,12 +74,14 @@ public class MailTemplateService {
       UserRepository userRepository,
       ApplicationSettingsService settings,
       EmailLayoutBuilder layoutBuilder,
-      FeatureToggleProperties features) {
+      FeatureToggleProperties features,
+      MailTemplateDefaults defaults) {
     this.repository = repository;
     this.userRepository = userRepository;
     this.settings = settings;
     this.layoutBuilder = layoutBuilder;
     this.features = features;
+    this.defaults = defaults;
   }
 
   /** Whether this deployment lets the templates be edited at all (issue #679). */
@@ -97,61 +102,74 @@ public class MailTemplateService {
   }
 
   /**
-   * Renders the template for {@code locale} (with fallback) using {@code vars}. Throws {@link
-   * com.samskivert.mustache.MustacheException} if a referenced variable is missing.
+   * Renders the template for {@code locale} (with fallback, see the class comment) using {@code
+   * vars}. Throws {@link com.samskivert.mustache.MustacheException} if a referenced variable is
+   * missing.
    *
-   * <p>When a stored row carries an HTML override it is used verbatim; otherwise the catalog
-   * default's content fragment is rendered and wrapped in the shared branded chrome ({@link
-   * EmailLayoutBuilder}), so every email — default or reset-to-default — looks consistent.
+   * <p>When a stored row carries an HTML override it is used verbatim; otherwise the shipped
+   * default's content fragment in the resolved language is rendered and wrapped in the shared
+   * branded chrome ({@link EmailLayoutBuilder}), so every email — default or reset-to-default —
+   * looks consistent.
    */
   public RenderedMail render(MailTemplateKey key, Map<String, Object> vars, String locale) {
-    Optional<MailTemplate> row = resolve(key, locale);
-    String subject = row.map(MailTemplate::getSubject).orElseGet(key::defaultSubject);
-    String plain = row.map(MailTemplate::getBodyPlain).orElseGet(key::defaultBodyPlain);
-    String storedHtml = row.map(MailTemplate::getBodyHtml).filter(h -> !h.isBlank()).orElse(null);
-    return renderContent(key, subject, plain, storedHtml, vars);
+    Resolved resolved = resolve(key, locale);
+    return renderContent(
+        resolved.locale(),
+        resolved.defaults(),
+        resolved.subject(),
+        resolved.bodyPlain(),
+        resolved.storedHtml(),
+        vars);
   }
 
   /**
    * Renders explicit {@code subject}/{@code plain}/{@code html} content with {@code vars}. A blank
-   * or absent HTML source falls back to the catalog default fragment wrapped in the branded chrome,
-   * so a draft preview without an HTML alternative still shows a representative HTML email.
+   * or absent HTML source falls back to the default fragment of {@code content} wrapped in the
+   * branded chrome, so a draft preview without an HTML alternative still shows a representative
+   * HTML email. The chrome (footer, CTA fallback, {@code lang}) follows {@code locale}, the
+   * language the mail is rendered in.
    */
   private RenderedMail renderContent(
-      MailTemplateKey key, String subject, String plain, String html, Map<String, Object> vars) {
+      String locale,
+      MailTemplateContent content,
+      String subject,
+      String plain,
+      String html,
+      Map<String, Object> vars) {
     String renderedSubject = plainCompiler.compile(subject).execute(vars);
     String renderedPlain = plainCompiler.compile(plain).execute(vars);
     String renderedHtml =
         html != null && !html.isBlank()
             ? htmlCompiler.compile(html).execute(vars)
-            : buildBrandedHtml(key, vars);
+            : buildBrandedHtml(locale, content, vars);
     return new RenderedMail(renderedSubject, renderedPlain, renderedHtml);
   }
 
-  /** Renders the catalog default content fragment and wraps it in the branded chrome. */
-  private String buildBrandedHtml(MailTemplateKey key, Map<String, Object> vars) {
-    String content = htmlCompiler.compile(key.defaultBodyHtmlContent()).execute(vars);
-    String preheader = plainCompiler.compile(key.preheader()).execute(vars);
+  /** Renders a default content fragment and wraps it in the branded chrome of {@code locale}. */
+  private String buildBrandedHtml(
+      String locale, MailTemplateContent content, Map<String, Object> vars) {
+    String fragment = htmlCompiler.compile(content.bodyHtmlContent()).execute(vars);
+    String preheader = plainCompiler.compile(content.preheader()).execute(vars);
     Object brand = vars.get("siteName");
     Object actionUrl = vars.get("actionUrl");
     return layoutBuilder.wrap(
+        MailMessages.forLocale(locale),
         brand == null ? null : brand.toString(),
         preheader,
-        content,
+        fragment,
         actionUrl == null ? null : actionUrl.toString(),
-        key.ctaLabel(),
-        AUTOMATED_FOOTER);
+        content.ctaLabel());
   }
 
-  /** The catalog default HTML body as a template (placeholders intact), for compare/reset. */
-  private String defaultBodyHtml(MailTemplateKey key) {
+  /** A default HTML body as a template (placeholders intact), for compare/reset. */
+  private String defaultBodyHtml(String locale, MailTemplateContent content) {
     return layoutBuilder.wrap(
+        MailMessages.forLocale(locale),
         "{{siteName}}",
-        key.preheader(),
-        key.defaultBodyHtmlContent(),
+        content.preheader(),
+        content.bodyHtmlContent(),
         "{{actionUrl}}",
-        key.ctaLabel(),
-        AUTOMATED_FOOTER);
+        content.ctaLabel());
   }
 
   /** Previews the stored or catalog-default version of {@code key} (issue #141). */
@@ -176,9 +194,15 @@ public class MailTemplateService {
       rendered = render(key, new HashMap<>(sampleVars), locale);
     } else {
       validatePlaceholders(key, draft.subject(), draft.bodyPlain(), draft.bodyHtml());
+      String draftLocale = requestedOrDefault(locale);
       rendered =
           renderContent(
-              key, draft.subject(), draft.bodyPlain(), draft.bodyHtml(), new HashMap<>(sampleVars));
+              draftLocale,
+              defaults.findOrEnglish(key, draftLocale),
+              draft.subject(),
+              draft.bodyPlain(),
+              draft.bodyHtml(),
+              new HashMap<>(sampleVars));
     }
     return new MailPreview(rendered, sampleVars);
   }
@@ -218,9 +242,15 @@ public class MailTemplateService {
         .toList();
   }
 
-  /** The effective view for one template at {@code locale} (exact row, else catalog default). */
+  /**
+   * The effective view for one template at {@code locale}: the exact row, else the shipped default
+   * in that language, else the English catalog default. The view's defaults (for compare/reset) are
+   * the shipped ones of {@code locale}, so resetting returns to that language's built-in text.
+   */
   public MailTemplateView getEffective(MailTemplateKey key, String locale) {
-    return findRow(key, locale)
+    String language = requestedOrDefault(locale);
+    MailTemplateContent content = defaults.findOrEnglish(key, language);
+    return findRow(key, language)
         .map(
             row ->
                 buildView(
@@ -231,18 +261,20 @@ public class MailTemplateService {
                     row.getBodyHtml(),
                     MailTemplateView.Source.DATABASE,
                     row.getUpdatedAt(),
-                    row.getUpdatedBy()))
+                    row.getUpdatedBy(),
+                    content))
         .orElseGet(
             () ->
                 buildView(
                     key,
-                    locale,
-                    key.defaultSubject(),
-                    key.defaultBodyPlain(),
+                    language,
+                    content.subject(),
+                    content.bodyPlain(),
                     null,
                     MailTemplateView.Source.DEFAULT,
                     null,
-                    null));
+                    null,
+                    content));
   }
 
   /** Upserts the stored override for {@code key}/{@code locale}; returns the saved view. */
@@ -256,9 +288,10 @@ public class MailTemplateService {
       UUID actor) {
     requireEditable();
     validatePlaceholders(key, subject, bodyPlain, bodyHtml);
+    String language = requestedOrDefault(locale);
     MailTemplate row =
-        findRow(key, locale)
-            .orElseGet(() -> new MailTemplate(key.key(), locale, subject, bodyPlain));
+        findRow(key, language)
+            .orElseGet(() -> new MailTemplate(key.key(), language, subject, bodyPlain));
     row.setSubject(subject);
     row.setBodyPlain(bodyPlain);
     row.setBodyHtml(bodyHtml);
@@ -272,7 +305,8 @@ public class MailTemplateService {
         saved.getBodyHtml(),
         MailTemplateView.Source.DATABASE,
         saved.getUpdatedAt(),
-        saved.getUpdatedBy());
+        saved.getUpdatedBy(),
+        defaults.findOrEnglish(key, language));
   }
 
   /**
@@ -281,7 +315,7 @@ public class MailTemplateService {
   @Transactional
   public boolean reset(MailTemplateKey key, String locale) {
     requireEditable();
-    return findRow(key, locale)
+    return findRow(key, requestedOrDefault(locale))
         .map(
             row -> {
               repository.delete(row);
@@ -302,20 +336,73 @@ public class MailTemplateService {
     return reset(key, defaultLocale());
   }
 
-  private Optional<MailTemplate> resolve(MailTemplateKey key, String locale) {
-    String requested = locale == null || locale.isBlank() ? defaultLocale() : locale;
-    return findRow(key, requested)
-        .or(() -> findRow(key, defaultLocale()))
-        .or(() -> findRow(key, FALLBACK_LOCALE));
+  /**
+   * Walks requested → default → {@code en}; in each language the admin row first, then the shipped
+   * default. Always resolves, because English always has a shipped default.
+   */
+  private Resolved resolve(MailTemplateKey key, String locale) {
+    LinkedHashSet<String> chain = new LinkedHashSet<>();
+    chain.add(requestedOrDefault(locale));
+    chain.add(defaultLocale());
+    chain.add(MailLocaleResolver.FALLBACK_LOCALE);
+    for (String candidate : chain) {
+      Optional<MailTemplate> row = findRow(key, candidate);
+      if (row.isPresent()) {
+        return new Resolved(candidate, row.get(), defaults.findOrEnglish(key, candidate));
+      }
+      Optional<MailTemplateContent> shipped = defaults.find(key, candidate);
+      if (shipped.isPresent()) {
+        return new Resolved(candidate, null, shipped.get());
+      }
+    }
+    // Unreachable: English is always shipped. Kept total rather than throwing.
+    return new Resolved(MailLocaleResolver.FALLBACK_LOCALE, null, MailTemplateContent.english(key));
+  }
+
+  /**
+   * One resolved template: the language it was found in (which the layout chrome and {@code lang}
+   * follow), the stored row if an admin customised it ({@code null} otherwise), and the shipped
+   * default of that language — or English where that language ships none. The default is the
+   * HTML/CTA/preheader source when the row carries no HTML of its own.
+   */
+  private record Resolved(String locale, MailTemplate row, MailTemplateContent defaults) {
+
+    String subject() {
+      return row != null ? row.getSubject() : defaults.subject();
+    }
+
+    String bodyPlain() {
+      return row != null ? row.getBodyPlain() : defaults.bodyPlain();
+    }
+
+    /** The row's own HTML, or {@code null} when the branded default is to be built. */
+    String storedHtml() {
+      if (row == null || row.getBodyHtml() == null || row.getBodyHtml().isBlank()) {
+        return null;
+      }
+      return row.getBodyHtml();
+    }
+
+    /** The HTML source the placeholders are validated against. */
+    String htmlSource() {
+      String stored = storedHtml();
+      return stored != null ? stored : defaults.bodyHtmlContent();
+    }
   }
 
   private Optional<MailTemplate> findRow(MailTemplateKey key, String locale) {
     return repository.findByTemplateKeyAndLocale(key.key(), locale);
   }
 
+  /** {@code locale} normalized ({@link MailLocaleResolver#normalize}), or the default language. */
+  private String requestedOrDefault(String locale) {
+    String language = MailLocaleResolver.normalize(locale);
+    return language != null ? language : defaultLocale();
+  }
+
   private String defaultLocale() {
-    String configured = settings.getString(ApplicationSettingKey.GENERAL_DEFAULT_LANGUAGE);
-    return configured == null || configured.isBlank() ? FALLBACK_LOCALE : configured;
+    return MailLocaleResolver.firstOf(
+        settings.getString(ApplicationSettingKey.GENERAL_DEFAULT_LANGUAGE));
   }
 
   /**
@@ -329,7 +416,8 @@ public class MailTemplateService {
       String bodyHtml,
       MailTemplateView.Source source,
       Instant updatedAt,
-      String updatedBy) {
+      String updatedBy,
+      MailTemplateContent content) {
     return new MailTemplateView(
         key.key(),
         key.friendlyName(),
@@ -339,9 +427,9 @@ public class MailTemplateService {
         bodyHtml,
         source,
         key.placeholders(),
-        key.defaultSubject(),
-        key.defaultBodyPlain(),
-        defaultBodyHtml(key),
+        content.subject(),
+        content.bodyPlain(),
+        defaultBodyHtml(locale, content),
         updatedAt,
         updatedBy,
         resolveUserName(updatedBy));
@@ -379,16 +467,13 @@ public class MailTemplateService {
 
   /** Validates the effective (stored or default) template content before a preview render. */
   private void validateEffectivePlaceholders(MailTemplateKey key, String locale) {
-    Optional<MailTemplate> row = resolve(key, locale);
-    String subject = row.map(MailTemplate::getSubject).orElseGet(key::defaultSubject);
-    String plain = row.map(MailTemplate::getBodyPlain).orElseGet(key::defaultBodyPlain);
-    String htmlSource =
-        row.map(MailTemplate::getBodyHtml)
-            .filter(h -> !h.isBlank())
-            .orElseGet(key::defaultBodyHtmlContent);
+    Resolved resolved = resolve(key, locale);
     SortedSet<String> unknown =
         MailPlaceholderValidator.unknownPlaceholders(
-            Set.copyOf(key.placeholders()), subject, plain, htmlSource);
+            Set.copyOf(key.placeholders()),
+            resolved.subject(),
+            resolved.bodyPlain(),
+            resolved.htmlSource());
     if (!unknown.isEmpty()) {
       throw new MailTemplateValidationException(unknown, key.placeholders());
     }

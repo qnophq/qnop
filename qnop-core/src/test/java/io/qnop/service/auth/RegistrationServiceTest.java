@@ -23,7 +23,6 @@ package io.qnop.service.auth;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyMap;
 import static org.mockito.ArgumentMatchers.eq;
-import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -34,6 +33,7 @@ import io.qnop.entity.UserRole;
 import io.qnop.service.ApplicationSettingKey;
 import io.qnop.service.ApplicationSettingsService;
 import io.qnop.service.UserService;
+import io.qnop.service.mail.MailLocaleResolver;
 import io.qnop.service.mail.MailService;
 import io.qnop.service.mail.MailTemplateKey;
 import java.time.Instant;
@@ -51,18 +51,22 @@ class RegistrationServiceTest {
   @Mock private EmailVerificationTokenService verificationTokens;
   @Mock private MailService mailService;
   @Mock private ApplicationSettingsService settings;
+  @Mock private MailLocaleResolver mailLocales;
 
   private RegistrationService service;
 
   @BeforeEach
   void setUp() {
-    service = new RegistrationService(userService, verificationTokens, mailService, settings);
+    service =
+        new RegistrationService(
+            userService, verificationTokens, mailService, settings, mailLocales);
     lenient()
         .when(settings.getString(ApplicationSettingKey.GENERAL_BASE_URL))
         .thenReturn("https://qnop.example/");
     lenient()
         .when(settings.getString(ApplicationSettingKey.GENERAL_APPLICATION_NAME))
         .thenReturn("qnop");
+    lenient().when(mailLocales.forUser(any())).thenReturn("en");
   }
 
   @Test
@@ -97,12 +101,21 @@ class RegistrationServiceTest {
     verify(userService)
         .createSelfRegistered("jane", "jane@example.com", "password1", "Jane", UserRole.AUDITOR);
     verify(verificationTokens).issue(user);
+    @SuppressWarnings("unchecked")
+    org.mockito.ArgumentCaptor<java.util.Map<String, Object>> vars =
+        org.mockito.ArgumentCaptor.forClass(java.util.Map.class);
     verify(mailService)
         .sendMailFromTemplate(
             eq(MailTemplateKey.REGISTRATION_VERIFICATION),
             eq("jane@example.com"),
-            anyMap(),
-            isNull());
+            vars.capture(),
+            eq("en"));
+    // Every placeholder the template uses is supplied (strict Mustache drops the mail otherwise),
+    // and the English expiry phrase is unchanged.
+    org.assertj.core.api.Assertions.assertThat(vars.getValue().keySet())
+        .containsAll(MailTemplateKey.REGISTRATION_VERIFICATION.placeholders());
+    org.assertj.core.api.Assertions.assertThat(vars.getValue().get("expiresAtHuman"))
+        .isEqualTo("in 1 minute");
   }
 
   @Test

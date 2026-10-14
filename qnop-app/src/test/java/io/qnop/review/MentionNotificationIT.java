@@ -24,7 +24,6 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyMap;
 import static org.mockito.ArgumentMatchers.eq;
-import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.after;
 import static org.mockito.Mockito.timeout;
 import static org.mockito.Mockito.verify;
@@ -150,7 +149,7 @@ class MentionNotificationIT extends SeededIntegrationTest {
     ArgumentCaptor<Map<String, Object>> vars = ArgumentCaptor.forClass(Map.class);
     verify(mail, timeout(5000))
         .sendMailFromTemplate(
-            eq(MailTemplateKey.REVIEW_MENTION), eq(emailOf(MEMBER2_ID)), vars.capture(), isNull());
+            eq(MailTemplateKey.REVIEW_MENTION), eq(emailOf(MEMBER2_ID)), vars.capture(), eq("en"));
     assertThat((String) vars.getValue().get("actionUrl")).contains("annotation=", "comment=");
   }
 
@@ -168,7 +167,7 @@ class MentionNotificationIT extends SeededIntegrationTest {
     // mail.
     verify(mail, timeout(5000))
         .sendMailFromTemplate(
-            eq(MailTemplateKey.REVIEW_MENTION), eq(emailOf(MEMBER2_ID)), anyMap(), isNull());
+            eq(MailTemplateKey.REVIEW_MENTION), eq(emailOf(MEMBER2_ID)), anyMap(), eq("en"));
     verify(mail, after(300).never())
         .sendMailFromTemplate(
             eq(MailTemplateKey.REVIEW_COMMENT_ADDED), eq(emailOf(MEMBER2_ID)), anyMap(), any());
@@ -187,7 +186,7 @@ class MentionNotificationIT extends SeededIntegrationTest {
             eq(MailTemplateKey.REVIEW_ANNOTATION_CREATED),
             eq(emailOf(MEMBER_ID)),
             anyMap(),
-            isNull());
+            eq("en"));
     verify(mail, after(300).never())
         .sendMailFromTemplate(eq(MailTemplateKey.REVIEW_MENTION), any(), anyMap(), any());
   }
@@ -206,7 +205,7 @@ class MentionNotificationIT extends SeededIntegrationTest {
             eq(MailTemplateKey.REVIEW_ANNOTATION_CREATED),
             eq(emailOf(MEMBER_ID)),
             anyMap(),
-            isNull());
+            eq("en"));
     verify(mail, after(300).never())
         .sendMailFromTemplate(eq(MailTemplateKey.REVIEW_MENTION), any(), anyMap(), any());
   }
@@ -225,7 +224,7 @@ class MentionNotificationIT extends SeededIntegrationTest {
             eq(MailTemplateKey.REVIEW_ANNOTATION_CREATED),
             eq(emailOf(MEMBER_ID)),
             anyMap(),
-            isNull());
+            eq("en"));
     verify(mail, after(300).never())
         .sendMailFromTemplate(
             eq(MailTemplateKey.REVIEW_MENTION), eq(emailOf(MEMBER2_ID)), anyMap(), any());

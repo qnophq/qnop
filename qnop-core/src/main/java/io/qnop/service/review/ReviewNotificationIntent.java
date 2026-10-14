@@ -39,14 +39,18 @@ import java.util.UUID;
  * to the reply mail for someone who muted mentions while the inbox still records the mention.
  *
  * <p>It carries both channels' needs side by side: {@code mailVars} is the already-rendered
- * template context (including the actor's name as <em>this</em> recipient may see it), while the
- * bare ids and the non-identity snapshot feed the persisted row, which resolves names on read.
+ * template context (including the actor's name as <em>this</em> recipient may see it), written in
+ * {@code mailLocale}, the recipient's mail language (issue #853) — the template is rendered in the
+ * same language, so the words around a variable and the variable agree. The bare ids and the
+ * non-identity snapshot feed the persisted row, which resolves names on read; its {@code decision}
+ * and states stay the raw values, never the translated words.
  */
 public record ReviewNotificationIntent(
     User recipient,
     NotificationType type,
     MailTemplateKey template,
     Map<String, Object> mailVars,
+    String mailLocale,
     UUID documentId,
     UUID actorId,
     UUID annotationId,
@@ -67,6 +71,7 @@ public record ReviewNotificationIntent(
     private final NotificationType type;
     private final MailTemplateKey template;
     private final Map<String, Object> mailVars = new LinkedHashMap<>();
+    private String mailLocale;
     private UUID documentId;
     private UUID actorId;
     private UUID annotationId;
@@ -90,6 +95,12 @@ public record ReviewNotificationIntent(
 
     public Builder var(String name, Object value) {
       this.mailVars.put(name, value);
+      return this;
+    }
+
+    /** The language {@code mailVars} are written in and the mail is to be rendered in. */
+    public Builder mailLocale(String mailLocale) {
+      this.mailLocale = mailLocale;
       return this;
     }
 
@@ -143,6 +154,7 @@ public record ReviewNotificationIntent(
           // (a blank site name, say) must degrade to an empty placeholder in one
           // mail — never take down the whole fan-out for that event.
           Collections.unmodifiableMap(new LinkedHashMap<>(mailVars)),
+          mailLocale,
           documentId,
           actorId,
           annotationId,

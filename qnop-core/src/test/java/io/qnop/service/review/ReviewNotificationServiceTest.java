@@ -69,6 +69,7 @@ class ReviewNotificationServiceTest {
   @Mock private UserRepository users;
   @Mock private ApplicationSettingsService settings;
   @Mock private ReviewIdentityResolver identity;
+  @Mock private io.qnop.repository.UserSettingRepository userSettings;
 
   /** A sink that records what it was handed and can be told to refuse or to blow up. */
   private static final class RecordingSink implements ReviewNotificationSink {
@@ -111,6 +112,8 @@ class ReviewNotificationServiceTest {
             participants,
             teamMembers,
             identity),
+        new io.qnop.service.mail.MailLocaleResolver(
+            userSettings, settings, new io.qnop.service.mail.MailTemplateDefaults()),
         List.of(sinks));
   }
 
@@ -180,9 +183,116 @@ class ReviewNotificationServiceTest {
   @Test
   @DisplayName("workflow states read like sentences")
   void humanStates() {
-    assertThat(ReviewNotificationService.humanState("CHANGES_REQUESTED"))
-        .isEqualTo("Changes requested");
-    assertThat(ReviewNotificationService.humanState(null)).isEmpty();
+    io.qnop.service.mail.MailMessages english = io.qnop.service.mail.MailMessages.forLocale("en");
+    assertThat(english.workflowState("CHANGES_REQUESTED")).isEqualTo("Changes requested");
+    assertThat(english.workflowState(null)).isEmpty();
+  }
+
+  // --- the recipient's mail language (issue #853) ---------------------------
+
+  private void prefersGerman(UUID userId) {
+    io.qnop.entity.UserSetting setting = org.mockito.Mockito.mock(io.qnop.entity.UserSetting.class);
+    when(setting.getSettingValue()).thenReturn("de");
+    when(userSettings.findByUserIdAndSettingKey(
+            userId, io.qnop.service.UserSettingKey.PREFERRED_LANGUAGE.getKey()))
+        .thenReturn(Optional.of(setting));
+  }
+
+  @Test
+  @DisplayName("a German recipient's decision mail speaks German; the stored decision stays raw")
+  void decisionIsWordedInTheRecipientsLanguage() {
+    seedMentionedFollower();
+    prefersGerman(FOLLOWER_ID);
+    RecordingSink sink = new RecordingSink();
+
+    service(sink)
+        .dispatch(new ReviewEvent.AnnotationDismissed(DOCUMENT_ID, ACTOR_ID, ANNOTATION_ID));
+
+    ReviewNotificationIntent intent = sink.delivered.getFirst();
+    assertThat(intent.mailLocale()).isEqualTo("de");
+    assertThat(intent.mailVars()).containsEntry("decision", "verworfen");
+    assertThat(intent.decision()).isEqualTo("dismissed");
+  }
+
+  @Test
+  @DisplayName("an English recipient keeps the English words and an unresolvable actor fallback")
+  void englishRecipientKeepsEnglish() {
+    seedMentionedFollower();
+    ReviewIdentityResolver.ReviewIdentities nobody =
+        org.mockito.Mockito.mock(ReviewIdentityResolver.ReviewIdentities.class);
+    when(identity.forDocument(any(), any())).thenReturn(nobody);
+    RecordingSink sink = new RecordingSink();
+
+    service(sink)
+        .dispatch(new ReviewEvent.AnnotationDecided(DOCUMENT_ID, ACTOR_ID, ANNOTATION_ID, false));
+
+    ReviewNotificationIntent intent = sink.delivered.getFirst();
+    assertThat(intent.mailLocale()).isEqualTo("en");
+    assertThat(intent.mailVars())
+        .containsEntry("decision", "resolved")
+        .containsEntry("actorName", "A participant");
+  }
+
+  @Test
+  @DisplayName("workflow states and the actor fallback are German for a German recipient")
+  void workflowStatesInGerman() {
+    seedMentionedFollower();
+    prefersGerman(FOLLOWER_ID);
+    when(participants.findByDocumentId(DOCUMENT_ID))
+        .thenReturn(List.of(io.qnop.entity.ReviewParticipant.forUser(DOCUMENT_ID, FOLLOWER_ID)));
+    RecordingSink sink = new RecordingSink();
+
+    service(sink)
+        .dispatch(
+            new ReviewEvent.WorkflowChanged(
+                DOCUMENT_ID, ACTOR_ID, "IN_REVIEW", "CHANGES_REQUESTED", true));
+
+    assertThat(sink.delivered)
+        .singleElement()
+        .satisfies(
+            intent ->
+                assertThat(intent.mailVars())
+                    .containsEntry("oldState", "Im Review")
+                    .containsEntry("newState", "Änderungen angefordert"));
+  }
+
+  @Test
+  @DisplayName("every notification's mail variables cover its template's placeholders")
+  void everyIntentCoversItsTemplatesPlaceholders() {
+    // Strict Mustache drops a mail whose variables miss a placeholder — which is how the
+    // review-deleted mail silently never went out before #853. Every intent type is built
+    // here and checked against its template's closed placeholder set.
+    seedMentionedFollower();
+    UUID other = UUID.randomUUID();
+    User follower = users.findAllById(List.of()).getFirst();
+    when(users.findById(FOLLOWER_ID)).thenReturn(Optional.of(follower));
+    List<ReviewEvent> events =
+        List.of(
+            new ReviewEvent.ParticipantAdded(DOCUMENT_ID, other, FOLLOWER_ID, null),
+            new ReviewEvent.AnnotationCreated(DOCUMENT_ID, other, ANNOTATION_ID),
+            new ReviewEvent.AnnotationDecided(DOCUMENT_ID, other, ANNOTATION_ID, true),
+            new ReviewEvent.AnnotationDismissed(DOCUMENT_ID, other, ANNOTATION_ID),
+            new ReviewEvent.CommentAdded(DOCUMENT_ID, other, ANNOTATION_ID, COMMENT_ID),
+            new ReviewEvent.VersionUploaded(DOCUMENT_ID, other, 2),
+            new ReviewEvent.WorkflowChanged(DOCUMENT_ID, other, "IN_REVIEW", "FINALIZED", true),
+            new ReviewEvent.ReviewDeleted(DOCUMENT_ID, other, FOLLOWER_ID, "Contract", false));
+    java.util.Set<NotificationType> seen = java.util.EnumSet.noneOf(NotificationType.class);
+    for (ReviewEvent event : events) {
+      // Once as is, once refusing mentions so the intent ranked below a mention shows up too.
+      for (NotificationType refused : new NotificationType[] {null, NotificationType.MENTION}) {
+        RecordingSink sink = new RecordingSink();
+        sink.refuse = refused;
+        service(sink).dispatch(event);
+        for (ReviewNotificationIntent intent : sink.delivered) {
+          seen.add(intent.type());
+          assertThat(intent.mailVars().keySet())
+              .as("%s variables", intent.type())
+              .containsAll(intent.template().placeholders());
+          assertThat(intent.mailLocale()).as("%s language", intent.type()).isEqualTo("en");
+        }
+      }
+    }
+    assertThat(seen).containsExactlyInAnyOrder(NotificationType.values());
   }
 
   // --- fixtures ------------------------------------------------------------

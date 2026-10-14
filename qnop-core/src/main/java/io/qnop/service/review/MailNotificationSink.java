@@ -65,10 +65,14 @@ public class MailNotificationSink implements ReviewNotificationSink {
     return !optedOut(recipient.getId(), intent.type());
   }
 
+  /**
+   * Sends in the recipient's mail language (issue #853), which the resolver already chose when it
+   * rendered the variables — so the template and its variables cannot disagree.
+   */
   @Override
   public void deliver(ReviewNotificationIntent intent) {
     mail.sendMailFromTemplate(
-        intent.template(), intent.recipient().getEmail(), intent.mailVars(), null);
+        intent.template(), intent.recipient().getEmail(), intent.mailVars(), intent.mailLocale());
   }
 
   /**

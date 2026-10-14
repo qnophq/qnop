@@ -24,6 +24,7 @@ import io.qnop.entity.User;
 import io.qnop.service.ApplicationSettingKey;
 import io.qnop.service.ApplicationSettingsService;
 import io.qnop.service.UserService;
+import io.qnop.service.mail.MailLocaleResolver;
 import io.qnop.service.mail.MailService;
 import io.qnop.service.mail.MailService.SendResult;
 import io.qnop.service.mail.MailTemplateKey;
@@ -47,16 +48,19 @@ public class PasswordResetFlowService {
   private final PasswordResetTokenService resetTokens;
   private final MailService mailService;
   private final ApplicationSettingsService settings;
+  private final MailLocaleResolver mailLocales;
 
   public PasswordResetFlowService(
       UserService userService,
       PasswordResetTokenService resetTokens,
       MailService mailService,
-      ApplicationSettingsService settings) {
+      ApplicationSettingsService settings,
+      MailLocaleResolver mailLocales) {
     this.userService = userService;
     this.resetTokens = resetTokens;
     this.mailService = mailService;
     this.settings = settings;
+    this.mailLocales = mailLocales;
   }
 
   /** Whether this deployment offers a self-service reset at all (issue #713). */
@@ -106,7 +110,9 @@ public class PasswordResetFlowService {
     return sendResetEmail(user, template);
   }
 
+  /** Written in the recipient's mail language (issue #853), the admin-initiated ones included. */
   private SetupLinkOutcome sendResetEmail(User user, MailTemplateKey template) {
+    String locale = mailLocales.forUser(user.getId());
     var issued = resetTokens.issue(user);
     String actionUrl =
         baseUrl()
@@ -120,8 +126,8 @@ public class PasswordResetFlowService {
                 "siteName", siteName(),
                 "recipientName", user.getDisplayName(),
                 "actionUrl", actionUrl,
-                "expiresAtHuman", RelativeTimePhrase.until(issued.expiresAt())),
-            null);
+                "expiresAtHuman", RelativeTimePhrase.until(issued.expiresAt(), locale)),
+            locale);
     return new SetupLinkOutcome(result instanceof SendResult.Sent, actionUrl);
   }
 
