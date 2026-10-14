@@ -712,21 +712,36 @@
       "custom": "Personnalisé",
       "default": "Par défaut"
     },
+    "localeStatus": {
+      "custom": "Personnalisé",
+      "shipped": "Intégré",
+      "fallback": "Manquant — envoi en anglais"
+    },
     "list": {
       "columns": {
-        "template": "Modèle",
-        "subject": "Objet",
-        "language": "Langue",
-        "source": "Source",
-        "lastEdited": "Dernière modification"
+        "template": "Modèle"
       },
-      "rowAria": "Modifier le modèle {{name}}",
-      "editedBy": "par {{name}}",
       "loadError": "Les modèles d’e-mail n’ont pas pu être chargés.",
       "empty": "Aucun modèle d’e-mail."
     },
+    "matrix": {
+      "cellAria": "{{name}} en {{language}} : {{status}}",
+      "cellAriaDefault": "{{name}} en {{language}} (langue par défaut) : {{status}}",
+      "edited": "Modifié {{when}}",
+      "editedBy": "Modifié {{when}} par {{name}}",
+      "fallbackShort": "→ {{code}}",
+      "defaultLanguage": "Langue par défaut",
+      "defaultLanguageLegend": "Langue par défaut (pour les destinataires sans langue définie)"
+    },
     "edit": {
       "loadError": "Ce modèle n’a pas pu être chargé. <back>Retour aux modèles</back>",
+      "unsupportedLanguage": "Les modèles d’e-mail ne sont pas proposés dans cette langue. <back>Ouvrir la langue par défaut</back>",
+      "languages": "Langue du modèle",
+      "languageTooltip": "{{language}} — {{status}}",
+      "languageTooltipDefault": "{{language}} (langue par défaut) — {{status}}",
+      "languageAria": "{{language}}, {{status}}",
+      "languageAriaDefault": "{{language}} (langue par défaut), {{status}}",
+      "fallbackNotice": "qnop ne fournit pas ce modèle en {{language}} : les e-mails en {{language}} partent donc actuellement avec le texte anglais affiché ici. L’enregistrement crée une version en {{language}}.",
       "edited": "— modifié {{when}}",
       "editedBy": "— modifié {{when}} par {{name}}",
       "variables": {
@@ -759,9 +774,14 @@
       "resetFailed": "Le modèle n’a pas pu être réinitialisé.",
       "reset": {
         "title": "Réinitialiser le modèle",
-        "message": "Abandonner le modèle personnalisé « {{name}} » et revenir au modèle intégré par défaut ? Cette action est irréversible."
+        "message": "Abandonner la version personnalisée en {{language}} du modèle « {{name}} » et revenir au modèle intégré par défaut ? Cette action est irréversible."
       },
-      "testHelper": "Envoie ce modèle, rendu avec le brouillon actuel et des données d’exemple."
+      "testHelper": "Envoie ce modèle, rendu avec le brouillon actuel et des données d’exemple.",
+      "switchLanguage": {
+        "title": "Abandonner les modifications non enregistrées ?",
+        "message": "Vos modifications de la version en {{language}} ne sont pas enregistrées. Passer à la version en {{target}} et les abandonner ?",
+        "confirm": "Abandonner et changer"
+      }
     },
     "compare": "Comparer avec {{target}}",
     "preview": {

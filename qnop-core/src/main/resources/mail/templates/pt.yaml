@@ -1,0 +1,250 @@
+# Copyright (c) 2026-present devtank42 GmbH
+# SPDX-License-Identifier: AGPL-3.0-only
+#
+# Shipped Brazilian Portuguese defaults of every mail template (issue #853).
+# English is authoritative in io.qnop.service.mail.MailTemplateKey; this file
+# mirrors it key for key, with the same placeholders and the same HTML structure
+# and inline styles. Loaded and validated at startup by MailTemplateDefaults:
+# every template key and field must be present, and only the key's own
+# placeholders may appear.
+#
+# Style: pt-BR, the reader is addressed as "você", gender-neutral phrasing where
+# possible, terminology as in qnop-ui/src/i18n/pt, “…” quotes (&#8220;…&#8221; in
+# HTML), em dash with spaces. An admin-edited row in the mail_template table still
+# wins over these defaults.
+
+auth.registration_verification:
+  subject: "Confirme sua conta no {{siteName}}"
+  bodyPlain: |
+    Olá, {{recipientName}},
+
+    Confirme seu endereço de e-mail para ativar sua conta no {{siteName}}:
+
+    {{actionUrl}}
+
+    Este link expira {{expiresAtHuman}}. Se você não criou esta conta, pode simplesmente ignorar esta mensagem.
+  bodyHtmlContent: |
+    <h1 style="margin:0 0 14px;color:#18191f;font-size:22px;font-weight:700;letter-spacing:-0.01em;line-height:1.3;">Confirme seu e-mail</h1>
+    <p style="margin:0 0 14px;">Olá, {{recipientName}},</p>
+    <p style="margin:0 0 14px;">Confirme este endereço para ativar sua conta no <strong style="color:#18191f;">{{siteName}}</strong>.</p>
+    <p style="margin:0;color:#9a9ea8;font-size:13px;">Este link expira {{expiresAtHuman}}. Se você não criou esta conta, pode ignorar este e-mail.</p>
+  ctaLabel: "Confirmar endereço de e-mail"
+  preheader: "Confirme seu e-mail para ativar sua conta no {{siteName}}."
+
+auth.password_reset:
+  subject: "Redefina sua senha do {{siteName}}"
+  bodyPlain: |
+    Olá, {{recipientName}},
+
+    Recebemos um pedido para redefinir sua senha do {{siteName}}. Escolha uma nova aqui:
+
+    {{actionUrl}}
+
+    Este link expira {{expiresAtHuman}}. Se você não fez esse pedido, pode simplesmente ignorar esta mensagem; sua senha continua a mesma.
+  bodyHtmlContent: |
+    <h1 style="margin:0 0 14px;color:#18191f;font-size:22px;font-weight:700;letter-spacing:-0.01em;line-height:1.3;">Redefina sua senha</h1>
+    <p style="margin:0 0 14px;">Olá, {{recipientName}},</p>
+    <p style="margin:0 0 14px;">Recebemos um pedido para redefinir sua senha do <strong style="color:#18191f;">{{siteName}}</strong>. Escolha uma nova abaixo.</p>
+    <p style="margin:0;color:#9a9ea8;font-size:13px;">Este link expira {{expiresAtHuman}}. Se você não fez esse pedido, ignore este e-mail — sua senha continua a mesma.</p>
+  ctaLabel: "Escolher uma nova senha"
+  preheader: "Redefina sua senha do {{siteName}}."
+
+auth.admin_password_reset:
+  subject: "Um administrador redefiniu sua senha do {{siteName}}"
+  bodyPlain: |
+    Olá, {{recipientName}},
+
+    Um administrador redefiniu sua senha do {{siteName}}. Defina uma nova para entrar novamente:
+
+    {{actionUrl}}
+
+    Este link expira {{expiresAtHuman}}.
+  bodyHtmlContent: |
+    <h1 style="margin:0 0 14px;color:#18191f;font-size:22px;font-weight:700;letter-spacing:-0.01em;line-height:1.3;">Defina uma nova senha</h1>
+    <p style="margin:0 0 14px;">Olá, {{recipientName}},</p>
+    <p style="margin:0 0 14px;">Um administrador redefiniu sua senha do <strong style="color:#18191f;">{{siteName}}</strong>. Defina uma nova para entrar novamente.</p>
+    <p style="margin:0;color:#9a9ea8;font-size:13px;">Este link expira {{expiresAtHuman}}.</p>
+  ctaLabel: "Definir uma nova senha"
+  preheader: "Um administrador redefiniu sua senha do {{siteName}}."
+
+review.participant_added:
+  subject: "Você agora participa da revisão de “{{documentTitle}}”"
+  bodyPlain: |
+    Olá, {{recipientName}},
+
+    {{actorName}} adicionou você como revisor em “{{documentTitle}}” ({{siteName}}).
+
+    Abra a revisão para ver o documento e a discussão:
+
+    {{actionUrl}}
+  bodyHtmlContent: |
+    <h1 style="margin:0 0 14px;color:#18191f;font-size:22px;font-weight:700;letter-spacing:-0.01em;line-height:1.3;">Você faz parte de uma revisão</h1>
+    <p style="margin:0 0 14px;">Olá, {{recipientName}},</p>
+    <p style="margin:0 0 14px;"><strong style="color:#18191f;">{{actorName}}</strong> adicionou você como revisor em <strong style="color:#18191f;">&#8220;{{documentTitle}}&#8221;</strong>.</p>
+    <p style="margin:0;color:#9a9ea8;font-size:13px;">Abra a revisão para ver o documento e a discussão.</p>
+  ctaLabel: "Abrir revisão"
+  preheader: "{{actorName}} adicionou você como revisor em “{{documentTitle}}”."
+
+review.daily_digest:
+  subject: "Resumo diário: {{totalPhrase}} nas suas revisões"
+  bodyPlain: |
+    Olá, {{recipientName}},
+
+    Veja o que aconteceu nas suas revisões desde o último resumo — {{totalPhrase}} no total:
+
+    {{digestBody}}
+
+    Abra suas revisões:
+
+    {{actionUrl}}
+
+    Você recebe um resumo por dia porque essa é a sua configuração de notificações; no seu perfil, você pode mudar para um e-mail por evento ou desativá-los.
+  bodyHtmlContent: |
+    <h1 style="margin:0 0 14px;color:#18191f;font-size:22px;font-weight:700;letter-spacing:-0.01em;line-height:1.3;">Seu resumo de revisões</h1>
+    <p style="margin:0 0 14px;color:#3d3f47;font-size:15px;line-height:1.6;">Olá, {{recipientName}}, veja o que aconteceu nas suas revisões desde o último resumo — {{totalPhrase}} no total.</p>
+    {{{digestBodyHtml}}}
+    <p style="margin:22px 0 0;"><a href="{{actionUrl}}" style="display:inline-block;padding:11px 18px;border-radius:8px;background:#18191f;color:#ffffff;font-size:15px;font-weight:600;text-decoration:none;">Abrir suas revisões</a></p>
+    <p style="margin:22px 0 0;color:#6b6d76;font-size:13px;line-height:1.6;">Você recebe um resumo por dia porque essa é a sua configuração de notificações; no seu perfil, você pode mudar para um e-mail por evento ou desativá-los.</p>
+  ctaLabel: "Abrir suas revisões"
+  preheader: "{{totalPhrase}} nas suas revisões desde o último resumo."
+
+review.annotation_created:
+  subject: "Nova anotação em “{{documentTitle}}”"
+  bodyPlain: |
+    Olá, {{recipientName}},
+
+    {{actorName}} criou uma nova anotação em “{{documentTitle}}” ({{siteName}}):
+
+    “{{annotationExcerpt}}”
+
+    Abra a anotação:
+
+    {{actionUrl}}
+  bodyHtmlContent: |
+    <h1 style="margin:0 0 14px;color:#18191f;font-size:22px;font-weight:700;letter-spacing:-0.01em;line-height:1.3;">Nova anotação</h1>
+    <p style="margin:0 0 14px;">Olá, {{recipientName}},</p>
+    <p style="margin:0 0 14px;"><strong style="color:#18191f;">{{actorName}}</strong> criou uma nova anotação em <strong style="color:#18191f;">&#8220;{{documentTitle}}&#8221;</strong>:</p>
+    <p style="margin:0 0 14px;padding:10px 14px;border-left:3px solid #d5d9e0;color:#5a5f6a;">{{annotationExcerpt}}</p>
+    <p style="margin:0;color:#9a9ea8;font-size:13px;">Abra a anotação para responder ou resolvê-la.</p>
+  ctaLabel: "Abrir anotação"
+  preheader: "{{actorName}} criou uma nova anotação em “{{documentTitle}}”."
+
+# {{decision}} is a feminine past participle agreeing with "anotação" (resolvida,
+# descartada, reaberta), so every sentence uses it passively: "foi {{decision}}".
+review.annotation_decided:
+  subject: "Uma anotação em “{{documentTitle}}” foi {{decision}}"
+  bodyPlain: |
+    Olá, {{recipientName}},
+
+    Uma anotação em “{{documentTitle}}” ({{siteName}}) foi {{decision}} por {{actorName}}:
+
+    “{{annotationExcerpt}}”
+
+    Abra a anotação:
+
+    {{actionUrl}}
+  bodyHtmlContent: |
+    <h1 style="margin:0 0 14px;color:#18191f;font-size:22px;font-weight:700;letter-spacing:-0.01em;line-height:1.3;">Anotação {{decision}}</h1>
+    <p style="margin:0 0 14px;">Olá, {{recipientName}},</p>
+    <p style="margin:0 0 14px;">Uma anotação em <strong style="color:#18191f;">&#8220;{{documentTitle}}&#8221;</strong> foi {{decision}} por <strong style="color:#18191f;">{{actorName}}</strong>:</p>
+    <p style="margin:0 0 14px;padding:10px 14px;border-left:3px solid #d5d9e0;color:#5a5f6a;">{{annotationExcerpt}}</p>
+    <p style="margin:0;color:#9a9ea8;font-size:13px;">Abra a anotação para ver a discussão.</p>
+  ctaLabel: "Abrir anotação"
+  preheader: "Uma anotação em “{{documentTitle}}” foi {{decision}}."
+
+review.comment_added:
+  subject: "Nova resposta em “{{documentTitle}}”"
+  bodyPlain: |
+    Olá, {{recipientName}},
+
+    {{actorName}} respondeu a uma discussão que você acompanha em “{{documentTitle}}” ({{siteName}}):
+
+    “{{commentExcerpt}}”
+
+    Abra a resposta:
+
+    {{actionUrl}}
+  bodyHtmlContent: |
+    <h1 style="margin:0 0 14px;color:#18191f;font-size:22px;font-weight:700;letter-spacing:-0.01em;line-height:1.3;">Nova resposta</h1>
+    <p style="margin:0 0 14px;">Olá, {{recipientName}},</p>
+    <p style="margin:0 0 14px;"><strong style="color:#18191f;">{{actorName}}</strong> respondeu a uma discussão que você acompanha em <strong style="color:#18191f;">&#8220;{{documentTitle}}&#8221;</strong>:</p>
+    <p style="margin:0 0 14px;padding:10px 14px;border-left:3px solid #d5d9e0;color:#5a5f6a;">{{commentExcerpt}}</p>
+    <p style="margin:0;color:#9a9ea8;font-size:13px;">Abra a discussão para responder.</p>
+  ctaLabel: "Abrir resposta"
+  preheader: "{{actorName}} respondeu em “{{documentTitle}}”."
+
+review.workflow_changed:
+  subject: "“{{documentTitle}}” passou para “{{newState}}”"
+  bodyPlain: |
+    Olá, {{recipientName}},
+
+    A revisão “{{documentTitle}}” ({{siteName}}) mudou de status: {{oldState}} -> {{newState}}.
+
+    Abra a revisão:
+
+    {{actionUrl}}
+  bodyHtmlContent: |
+    <h1 style="margin:0 0 14px;color:#18191f;font-size:22px;font-weight:700;letter-spacing:-0.01em;line-height:1.3;">Mudança de status da revisão</h1>
+    <p style="margin:0 0 14px;">Olá, {{recipientName}},</p>
+    <p style="margin:0 0 14px;"><strong style="color:#18191f;">&#8220;{{documentTitle}}&#8221;</strong> mudou de status: {{oldState}} &#8594; <strong style="color:#18191f;">{{newState}}</strong>.</p>
+    <p style="margin:0;color:#9a9ea8;font-size:13px;">Abra a revisão para ver os detalhes.</p>
+  ctaLabel: "Abrir revisão"
+  preheader: "“{{documentTitle}}” passou para “{{newState}}”."
+
+review.deleted:
+  subject: "A revisão “{{documentTitle}}” foi excluída"
+  bodyPlain: |
+    Olá, {{recipientName}},
+
+    Sua revisão “{{documentTitle}}” ({{siteName}}) foi excluída permanentemente por um administrador.
+
+    Tudo o que havia nela foi removido: cada versão, cada anotação e cada discussão. Esta ação não pode ser desfeita.
+
+    Se você não esperava por isso, fale com seu administrador — a exclusão está registrada na trilha de auditoria.
+  bodyHtmlContent: |
+    <h1 style="margin:0 0 14px;color:#18191f;font-size:22px;font-weight:700;letter-spacing:-0.01em;line-height:1.3;">Revisão excluída</h1>
+    <p style="margin:0 0 14px;">Olá, {{recipientName}},</p>
+    <p style="margin:0 0 14px;">Sua revisão <strong style="color:#18191f;">&#8220;{{documentTitle}}&#8221;</strong> foi excluída permanentemente por um administrador.</p>
+    <p style="margin:0 0 14px;">Tudo o que havia nela foi removido &#8212; cada versão, cada anotação e cada discussão. Esta ação não pode ser desfeita.</p>
+    <p style="margin:0;color:#9a9ea8;font-size:13px;">Se você não esperava por isso, fale com seu administrador; a exclusão está registrada na trilha de auditoria.</p>
+  # No call to action, as in English: there is nothing left to open (issue #421).
+  preheader: "A revisão “{{documentTitle}}” foi excluída permanentemente."
+
+review.version_uploaded:
+  subject: "Nova versão de “{{documentTitle}}” — v{{versionNumber}}"
+  bodyPlain: |
+    Olá, {{recipientName}},
+
+    {{actorName}} enviou a versão {{versionNumber}} de “{{documentTitle}}” ({{siteName}}).
+
+    As anotações existentes estão sendo reancoradas no novo texto. Abra a revisão para continuar:
+
+    {{actionUrl}}
+  bodyHtmlContent: |
+    <h1 style="margin:0 0 14px;color:#18191f;font-size:22px;font-weight:700;letter-spacing:-0.01em;line-height:1.3;">Nova versão do documento</h1>
+    <p style="margin:0 0 14px;">Olá, {{recipientName}},</p>
+    <p style="margin:0 0 14px;"><strong style="color:#18191f;">{{actorName}}</strong> enviou a versão <strong style="color:#18191f;">v{{versionNumber}}</strong> de <strong style="color:#18191f;">&#8220;{{documentTitle}}&#8221;</strong>.</p>
+    <p style="margin:0;color:#9a9ea8;font-size:13px;">As anotações existentes estão sendo reancoradas no novo texto. Abra a revisão para continuar.</p>
+  ctaLabel: "Abrir nova versão"
+  preheader: "{{actorName}} enviou a v{{versionNumber}} de “{{documentTitle}}”."
+
+review.mention:
+  subject: "{{actorName}} mencionou você em “{{documentTitle}}”"
+  bodyPlain: |
+    Olá, {{recipientName}},
+
+    {{actorName}} mencionou você em uma discussão em “{{documentTitle}}” ({{siteName}}):
+
+    “{{commentExcerpt}}”
+
+    Abra o comentário para responder:
+
+    {{actionUrl}}
+  bodyHtmlContent: |
+    <h1 style="margin:0 0 14px;color:#18191f;font-size:22px;font-weight:700;letter-spacing:-0.01em;line-height:1.3;">Mencionaram você</h1>
+    <p style="margin:0 0 14px;">Olá, {{recipientName}},</p>
+    <p style="margin:0 0 14px;"><strong style="color:#18191f;">{{actorName}}</strong> mencionou você em uma discussão em <strong style="color:#18191f;">&#8220;{{documentTitle}}&#8221;</strong>:</p>
+    <p style="margin:0 0 14px;padding:10px 14px;border-left:3px solid #d5d9e0;color:#5a5f6a;">{{commentExcerpt}}</p>
+    <p style="margin:0;color:#9a9ea8;font-size:13px;">Abra o comentário para responder.</p>
+  ctaLabel: "Abrir comentário"
+  preheader: "{{actorName}} mencionou você em “{{documentTitle}}”."

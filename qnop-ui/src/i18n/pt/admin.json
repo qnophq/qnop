@@ -712,21 +712,36 @@
       "custom": "Personalizado",
       "default": "Padrão"
     },
+    "localeStatus": {
+      "custom": "Personalizado",
+      "shipped": "Integrado",
+      "fallback": "Ausente — enviado em inglês"
+    },
     "list": {
       "columns": {
-        "template": "Modelo",
-        "subject": "Assunto",
-        "language": "Idioma",
-        "source": "Origem",
-        "lastEdited": "Última edição"
+        "template": "Modelo"
       },
-      "rowAria": "Editar o modelo {{name}}",
-      "editedBy": "por {{name}}",
       "loadError": "Não foi possível carregar os modelos de e-mail.",
       "empty": "Nenhum modelo de e-mail."
     },
+    "matrix": {
+      "cellAria": "{{name}} em {{language}}: {{status}}",
+      "cellAriaDefault": "{{name}} em {{language}} (idioma padrão): {{status}}",
+      "edited": "Editado {{when}}",
+      "editedBy": "Editado {{when}} por {{name}}",
+      "fallbackShort": "→ {{code}}",
+      "defaultLanguage": "Idioma padrão",
+      "defaultLanguageLegend": "Idioma padrão (para destinatários sem idioma próprio)"
+    },
     "edit": {
       "loadError": "Não foi possível carregar este modelo. <back>Voltar para os modelos</back>",
+      "unsupportedLanguage": "Os modelos de e-mail não estão disponíveis neste idioma. <back>Abrir o idioma padrão</back>",
+      "languages": "Idioma do modelo",
+      "languageTooltip": "{{language}} — {{status}}",
+      "languageTooltipDefault": "{{language}} (idioma padrão) — {{status}}",
+      "languageAria": "{{language}}, {{status}}",
+      "languageAriaDefault": "{{language}} (idioma padrão), {{status}}",
+      "fallbackNotice": "O qnop não inclui este modelo em {{language}}, então os e-mails em {{language}} saem agora com o texto em inglês mostrado aqui. Ao salvar, você cria uma versão em {{language}}.",
       "edited": "— editado {{when}}",
       "editedBy": "— editado {{when}} por {{name}}",
       "variables": {
@@ -759,9 +774,14 @@
       "resetFailed": "Não foi possível restaurar o modelo.",
       "reset": {
         "title": "Restaurar modelo",
-        "message": "Descartar o modelo personalizado “{{name}}” e voltar ao padrão integrado? Esta ação não pode ser desfeita."
+        "message": "Descartar a versão personalizada em {{language}} de “{{name}}” e voltar ao padrão integrado? Esta ação não pode ser desfeita."
       },
-      "testHelper": "Envia este modelo renderizado com o rascunho atual e dados de exemplo."
+      "testHelper": "Envia este modelo renderizado com o rascunho atual e dados de exemplo.",
+      "switchLanguage": {
+        "title": "Descartar alterações não salvas?",
+        "message": "Suas alterações na versão em {{language}} não foram salvas. Mudar para {{target}} e descartá-las?",
+        "confirm": "Descartar e mudar"
+      }
     },
     "compare": "Comparar com {{target}}",
     "preview": {

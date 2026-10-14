@@ -19,11 +19,11 @@
  * SPDX-License-Identifier: AGPL-3.0-only
  */
 
-import type { KeyboardEvent } from 'react';
 import Alert from '@mui/material/Alert';
 import Box from '@mui/material/Box';
 import LinearProgress from '@mui/material/LinearProgress';
 import Paper from '@mui/material/Paper';
+import Stack from '@mui/material/Stack';
 import Table from '@mui/material/Table';
 import TableBody from '@mui/material/TableBody';
 import TableCell from '@mui/material/TableCell';
@@ -31,129 +31,339 @@ import TableHead from '@mui/material/TableHead';
 import TableRow from '@mui/material/TableRow';
 import Tooltip from '@mui/material/Tooltip';
 import Typography from '@mui/material/Typography';
-import { ChevronRight } from 'lucide-react';
-import type { ParseKeys } from 'i18next';
+import useMediaQuery from '@mui/material/useMediaQuery';
+import { alpha, useTheme, type Theme } from '@mui/material/styles';
+import { Star } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
-import { useNavigate } from 'react-router';
-import type { MailTemplateResponse } from '../../api/generated';
+import { Link as RouterLink } from 'react-router';
+import type { MailTemplateResponse, MailTemplateVariant } from '../../api/generated';
 import { useMailTemplates } from '../../api/hooks/useMailTemplates';
-import { ToneBadge } from '../../components/admin/ToneBadge';
+import { LocaleStatusMark } from '../../components/admin/mail/locale/LocaleStatusMark';
+import {
+  MAIL_LOCALE_STATUS_LABELS,
+  mailLocaleStatus,
+  type MailLocaleStatus,
+} from '../../components/admin/mail/locale/mailLocaleStatus';
+import { mailTemplatePath } from '../../components/admin/mail/locale/mailTemplatePath';
 import { useFormatters } from '../../hooks/useFormatters';
+import { useUiStore } from '../../stores/uiStore';
 import { localeDisplayName, localeShortCode } from '../../utils/locale';
 
-/** Column headers as `admin` keys; `null` is the unlabelled chevron column. */
-const COLUMNS: Array<ParseKeys<'admin'> | null> = [
-  'mailTemplates.list.columns.template',
-  'mailTemplates.list.columns.subject',
-  'mailTemplates.list.columns.language',
-  'mailTemplates.list.columns.source',
-  'mailTemplates.list.columns.lastEdited',
-  null,
-];
+/** The default-language column reads as the anchor of the matrix: a faint brand tint. */
+const defaultColumnTint = (theme: Theme) => alpha(theme.qnop.brand.blue, 0.05);
 
-/** A compact, navigable template row: name + key, subject, language, source and edit attribution. */
-function TemplateRow({ template, onOpen }: { template: MailTemplateResponse; onOpen: () => void }) {
+/** One status for one language: what the tooltip and the accessible name say. */
+function useVariantDescription() {
   const { t } = useTranslation('admin');
   const { formatRelative } = useFormatters();
-  const customised = template.source === 'DATABASE';
-  const onKeyDown = (event: KeyboardEvent<HTMLTableRowElement>) => {
-    if (event.key === 'Enter' || event.key === ' ') {
-      event.preventDefault();
-      onOpen();
-    }
+  const uiLocale = useUiStore((s) => s.locale);
+  return (template: MailTemplateResponse, variant: MailTemplateVariant) => {
+    const language = localeDisplayName(variant.locale, uiLocale);
+    const status = t(MAIL_LOCALE_STATUS_LABELS[mailLocaleStatus(variant)]);
+    const edited =
+      variant.source === 'DATABASE'
+        ? variant.updatedByName
+          ? t('mailTemplates.matrix.editedBy', {
+              when: formatRelative(variant.updatedAt),
+              name: variant.updatedByName,
+            })
+          : t('mailTemplates.matrix.edited', { when: formatRelative(variant.updatedAt) })
+        : null;
+    return {
+      label: t(
+        variant.instanceDefault
+          ? 'mailTemplates.matrix.cellAriaDefault'
+          : 'mailTemplates.matrix.cellAria',
+        { name: template.friendlyName, language, status },
+      ),
+      language,
+      status,
+      edited,
+    };
   };
+}
 
+/** A matrix cell: the whole cell links to the editor in that language. */
+function VariantCell({
+  template,
+  variant,
+}: {
+  template: MailTemplateResponse;
+  variant: MailTemplateVariant;
+}) {
+  const { t } = useTranslation('admin');
+  const describe = useVariantDescription();
+  const { label, language, status, edited } = describe(template, variant);
+  const kind = mailLocaleStatus(variant);
   return (
-    <TableRow
-      hover
-      tabIndex={0}
-      onClick={onOpen}
-      onKeyDown={onKeyDown}
-      aria-label={t('mailTemplates.list.rowAria', { name: template.friendlyName })}
+    <TableCell
+      align="center"
+      sx={{ p: 0, bgcolor: variant.instanceDefault ? defaultColumnTint : undefined }}
+    >
+      <Tooltip
+        title={
+          <Box sx={{ py: 0.25 }}>
+            <Typography sx={{ fontSize: 12, fontWeight: 600 }}>
+              {t('mailTemplates.edit.languageTooltip', { language, status })}
+            </Typography>
+            <Typography sx={{ fontSize: 12, fontFamily: 'monospace' }}>
+              {variant.subject}
+            </Typography>
+            {edited && <Typography sx={{ fontSize: 12, opacity: 0.8 }}>{edited}</Typography>}
+          </Box>
+        }
+      >
+        <Box
+          component={RouterLink}
+          to={mailTemplatePath(template.key, variant.locale)}
+          aria-label={label}
+          sx={{
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: 0.5,
+            minHeight: 56,
+            px: 1,
+            color: 'inherit',
+            textDecoration: 'none',
+            transition: (theme) => theme.transitions.create(['background-color']),
+            '&:hover': { bgcolor: 'action.hover' },
+            '&:hover [data-status]': { transform: 'scale(1.25)' },
+            '& [data-status]': {
+              transition: (theme) => theme.transitions.create(['transform']),
+            },
+            '&:focus-visible': {
+              outline: (theme) => `2px solid ${theme.qnop.brand.blue}`,
+              outlineOffset: '-2px',
+            },
+          }}
+        >
+          <LocaleStatusMark status={kind} size={12} />
+          <FallbackHint status={kind} />
+        </Box>
+      </Tooltip>
+    </TableCell>
+  );
+}
+
+/** Under a fallback mark: "→ EN", so the gap reads without hovering. */
+function FallbackHint({ status }: { status: MailLocaleStatus }) {
+  const { t } = useTranslation('admin');
+  const theme = useTheme();
+  if (status !== 'fallback') return null;
+  const amber = theme.qnop.badge.amber;
+  return (
+    <Typography
+      component="span"
+      aria-hidden
       sx={{
-        cursor: 'pointer',
-        '& td': { borderColor: 'divider' },
-        '&:hover .row-chevron': { opacity: 1, transform: 'translateX(2px)' },
-        '&:focus-visible': {
-          outline: (theme) => `2px solid ${theme.qnop.brand.blue}`,
-          outlineOffset: '-2px',
-        },
+        fontSize: 10.5,
+        fontWeight: 600,
+        letterSpacing: '0.04em',
+        lineHeight: 1,
+        color: theme.palette.mode === 'dark' ? amber.fgDark : amber.fg,
       }}
     >
-      <TableCell sx={{ minWidth: 200 }}>
-        <Typography sx={{ fontSize: 14, fontWeight: 600 }}>{template.friendlyName}</Typography>
-        <Typography sx={{ fontSize: 12, fontFamily: 'monospace', color: 'text.secondary' }} noWrap>
-          {template.key}
-        </Typography>
-      </TableCell>
+      {t('mailTemplates.matrix.fallbackShort', { code: localeShortCode('en') })}
+    </Typography>
+  );
+}
 
-      <TableCell sx={{ maxWidth: 280 }}>
-        <Typography sx={{ fontSize: 13, color: 'text.secondary' }} noWrap title={template.subject}>
-          {template.subject}
-        </Typography>
-      </TableCell>
-
-      <TableCell>
-        <Tooltip title={localeDisplayName(template.locale)}>
-          <Box component="span" sx={{ display: 'inline-flex' }}>
-            <ToneBadge tone="neutral" label={localeShortCode(template.locale)} />
-          </Box>
-        </Tooltip>
-      </TableCell>
-
-      <TableCell>
-        <ToneBadge
-          tone={customised ? 'blue' : 'neutral'}
-          label={customised ? t('mailTemplates.source.custom') : t('mailTemplates.source.default')}
-        />
-      </TableCell>
-
-      <TableCell sx={{ whiteSpace: 'nowrap' }}>
-        {customised ? (
-          <>
-            <Typography sx={{ fontSize: 13 }}>{formatRelative(template.updatedAt)}</Typography>
-            {template.updatedByName && (
-              <Typography sx={{ fontSize: 12, color: 'text.secondary' }}>
-                {t('mailTemplates.list.editedBy', { name: template.updatedByName })}
-              </Typography>
-            )}
-          </>
-        ) : (
-          <Typography sx={{ fontSize: 13, color: 'text.disabled' }}>—</Typography>
-        )}
-      </TableCell>
-
-      <TableCell align="right" sx={{ width: 44 }}>
-        <Box
-          className="row-chevron"
-          sx={{
-            display: 'inline-flex',
-            color: 'text.secondary',
-            opacity: 0.5,
-            transition: (theme) => theme.transitions.create(['transform', 'opacity']),
-          }}
-          aria-hidden
+/** A column header: the language code, its name below, a star on the default language. */
+function LocaleHeader({ locale, isDefault }: { locale: string; isDefault: boolean }) {
+  const { t } = useTranslation('admin');
+  const uiLocale = useUiStore((s) => s.locale);
+  const name = localeDisplayName(locale, uiLocale);
+  return (
+    <TableCell
+      align="center"
+      sx={{
+        width: 84,
+        verticalAlign: 'bottom',
+        bgcolor: isDefault ? defaultColumnTint : undefined,
+      }}
+    >
+      <Stack spacing={0.25} sx={{ alignItems: 'center' }}>
+        <Stack direction="row" spacing={0.5} sx={{ alignItems: 'center' }}>
+          {isDefault && (
+            <Tooltip title={t('mailTemplates.matrix.defaultLanguage')}>
+              <Box
+                component="span"
+                sx={{ display: 'inline-flex', color: (theme) => theme.qnop.brand.blue }}
+              >
+                <Star size={12} fill="currentColor" aria-hidden />
+              </Box>
+            </Tooltip>
+          )}
+          <Typography
+            component="span"
+            sx={{ fontSize: 13, fontWeight: 700, fontFamily: 'monospace', letterSpacing: '0.06em' }}
+          >
+            {localeShortCode(locale)}
+          </Typography>
+        </Stack>
+        <Typography
+          component="span"
+          noWrap
+          sx={{ fontSize: 11, color: 'text.secondary', maxWidth: 80 }}
         >
-          <ChevronRight size={18} />
+          {name}
+        </Typography>
+      </Stack>
+    </TableCell>
+  );
+}
+
+/** The template's name and key; the name links to the editor in the default language. */
+function TemplateName({
+  template,
+  defaultLocale,
+}: {
+  template: MailTemplateResponse;
+  defaultLocale: string;
+}) {
+  return (
+    <>
+      <Typography
+        component={RouterLink}
+        to={mailTemplatePath(template.key, defaultLocale)}
+        sx={{
+          fontSize: 14,
+          fontWeight: 600,
+          color: 'text.primary',
+          textDecoration: 'none',
+          '&:hover': { textDecoration: 'underline' },
+        }}
+      >
+        {template.friendlyName}
+      </Typography>
+      <Typography sx={{ fontSize: 12, fontFamily: 'monospace', color: 'text.secondary' }} noWrap>
+        {template.key}
+      </Typography>
+    </>
+  );
+}
+
+/** The marks explained, once, under the matrix. */
+function Legend() {
+  const { t } = useTranslation('admin');
+  const statuses: MailLocaleStatus[] = ['custom', 'shipped', 'fallback'];
+  return (
+    <Stack
+      direction="row"
+      useFlexGap
+      spacing={2.5}
+      sx={{
+        flexWrap: 'wrap',
+        alignItems: 'center',
+        px: 2,
+        py: 1.5,
+        borderTop: '1px solid',
+        borderColor: 'divider',
+        bgcolor: (theme) => theme.qnop.surface2,
+      }}
+    >
+      {statuses.map((status) => (
+        <Stack key={status} direction="row" spacing={0.75} sx={{ alignItems: 'center' }}>
+          <LocaleStatusMark status={status} />
+          <Typography sx={{ fontSize: 12.5, color: 'text.secondary' }}>
+            {t(MAIL_LOCALE_STATUS_LABELS[status])}
+          </Typography>
+        </Stack>
+      ))}
+      <Stack direction="row" spacing={0.75} sx={{ alignItems: 'center' }}>
+        <Box
+          component="span"
+          sx={{ display: 'inline-flex', color: (theme) => theme.qnop.brand.blue }}
+        >
+          <Star size={12} fill="currentColor" aria-hidden />
         </Box>
-      </TableCell>
-    </TableRow>
+        <Typography sx={{ fontSize: 12.5, color: 'text.secondary' }}>
+          {t('mailTemplates.matrix.defaultLanguageLegend')}
+        </Typography>
+      </Stack>
+    </Stack>
+  );
+}
+
+/** Narrow screens: one card per template, its languages as a row of linked chips. */
+function TemplateCards({
+  templates,
+  defaultLocale,
+}: {
+  templates: MailTemplateResponse[];
+  defaultLocale: string;
+}) {
+  const describe = useVariantDescription();
+  return (
+    <Stack component="ul" sx={{ listStyle: 'none', m: 0, p: 0 }}>
+      {templates.map((template) => (
+        <Box
+          component="li"
+          key={template.key}
+          sx={{ px: 2, py: 1.5, borderBottom: '1px solid', borderColor: 'divider' }}
+        >
+          <TemplateName template={template} defaultLocale={defaultLocale} />
+          <Stack direction="row" useFlexGap spacing={0.75} sx={{ flexWrap: 'wrap', mt: 1 }}>
+            {(template.variants ?? []).map((variant) => (
+              <Box
+                key={variant.locale}
+                component={RouterLink}
+                to={mailTemplatePath(template.key, variant.locale)}
+                aria-label={describe(template, variant).label}
+                sx={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: 0.75,
+                  px: 1,
+                  py: 0.5,
+                  borderRadius: 1,
+                  border: '1px solid',
+                  borderColor: variant.instanceDefault ? 'primary.main' : 'divider',
+                  color: 'text.primary',
+                  textDecoration: 'none',
+                  fontSize: 12,
+                  fontWeight: 700,
+                  fontFamily: 'monospace',
+                }}
+              >
+                <LocaleStatusMark status={mailLocaleStatus(variant)} />
+                {localeShortCode(variant.locale)}
+                {variant.instanceDefault && (
+                  <Box
+                    component="span"
+                    aria-hidden
+                    sx={{ display: 'inline-flex', color: (theme) => theme.qnop.brand.blue }}
+                  >
+                    <Star size={11} fill="currentColor" />
+                  </Box>
+                )}
+              </Box>
+            ))}
+          </Stack>
+        </Box>
+      ))}
+    </Stack>
   );
 }
 
 /**
- * Mail-templates list (issue #144), the Templates tab of the email admin area (#525): a compact,
- * navigable table over the closed registry — no "add" CTA. Templates are managed per language
- * (today only the configured default locale exists); the Language column anticipates the
- * per-locale variants i18n will add. Customised templates carry an edit attribution, built-ins
- * read as factory defaults. Opening a row routes to its editor.
+ * Mail-templates list (issue #144), the Templates tab of the email admin area (#525): every
+ * template of the closed registry against every language the editor offers (issue #853). Each
+ * cell shows by shape whether the language is customised, built in, or missing so that English
+ * stands in, and links to the editor in that language; the default language's column is tinted
+ * and starred. Narrow screens get one card per template instead of the matrix.
  */
 export function MailTemplatesListPage() {
   const { t } = useTranslation(['admin', 'common']);
   const { data, isLoading, isFetching, isError } = useMailTemplates();
-  const navigate = useNavigate();
+  const theme = useTheme();
+  const narrow = useMediaQuery(theme.breakpoints.down('sm'));
 
   const templates = data?.templates ?? [];
+  const locales = data?.locales ?? [];
+  const defaultLocale = data?.defaultLocale ?? 'en';
 
   return (
     <Paper variant="outlined" sx={{ overflow: 'hidden' }}>
@@ -162,25 +372,31 @@ export function MailTemplatesListPage() {
         <Alert severity="error" sx={{ m: 2 }}>
           {t('mailTemplates.list.loadError')}
         </Alert>
+      ) : narrow ? (
+        <TemplateCards templates={templates} defaultLocale={defaultLocale} />
       ) : (
-        <Table size="medium" sx={{ '& th': { borderColor: 'divider' } }}>
+        <Table size="medium" sx={{ '& th, & td': { borderColor: 'divider' } }}>
           <TableHead>
             <TableRow>
-              {COLUMNS.map((col, index) => (
-                <TableCell
-                  key={col ?? 'chevron'}
-                  align={index === COLUMNS.length - 1 ? 'right' : 'left'}
-                  sx={{ fontSize: 12, color: 'text.secondary', fontWeight: 600 }}
-                >
-                  {col && t(col)}
-                </TableCell>
+              <TableCell
+                sx={{
+                  fontSize: 12,
+                  color: 'text.secondary',
+                  fontWeight: 600,
+                  verticalAlign: 'bottom',
+                }}
+              >
+                {t('mailTemplates.list.columns.template')}
+              </TableCell>
+              {locales.map((locale) => (
+                <LocaleHeader key={locale} locale={locale} isDefault={locale === defaultLocale} />
               ))}
             </TableRow>
           </TableHead>
           <TableBody>
             {!isLoading && templates.length === 0 && (
               <TableRow>
-                <TableCell colSpan={COLUMNS.length}>
+                <TableCell colSpan={locales.length + 1}>
                   <Typography color="text.secondary" sx={{ py: 4, textAlign: 'center' }}>
                     {t('mailTemplates.list.empty')}
                   </Typography>
@@ -188,13 +404,14 @@ export function MailTemplatesListPage() {
               </TableRow>
             )}
             {templates.map((template) => (
-              <TemplateRow
-                key={template.key}
-                template={template}
-                onOpen={() =>
-                  navigate(`/admin/email/templates/${encodeURIComponent(template.key)}`)
-                }
-              />
+              <TableRow key={template.key} hover>
+                <TableCell sx={{ minWidth: 200 }}>
+                  <TemplateName template={template} defaultLocale={defaultLocale} />
+                </TableCell>
+                {(template.variants ?? []).map((variant) => (
+                  <VariantCell key={variant.locale} template={template} variant={variant} />
+                ))}
+              </TableRow>
             ))}
           </TableBody>
         </Table>
@@ -204,6 +421,7 @@ export function MailTemplatesListPage() {
           {t('common:loading')}
         </Typography>
       )}
+      {!isLoading && !isError && templates.length > 0 && <Legend />}
     </Paper>
   );
 }
