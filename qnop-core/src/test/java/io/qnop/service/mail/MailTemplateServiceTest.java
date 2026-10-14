@@ -36,6 +36,7 @@ import io.qnop.service.ApplicationSettingKey;
 import io.qnop.service.ApplicationSettingsService;
 import io.qnop.service.limits.FeatureDisabledException;
 import io.qnop.service.limits.FeatureToggleProperties;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
@@ -456,11 +457,11 @@ class MailTemplateServiceTest {
     noRows();
     when(settings.getString(ApplicationSettingKey.GENERAL_DEFAULT_LANGUAGE)).thenReturn("de");
 
-    assertThat(service.render(MailTemplateKey.PASSWORD_RESET, FLOW_VARS, "fr").subject())
+    assertThat(service.render(MailTemplateKey.PASSWORD_RESET, FLOW_VARS, "it").subject())
         .isEqualTo("Setze dein qnop-Passwort zurück");
 
     row(MailTemplateKey.PASSWORD_RESET, "de", "Standardsprache {{siteName}}");
-    assertThat(service.render(MailTemplateKey.PASSWORD_RESET, FLOW_VARS, "fr").subject())
+    assertThat(service.render(MailTemplateKey.PASSWORD_RESET, FLOW_VARS, "it").subject())
         .isEqualTo("Standardsprache qnop");
     // No language at all means the default language.
     assertThat(service.render(MailTemplateKey.PASSWORD_RESET, FLOW_VARS, null).subject())
@@ -471,11 +472,11 @@ class MailTemplateServiceTest {
   @DisplayName("with an English default an unshipped language reaches the English row, then enum")
   void unshippedLanguageWithEnglishDefault() {
     noRows();
-    assertThat(service.render(MailTemplateKey.PASSWORD_RESET, FLOW_VARS, "fr").subject())
+    assertThat(service.render(MailTemplateKey.PASSWORD_RESET, FLOW_VARS, "it").subject())
         .isEqualTo("Reset your qnop password");
 
     row(MailTemplateKey.PASSWORD_RESET, "en", "Custom English {{siteName}}");
-    assertThat(service.render(MailTemplateKey.PASSWORD_RESET, FLOW_VARS, "fr").subject())
+    assertThat(service.render(MailTemplateKey.PASSWORD_RESET, FLOW_VARS, "it").subject())
         .isEqualTo("Custom English qnop");
   }
 
@@ -574,12 +575,101 @@ class MailTemplateServiceTest {
   @DisplayName("a row-only language gets its own lang attribute; English chrome text by fallback")
   void rowOnlyLanguageKeepsItsLang() {
     noRows();
-    when(settings.getString(ApplicationSettingKey.GENERAL_DEFAULT_LANGUAGE)).thenReturn("fr");
-    row(MailTemplateKey.PASSWORD_RESET, "fr", "Réinitialiser {{siteName}}");
+    when(settings.getString(ApplicationSettingKey.GENERAL_DEFAULT_LANGUAGE)).thenReturn("it");
+    row(MailTemplateKey.PASSWORD_RESET, "it", "Reimposta {{siteName}}");
 
     RenderedMail mail = service.render(MailTemplateKey.PASSWORD_RESET, FLOW_VARS, null);
 
-    assertThat(mail.subject()).isEqualTo("Réinitialiser qnop");
-    assertThat(mail.bodyHtml()).contains("<html lang=\"fr\">");
+    assertThat(mail.subject()).isEqualTo("Reimposta qnop");
+    assertThat(mail.bodyHtml()).contains("<html lang=\"it\">");
+  }
+
+  @Test
+  @DisplayName("the editor offers every shipped language plus the default, English first (#853)")
+  void editorLocalesAreShippedPlusDefault() {
+    assertThat(service.editorLocales()).containsExactly("en", "de", "es", "fr", "pt");
+
+    when(settings.getString(ApplicationSettingKey.GENERAL_DEFAULT_LANGUAGE)).thenReturn("it-IT");
+    assertThat(service.editorLocales()).containsExactly("en", "de", "es", "fr", "it", "pt");
+    assertThat(service.editorDefaultLocale()).isEqualTo("it");
+  }
+
+  @Test
+  @DisplayName("reading, saving and resetting refuse a language the editor does not offer")
+  void unofferedLanguageIsRefused() {
+    assertThatThrownBy(() -> service.getEffective(MailTemplateKey.PASSWORD_RESET, "it"))
+        .isInstanceOf(UnsupportedMailLocaleException.class)
+        .hasMessageContaining("'it'");
+    assertThatThrownBy(
+            () -> service.update(MailTemplateKey.PASSWORD_RESET, "it", "S", "B", null, null))
+        .isInstanceOf(UnsupportedMailLocaleException.class);
+    assertThatThrownBy(() -> service.reset(MailTemplateKey.PASSWORD_RESET, "it"))
+        .isInstanceOf(UnsupportedMailLocaleException.class);
+    verify(repository, org.mockito.Mockito.never()).save(any());
+  }
+
+  @Test
+  @DisplayName("variants report each language's source, shipping and editor in one query")
+  void variantsReportEveryLanguage() {
+    when(settings.getString(ApplicationSettingKey.GENERAL_DEFAULT_LANGUAGE)).thenReturn("it");
+    UUID adminId = UUID.randomUUID();
+    MailTemplate german =
+        new MailTemplate("auth.password_reset", "de", "Eigener Betreff", "Eigener Text");
+    german.setUpdatedBy(adminId.toString());
+    when(repository.findAll()).thenReturn(List.of(german));
+    io.qnop.entity.User admin = org.mockito.Mockito.mock(io.qnop.entity.User.class);
+    when(admin.getId()).thenReturn(adminId);
+    when(admin.getDisplayName()).thenReturn("Ada Admin");
+    when(userRepository.findAllById(List.of(adminId))).thenReturn(List.of(admin));
+
+    Map<MailTemplateKey, List<MailTemplateVariant>> all = service.variants();
+
+    assertThat(all).hasSize(MailTemplateKey.values().length);
+    List<MailTemplateVariant> reset = all.get(MailTemplateKey.PASSWORD_RESET);
+    assertThat(reset)
+        .extracting(MailTemplateVariant::locale)
+        .containsExactly("en", "de", "es", "fr", "it", "pt");
+    MailTemplateVariant de = reset.get(1);
+    assertThat(de.source()).isEqualTo(MailTemplateView.Source.DATABASE);
+    assertThat(de.subject()).isEqualTo("Eigener Betreff");
+    assertThat(de.updatedByName()).isEqualTo("Ada Admin");
+    MailTemplateVariant es = reset.get(2);
+    assertThat(es.source()).isEqualTo(MailTemplateView.Source.DEFAULT);
+    assertThat(es.shipped()).isTrue();
+    assertThat(es.subject())
+        .isEqualTo(DEFAULTS.find(MailTemplateKey.PASSWORD_RESET, "es").orElseThrow().subject());
+    // The default language ships nothing: marked unshipped, with the English subject in effect.
+    MailTemplateVariant it = reset.get(4);
+    assertThat(it.instanceDefault()).isTrue();
+    assertThat(it.shipped()).isFalse();
+    assertThat(it.subject()).isEqualTo("Reset your {{siteName}} password");
+    assertThat(reset.get(0).instanceDefault()).isFalse();
+  }
+
+  @Test
+  @DisplayName("preview demo values from the phrase bundle speak the preview's language")
+  void previewSampleValuesAreLocalized() {
+    noRows();
+
+    Map<String, String> german =
+        service.preview(MailTemplateKey.PASSWORD_RESET, "de", Map.of()).sampleVars();
+    assertThat(german).containsEntry("expiresAtHuman", "in 30 Minuten");
+    Map<String, String> workflow =
+        service.preview(MailTemplateKey.REVIEW_WORKFLOW_CHANGED, "de", Map.of()).sampleVars();
+    assertThat(workflow)
+        .containsEntry("oldState", "Im Review")
+        .containsEntry("newState", "Änderungen angefordert");
+    assertThat(
+            service.preview(MailTemplateKey.REVIEW_ANNOTATION_DECIDED, "de", Map.of()).sampleVars())
+        .containsEntry("decision", "erledigt");
+    // English keeps its former demo values exactly.
+    assertThat(service.preview(MailTemplateKey.PASSWORD_RESET, "en", Map.of()).sampleVars())
+        .containsEntry("expiresAtHuman", "in 30 minutes");
+    // An explicit override still wins.
+    assertThat(
+            service
+                .preview(MailTemplateKey.PASSWORD_RESET, "de", Map.of("expiresAtHuman", "bald"))
+                .sampleVars())
+        .containsEntry("expiresAtHuman", "bald");
   }
 }

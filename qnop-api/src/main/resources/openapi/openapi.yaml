@@ -657,7 +657,9 @@ paths:
       description: |
         Returns the effective content of every known mail template at the
         configured default locale, marking whether each comes from a stored
-        override (`DATABASE`) or the built-in default (`DEFAULT`). Superadmin only.
+        override (`DATABASE`) or the built-in default (`DEFAULT`). Each template
+        also lists its `variants`: the status of every language the editor
+        offers (`locales`). Superadmin only.
       operationId: listMailTemplates
       security:
         - bearerAuth: []
@@ -690,6 +692,7 @@ paths:
         - bearerAuth: []
       parameters:
         - $ref: '#/components/parameters/MailTemplateKeyParam'
+        - $ref: '#/components/parameters/MailTemplateLocaleParam'
       responses:
         '200':
           description: The effective template content
@@ -697,6 +700,12 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/MailTemplateResponse'
+        '400':
+          description: The language is not one the editor offers
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
         '404':
           description: Unknown template key
           content:
@@ -738,7 +747,9 @@ paths:
               schema:
                 $ref: '#/components/schemas/MailTemplateResponse'
         '400':
-          description: Invalid template content
+          description: >-
+            Invalid template content, or a language the editor does not offer
+            (see `MailTemplateListResponse.locales`)
           content:
             application/json:
               schema:
@@ -765,15 +776,24 @@ paths:
       tags:
         - AdminEmail
       summary: Reset a mail template to its default
-      description: Removes the stored override, reverting to the built-in default.
+      description: >-
+        Removes the stored override of one language, reverting it to the
+        built-in default of that language.
       operationId: resetMailTemplate
       security:
         - bearerAuth: []
       parameters:
         - $ref: '#/components/parameters/MailTemplateKeyParam'
+        - $ref: '#/components/parameters/MailTemplateLocaleParam'
       responses:
         '204':
           description: Override removed (or none existed)
+        '400':
+          description: The language is not one the editor offers
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
         '404':
           description: Unknown template key
           content:
@@ -4367,6 +4387,15 @@ components:
       description: The template storage key (e.g. `auth.password_reset`).
       schema:
         type: string
+    MailTemplateLocaleParam:
+      name: locale
+      in: query
+      required: false
+      description: >-
+        The template language (e.g. `de`); one of `MailTemplateListResponse.locales`.
+        Defaults to the configured default language.
+      schema:
+        type: string
     UserIdParam:
       name: userId
       in: path
@@ -5420,6 +5449,13 @@ components:
           description: >-
             The sorted, closed set of `{{placeholder}}` names this template
             accepts. The editor offers these as chips and rejects any other.
+        variants:
+          type: array
+          items:
+            $ref: '#/components/schemas/MailTemplateVariant'
+          description: >-
+            The status of this template in every language the editor offers, in
+            the order of `MailTemplateListResponse.locales`.
         defaultSubject:
           type: string
           description: The built-in catalog subject (for compare/reset in the editor).
@@ -5451,6 +5487,39 @@ components:
         - placeholders
         - defaultSubject
         - defaultBodyPlain
+    MailTemplateVariant:
+      type: object
+      description: The status of one template in one language.
+      properties:
+        locale:
+          type: string
+        source:
+          $ref: '#/components/schemas/MailTemplateSource'
+        shipped:
+          type: boolean
+          description: >-
+            Whether qnop ships a built-in default in this language. When false
+            and no override exists, mail in this language is sent from the
+            English default.
+        instanceDefault:
+          type: boolean
+          description: Whether this is the configured default language.
+        subject:
+          type: string
+          description: The effective subject in this language.
+        updatedAt:
+          type: string
+          format: date-time
+          description: When the override was last saved; absent for a built-in default.
+        updatedByName:
+          type: string
+          description: Display name of the admin who last saved the override, if known.
+      required:
+        - locale
+        - source
+        - shipped
+        - instanceDefault
+        - subject
     MailTemplateListResponse:
       type: object
       properties:
@@ -5458,8 +5527,21 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/MailTemplateResponse'
+        locales:
+          type: array
+          items:
+            type: string
+          description: >-
+            The languages the editor offers: every language qnop ships mail in,
+            plus the configured default language. English first, then
+            alphabetical.
+        defaultLocale:
+          type: string
+          description: The configured default language.
       required:
         - templates
+        - locales
+        - defaultLocale
     UpdateMailTemplateRequest:
       type: object
       description: Create-or-update a per-locale template override.

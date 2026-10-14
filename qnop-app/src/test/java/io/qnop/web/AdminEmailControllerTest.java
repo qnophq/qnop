@@ -22,8 +22,10 @@ package io.qnop.web;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
@@ -35,8 +37,10 @@ import io.qnop.service.mail.MailTemplateKey;
 import io.qnop.service.mail.MailTemplateService;
 import io.qnop.service.mail.MailTemplateService.MailPreview;
 import io.qnop.service.mail.MailTemplateValidationException;
+import io.qnop.service.mail.MailTemplateVariant;
 import io.qnop.service.mail.MailTemplateView;
 import io.qnop.service.mail.RenderedMail;
+import io.qnop.service.mail.UnsupportedMailLocaleException;
 import java.util.List;
 import java.util.Map;
 import org.junit.jupiter.api.Test;
@@ -99,7 +103,7 @@ class AdminEmailControllerTest {
 
   @Test
   void getTemplateExposesEditorMetadata() throws Exception {
-    when(templates.getEffective(MailTemplateKey.PASSWORD_RESET)).thenReturn(view());
+    when(templates.getEffective(MailTemplateKey.PASSWORD_RESET, null)).thenReturn(view());
 
     mockMvc
         .perform(get("/api/v1/admin/email/templates/auth.password_reset"))
@@ -110,6 +114,72 @@ class AdminEmailControllerTest {
         .andExpect(jsonPath("$.defaultSubject").value("Reset your {{siteName}} password"))
         .andExpect(jsonPath("$.defaultBodyPlain").value("Hi {{recipientName}}, {{actionUrl}}"))
         .andExpect(jsonPath("$.defaultBodyHtml").exists());
+  }
+
+  @Test
+  void getTemplateInALanguageCarriesEveryVariant() throws Exception {
+    when(templates.getEffective(MailTemplateKey.PASSWORD_RESET, "de")).thenReturn(view());
+    when(templates.variants(MailTemplateKey.PASSWORD_RESET))
+        .thenReturn(
+            List.of(
+                new MailTemplateVariant(
+                    "en", MailTemplateView.Source.DEFAULT, true, true, "Reset", null, null),
+                new MailTemplateVariant(
+                    "de",
+                    MailTemplateView.Source.DATABASE,
+                    true,
+                    false,
+                    "Zurücksetzen",
+                    java.time.Instant.parse("2026-10-01T10:00:00Z"),
+                    "Ada Admin")));
+
+    mockMvc
+        .perform(get("/api/v1/admin/email/templates/auth.password_reset").param("locale", "de"))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.variants.length()").value(2))
+        .andExpect(jsonPath("$.variants[0].instanceDefault").value(true))
+        .andExpect(jsonPath("$.variants[1].source").value("DATABASE"))
+        .andExpect(jsonPath("$.variants[1].updatedByName").value("Ada Admin"));
+  }
+
+  @Test
+  void aLanguageTheEditorDoesNotOfferIsABadRequest() throws Exception {
+    when(templates.getEffective(MailTemplateKey.PASSWORD_RESET, "it"))
+        .thenThrow(new UnsupportedMailLocaleException("it", List.of("en", "de")));
+    doThrow(new UnsupportedMailLocaleException("it", List.of("en", "de")))
+        .when(templates)
+        .reset(MailTemplateKey.PASSWORD_RESET, "it");
+
+    mockMvc
+        .perform(get("/api/v1/admin/email/templates/auth.password_reset").param("locale", "it"))
+        .andExpect(status().isBadRequest());
+    mockMvc
+        .perform(delete("/api/v1/admin/email/templates/auth.password_reset").param("locale", "it"))
+        .andExpect(status().isBadRequest());
+
+    when(templates.update(any(), eq("it"), any(), any(), any(), any()))
+        .thenThrow(new UnsupportedMailLocaleException("it", List.of("en", "de")));
+    mockMvc
+        .perform(
+            put("/api/v1/admin/email/templates/auth.password_reset")
+                .contentType("application/json")
+                .content("{\"locale\":\"it\",\"subject\":\"S\",\"bodyPlain\":\"B\"}"))
+        .andExpect(status().isBadRequest());
+  }
+
+  @Test
+  void listCarriesTheOfferedLanguages() throws Exception {
+    when(templates.listAll()).thenReturn(List.of(view()));
+    when(templates.variants()).thenReturn(Map.of());
+    when(templates.editorLocales()).thenReturn(List.of("en", "de", "es", "fr", "pt"));
+    when(templates.editorDefaultLocale()).thenReturn("de");
+
+    mockMvc
+        .perform(get("/api/v1/admin/email/templates"))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.locales.length()").value(5))
+        .andExpect(jsonPath("$.defaultLocale").value("de"))
+        .andExpect(jsonPath("$.templates[0].variants.length()").value(0));
   }
 
   @Test

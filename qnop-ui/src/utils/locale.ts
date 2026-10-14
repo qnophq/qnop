@@ -19,21 +19,18 @@
  * SPDX-License-Identifier: AGPL-3.0-only
  */
 
-const LANGUAGE_NAMES =
-  typeof Intl.DisplayNames === 'function'
-    ? new Intl.DisplayNames(['en'], { type: 'language' })
-    : null;
-
 /**
- * Human-readable language name for a BCP-47 locale tag ("en" → "English",
- * "de-AT" → "Austrian German"), falling back to the upper-cased tag for
- * unknown or unsupported locales. Kept locale-agnostic so the per-language
- * mail templates (issue #144) read clearly once more languages are added.
+ * Human-readable language name for a BCP-47 locale tag, written in `displayLocale` ("de" in "en" →
+ * "German", in "fr" → "allemand"), falling back to the upper-cased tag for unknown or unsupported
+ * locales. Pass the active UI language so the name reads in the admin's own language.
  */
-export function localeDisplayName(locale: string): string {
+export function localeDisplayName(locale: string, displayLocale = 'en'): string {
   if (!locale) return '';
   try {
-    return LANGUAGE_NAMES?.of(locale) ?? locale.toUpperCase();
+    return (
+      new Intl.DisplayNames([displayLocale], { type: 'language' }).of(locale) ??
+      locale.toUpperCase()
+    );
   } catch {
     return locale.toUpperCase();
   }
