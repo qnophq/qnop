@@ -724,7 +724,7 @@
       "review__workflow_changed": "Mudança de status da revisão",
       "review__deleted": "Revisão excluída",
       "review__version_uploaded": "Nova versão do documento",
-      "review__mention": "Nova menção"
+      "review__mention": "Mencionaram você"
     },
     "localeStatus": {
       "custom": "Personalizado",

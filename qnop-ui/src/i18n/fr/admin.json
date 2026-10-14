@@ -724,7 +724,7 @@
       "review__workflow_changed": "Changement de statut de la révision",
       "review__deleted": "Révision supprimée",
       "review__version_uploaded": "Nouvelle version du document",
-      "review__mention": "Nouvelle mention"
+      "review__mention": "On vous a mentionné"
     },
     "localeStatus": {
       "custom": "Personnalisé",

@@ -23,6 +23,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { screen, within } from '@testing-library/react';
 import type { MailTemplateResponse, MailTemplateVariant } from '../../api/generated';
 import { applyLocale } from '../../i18n';
+import { useUiStore } from '../../stores/uiStore';
 import { renderWithProviders } from '../../test/renderWithProviders';
 import { MailTemplatesListPage } from './MailTemplatesListPage';
 
@@ -90,6 +91,7 @@ vi.mock('../../api/hooks/useMailTemplates', () => ({
 
 describe('MailTemplatesListPage', () => {
   afterEach(async () => {
+    useUiStore.setState({ locale: 'en' });
     await applyLocale('en');
   });
 
@@ -134,6 +136,7 @@ describe('MailTemplatesListPage', () => {
 
   it('names the templates in the UI language, the server name for unknown ones', async () => {
     await applyLocale('de');
+    useUiStore.setState({ locale: 'de' });
     renderWithProviders(<MailTemplatesListPage />);
 
     expect(screen.getByRole('link', { name: 'Passwort zurücksetzen' })).toBeTruthy();

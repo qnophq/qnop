@@ -22,7 +22,6 @@
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
-import enAdmin from '../../../i18n/en/admin.json';
 import { SUPPORTED_LOCALES } from '../../../i18n/locales';
 import { mailTemplateCatalogId } from './mailTemplateName';
 
@@ -50,6 +49,9 @@ const adminCatalogs = import.meta.glob<{ mailTemplates: { names?: Record<string,
   { eager: true, import: 'default' },
 );
 
+/** Every enum constant, counted independently of the parse above so a skipped entry shows. */
+const constantCount = [...keySource.matchAll(/^ {2}[A-Z_]+\($/gm)].length;
+
 function names(locale: string): Record<string, string> {
   return adminCatalogs[`../../../i18n/${locale}/admin.json`]?.mailTemplates.names ?? {};
 }
@@ -62,6 +64,7 @@ function names(locale: string): Record<string, string> {
 describe('mail template name catalog', () => {
   it('finds the backend templates', () => {
     expect(backendNames.size).toBeGreaterThan(10);
+    expect(backendNames.size).toBe(constantCount);
     expect(backendNames.get('auth.password_reset')).toBe('Password reset');
   });
 
@@ -75,10 +78,13 @@ describe('mail template name catalog', () => {
     },
   );
 
-  it('has no names for templates the backend no longer declares', () => {
-    const known = new Set([...backendNames.keys()].map(mailTemplateCatalogId));
-    expect(Object.keys(enAdmin.mailTemplates.names).filter((id) => !known.has(id))).toEqual([]);
-  });
+  it.each(SUPPORTED_LOCALES.map((locale) => [locale, names(locale)] as const))(
+    '%s has no names for templates the backend no longer declares',
+    (_locale, catalog) => {
+      const known = new Set([...backendNames.keys()].map(mailTemplateCatalogId));
+      expect(Object.keys(catalog).filter((id) => !known.has(id))).toEqual([]);
+    },
+  );
 
   it('keeps the English names identical to the backend friendly names', () => {
     // The catalog wins over the server's friendlyName, so it must not drift from it.
