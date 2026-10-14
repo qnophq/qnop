@@ -37,6 +37,10 @@ const workspaceCatalogs = import.meta.glob<Workspace>('./*/workspace.json', {
 describe('annotation placement actions', () => {
   it.each(SUPPORTED_LOCALES)('%s words re-attach and re-position differently', (locale) => {
     const actions = workspaceCatalogs[`./${locale}/workspace.json`].annotation.placementActions;
+    // Present and non-empty first, so two missing keys cannot pass as "different".
+    for (const key of ['reattach', 'reposition', 'reattachHint', 'repositionHint']) {
+      expect(actions[key]?.trim()).toBeTruthy();
+    }
     expect(actions.reattach).not.toBe(actions.reposition);
     expect(actions.reattachHint).not.toBe(actions.repositionHint);
   });

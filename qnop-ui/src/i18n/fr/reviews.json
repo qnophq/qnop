@@ -417,7 +417,7 @@
   },
   "newVersion": {
     "title": "Téléverser une nouvelle version",
-    "body": "Elle devient la version que tout le monde révise. Les annotations existantes sont reprises et réancrées dans le nouveau document ; celles qui ne correspondent plus sont signalées pour que vous les rattachiez.",
+    "body": "Elle devient la version que tout le monde révise. Les annotations existantes sont reprises et réancrées dans le nouveau document ; celles qui ne correspondent plus sont signalées pour que vous les rattachiez au bon passage.",
     "uploaded": "Version {{version}} téléversée.",
     "failed": "Impossible de téléverser la nouvelle version.",
     "progressLabel": "Progression du téléversement",
