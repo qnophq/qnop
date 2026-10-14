@@ -85,10 +85,24 @@ export function apiFieldErrors(error: unknown): Record<string, string> {
   return map;
 }
 
+/**
+ * The codes whose single bound counts a noun ("at least 1 character"): the bound goes in as
+ * `count`, so i18next picks the plural form (issue #864).
+ */
+const COUNTED_BOUND: Readonly<Record<string, 'min' | 'max' | undefined>> = {
+  TOO_SHORT: 'min',
+  TOO_LONG: 'max',
+};
+
 function fieldErrorText(entry: FieldError): string {
-  const key = `fieldErrors.${entry.code ?? ''}`;
-  if (!entry.code || !i18n.exists(key)) return entry.message;
+  if (!entry.code) return entry.message;
+  const key = `fieldErrors.${entry.code}`;
+  const params: Record<string, string | number> = { ...entry.params };
+  const bound = COUNTED_BOUND[entry.code];
+  const count = bound === undefined ? NaN : Number(params[bound]);
+  if (Number.isFinite(count)) params.count = count;
   // The key is dynamic (a server code), so exists() checks it instead of the key types.
-  const translate = i18n.t as (key: string, options: Record<string, string>) => string;
-  return translate(key, entry.params ?? {});
+  if (!i18n.exists(key, params)) return entry.message;
+  const translate = i18n.t as (key: string, options: Record<string, string | number>) => string;
+  return translate(key, params);
 }

@@ -46,11 +46,12 @@ class FieldErrorCodeContractTest {
   @ParameterizedTest
   @EnumSource(FieldErrorCode.class)
   void everyCodeIsDocumentedAndWorded(FieldErrorCode code) throws IOException {
-    String quoted = "\"" + code.name() + "\":";
+    // A code that counts its bound (TOO_SHORT, TOO_LONG) is worded as i18next plural forms.
+    String[] keys = {"\"" + code.name() + "\":", "\"" + code.name() + "_other\":"};
     assertThat(read("qnop-api/src/main/resources/openapi/openapi.yaml"))
         .contains("`" + code.name() + "`");
-    assertThat(read("qnop-ui/src/i18n/en/common.json")).contains(quoted);
-    assertThat(read("qnop-ui/src/i18n/de/common.json")).contains(quoted);
+    assertThat(read("qnop-ui/src/i18n/en/common.json")).containsAnyOf(keys);
+    assertThat(read("qnop-ui/src/i18n/de/common.json")).containsAnyOf(keys);
   }
 
   @Test
