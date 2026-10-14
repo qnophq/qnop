@@ -107,8 +107,11 @@ services:
   #   From: noreply@qnop.local   Enable outgoing mail: ON
   # Then use "Send test" there and read the message at http://localhost:8025.
   # Bound to loopback only — this dev sink must never be reachable off-host.
+  # Pulled from upstream's GitHub Container Registry rather than its vendor-namespaced Docker Hub
+  # repo — the hosting arrangement minio/minio had until Docker Hub removed it without warning
+  # (#825, #827). Same image: upstream publishes the identical digest to both registries.
   mailpit:
-    image: axllent/mailpit:latest@sha256:94f6b70c1436defae6799d9ac7ff0eeff9540465b842026d5cdb018f1c0234ea
+    image: ghcr.io/axllent/mailpit:latest@sha256:94f6b70c1436defae6799d9ac7ff0eeff9540465b842026d5cdb018f1c0234ea
     profiles: ['mail']
     environment:
       # Allow unauthenticated/plaintext SMTP from the local app — dev only.
