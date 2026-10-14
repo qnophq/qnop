@@ -712,6 +712,20 @@
       "custom": "Personnalisé",
       "default": "Par défaut"
     },
+    "names": {
+      "auth__registration_verification": "Vérification du compte",
+      "auth__password_reset": "Réinitialisation du mot de passe",
+      "auth__admin_password_reset": "Réinitialisation du mot de passe par un administrateur",
+      "review__participant_added": "Invitation à une révision",
+      "review__daily_digest": "Résumé quotidien des révisions",
+      "review__annotation_created": "Nouvelle annotation",
+      "review__annotation_decided": "Décision sur une annotation",
+      "review__comment_added": "Nouvelle réponse",
+      "review__workflow_changed": "Changement de statut de la révision",
+      "review__deleted": "Révision supprimée",
+      "review__version_uploaded": "Nouvelle version du document",
+      "review__mention": "Nouvelle mention"
+    },
     "localeStatus": {
       "custom": "Personnalisé",
       "shipped": "Intégré",

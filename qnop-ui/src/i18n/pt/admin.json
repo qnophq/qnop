@@ -712,6 +712,20 @@
       "custom": "Personalizado",
       "default": "Padrão"
     },
+    "names": {
+      "auth__registration_verification": "Verificação de conta",
+      "auth__password_reset": "Redefinição de senha",
+      "auth__admin_password_reset": "Redefinição de senha pelo administrador",
+      "review__participant_added": "Convite para revisão",
+      "review__daily_digest": "Resumo diário de revisões",
+      "review__annotation_created": "Nova anotação",
+      "review__annotation_decided": "Decisão sobre anotação",
+      "review__comment_added": "Nova resposta",
+      "review__workflow_changed": "Mudança de status da revisão",
+      "review__deleted": "Revisão excluída",
+      "review__version_uploaded": "Nova versão do documento",
+      "review__mention": "Nova menção"
+    },
     "localeStatus": {
       "custom": "Personalizado",
       "shipped": "Integrado",

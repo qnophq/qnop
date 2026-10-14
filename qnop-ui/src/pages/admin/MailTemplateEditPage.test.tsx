@@ -21,12 +21,13 @@
 
 import { forwardRef, useImperativeHandle, type ReactNode } from 'react';
 import { AxiosError, type AxiosResponse } from 'axios';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { MemoryRouter } from 'react-router';
 import { ThemeProvider } from '@mui/material/styles';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import type { MailTemplateResponse } from '../../api/generated';
+import { applyLocale } from '../../i18n';
 import { buildTheme } from '../../theme/theme';
 import { MailTemplateEditPage } from './MailTemplateEditPage';
 
@@ -139,6 +140,17 @@ function wrapper({ children }: { children: ReactNode }) {
 const renderPage = () => render(<MailTemplateEditPage />, { wrapper });
 
 describe('MailTemplateEditPage', () => {
+  afterEach(async () => {
+    await applyLocale('en');
+  });
+
+  it('names the template in the UI language', async () => {
+    await applyLocale('de');
+    renderPage();
+
+    expect(screen.getByRole('heading', { name: 'Passwort zurücksetzen' })).toBeTruthy();
+  });
+
   it('saves the edited subject and plain body', async () => {
     renderPage();
 

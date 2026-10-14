@@ -700,6 +700,20 @@
       "custom": "Custom",
       "default": "Default"
     },
+    "names": {
+      "auth__registration_verification": "Account verification",
+      "auth__password_reset": "Password reset",
+      "auth__admin_password_reset": "Admin password reset",
+      "review__participant_added": "Review invitation",
+      "review__daily_digest": "Daily review digest",
+      "review__annotation_created": "New annotation",
+      "review__annotation_decided": "Annotation decision",
+      "review__comment_added": "New reply",
+      "review__workflow_changed": "Review status change",
+      "review__deleted": "Review deleted",
+      "review__version_uploaded": "New document version",
+      "review__mention": "You were mentioned"
+    },
     "localeStatus": {
       "custom": "Customised",
       "shipped": "Built-in",
