@@ -133,6 +133,48 @@ describe('apiFieldErrors', () => {
     }
   });
 
+  it('words a single length bound in the singular when it is 1', async () => {
+    const error = axiosWithBody(400, {
+      code: 'VALIDATION_ERROR',
+      fieldErrors: [
+        {
+          field: 'name',
+          message: 'size must be at least 1',
+          code: 'TOO_SHORT',
+          params: { min: '1' },
+        },
+        {
+          field: 'initial',
+          message: 'size must be at most 1',
+          code: 'TOO_LONG',
+          params: { max: '1' },
+        },
+        {
+          field: 'title',
+          message: 'size must be at most 200',
+          code: 'TOO_LONG',
+          params: { max: '200' },
+        },
+      ],
+    });
+    expect(apiFieldErrors(error)).toEqual({
+      name: 'must be at least 1 character',
+      initial: 'must be at most 1 character',
+      title: 'must be at most 200 characters',
+    });
+
+    await applyLocale('fr');
+    try {
+      expect(apiFieldErrors(error)).toEqual({
+        name: 'doit comporter au moins 1 caractère',
+        initial: 'doit comporter au maximum 1 caractère',
+        title: 'doit comporter au maximum 200 caractères',
+      });
+    } finally {
+      await applyLocale('en');
+    }
+  });
+
   it('keeps the server message for an unknown or missing code', async () => {
     const error = axiosWithBody(400, {
       code: 'VALIDATION_ERROR',
