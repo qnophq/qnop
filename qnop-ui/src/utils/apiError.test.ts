@@ -22,6 +22,7 @@
 import { AxiosError, type AxiosResponse } from 'axios';
 import { describe, expect, it } from 'vitest';
 import { applyLocale } from '../i18n';
+import type { AppLocale } from '../i18n/locales';
 import { apiErrorCode, apiErrorMessage, apiFieldErrors } from './apiError';
 
 function axiosWithStatus(status: number): AxiosError {
@@ -173,6 +174,41 @@ describe('apiFieldErrors', () => {
     } finally {
       await applyLocale('en');
     }
+  });
+
+  it.each<[AppLocale, string, string]>([
+    ['es', 'debe tener al menos 1 carácter', 'debe tener al menos 0 caracteres'],
+    ['pt', 'deve ter pelo menos 1 caractere', 'deve ter pelo menos 0 caractere'],
+    ['fr', 'doit comporter au moins 1 caractère', 'doit comporter au moins 0 caractère'],
+    ['en', 'must be at least 1 character', 'must be at least 0 characters'],
+  ])('%s picks the plural category of the bound, 0 included', async (locale, one, zero) => {
+    const error = axiosWithBody(400, {
+      code: 'VALIDATION_ERROR',
+      fieldErrors: [
+        { field: 'a', message: 'size must be at least 1', code: 'TOO_SHORT', params: { min: '1' } },
+        { field: 'b', message: 'size must be at least 0', code: 'TOO_SHORT', params: { min: '0' } },
+      ],
+    });
+    await applyLocale(locale);
+    try {
+      expect(apiFieldErrors(error)).toEqual({ a: one, b: zero });
+    } finally {
+      await applyLocale('en');
+    }
+  });
+
+  it('keeps the server message when a counted bound is missing or not a number', () => {
+    const error = axiosWithBody(400, {
+      code: 'VALIDATION_ERROR',
+      fieldErrors: [
+        { field: 'a', message: 'size must be at least x', code: 'TOO_SHORT', params: { min: 'x' } },
+        { field: 'b', message: 'size must be at most ?', code: 'TOO_LONG' },
+      ],
+    });
+    expect(apiFieldErrors(error)).toEqual({
+      a: 'size must be at least x',
+      b: 'size must be at most ?',
+    });
   });
 
   it('keeps the server message for an unknown or missing code', async () => {

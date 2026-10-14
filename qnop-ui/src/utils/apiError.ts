@@ -89,7 +89,10 @@ export function apiFieldErrors(error: unknown): Record<string, string> {
  * The codes whose single bound counts a noun ("at least 1 character"): the bound goes in as
  * `count`, so i18next picks the plural form (issue #864).
  */
-const COUNTED_BOUND: Partial<Record<string, string>> = { TOO_SHORT: 'min', TOO_LONG: 'max' };
+const COUNTED_BOUND: Readonly<Record<string, 'min' | 'max' | undefined>> = {
+  TOO_SHORT: 'min',
+  TOO_LONG: 'max',
+};
 
 function fieldErrorText(entry: FieldError): string {
   if (!entry.code) return entry.message;
