@@ -19,7 +19,7 @@
 
 services:
   qnop:
-    image: docker.io/qnophq/qnop-ce:latest@sha256:24eec1cf2b678a85dd907f04477c238497bd96645f96690e6ed307d9147a6297
+    image: docker.io/qnophq/qnop-ce:latest@sha256:7297f98ae36f9a9916d36a3b61ffc7a15f23bbf453843d311a48c21f7266ade4
     environment:
       - SERVICE_FQDN_QNOP_8080
       - QNOP_DB_HOST=postgres
