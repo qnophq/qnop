@@ -42,7 +42,7 @@ jacksonAnnotations = "2.22"
 #   container (security-constraint bypass, DIGEST replay, FORM login bypass).
 #   Boot 4.1.1 manages 11.0.24; qnop-app constrains all three tomcat-embed
 #   artifacts so core, el and websocket move together.
-postgresql = "42.7.13"
+postgresql = "42.7.14"
 jackson3 = "3.2.3"
 tomcat = "11.0.25"
 swaggerAnnotations = "2.2.55"
