@@ -111,7 +111,7 @@ services:
   # repo — the hosting arrangement minio/minio had until Docker Hub removed it without warning
   # (#825, #827). Same image: upstream publishes the identical digest to both registries.
   mailpit:
-    image: ghcr.io/axllent/mailpit:latest@sha256:94f6b70c1436defae6799d9ac7ff0eeff9540465b842026d5cdb018f1c0234ea
+    image: ghcr.io/axllent/mailpit:latest@sha256:23fe39e81bde596a918000b3135c0f85dc8bb4c9ea6be274b051143f3e300387
     profiles: ['mail']
     environment:
       # Allow unauthenticated/plaintext SMTP from the local app — dev only.
