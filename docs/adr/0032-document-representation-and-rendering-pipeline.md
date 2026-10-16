@@ -67,3 +67,14 @@ Serving therefore has two endpoints where §5 described one: `…/original` stre
 ## Amendment (2026-08-31, issue #601): the accept gate derives from the registered extractors
 
 The upload accept gate was hard-coded to PDF-and-DOCX, so a registered `DocumentExtractor` for another format was rejected before it ever ran — breaking this ADR's "adding a format = implementing one `DocumentExtractor`" promise. Now: a sniffed type passes the gate when it is PDF, DOCX-with-converter, or **claimed by a registered extractor** (`DocumentRenditionService.supports`); such a type is extracted directly (no office conversion). The SPI grows `default Set<String> mediaTypes()` (semver minor) as the enumerable face of the claim, surfaced to clients via `GET /config` `supportedMediaTypes` (and mapped onto the `SupportedFormat` enum where its vocabulary covers the type), from which the upload UI derives its file filter. Sniffing stays bytes-only and grew the common image magics — recognition and acceptance remain separate questions: an unclaimed recognized type is still a 415.
+
+## Amendment (2026-10-16, reversing for Markdown — current extractor set, as of v1.3.0)
+
+Decision point 4 and the 2026-07-16 amendment above no longer describe what Community ships; this amendment is where to read the current state. It **reverses** decision point 4 for Markdown only — recording, for this ADR, the move to the enterprise repository made in the 2026-08-05 amendment to [ADR-0010](0010-docx-representation-strategy.md) — and otherwise refines.
+
+- **PDF** — the one Community extractor (`PdfBoxDocumentExtractor`).
+- **DOCX** — shipped since v1.2.0, not as an extractor: converted to PDF out-of-process before extraction (2026-07-30 amendment), accepted only where the converter is available. The 2026-07-16 amendment's "DOCX extractor remains planned" is obsolete.
+- **Markdown** — **not Community scope.** It moved to the enterprise repository and arrives as a `DocumentExtractor` implementation behind this seam, advertised through `mediaTypes()` (2026-08-31 amendment). No Community Markdown extractor is planned.
+- **Images** — not shipped in Community. Their placement stays open, as the 2026-07-16 amendment left it; the first planned image extractor is an enterprise one behind the same seam (see [EXTENSION-POINTS.md](../EXTENSION-POINTS.md)), which does not by itself settle Community scope.
+
+The model itself — hybrid rendering, `RenderedDocument` as the canonical anchoring substrate, one extractor per format behind the published SPI — is unchanged.
