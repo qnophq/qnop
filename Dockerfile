@@ -26,14 +26,15 @@ RUN ./gradlew --no-daemon -x test :qnop-app:bootJar \
 FROM eclipse-temurin:21.0.11_10-jre@sha256:c8e00005c840f4e15a98dee36caf8b7be1e385350d63f4eb4a91e465bffa98a1 AS runtime
 WORKDIR /app
 
-# LibreOffice, headless, for the PDF export (issue #639) — and for DOCX ingest
-# when that lands (ADR-0010). It is invoked as a subprocess and never linked, which
-# is the only way ADR-0007 permits a copyleft tool.
+# LibreOffice, headless, for the PDF export (issue #639) and for DOCX ingest, which
+# converts to PDF before extraction (ADR-0010). It is invoked as a subprocess and
+# never linked, which is the only way ADR-0007 permits a copyleft tool.
 #
 # `--no-install-recommends` plus the Writer-only package keeps this to what the
 # conversion actually needs; the full suite would be several times the size. A
-# deployment that drops it still runs — the server then reports PDF as
-# unavailable and the export wizard stops offering it.
+# deployment that drops it still runs — the server then reports PDF export as
+# unavailable, the export wizard stops offering it, and DOCX uploads are refused
+# (PDF ingest is unaffected).
 RUN apt-get update \
     && apt-get install --yes --no-install-recommends libreoffice-writer-nogui fonts-dejavu-core \
     && rm -rf /var/lib/apt/lists/*
