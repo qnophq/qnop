@@ -44,7 +44,7 @@ jacksonAnnotations = "2.22"
 #   artifacts so core, el and websocket move together.
 postgresql = "42.7.14"
 jackson3 = "3.2.3"
-tomcat = "11.0.25"
+tomcat = "11.0.27"
 swaggerAnnotations = "2.2.55"
 jakartaValidation = "3.1.1"
 jakartaAnnotation = "3.0.0"
