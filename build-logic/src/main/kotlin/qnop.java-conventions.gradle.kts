@@ -62,6 +62,12 @@ tasks.withType<Test>().configureEach {
     // files (e.g. branding assets) without brittle relative paths; see testdata/README.md
     // and io.qnop.testsupport.TestData.
     systemProperty("qnop.testdata.dir", rootDir.resolve("testdata").absolutePath)
+    // Without an explicit heap each test worker JVM gets Gradle's default 512 MiB
+    // (separate from the daemon's own default). The integration suite keeps many
+    // full application contexts in Spring's test context cache (one per
+    // @MockitoBean/@TestPropertySource/@Import variant), and at 512 MiB loading
+    // the next one runs out of heap (issue #884).
+    maxHeapSize = "2g"
     // Surface full exception traces for failures. The integration tests are
     // CI-only (Testcontainers needs Docker), so a truncated stack in the CI log
     // would otherwise leave failures undebuggable.
