@@ -53,7 +53,7 @@ services:
       start_period: 60s
 
   postgres:
-    image: postgres:18@sha256:74935e72241653ca55e0414067e6d8763aceb8a810eb51b452253ec3dcfc4336
+    image: postgres:18@sha256:edb0c08dc33befd0262ab3b5cf1c4f3f8cfd8b09e88c05b45adee29d6761ddb6
     environment:
       - POSTGRES_USER=qnop
       - POSTGRES_PASSWORD=$SERVICE_PASSWORD_POSTGRES
@@ -67,7 +67,7 @@ services:
       retries: 5
 
   minio:
-    image: cgr.dev/chainguard/minio:latest@sha256:2136d593beacf4461187035eca949fe49abd589d5079735025c711ca58fee0c8
+    image: cgr.dev/chainguard/minio:latest@sha256:d88920d6a50bd0b088223b688be3b76c63e6205dbe494437f67ba1240ea12880
     user: '0:0' # keep volumes from the former root-run MinIO image writable
     command: server /data
     environment:
