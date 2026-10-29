@@ -23,7 +23,7 @@ jobs:
         with:
           distribution: temurin
           java-version: "21"
-      - uses: gradle/actions/setup-gradle@3f5f9adaf7d9fecd50b5935e54106014257a94e6 # v6
+      - uses: gradle/actions/setup-gradle@8da46b539cd8fe6ab27ca75128919a18d757604c # v6
       # `build` runs spotlessCheck (formatting + SPDX header) and the ArchUnit
       # conformance tests via the `check` task.
       - run: ./gradlew build --stacktrace
@@ -43,7 +43,7 @@ jobs:
         with:
           distribution: temurin
           java-version: "21"
-      - uses: gradle/actions/setup-gradle@3f5f9adaf7d9fecd50b5935e54106014257a94e6 # v6
+      - uses: gradle/actions/setup-gradle@8da46b539cd8fe6ab27ca75128919a18d757604c # v6
       # ADR-0007 / issue #498: the dependency-license gate promised once real
       # dependencies landed. `checkLicense` fails on any shipped (runtimeClasspath)
       # dependency whose license is outside the permissive allowlist in
@@ -179,7 +179,7 @@ jobs:
           node-version: "24"
           cache: pnpm
           cache-dependency-path: qnop-ui/pnpm-lock.yaml
-      - uses: gradle/actions/setup-gradle@3f5f9adaf7d9fecd50b5935e54106014257a94e6 # v6
+      - uses: gradle/actions/setup-gradle@8da46b539cd8fe6ab27ca75128919a18d757604c # v6
       - name: Build boot jar with embedded SPA
         run: |
           ./gradlew --no-daemon -x test :qnop-app:bootJar -PembedUi
@@ -194,7 +194,7 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4
       - name: Log in to GHCR
-        uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0
+        uses: docker/login-action@81c6f93d4bc991e510b342a00b419b3bb4efc5c6 # v4.7.0
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
