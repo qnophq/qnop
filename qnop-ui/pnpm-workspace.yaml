@@ -31,8 +31,8 @@ overrides:
   'shell-quote@<1.11.0': 1.12.0
   'basic-ftp@<6.2.1': 6.2.3
   'source-map-js@<1.2.2': 1.2.2
-  'ip-address@<10.3.1': 10.7.4
-  'undici@<7.29.0': 7.30.0
+  'ip-address@<10.3.1': 10.7.5
+  'undici@<7.29.0': 7.30.1
   # CodeMirror needs one instance of each (issue #857): see the catalog below.
   '@codemirror/state': 'catalog:'
   '@codemirror/view': 'catalog:'
