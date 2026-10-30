@@ -17,7 +17,7 @@
 
 services:
   postgres:
-    image: postgres:18@sha256:74935e72241653ca55e0414067e6d8763aceb8a810eb51b452253ec3dcfc4336
+    image: postgres:18@sha256:979bccfde35445db618c65107d27d08c6c21339d8dc3ad4c830c6633947be0e4
     environment:
       POSTGRES_USER: qnop
       POSTGRES_PASSWORD: qnop
@@ -32,7 +32,7 @@ services:
   # uploads here and the extraction job reads them back; `auto-create-bucket` on
   # the app side provisions the bucket on first use, so no init job is needed.
   minio:
-    image: cgr.dev/chainguard/minio:latest@sha256:2136d593beacf4461187035eca949fe49abd589d5079735025c711ca58fee0c8
+    image: cgr.dev/chainguard/minio:latest@sha256:3b6e40c30ecd5cea627e382ff0b82ca841f58c52294578787043ee80c8ef7c82
     command: server /data
     environment:
       MINIO_ROOT_USER: qnop
@@ -128,7 +128,7 @@ services:
   # the dev realm. Requires the database to have been seeded first (smoke-test.sh).
   smoke-oidc:
     # Tag-only (no digest): a throwaway test runner; Renovate pins the digest.
-    image: alpine:3.24@sha256:294b683cb724975bec92580e1e685676bd4b50bda910ddb8c51d4cabeaec77e6
+    image: alpine:3.24@sha256:be2656061b536c1883c4034790e21d0a09c5aaaf51968b89368a3c0371ea2c9a
     profiles: ['oidc']
     network_mode: 'service:app'
     depends_on:
