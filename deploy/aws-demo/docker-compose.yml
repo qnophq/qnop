@@ -11,7 +11,7 @@ name: qnop-demo
 
 services:
   caddy:
-    image: caddy:2@sha256:685ae3d7c34d9b5f8caeddc5d14051db7bbd88ff1f5a2fa0c16bd8ca328fb7af
+    image: caddy:2@sha256:ce773ec7a742ce15ee6bf2bb5f65882b9e2a4487b10733e6f1484f86e6b5d8bc
     ports:
       - '80:80'
       - '443:443'
@@ -64,7 +64,7 @@ services:
     restart: unless-stopped
 
   postgres:
-    image: postgres:18@sha256:74935e72241653ca55e0414067e6d8763aceb8a810eb51b452253ec3dcfc4336
+    image: postgres:18@sha256:bd5dfa494a5a259704365813dbfa5fa6b3e69be7348d43b547f540c730478583
     environment:
       POSTGRES_USER: ${QNOP_DB_USERNAME:-qnop}
       POSTGRES_PASSWORD: ${QNOP_DB_PASSWORD:?set a real database password}
@@ -81,7 +81,7 @@ services:
     restart: unless-stopped
 
   minio:
-    image: cgr.dev/chainguard/minio:latest@sha256:2136d593beacf4461187035eca949fe49abd589d5079735025c711ca58fee0c8
+    image: cgr.dev/chainguard/minio:latest@sha256:aea6c163749e1caca37f907976dcf337177ddf5f558808f2aa591618fd3a6eef
     user: '0:0' # keep volumes from the former root-run MinIO image writable
     command: server /data
     environment:
@@ -102,7 +102,7 @@ services:
   # cgr.dev/chainguard/minio-client. Root so it can write the ./golden bind mount.
   mc:
     user: '0:0'
-    image: cgr.dev/chainguard/minio:latest@sha256:2136d593beacf4461187035eca949fe49abd589d5079735025c711ca58fee0c8
+    image: cgr.dev/chainguard/minio:latest@sha256:aea6c163749e1caca37f907976dcf337177ddf5f558808f2aa591618fd3a6eef
     profiles: ['tools']
     entrypoint: ['/bin/sh', '-c']
     environment:

@@ -9,7 +9,7 @@
 
 services:
   postgres:
-    image: postgres:18@sha256:74935e72241653ca55e0414067e6d8763aceb8a810eb51b452253ec3dcfc4336
+    image: postgres:18@sha256:bd5dfa494a5a259704365813dbfa5fa6b3e69be7348d43b547f540c730478583
     environment:
       POSTGRES_USER: ${QNOP_DB_USERNAME:-qnop}
       POSTGRES_PASSWORD: ${QNOP_DB_PASSWORD:-qnop}
@@ -33,7 +33,7 @@ services:
   # also ships `mc`, so the healthcheck is unchanged). It runs as UID 65532;
   # `user: 0:0` keeps volumes written by the former root-run image usable.
   minio:
-    image: cgr.dev/chainguard/minio:latest@sha256:2136d593beacf4461187035eca949fe49abd589d5079735025c711ca58fee0c8
+    image: cgr.dev/chainguard/minio:latest@sha256:aea6c163749e1caca37f907976dcf337177ddf5f558808f2aa591618fd3a6eef
     user: '0:0'
     command: server /data --console-address ":9001"
     environment:
@@ -111,7 +111,7 @@ services:
   # repo — the hosting arrangement minio/minio had until Docker Hub removed it without warning
   # (#825, #827). Same image: upstream publishes the identical digest to both registries.
   mailpit:
-    image: ghcr.io/axllent/mailpit:latest@sha256:23fe39e81bde596a918000b3135c0f85dc8bb4c9ea6be274b051143f3e300387
+    image: ghcr.io/axllent/mailpit:latest@sha256:9b3a463be15354c0f0eba91697d80e3e0d8a5623ef0e627cacc836bc17fd5231
     profiles: ['mail']
     environment:
       # Allow unauthenticated/plaintext SMTP from the local app — dev only.
