@@ -60,3 +60,34 @@ config; the token tables (`refresh_token`, `revoked_token`) landed with issue #1
   them; the HttpOnly cookie cannot be read by scripts.
 - **`jjwt` instead of Nimbus** — rejected: Nimbus integrates natively with the
   Spring resource-server filter.
+
+## Amendment (2026-11, #897 #901 #902 #903 #920)
+
+Hardening of the session lifecycle (security review, epic #896):
+
+- **Every credential or privilege change ends every session.** Besides
+  password change, admin reset, generate-password and disable, the e-mail
+  token password reset now also revokes the user's refresh families (#897),
+  and so does **any role change** (#901): the role is a claim of the access
+  token, so `password_invalidated_before` is bumped and refresh families are
+  revoked; the user signs in again and gets a token carrying the current role.
+  The password-reset writes are atomic, version-bumping updates so the
+  context-clearing revocation in the same transaction cannot discard them.
+- **A token whose user is missing or disabled is revoked** (#901).
+  `TokenRevocationService.isRevoked` already loads the user per request; a
+  deleted account (its refresh tokens cascade away) or a disabled one is now
+  rejected outright instead of being waved through until expiry.
+- **Rotation is atomic** (#902). The presented refresh-token row is read with
+  `PESSIMISTIC_WRITE` (`SELECT ... FOR UPDATE`). A concurrent rotation of the
+  same token waits, then sees it revoked and is handled as reuse (family
+  revoked) — one token can never fork into two live successors.
+- **The last-admin guard is race-free** (#920). Demote/disable/delete of an
+  enabled admin locks the enabled-admin rows (ordered by id) before counting
+  them, which serialises concurrent admin-removing changes; PostgreSQL
+  re-checks a row a concurrent transaction changed and leaves it out of the
+  count. No schema change.
+- **Login timing is uniform** (#903). `AuthService.authenticate` runs exactly
+  one password comparison on every path; unknown, disabled and password-less
+  accounts are compared against a dummy hash computed at startup. Equalising
+  the registration path (synchronous account creation and mail only for new
+  addresses) is a follow-up on #903.
