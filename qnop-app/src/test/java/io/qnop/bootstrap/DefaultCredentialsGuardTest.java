@@ -87,6 +87,15 @@ class DefaultCredentialsGuardTest {
   }
 
   @Test
+  void defaultLiquibasePasswordFailsOutsideDev() {
+    MockEnvironment environment = withProfiles();
+    environment.setProperty("spring.liquibase.password", "qnop");
+    assertThatThrownBy(() -> DefaultCredentialsGuard.verify(environment, "s3cr3t-db", "s3cr3t-s3"))
+        .isInstanceOf(IllegalStateException.class)
+        .hasMessageContaining("spring.liquibase.password");
+  }
+
+  @Test
   void missingDatabasePasswordIsNotTreatedAsTheDefault() {
     assertThatCode(() -> DefaultCredentialsGuard.verify(withProfiles(), null, "s3cr3t-s3"))
         .doesNotThrowAnyException();

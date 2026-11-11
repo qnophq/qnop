@@ -27,12 +27,20 @@ DB_USER="${QNOP_DB_USERNAME:-qnop}"
 : "${DEMO_ADMIN_PASSWORD:?add DEMO_ADMIN_PASSWORD to /opt/qnop-demo/.env}"
 for f in clean.sql seed.sql; do
   [ -f "$SEED_DIR/$f" ] || { echo "missing $SEED_DIR/$f (re-run install.sh)" >&2; exit 1; }
+  # The single-transaction guarantee breaks if a seed file ends the transaction
+  # itself — refuse rather than briefly expose the published admin password.
+  if grep -qiE '^[[:space:]]*(begin|commit|end|rollback|start[[:space:]]+transaction|savepoint|release)\b' "$SEED_DIR/$f"; then
+    echo "$SEED_DIR/$f contains transaction control — refusing to seed" >&2
+    exit 1
+  fi
 done
 
 # bcrypt the admin password with Postgres' bundled pgcrypto, in the maintenance
 # database so the extension never lands in the qnop schema. The password reaches
-# psql through the environment (\getenv), not through a SQL literal.
-ADMIN_HASH=$(docker compose exec -T -e DEMO_ADMIN_PASSWORD="$DEMO_ADMIN_PASSWORD" postgres \
+# psql through the environment (\getenv), not through a SQL literal, and is
+# passed to docker by NAME only (exported by `set -a` above), so it never shows
+# up in a process's argv.
+ADMIN_HASH=$(docker compose exec -T -e DEMO_ADMIN_PASSWORD postgres \
   psql -U "$DB_USER" -d postgres -v ON_ERROR_STOP=1 -qtA <<'SQL'
 \getenv admin_password DEMO_ADMIN_PASSWORD
 CREATE EXTENSION IF NOT EXISTS pgcrypto;

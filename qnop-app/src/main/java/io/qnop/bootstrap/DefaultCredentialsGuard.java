@@ -91,6 +91,11 @@ class DefaultCredentialsGuard implements InitializingBean {
     if (DEFAULT_S3_SECRET_KEY.equals(s3SecretKey)) {
       defaults.add("QNOP_S3_SECRET_KEY (qnop.s3.secret-key)");
     }
+    // Liquibase connects with the datasource unless given its own credentials; a separately
+    // configured migration password is held to the same rule.
+    if (DEFAULT_DB_PASSWORD.equals(environment.getProperty("spring.liquibase.password"))) {
+      defaults.add("spring.liquibase.password");
+    }
     if (defaults.isEmpty()) {
       return;
     }

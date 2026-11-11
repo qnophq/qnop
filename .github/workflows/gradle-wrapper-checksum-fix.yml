@@ -45,6 +45,7 @@ jobs:
   fix:
     name: Correct a stale distributionSha256Sum
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
       # The branch under repair: data only, never executed.
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7

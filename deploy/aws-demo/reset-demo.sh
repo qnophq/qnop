@@ -25,11 +25,17 @@ BUCKET="${QNOP_S3_BUCKET:-qnop-documents}"
 echo "[$(date -u +%FT%TZ)] reset starting"
 # Take the compose file (and with it the pinned image digest) from main. Only
 # that file is refreshed; the scripts change when an operator re-runs install.sh.
+# A new file must validate against this host's .env first (e.g. a key it does
+# not have yet); otherwise the current one stays and the reset carries on.
 if [ -d /opt/qnop-src/.git ]; then
-  if git -C /opt/qnop-src pull --ff-only --quiet; then
-    install -m 0644 /opt/qnop-src/deploy/aws-demo/docker-compose.yml /opt/qnop-demo/
-  else
+  NEW_COMPOSE=/opt/qnop-src/deploy/aws-demo/docker-compose.yml
+  if ! git -C /opt/qnop-src pull --ff-only --quiet; then
     echo "WARN: could not update /opt/qnop-src — keeping the current stack definition"
+  elif ! docker compose -f "$NEW_COMPOSE" --project-directory /opt/qnop-demo \
+      --env-file /opt/qnop-demo/.env config -q; then
+    echo "WARN: docker-compose.yml from main does not validate against .env — keeping the current one (re-run install.sh?)"
+  else
+    install -m 0644 "$NEW_COMPOSE" /opt/qnop-demo/
   fi
 fi
 docker compose pull --quiet

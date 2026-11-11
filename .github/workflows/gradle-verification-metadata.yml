@@ -51,6 +51,7 @@ jobs:
   regenerate:
     name: Regenerate the checksums (untrusted, no secrets)
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     outputs:
       changed: ${{ steps.diff.outputs.changed }}
     steps:
@@ -88,6 +89,7 @@ jobs:
     needs: regenerate
     if: needs.regenerate.outputs.changed == 'true'
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
