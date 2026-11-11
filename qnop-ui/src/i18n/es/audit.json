@@ -130,6 +130,10 @@
       "label": "Secretos ilegibles",
       "description": "Al arrancar, algunos secretos almacenados no pudieron descifrarse con ninguna clave configurada y se consideran sin definir (issue #927). Los detalles nombran los ajustes y proveedores OIDC afectados: restaure como clave anterior la clave que los escribió o vuelva a introducir los secretos."
     },
+    "secretsReencryptionFailed": {
+      "label": "Falló el recifrado",
+      "description": "El recifrado de los secretos almacenados al arrancar falló (issue #927). La instancia arrancó de todos modos y lo reintentará en el próximo arranque; los detalles indican el tipo de error y el registro del servidor, el resto."
+    },
     "fallback": {
       "label": "{{type}}",
       "description": "Un evento de revisión registrado."

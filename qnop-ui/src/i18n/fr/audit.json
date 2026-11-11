@@ -130,6 +130,10 @@
       "label": "Secrets illisibles",
       "description": "Au démarrage, des secrets stockés n’ont pu être déchiffrés avec aucune clé configurée et sont considérés comme non définis (issue #927). Les détails nomment les paramètres et fournisseurs OIDC concernés — restaurez la clé qui les a écrits comme clé précédente, ou saisissez à nouveau les secrets."
     },
+    "secretsReencryptionFailed": {
+      "label": "Échec du rechiffrement",
+      "description": "Le rechiffrement des secrets stockés au démarrage a échoué (issue #927). L’instance a démarré malgré tout et réessaiera au prochain démarrage ; les détails indiquent le type d’erreur, le journal du serveur le reste."
+    },
     "fallback": {
       "label": "{{type}}",
       "description": "Un événement de révision enregistré."

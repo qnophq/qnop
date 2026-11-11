@@ -80,7 +80,11 @@ describe('auditEventMeta', () => {
 
   it('knows the secrets-at-rest maintenance events, and flags unreadable secrets in red', () => {
     expect(AUDIT_EVENT_TYPES).toEqual(
-      expect.arrayContaining(['secrets.reencrypted', 'secrets.unreadable']),
+      expect.arrayContaining([
+        'secrets.reencrypted',
+        'secrets.unreadable',
+        'secrets.reencryption_failed',
+      ]),
     );
     expect(english(auditEventMeta('secrets.unreadable').labelKey)).toBe('Secrets unreadable');
     expect(auditEventMeta('secrets.unreadable').tone).toBe('red');

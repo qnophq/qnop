@@ -130,6 +130,10 @@
       "label": "Segredos ilegíveis",
       "description": "Na inicialização, segredos armazenados não puderam ser descriptografados com nenhuma chave configurada e são tratados como não definidos (issue #927). Os detalhes nomeiam as configurações e os provedores OIDC afetados — restaure como chave anterior a chave que os gravou ou informe os segredos novamente."
     },
+    "secretsReencryptionFailed": {
+      "label": "Falha na recriptografia",
+      "description": "A recriptografia dos segredos armazenados na inicialização falhou (issue #927). A instância iniciou mesmo assim e tentará novamente na próxima inicialização; os detalhes indicam o tipo de erro e o log do servidor, o restante."
+    },
     "fallback": {
       "label": "{{type}}",
       "description": "Um evento de revisão registrado."

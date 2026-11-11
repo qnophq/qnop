@@ -178,6 +178,11 @@ export const AUDIT_EVENT_META: Record<string, AuditEventMeta> = {
     descriptionKey: 'events.secretsUnreadable.description',
     tone: 'red',
   },
+  'secrets.reencryption_failed': {
+    labelKey: 'events.secretsReencryptionFailed.label',
+    descriptionKey: 'events.secretsReencryptionFailed.description',
+    tone: 'amber',
+  },
 };
 
 /** The event types in a sensible display order — drives the filter and the legend. */
