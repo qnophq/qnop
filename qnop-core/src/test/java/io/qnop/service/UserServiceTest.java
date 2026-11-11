@@ -72,6 +72,26 @@ class UserServiceTest {
   }
 
   @Test
+  @DisplayName("provisionExternal neutralises control characters from identity-provider claims")
+  void provisionExternalNeutralisesControlCharacters() {
+    when(users.save(any(User.class))).thenAnswer(i -> i.getArgument(0));
+
+    User user = service.provisionExternal("Jane\r\nDoe\t", "jane@example.com");
+
+    assertThat(user.getDisplayName()).isEqualTo("Jane  Doe");
+  }
+
+  @Test
+  @DisplayName("provisionExternal falls back to the e-mail local part when no name is left")
+  void provisionExternalFallsBackWhenTheNameIsOnlyControlCharacters() {
+    when(users.save(any(User.class))).thenAnswer(i -> i.getArgument(0));
+
+    assertThat(service.provisionExternal("\r\n\t", "jane.doe@example.com").getDisplayName())
+        .isEqualTo("jane.doe");
+    assertThat(service.provisionExternal(null, null).getDisplayName()).isEqualTo("user");
+  }
+
+  @Test
   @DisplayName("getProfile throws for an unknown user")
   void getProfileRejectsUnknownUser() {
     UUID id = UUID.randomUUID();

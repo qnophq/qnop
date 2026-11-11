@@ -168,6 +168,22 @@ class AdminUserServiceTest {
   }
 
   @Test
+  @DisplayName("create and update reject a display name with control characters")
+  void displayNameWithControlCharactersRejected() {
+    UUID id = UUID.randomUUID();
+    User member = User.internal("Old Name", "m@example.com", "m", "h");
+    member.setRole(UserRole.MEMBER);
+    when(users.findById(id)).thenReturn(Optional.of(member));
+
+    assertThatThrownBy(
+            () -> service.create("Bad\r\nName", "bad", "bad@example.com", "MEMBER", "pw-123456"))
+        .isInstanceOf(InvalidTextException.class);
+    assertThatThrownBy(() -> service.update(id, "Bad\nName", null, null, UUID.randomUUID()))
+        .isInstanceOf(InvalidTextException.class);
+    assertThat(member.getDisplayName()).isEqualTo("Old Name");
+  }
+
+  @Test
   @DisplayName("update changes display name and role for a non-admin target")
   void updateAppliesChanges() {
     UUID id = UUID.randomUUID();

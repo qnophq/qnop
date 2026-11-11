@@ -492,6 +492,7 @@ public class TeamService {
     if (trimmed.isEmpty()) {
       throw new IllegalArgumentException("name is required");
     }
+    InvalidTextException.requireNoControlCharacters("name", trimmed); // issue #909
     return trimmed;
   }
 

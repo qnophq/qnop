@@ -20,13 +20,11 @@
  */
 package io.qnop.service.branding;
 
-import java.awt.image.BufferedImage;
+import io.qnop.service.image.ImageHeaderProbe;
 import java.io.ByteArrayInputStream;
-import java.io.IOException;
 import java.util.Optional;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
-import javax.imageio.ImageIO;
 import javax.xml.XMLConstants;
 import javax.xml.parsers.DocumentBuilderFactory;
 import org.slf4j.Logger;
@@ -34,11 +32,11 @@ import org.slf4j.LoggerFactory;
 import org.w3c.dom.Element;
 
 /**
- * Best-effort intrinsic dimensions of a branding asset (issue #23): raster formats via {@code
- * ImageIO}, SVG via its {@code viewBox} (or {@code width}/{@code height}). Returns empty when the
- * dimensions cannot be determined (e.g. WebP without an ImageIO plugin, or an SVG without a
- * viewBox) — the caller treats unknown dimensions as "skip the pixel-bound check" and relies on the
- * byte-size cap.
+ * Best-effort intrinsic dimensions of a branding asset (issue #23): raster formats from their
+ * header via {@link ImageHeaderProbe} (no pixel decode, issue #906), SVG via its {@code viewBox}
+ * (or {@code width}/{@code height}). Returns empty when the dimensions cannot be determined (an
+ * unreadable raster header, or an SVG without a viewBox). Upload validation rejects a raster with
+ * unknown dimensions; an SVG without them relies on the byte-size cap.
  */
 public record ImageDimensions(int width, int height) {
 
@@ -56,15 +54,9 @@ public record ImageDimensions(int width, int height) {
     };
   }
 
+  /** Header-only: no pixels are decoded (issue #906). */
   private static Optional<ImageDimensions> readRaster(byte[] bytes) {
-    try {
-      BufferedImage image = ImageIO.read(new ByteArrayInputStream(bytes));
-      return image == null
-          ? Optional.empty()
-          : Optional.of(new ImageDimensions(image.getWidth(), image.getHeight()));
-    } catch (IOException e) {
-      return Optional.empty();
-    }
+    return ImageHeaderProbe.probe(bytes).map(d -> new ImageDimensions(d.width(), d.height()));
   }
 
   private static Optional<ImageDimensions> readSvg(byte[] bytes) {

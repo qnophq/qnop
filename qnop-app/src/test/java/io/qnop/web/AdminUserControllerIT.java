@@ -189,6 +189,26 @@ class AdminUserControllerIT extends AbstractIntegrationTest {
   }
 
   @Test
+  void createRejectsADisplayNameWithLineBreaksAs400() throws Exception {
+    createUser("root", UserRole.ADMIN);
+    String token = adminToken();
+    String body =
+        """
+        {"displayName":"Two\\r\\nLines","username":"twolines","email":"two@example.com",\
+        "role":"MEMBER","initialPassword":"a-strong-pass-1"}""";
+
+    mockMvc
+        .perform(
+            post("/api/v1/admin/users")
+                .header("Authorization", "Bearer " + token)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(body))
+        .andExpect(status().isBadRequest())
+        .andExpect(jsonPath("$.code").value("VALIDATION_ERROR"))
+        .andExpect(jsonPath("$.fieldErrors[0].field").value("displayName"));
+  }
+
+  @Test
   void adminUpdatesRole() throws Exception {
     createUser("root", UserRole.ADMIN);
     User target = createUser("member", UserRole.MEMBER);

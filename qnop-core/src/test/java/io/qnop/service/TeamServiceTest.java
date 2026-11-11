@@ -58,6 +58,16 @@ class TeamServiceTest {
   private final TeamService service = new TeamService(teams, memberships, users, slugs, noLimits());
 
   @Test
+  @DisplayName("create rejects a team name with control or bidi-override characters")
+  void createRejectsControlCharactersInName() {
+    for (String name : new String[] {"Core\r\nTeam", "Core\u202ETeam"}) {
+      assertThatThrownBy(() -> service.create(name, null, UUID.randomUUID(), null, null, null))
+          .isInstanceOf(InvalidTextException.class);
+    }
+    verify(teams, never()).save(any());
+  }
+
+  @Test
   @DisplayName("create persists a new team with its initial LEAD and rejects a duplicate name")
   void create() {
     UUID teamId = UUID.randomUUID();

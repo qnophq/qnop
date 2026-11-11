@@ -23,6 +23,7 @@ package io.qnop.service.oidc;
 import io.qnop.entity.OidcProvider;
 import io.qnop.entity.OidcProviderType;
 import io.qnop.repository.OidcProviderRepository;
+import io.qnop.service.InvalidTextException;
 import io.qnop.service.limits.FeatureDisabledException;
 import io.qnop.service.limits.FeatureToggleProperties;
 import java.util.List;
@@ -180,6 +181,7 @@ public class OidcProviderService {
     // Configuring a capability this deployment does not have would be a form
     // that changes nothing (issue #674).
     requireOidcEnabled();
+    InvalidTextException.requireNoControlCharacters("name", name); // issue #909
     if (providers.findByName(name).isPresent()) {
       throw new OidcProviderConflictException(
           "NAME_TAKEN", "A provider with that name already exists.");
@@ -221,6 +223,7 @@ public class OidcProviderService {
       provider.setEnabled(patch.enabled());
     }
     if (isSet(patch.name())) {
+      InvalidTextException.requireNoControlCharacters("name", patch.name());
       provider.setName(patch.name().trim());
     }
     if (isSet(patch.clientId())) {

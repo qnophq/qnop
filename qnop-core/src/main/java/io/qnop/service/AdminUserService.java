@@ -126,6 +126,7 @@ public class AdminUserService {
   @Transactional
   public AdminUserView create(
       String displayName, String username, String email, String roleName, String initialPassword) {
+    InvalidTextException.requireNoControlCharacters("displayName", displayName);
     // An administrator adding somebody is still an account (issue #673).
     limits.requireUserCapacity();
     String normalizedEmail = normalizeEmail(email);
@@ -183,6 +184,7 @@ public class AdminUserService {
     }
 
     if (displayName != null) {
+      InvalidTextException.requireNoControlCharacters("displayName", displayName);
       user.setDisplayName(displayName);
     }
     user.setRole(newRole);

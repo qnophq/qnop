@@ -30,6 +30,7 @@ import static org.mockito.Mockito.when;
 
 import io.qnop.repository.UserRepository;
 import io.qnop.service.avatar.AvatarStorage.NewAvatar;
+import io.qnop.service.image.ImageFixtures;
 import java.awt.image.BufferedImage;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
@@ -139,15 +140,38 @@ class AvatarServiceTest {
   }
 
   @Test
-  void storeAcceptsWebpWithoutReadableDimensions() {
-    // A RIFF/WEBP header is enough to sniff; ImageIO has no WebP plugin, so dimensions stay null
-    // and only the size cap applies.
-    byte[] webp = {'R', 'I', 'F', 'F', 0, 0, 0, 0, 'W', 'E', 'B', 'P', 'V', 'P', '8', ' '};
-    service.store(userId, webp, actor);
+  void storeAcceptsWebpWithDimensionsFromItsHeader() {
+    service.store(userId, ImageFixtures.webpVp8x(64, 32), actor);
     ArgumentCaptor<NewAvatar> captor = ArgumentCaptor.forClass(NewAvatar.class);
     verify(storage).put(captor.capture());
     assertThat(captor.getValue().contentType()).isEqualTo(AvatarLimits.WEBP);
-    assertThat(captor.getValue().width()).isNull();
+    assertThat(captor.getValue().width()).isEqualTo(64);
+    assertThat(captor.getValue().height()).isEqualTo(32);
+  }
+
+  @Test
+  void storeRejectsWebpWithoutReadableDimensions() {
+    byte[] webp = {'R', 'I', 'F', 'F', 0, 0, 0, 0, 'W', 'E', 'B', 'P', 'V', 'P', '8', ' '};
+    assertThatThrownBy(() -> service.store(userId, webp, actor))
+        .isInstanceOf(AvatarValidationException.class)
+        .satisfies(e -> assertThat(((AvatarValidationException) e).getStatus()).isEqualTo(400));
+    verify(storage, never()).put(any());
+  }
+
+  @Test
+  void storeRejectsLargeDeclaredDimensionsFromTheHeaderAlone() {
+    // Tiny files whose headers declare rasters far beyond the budget: rejected before any decode.
+    for (byte[] declared :
+        new byte[][] {
+          ImageFixtures.pngHeader(20_000, 20_000),
+          ImageFixtures.webpVp8(16_000, 16_000),
+          ImageFixtures.webpVp8x(100_000, 100_000)
+        }) {
+      assertThatThrownBy(() -> service.store(userId, declared, actor))
+          .isInstanceOf(AvatarValidationException.class)
+          .hasMessageContaining("dimensions exceed");
+    }
+    verify(storage, never()).put(any());
   }
 
   @Test
