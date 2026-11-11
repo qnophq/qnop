@@ -40,11 +40,14 @@ public interface EmailVerificationTokenRepository
   /**
    * Atomically consumes a token (issue #61): sets {@code consumed_at} only if it is still null.
    * Returns 1 if this call won the race, 0 if the token was already consumed — so a verification
-   * token cannot be consumed twice under concurrency.
+   * token cannot be consumed twice under concurrency. Like every update that spends a link it also
+   * drops the registration's candidate credentials (issue #900): a spent link has no use for them.
    */
   @Modifying(clearAutomatically = true)
   @Query(
-      "UPDATE EmailVerificationToken t SET t.consumedAt = :at WHERE t.id = :id AND t.consumedAt IS NULL")
+      "UPDATE EmailVerificationToken t SET t.consumedAt = :at, t.candidateUsername = NULL, t.candidateDisplayName = NULL,"
+          + " t.candidatePasswordHash = NULL"
+          + " WHERE t.id = :id AND t.consumedAt IS NULL")
   int markConsumed(@Param("id") UUID id, @Param("at") Instant at);
 
   /**
@@ -64,21 +67,35 @@ public interface EmailVerificationTokenRepository
    */
   @Modifying(clearAutomatically = true)
   @Query(
-      "UPDATE EmailVerificationToken t SET t.consumedAt = :at"
+      "UPDATE EmailVerificationToken t SET t.consumedAt = :at, t.candidateUsername = NULL, t.candidateDisplayName = NULL,"
+          + " t.candidatePasswordHash = NULL"
           + " WHERE t.id = :id AND t.consumedAt IS NULL AND t.failedAttempts >= :max")
   int consumeIfAttemptsExhausted(
       @Param("id") UUID id, @Param("max") int max, @Param("at") Instant at);
 
-  /** Unconsumed tokens of a user, oldest first — to cap how many links are outstanding (#900). */
+  /** Ids of a user's unconsumed tokens, oldest first — to cap outstanding links (#900). */
   @Query(
-      "SELECT t FROM EmailVerificationToken t WHERE t.user.id = :userId AND t.consumedAt IS NULL"
-          + " ORDER BY t.createdAt ASC")
-  List<EmailVerificationToken> findUnconsumedTokensForUserOldestFirst(@Param("userId") UUID userId);
+      "SELECT t.id FROM EmailVerificationToken t WHERE t.user.id = :userId"
+          + " AND t.consumedAt IS NULL ORDER BY t.createdAt ASC, t.id ASC")
+  List<UUID> findUnconsumedIdsForUserOldestFirst(@Param("userId") UUID userId);
 
-  /** Spends every other unconsumed token of a user once one of them was verified (#900). */
+  /** Spends the given still-unconsumed tokens (eviction beyond the cap, #900). */
   @Modifying(clearAutomatically = true)
   @Query(
-      "UPDATE EmailVerificationToken t SET t.consumedAt = :at"
+      "UPDATE EmailVerificationToken t SET t.consumedAt = :at, t.candidateUsername = NULL, t.candidateDisplayName = NULL,"
+          + " t.candidatePasswordHash = NULL"
+          + " WHERE t.id IN :ids AND t.consumedAt IS NULL")
+  int consumeAllById(@Param("ids") List<UUID> ids, @Param("at") Instant at);
+
+  /** When the user's newest verification token was issued — the issuance throttle (#900). */
+  @Query("SELECT MAX(t.createdAt) FROM EmailVerificationToken t WHERE t.user.id = :userId")
+  Optional<Instant> findLatestIssuedAt(@Param("userId") UUID userId);
+
+  /** Spends every unconsumed token of a user once one of them was verified (#900). */
+  @Modifying(clearAutomatically = true)
+  @Query(
+      "UPDATE EmailVerificationToken t SET t.consumedAt = :at, t.candidateUsername = NULL, t.candidateDisplayName = NULL,"
+          + " t.candidatePasswordHash = NULL"
           + " WHERE t.user.id = :userId AND t.consumedAt IS NULL")
   int consumeAllForUser(@Param("userId") UUID userId, @Param("at") Instant at);
 

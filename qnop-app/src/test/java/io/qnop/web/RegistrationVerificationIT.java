@@ -142,11 +142,14 @@ class RegistrationVerificationIT extends SeededIntegrationTest {
     String squatterToken = lastVerificationToken("contested@qnop.test");
     clearInvocations(mail);
 
-    // No cool-down and no invalidation: the owner's registration gets a link of its own.
+    // After the issuance throttle, the owner's registration gets a link of its own; the
+    // squatter's link stays as it is.
+    ageVerificationTokens(java.time.Duration.ofMinutes(6));
     register("owner", "contested@qnop.test", PASSWORD).andExpect(status().isOk());
     String ownerToken = lastVerificationToken("contested@qnop.test");
 
     // A later registration by the squatter does not kill the owner's link either.
+    ageVerificationTokens(java.time.Duration.ofMinutes(6));
     register("squatter", "contested@qnop.test", "Squat-Pass-1234!").andExpect(status().isOk());
 
     // Each link checks its own registration's password.
@@ -326,6 +329,139 @@ class RegistrationVerificationIT extends SeededIntegrationTest {
     }
     int start = yaml.indexOf("UPDATE qnop_user");
     return yaml.substring(start, yaml.indexOf(';', start));
+  }
+
+  @Test
+  @DisplayName(
+      "the per-address throttle and the three-link cap: a displaced link takes three windows, and"
+          + " the owner recovers by registering again")
+  void linkEvictionIsThrottledAndRecoverable() throws Exception {
+    register("evictee", "evictee@qnop.test", PASSWORD).andExpect(status().isOk());
+    String ownerToken = lastVerificationToken("evictee@qnop.test");
+    clearInvocations(mail);
+
+    // Within the throttle window: no new link, no mail.
+    register("evictee", "evictee@qnop.test", "Other-Pass-1234!").andExpect(status().isOk());
+    verify(mail, never()).sendMailFromTemplateAfterCommit(any(), any(), anyMap(), any());
+
+    // Two more registrations, each after a window: three links outstanding, the owner's alive.
+    for (int i = 0; i < 2; i++) {
+      ageVerificationTokens(java.time.Duration.ofMinutes(6));
+      register("evictee", "evictee@qnop.test", "Other-Pass-1234!").andExpect(status().isOk());
+    }
+    assertThat(outstandingLinks("evictee@qnop.test")).isEqualTo(3);
+
+    // The third one after the owner's link displaces it (the oldest).
+    ageVerificationTokens(java.time.Duration.ofMinutes(6));
+    register("evictee", "evictee@qnop.test", "Other-Pass-1234!").andExpect(status().isOk());
+    assertThat(outstandingLinks("evictee@qnop.test")).isEqualTo(3);
+    verifyEmail(ownerToken, PASSWORD)
+        .andExpect(status().isBadRequest())
+        .andExpect(jsonPath("$.code").value("INVALID_VERIFICATION_TOKEN"));
+
+    // Recovery: register again and verify the new link.
+    ageVerificationTokens(java.time.Duration.ofMinutes(6));
+    clearInvocations(mail);
+    register("evictee", "evictee@qnop.test", PASSWORD).andExpect(status().isOk());
+    verifyEmail(lastVerificationToken("evictee@qnop.test"), PASSWORD).andExpect(status().isOk());
+    assertThat(internal("evictee").isEnabled()).isTrue();
+  }
+
+  @Test
+  @DisplayName(
+      "a registration whose username another account took meanwhile cannot be verified; the link"
+          + " is spent and the code says why")
+  void usernameTakenMeanwhileSpendsTheLink() throws Exception {
+    register("first-name", "late@qnop.test", "First-Pass-1234!").andExpect(status().isOk());
+    ageVerificationTokens(java.time.Duration.ofMinutes(6));
+    clearInvocations(mail);
+    register("wanted", "late@qnop.test", PASSWORD).andExpect(status().isOk());
+    String token = lastVerificationToken("late@qnop.test");
+
+    // Candidate usernames reserve nothing: another address registers "wanted" in the meantime.
+    register("wanted", "someone-else@qnop.test", "Else-Pass-1234!").andExpect(status().isOk());
+
+    verifyEmail(token, PASSWORD)
+        .andExpect(status().isBadRequest())
+        .andExpect(jsonPath("$.code").value("VERIFICATION_USERNAME_TAKEN"));
+    verifyEmail(token, PASSWORD)
+        .andExpect(status().isBadRequest())
+        .andExpect(jsonPath("$.code").value("INVALID_VERIFICATION_TOKEN"));
+    assertThat(
+            users
+                .findByEmailIgnoreCaseAndSource("late@qnop.test", UserSource.INTERNAL)
+                .orElseThrow()
+                .isEnabled())
+        .isFalse();
+  }
+
+  @Test
+  @DisplayName("a link issued before credentials moved to the token still verifies against the row")
+  void legacyTokenStillVerifies() throws Exception {
+    register("legacy", "legacy@qnop.test", "Ignored-Pass-1234!").andExpect(status().isOk());
+    User account = internal("legacy");
+    // What a pre-upgrade registration looks like: the password on the row, a token without
+    // candidate credentials.
+    jdbc.update(
+        "UPDATE qnop_user SET password_hash = ? WHERE id = ?",
+        passwordEncoder.encode(PASSWORD),
+        account.getId());
+    jdbc.update(
+        "UPDATE email_verification_token SET consumed_at = now(), candidate_username = NULL,"
+            + " candidate_display_name = NULL, candidate_password_hash = NULL WHERE user_id = ?",
+        account.getId());
+    String raw = "legacy-raw-token-value";
+    jdbc.update(
+        "INSERT INTO email_verification_token (id, user_id, token_hash, created_at, expires_at)"
+            + " VALUES (?, ?, ?, now(), now() + interval '1 day')",
+        java.util.UUID.randomUUID(),
+        account.getId(),
+        sha256Hex(raw));
+
+    verifyEmail(raw, PASSWORD).andExpect(status().isOk());
+    User active = internal("legacy");
+    assertThat(active.isEnabled()).isTrue();
+    assertThat(passwordEncoder.matches(PASSWORD, active.getPasswordHash())).isTrue();
+  }
+
+  @Test
+  @DisplayName("an admin cannot enable an account that is still pending verification (409)")
+  void adminEnableOfAPendingAccountIsRefused() throws Exception {
+    register("waiting", "waiting@qnop.test", PASSWORD).andExpect(status().isOk());
+    User account = internal("waiting");
+
+    mockMvc
+        .perform(
+            org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch(
+                    "/api/v1/admin/users/" + account.getId())
+                .header("Authorization", "Bearer " + token(ADMIN_ID))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"enabled\":true}"))
+        .andExpect(status().isConflict())
+        .andExpect(jsonPath("$.code").value("USER_PENDING_VERIFICATION"));
+    assertThat(internal("waiting").isEnabled()).isFalse();
+    assertThat(internal("waiting").isEmailVerificationPending()).isTrue();
+  }
+
+  private int outstandingLinks(String email) {
+    return jdbc.queryForObject(
+        "SELECT count(*) FROM email_verification_token t JOIN qnop_user u ON u.id = t.user_id"
+            + " WHERE lower(u.email) = lower(?) AND t.consumed_at IS NULL",
+        Integer.class,
+        email);
+  }
+
+  private void ageVerificationTokens(java.time.Duration age) {
+    jdbc.update(
+        "UPDATE email_verification_token SET created_at = created_at - (? * interval '1 second')",
+        age.toSeconds());
+  }
+
+  private static String sha256Hex(String input) throws Exception {
+    byte[] digest =
+        java.security.MessageDigest.getInstance("SHA-256")
+            .digest(input.getBytes(StandardCharsets.UTF_8));
+    return java.util.HexFormat.of().formatHex(digest);
   }
 
   private User internal(String username) {

@@ -106,20 +106,19 @@ class UserServiceTest {
 
   @Test
   @DisplayName(
-      "createPendingRegistration stores the given hash, falls back to the username and leaves the"
-          + " account disabled and pending verification")
+      "createPendingRegistration stores no registrant password, falls back to the username and"
+          + " leaves the account disabled and pending verification")
   void createPendingRegistrationFallsBackToUsername() {
     when(users.save(any(User.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
     User created =
-        service.createPendingRegistration(
-            "jdoe", "JDoe@Example.com", "hashed", "  ", UserRole.MEMBER);
+        service.createPendingRegistration("jdoe", "JDoe@Example.com", "  ", UserRole.MEMBER);
 
     assertThat(created.getDisplayName()).isEqualTo("jdoe");
     assertThat(created.getRole()).isEqualTo(UserRole.MEMBER);
     assertThat(created.isEnabled()).isFalse();
     assertThat(created.isEmailVerificationPending()).isTrue();
-    assertThat(created.getPasswordHash()).isEqualTo("hashed");
+    assertThat(created.getPasswordHash()).isEqualTo(UserService.PENDING_PASSWORD_PLACEHOLDER);
     assertThat(created.getEmail()).isEqualTo("jdoe@example.com");
   }
 
@@ -128,8 +127,7 @@ class UserServiceTest {
   void createPendingRegistrationWithNullEmail() {
     when(users.save(any(User.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
-    User created =
-        service.createPendingRegistration("jdoe", null, "hashed", "Jane Doe", UserRole.MEMBER);
+    User created = service.createPendingRegistration("jdoe", null, "Jane Doe", UserRole.MEMBER);
 
     assertThat(created.getEmail()).isNull();
     assertThat(created.getDisplayName()).isEqualTo("Jane Doe");
@@ -146,7 +144,8 @@ class UserServiceTest {
     when(users.activateVerifiedRegistration(id, "jane", "Jane Doe", "new-hash")).thenReturn(1);
     when(users.findById(id)).thenReturn(Optional.of(pending));
 
-    assertThat(service.activateVerifiedRegistration(id, "jane", "Jane Doe", "new-hash")).isTrue();
+    assertThat(service.activateVerifiedRegistration(id, "jane", "Jane Doe", "new-hash"))
+        .isEqualTo(UserService.ActivationOutcome.ACTIVATED);
 
     // The earlier registrant's name does not survive in the profile URL (issue #900).
     verify(users).updateSlug(id, "jane-doe");
@@ -173,7 +172,8 @@ class UserServiceTest {
     UUID id = UUID.randomUUID();
     when(users.activateVerifiedRegistration(id, "jane", "jane", "h")).thenReturn(0);
 
-    assertThat(service.activateVerifiedRegistration(id, "jane", null, "h")).isFalse();
+    assertThat(service.activateVerifiedRegistration(id, "jane", null, "h"))
+        .isEqualTo(UserService.ActivationOutcome.NOT_PENDING);
     verify(users, never()).updateSlug(any(), any());
   }
 
@@ -185,7 +185,8 @@ class UserServiceTest {
     when(users.findByUsernameAndSource("jane", UserSource.INTERNAL))
         .thenReturn(Optional.of(other)); // a different (id-less) account
 
-    assertThat(service.activateVerifiedRegistration(id, "jane", "Jane", "h")).isFalse();
+    assertThat(service.activateVerifiedRegistration(id, "jane", "Jane", "h"))
+        .isEqualTo(UserService.ActivationOutcome.USERNAME_TAKEN);
     verify(users, never()).activateVerifiedRegistration(any(), any(), any(), any());
   }
 

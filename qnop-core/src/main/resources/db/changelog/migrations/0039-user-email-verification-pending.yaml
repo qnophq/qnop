@@ -76,3 +76,17 @@ databaseChangeLog:
               - column: { name: candidate_username, type: VARCHAR(64) }
               - column: { name: candidate_display_name, type: VARCHAR(255) }
               - column: { name: candidate_password_hash, type: VARCHAR(255) }
+  - changeSet:
+      id: 0039-email-verification-token-checks
+      author: qnop
+      comment: >-
+        Candidate credentials are all set or all absent; attempt counts never go
+        negative (issue #900).
+      changes:
+        - sql:
+            splitStatements: true
+            sql: |
+              ALTER TABLE email_verification_token ADD CONSTRAINT ck_email_verification_token_candidate
+                CHECK (num_nonnulls(candidate_username, candidate_display_name, candidate_password_hash) IN (0, 3));
+              ALTER TABLE email_verification_token ADD CONSTRAINT ck_email_verification_token_attempts
+                CHECK (failed_attempts >= 0);

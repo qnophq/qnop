@@ -42,7 +42,8 @@
       "SELF_LOCKOUT": "You can't disable or change the role of your own account.",
       "SELF_DELETE": "You can't delete your own account.",
       "EMAIL_TAKEN": "An account with this email already exists.",
-      "USERNAME_TAKEN": "This username is already taken."
+      "USERNAME_TAKEN": "This username is already taken.",
+      "USER_PENDING_VERIFICATION": "This account is still waiting for its email verification. Send a password-reset link instead — it becomes active once its owner sets a password."
     },
     "toasts": {
       "updateFailed": "Could not update {{name}}.",

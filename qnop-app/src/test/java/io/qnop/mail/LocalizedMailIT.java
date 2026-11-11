@@ -224,7 +224,7 @@ class LocalizedMailIT extends SeededIntegrationTest {
     RenderedMail sent =
         germanDeferredMail(MailTemplateKey.REGISTRATION_VERIFICATION, "neu@qnop.test");
     assertThat(sent.subject()).startsWith("Bestätige dein ").endsWith("-Konto");
-    assertThat(sent.bodyPlain()).startsWith("Hallo Neu Nutzer,");
+    assertThat(sent.bodyPlain()).startsWith("Hallo neu,");
   }
 
   @Test

@@ -30,7 +30,9 @@ import io.qnop.service.ApplicationSettingsService;
 import io.qnop.service.auth.EmailVerificationTokenService.InvalidVerificationTokenException;
 import io.qnop.service.auth.RegistrationService;
 import io.qnop.service.auth.RegistrationService.VerificationPasswordMismatchException;
+import io.qnop.service.auth.RegistrationService.VerificationUsernameTakenException;
 import java.time.OffsetDateTime;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.ExceptionHandler;
@@ -76,7 +78,13 @@ public class AuthRegistrationController implements AuthRegistrationApi {
 
   @Override
   public ResponseEntity<VerifyEmailResponse> verifyEmail(VerifyEmailRequest request) {
-    registrationService.verify(request.getToken(), request.getPassword());
+    try {
+      registrationService.verify(request.getToken(), request.getPassword());
+    } catch (DataIntegrityViolationException e) {
+      // The only unique value a verification writes is the username: another account claimed it
+      // between the check and the update (issue #900). Same answer as the checked case, no 500.
+      throw new VerificationUsernameTakenException();
+    }
     return ResponseEntity.ok(
         new VerifyEmailResponse().verified(true).message("Email verified. You can now sign in."));
   }
@@ -94,6 +102,11 @@ public class AuthRegistrationController implements AuthRegistrationApi {
     return verificationError(
         e.linkSpent() ? "INVALID_VERIFICATION_TOKEN" : "VERIFICATION_PASSWORD_MISMATCH",
         e.getMessage());
+  }
+
+  @ExceptionHandler(VerificationUsernameTakenException.class)
+  ResponseEntity<ErrorResponse> usernameTaken(VerificationUsernameTakenException e) {
+    return verificationError("VERIFICATION_USERNAME_TAKEN", e.getMessage());
   }
 
   private static ResponseEntity<ErrorResponse> verificationError(String code, String message) {

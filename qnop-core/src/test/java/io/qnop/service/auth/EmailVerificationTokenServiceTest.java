@@ -24,6 +24,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -66,7 +67,7 @@ class EmailVerificationTokenServiceTest {
   @Test
   @DisplayName("issueForRegistration stores a 24h token carrying the registration's credentials")
   void issueStoresCandidate() {
-    when(tokens.findUnconsumedTokensForUserOldestFirst(any())).thenReturn(List.of());
+    when(tokens.findUnconsumedIdsForUserOldestFirst(any())).thenReturn(List.of());
 
     var issued = service.issueForRegistration(user, "jane2", "Jane Two", "cand-hash");
 
@@ -83,32 +84,39 @@ class EmailVerificationTokenServiceTest {
   @Test
   @DisplayName("other outstanding links stay valid while fewer than the cap are outstanding")
   void issueKeepsOtherLinks() {
-    EmailVerificationToken first = live();
-    EmailVerificationToken second = live();
-    when(tokens.findUnconsumedTokensForUserOldestFirst(any())).thenReturn(List.of(first, second));
+    when(tokens.findUnconsumedIdsForUserOldestFirst(any()))
+        .thenReturn(List.of(UUID.randomUUID(), UUID.randomUUID()));
 
     service.issueForRegistration(user, "jane", "Jane", "h");
 
-    assertThat(first.getConsumedAt()).isNull();
-    assertThat(second.getConsumedAt()).isNull();
+    verify(tokens, never()).consumeAllById(any(), any());
   }
 
   @Test
   @DisplayName("at the cap the oldest outstanding links are spent")
   void issueEvictsTheOldest() {
-    List<EmailVerificationToken> outstanding = new ArrayList<>();
+    List<UUID> outstanding = new ArrayList<>();
     for (int i = 0; i < 4; i++) {
-      outstanding.add(live());
+      outstanding.add(UUID.randomUUID());
     }
-    when(tokens.findUnconsumedTokensForUserOldestFirst(any())).thenReturn(outstanding);
+    when(tokens.findUnconsumedIdsForUserOldestFirst(any())).thenReturn(outstanding);
 
     service.issueForRegistration(user, "jane", "Jane", "h");
 
-    // 4 outstanding + 1 new, cap 3: the two oldest go.
-    assertThat(outstanding.get(0).getConsumedAt()).isNotNull();
-    assertThat(outstanding.get(1).getConsumedAt()).isNotNull();
-    assertThat(outstanding.get(2).getConsumedAt()).isNull();
-    assertThat(outstanding.get(3).getConsumedAt()).isNull();
+    // 4 outstanding + 1 new, cap 3: the two oldest go, in one targeted update.
+    verify(tokens).consumeAllById(eq(outstanding.subList(0, 2)), any());
+  }
+
+  @Test
+  @DisplayName("issuedWithin compares the newest link's age with the window")
+  void issuedWithinUsesTheNewestLink() {
+    UUID userId = UUID.randomUUID();
+    when(tokens.findLatestIssuedAt(userId)).thenReturn(Optional.of(Instant.now().minusSeconds(60)));
+    assertThat(service.issuedWithin(userId, java.time.Duration.ofMinutes(5))).isTrue();
+    assertThat(service.issuedWithin(userId, java.time.Duration.ofSeconds(30))).isFalse();
+
+    when(tokens.findLatestIssuedAt(userId)).thenReturn(Optional.empty());
+    assertThat(service.issuedWithin(userId, java.time.Duration.ofMinutes(5))).isFalse();
   }
 
   @Test

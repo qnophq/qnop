@@ -212,12 +212,11 @@ class TokenSchemaIT extends AbstractIntegrationTest {
     EmailVerificationToken consumed = new EmailVerificationToken(user, "ev-consumed", EXPIRES);
     consumed.setConsumedAt(Instant.now());
     emailTokens.saveAndFlush(consumed);
+    UUID activeId = emailTokens.findByTokenHash("ev-active").orElseThrow().getId();
 
-    var unconsumed = emailTokens.findUnconsumedTokensForUserOldestFirst(user.getId());
+    var unconsumed = emailTokens.findUnconsumedIdsForUserOldestFirst(user.getId());
 
-    assertThat(unconsumed)
-        .singleElement()
-        .satisfies(t -> assertThat(t.getTokenHash()).isEqualTo("ev-active"));
+    assertThat(unconsumed).containsExactly(activeId);
     assertThat(emailTokens.findByTokenHash("ev-active").orElseThrow().getUser().getId())
         .isEqualTo(user.getId());
   }

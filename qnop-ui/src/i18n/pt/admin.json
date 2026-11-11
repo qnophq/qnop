@@ -44,7 +44,8 @@
       "SELF_LOCKOUT": "Você não pode desativar sua própria conta nem alterar a função dela.",
       "SELF_DELETE": "Você não pode excluir sua própria conta.",
       "EMAIL_TAKEN": "Já existe uma conta com este e-mail.",
-      "USERNAME_TAKEN": "Este nome de usuário já está em uso."
+      "USERNAME_TAKEN": "Este nome de usuário já está em uso.",
+      "USER_PENDING_VERIFICATION": "Esta conta ainda aguarda a confirmação do e-mail. Envie um link de redefinição de senha — ela fica ativa assim que o titular definir uma senha."
     },
     "toasts": {
       "updateFailed": "Não foi possível atualizar {{name}}.",

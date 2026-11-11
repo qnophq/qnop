@@ -218,6 +218,24 @@ class AdminUserServiceTest {
   }
 
   @Test
+  @DisplayName(
+      "enabling an account still pending verification is refused (409): it would activate"
+          + " credentials the owner never confirmed")
+  void enablingAPendingAccountIsRefused() {
+    UUID id = UUID.randomUUID();
+    User pending = User.internal("Pending", "p@example.com", "p", "h");
+    pending.markPendingEmailVerification();
+    when(users.findById(id)).thenReturn(Optional.of(pending));
+
+    assertThatThrownBy(() -> service.update(id, null, null, true, UUID.randomUUID()))
+        .isInstanceOf(AdminUserConflictException.class)
+        .extracting("code")
+        .isEqualTo("USER_PENDING_VERIFICATION");
+    assertThat(pending.isEnabled()).isFalse();
+    assertThat(pending.isEmailVerificationPending()).isTrue();
+  }
+
+  @Test
   @DisplayName("disabling a user revokes their active sessions")
   void updateDisablingRevokesSessions() {
     UUID id = UUID.randomUUID();
@@ -413,6 +431,25 @@ class AdminUserServiceTest {
     verify(passwordResetFlow).sendSetupLink(internal, MailTemplateKey.ADMIN_PASSWORD_RESET);
     verify(refreshTokens).revokeAllForUser(internalId);
     verify(users).bumpPasswordInvalidatedBefore(eq(internalId), any());
+  }
+
+  @Test
+  @DisplayName(
+      "a reset link for an account pending verification activates it with no usable password —"
+          + " only whoever gets the link at the address can sign in (#900)")
+  void sendPasswordResetSettlesAPendingAccount() {
+    UUID id = UUID.randomUUID();
+    User pending = User.internal("Pending", "p@example.com", "p", "candidate-of-someone");
+    pending.markPendingEmailVerification();
+    when(users.findById(id)).thenReturn(Optional.of(pending));
+    when(passwordResetFlow.sendSetupLink(pending, MailTemplateKey.ADMIN_PASSWORD_RESET))
+        .thenReturn(new SetupLinkOutcome(true, "https://app/reset?token=z"));
+
+    service.sendPasswordReset(id);
+
+    assertThat(pending.isEnabled()).isTrue();
+    assertThat(pending.isEmailVerificationPending()).isFalse();
+    assertThat(pending.getPasswordHash()).isEqualTo(UserService.PENDING_PASSWORD_PLACEHOLDER);
   }
 
   @Test

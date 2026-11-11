@@ -1060,7 +1060,10 @@ paths:
       description: |
         Partial update of display name, global role and enabled state. The
         self-lockout guard rejects (409) an attempt to disable or demote your own
-        account or the last remaining admin.
+        account or the last remaining admin. Enabling an account that is still
+        pending its e-mail verification is refused (409 `USER_PENDING_VERIFICATION`);
+        send it a password-reset link instead, which activates it without any
+        registrant-chosen password.
       operationId: updateUser
       security:
         - bearerAuth: []
@@ -1092,7 +1095,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
         '409':
-          description: Self-lockout or last-admin guard violated
+          description: Self-lockout or last-admin guard violated, or the account is pending verification
           content:
             application/json:
               schema:
@@ -1931,7 +1934,9 @@ paths:
         administrator has disabled. A wrong password leaves
         the token usable (`VERIFICATION_PASSWORD_MISMATCH`) up to five times; the fifth
         spends it. An unknown, expired, used or spent token, or an account no longer
-        pending, is `INVALID_VERIFICATION_TOKEN` — the registrant registers again.
+        pending, is `INVALID_VERIFICATION_TOKEN` — the registrant registers again. If
+        the registration's username was taken by another account in the meantime, the
+        link is spent and the answer is `VERIFICATION_USERNAME_TAKEN`.
         Rate-limited per client IP.
       operationId: verifyEmail
       security: []

@@ -62,6 +62,8 @@ export function VerifyEmailPage() {
       const code = apiErrorCode(err);
       if (code === 'VERIFICATION_PASSWORD_MISMATCH') {
         setError(t('verifyEmail.passwordMismatch'));
+      } else if (code === 'VERIFICATION_USERNAME_TAKEN') {
+        setError(t('verifyEmail.usernameTaken'));
       } else if (code === 'INVALID_VERIFICATION_TOKEN') {
         setStatus('invalid');
       } else {

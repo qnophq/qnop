@@ -73,18 +73,19 @@ public class EmailVerificationTokenService {
 
   /**
    * Issues a token for one registration of {@code user}'s pending address, carrying the credentials
-   * that registration asked for (issue #900). Other outstanding tokens stay valid — two
-   * registrations of one address cannot invalidate each other — except that at most {@value
-   * #MAX_OUTSTANDING_TOKENS} are kept: the oldest beyond that are spent.
+   * that registration asked for (issue #900). Other outstanding tokens stay valid, up to {@value
+   * #MAX_OUTSTANDING_TOKENS}: the oldest beyond that are spent with one targeted update. The caller
+   * holds the lock on the account row (see {@code UserService#lockForUpdate}), which makes this cap
+   * exact under concurrent registrations.
    */
   @Transactional
   public IssuedToken issueForRegistration(
       User user, String username, String displayName, String passwordHash) {
     Instant now = Instant.now();
-    List<EmailVerificationToken> outstanding =
-        tokens.findUnconsumedTokensForUserOldestFirst(user.getId());
-    for (int i = 0; i <= outstanding.size() - MAX_OUTSTANDING_TOKENS; i++) {
-      outstanding.get(i).setConsumedAt(now);
+    List<UUID> outstanding = tokens.findUnconsumedIdsForUserOldestFirst(user.getId());
+    int surplus = outstanding.size() - (MAX_OUTSTANDING_TOKENS - 1);
+    if (surplus > 0) {
+      tokens.consumeAllById(outstanding.subList(0, surplus), now);
     }
     String rawToken = generateRawToken();
     Instant expiresAt = now.plus(TOKEN_TTL);
@@ -92,6 +93,20 @@ public class EmailVerificationTokenService {
         new EmailVerificationToken(
             user, sha256Hex(rawToken), expiresAt, username, displayName, passwordHash));
     return new IssuedToken(rawToken, expiresAt);
+  }
+
+  /**
+   * Whether the user's newest verification link is younger than {@code window} — the per-address
+   * issuance throttle (issue #900): within it a further registration issues no link and sends no
+   * mail, so displacing a link through the cap takes at least {@code MAX_OUTSTANDING_TOKENS}
+   * windows.
+   */
+  @Transactional(readOnly = true)
+  public boolean issuedWithin(UUID userId, Duration window) {
+    return tokens
+        .findLatestIssuedAt(userId)
+        .map(issued -> issued.isAfter(Instant.now().minus(window)))
+        .orElse(false);
   }
 
   /**

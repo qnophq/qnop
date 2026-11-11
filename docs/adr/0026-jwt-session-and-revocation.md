@@ -135,20 +135,43 @@ comes into being without an authenticated session. Both are hardened:
 - **Credentials are bound to the verification token, not to the account row.**
   Every (re)registration of a pending address issues a token that carries that
   registration's candidate username, display name and password hash
-  (`email_verification_token.candidate_*`, migration 0039); it does **not**
-  invalidate the other outstanding tokens. Verifying a token with its own password
-  activates the account with exactly that token's credentials (one conditional,
-  version-bumping update; the profile slug follows the verified display name) and
-  spends every other token of the address. So neither party can block or
-  invalidate the other — a registration by someone who does not own the address
-  leaves the owner's link working, and only the mailbox owner, who receives the
-  links, can complete any of them. At most three links per address are
-  outstanding (the oldest are spent); volume per address is the job of the
-  register rate limits. Tokens issued before this change carry no candidate and
-  fall back to the account row. An earlier draft let the newest registration
-  replace the account row's credentials (and then a cool-down to stop it from
-  killing fresh links); both directions let a third party interfere, which the
-  token binding removes structurally.
+  (`email_verification_token.candidate_*`, migration 0039, all set or all null by
+  check constraint); it does not invalidate the other outstanding tokens. The
+  account row of a pending registration holds no registrant password at all (an
+  unmatchable placeholder). Verifying a token with its own password activates the
+  account with exactly that token's credentials (one conditional, version-bumping
+  update; the profile slug follows the verified display name) and spends every
+  other token of the address. Every update that spends a link also nulls its
+  candidate columns. A third party who registers somebody else's address can
+  therefore never complete or hijack the account — only the mailbox owner, who
+  receives the links, can complete one — and leaves the owner's link working.
+  What it *can* do is bounded: at most three links per address are outstanding
+  (registering beyond that spends the oldest, in one targeted update) and at most
+  one new link and mail is issued per address per five minutes (the newest
+  token's `created_at`; within the window a registration is a uniform no-op that
+  still pays the BCrypt cost). Displacing an owner's link therefore takes at
+  least three windows (≥ 15 minutes), after which the owner simply registers
+  again; the per-e-mail register buckets of #931 bound the volume further. The
+  cap check and insert run under a lock on the account row, so concurrent
+  registrations cannot overshoot it. A candidate username reserves nothing: if
+  another account takes it before verification, the link is spent and the answer
+  is `VERIFICATION_USERNAME_TAKEN` (also for the unique-index race), and the
+  registrant registers again with another username. Tokens issued before this
+  change carry no candidate and fall back to the account row. An earlier draft
+  let the newest registration replace the account row's credentials (and then a
+  cool-down to stop it from killing fresh links); both let a third party
+  interfere far more cheaply.
+- **The verification mail greets the address, not the request.** The greeting is
+  the local part of the address; no text from the registration request appears in
+  any registration mail.
+- **An administrator cannot enable a pending account** (409
+  `USER_PENDING_VERIFICATION`): that would activate credentials nobody confirmed.
+  The admin's way in is the password-reset link (or a generated password), which
+  activates the account without any registrant's password, so only whoever holds
+  the link at the address — or the admin's chosen credential — gets in.
+- **Lock order.** Verify and further registrations of one address both lock the
+  account row first and its tokens second, so they serialise per address and
+  cannot deadlock each other.
 - **Guessing is bounded.** One attempt is reserved atomically **before** the
   password comparison (`UPDATE … SET failed_attempts = failed_attempts + 1 WHERE
   consumed_at IS NULL AND failed_attempts < 5`); no reservation, no comparison.

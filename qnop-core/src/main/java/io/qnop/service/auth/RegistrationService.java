@@ -26,6 +26,7 @@ import io.qnop.service.ApplicationSettingKey;
 import io.qnop.service.ApplicationSettingsService;
 import io.qnop.service.InvalidTextException;
 import io.qnop.service.UserService;
+import io.qnop.service.UserService.ActivationOutcome;
 import io.qnop.service.auth.EmailVerificationTokenService.InvalidVerificationTokenException;
 import io.qnop.service.auth.EmailVerificationTokenService.PendingVerification;
 import io.qnop.service.mail.MailLocaleResolver;
@@ -34,6 +35,7 @@ import io.qnop.service.mail.MailTemplateKey;
 import io.qnop.service.mail.RelativeTimePhrase;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
+import java.time.Duration;
 import java.util.Map;
 import java.util.Optional;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -66,6 +68,14 @@ import org.springframework.transaction.annotation.Transactional;
  */
 @Service
 public class RegistrationService {
+
+  /**
+   * At most one new verification link (and mail) per pending address in this window (issue #900).
+   * With the cap of {@value EmailVerificationTokenService#MAX_OUTSTANDING_TOKENS} outstanding
+   * links, displacing an existing link takes at least that many windows; per-address register rate
+   * limits come on top.
+   */
+  static final Duration ISSUE_THROTTLE = Duration.ofMinutes(5);
 
   private final UserService userService;
   private final EmailVerificationTokenService verificationTokens;
@@ -109,13 +119,20 @@ public class RegistrationService {
 
     if (byEmail.isEmpty() && byUsername.isEmpty()) {
       User user =
-          userService.createPendingRegistration(
-              username, email, passwordHash, displayName, defaultRole());
+          userService.createPendingRegistration(username, email, displayName, defaultRole());
       queueVerificationEmail(user, username, name, passwordHash);
       return;
     }
     if (byEmail.isPresent() && joinsPending(byEmail.get(), byUsername)) {
-      queueVerificationEmail(byEmail.get(), username, name, passwordHash);
+      User pending = byEmail.get();
+      // Account row first, then its tokens — the same order as verify — so concurrent
+      // registrations of one address serialise and the link cap stays exact.
+      userService.lockForUpdate(pending.getId());
+      if (verificationTokens.issuedWithin(pending.getId(), ISSUE_THROTTLE)) {
+        // Per-address throttle: no new link, no mail (the response stays the same).
+        return;
+      }
+      queueVerificationEmail(pending, username, name, passwordHash);
       return;
     }
     queueAttemptNotice(email, byEmail.map(User::getId).orElse(null));
@@ -159,13 +176,22 @@ public class RegistrationService {
    * @throws InvalidVerificationTokenException for an unknown, expired, used or spent token, or an
    *     account that is no longer pending verification (e.g. an administrator disabled it)
    * @throws VerificationPasswordMismatchException when the password does not match
+   * @throws VerificationUsernameTakenException when the registration's username was taken meanwhile
+   *     (the link is spent)
    */
-  @Transactional(noRollbackFor = VerificationPasswordMismatchException.class)
+  @Transactional(
+      noRollbackFor = {
+        VerificationPasswordMismatchException.class,
+        VerificationUsernameTakenException.class
+      })
   public void verify(String rawToken, String password) {
     PendingVerification pending = verificationTokens.peek(rawToken);
     if (!pending.accountPending()) {
       throw new InvalidVerificationTokenException("Verification token is no longer valid");
     }
+    // Account row first, then the token: every verify and every registration of this address
+    // takes the locks in this order.
+    userService.lockForUpdate(pending.userId());
     if (!verificationTokens.reserveAttempt(pending.tokenId())) {
       throw new InvalidVerificationTokenException("Verification token is no longer valid");
     }
@@ -176,20 +202,32 @@ public class RegistrationService {
       throw new VerificationPasswordMismatchException(
           verificationTokens.spendIfExhausted(pending.tokenId()));
     }
-    verificationTokens.consume(pending.tokenId());
     // Conditional on the pending flag in the database, so an administrator's decision or another
-    // link verified concurrently still wins; the throw rolls the consumption back with it.
-    if (!userService.activateVerifiedRegistration(
-        pending.userId(), pending.username(), pending.displayName(), pending.passwordHash())) {
-      throw new InvalidVerificationTokenException("Verification token is no longer valid");
+    // link verified concurrently still wins; that throw rolls everything back.
+    ActivationOutcome outcome =
+        userService.activateVerifiedRegistration(
+            pending.userId(), pending.username(), pending.displayName(), pending.passwordHash());
+    switch (outcome) {
+      case USERNAME_TAKEN -> {
+        // This link can never succeed: spend it (committed, noRollbackFor) instead of letting
+        // every retry cost another password comparison.
+        verificationTokens.consume(pending.tokenId());
+        throw new VerificationUsernameTakenException();
+      }
+      case NOT_PENDING ->
+          throw new InvalidVerificationTokenException("Verification token is no longer valid");
+      case ACTIVATED -> {
+        verificationTokens.consume(pending.tokenId());
+        verificationTokens.consumeAllForUser(pending.userId());
+      }
     }
-    verificationTokens.consumeAllForUser(pending.userId());
   }
 
   /**
-   * Issues this registration's own link and queues the mail. The greeting uses the name given in
-   * this registration — the mail is the registrant's own. The language is the account's (a
-   * brand-new account has none yet, so the application default applies, issue #853).
+   * Issues this registration's own link and queues the mail. The greeting never uses a name from
+   * the request — whoever registers an address need not be its owner — but the address's own local
+   * part. The language is the account's (a brand-new account has none yet, so the application
+   * default applies, issue #853).
    */
   private void queueVerificationEmail(
       User user, String username, String displayName, String passwordHash) {
@@ -200,7 +238,7 @@ public class RegistrationService {
         user.getEmail(),
         Map.of(
             "siteName", siteName(),
-            "recipientName", displayName,
+            "recipientName", localPart(user.getEmail()),
             "actionUrl", verifyUrl(issued.rawToken()),
             "expiresAtHuman", RelativeTimePhrase.until(issued.expiresAt(), locale)),
         locale);
@@ -220,6 +258,12 @@ public class RegistrationService {
         locale);
   }
 
+  /** The part of an address before the {@code @}: the owner's own text, never the requester's. */
+  private static String localPart(String email) {
+    int at = email.indexOf('@');
+    return at > 0 ? email.substring(0, at) : email;
+  }
+
   private String verifyUrl(String rawToken) {
     return baseUrl() + "/verify-email?token=" + URLEncoder.encode(rawToken, StandardCharsets.UTF_8);
   }
@@ -231,6 +275,16 @@ public class RegistrationService {
   private String baseUrl() {
     String base = settings.getString(ApplicationSettingKey.GENERAL_BASE_URL);
     return base.endsWith("/") ? base.substring(0, base.length() - 1) : base;
+  }
+
+  /**
+   * The verified registration's username was taken by another account in the meantime (issue #900);
+   * the link is spent and the registrant registers again with another username.
+   */
+  public static class VerificationUsernameTakenException extends RuntimeException {
+    public VerificationUsernameTakenException() {
+      super("The username of this registration is no longer available; please register again");
+    }
   }
 
   /** The password presented at verification is not the one chosen at registration (issue #900). */

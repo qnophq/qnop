@@ -83,15 +83,16 @@ public class EmailVerificationToken {
    * The credentials the registration behind this token asked for (issue #900). Verifying THIS
    * token applies exactly these to the account, so two registrations of one pending address can
    * neither overwrite nor invalidate each other — only the mailbox owner, who receives the links,
-   * completes one. Null on tokens issued before this design: the account row applies then.
+   * completes one. Null on tokens issued before this design (the account row applies then), and
+   * nulled as soon as a link is spent.
    */
-  @Column(name = "candidate_username", length = 64, updatable = false)
+  @Column(name = "candidate_username", length = 64)
   private String candidateUsername;
 
-  @Column(name = "candidate_display_name", updatable = false)
+  @Column(name = "candidate_display_name")
   private String candidateDisplayName;
 
-  @Column(name = "candidate_password_hash", updatable = false)
+  @Column(name = "candidate_password_hash")
   private String candidatePasswordHash;
 
   protected EmailVerificationToken() {

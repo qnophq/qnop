@@ -171,6 +171,15 @@ public class AdminUserService {
     UserRole newRole = roleName == null ? user.getRole() : requireRole(roleName);
     boolean newEnabled = enabled == null ? user.isEnabled() : enabled;
 
+    if (Boolean.TRUE.equals(enabled) && user.isEmailVerificationPending()) {
+      // Enabling would activate the account with whatever its first registration wrote, not with
+      // credentials the owner of the address confirmed (issue #900). The admin's way in is a
+      // set-password link to that address, which also settles the pending state.
+      throw new AdminUserConflictException(
+          "USER_PENDING_VERIFICATION",
+          "This account is still waiting for its e-mail verification. Send a password-reset link"
+              + " instead: the account becomes active once its owner sets a password.");
+    }
     boolean demoting = user.getRole() == UserRole.ADMIN && newRole != UserRole.ADMIN;
     boolean disabling = user.isEnabled() && !newEnabled;
     boolean roleChanging = newRole != user.getRole();
@@ -258,8 +267,16 @@ public class AdminUserService {
           "NO_LOCAL_PASSWORD",
           "This account signs in via an identity provider; it has no password.");
     }
+    if (user.isEmailVerificationPending()) {
+      // The admin's way to activate an account still waiting for its verification (issue #900):
+      // active with no usable password, so only whoever receives this link at the address can
+      // sign in; the verification links die with the pending state.
+      user.setPasswordHash(UserService.PENDING_PASSWORD_PLACEHOLDER);
+      user.setEnabled(true);
+    }
     SetupLinkOutcome outcome =
         passwordResetFlow.sendSetupLink(user, MailTemplateKey.ADMIN_PASSWORD_RESET);
+    users.flush();
     // Revoke active sessions now (the modifying writes clear the persistence context, so do this
     // after the link has been issued from the still-managed entity).
     users.bumpPasswordInvalidatedBefore(id, Instant.now());
@@ -286,6 +303,10 @@ public class AdminUserService {
     String password = PasswordGenerator.generate();
     user.setPasswordHash(passwordEncoder.encode(password));
     user.setPasswordChangeRequired(true);
+    if (user.isEmailVerificationPending()) {
+      // An admin-chosen credential replaces whatever the registrations asked for (issue #900).
+      user.setEnabled(true);
+    }
     // flush() persists the hash + flag before bumpPasswordInvalidatedBefore clears the context.
     users.flush();
     users.bumpPasswordInvalidatedBefore(id, Instant.now());

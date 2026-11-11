@@ -89,6 +89,17 @@ describe('VerifyEmailPage', () => {
     expect(screen.getByRole('button', { name: /confirm and activate/i })).toBeInTheDocument();
   });
 
+  it('asks to register again when the sign-up username was taken meanwhile', async () => {
+    verifyEmailFn.mockRejectedValue(apiError('VERIFICATION_USERNAME_TAKEN'));
+    renderWithProviders(<VerifyEmailPage />, {
+      initialEntries: ['/verify-email?token=good-token'],
+    });
+
+    await submitPassword('my-password-1');
+
+    expect(await screen.findByText(/has been taken in the meantime/i)).toBeInTheDocument();
+  });
+
   it('shows the dead-link error when the token is rejected', async () => {
     verifyEmailFn.mockRejectedValue(apiError('INVALID_VERIFICATION_TOKEN'));
     renderWithProviders(<VerifyEmailPage />, { initialEntries: ['/verify-email?token=stale'] });

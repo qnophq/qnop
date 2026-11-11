@@ -53,6 +53,11 @@ public interface UserRepository extends JpaRepository<User, UUID> {
           + " WHERE u.id IN :ids")
   List<UserDisplayName> findDisplayNamesByIdIn(@Param("ids") Collection<UUID> ids);
 
+  /** Reads a user with a row lock held until the transaction ends (issue #900). */
+  @org.springframework.data.jpa.repository.Lock(jakarta.persistence.LockModeType.PESSIMISTIC_WRITE)
+  @Query("SELECT u FROM User u WHERE u.id = :id")
+  Optional<User> findByIdForUpdate(@Param("id") UUID id);
+
   /** Finds an internal user by exact username. */
   Optional<User> findByUsernameAndSource(String username, UserSource source);
 
