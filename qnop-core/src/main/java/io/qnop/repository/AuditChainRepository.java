@@ -22,7 +22,9 @@ package io.qnop.repository;
 
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.PersistenceContext;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 import java.util.UUID;
 import org.springframework.stereotype.Repository;
 
@@ -38,8 +40,13 @@ import org.springframework.stereotype.Repository;
 @Repository
 public class AuditChainRepository {
 
-  /** The tombstone event type the prune trigger writes (keep in sync with 0041-audit-chain.sql). */
+  /** The tombstone event type the prune trigger writes (keep in sync with 0040-audit-chain.sql). */
   public static final String PRUNED_EVENT_TYPE = "audit.chain.pruned";
+
+  /** Event types that explain a document deletion (ReviewDeletionService, ReviewPurgeService). */
+  static final String REVIEW_DELETED_EVENT_TYPE = "review.deleted";
+
+  static final String REVIEW_PURGED_EVENT_TYPE = "review.purged";
 
   @PersistenceContext private EntityManager entityManager;
 
@@ -78,18 +85,19 @@ public class AuditChainRepository {
         .toList();
   }
 
-  /** Every pruned range recorded by a tombstone event. */
-  public List<AuditChainPrunedRange> findPrunedRanges() {
+  /**
+   * Every tombstone event as raw detail text — parsed defensively by the verifier, so a malformed
+   * tombstone is reported rather than aborting the walk.
+   */
+  public List<AuditChainTombstoneRow> findTombstones() {
     List<?> raw =
         entityManager
             .createNativeQuery(
                 """
-                SELECT e.chain_seq, (r ->> 'fromSeq')::bigint, (r ->> 'toSeq')::bigint,
-                       r ->> 'prevHash', r ->> 'lastHash'
-                FROM audit_event e
-                CROSS JOIN LATERAL jsonb_array_elements(e.detail -> 'ranges') r
-                WHERE e.scope = 'SYSTEM' AND e.event_type = :type
-                  AND jsonb_typeof(e.detail -> 'ranges') = 'array'
+                SELECT chain_seq, detail::text
+                FROM audit_event
+                WHERE scope = 'SYSTEM' AND event_type = :type
+                ORDER BY chain_seq
                 """)
             .setParameter("type", PRUNED_EVENT_TYPE)
             .getResultList();
@@ -97,13 +105,53 @@ public class AuditChainRepository {
         .map(Object[].class::cast)
         .map(
             r ->
-                new AuditChainPrunedRange(
-                    r[0] == null ? null : ((Number) r[0]).longValue(),
-                    ((Number) r[1]).longValue(),
-                    ((Number) r[2]).longValue(),
-                    (String) r[3],
-                    (String) r[4]))
+                new AuditChainTombstoneRow(
+                    r[0] == null ? null : ((Number) r[0]).longValue(), (String) r[1]))
         .toList();
+  }
+
+  /**
+   * Ids of documents whose deletion the trail explains: named by a {@code review.deleted} event or
+   * listed by a {@code review.purged} event (its uncapped {@code documentIds}, or the older capped
+   * {@code purged[].id}). Every JSON access is type-guarded, so odd payloads are skipped, never
+   * fatal.
+   */
+  public Set<String> findExplainedDocumentIds() {
+    List<?> raw =
+        entityManager
+            .createNativeQuery(
+                """
+                SELECT x.detail ->> 'documentId'
+                FROM audit_event x
+                WHERE x.scope = 'SYSTEM' AND x.event_type = :deleted
+                  AND jsonb_typeof(x.detail) = 'object'
+                UNION
+                SELECT d
+                FROM audit_event x
+                CROSS JOIN LATERAL jsonb_array_elements_text(
+                  CASE WHEN jsonb_typeof(x.detail -> 'documentIds') = 'array'
+                       THEN x.detail -> 'documentIds' ELSE '[]'::jsonb END) d
+                WHERE x.scope = 'SYSTEM' AND x.event_type = :purged
+                  AND jsonb_typeof(x.detail) = 'object'
+                UNION
+                SELECT p ->> 'id'
+                FROM audit_event x
+                CROSS JOIN LATERAL jsonb_array_elements(
+                  CASE WHEN jsonb_typeof(x.detail -> 'purged') = 'array'
+                       THEN x.detail -> 'purged' ELSE '[]'::jsonb END) p
+                WHERE x.scope = 'SYSTEM' AND x.event_type = :purged
+                  AND jsonb_typeof(x.detail) = 'object' AND jsonb_typeof(p) = 'object'
+                """)
+            .setParameter("deleted", REVIEW_DELETED_EVENT_TYPE)
+            .setParameter("purged", REVIEW_PURGED_EVENT_TYPE)
+            .getResultList();
+    Set<String> ids = new HashSet<>();
+    for (Object id : raw) {
+      if (id instanceof String text) {
+        ids.add(text);
+      }
+    }
+    return ids;
   }
 
   /** The chain head. */
@@ -117,14 +165,19 @@ public class AuditChainRepository {
   }
 
   /**
-   * Committed rows the commit-time seal never reached — only possible when the sealing trigger was
-   * bypassed.
+   * Committed rows outside the chain: never sealed, or carrying an impossible position — only
+   * possible when the triggers or constraints were bypassed.
    */
   public long countUnsealed() {
-    return ((Number)
-            entityManager
-                .createNativeQuery("SELECT count(*) FROM audit_event WHERE chain_seq IS NULL")
-                .getSingleResult())
-        .longValue();
+    return count("SELECT count(*) FROM audit_event WHERE chain_seq IS NULL OR chain_seq < 1");
+  }
+
+  /** All rows, for the verifier's cross-check against what the walk saw. */
+  public long countAll() {
+    return count("SELECT count(*) FROM audit_event");
+  }
+
+  private long count(String sql) {
+    return ((Number) entityManager.createNativeQuery(sql).getSingleResult()).longValue();
   }
 }

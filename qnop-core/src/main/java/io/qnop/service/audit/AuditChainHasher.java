@@ -32,7 +32,7 @@ import java.util.UUID;
 /**
  * The canonical form and hash of one audit-chain link (issue #928, ADR-0043) — an independent Java
  * re-implementation of {@code audit_event_canonical} / {@code audit_event_seal} in {@code
- * 0041-audit-chain.sql}. The verifier recomputes every row with this class, so a database function
+ * 0040-audit-chain.sql}. The verifier recomputes every row with this class, so a database function
  * quietly redefined to ignore a column cannot make tampering with that column pass.
  *
  * <p>Canonical form: format version {@code "1"}, id, scope, document id, event type, actor id,

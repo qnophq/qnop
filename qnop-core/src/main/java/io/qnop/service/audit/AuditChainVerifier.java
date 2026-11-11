@@ -28,6 +28,7 @@ import java.util.Collection;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 /**
  * Walks the audit hash chain in order and reports every place it does not hold (issue #928,
@@ -37,8 +38,12 @@ import java.util.Map;
  * <p>Checks, per sealed row: its position follows on from the previous one (a hole is acceptable
  * only when a tombstone range covers it exactly and links up on both sides); its {@code prevHash}
  * equals the previous link's hash; and its {@code rowHash} equals the hash recomputed from its
- * content. At the end the walk must arrive exactly at the recorded chain head, and no committed row
- * may be unsealed.
+ * content. At the end the walk must arrive exactly at the recorded chain head, no committed row may
+ * be unsealed, and the rows walked plus the unsealed ones must account for every row in the table.
+ *
+ * <p>Tombstones are checked too: a malformed one is a {@link ProblemKind#BAD_PRUNE_RANGE} (its
+ * ranges bridge nothing), and every document it names must have its deletion explained by a {@code
+ * review.deleted}/{@code review.purged} event — otherwise {@link ProblemKind#UNEXPLAINED_PRUNE}.
  *
  * <p>After a mismatch the walk continues from the stored hash, so one altered row is reported once
  * rather than as a cascade of every later link.
@@ -60,8 +65,14 @@ public final class AuditChainVerifier {
     CONTENT_MISMATCH,
     /** The walk does not end on the recorded chain head (rows removed from the end, or forged). */
     HEAD_MISMATCH,
-    /** Committed rows that were never sealed (the sealing trigger was bypassed). */
-    UNSEALED_ROWS
+    /** Committed rows that were never sealed, or carry an impossible position (seq < 1). */
+    UNSEALED_ROWS,
+    /** The table holds rows the walk did not account for. */
+    ROW_COUNT_MISMATCH,
+    /** A tombstone names a document whose deletion no review-deleted/purged event explains. */
+    UNEXPLAINED_PRUNE,
+    /** The verification itself failed before reaching a verdict. */
+    VERIFICATION_ERROR
   }
 
   /** One break, located by the chain positions it concerns ({@code count} for unsealed rows). */
@@ -79,6 +90,12 @@ public final class AuditChainVerifier {
     public Report {
       problems = List.copyOf(problems);
     }
+
+    /** The report for a run that failed before reaching a verdict — never "intact". */
+    public static Report failed() {
+      return new Report(
+          false, 0, -1, null, List.of(new Problem(ProblemKind.VERIFICATION_ERROR, 0, 0)), 1);
+    }
   }
 
   private final Map<Long, AuditChainPrunedRange> rangesByStart = new HashMap<>();
@@ -95,21 +112,42 @@ public final class AuditChainVerifier {
   private long rowsChecked;
 
   /**
-   * @param prunedRanges every range recorded by an {@code audit.chain.pruned} tombstone. A range is
-   *     only honoured if it is well-formed and its tombstone was sealed <em>after</em> the rows it
-   *     accounts for — a tombstone cannot vouch for a future it had not seen.
+   * @param tombstones every parsed {@code audit.chain.pruned} tombstone. A range is only honoured
+   *     if its tombstone parsed cleanly, the range is well-formed, and the tombstone was sealed
+   *     <em>after</em> the rows it accounts for — a tombstone cannot vouch for a future it had not
+   *     seen.
+   * @param explainedDocumentIds ids of documents whose deletion a review-deleted/purged event
+   *     records
    */
-  public AuditChainVerifier(Collection<AuditChainPrunedRange> prunedRanges) {
-    for (AuditChainPrunedRange range : prunedRanges) {
-      boolean wellFormed =
-          range.fromSeq() >= 1
-              && range.toSeq() >= range.fromSeq()
-              && range.prevHash() != null
-              && range.lastHash() != null
-              && range.recordedSeq() != null
-              && range.recordedSeq() > range.toSeq();
-      if (wellFormed) {
-        rangesByStart.putIfAbsent(range.fromSeq(), range);
+  public AuditChainVerifier(
+      Collection<AuditChainTombstone> tombstones, Set<String> explainedDocumentIds) {
+    for (AuditChainTombstone tombstone : tombstones) {
+      long at = tombstone.recordedSeq() == null ? 0 : tombstone.recordedSeq();
+      if (tombstone.malformed()) {
+        report(ProblemKind.BAD_PRUNE_RANGE, at, at);
+        continue;
+      }
+      for (String documentId : tombstone.documentIds()) {
+        if (!explainedDocumentIds.contains(documentId)) {
+          report(ProblemKind.UNEXPLAINED_PRUNE, at, at);
+        }
+      }
+      for (AuditChainPrunedRange range : tombstone.ranges()) {
+        boolean wellFormed =
+            range.fromSeq() >= 1
+                && range.toSeq() >= range.fromSeq()
+                && range.recordedSeq() != null
+                && range.recordedSeq() > range.toSeq();
+        if (!wellFormed) {
+          continue;
+        }
+        if (rangesByStart.containsKey(range.fromSeq())) {
+          // Only one deletion can remove a given position; a second claim is suspect.
+          // Tombstones arrive in chain order, so the earliest claim is the one kept.
+          report(ProblemKind.BAD_PRUNE_RANGE, range.fromSeq(), range.toSeq());
+        } else {
+          rangesByStart.put(range.fromSeq(), range);
+        }
       }
     }
   }
@@ -130,8 +168,11 @@ public final class AuditChainVerifier {
     rowsChecked++;
   }
 
-  /** Closes the walk against the chain head and the unsealed-row count, and builds the report. */
-  public Report finish(AuditChainHead head, long unsealedRows) {
+  /**
+   * Closes the walk against the chain head, the unsealed-row count and the table's total row count,
+   * and builds the report.
+   */
+  public Report finish(AuditChainHead head, long unsealedRows, long totalRows) {
     if (head.lastSeq() + 1 < expectedSeq) {
       // Rows exist beyond the recorded head: the head was rewound.
       report(ProblemKind.HEAD_MISMATCH, head.lastSeq(), expectedSeq - 1);
@@ -143,6 +184,9 @@ public final class AuditChainVerifier {
     }
     if (unsealedRows > 0) {
       report(ProblemKind.UNSEALED_ROWS, unsealedRows, unsealedRows);
+    }
+    if (totalRows != rowsChecked + unsealedRows) {
+      report(ProblemKind.ROW_COUNT_MISMATCH, rowsChecked + unsealedRows, totalRows);
     }
     return new Report(
         problemCount == 0, rowsChecked, head.lastSeq(), head.lastHash(), problems, problemCount);

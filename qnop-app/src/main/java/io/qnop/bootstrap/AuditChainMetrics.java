@@ -28,10 +28,12 @@ import io.qnop.service.audit.AuditChainVerifier;
 import org.springframework.stereotype.Component;
 
 /**
- * Publishes the outcome of the latest audit-chain verification on this instance (issue #928,
- * ADR-0043): {@code qnop.audit.chain.intact} is 1 for an intact chain, 0 for a broken one, and NaN
- * until a verification has run here (the job runs on one instance per tick, under its scheduler
- * lock); {@code qnop.audit.chain.problems} counts the breaks found. Alert on {@code intact == 0}.
+ * Publishes the outcome of the latest audit-chain verification (issue #928, ADR-0043): {@code
+ * qnop.audit.chain.intact} is 1 for an intact chain and 0 for a broken one or a run that failed —
+ * this instance's own last run, else the outcome the scheduler persisted for the job, so a restart
+ * or an instance that did not run it still reports; NaN only before any run is known. {@code
+ * qnop.audit.chain.problems} counts the breaks found by this instance's last run. Alert on {@code
+ * intact == 0}.
  */
 @Component
 class AuditChainMetrics implements MeterBinder {
@@ -47,8 +49,8 @@ class AuditChainMetrics implements MeterBinder {
     Gauge.builder(
             "qnop.audit.chain.intact",
             verification,
-            v -> v.lastReport().map(r -> r.intact() ? 1.0 : 0.0).orElse(Double.NaN))
-        .description("1 if the last audit-chain verification on this instance passed, else 0")
+            v -> v.lastKnownIntact().map(intact -> intact ? 1.0 : 0.0).orElse(Double.NaN))
+        .description("1 if the last known audit-chain verification passed, else 0")
         .register(registry);
     Gauge.builder(
             "qnop.audit.chain.problems",

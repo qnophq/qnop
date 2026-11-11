@@ -37,6 +37,7 @@ import io.qnop.service.audit.AuditChainVerificationService;
 import io.qnop.service.audit.AuditChainVerifier.Problem;
 import io.qnop.service.audit.AuditChainVerifier.ProblemKind;
 import io.qnop.service.audit.AuditChainVerifier.Report;
+import io.qnop.service.review.ReviewDeletionService;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -53,6 +54,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.TransactionDefinition;
 import org.springframework.transaction.support.TransactionTemplate;
 
 /**
@@ -69,6 +71,7 @@ class AuditChainIT extends AbstractIntegrationTest {
   @Autowired UserRepository users;
   @Autowired JdbcTemplate jdbc;
   @Autowired PlatformTransactionManager transactionManager;
+  @Autowired ReviewDeletionService reviewDeletion;
 
   private TransactionTemplate tx;
   private final List<UUID> createdUsers = new ArrayList<>();
@@ -207,7 +210,7 @@ class AuditChainIT extends AbstractIntegrationTest {
     saveForDocument(doc.getId(), "test.doc.3");
     saveSystem("test.after", null);
 
-    jdbc.update("DELETE FROM document WHERE id = ?", doc.getId());
+    reviewDeletion.delete(doc.getId(), doc.getOwnerId(), true);
 
     List<String> tombstones =
         jdbc.queryForList(
@@ -281,5 +284,148 @@ class AuditChainIT extends AbstractIntegrationTest {
 
     assertThat(verification.verify().problems())
         .containsExactly(new Problem(ProblemKind.UNSANCTIONED_GAP, 2, 2));
+  }
+
+  @Test
+  @DisplayName("a document deleted without a review-deletion record is an unexplained prune")
+  void unexplainedCascadeDetected() {
+    Document doc = newDocument();
+    saveForDocument(doc.getId(), "test.doc");
+    saveSystem("test.after", null);
+
+    jdbc.update("DELETE FROM document WHERE id = ?", doc.getId());
+
+    assertThat(verification.verify().problems())
+        .extracting(Problem::kind)
+        .containsExactly(ProblemKind.UNEXPLAINED_PRUNE);
+  }
+
+  @Test
+  @DisplayName("a delete issued from another trigger is rejected while the document exists")
+  void deleteFromNonCascadeTriggerRejected() {
+    Document doc = newDocument();
+    saveForDocument(doc.getId(), "test.doc");
+    UUID eventId =
+        jdbc.queryForObject(
+            "SELECT id FROM audit_event WHERE document_id = ?", UUID.class, doc.getId());
+
+    jdbc.execute("CREATE TABLE audit_chain_it_probe (id UUID)");
+    jdbc.execute(
+        """
+        CREATE FUNCTION audit_chain_it_probe_fn() RETURNS TRIGGER LANGUAGE plpgsql AS $$
+        BEGIN
+          DELETE FROM audit_event WHERE id = NEW.id;
+          RETURN NEW;
+        END;
+        $$
+        """);
+    jdbc.execute(
+        "CREATE TRIGGER audit_chain_it_probe_trg AFTER INSERT ON audit_chain_it_probe"
+            + " FOR EACH ROW EXECUTE FUNCTION audit_chain_it_probe_fn()");
+    try {
+      assertThatThrownBy(
+              () ->
+                  tx.executeWithoutResult(
+                      status -> {
+                        // Even with the cascade marker set for this document.
+                        jdbc.queryForObject(
+                            "SELECT set_config('qnop.audit_cascade_docs', ?, true)",
+                            String.class,
+                            doc.getId().toString());
+                        jdbc.update("INSERT INTO audit_chain_it_probe VALUES (?)", eventId);
+                      }))
+          .rootCause()
+          .hasMessageContaining("append-only");
+    } finally {
+      jdbc.execute("DROP TABLE audit_chain_it_probe");
+      jdbc.execute("DROP FUNCTION audit_chain_it_probe_fn()");
+    }
+    assertThat(
+            jdbc.queryForObject(
+                "SELECT count(*) FROM audit_event WHERE id = ?", Long.class, eventId))
+        .isEqualTo(1L);
+  }
+
+  @Test
+  @DisplayName("an insert carrying chain values is rejected")
+  void preSealedInsertRejected() {
+    assertThatThrownBy(
+            () ->
+                jdbc.update(
+                    "INSERT INTO audit_event (id, scope, event_type, created_at, chain_seq,"
+                        + " prev_hash, row_hash) VALUES (gen_random_uuid(), 'SYSTEM', 'test.forged',"
+                        + " now(), 1, repeat('0', 64), repeat('a', 64))"))
+        .rootCause()
+        .hasMessageContaining("assigned by the database");
+  }
+
+  @Test
+  @DisplayName("a tombstone cannot be inserted directly, even with the writer flag set")
+  void directTombstoneInsertRejected() {
+    assertThatThrownBy(
+            () ->
+                tx.executeWithoutResult(
+                    status -> {
+                      jdbc.queryForObject(
+                          "SELECT set_config('qnop.audit_writing_tombstone', 'on', true)",
+                          String.class);
+                      jdbc.update(
+                          "INSERT INTO audit_event (id, scope, event_type, detail, created_at)"
+                              + " VALUES (gen_random_uuid(), 'SYSTEM', ?, '{}'::jsonb, now())",
+                          AuditChainRepository.PRUNED_EVENT_TYPE);
+                    }))
+        .rootCause()
+        .hasMessageContaining("written only by the database");
+  }
+
+  @Test
+  @DisplayName("a malformed tombstone is reported, not fatal")
+  void malformedTombstoneReported() {
+    saveSystem("test.a", null);
+    jdbc.execute("ALTER TABLE audit_event DISABLE TRIGGER trg_audit_event_guard_insert");
+    try {
+      jdbc.update(
+          "INSERT INTO audit_event (id, scope, event_type, detail, created_at)"
+              + " VALUES (gen_random_uuid(), 'SYSTEM', ?, '{\"ranges\": \"oops\"}'::jsonb, now())",
+          AuditChainRepository.PRUNED_EVENT_TYPE);
+    } finally {
+      jdbc.execute("ALTER TABLE audit_event ENABLE TRIGGER trg_audit_event_guard_insert");
+    }
+
+    Report report = verification.verify();
+
+    assertThat(report.problems()).containsExactly(new Problem(ProblemKind.BAD_PRUNE_RANGE, 2, 2));
+    assertThat(verification.lastKnownIntact()).contains(false);
+  }
+
+  @Test
+  @DisplayName("a session-local table cannot stand in for the chain head")
+  void tempTableCannotShadowHead() {
+    tx.executeWithoutResult(
+        status -> {
+          jdbc.execute(
+              "CREATE TEMP TABLE audit_chain_head (id SMALLINT, last_seq BIGINT,"
+                  + " last_hash VARCHAR(64)) ON COMMIT DROP");
+          jdbc.execute("INSERT INTO audit_chain_head VALUES (1, 100, repeat('f', 64))");
+          auditEvents.saveAndFlush(AuditEvent.system("test.shadow", null, null));
+        });
+
+    assertThat(jdbc.queryForList("SELECT chain_seq FROM audit_event", Long.class))
+        .containsExactly(1L);
+    assertThat(verification.verify().intact()).isTrue();
+  }
+
+  @Test
+  @DisplayName("audit writes under snapshot isolation fail with a clear message")
+  void nonReadCommittedWriterRejected() {
+    TransactionTemplate repeatable = new TransactionTemplate(transactionManager);
+    repeatable.setIsolationLevel(TransactionDefinition.ISOLATION_REPEATABLE_READ);
+
+    assertThatThrownBy(
+            () ->
+                repeatable.executeWithoutResult(
+                    status -> auditEvents.save(AuditEvent.system("test.rr", null, null))))
+        .rootCause()
+        .hasMessageContaining("READ COMMITTED");
   }
 }

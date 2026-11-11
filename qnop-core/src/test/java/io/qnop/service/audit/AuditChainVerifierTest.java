@@ -25,13 +25,17 @@ import static org.assertj.core.api.Assertions.assertThat;
 import io.qnop.repository.AuditChainHead;
 import io.qnop.repository.AuditChainPrunedRange;
 import io.qnop.repository.AuditChainRow;
+import io.qnop.repository.AuditChainTombstoneRow;
 import io.qnop.service.audit.AuditChainVerifier.Problem;
 import io.qnop.service.audit.AuditChainVerifier.ProblemKind;
 import io.qnop.service.audit.AuditChainVerifier.Report;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
+import java.util.Set;
+import java.util.TreeMap;
 import java.util.UUID;
+import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -62,9 +66,23 @@ class AuditChainVerifierTest {
 
   private static Report verify(
       List<AuditChainRow> rows, Collection<AuditChainPrunedRange> ranges, AuditChainHead head) {
-    AuditChainVerifier verifier = new AuditChainVerifier(ranges);
+    AuditChainVerifier verifier = new AuditChainVerifier(tombstones(ranges), Set.of(DOC));
     rows.forEach(verifier::accept);
-    return verifier.finish(head, 0);
+    return verifier.finish(head, 0, rows.size());
+  }
+
+  private static final String DOC = "0190a1b2-c3d4-7e5f-8a9b-000000000001";
+
+  /** Wraps ranges into one well-formed tombstone per recording position, naming {@link #DOC}. */
+  private static List<AuditChainTombstone> tombstones(Collection<AuditChainPrunedRange> ranges) {
+    return ranges.stream()
+        .collect(
+            Collectors.groupingBy(
+                AuditChainPrunedRange::recordedSeq, TreeMap::new, Collectors.toList()))
+        .entrySet()
+        .stream()
+        .map(e -> new AuditChainTombstone(e.getKey(), e.getValue(), List.of(DOC), false))
+        .toList();
   }
 
   private static AuditChainHead headOf(List<AuditChainRow> rows) {
@@ -236,12 +254,85 @@ class AuditChainVerifierTest {
   @DisplayName("unsealed committed rows are reported")
   void unsealedRows() {
     List<AuditChainRow> all = chain(2);
-    AuditChainVerifier verifier = new AuditChainVerifier(List.of());
+    AuditChainVerifier verifier = new AuditChainVerifier(List.of(), Set.of());
     all.forEach(verifier::accept);
 
-    Report report = verifier.finish(headOf(all), 3);
+    Report report = verifier.finish(headOf(all), 3, 5);
 
     assertThat(report.problems()).containsExactly(new Problem(ProblemKind.UNSEALED_ROWS, 3, 3));
+  }
+
+  @Test
+  @DisplayName("rows the walk did not see are reported against the table's row count")
+  void rowCountMismatch() {
+    List<AuditChainRow> all = chain(2);
+    AuditChainVerifier verifier = new AuditChainVerifier(List.of(), Set.of());
+    all.forEach(verifier::accept);
+
+    Report report = verifier.finish(headOf(all), 0, 3);
+
+    assertThat(report.problems())
+        .containsExactly(new Problem(ProblemKind.ROW_COUNT_MISMATCH, 2, 3));
+  }
+
+  @Test
+  @DisplayName("a malformed tombstone is reported and bridges nothing")
+  void malformedTombstone() {
+    List<AuditChainRow> all = chain(4);
+    AuditChainTombstone broken =
+        AuditChainTombstone.parse(new AuditChainTombstoneRow(9L, "{\"ranges\": \"oops\"}"));
+    AuditChainVerifier verifier = new AuditChainVerifier(List.of(broken), Set.of());
+    without(all, 2).forEach(verifier::accept);
+
+    Report report = verifier.finish(headOf(all), 0, 3);
+
+    assertThat(report.problems())
+        .containsExactly(
+            new Problem(ProblemKind.BAD_PRUNE_RANGE, 9, 9),
+            new Problem(ProblemKind.UNSANCTIONED_GAP, 2, 2));
+  }
+
+  @Test
+  @DisplayName("a prune of a document whose deletion nothing explains is reported")
+  void unexplainedPrune() {
+    List<AuditChainRow> all = new ArrayList<>(chain(3));
+    all.add(sealed(4, all.get(2).rowHash(), "audit.chain.pruned", "{}"));
+    AuditChainTombstone tombstone =
+        new AuditChainTombstone(4L, List.of(range(all, 2, 2, 4)), List.of("other-doc"), false);
+    AuditChainVerifier verifier = new AuditChainVerifier(List.of(tombstone), Set.of(DOC));
+    without(all, 2).forEach(verifier::accept);
+
+    Report report = verifier.finish(headOf(all), 0, 3);
+
+    assertThat(report.problems()).containsExactly(new Problem(ProblemKind.UNEXPLAINED_PRUNE, 4, 4));
+  }
+
+  @Test
+  @DisplayName("a failed run never reads as intact")
+  void failedReportIsNotIntact() {
+    assertThat(Report.failed().headSeq()).isEqualTo(-1);
+    failedReportShape();
+  }
+
+  @Test
+  @DisplayName("a second tombstone claiming the same positions is reported; the first is kept")
+  void duplicateRangeReported() {
+    List<AuditChainRow> all = new ArrayList<>(chain(3));
+    all.add(sealed(4, all.get(2).rowHash(), "audit.chain.pruned", "{}"));
+    all.add(sealed(5, all.get(3).rowHash(), "audit.chain.pruned", "{}"));
+    AuditChainPrunedRange genuine = range(all, 2, 2, 4);
+    AuditChainPrunedRange rival = new AuditChainPrunedRange(5L, 2, 2, "a", "b");
+
+    Report report = verify(without(all, 2), List.of(genuine, rival), headOf(all));
+
+    assertThat(report.problems()).containsExactly(new Problem(ProblemKind.BAD_PRUNE_RANGE, 2, 2));
+  }
+
+  private static void failedReportShape() {
+    assertThat(Report.failed().intact()).isFalse();
+    assertThat(Report.failed().problems())
+        .extracting(Problem::kind)
+        .containsExactly(ProblemKind.VERIFICATION_ERROR);
   }
 
   @Test

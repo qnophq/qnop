@@ -38,9 +38,27 @@
 -- Resistance where it is cheap: rows can never be UPDATEd (only the seal
 -- itself may fill in the chain columns, once) and never DELETEd directly — the
 -- one sanctioned delete path is the ON DELETE CASCADE from document. A
--- cascade is recorded by a statement trigger as an `audit.chain.pruned`
--- SYSTEM event carrying the removed ranges' boundary hashes, so the verifier
--- can tell a sanctioned purge from a hole.
+-- BEFORE DELETE trigger on document marks, transaction-locally, which
+-- document ids are being deleted; only DOCUMENT rows of a marked document may
+-- go. The cascade is recorded by a statement trigger as an
+-- `audit.chain.pruned` SYSTEM event carrying the document ids and the removed
+-- ranges' boundary hashes, so the verifier can tell a sanctioned purge from a
+-- hole. The statement trigger re-checks the marker itself, so disabling the
+-- row guard alone does not open a delete path, and disabling the tombstone
+-- writer alone leaves a gap the verifier reports. New rows cannot arrive
+-- pre-sealed, and tombstones can only be written by the tombstone trigger.
+
+-- --- preconditions --------------------------------------------------------
+
+-- extract(epoch) returns exact numeric only from PostgreSQL 14 on; earlier
+-- versions would hash rounded timestamps.
+DO $$
+BEGIN
+  IF current_setting('server_version_num')::int < 140000 THEN
+    RAISE EXCEPTION 'qnop requires PostgreSQL 14 or newer (found %)', current_setting('server_version');
+  END IF;
+END;
+$$;
 
 -- --- schema ---------------------------------------------------------------
 
@@ -50,6 +68,8 @@ ALTER TABLE audit_event
   ADD COLUMN row_hash VARCHAR(64);
 
 ALTER TABLE audit_event ADD CONSTRAINT ux_audit_event_chain_seq UNIQUE (chain_seq);
+ALTER TABLE audit_event ADD CONSTRAINT ck_audit_event_chain_seq
+  CHECK (chain_seq IS NULL OR chain_seq >= 1);
 
 -- One row, ever: the position and hash of the newest sealed event.
 CREATE TABLE audit_chain_head (
@@ -81,7 +101,7 @@ LANGUAGE sql
 IMMUTABLE
 AS $fn$
   SELECT string_agg(
-           CASE WHEN f IS NULL THEN '~' ELSE octet_length(f) || ':' || f END,
+           CASE WHEN f IS NULL THEN '~' ELSE octet_length(convert_to(f, 'UTF8')) || ':' || f END,
            '' ORDER BY ord)
   FROM unnest(ARRAY[
          '1',
@@ -101,13 +121,21 @@ CREATE FUNCTION audit_event_seal()
 RETURNS TRIGGER
 LANGUAGE plpgsql
 SECURITY DEFINER
-SET search_path FROM CURRENT
 AS $fn$
 DECLARE
   v_seq BIGINT;
   v_prev VARCHAR(64);
   v_hash VARCHAR(64);
 BEGIN
+  -- The head lock serialises chain order only under READ COMMITTED; under a
+  -- snapshot isolation a concurrent seal would surface as a serialisation
+  -- failure at commit. Fail with a clear message instead.
+  IF current_setting('transaction_isolation') <> 'read committed' THEN
+    RAISE EXCEPTION 'audit events must be written in READ COMMITTED transactions (found %)',
+      current_setting('transaction_isolation')
+      USING ERRCODE = 'invalid_transaction_state';
+  END IF;
+
   -- The row may already be gone again (inserted and cascade-deleted in the
   -- same transaction); then there is nothing to seal.
   PERFORM 1 FROM audit_event WHERE id = NEW.id AND chain_seq IS NULL;
@@ -157,14 +185,48 @@ BEGIN
 END;
 $fn$;
 
--- A direct DELETE runs this at trigger depth 1; the document FK cascade runs
--- it from inside the referential-action trigger, i.e. at depth 2 or more.
+-- Whether a row being deleted belongs to a document whose deletion this
+-- transaction announced (document_mark_audit_cascade) and which is gone.
+-- Only DOCUMENT rows qualify: SYSTEM rows have no document and never leave.
+CREATE FUNCTION audit_event_cascade_sanctioned(p_scope TEXT, p_document_id UUID)
+RETURNS BOOLEAN
+LANGUAGE sql
+STABLE
+AS $fn$
+  SELECT p_scope = 'DOCUMENT'
+     AND p_document_id IS NOT NULL
+     AND p_document_id::text = ANY (string_to_array(
+           coalesce(current_setting('qnop.audit_cascade_docs', true), ''), ','))
+     -- Inside the referential action the parent row is already invisible.
+     AND NOT EXISTS (SELECT 1 FROM document d WHERE d.id = p_document_id)
+$fn$;
+
+-- BEFORE DELETE on document: records the id in a transaction-local marker
+-- before the referential action removes the document's audit rows.
+CREATE FUNCTION document_mark_audit_cascade()
+RETURNS TRIGGER
+LANGUAGE plpgsql
+AS $fn$
+BEGIN
+  PERFORM set_config(
+    'qnop.audit_cascade_docs',
+    coalesce(nullif(current_setting('qnop.audit_cascade_docs', true), '') || ',', '')
+      || OLD.id::text,
+    true);
+  RETURN OLD;
+END;
+$fn$;
+
+-- A row may only go through the document cascade: issued from inside a
+-- trigger (the referential action), for a DOCUMENT row whose document this
+-- transaction is deleting. Everything else is rejected.
 CREATE FUNCTION audit_event_reject_direct_delete()
 RETURNS TRIGGER
 LANGUAGE plpgsql
 AS $fn$
 BEGIN
-  IF pg_trigger_depth() > 1 THEN
+  IF pg_trigger_depth() > 1
+     AND audit_event_cascade_sanctioned(OLD.scope, OLD.document_id) THEN
     RETURN OLD;
   END IF;
   RAISE EXCEPTION 'audit_event is append-only: rows are removed only with their document'
@@ -172,19 +234,50 @@ BEGIN
 END;
 $fn$;
 
+-- New rows arrive unsealed (the seal assigns the chain columns), and the
+-- tombstone event type is reserved for audit_event_record_prune.
+CREATE FUNCTION audit_event_guard_insert()
+RETURNS TRIGGER
+LANGUAGE plpgsql
+AS $fn$
+BEGIN
+  IF NEW.chain_seq IS NOT NULL OR NEW.prev_hash IS NOT NULL OR NEW.row_hash IS NOT NULL THEN
+    RAISE EXCEPTION 'audit_event chain columns are assigned by the database at commit'
+      USING ERRCODE = 'insufficient_privilege';
+  END IF;
+  IF NEW.event_type = 'audit.chain.pruned'
+     AND (pg_trigger_depth() < 2
+          OR coalesce(current_setting('qnop.audit_writing_tombstone', true), '') <> 'on') THEN
+    RAISE EXCEPTION 'audit.chain.pruned events are written only by the database'
+      USING ERRCODE = 'insufficient_privilege';
+  END IF;
+  RETURN NEW;
+END;
+$fn$;
+
 -- --- tombstones for sanctioned (cascade) deletes ----------------------------
 
--- One `audit.chain.pruned` SYSTEM event per deleting statement, listing every
--- maximal run of consecutive removed chain positions with the hash that led
--- into it (prevHash) and the hash it ended on (lastHash). The verifier bridges
--- a hole only when such a range covers it exactly and links up on both sides.
+-- One `audit.chain.pruned` SYSTEM event per deleting statement, listing the
+-- documents and every maximal run of consecutive removed chain positions with
+-- the hash that led into it (prevHash) and the hash it ended on (lastHash).
+-- The verifier bridges a hole only when such a range covers it exactly and
+-- links up on both sides, and only for documents whose deletion the trail
+-- explains. The sanction check is repeated here so that this trigger and the
+-- row guard each refuse an unsanctioned delete on their own.
 CREATE FUNCTION audit_event_record_prune()
 RETURNS TRIGGER
 LANGUAGE plpgsql
 SECURITY DEFINER
-SET search_path FROM CURRENT
 AS $fn$
 BEGIN
+  IF EXISTS (
+    SELECT 1 FROM removed r
+    WHERE NOT coalesce(audit_event_cascade_sanctioned(r.scope, r.document_id), false)) THEN
+    RAISE EXCEPTION 'audit_event is append-only: rows are removed only with their document'
+      USING ERRCODE = 'insufficient_privilege';
+  END IF;
+
+  PERFORM set_config('qnop.audit_writing_tombstone', 'on', true);
   INSERT INTO audit_event (id, scope, document_id, event_type, actor_id, detail, created_at)
   SELECT gen_random_uuid(), 'SYSTEM', NULL, 'audit.chain.pruned', NULL,
          jsonb_build_object(
@@ -210,6 +303,7 @@ BEGIN
     GROUP BY island
   ) g
   HAVING count(*) > 0;
+  PERFORM set_config('qnop.audit_writing_tombstone', 'off', true);
   RETURN NULL;
 END;
 $fn$;
@@ -245,6 +339,30 @@ BEGIN
 END;
 $$;
 
+-- --- search_path ----------------------------------------------------------
+
+-- Every function resolves unqualified names in the schema it was created in,
+-- with pg_temp explicitly last, so no session-local object can shadow a
+-- table inside a trigger (essential for the SECURITY DEFINER ones).
+DO $$
+DECLARE
+  f TEXT;
+BEGIN
+  FOREACH f IN ARRAY ARRAY[
+    'audit_event_canonical(uuid, text, uuid, text, uuid, jsonb, timestamptz)',
+    'audit_event_seal()',
+    'audit_event_reject_update()',
+    'audit_event_cascade_sanctioned(text, uuid)',
+    'document_mark_audit_cascade()',
+    'audit_event_reject_direct_delete()',
+    'audit_event_guard_insert()',
+    'audit_event_record_prune()']
+  LOOP
+    EXECUTE format('ALTER FUNCTION %s SET search_path = %I, pg_temp', f, current_schema());
+  END LOOP;
+END;
+$$;
+
 -- --- triggers -------------------------------------------------------------
 
 CREATE CONSTRAINT TRIGGER trg_audit_event_seal
@@ -264,3 +382,11 @@ CREATE TRIGGER trg_audit_event_record_prune
   AFTER DELETE ON audit_event
   REFERENCING OLD TABLE AS removed
   FOR EACH STATEMENT EXECUTE FUNCTION audit_event_record_prune();
+
+CREATE TRIGGER trg_audit_event_guard_insert
+  BEFORE INSERT ON audit_event
+  FOR EACH ROW EXECUTE FUNCTION audit_event_guard_insert();
+
+CREATE TRIGGER trg_document_mark_audit_cascade
+  BEFORE DELETE ON document
+  FOR EACH ROW EXECUTE FUNCTION document_mark_audit_cascade();

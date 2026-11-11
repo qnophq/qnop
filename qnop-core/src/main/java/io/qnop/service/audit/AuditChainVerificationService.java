@@ -24,6 +24,8 @@ import io.qnop.entity.AuditEvent;
 import io.qnop.repository.AuditChainRepository;
 import io.qnop.repository.AuditChainRow;
 import io.qnop.repository.AuditEventRepository;
+import io.qnop.repository.SchedulerJobRepository;
+import io.qnop.service.scheduler.RunOutcome;
 import io.qnop.service.scheduler.SchedulerJobCatalog;
 import io.qnop.service.scheduler.SchedulerService;
 import java.util.List;
@@ -63,6 +65,7 @@ public class AuditChainVerificationService {
   private final AuditChainRepository chain;
   private final AuditEventRepository auditEvents;
   private final SchedulerService scheduler;
+  private final SchedulerJobRepository schedulerJobs;
   private final TransactionTemplate snapshotTx;
   private final TransactionTemplate writeTx;
 
@@ -72,10 +75,12 @@ public class AuditChainVerificationService {
       AuditChainRepository chain,
       AuditEventRepository auditEvents,
       SchedulerService scheduler,
+      SchedulerJobRepository schedulerJobs,
       PlatformTransactionManager transactionManager) {
     this.chain = chain;
     this.auditEvents = auditEvents;
     this.scheduler = scheduler;
+    this.schedulerJobs = schedulerJobs;
     this.snapshotTx = new TransactionTemplate(transactionManager);
     this.snapshotTx.setIsolationLevel(TransactionDefinition.ISOLATION_REPEATABLE_READ);
     this.snapshotTx.setReadOnly(true);
@@ -95,12 +100,41 @@ public class AuditChainVerificationService {
   }
 
   /**
+   * Whether the chain was intact at the last verification known to this instance: its own last run
+   * if it has one, otherwise the outcome the scheduler persisted for the job (whichever instance
+   * ran it — so a restart does not blank the signal). Empty when no run is known or the lookup
+   * fails.
+   */
+  public Optional<Boolean> lastKnownIntact() {
+    AuditChainVerifier.Report report = lastReport;
+    if (report != null) {
+      return Optional.of(report.intact());
+    }
+    try {
+      return schedulerJobs
+          .findById(SchedulerJobCatalog.AUDIT_CHAIN_VERIFY)
+          .map(job -> job.getLastOutcome())
+          .filter(outcome -> outcome != null)
+          .map(outcome -> RunOutcome.SUCCESS.name().equals(outcome));
+    } catch (RuntimeException e) {
+      log.warn("Could not read the persisted audit-chain verification outcome", e);
+      return Optional.empty();
+    }
+  }
+
+  /**
    * Walks the whole chain and returns the report, without side effects beyond {@link #lastReport}.
    */
   public AuditChainVerifier.Report verify() {
-    AuditChainVerifier.Report report = snapshotTx.execute(status -> walk());
-    lastReport = report;
-    return report;
+    try {
+      AuditChainVerifier.Report report = snapshotTx.execute(status -> walk());
+      lastReport = report;
+      return report;
+    } catch (RuntimeException e) {
+      // Never leave an earlier "intact" standing when this run could not reach a verdict.
+      lastReport = AuditChainVerifier.Report.failed();
+      throw e;
+    }
   }
 
   /**
@@ -136,7 +170,10 @@ public class AuditChainVerificationService {
   }
 
   private AuditChainVerifier.Report walk() {
-    AuditChainVerifier verifier = new AuditChainVerifier(chain.findPrunedRanges());
+    AuditChainVerifier verifier =
+        new AuditChainVerifier(
+            chain.findTombstones().stream().map(AuditChainTombstone::parse).toList(),
+            chain.findExplainedDocumentIds());
     long after = 0;
     while (true) {
       List<AuditChainRow> batch = chain.findSealedAfter(after, BATCH_SIZE);
@@ -146,7 +183,7 @@ public class AuditChainVerificationService {
       }
       after = batch.getLast().seq();
     }
-    return verifier.finish(chain.findHead(), chain.countUnsealed());
+    return verifier.finish(chain.findHead(), chain.countUnsealed(), chain.countAll());
   }
 
   /** The SYSTEM event detail; every value is a number, an enum name or a hex hash — no escaping. */

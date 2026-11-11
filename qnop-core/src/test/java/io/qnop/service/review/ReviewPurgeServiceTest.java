@@ -338,7 +338,9 @@ class ReviewPurgeServiceTest {
         .contains("\"reviews\":1")
         .contains("\"storageObjects\":1")
         .contains("\"title\":\"Q3 report\"")
-        .contains(document.getId().toString());
+        .contains(document.getId().toString())
+        // The uncapped id list the audit-chain verifier matches tombstones against (#928).
+        .contains("\"documentIds\":[\"" + document.getId() + "\"]");
   }
 
   @Test

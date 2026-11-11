@@ -74,11 +74,11 @@ docker compose exec qnop cat /tmp/qnop-admin-password.txt
 
 ## Audit-trail integrity
 
-The audit trail (`audit_event`) protects itself inside the database (ADR-0043, issue #928): rows cannot be updated, they can be deleted only together with their review (the document cascade, which records an `audit.chain.pruned` tombstone), and every row is sealed into a SHA-256 hash chain when its transaction commits. The **Audit chain verification** job (`/admin/scheduler`, nightly at 05:00, also runnable on demand) recomputes the chain; a break fails the job, writes an `audit.chain.broken` event to the audit trail, and sets the Prometheus gauge `qnop_audit_chain_intact` to `0` — alert on that. PostgreSQL 14 or newer is required.
+The audit trail (`audit_event`) protects itself inside the database (ADR-0043, issue #928): rows cannot be updated, they can be deleted only together with their review (the document cascade, which records an `audit.chain.pruned` tombstone), and every row is sealed into a SHA-256 hash chain when its transaction commits. The **Audit chain verification** job (`/admin/scheduler`, nightly at 05:00, also runnable on demand) recomputes the chain; a break fails the job, writes an `audit.chain.broken` event to the audit trail, and sets the Prometheus gauge `qnop_audit_chain_intact` to `0` — alert on that (it is `NaN` only until the job has run once anywhere). PostgreSQL 14 or newer is required (the migration refuses older versions), and audit-writing transactions must run under the default `READ COMMITTED` isolation — do not set `default_transaction_isolation` to anything stricter for the qnop database.
 
 These guards stop mistakes and a compromised application, but **whoever owns the schema can switch them off**. Two optional measures close that gap:
 
-**1. Run the application as a restricted role.** Let Liquibase migrate as the schema owner and let the application connect as a role that cannot alter the schema or touch the audit trail beyond appending to it:
+**1. Run the application as a restricted role.** Migrate as the schema owner and let the application connect as a role that cannot alter the schema or touch the audit trail beyond appending to it:
 
 ```sql
 -- once, as a superuser / the owner
@@ -95,14 +95,17 @@ ALTER DEFAULT PRIVILEGES FOR ROLE qnop IN SCHEMA public
   GRANT USAGE, SELECT ON SEQUENCES TO qnop_app;
 ```
 
+Keep the owner's credentials out of the running application. The recommended pattern is a **separate one-off migration step** per upgrade: run the same image once with `QNOP_DB_USERNAME`/`QNOP_DB_PASSWORD` set to the owner — it applies the migrations at startup — and stop it once it reports started; then run the service itself with the restricted role and migrations switched off:
+
 ```bash
 QNOP_DB_USERNAME=qnop_app            # the application's runtime connection
 QNOP_DB_PASSWORD=…
-SPRING_LIQUIBASE_USER=qnop           # the schema owner, used only for migrations at startup
-SPRING_LIQUIBASE_PASSWORD=…
+SPRING_LIQUIBASE_ENABLED=false       # migrations ran in the one-off step
 ```
 
-The chain-sealing and tombstone triggers run with the owner's rights (`SECURITY DEFINER`), and PostgreSQL runs the review-deletion cascade as the table owner, so deleting a review keeps working without granting `DELETE` on `audit_event`. Re-run the `REVOKE` lines if you ever re-grant on all tables. Keep the owner's credentials out of the application's environment except for the Liquibase pair (or run migrations from a separate one-off container).
+Only if a separate step is impractical, let the service migrate with the owner pair `SPRING_LIQUIBASE_USER` / `SPRING_LIQUIBASE_PASSWORD` next to the restricted runtime credentials — weaker, because a compromised application process then holds the owner's credentials too.
+
+The chain-sealing and tombstone triggers run with the owner's rights (`SECURITY DEFINER`), and PostgreSQL runs the review-deletion cascade as the table owner, so deleting a review keeps working without granting `DELETE` on `audit_event`. Re-run the `REVOKE` lines if you ever re-grant on all tables.
 
 **2. Ship the checkpoints out of the database.** Each successful verification logs `Audit chain intact: … head seq=<n> hash=<h>` (logger `io.qnop.service.audit.AuditChainVerificationService`). Forward these lines — or the whole application log — to an append-only store the database credentials cannot reach (your log platform, object storage with retention lock, syslog on another host). Someone who rewrites the trail and recomputes the chain cannot make an earlier logged hash reappear at its logged position: compare a stored checkpoint with `SELECT row_hash FROM audit_event WHERE chain_seq = <n>` to prove the trail up to that point is unchanged. (If row `<n>` has since been deleted with its review, an `audit.chain.pruned` tombstone lists its range; compare against the nearest surviving later checkpoint instead.)
 
