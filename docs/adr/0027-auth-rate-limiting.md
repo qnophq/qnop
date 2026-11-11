@@ -77,3 +77,55 @@ Two cross-cutting concerns shape the design:
   single-node and Redis is explicitly deferred (ADR-0013). The in-process Caffeine
   store is sufficient; a distributed backend can replace it behind the same
   service if horizontal scaling arrives.
+
+## Amendment (2026-11, #898 and #899): right-to-left client IP, per-identifier buckets
+
+A security review (epic #896) found two places where the implementation fell short of this
+decision.
+
+**Client IP (#898).** Behind a trusted proxy the resolver used the *leftmost*
+`X-Forwarded-For` entry. Proxies that append to the header put the address they actually saw
+on the right, so the leftmost entry is whatever the client sent. `HttpClientIpResolver` now
+walks the header **right to left**: entries inside `trusted-proxy-cidrs` are skipped, and the
+first entry outside it is the client. If every entry is trusted, the leftmost is used. An
+entry that is not an IP literal (empty, `unknown`, a hostname) ends the walk at the last
+trusted hop, since nothing left of it can be verified; entries are never resolved through DNS.
+Repeated header lines are joined in order; ports and IPv6 brackets are stripped. This also
+removes the "multi-hop chains deferred" consequence above — a chain of trusted proxies is
+supported as long as every hop is listed. Operator guidance is in `docs/DEPLOYMENT.md`
+("Behind a reverse proxy"). The secure default (empty trust list → header ignored) is
+unchanged.
+
+**Per-identifier buckets (#899).** The email- and token-keyed limits deferred to #20 were never
+built, and login had no per-account limit, so per-IP limits were the only bound and a caller
+using many source addresses was not limited at all. They now exist next to the per-IP ones:
+
+| Scope (`qnop.auth.rate-limit.*`) | Key | Default | Counts |
+|---|---|---|---|
+| `login-account` | username / e-mail | 10 / 900s | failed attempts only |
+| `register-email` | e-mail | 5 / 3600s | every attempt |
+| `forgot-password-email` | e-mail | 5 / 3600s | every attempt |
+| `reset-password-token` | reset token | 10 / 3600s | every attempt |
+| `reset-password` (per IP, filter) | client IP | 5 / 900s | every attempt |
+
+The per-IP `reset-password` filter is the IP half of the password-reset limit the decision
+above already named; `forgot-password` keeps its existing per-IP filter.
+
+- **Enforced in the controller**, as the context section anticipated: the filters never read the
+  body, and buffering and re-parsing it in a filter is not worth it. `AuthIdentifierRateLimiter`
+  is called by `AuthController`, `AuthRegistrationController` and `AuthPasswordResetController`
+  after their feature-flag checks and before any lookup; a drained bucket throws
+  `RateLimitExceededException`, rendered by `RateLimitExceptionHandler` with the *same* status,
+  `Retry-After`, code and message as that endpoint's per-IP filter.
+- **Keys are SHA-256 hashes** of the identifier after trimming and lower-casing (the reset token
+  is case-sensitive and only hashed). The raw identifier never sits in the bucket store.
+- **No enumeration.** A bucket is created for any identifier, registered or not, and checked
+  before the account is looked up, so a throttled response looks the same for a known and an
+  unknown identifier; the uniform `200`/`204` answers of register and forgot-password are kept.
+- **Login counts failures only.** A token is taken before the credential check (atomic, so
+  concurrent attempts cannot overshoot) and given back on success. While the bucket is drained
+  every attempt is refused, the correct password included — otherwise the limit would leak the
+  password. The flip side is that a third party can keep one account throttled; the refill (one
+  attempt every 90 s at the default) bounds that, and progressive delay or a lockout with
+  out-of-band unlock were not adopted.
+- A breached-password check was considered and left out of scope here.

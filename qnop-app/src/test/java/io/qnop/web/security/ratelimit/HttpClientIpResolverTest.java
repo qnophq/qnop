@@ -25,6 +25,7 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 import jakarta.servlet.http.HttpServletRequest;
+import java.util.Collections;
 import java.util.List;
 import org.junit.jupiter.api.Test;
 
@@ -35,10 +36,11 @@ import org.junit.jupiter.api.Test;
  */
 class HttpClientIpResolverTest {
 
-  private static HttpServletRequest request(String remoteAddr, String xForwardedFor) {
+  private static HttpServletRequest request(String remoteAddr, String... xForwardedFor) {
     HttpServletRequest request = mock(HttpServletRequest.class);
     when(request.getRemoteAddr()).thenReturn(remoteAddr);
-    when(request.getHeader("X-Forwarded-For")).thenReturn(xForwardedFor);
+    List<String> headers = xForwardedFor.length == 0 ? List.<String>of() : List.of(xForwardedFor);
+    when(request.getHeaders("X-Forwarded-For")).thenReturn(Collections.enumeration(headers));
     return request;
   }
 
@@ -50,7 +52,7 @@ class HttpClientIpResolverTest {
   void usesRemoteAddrWhenNoForwardedHeader() {
     HttpClientIpResolver resolver = resolver(List.of("10.0.0.0/8"));
 
-    assertThat(resolver.resolve(request("203.0.113.5", null))).isEqualTo("203.0.113.5");
+    assertThat(resolver.resolve(request("203.0.113.5"))).isEqualTo("203.0.113.5");
   }
 
   @Test
@@ -77,10 +79,88 @@ class HttpClientIpResolverTest {
   }
 
   @Test
-  void takesLeftmostForwardedEntryFromTrustedProxy() {
+  void takesRightmostUntrustedEntryWhenTheProxyAppends() {
+    // An appending proxy puts the peer it saw on the right; anything to its left is
+    // client-supplied.
     HttpClientIpResolver resolver = resolver(List.of("10.0.0.0/8"));
 
-    assertThat(resolver.resolve(request("10.1.2.3", "198.51.100.7, 10.1.2.3")))
+    assertThat(resolver.resolve(request("10.1.2.3", "192.0.2.44, 198.51.100.7")))
+        .isEqualTo("198.51.100.7");
+  }
+
+  @Test
+  void skipsTrustedHopsInAMultiHopChain() {
+    HttpClientIpResolver resolver = resolver(List.of("10.0.0.0/8", "172.16.0.0/12"));
+
+    assertThat(
+            resolver.resolve(request("10.1.2.3", "192.0.2.44, 198.51.100.7, 172.16.5.5, 10.9.9.9")))
+        .isEqualTo("198.51.100.7");
+  }
+
+  @Test
+  void takesLeftmostEntryWhenEveryHopIsTrusted() {
+    HttpClientIpResolver resolver = resolver(List.of("10.0.0.0/8"));
+
+    assertThat(resolver.resolve(request("10.1.2.3", "10.0.0.5, 10.0.0.6"))).isEqualTo("10.0.0.5");
+  }
+
+  @Test
+  void joinsRepeatedHeaderLinesInOrder() {
+    HttpClientIpResolver resolver = resolver(List.of("10.0.0.0/8"));
+
+    assertThat(resolver.resolve(request("10.1.2.3", "192.0.2.44", "198.51.100.7, 10.0.0.6")))
+        .isEqualTo("198.51.100.7");
+  }
+
+  @Test
+  void fallsBackToRemoteAddrWhenTheRightmostEntryIsMalformed() {
+    HttpClientIpResolver resolver = resolver(List.of("10.0.0.0/8"));
+
+    assertThat(resolver.resolve(request("10.1.2.3", "198.51.100.7, not-an-ip")))
+        .isEqualTo("10.1.2.3");
+  }
+
+  @Test
+  void stopsAtTheLastTrustedHopWhenAnEarlierEntryIsMalformed() {
+    HttpClientIpResolver resolver = resolver(List.of("10.0.0.0/8"));
+
+    assertThat(resolver.resolve(request("10.1.2.3", "198.51.100.7, unknown, 10.0.0.6")))
+        .isEqualTo("10.0.0.6");
+  }
+
+  @Test
+  void treatsEmptyEntriesAndHostnamesAsMalformed() {
+    HttpClientIpResolver resolver = resolver(List.of("10.0.0.0/8"));
+
+    assertThat(resolver.resolve(request("10.1.2.3", "198.51.100.7, ,"))).isEqualTo("10.1.2.3");
+    assertThat(resolver.resolve(request("10.1.2.3", "localhost"))).isEqualTo("10.1.2.3");
+    assertThat(resolver.resolve(request("10.1.2.3", "256.1.1.1"))).isEqualTo("10.1.2.3");
+  }
+
+  @Test
+  void ignoresBlankHeader() {
+    HttpClientIpResolver resolver = resolver(List.of("10.0.0.0/8"));
+
+    assertThat(resolver.resolve(request("10.1.2.3", "  "))).isEqualTo("10.1.2.3");
+  }
+
+  @Test
+  void stripsPortsAndBracketsFromEntries() {
+    HttpClientIpResolver resolver = resolver(List.of("10.0.0.0/8"));
+
+    assertThat(resolver.resolve(request("10.1.2.3", "198.51.100.7:4711")))
+        .isEqualTo("198.51.100.7");
+    assertThat(resolver.resolve(request("10.1.2.3", "[2001:db8::1]:443")))
+        .isEqualTo("2001:db8:0:0:0:0:0:1");
+    assertThat(resolver.resolve(request("10.1.2.3", "2001:db8::1")))
+        .isEqualTo("2001:db8:0:0:0:0:0:1");
+  }
+
+  @Test
+  void matchesIpv6TrustedProxies() {
+    HttpClientIpResolver resolver = resolver(List.of("fd00::/8"));
+
+    assertThat(resolver.resolve(request("fd00::1", "198.51.100.7, fd00::2")))
         .isEqualTo("198.51.100.7");
   }
 }

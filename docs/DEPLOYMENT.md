@@ -47,6 +47,7 @@ Rotating `QNOP_AUTH_JWT_SECRET` invalidates all sessions; rotating the encryptio
 | `QNOP_UPLOAD_MULTIPART_LIMIT_MB` | `55` | HTTP multipart ceiling (keep above the document size limit) |
 | `QNOP_CORS_ALLOWED_ORIGINS` | `http://localhost:5173` | Only needed when a browser client runs on a *different* origin; the embedded UI is same-origin and needs none |
 | `QNOP_HTTP_FORWARD_HEADERS_STRATEGY` | `none` | Set `framework` behind a trusted reverse proxy so `X-Forwarded-*` drive scheme/host |
+| `QNOP_AUTH_RATELIMIT_TRUSTEDPROXYCIDRS` | *(empty)* | Comma-separated CIDRs of your reverse proxies; see [Behind a reverse proxy](#behind-a-reverse-proxy) |
 | `QNOP_HTTP_SHUTDOWN_GRACE` | `30s` | Graceful-shutdown drain window (align your orchestrator's stop grace period) |
 | `QNOP_AUTH_OIDC_FRONTEND_BASE_URL` | *(empty)* | Public base URL the OIDC login flow redirects back to, when it differs from the request origin |
 
@@ -71,6 +72,18 @@ docker compose exec qnop cat /tmp/qnop-admin-password.txt
 - **JVM flags**: extend via `JDK_JAVA_OPTS`; the image defaults to `-XX:MaxRAMPercentage=75.0 -XX:+ExitOnOutOfMemoryError` and runs as a non-root user.
 - **TLS**: terminate TLS at a reverse proxy and set `QNOP_HTTP_FORWARD_HEADERS_STRATEGY=framework`. The refresh cookie is `Secure` — plain-HTTP deployments are for local evaluation only.
 - **Backups**: the PostgreSQL database and the object-storage bucket together form the complete state; back them up as a pair.
+
+## Behind a reverse proxy
+
+The auth rate limits (login, refresh, registration, password reset — ADR-0027) and usage tracking key on the client IP. qnop only believes `X-Forwarded-For` when the TCP peer is one of the CIDRs in `QNOP_AUTH_RATELIMIT_TRUSTEDPROXYCIDRS` (property `qnop.auth.rate-limit.trusted-proxy-cidrs`).
+
+- **No proxy (default, empty list):** `X-Forwarded-For` is ignored and the connection address is used. Leave it empty when clients connect to qnop directly — any non-empty value there lets a client choose its own address.
+- **Behind a proxy:** list the address ranges of **every** proxy hop in front of qnop (load balancer, ingress, CDN egress ranges), and nothing else — e.g. `QNOP_AUTH_RATELIMIT_TRUSTEDPROXYCIDRS=10.0.0.0/8,172.28.0.0/16`. Never list a range clients can connect from. If the list is left empty behind a proxy, every client appears to come from the proxy and shares a single rate-limit bucket.
+- **How the client is chosen:** the header is read **right to left**. Entries written by your trusted proxies are skipped; the first address outside the list is the client. Anything to the left of it was supplied by the client and is never used. An entry that is not an IP literal stops the walk at the last trusted hop. This is correct for proxies that *append* to the header (nginx `$proxy_add_x_forwarded_for`, AWS ALB, GCP and Azure load balancers, Traefik) and for proxies that *replace* it (Caddy's default).
+- Make sure the proxy closest to the client does not trust an incoming `X-Forwarded-For` blindly unless it, too, sits behind trusted infrastructure.
+- `QNOP_HTTP_FORWARD_HEADERS_STRATEGY=framework` is a separate setting: it controls scheme/host for redirects and cookies, not the rate-limit IP.
+
+Besides the per-IP limits, login, registration, password-reset request and password reset are also throttled per account / e-mail address / reset token, so spreading attempts over many addresses does not lift the limit. All limits are tunable under `qnop.auth.rate-limit.*` (see ADR-0027).
 
 ## Upgrades
 
