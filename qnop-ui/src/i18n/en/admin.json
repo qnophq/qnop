@@ -704,6 +704,7 @@
       "auth__registration_verification": "Account verification",
       "auth__password_reset": "Password reset",
       "auth__admin_password_reset": "Admin password reset",
+      "auth__registration_attempt": "Registration attempt",
       "review__participant_added": "Review invitation",
       "review__daily_digest": "Daily review digest",
       "review__annotation_created": "New annotation",

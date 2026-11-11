@@ -1881,10 +1881,13 @@ paths:
       summary: Register a local account
       description: |
         Self-registration of a local user. Public; gated by the
-        `auth.self_registration_enabled` setting. Anti-enumeration: the response is
-        **uniform** whether or not the username/email already exists (no account is
-        created or re-mailed for a duplicate); when registration is disabled the
-        endpoint reports a **disguised 404** so its availability is not revealed.
+        `auth.self_registration_enabled` setting. The account stays pending until the
+        address is verified (see `/auth/verify-email`). Anti-enumeration: the response
+        is **uniform** whether or not the username/email already exists — a duplicate
+        creates no account and instead sends a neutral notice to the entered address,
+        and every mail is sent after the response, off the request thread; when
+        registration is disabled the endpoint reports a **disguised 404** so its
+        availability is not revealed.
       operationId: register
       security: []
       requestBody:
@@ -1915,20 +1918,26 @@ paths:
         '429':
           $ref: '#/components/responses/TooManyRequests'
   /auth/verify-email:
-    get:
+    post:
       tags:
         - AuthRegistration
       summary: Verify a registered email address
-      description: Consumes a single-use verification token and activates the account. Public.
+      description: |
+        Confirms a self-registration and activates the account (issue #900). Public.
+        Requires the single-use token from the emailed link **and** the password chosen
+        at registration: a password only becomes a credential once the owner of the
+        mailbox confirms it. Only an account still pending verification can be
+        activated — never one an administrator has disabled. A wrong password leaves
+        the token usable (`VERIFICATION_PASSWORD_MISMATCH`); an unknown, expired or
+        used token, or an account no longer pending, is `INVALID_VERIFICATION_TOKEN`.
       operationId: verifyEmail
       security: []
-      parameters:
-        - name: token
-          in: query
-          required: true
-          description: The raw verification token from the emailed link.
-          schema:
-            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/VerifyEmailRequest'
       responses:
         '200':
           description: Verification result
@@ -1937,7 +1946,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/VerifyEmailResponse'
         '400':
-          description: Unknown, expired, or already-used token
+          description: Invalid token, or a password that does not match the registration
           content:
             application/json:
               schema:
@@ -6679,6 +6688,22 @@ components:
       required:
         - verificationRequired
         - message
+    VerifyEmailRequest:
+      type: object
+      description: The emailed verification token plus the password chosen at registration.
+      properties:
+        token:
+          type: string
+          minLength: 1
+          maxLength: 512
+        password:
+          type: string
+          format: password
+          minLength: 1
+          maxLength: 200
+      required:
+        - token
+        - password
     VerifyEmailResponse:
       type: object
       properties:

@@ -73,21 +73,20 @@ public class EmailVerificationTokenService {
     return new IssuedToken(rawToken, expiresAt);
   }
 
+  /**
+   * Validates a token WITHOUT consuming it and returns its owner (issue #900): the verification
+   * step checks the registrant's password before it spends the single-use token, so a mistyped
+   * password does not burn the link. Throws if unknown/expired/used.
+   */
+  @Transactional(readOnly = true)
+  public User peek(String rawToken) {
+    return requireUsable(rawToken).getUser();
+  }
+
   /** Validates and consumes a token, returning its owner. Throws if unknown/expired/used. */
   @Transactional
   public User consume(String rawToken) {
-    EmailVerificationToken token =
-        tokens
-            .findByTokenHash(sha256Hex(rawToken))
-            .orElseThrow(
-                () ->
-                    new InvalidVerificationTokenException("Unknown or invalid verification token"));
-    if (token.getConsumedAt() != null) {
-      throw new InvalidVerificationTokenException("Verification token already used");
-    }
-    if (token.getExpiresAt().isBefore(Instant.now())) {
-      throw new InvalidVerificationTokenException("Verification token has expired");
-    }
+    EmailVerificationToken token = requireUsable(rawToken);
     User user = token.getUser(); // resolve before the atomic update clears the persistence context
     // Atomic single-use guard (issue #61): only one concurrent caller flips consumed_at from null.
     if (tokens.markConsumed(token.getId(), Instant.now()) == 0) {
@@ -110,6 +109,22 @@ public class EmailVerificationTokenService {
   /** The raw purge, run inside the scheduler gate's transaction (issue #524). */
   public void sweepOnce() {
     tokens.deleteByExpiresAtBefore(Instant.now());
+  }
+
+  private EmailVerificationToken requireUsable(String rawToken) {
+    EmailVerificationToken token =
+        tokens
+            .findByTokenHash(sha256Hex(rawToken))
+            .orElseThrow(
+                () ->
+                    new InvalidVerificationTokenException("Unknown or invalid verification token"));
+    if (token.getConsumedAt() != null) {
+      throw new InvalidVerificationTokenException("Verification token already used");
+    }
+    if (token.getExpiresAt().isBefore(Instant.now())) {
+      throw new InvalidVerificationTokenException("Verification token has expired");
+    }
+    return token;
   }
 
   private static String generateRawToken() {

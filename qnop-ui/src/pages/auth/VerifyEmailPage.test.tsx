@@ -21,6 +21,8 @@
 
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
+import { AxiosError, AxiosHeaders } from 'axios';
 import { renderWithProviders } from '../../test/renderWithProviders';
 import { verifyEmail } from '../../api/auth';
 import { VerifyEmailPage } from './VerifyEmailPage';
@@ -28,26 +30,62 @@ import { VerifyEmailPage } from './VerifyEmailPage';
 vi.mock('../../api/auth', () => ({ verifyEmail: vi.fn() }));
 const verifyEmailFn = vi.mocked(verifyEmail);
 
+function apiError(code: string): AxiosError {
+  const headers = new AxiosHeaders();
+  return new AxiosError('Bad Request', 'ERR_BAD_REQUEST', { headers }, undefined, {
+    status: 400,
+    statusText: 'Bad Request',
+    headers: {},
+    config: { headers },
+    data: { code, message: 'x' },
+  });
+}
+
+async function submitPassword(password: string) {
+  const user = userEvent.setup();
+  await user.type(screen.getByLabelText(/^password/i), password);
+  await user.click(screen.getByRole('button', { name: /confirm and activate/i }));
+}
+
 beforeEach(() => {
   vi.clearAllMocks();
 });
 
 describe('VerifyEmailPage', () => {
-  it('verifies the token from the link and confirms success', async () => {
+  it('verifies the token with the registration password and confirms success', async () => {
     verifyEmailFn.mockResolvedValue();
     renderWithProviders(<VerifyEmailPage />, {
       initialEntries: ['/verify-email?token=good-token'],
     });
 
+    // Nothing is sent before the password is entered.
+    expect(verifyEmailFn).not.toHaveBeenCalled();
+    await submitPassword('my-password-1');
+
     expect(await screen.findByText(/your email address is confirmed/i)).toBeInTheDocument();
-    expect(verifyEmailFn).toHaveBeenCalledWith('good-token');
+    expect(verifyEmailFn).toHaveBeenCalledWith('good-token', 'my-password-1');
   });
 
-  it('shows an error when the token is rejected', async () => {
-    verifyEmailFn.mockRejectedValue(new Error('invalid'));
+  it('keeps the form and explains a password that does not match', async () => {
+    verifyEmailFn.mockRejectedValue(apiError('VERIFICATION_PASSWORD_MISMATCH'));
+    renderWithProviders(<VerifyEmailPage />, {
+      initialEntries: ['/verify-email?token=good-token'],
+    });
+
+    await submitPassword('wrong');
+
+    expect(await screen.findByText(/doesn't match the password chosen/i)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /confirm and activate/i })).toBeInTheDocument();
+  });
+
+  it('shows the dead-link error when the token is rejected', async () => {
+    verifyEmailFn.mockRejectedValue(apiError('INVALID_VERIFICATION_TOKEN'));
     renderWithProviders(<VerifyEmailPage />, { initialEntries: ['/verify-email?token=stale'] });
 
+    await submitPassword('my-password-1');
+
     expect(await screen.findByText(/link is invalid or expired/i)).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /confirm and activate/i })).toBeNull();
   });
 
   it('shows an error and never calls the API when no token is present', () => {

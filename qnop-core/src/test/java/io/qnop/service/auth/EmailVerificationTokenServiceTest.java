@@ -23,6 +23,7 @@ package io.qnop.service.auth;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -133,6 +134,34 @@ class EmailVerificationTokenServiceTest {
     when(tokens.findByTokenHash(any())).thenReturn(Optional.empty());
 
     assertThatThrownBy(() -> service.consume("raw-token"))
+        .isInstanceOf(InvalidVerificationTokenException.class);
+  }
+
+  @Test
+  @DisplayName("peek returns the owner of a usable token without consuming it (#900)")
+  void peekDoesNotConsume() {
+    EmailVerificationToken token =
+        new EmailVerificationToken(user, "h", Instant.now().plusSeconds(60));
+    when(tokens.findByTokenHash(any())).thenReturn(Optional.of(token));
+
+    assertThat(service.peek("raw-token")).isSameAs(user);
+    verify(tokens, never()).markConsumed(any(), any());
+  }
+
+  @Test
+  @DisplayName("peek applies the same validity rules as consume")
+  void peekRejectsUsedAndExpired() {
+    EmailVerificationToken used =
+        new EmailVerificationToken(user, "h", Instant.now().plusSeconds(60));
+    used.setConsumedAt(Instant.now());
+    when(tokens.findByTokenHash(any())).thenReturn(Optional.of(used));
+    assertThatThrownBy(() -> service.peek("raw-token"))
+        .isInstanceOf(InvalidVerificationTokenException.class);
+
+    EmailVerificationToken expired =
+        new EmailVerificationToken(user, "h", Instant.now().minusSeconds(60));
+    when(tokens.findByTokenHash(any())).thenReturn(Optional.of(expired));
+    assertThatThrownBy(() -> service.peek("raw-token"))
         .isInstanceOf(InvalidVerificationTokenException.class);
   }
 }

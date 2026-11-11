@@ -114,6 +114,18 @@ class LocalizedMailIT extends SeededIntegrationTest {
     return templates.render(key, vars.getValue(), "de");
   }
 
+  /**
+   * The same for the anti-enumeration flows, which queue their mail for after the commit (issue
+   * #903) instead of sending it in the request.
+   */
+  private RenderedMail germanDeferredMail(MailTemplateKey key, String to) {
+    @SuppressWarnings("unchecked")
+    ArgumentCaptor<Map<String, Object>> vars = ArgumentCaptor.forClass(Map.class);
+    verify(mail, timeout(5000))
+        .sendMailFromTemplateAfterCommit(eq(key), eq(to), vars.capture(), eq("de"));
+    return templates.render(key, vars.getValue(), "de");
+  }
+
   private UUID seedReview() {
     Document document = new Document(MEMBER_ID, "Rahmenvertrag");
     document.setWorkflowState(WorkflowState.IN_REVIEW);
@@ -183,7 +195,7 @@ class LocalizedMailIT extends SeededIntegrationTest {
 
     passwordReset.requestReset(emailOf(MEMBER_ID));
 
-    RenderedMail sent = germanMail(MailTemplateKey.PASSWORD_RESET, emailOf(MEMBER_ID));
+    RenderedMail sent = germanDeferredMail(MailTemplateKey.PASSWORD_RESET, emailOf(MEMBER_ID));
     assertThat(sent.subject()).startsWith("Setze dein ").endsWith("-Passwort zurück");
     assertThat(sent.bodyPlain())
         .startsWith("Hallo ")
@@ -209,7 +221,8 @@ class LocalizedMailIT extends SeededIntegrationTest {
 
     registration.register("neu", "neu@qnop.test", "Neues-Pass-1234!", "Neu Nutzer");
 
-    RenderedMail sent = germanMail(MailTemplateKey.REGISTRATION_VERIFICATION, "neu@qnop.test");
+    RenderedMail sent =
+        germanDeferredMail(MailTemplateKey.REGISTRATION_VERIFICATION, "neu@qnop.test");
     assertThat(sent.subject()).startsWith("Bestätige dein ").endsWith("-Konto");
     assertThat(sent.bodyPlain()).startsWith("Hallo Neu Nutzer,");
   }

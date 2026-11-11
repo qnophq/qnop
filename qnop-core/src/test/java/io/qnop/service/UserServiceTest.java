@@ -28,7 +28,6 @@ import static org.mockito.Mockito.when;
 
 import io.qnop.entity.User;
 import io.qnop.entity.UserRole;
-import io.qnop.entity.UserSource;
 import io.qnop.repository.TeamRepository;
 import io.qnop.repository.UserRepository;
 import io.qnop.service.UserService.UserProfileView;
@@ -81,41 +80,75 @@ class UserServiceTest {
   }
 
   @Test
-  @DisplayName("createSelfRegistered falls back to the username when the display name is blank")
-  void createSelfRegisteredFallsBackToUsername() {
-    when(passwordEncoder.encode("secret")).thenReturn("hashed");
+  @DisplayName(
+      "createPendingRegistration stores the given hash, falls back to the username and leaves the"
+          + " account disabled and pending verification")
+  void createPendingRegistrationFallsBackToUsername() {
     when(users.save(any(User.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
     User created =
-        service.createSelfRegistered("jdoe", "jdoe@example.com", "secret", "  ", UserRole.MEMBER);
+        service.createPendingRegistration(
+            "jdoe", "JDoe@Example.com", "hashed", "  ", UserRole.MEMBER);
 
     assertThat(created.getDisplayName()).isEqualTo("jdoe");
     assertThat(created.getRole()).isEqualTo(UserRole.MEMBER);
     assertThat(created.isEnabled()).isFalse();
+    assertThat(created.isEmailVerificationPending()).isTrue();
+    assertThat(created.getPasswordHash()).isEqualTo("hashed");
     assertThat(created.getEmail()).isEqualTo("jdoe@example.com");
   }
 
   @Test
-  @DisplayName("createSelfRegistered tolerates a null email (normalizeEmail short-circuits)")
-  void createSelfRegisteredWithNullEmail() {
-    when(passwordEncoder.encode("secret")).thenReturn("hashed");
+  @DisplayName("createPendingRegistration tolerates a null email (normalizeEmail short-circuits)")
+  void createPendingRegistrationWithNullEmail() {
     when(users.save(any(User.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
     User created =
-        service.createSelfRegistered("jdoe", null, "secret", "Jane Doe", UserRole.MEMBER);
+        service.createPendingRegistration("jdoe", null, "hashed", "Jane Doe", UserRole.MEMBER);
 
     assertThat(created.getEmail()).isNull();
     assertThat(created.getDisplayName()).isEqualTo("Jane Doe");
   }
 
   @Test
-  @DisplayName("internalUserExists returns true on an email match alone, normalizing case")
-  void internalUserExistsOnEmailOnly() {
-    when(users.existsByEmailIgnoreCaseAndSource("bob@example.com", UserSource.INTERNAL))
-        .thenReturn(true);
+  @DisplayName("replacePendingRegistration swaps username, display name and password hash")
+  void replacePendingRegistrationReplacesCredentials() {
+    UUID id = UUID.randomUUID();
+    User pending = User.internal("Old", "jane@example.com", "old", "old-hash");
+    pending.markPendingEmailVerification();
+    when(users.findById(id)).thenReturn(Optional.of(pending));
 
-    // The email branch short-circuits the OR, so the username lookup is never consulted.
-    assertThat(service.internalUserExists("bob", "Bob@Example.com")).isTrue();
+    User replaced = service.replacePendingRegistration(id, "jane", "new-hash", null);
+
+    assertThat(replaced.getUsername()).isEqualTo("jane");
+    assertThat(replaced.getDisplayName()).isEqualTo("jane");
+    assertThat(replaced.getPasswordHash()).isEqualTo("new-hash");
+    assertThat(replaced.isEmailVerificationPending()).isTrue();
+  }
+
+  @Test
+  @DisplayName("replacePendingRegistration refuses an account that is no longer pending")
+  void replacePendingRegistrationRefusesDecidedAccounts() {
+    UUID id = UUID.randomUUID();
+    User disabled = User.internal("Jane", "jane@example.com", "jane", "hash");
+    disabled.setEnabled(false);
+    when(users.findById(id)).thenReturn(Optional.of(disabled));
+
+    assertThatThrownBy(() -> service.replacePendingRegistration(id, "x", "new-hash", "X"))
+        .isInstanceOf(IllegalStateException.class);
+    assertThat(disabled.getPasswordHash()).isEqualTo("hash");
+  }
+
+  @Test
+  @DisplayName("activatePendingVerification reports whether the conditional update hit a row")
+  void activatePendingVerificationIsConditional() {
+    UUID pending = UUID.randomUUID();
+    UUID decided = UUID.randomUUID();
+    when(users.activatePendingVerification(pending)).thenReturn(1);
+    when(users.activatePendingVerification(decided)).thenReturn(0);
+
+    assertThat(service.activatePendingVerification(pending)).isTrue();
+    assertThat(service.activatePendingVerification(decided)).isFalse();
   }
 
   @Test

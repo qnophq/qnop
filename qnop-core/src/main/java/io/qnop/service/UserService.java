@@ -62,32 +62,54 @@ public class UserService {
     this.slugs = slugs;
   }
 
-  /** Creates a disabled internal user with the given role, pending email verification. */
+  /**
+   * Creates an internal user with the given role, disabled and pending e-mail verification (issue
+   * #900). Takes an already-encoded hash: the registration flow encodes on every branch so that a
+   * new and an already-known address cost the same (issue #903).
+   */
   @Transactional
-  public User createSelfRegistered(
-      String username, String email, String rawPassword, String displayName, UserRole role) {
+  public User createPendingRegistration(
+      String username, String email, String passwordHash, String displayName, UserRole role) {
     // Self-registration is the one path a stranger can walk (issue #673).
     limits.requireUserCapacity();
-    String name = displayName == null || displayName.isBlank() ? username : displayName;
-    User user =
-        User.internal(name, normalizeEmail(email), username, passwordEncoder.encode(rawPassword));
+    String name = displayNameOrUsername(displayName, username);
+    User user = User.internal(name, normalizeEmail(email), username, passwordHash);
     user.setRole(role);
-    user.setEnabled(false);
+    user.markPendingEmailVerification();
     user.setSlug(slugs.allocate(name));
     return users.save(user);
+  }
+
+  /**
+   * Re-registration of an address whose account is still pending verification (issue #900): the
+   * newest registration's username, display name and password replace the unverified ones. Nobody
+   * has proven control of the mailbox yet, so no earlier registrant has a claim to keep — and the
+   * verification step requires the password, so only a registrant who knows the stored password and
+   * receives the mail can activate the account. Refuses an account that is no longer pending.
+   */
+  @Transactional
+  public User replacePendingRegistration(
+      UUID id, String username, String passwordHash, String displayName) {
+    User user = users.findById(id).orElseThrow(() -> new UserNotFoundException(id));
+    if (!user.isEmailVerificationPending()) {
+      throw new IllegalStateException("account " + id + " is not pending verification");
+    }
+    user.setUsername(username);
+    user.setDisplayName(displayNameOrUsername(displayName, username));
+    user.setPasswordHash(passwordHash);
+    return user;
+  }
+
+  /** An internal user by exact username, if one exists. */
+  @Transactional(readOnly = true)
+  public Optional<User> findInternalByUsername(String username) {
+    return users.findByUsernameAndSource(username, UserSource.INTERNAL);
   }
 
   /** An internal user by case-insensitive email, if one exists. */
   @Transactional(readOnly = true)
   public Optional<User> findInternalByEmail(String email) {
     return users.findByEmailIgnoreCaseAndSource(normalizeEmail(email), UserSource.INTERNAL);
-  }
-
-  /** Whether an internal user already exists with the given username or email. */
-  @Transactional(readOnly = true)
-  public boolean internalUserExists(String username, String email) {
-    return users.existsByEmailIgnoreCaseAndSource(normalizeEmail(email), UserSource.INTERNAL)
-        || users.findByUsernameAndSource(username, UserSource.INTERNAL).isPresent();
   }
 
   @Transactional(readOnly = true)
@@ -122,12 +144,14 @@ public class UserService {
    * The lean, workspace-public slice of a user (issue #454): what any signed-in user may see about
    * a colleague — display name and tenure, nothing more (no email, role or source).
    */
-  /** Activates a user after successful email verification. */
+  /**
+   * Activates an account after a successful e-mail verification (issue #900) — only while it is
+   * still pending. Returns {@code false} when it is not (an administrator decided about it, or it
+   * was activated already), in which case nothing changes.
+   */
   @Transactional
-  public User enable(UUID id) {
-    User user = users.findById(id).orElseThrow(() -> new UserNotFoundException(id));
-    user.setEnabled(true);
-    return user;
+  public boolean activatePendingVerification(UUID id) {
+    return users.activatePendingVerification(id) == 1;
   }
 
   /**
@@ -188,6 +212,10 @@ public class UserService {
     admin.setPasswordChangeRequired(passwordChangeRequired);
     admin.setSlug(slugs.allocate(displayName));
     return users.save(admin);
+  }
+
+  private static String displayNameOrUsername(String displayName, String username) {
+    return displayName == null || displayName.isBlank() ? username : displayName;
   }
 
   private String normalizeEmail(String email) {

@@ -108,6 +108,18 @@ public interface UserRepository extends JpaRepository<User, UUID> {
   boolean existsByEmailIgnoreCaseAndSource(String email, UserSource source);
 
   /**
+   * Atomically activates an account whose e-mail verification is still pending (issue #900) and
+   * bumps {@code version}. Conditional on the pending flag, so it is a no-op (returns 0) for an
+   * account an administrator has decided about in the meantime — a verification link can never
+   * re-enable an administrator-disabled account, not even in a race with that decision.
+   */
+  @Modifying(clearAutomatically = true)
+  @Query(
+      "UPDATE User u SET u.enabled = true, u.emailVerificationPending = false,"
+          + " u.version = u.version + 1 WHERE u.id = :id AND u.emailVerificationPending = true")
+  int activatePendingVerification(@Param("id") UUID id);
+
+  /**
    * Atomically stamps the last-login timestamp (issue #61) without a read-modify-write, so a login
    * never clobbers a concurrent security write. Best-effort: it does not bump {@code version}, so a
    * concurrent full-entity edit may overwrite the timestamp — harmless for a login marker.

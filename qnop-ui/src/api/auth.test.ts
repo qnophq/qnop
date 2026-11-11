@@ -54,12 +54,14 @@ describe('auth API wrappers', () => {
     expect(registerFn).toHaveBeenCalledWith({ registerRequest: input });
   });
 
-  it('verifyEmail forwards the token', async () => {
+  it('verifyEmail forwards the token and password', async () => {
     verifyEmailFn.mockResolvedValue({ status: 200 } as never);
 
-    await verifyEmail('tok-123');
+    await verifyEmail('tok-123', 'pw-123');
 
-    expect(verifyEmailFn).toHaveBeenCalledWith({ token: 'tok-123' });
+    expect(verifyEmailFn).toHaveBeenCalledWith({
+      verifyEmailRequest: { token: 'tok-123', password: 'pw-123' },
+    });
   });
 
   it('forgotPassword wraps the email in the request body', async () => {

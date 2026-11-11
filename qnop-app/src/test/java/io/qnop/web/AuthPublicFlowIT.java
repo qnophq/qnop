@@ -21,7 +21,6 @@
 package io.qnop.web;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -118,7 +117,10 @@ class AuthPublicFlowIT extends AbstractIntegrationTest {
   @Test
   void verifyEmailReturns400ForInvalidToken() throws Exception {
     mockMvc
-        .perform(get("/api/v1/auth/verify-email").param("token", "not-a-real-token"))
+        .perform(
+            post("/api/v1/auth/verify-email")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"token\":\"not-a-real-token\",\"password\":\"" + PASSWORD + "\"}"))
         .andExpect(status().isBadRequest());
   }
 

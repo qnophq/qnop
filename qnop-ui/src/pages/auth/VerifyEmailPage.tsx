@@ -19,42 +19,80 @@
  * SPDX-License-Identifier: AGPL-3.0-only
  */
 
-import { useEffect, useRef, useState } from 'react';
+import { useState, type FormEvent } from 'react';
 import Alert from '@mui/material/Alert';
 import Box from '@mui/material/Box';
-import CircularProgress from '@mui/material/CircularProgress';
+import Button from '@mui/material/Button';
 import Link from '@mui/material/Link';
+import Stack from '@mui/material/Stack';
 import { Link as RouterLink, useSearchParams } from 'react-router';
 import { AuthLayout } from '../../components/auth/AuthLayout';
+import { PasswordField } from '../../components/auth/PasswordField';
 import { verifyEmail } from '../../api/auth';
+import { apiErrorCode, apiErrorMessage } from '../../utils/apiError';
 import { useTranslation } from 'react-i18next';
 
-type Status = 'verifying' | 'success' | 'error';
+type Status = 'form' | 'success' | 'invalid';
 
-/** Landing page for the email-verification link; verifies the token on mount. */
+/**
+ * Landing page for the email-verification link (issue #900). Verification asks for the
+ * password chosen at registration: only the owner of the mailbox gets the link, and only
+ * a password they know becomes the account's credential. A mistyped password keeps the
+ * link usable; a dead link (or an account an administrator has decided about) ends here.
+ */
 export function VerifyEmailPage() {
   const { t } = useTranslation('auth');
   const [params] = useSearchParams();
   const token = params.get('token') ?? '';
-  const [status, setStatus] = useState<Status>(token ? 'verifying' : 'error');
-  const ran = useRef(false);
+  const [status, setStatus] = useState<Status>(token ? 'form' : 'invalid');
+  const [password, setPassword] = useState('');
+  const [error, setError] = useState<string | null>(null);
+  const [submitting, setSubmitting] = useState(false);
 
-  useEffect(() => {
-    if (!token || ran.current) {
-      return;
+  const onSubmit = async (event: FormEvent) => {
+    event.preventDefault();
+    setError(null);
+    setSubmitting(true);
+    try {
+      await verifyEmail(token, password);
+      setStatus('success');
+    } catch (err) {
+      const code = apiErrorCode(err);
+      if (code === 'VERIFICATION_PASSWORD_MISMATCH') {
+        setError(t('verifyEmail.passwordMismatch'));
+      } else if (code === 'INVALID_VERIFICATION_TOKEN') {
+        setStatus('invalid');
+      } else {
+        setError(apiErrorMessage(err, t('verifyEmail.failed')));
+      }
+    } finally {
+      setSubmitting(false);
     }
-    ran.current = true;
-    verifyEmail(token)
-      .then(() => setStatus('success'))
-      .catch(() => setStatus('error'));
-  }, [token]);
+  };
 
   return (
-    <AuthLayout title={t('verifyEmail.title')}>
-      {status === 'verifying' && (
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, color: 'text.secondary' }}>
-          <CircularProgress size={20} />
-          {t('verifyEmail.verifying')}
+    <AuthLayout title={t('verifyEmail.title')} subtitle={t('verifyEmail.subtitle')}>
+      {status === 'form' && (
+        <Box component="form" onSubmit={onSubmit} noValidate>
+          <Stack spacing={2}>
+            <PasswordField
+              label={t('verifyEmail.password')}
+              value={password}
+              onChange={setPassword}
+              autoComplete="current-password"
+              required
+            />
+            {error && <Alert severity="error">{error}</Alert>}
+            <Button
+              type="submit"
+              variant="contained"
+              size="large"
+              disabled={submitting || password.length === 0}
+              fullWidth
+            >
+              {t('verifyEmail.submit')}
+            </Button>
+          </Stack>
         </Box>
       )}
       {status === 'success' && (
@@ -67,7 +105,7 @@ export function VerifyEmailPage() {
           </Link>
         </>
       )}
-      {status === 'error' && (
+      {status === 'invalid' && (
         <>
           <Alert severity="error" sx={{ mb: 2 }}>
             {t('verifyEmail.error')}

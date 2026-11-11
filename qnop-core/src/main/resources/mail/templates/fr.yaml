@@ -68,6 +68,27 @@ auth.admin_password_reset:
   ctaLabel: "Définir un nouveau mot de passe"
   preheader: "Un administrateur a réinitialisé votre mot de passe {{siteName}}."
 
+auth.registration_attempt:
+  subject: "À propos de votre inscription sur {{siteName}}"
+  bodyPlain: |
+    Bonjour,
+
+    Quelqu'un a demandé la création d'un compte {{siteName}} avec cette adresse e-mail. Aucun nouveau compte n'a été créé, car cette adresse e-mail ou le nom d'utilisateur choisi est déjà utilisé.
+
+    Si vous avez déjà un compte, connectez-vous ici — la page de connexion permet aussi de réinitialiser un mot de passe oublié :
+
+    {{actionUrl}}
+
+    Si ce n'était pas vous, vous pouvez ignorer ce message ; rien n'a changé.
+  bodyHtmlContent: |
+    <h1 style="margin:0 0 14px;color:#18191f;font-size:22px;font-weight:700;letter-spacing:-0.01em;line-height:1.3;">À propos de votre inscription</h1>
+    <p style="margin:0 0 14px;">Bonjour,</p>
+    <p style="margin:0 0 14px;">Quelqu'un a demandé la création d'un compte <strong style="color:#18191f;">{{siteName}}</strong> avec cette adresse e-mail. Aucun nouveau compte n'a été créé, car cette adresse e-mail ou le nom d'utilisateur choisi est déjà utilisé.</p>
+    <p style="margin:0 0 14px;">Si vous avez déjà un compte, connectez-vous — la page de connexion permet aussi de réinitialiser un mot de passe oublié.</p>
+    <p style="margin:0;color:#9a9ea8;font-size:13px;">Si ce n'était pas vous, vous pouvez ignorer cet e-mail — rien n'a changé.</p>
+  ctaLabel: "Aller à la connexion"
+  preheader: "Aucun nouveau compte {{siteName}} n'a été créé pour cette adresse."
+
 review.participant_added:
   subject: "Invitation à réviser « {{documentTitle}} »"
   bodyPlain: |

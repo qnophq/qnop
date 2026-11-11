@@ -716,6 +716,7 @@
       "auth__registration_verification": "Vérification du compte",
       "auth__password_reset": "Réinitialisation du mot de passe",
       "auth__admin_password_reset": "Réinitialisation du mot de passe par un administrateur",
+      "auth__registration_attempt": "Tentative d’inscription",
       "review__participant_added": "Invitation à une révision",
       "review__daily_digest": "Résumé quotidien des révisions",
       "review__annotation_created": "Nouvelle annotation",

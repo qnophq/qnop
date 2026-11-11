@@ -31,9 +31,12 @@ export async function register(input: {
   await authRegistrationApi.register({ registerRequest: input });
 }
 
-/** Activates an account from an email-verification token. */
-export async function verifyEmail(token: string): Promise<void> {
-  await authRegistrationApi.verifyEmail({ token });
+/**
+ * Activates an account from an email-verification token plus the password chosen at
+ * registration (issue #900) — the password only becomes a credential once confirmed here.
+ */
+export async function verifyEmail(token: string, password: string): Promise<void> {
+  await authRegistrationApi.verifyEmail({ verifyEmailRequest: { token, password } });
 }
 
 /** Requests a password-reset email. Uniform ack regardless of whether the account exists. */

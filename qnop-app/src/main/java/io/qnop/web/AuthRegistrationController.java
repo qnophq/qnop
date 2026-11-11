@@ -21,14 +21,19 @@
 package io.qnop.web;
 
 import io.qnop.api.v1.endpoint.AuthRegistrationApi;
+import io.qnop.api.v1.model.ErrorResponse;
 import io.qnop.api.v1.model.RegisterRequest;
 import io.qnop.api.v1.model.RegisterResponse;
+import io.qnop.api.v1.model.VerifyEmailRequest;
 import io.qnop.api.v1.model.VerifyEmailResponse;
 import io.qnop.service.ApplicationSettingsService;
 import io.qnop.service.auth.EmailVerificationTokenService.InvalidVerificationTokenException;
 import io.qnop.service.auth.RegistrationService;
+import io.qnop.service.auth.RegistrationService.VerificationPasswordMismatchException;
+import java.time.OffsetDateTime;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.server.ResponseStatusException;
 
@@ -70,13 +75,25 @@ public class AuthRegistrationController implements AuthRegistrationApi {
   }
 
   @Override
-  public ResponseEntity<VerifyEmailResponse> verifyEmail(String token) {
-    try {
-      registrationService.verify(token);
-    } catch (InvalidVerificationTokenException e) {
-      throw new ResponseStatusException(HttpStatus.BAD_REQUEST, e.getMessage());
-    }
+  public ResponseEntity<VerifyEmailResponse> verifyEmail(VerifyEmailRequest request) {
+    registrationService.verify(request.getToken(), request.getPassword());
     return ResponseEntity.ok(
         new VerifyEmailResponse().verified(true).message("Email verified. You can now sign in."));
+  }
+
+  @ExceptionHandler(InvalidVerificationTokenException.class)
+  ResponseEntity<ErrorResponse> invalidToken(InvalidVerificationTokenException e) {
+    return verificationError("INVALID_VERIFICATION_TOKEN", e.getMessage());
+  }
+
+  /** Its own code, so the SPA can tell a mistyped password from a dead link (issue #900). */
+  @ExceptionHandler(VerificationPasswordMismatchException.class)
+  ResponseEntity<ErrorResponse> passwordMismatch(VerificationPasswordMismatchException e) {
+    return verificationError("VERIFICATION_PASSWORD_MISMATCH", e.getMessage());
+  }
+
+  private static ResponseEntity<ErrorResponse> verificationError(String code, String message) {
+    return ResponseEntity.badRequest()
+        .body(new ErrorResponse().code(code).message(message).timestamp(OffsetDateTime.now()));
   }
 }

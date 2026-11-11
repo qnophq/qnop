@@ -60,3 +60,61 @@ config; the token tables (`refresh_token`, `revoked_token`) landed with issue #1
   them; the HttpOnly cookie cannot be read by scripts.
 - **`jjwt` instead of Nimbus** — rejected: Nimbus integrates natively with the
   Spring resource-server filter.
+
+## Amendment (2026-11, #900 #903 #905): registration, verification and bootstrap credentials
+
+Self-registration and the first-boot admin are the two places where a credential
+comes into being without an authenticated session. Both are hardened:
+
+- **Pending verification is its own state.** `qnop_user.email_verification_pending`
+  (migration `0039`, check `NOT (email_verification_pending AND enabled)`) marks a
+  self-registration that has not confirmed its address. It is distinct from an
+  administrator-disabled account: verification activates **only** a pending
+  account, through a conditional, version-bumping update
+  (`… WHERE email_verification_pending`), so a verification link can never re-enable
+  an account an administrator decided about — not even in a race. Any explicit
+  enabled-state decision (`User.setEnabled`, i.e. every admin edit) settles the
+  pending flag.
+  *Backfill:* only provably untouched, never-verified self-registrations become
+  pending — internal, disabled, never signed in, `version = 0` (no edit after the
+  insert) and holding an unconsumed verification token. Every other disabled
+  account stays administrator-disabled: when in doubt the account is **not**
+  reopened for self-service verification.
+- **A password becomes a credential only once the mailbox owner confirms it.**
+  `POST /auth/verify-email` takes the token **and** the password chosen at
+  registration (the former `GET ?token=` is gone). The token is checked without
+  being consumed, then the password, and only then is the single-use token spent,
+  so a typo does not burn the link (`VERIFICATION_PASSWORD_MISMATCH` vs.
+  `INVALID_VERIFICATION_TOKEN`). Whoever registers an address they do not control
+  gains nothing: the owner who receives the link cannot confirm a password they do
+  not know, and a new registration for an address that is still pending
+  **replaces** the unverified username, display name and password and supersedes
+  the earlier link. Nobody has proven control of the mailbox at that point, so no
+  earlier registrant has a claim to protect.
+- **Duplicate registration sends a neutral notice** (`auth.registration_attempt`)
+  to the entered address when the address or username belongs to any other
+  account; nothing is created or changed and the response stays uniform.
+- **Timing does not tell the branches apart.** Registration encodes the password
+  on every branch (BCrypt dominates the request), and the mails of the
+  anti-enumeration flows — registration, notice and the self-service
+  forgot-password request — are queued with
+  `MailService.sendMailFromTemplateAfterCommit`: an `AFTER_COMMIT` event delivered
+  by `DeferredMailListener` on the bounded `mailDispatchExecutor`, so neither
+  rendering nor SMTP runs in the request thread and a rolled-back request mails
+  nobody. Admin-initiated setup links stay synchronous because the admin UI needs
+  the send result. (Login timing: issue #903, first part.)
+- **First-boot admin credential.** A generated password is written to
+  `admin-password.txt` inside a new `qnop-bootstrap-<random>` directory created
+  with `rwx------` in one step, the file with `CREATE_NEW` + `rw-------` in one step:
+  nothing pre-existing (file or symbolic link) is ever followed, there is no window
+  with wider permissions, and where this cannot be guaranteed no file is written
+  (stderr remains). `QNOP_ADMIN_PASSWORD` — a lasting ADMIN credential without a
+  forced change — must be ≥ 12 characters, ≤ 72 bytes, not contain the username and
+  mix three character classes (or be a 20+ character passphrase); otherwise the
+  startup fails.
+
+Accepted consequences: the verify step now asks for a password, so a user who
+forgot the password chosen minutes earlier registers again (which replaces the
+pending registration). An admin who edits a pending account in any way turns it
+into an ordinary (possibly disabled) account the link can no longer activate. The
+admin user list does not yet show the pending state separately (follow-up).
