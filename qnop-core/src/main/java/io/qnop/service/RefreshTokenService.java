@@ -48,6 +48,10 @@ import org.springframework.transaction.annotation.Transactional;
  *   <li>an unknown or expired token yields {@link RotationResult.Unknown}, indistinguishable from
  *       reuse to the caller.
  * </ul>
+ *
+ * <p>Rotation is atomic (issue #902): the presented row is locked before it is checked, so two
+ * concurrent rotations of one token are serialised — the first yields the only successor, the
+ * second finds the token revoked and is treated as reuse.
  */
 @Service
 public class RefreshTokenService {
@@ -83,8 +87,7 @@ public class RefreshTokenService {
   /** Rotates a presented token; see the class doc for reuse-detection semantics. */
   @Transactional
   public RotationResult rotate(String presentedPlaintext) {
-    RefreshToken row =
-        repository.findByTokenLookupHash(hasher.hash(presentedPlaintext)).orElse(null);
+    RefreshToken row = repository.findForRotation(hasher.hash(presentedPlaintext)).orElse(null);
     if (row == null) {
       return new RotationResult.Unknown();
     }

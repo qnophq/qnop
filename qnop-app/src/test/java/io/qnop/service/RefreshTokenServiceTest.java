@@ -81,7 +81,7 @@ class RefreshTokenServiceTest {
 
   @Test
   void rotateUnknownTokenReturnsUnknown() {
-    when(repository.findByTokenLookupHash(any())).thenReturn(Optional.empty());
+    when(repository.findForRotation(any())).thenReturn(Optional.empty());
 
     assertThat(service.rotate("nope"))
         .isInstanceOf(RefreshTokenService.RotationResult.Unknown.class);
@@ -93,7 +93,7 @@ class RefreshTokenServiceTest {
     UUID userId = UUID.randomUUID();
     RefreshToken active =
         new RefreshToken(UUID.randomUUID(), userId, "hash", Instant.now().plusSeconds(3600));
-    when(repository.findByTokenLookupHash(any())).thenReturn(Optional.of(active));
+    when(repository.findForRotation(any())).thenReturn(Optional.of(active));
     when(repository.save(any(RefreshToken.class))).thenAnswer(call -> call.getArgument(0));
 
     RefreshTokenService.RotationResult result = service.rotate("present");
@@ -110,7 +110,7 @@ class RefreshTokenServiceTest {
     RefreshToken revoked =
         new RefreshToken(family, UUID.randomUUID(), "hash", Instant.now().plusSeconds(3600));
     revoked.setRevokedAt(Instant.now().minusSeconds(60));
-    when(repository.findByTokenLookupHash(any())).thenReturn(Optional.of(revoked));
+    when(repository.findForRotation(any())).thenReturn(Optional.of(revoked));
 
     RefreshTokenService.RotationResult result = service.rotate("replayed");
 
