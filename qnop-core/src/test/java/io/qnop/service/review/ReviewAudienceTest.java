@@ -49,7 +49,12 @@ class ReviewAudienceTest {
   private final DocumentRepository documents = mock(DocumentRepository.class);
   private final AnnotationRepository annotations = mock(AnnotationRepository.class);
   private final ReviewParticipantRepository participants = mock(ReviewParticipantRepository.class);
-  private final ReviewAudience audience = new ReviewAudience(documents, annotations, participants);
+  private final io.qnop.repository.CommentRepository comments =
+      mock(io.qnop.repository.CommentRepository.class);
+  private final io.qnop.repository.UserRepository users =
+      mock(io.qnop.repository.UserRepository.class);
+  private final ReviewAudience audience =
+      new ReviewAudience(documents, annotations, comments, participants, users);
   private final Document document = mock(Document.class);
   private final Annotation annotation = mock(Annotation.class);
 
@@ -77,7 +82,7 @@ class ReviewAudienceTest {
   @Test
   @DisplayName("an OPEN thread is visible to every participant")
   void openThread() {
-    assertThat(audience.canSeeThread(document, annotation, REVIEWER)).isTrue();
+    assertThat(audience.canSeeThread(document, AUTHOR, REVIEWER, false)).isTrue();
     assertThat(audience.canSee(DOCUMENT_ID, ANNOTATION_ID, REVIEWER)).isTrue();
   }
 
@@ -86,10 +91,31 @@ class ReviewAudienceTest {
   void privateThread() {
     when(document.getThreadParticipation()).thenReturn(ThreadParticipation.PRIVATE);
 
-    assertThat(audience.canSeeThread(document, annotation, AUTHOR)).isTrue();
-    assertThat(audience.canSeeThread(document, annotation, OWNER)).isTrue();
-    assertThat(audience.canSeeThread(document, annotation, REVIEWER)).isFalse();
+    assertThat(audience.canSeeThread(document, AUTHOR, AUTHOR, true)).isTrue();
+    assertThat(audience.canSeeThread(document, AUTHOR, OWNER, false)).isTrue();
+    assertThat(audience.canSeeThread(document, AUTHOR, REVIEWER, false)).isFalse();
     assertThat(audience.canSee(DOCUMENT_ID, ANNOTATION_ID, REVIEWER)).isFalse();
+  }
+
+  @Test
+  @DisplayName("an admin hears about a PRIVATE thread they took part in, even as a non-member")
+  void adminsWhoTookPart() {
+    when(document.getThreadParticipation()).thenReturn(ThreadParticipation.PRIVATE);
+    UUID admin = UUID.randomUUID();
+    io.qnop.entity.User adminUser = mock(io.qnop.entity.User.class);
+    when(adminUser.getRole()).thenReturn(io.qnop.entity.UserRole.ADMIN);
+    when(users.findById(admin)).thenReturn(Optional.of(adminUser));
+
+    // Not a participant: only taking part admits them (moderation, as canSeeThread allows).
+    assertThat(audience.canSeeThread(document, AUTHOR, admin, true)).isTrue();
+    assertThat(audience.canSeeThread(document, AUTHOR, admin, false)).isFalse();
+    when(comments.existsByAnnotationIdAndAuthorId(ANNOTATION_ID, admin)).thenReturn(true);
+    assertThat(audience.canSee(DOCUMENT_ID, ANNOTATION_ID, admin)).isTrue();
+    // A participating admin sees every thread, as on the read paths.
+    when(participants.existsAccessibleParticipant(DOCUMENT_ID, admin)).thenReturn(true);
+    assertThat(audience.canSeeThread(document, AUTHOR, admin, false)).isTrue();
+    // The same role check never admits a plain reviewer.
+    assertThat(audience.canSeeThread(document, AUTHOR, REVIEWER, true)).isFalse();
   }
 
   @Test

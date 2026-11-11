@@ -47,6 +47,9 @@ public interface CommentRepository extends JpaRepository<Comment, UUID> {
           + " WHERE c.annotationId = a.id AND a.documentId = :documentId")
   List<UUID> findDistinctCommentAuthorIdsByDocumentId(@Param("documentId") UUID documentId);
 
+  /** Whether {@code authorId} has written in the thread of {@code annotationId} (issue #919). */
+  boolean existsByAnnotationIdAndAuthorId(UUID annotationId, UUID authorId);
+
   /**
    * Whether {@code commentAuthorId} wrote a comment carrying {@code fragment} in one of {@code
    * threadAuthorId}'s threads on the document — used to tie a document-scoped attachment to the

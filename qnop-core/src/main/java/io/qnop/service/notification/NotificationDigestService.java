@@ -236,6 +236,12 @@ public class NotificationDigestService {
    * without a document (a deleted review, addressed to its owner) carry their own text and stay.
    * Dropped rows are simply left out; they are not marked read, so the in-app inbox (which
    * tombstones them) stays the single place that shows them.
+   *
+   * <p>Deliberately, a run whose rows are all dropped sends nothing and leaves the watermark where
+   * it was, so those rows are re-checked on every hourly run until a digest goes out or the inbox
+   * sweep removes them. That is bounded by notification retention and cheap. Do not "fix" it by
+   * marking the rows read or advancing the watermark: either would hide them from the inbox or skip
+   * rows that become visible again.
    */
   private List<Notification> stillVisible(UUID recipientId, List<Notification> unread) {
     Map<String, Boolean> memo = new HashMap<>();

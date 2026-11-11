@@ -23,39 +23,56 @@ package io.qnop.service.review;
 import io.qnop.entity.Annotation;
 import io.qnop.entity.Document;
 import io.qnop.entity.ThreadParticipation;
+import io.qnop.entity.User;
+import io.qnop.entity.UserRole;
 import io.qnop.repository.AnnotationRepository;
+import io.qnop.repository.CommentRepository;
 import io.qnop.repository.DocumentRepository;
 import io.qnop.repository.ReviewParticipantRepository;
+import io.qnop.repository.UserRepository;
 import java.util.Optional;
 import java.util.UUID;
 import org.springframework.stereotype.Component;
 
 /**
- * Who may <em>currently</em> hear about a review or one of its threads (issue #919).
+ * Who may <em>currently</em> hear about a review or one of its threads (issue #919), and who may be
+ * named in a thread (mentions, issue #921).
  *
  * <p>Notifications are addressed to people derived from history — the annotation's author, earlier
  * commenters, a team at the time it was added — so the set can outlive the access it was based on.
- * Every out-of-band channel (the immediate mail, the daily digest) therefore re-checks with this
- * class at delivery or assembly time, with the same rules the read paths apply: the owner and the
- * review's participants (direct or via a team) see the review, and under {@link
- * ThreadParticipation#PRIVATE} only the owner and the annotation's author see a thread (issue
- * #413). Admin status is deliberately not consulted, matching the in-app inbox: an admin who is not
- * part of a review is not its audience.
+ * Every out-of-band channel (the immediate mail and in-app row, the daily digest) therefore
+ * re-checks with this class at delivery or assembly time, with the rules the read paths apply:
+ *
+ * <ul>
+ *   <li><strong>Review:</strong> the owner and the review's participants (direct or via a team).
+ *       Admin status alone is not membership, matching the in-app inbox.
+ *   <li><strong>Thread:</strong> under {@link ThreadParticipation#PRIVATE} only the owner and the
+ *       annotation's author see a thread (issue #413) — plus admins, exactly as {@code
+ *       AnnotationService.canSeeThread} lets them read and write it for moderation. An admin who
+ *       actually took part in the thread (authored it or commented in it) keeps hearing about it
+ *       even when they are not a participant of the review.
+ * </ul>
  */
 @Component
 public class ReviewAudience {
 
   private final DocumentRepository documents;
   private final AnnotationRepository annotations;
+  private final CommentRepository comments;
   private final ReviewParticipantRepository participants;
+  private final UserRepository users;
 
   public ReviewAudience(
       DocumentRepository documents,
       AnnotationRepository annotations,
-      ReviewParticipantRepository participants) {
+      CommentRepository comments,
+      ReviewParticipantRepository participants,
+      UserRepository users) {
     this.documents = documents;
     this.annotations = annotations;
+    this.comments = comments;
     this.participants = participants;
+    this.users = users;
   }
 
   /** Whether {@code userId} is currently the owner or a participant of {@code document}. */
@@ -65,12 +82,22 @@ public class ReviewAudience {
   }
 
   /**
-   * Whether {@code userId} currently sees the review and — under PRIVATE participation — the thread
-   * of {@code annotation}.
+   * Whether {@code userId} may currently hear about the thread authored by {@code
+   * annotationAuthorId}.
+   *
+   * @param tookPart whether the user authored the thread or commented in it — only consulted for
+   *     admins, whom the review-level gate does not otherwise admit
    */
-  public boolean canSeeThread(Document document, Annotation annotation, UUID userId) {
-    return canSeeReview(document, userId)
-        && threadVisible(document, annotation.getAuthorId(), userId);
+  public boolean canSeeThread(
+      Document document, UUID annotationAuthorId, UUID userId, boolean tookPart) {
+    boolean member = canSeeReview(document, userId);
+    if (member && threadVisible(document, annotationAuthorId, userId)) {
+      return true;
+    }
+    if (!isAdmin(userId)) {
+      return false;
+    }
+    return member || tookPart;
   }
 
   /**
@@ -79,16 +106,20 @@ public class ReviewAudience {
    */
   public boolean canSee(UUID documentId, UUID annotationId, UUID userId) {
     Optional<Document> document = documents.findById(documentId);
-    if (document.isEmpty() || !canSeeReview(document.get(), userId)) {
+    if (document.isEmpty()) {
       return false;
     }
     if (annotationId == null) {
-      return true;
+      return canSeeReview(document.get(), userId);
     }
-    return annotations
-        .findById(annotationId)
-        .map(annotation -> threadVisible(document.get(), annotation.getAuthorId(), userId))
-        .orElse(false);
+    Optional<Annotation> annotation = annotations.findById(annotationId);
+    if (annotation.isEmpty()) {
+      return false;
+    }
+    UUID authorId = annotation.get().getAuthorId();
+    boolean tookPart =
+        userId.equals(authorId) || comments.existsByAnnotationIdAndAuthorId(annotationId, userId);
+    return canSeeThread(document.get(), authorId, userId, tookPart);
   }
 
   /** The PRIVATE-participation rule alone (issue #413); OPEN and READ_ONLY show every thread. */
@@ -97,5 +128,9 @@ public class ReviewAudience {
       return true;
     }
     return userId.equals(document.getOwnerId()) || userId.equals(annotationAuthorId);
+  }
+
+  private boolean isAdmin(UUID userId) {
+    return users.findById(userId).map(User::getRole).filter(UserRole.ADMIN::equals).isPresent();
   }
 }

@@ -131,8 +131,13 @@ export function CommentThread({
   // review's flags from the already-cached document. No document, no cards —
   // realAuthorId treats a missing review as "expose nothing".
   const review = useDocument(documentId ?? '').data;
-  // The @-mention roster for the reply composers (issue #462).
-  const mentionCandidates = useMentionRoster(documentId);
+  // The @-mention roster for the reply composers (issue #462), scoped to the
+  // thread's audience under PRIVATE participation (issue #921): the opener's
+  // author is the thread's author.
+  const mentionCandidates = useMentionRoster(
+    documentId,
+    commentsQuery.data?.comments?.[0]?.authorId ?? null,
+  );
   const addComment = useAddComment(annotationId);
   const toggleReaction = useToggleCommentReaction(annotationId, notify);
   const uploadAttachment = useCommentAttachmentUpload(documentId, notify);

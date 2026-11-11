@@ -57,6 +57,7 @@ class NotificationDigestIT extends SeededIntegrationTest {
   @Autowired private NotificationDigestRepository watermarks;
   @Autowired private io.qnop.repository.DocumentRepository documents;
   @Autowired private io.qnop.repository.ReviewParticipantRepository participants;
+  @Autowired private io.qnop.repository.AnnotationRepository annotations;
   @Autowired private io.qnop.service.ApplicationSettingsService settings;
 
   private UUID documentId;
@@ -203,6 +204,42 @@ class NotificationDigestIT extends SeededIntegrationTest {
 
     // Control: with current access the same row is digested.
     participants.save(io.qnop.entity.ReviewParticipant.forUser(documentId, MEMBER2_ID));
+    digest.digestOnce(false);
+
+    verify(mail)
+        .sendMailFromTemplate(
+            eq(MailTemplateKey.REVIEW_DAILY_DIGEST), eq("member2@qnop.test"), any(), any());
+  }
+
+  @Test
+  @DisplayName("a current reviewer gets no digest lines about someone else's PRIVATE thread (#919)")
+  void digestRechecksPrivateThreadVisibility() {
+    storeReviewMailCadence(MEMBER2_ID, "DAILY");
+    storeUserSetting(MEMBER2_ID, "timezone", zoneAtNoon());
+    io.qnop.entity.Document privateReview = new io.qnop.entity.Document(MEMBER_ID, "Private");
+    privateReview.setThreadParticipation(io.qnop.entity.ThreadParticipation.PRIVATE);
+    UUID privateId = documents.save(privateReview).getId();
+    participants.save(io.qnop.entity.ReviewParticipant.forUser(privateId, MEMBER2_ID));
+    participants.save(io.qnop.entity.ReviewParticipant.forUser(privateId, AUDITOR_ID));
+    UUID foreignThread =
+        annotations.save(new io.qnop.entity.Annotation(privateId, AUDITOR_ID)).getId();
+    notifications.save(
+        Notification.of(MEMBER2_ID, NotificationType.COMMENT_ADDED)
+            .withDocument(privateId)
+            .withAnnotation(foreignThread));
+
+    digest.digestOnce(false);
+
+    verify(mail, never())
+        .sendMailFromTemplate(
+            eq(MailTemplateKey.REVIEW_DAILY_DIGEST), eq("member2@qnop.test"), any(), any());
+
+    // Control: a line about MEMBER2's own thread in the same review is digested.
+    UUID ownThread = annotations.save(new io.qnop.entity.Annotation(privateId, MEMBER2_ID)).getId();
+    notifications.save(
+        Notification.of(MEMBER2_ID, NotificationType.COMMENT_ADDED)
+            .withDocument(privateId)
+            .withAnnotation(ownThread));
     digest.digestOnce(false);
 
     verify(mail)
