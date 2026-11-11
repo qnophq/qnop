@@ -109,6 +109,7 @@ Only if a separate step is impractical, let the service migrate with the owner p
 The chain-sealing and tombstone triggers run with the owner's rights (`SECURITY DEFINER`), and PostgreSQL runs the review-deletion cascade as the table owner, so deleting a review keeps working without granting `DELETE` on `audit_event`. Re-run the `REVOKE` lines if you ever re-grant on all tables.
 
 **2. Ship the checkpoints out of the database.** Each successful verification logs `Audit chain intact: … head seq=<n> hash=<h>` (logger `io.qnop.service.audit.AuditChainVerificationService`). Forward these lines — or the whole application log — to an append-only store the database credentials cannot reach (your log platform, object storage with retention lock, syslog on another host). Someone who rewrites the trail and recomputes the chain cannot make an earlier logged hash reappear at its logged position: compare a stored checkpoint with `SELECT row_hash FROM audit_event WHERE chain_seq = <n>` to prove the trail up to that point is unchanged. (If row `<n>` has since been deleted with its review, an `audit.chain.pruned` tombstone lists its range; compare against the nearest surviving later checkpoint instead.)
+
 ## Office converter isolation
 
 The image ships headless LibreOffice for DOCX ingest and the PDF annotation export. It parses documents uploaded by users, so treat it as the least-trusted code in the deployment. qnop applies these limits on every run (issue #908, ADR-0010 amendment):
