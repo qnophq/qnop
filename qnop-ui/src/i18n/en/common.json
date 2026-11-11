@@ -144,6 +144,7 @@
     "TOO_LARGE": "must be at most {{max}}",
     "INVALID_EMAIL": "must be a valid email address",
     "INVALID_URL": "must be a valid http(s) URL",
+    "REQUIRES_HTTPS": "must use https unless the host is a private address",
     "INVALID_TIMEZONE": "must be a valid IANA timezone id",
     "INVALID_LANGUAGE": "must be a two-letter ISO 639-1 language code",
     "INVALID_FORMAT": "has an invalid format",

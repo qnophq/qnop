@@ -29,9 +29,8 @@ package io.qnop.service.tracking;
  *
  * @param provider which backend receives the measurements
  * @param siteId the backend's identifier for this site, passed to the browser
- * @param scriptUrl absolute URL of the vendor script the proxy fetches
  * @param collectBaseUrl absolute base the proxy appends an allowed collect path to
- * @param consentRequired whether the client must ask before loading anything
+ * @param consentRequired whether the client must ask before measuring anything
  * @param respectDnt whether a Do-Not-Track browser is left alone
  * @param trackPrivilegedRoles whether administrators and auditors are measured too
  * @param forwardClientIp how much of the visitor's address travels with each measurement (issue
@@ -40,7 +39,6 @@ package io.qnop.service.tracking;
 public record TrackingRuntimeConfig(
     TrackingProvider provider,
     String siteId,
-    String scriptUrl,
     String collectBaseUrl,
     boolean consentRequired,
     boolean respectDnt,

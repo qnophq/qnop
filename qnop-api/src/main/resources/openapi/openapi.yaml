@@ -5066,22 +5066,24 @@ components:
       type: object
       description: |
         What the client needs to measure usage (issue #666). It never learns the
-        analytics host: the script comes from `/t/s.js` and measurements go to
-        `/t/c/…` on this origin, which is what keeps the CSP pinned to 'self'.
+        analytics host: the client builds each measurement in the backend's
+        collect format and sends it to `/t/c/…` on this origin, which is what
+        keeps the CSP pinned to 'self'. No analytics vendor script is loaded
+        (issue #910).
       properties:
         provider:
           type: string
           enum: [matomo, plausible, umami, posthog, pirsch]
-          description: Which backend's script and call shape to use.
+          description: Which backend's collect format to use.
         siteId:
           type: string
           description: |
-            The backend's identifier for this site, as the script needs it
+            The backend's identifier for this site, as its collect format needs it
             (Matomo idSite, Plausible domain, Umami website id, PostHog project
             API key, Pirsch identification code).
         consentRequired:
           type: boolean
-          description: Ask before loading anything at all.
+          description: Ask before measuring anything at all.
         respectDnt:
           type: boolean
           description: Leave browsers that send Do-Not-Track or GPC entirely alone.
@@ -6949,8 +6951,8 @@ components:
             the failure in the user's language: `REQUIRED`, `NOT_AN_INTEGER`,
             `NOT_A_BOOLEAN`, `NOT_AN_OPTION`, `TOO_LONG`, `TOO_SHORT`,
             `LENGTH_OUT_OF_RANGE`, `TOO_SMALL`, `TOO_LARGE`, `INVALID_EMAIL`,
-            `INVALID_URL`, `INVALID_TIMEZONE`, `INVALID_LANGUAGE`,
-            `INVALID_FORMAT`, `UNKNOWN_SETTING`. Null when the failure has no
+            `INVALID_URL`, `REQUIRES_HTTPS`, `INVALID_TIMEZONE`,
+            `INVALID_LANGUAGE`, `INVALID_FORMAT`, `UNKNOWN_SETTING`. Null when the failure has no
             stable reason (e.g. a custom constraint message, or a size limit on
             a list); new codes may be added, so a client falls back to `message`
             for one it does not know.

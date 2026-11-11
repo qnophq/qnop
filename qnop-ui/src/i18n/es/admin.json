@@ -396,7 +396,8 @@
       "needsSiteId": "No se está midiendo nada — {{provider}} necesita el ID de sitio con el que identifica este espacio de trabajo.",
       "needsHost": "No se está midiendo nada — {{provider}} está autoalojado, así que necesita la dirección de tu servidor.",
       "measuring": "Midiendo en {{provider}}. Las direcciones de las páginas se reducen a patrones de ruta antes de reenviarlas.",
-      "measuringAt": "Midiendo en {{provider}} en {{host}}. Las direcciones de las páginas se reducen a patrones de ruta antes de reenviarlas."
+      "measuringAt": "Midiendo en {{provider}} en {{host}}. Las direcciones de las páginas se reducen a patrones de ruta antes de reenviarlas.",
+      "trustNote": "qnop nunca ejecuta código del proveedor de analítica en el navegador: construye cada medición por sí mismo —como mucho un patrón de ruta, uno de cuatro eventos con nombre, el tamaño de pantalla y el idioma del navegador— y la envía a través de este servidor, que no acepta nada más. Aun así, el backend que configure aquí recibe cada medición reenviada junto con la identificación del navegador del visitante y, según el ajuste de abajo, su dirección IP, así que apúntelo solo a un servidor de confianza. Un host público debe usar https."
     },
     "fields": {
       "general__application_name": {
@@ -425,7 +426,7 @@
       },
       "tracking__enabled": {
         "label": "Activada",
-        "description": "Si la medición de uso anónima está activada. La medición pasa siempre por este servidor, nunca lo evita: el navegador carga el script de analítica desde qnop y envía sus eventos a qnop, que los reenvía. Los visitantes nunca se comunican directamente con el backend de analítica."
+        "description": "Si la medición de uso anónima está activada. La medición pasa siempre por este servidor, nunca lo evita: qnop construye cada medición por sí mismo y la envía a qnop, que la reenvía. No se carga ningún script de analítica y los visitantes nunca se comunican directamente con el backend de analítica."
       },
       "tracking__provider": {
         "label": "Proveedor",
@@ -433,7 +434,7 @@
       },
       "tracking__host": {
         "label": "Host",
-        "description": "URL base del backend de analítica, p. ej., https://matomo.internal. Si se deja vacío, se usa la nube propia del proveedor cuando la tiene (Plausible, PostHog, Pirsch); Matomo y Umami son autoalojados y siempre lo necesitan."
+        "description": "URL base del backend de analítica, p. ej., https://matomo.example.com. Si se deja vacío, se usa la nube propia del proveedor cuando la tiene (Plausible, PostHog US, Pirsch); para un proyecto de PostHog en la UE, indique https://eu.i.posthog.com. Matomo y Umami son autoalojados y siempre lo necesitan. Debe usar https, salvo que el host sea una dirección privada."
       },
       "tracking__site_id": {
         "label": "ID de sitio",
@@ -453,7 +454,7 @@
       },
       "tracking__forward_client_ip": {
         "label": "Reenviar la IP del cliente",
-        "description": "Qué parte de la dirección IP de un visitante se pasa a tu backend de analítica. Anonimizada la acorta, de modo que los visitantes se pueden contar sin poder identificarlos. No reenviar significa que el backend cuenta a todos como un único visitante. Completa envía la dirección exacta, que es un dato personal — necesitas tu propia base legal para ello."
+        "description": "Qué parte de la dirección IP de un visitante se pasa a su backend de analítica. Anonimizada la acorta, de modo que los visitantes siguen siendo contables sin ser identificables. No reenviada significa que el backend cuenta a todos como un único visitante. Completa envía la dirección exacta, que es un dato personal: necesita su propia base jurídica. El backend debe confiar en la dirección reenviada: Matomo solo la usa si su config.ini incluye la cabecera en proxy_client_headers[], y Pirsch puede contar a todos los visitantes con la dirección de este servidor; consulte la guía de despliegue."
       },
       "smtp__enabled": {
         "label": "Activado",
