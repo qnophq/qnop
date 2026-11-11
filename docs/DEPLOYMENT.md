@@ -72,6 +72,31 @@ docker compose exec qnop cat /tmp/qnop-admin-password.txt
 - **TLS**: terminate TLS at a reverse proxy and set `QNOP_HTTP_FORWARD_HEADERS_STRATEGY=framework`. The refresh cookie is `Secure` — plain-HTTP deployments are for local evaluation only.
 - **Backups**: the PostgreSQL database and the object-storage bucket together form the complete state; back them up as a pair.
 
+## Office converter isolation
+
+The image ships headless LibreOffice for DOCX ingest and the PDF annotation export. It parses documents uploaded by users, so treat it as the least-trusted code in the deployment. qnop applies these limits on every run (issue #908, ADR-0010 amendment):
+
+- **Empty environment.** The converter process receives only `PATH`, `HOME`, `TMPDIR`, `LANG` and `SAL_USE_VCLPLUGIN`; none of the `QNOP_*` secrets, database or storage credentials are passed on. `HOME`, `TMPDIR` and the working directory point into a throwaway per-run directory that is deleted afterwards.
+- **Hardened per-run profile.** Macro execution is disabled, the macro security level is set to its highest value, active content and untrusted links are blocked, and Writer never updates links on load.
+- **Whole-tree timeout.** When a run exceeds `QNOP_OFFICE_TIMEOUT` (default `60s`), the launcher and every process it started are killed.
+- **Size caps.** `QNOP_OFFICE_MAX_INPUT_SIZE` (default `100MB`) bounds what is handed to the converter, `QNOP_OFFICE_MAX_OUTPUT_SIZE` (default `256MB`) bounds the PDF read back.
+- **Bounded concurrency.** `QNOP_OFFICE_MAX_CONCURRENT` / `QNOP_OFFICE_MAX_WAIT` (ADR-0055).
+
+What a subprocess cannot do on its own is change user, network or kernel limits — the converter still runs as the server's uid, in the server's network namespace. Recommended additional isolation, strongest first:
+
+1. **Restrict the container's egress.** The qnop container only needs PostgreSQL, the object store, SMTP and (if used) the OIDC provider. A Kubernetes `NetworkPolicy` or firewall rule that allows exactly those keeps a converted document from reaching anything else.
+2. **Bound the container's resources.** Set memory and PID limits (`--memory`, `--pids-limit`, or the Kubernetes equivalents) and keep the JVM's `-XX:+ExitOnOutOfMemoryError`; run with the runtime's default seccomp profile, `--cap-drop=ALL`, `no-new-privileges`, and a read-only root filesystem with a writable `/tmp`.
+3. **Wrap the binary.** `QNOP_OFFICE_BINARY` may point at a wrapper script that applies per-process limits or namespaces before starting `soffice`. The wrapper sees the same empty environment, so use absolute paths or binaries on the default `PATH`. For example, with `util-linux` available and unprivileged user namespaces enabled on the host:
+
+   ```sh
+   #!/bin/sh
+   # No network at all, CPU-time and file-size limits, then the real converter.
+   exec prlimit --cpu=120 --fsize=536870912 -- unshare --user --map-root-user --net -- soffice "$@"
+   ```
+
+   Running the converter under a separate uid (for example `sudo -u <converter-user>` in the wrapper with a sudoers rule scoped to that single command) additionally keeps it from reading the server process's files and `/proc` entries.
+4. **Disable it.** A deployment that does not need DOCX ingest or PDF export can set `QNOP_OFFICE_BINARY` to a non-existent path; both features then report themselves unavailable in `GET /api/v1/config`.
+
 ## Upgrades
 
 1. Read the release notes of every version you skip: <https://github.com/qnophq/qnop/releases>.

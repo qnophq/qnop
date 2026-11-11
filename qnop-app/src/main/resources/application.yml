@@ -183,6 +183,13 @@ qnop:
   # is small, and it is not a per-deployment limit (ADR-0055). A conversion that
   # finds every slot busy waits up to `max-wait` and is then refused — the export
   # answers 503 with Retry-After, an ingest job retries under the queue's backoff.
+  #
+  # The converter runs untrusted documents, so each run is isolated as far as a
+  # subprocess can be (issue #908, ADR-0010 amendment): an empty environment apart
+  # from PATH/HOME/TMPDIR/LANG, a throwaway profile with macros and link updates
+  # off, the whole process tree killed on timeout, and `max-input-size` /
+  # `max-output-size` caps on what goes in and what is read back. Separate uid,
+  # network and resource limits are deployment choices — see docs/DEPLOYMENT.md.
   # Instance quotas (issue #673, ADR-0057). What this deployment may hold, set by
   # whoever operates it — a SaaS plan, in practice. Deliberately NOT application
   # settings: an administrator inside the instance must not be able to raise their
@@ -274,3 +281,5 @@ qnop:
     timeout: ${QNOP_OFFICE_TIMEOUT:60s}
     max-concurrent: ${QNOP_OFFICE_MAX_CONCURRENT:2}
     max-wait: ${QNOP_OFFICE_MAX_WAIT:30s}
+    max-input-size: ${QNOP_OFFICE_MAX_INPUT_SIZE:100MB}
+    max-output-size: ${QNOP_OFFICE_MAX_OUTPUT_SIZE:256MB}

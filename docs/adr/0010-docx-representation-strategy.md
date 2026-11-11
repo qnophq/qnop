@@ -59,3 +59,15 @@ The decision above lists Markdown among the formats Community ingests ("Markdown
 What does **not** change is the reasoning. Markdown was always going to be the format that proved the seam, because it is the one that cannot funnel through a PDF conversion the way DOCX does — it has no layout to preserve, so it takes the HTML path this ADR named. That the seam has to carry a format the canonical pipeline does not natively fit is exactly why `DocumentExtractor` is a published SPI (ADR-0003/0046) rather than an internal interface. An enterprise module implementing it is the case this architecture was drawn for, not a departure from it.
 
 The practical consequence for this repository: `GET /api/v1/config` keeps reporting `supportedFormats` from the extractors actually registered, so a deployment with the enterprise module simply advertises one more. Nothing here needs a flag, a branch, or a stub.
+
+## Amendment (2026-11, #908): the converter is an untrusted-input boundary
+
+The out-of-process boundary this ADR chose was drawn for licensing (ADR-0007). It is also a security boundary, because LibreOffice parses files chosen by any uploader, and a parser running as the server's uid with the server's environment can read everything the server can. The decision stands — out-of-process, in the same image — with the subprocess now isolated as far as the server alone can isolate it:
+
+- **Environment.** The child gets a fresh environment containing only `PATH`, `HOME`, `TMPDIR`, `LANG` and `SAL_USE_VCLPLUGIN`, with `HOME`, `TMPDIR` and the working directory inside the throwaway per-run workspace. The server's secrets are never inherited.
+- **Profile.** The per-run user profile (already required for concurrency) is seeded with a `registrymodifications.xcu` that disables macro execution, sets the macro security level to its highest value, blocks active content and untrusted links, and sets Writer's link update mode to *never*.
+- **Lifetime.** `soffice` is a launcher; on timeout or interruption its descendants are listed first and killed with it, so no office process outlives its run.
+- **Size.** Input and output are capped (`qnop.office.max-input-size`, `max-output-size`); the output size is checked before the PDF is read into memory. Both failures are permanent (a retry would repeat them).
+
+What stays a **deployment** responsibility, documented in `docs/DEPLOYMENT.md`: a separate uid, no network egress, and kernel resource limits. These need privileges or orchestration the application does not have; the binary setting accepts a wrapper so an operator can add them without a code change. Shipping the converter as a separate, network-less sidecar container is the stronger option and remains open as follow-up work — it changes the deployment contract (a second service) and is not required to close the environment-inheritance and lifetime gaps above.
+

@@ -29,6 +29,7 @@ import java.nio.file.Path;
 import java.time.Duration;
 import java.util.Comparator;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.TimeUnit;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -58,6 +59,37 @@ public class LibreOfficeConverter implements OfficeConverter {
 
   /** How long to wait for the reader once the process is already gone. */
   private static final Duration OUTPUT_DRAIN_GRACE = Duration.ofSeconds(2);
+
+  /** The per-run profile directory inside the workspace. */
+  private static final String PROFILE_DIR = "profile";
+
+  /** The per-run temp directory inside the workspace. */
+  private static final String TMP_DIR = "tmp";
+
+  /** The search path used when the server itself has none. */
+  private static final String DEFAULT_PATH = "/usr/local/bin:/usr/bin:/bin";
+
+  /** A locale every system has; LibreOffice only needs one to be set. */
+  private static final String CHILD_LOCALE = "C.UTF-8";
+
+  private static final String HARDENED_REGISTRY =
+      """
+      <?xml version="1.0" encoding="UTF-8"?>
+      <oor:items xmlns:oor="http://openoffice.org/2001/registry" \
+      xmlns:xs="http://www.w3.org/2001/XMLSchema" \
+      xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+      <item oor:path="/org.openoffice.Office.Common/Security/Scripting">\
+      <prop oor:name="DisableMacrosExecution" oor:op="fuse"><value>true</value></prop></item>
+      <item oor:path="/org.openoffice.Office.Common/Security/Scripting">\
+      <prop oor:name="MacroSecurityLevel" oor:op="fuse"><value>3</value></prop></item>
+      <item oor:path="/org.openoffice.Office.Common/Security/Scripting">\
+      <prop oor:name="BlockUntrustedRefererLinks" oor:op="fuse"><value>true</value></prop></item>
+      <item oor:path="/org.openoffice.Office.Common/Security/Scripting">\
+      <prop oor:name="DisableActiveContent" oor:op="fuse"><value>true</value></prop></item>
+      <item oor:path="/org.openoffice.Office.Writer/Content/Update">\
+      <prop oor:name="Link" oor:op="fuse"><value>2</value></prop></item>
+      </oor:items>
+      """;
 
   private final OfficeConverterProperties properties;
 
@@ -91,14 +123,22 @@ public class LibreOfficeConverter implements OfficeConverter {
   /** Asks the binary for its version — the cheapest question that proves it can actually run. */
   private boolean probe() {
     try {
-      Process process =
-          new ProcessBuilder(properties.binary(), "--version")
-              .redirectErrorStream(true)
-              .redirectOutput(ProcessBuilder.Redirect.DISCARD)
-              .start();
+      Path home = Files.createTempDirectory("qnop-convert-probe-");
+      Process process;
+      try {
+        process =
+            scrubbed(new ProcessBuilder(properties.binary(), "--version"), home)
+                .redirectErrorStream(true)
+                .redirectOutput(ProcessBuilder.Redirect.DISCARD)
+                .start();
+      } catch (IOException e) {
+        deleteRecursively(home);
+        throw e;
+      }
       boolean finished = process.waitFor(20, TimeUnit.SECONDS);
+      deleteRecursively(home);
       if (!finished) {
-        process.destroyForcibly();
+        destroyTree(process);
         log.warn("{} --version did not answer; PDF export stays unavailable", properties.binary());
         return false;
       }
@@ -130,9 +170,15 @@ public class LibreOfficeConverter implements OfficeConverter {
               + properties.binary()
               + "')");
     }
+    if (source.length > properties.maxInputSize().toBytes()) {
+      throw OfficeConversionException.unreadableDocument(
+          "the document exceeds the converter's input limit of " + properties.maxInputSize());
+    }
     Path workspace = null;
     try {
       workspace = Files.createTempDirectory("qnop-convert-");
+      writeHardenedProfile(workspace.resolve(PROFILE_DIR));
+      Files.createDirectories(workspace.resolve(TMP_DIR));
       Path input = workspace.resolve("document." + sourceExtension);
       Files.write(input, source);
       long started = System.nanoTime();
@@ -151,6 +197,12 @@ public class LibreOfficeConverter implements OfficeConverter {
         throw OfficeConversionException.unreadableDocument(
             "the converter reported success but produced no PDF for " + input.getFileName());
       }
+      if (Files.size(output) > properties.maxOutputSize().toBytes()) {
+        // Checked before reading: the size of what a document expands to is the
+        // document's choice, and the heap must not be (issue #908).
+        throw OfficeConversionException.unreadableDocument(
+            "the converted PDF exceeds the output limit of " + properties.maxOutputSize());
+      }
       return Files.readAllBytes(output);
     } catch (IOException e) {
       throw new OfficeConversionException("could not convert a document to PDF", e);
@@ -160,33 +212,20 @@ public class LibreOfficeConverter implements OfficeConverter {
   }
 
   private void run(Path workspace, Path input) throws IOException {
-    List<String> command =
-        List.of(
-            properties.binary(),
-            "--headless",
-            "--norestore",
-            "--invisible",
-            // Its own profile per run: LibreOffice will not start against a profile
-            // another instance holds, so a shared one turns concurrent exports into
-            // sporadic failures.
-            "-env:UserInstallation=file://" + workspace.resolve("profile"),
-            "--convert-to",
-            "pdf",
-            "--outdir",
-            workspace.toString(),
-            input.toString());
+    List<String> command = command(workspace, input);
 
     // Kept rather than discarded (issue #659): a non-zero exit used to leave nothing
     // but a status number, and what LibreOffice actually complained about is the one
     // thing a developer needs. The workspace path holds no user-chosen name — the
     // input is always "document.<ext>" under a generated temp directory — so the
     // output carries nothing personal.
-    Process process = new ProcessBuilder(command).redirectErrorStream(true).start();
+    Process process =
+        scrubbed(new ProcessBuilder(command), workspace).redirectErrorStream(true).start();
     StringBuilder output = new StringBuilder();
     Thread drain = drainInto(process, output);
     try {
       if (!process.waitFor(properties.timeout().toMillis(), TimeUnit.MILLISECONDS)) {
-        process.destroyForcibly();
+        destroyTree(process);
         log.warn(
             "The office converter did not finish within {}; it said: {}",
             properties.timeout(),
@@ -203,10 +242,88 @@ public class LibreOfficeConverter implements OfficeConverter {
             "the converter exited with status " + process.exitValue());
       }
     } catch (InterruptedException e) {
-      process.destroyForcibly();
+      destroyTree(process);
       Thread.currentThread().interrupt();
       throw new OfficeConversionException("interrupted while converting a document", e);
     }
+  }
+
+  /** The full argument list for one conversion run. */
+  List<String> command(Path workspace, Path input) {
+    return List.of(
+        properties.binary(),
+        "--headless",
+        "--norestore",
+        "--invisible",
+        "--nolockcheck",
+        "--nodefault",
+        // Its own profile per run: LibreOffice will not start against a profile
+        // another instance holds, so a shared one turns concurrent exports into
+        // sporadic failures. It is also where the hardened settings live.
+        "-env:UserInstallation=" + workspace.resolve(PROFILE_DIR).toUri(),
+        "--convert-to",
+        "pdf",
+        "--outdir",
+        workspace.toString(),
+        input.toString());
+  }
+
+  /**
+   * Gives the child a fresh, minimal environment (issue #908).
+   *
+   * <p>The server's own environment carries its secrets — signing and encryption keys, database and
+   * object-storage credentials — and a document parser that runs untrusted files has no use for any
+   * of them. Only what the office suite needs to start is passed: the executable search path, a
+   * home and temp directory inside the per-run workspace (deleted afterwards), a locale, and the
+   * headless rendering backend.
+   */
+  static ProcessBuilder scrubbed(ProcessBuilder builder, Path workspace) {
+    Map<String, String> environment = builder.environment();
+    Map<String, String> child = childEnvironment(System.getenv(), workspace);
+    environment.clear();
+    environment.putAll(child);
+    // Started inside the throwaway workspace, not the server's working directory.
+    return builder.directory(workspace.toFile());
+  }
+
+  /** The child environment for a run in {@code workspace}, derived from the server's own. */
+  static Map<String, String> childEnvironment(Map<String, String> parent, Path workspace) {
+    String path = parent.get("PATH");
+    return Map.of(
+        "PATH",
+        path == null || path.isBlank() ? DEFAULT_PATH : path,
+        "HOME",
+        workspace.toString(),
+        "TMPDIR",
+        workspace.resolve(TMP_DIR).toString(),
+        "LANG",
+        CHILD_LOCALE,
+        "SAL_USE_VCLPLUGIN",
+        "svp");
+  }
+
+  /**
+   * Kills the process and everything it started (issue #908).
+   *
+   * <p>{@code soffice} is a launcher: the work happens in a child process, and killing only the
+   * launcher would leave that child running with the document open. The descendants are listed
+   * before the launcher dies, because once it is gone they are re-parented and no longer reachable
+   * through it.
+   */
+  static void destroyTree(Process process) {
+    List<ProcessHandle> descendants = process.descendants().toList();
+    process.destroyForcibly();
+    descendants.forEach(ProcessHandle::destroyForcibly);
+  }
+
+  /**
+   * Seeds the per-run profile with settings that keep a document from doing anything but render
+   * (issue #908): macros disabled outright, the macro security level at its highest, links and
+   * active content (OLE, DDE) not followed or updated, and links from untrusted documents blocked.
+   */
+  static void writeHardenedProfile(Path profile) throws IOException {
+    Path user = Files.createDirectories(profile.resolve("user"));
+    Files.writeString(user.resolve("registrymodifications.xcu"), HARDENED_REGISTRY);
   }
 
   /**
