@@ -81,7 +81,8 @@ class OfficeConversionMetricsTest {
         };
     ThrottledOfficeConverter converter =
         new ThrottledOfficeConverter(
-            delegate, new OfficeConverterProperties(null, null, 1, Duration.ofSeconds(5)));
+            delegate,
+            new OfficeConverterProperties(null, null, 1, Duration.ofSeconds(5), null, null));
     new OfficeConversionMetrics(converter).bindTo(registry);
 
     assertThat(gauge("active")).isZero();

@@ -23,11 +23,9 @@ package io.qnop.web.security.ratelimit;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
-import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
-import io.qnop.service.AuthService;
 import io.qnop.web.security.ratelimit.AuthIdentifierRateLimiter.LoginAttempt;
 import jakarta.servlet.http.Cookie;
 import jakarta.servlet.http.HttpServletRequest;
@@ -35,8 +33,8 @@ import java.time.Instant;
 import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
-import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 /** Unit tests for the per-identifier auth throttles (issue #899) — no Spring context, no Docker. */
@@ -51,19 +49,22 @@ class AuthIdentifierRateLimiterTest {
           List.of(), null, null, null, null, null, null, TWO, FIVE, TWO, TWO, FIVE, TWO, null,
           100_000L);
   private final BucketRateLimitService buckets = new BucketRateLimitService(properties);
-  private final AuthService authService = mock(AuthService.class);
   private final LoginDeviceCookies deviceCookies =
       LoginDeviceCookiesTest.cookies(LoginDeviceCookiesTest.PROPERTIES, Instant.now());
   private final AuthIdentifierRateLimiter limiter =
       new AuthIdentifierRateLimiter(
-          buckets, properties, new HttpClientIpResolver(properties), authService, deviceCookies);
+          buckets, properties, new HttpClientIpResolver(properties), deviceCookies);
 
-  @BeforeEach
-  void accounts() {
-    when(authService.findLocalAccountId(any())).thenReturn(Optional.empty());
-    when(authService.findLocalAccountId("alice")).thenReturn(Optional.of(ALICE));
-    when(authService.findLocalAccountId("alice@example.com")).thenReturn(Optional.of(ALICE));
-    when(authService.findLocalAccountId("Alice@Example.com")).thenReturn(Optional.of(ALICE));
+  /** Stands in for the credential check's lookup: three spellings of one account, nothing else. */
+  private static final Set<String> ALICE_SPELLINGS =
+      Set.of("alice", "alice@example.com", "Alice@Example.com");
+
+  private LoginAttempt begin(String identifier, HttpServletRequest request) {
+    Optional<UUID> account =
+        identifier != null && ALICE_SPELLINGS.contains(identifier)
+            ? Optional.of(ALICE)
+            : Optional.empty();
+    return limiter.beginLogin(identifier, account, request);
   }
 
   private static HttpServletRequest from(String ip) {
@@ -84,16 +85,16 @@ class AuthIdentifierRateLimiterTest {
   /** Five failures from five networks: drains the ceiling (5) without touching any one network. */
   private void drainCeiling() {
     for (int net = 1; net <= 5; net++) {
-      assertThat(limiter.beginLogin("alice", from("192.0." + net + ".1")).refused()).isFalse();
+      assertThat(begin("alice", from("192.0." + net + ".1")).refused()).isFalse();
     }
   }
 
   @Test
   void usernameAndEmailOfOneAccountShareTheNetworkBucket() {
-    limiter.beginLogin("alice", from("203.0.113.5"));
-    limiter.beginLogin("Alice@Example.com", from("203.0.113.5"));
+    begin("alice", from("203.0.113.5"));
+    begin("Alice@Example.com", from("203.0.113.5"));
 
-    assertThatThrownBy(() -> limiter.beginLogin("alice@example.com", from("203.0.113.5")))
+    assertThatThrownBy(() -> begin("alice@example.com", from("203.0.113.5")))
         .isInstanceOf(RateLimitExceededException.class)
         .hasMessage(LoginRateLimitFilter.MESSAGE)
         .satisfies(
@@ -102,12 +103,12 @@ class AuthIdentifierRateLimiterTest {
 
   @Test
   void failuresFromOneNetworkDoNotAffectAnotherNetwork() {
-    limiter.beginLogin("alice", from("203.0.113.5"));
-    limiter.beginLogin("alice", from("203.0.113.77")); // same /24
-    assertThatThrownBy(() -> limiter.beginLogin("alice", from("203.0.113.9")))
+    begin("alice", from("203.0.113.5"));
+    begin("alice", from("203.0.113.77")); // same /24
+    assertThatThrownBy(() -> begin("alice", from("203.0.113.9")))
         .isInstanceOf(RateLimitExceededException.class);
 
-    LoginAttempt owner = limiter.beginLogin("alice", from("198.51.100.20"));
+    LoginAttempt owner = begin("alice", from("198.51.100.20"));
     assertThat(owner.refused()).isFalse();
     limiter.loginSucceeded(owner);
   }
@@ -117,7 +118,7 @@ class AuthIdentifierRateLimiterTest {
     drainCeiling();
 
     // Another network, another spelling of the same account: no 429, just a refused attempt.
-    LoginAttempt attempt = limiter.beginLogin("alice@example.com", from("198.51.100.20"));
+    LoginAttempt attempt = begin("alice@example.com", from("198.51.100.20"));
     assertThat(attempt.refused()).isTrue();
   }
 
@@ -125,11 +126,10 @@ class AuthIdentifierRateLimiterTest {
   void aSilentRefusalStillSpendsTheCallersNetworkToken() {
     drainCeiling();
     HttpServletRequest source = from("198.51.100.20");
-    limiter.beginLogin("alice", source);
-    limiter.beginLogin("alice", source);
+    begin("alice", source);
+    begin("alice", source);
 
-    assertThatThrownBy(() -> limiter.beginLogin("alice", source))
-        .isInstanceOf(RateLimitExceededException.class);
+    assertThatThrownBy(() -> begin("alice", source)).isInstanceOf(RateLimitExceededException.class);
   }
 
   @Test
@@ -137,7 +137,7 @@ class AuthIdentifierRateLimiterTest {
     String device = deviceCookies.issue(ALICE).getValue();
     drainCeiling();
 
-    LoginAttempt owner = limiter.beginLogin("alice", from("198.51.100.20", device));
+    LoginAttempt owner = begin("alice", from("198.51.100.20", device));
 
     assertThat(owner.refused()).isFalse();
     limiter.loginSucceeded(owner);
@@ -146,22 +146,21 @@ class AuthIdentifierRateLimiterTest {
   @Test
   void aRecognisedDeviceHasItsOwnBucketEvenInsideABusyNetwork() {
     String device = deviceCookies.issue(ALICE).getValue();
-    limiter.beginLogin("alice", from("203.0.113.5"));
-    limiter.beginLogin("alice", from("203.0.113.6"));
-    assertThatThrownBy(() -> limiter.beginLogin("alice", from("203.0.113.7")))
+    begin("alice", from("203.0.113.5"));
+    begin("alice", from("203.0.113.6"));
+    assertThatThrownBy(() -> begin("alice", from("203.0.113.7")))
         .isInstanceOf(RateLimitExceededException.class);
 
-    assertThatCode(() -> limiter.beginLogin("alice", from("203.0.113.8", device)))
-        .doesNotThrowAnyException();
+    assertThatCode(() -> begin("alice", from("203.0.113.8", device))).doesNotThrowAnyException();
   }
 
   @Test
   void aRecognisedDeviceIsStillThrottledOnItsOwn() {
     String device = deviceCookies.issue(ALICE).getValue();
-    limiter.beginLogin("alice", from("203.0.113.5", device));
-    limiter.beginLogin("alice", from("198.51.100.5", device));
+    begin("alice", from("203.0.113.5", device));
+    begin("alice", from("198.51.100.5", device));
 
-    assertThatThrownBy(() -> limiter.beginLogin("alice", from("192.0.2.5", device)))
+    assertThatThrownBy(() -> begin("alice", from("192.0.2.5", device)))
         .isInstanceOf(RateLimitExceededException.class);
   }
 
@@ -170,35 +169,34 @@ class AuthIdentifierRateLimiterTest {
     String device = deviceCookies.issue(UUID.randomUUID()).getValue();
     drainCeiling();
 
-    assertThat(limiter.beginLogin("alice", from("198.51.100.20", device)).refused()).isTrue();
+    assertThat(begin("alice", from("198.51.100.20", device)).refused()).isTrue();
   }
 
   @Test
   void successfulLoginsDoNotCount() {
     for (int i = 0; i < 10; i++) {
-      limiter.loginSucceeded(limiter.beginLogin("alice", from("203.0.113.5")));
+      limiter.loginSucceeded(begin("alice", from("203.0.113.5")));
     }
 
-    assertThat(limiter.beginLogin("alice", from("203.0.113.5")).refused()).isFalse();
+    assertThat(begin("alice", from("203.0.113.5")).refused()).isFalse();
   }
 
   @Test
   void ipv6ClientsAreGroupedByTheirSlash56() {
-    limiter.beginLogin("alice", from("2001:db8:1:200::1"));
-    limiter.beginLogin("alice", from("2001:db8:1:2ff:ffff::9"));
+    begin("alice", from("2001:db8:1:200::1"));
+    begin("alice", from("2001:db8:1:2ff:ffff::9"));
 
-    assertThatThrownBy(() -> limiter.beginLogin("alice", from("2001:db8:1:250::abcd")))
+    assertThatThrownBy(() -> begin("alice", from("2001:db8:1:250::abcd")))
         .isInstanceOf(RateLimitExceededException.class);
-    assertThatCode(() -> limiter.beginLogin("alice", from("2001:db8:1:300::1")))
-        .doesNotThrowAnyException();
+    assertThatCode(() -> begin("alice", from("2001:db8:1:300::1"))).doesNotThrowAnyException();
   }
 
   @Test
   void unknownIdentifiersAreThrottledLikeKnownOnes() {
-    limiter.beginLogin("ghost@example.com", from("203.0.113.5"));
-    limiter.beginLogin("GHOST@example.com", from("203.0.113.5"));
+    begin("ghost@example.com", from("203.0.113.5"));
+    begin("GHOST@example.com", from("203.0.113.5"));
 
-    assertThatThrownBy(() -> limiter.beginLogin("ghost@example.com", from("203.0.113.5")))
+    assertThatThrownBy(() -> begin("ghost@example.com", from("203.0.113.5")))
         .isInstanceOf(RateLimitExceededException.class);
   }
 
@@ -245,7 +243,7 @@ class AuthIdentifierRateLimiterTest {
       limiter.mayRequestPasswordReset("alice@example.com", from("192.0." + net + ".1"));
     }
 
-    assertThat(limiter.beginLogin("alice@example.com", from("203.0.113.5")).refused()).isFalse();
+    assertThat(begin("alice@example.com", from("203.0.113.5")).refused()).isFalse();
   }
 
   @Test
@@ -271,7 +269,7 @@ class AuthIdentifierRateLimiterTest {
 
   @Test
   void nullIdentifiersAreKeyedRatherThanRejected() {
-    assertThatCode(() -> limiter.beginLogin(null, from("203.0.113.5"))).doesNotThrowAnyException();
+    assertThatCode(() -> begin(null, from("203.0.113.5"))).doesNotThrowAnyException();
     assertThatCode(() -> limiter.register(null)).doesNotThrowAnyException();
     assertThatCode(() -> limiter.resetPassword(null)).doesNotThrowAnyException();
   }

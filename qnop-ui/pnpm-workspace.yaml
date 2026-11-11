@@ -26,13 +26,22 @@ allowBuilds:
 # GHSA-pqg4-j6r4-53mv (>= 1.11.0), basic-ftp GHSA-c475-qrg2-pj4r (openapi-generator-cli's
 # proxy chain; the fix exists only on the 6.x line) and source-map-js
 # GHSA-68fv-2mgg-jv7q (vite/postcss build tooling).
+#
+# The 2026-11 advisories (issue #894) raise the undici floor to >= 7.30.1
+# (GHSA-qrxm-fqhp-jwvm et al., via jsdom and openapi-generator-cli) and add
+# follow-redirects >= 1.16.2 (GHSA-mrwp-f3q8-3g9p et al.) and zod >= 4.6.6
+# (memory exhaustion on oversized input). follow-redirects is the one RUNTIME
+# path here (axios); zod is reachable only via eslint-plugin-react-hooks >
+# zod-validation-error.
 overrides:
   'brace-expansion@<5.0.11': 5.0.12
   'shell-quote@<1.11.0': 1.12.0
-  'basic-ftp@<6.2.1': 6.2.3
+  'basic-ftp@<6.2.1': 6.2.6
   'source-map-js@<1.2.2': 1.2.2
-  'ip-address@<10.3.1': 10.7.4
-  'undici@<7.29.0': 7.30.0
+  'ip-address@<10.3.1': 10.7.6
+  'undici@<7.30.1': 7.30.2
+  'follow-redirects@<1.16.2': 1.16.3
+  'zod@<4.6.6': 4.6.7
   # CodeMirror needs one instance of each (issue #857): see the catalog below.
   '@codemirror/state': 'catalog:'
   '@codemirror/view': 'catalog:'

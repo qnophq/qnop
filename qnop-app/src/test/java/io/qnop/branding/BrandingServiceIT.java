@@ -30,7 +30,9 @@ import io.qnop.service.branding.BrandingService;
 import io.qnop.service.branding.BrandingValidationException;
 import java.awt.image.BufferedImage;
 import java.io.ByteArrayOutputStream;
+import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
+import java.util.zip.CRC32;
 import javax.imageio.ImageIO;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -86,6 +88,39 @@ class BrandingServiceIT extends AbstractIntegrationTest {
     long rows =
         assets.findAll().stream().filter(a -> a.getSlot() == BrandingSlot.LOGO_LIGHT).count();
     assertThat(rows).isEqualTo(1);
+  }
+
+  /** A PNG whose IHDR declares the given size, followed by no real pixel data (issue #906). */
+  private static byte[] declaredPng(int width, int height) {
+    ByteBuffer ihdr = ByteBuffer.allocate(13).putInt(width).putInt(height);
+    ihdr.put((byte) 8).put((byte) 6);
+    CRC32 crc = new CRC32();
+    crc.update("IHDR".getBytes(StandardCharsets.US_ASCII));
+    crc.update(ihdr.array());
+    return ByteBuffer.allocate(8 + 4 + 4 + 13 + 4 + 16)
+        .put(new byte[] {(byte) 0x89, 'P', 'N', 'G', 0x0D, 0x0A, 0x1A, 0x0A})
+        .putInt(13)
+        .put("IHDR".getBytes(StandardCharsets.US_ASCII))
+        .put(ihdr.array())
+        .putInt((int) crc.getValue())
+        .array();
+  }
+
+  @Test
+  void rejectsDeclaredDimensionsBeyondTheBudgetFromTheHeader() {
+    assertThatThrownBy(() -> branding.store("logo-light", declaredPng(30_000, 30_000), null))
+        .isInstanceOfSatisfying(
+            BrandingValidationException.class, e -> assertThat(e.getStatus()).isEqualTo(400));
+    assertThatThrownBy(() -> branding.store("logo-light", declaredPng(2000, 2001), null))
+        .isInstanceOf(BrandingValidationException.class);
+  }
+
+  @Test
+  void rejectsWebpWithoutReadableDimensions() {
+    byte[] webp = {'R', 'I', 'F', 'F', 0, 0, 0, 0, 'W', 'E', 'B', 'P', 'V', 'P', '8', ' '};
+    assertThatThrownBy(() -> branding.store("logo-light", webp, null))
+        .isInstanceOfSatisfying(
+            BrandingValidationException.class, e -> assertThat(e.getStatus()).isEqualTo(400));
   }
 
   @Test

@@ -129,14 +129,15 @@ named; `forgot-password` keeps its existing per-IP filter.
   by `RateLimitExceptionHandler` with the *same* status, `Retry-After`, code and message as that
   endpoint's per-IP filter.
 - **Which account a login is charged to.** The key is the user id whenever the identifier
-  resolves to a local account, through `AuthService.findLocalAccountId` — the lookup the
-  credential check uses (username exact, else e-mail case-insensitively). Username and e-mail of
-  one account, and every spelling the lookup accepts, therefore share one key. The lookup runs on
-  every attempt, known or unknown. An identifier that resolves to nothing is keyed on a hash
-  folded the way the lookup folds (case-insensitive if it contains `@`, exact otherwise, never
-  trimmed) and gets buckets exactly like a real account. The credential check itself runs as
-  well (twice the account lookup per login; folding the two together is left for after #930,
-  which reshapes `authenticate`).
+  resolves to a local account. The throttle does not look the account up itself: it runs as a
+  gate inside `AuthService.authenticate`, between the credential check's own lookup (username
+  exact, else e-mail case-insensitively) and the password comparison, and receives the resolved
+  account id from it. Username and e-mail of one account, and every spelling the lookup accepts,
+  therefore share one key, with a single lookup per login. An identifier that resolves to
+  nothing is keyed on a hash folded the way the lookup folds (case-insensitive if it contains
+  `@`, exact otherwise, never trimmed) and gets buckets exactly like a real account. The
+  password comparison runs on every path that is not refused with a `429` (against a dummy hash
+  for unknown accounts, #903).
 - **Only the caller's own bucket answers `429`.** Every identifier throttle that has a ceiling
   pairs it with a strict bucket per identifier and *source* — the client network, or for login a
   recognised device. Only the source bucket refuses with `429`. A drained ceiling refuses

@@ -83,8 +83,9 @@ public class TokenRevocationService {
   }
 
   /**
-   * Whether a token must be rejected — either its {@code jti} is denylisted, or it was issued
-   * before the user's password was last invalidated.
+   * Whether a token must be rejected — its {@code jti} is denylisted, its user no longer exists or
+   * is disabled (issue #901: a deleted or disabled account's still-unexpired token must not keep
+   * working), or it was issued before the user's sessions were last invalidated.
    */
   @Transactional(readOnly = true)
   public boolean isRevoked(String jti, String subject, Instant issuedAt) {
@@ -100,10 +101,11 @@ public class TokenRevocationService {
       return false; // non-UUID subject can't match a user; JWS verification already passed
     }
     User user = userRepository.findById(userId).orElse(null);
-    if (user == null || user.getPasswordInvalidatedBefore() == null) {
-      return false;
+    if (user == null || !user.isEnabled()) {
+      return true;
     }
-    return issuedAt.isBefore(user.getPasswordInvalidatedBefore());
+    Instant invalidatedBefore = user.getPasswordInvalidatedBefore();
+    return invalidatedBefore != null && issuedAt.isBefore(invalidatedBefore);
   }
 
   /**

@@ -20,7 +20,6 @@
  */
 package io.qnop.web.security.ratelimit;
 
-import io.qnop.service.AuthService;
 import jakarta.servlet.http.HttpServletRequest;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
@@ -58,9 +57,9 @@ import org.springframework.stereotype.Component;
  * device is charged to that device's bucket and is exempt from the ceiling, so the owner keeps
  * access from devices they have signed in on whatever happens elsewhere; every other attempt is
  * charged to its network bucket and the ceiling. The account key is the user id when the identifier
- * resolves to a local account, through {@link AuthService#findLocalAccountId} (the same lookup the
- * credential check uses, run on every attempt); an identifier that resolves to nothing is keyed on
- * its hash, folded the way that lookup folds.
+ * resolves to a local account — handed in by the credential check's own lookup ({@code
+ * AuthService.authenticate} with a gate), so both agree on which account is meant; an identifier
+ * that resolves to nothing is keyed on its hash, folded the way that lookup folds.
  *
  * <p><b>Register / reset token</b> keep a single hard cap per e-mail / token. The buckets live in a
  * store of their own, separate from the per-IP filters', so neither can evict the other's. Keys are
@@ -81,7 +80,6 @@ public class AuthIdentifierRateLimiter {
   private final BucketRateLimitService buckets;
   private final RateLimitProperties properties;
   private final HttpClientIpResolver clientIpResolver;
-  private final AuthService authService;
   private final LoginDeviceCookies deviceCookies;
 
   /** Production wiring: a bucket store of its own, sized by {@code max-buckets}. */
@@ -89,26 +87,18 @@ public class AuthIdentifierRateLimiter {
   public AuthIdentifierRateLimiter(
       RateLimitProperties properties,
       HttpClientIpResolver clientIpResolver,
-      AuthService authService,
       LoginDeviceCookies deviceCookies) {
-    this(
-        new BucketRateLimitService(properties),
-        properties,
-        clientIpResolver,
-        authService,
-        deviceCookies);
+    this(new BucketRateLimitService(properties), properties, clientIpResolver, deviceCookies);
   }
 
   AuthIdentifierRateLimiter(
       BucketRateLimitService buckets,
       RateLimitProperties properties,
       HttpClientIpResolver clientIpResolver,
-      AuthService authService,
       LoginDeviceCookies deviceCookies) {
     this.buckets = buckets;
     this.properties = properties;
     this.clientIpResolver = clientIpResolver;
-    this.authService = authService;
     this.deviceCookies = deviceCookies;
   }
 
@@ -120,11 +110,12 @@ public class AuthIdentifierRateLimiter {
   public record LoginAttempt(String sourceKey, String ceilingKey, boolean refused) {}
 
   /**
-   * A login attempt for {@code usernameOrEmail} from {@code request}'s client. Throws {@link
+   * A login attempt for {@code usernameOrEmail}, which resolves to the local account {@code
+   * accountId} (empty when none), from {@code request}'s client. Throws {@link
    * RateLimitExceededException} when the caller's own source bucket for the account is drained.
    */
-  public LoginAttempt beginLogin(String usernameOrEmail, HttpServletRequest request) {
-    Optional<UUID> accountId = authService.findLocalAccountId(usernameOrEmail);
+  public LoginAttempt beginLogin(
+      String usernameOrEmail, Optional<UUID> accountId, HttpServletRequest request) {
     String accountKey =
         accountId
             .map(id -> "user:" + id)

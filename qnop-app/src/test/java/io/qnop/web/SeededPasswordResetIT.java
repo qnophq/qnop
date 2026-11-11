@@ -20,23 +20,28 @@
  */
 package io.qnop.web;
 
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import com.jayway.jsonpath.JsonPath;
 import io.qnop.testsupport.SeededIntegrationTest;
+import jakarta.servlet.http.Cookie;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.http.MediaType;
+import org.springframework.test.web.servlet.MvcResult;
 
 /**
  * Self-service password reset (issue #163). The forgot-password endpoint is uniformly 204 to avoid
  * account enumeration; reset-password rejects unknown/invalid tokens and short passwords. The
- * happy-path reset needs the emailed raw token, which the suite cannot observe, so it is covered at
- * the service layer rather than here.
+ * emailed raw token is not observable here, so the happy path issues one directly through {@link
+ * io.qnop.service.auth.PasswordResetTokenService} and then drives the real endpoint (issue #897).
  */
 class SeededPasswordResetIT extends SeededIntegrationTest {
 
@@ -56,6 +61,39 @@ class SeededPasswordResetIT extends SeededIntegrationTest {
   }
 
   private static final String RESET = "/api/v1/auth/reset-password";
+
+  @org.springframework.beans.factory.annotation.Autowired
+  private io.qnop.service.auth.PasswordResetTokenService resetTokens;
+
+  @org.springframework.beans.factory.annotation.Autowired
+  private io.qnop.repository.UserRepository users;
+
+  @Test
+  @DisplayName("a reset by e-mail token ends every existing session of the user (#897)")
+  void resetEndsExistingSessions() throws Exception {
+    MvcResult session = login("member", SEED_PASSWORD);
+    Cookie preResetCookie = refreshCookie(session);
+    String preResetAccess =
+        JsonPath.read(session.getResponse().getContentAsString(), "$.accessToken");
+    String rawToken = resetTokens.issue(users.findById(MEMBER_ID).orElseThrow()).rawToken();
+
+    mockMvc
+        .perform(
+            post(RESET)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(
+                    "{\"token\":\"%s\",\"newPassword\":\"New-Pass-9876!\"}".formatted(rawToken)))
+        .andExpect(status().is2xxSuccessful());
+
+    mockMvc
+        .perform(post("/api/v1/auth/refresh").with(csrf()).cookie(preResetCookie))
+        .andExpect(status().isUnauthorized());
+    mockMvc
+        .perform(get("/api/v1/users/me").header("Authorization", "Bearer " + preResetAccess))
+        .andExpect(status().isUnauthorized());
+    // The new password works.
+    assertThat(login("member", "New-Pass-9876!").getResponse().getStatus()).isEqualTo(200);
+  }
 
   @ParameterizedTest
   @ValueSource(

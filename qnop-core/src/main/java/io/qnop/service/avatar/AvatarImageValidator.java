@@ -20,14 +20,10 @@
  */
 package io.qnop.service.avatar;
 
-import java.awt.image.BufferedImage;
-import java.io.ByteArrayInputStream;
-import java.io.IOException;
+import io.qnop.service.image.ImageHeaderProbe;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.util.HexFormat;
-import java.util.Optional;
-import javax.imageio.ImageIO;
 import org.springframework.stereotype.Component;
 
 /**
@@ -62,43 +58,24 @@ public class AvatarImageValidator {
     String contentType = sniffContentType(bytes);
     int[] dimensions = enforceDimensions(contentType, bytes);
     return new ValidatedImage(
-        contentType,
-        dimensions == null ? null : dimensions[0],
-        dimensions == null ? null : dimensions[1],
-        sha256Hex(bytes),
-        bytes.length);
+        contentType, dimensions[0], dimensions[1], sha256Hex(bytes), bytes.length);
   }
 
   /**
-   * Bounds the raster dimensions and returns {@code [width, height]}, or {@code null} when the
-   * format carries no readable raster dimensions (WebP without an ImageIO plugin) — the size cap
-   * still applies.
+   * Bounds the declared raster dimensions and returns {@code [width, height]}. The dimensions come
+   * from the image header only (issue #906): nothing is decoded, so an image declaring a huge
+   * raster is rejected without its pixels ever being allocated. An image whose header cannot be
+   * read is rejected as well — every accepted type has a parseable header.
    */
-  private int[] enforceDimensions(String contentType, byte[] bytes) {
-    Optional<int[]> dimensions = rasterDimensions(bytes);
-    if ((AvatarLimits.PNG.equals(contentType) || AvatarLimits.JPEG.equals(contentType))
-        && dimensions.isEmpty()) {
-      throw AvatarValidationException.invalidImage("unreadable " + contentType);
+  private static int[] enforceDimensions(String contentType, byte[] bytes) {
+    ImageHeaderProbe.Dimensions dimensions =
+        ImageHeaderProbe.probe(bytes)
+            .orElseThrow(() -> AvatarValidationException.invalidImage("unreadable " + contentType));
+    if (!AvatarLimits.PIXEL_BUDGET.admits(dimensions)) {
+      throw AvatarValidationException.invalidImage(
+          "dimensions exceed " + AvatarLimits.MAX_DIMENSION_PX + "px");
     }
-    dimensions.ifPresent(
-        d -> {
-          if (d[0] > AvatarLimits.MAX_DIMENSION_PX || d[1] > AvatarLimits.MAX_DIMENSION_PX) {
-            throw AvatarValidationException.invalidImage(
-                "dimensions exceed " + AvatarLimits.MAX_DIMENSION_PX + "px");
-          }
-        });
-    return dimensions.orElse(null);
-  }
-
-  private static Optional<int[]> rasterDimensions(byte[] bytes) {
-    try {
-      BufferedImage image = ImageIO.read(new ByteArrayInputStream(bytes));
-      return image == null
-          ? Optional.empty()
-          : Optional.of(new int[] {image.getWidth(), image.getHeight()});
-    } catch (IOException e) {
-      return Optional.empty();
-    }
+    return new int[] {dimensions.width(), dimensions.height()};
   }
 
   /** Derives the content type from the magic bytes; the client-declared header is not trusted. */

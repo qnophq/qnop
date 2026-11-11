@@ -20,6 +20,7 @@
  */
 package io.qnop.service.avatar;
 
+import io.qnop.service.image.PixelBudget;
 import java.util.Set;
 
 /**
@@ -46,4 +47,8 @@ public final class AvatarLimits {
    * Maximum raster width/height in pixels; the client crops to a canonical square well under this.
    */
   public static final int MAX_DIMENSION_PX = 1024;
+
+  /** The decode budget: each side and the total pixel count (issue #906). */
+  public static final PixelBudget PIXEL_BUDGET =
+      new PixelBudget(MAX_DIMENSION_PX, (long) MAX_DIMENSION_PX * MAX_DIMENSION_PX);
 }

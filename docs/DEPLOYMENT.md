@@ -49,6 +49,7 @@ Rotating `QNOP_AUTH_JWT_SECRET` invalidates all sessions; rotating the encryptio
 | `QNOP_HTTP_FORWARD_HEADERS_STRATEGY` | `none` | Set `framework` behind a trusted reverse proxy so `X-Forwarded-*` drive scheme/host |
 | `QNOP_AUTH_RATELIMIT_TRUSTEDPROXYCIDRS` | *(empty)* | Comma-separated CIDRs of your reverse proxies; see [Behind a reverse proxy](#behind-a-reverse-proxy) |
 | `QNOP_HTTP_SHUTDOWN_GRACE` | `30s` | Graceful-shutdown drain window (align your orchestrator's stop grace period) |
+| `QNOP_ATTACHMENTS_MAX_IMAGE_MEGAPIXELS` | `50` | Image attachments larger than this (or 32768 px per side), or whose size cannot be read, are stored download-only: linked, never shown inline or embedded in exports |
 | `QNOP_AUTH_OIDC_FRONTEND_BASE_URL` | *(empty)* | Public base URL the OIDC login flow redirects back to, when it differs from the request origin |
 
 SMTP for e-mail notifications (verification, reset, review events) is configured at runtime under **Administration → Settings**, not via environment.
@@ -84,6 +85,31 @@ The auth rate limits (login, refresh, registration, password reset — ADR-0027)
 - `QNOP_HTTP_FORWARD_HEADERS_STRATEGY=framework` is a separate setting: it controls scheme/host for redirects and cookies, not the rate-limit IP.
 
 Besides the per-IP limits, login, registration, password-reset request and password reset are also throttled per account / e-mail address / reset token, so spreading attempts over many addresses does not lift the limit. Failed logins are counted per account and client network (IPv4 /24, IPv6 /56), and per recognised device: a successful login sets an `HttpOnly` `qnop_device` cookie (path `/api/v1/auth/login`, valid for `qnop.auth.rate-limit.login-device-cookie-lifetime`, default 30 days), and a browser that carries one is never held back by failures elsewhere. A much higher per-account ceiling bounds failures from unrecognised devices across all networks; a `WARN` line `Login ceiling reached for account …` means it was hit — worth a look. Rotating `QNOP_AUTH_JWT_SECRET` invalidates all device cookies. All limits are tunable under `qnop.auth.rate-limit.*` (see ADR-0027).
+
+## Office converter isolation
+
+The image ships headless LibreOffice for DOCX ingest and the PDF annotation export. It parses documents uploaded by users, so treat it as the least-trusted code in the deployment. qnop applies these limits on every run (issue #908, ADR-0010 amendment):
+
+- **Empty environment.** The converter process receives only `PATH`, `HOME`, `TMPDIR`, `LANG` and `SAL_USE_VCLPLUGIN`; none of the `QNOP_*` secrets, database or storage credentials are passed on. `HOME`, `TMPDIR` and the working directory point into a throwaway per-run directory that is deleted afterwards.
+- **Hardened per-run profile.** Macro execution and the Python runtime are disabled, the macro security level is set to its highest value, active content and untrusted links are blocked, and Writer never updates links or fields on load. Some of these keys (notably `DisableActiveContent`) exist only in recent LibreOffice releases; older ones ignore them, so keep the image's LibreOffice current.
+- **Whole-tree timeout.** When a run exceeds `QNOP_OFFICE_TIMEOUT` (default `60s`), the launcher and every process it started are killed.
+- **Size caps.** `QNOP_OFFICE_MAX_INPUT_SIZE` (default `100MB`) bounds what is handed to the converter, `QNOP_OFFICE_MAX_OUTPUT_SIZE` (default `256MB`) bounds the PDF read back.
+- **Bounded concurrency.** `QNOP_OFFICE_MAX_CONCURRENT` / `QNOP_OFFICE_MAX_WAIT` (ADR-0055).
+
+What a subprocess cannot do on its own is change user, network or kernel limits — the converter still runs as the server's uid, in the server's network namespace. Recommended additional isolation, strongest first:
+
+1. **Restrict the container's egress.** The qnop container only needs PostgreSQL, the object store, SMTP and (if used) the OIDC provider. A Kubernetes `NetworkPolicy` or firewall rule that allows exactly those keeps a converted document from reaching anything else.
+2. **Bound the container's resources.** Set memory and PID limits (`--memory`, `--pids-limit`, or the Kubernetes equivalents) and keep the JVM's `-XX:+ExitOnOutOfMemoryError`; run with the runtime's default seccomp profile, `--cap-drop=ALL`, `no-new-privileges`, and a read-only root filesystem with a writable `/tmp`.
+3. **Wrap the binary.** `QNOP_OFFICE_BINARY` may point at a wrapper script that applies per-process limits or namespaces before starting `soffice`. The wrapper runs with the same minimal environment (the server's `PATH` plus the per-run `HOME`, `TMPDIR` and `LANG`), so anything it calls must be on that `PATH` or given by absolute path. For example, with `util-linux` available and unprivileged user namespaces enabled on the host:
+
+   ```sh
+   #!/bin/sh
+   # No network at all, CPU-time and file-size limits, then the real converter.
+   exec prlimit --cpu=120 --fsize=536870912 -- unshare --user --map-root-user --net -- soffice "$@"
+   ```
+
+   Running the converter under a separate uid (for example `sudo -u <converter-user>` in the wrapper with a sudoers rule scoped to that single command) additionally keeps it from reading the server process's files and `/proc` entries.
+4. **Disable it.** A deployment that does not need DOCX ingest or PDF export can set `QNOP_OFFICE_BINARY` to a non-existent path; both features then report themselves unavailable in `GET /api/v1/config`.
 
 ## Upgrades
 

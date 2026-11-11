@@ -41,6 +41,7 @@ import jakarta.servlet.http.HttpServletRequest;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
 import java.util.UUID;
+import java.util.concurrent.atomic.AtomicReference;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpHeaders;
@@ -109,19 +110,25 @@ public class AuthController implements AuthApi {
     // Per-account throttle (issue #899): checked before the credentials, for known and unknown
     // identifiers alike, and only failures count against it. The credentials are checked even when
     // the account's ceiling refused the attempt, so a silent refusal takes as long as a real one.
-    LoginAttempt attempt =
-        identifierRateLimiter.beginLogin(request.getUsernameOrEmail(), httpRequest);
+    AtomicReference<LoginAttempt> attempt = new AtomicReference<>();
     UUID userId =
         authService
-            .authenticate(request.getUsernameOrEmail(), request.getPassword())
-            .filter(authenticated -> !attempt.refused())
+            .authenticate(
+                request.getUsernameOrEmail(),
+                request.getPassword(),
+                account -> {
+                  attempt.set(
+                      identifierRateLimiter.beginLogin(
+                          request.getUsernameOrEmail(), account, httpRequest));
+                  return !attempt.get().refused();
+                })
             .orElseThrow(
                 () -> {
                   log.info("Login rejected: invalid credentials");
                   return new ResponseStatusException(
                       HttpStatus.UNAUTHORIZED, "Invalid credentials");
                 });
-    identifierRateLimiter.loginSucceeded(attempt);
+    identifierRateLimiter.loginSucceeded(attempt.get());
     log.info("Login succeeded for {}", userId);
     ResponseEntity<TokenResponse> session = issueSession(userId);
     // Recognise this device on the next attempt (issue #899, LoginDeviceCookies).
