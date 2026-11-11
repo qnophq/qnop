@@ -20,6 +20,7 @@
  */
 package io.qnop.service.auth;
 
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyMap;
 import static org.mockito.ArgumentMatchers.eq;
@@ -32,6 +33,7 @@ import io.qnop.entity.User;
 import io.qnop.entity.UserRole;
 import io.qnop.service.ApplicationSettingKey;
 import io.qnop.service.ApplicationSettingsService;
+import io.qnop.service.InvalidTextException;
 import io.qnop.service.UserService;
 import io.qnop.service.mail.MailLocaleResolver;
 import io.qnop.service.mail.MailService;
@@ -67,6 +69,17 @@ class RegistrationServiceTest {
         .when(settings.getString(ApplicationSettingKey.GENERAL_APPLICATION_NAME))
         .thenReturn("qnop");
     lenient().when(mailLocales.forUser(any())).thenReturn("en");
+  }
+
+  @Test
+  @DisplayName("a display name with control characters is rejected before anything else")
+  void displayNameWithControlCharactersRejected() {
+    assertThatThrownBy(
+            () -> service.register("jane", "jane@example.com", "password1", "Jane\r\nDoe"))
+        .isInstanceOf(InvalidTextException.class);
+
+    verify(userService, never()).internalUserExists(any(), any());
+    verify(userService, never()).createSelfRegistered(any(), any(), any(), any(), any());
   }
 
   @Test

@@ -23,6 +23,7 @@ package io.qnop.repository;
 import io.qnop.entity.User;
 import io.qnop.entity.UserRole;
 import io.qnop.entity.UserSource;
+import jakarta.persistence.LockModeType;
 import java.time.Instant;
 import java.util.Collection;
 import java.util.List;
@@ -31,6 +32,7 @@ import java.util.UUID;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -97,6 +99,36 @@ public interface UserRepository extends JpaRepository<User, UUID> {
 
   /** Number of enabled users with the given role — guards the last-admin invariant (issue #104). */
   long countByRoleAndEnabledTrue(UserRole role);
+
+  /**
+   * The enabled users with {@code role}, row-locked for the rest of the transaction ({@code
+   * PESSIMISTIC_WRITE}, rendered as {@code FOR NO KEY UPDATE} on PostgreSQL; ordered by id so
+   * concurrent callers lock in the same order). Backs the race-free last-admin guard (issue #920):
+   * a concurrent transaction that demoted, disabled or deleted one of these rows makes this call
+   * wait for its commit, after which PostgreSQL re-checks the row and leaves it out.
+   */
+  @Lock(LockModeType.PESSIMISTIC_WRITE)
+  @Query("SELECT u FROM User u WHERE u.role = :role AND u.enabled = TRUE ORDER BY u.id")
+  List<User> lockEnabledByRole(@Param("role") UserRole role);
+
+  /**
+   * A user row share-locked ({@code PESSIMISTIC_READ}, {@code FOR SHARE} on PostgreSQL) for the
+   * rest of the transaction. Refresh-token rotation takes it first (issue #902) so a concurrent
+   * session revocation — which writes the user row ({@code password_invalidated_before}) before it
+   * revokes the token rows — is either fully committed before the rotation checks the user, or
+   * waits until the rotation's successor token is committed and can be revoked with the rest.
+   */
+  @Lock(LockModeType.PESSIMISTIC_READ)
+  @Query("SELECT u FROM User u WHERE u.id = :id")
+  Optional<User> lockForSessionCheck(@Param("id") UUID id);
+
+  /**
+   * A user row locked for update ({@code PESSIMISTIC_WRITE}). Deletion takes it before revoking the
+   * user's refresh tokens, so it locks user-then-tokens like rotation does (issue #901).
+   */
+  @Lock(LockModeType.PESSIMISTIC_WRITE)
+  @Query("SELECT u FROM User u WHERE u.id = :id")
+  Optional<User> lockById(@Param("id") UUID id);
 
   /**
    * Enabled accounts on this instance — the figure the user quota is measured against (issue #673).

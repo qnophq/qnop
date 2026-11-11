@@ -21,10 +21,12 @@
 package io.qnop.repository;
 
 import io.qnop.entity.RefreshToken;
+import jakarta.persistence.LockModeType;
 import java.time.Instant;
 import java.util.Optional;
 import java.util.UUID;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -38,6 +40,25 @@ public interface RefreshTokenRepository extends JpaRepository<RefreshToken, UUID
    * revokedAt} explicitly so reuse-detection can tell a replayed revoked token from an unknown one.
    */
   Optional<RefreshToken> findByTokenLookupHash(String tokenLookupHash);
+
+  /**
+   * The owner of a token by HMAC lookup, as a scalar (no managed entity is loaded, so a later
+   * locking read of the row returns fresh state). Rotation uses it to lock the user row before the
+   * token row (issue #902).
+   */
+  @Query("SELECT t.userId FROM RefreshToken t WHERE t.tokenLookupHash = :tokenLookupHash")
+  Optional<UUID> findUserIdByTokenLookupHash(@Param("tokenLookupHash") String tokenLookupHash);
+
+  /**
+   * The same lookup as {@link #findByTokenLookupHash}, but row-locked for the rest of the
+   * transaction ({@code PESSIMISTIC_WRITE}, which Hibernate renders as {@code FOR NO KEY UPDATE} on
+   * PostgreSQL) so rotation is atomic (issue #902): a concurrent rotation of the same token waits
+   * for this one to commit and then sees the row as already revoked, which is reuse — never a
+   * second successor.
+   */
+  @Lock(LockModeType.PESSIMISTIC_WRITE)
+  @Query("SELECT t FROM RefreshToken t WHERE t.tokenLookupHash = :tokenLookupHash")
+  Optional<RefreshToken> findForRotation(@Param("tokenLookupHash") String tokenLookupHash);
 
   /**
    * Force-revokes every still-active row in a family. Idempotent: already-revoked rows keep their

@@ -20,11 +20,15 @@
  */
 package io.qnop.review;
 
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.tuple;
 import static org.hamcrest.Matchers.hasItem;
+import static org.hamcrest.Matchers.matchesPattern;
 import static org.hamcrest.Matchers.not;
 import static org.hamcrest.Matchers.startsWith;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -32,15 +36,19 @@ import com.jayway.jsonpath.JsonPath;
 import io.qnop.entity.Document;
 import io.qnop.entity.DocumentVersion;
 import io.qnop.entity.ReviewParticipant;
+import io.qnop.entity.ReviewPseudonym;
 import io.qnop.repository.DocumentRepository;
 import io.qnop.repository.DocumentVersionRepository;
 import io.qnop.repository.ReviewParticipantRepository;
+import io.qnop.repository.ReviewPseudonymRepository;
 import io.qnop.repository.UserRepository;
 import io.qnop.testsupport.SeededIntegrationTest;
+import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.MediaType;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
 
 /**
@@ -58,6 +66,10 @@ class AnnotationAnonymityIT extends SeededIntegrationTest {
   @Autowired private DocumentVersionRepository versions;
   @Autowired private ReviewParticipantRepository participants;
   @Autowired private UserRepository users;
+  @Autowired private ReviewPseudonymRepository pseudonyms;
+  @Autowired private JdbcTemplate jdbc;
+
+  private static final String PSEUDONYM = "Participant [12]";
 
   private UUID seedDocument(boolean anonymous) {
     Document document = new Document(MEMBER_ID, "Master services agreement");
@@ -119,12 +131,12 @@ class AnnotationAnonymityIT extends SeededIntegrationTest {
     UUID documentId = seedDocument(true);
     createAnnotation(documentId, AUDITOR_ID);
 
-    // The foreign reviewer sees a stable pseudonym and NOT the real id or name. The ordinal covers
-    // all non-owner participants (issue #422), sorted by id: MEMBER2 (…003) is 1, AUDITOR (…004) 2.
+    // The foreign reviewer sees a pseudonym and NOT the real id or name. The ordinal covers all
+    // non-owner participants (issue #422) in keyed order (issue #914) — so it is 1 or 2 here.
     mockMvc
         .perform(as(get("/api/v1/documents/" + documentId + "/annotations"), MEMBER2_ID))
         .andExpect(status().isOk())
-        .andExpect(jsonPath("$.annotations[0].authorDisplayName").value("Participant 2"))
+        .andExpect(jsonPath("$.annotations[0].authorDisplayName").value(matchesPattern(PSEUDONYM)))
         .andExpect(jsonPath("$.annotations[0].authorId").value(not(AUDITOR_ID.toString())))
         .andExpect(jsonPath("$.annotations[0].authorDisplayName").value(not(realName(AUDITOR_ID))))
         // A slug identifies as surely as the id — pseudonymised authors ship none (#486).
@@ -164,13 +176,108 @@ class AnnotationAnonymityIT extends SeededIntegrationTest {
     UUID documentId = seedDocument(true);
     String annotationId = createAnnotation(documentId, AUDITOR_ID);
 
-    // The opening comment (authored by AUDITOR) is pseudonymised for a foreign viewer; AUDITOR is
-    // "Participant 2" under the participant-covering numbering (issue #422).
+    // The opening comment (authored by AUDITOR) is pseudonymised for a foreign viewer, under the
+    // participant-covering numbering (issue #422).
     mockMvc
         .perform(as(get("/api/v1/annotations/" + annotationId + "/comments"), MEMBER2_ID))
         .andExpect(status().isOk())
-        .andExpect(jsonPath("$.comments[0].authorDisplayName").value("Participant 2"))
+        .andExpect(jsonPath("$.comments[0].authorDisplayName").value(matchesPattern(PSEUDONYM)))
         .andExpect(jsonPath("$.comments[0].authorId").value(not(AUDITOR_ID.toString())));
+  }
+
+  @Test
+  void anonymousPseudonymsStayStableWhenContributorsJoin() throws Exception {
+    UUID documentId = seedDocument(true);
+    String first = createAnnotation(documentId, AUDITOR_ID);
+    String before = labelSeenByMember2(documentId, first);
+
+    // A further reviewer joins and contributes: existing labels must not shift (issue #914).
+    participants.save(ReviewParticipant.forUser(documentId, ADMIN2_ID));
+    String second = createAnnotation(documentId, ADMIN2_ID);
+
+    assertThat(labelSeenByMember2(documentId, first)).isEqualTo(before);
+    assertThat(labelSeenByMember2(documentId, second)).isEqualTo("Participant 3");
+    int auditorOrdinal = Integer.parseInt(before.substring("Participant ".length()));
+    assertThat(pseudonyms.findByDocumentId(documentId))
+        .extracting(ReviewPseudonym::getPrincipalId, ReviewPseudonym::getOrdinal)
+        .containsExactlyInAnyOrder(
+            tuple(AUDITOR_ID, auditorOrdinal),
+            tuple(MEMBER2_ID, 3 - auditorOrdinal),
+            tuple(ADMIN2_ID, 3));
+  }
+
+  @Test
+  void readsWriteNoPseudonymsAndShowTheLabelTheFirstWritePersists() throws Exception {
+    UUID documentId = seedDocument(true);
+
+    // A read-only roster read assigns nothing but already shows the provisional label.
+    String provisional = peerLabelInRosterOfMember2(documentId);
+    assertThat(provisional).matches(PSEUDONYM);
+    assertThat(pseudonyms.findByDocumentId(documentId)).isEmpty();
+
+    // The first contribution persists exactly that label.
+    String annotationId = createAnnotation(documentId, AUDITOR_ID);
+    assertThat(pseudonyms.findByDocumentId(documentId)).hasSize(2);
+    assertThat(peerLabelInRosterOfMember2(documentId)).isEqualTo(provisional);
+    assertThat(labelSeenByMember2(documentId, annotationId)).isEqualTo(provisional);
+  }
+
+  /** The label MEMBER2 sees for their one peer (AUDITOR) on the roster; own row sorts first. */
+  private String peerLabelInRosterOfMember2(UUID documentId) throws Exception {
+    String json =
+        mockMvc
+            .perform(as(get("/api/v1/documents/" + documentId + "/participants"), MEMBER2_ID))
+            .andExpect(status().isOk())
+            .andReturn()
+            .getResponse()
+            .getContentAsString();
+    return JsonPath.read(json, "$.participants[1].displayName");
+  }
+
+  @Test
+  void aTeamOnlyReactorGetsAProperPseudonym() throws Exception {
+    UUID documentId = seedDocument(true);
+    // ADMIN2 reviews only through team Beta: no participant row, no authorship (issue #921).
+    participants.save(ReviewParticipant.forTeam(documentId, TEAM_BETA_ID));
+    jdbc.update(
+        "INSERT INTO team_membership (id, team_id, user_id, team_role, joined_at, version)"
+            + " VALUES (?, ?, ?, 'MEMBER', now(), 0)",
+        UUID.randomUUID(),
+        TEAM_BETA_ID,
+        ADMIN2_ID);
+    String annotationId = createAnnotation(documentId, AUDITOR_ID);
+    mockMvc
+        .perform(
+            as(put("/api/v1/annotations/{id}/reactions/{emoji}", annotationId, "👍"), ADMIN2_ID))
+        .andExpect(status().is2xxSuccessful());
+
+    mockMvc
+        .perform(as(get("/api/v1/annotations/" + annotationId), MEMBER2_ID))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.reactions[0].reactors[0]").value(matchesPattern("Participant \\d+")))
+        .andExpect(jsonPath("$.reactions[0].reactors[0]").value(not(realName(ADMIN2_ID))));
+  }
+
+  @Test
+  void nonAnonymousReviewPersistsNoPseudonyms() throws Exception {
+    UUID documentId = seedDocument(false);
+    createAnnotation(documentId, AUDITOR_ID);
+
+    assertThat(pseudonyms.findByDocumentId(documentId)).isEmpty();
+  }
+
+  private String labelSeenByMember2(UUID documentId, String annotationId) throws Exception {
+    String json =
+        mockMvc
+            .perform(as(get("/api/v1/documents/" + documentId + "/annotations"), MEMBER2_ID))
+            .andExpect(status().isOk())
+            .andReturn()
+            .getResponse()
+            .getContentAsString();
+    List<String> labels =
+        JsonPath.read(json, "$.annotations[?(@.id == '" + annotationId + "')].authorDisplayName");
+    assertThat(labels).hasSize(1);
+    return labels.get(0);
   }
 
   // ── Roster anonymity (issue #422) ────────────────────────────────────────
@@ -185,7 +292,7 @@ class AnnotationAnonymityIT extends SeededIntegrationTest {
         // A peer (AUDITOR) is neither their real id nor their real name — a pseudonym instead.
         .andExpect(
             jsonPath("$.participants[?(@.principalId == '" + AUDITOR_ID + "')]").doesNotExist())
-        .andExpect(jsonPath("$.participants[*].displayName", hasItem("Participant 2")))
+        .andExpect(jsonPath("$.participants[*].displayName", hasItem(matchesPattern(PSEUDONYM))))
         .andExpect(jsonPath("$.participants[*].displayName", not(hasItem(realName(AUDITOR_ID)))))
         // The viewer's own row is sorted first and stays real (they know themselves).
         .andExpect(jsonPath("$.participants[0].principalId").value(MEMBER2_ID.toString()))

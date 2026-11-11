@@ -20,10 +20,9 @@
  */
 package io.qnop.service.review.export;
 
+import io.qnop.service.image.ImageHeaderProbe;
 import io.qnop.service.review.AnnotationService.AnnotationView;
 import io.qnop.service.review.AnnotationService.CommentView;
-import java.awt.image.BufferedImage;
-import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.time.Instant;
@@ -32,7 +31,6 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import javax.imageio.ImageIO;
 import javax.xml.namespace.QName;
 import org.apache.poi.common.usermodel.HyperlinkType;
 import org.apache.poi.ss.SpreadsheetVersion;
@@ -322,13 +320,16 @@ public class XlsxAnnotationRenderer implements AnnotationExportRenderer {
    * deformation this code has already been wrong about once.
    */
   private static java.awt.Dimension displaySize(byte[] png) throws IOException {
-    BufferedImage image = ImageIO.read(new ByteArrayInputStream(png));
-    if (image == null || image.getWidth() <= 0) {
+    // Header-only (#907): the size is all this needs, so nothing is decoded.
+    ImageHeaderProbe.Dimensions image =
+        ImageHeaderProbe.probe(png)
+            .orElseThrow(() -> new IOException("branding logo could not be decoded"));
+    if (image.width() <= 0) {
       throw new IOException("branding logo could not be decoded");
     }
     return new java.awt.Dimension(
-        Math.max(1, (int) Math.round(image.getWidth() * LOGO_SCALE)),
-        Math.max(1, (int) Math.round(image.getHeight() * LOGO_SCALE)));
+        Math.max(1, (int) Math.round(image.width() * LOGO_SCALE)),
+        Math.max(1, (int) Math.round(image.height() * LOGO_SCALE)));
   }
 
   /**

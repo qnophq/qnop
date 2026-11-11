@@ -60,6 +60,28 @@ class OidcProviderServiceTest {
   }
 
   @Test
+  @DisplayName("create rejects a provider name with control characters")
+  void createRejectsControlCharactersInName() {
+    org.assertj.core.api.Assertions.assertThatThrownBy(
+            () ->
+                service.create(
+                    "Goo\ngle",
+                    "GOOGLE",
+                    "client-123",
+                    "super-secret",
+                    "https://accounts.google.com",
+                    null,
+                    null,
+                    null,
+                    null,
+                    null,
+                    null,
+                    null,
+                    null))
+        .isInstanceOf(io.qnop.service.InvalidTextException.class);
+  }
+
+  @Test
   @DisplayName("create stores a disabled provider, defaults the scope, and never echoes the secret")
   void createMasksSecret() {
     when(providers.save(any(OidcProvider.class))).thenAnswer(inv -> inv.getArgument(0));

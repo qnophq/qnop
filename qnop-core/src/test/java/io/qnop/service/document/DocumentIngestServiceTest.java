@@ -151,6 +151,17 @@ class DocumentIngestServiceTest {
     }
 
     @Test
+    @DisplayName("a title with a line break or control character is rejected with 400")
+    void controlCharacterTitleRejected() {
+      service = newService();
+
+      for (String title : new String[] {"Contract\r\nBcc: x", "Con\ttract", "A\u2028B"}) {
+        assertRejected(
+            () -> service.createDocument(OWNER, title, pdfUpload(), null, null, false, null), 400);
+      }
+    }
+
+    @Test
     @DisplayName("a dueAt in the past is rejected with 400")
     void pastDueAtRejected() {
       service = newService();

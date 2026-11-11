@@ -20,6 +20,10 @@ TRUNCATE TABLE annotation_placement, comment, annotation, audit_event,
                review_participant, document_version, document
                RESTART IDENTITY CASCADE;
 
+-- Anonymous-review pseudonyms (issue #914) carry no FK to document, so the
+-- CASCADE above does not reach them.
+TRUNCATE TABLE review_pseudonym;
+
 -- Test-created data without migration seeds; CASCADE also clears anything a
 -- test created that references these rows (e.g. team memberships).
 TRUNCATE TABLE team_membership, team, oidc_provider, user_setting, application_asset

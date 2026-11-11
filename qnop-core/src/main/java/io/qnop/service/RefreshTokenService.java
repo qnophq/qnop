@@ -21,7 +21,9 @@
 package io.qnop.service;
 
 import io.qnop.entity.RefreshToken;
+import io.qnop.entity.User;
 import io.qnop.repository.RefreshTokenRepository;
+import io.qnop.repository.UserRepository;
 import io.qnop.security.QnopProperties;
 import io.qnop.service.scheduler.SchedulerJobCatalog;
 import io.qnop.service.scheduler.SchedulerService;
@@ -48,6 +50,13 @@ import org.springframework.transaction.annotation.Transactional;
  *   <li>an unknown or expired token yields {@link RotationResult.Unknown}, indistinguishable from
  *       reuse to the caller.
  * </ul>
+ *
+ * <p>Rotation is atomic (issue #902): the presented row is locked before it is checked, so two
+ * concurrent rotations of one token are serialised — the first yields the only successor, the
+ * second finds the token revoked and is treated as reuse. The owning user row is share-locked first
+ * (always user before token, the order every revocation path writes in), and a token issued before
+ * the user's sessions were invalidated — or whose user is gone or disabled — is revoked instead of
+ * rotated, so an in-flight rotation can never carry a session past a revocation.
  */
 @Service
 public class RefreshTokenService {
@@ -55,9 +64,11 @@ public class RefreshTokenService {
   static final String ROTATED = "ROTATED";
   static final String REUSE_DETECTED = "REUSE_DETECTED";
   static final String LOGOUT = "LOGOUT";
+  static final String INVALIDATED = "INVALIDATED";
   private static final int TOKEN_BYTES = 32;
 
   private final RefreshTokenRepository repository;
+  private final UserRepository users;
   private final RefreshTokenHasher hasher;
   private final QnopProperties properties;
   private final SchedulerService scheduler;
@@ -65,10 +76,12 @@ public class RefreshTokenService {
 
   public RefreshTokenService(
       RefreshTokenRepository repository,
+      UserRepository users,
       RefreshTokenHasher hasher,
       QnopProperties properties,
       SchedulerService scheduler) {
     this.repository = repository;
+    this.users = users;
     this.hasher = hasher;
     this.properties = properties;
     this.scheduler = scheduler;
@@ -83,8 +96,14 @@ public class RefreshTokenService {
   /** Rotates a presented token; see the class doc for reuse-detection semantics. */
   @Transactional
   public RotationResult rotate(String presentedPlaintext) {
-    RefreshToken row =
-        repository.findByTokenLookupHash(hasher.hash(presentedPlaintext)).orElse(null);
+    String lookupHash = hasher.hash(presentedPlaintext);
+    UUID ownerId = repository.findUserIdByTokenLookupHash(lookupHash).orElse(null);
+    if (ownerId == null) {
+      return new RotationResult.Unknown();
+    }
+    // Lock order user -> token, matching every revocation path (see the class doc).
+    User owner = users.lockForSessionCheck(ownerId).orElse(null);
+    RefreshToken row = repository.findForRotation(lookupHash).orElse(null);
     if (row == null) {
       return new RotationResult.Unknown();
     }
@@ -94,6 +113,10 @@ public class RefreshTokenService {
       return new RotationResult.Reused();
     }
     if (row.getExpiresAt().isBefore(now)) {
+      return new RotationResult.Unknown();
+    }
+    if (sessionInvalidated(owner, row)) {
+      repository.revokeFamily(row.getFamilyId(), INVALIDATED, now);
       return new RotationResult.Unknown();
     }
     Minted successor = issueInFamily(row.getUserId(), row.getFamilyId());
@@ -135,6 +158,21 @@ public class RefreshTokenService {
   /** The raw purge, run inside the scheduler gate's transaction (issue #524). */
   public void sweepExpiredOnce() {
     repository.deleteExpiredBefore(Instant.now());
+  }
+
+  /**
+   * Whether the session behind {@code row} has been ended since the token was issued: the user is
+   * gone or disabled, or the token predates {@code password_invalidated_before}. Catches a
+   * successor that a rotation created while a revocation was in flight.
+   */
+  private static boolean sessionInvalidated(User owner, RefreshToken row) {
+    if (owner == null || !owner.isEnabled()) {
+      return true;
+    }
+    Instant invalidatedBefore = owner.getPasswordInvalidatedBefore();
+    return invalidatedBefore != null
+        && row.getIssuedAt() != null
+        && row.getIssuedAt().isBefore(invalidatedBefore);
   }
 
   private Minted issueInFamily(UUID userId, UUID familyId) {

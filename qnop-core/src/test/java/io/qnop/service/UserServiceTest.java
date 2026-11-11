@@ -23,7 +23,10 @@ package io.qnop.service;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import io.qnop.entity.User;
@@ -34,6 +37,7 @@ import io.qnop.repository.UserRepository;
 import io.qnop.service.UserService.UserProfileView;
 import io.qnop.service.limits.InstanceLimitProperties;
 import io.qnop.service.limits.InstanceLimitService;
+import java.time.Instant;
 import java.util.Optional;
 import java.util.UUID;
 import org.junit.jupiter.api.DisplayName;
@@ -69,6 +73,26 @@ class UserServiceTest {
     assertThat(view.email()).isEqualTo("ivan@example.com");
     assertThat(view.role()).isEqualTo("ADMIN");
     assertThat(view.source()).isEqualTo("INTERNAL");
+  }
+
+  @Test
+  @DisplayName("provisionExternal neutralises control characters from identity-provider claims")
+  void provisionExternalNeutralisesControlCharacters() {
+    when(users.save(any(User.class))).thenAnswer(i -> i.getArgument(0));
+
+    User user = service.provisionExternal("Jane\r\nDoe\t", "jane@example.com");
+
+    assertThat(user.getDisplayName()).isEqualTo("Jane  Doe");
+  }
+
+  @Test
+  @DisplayName("provisionExternal falls back to the e-mail local part when no name is left")
+  void provisionExternalFallsBackWhenTheNameIsOnlyControlCharacters() {
+    when(users.save(any(User.class))).thenAnswer(i -> i.getArgument(0));
+
+    assertThat(service.provisionExternal("\r\n\t", "jane.doe@example.com").getDisplayName())
+        .isEqualTo("jane.doe");
+    assertThat(service.provisionExternal(null, null).getDisplayName()).isEqualTo("user");
   }
 
   @Test
@@ -120,29 +144,33 @@ class UserServiceTest {
 
   @Test
   @DisplayName(
-      "applyPasswordReset re-hashes, clears the forced-change flag and invalidates sessions")
+      "applyPasswordReset re-hashes and invalidates sessions through atomic updates (#61, #897)")
   void applyPasswordResetInvalidatesSessions() {
     UUID id = UUID.randomUUID();
-    User user = User.internal("Bob", "bob@example.com", "bob", "old-hash");
-    user.setPasswordChangeRequired(true);
-    when(users.findById(id)).thenReturn(Optional.of(user));
+    User fresh = User.internal("Bob", "bob@example.com", "bob", "new-hash");
+    when(users.updatePasswordHash(id, "new-hash")).thenReturn(1);
+    when(users.findById(id)).thenReturn(Optional.of(fresh));
     when(passwordEncoder.encode("new-password")).thenReturn("new-hash");
 
     User result = service.applyPasswordReset(id, "new-password");
 
-    assertThat(result.getPasswordHash()).isEqualTo("new-hash");
-    assertThat(result.isPasswordChangeRequired()).isFalse();
-    assertThat(result.getPasswordInvalidatedBefore()).isNotNull();
+    // The hash write also clears password_change_required; the bump revokes access tokens.
+    verify(users).updatePasswordHash(id, "new-hash");
+    verify(users).bumpPasswordInvalidatedBefore(eq(id), any(Instant.class));
+    verify(users, never()).save(any());
+    assertThat(result).isSameAs(fresh);
   }
 
   @Test
   @DisplayName("applyPasswordReset throws for an unknown user")
   void applyPasswordResetRejectsUnknownUser() {
     UUID id = UUID.randomUUID();
-    when(users.findById(id)).thenReturn(Optional.empty());
+    when(passwordEncoder.encode("new-password")).thenReturn("new-hash");
+    when(users.updatePasswordHash(id, "new-hash")).thenReturn(0);
 
     assertThatThrownBy(() -> service.applyPasswordReset(id, "new-password"))
         .isInstanceOf(UserNotFoundException.class);
+    verify(users, never()).bumpPasswordInvalidatedBefore(any(), any());
   }
 
   /**

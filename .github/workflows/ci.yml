@@ -23,7 +23,7 @@ jobs:
         with:
           distribution: temurin
           java-version: "21"
-      - uses: gradle/actions/setup-gradle@3f5f9adaf7d9fecd50b5935e54106014257a94e6 # v6
+      - uses: gradle/actions/setup-gradle@8da46b539cd8fe6ab27ca75128919a18d757604c # v6
       # `build` runs spotlessCheck (formatting + SPDX header) and the ArchUnit
       # conformance tests via the `check` task.
       - run: ./gradlew build --stacktrace
@@ -43,7 +43,7 @@ jobs:
         with:
           distribution: temurin
           java-version: "21"
-      - uses: gradle/actions/setup-gradle@3f5f9adaf7d9fecd50b5935e54106014257a94e6 # v6
+      - uses: gradle/actions/setup-gradle@8da46b539cd8fe6ab27ca75128919a18d757604c # v6
       # ADR-0007 / issue #498: the dependency-license gate promised once real
       # dependencies landed. `checkLicense` fails on any shipped (runtimeClasspath)
       # dependency whose license is outside the permissive allowlist in
@@ -62,7 +62,7 @@ jobs:
         working-directory: qnop-ui
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
-      - uses: pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86 # v6
+      - uses: pnpm/action-setup@73e46992e05b19abd31f2f3c20e0e7370d762115 # v6
         with:
           # action runs from the repo root; read the pnpm version from qnop-ui/
           package_json_file: qnop-ui/package.json
@@ -111,7 +111,7 @@ jobs:
       # stack) against the data the smoke script just seeded and uploaded. It
       # asserts no horizontal overflow on every audited surface at six widths,
       # the header touch targets, and screenshot baselines at four widths.
-      - uses: pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86 # v6
+      - uses: pnpm/action-setup@73e46992e05b19abd31f2f3c20e0e7370d762115 # v6
         with:
           package_json_file: qnop-ui/package.json
       - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
@@ -136,6 +136,12 @@ jobs:
         env:
           QNOP_API_URL: http://localhost:8080
         run: scripts/e2e-docker.sh
+      # The office converter end to end (issue #908): DOCX ingest and the PDF
+      # export through the image's LibreOffice, with the isolated environment and
+      # hardened profile. After the screenshot run, so its extra review cannot
+      # change a baseline.
+      - name: Run office converter smoke test
+        run: bash scripts/smoke-office.sh
       # The report carries the diff images and traces of any failure — the only
       # way to judge a screenshot mismatch, and the input for updating a baseline.
       - name: Upload the Playwright report
@@ -171,7 +177,7 @@ jobs:
         with:
           distribution: temurin
           java-version: "21"
-      - uses: pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86 # v6
+      - uses: pnpm/action-setup@73e46992e05b19abd31f2f3c20e0e7370d762115 # v6
         with:
           package_json_file: qnop-ui/package.json
       - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
@@ -179,7 +185,7 @@ jobs:
           node-version: "24"
           cache: pnpm
           cache-dependency-path: qnop-ui/pnpm-lock.yaml
-      - uses: gradle/actions/setup-gradle@3f5f9adaf7d9fecd50b5935e54106014257a94e6 # v6
+      - uses: gradle/actions/setup-gradle@8da46b539cd8fe6ab27ca75128919a18d757604c # v6
       - name: Build boot jar with embedded SPA
         run: |
           ./gradlew --no-daemon -x test :qnop-app:bootJar -PembedUi
@@ -194,7 +200,7 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4
       - name: Log in to GHCR
-        uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0
+        uses: docker/login-action@8aa5831fb8d48d8f76594c7ddde61ae58019f550 # v4.8.0
         with:
           registry: ghcr.io
           username: ${{ github.actor }}

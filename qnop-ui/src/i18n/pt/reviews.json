@@ -430,6 +430,8 @@
     "title": "Participantes",
     "loadingMembers": "Carregando os membros da equipe",
     "noMembers": "Esta equipe não tem membros.",
+    "membersHidden": "Os membros desta equipe não estão visíveis para você.",
+    "membersLoadFailed": "Não foi possível carregar os membros da equipe.",
     "empty": "Esta revisão ainda não tem revisores.",
     "showMembers": "Mostrar os membros de {{name}}",
     "addPlaceholder": "Adicionar pessoas ou equipes…",

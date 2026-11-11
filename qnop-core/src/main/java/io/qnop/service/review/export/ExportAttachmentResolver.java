@@ -23,8 +23,8 @@ package io.qnop.service.review.export;
 import io.qnop.service.ApplicationSettingKey;
 import io.qnop.service.ApplicationSettingsService;
 import io.qnop.service.document.DocumentAttachmentService;
+import io.qnop.service.image.ImageHeaderProbe;
 import java.awt.image.BufferedImage;
-import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.util.LinkedHashMap;
 import java.util.Map;
@@ -230,6 +230,16 @@ public class ExportAttachmentResolver {
       try (DocumentAttachmentService.AttachmentDownload download = attachments.open(metadata)) {
         bytes = download.stream().readAllBytes();
       }
+      if (!withinPixelBudget(bytes)) {
+        // Stored before the upload check existed, or otherwise unreadable: every
+        // renderer would decode it, so it degrades to its filename instead (#907).
+        log.warn(
+            "Skipping attachment {} in the export of document {}: image dimensions unreadable"
+                + " or over the pixel budget",
+            attachmentId,
+            documentId);
+        return Optional.empty();
+      }
       return embeddable(bytes, metadata.contentType())
           .map(
               converted ->
@@ -260,7 +270,8 @@ public class ExportAttachmentResolver {
         || DocumentAttachmentService.GIF.equals(contentType)) {
       return Optional.of(new Converted(bytes, contentType));
     }
-    BufferedImage decoded = ImageIO.read(new ByteArrayInputStream(bytes));
+    BufferedImage decoded =
+        ImageHeaderProbe.decodeWithinBudget(bytes, attachments.pixelBudget()).orElse(null);
     if (decoded == null) {
       return Optional.empty();
     }
@@ -268,6 +279,11 @@ public class ExportAttachmentResolver {
     return ImageIO.write(decoded, "png", out)
         ? Optional.of(new Converted(out.toByteArray(), DocumentAttachmentService.PNG))
         : Optional.empty();
+  }
+
+  /** Header-only: true when the declared raster fits the attachment pixel budget (#907). */
+  private boolean withinPixelBudget(byte[] bytes) {
+    return ImageHeaderProbe.probe(bytes).filter(attachments.pixelBudget()::admits).isPresent();
   }
 
   private record Converted(byte[] bytes, String contentType) {}

@@ -105,7 +105,7 @@ class ThrottledOfficeConverterTest {
   private static ThrottledOfficeConverter throttled(
       OfficeConverter delegate, int maxConcurrent, Duration maxWait) {
     return new ThrottledOfficeConverter(
-        delegate, new OfficeConverterProperties(null, null, maxConcurrent, maxWait));
+        delegate, new OfficeConverterProperties(null, null, maxConcurrent, maxWait, null, null));
   }
 
   @Test

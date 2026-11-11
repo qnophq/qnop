@@ -50,6 +50,23 @@ export function mentionToken(candidate: MentionCandidate): string {
  */
 export const MENTION_TOKEN = /(^|[\s([{>])@([A-Za-z0-9][A-Za-z0-9-]{1,62}[A-Za-z0-9])(?![\w-])/g;
 
+/** A whole string in the mention slug shape — the same rule as {@link MENTION_TOKEN}'s group 2. */
+const MENTION_SLUG = /^[A-Za-z0-9][A-Za-z0-9-]{1,62}[A-Za-z0-9]$/;
+
+/** The canonical @mention href scheme (issue #462): `mention:<slug>`. */
+export const MENTION_HREF = 'mention:';
+
+/**
+ * The slug of a `mention:<slug>` href, or {@code null} when the target is not a well-formed
+ * mention (issue #912). Only a value in the exact slug shape becomes a profile pill and a profile
+ * lookup; anything else (encoded characters, separators, empty) is rendered as plain text.
+ */
+export function mentionSlugFromHref(href: string | undefined): string | null {
+  if (typeof href !== 'string' || !href.startsWith(MENTION_HREF)) return null;
+  const slug = href.slice(MENTION_HREF.length);
+  return MENTION_SLUG.test(slug) ? slug : null;
+}
+
 /**
  * Replaces every {@code @slug} mention token in a plain/Markdown text with whatever {@code resolve}
  * returns for the slug — a token whose slug does not resolve stays as-is, mirroring the renderer's
