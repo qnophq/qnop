@@ -70,6 +70,14 @@ describe('InfoBanner', () => {
     expect(screen.queryByRole('link')).not.toBeInTheDocument();
   });
 
+  it.each(['javascript:alert(1)', 'data:text/html,x', '//status.example', '/relative', 'ftp://x'])(
+    'renders no link for a non-http(s) URL: %s (#913)',
+    (linkUrl) => {
+      renderWithProviders(<InfoBanner banner={banner({ linkLabel: 'Status page', linkUrl })} />);
+      expect(screen.queryByRole('link')).not.toBeInTheDocument();
+    },
+  );
+
   it('offers dismissal only where the caller handles it', async () => {
     const onDismiss = vi.fn();
     const { unmount } = renderWithProviders(<InfoBanner banner={banner()} onDismiss={onDismiss} />);
