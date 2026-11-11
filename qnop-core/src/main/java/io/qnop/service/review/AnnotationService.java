@@ -368,10 +368,13 @@ public class AnnotationService {
   /**
    * Resolves the annotation as its author (ADR-0011 as amended by #405) via the workflow
    * choke-point (which enforces the authorization, appends the optional closing note to the thread
-   * and re-derives the document state), and returns the updated annotation's view.
+   * and re-derives the document state), and returns the updated annotation's view. The caller must
+   * still see the review and the thread (issue #916): an author who lost access gets the same 404
+   * as on every other annotation path.
    */
   @Transactional
-  public AnnotationView resolve(UUID annotationId, String note, UUID actor) {
+  public AnnotationView resolve(UUID annotationId, String note, UUID actor, boolean admin) {
+    requireVisibleAnnotation(annotationId, actor, admin);
     Annotation updated = workflow.resolveAnnotation(annotationId, note, actor);
     ReviewIdentityResolver.ReviewIdentities identities =
         identity.forDocument(updated.getDocumentId(), actor);
@@ -388,10 +391,12 @@ public class AnnotationService {
   /**
    * Reopens the annotation as its author or an admin (issues #394/#408) via the workflow
    * choke-point (which enforces the authorization, the closed-review guard and the state
-   * re-derivation), and returns the updated annotation's view.
+   * re-derivation), and returns the updated annotation's view. Visibility is checked first, as on
+   * {@link #resolve} (issue #916).
    */
   @Transactional
   public AnnotationView reopen(UUID annotationId, UUID actor, boolean admin) {
+    requireVisibleAnnotation(annotationId, actor, admin);
     Annotation updated = workflow.reopenAnnotation(annotationId, actor, admin);
     ReviewIdentityResolver.ReviewIdentities identities =
         identity.forDocument(updated.getDocumentId(), actor);
@@ -566,6 +571,20 @@ public class AnnotationService {
         foreignActivity(annotationId, actor),
         annotationReactions(annotationId, actor, identities),
         identities);
+  }
+
+  /**
+   * The annotation, provided {@code actor} can currently see its review and — under PRIVATE
+   * participation — its thread; otherwise the anti-enumeration 404 shared by the read paths (issue
+   * #916). Runs before any workflow decision so a caller who lost access learns nothing.
+   */
+  private void requireVisibleAnnotation(UUID annotationId, UUID actor, boolean admin) {
+    Annotation annotation = requireAnnotation(annotationId);
+    DocumentAccessService.DocumentView document =
+        documentAccess.getDocument(annotation.getDocumentId(), actor, admin);
+    if (!canSeeThread(document, annotation.getAuthorId(), actor, admin)) {
+      throw DocumentValidationException.notFound("no such annotation: " + annotationId);
+    }
   }
 
   /** FINALIZED/CANCELLED as strings — the column tolerates enterprise states (ADR-0011). */

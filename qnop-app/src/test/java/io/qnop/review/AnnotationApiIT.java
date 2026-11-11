@@ -32,11 +32,16 @@ import com.jayway.jsonpath.JsonPath;
 import io.qnop.entity.Document;
 import io.qnop.entity.DocumentVersion;
 import io.qnop.entity.ReviewParticipant;
+import io.qnop.entity.Team;
+import io.qnop.entity.TeamMembership;
+import io.qnop.entity.TeamRole;
 import io.qnop.entity.WorkflowState;
 import io.qnop.repository.AuditEventRepository;
 import io.qnop.repository.DocumentRepository;
 import io.qnop.repository.DocumentVersionRepository;
 import io.qnop.repository.ReviewParticipantRepository;
+import io.qnop.repository.TeamMembershipRepository;
+import io.qnop.repository.TeamRepository;
 import io.qnop.testsupport.SeededIntegrationTest;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
@@ -59,6 +64,8 @@ class AnnotationApiIT extends SeededIntegrationTest {
   @Autowired private DocumentVersionRepository versions;
   @Autowired private ReviewParticipantRepository participants;
   @Autowired private AuditEventRepository auditEvents;
+  @Autowired private TeamRepository teams;
+  @Autowired private TeamMembershipRepository teamMemberships;
 
   /** A DRAFT document owned by MEMBER with AUDITOR + MEMBER2 as reviewers and one version. */
   private UUID seedDocumentWithVersion() {
@@ -390,6 +397,51 @@ class AnnotationApiIT extends SeededIntegrationTest {
         .perform(as(get("/api/v1/documents/" + documentId + "/annotations"), MEMBER_ID))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.annotations.length()").value(0));
+  }
+
+  @Test
+  void anAuthorRemovedFromTheReviewCanNeitherResolveNorReopen() throws Exception {
+    UUID documentId = seedDocumentWithVersion();
+    String open = createAnnotation(documentId, AUDITOR_ID);
+    String resolved = createAnnotation(documentId, AUDITOR_ID);
+    resolve(resolved, AUDITOR_ID).andExpect(status().isOk());
+    participants.findByDocumentId(documentId).stream()
+        .filter(p -> AUDITOR_ID.equals(p.getUserId()))
+        .forEach(participants::delete);
+
+    // Lost access → the annotation is invisible: 404 like every other annotation path (#916).
+    resolve(open, AUDITOR_ID).andExpect(status().isNotFound());
+    mockMvc
+        .perform(as(post("/api/v1/annotations/" + resolved + "/reopen"), AUDITOR_ID))
+        .andExpect(status().isNotFound());
+
+    mockMvc
+        .perform(as(get("/api/v1/annotations/" + open), MEMBER_ID))
+        .andExpect(jsonPath("$.status").value("OPEN"))
+        .andExpect(jsonPath("$.commentCount").value(1));
+    mockMvc
+        .perform(as(get("/api/v1/annotations/" + resolved), MEMBER_ID))
+        .andExpect(jsonPath("$.status").value("RESOLVED"));
+  }
+
+  @Test
+  void anAuthorRemovedFromTheGrantingTeamCanNeitherResolveNorReopen() throws Exception {
+    UUID documentId = seedDocumentWithVersion();
+    Team team = teams.save(Team.create("annotation-it-" + UUID.randomUUID(), null));
+    TeamMembership membership =
+        teamMemberships.save(TeamMembership.of(team.getId(), EXTERNAL_ID, TeamRole.MEMBER));
+    participants.save(ReviewParticipant.forTeam(documentId, team.getId()));
+    String open = createAnnotation(documentId, EXTERNAL_ID);
+    String resolved = createAnnotation(documentId, EXTERNAL_ID);
+    resolve(resolved, EXTERNAL_ID).andExpect(status().isOk());
+    teamMemberships.delete(membership);
+
+    resolve(open, EXTERNAL_ID).andExpect(status().isNotFound());
+    mockMvc
+        .perform(as(post("/api/v1/annotations/" + resolved + "/reopen"), EXTERNAL_ID))
+        .andExpect(status().isNotFound());
+    assertThat(auditEvents.findByDocumentIdOrderByCreatedAtDesc(documentId))
+        .noneMatch(event -> "annotation.reopened".equals(event.getEventType()));
   }
 
   @Test
