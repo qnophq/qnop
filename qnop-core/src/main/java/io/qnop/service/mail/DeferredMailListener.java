@@ -20,7 +20,6 @@
  */
 package io.qnop.service.mail;
 
-import io.qnop.service.mail.MailService.SendResult;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.scheduling.annotation.Async;
@@ -33,7 +32,7 @@ import org.springframework.transaction.event.TransactionalEventListener;
  * mails nobody, {@code fallbackExecution} so a publish outside a transaction still sends, and
  * {@code @Async} on the bounded {@code mailDispatchExecutor} so neither rendering nor SMTP latency
  * sits in the request thread. Mail stays best-effort: a failed send is logged (never the address,
- * issue #659) and swallowed.
+ * issue #659) once and swallowed; the executor carries the request's MDC for correlation.
  */
 @Component
 public class DeferredMailListener {
@@ -50,11 +49,8 @@ public class DeferredMailListener {
   @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT, fallbackExecution = true)
   public void on(DeferredTemplateMail mail) {
     try {
-      SendResult result =
-          mailService.sendMailFromTemplate(mail.key(), mail.to(), mail.vars(), mail.locale());
-      if (result instanceof SendResult.Failed failed) {
-        log.warn("deferred {} mail was not sent: {}", mail.key().key(), failed.reason());
-      }
+      // A Failed result is already logged once by MailService (without the address, #659).
+      mailService.sendMailFromTemplate(mail.key(), mail.to(), mail.vars(), mail.locale());
     } catch (RuntimeException ex) {
       log.warn("deferred {} mail failed", mail.key().key(), ex);
     }
