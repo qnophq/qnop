@@ -396,7 +396,8 @@
       "needsSiteId": "Nada está sendo medido — {{provider}} precisa do ID do site pelo qual identifica este espaço de trabalho.",
       "needsHost": "Nada está sendo medido — {{provider}} é auto-hospedado, então precisa do endereço do seu servidor.",
       "measuring": "Medindo em {{provider}}. Os endereços das páginas são reduzidos a padrões de rota antes de serem repassados.",
-      "measuringAt": "Medindo em {{provider}} em {{host}}. Os endereços das páginas são reduzidos a padrões de rota antes de serem repassados."
+      "measuringAt": "Medindo em {{provider}} em {{host}}. Os endereços das páginas são reduzidos a padrões de rota antes de serem repassados.",
+      "trustNote": "O qnop nunca executa código do provedor de análise no navegador: ele monta cada medição por conta própria — um padrão de rota, um de quatro eventos nomeados, o tamanho da tela e o idioma — e a envia por este servidor. Ainda assim, o backend configurado aqui recebe cada medição repassada junto com a identificação do navegador do visitante e, conforme a configuração abaixo, o endereço IP dele; por isso, aponte-o somente para um servidor de confiança. Um host público deve usar https."
     },
     "fields": {
       "general__application_name": {
@@ -425,7 +426,7 @@
       },
       "tracking__enabled": {
         "label": "Medição de uso ativada",
-        "description": "Se a medição de uso anônima está ativada. A medição passa por este servidor, nunca o contorna: o navegador carrega o script de análise a partir do qnop e envia os eventos ao qnop, que os repassa. Os visitantes nunca se comunicam diretamente com o backend de análise."
+        "description": "Se a medição de uso anônima está ativada. A medição passa por este servidor, nunca o contorna: o qnop monta cada medição por conta própria e a envia ao qnop, que a repassa. Nenhum script de análise é carregado, e os visitantes nunca se comunicam diretamente com o backend de análise."
       },
       "tracking__provider": {
         "label": "Provedor",
@@ -433,7 +434,7 @@
       },
       "tracking__host": {
         "label": "Host",
-        "description": "URL base do backend de análise, por exemplo, https://matomo.internal. Se ficar vazio, usa a nuvem do próprio provedor, quando houver (Plausible, PostHog, Pirsch); Matomo e Umami são auto-hospedados e sempre precisam deste valor."
+        "description": "URL base do backend de análise, por exemplo, https://matomo.example.com. Se ficar vazio, usa a nuvem do próprio provedor, quando houver (Plausible, PostHog, Pirsch); Matomo e Umami são auto-hospedados e sempre precisam deste valor. Deve usar https, a menos que o host seja um endereço privado."
       },
       "tracking__site_id": {
         "label": "ID do site",

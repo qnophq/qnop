@@ -75,8 +75,9 @@ public enum ApplicationSettingKey {
       SettingValueType.BOOLEAN,
       "false",
       "Whether anonymous usage tracking is enabled. Measurement runs through this server, never"
-          + " past it: the browser loads the analytics script from qnop and sends its events to"
-          + " qnop, which forwards them. Visitors never talk to the analytics backend directly."),
+          + " past it: qnop builds each measurement itself and sends it to qnop, which forwards it."
+          + " No analytics script is loaded, and visitors never talk to the analytics backend"
+          + " directly."),
   TRACKING_PROVIDER(
       "tracking.provider",
       SettingValueType.ENUM,
@@ -87,9 +88,10 @@ public enum ApplicationSettingKey {
       "tracking.host",
       SettingValueType.STRING,
       "",
-      "Base URL of the analytics backend, e.g. https://matomo.internal. Empty uses the provider's"
-          + " own cloud where it has one (Plausible, PostHog, Pirsch); Matomo and Umami are"
-          + " self-hosted and always need this."),
+      "Base URL of the analytics backend, e.g. https://matomo.example.com. Empty uses the"
+          + " provider's own cloud where it has one (Plausible, PostHog, Pirsch); Matomo and Umami"
+          + " are self-hosted and always need this. Must be https unless the host is a private"
+          + " address."),
   TRACKING_SITE_ID(
       "tracking.site_id",
       SettingValueType.STRING,

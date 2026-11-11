@@ -389,7 +389,8 @@
       "needsSiteId": "Nothing is being measured — {{provider}} needs the site id it knows this workspace by.",
       "needsHost": "Nothing is being measured — {{provider}} is self-hosted, so it needs the address of your server.",
       "measuring": "Measuring into {{provider}}. Page addresses are reduced to route patterns before they are forwarded.",
-      "measuringAt": "Measuring into {{provider}} at {{host}}. Page addresses are reduced to route patterns before they are forwarded."
+      "measuringAt": "Measuring into {{provider}} at {{host}}. Page addresses are reduced to route patterns before they are forwarded.",
+      "trustNote": "qnop never runs the analytics provider's code in the browser: it builds each measurement itself — a route pattern, one of four named events, screen size and language — and sends it through this server. The backend you configure here still receives every forwarded measurement together with the visitor's browser identification and, as set below, their IP address, so point it only at a server you trust. A public host must use https."
     },
     "fields": {
       "general__application_name": {
@@ -418,7 +419,7 @@
       },
       "tracking__enabled": {
         "label": "Enabled",
-        "description": "Whether anonymous usage tracking is enabled. Measurement runs through this server, never past it: the browser loads the analytics script from qnop and sends its events to qnop, which forwards them. Visitors never talk to the analytics backend directly."
+        "description": "Whether anonymous usage tracking is enabled. Measurement runs through this server, never past it: qnop builds each measurement itself and sends it to qnop, which forwards it. No analytics script is loaded, and visitors never talk to the analytics backend directly."
       },
       "tracking__provider": {
         "label": "Provider",
@@ -426,7 +427,7 @@
       },
       "tracking__host": {
         "label": "Host",
-        "description": "Base URL of the analytics backend, e.g. https://matomo.internal. Empty uses the provider's own cloud where it has one (Plausible, PostHog, Pirsch); Matomo and Umami are self-hosted and always need this."
+        "description": "Base URL of the analytics backend, e.g. https://matomo.example.com. Empty uses the provider's own cloud where it has one (Plausible, PostHog, Pirsch); Matomo and Umami are self-hosted and always need this. Must be https unless the host is a private address."
       },
       "tracking__site_id": {
         "label": "Site id",

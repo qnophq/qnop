@@ -389,7 +389,8 @@
       "needsSiteId": "Es wird nichts gemessen — {{provider}} braucht die Site-ID, unter der es diesen Workspace kennt.",
       "needsHost": "Es wird nichts gemessen — {{provider}} wird selbst gehostet und braucht daher die Adresse deines Servers.",
       "measuring": "Messung läuft über {{provider}}. Seitenadressen werden vor dem Weiterleiten auf Routenmuster reduziert.",
-      "measuringAt": "Messung läuft über {{provider}} unter {{host}}. Seitenadressen werden vor dem Weiterleiten auf Routenmuster reduziert."
+      "measuringAt": "Messung läuft über {{provider}} unter {{host}}. Seitenadressen werden vor dem Weiterleiten auf Routenmuster reduziert.",
+      "trustNote": "qnop führt im Browser keinen Code des Analyse-Anbieters aus: Jede Messung baut qnop selbst — ein Routenmuster, eines von vier benannten Ereignissen, Bildschirmgröße und Sprache — und schickt sie über diesen Server. Das hier eingetragene Backend erhält trotzdem jede weitergeleitete Messung zusammen mit der Browserkennung der Besucher und, je nach Einstellung unten, ihrer IP-Adresse. Tragen Sie daher nur einen Server ein, dem Sie vertrauen. Ein öffentlicher Host muss https verwenden."
     },
     "fields": {
       "general__application_name": {
@@ -418,7 +419,7 @@
       },
       "tracking__enabled": {
         "label": "Aktiviert",
-        "description": "Ob die anonyme Nutzungsmessung eingeschaltet ist. Die Messung läuft über diesen Server, nie an ihm vorbei: Der Browser lädt das Analyse-Skript von qnop und schickt seine Ereignisse an qnop, das sie weiterleitet. Besucher sprechen nie direkt mit dem Analyse-Backend."
+        "description": "Ob die anonyme Nutzungsmessung eingeschaltet ist. Die Messung läuft über diesen Server, nie an ihm vorbei: qnop baut jede Messung selbst und schickt sie an qnop, das sie weiterleitet. Es wird kein Analyse-Skript geladen, und Besucher sprechen nie direkt mit dem Analyse-Backend."
       },
       "tracking__provider": {
         "label": "Anbieter",
@@ -426,7 +427,7 @@
       },
       "tracking__host": {
         "label": "Host",
-        "description": "Basis-URL des Analyse-Backends, z. B. https://matomo.internal. Leer nutzt die Cloud des Anbieters, sofern es eine gibt (Plausible, PostHog, Pirsch); Matomo und Umami werden selbst gehostet und brauchen den Wert immer."
+        "description": "Basis-URL des Analyse-Backends, z. B. https://matomo.example.com. Leer nutzt die Cloud des Anbieters, sofern es eine gibt (Plausible, PostHog, Pirsch); Matomo und Umami werden selbst gehostet und brauchen den Wert immer. Muss https verwenden, außer der Host ist eine private Adresse."
       },
       "tracking__site_id": {
         "label": "Site-ID",

@@ -396,7 +396,8 @@
       "needsSiteId": "Rien n’est mesuré — {{provider}} a besoin de l’identifiant de site sous lequel il connaît cet espace de travail.",
       "needsHost": "Rien n’est mesuré — {{provider}} est auto-hébergé et a donc besoin de l’adresse de votre serveur.",
       "measuring": "Mesures envoyées à {{provider}}. Les adresses des pages sont réduites à des modèles de route avant d’être transmises.",
-      "measuringAt": "Mesures envoyées à {{provider}} sur {{host}}. Les adresses des pages sont réduites à des modèles de route avant d’être transmises."
+      "measuringAt": "Mesures envoyées à {{provider}} sur {{host}}. Les adresses des pages sont réduites à des modèles de route avant d’être transmises.",
+      "trustNote": "qnop n’exécute jamais le code du fournisseur d’analyse dans le navigateur : il construit lui-même chaque mesure — un modèle de route, l’un des quatre événements nommés, la taille de l’écran et la langue — et l’envoie via ce serveur. Le service configuré ici reçoit néanmoins chaque mesure transmise, avec l’identification du navigateur du visiteur et, selon le réglage ci-dessous, son adresse IP : ne l’orientez que vers un serveur de confiance. Un hôte public doit utiliser https."
     },
     "fields": {
       "general__application_name": {
@@ -425,7 +426,7 @@
       },
       "tracking__enabled": {
         "label": "Activée",
-        "description": "Indique si la mesure d’utilisation anonyme est activée. La mesure passe toujours par ce serveur, jamais à côté : le navigateur charge le script d’analyse depuis qnop et envoie ses événements à qnop, qui les transmet. Les visiteurs ne communiquent jamais directement avec le service d’analyse."
+        "description": "Indique si la mesure d’utilisation anonyme est activée. La mesure passe toujours par ce serveur, jamais à côté : qnop construit lui-même chaque mesure et l’envoie à qnop, qui la transmet. Aucun script d’analyse n’est chargé et les visiteurs ne communiquent jamais directement avec le service d’analyse."
       },
       "tracking__provider": {
         "label": "Fournisseur",
@@ -433,7 +434,7 @@
       },
       "tracking__host": {
         "label": "Hôte",
-        "description": "URL de base du service d’analyse, par ex. https://matomo.internal. Si le champ est vide, le cloud du fournisseur est utilisé lorsqu’il en propose un (Plausible, PostHog, Pirsch) ; Matomo et Umami sont auto-hébergés et nécessitent toujours ce champ."
+        "description": "URL de base du service d’analyse, par ex. https://matomo.example.com. Si le champ est vide, le cloud du fournisseur est utilisé lorsqu’il en propose un (Plausible, PostHog, Pirsch) ; Matomo et Umami sont auto-hébergés et nécessitent toujours ce champ. https est obligatoire, sauf pour une adresse privée."
       },
       "tracking__site_id": {
         "label": "ID du site",
