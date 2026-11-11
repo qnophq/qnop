@@ -214,15 +214,20 @@ public class AdminUserService {
       throw new AdminUserConflictException("SELF_DELETE", "You cannot delete your own account.");
     }
     requireAnotherEnabledAdmin(user);
-    users.delete(user);
+    // Lock the user row, then revoke the refresh tokens, then delete: user-then-tokens is the order
+    // rotation locks in too, so a concurrent refresh of this user cannot deadlock the delete. The
+    // revocation also ends a session that a rotation in flight just extended.
+    users.lockById(id);
+    refreshTokens.revokeAllForUser(id);
+    users.deleteById(id);
   }
 
   /**
    * Rejects (409) a change that would remove {@code target} from the enabled admins when it is the
-   * last one. The enabled-admin rows are locked ({@code SELECT ... FOR UPDATE}) before they are
-   * counted, so concurrent demote/disable/delete requests are serialised: the second one waits for
-   * the first to commit and then counts what is really left (issue #920). A no-op for a target that
-   * is not an enabled admin.
+   * last one. The enabled-admin rows are locked ({@code PESSIMISTIC_WRITE}, {@code FOR NO KEY
+   * UPDATE} on PostgreSQL) before they are counted, so concurrent demote/disable/delete requests
+   * are serialised: the second one waits for the first to commit and then counts what is really
+   * left (issue #920). A no-op for a target that is not an enabled admin.
    */
   private void requireAnotherEnabledAdmin(User target) {
     if (target.getRole() != UserRole.ADMIN || !target.isEnabled()) {

@@ -38,13 +38,18 @@ import io.qnop.testsupport.SeededIntegrationTest;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutionException;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.TimeoutException;
 import java.util.function.Supplier;
+import javax.sql.DataSource;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.MediaType;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.support.TransactionTemplate;
 
@@ -62,13 +67,27 @@ class SessionLifecycleIT extends SeededIntegrationTest {
 
   private static final String USERS = "/api/v1/admin/users";
   private static final String ME = "/api/v1/users/me";
-  private static final long BLOCKED_MS = 1500;
+  private static final long LOCK_WAIT_TIMEOUT_MS = 10_000;
 
   @Autowired private AdminUserService adminUsers;
   @Autowired private RefreshTokenService refreshTokens;
   @Autowired private RefreshTokenRepository refreshTokenRows;
   @Autowired private UserRepository users;
   @Autowired private PlatformTransactionManager transactionManager;
+  @Autowired private DataSource dataSource;
+
+  /** Dedicated threads, so neither operation queues behind unrelated work on a shared pool. */
+  private ExecutorService pool;
+
+  @BeforeEach
+  void startPool() {
+    pool = Executors.newFixedThreadPool(2);
+  }
+
+  @AfterEach
+  void stopPool() {
+    pool.shutdownNow();
+  }
 
   @Test
   @DisplayName("a role change rejects the user's existing access token immediately (#901)")
@@ -117,7 +136,7 @@ class SessionLifecycleIT extends SeededIntegrationTest {
 
     HeldTransaction<RotationResult> first = holdOpen(() -> refreshTokens.rotate(presented));
     CompletableFuture<RotationResult> second =
-        CompletableFuture.supplyAsync(() -> refreshTokens.rotate(presented));
+        CompletableFuture.supplyAsync(() -> refreshTokens.rotate(presented), pool);
 
     assertWaitsForTheFirst(second);
     RotationResult firstResult = first.commit();
@@ -138,7 +157,7 @@ class SessionLifecycleIT extends SeededIntegrationTest {
         holdOpen(() -> adminUsers.update(ADMIN2_ID, null, "MEMBER", null, ADMIN_ID));
     CompletableFuture<Object> second =
         CompletableFuture.supplyAsync(
-            () -> adminUsers.update(ADMIN_ID, null, "MEMBER", null, ADMIN2_ID));
+            () -> adminUsers.update(ADMIN_ID, null, "MEMBER", null, ADMIN2_ID), pool);
 
     assertWaitsForTheFirst(second);
     first.commit();
@@ -162,7 +181,8 @@ class SessionLifecycleIT extends SeededIntegrationTest {
             () -> {
               adminUsers.delete(ADMIN_ID, ADMIN2_ID);
               return null;
-            });
+            },
+            pool);
 
     assertWaitsForTheFirst(second);
     first.commit();
@@ -174,11 +194,48 @@ class SessionLifecycleIT extends SeededIntegrationTest {
     assertThat(users.countByRoleAndEnabledTrue(UserRole.ADMIN)).isEqualTo(1);
   }
 
-  /** The second operation must still be waiting on the first one's row locks. */
-  private static void assertWaitsForTheFirst(CompletableFuture<?> second) {
-    assertThatThrownBy(() -> second.get(BLOCKED_MS, TimeUnit.MILLISECONDS))
-        .as("the second operation must wait for the first transaction to commit")
-        .isInstanceOf(TimeoutException.class);
+  @Test
+  @DisplayName("a revocation racing an in-flight rotation also ends the new successor (#902)")
+  void revocationDuringRotationEndsTheSuccessor() throws Exception {
+    String presented = refreshCookie(login("member", SEED_PASSWORD)).getValue();
+
+    HeldTransaction<RotationResult> rotation = holdOpen(() -> refreshTokens.rotate(presented));
+    CompletableFuture<Object> roleChange =
+        CompletableFuture.supplyAsync(
+            () -> adminUsers.update(MEMBER_ID, null, "AUDITOR", null, ADMIN_ID), pool);
+
+    assertWaitsForTheFirst(roleChange);
+    RotationResult rotated = rotation.commit();
+    roleChange.get(10, TimeUnit.SECONDS);
+
+    assertThat(rotated).isInstanceOf(RotationResult.Success.class);
+    String successor = ((RotationResult.Success) rotated).token().plaintext();
+    assertThat(refreshTokens.rotate(successor)).isNotInstanceOf(RotationResult.Success.class);
+  }
+
+  /**
+   * Proves the second operation is blocked on the first one's row locks: polls {@code
+   * pg_stat_activity} until another backend waits on a lock, failing if the second operation
+   * finishes first (it did not wait) or nothing ever waits.
+   */
+  private void assertWaitsForTheFirst(CompletableFuture<?> second) throws InterruptedException {
+    JdbcTemplate jdbc = new JdbcTemplate(dataSource);
+    long deadline = System.currentTimeMillis() + LOCK_WAIT_TIMEOUT_MS;
+    while (System.currentTimeMillis() < deadline) {
+      assertThat(second.isDone())
+          .as("the second operation must wait for the first transaction, not finish before it")
+          .isFalse();
+      Integer waiting =
+          jdbc.queryForObject(
+              "SELECT count(*) FROM pg_stat_activity WHERE datname = current_database()"
+                  + " AND wait_event_type = 'Lock' AND pid <> pg_backend_pid()",
+              Integer.class);
+      if (waiting != null && waiting > 0) {
+        return;
+      }
+      TimeUnit.MILLISECONDS.sleep(25);
+    }
+    throw new AssertionError("the second operation never waited on a row lock");
   }
 
   /**
@@ -198,7 +255,8 @@ class SessionLifecycleIT extends SeededIntegrationTest {
                       done.countDown();
                       awaitQuietly(release);
                       return value;
-                    }));
+                    }),
+            pool);
     if (!done.await(10, TimeUnit.SECONDS)) {
       result.get(1, TimeUnit.SECONDS); // surfaces the failure of the first operation
       throw new AssertionError("the first operation did not finish");

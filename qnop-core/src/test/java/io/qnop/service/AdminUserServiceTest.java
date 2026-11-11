@@ -331,7 +331,11 @@ class AdminUserServiceTest {
     member.setRole(UserRole.MEMBER);
     when(users.findById(memberId)).thenReturn(Optional.of(member));
     service.delete(memberId, UUID.randomUUID());
-    verify(users).delete(member);
+    // User row first, then its refresh tokens, then the delete — the lock order rotation uses.
+    var order = inOrder(users, refreshTokens);
+    order.verify(users).lockById(memberId);
+    order.verify(refreshTokens).revokeAllForUser(memberId);
+    order.verify(users).deleteById(memberId);
   }
 
   @Test

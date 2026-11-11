@@ -128,7 +128,7 @@ class UserServiceTest {
   void applyPasswordResetInvalidatesSessions() {
     UUID id = UUID.randomUUID();
     User fresh = User.internal("Bob", "bob@example.com", "bob", "new-hash");
-    when(users.existsById(id)).thenReturn(true);
+    when(users.updatePasswordHash(id, "new-hash")).thenReturn(1);
     when(users.findById(id)).thenReturn(Optional.of(fresh));
     when(passwordEncoder.encode("new-password")).thenReturn("new-hash");
 
@@ -145,11 +145,12 @@ class UserServiceTest {
   @DisplayName("applyPasswordReset throws for an unknown user")
   void applyPasswordResetRejectsUnknownUser() {
     UUID id = UUID.randomUUID();
-    when(users.existsById(id)).thenReturn(false);
+    when(passwordEncoder.encode("new-password")).thenReturn("new-hash");
+    when(users.updatePasswordHash(id, "new-hash")).thenReturn(0);
 
     assertThatThrownBy(() -> service.applyPasswordReset(id, "new-password"))
         .isInstanceOf(UserNotFoundException.class);
-    verify(users, never()).updatePasswordHash(any(), any());
+    verify(users, never()).bumpPasswordInvalidatedBefore(any(), any());
   }
 
   /**

@@ -75,17 +75,35 @@ Hardening of the session lifecycle (security review, epic #896):
   context-clearing revocation in the same transaction cannot discard them.
 - **A token whose user is missing or disabled is revoked** (#901).
   `TokenRevocationService.isRevoked` already loads the user per request; a
-  deleted account (its refresh tokens cascade away) or a disabled one is now
-  rejected outright instead of being waved through until expiry.
+  deleted account or a disabled one is now rejected outright instead of being
+  waved through until expiry. Deletion locks the user row, revokes the refresh
+  tokens explicitly and then deletes (the FK cascade removes the rows).
 - **Rotation is atomic** (#902). The presented refresh-token row is read with
-  `PESSIMISTIC_WRITE` (`SELECT ... FOR UPDATE`). A concurrent rotation of the
-  same token waits, then sees it revoked and is handled as reuse (family
-  revoked) — one token can never fork into two live successors.
+  `PESSIMISTIC_WRITE` (Hibernate renders this as `FOR NO KEY UPDATE` on
+  PostgreSQL). A concurrent rotation of the same token waits, then sees it
+  revoked and is handled as reuse (family revoked) — one token can never fork
+  into two live successors.
+- **Rotation cannot outrun a revocation.** Before the token row, rotation
+  share-locks the owning user row (`PESSIMISTIC_READ`, `FOR SHARE`). Every
+  revocation path writes the user row first and the token rows second, so the
+  lock order is always user → token (no deadlock), and a revocation either
+  commits before the rotation checks the user or waits until the rotation's
+  successor exists and is revoked with the rest. Rotation also refuses (and
+  revokes the family, reason `INVALIDATED`) a token issued before
+  `password_invalidated_before` or belonging to a missing/disabled user.
 - **The last-admin guard is race-free** (#920). Demote/disable/delete of an
-  enabled admin locks the enabled-admin rows (ordered by id) before counting
-  them, which serialises concurrent admin-removing changes; PostgreSQL
-  re-checks a row a concurrent transaction changed and leaves it out of the
-  count. No schema change.
+  enabled admin locks the enabled-admin rows (ordered by id, `PESSIMISTIC_WRITE`
+  → `FOR NO KEY UPDATE`) before counting them, which serialises concurrent
+  admin-removing changes; PostgreSQL re-checks a row a concurrent transaction
+  changed and leaves it out of the count. No schema change.
+- **Multiple tabs.** Strict reuse detection means two tabs presenting the same
+  single-use refresh cookie at once would revoke the family and sign the user
+  out everywhere. The server deliberately keeps no grace window; instead the
+  SPA serialises refreshes across tabs with the Web Locks API
+  (`navigator.locks.request('qnop-refresh', …)` in `qnop-ui/src/api/refresh.ts`).
+  The cookie jar is shared, so a waiting tab sends the cookie the first tab's
+  response already rotated and succeeds. Without `navigator.locks` the
+  previous, unserialised behaviour remains.
 - **Login timing is uniform** (#903). `AuthService.authenticate` runs exactly
   one password comparison on every path; unknown, disabled and password-less
   accounts are compared against a dummy hash computed at startup. Equalising

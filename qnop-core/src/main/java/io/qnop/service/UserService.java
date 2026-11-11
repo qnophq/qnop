@@ -162,10 +162,9 @@ public class UserService {
    */
   @Transactional
   public User applyPasswordReset(UUID id, String rawPassword) {
-    if (!users.existsById(id)) {
+    if (users.updatePasswordHash(id, passwordEncoder.encode(rawPassword)) == 0) {
       throw new UserNotFoundException(id);
     }
-    users.updatePasswordHash(id, passwordEncoder.encode(rawPassword));
     users.bumpPasswordInvalidatedBefore(id, Instant.now());
     return users.findById(id).orElseThrow(() -> new UserNotFoundException(id));
   }

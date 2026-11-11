@@ -28,7 +28,9 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import io.qnop.entity.RefreshToken;
+import io.qnop.entity.User;
 import io.qnop.repository.RefreshTokenRepository;
+import io.qnop.repository.UserRepository;
 import io.qnop.security.JwtKeyService;
 import io.qnop.security.QnopProperties;
 import io.qnop.service.scheduler.SchedulerService;
@@ -41,6 +43,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.test.util.ReflectionTestUtils;
 
 /** Unit tests for {@link RefreshTokenService} rotation and reuse-detection (DB-free). */
 @ExtendWith(MockitoExtension.class)
@@ -48,6 +51,7 @@ class RefreshTokenServiceTest {
 
   @Mock private RefreshTokenRepository repository;
   @Mock private SchedulerService scheduler;
+  @Mock private UserRepository users;
 
   private RefreshTokenService service;
 
@@ -66,7 +70,7 @@ class RefreshTokenServiceTest {
                 null),
             new QnopProperties.Cors(null));
     RefreshTokenHasher hasher = new RefreshTokenHasher(new JwtKeyService(properties));
-    service = new RefreshTokenService(repository, hasher, properties, scheduler);
+    service = new RefreshTokenService(repository, users, hasher, properties, scheduler);
   }
 
   @Test
@@ -81,7 +85,7 @@ class RefreshTokenServiceTest {
 
   @Test
   void rotateUnknownTokenReturnsUnknown() {
-    when(repository.findForRotation(any())).thenReturn(Optional.empty());
+    when(repository.findUserIdByTokenLookupHash(any())).thenReturn(Optional.empty());
 
     assertThat(service.rotate("nope"))
         .isInstanceOf(RefreshTokenService.RotationResult.Unknown.class);
@@ -93,6 +97,7 @@ class RefreshTokenServiceTest {
     UUID userId = UUID.randomUUID();
     RefreshToken active =
         new RefreshToken(UUID.randomUUID(), userId, "hash", Instant.now().plusSeconds(3600));
+    ownedBy(userId, enabledUser(null));
     when(repository.findForRotation(any())).thenReturn(Optional.of(active));
     when(repository.save(any(RefreshToken.class))).thenAnswer(call -> call.getArgument(0));
 
@@ -107,14 +112,77 @@ class RefreshTokenServiceTest {
   @Test
   void rotateRevokedTokenDetectsReuseAndRevokesFamily() {
     UUID family = UUID.randomUUID();
+    UUID userId = UUID.randomUUID();
     RefreshToken revoked =
-        new RefreshToken(family, UUID.randomUUID(), "hash", Instant.now().plusSeconds(3600));
+        new RefreshToken(family, userId, "hash", Instant.now().plusSeconds(3600));
     revoked.setRevokedAt(Instant.now().minusSeconds(60));
+    ownedBy(userId, enabledUser(null));
     when(repository.findForRotation(any())).thenReturn(Optional.of(revoked));
 
     RefreshTokenService.RotationResult result = service.rotate("replayed");
 
     assertThat(result).isInstanceOf(RefreshTokenService.RotationResult.Reused.class);
     verify(repository).revokeFamily(eq(family), eq(RefreshTokenService.REUSE_DETECTED), any());
+  }
+
+  @Test
+  void rotateTokenIssuedBeforeSessionInvalidationRevokesInsteadOfRotating() {
+    UUID userId = UUID.randomUUID();
+    UUID family = UUID.randomUUID();
+    RefreshToken stale = new RefreshToken(family, userId, "hash", Instant.now().plusSeconds(3600));
+    ReflectionTestUtils.setField(stale, "issuedAt", Instant.now().minusSeconds(30));
+    ownedBy(userId, enabledUser(Instant.now().minusSeconds(10)));
+    when(repository.findForRotation(any())).thenReturn(Optional.of(stale));
+
+    assertThat(service.rotate("present"))
+        .isInstanceOf(RefreshTokenService.RotationResult.Unknown.class);
+    verify(repository).revokeFamily(eq(family), eq(RefreshTokenService.INVALIDATED), any());
+    verify(repository, never()).save(any());
+  }
+
+  @Test
+  void rotateTokenIssuedAfterSessionInvalidationRotates() {
+    UUID userId = UUID.randomUUID();
+    RefreshToken fresh =
+        new RefreshToken(UUID.randomUUID(), userId, "hash", Instant.now().plusSeconds(3600));
+    ReflectionTestUtils.setField(fresh, "issuedAt", Instant.now().minusSeconds(5));
+    ownedBy(userId, enabledUser(Instant.now().minusSeconds(60)));
+    when(repository.findForRotation(any())).thenReturn(Optional.of(fresh));
+    when(repository.save(any(RefreshToken.class))).thenAnswer(call -> call.getArgument(0));
+
+    assertThat(service.rotate("present"))
+        .isInstanceOf(RefreshTokenService.RotationResult.Success.class);
+  }
+
+  @Test
+  void rotateTokenOfMissingOrDisabledUserRevokes() {
+    UUID userId = UUID.randomUUID();
+    RefreshToken row =
+        new RefreshToken(UUID.randomUUID(), userId, "hash", Instant.now().plusSeconds(3600));
+    when(repository.findUserIdByTokenLookupHash(any())).thenReturn(Optional.of(userId));
+    when(users.lockForSessionCheck(userId)).thenReturn(Optional.empty());
+    when(repository.findForRotation(any())).thenReturn(Optional.of(row));
+
+    assertThat(service.rotate("present"))
+        .isInstanceOf(RefreshTokenService.RotationResult.Unknown.class);
+
+    User disabled = User.internal("D", "d@example.com", "d", "h");
+    disabled.setEnabled(false);
+    when(users.lockForSessionCheck(userId)).thenReturn(Optional.of(disabled));
+    assertThat(service.rotate("present"))
+        .isInstanceOf(RefreshTokenService.RotationResult.Unknown.class);
+    verify(repository, never()).save(any());
+  }
+
+  private void ownedBy(UUID userId, User owner) {
+    when(repository.findUserIdByTokenLookupHash(any())).thenReturn(Optional.of(userId));
+    when(users.lockForSessionCheck(userId)).thenReturn(Optional.of(owner));
+  }
+
+  private static User enabledUser(Instant passwordInvalidatedBefore) {
+    User user = User.internal("U", "u@example.com", "u", "h");
+    user.setEnabled(true);
+    user.setPasswordInvalidatedBefore(passwordInvalidatedBefore);
+    return user;
   }
 }
