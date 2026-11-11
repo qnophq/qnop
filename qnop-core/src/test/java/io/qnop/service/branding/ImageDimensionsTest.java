@@ -64,4 +64,16 @@ class ImageDimensionsTest {
   void returnsEmptyForUnreadableRaster() {
     assertTrue(ImageDimensions.read(BrandingLimits.PNG, new byte[] {1, 2, 3}).isEmpty());
   }
+
+  @Test
+  void readsWebpAndOversizedPngDimensionsFromTheHeaderOnly() {
+    assertEquals(
+        Optional.of(new ImageDimensions(300, 200)),
+        ImageDimensions.read(
+            BrandingLimits.WEBP, io.qnop.service.image.ImageFixtures.webpVp8l(300, 200)));
+    assertEquals(
+        Optional.of(new ImageDimensions(30_000, 30_000)),
+        ImageDimensions.read(
+            BrandingLimits.PNG, io.qnop.service.image.ImageFixtures.pngHeader(30_000, 30_000)));
+  }
 }
