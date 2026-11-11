@@ -22,15 +22,13 @@ package io.qnop.web.security.ratelimit;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import java.util.List;
 import org.junit.jupiter.api.Test;
 
 /** Unit tests for the shared Bucket4j limiter — no Spring context, no Docker. */
 class BucketRateLimitServiceTest {
 
   private final BucketRateLimitService service =
-      new BucketRateLimitService(
-          new RateLimitProperties(List.of(), null, null, null, null, null, 100_000L));
+      new BucketRateLimitService(RateLimitPropertiesFixture.defaults());
 
   @Test
   void allowsUpToCapacityThenRejects() {
@@ -67,5 +65,29 @@ class BucketRateLimitServiceTest {
 
     assertThat(service.tryConsume("login", "ip-b", 1, 60))
         .isInstanceOf(RateLimitResult.Allowed.class);
+  }
+
+  @Test
+  void refundGivesATokenBackWithoutExceedingCapacity() {
+    service.tryConsume("login-account", "k", 2, 900);
+    service.tryConsume("login-account", "k", 2, 900); // drained
+    service.refund("login-account", "k");
+    service.refund("login-account", "k");
+    service.refund("login-account", "k"); // capped at capacity 2
+
+    assertThat(service.tryConsume("login-account", "k", 2, 900))
+        .isInstanceOf(RateLimitResult.Allowed.class);
+    assertThat(service.tryConsume("login-account", "k", 2, 900))
+        .isInstanceOf(RateLimitResult.Allowed.class);
+    assertThat(service.tryConsume("login-account", "k", 2, 900))
+        .isInstanceOf(RateLimitResult.Rejected.class);
+  }
+
+  @Test
+  void refundOfAnUnknownBucketIsANoOp() {
+    service.refund("login-account", "never-seen");
+
+    RateLimitResult first = service.tryConsume("login-account", "never-seen", 2, 900);
+    assertThat(((RateLimitResult.Allowed) first).remainingTokens()).isEqualTo(1);
   }
 }

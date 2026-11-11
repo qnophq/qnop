@@ -30,9 +30,10 @@ import java.lang.annotation.Target;
 
 /**
  * Validates that a secret is present and strong: non-blank, at least {@value
- * SecretValidator#MIN_LENGTH} characters, and not one of the well-known placeholder/default values
- * shipped in {@code .env.example}. Drives the fail-fast requirement of issue #10 — a context bound
- * to an insecure default secret must refuse to start.
+ * SecretValidator#MIN_LENGTH} characters with at least {@value
+ * SecretValidator#MIN_DISTINCT_CHARACTERS} distinct characters (issue #927), and not one of the
+ * well-known placeholder/default values shipped in {@code .env.example}. Drives the fail-fast
+ * requirement of issue #10 — a context bound to an insecure default secret must refuse to start.
  */
 @Documented
 @Constraint(validatedBy = SecretValidator.class)
@@ -40,7 +41,9 @@ import java.lang.annotation.Target;
 @Retention(RetentionPolicy.RUNTIME)
 public @interface ValidSecret {
 
-  String message() default "must be set to a strong, non-default secret of at least 32 characters";
+  String message() default
+      "must be set to a strong, non-default secret of at least 32 characters (and at least 8"
+          + " distinct characters)";
 
   Class<?>[] groups() default {};
 

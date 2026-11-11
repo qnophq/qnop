@@ -104,7 +104,9 @@ class MyTeamsControllerIT extends AbstractIntegrationTest {
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("{\"userId\":\"%s\",\"teamRole\":\"MEMBER\"}".formatted(carol.getId())))
         .andExpect(status().isCreated())
-        .andExpect(jsonPath("$.teamRole").value("MEMBER"));
+        .andExpect(jsonPath("$.teamRole").value("MEMBER"))
+        // Names only on the member surface — never an e-mail address (issue #917).
+        .andExpect(jsonPath("$.email").doesNotExist());
 
     // Promote carol to LEAD, then demote again (a co-lead remains, so allowed).
     mockMvc
@@ -114,7 +116,8 @@ class MyTeamsControllerIT extends AbstractIntegrationTest {
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("{\"teamRole\":\"LEAD\"}"))
         .andExpect(status().isOk())
-        .andExpect(jsonPath("$.teamRole").value("LEAD"));
+        .andExpect(jsonPath("$.teamRole").value("LEAD"))
+        .andExpect(jsonPath("$.email").doesNotExist());
     mockMvc
         .perform(
             patch("/api/v1/teams/{id}/members/{uid}", teamId, carol.getId())
@@ -169,6 +172,25 @@ class MyTeamsControllerIT extends AbstractIntegrationTest {
   }
 
   @Test
+  void leadCannotEnrolADisabledAccount() throws Exception {
+    String admin = token(createUser("root", UserRole.ADMIN));
+    User lead = createUser("lead", UserRole.MEMBER);
+    User dormant = createUser("dormant", UserRole.MEMBER);
+    dormant.setEnabled(false);
+    userRepository.saveAndFlush(dormant);
+    String teamId = createTeam(admin, "Core", lead);
+
+    // Same answer as an unknown user id: the lead surface reveals nothing about account state.
+    mockMvc
+        .perform(
+            post("/api/v1/teams/{id}/members", teamId)
+                .header("Authorization", bearer(token("lead")))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"userId\":\"%s\",\"teamRole\":\"MEMBER\"}".formatted(dormant.getId())))
+        .andExpect(status().isNotFound());
+  }
+
+  @Test
   void plainMemberCanViewButNotManage() throws Exception {
     String admin = token(createUser("root", UserRole.ADMIN));
     User lead = createUser("lead", UserRole.MEMBER);
@@ -192,7 +214,8 @@ class MyTeamsControllerIT extends AbstractIntegrationTest {
         .andExpect(jsonPath("$.viewerRole").value("MEMBER"))
         .andExpect(jsonPath("$.viewerCanManage").value(false))
         .andExpect(jsonPath("$.members").isArray())
-        .andExpect(jsonPath("$.members[?(@.displayName == 'lead')].slug").exists());
+        .andExpect(jsonPath("$.members[?(@.displayName == 'lead')].slug").exists())
+        .andExpect(jsonPath("$.members[*].email").isEmpty());
 
     // ...and every management action is refused.
     mockMvc

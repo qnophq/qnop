@@ -25,6 +25,7 @@ import io.qnop.entity.UserSource;
 import io.qnop.repository.UserRepository;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.function.Predicate;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -42,6 +43,12 @@ public class AuthService {
   private final TokenRevocationService tokenRevocationService;
   private final RefreshTokenService refreshTokenService;
 
+  /**
+   * A hash of a random, never-disclosed secret, compared against on every login that has no usable
+   * stored hash (issue #903), so every path pays exactly one password comparison.
+   */
+  private final String dummyPasswordHash;
+
   public AuthService(
       UserRepository userRepository,
       PasswordEncoder passwordEncoder,
@@ -51,30 +58,53 @@ public class AuthService {
     this.passwordEncoder = passwordEncoder;
     this.tokenRevocationService = tokenRevocationService;
     this.refreshTokenService = refreshTokenService;
+    this.dummyPasswordHash = passwordEncoder.encode(UUID.randomUUID().toString());
   }
 
   /**
    * Verifies local credentials. Accepts the username or the (case-insensitive) email. Returns the
    * user id on success, or empty on any failure (unknown user, disabled, wrong password) — the
    * caller must not distinguish the reasons.
+   *
+   * <p>Exactly one password comparison runs on every path (issue #903): an unknown, disabled or
+   * password-less account is compared against a dummy hash, so the response time does not reveal
+   * whether an account exists.
    */
   @Transactional(readOnly = true)
   public Optional<UUID> authenticate(String usernameOrEmail, String password) {
-    User user =
-        userRepository
-            .findByUsernameAndSource(usernameOrEmail, UserSource.INTERNAL)
-            .or(
-                () ->
-                    userRepository.findByEmailIgnoreCaseAndSource(
-                        usernameOrEmail, UserSource.INTERNAL))
-            .orElse(null);
-    if (user == null
-        || !user.isEnabled()
-        || user.getPasswordHash() == null
-        || !passwordEncoder.matches(password, user.getPasswordHash())) {
+    return authenticate(usernameOrEmail, password, account -> true);
+  }
+
+  /**
+   * {@link #authenticate(String, String)} with a gate consulted between the account lookup and the
+   * password comparison (issue #899): it receives the id of the local account the identifier
+   * resolves to (empty when none), so a per-account login throttle keys on exactly the account the
+   * credential check means, whichever of username or e-mail spelling was used, without a second
+   * lookup. The gate may throw to refuse the attempt outright, or return {@code false} to fail it
+   * silently; the password comparison runs either way, so a silent refusal takes as long as a real
+   * one.
+   */
+  @Transactional(readOnly = true)
+  public Optional<UUID> authenticate(
+      String usernameOrEmail, String password, Predicate<Optional<UUID>> gate) {
+    User user = findLocalAccount(usernameOrEmail).orElse(null);
+    boolean admitted = gate.test(Optional.ofNullable(user).map(User::getId));
+    boolean usable = user != null && user.isEnabled() && user.getPasswordHash() != null;
+    boolean matches =
+        passwordEncoder.matches(password, usable ? user.getPasswordHash() : dummyPasswordHash);
+    return admitted && usable && matches ? Optional.of(user.getId()) : Optional.empty();
+  }
+
+  private Optional<User> findLocalAccount(String usernameOrEmail) {
+    if (usernameOrEmail == null) {
       return Optional.empty();
     }
-    return Optional.of(user.getId());
+    return userRepository
+        .findByUsernameAndSource(usernameOrEmail, UserSource.INTERNAL)
+        .or(
+            () ->
+                userRepository.findByEmailIgnoreCaseAndSource(
+                    usernameOrEmail, UserSource.INTERNAL));
   }
 
   /**

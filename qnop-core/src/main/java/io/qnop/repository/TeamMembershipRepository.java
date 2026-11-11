@@ -58,6 +58,17 @@ public interface TeamMembershipRepository extends JpaRepository<TeamMembership, 
           + "WHERE m.teamId = :teamId ORDER BY LOWER(u.displayName)")
   List<TeamMemberProjection> findMembersByTeamId(@Param("teamId") UUID teamId);
 
+  /**
+   * {@link #findMembersByTeamId} without disabled accounts, for surfaces outside team management
+   * (the principal directory, issue #918) where a disabled user is not served.
+   */
+  @Query(
+      "SELECT new io.qnop.repository.TeamMemberProjection("
+          + "m.id, u.id, u.displayName, u.slug, u.email, m.teamRole, m.joinedAt) "
+          + "FROM TeamMembership m JOIN User u ON u.id = m.userId "
+          + "WHERE m.teamId = :teamId AND u.enabled = true ORDER BY LOWER(u.displayName)")
+  List<TeamMemberProjection> findEnabledMembersByTeamId(@Param("teamId") UUID teamId);
+
   /** Member counts for a set of teams, to populate the list without an N+1. */
   @Query(
       "SELECT new io.qnop.repository.TeamMemberCount(m.teamId, COUNT(m)) "

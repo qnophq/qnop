@@ -52,7 +52,9 @@ import tools.jackson.databind.json.JsonMapper;
  * secret}, {@code password}, {@code key}, {@code token} or {@code salt} is emitted as a {@link
  * ConfigurationValueType#SECRET} entry carrying only a {@code configured} flag — the value never
  * enters the response. Terminal-token matching avoids false positives ({@code key-prefix}, {@code
- * password-change-required}); {@link #SECRET_ALLOW_LIST} documents deliberate exemptions.
+ * password-change-required}); {@link #SECRET_ALLOW_LIST} documents deliberate exemptions. A
+ * trailing rotation qualifier ({@code previous}, issue #927) is looked through, so {@code
+ * encryption-key-previous} is judged by {@code key}.
  */
 @Component
 public class ConfigurationTreeBuilder {
@@ -67,6 +69,12 @@ public class ConfigurationTreeBuilder {
    * rather than by weakening the terminal-token rule.
    */
   private static final Set<String> SECRET_ALLOW_LIST = Set.of();
+
+  /**
+   * Trailing qualifiers that name a variant of a property rather than what it holds (issue #927):
+   * {@code encryption-key-previous} is still a key.
+   */
+  private static final Set<String> QUALIFIER_TOKENS = Set.of("previous");
 
   private final JsonMapper mapper =
       JsonMapper.builder()
@@ -163,9 +171,12 @@ public class ConfigurationTreeBuilder {
     // a hypothetical `key-prefix` (prefix) do not.
     int lastDot = path.lastIndexOf('.');
     String lastSegment = lastDot < 0 ? path : path.substring(lastDot + 1);
-    int lastDash = lastSegment.lastIndexOf('-');
-    String terminal = lastDash < 0 ? lastSegment : lastSegment.substring(lastDash + 1);
-    return SECRET_TOKENS.contains(terminal);
+    String[] tokens = lastSegment.split("-");
+    int terminal = tokens.length - 1;
+    while (terminal > 0 && QUALIFIER_TOKENS.contains(tokens[terminal])) {
+      terminal--;
+    }
+    return SECRET_TOKENS.contains(tokens[terminal]);
   }
 
   /** Boot's relaxed-binding convention: uppercase, dots and dashes to underscores (see docs). */

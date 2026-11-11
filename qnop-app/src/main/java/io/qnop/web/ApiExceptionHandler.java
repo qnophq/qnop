@@ -22,6 +22,7 @@ package io.qnop.web;
 
 import io.qnop.api.v1.model.ErrorResponse;
 import io.qnop.api.v1.model.FieldError;
+import io.qnop.service.InvalidTextException;
 import io.qnop.service.limits.FeatureDisabledException;
 import io.qnop.service.limits.InstanceLimitExceededException;
 import jakarta.validation.ConstraintViolation;
@@ -154,6 +155,12 @@ public class ApiExceptionHandler {
                 .code(ex.code())
                 .message(ex.getMessage())
                 .timestamp(OffsetDateTime.now()));
+  }
+
+  /** A single-line text field holds control characters (issue #909). */
+  @ExceptionHandler(InvalidTextException.class)
+  ResponseEntity<ErrorResponse> invalidText(InvalidTextException ex) {
+    return validationError(List.of(new FieldError().field(ex.field()).message(ex.getMessage())));
   }
 
   private static ResponseEntity<ErrorResponse> badRequest(String message) {

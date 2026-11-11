@@ -289,7 +289,6 @@ public class MyTeamsController implements TeamsApi {
         .displayName(v.displayName())
         .slug(v.slug())
         .avatarUrl(AvatarUrls.forUser(v.userId(), avatarUpdatedAt))
-        .email(v.email())
         .teamRole(TeamRole.fromValue(v.teamRole()))
         .joinedAt(toOffset(v.joinedAt()));
   }

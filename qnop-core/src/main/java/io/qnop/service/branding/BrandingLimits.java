@@ -20,6 +20,7 @@
  */
 package io.qnop.service.branding;
 
+import io.qnop.service.image.PixelBudget;
 import java.util.Set;
 
 /**
@@ -43,4 +44,8 @@ public final class BrandingLimits {
 
   /** Maximum raster width/height in pixels; logos beyond this are almost certainly a mistake. */
   public static final int MAX_DIMENSION_PX = 2000;
+
+  /** The decode budget: each side and the total pixel count (issue #906). */
+  public static final PixelBudget PIXEL_BUDGET =
+      new PixelBudget(MAX_DIMENSION_PX, (long) MAX_DIMENSION_PX * MAX_DIMENSION_PX);
 }

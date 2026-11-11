@@ -140,6 +140,12 @@ jobs:
         env:
           QNOP_API_URL: http://localhost:8080
         run: scripts/e2e-docker.sh
+      # The office converter end to end (issue #908): DOCX ingest and the PDF
+      # export through the image's LibreOffice, with the isolated environment and
+      # hardened profile. After the screenshot run, so its extra review cannot
+      # change a baseline.
+      - name: Run office converter smoke test
+        run: bash scripts/smoke-office.sh
       # The report carries the diff images and traces of any failure — the only
       # way to judge a screenshot mismatch, and the input for updating a baseline.
       - name: Upload the Playwright report

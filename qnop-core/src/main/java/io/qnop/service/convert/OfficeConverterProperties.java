@@ -22,6 +22,7 @@ package io.qnop.service.convert;
 
 import java.time.Duration;
 import org.springframework.boot.context.properties.ConfigurationProperties;
+import org.springframework.util.unit.DataSize;
 
 /**
  * Tunables for the out-of-process office converter (issue #639), overridable via {@code
@@ -38,13 +39,25 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
  * @param maxWait how long a conversion may wait for a free slot before it is refused (30s). Waiting
  *     is kinder than failing right up to the point where a request thread is held so long that the
  *     caller has given up; past that a refusal it can retry is the better answer.
+ * @param maxInputSize the largest document handed to the converter (100MB, issue #908). Uploads are
+ *     capped well below this; the bound exists so no caller can feed the subprocess an unbounded
+ *     file.
+ * @param maxOutputSize the largest PDF read back from the converter (256MB, issue #908). A document
+ *     that expands past this is refused instead of being read into the heap.
  */
 @ConfigurationProperties(prefix = "qnop.office")
 public record OfficeConverterProperties(
-    String binary, Duration timeout, int maxConcurrent, Duration maxWait) {
+    String binary,
+    Duration timeout,
+    int maxConcurrent,
+    Duration maxWait,
+    DataSize maxInputSize,
+    DataSize maxOutputSize) {
 
   private static final int DEFAULT_MAX_CONCURRENT = 2;
   private static final Duration DEFAULT_MAX_WAIT = Duration.ofSeconds(30);
+  private static final DataSize DEFAULT_MAX_INPUT_SIZE = DataSize.ofMegabytes(100);
+  private static final DataSize DEFAULT_MAX_OUTPUT_SIZE = DataSize.ofMegabytes(256);
 
   public OfficeConverterProperties {
     binary = binary == null || binary.isBlank() ? "soffice" : binary.strip();
@@ -53,10 +66,16 @@ public record OfficeConverterProperties(
     // Zero is left as configured: "do not wait at all" is a legitimate choice for an
     // operator who would rather have a fast refusal than a held thread.
     maxWait = maxWait == null || maxWait.isNegative() ? DEFAULT_MAX_WAIT : maxWait;
+    maxInputSize = positiveOr(maxInputSize, DEFAULT_MAX_INPUT_SIZE);
+    maxOutputSize = positiveOr(maxOutputSize, DEFAULT_MAX_OUTPUT_SIZE);
+  }
+
+  private static DataSize positiveOr(DataSize value, DataSize fallback) {
+    return value == null || value.toBytes() <= 0 ? fallback : value;
   }
 
   /** The documented defaults — for direct construction in tests and non-Spring callers. */
   public static OfficeConverterProperties defaults() {
-    return new OfficeConverterProperties(null, null, 0, null);
+    return new OfficeConverterProperties(null, null, 0, null, null, null);
   }
 }

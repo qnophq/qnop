@@ -30,6 +30,7 @@ import static org.mockito.Mockito.when;
 import io.qnop.entity.OidcProvider;
 import io.qnop.entity.OidcProviderType;
 import io.qnop.repository.OidcProviderRepository;
+import io.qnop.service.http.HttpClientProperties;
 import io.qnop.service.limits.FeatureToggleProperties;
 import io.qnop.service.oidc.OidcProviderService.OidcDiscoveryOutcome;
 import io.qnop.service.oidc.OidcProviderService.OidcProviderPatch;
@@ -54,9 +55,38 @@ class OidcProviderServiceTest {
   @BeforeEach
   void setUp() {
     // Use the real SSRF policy so its rules are exercised through the service.
+    OidcSsrfPolicy policy = new OidcSsrfPolicy(false);
     service =
         new OidcProviderService(
-            providers, new OidcSsrfPolicy(false), events, FeatureToggleProperties.all());
+            providers,
+            policy,
+            new OidcDiscoveryClient(
+                new OidcHttpTransport(
+                    policy, new HttpClientProperties(null, null, null, null, null))),
+            events,
+            FeatureToggleProperties.all());
+  }
+
+  @Test
+  @DisplayName("create rejects a provider name with control characters")
+  void createRejectsControlCharactersInName() {
+    org.assertj.core.api.Assertions.assertThatThrownBy(
+            () ->
+                service.create(
+                    "Goo\ngle",
+                    "GOOGLE",
+                    "client-123",
+                    "super-secret",
+                    "https://accounts.google.com",
+                    null,
+                    null,
+                    null,
+                    null,
+                    null,
+                    null,
+                    null,
+                    null))
+        .isInstanceOf(io.qnop.service.InvalidTextException.class);
   }
 
   @Test

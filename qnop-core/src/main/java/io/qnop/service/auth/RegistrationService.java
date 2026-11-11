@@ -24,6 +24,7 @@ import io.qnop.entity.User;
 import io.qnop.entity.UserRole;
 import io.qnop.service.ApplicationSettingKey;
 import io.qnop.service.ApplicationSettingsService;
+import io.qnop.service.InvalidTextException;
 import io.qnop.service.UserService;
 import io.qnop.service.mail.MailLocaleResolver;
 import io.qnop.service.mail.MailService;
@@ -69,6 +70,8 @@ public class RegistrationService {
    */
   @Transactional
   public void register(String username, String email, String password, String displayName) {
+    // Before the existence check, so the answer depends on the input alone (anti-enumeration).
+    InvalidTextException.requireNoControlCharacters("displayName", displayName);
     if (userService.internalUserExists(username, email)) {
       return;
     }

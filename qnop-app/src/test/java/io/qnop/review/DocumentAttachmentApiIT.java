@@ -25,6 +25,7 @@ import static org.hamcrest.Matchers.startsWith;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -35,8 +36,11 @@ import io.qnop.entity.ReviewParticipant;
 import io.qnop.repository.DocumentRepository;
 import io.qnop.repository.ReviewParticipantRepository;
 import io.qnop.testsupport.SeededIntegrationTest;
+import java.nio.ByteBuffer;
+import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
 import java.util.UUID;
+import java.util.zip.CRC32;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.MediaType;
@@ -54,17 +58,35 @@ import org.springframework.test.web.servlet.request.MockMultipartHttpServletRequ
  */
 class DocumentAttachmentApiIT extends SeededIntegrationTest {
 
-  /** A minimal but honest PNG header followed by payload bytes. */
+  /** A minimal but honest PNG header (a 16x16 IHDR) followed by payload bytes. */
   private static final byte[] PNG_BYTES = pngBytes(64);
 
   @Autowired private DocumentRepository documents;
   @Autowired private ReviewParticipantRepository participants;
+  @Autowired private io.qnop.repository.DocumentVersionRepository versions;
 
   private static byte[] pngBytes(int size) {
+    return pngBytes(size, 16, 16);
+  }
+
+  /** {@code size} bytes: a PNG signature and an IHDR declaring the given raster, then filler. */
+  private static byte[] pngBytes(int size, int width, int height) {
     byte[] bytes = new byte[size];
-    byte[] signature = {(byte) 0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A};
-    System.arraycopy(signature, 0, bytes, 0, signature.length);
-    Arrays.fill(bytes, signature.length, size, (byte) 0x42);
+    ByteBuffer ihdr = ByteBuffer.allocate(13).putInt(width).putInt(height);
+    ihdr.put((byte) 8).put((byte) 6);
+    CRC32 crc = new CRC32();
+    crc.update("IHDR".getBytes(StandardCharsets.US_ASCII));
+    crc.update(ihdr.array());
+    byte[] header =
+        ByteBuffer.allocate(33)
+            .put(new byte[] {(byte) 0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A})
+            .putInt(13)
+            .put("IHDR".getBytes(StandardCharsets.US_ASCII))
+            .put(ihdr.array())
+            .putInt((int) crc.getValue())
+            .array();
+    System.arraycopy(header, 0, bytes, 0, header.length);
+    Arrays.fill(bytes, header.length, size, (byte) 0x42);
     return bytes;
   }
 
@@ -142,6 +164,33 @@ class DocumentAttachmentApiIT extends SeededIntegrationTest {
   }
 
   @Test
+  void servesANonAsciiFileNameAsUtf8ExtendedParameter() throws Exception {
+    UUID documentId = seedDocument();
+
+    byte[] pdf = "%PDF-1.7 fake but honest header".getBytes();
+    String json =
+        mockMvc
+            .perform(as(uploadRequest(documentId, pdf, "Prüfbericht €.pdf"), AUDITOR_ID))
+            .andExpect(status().isCreated())
+            .andReturn()
+            .getResponse()
+            .getContentAsString();
+    String url = JsonPath.read(json, "$.url");
+
+    String disposition =
+        mockMvc
+            .perform(as(get(url), MEMBER_ID))
+            .andExpect(status().isOk())
+            .andReturn()
+            .getResponse()
+            .getHeader("Content-Disposition");
+    // RFC 5987/6266: the name travels percent-encoded as UTF-8, never as raw non-Latin-1 bytes.
+    assertThat(disposition)
+        .startsWith("attachment")
+        .contains("filename*=UTF-8''Pr%C3%BCfbericht%20%E2%82%AC.pdf");
+  }
+
+  @Test
   void collapsesUnknownBytesToOctetStreamRegardlessOfTheDeclaredName() throws Exception {
     UUID documentId = seedDocument();
 
@@ -172,6 +221,16 @@ class DocumentAttachmentApiIT extends SeededIntegrationTest {
     mockMvc
         .perform(as(uploadRequest(documentId, tooBig, "huge.png"), AUDITOR_ID))
         .andExpect(status().isPayloadTooLarge());
+  }
+
+  @Test
+  void storesAnImageDeclaringMoreThanThePixelBudgetAsDownloadOnly() throws Exception {
+    UUID documentId = seedDocument();
+    byte[] declared = pngBytes(64, 20_000, 20_000);
+    mockMvc
+        .perform(as(uploadRequest(documentId, declared, "wide.png"), AUDITOR_ID))
+        .andExpect(status().isCreated())
+        .andExpect(jsonPath("$.contentType").value("application/octet-stream"));
   }
 
   @Test
@@ -207,6 +266,70 @@ class DocumentAttachmentApiIT extends SeededIntegrationTest {
                 .content(
                     "{\"values\":{\"upload.attachment_max_file_size_mb\":\"" + megabytes + "\"}}"))
         .andExpect(status().isOk());
+  }
+
+  @Test
+  void privateThreadsKeepTheirAttachmentsToTheirOwnAudience() throws Exception {
+    // The policy is fixed at creation (the column is not updatable).
+    Document document = new Document(MEMBER_ID, "Private review");
+    document.setThreadParticipation(io.qnop.entity.ThreadParticipation.PRIVATE);
+    UUID documentId = documents.save(document).getId();
+    participants.save(ReviewParticipant.forUser(documentId, AUDITOR_ID));
+    participants.save(ReviewParticipant.forUser(documentId, MEMBER2_ID));
+    versions.save(
+        new io.qnop.entity.DocumentVersion(
+            documentId, 1, "sha256/aa/deadbeef", "deadbeef", "application/pdf", 1234L, MEMBER_ID));
+
+    // AUDITOR's file, embedded in AUDITOR's own PRIVATE thread.
+    String auditorUrl = upload(documentId, AUDITOR_ID);
+    createAnnotation(documentId, AUDITOR_ID, "see ![shot](" + auditorUrl + ")");
+
+    mockMvc.perform(as(get(auditorUrl), AUDITOR_ID)).andExpect(status().isOk());
+    mockMvc.perform(as(get(auditorUrl), MEMBER_ID)).andExpect(status().isOk());
+    // Another reviewer cannot see that thread, so neither its file (#921).
+    mockMvc.perform(as(get(auditorUrl), MEMBER2_ID)).andExpect(status().isNotFound());
+
+    // Referencing a foreign file in one's own thread does not grant access to it.
+    String member2Thread =
+        createAnnotation(documentId, MEMBER2_ID, "reference ![x](" + auditorUrl + ")");
+    mockMvc.perform(as(get(auditorUrl), MEMBER2_ID)).andExpect(status().isNotFound());
+
+    // A file the owner shares in MEMBER2's thread is readable by MEMBER2.
+    String ownerUrl = upload(documentId, MEMBER_ID);
+    mockMvc.perform(as(get(ownerUrl), MEMBER2_ID)).andExpect(status().isNotFound());
+    mockMvc
+        .perform(
+            as(post("/api/v1/annotations/" + member2Thread + "/comments"), MEMBER_ID)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"body\":\"here ![y](" + ownerUrl + ")\"}"))
+        .andExpect(status().isCreated());
+    mockMvc.perform(as(get(ownerUrl), MEMBER2_ID)).andExpect(status().isOk());
+    mockMvc.perform(as(get(ownerUrl), AUDITOR_ID)).andExpect(status().isNotFound());
+  }
+
+  private String upload(UUID documentId, UUID actor) throws Exception {
+    String json =
+        mockMvc
+            .perform(as(uploadRequest(documentId, PNG_BYTES, "shot.png"), actor))
+            .andExpect(status().isCreated())
+            .andReturn()
+            .getResponse()
+            .getContentAsString();
+    return JsonPath.read(json, "$.url");
+  }
+
+  private String createAnnotation(UUID documentId, UUID actor, String comment) throws Exception {
+    String json =
+        mockMvc
+            .perform(
+                as(post("/api/v1/documents/" + documentId + "/annotations"), actor)
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content("{\"versionNumber\":1,\"comment\":\"" + comment + "\"}"))
+            .andExpect(status().isCreated())
+            .andReturn()
+            .getResponse()
+            .getContentAsString();
+    return JsonPath.read(json, "$.id");
   }
 
   @Test

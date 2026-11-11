@@ -33,6 +33,11 @@ import org.springframework.stereotype.Component;
  *
  * <p>The block can be relaxed for trusted internal IdPs with {@code
  * qnop.auth.oidc.allow-private-discovery-uris=true} (scheme validation still applies).
+ *
+ * <p>This is the save-time, DNS-free half. Every request to an OIDC provider — discovery, token,
+ * user-info, JWK set — also goes through the guarded client of {@link
+ * OidcOutboundHttpConfiguration} (issue #904), which validates each resolved address at connection
+ * time and follows no redirects.
  */
 @Component
 public class OidcSsrfPolicy {
@@ -53,5 +58,13 @@ public class OidcSsrfPolicy {
    */
   public void requirePublicHttpUri(String value, String fieldName, boolean required) {
     OutboundUriGuard.requireAllowedHttpUri(value, fieldName, required, allowPrivate);
+  }
+
+  /**
+   * Whether this deployment opted in to private IdPs. Also governs the connection-time check of the
+   * OIDC HTTP clients ({@link OidcOutboundHttpConfiguration}, issue #904).
+   */
+  public boolean allowsPrivate() {
+    return allowPrivate;
   }
 }

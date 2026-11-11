@@ -23,6 +23,7 @@ package io.qnop.service.oidc;
 import io.qnop.entity.OidcProvider;
 import io.qnop.entity.OidcProviderType;
 import io.qnop.repository.OidcProviderRepository;
+import io.qnop.service.InvalidTextException;
 import io.qnop.service.limits.FeatureDisabledException;
 import io.qnop.service.limits.FeatureToggleProperties;
 import java.util.List;
@@ -31,7 +32,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.security.oauth2.client.registration.ClientRegistration;
-import org.springframework.security.oauth2.client.registration.ClientRegistrations;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -58,16 +58,19 @@ public class OidcProviderService {
 
   private final OidcProviderRepository providers;
   private final OidcSsrfPolicy ssrfPolicy;
+  private final OidcDiscoveryClient discovery;
   private final ApplicationEventPublisher events;
 
   public OidcProviderService(
       OidcProviderRepository providers,
       OidcSsrfPolicy ssrfPolicy,
+      OidcDiscoveryClient discovery,
       ApplicationEventPublisher events,
       FeatureToggleProperties features) {
     this.features = features;
     this.providers = providers;
     this.ssrfPolicy = ssrfPolicy;
+    this.discovery = discovery;
     this.events = events;
   }
 
@@ -126,15 +129,13 @@ public class OidcProviderService {
       return OidcDiscoveryOutcome.failure(e.getMessage());
     }
     try {
-      // fromIssuerLocation fetches the discovery document and pre-fills the endpoints; build()
-      // still validates a registrationId + clientId, which a pure endpoint probe does not have.
+      // The discovery client fetches the document (guarded, issue #904) and pre-fills the
+      // endpoints; build() still validates a registrationId + clientId, which a pure endpoint probe
+      // does not have.
       // Supply throwaway placeholders so the build succeeds without the operator's real
       // credentials.
       ClientRegistration registration =
-          ClientRegistrations.fromIssuerLocation(trimmed)
-              .registrationId("discovery")
-              .clientId("discovery")
-              .build();
+          discovery.fromIssuer(trimmed).registrationId("discovery").clientId("discovery").build();
       ClientRegistration.ProviderDetails details = registration.getProviderDetails();
       return new OidcDiscoveryOutcome(
           true,
@@ -152,7 +153,7 @@ public class OidcProviderService {
   /**
    * A discovery-failure message that keeps the actionable hint and appends the underlying cause.
    * Discovery is an admin-only probe against an operator-supplied issuer, so the cause (a Spring
-   * {@code ClientRegistrations} message, e.g. an unreachable issuer or a malformed document) aids
+   * {@code OidcDiscoveryClient} message, e.g. an unreachable issuer or a malformed document) aids
    * diagnosis without leaking qnop internals.
    */
   private static String discoveryFailureMessage(Throwable cause) {
@@ -180,6 +181,7 @@ public class OidcProviderService {
     // Configuring a capability this deployment does not have would be a form
     // that changes nothing (issue #674).
     requireOidcEnabled();
+    InvalidTextException.requireNoControlCharacters("name", name); // issue #909
     if (providers.findByName(name).isPresent()) {
       throw new OidcProviderConflictException(
           "NAME_TAKEN", "A provider with that name already exists.");
@@ -221,6 +223,7 @@ public class OidcProviderService {
       provider.setEnabled(patch.enabled());
     }
     if (isSet(patch.name())) {
+      InvalidTextException.requireNoControlCharacters("name", patch.name());
       provider.setName(patch.name().trim());
     }
     if (isSet(patch.clientId())) {

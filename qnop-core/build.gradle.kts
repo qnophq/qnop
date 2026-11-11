@@ -58,6 +58,11 @@ dependencies {
     // for endpoint discovery. The browser login flow is wired in qnop-app (PR B).
     implementation(libs.spring.boot.starter.oauth2.client)
 
+    // Guarded outbound HTTP (issue #904, ADR-0056 amendment): the OIDC and tracking
+    // clients resolve the destination through a DNS hook that validates every
+    // address and connects to exactly the validated ones — no check-then-use gap.
+    implementation(libs.httpclient5)
+
     // Mail subsystem (issue #19): runtime SMTP (JavaMailSender) + logic-less
     // Mustache rendering of DB-stored, admin-editable templates.
     implementation(libs.spring.boot.starter.mail)

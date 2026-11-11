@@ -24,6 +24,7 @@ import io.qnop.entity.ApplicationSetting;
 import io.qnop.entity.AuditEvent;
 import io.qnop.repository.ApplicationSettingRepository;
 import io.qnop.repository.AuditEventRepository;
+import io.qnop.security.SecretDecryptionException;
 import io.qnop.service.limits.FeatureDisabledException;
 import io.qnop.service.limits.FeatureToggleProperties;
 import jakarta.annotation.PostConstruct;
@@ -40,6 +41,8 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.security.crypto.encrypt.TextEncryptor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.PlatformTransactionManager;
@@ -69,6 +72,8 @@ public class ApplicationSettingsService {
   private static final String AUDIT_SETTING_UPDATED = "settings.updated";
 
   private static final ObjectMapper MAPPER = JsonMapper.builder().build();
+
+  private static final Logger log = LoggerFactory.getLogger(ApplicationSettingsService.class);
 
   private static final int MAX_WRITE_ATTEMPTS = 3;
 
@@ -373,9 +378,26 @@ public class ApplicationSettingsService {
     return value;
   }
 
+  /**
+   * Decrypts a stored secret for the snapshot. A value no configured key can decrypt (issue #927)
+   * is treated as unset — with a loud, value-free error — instead of failing the snapshot build,
+   * which would refuse to boot the instance (or break every later settings write) over one setting.
+   * The stored ciphertext is left as it is: restoring the right key recovers it, and an
+   * administrator can simply enter the secret again. The startup re-encryption pass also records it
+   * in the SYSTEM audit trail.
+   */
   private String decryptIfSecret(ApplicationSettingKey key, String value) {
     if (key.isSensitive() && value != null && !value.isBlank()) {
-      return textEncryptor.decrypt(value);
+      try {
+        return textEncryptor.decrypt(value);
+      } catch (SecretDecryptionException e) {
+        log.error(
+            "Setting '{}' could not be decrypted with any configured encryption key and is treated"
+                + " as unset: {}",
+            key.getKey(),
+            e.getMessage());
+        return null;
+      }
     }
     return value;
   }

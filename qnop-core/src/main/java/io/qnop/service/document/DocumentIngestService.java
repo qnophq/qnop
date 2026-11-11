@@ -31,6 +31,7 @@ import io.qnop.repository.DocumentRepository;
 import io.qnop.repository.DocumentVersionRepository;
 import io.qnop.service.ApplicationSettingKey;
 import io.qnop.service.ApplicationSettingsService;
+import io.qnop.service.ControlCharacters;
 import io.qnop.service.job.JobPayload;
 import io.qnop.service.job.JobPayloadCodec;
 import io.qnop.service.job.JobService;
@@ -294,6 +295,12 @@ public class DocumentIngestService {
     String trimmed = title == null ? "" : title.trim();
     if (trimmed.isEmpty()) {
       throw DocumentValidationException.invalidRequest("title is required");
+    }
+    if (ControlCharacters.contains(trimmed)) {
+      // A title is one line wherever it goes — mail subjects, file names, report
+      // headers — so a line break or control character is refused here (issue #909).
+      throw DocumentValidationException.invalidField(
+          "title", "title must not contain control characters or line breaks");
     }
     if (trimmed.length() > MAX_TITLE_LENGTH) {
       throw DocumentValidationException.invalidRequest(

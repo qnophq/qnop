@@ -20,7 +20,7 @@
  */
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { csrfHeaders, performRefresh } from './refresh';
+import { REFRESH_LOCK, csrfHeaders, performRefresh } from './refresh';
 
 function setCookie(value: string) {
   Object.defineProperty(document, 'cookie', { value, writable: true, configurable: true });
@@ -85,5 +85,87 @@ describe('refresh', () => {
     expect(a).toBe('one');
     expect(b).toBe('one');
     expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  describe('across tabs (#902)', () => {
+    const originalLocks = Object.getOwnPropertyDescriptor(navigator, 'locks');
+
+    afterEach(() => {
+      if (originalLocks) {
+        Object.defineProperty(navigator, 'locks', originalLocks);
+      } else {
+        delete (navigator as { locks?: unknown }).locks;
+      }
+    });
+
+    function stubLocks(request: (name: string, cb: () => Promise<unknown>) => Promise<unknown>) {
+      Object.defineProperty(navigator, 'locks', {
+        value: { request: vi.fn(request) },
+        configurable: true,
+      });
+      return navigator.locks.request as unknown as ReturnType<typeof vi.fn>;
+    }
+
+    it('holds the cross-tab refresh lock for the whole request', async () => {
+      setCookie('XSRF-TOKEN=t');
+      let lockHeld = false;
+      const fetchMock = vi.fn().mockImplementation(() => {
+        expect(lockHeld).toBe(true);
+        return Promise.resolve(jsonResponse({ accessToken: 'locked' }));
+      });
+      vi.stubGlobal('fetch', fetchMock);
+      const request = stubLocks(async (_name, cb) => {
+        lockHeld = true;
+        try {
+          return await cb();
+        } finally {
+          lockHeld = false;
+        }
+      });
+
+      expect(await performRefresh()).toBe('locked');
+      expect(request).toHaveBeenCalledTimes(1);
+      expect(request.mock.calls[0][0]).toBe(REFRESH_LOCK);
+    });
+
+    it('a waiting tab refreshes only after the holder finished, with the rotated cookie', async () => {
+      // Simulate another tab holding the lock: our callback runs only once it is released,
+      // by which time the shared cookie jar holds the rotated refresh cookie.
+      setCookie('XSRF-TOKEN=t');
+      let release!: () => void;
+      const otherTabDone = new Promise<void>((resolve) => {
+        release = resolve;
+      });
+      const sentCookies: string[] = [];
+      vi.stubGlobal(
+        'fetch',
+        vi.fn().mockImplementation(() => {
+          sentCookies.push(document.cookie);
+          return Promise.resolve(jsonResponse({ accessToken: 'after-wait' }));
+        }),
+      );
+      stubLocks(async (_name, cb) => {
+        await otherTabDone;
+        return cb();
+      });
+
+      const pending = performRefresh();
+      await Promise.resolve();
+      expect(sentCookies).toHaveLength(0);
+
+      setCookie('XSRF-TOKEN=t; qnop_refresh=rotated-by-other-tab');
+      release();
+
+      expect(await pending).toBe('after-wait');
+      expect(sentCookies).toEqual(['XSRF-TOKEN=t; qnop_refresh=rotated-by-other-tab']);
+    });
+
+    it('falls back to an unserialised refresh without the Web Locks API', async () => {
+      setCookie('XSRF-TOKEN=t');
+      Object.defineProperty(navigator, 'locks', { value: undefined, configurable: true });
+      vi.stubGlobal('fetch', vi.fn().mockResolvedValue(jsonResponse({ accessToken: 'plain' })));
+
+      expect(await performRefresh()).toBe('plain');
+    });
   });
 });
