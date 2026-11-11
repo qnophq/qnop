@@ -60,14 +60,7 @@ public class AuthService {
    */
   @Transactional(readOnly = true)
   public Optional<UUID> authenticate(String usernameOrEmail, String password) {
-    User user =
-        userRepository
-            .findByUsernameAndSource(usernameOrEmail, UserSource.INTERNAL)
-            .or(
-                () ->
-                    userRepository.findByEmailIgnoreCaseAndSource(
-                        usernameOrEmail, UserSource.INTERNAL))
-            .orElse(null);
+    User user = findLocalAccount(usernameOrEmail).orElse(null);
     if (user == null
         || !user.isEnabled()
         || user.getPasswordHash() == null
@@ -75,6 +68,29 @@ public class AuthService {
       return Optional.empty();
     }
     return Optional.of(user.getId());
+  }
+
+  /**
+   * The id of the local account {@link #authenticate} would check for {@code usernameOrEmail} —
+   * exactly the same lookup, so a caller keying something per account (the login throttle, issue
+   * #899) agrees with the credential check on which account is meant, whichever of username or
+   * e-mail spelling was used. Says nothing about whether the account may sign in.
+   */
+  @Transactional(readOnly = true)
+  public Optional<UUID> findLocalAccountId(String usernameOrEmail) {
+    return findLocalAccount(usernameOrEmail).map(User::getId);
+  }
+
+  private Optional<User> findLocalAccount(String usernameOrEmail) {
+    if (usernameOrEmail == null) {
+      return Optional.empty();
+    }
+    return userRepository
+        .findByUsernameAndSource(usernameOrEmail, UserSource.INTERNAL)
+        .or(
+            () ->
+                userRepository.findByEmailIgnoreCaseAndSource(
+                    usernameOrEmail, UserSource.INTERNAL));
   }
 
   /**

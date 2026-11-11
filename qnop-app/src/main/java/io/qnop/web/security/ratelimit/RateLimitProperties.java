@@ -48,8 +48,10 @@ import org.springframework.boot.context.properties.bind.DefaultValue;
  *     3600s)
  * @param resetPassword IP-keyed limit for {@code POST /api/v1/auth/reset-password} (default 5 /
  *     900s)
- * @param loginAccount per-account limit on <em>failed</em> logins for one username / e-mail
- *     (default 10 / 900s); a successful login gives its token back
+ * @param loginAccountNetwork limit on <em>failed</em> logins to one account from one client network
+ *     (IPv4 /24, IPv6 /64) (default 10 / 900s); a successful login gives its token back
+ * @param loginAccount overall ceiling on <em>failed</em> logins to one account from all networks
+ *     together (default 100 / 3600s); deliberately much higher than {@code loginAccountNetwork}
  * @param registerEmail per-e-mail limit for registrations (default 5 / 3600s)
  * @param forgotPasswordEmail per-e-mail limit for reset requests (default 5 / 3600s)
  * @param resetPasswordToken per-token limit for reset attempts (default 10 / 3600s)
@@ -66,6 +68,7 @@ public record RateLimitProperties(
     Limit register,
     Limit forgotPassword,
     Limit resetPassword,
+    Limit loginAccountNetwork,
     Limit loginAccount,
     Limit registerEmail,
     Limit forgotPasswordEmail,
@@ -83,7 +86,8 @@ public record RateLimitProperties(
     register = register != null ? register : new Limit(5, 3600);
     forgotPassword = forgotPassword != null ? forgotPassword : new Limit(5, 3600);
     resetPassword = resetPassword != null ? resetPassword : new Limit(5, 900);
-    loginAccount = loginAccount != null ? loginAccount : new Limit(10, 900);
+    loginAccountNetwork = loginAccountNetwork != null ? loginAccountNetwork : new Limit(10, 900);
+    loginAccount = loginAccount != null ? loginAccount : new Limit(100, 3600);
     registerEmail = registerEmail != null ? registerEmail : new Limit(5, 3600);
     forgotPasswordEmail = forgotPasswordEmail != null ? forgotPasswordEmail : new Limit(5, 3600);
     resetPasswordToken = resetPasswordToken != null ? resetPasswordToken : new Limit(10, 3600);

@@ -83,7 +83,7 @@ The auth rate limits (login, refresh, registration, password reset — ADR-0027)
 - Make sure the proxy closest to the client does not trust an incoming `X-Forwarded-For` blindly unless it, too, sits behind trusted infrastructure.
 - `QNOP_HTTP_FORWARD_HEADERS_STRATEGY=framework` is a separate setting: it controls scheme/host for redirects and cookies, not the rate-limit IP.
 
-Besides the per-IP limits, login, registration, password-reset request and password reset are also throttled per account / e-mail address / reset token, so spreading attempts over many addresses does not lift the limit. All limits are tunable under `qnop.auth.rate-limit.*` (see ADR-0027).
+Besides the per-IP limits, login, registration, password-reset request and password reset are also throttled per account / e-mail address / reset token, so spreading attempts over many addresses does not lift the limit. Failed logins are counted per account and client network first, so failures from one network do not lock the account's owner out elsewhere; a much higher per-account ceiling across all networks bounds the rest. A `WARN` line `Login ceiling reached for account …` means that ceiling was hit — worth a look. All limits are tunable under `qnop.auth.rate-limit.*` (see ADR-0027).
 
 ## Upgrades
 

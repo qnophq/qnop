@@ -38,6 +38,18 @@ public final class RateLimitPropertiesFixture {
   /** All scopes at their defaults, with the given trusted-proxy CIDRs. */
   public static RateLimitProperties withTrustedProxies(List<String> trustedProxyCidrs) {
     return new RateLimitProperties(
-        trustedProxyCidrs, null, null, null, null, null, null, null, null, null, null, 100_000L);
+        trustedProxyCidrs,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        100_000L);
   }
 }

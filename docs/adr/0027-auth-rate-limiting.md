@@ -102,7 +102,8 @@ using many source addresses was not limited at all. They now exist next to the p
 
 | Scope (`qnop.auth.rate-limit.*`) | Key | Default | Counts |
 |---|---|---|---|
-| `login-account` | username / e-mail | 10 / 900s | failed attempts only |
+| `login-account-network` | account × client network (IPv4 /24, IPv6 /64) | 10 / 900s | failed attempts only |
+| `login-account` | account, all networks together | 100 / 3600s | failed attempts only |
 | `register-email` | e-mail | 5 / 3600s | every attempt |
 | `forgot-password-email` | e-mail | 5 / 3600s | every attempt |
 | `reset-password-token` | reset token | 10 / 3600s | every attempt |
@@ -114,18 +115,39 @@ above already named; `forgot-password` keeps its existing per-IP filter.
 - **Enforced in the controller**, as the context section anticipated: the filters never read the
   body, and buffering and re-parsing it in a filter is not worth it. `AuthIdentifierRateLimiter`
   is called by `AuthController`, `AuthRegistrationController` and `AuthPasswordResetController`
-  after their feature-flag checks and before any lookup; a drained bucket throws
-  `RateLimitExceededException`, rendered by `RateLimitExceptionHandler` with the *same* status,
-  `Retry-After`, code and message as that endpoint's per-IP filter.
-- **Keys are SHA-256 hashes** of the identifier after trimming and lower-casing (the reset token
-  is case-sensitive and only hashed). The raw identifier never sits in the bucket store.
-- **No enumeration.** A bucket is created for any identifier, registered or not, and checked
-  before the account is looked up, so a throttled response looks the same for a known and an
-  unknown identifier; the uniform `200`/`204` answers of register and forgot-password are kept.
-- **Login counts failures only.** A token is taken before the credential check (atomic, so
-  concurrent attempts cannot overshoot) and given back on success. While the bucket is drained
-  every attempt is refused, the correct password included — otherwise the limit would leak the
-  password. The flip side is that a third party can keep one account throttled; the refill (one
-  attempt every 90 s at the default) bounds that, and progressive delay or a lockout with
-  out-of-band unlock were not adopted.
+  after their feature-flag checks; a drained bucket throws `RateLimitExceededException`, rendered
+  by `RateLimitExceptionHandler` with the *same* status, `Retry-After`, code and message as that
+  endpoint's per-IP filter.
+- **Which account a login is charged to.** The key is the user id whenever the identifier
+  resolves to a local account, through `AuthService.findLocalAccountId` — the very lookup the
+  credential check uses (username exact, else e-mail case-insensitively). Username and e-mail of
+  one account, and every spelling the lookup accepts, therefore share one bucket. The lookup runs
+  on every attempt, known or unknown, so it adds no timing difference of its own. An identifier
+  that resolves to nothing is keyed on a hash folded the same way the lookup folds
+  (case-insensitive if it contains `@`, exact otherwise, never trimmed), and gets buckets exactly
+  like a real account, so a refusal does not distinguish the two. The one residual signal is that
+  a username and an e-mail address share a bucket only if they belong to the same account; seeing
+  it requires exhausting that bucket from one network, i.e. many failed attempts, which the
+  limits themselves bound.
+- **Login: failures only, per network first, then a generous overall ceiling.** Each attempt
+  takes a token from both login buckets before the credential check (atomic, so concurrent
+  attempts cannot overshoot); a success gives both back, so only failures count. A drained bucket
+  refuses every attempt, the correct password included — otherwise the refusal would reveal the
+  right guess. The trade-off between guessing resistance and lock-out by a third party:
+  - A single hard per-account cap would let anyone keep an account's owner out simply by failing
+    on purpose. Keying the strict bucket on account × client network confines that effect to the
+    network that produces the failures; the owner signing in from anywhere else is unaffected.
+  - The overall per-account ceiling is an order of magnitude higher. It bounds the total guesses
+    against one account per hour however many networks are used, and it is the only bucket a
+    third party can drain for everyone — which takes failures from many networks. Reaching it is
+    an attack signal operators should see in the logs, not routine.
+  - Rejected: a pure per-account hard block (trivial lock-out), progressive server-side delay
+    (ties up request threads under exactly the load it is meant to absorb), and lock-out with
+    out-of-band unlock (needs mail and an unlock flow, and still lets a third party trigger it).
+- **Register / forgot-password / reset are hard caps per e-mail / token.** They protect a mailbox
+  from being flooded, not an account from guessing, so a hard cap is right. They are scopes of
+  their own and never count against login: draining them does not stop the owner from signing in.
+  E-mail keys are trimmed and lower-cased; the reset token is case-sensitive and only hashed.
+- **Keys are SHA-256 hashes** (or the user id); the raw identifier never sits in the bucket store.
+  The uniform `200`/`204` answers of register and forgot-password are kept.
 - A breached-password check was considered and left out of scope here.

@@ -71,6 +71,7 @@ import org.springframework.test.web.servlet.MvcResult;
       "qnop.auth.rate-limit.register.max-attempts=1000000",
       "qnop.auth.rate-limit.forgot-password.max-attempts=1000000",
       "qnop.auth.rate-limit.reset-password.max-attempts=1000000",
+      "qnop.auth.rate-limit.login-account-network.max-attempts=1000000",
       "qnop.auth.rate-limit.login-account.max-attempts=1000000",
       "qnop.auth.rate-limit.register-email.max-attempts=1000000",
       "qnop.auth.rate-limit.forgot-password-email.max-attempts=1000000",

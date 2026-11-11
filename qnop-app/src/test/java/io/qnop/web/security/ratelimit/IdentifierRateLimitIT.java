@@ -48,7 +48,9 @@ import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilde
 /**
  * The per-identifier auth throttles (issue #899, ADR-0027) through the real security chain: each
  * request comes from a different client address, so the per-IP filters never fire and only the
- * identifier bucket can refuse. Low per-identifier limits, generous per-IP ones. Requires Docker.
+ * identifier buckets can refuse. {@link #perform} keeps every request in one /24, so the
+ * per-network login bucket applies; {@link #performFrom} picks the network. Low per-identifier
+ * limits, generous per-IP ones. Requires Docker.
  */
 @AutoConfigureMockMvc
 @TestPropertySource(
@@ -57,7 +59,8 @@ import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilde
       "qnop.auth.rate-limit.register.max-attempts=1000",
       "qnop.auth.rate-limit.forgot-password.max-attempts=1000",
       "qnop.auth.rate-limit.reset-password.max-attempts=1000",
-      "qnop.auth.rate-limit.login-account.max-attempts=3",
+      "qnop.auth.rate-limit.login-account-network.max-attempts=3",
+      "qnop.auth.rate-limit.login-account.max-attempts=6",
       "qnop.auth.rate-limit.register-email.max-attempts=2",
       "qnop.auth.rate-limit.forgot-password-email.max-attempts=2",
       "qnop.auth.rate-limit.reset-password-token.max-attempts=2"
@@ -77,7 +80,8 @@ class IdentifierRateLimitIT extends AbstractIntegrationTest {
   @AfterEach
   void cleanup() {
     settings.update(Map.of(REGISTRATION_KEY, "false"), null);
-    for (String username : List.of("limited-login", "limited-ok", "limited-reg")) {
+    for (String username :
+        List.of("limited-login", "limited-alias", "limited-ceiling", "limited-ok", "limited-reg")) {
       userRepository
           .findByUsernameAndSource(username, UserSource.INTERNAL)
           .ifPresent(userRepository::delete);
@@ -85,15 +89,46 @@ class IdentifierRateLimitIT extends AbstractIntegrationTest {
   }
 
   @Test
-  void failedLoginsAreCappedPerAccountAcrossClientAddresses() throws Exception {
+  void failuresFromOneNetworkAreCappedWithoutLockingTheOwnerOut() throws Exception {
     createUser("limited-login", "limited-login@example.com");
 
     for (int i = 0; i < 3; i++) {
       perform(login("limited-login", "wrong-password")).andExpect(status().isUnauthorized());
     }
 
-    // The bucket is drained: even the right password is refused, from yet another address.
+    // That network's bucket is drained: even the right password is refused from it ...
     expectRateLimited(perform(login("limited-login", PASSWORD)), LoginRateLimitFilter.MESSAGE);
+    // ... while the owner, signing in from another network, is not affected.
+    performFrom(login("limited-login", PASSWORD), "192.0.2.10").andExpect(status().isOk());
+    performFrom(login("limited-login@example.com", PASSWORD), "192.0.2.10")
+        .andExpect(status().isOk());
+  }
+
+  @Test
+  void usernameAndEmailOfOneAccountShareItsBucket() throws Exception {
+    createUser("limited-alias", "limited-alias@example.com");
+
+    perform(login("limited-alias", "wrong-password")).andExpect(status().isUnauthorized());
+    perform(login("LIMITED-ALIAS@example.com", "wrong-password"))
+        .andExpect(status().isUnauthorized());
+    perform(login("limited-alias@example.com", "wrong-password"))
+        .andExpect(status().isUnauthorized());
+
+    expectRateLimited(perform(login("limited-alias", PASSWORD)), LoginRateLimitFilter.MESSAGE);
+  }
+
+  @Test
+  void failuresAcrossNetworksHitTheOverallCeiling() throws Exception {
+    createUser("limited-ceiling", "limited-ceiling@example.com");
+
+    for (int net = 1; net <= 6; net++) {
+      performFrom(login("limited-ceiling", "wrong-password"), "203.0." + net + ".1")
+          .andExpect(status().isUnauthorized());
+    }
+
+    expectRateLimited(
+        performFrom(login("limited-ceiling", PASSWORD), "203.0.99.1"),
+        LoginRateLimitFilter.MESSAGE);
   }
 
   @Test
@@ -152,8 +187,13 @@ class IdentifierRateLimitIT extends AbstractIntegrationTest {
     userRepository.saveAndFlush(user);
   }
 
+  /** From a fresh address inside 198.51.100.0/24. */
   private ResultActions perform(MockHttpServletRequestBuilder request) throws Exception {
-    String ip = "198.51.100." + (IP_SEQ.incrementAndGet() % 250 + 1);
+    return performFrom(request, "198.51.100." + (IP_SEQ.incrementAndGet() % 250 + 1));
+  }
+
+  private ResultActions performFrom(MockHttpServletRequestBuilder request, String ip)
+      throws Exception {
     return mockMvc.perform(
         request.with(
             r -> {
