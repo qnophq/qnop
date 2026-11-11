@@ -32,6 +32,7 @@ import io.qnop.repository.AuditEventRepository;
 import io.qnop.repository.SchedulerJobRepository;
 import io.qnop.service.scheduler.SchedulerJobCatalog;
 import io.qnop.service.scheduler.SchedulerService;
+import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
@@ -87,6 +88,83 @@ class AuditChainVerificationServiceTest {
         .thenReturn(Optional.of(job));
 
     assertThat(service.lastKnownIntact()).contains(false);
+  }
+
+  /** Another application instance sharing the same database (repositories). */
+  private AuditChainVerificationService otherInstance() {
+    return new AuditChainVerificationService(
+        chain,
+        mock(AuditEventRepository.class),
+        mock(SchedulerService.class),
+        schedulerJobs,
+        mock(PlatformTransactionManager.class));
+  }
+
+  private void persisted(String outcome, Instant at) {
+    SchedulerJob job = mock(SchedulerJob.class);
+    when(job.getLastOutcome()).thenReturn(outcome);
+    when(job.getLastRunAt()).thenReturn(at);
+    when(schedulerJobs.findById(SchedulerJobCatalog.AUDIT_CHAIN_VERIFY))
+        .thenReturn(Optional.of(job));
+  }
+
+  @Test
+  @DisplayName("an earlier local 'intact' yields to a newer failure recorded by another instance")
+  void newerPersistedFailureWins() {
+    intactEmptyChain();
+    AuditChainVerificationService instanceA = service;
+    assertThat(instanceA.verify().intact()).isTrue();
+
+    // Instance B runs later, finds a break, and the scheduler persists FAILURE.
+    persisted("FAILURE", Instant.now().plusSeconds(60));
+
+    assertThat(instanceA.lastKnownIntact()).contains(false);
+    assertThat(otherInstance().lastKnownIntact()).contains(false);
+  }
+
+  @Test
+  @DisplayName("a newer local failure is not masked by an older persisted success")
+  void newerLocalFailureWins() {
+    persisted("SUCCESS", Instant.now().minusSeconds(3600));
+    when(chain.findHead()).thenThrow(new IllegalStateException("database unavailable"));
+
+    assertThatThrownBy(service::verify).isInstanceOf(IllegalStateException.class);
+
+    assertThat(service.lastKnownIntact()).contains(false);
+    assertThat(otherInstance().lastKnownIntact()).contains(true);
+  }
+
+  @Test
+  @DisplayName("a newer persisted success supersedes an older local failure")
+  void newerPersistedSuccessWins() {
+    when(chain.findHead()).thenThrow(new IllegalStateException("database unavailable"));
+    assertThatThrownBy(service::verify).isInstanceOf(IllegalStateException.class);
+
+    persisted("SUCCESS", Instant.now().plusSeconds(60));
+
+    assertThat(service.lastKnownIntact()).contains(true);
+  }
+
+  @Test
+  @DisplayName("if the persisted outcome cannot be read, the local verdict stands")
+  void persistedLookupFailureFallsBackToLocal() {
+    intactEmptyChain();
+    service.verify();
+    when(schedulerJobs.findById(SchedulerJobCatalog.AUDIT_CHAIN_VERIFY))
+        .thenThrow(new IllegalStateException("database unavailable"));
+
+    assertThat(service.lastKnownIntact()).contains(true);
+  }
+
+  @Test
+  @DisplayName("on a tie a failure wins over a success")
+  void tieFavoursFailure() {
+    Instant at = Instant.now();
+    var ok = Optional.of(new AuditChainVerificationService.Verdict(true, at));
+    var broken = Optional.of(new AuditChainVerificationService.Verdict(false, at));
+
+    assertThat(AuditChainVerificationService.newer(ok, broken)).isEqualTo(broken);
+    assertThat(AuditChainVerificationService.newer(broken, ok)).isEqualTo(broken);
   }
 
   @Test

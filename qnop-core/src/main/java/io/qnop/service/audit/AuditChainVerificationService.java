@@ -28,6 +28,7 @@ import io.qnop.repository.SchedulerJobRepository;
 import io.qnop.service.scheduler.RunOutcome;
 import io.qnop.service.scheduler.SchedulerJobCatalog;
 import io.qnop.service.scheduler.SchedulerService;
+import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 import java.util.stream.Collectors;
@@ -71,6 +72,9 @@ public class AuditChainVerificationService {
 
   private volatile AuditChainVerifier.Report lastReport;
 
+  /** When {@link #lastReport} was produced; compared with the persisted run time. */
+  private volatile Instant lastReportAt;
+
   public AuditChainVerificationService(
       AuditChainRepository chain,
       AuditEventRepository auditEvents,
@@ -100,26 +104,61 @@ public class AuditChainVerificationService {
   }
 
   /**
-   * Whether the chain was intact at the last verification known to this instance: its own last run
-   * if it has one, otherwise the outcome the scheduler persisted for the job (whichever instance
-   * ran it — so a restart does not blank the signal). Empty when no run is known or the lookup
-   * fails.
+   * Whether the chain was intact at the <em>newest</em> verification known to this instance: its
+   * own last run, or the outcome the scheduler persisted for the job by whichever instance ran it —
+   * whichever finished later. So a restart does not blank the signal, and an instance that verified
+   * earlier never keeps reporting "intact" once another instance has recorded a newer failure. If
+   * the persisted outcome cannot be read, the local verdict stands; empty when no run is known at
+   * all.
    */
   public Optional<Boolean> lastKnownIntact() {
     AuditChainVerifier.Report report = lastReport;
-    if (report != null) {
-      return Optional.of(report.intact());
-    }
+    Instant reportAt = lastReportAt;
+    Optional<Verdict> local =
+        report == null ? Optional.empty() : Optional.of(new Verdict(report.intact(), reportAt));
+    Optional<Verdict> persisted;
     try {
-      return schedulerJobs
-          .findById(SchedulerJobCatalog.AUDIT_CHAIN_VERIFY)
-          .map(job -> job.getLastOutcome())
-          .filter(outcome -> outcome != null)
-          .map(outcome -> RunOutcome.SUCCESS.name().equals(outcome));
+      persisted = persistedVerdict();
     } catch (RuntimeException e) {
       log.warn("Could not read the persisted audit-chain verification outcome", e);
-      return Optional.empty();
+      return local.map(Verdict::intact);
     }
+    return newer(local, persisted).map(Verdict::intact);
+  }
+
+  /** One verdict and when it was reached (null if unknown — then it counts as oldest). */
+  record Verdict(boolean intact, Instant at) {}
+
+  private Optional<Verdict> persistedVerdict() {
+    return schedulerJobs
+        .findById(SchedulerJobCatalog.AUDIT_CHAIN_VERIFY)
+        .filter(job -> job.getLastOutcome() != null)
+        .map(
+            job ->
+                new Verdict(
+                    RunOutcome.SUCCESS.name().equals(job.getLastOutcome()), job.getLastRunAt()));
+  }
+
+  /**
+   * The later of two verdicts. On a tie, or when neither carries a time, a failure wins — the gauge
+   * must never prefer "intact" when it cannot tell which is newer.
+   */
+  static Optional<Verdict> newer(Optional<Verdict> a, Optional<Verdict> b) {
+    if (a.isEmpty()) {
+      return b;
+    }
+    if (b.isEmpty()) {
+      return a;
+    }
+    Instant at = a.get().at();
+    Instant bt = b.get().at();
+    if (at != null && (bt == null || at.isAfter(bt))) {
+      return a;
+    }
+    if (bt != null && (at == null || bt.isAfter(at))) {
+      return b;
+    }
+    return a.get().intact() ? b : a;
   }
 
   /**
@@ -128,10 +167,12 @@ public class AuditChainVerificationService {
   public AuditChainVerifier.Report verify() {
     try {
       AuditChainVerifier.Report report = snapshotTx.execute(status -> walk());
+      lastReportAt = Instant.now();
       lastReport = report;
       return report;
     } catch (RuntimeException e) {
       // Never leave an earlier "intact" standing when this run could not reach a verdict.
+      lastReportAt = Instant.now();
       lastReport = AuditChainVerifier.Report.failed();
       throw e;
     }
