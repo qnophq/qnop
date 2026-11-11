@@ -22,7 +22,9 @@ package io.qnop.service;
 
 /**
  * Control characters in single-line text (issue #909): the C0/C1 control range (which includes CR,
- * LF and TAB) and the Unicode line and paragraph separators.
+ * LF and TAB), the Unicode line and paragraph separators, and the bidirectional embedding, override
+ * and isolate characters (U+202A–U+202E, U+2066–U+2069), which can make a name or title display as
+ * something other than what it is.
  *
  * <p>Titles and display names are single-line values that end up in places where a line break
  * changes meaning — mail headers above all, but also file names, log lines and spreadsheet cells.
@@ -52,6 +54,10 @@ public final class ControlCharacters {
   }
 
   private static boolean isControl(int codePoint) {
+    if ((codePoint >= 0x202A && codePoint <= 0x202E)
+        || (codePoint >= 0x2066 && codePoint <= 0x2069)) {
+      return true;
+    }
     int type = Character.getType(codePoint);
     return type == Character.CONTROL
         || type == Character.LINE_SEPARATOR

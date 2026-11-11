@@ -82,6 +82,16 @@ class UserServiceTest {
   }
 
   @Test
+  @DisplayName("provisionExternal falls back to the e-mail local part when no name is left")
+  void provisionExternalFallsBackWhenTheNameIsOnlyControlCharacters() {
+    when(users.save(any(User.class))).thenAnswer(i -> i.getArgument(0));
+
+    assertThat(service.provisionExternal("\r\n\t", "jane.doe@example.com").getDisplayName())
+        .isEqualTo("jane.doe");
+    assertThat(service.provisionExternal(null, null).getDisplayName()).isEqualTo("user");
+  }
+
+  @Test
   @DisplayName("getProfile throws for an unknown user")
   void getProfileRejectsUnknownUser() {
     UUID id = UUID.randomUUID();

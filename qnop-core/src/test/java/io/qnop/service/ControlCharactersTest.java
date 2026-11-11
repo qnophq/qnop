@@ -29,7 +29,18 @@ class ControlCharactersTest {
 
   @Test
   void detectsC0C1AndLineSeparators() {
-    for (String value : new String[] {"a\rb", "a\nb", "a\tb", "a\u0000b", "a\u0085b", "a b"}) {
+    for (String value :
+        new String[] {
+          "a\rb",
+          "a\nb",
+          "a\tb",
+          "a\u0000b",
+          "a\u0085b",
+          "a\u2028b",
+          "a\u202Eb",
+          "a\u2066b",
+          "a\u2069b"
+        }) {
       assertThat(ControlCharacters.contains(value)).as(value).isTrue();
     }
   }
