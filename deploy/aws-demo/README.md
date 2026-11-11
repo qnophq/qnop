@@ -13,7 +13,7 @@ in minutes.
 Internet ──▶ EC2 (eu-central-1, t4g.medium, Amazon Linux 2023)
               └─ docker compose (project: qnop-demo)
                  ├─ caddy     :80/:443 — TLS via Let's Encrypt
-                 ├─ qnop      qnophq/qnop-ce:latest (not exposed)
+                 ├─ qnop      qnophq/qnop-ce, pinned by digest (not exposed)
                  ├─ postgres  :18
                  ├─ minio     object storage
                  └─ mc        (profile "tools", used by the scripts)
@@ -24,8 +24,10 @@ Internet ──▶ EC2 (eu-central-1, t4g.medium, Amazon Linux 2023)
   (seeded users, example reviews with annotations) by
   `build-golden-state.sh`.
 - **Reset + auto-deploy**: `reset-demo.sh` runs from cron at 03:00 and
-  15:00 UTC. It pulls the latest images (so releases roll out on their
-  own), drops and restores the database, mirrors the bucket back and
+  15:00 UTC. It refreshes `docker-compose.yml` from `main` — where the
+  app image is pinned by tag **and digest**, bumped by reviewed Renovate
+  PRs (issue #925) — pulls those images (so releases roll out once the
+  pin is merged), drops and restores the database, mirrors the bucket back and
   restarts the stack. The app restart also clears qnop's boot-time
   settings cache.
 
@@ -33,7 +35,7 @@ Internet ──▶ EC2 (eu-central-1, t4g.medium, Amazon Linux 2023)
 
 | File | Purpose |
 |---|---|
-| `user-data.sh` | EC2 cloud-init bootstrap: Docker + compose plugin, clones this repo, runs `install.sh` |
+| `user-data.sh` | EC2 cloud-init bootstrap: Docker + compose plugin (pinned version, SHA-256 verified), clones this repo, runs `install.sh` |
 | `install.sh` | Idempotent host setup: `/opt/qnop-demo`, secrets in `.env` (first run only), cron job, stack up |
 | `docker-compose.yml` | The demo stack (deployer stack + Caddy + `mc` tool profile) |
 | `Caddyfile` | TLS + reverse proxy for `$QNOP_DEMO_DOMAIN` |

@@ -4,7 +4,9 @@
 # The 12-hourly demo job (cron, see install.sh). One mechanism covers both
 # requirements of issue #710:
 #
-#   1. auto-deploy — pull the latest images before every reset
+#   1. auto-deploy — refresh the stack definition from main (the image is
+#      pinned by digest there and bumped by reviewed Renovate PRs, #925),
+#      then pull its images before every reset
 #   2. data reset  — restore the golden state captured by
 #      build-golden-state.sh (full pg_dump + object-storage bucket mirror)
 #
@@ -21,6 +23,15 @@ DB_USER="${QNOP_DB_USERNAME:-qnop}"
 BUCKET="${QNOP_S3_BUCKET:-qnop-documents}"
 
 echo "[$(date -u +%FT%TZ)] reset starting"
+# Take the compose file (and with it the pinned image digest) from main. Only
+# that file is refreshed; the scripts change when an operator re-runs install.sh.
+if [ -d /opt/qnop-src/.git ]; then
+  if git -C /opt/qnop-src pull --ff-only --quiet; then
+    install -m 0644 /opt/qnop-src/deploy/aws-demo/docker-compose.yml /opt/qnop-demo/
+  else
+    echo "WARN: could not update /opt/qnop-src — keeping the current stack definition"
+  fi
+fi
 docker compose pull --quiet
 
 if [ ! -f golden/db.dump ]; then
