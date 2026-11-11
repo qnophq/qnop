@@ -83,7 +83,9 @@ class PasswordResetFlowServiceTest {
   }
 
   @Test
-  @DisplayName("requestReset issues a token and emails the link for an enabled local account")
+  @DisplayName(
+      "requestReset issues a token and queues the link mail for after the commit (#903),"
+          + " never sending it inside the request")
   void requestResetEnabled() {
     User user = User.internal("Jane", "jane@example.com", "jane", "hash");
     when(settings.getBoolean(ApplicationSettingKey.AUTH_PASSWORD_RESET_ENABLED)).thenReturn(true);
@@ -94,9 +96,14 @@ class PasswordResetFlowServiceTest {
 
     service.requestReset("jane@example.com");
 
+    @SuppressWarnings("unchecked")
+    ArgumentCaptor<Map<String, Object>> vars = ArgumentCaptor.forClass(Map.class);
     verify(mailService)
-        .sendMailFromTemplate(
-            eq(MailTemplateKey.PASSWORD_RESET), eq("jane@example.com"), anyMap(), eq("en"));
+        .sendMailFromTemplateAfterCommit(
+            eq(MailTemplateKey.PASSWORD_RESET), eq("jane@example.com"), vars.capture(), eq("en"));
+    verify(mailService, never()).sendMailFromTemplate(any(), any(), anyMap(), any());
+    assertThat(vars.getValue().keySet()).containsAll(MailTemplateKey.PASSWORD_RESET.placeholders());
+    assertThat(vars.getValue().get("actionUrl").toString()).endsWith("/reset-password?token=RAW");
   }
 
   @Test

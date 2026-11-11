@@ -24,6 +24,7 @@ import jakarta.mail.internet.MimeMessage;
 import java.util.Map;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.mail.javamail.MimeMessageHelper;
 import org.springframework.stereotype.Service;
@@ -42,10 +43,15 @@ public class MailService {
 
   private final MailSenderProvider senderProvider;
   private final MailTemplateService templates;
+  private final ApplicationEventPublisher events;
 
-  public MailService(MailSenderProvider senderProvider, MailTemplateService templates) {
+  public MailService(
+      MailSenderProvider senderProvider,
+      MailTemplateService templates,
+      ApplicationEventPublisher events) {
     this.senderProvider = senderProvider;
     this.templates = templates;
+    this.events = events;
   }
 
   /** Sends a message; returns the outcome without throwing. */
@@ -96,6 +102,20 @@ public class MailService {
       return new SendResult.Failed("template render failed: " + e.getMessage());
     }
     return sendMail(to, mail.subject(), mail.bodyPlain(), mail.bodyHtml());
+  }
+
+  /**
+   * Queues a template mail to be rendered and sent off the request thread once the surrounding
+   * transaction has committed (issue #903) — immediately and still asynchronously when there is no
+   * transaction. For flows whose caller must learn nothing from how long the request took (the
+   * anti-enumeration registration and password-reset requests): SMTP latency would otherwise reveal
+   * which branch ran. A rolled-back transaction sends nothing. The outcome is only logged, since
+   * nobody is waiting for it; callers that need the {@link SendResult} use {@link
+   * #sendMailFromTemplate}.
+   */
+  public void sendMailFromTemplateAfterCommit(
+      MailTemplateKey key, String to, Map<String, Object> vars, String locale) {
+    events.publishEvent(new DeferredTemplateMail(key, to, Map.copyOf(vars), locale));
   }
 
   /** The outcome of a send attempt. */

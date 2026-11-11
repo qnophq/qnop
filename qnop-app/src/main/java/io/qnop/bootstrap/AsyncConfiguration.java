@@ -67,6 +67,35 @@ public class AsyncConfiguration {
   }
 
   /**
+   * Sends the account mails of the anti-enumeration flows (registration, password-reset request)
+   * after commit and off the request thread (issue #903), so how long a request took no longer
+   * tells whether an address is known. Overflow runs in the caller thread like review mail: slower
+   * under a flood, but no account mail is silently dropped.
+   */
+  @Bean(name = "mailDispatchExecutor")
+  @ConditionalOnProperty(
+      name = "qnop.notifications.sync-dispatch",
+      havingValue = "false",
+      matchIfMissing = true)
+  public ThreadPoolTaskExecutor mailDispatchExecutor() {
+    ThreadPoolTaskExecutor executor = new ThreadPoolTaskExecutor();
+    executor.setThreadNamePrefix("mail-dispatch-");
+    executor.setCorePoolSize(1);
+    executor.setMaxPoolSize(2);
+    executor.setQueueCapacity(200);
+    executor.setRejectedExecutionHandler(
+        new java.util.concurrent.ThreadPoolExecutor.CallerRunsPolicy());
+    return executor;
+  }
+
+  /** Synchronous variant for integration tests (same switch as the review notifications). */
+  @Bean(name = "mailDispatchExecutor")
+  @ConditionalOnProperty(name = "qnop.notifications.sync-dispatch", havingValue = "true")
+  public TaskExecutor syncMailDispatchExecutor() {
+    return new SyncTaskExecutor();
+  }
+
+  /**
    * Dispatches the published event stream (issue #685, ADR-0059). Bounded, and full means DROP
    * (warn-logged) rather than CallerRuns: an extension's slow listener must never be able to slow
    * the committing request thread — delivery is best-effort by contract, and a consumer needing

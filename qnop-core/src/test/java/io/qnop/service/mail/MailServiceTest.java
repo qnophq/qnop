@@ -24,6 +24,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 import io.qnop.service.mail.MailService.SendResult;
@@ -36,6 +37,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.mail.MailSendException;
 import org.springframework.mail.javamail.JavaMailSender;
 
@@ -45,12 +47,13 @@ class MailServiceTest {
   @Mock private MailSenderProvider senderProvider;
   @Mock private MailTemplateService templates;
   @Mock private JavaMailSender sender;
+  @Mock private ApplicationEventPublisher events;
 
   private MailService service;
 
   @BeforeEach
   void setUp() {
-    service = new MailService(senderProvider, templates);
+    service = new MailService(senderProvider, templates, events);
   }
 
   @Test
@@ -115,5 +118,21 @@ class MailServiceTest {
             MailTemplateKey.PASSWORD_RESET, "to@example.com", Map.of(), "en");
 
     assertThat(result).isInstanceOf(SendResult.Failed.class);
+  }
+
+  @Test
+  @DisplayName("sendMailFromTemplateAfterCommit only publishes the mail, never sends inline (#903)")
+  void afterCommitPublishesInsteadOfSending() {
+    service.sendMailFromTemplateAfterCommit(
+        MailTemplateKey.PASSWORD_RESET, "to@example.com", Map.of("siteName", "qnop"), "de");
+
+    verify(events)
+        .publishEvent(
+            new DeferredTemplateMail(
+                MailTemplateKey.PASSWORD_RESET,
+                "to@example.com",
+                Map.of("siteName", "qnop"),
+                "de"));
+    verifyNoInteractions(senderProvider, templates);
   }
 }
