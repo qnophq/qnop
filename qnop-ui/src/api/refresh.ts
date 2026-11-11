@@ -30,10 +30,20 @@
  * cookie is emitted by the backend on any prior response; if it is missing we
  * prime it with a public GET first. Concurrent callers share one in-flight
  * request (single-flight).
+ *
+ * Across tabs, refreshes are serialised with the Web Locks API (issue #902).
+ * The refresh cookie is single-use and the browser's cookie jar is shared, so
+ * two tabs presenting the same cookie at once would look like token reuse to
+ * the server and end the session everywhere. Holding a cross-tab lock for the
+ * whole request makes a second tab wait; it then sends the cookie the first
+ * tab's response already rotated, and succeeds. Where `navigator.locks` is
+ * unavailable the request simply runs unserialised, as before.
  */
 const API_BASE = '/api/v1';
 const CSRF_COOKIE = 'XSRF-TOKEN';
 const CSRF_HEADER = 'X-XSRF-TOKEN';
+/** Name of the cross-tab Web Lock held for the duration of one refresh. */
+export const REFRESH_LOCK = 'qnop-refresh';
 
 let inFlight: Promise<string | null> | null = null;
 
@@ -84,10 +94,22 @@ async function postRefresh(): Promise<string | null> {
   return body.accessToken ?? null;
 }
 
+/**
+ * Runs one refresh under the cross-tab lock when the Web Locks API exists, so
+ * no two tabs ever present the same single-use refresh cookie concurrently.
+ */
+function refreshAcrossTabs(): Promise<string | null> {
+  const locks = typeof navigator === 'undefined' ? undefined : navigator.locks;
+  if (!locks?.request) {
+    return postRefresh();
+  }
+  return locks.request(REFRESH_LOCK, () => postRefresh());
+}
+
 /** Returns a fresh access token, or null when the session cannot be refreshed. */
 export function performRefresh(): Promise<string | null> {
   if (!inFlight) {
-    inFlight = postRefresh().finally(() => {
+    inFlight = refreshAcrossTabs().finally(() => {
       inFlight = null;
     });
   }

@@ -21,9 +21,11 @@
 package io.qnop.service.auth;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyMap;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -32,6 +34,7 @@ import static org.mockito.Mockito.when;
 import io.qnop.entity.User;
 import io.qnop.service.ApplicationSettingKey;
 import io.qnop.service.ApplicationSettingsService;
+import io.qnop.service.RefreshTokenService;
 import io.qnop.service.UserService;
 import io.qnop.service.mail.MailLocaleResolver;
 import io.qnop.service.mail.MailService;
@@ -44,6 +47,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
+import org.mockito.InOrder;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
@@ -55,13 +59,15 @@ class PasswordResetFlowServiceTest {
   @Mock private MailService mailService;
   @Mock private ApplicationSettingsService settings;
   @Mock private MailLocaleResolver mailLocales;
+  @Mock private RefreshTokenService refreshTokens;
 
   private PasswordResetFlowService service;
 
   @BeforeEach
   void setUp() {
     service =
-        new PasswordResetFlowService(userService, resetTokens, mailService, settings, mailLocales);
+        new PasswordResetFlowService(
+            userService, resetTokens, mailService, settings, mailLocales, refreshTokens);
     lenient()
         .when(settings.getString(ApplicationSettingKey.GENERAL_BASE_URL))
         .thenReturn("https://qnop.example");
@@ -140,13 +146,28 @@ class PasswordResetFlowServiceTest {
   }
 
   @Test
-  @DisplayName("reset consumes the token and applies the new password")
+  @DisplayName("reset consumes the token, applies the new password and ends every session (#897)")
   void resetApplies() {
     User user = User.internal("Jane", "jane@example.com", "jane", "hash");
     when(resetTokens.consume("tok")).thenReturn(user);
 
     service.reset("tok", "new-password");
 
-    verify(userService).applyPasswordReset(user.getId(), "new-password");
+    InOrder order = inOrder(userService, refreshTokens);
+    order.verify(userService).applyPasswordReset(user.getId(), "new-password");
+    order.verify(refreshTokens).revokeAllForUser(user.getId());
+  }
+
+  @Test
+  @DisplayName("an invalid reset token revokes nothing")
+  void invalidTokenRevokesNothing() {
+    when(resetTokens.consume("bad"))
+        .thenThrow(
+            new PasswordResetTokenService.InvalidPasswordResetTokenException(
+                "Unknown or invalid reset token"));
+
+    assertThatThrownBy(() -> service.reset("bad", "new-password"))
+        .isInstanceOf(PasswordResetTokenService.InvalidPasswordResetTokenException.class);
+    verify(refreshTokens, never()).revokeAllForUser(any());
   }
 }
