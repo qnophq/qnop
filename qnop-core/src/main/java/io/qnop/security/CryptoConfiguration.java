@@ -23,7 +23,6 @@ package io.qnop.security;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
-import org.springframework.security.crypto.encrypt.Encryptors;
 import org.springframework.security.crypto.encrypt.TextEncryptor;
 import org.springframework.security.crypto.password.PasswordEncoder;
 
@@ -32,8 +31,9 @@ import org.springframework.security.crypto.password.PasswordEncoder;
  *
  * <ul>
  *   <li>{@link PasswordEncoder} — BCrypt, for user password hashing (issue #20).
- *   <li>{@link TextEncryptor} — {@code Encryptors.delux} (AES-256), for secrets stored at rest such
- *       as OIDC client secrets (issue #21).
+ *   <li>{@link TextEncryptor} — the {@link SecretCipher} (versioned, key-identified AES-256-GCM
+ *       with an HKDF-derived key), for secrets stored at rest such as OIDC client secrets (issue
+ *       #21) and the SMTP password; it supports key rotation (issue #927).
  * </ul>
  *
  * <p>These are beans rather than the web filter chain, so they live in the framework-light {@code
@@ -47,9 +47,32 @@ public class CryptoConfiguration {
     return new BCryptPasswordEncoder();
   }
 
+  /**
+   * The cipher for secrets at rest. Exposed as {@link SecretCipher} (a {@link TextEncryptor}) so
+   * the re-encryption pass can ask which stored values still need rewriting.
+   *
+   * @throws IllegalStateException if a previous (rotation) key is configured but weak
+   */
   @Bean
-  TextEncryptor textEncryptor(QnopProperties properties) {
+  SecretCipher textEncryptor(QnopProperties properties) {
     QnopProperties.Auth auth = properties.auth();
-    return Encryptors.delux(auth.encryptionKey(), auth.encryptionSalt());
+    SecretCipher.KeyMaterial current =
+        new SecretCipher.KeyMaterial(auth.encryptionKey(), auth.encryptionSalt());
+    SecretCipher.KeyMaterial previous = null;
+    if (auth.hasEncryptionKeyPrevious()) {
+      if (!SecretValidator.isStrong(auth.encryptionKeyPrevious())) {
+        throw new IllegalStateException(
+            "qnop.auth.encryption-key-previous must be blank or a strong, non-default secret of at"
+                + " least "
+                + SecretValidator.MIN_LENGTH
+                + " characters");
+      }
+      String salt =
+          auth.encryptionSaltPrevious().isEmpty()
+              ? auth.encryptionSalt()
+              : auth.encryptionSaltPrevious();
+      previous = new SecretCipher.KeyMaterial(auth.encryptionKeyPrevious(), salt);
+    }
+    return new SecretCipher(current, previous, auth.secrets().writeFormat());
   }
 }

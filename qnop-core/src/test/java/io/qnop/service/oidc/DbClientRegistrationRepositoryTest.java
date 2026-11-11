@@ -27,6 +27,7 @@ import static org.mockito.Mockito.when;
 import io.qnop.entity.OidcProvider;
 import io.qnop.entity.OidcProviderType;
 import io.qnop.repository.OidcProviderRepository;
+import io.qnop.service.http.HttpClientProperties;
 import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.DisplayName;
@@ -43,7 +44,12 @@ class DbClientRegistrationRepositoryTest {
   private final OidcProviderRepository providers = mock(OidcProviderRepository.class);
   private final OidcSsrfPolicy denyPrivate = new OidcSsrfPolicy(false);
   private final DbClientRegistrationRepository repository =
-      new DbClientRegistrationRepository(providers, denyPrivate);
+      new DbClientRegistrationRepository(
+          providers,
+          denyPrivate,
+          new OidcDiscoveryClient(
+              new OidcHttpTransport(
+                  denyPrivate, new HttpClientProperties(null, null, null, null, null))));
 
   @Test
   @DisplayName(
@@ -68,6 +74,57 @@ class DbClientRegistrationRepositoryTest {
     repository.refresh();
 
     assertThat(repository).isEmpty();
+  }
+
+  @Test
+  @DisplayName("skips a provider whose stored client secret cannot be decrypted (issue #927)")
+  void skipsProviderWithUnreadableSecret() {
+    OidcProvider github = enabledGithubProvider(null);
+    when(providers.findAll()).thenReturn(List.of(github));
+    when(providers.findStoredClientSecrets()).thenReturn(List.of(stored(github.getId())));
+
+    repository.refresh();
+
+    assertThat(repository).isEmpty();
+  }
+
+  @Test
+  @DisplayName("registers a provider that simply has no client secret")
+  void registersProviderWithoutSecret() {
+    OidcProvider github = enabledGithubProvider(null);
+    when(providers.findAll()).thenReturn(List.of(github));
+    when(providers.findStoredClientSecrets()).thenReturn(List.of());
+
+    repository.refresh();
+
+    assertThat(repository.findByRegistrationId(OidcRegistrationIds.of(github.getId()))).isNotNull();
+  }
+
+  private static OidcProviderRepository.StoredClientSecret stored(UUID id) {
+    return new OidcProviderRepository.StoredClientSecret() {
+      @Override
+      public UUID getId() {
+        return id;
+      }
+
+      @Override
+      public String getName() {
+        return "github";
+      }
+
+      @Override
+      public String getCiphertext() {
+        return "v2:00000000:AAAA";
+      }
+    };
+  }
+
+  private static OidcProvider enabledGithubProvider(String secret) {
+    OidcProvider provider = new OidcProvider("github", OidcProviderType.GITHUB, "client-id");
+    ReflectionTestUtils.setField(provider, "id", UUID.randomUUID());
+    provider.setEnabled(true);
+    provider.setClientSecret(secret);
+    return provider;
   }
 
   private static OidcProvider enabledOidcProvider(String issuerUri) {

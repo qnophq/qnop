@@ -150,7 +150,9 @@ public class AnnotationController implements AnnotationsApi {
       UUID annotationId, AnnotationResolveRequest request) {
     String note = request == null ? null : request.getNote();
     return ResponseEntity.ok(
-        toDto(annotations.resolve(annotationId, note, CurrentUser.requireUserId())));
+        toDto(
+            annotations.resolve(
+                annotationId, note, CurrentUser.requireUserId(), CurrentUser.isAdmin())));
   }
 
   @Override

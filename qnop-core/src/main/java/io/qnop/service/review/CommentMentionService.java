@@ -20,9 +20,14 @@
  */
 package io.qnop.service.review;
 
+import io.qnop.entity.Annotation;
+import io.qnop.entity.Comment;
 import io.qnop.entity.CommentMention;
 import io.qnop.entity.Document;
+import io.qnop.entity.ThreadParticipation;
+import io.qnop.repository.AnnotationRepository;
 import io.qnop.repository.CommentMentionRepository;
+import io.qnop.repository.CommentRepository;
 import io.qnop.repository.DocumentRepository;
 import io.qnop.repository.ReviewParticipantRepository;
 import io.qnop.spi.mention.MentionContext;
@@ -45,7 +50,11 @@ import org.springframework.transaction.annotation.Transactional;
  * <p><strong>Access-scoping:</strong> a token only becomes a mention when the mentioned user
  * actually has access to the document (owner, a direct participant, or a member of a participating
  * team — the same rule as {@link ReviewParticipantRepository#existsAccessibleParticipant}). Tokens
- * for anyone off the roster stay plain text — mentioning someone without access does nothing.
+ * for anyone off the roster stay plain text — mentioning someone without access does nothing. Under
+ * {@link ThreadParticipation#PRIVATE} the thread rule applies on top (issue #921): only users who
+ * can see the comment's thread — the owner, the annotation's author, and admins on the roster (see
+ * {@link ReviewAudience}) — can be mentioned there; any other token stays plain text, so no mention
+ * row, no pill and no notification exist for someone who could not open the thread.
  *
  * <p><strong>Anonymity (ADR-0038, #413):</strong> mentions are disabled in anonymous reviews. A
  * roster picker or a rendered {@code @realname} would leak identities the review deliberately
@@ -67,16 +76,25 @@ public class CommentMentionService {
   private final CommentMentionRepository mentions;
   private final DocumentRepository documents;
   private final ReviewParticipantRepository participants;
+  private final CommentRepository comments;
+  private final AnnotationRepository annotations;
+  private final ReviewAudience audience;
   private final List<MentionResolver> resolvers;
 
   public CommentMentionService(
       CommentMentionRepository mentions,
       DocumentRepository documents,
       ReviewParticipantRepository participants,
+      CommentRepository comments,
+      AnnotationRepository annotations,
+      ReviewAudience audience,
       List<MentionResolver> resolvers) {
     this.mentions = mentions;
     this.documents = documents;
     this.participants = participants;
+    this.comments = comments;
+    this.annotations = annotations;
+    this.audience = audience;
     this.resolvers = List.copyOf(resolvers);
   }
 
@@ -98,7 +116,7 @@ public class CommentMentionService {
     if (document == null || document.isAnonymous()) {
       return List.of(); // anonymous reviews: mentions stay plain text (ADR-0038)
     }
-    Set<UUID> mentionedIds = resolveAccessScoped(document, documentId, authorId, slugs);
+    Set<UUID> mentionedIds = resolveAccessScoped(document, documentId, commentId, authorId, slugs);
     List<CommentMention> rows =
         mentionedIds.stream().map(userId -> new CommentMention(commentId, userId)).toList();
     if (rows.isEmpty()) {
@@ -137,7 +155,8 @@ public class CommentMentionService {
       return List.of();
     }
     Set<UUID> wanted =
-        resolveAccessScoped(document, documentId, authorId, MentionParser.extractSlugs(body));
+        resolveAccessScoped(
+            document, documentId, commentId, authorId, MentionParser.extractSlugs(body));
     List<CommentMention> existing = mentions.findByCommentId(commentId);
     Set<UUID> before =
         existing.stream().map(CommentMention::getMentionedUserId).collect(Collectors.toSet());
@@ -163,20 +182,36 @@ public class CommentMentionService {
    * resolution path shared by creation and re-resolution (issue #600), so the two can never drift.
    */
   private Set<UUID> resolveAccessScoped(
-      Document document, UUID documentId, UUID authorId, Set<String> slugs) {
+      Document document, UUID documentId, UUID commentId, UUID authorId, Set<String> slugs) {
     UUID owner = document.getOwnerId();
     MentionContext context = new MentionContext(documentId, owner, authorId);
+    boolean privateThreads = document.getThreadParticipation() == ThreadParticipation.PRIVATE;
+    UUID threadAuthor = privateThreads ? threadAuthorOf(commentId) : null;
     Set<UUID> mentionedIds = new LinkedHashSet<>();
     for (String slug : slugs) {
       for (MentionResolver resolver : resolvers) {
         for (UUID id : resolveSafely(resolver, context, slug)) {
-          if (hasAccess(documentId, owner, id)) {
+          boolean allowed =
+              privateThreads
+                  ? audience.canSeeThread(document, threadAuthor, id, false)
+                  : hasAccess(documentId, owner, id);
+          if (allowed) {
             mentionedIds.add(id);
           }
         }
       }
     }
     return mentionedIds;
+  }
+
+  /** The author of the thread {@code commentId} belongs to, or null when it cannot be found. */
+  private UUID threadAuthorOf(UUID commentId) {
+    return comments
+        .findById(commentId)
+        .map(Comment::getAnnotationId)
+        .flatMap(annotations::findById)
+        .map(Annotation::getAuthorId)
+        .orElse(null);
   }
 
   /**

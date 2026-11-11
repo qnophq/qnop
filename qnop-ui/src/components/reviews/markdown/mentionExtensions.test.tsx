@@ -92,6 +92,38 @@ describe('mention seams with a contributed namespace (issue #598)', () => {
     expect(result.current).toEqual([]);
   });
 
+  it('offers only the thread audience in a PRIVATE review (issue #921)', () => {
+    unregister = registerFakeContributor();
+    vi.mocked(useDocument).mockReturnValue({
+      data: {
+        anonymous: false,
+        threadParticipation: 'PRIVATE',
+        ownerId: 'owner-1',
+        ownerDisplayName: 'Olivia Owner',
+        ownerSlug: 'olivia-owner',
+      },
+    } as never);
+    const user = (id: string, slug: string) => ({
+      kind: 'USER',
+      principalId: id,
+      displayName: slug,
+      slug,
+    });
+    vi.mocked(useParticipants).mockReturnValue({
+      data: { participants: [user('author-1', 'ada-author'), user('rev-2', 'rita-reviewer')] },
+    } as never);
+
+    // Replying in Ada's thread: the owner and Ada — no other reviewer, no contributed team.
+    const reply = renderHook(() => useMentionRoster('doc-1', 'author-1'));
+    expect(reply.result.current.map((candidate) => candidate.slug)).toEqual([
+      'olivia-owner',
+      'ada-author',
+    ]);
+    // Starting a new thread (the caller is its author): only the owner.
+    const fresh = renderHook(() => useMentionRoster('doc-1'));
+    expect(fresh.result.current.map((candidate) => candidate.slug)).toEqual(['olivia-owner']);
+  });
+
   it('keeps the roster byte-identical without a contributor', () => {
     const { result } = renderHook(() => useMentionRoster('doc-1'));
     expect(result.current.map((candidate) => candidate.slug)).toEqual(['olivia-owner']);

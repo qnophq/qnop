@@ -53,11 +53,18 @@ public final class TrackingHostPolicy {
 
   private static boolean isLexicallyPrivate(String url) {
     try {
+      // Accepted with private hosts allowed: a well-formed URL whose host is not
+      // refused outright (e.g. a non-canonical numeric spelling).
+      OutboundUriGuard.requireAllowedHttpUri(url, "tracking.host", true, true);
+    } catch (IllegalArgumentException malformed) {
+      return false;
+    }
+    try {
       OutboundUriGuard.requireAllowedHttpUri(url, "tracking.host", true, false);
       return false;
     } catch (IllegalArgumentException blocked) {
-      // Refused under the strict policy — which, for a URL already known to be a
-      // valid http(s) URL with a host, means a private, loopback or internal host.
+      // Accepted above but refused under the strict policy — which means a private,
+      // loopback or internal host.
       return true;
     }
   }

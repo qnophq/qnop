@@ -98,7 +98,7 @@ public class ReactionService {
   public void reactToComment(UUID commentId, String emoji, UUID actor, boolean admin) {
     String validated = requireEmoji(emoji);
     Comment comment = requireComment(commentId);
-    guardTarget(requireAnnotation(comment.getAnnotationId()), actor, admin);
+    guardComment(comment, actor, admin);
     if (!reactions.existsByCommentIdAndUserIdAndEmoji(commentId, actor, validated)) {
       reactions.save(Reaction.onComment(commentId, actor, validated));
     }
@@ -109,7 +109,7 @@ public class ReactionService {
   public void unreactFromComment(UUID commentId, String emoji, UUID actor, boolean admin) {
     String validated = requireEmoji(emoji);
     Comment comment = requireComment(commentId);
-    guardTarget(requireAnnotation(comment.getAnnotationId()), actor, admin);
+    guardComment(comment, actor, admin);
     reactions.deleteByCommentIdAndUserIdAndEmoji(commentId, actor, validated);
   }
 
@@ -217,10 +217,7 @@ public class ReactionService {
    */
   private void guardTarget(Annotation annotation, UUID actor, boolean admin) {
     DocumentAccessService.DocumentView document =
-        documentAccess.getDocument(annotation.getDocumentId(), actor, admin);
-    if (!AnnotationService.canSeeThread(document, annotation.getAuthorId(), actor, admin)) {
-      throw DocumentValidationException.notFound("no such annotation: " + annotation.getId());
-    }
+        AnnotationService.visibleThread(documentAccess, annotation, actor, admin);
     // String comparison — the column tolerates enterprise states (ADR-0011).
     String state = document.workflowState();
     if (WorkflowState.FINALIZED.name().equals(state)
@@ -231,6 +228,22 @@ public class ReactionService {
     }
   }
 
+  /**
+   * The comment-route form of {@link #guardTarget}: a comment in a thread the caller cannot see
+   * answers exactly like an unknown comment id (issue #916).
+   */
+  private void guardComment(Comment comment, UUID actor, boolean admin) {
+    try {
+      guardTarget(requireAnnotation(comment.getAnnotationId()), actor, admin);
+    } catch (AnnotationNotFoundException e) {
+      throw unknownComment(comment.getId());
+    }
+  }
+
+  private static DocumentValidationException unknownComment(UUID commentId) {
+    return DocumentValidationException.notFound("no such comment: " + commentId);
+  }
+
   private Annotation requireAnnotation(UUID annotationId) {
     return annotations
         .findById(annotationId)
@@ -238,8 +251,6 @@ public class ReactionService {
   }
 
   private Comment requireComment(UUID commentId) {
-    return comments
-        .findById(commentId)
-        .orElseThrow(() -> DocumentValidationException.notFound("no such comment: " + commentId));
+    return comments.findById(commentId).orElseThrow(() -> unknownComment(commentId));
   }
 }

@@ -267,6 +267,15 @@ class ValueValidatorTest {
                 ApplicationSettingKey.TRACKING_HOST, "https://matomo.example.com"));
     assertDoesNotThrow(
         () -> ValueValidator.validate(ApplicationSettingKey.TRACKING_HOST, "http://10.0.0.5:8080"));
+    // A numeric spelling the guard refuses outright is not "private" either.
+    assertThat(
+            assertThrows(
+                    SettingValidationException.class,
+                    () ->
+                        ValueValidator.validate(
+                            ApplicationSettingKey.TRACKING_HOST, "http://2130706433"))
+                .getCode())
+        .isEqualTo(FieldErrorCode.REQUIRES_HTTPS);
     assertDoesNotThrow(
         () ->
             ValueValidator.validate(

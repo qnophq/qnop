@@ -27,12 +27,14 @@ import java.util.Arrays;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
+import java.util.UUID;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.stream.Collectors;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.security.oauth2.client.registration.ClientRegistration;
 import org.springframework.security.oauth2.client.registration.ClientRegistrationRepository;
-import org.springframework.security.oauth2.client.registration.ClientRegistrations;
 import org.springframework.security.oauth2.core.AuthorizationGrantType;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
@@ -46,6 +48,10 @@ import org.springframework.transaction.event.TransactionalEventListener;
  * #refresh()} (called by {@code OidcProviderService} after any change), so providers come and go
  * without a restart. Build failures (e.g. an unreachable issuer for discovery) are logged and the
  * provider is skipped rather than failing the whole refresh.
+ *
+ * <p>A provider whose client secret is stored but cannot be decrypted with any configured key
+ * (issue #927 — it reads as {@code null}) is skipped with a clear log line, rather than registered
+ * without a secret and left to fail at the identity provider's token endpoint.
  */
 @Component
 public class DbClientRegistrationRepository
@@ -57,13 +63,17 @@ public class DbClientRegistrationRepository
 
   private final io.qnop.repository.OidcProviderRepository providers;
   private final OidcSsrfPolicy ssrfPolicy;
+  private final OidcDiscoveryClient discovery;
   private final AtomicReference<Map<String, ClientRegistration>> cache =
       new AtomicReference<>(Map.of());
 
   public DbClientRegistrationRepository(
-      io.qnop.repository.OidcProviderRepository providers, OidcSsrfPolicy ssrfPolicy) {
+      io.qnop.repository.OidcProviderRepository providers,
+      OidcSsrfPolicy ssrfPolicy,
+      OidcDiscoveryClient discovery) {
     this.providers = providers;
     this.ssrfPolicy = ssrfPolicy;
+    this.discovery = discovery;
   }
 
   @PostConstruct
@@ -91,11 +101,26 @@ public class DbClientRegistrationRepository
   @Transactional(readOnly = true)
   public void refresh() {
     Map<String, ClientRegistration> built = new LinkedHashMap<>();
+    Set<UUID> withStoredSecret = null;
     for (OidcProvider provider : providers.findAll()) {
       if (!provider.isEnabled()) {
         continue;
       }
       String registrationId = OidcRegistrationIds.of(provider.getId());
+      if (provider.getClientSecret() == null) {
+        if (withStoredSecret == null) {
+          withStoredSecret = storedSecretIds();
+        }
+        if (withStoredSecret.contains(provider.getId())) {
+          log.error(
+              "Skipping OIDC provider {} (registrationId={}): its stored client secret cannot be"
+                  + " decrypted with any configured encryption key. Restore that key as"
+                  + " qnop.auth.encryption-key-previous or enter the client secret again.",
+              provider.getName(),
+              registrationId);
+          continue;
+        }
+      }
       try {
         built.put(registrationId, buildRegistration(provider, registrationId));
       } catch (RuntimeException e) {
@@ -109,19 +134,23 @@ public class DbClientRegistrationRepository
     cache.set(Map.copyOf(built));
   }
 
+  /** Providers whose client-secret column holds a value, read raw (bypassing decryption). */
+  private Set<UUID> storedSecretIds() {
+    return providers.findStoredClientSecrets().stream()
+        .map(io.qnop.repository.OidcProviderRepository.StoredClientSecret::getId)
+        .collect(Collectors.toUnmodifiableSet());
+  }
+
   private ClientRegistration buildRegistration(OidcProvider provider, String registrationId) {
     // Re-validate the stored URIs against the SSRF policy at use time, not only when the operator
-    // saved them (issue #168): discovery (fromIssuerLocation) and the OAuth2 endpoints below issue
+    // saved them (issue #168): discovery (OidcDiscoveryClient) and the OAuth2 endpoints below issue
     // outbound requests, so a row whose URI is internal — e.g. via a policy change or a direct DB
     // edit — must be blocked here too. A violation throws, and refresh() logs and skips the row.
     validateOutboundUris(provider);
     ClientRegistration.Builder builder =
         switch (provider.getProviderType()) {
-          case OIDC ->
-              ClientRegistrations.fromIssuerLocation(requireIssuer(provider))
-                  .registrationId(registrationId);
-          case GOOGLE ->
-              ClientRegistrations.fromIssuerLocation(GOOGLE_ISSUER).registrationId(registrationId);
+          case OIDC -> discovery.fromIssuer(requireIssuer(provider)).registrationId(registrationId);
+          case GOOGLE -> discovery.fromIssuer(GOOGLE_ISSUER).registrationId(registrationId);
           case GITHUB ->
               ClientRegistration.withRegistrationId(registrationId)
                   .authorizationGrantType(AuthorizationGrantType.AUTHORIZATION_CODE)

@@ -24,6 +24,7 @@ import java.net.InetAddress;
 import java.net.URI;
 import java.net.UnknownHostException;
 import java.util.Locale;
+import java.util.regex.Pattern;
 
 /**
  * The SSRF check for any operator-supplied URL this server will fetch.
@@ -33,16 +34,28 @@ import java.util.Locale;
  * places the same mistake can be made, and duplicating a security check is how the copies drift
  * apart.
  *
- * <p><strong>DNS-free by design.</strong> Only <em>IP literals</em> are range-checked; hostnames
- * are never resolved here, because resolving would add a TOCTOU window and a DNS-rebinding angle. A
- * hostname that is not a literal passes unless it is on the static name blocklist; the residual
- * risk of a public name resolving to a private address is accepted and mitigated operationally.
+ * <p><strong>Two halves (issue #904, ADR-0056 amendment).</strong> This class is the
+ * <em>lexical</em> half, run when a URL is saved and again before use: http(s) only, a host is
+ * present, no reserved name ({@code localhost}, {@code *.local}, {@code *.internal}), no
+ * non-canonical numeric host (a single integer, hex or octal parts, a short dotted form), and no IP
+ * literal in a range {@link OutboundAddressPolicy} blocks. It deliberately performs no DNS: a name
+ * resolved here could resolve differently a moment later. Host names are checked by the
+ * <em>connection-time</em> half, {@link GuardedDnsResolver}, which resolves once, validates every
+ * address and hands exactly those addresses to the socket — see {@link OutboundHttpClients}.
  *
  * <p>Whether private destinations are allowed at all is a <em>deployment</em> decision (a property,
  * not a database setting) — an internal IdP and a self-hosted analytics server are both legitimate,
- * and neither should be reachable by an administrator flipping a switch in the web UI.
+ * and neither should be reachable by an administrator flipping a switch in the web UI. Malformed
+ * numeric hosts are refused even then: no legitimate configuration spells an address that way.
  */
 public final class OutboundUriGuard {
+
+  /** A label that a URL parser could read as (part of) a number: decimal, octal or hex. */
+  private static final Pattern NUMERIC_LABEL = Pattern.compile("(0x[0-9a-f]*|[0-9]+)");
+
+  /** One canonical decimal octet: 0-255 without leading zeros. */
+  private static final Pattern CANONICAL_OCTET =
+      Pattern.compile("(0|[1-9][0-9]?|1[0-9]{2}|2[0-4][0-9]|25[0-5])");
 
   private OutboundUriGuard() {}
 
@@ -76,35 +89,66 @@ public final class OutboundUriGuard {
     if (host == null || host.isBlank()) {
       throw new IllegalArgumentException(fieldName + " must include a host");
     }
+    String normalized = normalize(host);
+    if (isNonCanonicalNumericHost(normalized)) {
+      throw new IllegalArgumentException(fieldName + " must not use a non-canonical numeric host");
+    }
     if (allowPrivate) {
       return;
     }
-    if (isBlockedHost(host)) {
+    if (isBlockedHost(normalized)) {
       throw new IllegalArgumentException(
           fieldName + " targets a blocked (private/loopback/metadata) host");
     }
   }
 
-  private static boolean isBlockedHost(String host) {
+  /** Lower-cases, strips IPv6 brackets and a single trailing root dot. */
+  private static String normalize(String host) {
     String h = host.toLowerCase(Locale.ROOT);
     if (h.startsWith("[") && h.endsWith("]")) {
-      h = h.substring(1, h.length() - 1);
+      return h.substring(1, h.length() - 1);
     }
+    return h.endsWith(".") ? h.substring(0, h.length() - 1) : h;
+  }
+
+  /**
+   * A host whose last label is numeric is an IPv4 address to a URL parser (WHATWG "ends in a
+   * number"), and many accept {@code 2130706433}, {@code 0x7f.1} or {@code 0177.0.0.1} for {@code
+   * 127.0.0.1}. Only the canonical dotted-quad spelling is accepted.
+   */
+  static boolean isNonCanonicalNumericHost(String host) {
+    if (host.indexOf(':') >= 0) {
+      return false; // IPv6 literal — the JDK parser accepts only valid IPv6 text
+    }
+    String[] labels = host.split("\\.", -1);
+    if (!NUMERIC_LABEL.matcher(labels[labels.length - 1]).matches()) {
+      return false; // an ordinary host name
+    }
+    if (labels.length != 4) {
+      return true;
+    }
+    for (String label : labels) {
+      if (!CANONICAL_OCTET.matcher(label).matches()) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  private static boolean isBlockedHost(String h) {
     if (h.equals("localhost")
         || h.endsWith(".localhost")
+        || h.equals("local")
         || h.endsWith(".local")
+        || h.equals("internal")
         || h.endsWith(".internal")) {
       return true;
     }
     InetAddress ip = ipLiteralOrNull(h);
     if (ip == null) {
-      return false; // a (non-literal) hostname — not resolved here (DNS-free)
+      return false; // a host name — checked at connection time by GuardedDnsResolver
     }
-    return ip.isLoopbackAddress()
-        || ip.isAnyLocalAddress()
-        || ip.isLinkLocalAddress()
-        || ip.isSiteLocalAddress()
-        || isUniqueLocalIpv6(ip);
+    return OutboundAddressPolicy.isBlocked(ip);
   }
 
   /** Parses {@code host} as an IP literal without any DNS resolution; null if it is not one. */
@@ -123,26 +167,15 @@ public final class OutboundUriGuard {
     }
     byte[] addr = new byte[4];
     for (int i = 0; i < 4; i++) {
-      try {
-        int octet = Integer.parseInt(parts[i]);
-        if (octet < 0 || octet > 255) {
-          return null;
-        }
-        addr[i] = (byte) octet;
-      } catch (NumberFormatException e) {
+      if (!CANONICAL_OCTET.matcher(parts[i]).matches()) {
         return null;
       }
+      addr[i] = (byte) Integer.parseInt(parts[i]);
     }
     try {
       return InetAddress.getByAddress(addr); // from raw bytes — never resolves DNS
     } catch (UnknownHostException e) {
       return null;
     }
-  }
-
-  private static boolean isUniqueLocalIpv6(InetAddress ip) {
-    byte[] a = ip.getAddress();
-    // fc00::/7 (unique local addresses) — first 7 bits are 1111110.
-    return a.length == 16 && (a[0] & 0xFE) == 0xFC;
   }
 }
