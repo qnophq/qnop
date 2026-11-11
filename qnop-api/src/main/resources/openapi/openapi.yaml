@@ -84,7 +84,9 @@ tags:
       demote leads — without being a global ADMIN, gated per-team in the handler
       (a MEMBER or non-lead gets 403; an ADMIN passes for any team). Creating,
       renaming and deleting teams stays ADMIN-only under `/admin/teams`. A team can
-      never lose its last lead through this surface.
+      never lose its last lead through this surface. Since issue #936 (ADR-0064) a
+      lead who is not an ADMIN only invites — the user joins once they accept
+      (`/teams/invitations/**`) — and granting `LEAD` is an ADMIN decision.
   - name: AdminOidcProviders
     description: |
       Superadmin-only management of DB-configured OIDC/OAuth2 login providers,
