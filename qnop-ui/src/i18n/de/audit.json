@@ -130,6 +130,18 @@
       "label": "Audit-Kette unterbrochen",
       "description": "Die Prüfung der Audit-Kette hat Audit-Ereignisse gefunden, die außerhalb der Anwendung verändert, entfernt oder eingefügt wurden (Issue #928). Die Details benennen jede Unterbrechung mit ihrer Kettenposition; prüfen Sie den Vorfall, bevor Sie den betroffenen Einträgen vertrauen."
     },
+    "secretsReencrypted": {
+      "label": "Geheimnisse neu verschlüsselt",
+      "description": "Gespeicherte Geheimnisse (sensible Einstellungen, OIDC-Client-Secrets) in einem älteren Format oder unter einem abgelösten Schlüssel wurden beim Start unter dem aktuellen Schlüssel neu verschlüsselt (Issue #927). Die Details nennen die Anzahl und die aktuelle Schlüssel-ID – nie einen Wert."
+    },
+    "secretsUnreadable": {
+      "label": "Geheimnisse nicht lesbar",
+      "description": "Beim Start ließen sich gespeicherte Geheimnisse mit keinem konfigurierten Schlüssel entschlüsseln und gelten als nicht gesetzt (Issue #927). Die Details nennen die betroffenen Einstellungen und OIDC-Provider – den Schlüssel, der sie geschrieben hat, als vorherigen Schlüssel wiederherstellen oder die Geheimnisse neu eingeben."
+    },
+    "secretsReencryptionFailed": {
+      "label": "Neuverschlüsselung fehlgeschlagen",
+      "description": "Die Neuverschlüsselung gespeicherter Geheimnisse beim Start ist fehlgeschlagen (Issue #927). Die Instanz ist trotzdem gestartet und versucht es beim nächsten Start erneut; die Details nennen den Fehlertyp, das Server-Log den Rest."
+    },
     "fallback": {
       "label": "{{type}}",
       "description": "Ein aufgezeichnetes Review-Ereignis."

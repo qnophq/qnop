@@ -41,13 +41,29 @@ public class SecretValidator implements ConstraintValidator<ValidSecret, String>
   private static final Set<String> FORBIDDEN =
       Set.of("change_me", "change-me", "changeme", "changeit", "secret", "password", "qnop");
 
+  /**
+   * Minimum number of distinct characters (issue #927). A light sanity check, not an entropy
+   * estimate: it rejects degenerate values such as a repeated character or a short repeated
+   * pattern, which pass the length check yet derive a guessable key. Any generated secret ({@code
+   * openssl rand -base64 48}, {@code -hex 32}) clears it by a wide margin.
+   */
+  static final int MIN_DISTINCT_CHARACTERS = 8;
+
   @Override
   public boolean isValid(String value, ConstraintValidatorContext context) {
+    return isStrong(value);
+  }
+
+  /** The constraint as a plain predicate, for secrets validated outside Bean Validation. */
+  public static boolean isStrong(String value) {
     if (value == null) {
       return false;
     }
     String trimmed = value.trim();
     if (trimmed.length() < MIN_LENGTH) {
+      return false;
+    }
+    if (trimmed.chars().distinct().count() < MIN_DISTINCT_CHARACTERS) {
       return false;
     }
     return !FORBIDDEN.contains(trimmed.toLowerCase(Locale.ROOT));

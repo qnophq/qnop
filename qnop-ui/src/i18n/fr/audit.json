@@ -130,6 +130,18 @@
       "label": "Chaîne d’audit rompue",
       "description": "La vérification de la chaîne d’audit a trouvé des événements d’audit modifiés, supprimés ou insérés en dehors de l’application (issue #928). Les détails situent chaque rupture par sa position dans la chaîne ; enquêtez avant de vous fier aux entrées concernées."
     },
+    "secretsReencrypted": {
+      "label": "Secrets rechiffrés",
+      "description": "Des secrets stockés (paramètres sensibles, secrets client OIDC) dans un ancien format ou sous une clé retirée ont été rechiffrés sous la clé actuelle au démarrage (issue #927). Les détails donnent les nombres et l’identifiant de la clé actuelle — jamais une valeur."
+    },
+    "secretsUnreadable": {
+      "label": "Secrets illisibles",
+      "description": "Au démarrage, des secrets stockés n’ont pu être déchiffrés avec aucune clé configurée et sont considérés comme non définis (issue #927). Les détails nomment les paramètres et fournisseurs OIDC concernés — restaurez la clé qui les a écrits comme clé précédente, ou saisissez à nouveau les secrets."
+    },
+    "secretsReencryptionFailed": {
+      "label": "Échec du rechiffrement",
+      "description": "Le rechiffrement des secrets stockés au démarrage a échoué (issue #927). L’instance a démarré malgré tout et réessaiera au prochain démarrage ; les détails indiquent le type d’erreur, le journal du serveur le reste."
+    },
     "fallback": {
       "label": "{{type}}",
       "description": "Un événement de révision enregistré."

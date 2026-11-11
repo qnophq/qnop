@@ -72,9 +72,11 @@ VALUES
 -- OIDC providers: one enabled (with secret), one disabled (no secret).
 --
 -- client_secret_encrypted is read through EncryptedStringConverter, which
--- decrypts on entity load — so the value MUST be a real ciphertext produced by
--- Encryptors.delux with the integration-test key/salt (AbstractIntegrationTest).
--- The literal below is the encryption of "seed-dummy-secret"; the disabled
+-- decrypts on entity load — so the value MUST be a real ciphertext under the
+-- integration-test key/salt (AbstractIntegrationTest). The literal below is the
+-- legacy pre-#927 format (Encryptors.delux) of "seed-dummy-secret", kept on
+-- purpose: it exercises legacy decryption and the start-up re-encryption pass
+-- (SecretReEncryptionIT). The disabled
 -- provider stores NULL to exercise the no-secret path (hasClientSecret=false).
 -- ---------------------------------------------------------------------------
 INSERT INTO oidc_provider

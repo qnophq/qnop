@@ -177,6 +177,22 @@ export const AUDIT_EVENT_META: Record<string, AuditEventMeta> = {
     descriptionKey: 'events.auditChainBroken.description',
     tone: 'red',
   },
+  'secrets.reencrypted': {
+    labelKey: 'events.secretsReencrypted.label',
+    descriptionKey: 'events.secretsReencrypted.description',
+    tone: 'neutral',
+  },
+  // Red: a secret the instance needs (SMTP, an OIDC client) is effectively missing (issue #927).
+  'secrets.unreadable': {
+    labelKey: 'events.secretsUnreadable.label',
+    descriptionKey: 'events.secretsUnreadable.description',
+    tone: 'red',
+  },
+  'secrets.reencryption_failed': {
+    labelKey: 'events.secretsReencryptionFailed.label',
+    descriptionKey: 'events.secretsReencryptionFailed.description',
+    tone: 'amber',
+  },
 };
 
 /** The event types in a sensible display order — drives the filter and the legend. */

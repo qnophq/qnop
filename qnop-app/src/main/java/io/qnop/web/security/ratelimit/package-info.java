@@ -26,7 +26,10 @@
  * is fronted by {@code OncePerRequestFilter}s that return {@code 429} + {@code Retry-After} when a
  * scope's bucket is drained. Client IPs are resolved through {@link
  * io.qnop.web.security.ratelimit.HttpClientIpResolver}, which only honours {@code X-Forwarded-For}
- * from configured trusted proxies. Limits are tunable via {@code qnop.auth.rate-limit.*} ({@link
+ * from configured trusted proxies, walking it right to left (issue #898). Per-account / per-e-mail
+ * / per-token buckets sit next to the per-IP filters in {@link
+ * io.qnop.web.security.ratelimit.AuthIdentifierRateLimiter}, called from the auth controllers once
+ * the body is parsed (issue #899). Limits are tunable via {@code qnop.auth.rate-limit.*} ({@link
  * io.qnop.web.security.ratelimit.RateLimitProperties}).
  */
 package io.qnop.web.security.ratelimit;

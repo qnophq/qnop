@@ -252,18 +252,27 @@ public class DashboardService {
   }
 
   /**
-   * The PRIVATE-participation rule (#413), applied conservatively: annotation events of a PRIVATE
-   * review are shown only to its owner — the audit payload is not parsed, so per-thread visibility
-   * cannot be decided here and hiding is the safe default.
+   * The PRIVATE-participation rule (#413), applied conservatively: thread-scoped events of a
+   * PRIVATE review are shown only to its owner — the audit payload is not parsed, so per-thread
+   * visibility cannot be decided here and hiding is the safe default.
    */
   private static boolean visibleActivity(AuditEvent event, Document document, UUID actor) {
-    if (!event.getEventType().startsWith("annotation.")) {
+    if (!isThreadScoped(event.getEventType())) {
       return true;
     }
     if (document.getThreadParticipation() != ThreadParticipation.PRIVATE) {
       return true;
     }
     return document.getOwnerId().equals(actor);
+  }
+
+  /**
+   * Whether a feed event belongs to one annotation's thread rather than to the review as a whole:
+   * the annotation decisions and the placement confirmations/re-attachments alike (issue #921). A
+   * new thread-scoped event family must be added here, or it leaks PRIVATE thread metadata.
+   */
+  static boolean isThreadScoped(String eventType) {
+    return eventType.startsWith("annotation.") || eventType.startsWith("placement.");
   }
 
   /**

@@ -289,14 +289,14 @@ class AnnotationServiceTest {
   // --- addComment ------------------------------------------------------------
 
   @Test
-  @DisplayName("addComment surfaces the delegated 404 for a non-participant")
+  @DisplayName("addComment answers a non-participant exactly like an unknown annotation (#916)")
   void addCommentRejectsNonParticipant() {
     when(annotations.findById(any())).thenReturn(Optional.of(new Annotation(documentId, author)));
     when(documentAccess.getDocument(any(), any(), anyBoolean()))
         .thenThrow(DocumentValidationException.notFound("no such document"));
 
     assertThatThrownBy(() -> service.addComment(UUID.randomUUID(), stranger, false, "hi"))
-        .isInstanceOf(DocumentValidationException.class);
+        .isInstanceOf(AnnotationNotFoundException.class);
   }
 
   @Test

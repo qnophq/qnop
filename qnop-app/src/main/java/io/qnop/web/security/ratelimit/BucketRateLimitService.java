@@ -78,6 +78,18 @@ public class BucketRateLimitService {
     return new RateLimitResult.Rejected(retryAfterSeconds);
   }
 
+  /**
+   * Gives one token back to the bucket identified by {@code scope + key}, if it still exists — used
+   * by limits that should count only failed attempts (consume up front, refund on success, so a
+   * burst of concurrent requests cannot overshoot the limit). Never exceeds the bucket's capacity.
+   */
+  public void refund(String scope, String key) {
+    Bucket bucket = buckets.get(scope + ":" + key);
+    if (bucket != null) {
+      bucket.addTokens(1);
+    }
+  }
+
   private static Bucket newBucket(int maxAttempts, long windowSeconds) {
     return Bucket.builder()
         .addLimit(

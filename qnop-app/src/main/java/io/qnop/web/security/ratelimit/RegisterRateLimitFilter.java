@@ -31,6 +31,7 @@ import org.springframework.stereotype.Component;
 public class RegisterRateLimitFilter extends AbstractRateLimitFilter {
 
   static final String PATH = "/api/v1/auth/register";
+  static final String MESSAGE = "Too many registration attempts. Please try again later.";
 
   private final HttpClientIpResolver clientIpResolver;
   private final RateLimitProperties.Limit limit;
@@ -39,7 +40,7 @@ public class RegisterRateLimitFilter extends AbstractRateLimitFilter {
       BucketRateLimitService rateLimitService,
       HttpClientIpResolver clientIpResolver,
       RateLimitProperties properties) {
-    super(rateLimitService, "Too many registration attempts. Please try again later.");
+    super(rateLimitService, MESSAGE);
     this.clientIpResolver = clientIpResolver;
     this.limit = properties.register();
   }
@@ -51,7 +52,8 @@ public class RegisterRateLimitFilter extends AbstractRateLimitFilter {
 
   @Override
   protected String resolveKey(HttpServletRequest request) {
-    return clientIpResolver.resolve(request);
+    // IPv6 grouped by /56 (ClientNetworks).
+    return ClientNetworks.perIpKey(clientIpResolver.resolve(request));
   }
 
   @Override

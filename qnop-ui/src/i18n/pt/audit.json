@@ -130,6 +130,18 @@
       "label": "Cadeia de auditoria rompida",
       "description": "A verificação da cadeia de auditoria encontrou eventos de auditoria alterados, removidos ou inseridos fora da aplicação (issue #928). Os detalhes localizam cada ruptura pela posição na cadeia; investigue antes de confiar nas entradas afetadas."
     },
+    "secretsReencrypted": {
+      "label": "Segredos recriptografados",
+      "description": "Segredos armazenados (configurações sensíveis, segredos de cliente OIDC) em um formato antigo ou sob uma chave retirada foram criptografados novamente com a chave atual na inicialização (issue #927). Os detalhes mostram as contagens e o identificador da chave atual — nunca um valor."
+    },
+    "secretsUnreadable": {
+      "label": "Segredos ilegíveis",
+      "description": "Na inicialização, segredos armazenados não puderam ser descriptografados com nenhuma chave configurada e são tratados como não definidos (issue #927). Os detalhes nomeiam as configurações e os provedores OIDC afetados — restaure como chave anterior a chave que os gravou ou informe os segredos novamente."
+    },
+    "secretsReencryptionFailed": {
+      "label": "Falha na recriptografia",
+      "description": "A recriptografia dos segredos armazenados na inicialização falhou (issue #927). A instância iniciou mesmo assim e tentará novamente na próxima inicialização; os detalhes indicam o tipo de erro e o log do servidor, o restante."
+    },
     "fallback": {
       "label": "{{type}}",
       "description": "Um evento de revisão registrado."
