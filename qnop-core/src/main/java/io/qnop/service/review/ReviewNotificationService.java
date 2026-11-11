@@ -96,6 +96,7 @@ public class ReviewNotificationService {
   private final ReviewIdentityResolver identity;
   private final ReviewFacadeService facade;
   private final MailLocaleResolver mailLocales;
+  private final ReviewAudience audience;
   private final List<ReviewNotificationSink> sinks;
 
   public ReviewNotificationService(
@@ -110,6 +111,7 @@ public class ReviewNotificationService {
       ReviewIdentityResolver identity,
       ReviewFacadeService facade,
       MailLocaleResolver mailLocales,
+      ReviewAudience audience,
       List<ReviewNotificationSink> sinks) {
     this.documents = documents;
     this.annotations = annotations;
@@ -122,6 +124,7 @@ public class ReviewNotificationService {
     this.identity = identity;
     this.facade = facade;
     this.mailLocales = mailLocales;
+    this.audience = audience;
     this.sinks = sinks;
   }
 
@@ -258,7 +261,7 @@ public class ReviewNotificationService {
     // Adding is owner/admin-only and both act under their public name — no anonymity concern.
     Optional<String> actorName = users.findById(event.actorId()).map(User::getDisplayName);
     List<ReviewNotificationIntent> intents = new ArrayList<>();
-    for (User recipient : recipients(candidates, event.actorId())) {
+    for (User recipient : recipients(document, null, candidates, event.actorId())) {
       MailMessages messages = messagesFor(recipient);
       intents.add(
           ReviewNotificationIntent.to(
@@ -278,7 +281,8 @@ public class ReviewNotificationService {
 
   private List<ReviewNotificationIntent> annotationCreated(
       Document document, ReviewEvent.AnnotationCreated event) {
-    if (annotations.findById(event.annotationId()).isEmpty()) {
+    Optional<Annotation> annotation = annotations.findById(event.annotationId());
+    if (annotation.isEmpty()) {
       return List.of();
     }
     Comment opening =
@@ -293,13 +297,14 @@ public class ReviewNotificationService {
       intents.addAll(
           mentionIntents(
               document,
+              annotation.get(),
               opening.getId(),
-              event.annotationId(),
               event.actorId(),
               excerpt,
               annotationUrl(document, event.annotationId()) + "&comment=" + opening.getId()));
     }
-    for (User recipient : recipients(Set.of(document.getOwnerId()), event.actorId())) {
+    for (User recipient :
+        recipients(document, annotation.get(), Set.of(document.getOwnerId()), event.actorId())) {
       MailMessages messages = messagesFor(recipient);
       intents.add(
           ReviewNotificationIntent.to(
@@ -330,7 +335,7 @@ public class ReviewNotificationService {
         new LinkedHashSet<>(List.of(document.getOwnerId(), annotation.get().getAuthorId()));
     String excerpt = firstCommentExcerpt(annotationId);
     List<ReviewNotificationIntent> intents = new ArrayList<>();
-    for (User recipient : recipients(candidates, actorId)) {
+    for (User recipient : recipients(document, annotation.get(), candidates, actorId)) {
       MailMessages messages = messagesFor(recipient);
       intents.add(
           ReviewNotificationIntent.to(
@@ -377,12 +382,12 @@ public class ReviewNotificationService {
         new ArrayList<>(
             mentionIntents(
                 document,
+                annotation.get(),
                 event.commentId(),
-                event.annotationId(),
                 event.actorId(),
                 excerpt,
                 actionUrl));
-    for (User recipient : recipients(candidates, event.actorId())) {
+    for (User recipient : recipients(document, annotation.get(), candidates, event.actorId())) {
       MailMessages messages = messagesFor(recipient);
       intents.add(
           ReviewNotificationIntent.to(
@@ -412,7 +417,7 @@ public class ReviewNotificationService {
     // Uploads are owner-only and the owner acts under their public name (issue #413).
     Optional<String> actorName = users.findById(event.actorId()).map(User::getDisplayName);
     List<ReviewNotificationIntent> intents = new ArrayList<>();
-    for (User recipient : recipients(reviewCircle(document), event.actorId())) {
+    for (User recipient : recipients(document, null, reviewCircle(document), event.actorId())) {
       MailMessages messages = messagesFor(recipient);
       intents.add(
           ReviewNotificationIntent.to(
@@ -440,7 +445,7 @@ public class ReviewNotificationService {
       return List.of();
     }
     List<ReviewNotificationIntent> intents = new ArrayList<>();
-    for (User recipient : recipients(reviewCircle(document), event.actorId())) {
+    for (User recipient : recipients(document, null, reviewCircle(document), event.actorId())) {
       MailMessages messages = messagesFor(recipient);
       intents.add(
           ReviewNotificationIntent.to(
@@ -466,8 +471,8 @@ public class ReviewNotificationService {
    */
   private List<ReviewNotificationIntent> mentionIntents(
       Document document,
+      Annotation annotation,
       UUID commentId,
-      UUID annotationId,
       UUID actorId,
       String excerpt,
       String actionUrl) {
@@ -479,7 +484,8 @@ public class ReviewNotificationService {
       return List.of();
     }
     List<ReviewNotificationIntent> intents = new ArrayList<>();
-    for (User recipient : recipients(mentioned, actorId)) {
+    UUID annotationId = annotation.getId();
+    for (User recipient : recipients(document, annotation, mentioned, actorId)) {
       MailMessages messages = messagesFor(recipient);
       intents.add(
           ReviewNotificationIntent.to(
@@ -510,16 +516,29 @@ public class ReviewNotificationService {
 
   /**
    * The users an event may be told to at all: the candidates minus the actor, restricted to enabled
-   * accounts. Deliberately nothing else — an address and the mail opt-outs are the mail sink's
-   * business (ADR-0051), so a user who muted mail still gets the in-app record.
+   * accounts that can see the review <em>now</em> — and, for a thread-scoped event, its thread
+   * under PRIVATE participation (issue #919). Candidates come from history (authors, earlier
+   * commenters, mentions), so access is re-checked here, at send time, rather than assumed. The
+   * address and the mail opt-outs remain the mail sink's business (ADR-0051), so a user who muted
+   * mail still gets the in-app record.
+   *
+   * @param thread the annotation the event is about, or {@code null} for review-wide events
    */
-  private List<User> recipients(Set<UUID> candidates, UUID actorId) {
+  private List<User> recipients(
+      Document document, Annotation thread, Set<UUID> candidates, UUID actorId) {
     Set<UUID> ids = new LinkedHashSet<>(candidates);
     ids.remove(actorId);
     if (ids.isEmpty()) {
       return List.of();
     }
-    return users.findAllById(ids).stream().filter(User::isEnabled).toList();
+    return users.findAllById(ids).stream()
+        .filter(User::isEnabled)
+        .filter(
+            user ->
+                thread == null
+                    ? audience.canSeeReview(document, user.getId())
+                    : audience.canSeeThread(document, thread, user.getId()))
+        .toList();
   }
 
   /**

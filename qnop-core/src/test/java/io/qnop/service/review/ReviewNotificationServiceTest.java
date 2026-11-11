@@ -114,6 +114,7 @@ class ReviewNotificationServiceTest {
             identity),
         new io.qnop.service.mail.MailLocaleResolver(
             userSettings, settings, new io.qnop.service.mail.MailTemplateDefaults()),
+        new ReviewAudience(documents, annotations, participants),
         List.of(sinks));
   }
 
@@ -169,6 +170,38 @@ class ReviewNotificationServiceTest {
     service(broken, healthy).dispatch(commentEvent());
 
     assertThat(healthy.types()).containsExactly(NotificationType.MENTION);
+  }
+
+  @Test
+  @DisplayName("a follower who no longer belongs to the review is told nothing (#919)")
+  void formerParticipantIsNotNotified() {
+    seedMentionedFollower();
+    when(participants.existsAccessibleParticipant(DOCUMENT_ID, FOLLOWER_ID)).thenReturn(false);
+    RecordingSink sink = new RecordingSink();
+
+    ReviewNotificationService service = service(sink);
+    service.dispatch(commentEvent());
+    service.dispatch(new ReviewEvent.AnnotationDecided(DOCUMENT_ID, ACTOR_ID, ANNOTATION_ID, true));
+    service.dispatch(
+        new ReviewEvent.WorkflowChanged(DOCUMENT_ID, ACTOR_ID, "IN_REVIEW", "FINALIZED", true));
+
+    assertThat(sink.delivered).isEmpty();
+  }
+
+  @Test
+  @DisplayName("under PRIVATE participation only the thread's author and the owner hear of it")
+  void privateThreadReachesOnlyItsAuthorAndOwner() {
+    seedMentionedFollower();
+    Document document = documents.findById(DOCUMENT_ID).orElseThrow();
+    when(document.getThreadParticipation()).thenReturn(io.qnop.entity.ThreadParticipation.PRIVATE);
+    // The follower commented in a thread someone else authored: a candidate from history.
+    Annotation foreign = annotations.findById(ANNOTATION_ID).orElseThrow();
+    when(foreign.getAuthorId()).thenReturn(UUID.randomUUID());
+    RecordingSink sink = new RecordingSink();
+
+    service(sink).dispatch(commentEvent());
+
+    assertThat(sink.delivered).isEmpty();
   }
 
   @Test
@@ -316,7 +349,10 @@ class ReviewNotificationServiceTest {
     when(documents.findById(DOCUMENT_ID)).thenReturn(Optional.of(document));
 
     Annotation annotation = org.mockito.Mockito.mock(Annotation.class);
+    when(annotation.getId()).thenReturn(ANNOTATION_ID);
     when(annotation.getAuthorId()).thenReturn(FOLLOWER_ID);
+    // The follower is a current participant unless a test revokes it (issue #919).
+    when(participants.existsAccessibleParticipant(DOCUMENT_ID, FOLLOWER_ID)).thenReturn(true);
     when(annotations.findById(ANNOTATION_ID)).thenReturn(Optional.of(annotation));
 
     Comment reply = org.mockito.Mockito.mock(Comment.class);
