@@ -300,7 +300,7 @@ public class AnnotationService {
       UUID annotationId, UUID actor, boolean admin, String type, String priority) {
     Annotation annotation = requireAnnotation(annotationId);
     DocumentAccessService.DocumentView document =
-        documentAccess.getDocument(annotation.getDocumentId(), actor, admin);
+        visibleThread(documentAccess, annotation, actor, admin);
     if (!document.ownerId().equals(actor) && !annotation.getAuthorId().equals(actor)) {
       throw new AnnotationActionForbiddenException(
           "Only the document owner or the annotation's author may classify it");
@@ -348,11 +348,7 @@ public class AnnotationService {
   public AnnotationView get(UUID annotationId, UUID actor, boolean admin) {
     Annotation annotation = requireAnnotation(annotationId);
     DocumentAccessService.DocumentView document =
-        documentAccess.getDocument(annotation.getDocumentId(), actor, admin);
-    if (!canSeeThread(document, annotation.getAuthorId(), actor, admin)) {
-      // A PRIVATE foreign thread is invisible — 404, like the document itself.
-      throw DocumentValidationException.notFound("no such annotation: " + annotationId);
-    }
+        visibleThread(documentAccess, annotation, actor, admin);
     ReviewIdentityResolver.ReviewIdentities identities =
         identity.forDocument(annotation.getDocumentId(), actor);
     return view(
@@ -418,6 +414,7 @@ public class AnnotationService {
   @Transactional
   public AnnotationView dismiss(
       UUID annotationId, String justification, UUID actor, boolean admin) {
+    requireVisibleAnnotation(annotationId, actor, admin);
     Annotation updated = workflow.dismissAnnotation(annotationId, justification, actor, admin);
     ReviewIdentityResolver.ReviewIdentities identities =
         identity.forDocument(updated.getDocumentId(), actor);
@@ -442,10 +439,7 @@ public class AnnotationService {
       UUID annotationId, int versionNumber, UUID actor, boolean admin) {
     Annotation annotation = requireAnnotation(annotationId);
     DocumentAccessService.DocumentView document =
-        documentAccess.getDocument(annotation.getDocumentId(), actor, admin);
-    if (!canSeeThread(document, annotation.getAuthorId(), actor, admin)) {
-      throw DocumentValidationException.notFound("no such annotation: " + annotationId);
-    }
+        visibleThread(documentAccess, annotation, actor, admin);
     if (!admin && !document.ownerId().equals(actor) && !annotation.getAuthorId().equals(actor)) {
       throw new AnnotationActionForbiddenException(
           "Only the document owner or the annotation's author may confirm a placement");
@@ -504,10 +498,7 @@ public class AnnotationService {
     }
     Annotation annotation = requireAnnotation(annotationId);
     DocumentAccessService.DocumentView document =
-        documentAccess.getDocument(annotation.getDocumentId(), actor, admin);
-    if (!canSeeThread(document, annotation.getAuthorId(), actor, admin)) {
-      throw DocumentValidationException.notFound("no such annotation: " + annotationId);
-    }
+        visibleThread(documentAccess, annotation, actor, admin);
     if (!admin && !document.ownerId().equals(actor) && !annotation.getAuthorId().equals(actor)) {
       throw new AnnotationActionForbiddenException(
           "Only the document owner or the annotation's author may re-attach a placement");
@@ -574,17 +565,35 @@ public class AnnotationService {
   }
 
   /**
-   * The annotation, provided {@code actor} can currently see its review and — under PRIVATE
-   * participation — its thread; otherwise the anti-enumeration 404 shared by the read paths (issue
-   * #916). Runs before any workflow decision so a caller who lost access learns nothing.
+   * Runs the visibility gate before any workflow decision (issue #916), so a caller who lost access
+   * learns nothing from the decision's own authorization.
    */
   private void requireVisibleAnnotation(UUID annotationId, UUID actor, boolean admin) {
-    Annotation annotation = requireAnnotation(annotationId);
-    DocumentAccessService.DocumentView document =
-        documentAccess.getDocument(annotation.getDocumentId(), actor, admin);
-    if (!canSeeThread(document, annotation.getAuthorId(), actor, admin)) {
-      throw DocumentValidationException.notFound("no such annotation: " + annotationId);
+    visibleThread(documentAccess, requireAnnotation(annotationId), actor, admin);
+  }
+
+  /**
+   * The annotation's review as {@code actor} may see it, provided they can see the review and —
+   * under PRIVATE participation — the thread. Every miss answers exactly like an unknown annotation
+   * id ({@link AnnotationNotFoundException}: same status, code and message shape), so a hidden
+   * annotation cannot be told apart from one that does not exist (issue #916). Shared by every
+   * annotation-id path, including reactions.
+   */
+  static DocumentAccessService.DocumentView visibleThread(
+      DocumentAccessService documentAccess, Annotation annotation, UUID actor, boolean admin) {
+    DocumentAccessService.DocumentView document;
+    try {
+      document = documentAccess.getDocument(annotation.getDocumentId(), actor, admin);
+    } catch (DocumentValidationException e) {
+      if (!"NOT_FOUND".equals(e.getCode())) {
+        throw e;
+      }
+      throw new AnnotationNotFoundException(annotation.getId());
     }
+    if (!canSeeThread(document, annotation.getAuthorId(), actor, admin)) {
+      throw new AnnotationNotFoundException(annotation.getId());
+    }
+    return document;
   }
 
   /** FINALIZED/CANCELLED as strings — the column tolerates enterprise states (ADR-0011). */
@@ -603,11 +612,7 @@ public class AnnotationService {
   public CommentView addComment(UUID annotationId, UUID author, boolean admin, String body) {
     Annotation annotation = requireAnnotation(annotationId);
     DocumentAccessService.DocumentView document =
-        documentAccess.getDocument(annotation.getDocumentId(), author, admin);
-    if (!canSeeThread(document, annotation.getAuthorId(), author, admin)) {
-      // Invisible under PRIVATE — same 404 as the read paths (anti-enumeration).
-      throw DocumentValidationException.notFound("no such annotation: " + annotationId);
-    }
+        visibleThread(documentAccess, annotation, author, admin);
     if (!canWriteThread(document, annotation.getAuthorId(), author, admin)) {
       // READ_ONLY (issue #413): the thread is visible, but only the author and owner may comment.
       throw DocumentValidationException.threadReadOnly(
@@ -638,10 +643,7 @@ public class AnnotationService {
   public List<CommentView> listComments(UUID annotationId, UUID actor, boolean admin) {
     Annotation annotation = requireAnnotation(annotationId);
     DocumentAccessService.DocumentView document =
-        documentAccess.getDocument(annotation.getDocumentId(), actor, admin);
-    if (!canSeeThread(document, annotation.getAuthorId(), actor, admin)) {
-      throw DocumentValidationException.notFound("no such annotation: " + annotationId);
-    }
+        visibleThread(documentAccess, annotation, actor, admin);
     ReviewIdentityResolver.ReviewIdentities identities =
         identity.forDocument(annotation.getDocumentId(), actor);
     List<Comment> thread = comments.findByAnnotationIdOrderByCreatedAtAsc(annotationId);

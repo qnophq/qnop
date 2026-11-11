@@ -445,6 +445,65 @@ class AnnotationApiIT extends SeededIntegrationTest {
   }
 
   @Test
+  void aHiddenAnnotationIsIndistinguishableFromAnUnknownOne() throws Exception {
+    UUID documentId = seedDocumentWithVersion();
+    String hidden = createAnnotation(documentId, AUDITOR_ID);
+    String unknown = UUID.randomUUID().toString();
+
+    // Same status, code and message shape on every annotation route (#916).
+    for (String id : new String[] {hidden, unknown}) {
+      for (MockHttpServletRequestBuilder request :
+          new MockHttpServletRequestBuilder[] {
+            get("/api/v1/annotations/" + id),
+            get("/api/v1/annotations/" + id + "/comments"),
+            post("/api/v1/annotations/" + id + "/resolve"),
+            post("/api/v1/annotations/" + id + "/reopen")
+          }) {
+        mockMvc
+            .perform(as(request, EXTERNAL_ID))
+            .andExpect(status().isNotFound())
+            .andExpect(jsonPath("$.code").value("ANNOTATION_NOT_FOUND"))
+            .andExpect(jsonPath("$.message").value("Unknown annotation: " + id));
+      }
+    }
+  }
+
+  @Test
+  void aNonParticipantAdminReachesTheAuthorOnlyRuleNotA404() throws Exception {
+    UUID documentId = seedDocumentWithVersion();
+    String annotationId = createAnnotation(documentId, AUDITOR_ID);
+
+    // Admins see every review, so the visibility gate passes and the author-only rule answers.
+    resolve(annotationId, ADMIN_ID)
+        .andExpect(status().isForbidden())
+        .andExpect(jsonPath("$.code").value("ANNOTATION_ACTION_FORBIDDEN"));
+  }
+
+  @Test
+  void aForeignPrivateThreadCannotBeResolvedOrReopenedByAnotherReviewer() throws Exception {
+    // The policy is fixed at creation (the column is not updatable).
+    Document document = new Document(MEMBER_ID, "Private review");
+    document.setThreadParticipation(io.qnop.entity.ThreadParticipation.PRIVATE);
+    UUID documentId = documents.save(document).getId();
+    participants.save(ReviewParticipant.forUser(documentId, AUDITOR_ID));
+    participants.save(ReviewParticipant.forUser(documentId, MEMBER2_ID));
+    versions.save(
+        new DocumentVersion(
+            documentId, 1, "sha256/aa/deadbeef", "deadbeef", "application/pdf", 1234L, MEMBER_ID));
+    String open = createAnnotation(documentId, AUDITOR_ID);
+    String resolved = createAnnotation(documentId, AUDITOR_ID);
+    resolve(resolved, AUDITOR_ID).andExpect(status().isOk());
+
+    resolve(open, MEMBER2_ID)
+        .andExpect(status().isNotFound())
+        .andExpect(jsonPath("$.code").value("ANNOTATION_NOT_FOUND"));
+    mockMvc
+        .perform(as(post("/api/v1/annotations/" + resolved + "/reopen"), MEMBER2_ID))
+        .andExpect(status().isNotFound())
+        .andExpect(jsonPath("$.code").value("ANNOTATION_NOT_FOUND"));
+  }
+
+  @Test
   void resolvingAnAlreadyResolvedAnnotationIsConflict() throws Exception {
     UUID documentId = seedDocumentWithVersion();
     String annotationId = createAnnotation(documentId, AUDITOR_ID);
