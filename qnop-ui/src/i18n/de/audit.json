@@ -122,6 +122,14 @@
       "label": "Reviews endgültig gelöscht",
       "description": "Archivierte Reviews haben die Löschfrist überschritten und wurden endgültig gelöscht, einschließlich Speicherobjekten, auf die kein anderes Dokument verwies (Issue #577). Dies ist der einzige verbliebene Nachweis — ihr eigener Audit-Trail wurde mit ihnen gelöscht; die Details listen auf, was entfernt wurde."
     },
+    "auditChainPruned": {
+      "label": "Audit-Trail bereinigt",
+      "description": "Ein Review wurde gelöscht und seine eigenen Audit-Ereignisse mit ihm (Issue #928). Dieser Grabstein hält fest, welche Positionen der manipulationssicheren Audit-Kette entfernt wurden, damit die Kettenprüfung diese zulässige Löschung von einer Manipulation unterscheiden kann."
+    },
+    "auditChainBroken": {
+      "label": "Audit-Kette unterbrochen",
+      "description": "Die Prüfung der Audit-Kette hat Audit-Ereignisse gefunden, die außerhalb der Anwendung verändert, entfernt oder eingefügt wurden (Issue #928). Die Details benennen jede Unterbrechung mit ihrer Kettenposition; prüfen Sie den Vorfall, bevor Sie den betroffenen Einträgen vertrauen."
+    },
     "secretsReencrypted": {
       "label": "Geheimnisse neu verschlüsselt",
       "description": "Gespeicherte Geheimnisse (sensible Einstellungen, OIDC-Client-Secrets) in einem älteren Format oder unter einem abgelösten Schlüssel wurden beim Start unter dem aktuellen Schlüssel neu verschlüsselt (Issue #927). Die Details nennen die Anzahl und die aktuelle Schlüssel-ID – nie einen Wert."

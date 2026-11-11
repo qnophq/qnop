@@ -1,0 +1,45 @@
+# Copyright (c) 2026-present devtank42 GmbH
+# SPDX-License-Identifier: AGPL-3.0-only
+#
+# Audit-trail tamper evidence and resistance (issue #928, ADR-0043 amendment):
+# a commit-time hash chain over audit_event, append-only guards (no UPDATE, no
+# DELETE except the document cascade), prune tombstones for sanctioned
+# cascades, and a one-time backfill of the chain over pre-existing rows. A NEW
+# changeset — shipped changesets are immutable. The body lives in a sqlFile
+# (PL/pgSQL needs splitStatements: false).
+databaseChangeLog:
+  - changeSet:
+      id: 0040-audit-chain
+      author: qnop
+      comment: >-
+        audit_event hash chain (chain_seq/prev_hash/row_hash + audit_chain_head),
+        append-only triggers and cascade-prune tombstones (issue #928).
+      changes:
+        - sqlFile:
+            path: 0040-audit-chain.sql
+            relativeToChangelogFile: true
+            splitStatements: false
+      # Rollback removes the guards and the chain (and with it the integrity
+      # evidence collected so far); the tombstone events stay as ordinary rows.
+      rollback:
+        - sql:
+            splitStatements: true
+            sql: |
+              DROP TRIGGER IF EXISTS trg_document_mark_audit_cascade ON document;
+              DROP TRIGGER IF EXISTS trg_audit_event_guard_insert ON audit_event;
+              DROP TRIGGER IF EXISTS trg_audit_event_record_prune ON audit_event;
+              DROP TRIGGER IF EXISTS trg_audit_event_no_direct_delete ON audit_event;
+              DROP TRIGGER IF EXISTS trg_audit_event_no_update ON audit_event;
+              DROP TRIGGER IF EXISTS trg_audit_event_seal ON audit_event;
+              DROP FUNCTION IF EXISTS audit_event_record_prune();
+              DROP FUNCTION IF EXISTS audit_event_guard_insert();
+              DROP FUNCTION IF EXISTS audit_event_reject_direct_delete();
+              DROP FUNCTION IF EXISTS document_mark_audit_cascade();
+              DROP FUNCTION IF EXISTS audit_event_cascade_sanctioned(text, uuid);
+              DROP FUNCTION IF EXISTS audit_event_reject_update();
+              DROP FUNCTION IF EXISTS audit_event_seal();
+              DROP FUNCTION IF EXISTS audit_event_canonical(uuid, text, uuid, text, uuid, jsonb, timestamptz);
+              DROP TABLE IF EXISTS audit_chain_head;
+              ALTER TABLE audit_event DROP CONSTRAINT IF EXISTS ck_audit_event_chain_seq;
+              ALTER TABLE audit_event DROP CONSTRAINT IF EXISTS ux_audit_event_chain_seq;
+              ALTER TABLE audit_event DROP COLUMN IF EXISTS row_hash, DROP COLUMN IF EXISTS prev_hash, DROP COLUMN IF EXISTS chain_seq;

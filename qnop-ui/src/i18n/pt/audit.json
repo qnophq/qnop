@@ -122,6 +122,14 @@
       "label": "Revisões excluídas definitivamente",
       "description": "Revisões arquivadas ultrapassaram o período de retenção para limpeza e foram excluídas permanentemente, junto com os objetos de armazenamento não referenciados por nenhum outro documento (issue #577). Este é o único registro que resta delas — a própria trilha de auditoria delas foi excluída junto; os detalhes listam o que foi removido."
     },
+    "auditChainPruned": {
+      "label": "Trilha de auditoria podada",
+      "description": "Uma revisão foi excluída e os próprios eventos de auditoria dela foram junto (issue #928). Este marcador registra quais posições da cadeia de auditoria à prova de adulteração foram removidas, para que a verificação da cadeia distinga esta exclusão autorizada de uma adulteração."
+    },
+    "auditChainBroken": {
+      "label": "Cadeia de auditoria rompida",
+      "description": "A verificação da cadeia de auditoria encontrou eventos de auditoria alterados, removidos ou inseridos fora da aplicação (issue #928). Os detalhes localizam cada ruptura pela posição na cadeia; investigue antes de confiar nas entradas afetadas."
+    },
     "secretsReencrypted": {
       "label": "Segredos recriptografados",
       "description": "Segredos armazenados (configurações sensíveis, segredos de cliente OIDC) em um formato antigo ou sob uma chave retirada foram criptografados novamente com a chave atual na inicialização (issue #927). Os detalhes mostram as contagens e o identificador da chave atual — nunca um valor."
