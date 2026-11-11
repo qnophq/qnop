@@ -27,6 +27,10 @@ jobs:
       # `build` runs spotlessCheck (formatting + SPDX header) and the ArchUnit
       # conformance tests via the `check` task.
       - run: ./gradlew build --stacktrace
+      # Stdlib-only tests of the repository's helper scripts, e.g. the
+      # verification-metadata gate (issue #925).
+      - name: Script tests
+        run: python3 -I -m unittest discover -s scripts -p 'test_*.py' -v
 
   # The backend CVE gate is now the Trivy SBOM scan in security.yml (issue #496):
   # it scans a CycloneDX SBOM of qnop-app's runtime classpath with Trivy's own
