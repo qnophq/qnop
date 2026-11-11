@@ -157,6 +157,25 @@ class HttpClientIpResolverTest {
   }
 
   @Test
+  void canonicalisesIpv4MappedEntries() {
+    HttpClientIpResolver resolver = resolver(List.of("10.0.0.0/8"));
+
+    assertThat(resolver.resolve(request("10.1.2.3", "::ffff:198.51.100.7")))
+        .isEqualTo("198.51.100.7");
+  }
+
+  @Test
+  void neverTreatsAnEntryThatCouldReachTheNameServiceAsALiteral() {
+    // Only strings starting with a hex digit or ':' are parsed by the JDK without a lookup.
+    assertThat(HttpClientIpResolver.parseLiteral(".:")).isEmpty();
+    assertThat(HttpClientIpResolver.parseLiteral(".1:2")).isEmpty();
+    assertThat(HttpClientIpResolver.parseLiteral("[.:]")).isEmpty();
+    assertThat(HttpClientIpResolver.parseLiteral("g::1")).isEmpty();
+    assertThat(HttpClientIpResolver.parseLiteral("abc")).isEmpty();
+    assertThat(HttpClientIpResolver.parseLiteral("::1")).contains("0:0:0:0:0:0:0:1");
+  }
+
+  @Test
   void matchesIpv6TrustedProxies() {
     HttpClientIpResolver resolver = resolver(List.of("fd00::/8"));
 

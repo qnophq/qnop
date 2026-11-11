@@ -70,7 +70,9 @@ public class HttpClientIpResolver {
       Pattern.compile("(\\d{1,3})\\.(\\d{1,3})\\.(\\d{1,3})\\.(\\d{1,3})(?::\\d{1,5})?");
   private static final Pattern BRACKETED_IPV6 =
       Pattern.compile("\\[([0-9A-Fa-f:.]+)](?::\\d{1,5})?");
-  private static final Pattern IPV6 = Pattern.compile("[0-9A-Fa-f:.]*:[0-9A-Fa-f:.]*");
+  // Must start with a hex digit or ":" — only then does the JDK treat the string as a literal
+  // (anything else, e.g. a leading ".", is handed to the name service).
+  private static final Pattern IPV6 = Pattern.compile("(?=.*:)[0-9A-Fa-f:][0-9A-Fa-f:.]*");
 
   private static final Logger log = LoggerFactory.getLogger(HttpClientIpResolver.class);
 
@@ -159,7 +161,8 @@ public class HttpClientIpResolver {
       return Optional.empty();
     }
     try {
-      // Contains ':' and only hex digits / ':' / '.', so the JDK parses it as an IPv6 literal (or
+      // Starts with a hex digit or ':', contains ':' and only hex digits / ':' / '.', so the JDK
+      // parses it as an IPv6 literal (or
       // rejects it) without consulting a resolver.
       return Optional.of(InetAddress.getByName(v6).getHostAddress());
     } catch (UnknownHostException | IllegalArgumentException e) {

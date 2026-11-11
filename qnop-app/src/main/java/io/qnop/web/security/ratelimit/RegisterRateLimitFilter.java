@@ -52,7 +52,8 @@ public class RegisterRateLimitFilter extends AbstractRateLimitFilter {
 
   @Override
   protected String resolveKey(HttpServletRequest request) {
-    return clientIpResolver.resolve(request);
+    // IPv6 grouped by /56 (ClientNetworks).
+    return ClientNetworks.perIpKey(clientIpResolver.resolve(request));
   }
 
   @Override
