@@ -366,6 +366,7 @@ export function ApplicationSettingsForm() {
             description={GROUP_DESCRIPTIONS[group] ? t(GROUP_DESCRIPTIONS[group]) : undefined}
           >
             <Stack spacing={2.5}>
+              {group === 'tracking' && <TrackingTrustNote />}
               {group === 'tracking' && <TrackingStatusNote values={effectiveValues} />}
               {items.map((setting) => (
                 <SettingField
@@ -527,6 +528,20 @@ function SettingField({ setting, value, error, onChange }: SettingFieldProps) {
       autoComplete={isPassword ? 'new-password' : undefined}
       sx={{ maxWidth: 480 }}
     />
+  );
+}
+
+/**
+ * What enabling measurement trusts the analytics backend with (issue #910), stated where the
+ * backend is chosen. Always shown, not only once tracking is on: the decision is made before the
+ * switch is flipped.
+ */
+function TrackingTrustNote() {
+  const { t } = useTranslation('admin');
+  return (
+    <Alert severity="info" variant="outlined">
+      {t('settings.tracking.trustNote')}
+    </Alert>
   );
 }
 

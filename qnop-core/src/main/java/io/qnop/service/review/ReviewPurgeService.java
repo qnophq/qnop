@@ -291,6 +291,16 @@ public class ReviewPurgeService {
     if (purged.size() > listed.size()) {
       json.append(",\"truncated\":").append(purged.size() - listed.size());
     }
+    // Every purged id, uncapped (UUIDs only, so it stays small): the audit-chain
+    // verifier (issue #928) matches each pruned document against this list.
+    json.append(",\"documentIds\":[");
+    for (int i = 0; i < purged.size(); i++) {
+      if (i > 0) {
+        json.append(',');
+      }
+      json.append('"').append(purged.get(i).id()).append('"');
+    }
+    json.append(']');
     return json.append('}').toString();
   }
 

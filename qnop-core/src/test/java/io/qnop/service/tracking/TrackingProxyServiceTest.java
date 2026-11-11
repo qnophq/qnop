@@ -86,7 +86,6 @@ class TrackingProxyServiceTest {
                 new TrackingRuntimeConfig(
                     TrackingProvider.MATOMO,
                     "1",
-                    host + "/matomo.js",
                     host,
                     false,
                     false,
@@ -139,7 +138,6 @@ class TrackingProxyServiceTest {
                 new TrackingRuntimeConfig(
                     TrackingProvider.UMAMI,
                     "site",
-                    "http://127.0.0.1:" + backend.getAddress().getPort() + "/script.js",
                     "http://127.0.0.1:" + backend.getAddress().getPort(),
                     false,
                     false,
@@ -185,7 +183,6 @@ class TrackingProxyServiceTest {
             guarded.forward(
                 "GET", "/matomo.php", "idsite=1&rec=1", new byte[0], null, null, "Mozilla/5.0"))
         .isEmpty();
-    assertThat(guarded.script()).isEmpty();
     assertThat(requests.poll(1, TimeUnit.SECONDS)).as("nothing was sent").isNull();
   }
 
@@ -214,7 +211,6 @@ class TrackingProxyServiceTest {
                   new TrackingRuntimeConfig(
                       TrackingProvider.MATOMO,
                       "1",
-                      host + "/matomo.js",
                       host,
                       false,
                       false,

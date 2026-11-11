@@ -50,6 +50,8 @@ public enum FieldErrorCode {
   INVALID_EMAIL,
   /** Not an http(s) URL. */
   INVALID_URL,
+  /** Plain http where https is required (a public analytics host, issue #910). */
+  REQUIRES_HTTPS,
   /** Not an IANA time-zone id. */
   INVALID_TIMEZONE,
   /** Not a two-letter ISO 639-1 language code. */

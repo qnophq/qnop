@@ -44,6 +44,7 @@ public final class SchedulerJobCatalog {
   public static final String REVIEW_PURGE = "reviewPurge";
   public static final String NOTIFICATION_SWEEP = "notificationSweep";
   public static final String NOTIFICATION_DIGEST = "notificationDigest";
+  public static final String AUDIT_CHAIN_VERIFY = "auditChainVerify";
 
   private static final List<SchedulerJobDefinition> DEFINITIONS =
       List.of(
@@ -140,6 +141,19 @@ public final class SchedulerJobCatalog {
               // recipients would roll back fifty watermarks whose mails are already
               // delivered — and the next run would send them again. Mail cannot be
               // rolled back, so the commit must not be deferred past it.
+              true),
+          // Read-only, so nothing to dry-run (issue #928, ADR-0043). Self-transactional:
+          // the walk needs its own repeatable-read snapshot, and a break is recorded in a
+          // separate transaction before the run fails.
+          new SchedulerJobDefinition(
+              AUDIT_CHAIN_VERIFY,
+              "Audit chain verification",
+              "Recomputes the audit trail's hash chain and checks that no audit event was altered"
+                  + " or removed outside a sanctioned review deletion. A break fails the run and"
+                  + " is recorded in the audit trail.",
+              "0 0 5 * * *",
+              false,
+              true,
               true));
 
   private static final List<String> IDS =

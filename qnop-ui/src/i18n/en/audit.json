@@ -122,6 +122,14 @@
       "label": "Reviews purged",
       "description": "Archived reviews passed the purge retention window and were deleted permanently, including storage objects no other document referenced (issue #577). This is the only surviving record of them — their own audit trail was deleted with them; the details list what went."
     },
+    "auditChainPruned": {
+      "label": "Audit trail pruned",
+      "description": "A review was deleted and its own audit events went with it (issue #928). This tombstone records which positions of the tamper-evident audit chain were removed, so the chain verification can tell this sanctioned deletion apart from tampering."
+    },
+    "auditChainBroken": {
+      "label": "Audit chain broken",
+      "description": "The audit-chain verification found audit events that were altered, removed or inserted outside the application (issue #928). The details locate each break by chain position; investigate before trusting the affected entries."
+    },
     "secretsReencrypted": {
       "label": "Secrets re-encrypted",
       "description": "Stored secrets (sensitive settings, OIDC client secrets) in an older format or under a rotated-out encryption key were re-encrypted under the current key at start-up (issue #927). The details give the counts and the current key id — never a value."

@@ -117,6 +117,43 @@ docker compose exec qnop sh -c 'cat /tmp/qnop-bootstrap-*/admin-password.txt'
 - **TLS**: terminate TLS at a reverse proxy and set `QNOP_HTTP_FORWARD_HEADERS_STRATEGY=framework`. The refresh cookie is `Secure` — plain-HTTP deployments are for local evaluation only.
 - **Backups**: the PostgreSQL database and the object-storage bucket together form the complete state; back them up as a pair.
 
+## Audit-trail integrity
+
+The audit trail (`audit_event`) protects itself inside the database (ADR-0043, issue #928): rows cannot be updated, they can be deleted only together with their review (the document cascade, which records an `audit.chain.pruned` tombstone), and every row is sealed into a SHA-256 hash chain when its transaction commits. The **Audit chain verification** job (`/admin/scheduler`, nightly at 05:00, also runnable on demand) recomputes the chain; a break fails the job, writes an `audit.chain.broken` event to the audit trail, and sets the Prometheus gauge `qnop_audit_chain_intact` to `0` — alert on that (it is `NaN` only until the job has run once anywhere). PostgreSQL 14 or newer is required (the migration refuses older versions), and audit-writing transactions must run under the default `READ COMMITTED` isolation — do not set `default_transaction_isolation` to anything stricter for the qnop database.
+
+These guards stop mistakes and a compromised application, but **whoever owns the schema can switch them off**. Two optional measures close that gap:
+
+**1. Run the application as a restricted role.** Migrate as the schema owner and let the application connect as a role that cannot alter the schema or touch the audit trail beyond appending to it:
+
+```sql
+-- once, as a superuser / the owner
+CREATE ROLE qnop_app LOGIN PASSWORD '…';
+GRANT USAGE ON SCHEMA public TO qnop_app;
+GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public TO qnop_app;
+GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public TO qnop_app;
+REVOKE UPDATE, DELETE, TRUNCATE ON audit_event FROM qnop_app;
+REVOKE INSERT, UPDATE, DELETE, TRUNCATE ON audit_chain_head FROM qnop_app;
+-- tables created by later migrations (run as the owner):
+ALTER DEFAULT PRIVILEGES FOR ROLE qnop IN SCHEMA public
+  GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES TO qnop_app;
+ALTER DEFAULT PRIVILEGES FOR ROLE qnop IN SCHEMA public
+  GRANT USAGE, SELECT ON SEQUENCES TO qnop_app;
+```
+
+Keep the owner's credentials out of the running application. The recommended pattern is a **separate one-off migration step** per upgrade: run the same image once with `QNOP_DB_USERNAME`/`QNOP_DB_PASSWORD` set to the owner — it applies the migrations at startup — and stop it once it reports started; then run the service itself with the restricted role and migrations switched off:
+
+```bash
+QNOP_DB_USERNAME=qnop_app            # the application's runtime connection
+QNOP_DB_PASSWORD=…
+SPRING_LIQUIBASE_ENABLED=false       # migrations ran in the one-off step
+```
+
+Only if a separate step is impractical, let the service migrate with the owner pair `SPRING_LIQUIBASE_USER` / `SPRING_LIQUIBASE_PASSWORD` next to the restricted runtime credentials — weaker, because a compromised application process then holds the owner's credentials too.
+
+The chain-sealing and tombstone triggers run with the owner's rights (`SECURITY DEFINER`), and PostgreSQL runs the review-deletion cascade as the table owner, so deleting a review keeps working without granting `DELETE` on `audit_event`. Re-run the `REVOKE` lines if you ever re-grant on all tables.
+
+**2. Ship the checkpoints out of the database.** Each successful verification logs `Audit chain intact: … head seq=<n> hash=<h>` (logger `io.qnop.service.audit.AuditChainVerificationService`). Forward these lines — or the whole application log — to an append-only store the database credentials cannot reach (your log platform, object storage with retention lock, syslog on another host). Someone who rewrites the trail and recomputes the chain cannot make an earlier logged hash reappear at its logged position: compare a stored checkpoint with `SELECT row_hash FROM audit_event WHERE chain_seq = <n>` to prove the trail up to that point is unchanged. (If row `<n>` has since been deleted with its review, an `audit.chain.pruned` tombstone lists its range; compare against the nearest surviving later checkpoint instead.)
+
 ## Behind a reverse proxy
 
 The auth rate limits (login, refresh, registration, password reset — ADR-0027) and usage tracking key on the client IP. qnop only believes `X-Forwarded-For` when the TCP peer is one of the CIDRs in `QNOP_AUTH_RATELIMIT_TRUSTEDPROXYCIDRS` (property `qnop.auth.rate-limit.trusted-proxy-cidrs`).
@@ -153,6 +190,17 @@ What a subprocess cannot do on its own is change user, network or kernel limits 
 
    Running the converter under a separate uid (for example `sudo -u <converter-user>` in the wrapper with a sudoers rule scoped to that single command) additionally keeps it from reading the server process's files and `/proc` entries.
 4. **Disable it.** A deployment that does not need DOCX ingest or PDF export can set `QNOP_OFFICE_BINARY` to a non-existent path; both features then report themselves unavailable in `GET /api/v1/config`.
+
+## Usage tracking (analytics backends)
+
+Usage tracking is off by default and configured under *Administration → Settings → Usage tracking* (ADR-0056). The browser never talks to the analytics backend and loads no analytics script: qnop builds each measurement itself and posts it to `/t/c/…` on its own origin, and the server checks it against the exact shape qnop sends before forwarding it with the visitor's user agent and — per `tracking.forward_client_ip` — a truncated, exact or no `X-Forwarded-For` (issue #910).
+
+- **Transport.** `tracking.host` must be `https://` unless it is a private address (an IP literal in a private range, `localhost`, `*.local`, `*.internal`). Reaching a private host additionally needs `QNOP_TRACKING_ALLOW_PRIVATE_HOST=true` (`qnop.tracking.allow-private-host`).
+- **Visitor addresses through the proxy.** Every measurement reaches the backend from qnop's server, so the backend has to take the visitor's address from `X-Forwarded-For` — otherwise it counts every visitor as one.
+  - **Matomo** uses the header only when told to: add `proxy_client_headers[] = HTTP_X_FORWARDED_FOR` to the `[General]` section of its `config/config.ini.php`. Only do this if requests reach Matomo exclusively through qnop or another proxy you control, since the header is otherwise caller-supplied.
+  - **Umami, Plausible and PostHog** read the forwarded address as part of their documented proxy setups; check the visitor counts on your instance after enabling.
+  - **Pirsch** — known limitation: its identification-code endpoints are designed to be called from the browser, and its documented proxy setups use a server-side API client instead. Through qnop, Pirsch may attribute every visitor to qnop's address. A server-side access-token mode is tracked in issue #944; until then, prefer another backend if unique-visitor counts matter.
+- **PostHog region.** An empty host means PostHog's US cloud. For an EU project set `tracking.host` to `https://eu.i.posthog.com`. Unique-user counts in PostHog are per page load by design (no persistent id is kept), so read page views and events rather than "unique users".
 
 ## Upgrades
 

@@ -167,6 +167,16 @@ export const AUDIT_EVENT_META: Record<string, AuditEventMeta> = {
     descriptionKey: 'events.reviewPurged.description',
     tone: 'red',
   },
+  'audit.chain.pruned': {
+    labelKey: 'events.auditChainPruned.label',
+    descriptionKey: 'events.auditChainPruned.description',
+    tone: 'neutral',
+  },
+  'audit.chain.broken': {
+    labelKey: 'events.auditChainBroken.label',
+    descriptionKey: 'events.auditChainBroken.description',
+    tone: 'red',
+  },
   'secrets.reencrypted': {
     labelKey: 'events.secretsReencrypted.label',
     descriptionKey: 'events.secretsReencrypted.description',

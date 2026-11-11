@@ -48,6 +48,12 @@ import org.hibernate.type.SqlTypes;
  * AuditScope#DOCUMENT} rows (the original per-document trail) always carry a {@code documentId};
  * {@link AuditScope#SYSTEM} rows (org-level operator actions, e.g. scheduler toggles) never do. Use
  * {@link #system(String, UUID, String)} to record the latter.
+ *
+ * <p>Append-only is enforced by the database, not just this mapping (issue #928, ADR-0043):
+ * triggers reject every UPDATE and every DELETE other than the document cascade, and seal each row
+ * into a hash chain at commit. The chain columns ({@code chain_seq}, {@code prev_hash}, {@code
+ * row_hash}) are deliberately not mapped here; {@code AuditChainRepository} reads them for
+ * verification.
  */
 @Entity
 @Table(name = "audit_event")

@@ -118,4 +118,14 @@ describe('ApplicationSettingsForm — default timezone', () => {
     // opt-in was granted on.
     expect(screen.getByText(/Do-Not-Track keep applying/)).toBeInTheDocument();
   });
+
+  it('states what the analytics backend is trusted with (#910)', () => {
+    renderWithProviders(<ApplicationSettingsForm />);
+
+    const note = screen.getByText(/never runs the analytics provider's code/);
+    // What leaves, who receives it, and the transport rule — said before the
+    // switch is flipped, not after.
+    expect(note).toHaveTextContent(/only at a server you trust/);
+    expect(note).toHaveTextContent(/must use https/);
+  });
 });
