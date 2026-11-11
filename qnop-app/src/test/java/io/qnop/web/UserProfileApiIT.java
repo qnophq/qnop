@@ -205,4 +205,19 @@ class UserProfileApiIT extends SeededIntegrationTest {
         .andExpect(status().isNotFound());
     mockMvc.perform(get("/api/v1/users/" + MEMBER_ID)).andExpect(status().isUnauthorized());
   }
+
+  @Test
+  @DisplayName("a disabled account's profile answers the same 404 by id and by slug (#918)")
+  void disabledAccountsAreNotServed() throws Exception {
+    mockMvc
+        .perform(
+            get("/api/v1/users/" + DISABLED_ID)
+                .header("Authorization", "Bearer " + token(MEMBER_ID)))
+        .andExpect(status().isNotFound());
+    mockMvc
+        .perform(
+            get("/api/v1/users/by-slug/dana-disabled")
+                .header("Authorization", "Bearer " + token(MEMBER_ID)))
+        .andExpect(status().isNotFound());
+  }
 }

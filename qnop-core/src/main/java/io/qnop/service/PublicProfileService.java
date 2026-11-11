@@ -66,19 +66,30 @@ public class PublicProfileService {
     this.teamMemberships = teamMemberships;
   }
 
+  /**
+   * A disabled account's profile is not served (issue #918): it answers the same 404 as an unknown
+   * id, so the public surface reveals nothing about deactivated accounts.
+   */
   @Transactional(readOnly = true)
   public PublicProfileView getProfile(UUID id) {
-    return buildProfile(users.findById(id).orElseThrow(() -> new UserNotFoundException(id)));
+    return buildProfile(
+        users
+            .findById(id)
+            .filter(User::isEnabled)
+            .orElseThrow(() -> new UserNotFoundException(id)));
   }
 
   /**
    * Resolves a profile by the immutable, case-insensitively unique profile slug (issue #486).
-   * Unknown slugs answer the same 404 as unknown ids.
+   * Unknown slugs and disabled accounts answer the same 404 as unknown ids.
    */
   @Transactional(readOnly = true)
   public PublicProfileView getProfileBySlug(String slug) {
     return buildProfile(
-        users.findBySlugIgnoreCase(slug).orElseThrow(() -> new UserNotFoundException(slug)));
+        users
+            .findBySlugIgnoreCase(slug)
+            .filter(User::isEnabled)
+            .orElseThrow(() -> new UserNotFoundException(slug)));
   }
 
   private PublicProfileView buildProfile(User user) {

@@ -203,4 +203,16 @@ describe('ParticipantsDialog — owner management', () => {
     expect(screen.getByText('Jonas Keller')).toBeInTheDocument();
     expect(vi.mocked(principalsApi.listTeamMembers)).toHaveBeenCalledWith({ teamId: 't-alpha' });
   });
+
+  it('says the roster is not visible when a foreign team hides its members (#918)', async () => {
+    vi.mocked(principalsApi.listTeamMembers).mockRejectedValue(new Error('404'));
+    renderDialog(false);
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Show members of Team Alpha' }));
+
+    expect(
+      await screen.findByText("This team's members are not visible to you."),
+    ).toBeInTheDocument();
+    expect(screen.queryByText('No members in this team.')).not.toBeInTheDocument();
+  });
 });

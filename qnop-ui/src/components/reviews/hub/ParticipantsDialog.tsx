@@ -102,6 +102,14 @@ function TeamMemberList({ teamId }: { teamId: string }) {
       </Stack>
     );
   }
+  // A foreign team's roster follows its profile setting (issue #918): a hidden one answers 404.
+  if (membersQuery.isError) {
+    return (
+      <Typography variant="caption" color="text.secondary" sx={{ display: 'block', pl: 7 }}>
+        {t('participants.membersHidden')}
+      </Typography>
+    );
+  }
   if (members.length === 0) {
     return (
       <Typography variant="caption" color="text.secondary" sx={{ display: 'block', pl: 7 }}>

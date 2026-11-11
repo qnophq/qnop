@@ -20,6 +20,7 @@
  */
 package io.qnop.service;
 
+import io.qnop.entity.Team;
 import io.qnop.repository.TeamMembershipRepository;
 import io.qnop.repository.TeamRepository;
 import io.qnop.repository.UserRepository;
@@ -74,14 +75,27 @@ public class PrincipalDirectoryService {
 
   /**
    * A team's members, display names only (issue #403): lets a participant list unfold a team to see
-   * who reviews behind it — the same visibility rule as the directory itself.
+   * who reviews behind it. Served to the team's members and admins, and to anyone else only when
+   * the team's public profile opts into showing its members (issue #918 — the team profile's rule,
+   * so team membership is not enumerable by every account). A disabled team answers like an unknown
+   * one, a hidden roster too (no existence or visibility oracle), and disabled member accounts are
+   * left out.
    */
   @Transactional(readOnly = true)
-  public List<PrincipalView> teamMembers(UUID teamId) {
-    if (!teams.existsById(teamId)) {
+  public List<PrincipalView> teamMembers(UUID teamId, UUID actorId, boolean admin) {
+    Team team =
+        teams
+            .findById(teamId)
+            .filter(Team::isEnabled)
+            .orElseThrow(() -> new TeamNotFoundException("team not found: " + teamId));
+    boolean mayList =
+        admin
+            || team.isProfileShowMembers()
+            || memberships.existsByTeamIdAndUserId(teamId, actorId);
+    if (!mayList) {
       throw new TeamNotFoundException("team not found: " + teamId);
     }
-    return memberships.findMembersByTeamId(teamId).stream()
+    return memberships.findEnabledMembersByTeamId(teamId).stream()
         .map(
             member ->
                 new PrincipalView(member.userId(), false, member.slug(), member.displayName()))

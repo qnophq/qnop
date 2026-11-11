@@ -65,8 +65,9 @@ public class PrincipalsController implements PrincipalsApi {
 
   @Override
   public ResponseEntity<PrincipalListResponse> listTeamMembers(UUID teamId) {
-    CurrentUser.requireUserId();
-    return ResponseEntity.ok(toResponse(directory.teamMembers(teamId)));
+    UUID actorId = CurrentUser.requireUserId();
+    return ResponseEntity.ok(
+        toResponse(directory.teamMembers(teamId, actorId, CurrentUser.isAdmin())));
   }
 
   private PrincipalListResponse toResponse(List<PrincipalDirectoryService.PrincipalView> views) {
