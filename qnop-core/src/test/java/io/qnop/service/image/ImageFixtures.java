@@ -54,6 +54,29 @@ public final class ImageFixtures {
     return encode(new BufferedImage(width, height, BufferedImage.TYPE_BYTE_INDEXED), "gif");
   }
 
+  /**
+   * A GIF89a with the given logical screen and one frame per {@code {left, top, width, height}}
+   * entry, each preceded by a graphic control extension and carrying a token LZW payload.
+   */
+  public static byte[] gif(int screenWidth, int screenHeight, int[]... frames) {
+    ByteArrayOutputStream out = new ByteArrayOutputStream();
+    out.writeBytes("GIF89a".getBytes(StandardCharsets.US_ASCII));
+    out.writeBytes(le(4).putShort((short) screenWidth).putShort((short) screenHeight).array());
+    out.writeBytes(new byte[] {0, 0, 0}); // no global colour table, background, aspect
+    for (int[] frame : frames) {
+      out.writeBytes(new byte[] {0x21, (byte) 0xF9, 4, 0, 0, 0, 0, 0}); // graphic control ext.
+      out.write(0x2C);
+      ByteBuffer descriptor = le(8);
+      for (int value : frame) {
+        descriptor.putShort((short) value);
+      }
+      out.writeBytes(descriptor.array());
+      out.writeBytes(new byte[] {0, 2, 2, 0x44, 0x01, 0}); // packed, LZW size, one sub-block, end
+    }
+    out.write(0x3B);
+    return out.toByteArray();
+  }
+
   /** A PNG signature plus an IHDR declaring the given size, a tiny IDAT and IEND. */
   public static byte[] pngHeader(int width, int height) {
     ByteArrayOutputStream out = new ByteArrayOutputStream();

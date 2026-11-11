@@ -89,6 +89,35 @@ class ImageHeaderProbeTest {
   }
 
   @Test
+  void gifSizeIsTheLargerOfTheLogicalScreenAndEveryFrame() {
+    // A small first frame on a large logical screen: the screen is what renderers allocate.
+    assertThat(ImageHeaderProbe.probe(ImageFixtures.gif(20_000, 20_000, new int[] {0, 0, 1, 1})))
+        .contains(new Dimensions(20_000, 20_000));
+    // A later frame reaching beyond the screen counts too.
+    assertThat(
+            ImageHeaderProbe.probe(
+                ImageFixtures.gif(10, 10, new int[] {0, 0, 10, 10}, new int[] {5, 0, 30_000, 4})))
+        .contains(new Dimensions(30_005, 10));
+  }
+
+  @Test
+  void gifWithTooManyFramesOrNoFrameIsUnreadable() {
+    int[][] frames = new int[GifHeader.MAX_FRAMES + 1][];
+    Arrays.fill(frames, new int[] {0, 0, 1, 1});
+    assertThat(ImageHeaderProbe.probe(ImageFixtures.gif(1, 1, frames))).isEmpty();
+    assertThat(ImageHeaderProbe.probe(ImageFixtures.gif(1, 1))).isEmpty();
+    assertThat(ImageHeaderProbe.probe(ImageFixtures.gif(1, 1, new int[] {0, 0, 0, 1}))).isEmpty();
+  }
+
+  @Test
+  void decodeWithinBudgetRefusesAGifWhoseScreenExceedsIt() {
+    assertThat(
+            ImageHeaderProbe.decodeWithinBudget(
+                ImageFixtures.gif(20_000, 20_000, new int[] {0, 0, 1, 1}), SMALL))
+        .isEmpty();
+  }
+
+  @Test
   void probesFromAStream() {
     assertThat(
             ImageHeaderProbe.probe(

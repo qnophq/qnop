@@ -45,8 +45,10 @@ import org.slf4j.LoggerFactory;
  * is the only safe place to look before deciding to decode.
  *
  * <p>WebP is parsed here directly ({@link WebpHeader} walks every RIFF chunk) so its dimensions are
- * known whether or not an ImageIO WebP plugin is on the classpath. Every other format uses the
- * matching {@link ImageReader}'s {@code getWidth}/{@code getHeight}, which read only the header.
+ * known whether or not an ImageIO WebP plugin is on the classpath. GIF is parsed directly too
+ * ({@link GifHeader}): its logical screen and every frame count, not just the first frame an
+ * ImageIO reader reports. Every other format uses the matching {@link ImageReader}'s {@code
+ * getWidth}/{@code getHeight}, which read only the header.
  */
 public final class ImageHeaderProbe {
 
@@ -79,6 +81,9 @@ public final class ImageHeaderProbe {
         return WebpHeader.read(in);
       }
       InputStream whole = new SequenceInputStream(new ByteArrayInputStream(prefix), in);
+      if (GifHeader.matches(prefix)) {
+        return GifHeader.read(whole);
+      }
       try (ImageInputStream stream = new MemoryCacheImageInputStream(whole)) {
         return readerDimensions(stream);
       }
