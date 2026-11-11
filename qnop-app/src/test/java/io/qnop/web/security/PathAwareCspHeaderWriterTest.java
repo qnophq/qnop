@@ -102,8 +102,8 @@ class PathAwareCspHeaderWriterTest {
   }
 
   @Test
-  @DisplayName("a header that merely happens to be present is replaced by the policy")
-  void presentHeaderIsNotAnOptOut() {
+  @DisplayName("a policy a handler already set is replaced, never kept")
+  void existingPolicyIsReplaced() {
     MockHttpServletRequest request = request("/");
     MockHttpServletResponse response = new MockHttpServletResponse();
     response.setHeader("Content-Security-Policy", "default-src *");
@@ -111,18 +111,5 @@ class PathAwareCspHeaderWriterTest {
     writer.writeHeaders(request, response);
 
     assertThat(response.getHeader("Content-Security-Policy")).startsWith("default-src 'self'");
-  }
-
-  @Test
-  @DisplayName("a handler that explicitly opts out keeps its own policy")
-  void explicitOptOutIsRespected() {
-    MockHttpServletRequest request = request("/");
-    MockHttpServletResponse response = new MockHttpServletResponse();
-    PathAwareCspHeaderWriter.optOut(request);
-    response.setHeader("Content-Security-Policy", "sentinel");
-
-    writer.writeHeaders(request, response);
-
-    assertThat(response.getHeader("Content-Security-Policy")).isEqualTo("sentinel");
   }
 }

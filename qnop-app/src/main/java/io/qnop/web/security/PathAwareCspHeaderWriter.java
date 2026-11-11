@@ -36,16 +36,13 @@ import org.springframework.security.web.header.HeaderWriter;
  * injected {@code <style>} element nor a {@code style="…"} attribute in markup is applied; style
  * writes through the CSSOM (React's {@code style} prop) are not governed by CSP and keep working.
  *
- * <p>The writer always sets the header. A handler that genuinely needs a different policy must say
- * so with {@link #optOut(HttpServletRequest)} and set its own — a header that merely happens to be
- * present is overwritten, so no code path can weaken the policy by accident.
+ * <p>The writer always sets the header, replacing any policy a handler may have set: no code path
+ * can weaken it by accident. A surface that genuinely needs a different policy gets its own branch
+ * here, next to the two that exist.
  */
-public final class PathAwareCspHeaderWriter implements HeaderWriter {
+final class PathAwareCspHeaderWriter implements HeaderWriter {
 
   private static final String HEADER = "Content-Security-Policy";
-
-  /** Request attribute marking a handler's explicit opt-out; see {@link #optOut}. */
-  static final String OPT_OUT_ATTRIBUTE = PathAwareCspHeaderWriter.class.getName() + ".OPT_OUT";
 
   private static final String API_CSP =
       "default-src 'none'; frame-ancestors 'none'; base-uri 'none'";
@@ -56,21 +53,8 @@ public final class PathAwareCspHeaderWriter implements HeaderWriter {
           + "worker-src 'self' blob:; frame-ancestors 'none'; base-uri 'self'; "
           + "form-action 'self'; object-src 'none'";
 
-  PathAwareCspHeaderWriter() {}
-
-  /**
-   * Hands the Content-Security-Policy of this response to the calling handler, which then MUST set
-   * one itself. The only way to keep this writer from setting its policy.
-   */
-  public static void optOut(HttpServletRequest request) {
-    request.setAttribute(OPT_OUT_ATTRIBUTE, Boolean.TRUE);
-  }
-
   @Override
   public void writeHeaders(HttpServletRequest request, HttpServletResponse response) {
-    if (Boolean.TRUE.equals(request.getAttribute(OPT_OUT_ATTRIBUTE))) {
-      return;
-    }
     String path = request.getRequestURI();
     boolean api =
         path.startsWith("/api/") || path.startsWith("/actuator/") || path.equals("/actuator");
