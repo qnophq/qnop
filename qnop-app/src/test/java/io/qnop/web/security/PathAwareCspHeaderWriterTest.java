@@ -22,6 +22,9 @@ package io.qnop.web.security;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import java.util.Base64;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.mock.web.MockHttpServletRequest;
@@ -30,14 +33,30 @@ import org.springframework.mock.web.MockHttpServletResponse;
 /** One CSP per surface (ADR-0040): deny-all for the API, a browser-app policy for the SPA. */
 class PathAwareCspHeaderWriterTest {
 
+  private static final Pattern STYLE_SRC = Pattern.compile("style-src ([^;]*)");
+
   private final PathAwareCspHeaderWriter writer = new PathAwareCspHeaderWriter();
 
-  private String cspFor(String uri) {
+  private static MockHttpServletRequest request(String uri) {
     MockHttpServletRequest request = new MockHttpServletRequest("GET", uri);
     request.setRequestURI(uri);
+    return request;
+  }
+
+  private String cspFor(MockHttpServletRequest request) {
     MockHttpServletResponse response = new MockHttpServletResponse();
     writer.writeHeaders(request, response);
     return response.getHeader("Content-Security-Policy");
+  }
+
+  private String cspFor(String uri) {
+    return cspFor(request(uri));
+  }
+
+  private static String styleSrc(String csp) {
+    Matcher matcher = STYLE_SRC.matcher(csp);
+    assertThat(matcher.find()).as("style-src in %s", csp).isTrue();
+    return matcher.group(1);
   }
 
   @Test
@@ -45,6 +64,7 @@ class PathAwareCspHeaderWriterTest {
   void apiKeepsDenyAll() {
     assertThat(cspFor("/api/v1/documents")).isEqualTo(cspFor("/actuator/health"));
     assertThat(cspFor("/api/v1/documents")).startsWith("default-src 'none'");
+    assertThat(cspFor("/api/v1/documents")).doesNotContain("nonce");
   }
 
   @Test
@@ -55,17 +75,54 @@ class PathAwareCspHeaderWriterTest {
     assertThat(csp).contains("worker-src 'self' blob:"); // pdf.js workers
     assertThat(csp).contains("frame-ancestors 'none'");
     assertThat(csp).doesNotContain("http"); // no remote origins anywhere
-    assertThat(cspFor("/")).isEqualTo(csp);
   }
 
   @Test
-  @DisplayName("an already-set CSP header is never overwritten")
-  void respectsExistingHeader() {
-    MockHttpServletRequest request = new MockHttpServletRequest("GET", "/");
-    request.setRequestURI("/");
+  @DisplayName("SPA styles are allowed by the request's nonce, never by 'unsafe-inline'")
+  void spaStylesAreNonceBased() {
+    MockHttpServletRequest request = request("/");
+    String csp = cspFor(request);
+
+    assertThat(csp).doesNotContain("unsafe-inline");
+    assertThat(csp).doesNotContain("style-src-attr").doesNotContain("style-src-elem");
+    String nonce = CspNonce.forRequest(request);
+    assertThat(styleSrc(csp)).isEqualTo("'self' 'nonce-" + nonce + "'");
+    assertThat(Base64.getDecoder().decode(nonce)).hasSize(16);
+  }
+
+  @Test
+  @DisplayName("every request gets its own nonce; within a request it is stable")
+  void noncePerRequest() {
+    MockHttpServletRequest first = request("/");
+    String nonce = CspNonce.forRequest(first);
+
+    assertThat(styleSrc(cspFor(first))).contains("'nonce-" + nonce + "'");
+    assertThat(CspNonce.forRequest(first)).isEqualTo(nonce);
+    assertThat(styleSrc(cspFor("/"))).doesNotContain(nonce);
+  }
+
+  @Test
+  @DisplayName("a header that merely happens to be present is replaced by the policy")
+  void presentHeaderIsNotAnOptOut() {
+    MockHttpServletRequest request = request("/");
     MockHttpServletResponse response = new MockHttpServletResponse();
-    response.setHeader("Content-Security-Policy", "sentinel");
+    response.setHeader("Content-Security-Policy", "default-src *");
+
     writer.writeHeaders(request, response);
+
+    assertThat(response.getHeader("Content-Security-Policy")).startsWith("default-src 'self'");
+  }
+
+  @Test
+  @DisplayName("a handler that explicitly opts out keeps its own policy")
+  void explicitOptOutIsRespected() {
+    MockHttpServletRequest request = request("/");
+    MockHttpServletResponse response = new MockHttpServletResponse();
+    PathAwareCspHeaderWriter.optOut(request);
+    response.setHeader("Content-Security-Policy", "sentinel");
+
+    writer.writeHeaders(request, response);
+
     assertThat(response.getHeader("Content-Security-Policy")).isEqualTo("sentinel");
   }
 }
