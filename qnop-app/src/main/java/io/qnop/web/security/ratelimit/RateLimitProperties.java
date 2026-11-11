@@ -27,14 +27,15 @@ import org.springframework.boot.context.properties.bind.DefaultValue;
 /**
  * Tunable limits for the auth rate-limiting subsystem (issue #18, ADR-0027), bound from {@code
  * qnop.auth.rate-limit.*}. Each scope carries its own bucket capacity ({@code maxAttempts}) and
- * refill window ({@code windowSeconds}); defaults match the issue. All values are optional — absent
- * entries fall back to the per-component {@link DefaultValue}s.
+ * refill window ({@code windowSeconds}). All values are optional — absent entries fall back to the
+ * per-scope defaults below.
  *
- * <p>The register and password-reset endpoints (and their email-/token-keyed buckets) arrive with
- * issue #20; their limits are added here when those endpoints land. This module wires the limits
- * for the endpoints that exist today: login, refresh, and change-password.
+ * <p>Two kinds of scope exist (ADR-0027, amended by #899): <b>per-IP</b> scopes enforced in servlet
+ * filters before the request reaches a controller, and <b>per-identifier</b> scopes (account,
+ * e-mail address, reset token) enforced in the controller once the body is parsed. Identifier
+ * buckets are keyed on a hash of the normalized identifier, never the identifier itself.
  *
- * @param trustedProxyCidrs CIDR ranges whose {@code X-Forwarded-For} header is trusted by {@link
+ * @param trustedProxyCidrs CIDR ranges whose {@code X-Forwarded-For} entries are trusted by {@link
  *     HttpClientIpResolver}. Empty by default — the secure default for a server with no reverse
  *     proxy, which then ignores {@code X-Forwarded-For} entirely. Operators behind a proxy MUST set
  *     this to the proxy's egress IPs, or per-IP limits collapse to one shared bucket.
@@ -42,10 +43,16 @@ import org.springframework.boot.context.properties.bind.DefaultValue;
  * @param refresh IP-keyed limit for {@code POST /api/v1/auth/refresh} (default 30 / 60s)
  * @param changePassword subject-keyed limit for {@code POST /api/v1/auth/change-password} (default
  *     5 / 300s)
- * @param register IP-keyed limit for {@code POST /api/v1/auth/register} (default 5 / 3600s; the
- *     endpoint itself arrives with issue #20)
- * @param forgotPassword IP-keyed limit for the password-reset request endpoint (default 5 / 3600s;
- *     the endpoint itself arrives with issue #20)
+ * @param register IP-keyed limit for {@code POST /api/v1/auth/register} (default 5 / 3600s)
+ * @param forgotPassword IP-keyed limit for {@code POST /api/v1/auth/forgot-password} (default 5 /
+ *     3600s)
+ * @param resetPassword IP-keyed limit for {@code POST /api/v1/auth/reset-password} (default 5 /
+ *     900s)
+ * @param loginAccount per-account limit on <em>failed</em> logins for one username / e-mail
+ *     (default 10 / 900s); a successful login gives its token back
+ * @param registerEmail per-e-mail limit for registrations (default 5 / 3600s)
+ * @param forgotPasswordEmail per-e-mail limit for reset requests (default 5 / 3600s)
+ * @param resetPasswordToken per-token limit for reset attempts (default 10 / 3600s)
  * @param maxBuckets upper bound on the number of live token buckets held in memory (default
  *     100&nbsp;000). Bounds memory under a high-cardinality key space — e.g. a spoofable client IP
  *     when no trusted proxy is configured (issue #49).
@@ -58,6 +65,11 @@ public record RateLimitProperties(
     Limit changePassword,
     Limit register,
     Limit forgotPassword,
+    Limit resetPassword,
+    Limit loginAccount,
+    Limit registerEmail,
+    Limit forgotPasswordEmail,
+    Limit resetPasswordToken,
     @DefaultValue("100000") long maxBuckets) {
 
   // A whole scope absent from config arrives as null here; substitute its per-scope default. The
@@ -70,6 +82,11 @@ public record RateLimitProperties(
     changePassword = changePassword != null ? changePassword : new Limit(5, 300);
     register = register != null ? register : new Limit(5, 3600);
     forgotPassword = forgotPassword != null ? forgotPassword : new Limit(5, 3600);
+    resetPassword = resetPassword != null ? resetPassword : new Limit(5, 900);
+    loginAccount = loginAccount != null ? loginAccount : new Limit(10, 900);
+    registerEmail = registerEmail != null ? registerEmail : new Limit(5, 3600);
+    forgotPasswordEmail = forgotPasswordEmail != null ? forgotPasswordEmail : new Limit(5, 3600);
+    resetPasswordToken = resetPasswordToken != null ? resetPasswordToken : new Limit(10, 3600);
   }
 
   /**

@@ -43,8 +43,7 @@ class HttpClientIpResolverTest {
   }
 
   private static HttpClientIpResolver resolver(List<String> trustedCidrs) {
-    return new HttpClientIpResolver(
-        new RateLimitProperties(trustedCidrs, null, null, null, null, null, 100_000L));
+    return new HttpClientIpResolver(RateLimitPropertiesFixture.withTrustedProxies(trustedCidrs));
   }
 
   @Test

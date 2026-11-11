@@ -32,6 +32,7 @@ import io.qnop.service.http.HttpClientProperties;
 import io.qnop.service.review.ReanchoringProperties;
 import io.qnop.service.storage.S3Properties;
 import io.qnop.web.security.ratelimit.RateLimitProperties;
+import io.qnop.web.security.ratelimit.RateLimitPropertiesFixture;
 import java.time.Duration;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -94,7 +95,7 @@ class ConfigurationTreeBuilderTest {
     HttpClientProperties http = new HttpClientProperties(null, null, null, null, null);
     ReanchoringProperties reanchoring = ReanchoringProperties.defaults();
     RateLimitProperties rateLimit =
-        new RateLimitProperties(List.of("10.0.0.0/8"), null, null, null, null, null, 100_000);
+        RateLimitPropertiesFixture.withTrustedProxies(List.of("10.0.0.0/8"));
 
     SequencedMap<String, Object> roots = new LinkedHashMap<>();
     roots.put("qnop", qnop);

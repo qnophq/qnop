@@ -25,6 +25,7 @@ import io.qnop.api.v1.model.ForgotPasswordRequest;
 import io.qnop.api.v1.model.ResetPasswordRequest;
 import io.qnop.service.auth.PasswordResetFlowService;
 import io.qnop.service.auth.PasswordResetTokenService.InvalidPasswordResetTokenException;
+import io.qnop.web.security.ratelimit.AuthIdentifierRateLimiter;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.RestController;
@@ -44,9 +45,12 @@ import org.springframework.web.server.ResponseStatusException;
 public class AuthPasswordResetController implements AuthPasswordResetApi {
 
   private final PasswordResetFlowService passwordResetFlow;
+  private final AuthIdentifierRateLimiter identifierRateLimiter;
 
-  public AuthPasswordResetController(PasswordResetFlowService passwordResetFlow) {
+  public AuthPasswordResetController(
+      PasswordResetFlowService passwordResetFlow, AuthIdentifierRateLimiter identifierRateLimiter) {
     this.passwordResetFlow = passwordResetFlow;
+    this.identifierRateLimiter = identifierRateLimiter;
   }
 
   @Override
@@ -57,12 +61,16 @@ public class AuthPasswordResetController implements AuthPasswordResetApi {
       // going to be sent.
       throw new ResponseStatusException(HttpStatus.FORBIDDEN, "PASSWORD_RESET_DISABLED");
     }
+    // Per-e-mail throttle (issue #899), applied whether or not the address is registered, so the
+    // uniform 204 stays uniform.
+    identifierRateLimiter.forgotPassword(request.getEmail());
     passwordResetFlow.requestReset(request.getEmail());
     return ResponseEntity.noContent().build();
   }
 
   @Override
   public ResponseEntity<Void> resetPassword(ResetPasswordRequest request) {
+    identifierRateLimiter.resetPassword(request.getToken());
     try {
       passwordResetFlow.reset(request.getToken(), request.getNewPassword());
     } catch (InvalidPasswordResetTokenException e) {

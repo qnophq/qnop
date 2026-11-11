@@ -31,6 +31,7 @@ import org.springframework.stereotype.Component;
 public class LoginRateLimitFilter extends AbstractRateLimitFilter {
 
   static final String PATH = "/api/v1/auth/login";
+  static final String MESSAGE = "Too many login attempts. Please try again later.";
 
   private final HttpClientIpResolver clientIpResolver;
   private final RateLimitProperties.Limit limit;
@@ -39,7 +40,7 @@ public class LoginRateLimitFilter extends AbstractRateLimitFilter {
       BucketRateLimitService rateLimitService,
       HttpClientIpResolver clientIpResolver,
       RateLimitProperties properties) {
-    super(rateLimitService, "Too many login attempts. Please try again later.");
+    super(rateLimitService, MESSAGE);
     this.clientIpResolver = clientIpResolver;
     this.limit = properties.login();
   }

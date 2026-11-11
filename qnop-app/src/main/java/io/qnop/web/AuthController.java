@@ -34,6 +34,7 @@ import io.qnop.service.RefreshTokenService.IssuedRefreshToken;
 import io.qnop.service.RefreshTokenService.RotationResult;
 import io.qnop.service.TokenRevocationService;
 import io.qnop.web.security.RefreshTokenCookieFactory;
+import io.qnop.web.security.ratelimit.AuthIdentifierRateLimiter;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
 import java.util.UUID;
@@ -70,6 +71,7 @@ public class AuthController implements AuthApi {
   private final TokenRevocationService tokenRevocationService;
   private final RefreshTokenCookieFactory cookieFactory;
   private final QnopProperties properties;
+  private final AuthIdentifierRateLimiter identifierRateLimiter;
 
   public AuthController(
       AuthService authService,
@@ -77,13 +79,15 @@ public class AuthController implements AuthApi {
       RefreshTokenService refreshTokenService,
       TokenRevocationService tokenRevocationService,
       RefreshTokenCookieFactory cookieFactory,
-      QnopProperties properties) {
+      QnopProperties properties,
+      AuthIdentifierRateLimiter identifierRateLimiter) {
     this.authService = authService;
     this.jwtTokenService = jwtTokenService;
     this.refreshTokenService = refreshTokenService;
     this.tokenRevocationService = tokenRevocationService;
     this.cookieFactory = cookieFactory;
     this.properties = properties;
+    this.identifierRateLimiter = identifierRateLimiter;
   }
 
   @Override
@@ -91,6 +95,10 @@ public class AuthController implements AuthApi {
     // Never the identifier that was tried (issue #659): it is an e-mail address
     // or a username, and a failed login writes it into a file with no access
     // control. The request id ties the attempt to its rate-limit and audit rows.
+    //
+    // Per-account throttle (issue #899): checked before the credentials, for known and unknown
+    // identifiers alike, and only failures count against it.
+    identifierRateLimiter.beginLogin(request.getUsernameOrEmail());
     UUID userId =
         authService
             .authenticate(request.getUsernameOrEmail(), request.getPassword())
@@ -100,6 +108,7 @@ public class AuthController implements AuthApi {
                   return new ResponseStatusException(
                       HttpStatus.UNAUTHORIZED, "Invalid credentials");
                 });
+    identifierRateLimiter.loginSucceeded(request.getUsernameOrEmail());
     log.info("Login succeeded for {}", userId);
     return issueSession(userId);
   }
