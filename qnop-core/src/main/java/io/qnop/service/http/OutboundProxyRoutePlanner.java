@@ -21,12 +21,14 @@
 package io.qnop.service.http;
 
 import java.net.InetAddress;
+import java.net.URI;
+import java.net.URISyntaxException;
 import java.net.UnknownHostException;
+import org.apache.hc.client5.http.DnsResolver;
 import org.apache.hc.client5.http.HttpRoute;
 import org.apache.hc.client5.http.classic.ExecChainHandler;
 import org.apache.hc.client5.http.impl.DefaultSchemePortResolver;
 import org.apache.hc.client5.http.impl.routing.DefaultRoutePlanner;
-import org.apache.hc.core5.http.HttpException;
 import org.apache.hc.core5.http.HttpHost;
 import org.apache.hc.core5.http.protocol.HttpContext;
 
@@ -43,9 +45,12 @@ import org.apache.hc.core5.http.protocol.HttpContext;
  *       OutboundUriGuard}) on every proxied request instead, and the proxy's own egress ACL is the
  *       remaining control.
  *   <li><strong>The proxy host itself</strong> is operator configuration and usually lives on a
- *       private network, so it is resolved by the platform resolver and handed to the connection
- *       operator as a pre-resolved address — exempt from {@link OutboundAddressPolicy}, by design
- *       and only for this one host. (The first resolved address is used per route.)
+ *       private network, so {@link #exemptingProxyHost} lets exactly that name past {@link
+ *       OutboundAddressPolicy}. It is resolved like any other connection target — once per new
+ *       connection, not per request (pooled connections are reused), with every address it answers
+ *       tried in turn by the connection operator. The exemption is by name and reaches only the
+ *       proxy hop: a proxied destination is never resolved locally, and configuration refuses a
+ *       non-proxy entry that covers the proxy host, so no direct route can lead to it.
  *   <li><strong>Non-proxy hosts</strong> ({@link HttpClientProperties.Proxy#bypasses}) are routed
  *       directly and keep the full guard: resolved by {@link GuardedDnsResolver}, every address
  *       checked, the socket pinned to the checked address.
@@ -53,42 +58,55 @@ import org.apache.hc.core5.http.protocol.HttpContext;
  */
 final class OutboundProxyRoutePlanner extends DefaultRoutePlanner {
 
+  private final HttpHost proxyHost;
   private final HttpClientProperties.Proxy proxy;
-  private final HostResolver proxyResolver;
 
-  OutboundProxyRoutePlanner(HttpClientProperties.Proxy proxy, HostResolver proxyResolver) {
+  OutboundProxyRoutePlanner(HttpClientProperties.Proxy proxy) {
     super(DefaultSchemePortResolver.INSTANCE);
     if (!proxy.enabled()) {
       throw new IllegalArgumentException("no outbound proxy configured");
     }
     this.proxy = proxy;
-    this.proxyResolver = proxyResolver;
+    this.proxyHost = new HttpHost("http", proxy.host(), proxy.port());
   }
 
   @Override
-  protected HttpHost determineProxy(HttpHost target, HttpContext context) throws HttpException {
-    if (proxy.bypasses(target.getHostName())) {
-      return null; // direct: GuardedDnsResolver resolves, checks and pins as usual
-    }
-    InetAddress address;
-    try {
-      InetAddress[] addresses = proxyResolver.resolve(proxy.host());
-      if (addresses == null || addresses.length == 0) {
-        throw new UnknownHostException(proxy.host());
+  protected HttpHost determineProxy(HttpHost target, HttpContext context) {
+    // null = direct: GuardedDnsResolver resolves, checks and pins as usual
+    return proxy.bypasses(target.getHostName()) ? null : proxyHost;
+  }
+
+  /**
+   * The DNS resolver for a proxy-mode client: the configured proxy host resolves through {@code
+   * proxyResolver} unchecked; every other name goes through {@code guarded}.
+   */
+  static DnsResolver exemptingProxyHost(
+      HttpClientProperties.Proxy proxy, DnsResolver guarded, HostResolver proxyResolver) {
+    return new DnsResolver() {
+      @Override
+      public InetAddress[] resolve(String host) throws UnknownHostException {
+        if (!proxy.isProxyHost(host)) {
+          return guarded.resolve(host);
+        }
+        InetAddress[] addresses = proxyResolver.resolve(host);
+        if (addresses == null || addresses.length == 0) {
+          throw new UnknownHostException(host);
+        }
+        return addresses.clone();
       }
-      address = addresses[0];
-    } catch (UnknownHostException e) {
-      throw new HttpException("the configured outbound proxy host cannot be resolved", e);
-    }
-    // Pre-resolved: the connection operator connects to this address without consulting the
-    // guarded DNS resolver — the one intended exemption, for the operator's own proxy.
-    return new HttpHost("http", address, proxy.host(), proxy.port());
+
+      @Override
+      public String resolveCanonicalHostname(String host) {
+        return host; // never consulted for routing; avoid a reverse lookup
+      }
+    };
   }
 
   /**
    * Re-applies the lexical guard to every request that is about to leave through the proxy, since
-   * the connection-time address check cannot see the proxied destination. Direct (non-proxy-host)
-   * routes are left to {@link GuardedDnsResolver}.
+   * the connection-time address check cannot see the proxied destination. Runs before the
+   * connection (and any {@code CONNECT}) is opened. Direct (non-proxy-host) routes are left to
+   * {@link GuardedDnsResolver}.
    *
    * @param allowPrivate the deployment's private-destination opt-in for this client
    */
@@ -99,12 +117,22 @@ final class OutboundProxyRoutePlanner extends DefaultRoutePlanner {
         HttpHost target = route.getTargetHost();
         try {
           OutboundUriGuard.requireAllowedHttpUri(
-              target.toURI(), "outbound request", true, allowPrivate);
-        } catch (IllegalArgumentException e) {
+              targetUri(target), "outbound request", true, allowPrivate);
+        } catch (IllegalArgumentException | URISyntaxException e) {
           throw new BlockedOutboundAddressException(target.getHostName());
         }
       }
       return chain.proceed(request, scope);
     };
+  }
+
+  /** The target as a URI string; the multi-argument constructor brackets an IPv6 literal. */
+  private static String targetUri(HttpHost target) throws URISyntaxException {
+    String host = target.getHostName();
+    if (host.startsWith("[") && host.endsWith("]")) {
+      host = host.substring(1, host.length() - 1);
+    }
+    return new URI(target.getSchemeName(), null, host, target.getPort(), null, null, null)
+        .toString();
   }
 }

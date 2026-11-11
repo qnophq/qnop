@@ -213,7 +213,7 @@ If those destinations are reachable only through a mandatory egress proxy, opt i
 |----------|----------|---------|
 | `QNOP_HTTP_CLIENT_PROXY_HOST` | `qnop.http-client.proxy.host` | Proxy host name or IP literal. Unset = direct connections (the default). |
 | `QNOP_HTTP_CLIENT_PROXY_PORT` | `qnop.http-client.proxy.port` | Proxy port; required with the host. |
-| `QNOP_HTTP_CLIENT_PROXY_NON_PROXY_HOSTS` | `qnop.http-client.proxy.non-proxy-hosts` | Comma-separated destinations that stay direct: exact host names (`idp.corp.example`) or `*.suffix` (`*.internal.corp.example`, subdomains only). Case-insensitive. |
+| `QNOP_HTTP_CLIENT_PROXY_NON_PROXY_HOSTS` | `qnop.http-client.proxy.non-proxy-hosts` | Comma-separated destinations that stay direct: exact host names (`idp.corp.example`), `*.suffix` (`*.internal.corp.example`, subdomains only) or IPv6 literals. Case-insensitive; a trailing dot is ignored; no ports. Must not cover the proxy host itself. |
 
 The proxy is spoken to over plain HTTP (`CONNECT` tunnels for `https://` destinations, so TLS to the IdP is end-to-end). **Proxy authentication is not supported.** A misconfiguration (host without port, port without host, a host with a scheme or path, an invalid non-proxy entry) stops the server at startup. When proxy mode is active, the server logs one `WARN` line naming the proxy's `host:port`.
 
@@ -222,7 +222,7 @@ The proxy is spoken to over plain HTTP (`CONNECT` tunnels for `https://` destina
 - For proxied destinations qnop no longer sees the address it connects to: the proxy resolves the name. The connection-time address check cannot apply. qnop still applies the lexical check on every request (no `localhost`/`*.local`/`*.internal`, no private, loopback or metadata IP literals, no non-canonical numeric hosts), but a public-looking name that resolves to an internal address is **not** caught by qnop.
 - **The proxy's egress ACL becomes the remaining control.** Configure it to refuse internal ranges and cloud metadata addresses (`169.254.169.254`, `fd00:ec2::254`, …) for qnop's traffic, ideally to allow only your IdP and analytics hosts.
 - Destinations in the non-proxy list keep the full guard (resolved by qnop, every address checked, connection pinned). Prefer listing internal IdPs there over sending them through the proxy.
-- The proxy host itself is trusted configuration and is exempt from the address checks (it usually lives on a private network).
+- The proxy host itself is trusted configuration and is exempt from the address checks (it usually lives on a private network). If its name resolves to several addresses, each is tried in turn.
 
 ## Upgrades
 

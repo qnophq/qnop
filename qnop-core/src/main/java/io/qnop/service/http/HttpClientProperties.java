@@ -88,8 +88,9 @@ public record HttpClientProperties(
    * @param host the proxy host name or IP literal; blank/unset disables proxy mode
    * @param port the proxy port (1–65535), required with {@code host}
    * @param nonProxyHosts destinations that bypass the proxy and keep the full direct, address-
-   *     pinned guard: an exact host name ({@code idp.corp.example}) or a leading-wildcard suffix
-   *     ({@code *.corp.example}, matching any subdomain); case-insensitive
+   *     pinned guard: an exact host name ({@code idp.corp.example}), a leading-wildcard suffix
+   *     ({@code *.corp.example}, matching any subdomain) or an IPv6 literal; case-insensitive, a
+   *     trailing root dot is ignored; no ports; must not cover the proxy host itself
    */
   public record Proxy(String host, Integer port, List<String> nonProxyHosts) {
 
@@ -100,8 +101,13 @@ public record HttpClientProperties(
     private static final Pattern HOST =
         Pattern.compile("[A-Za-z0-9.-]+|[0-9A-Fa-f.]*:[0-9A-Fa-f.]*:[0-9A-Fa-f:.]*");
 
-    /** An exact host name, or {@code *.} followed by a domain suffix. */
-    private static final Pattern NON_PROXY_ENTRY = Pattern.compile("(\\*\\.)?[a-z0-9._:-]+");
+    /**
+     * A normalised non-proxy entry: an exact host name, {@code *.} followed by a domain suffix, or
+     * an IPv6 literal. No port, no empty label: an entry that could never match is refused rather
+     * than silently proxying the destination it was meant to keep direct.
+     */
+    private static final Pattern NON_PROXY_ENTRY =
+        Pattern.compile("(\\*\\.)?[a-z0-9-]+(\\.[a-z0-9-]+)*|[0-9a-f.]*:[0-9a-f.]*:[0-9a-f:.]*");
 
     public Proxy {
       host = host == null || host.isBlank() ? null : host.trim();
@@ -110,7 +116,7 @@ public record HttpClientProperties(
               ? List.of()
               : nonProxyHosts.stream()
                   .filter(entry -> entry != null && !entry.isBlank())
-                  .map(entry -> entry.trim().toLowerCase(Locale.ROOT))
+                  .map(entry -> normalize(entry.trim()))
                   .toList();
       validate(host, port, nonProxyHosts);
     }
@@ -137,9 +143,16 @@ public record HttpClientProperties(
       for (String entry : nonProxyHosts) {
         if (!NON_PROXY_ENTRY.matcher(entry).matches()) {
           throw new IllegalArgumentException(
-              "qnop.http-client.proxy.non-proxy-hosts entry is not a host name or *.suffix: "
+              "qnop.http-client.proxy.non-proxy-hosts entry is not a host name, *.suffix or"
+                  + " IPv6 literal (no port): "
                   + entry);
         }
+      }
+      // The proxy host is exempt from the address check only on the proxy hop (see
+      // OutboundProxyRoutePlanner); a non-proxy entry covering it would open a direct route to it.
+      if (bypasses(nonProxyHosts, host)) {
+        throw new IllegalArgumentException(
+            "qnop.http-client.proxy.non-proxy-hosts must not cover the proxy host itself");
       }
     }
 
@@ -152,21 +165,31 @@ public record HttpClientProperties(
      * Whether {@code targetHost} bypasses the proxy (and therefore keeps the full direct guard).
      */
     public boolean bypasses(String targetHost) {
+      return bypasses(nonProxyHosts, targetHost);
+    }
+
+    /** Whether {@code candidate} names the configured proxy host (normalised comparison). */
+    public boolean isProxyHost(String candidate) {
+      return host != null && candidate != null && normalize(candidate).equals(normalize(host));
+    }
+
+    private static boolean bypasses(List<String> entries, String targetHost) {
       if (targetHost == null) {
         return false;
       }
       String target = normalize(targetHost);
-      for (String entry : nonProxyHosts) {
-        if (entry.startsWith("*.")
-            ? target.endsWith(entry.substring(1))
-            : target.equals(normalize(entry))) {
+      for (String entry : entries) {
+        if (entry.startsWith("*.") ? target.endsWith(entry.substring(1)) : target.equals(entry)) {
           return true;
         }
       }
       return false;
     }
 
-    /** Lower-cases and strips IPv6 brackets and a single trailing root dot. */
+    /**
+     * Lower-cases and strips IPv6 brackets and a single trailing root dot. Applied to entries and
+     * targets alike, so {@code IDP.Corp.example.} and {@code idp.corp.example} are one host.
+     */
     private static String normalize(String host) {
       String h = host.toLowerCase(Locale.ROOT);
       if (h.startsWith("[") && h.endsWith("]")) {

@@ -25,9 +25,15 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.sun.net.httpserver.HttpServer;
 import java.io.IOException;
+import java.io.InputStream;
+import java.io.OutputStream;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
+import java.net.ServerSocket;
+import java.net.Socket;
+import java.nio.charset.StandardCharsets;
 import java.util.List;
+import java.util.Locale;
 import java.util.concurrent.CopyOnWriteArrayList;
 import org.apache.hc.client5.http.classic.methods.HttpGet;
 import org.apache.hc.client5.http.impl.classic.CloseableHttpClient;
@@ -59,7 +65,8 @@ class OutboundProxyClientTest {
   /** Maps only the direct-route host onto loopback; any other lookup is a test failure. */
   private final HostResolver destinations =
       host -> {
-        if (host.equals(DIRECT_HOST)) {
+        String normalized = host.toLowerCase(Locale.ROOT).replaceAll("\\.$", "");
+        if (normalized.equals(DIRECT_HOST)) {
           return new InetAddress[] {InetAddress.getLoopbackAddress()};
         }
         throw new AssertionError("the client resolved a proxied destination itself: " + host);
@@ -103,6 +110,11 @@ class OutboundProxyClientTest {
 
   private CloseableHttpClient client(HttpClientProperties properties, boolean allowPrivate) {
     return OutboundHttpClients.create(properties, allowPrivate, destinations, HostResolver.SYSTEM);
+  }
+
+  private static HttpClientProperties viaProxy(String host, int port) {
+    return new HttpClientProperties(
+        null, null, null, null, null, new HttpClientProperties.Proxy(host, port, List.of()));
   }
 
   private static int get(CloseableHttpClient client, String url) throws IOException {
@@ -194,6 +206,143 @@ class OutboundProxyClientTest {
       System.clearProperty(key);
     } else {
       System.setProperty(key, value);
+    }
+  }
+
+  @Test
+  @DisplayName("a public IPv6 literal leaves through the proxy, bracketed")
+  void publicIpv6LiteralIsProxied() throws IOException {
+    try (CloseableHttpClient client = client(viaProxy(List.of()), false)) {
+      assertThat(get(client, "http://[2606:4700:4700::1111]/x")).isEqualTo(204);
+    }
+    assertThat(proxied).containsExactly("http://[2606:4700:4700::1111]/x");
+  }
+
+  @ParameterizedTest
+  @ValueSource(strings = {"IDP.Corp.Test.", "idp.corp.test", "*.CORP.test."})
+  @DisplayName("case and trailing-dot variants of a non-proxy entry still go direct")
+  void nonProxyVariantsGoDirect(String entry) throws IOException {
+    try (CloseableHttpClient client = client(viaProxy(List.of(entry)), true)) {
+      for (String host : List.of("idp.corp.test", "IDP.corp.TEST", "idp.corp.test.")) {
+        String url = "http://" + host + ":" + internal.getAddress().getPort() + "/direct";
+        assertThat(get(client, url)).isEqualTo(204);
+      }
+    }
+    assertThat(direct).hasSize(3);
+    assertThat(proxied).isEmpty();
+  }
+
+  @Test
+  @DisplayName("the proxy name is resolved unchecked and every address it answers is tried")
+  void proxyNameFallsBackAcrossItsAddresses() throws IOException {
+    // 127.0.0.2 is on the loopback network but nothing listens there: the connection is refused
+    // and the operator moves on to the next address the proxy name answered.
+    HostResolver proxyNames =
+        host -> {
+          assertThat(host).isEqualTo("proxy.internal.test");
+          return new InetAddress[] {
+            InetAddress.getByName("127.0.0.2"), InetAddress.getLoopbackAddress()
+          };
+        };
+    try (CloseableHttpClient client =
+        OutboundHttpClients.create(
+            viaProxy("proxy.internal.test", proxy.getAddress().getPort()),
+            false,
+            destinations,
+            proxyNames)) {
+      assertThat(get(client, "http://" + PROXIED_HOST + "/a")).isEqualTo(204);
+    }
+    assertThat(proxied).containsExactly("http://" + PROXIED_HOST + "/a");
+  }
+
+  @Test
+  @DisplayName("an https destination is tunnelled with CONNECT to the unresolved name")
+  void httpsDestinationUsesConnect() throws IOException {
+    try (ConnectRecorder recorder = new ConnectRecorder();
+        CloseableHttpClient client = client(viaProxy("127.0.0.1", recorder.port()), false)) {
+      // The stub refuses the tunnel (HttpClient 5 hands the proxy's refusal back as the response);
+      // what matters is what was asked of it.
+      assertThat(get(client, "https://" + PROXIED_HOST + "/token")).isEqualTo(403);
+      assertThat(recorder.requestLines())
+          .containsExactly("CONNECT " + PROXIED_HOST + ":443 HTTP/1.1");
+    }
+  }
+
+  @ParameterizedTest
+  @ValueSource(
+      strings = {
+        "https://127.0.0.1/",
+        "https://[::1]/",
+        "https://[fd00::1]/",
+        "https://[::ffff:10.0.0.1]/",
+        "https://metadata.google.internal/"
+      })
+  @DisplayName("a blocked https destination is refused before any CONNECT is sent")
+  void blockedHttpsDestinationNeverReachesTheProxy(String url) throws IOException {
+    try (ConnectRecorder recorder = new ConnectRecorder();
+        CloseableHttpClient client = client(viaProxy("127.0.0.1", recorder.port()), false)) {
+      assertThatThrownBy(() -> get(client, url))
+          .isInstanceOf(BlockedOutboundAddressException.class);
+      assertThat(recorder.requestLines()).isEmpty();
+    }
+  }
+
+  /**
+   * A minimal proxy stub that records each request line and refuses every tunnel with a 403, so the
+   * CONNECT path can be observed without TLS.
+   */
+  private static final class ConnectRecorder implements AutoCloseable {
+
+    private final ServerSocket socket;
+    private final List<String> lines = new CopyOnWriteArrayList<>();
+    private final Thread acceptor;
+
+    ConnectRecorder() throws IOException {
+      socket = new ServerSocket(0, 50, InetAddress.getLoopbackAddress());
+      acceptor = new Thread(this::serve, "connect-recorder");
+      acceptor.setDaemon(true);
+      acceptor.start();
+    }
+
+    int port() {
+      return socket.getLocalPort();
+    }
+
+    List<String> requestLines() {
+      return lines;
+    }
+
+    private void serve() {
+      while (!socket.isClosed()) {
+        try (Socket connection = socket.accept()) {
+          String head = readHead(connection.getInputStream());
+          lines.add(head.lines().findFirst().orElse(""));
+          OutputStream out = connection.getOutputStream();
+          out.write(
+              "HTTP/1.1 403 Forbidden\r\nContent-Length: 0\r\nConnection: close\r\n\r\n"
+                  .getBytes(StandardCharsets.US_ASCII));
+          out.flush();
+        } catch (IOException closed) {
+          return;
+        }
+      }
+    }
+
+    private static String readHead(InputStream in) throws IOException {
+      StringBuilder head = new StringBuilder();
+      int b;
+      while ((b = in.read()) >= 0) {
+        head.append((char) b);
+        if (head.toString().endsWith("\r\n\r\n")) {
+          break;
+        }
+      }
+      return head.toString();
+    }
+
+    @Override
+    public void close() throws IOException {
+      socket.close();
     }
   }
 }

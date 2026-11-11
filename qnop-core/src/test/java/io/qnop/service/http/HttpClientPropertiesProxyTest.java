@@ -109,8 +109,22 @@ class HttpClientPropertiesProxyTest {
   }
 
   @ParameterizedTest
-  @ValueSource(strings = {"*", "corp.*", "a*.corp", "*corp.example", "http://x"})
-  @DisplayName("non-proxy entries are exact host names or *.suffix")
+  @ValueSource(
+      strings = {
+        "*",
+        "corp.*",
+        "a*.corp",
+        "*corp.example",
+        "http://x",
+        "idp.corp.example:443",
+        "*.corp.example:443",
+        "[fd00::1]:443",
+        "*.",
+        ".corp.example",
+        "a..corp.example",
+        "idp.corp.example.."
+      })
+  @DisplayName("non-proxy entries that could never match (ports, empty labels) are refused")
   void nonProxyEntriesAreValidated(String entry) {
     assertThatThrownBy(() -> new Proxy("proxy", 3128, List.of(entry)))
         .isInstanceOf(IllegalArgumentException.class);
@@ -143,5 +157,39 @@ class HttpClientPropertiesProxyTest {
                 assertThat(line)
                     .contains("proxy.corp.example:3128")
                     .contains("1 non-proxy host entries"));
+  }
+
+  @Test
+  @DisplayName("non-proxy entries are normalised: case, trailing root dot, IPv6 brackets")
+  void nonProxyEntriesAreNormalised() {
+    Proxy proxy =
+        new Proxy("proxy", 3128, List.of("IDP.Corp.Example.", "*.Corp.Example.", "[FD00::1]"));
+
+    assertThat(proxy.nonProxyHosts())
+        .containsExactly("idp.corp.example", "*.corp.example", "fd00::1");
+    assertThat(proxy.bypasses("idp.corp.example")).isTrue();
+    assertThat(proxy.bypasses("a.CORP.example.")).isTrue();
+    assertThat(proxy.bypasses("[fd00::1]")).isTrue();
+  }
+
+  @Test
+  @DisplayName("a non-proxy entry covering the proxy host itself is refused")
+  void nonProxyEntryMustNotCoverTheProxy() {
+    assertThatThrownBy(() -> new Proxy("proxy.corp.example", 3128, List.of("*.corp.example")))
+        .isInstanceOf(IllegalArgumentException.class)
+        .hasMessageContaining("proxy host itself");
+    assertThatThrownBy(() -> new Proxy("Proxy.Corp.Example", 3128, List.of("proxy.corp.example.")))
+        .isInstanceOf(IllegalArgumentException.class);
+  }
+
+  @Test
+  @DisplayName("the proxy host is recognised whatever its case or trailing dot")
+  void recognisesTheProxyHost() {
+    Proxy proxy = new Proxy("proxy.corp.example", 3128, null);
+
+    assertThat(proxy.isProxyHost("PROXY.corp.example.")).isTrue();
+    assertThat(proxy.isProxyHost("proxy.corp.example.evil")).isFalse();
+    assertThat(proxy.isProxyHost(null)).isFalse();
+    assertThat(Proxy.NONE.isProxyHost("proxy.corp.example")).isFalse();
   }
 }

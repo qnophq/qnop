@@ -24,6 +24,7 @@ import java.io.FilterInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
+import org.apache.hc.client5.http.DnsResolver;
 import org.apache.hc.client5.http.classic.ExecChainHandler;
 import org.apache.hc.client5.http.config.ConnectionConfig;
 import org.apache.hc.client5.http.config.RequestConfig;
@@ -96,26 +97,29 @@ public final class OutboundHttpClients {
       boolean allowPrivate,
       HostResolver resolver,
       HostResolver proxyResolver) {
-    HttpClientBuilder builder = baseBuilder(properties, allowPrivate, resolver);
     HttpClientProperties.Proxy proxy = properties.proxy();
-    if (proxy.enabled()) {
-      // Proxy mode (issue #940): the weaker trust model is explicit here, not accidental — see
-      // OutboundProxyRoutePlanner. Proxied requests get the lexical guard per request; non-proxy
-      // hosts stay direct and keep the connection-time guard of GuardedDnsResolver.
-      builder
-          .setRoutePlanner(new OutboundProxyRoutePlanner(proxy, proxyResolver))
-          .addExecInterceptorFirst(
-              "proxy-lexical-guard", OutboundProxyRoutePlanner.lexicalGuard(allowPrivate));
+    DnsResolver guarded = new GuardedDnsResolver(resolver, allowPrivate);
+    if (!proxy.enabled()) {
+      return baseBuilder(properties, guarded).build();
     }
-    return builder.build();
+    // Proxy mode (issue #940): the weaker trust model is explicit here, not accidental — see
+    // OutboundProxyRoutePlanner. Proxied requests get the lexical guard per request; non-proxy
+    // hosts stay direct and keep the connection-time guard of GuardedDnsResolver; only the proxy
+    // host's own name skips the address policy.
+    return baseBuilder(
+            properties, OutboundProxyRoutePlanner.exemptingProxyHost(proxy, guarded, proxyResolver))
+        .setRoutePlanner(new OutboundProxyRoutePlanner(proxy))
+        .addExecInterceptorFirst(
+            "proxy-lexical-guard", OutboundProxyRoutePlanner.lexicalGuard(allowPrivate))
+        .build();
   }
 
   private static HttpClientBuilder baseBuilder(
-      HttpClientProperties properties, boolean allowPrivate, HostResolver resolver) {
+      HttpClientProperties properties, DnsResolver dnsResolver) {
     return HttpClients.custom()
         .setConnectionManager(
             PoolingHttpClientConnectionManagerBuilder.create()
-                .setDnsResolver(new GuardedDnsResolver(resolver, allowPrivate))
+                .setDnsResolver(dnsResolver)
                 .setMaxConnPerRoute(MAX_CONNECTIONS_PER_ROUTE)
                 .setMaxConnTotal(MAX_CONNECTIONS_TOTAL)
                 .setDefaultConnectionConfig(
