@@ -122,6 +122,18 @@
       "label": "Reviews purged",
       "description": "Archived reviews passed the purge retention window and were deleted permanently, including storage objects no other document referenced (issue #577). This is the only surviving record of them — their own audit trail was deleted with them; the details list what went."
     },
+    "secretsReencrypted": {
+      "label": "Secrets re-encrypted",
+      "description": "Stored secrets (sensitive settings, OIDC client secrets) in an older format or under a rotated-out encryption key were re-encrypted under the current key at start-up (issue #927). The details give the counts and the current key id — never a value."
+    },
+    "secretsUnreadable": {
+      "label": "Secrets unreadable",
+      "description": "At start-up, stored secrets could not be decrypted with any configured encryption key and are treated as unset (issue #927). The details name the settings and OIDC providers affected — restore the key that wrote them as the previous key, or enter the secrets again."
+    },
+    "secretsReencryptionFailed": {
+      "label": "Secret re-encryption failed",
+      "description": "The start-up re-encryption of stored secrets failed (issue #927). The instance started anyway and retries on the next start; the details give the error type, the server log has the rest."
+    },
     "fallback": {
       "label": "{{type}}",
       "description": "A recorded review event."
