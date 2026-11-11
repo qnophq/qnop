@@ -27,6 +27,7 @@ import static org.mockito.Mockito.when;
 import io.qnop.entity.OidcProvider;
 import io.qnop.entity.OidcProviderType;
 import io.qnop.repository.OidcProviderRepository;
+import io.qnop.service.http.HttpClientProperties;
 import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.DisplayName;
@@ -43,7 +44,12 @@ class DbClientRegistrationRepositoryTest {
   private final OidcProviderRepository providers = mock(OidcProviderRepository.class);
   private final OidcSsrfPolicy denyPrivate = new OidcSsrfPolicy(false);
   private final DbClientRegistrationRepository repository =
-      new DbClientRegistrationRepository(providers, denyPrivate);
+      new DbClientRegistrationRepository(
+          providers,
+          denyPrivate,
+          new OidcDiscoveryClient(
+              new OidcHttpTransport(
+                  denyPrivate, new HttpClientProperties(null, null, null, null, null))));
 
   @Test
   @DisplayName(

@@ -32,7 +32,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.security.oauth2.client.registration.ClientRegistration;
 import org.springframework.security.oauth2.client.registration.ClientRegistrationRepository;
-import org.springframework.security.oauth2.client.registration.ClientRegistrations;
 import org.springframework.security.oauth2.core.AuthorizationGrantType;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
@@ -57,13 +56,17 @@ public class DbClientRegistrationRepository
 
   private final io.qnop.repository.OidcProviderRepository providers;
   private final OidcSsrfPolicy ssrfPolicy;
+  private final OidcDiscoveryClient discovery;
   private final AtomicReference<Map<String, ClientRegistration>> cache =
       new AtomicReference<>(Map.of());
 
   public DbClientRegistrationRepository(
-      io.qnop.repository.OidcProviderRepository providers, OidcSsrfPolicy ssrfPolicy) {
+      io.qnop.repository.OidcProviderRepository providers,
+      OidcSsrfPolicy ssrfPolicy,
+      OidcDiscoveryClient discovery) {
     this.providers = providers;
     this.ssrfPolicy = ssrfPolicy;
+    this.discovery = discovery;
   }
 
   @PostConstruct
@@ -111,17 +114,14 @@ public class DbClientRegistrationRepository
 
   private ClientRegistration buildRegistration(OidcProvider provider, String registrationId) {
     // Re-validate the stored URIs against the SSRF policy at use time, not only when the operator
-    // saved them (issue #168): discovery (fromIssuerLocation) and the OAuth2 endpoints below issue
+    // saved them (issue #168): discovery (OidcDiscoveryClient) and the OAuth2 endpoints below issue
     // outbound requests, so a row whose URI is internal — e.g. via a policy change or a direct DB
     // edit — must be blocked here too. A violation throws, and refresh() logs and skips the row.
     validateOutboundUris(provider);
     ClientRegistration.Builder builder =
         switch (provider.getProviderType()) {
-          case OIDC ->
-              ClientRegistrations.fromIssuerLocation(requireIssuer(provider))
-                  .registrationId(registrationId);
-          case GOOGLE ->
-              ClientRegistrations.fromIssuerLocation(GOOGLE_ISSUER).registrationId(registrationId);
+          case OIDC -> discovery.fromIssuer(requireIssuer(provider)).registrationId(registrationId);
+          case GOOGLE -> discovery.fromIssuer(GOOGLE_ISSUER).registrationId(registrationId);
           case GITHUB ->
               ClientRegistration.withRegistrationId(registrationId)
                   .authorizationGrantType(AuthorizationGrantType.AUTHORIZATION_CODE)
