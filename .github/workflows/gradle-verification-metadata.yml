@@ -64,7 +64,10 @@ jobs:
           java-version: '21'
       - uses: gradle/actions/setup-gradle@8da46b539cd8fe6ab27ca75128919a18d757604c # v6
         with:
-          cache-read-only: true
+          # Cold cache on purpose: a warm one serves processed module metadata,
+          # so parent POMs/BOMs would not be recorded (and CI, resolving them,
+          # would then fail verification).
+          cache-disabled: true
       - run: scripts/update-gradle-verification-metadata.sh
       - name: Detect a change
         id: diff
