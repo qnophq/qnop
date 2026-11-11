@@ -142,6 +142,33 @@ class DocumentAttachmentApiIT extends SeededIntegrationTest {
   }
 
   @Test
+  void servesANonAsciiFileNameAsUtf8ExtendedParameter() throws Exception {
+    UUID documentId = seedDocument();
+
+    byte[] pdf = "%PDF-1.7 fake but honest header".getBytes();
+    String json =
+        mockMvc
+            .perform(as(uploadRequest(documentId, pdf, "Prüfbericht €.pdf"), AUDITOR_ID))
+            .andExpect(status().isCreated())
+            .andReturn()
+            .getResponse()
+            .getContentAsString();
+    String url = JsonPath.read(json, "$.url");
+
+    String disposition =
+        mockMvc
+            .perform(as(get(url), MEMBER_ID))
+            .andExpect(status().isOk())
+            .andReturn()
+            .getResponse()
+            .getHeader("Content-Disposition");
+    // RFC 5987/6266: the name travels percent-encoded as UTF-8, never as raw non-Latin-1 bytes.
+    assertThat(disposition)
+        .startsWith("attachment")
+        .contains("filename*=UTF-8''Pr%C3%BCfbericht%20%E2%82%AC.pdf");
+  }
+
+  @Test
   void collapsesUnknownBytesToOctetStreamRegardlessOfTheDeclaredName() throws Exception {
     UUID documentId = seedDocument();
 
