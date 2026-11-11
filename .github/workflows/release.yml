@@ -4,6 +4,20 @@
 # qnop-ui SPA, publishes a multi-arch image to GHCR, and creates the GitHub
 # Release with generated notes. Tests deliberately do not run here — ci.yml
 # gates every commit on main; a tag releases exactly what main already proved.
+#
+# Supply-chain gates (issues #925/#926):
+#  - The job runs in the protected `release` GitHub Environment. Configure it
+#    (Settings → Environments) with required reviewers and a deployment tag
+#    rule `v*`, and keep the release secrets (SIGNING_*, DOCKERHUB_*) there:
+#    no tag push reaches a signing key or a registry credential without a
+#    maintainer's approval.
+#  - The tagged commit must be reachable from main.
+#  - Images carry BuildKit SBOM + max-mode provenance attestations and are
+#    signed keyless with cosign (Sigstore, GitHub OIDC identity of this
+#    workflow). Verify with:
+#      cosign verify ghcr.io/qnophq/qnop-ce:<version> \
+#        --certificate-identity-regexp '^https://github.com/qnophq/qnop/\.github/workflows/release\.yml@refs/tags/v' \
+#        --certificate-oidc-issuer https://token.actions.githubusercontent.com
 
 name: Release
 
@@ -15,15 +29,31 @@ on:
 permissions:
   contents: write
   packages: write
+  # Keyless cosign signing: the workflow's OIDC token is the signing identity.
+  id-token: write
 
 jobs:
   release:
     name: Build, publish image, create release
     runs-on: ubuntu-latest
+    # Protected environment (issue #926): required reviewers + tag rule, and the
+    # home of the release secrets. Must exist before this workflow runs.
+    environment: release
 
     steps:
       - name: Checkout
         uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
+        with:
+          # Full history so the on-main check below can see origin/main.
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Verify the tagged commit is on main
+        run: |
+          if ! git merge-base --is-ancestor "$GITHUB_SHA" origin/main; then
+            echo "::error::Tag $GITHUB_REF_NAME points at $GITHUB_SHA, which is not on main — only commits main has proven are released"
+            exit 1
+          fi
 
       - name: Validate tag against VERSION
         run: |
@@ -142,6 +172,7 @@ jobs:
             org.opencontainers.image.licenses=AGPL-3.0-only
 
       - name: Build and push image
+        id: build
         uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
         with:
           context: deploy/context
@@ -150,9 +181,26 @@ jobs:
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
-          provenance: false
+          # SBOM + SLSA provenance attestations, attached to the image index.
+          provenance: mode=max
+          sbom: true
           cache-from: type=gha
           cache-to: type=gha,mode=max
+
+      - name: Install cosign
+        uses: sigstore/cosign-installer@6f9f17788090df1f26f669e9d70d6ae9567deba6 # v4.1.2
+
+      # Sign by digest (never by tag), once per registry the image went to.
+      - name: Sign the image
+        env:
+          DIGEST: ${{ steps.build.outputs.digest }}
+          DOCKERHUB_IMAGE: ${{ steps.dockerhub.outputs.image }}
+        run: |
+          [[ "$DIGEST" =~ ^sha256:[0-9a-f]{64}$ ]] || { echo "::error::unexpected image digest '$DIGEST'"; exit 1; }
+          cosign sign --yes "ghcr.io/qnophq/qnop-ce@${DIGEST}"
+          if [ -n "$DOCKERHUB_IMAGE" ]; then
+            cosign sign --yes "${DOCKERHUB_IMAGE}@${DIGEST}"
+          fi
 
       - name: Sync Docker Hub README
         if: steps.dockerhub.outputs.enabled == 'true'

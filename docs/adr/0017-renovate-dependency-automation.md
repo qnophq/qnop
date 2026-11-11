@@ -71,3 +71,15 @@ Renovate's `gradle-wrapper` manager bumps `distributionUrl` on a Gradle release 
 - **Scope guard:** the job refuses to push anything but a one-line change to that one file, and only on `renovate/**`. Its own push re-triggers it once; that run finds the pin correct and ends without a commit.
 
 **Consequence:** one more workflow holds the App private key and can push to Renovate branches — the trade-off issue #769 weighs. Accepted because the blast radius is bounded by the scope guard, and because the alternative was a monthly hand-edit that the guard only made faster, not unnecessary.
+
+## Amendment (2026-11, #926): the checksum fixer runs only trusted code
+
+The 2026-08-29 design ran the fixer script from the pushed `renovate/**` branch while the App token was already minted and persisted by `actions/checkout`, and the scope guard ran only after the script. Branch content could therefore execute with the App token.
+
+**Decision:** nothing from the pushed branch executes in `gradle-wrapper-checksum-fix.yml`.
+
+- The script is checked out from the **default branch** (a separate, sparse checkout); the branch itself is checked out as data and edited by that trusted script.
+- Both checkouts use `persist-credentials: false`. The App token is minted **after** the scope guard has passed, narrowed to this repository with `contents: write`, and used only for the final `git push` through a one-off auth header (never written to `.git/config`).
+- `scripts/check-gradle-wrapper-checksum.sh` accepts only a `distributionUrl` under `https://services.gradle.org/distributions/`, so the "published checksum" is always Gradle's own — in CI guard and fixer alike.
+
+Consequence: a change to the script itself takes effect in the fixer only once it is on `main`, which is the point.
