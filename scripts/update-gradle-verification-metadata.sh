@@ -14,19 +14,46 @@
 # repository served today); a CHANGED checksum for an existing version is the
 # signal dependency verification exists for — do not accept it without a reason.
 #
-# Usage: scripts/update-gradle-verification-metadata.sh
+# Gradle never prunes entries, so the file only grows. `--fresh` drops every
+# <component> (the <configuration> block stays) and records the build's current
+# dependency set from scratch — removing stale versions. Use it deliberately:
+# the result re-trusts EVERY artifact as served today, so review it like a new
+# baseline, never as part of an automated run.
+#
+# Usage: scripts/update-gradle-verification-metadata.sh [--fresh]
 set -euo pipefail
 
 cd "$(dirname "${BASH_SOURCE[0]}")/.."
+
+METADATA=gradle/verification-metadata.xml
+if [[ "${1:-}" == "--fresh" ]]; then
+  python3 -I - "$METADATA" <<'PY'
+import re, sys
+path = sys.argv[1]
+with open(path, encoding="utf-8") as f:
+    text = f.read()
+text, n = re.subn(r"<components>.*?</components>", "<components>\n   </components>", text, flags=re.S)
+if n != 1:
+    sys.exit(f"{path}: expected exactly one <components> section")
+with open(path, "w", encoding="utf-8") as f:
+    f.write(text)
+PY
+  echo "--fresh: dropped all recorded components; regenerating from scratch."
+elif [[ -n "${1:-}" ]]; then
+  echo "usage: $0 [--fresh]" >&2
+  exit 2
+fi
 
 # Resolve everything any CI job resolves: all configurations of every project
 # (init script), Spotless's formatter, the license report and the CycloneDX
 # SBOM. Configuration cache and parallel execution are off because the license
 # report and the init task do not support them (same as the CI license-scan job).
-./gradlew --no-configuration-cache --no-parallel \
+# --rerun-tasks: an up-to-date or cached task resolves nothing, and an artifact
+# that is not resolved is not recorded.
+./gradlew --no-configuration-cache --no-parallel --rerun-tasks \
   --init-script gradle/verification/resolve-all.init.gradle.kts \
   --write-verification-metadata sha256 \
   resolveAllForVerification spotlessCheck checkLicense \
   :qnop-app:cyclonedxBom
 
-echo "gradle/verification-metadata.xml regenerated — review and commit the diff."
+echo "$METADATA regenerated — review and commit the diff."
