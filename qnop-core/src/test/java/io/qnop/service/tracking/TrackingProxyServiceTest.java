@@ -89,7 +89,8 @@ class TrackingProxyServiceTest {
                     false,
                     false,
                     ClientIpForwarding.ANONYMIZED)));
-    proxy = new TrackingProxyService(config, defaults());
+    // The stand-in backend listens on loopback, so this deployment opts in to private hosts.
+    proxy = new TrackingProxyService(config, defaults(), true);
   }
 
   @AfterEach
@@ -170,5 +171,18 @@ class TrackingProxyServiceTest {
         .isEmpty();
 
     assertThat(requests.poll(1, TimeUnit.SECONDS)).as("nothing was forwarded").isNull();
+  }
+
+  @Test
+  @DisplayName("without the private-host opt-in, a loopback backend is never contacted")
+  void privateBackendIsRefusedAtConnectionTime() throws Exception {
+    TrackingProxyService guarded = new TrackingProxyService(config, defaults(), false);
+
+    assertThat(
+            guarded.forward(
+                "GET", "/matomo.php", "idsite=1&rec=1", new byte[0], null, null, "Mozilla/5.0"))
+        .isEmpty();
+    assertThat(guarded.script()).isEmpty();
+    assertThat(requests.poll(1, TimeUnit.SECONDS)).as("nothing was sent").isNull();
   }
 }

@@ -134,7 +134,9 @@ qnop:
     # OIDC discovery against a private/loopback issuer (e.g. a local Keycloak on
     # http://localhost) is blocked by default as an SSRF guard (issue #21). The
     # local-dev .env turns this on so the bundled Keycloak works out of the box.
-    # NEVER enable in production.
+    # Every OIDC request (discovery, token, user-info, JWK set) is also checked at
+    # connection time against each resolved address, and redirects are not
+    # followed (issue #904); this flag relaxes both checks. NEVER enable in production.
     oidc:
       allow-private-discovery-uris: ${QNOP_AUTH_OIDC_ALLOW_PRIVATE_DISCOVERY_URIS:false}
       # Post-OIDC-login redirect base (issue #178). Blank → same-origin relative redirects
@@ -263,7 +265,9 @@ qnop:
   #
   # `allow-private-host` lets the proxy call a private/loopback address — a
   # self-hosted Matomo on an internal network is the normal case, but so is
-  # 169.254.169.254, which is why this is a property and not a setting.
+  # 169.254.169.254, which is why this is a property and not a setting. Without it,
+  # the host is checked against every address it resolves to at connection time
+  # (issue #904).
   tracking:
     allow-private-host: ${QNOP_TRACKING_ALLOW_PRIVATE_HOST:false}
     rate-limit:

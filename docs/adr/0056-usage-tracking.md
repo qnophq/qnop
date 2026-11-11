@@ -57,6 +57,22 @@ One thing this amendment does **not** provide, and an operator relying on it sho
 
 **A note on the mechanism.** `full` parses the address and re-emits it canonically rather than passing the resolved string through. That is not tidiness: behind a trusted proxy, `X-Forwarded-For` carries whatever that proxy passed along, and the truncating path only validated it as a side effect of having to understand it. Forwarding raw would have put unvalidated foreign text into an outgoing header.
 
+### Amendment (2026-11, issue #904): the outbound guard resolves, and pins what it resolved
+
+`OutboundUriGuard` (shared by usage tracking and the OIDC providers, issue #21) was purely lexical: host names were never resolved, only canonical dotted-quad IPv4 literals were recognised, some ranges were missing, and Spring Security's OIDC clients followed redirects and resolved hosts on their own. The guard now has two halves.
+
+**Lexical, at save time and before use (`OutboundUriGuard`, `OutboundAddressPolicy`).** Still DNS-free — a name resolved at save time proves nothing about the moment of the request. It refuses reserved names, any non-canonical numeric host (a single integer, hex or octal parts, a short dotted form — refused even with the private opt-in, since no legitimate configuration spells an address that way), and IP literals in a blocked range: loopback, `0.0.0.0/8`, RFC 1918, CGNAT `100.64.0.0/10`, link-local, `192.0.0.0/24`, `198.18.0.0/15`, multicast, reserved/broadcast; IPv6 unspecified/loopback, ULA `fc00::/7`, link-local, site-local, multicast; IPv4-mapped, IPv4-compatible and 6to4 addresses judged by their embedded IPv4 address; the NAT64 prefix `64:ff9b::/96` (and `64:ff9b:1::/48`) outright; and the cloud metadata addresses by name, including Azure's, which sits in public space.
+
+**At connection time (`GuardedDnsResolver`, `OutboundHttpClients`).** The decision is enforced by the client that makes the request, on the address it actually connects to. We chose **Apache HttpClient 5** (Apache-2.0, already managed by the Spring Boot BOM) because it is the one mainstream JVM client with a DNS hook: the connection operator asks the `DnsResolver` for the host's addresses and opens the socket to exactly those, so there is no second lookup between check and connect — a name that answers with a public address first and a private one later cannot get through. Every resolved address must pass the policy; one blocked address refuses the host. SNI, certificate verification and the `Host` header keep using the name. The alternatives were worse: the JDK `HttpClient` and `HttpURLConnection` have no resolution hook; rewriting the URL to the IP literal breaks TLS host verification; a JVM-wide `InetAddressResolverProvider` would affect every connection the process makes (database, object storage) and is bypassed by the JDK address cache. The guarded clients follow **no redirects**, ignore proxy system properties (a proxy would resolve the name outside the guard), and carry the `qnop.http-client.outbound-*` timeouts.
+
+Where it is wired:
+
+- **Tracking proxy** — `TrackingProxyService` forwards and fetches the script over the guarded client.
+- **OIDC discovery** — `OidcDiscoveryClient` fetches `<issuer>/.well-known/openid-configuration` over the guarded client and builds the registration with `ClientRegistrations.fromOidcConfiguration`, keeping the issuer-match check. `ClientRegistrations.fromIssuerLocation` was dropped: its private `RestTemplate` cannot be replaced, follows redirects, and also probes RFC 8414 locations, which OIDC providers do not need.
+- **OIDC login flow** — `OidcOutboundHttpConfiguration` declares the token-response client, both user-info services and the ID-token `JwtDecoderFactory` as beans; Spring Security 7's `oauth2Login` configurer picks those up in place of its defaults, so the filter chain is unchanged. Each mirrors Spring Security's default configuration apart from the transport (the JWK set uses RS256 as `OidcIdTokenDecoderFactory` does by default).
+
+The deployment opt-ins are unchanged in meaning: `qnop.auth.oidc.allow-private-discovery-uris` and `qnop.tracking.allow-private-host` relax the range checks at both halves (local Keycloak on `localhost` keeps working); the numeric-form check stays on.
+
 ### Four gates, any of which says no
 
 Operator configuration, Do-Not-Track/GPC, the account-level opt-out, and consent. All four must agree before a script tag is even created. The consent answer lives in the browser (the sign-in screen is measured, and nobody has an account yet at that point); the opt-out lives on the account, so it follows a person across devices and outlives a cleared browser store. Administrators and auditors are excluded unless an operator explicitly includes them — a handful of privileged people is barely a statistic and very much personal data.
@@ -83,3 +99,4 @@ Matomo, Plausible, Umami, PostHog (self-hostable) and Pirsch (cloud, proxy-nativ
 - **ADR-0025** — application settings; every operator-facing knob here is one
 - **ADR-0027** — the rate-limiting the unauthenticated collect endpoint reuses
 - **Issue #21** — the OIDC SSRF guard, extracted here into `OutboundUriGuard` and shared
+- **Issue #904** — the guard resolves host names and pins the connection to the validated addresses (amendment above)

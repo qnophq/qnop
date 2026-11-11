@@ -164,6 +164,10 @@ bucket4j-core = { module = "com.bucket4j:bucket4j_jdk17-core", version.ref = "bu
 # backs the lock on the existing Postgres (no Redis, ADR-0013) and is wired in qnop-app.
 shedlock-spring = { module = "net.javacrumbs.shedlock:shedlock-spring", version.ref = "shedlock" }
 shedlock-provider-jdbc-template = { module = "net.javacrumbs.shedlock:shedlock-provider-jdbc-template", version.ref = "shedlock" }
+# Guarded outbound HTTP (issue #904): Apache HttpClient 5 is the one JVM client with
+# a pluggable DNS hook, which is what lets the SSRF guard validate the very address
+# a connection goes to. Apache-2.0; version managed by the Spring Boot BOM.
+httpclient5 = { module = "org.apache.httpcomponents.client5:httpclient5" }
 # Mail subsystem (issue #19) — JavaMail + logic-less Mustache template rendering.
 spring-boot-starter-mail = { module = "org.springframework.boot:spring-boot-starter-mail" }
 jmustache = { module = "com.samskivert:jmustache", version.ref = "jmustache" }

@@ -31,7 +31,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.security.oauth2.client.registration.ClientRegistration;
-import org.springframework.security.oauth2.client.registration.ClientRegistrations;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -58,16 +57,19 @@ public class OidcProviderService {
 
   private final OidcProviderRepository providers;
   private final OidcSsrfPolicy ssrfPolicy;
+  private final OidcDiscoveryClient discovery;
   private final ApplicationEventPublisher events;
 
   public OidcProviderService(
       OidcProviderRepository providers,
       OidcSsrfPolicy ssrfPolicy,
+      OidcDiscoveryClient discovery,
       ApplicationEventPublisher events,
       FeatureToggleProperties features) {
     this.features = features;
     this.providers = providers;
     this.ssrfPolicy = ssrfPolicy;
+    this.discovery = discovery;
     this.events = events;
   }
 
@@ -126,15 +128,13 @@ public class OidcProviderService {
       return OidcDiscoveryOutcome.failure(e.getMessage());
     }
     try {
-      // fromIssuerLocation fetches the discovery document and pre-fills the endpoints; build()
-      // still validates a registrationId + clientId, which a pure endpoint probe does not have.
+      // The discovery client fetches the document (guarded, issue #904) and pre-fills the
+      // endpoints; build() still validates a registrationId + clientId, which a pure endpoint probe
+      // does not have.
       // Supply throwaway placeholders so the build succeeds without the operator's real
       // credentials.
       ClientRegistration registration =
-          ClientRegistrations.fromIssuerLocation(trimmed)
-              .registrationId("discovery")
-              .clientId("discovery")
-              .build();
+          discovery.fromIssuer(trimmed).registrationId("discovery").clientId("discovery").build();
       ClientRegistration.ProviderDetails details = registration.getProviderDetails();
       return new OidcDiscoveryOutcome(
           true,
@@ -152,7 +152,7 @@ public class OidcProviderService {
   /**
    * A discovery-failure message that keeps the actionable hint and appends the underlying cause.
    * Discovery is an admin-only probe against an operator-supplied issuer, so the cause (a Spring
-   * {@code ClientRegistrations} message, e.g. an unreachable issuer or a malformed document) aids
+   * {@code OidcDiscoveryClient} message, e.g. an unreachable issuer or a malformed document) aids
    * diagnosis without leaking qnop internals.
    */
   private static String discoveryFailureMessage(Throwable cause) {
