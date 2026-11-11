@@ -80,6 +80,22 @@ class MailServiceTest {
   }
 
   @Test
+  @DisplayName("the subject never carries CR/LF or other control characters")
+  void subjectIsOneLine() throws Exception {
+    when(senderProvider.current()).thenReturn(sender);
+    when(senderProvider.from()).thenReturn("from@qnop.example");
+    MimeMessage mime = new MimeMessage((Session) null);
+    when(sender.createMimeMessage()).thenReturn(mime);
+
+    service.sendMail("to@example.com", "Review: Plan\r\nBcc: x@example.com\u0000", "Body", null);
+
+    assertThat(mime.getSubject())
+        .startsWith("Review: Plan  Bcc: x@example.com")
+        .doesNotContain("\r", "\n", "\u0000");
+    assertThat(mime.getHeader("Bcc")).isNull();
+  }
+
+  @Test
   @DisplayName("uses smtp.from_name as the From display name")
   void usesFromNameAsDisplayName() throws Exception {
     when(senderProvider.current()).thenReturn(sender);

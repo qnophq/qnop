@@ -103,6 +103,7 @@ class ReviewPurgeServiceTest {
             versions,
             attachments,
             auditEvents,
+            org.mockito.Mockito.mock(io.qnop.repository.ReviewPseudonymRepository.class),
             org.mockito.Mockito.mock(io.qnop.service.document.DocumentAccessService.class),
             storage,
             org.mockito.Mockito.mock(org.springframework.context.ApplicationEventPublisher.class),

@@ -24,6 +24,7 @@ import io.qnop.entity.User;
 import io.qnop.entity.UserRole;
 import io.qnop.service.ApplicationSettingKey;
 import io.qnop.service.ApplicationSettingsService;
+import io.qnop.service.InvalidTextException;
 import io.qnop.service.UserService;
 import io.qnop.service.auth.EmailVerificationTokenService.InvalidVerificationTokenException;
 import io.qnop.service.mail.MailLocaleResolver;
@@ -92,6 +93,8 @@ public class RegistrationService {
    */
   @Transactional
   public void register(String username, String email, String password, String displayName) {
+    // Before anything else, so the answer depends on the input alone (anti-enumeration).
+    InvalidTextException.requireNoControlCharacters("displayName", displayName);
     // Encoded up front on every branch: the BCrypt cost dominates the request, so paying it only
     // when an account is created would let response times tell the branches apart (issue #903).
     String passwordHash = passwordEncoder.encode(password);

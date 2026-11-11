@@ -23,6 +23,7 @@ package io.qnop.service.auth;
 import io.qnop.entity.User;
 import io.qnop.service.ApplicationSettingKey;
 import io.qnop.service.ApplicationSettingsService;
+import io.qnop.service.RefreshTokenService;
 import io.qnop.service.UserService;
 import io.qnop.service.mail.MailLocaleResolver;
 import io.qnop.service.mail.MailService;
@@ -49,13 +50,16 @@ public class PasswordResetFlowService {
   private final MailService mailService;
   private final ApplicationSettingsService settings;
   private final MailLocaleResolver mailLocales;
+  private final RefreshTokenService refreshTokens;
 
   public PasswordResetFlowService(
       UserService userService,
       PasswordResetTokenService resetTokens,
       MailService mailService,
       ApplicationSettingsService settings,
-      MailLocaleResolver mailLocales) {
+      MailLocaleResolver mailLocales,
+      RefreshTokenService refreshTokens) {
+    this.refreshTokens = refreshTokens;
     this.userService = userService;
     this.resetTokens = resetTokens;
     this.mailService = mailService;
@@ -88,11 +92,17 @@ public class PasswordResetFlowService {
         .ifPresent(this::queueSelfServiceResetEmail);
   }
 
-  /** Consumes a reset token and applies the new password. Throws on an invalid token. */
+  /**
+   * Consumes a reset token, applies the new password and ends every existing session of the user:
+   * access tokens through {@code password_invalidated_before} (set by {@link
+   * UserService#applyPasswordReset}) and refresh-token families revoked here, like every other
+   * credential-change path (issue #897). Throws on an invalid token.
+   */
   @Transactional
   public void reset(String rawToken, String newPassword) {
     User user = resetTokens.consume(rawToken);
     userService.applyPasswordReset(user.getId(), newPassword);
+    refreshTokens.revokeAllForUser(user.getId());
   }
 
   /**

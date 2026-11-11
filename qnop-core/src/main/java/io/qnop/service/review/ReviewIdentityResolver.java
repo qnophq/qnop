@@ -24,18 +24,28 @@ import io.qnop.entity.Document;
 import io.qnop.repository.AnnotationRepository;
 import io.qnop.repository.CommentRepository;
 import io.qnop.repository.DocumentRepository;
+import io.qnop.repository.ReactionRepository;
 import io.qnop.repository.ReviewParticipantRepository;
+import io.qnop.repository.ReviewPseudonymRepository;
 import io.qnop.repository.UserDisplayName;
 import io.qnop.repository.UserRepository;
 import io.qnop.repository.UserSlug;
+import io.qnop.security.PseudonymKeyService;
 import java.nio.charset.StandardCharsets;
+import java.util.Collection;
 import java.util.HashMap;
 import java.util.LinkedHashSet;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.TransactionDefinition;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
+import org.springframework.transaction.support.TransactionTemplate;
 
 /**
  * Resolves who a review's annotation/comment authors are, honouring the document's per-review
@@ -56,10 +66,20 @@ import org.springframework.stereotype.Service;
  *       client cannot correlate it back to the participant roster.
  * </ul>
  *
- * <p>The pseudonym ordinal is assigned by ascending user id over the document's non-owner users —
- * everyone who authored something <em>or</em> is a direct participant (issue #422), so the roster
- * and the annotations share one numbering: stable across requests and surfaces, deterministic, and
- * revealing nothing but a count.
+ * <p>The pseudonym ordinal covers the document's non-owner principals — everyone who authored
+ * something <em>or</em> is a direct participant (issue #422), so the roster and the annotations
+ * share one numbering. Ordinals are persisted write-once in {@code review_pseudonym} (issue #914,
+ * ADR-0038 amendment): a principal without one is appended after the current maximum, newcomers
+ * ordered among themselves by a keyed HMAC ({@link PseudonymKeyService}) — never by user id, which
+ * is time-ordered and public. So a label is neither derivable from ids nor shifted by later joins.
+ *
+ * <p><b>Side effect — keep in mind when calling this from a new path.</b> When {@link #forDocument}
+ * runs inside a <em>writable</em> transaction and a principal has no ordinal yet, it allocates one:
+ * in a short, separate {@code REQUIRES_NEW} transaction under a per-review advisory lock, committed
+ * immediately, so no lock or uncommitted row outlives the allocation (the caller may go on to do
+ * slow work such as sending mail). Every contribution path (annotation, comment) runs writable and
+ * so persists its author's label. A read-only caller never writes; it sees the deterministic
+ * provisional ordinal the next writer will persist.
  */
 @Service
 public class ReviewIdentityResolver {
@@ -67,20 +87,33 @@ public class ReviewIdentityResolver {
   private final DocumentRepository documents;
   private final AnnotationRepository annotations;
   private final CommentRepository comments;
+  private final ReactionRepository reactions;
   private final ReviewParticipantRepository participants;
   private final UserRepository users;
+  private final ReviewPseudonymRepository pseudonyms;
+  private final PseudonymKeyService pseudonymKeys;
+  private final TransactionTemplate allocationTx;
 
   public ReviewIdentityResolver(
       DocumentRepository documents,
       AnnotationRepository annotations,
       CommentRepository comments,
+      ReactionRepository reactions,
       ReviewParticipantRepository participants,
-      UserRepository users) {
+      UserRepository users,
+      ReviewPseudonymRepository pseudonyms,
+      PseudonymKeyService pseudonymKeys,
+      PlatformTransactionManager transactionManager) {
     this.documents = documents;
     this.annotations = annotations;
     this.comments = comments;
+    this.reactions = reactions;
     this.participants = participants;
     this.users = users;
+    this.pseudonyms = pseudonyms;
+    this.pseudonymKeys = pseudonymKeys;
+    this.allocationTx = new TransactionTemplate(transactionManager);
+    this.allocationTx.setPropagationBehavior(TransactionDefinition.PROPAGATION_REQUIRES_NEW);
   }
 
   /**
@@ -93,13 +126,17 @@ public class ReviewIdentityResolver {
         documents.findById(documentId).orElseThrow(() -> new DocumentNotFoundException(documentId));
     UUID ownerId = document.getOwnerId();
 
-    // Every non-owner user who needs a stable label: annotation authors, comment-only authors, AND
-    // direct participants who never wrote anything (issue #422) — one numbering across the roster
-    // and the notes. Authors who participate via a team are covered by their authorship.
+    // Every non-owner user who needs a stable label: annotation authors, comment-only authors,
+    // reactors, AND direct participants who never wrote anything (issue #422) — one numbering
+    // across
+    // the roster and the notes. Team-derived reviewers are covered by what they did.
     Set<UUID> userIds = new LinkedHashSet<>();
     userIds.addAll(annotations.findDistinctAuthorIdsByDocumentId(documentId));
     userIds.addAll(comments.findDistinctCommentAuthorIdsByDocumentId(documentId));
     userIds.addAll(participants.findDirectUserIdsByDocumentId(documentId));
+    // Reactors (issue #921): someone reviewing only through a team who only reacts is no author
+    // and no participant row, but is shown as a reactor and so needs a proper label too.
+    userIds.addAll(reactions.findDistinctReactorIdsByDocumentId(documentId));
     // The owner is structurally public (#413) but is no participant row and may
     // not have written anything yet — without this, owner-driven events (workflow
     // transitions, reviewer additions) resolve to a null name (issue #472).
@@ -131,14 +168,66 @@ public class ReviewIdentityResolver {
                 .filter(row -> row.slug() != null)
                 .collect(Collectors.toMap(UserSlug::id, UserSlug::slug));
 
-    Map<UUID, Integer> ordinals = new HashMap<>();
-    int next = 0;
-    for (UUID id : userIds.stream().filter(id -> !id.equals(ownerId)).sorted().toList()) {
-      ordinals.put(id, ++next);
-    }
+    // Ordinals only matter under anonymity; non-anonymous reviews never read them.
+    Map<UUID, Integer> ordinals =
+        document.isAnonymous()
+            ? ordinals(documentId, userIds.stream().filter(id -> !id.equals(ownerId)).toList())
+            : Map.of();
 
     return new ReviewIdentities(
         document.isAnonymous(), ownerId, actor, documentId, names, slugs, ordinals);
+  }
+
+  /**
+   * The ordinals of {@code principals}: persisted ones as stored, missing ones allocated (when the
+   * caller's transaction is writable) or provisional (when it is not).
+   *
+   * <p>Allocation happens only when something is missing — the hot path is one read. It runs in its
+   * own short {@code REQUIRES_NEW} transaction that takes a per-review {@code
+   * pg_advisory_xact_lock}, re-reads the committed assignments, inserts the missing ones in ordinal
+   * order and commits. So concurrent first contributions to one review are serialized instead of
+   * racing on the unique keys, and the caller's transaction holds neither the lock nor uncommitted
+   * rows. A label survives a rolled-back contribution, which is harmless: it is never reused and
+   * reveals nothing. The table deliberately has no FK to the document, so the allocation never
+   * waits on a document row the caller holds locked or has not committed yet (migration 0038).
+   */
+  private Map<UUID, Integer> ordinals(UUID documentId, Collection<UUID> principals) {
+    Function<UUID, byte[]> sortKey = id -> pseudonymKeys.sortKey(documentId, id);
+    Map<UUID, Integer> assigned = loadAssigned(documentId);
+    if (assigned.keySet().containsAll(principals) || !canWrite()) {
+      return PseudonymOrdinals.extend(assigned, principals, sortKey);
+    }
+    List<UUID> wanted = List.copyOf(principals);
+    return allocationTx.execute(status -> allocate(documentId, wanted, sortKey));
+  }
+
+  /** Runs inside the allocation transaction; see {@link #ordinals}. */
+  private Map<UUID, Integer> allocate(
+      UUID documentId, List<UUID> principals, Function<UUID, byte[]> sortKey) {
+    pseudonyms.lockForAllocation("review_pseudonym:" + documentId);
+    Map<UUID, Integer> assigned = loadAssigned(documentId);
+    Map<UUID, Integer> extended = PseudonymOrdinals.extend(assigned, principals, sortKey);
+    extended.entrySet().stream()
+        .filter(entry -> !assigned.containsKey(entry.getKey()))
+        .sorted(Map.Entry.comparingByValue())
+        .forEach(
+            entry ->
+                pseudonyms.insertIfAbsent(
+                    UUID.randomUUID(), documentId, entry.getKey(), entry.getValue()));
+    return extended;
+  }
+
+  private Map<UUID, Integer> loadAssigned(UUID documentId) {
+    Map<UUID, Integer> assigned = new HashMap<>();
+    for (var row : pseudonyms.findByDocumentId(documentId)) {
+      assigned.put(row.getPrincipalId(), row.getOrdinal());
+    }
+    return assigned;
+  }
+
+  private static boolean canWrite() {
+    return TransactionSynchronizationManager.isActualTransactionActive()
+        && !TransactionSynchronizationManager.isCurrentTransactionReadOnly();
   }
 
   /** An immutable, request-scoped view of a review's author identities (issue #413). */

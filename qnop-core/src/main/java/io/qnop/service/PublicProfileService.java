@@ -20,17 +20,21 @@
  */
 package io.qnop.service;
 
+import io.qnop.entity.Team;
 import io.qnop.entity.User;
 import io.qnop.repository.AnnotationRepository;
 import io.qnop.repository.CommentRepository;
 import io.qnop.repository.DocumentRepository;
 import io.qnop.repository.ReviewParticipantRepository;
 import io.qnop.repository.TeamMembershipRepository;
+import io.qnop.repository.TeamRepository;
 import io.qnop.repository.UserRepository;
 import io.qnop.repository.UserTeamProjection;
 import java.time.Instant;
 import java.util.List;
+import java.util.Set;
 import java.util.UUID;
+import java.util.stream.Collectors;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -38,8 +42,10 @@ import org.springframework.transaction.annotation.Transactional;
  * The workspace-public profile (issues #454, #473): identity plus contribution aggregates and team
  * affiliations. Activity counters cover NON-anonymous reviews only (ADR-0038) — a public number
  * must never let anyone infer what anonymity hides; owned reviews count fully, since ownership is
- * structurally public. Team rosters are workspace-visible through the principal directory, so the
- * profile only aggregates what any member could already query.
+ * structurally public. The team affiliations follow the team-roster rule of the principal directory
+ * and the team profile (issue #918): a team is listed only to the profile's own user, an admin, a
+ * member of that team, or when the team's profile shows its members — otherwise walking user
+ * profiles would rebuild every hidden roster.
  */
 @Service
 public class PublicProfileService {
@@ -50,6 +56,7 @@ public class PublicProfileService {
   private final AnnotationRepository annotations;
   private final CommentRepository comments;
   private final TeamMembershipRepository teamMemberships;
+  private final TeamRepository teamRepository;
 
   public PublicProfileService(
       UserRepository users,
@@ -57,31 +64,45 @@ public class PublicProfileService {
       ReviewParticipantRepository participants,
       AnnotationRepository annotations,
       CommentRepository comments,
-      TeamMembershipRepository teamMemberships) {
+      TeamMembershipRepository teamMemberships,
+      TeamRepository teamRepository) {
     this.users = users;
     this.documents = documents;
     this.participants = participants;
     this.annotations = annotations;
     this.comments = comments;
     this.teamMemberships = teamMemberships;
+    this.teamRepository = teamRepository;
   }
 
+  /**
+   * A disabled account's profile is not served (issue #918): it answers the same 404 as an unknown
+   * id, so the public surface reveals nothing about deactivated accounts.
+   */
   @Transactional(readOnly = true)
-  public PublicProfileView getProfile(UUID id) {
-    return buildProfile(users.findById(id).orElseThrow(() -> new UserNotFoundException(id)));
+  public PublicProfileView getProfile(UUID id, UUID actorId, boolean admin) {
+    return buildProfile(
+        users.findById(id).filter(User::isEnabled).orElseThrow(() -> new UserNotFoundException(id)),
+        actorId,
+        admin);
   }
 
   /**
    * Resolves a profile by the immutable, case-insensitively unique profile slug (issue #486).
-   * Unknown slugs answer the same 404 as unknown ids.
+   * Unknown slugs and disabled accounts answer the same 404 as unknown ids.
    */
   @Transactional(readOnly = true)
-  public PublicProfileView getProfileBySlug(String slug) {
+  public PublicProfileView getProfileBySlug(String slug, UUID actorId, boolean admin) {
     return buildProfile(
-        users.findBySlugIgnoreCase(slug).orElseThrow(() -> new UserNotFoundException(slug)));
+        users
+            .findBySlugIgnoreCase(slug)
+            .filter(User::isEnabled)
+            .orElseThrow(() -> new UserNotFoundException(slug)),
+        actorId,
+        admin);
   }
 
-  private PublicProfileView buildProfile(User user) {
+  private PublicProfileView buildProfile(User user, UUID actorId, boolean admin) {
     UUID id = user.getId();
     PublicStatsView stats =
         new PublicStatsView(
@@ -91,9 +112,36 @@ public class PublicProfileService {
             annotations.countPublicResolvedByAuthor(id),
             comments.countPublicByAuthor(id));
     List<UserTeamView> teams =
-        teamMemberships.findTeamsOfUser(id).stream().map(UserTeamView::of).toList();
+        visibleTeams(teamMemberships.findTeamsOfUser(id), id, actorId, admin).stream()
+            .map(UserTeamView::of)
+            .toList();
     return new PublicProfileView(
         id, user.getDisplayName(), user.getSlug(), user.getCreatedAt(), stats, teams);
+  }
+
+  /**
+   * The affiliations {@code actorId} may see (issue #918): all of them for the profile's own user
+   * or an admin; otherwise only teams the caller belongs to or whose profile shows its members.
+   */
+  private List<UserTeamProjection> visibleTeams(
+      List<UserTeamProjection> affiliations, UUID profileUserId, UUID actorId, boolean admin) {
+    if (admin || profileUserId.equals(actorId) || affiliations.isEmpty()) {
+      return affiliations;
+    }
+    Set<UUID> callerTeams =
+        teamMemberships.findTeamsOfUser(actorId).stream()
+            .map(UserTeamProjection::teamId)
+            .collect(Collectors.toSet());
+    Set<UUID> showingMembers =
+        teamRepository
+            .findAllById(affiliations.stream().map(UserTeamProjection::teamId).toList())
+            .stream()
+            .filter(Team::isProfileShowMembers)
+            .map(Team::getId)
+            .collect(Collectors.toSet());
+    return affiliations.stream()
+        .filter(t -> callerTeams.contains(t.teamId()) || showingMembers.contains(t.teamId()))
+        .toList();
   }
 
   /** The public slice served by {@code GET /users/{userId}} and {@code /users/by-slug/{slug}}. */

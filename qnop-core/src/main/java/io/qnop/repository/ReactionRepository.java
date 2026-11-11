@@ -25,6 +25,8 @@ import java.util.Collection;
 import java.util.List;
 import java.util.UUID;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 
 /** Emoji reactions on annotations and comments (issue #410). */
 public interface ReactionRepository extends JpaRepository<Reaction, UUID> {
@@ -34,6 +36,18 @@ public interface ReactionRepository extends JpaRepository<Reaction, UUID> {
 
   /** All reactions of a batch of comments, oldest first — grouped in the service (#313). */
   List<Reaction> findByCommentIdInOrderByCreatedAtAsc(Collection<UUID> commentIds);
+
+  /**
+   * The distinct users who reacted to any annotation or comment of a document (issue #921). A
+   * reviewer who takes part only through a team and only reacts is neither an author nor a
+   * participant row, yet still needs a stable pseudonym in an anonymous review.
+   */
+  @Query(
+      "SELECT DISTINCT r.userId FROM Reaction r WHERE r.annotationId IN"
+          + " (SELECT a.id FROM Annotation a WHERE a.documentId = :documentId)"
+          + " OR r.commentId IN (SELECT c.id FROM Comment c, Annotation a"
+          + "   WHERE c.annotationId = a.id AND a.documentId = :documentId)")
+  List<UUID> findDistinctReactorIdsByDocumentId(@Param("documentId") UUID documentId);
 
   boolean existsByAnnotationIdAndUserIdAndEmoji(UUID annotationId, UUID userId, String emoji);
 

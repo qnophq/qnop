@@ -30,12 +30,10 @@ import rehypeSanitize, { defaultSchema } from 'rehype-sanitize';
 import { tokens } from '../../../theme/tokens';
 import { AttachmentImage } from './AttachmentImage';
 import { AttachmentLink } from './AttachmentLink';
-import { isAppAttachmentUrl } from './attachmentSources';
+import { isAppAttachmentUrl, isOtherAppApiUrl } from './attachmentSources';
 import { MentionLink } from './MentionLink';
+import { MENTION_HREF, mentionSlugFromHref } from './mentionToken';
 import { remarkMentions } from './remarkMentions';
-
-/** The canonical @mention href scheme (issue #462): `mention:<slug>`. */
-const MENTION_HREF = 'mention:';
 
 // react-markdown's default urlTransform sanitises hrefs to a small protocol allowlist (http/https/
 // mailto/…) and would blank out our custom `mention:` scheme before it ever reaches the renderer.
@@ -59,7 +57,13 @@ const components: Components = {
     // A mention (issue #462): remarkMentions promotes the plain @slug token to a mention: link,
     // rendered as an in-app profile pill rather than an external anchor.
     if (props.href?.startsWith(MENTION_HREF)) {
-      return <MentionLink slug={props.href.slice(MENTION_HREF.length)}>{children}</MentionLink>;
+      // Only a well-formed slug becomes a pill (issue #912); a malformed target stays plain text.
+      const slug = mentionSlugFromHref(props.href);
+      return slug ? <MentionLink slug={slug}>{children}</MentionLink> : <span>{children}</span>;
+    }
+    // An API path that is not exactly an attachment is never fetched or linked (issue #911).
+    if (isOtherAppApiUrl(props.href)) {
+      return <span>{children}</span>;
     }
     return isAppAttachmentUrl(props.href) ? (
       <AttachmentLink href={props.href}>{children}</AttachmentLink>
@@ -70,7 +74,10 @@ const components: Components = {
     );
   },
   img: ({ node: _node, ...props }) =>
-    isAppAttachmentUrl(props.src) ? (
+    // An API path that is not exactly an attachment loads nothing — only its alt text shows (#911).
+    isOtherAppApiUrl(props.src) ? (
+      <span>{props.alt ?? ''}</span>
+    ) : isAppAttachmentUrl(props.src) ? (
       <AttachmentImage src={props.src} alt={props.alt ?? ''} />
     ) : (
       <img {...props} alt={props.alt ?? ''} loading="lazy" referrerPolicy="no-referrer" />

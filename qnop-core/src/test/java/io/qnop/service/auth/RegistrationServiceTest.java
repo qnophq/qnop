@@ -34,6 +34,7 @@ import io.qnop.entity.User;
 import io.qnop.entity.UserRole;
 import io.qnop.service.ApplicationSettingKey;
 import io.qnop.service.ApplicationSettingsService;
+import io.qnop.service.InvalidTextException;
 import io.qnop.service.UserService;
 import io.qnop.service.auth.EmailVerificationTokenService.InvalidVerificationTokenException;
 import io.qnop.service.auth.RegistrationService.VerificationPasswordMismatchException;
@@ -92,6 +93,17 @@ class RegistrationServiceTest {
       throw new IllegalStateException(e);
     }
     return user;
+  }
+
+  @Test
+  @DisplayName("a display name with control characters is rejected before anything else")
+  void displayNameWithControlCharactersRejected() {
+    assertThatThrownBy(
+            () -> service.register("jane", "jane@example.com", "password1", "Jane\r\nDoe"))
+        .isInstanceOf(InvalidTextException.class);
+
+    verify(userService, never()).findInternalByEmail(any());
+    verify(userService, never()).createPendingRegistration(any(), any(), any(), any(), any());
   }
 
   private static User pending(String username, String email) {

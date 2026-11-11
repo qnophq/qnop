@@ -80,7 +80,6 @@ const LEAD: TeamMember = {
   displayName: 'Ada Lovelace',
   slug: 'ada-lovelace',
   avatarUrl: undefined,
-  email: 'ada@example.com',
   teamRole: 'LEAD',
   joinedAt: '2026-01-01T10:00:00Z',
 };
@@ -90,7 +89,6 @@ const MEMBER: TeamMember = {
   displayName: 'Alan Turing',
   slug: 'alan-turing',
   avatarUrl: undefined,
-  email: 'alan@example.com',
   teamRole: 'MEMBER',
   joinedAt: '2026-02-01T10:00:00Z',
 };

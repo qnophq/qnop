@@ -20,7 +20,36 @@
  */
 
 import { describe, expect, it } from 'vitest';
-import { activeMentionQuery, mentionToken, replaceMentionTokens } from './mentionToken';
+import {
+  activeMentionQuery,
+  mentionSlugFromHref,
+  mentionToken,
+  replaceMentionTokens,
+} from './mentionToken';
+
+describe('mentionSlugFromHref (#912)', () => {
+  it('returns the slug of a well-formed mention href', () => {
+    expect(mentionSlugFromHref('mention:anna-krause')).toBe('anna-krause');
+    expect(mentionSlugFromHref('mention:Bob1')).toBe('Bob1');
+  });
+
+  it.each([
+    undefined,
+    'https://example.com',
+    'mention:',
+    'mention:ab',
+    'mention:-anna',
+    'mention:anna-',
+    'mention:%2e%2e/admin',
+    'mention:../admin',
+    'mention:anna/krause',
+    'mention:anna?x=1',
+    'mention:anna krause',
+    `mention:${'a'.repeat(65)}`,
+  ])('rejects %s', (href) => {
+    expect(mentionSlugFromHref(href)).toBeNull();
+  });
+});
 
 describe('mentionToken (#462)', () => {
   it('builds the GitHub-style slug token', () => {
