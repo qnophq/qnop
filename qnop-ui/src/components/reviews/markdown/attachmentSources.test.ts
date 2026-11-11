@@ -65,10 +65,24 @@ describe('isOtherAppApiUrl (#911)', () => {
     expect(isOtherAppApiUrl('/API/v1/x')).toBe(true);
   });
 
+  it.each([
+    `${window.location.origin}/api/v1/users/me`,
+    `//${window.location.host}/api/v1/users/me`,
+    '../api/v1/users/me',
+    './api/v1/users/me',
+    '\\api\\v1\\users\\me',
+    '/api',
+    '/x/../api/v1/users/me',
+  ])('resolves other same-origin spellings of the API: %s', (target) => {
+    expect(isOtherAppApiUrl(target)).toBe(true);
+  });
+
   it('leaves attachment and external targets alone', () => {
     expect(isOtherAppApiUrl(VALID)).toBe(false);
     expect(isOtherAppApiUrl('https://example.com/api/v1/x')).toBe(false);
     expect(isOtherAppApiUrl(undefined)).toBe(false);
+    expect(isOtherAppApiUrl('/apiary')).toBe(false);
+    expect(isOtherAppApiUrl('/reviews/x')).toBe(false);
   });
 });
 
@@ -83,6 +97,22 @@ describe('sanitizeFilename (#911)', () => {
 
   it('drops leading dots and whitespace', () => {
     expect(sanitizeFilename('  ..hidden.txt')).toBe('hidden.txt');
+  });
+
+  it('replaces bidi and C1 controls', () => {
+    expect(sanitizeFilename('report‮fdp.exe')).toBe('report_fdp.exe');
+    expect(sanitizeFilename('a⁦b‏c\u0085d.txt')).toBe('a_b_c_d.txt');
+  });
+
+  it('drops trailing dots and whitespace', () => {
+    expect(sanitizeFilename('notes.txt. . ')).toBe('notes.txt');
+  });
+
+  it('defuses reserved Windows device names', () => {
+    expect(sanitizeFilename('CON')).toBe('_CON');
+    expect(sanitizeFilename('nul.txt')).toBe('_nul.txt');
+    expect(sanitizeFilename('com1.pdf')).toBe('_com1.pdf');
+    expect(sanitizeFilename('console.txt')).toBe('console.txt');
   });
 
   it('caps the length', () => {
@@ -119,6 +149,20 @@ describe('filenameFromContentDisposition (#911)', () => {
     expect(
       filenameFromContentDisposition(`attachment; filename="a.pdf"; filename*=UTF-8''%E0%A4%A`),
     ).toBe('a.pdf');
+  });
+
+  it('treats parameter syntax inside a quoted value as part of the value', () => {
+    expect(
+      filenameFromContentDisposition(`attachment; filename="a; filename*=UTF-8''other.exe; b.pdf"`),
+    ).toBe(`a; filename_=UTF-8''other.exe; b.pdf`);
+  });
+
+  it('reads the server-emitted UTF-8 extended form on its own', () => {
+    expect(
+      filenameFromContentDisposition(
+        `attachment; filename*=UTF-8''Pr%C3%BCfbericht%20%E2%82%AC.pdf`,
+      ),
+    ).toBe('Prüfbericht €.pdf');
   });
 
   it('never yields a path from the server value', () => {

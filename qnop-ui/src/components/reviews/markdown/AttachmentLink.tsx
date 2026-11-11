@@ -35,9 +35,17 @@ interface AttachmentLinkProps {
   children: ReactNode;
 }
 
-/** One response header as a string — axios lower-cases header names when it parses them. */
+/**
+ * One response header as a string. Axios hands back an `AxiosHeaders` instance whose `get` is
+ * case-insensitive; a plain record (other adapters, test doubles) is looked up by lower-case name.
+ */
 function headerValue(headers: unknown, name: string): string | null {
-  const value = (headers as Record<string, unknown> | undefined)?.[name];
+  if (!headers || typeof headers !== 'object') return null;
+  const getter = (headers as { get?: unknown }).get;
+  const value =
+    typeof getter === 'function'
+      ? (getter as (key: string) => unknown).call(headers, name)
+      : (headers as Record<string, unknown>)[name.toLowerCase()];
   return typeof value === 'string' ? value : null;
 }
 

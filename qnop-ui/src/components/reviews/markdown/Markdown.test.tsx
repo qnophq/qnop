@@ -22,6 +22,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import { fireEvent, render, waitFor } from '@testing-library/react';
 import { MemoryRouter } from 'react-router';
+import { AxiosHeaders } from 'axios';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { ThemeProvider } from '@mui/material/styles';
 import { buildTheme } from '../../../theme/theme';
@@ -233,11 +234,66 @@ describe('Markdown render (#427)', () => {
     click.mockRestore();
   });
 
+  it('reads the file name through AxiosHeaders regardless of header case (#911)', async () => {
+    const download: string[] = [];
+    const click = vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(function (
+      this: HTMLAnchorElement,
+    ) {
+      download.push(this.download);
+    });
+    vi.mocked(axiosInstance.get).mockResolvedValueOnce({
+      data: new Blob(['pdf']),
+      headers: new AxiosHeaders({
+        'Content-Disposition': `attachment; filename*=UTF-8''Pr%C3%BCfbericht.pdf`,
+      }),
+    } as never);
+    const { getByTestId } = renderMd(`[x](/api/v1/documents/${DOC}/attachments/${ATT2})`);
+
+    fireEvent.click(getByTestId('attachment-link'));
+
+    await waitFor(() => expect(download).toEqual(['Prüfbericht.pdf']));
+    click.mockRestore();
+  });
+
+  it('falls back to the generic name without a usable Content-Disposition (#911)', async () => {
+    const download: string[] = [];
+    const click = vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(function (
+      this: HTMLAnchorElement,
+    ) {
+      download.push(this.download);
+    });
+    vi.mocked(axiosInstance.get).mockResolvedValueOnce({
+      data: new Blob(['pdf']),
+      headers: { 'content-disposition': 'attachment' },
+    } as never);
+    const { getByTestId } = renderMd(`[agenda.exe](/api/v1/documents/${DOC}/attachments/${ATT2})`);
+
+    fireEvent.click(getByTestId('attachment-link'));
+
+    await waitFor(() => expect(download).toHaveLength(1));
+    expect(download[0]).not.toBe('agenda.exe');
+    expect(download[0]).toBeTruthy();
+    click.mockRestore();
+  });
+
+  it('still renders a pill for a UUID-shaped mention target (#912)', () => {
+    vi.mocked(usersApi.getUserProfileBySlug).mockRejectedValue(new Error('404'));
+    const { getByTestId } = renderMdWithMentions(`[@someone](mention:${DOC})`);
+
+    expect(getByTestId('mention-link')).toHaveAttribute('href', `/users/${DOC}`);
+  });
+
   it.each([
     '/api/v1/documents/' + DOC + '/attachments/' + ATT1 + '/../../../x',
     '/api/v1/documents/' + DOC + '/attachments/%2e%2e',
     '/api/v1/users/me',
     '/api/v1/documents/' + DOC + '/attachments/' + ATT1 + '?x=1',
+    `${window.location.origin}/api/v1/users/me`,
+    `//${window.location.host}/api/v1/users/me`,
+    '../api/v1/users/me',
+    './api/v1/users/me',
+    '/api',
+    `${window.location.origin}/api/v1/documents/${DOC}/attachments/${ATT1}`,
   ])('never fetches or links a non-attachment API target: %s (#911)', (target) => {
     vi.mocked(axiosInstance.get).mockClear();
     const { container, getByText } = renderMd(`![pic](${target}) and [file](${target})`);

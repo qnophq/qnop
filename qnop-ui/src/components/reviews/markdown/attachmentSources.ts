@@ -38,37 +38,55 @@ export function isAppAttachmentUrl(target: string | undefined): target is string
 }
 
 /**
- * True when a target points into the app's API but is not an attachment URL (issue #911). Such
- * targets render link-less: they are never fetched with the bearer token, and the viewer's browser
- * issues no request on the author's behalf.
+ * True when a target resolves into the app's own API but is not an attachment URL (issue #911).
+ * The target is resolved against the current page first, so absolute, protocol-relative,
+ * relative, backslash and dot-segment spellings of a same-origin `/api` path are all caught. Such
+ * targets render link-less: they are never fetched (with or without the bearer token) and never
+ * become a clickable link.
  */
 export function isOtherAppApiUrl(target: string | undefined): boolean {
+  if (typeof target !== 'string' || isAppAttachmentUrl(target)) return false;
+  let resolved: URL;
+  try {
+    resolved = new URL(target, window.location.href);
+  } catch {
+    return false;
+  }
+  const path = resolved.pathname.toLowerCase();
   return (
-    typeof target === 'string' &&
-    target.toLowerCase().startsWith('/api/') &&
-    !isAppAttachmentUrl(target)
+    resolved.origin === window.location.origin && (path === '/api' || path.startsWith('/api/'))
   );
 }
 
-/** Characters that are unsafe or meaningless in a downloaded file name. */
-// eslint-disable-next-line no-control-regex
-const UNSAFE_FILENAME_CHARS = /[\u0000-\u001f\u007f/\\:*?"<>|]/g;
+/**
+ * Characters that are unsafe or misleading in a downloaded file name: C0/C1 controls, DEL, the
+ * Unicode bidi controls (which can make a name display with a fake extension), path separators
+ * and the characters Windows reserves.
+ */
+const UNSAFE_FILENAME_CHARS =
+  // eslint-disable-next-line no-control-regex
+  /[\u0000-\u001f\u007f-\u009f‎‏‪-‮⁦-⁩/\\:*?"<>|]/g;
+
+/** Windows device names, reserved with or without an extension. */
+const RESERVED_DEVICE_NAME = /^(con|prn|aux|nul|com[0-9]|lpt[0-9])(\.|$)/i;
 
 /** Caps the suggested name well below the 255-byte limit of common file systems. */
 const MAX_FILENAME_LENGTH = 200;
 
 /**
  * Reduces a server-supplied file name to a safe download name (issue #911): replaces path
- * separators, control and reserved characters, drops leading dots/whitespace (no hidden or
- * relative names) and caps the length. Returns `null` when nothing usable remains.
+ * separators, control, bidi and reserved characters, drops leading and trailing dots/whitespace
+ * (no hidden, relative or silently-truncated names), defuses Windows device names and caps the
+ * length. Returns `null` when nothing usable remains.
  */
 export function sanitizeFilename(raw: string): string | null {
   const cleaned = raw
     .replace(UNSAFE_FILENAME_CHARS, '_')
+    .slice(0, MAX_FILENAME_LENGTH)
     .replace(/^[\s.]+/, '')
-    .trim()
-    .slice(0, MAX_FILENAME_LENGTH);
-  return /[^_]/.test(cleaned) ? cleaned : null;
+    .replace(/[\s.]+$/, '');
+  if (!/[^_]/.test(cleaned)) return null;
+  return RESERVED_DEVICE_NAME.test(cleaned) ? `_${cleaned}` : cleaned;
 }
 
 /** Decodes an RFC 5987 `charset'lang'value` extended parameter; `null` when malformed. */
@@ -89,11 +107,53 @@ function decodeExtValue(value: string): string | null {
  */
 export function filenameFromContentDisposition(header: string | null | undefined): string | null {
   if (!header) return null;
-  const extended = /filename\*\s*=\s*([^;]+)/i.exec(header);
-  const decoded = extended ? decodeExtValue(extended[1].trim()) : null;
+  const params = dispositionParams(header);
+  const extended = params.get('filename*');
+  const decoded = extended !== undefined ? decodeExtValue(extended) : null;
   if (decoded !== null) return sanitizeFilename(decoded);
-  const quoted = /filename\s*=\s*"((?:[^"\\]|\\.)*)"/i.exec(header);
-  if (quoted) return sanitizeFilename(quoted[1].replace(/\\(.)/g, '$1'));
-  const token = /filename\s*=\s*([^;\s]+)/i.exec(header);
-  return token ? sanitizeFilename(token[1]) : null;
+  const plain = params.get('filename');
+  return plain !== undefined ? sanitizeFilename(plain) : null;
+}
+
+/**
+ * Splits a `Content-Disposition` value into its parameters (lower-cased names → values), honouring
+ * quoted strings: a `;` or `name=` inside quotes is part of the value, never a parameter boundary.
+ * The first occurrence of a parameter wins; the leading disposition type is skipped.
+ */
+function dispositionParams(header: string): Map<string, string> {
+  const params = new Map<string, string>();
+  const segments: string[] = [];
+  let current = '';
+  let quoted = false;
+  for (let i = 0; i < header.length; i++) {
+    const ch = header[i];
+    if (quoted && ch === '\\' && i + 1 < header.length) {
+      current += ch + header[++i];
+    } else if (ch === '"') {
+      quoted = !quoted;
+      current += ch;
+    } else if (ch === ';' && !quoted) {
+      segments.push(current);
+      current = '';
+    } else {
+      current += ch;
+    }
+  }
+  segments.push(current);
+  for (const segment of segments.slice(1)) {
+    const eq = segment.indexOf('=');
+    if (eq < 0) continue;
+    const name = segment.slice(0, eq).trim().toLowerCase();
+    const value = unquote(segment.slice(eq + 1).trim());
+    if (name && !params.has(name)) params.set(name, value);
+  }
+  return params;
+}
+
+/** Strips the surrounding quotes of an RFC 7230 quoted-string and resolves its escapes. */
+function unquote(value: string): string {
+  if (value.length >= 2 && value.startsWith('"') && value.endsWith('"')) {
+    return value.slice(1, -1).replace(/\\(.)/g, '$1');
+  }
+  return value;
 }
