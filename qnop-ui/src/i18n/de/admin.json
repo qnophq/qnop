@@ -390,7 +390,7 @@
       "needsHost": "Es wird nichts gemessen — {{provider}} wird selbst gehostet und braucht daher die Adresse deines Servers.",
       "measuring": "Messung läuft über {{provider}}. Seitenadressen werden vor dem Weiterleiten auf Routenmuster reduziert.",
       "measuringAt": "Messung läuft über {{provider}} unter {{host}}. Seitenadressen werden vor dem Weiterleiten auf Routenmuster reduziert.",
-      "trustNote": "qnop führt im Browser keinen Code des Analyse-Anbieters aus: Jede Messung baut qnop selbst — ein Routenmuster, eines von vier benannten Ereignissen, Bildschirmgröße und Sprache — und schickt sie über diesen Server. Das hier eingetragene Backend erhält trotzdem jede weitergeleitete Messung zusammen mit der Browserkennung der Besucher und, je nach Einstellung unten, ihrer IP-Adresse. Tragen Sie daher nur einen Server ein, dem Sie vertrauen. Ein öffentlicher Host muss https verwenden."
+      "trustNote": "qnop führt im Browser keinen Code des Analyse-Anbieters aus: Jede Messung baut qnop selbst — höchstens ein Routenmuster, eines von vier benannten Ereignissen, die Bildschirmgröße und die Browsersprache — und schickt sie über diesen Server, der nichts anderes annimmt. Das hier eingetragene Backend erhält trotzdem jede weitergeleitete Messung zusammen mit der Browserkennung der Besucher und, je nach Einstellung unten, ihrer IP-Adresse. Tragen Sie daher nur einen Server ein, dem Sie vertrauen. Ein öffentlicher Host muss https verwenden."
     },
     "fields": {
       "general__application_name": {
@@ -427,7 +427,7 @@
       },
       "tracking__host": {
         "label": "Host",
-        "description": "Basis-URL des Analyse-Backends, z. B. https://matomo.example.com. Leer nutzt die Cloud des Anbieters, sofern es eine gibt (Plausible, PostHog, Pirsch); Matomo und Umami werden selbst gehostet und brauchen den Wert immer. Muss https verwenden, außer der Host ist eine private Adresse."
+        "description": "Basis-URL des Analyse-Backends, z. B. https://matomo.example.com. Leer nutzt die Cloud des Anbieters, sofern es eine gibt (Plausible, PostHog US, Pirsch); für ein PostHog-Projekt in der EU tragen Sie https://eu.i.posthog.com ein. Matomo und Umami werden selbst gehostet und brauchen den Wert immer. Muss https verwenden, außer der Host ist eine private Adresse."
       },
       "tracking__site_id": {
         "label": "Site-ID",
@@ -447,7 +447,7 @@
       },
       "tracking__forward_client_ip": {
         "label": "Client-IP weiterleiten",
-        "description": "Wie viel von der IP-Adresse eines Besuchers an dein Analyse-Backend weitergegeben wird. Anonymisiert kürzt sie, sodass Besucher zählbar bleiben, ohne identifizierbar zu sein. Nicht weiterleiten heißt, das Backend zählt alle als einen einzigen Besucher. Vollständig sendet die genaue Adresse — das sind personenbezogene Daten, für die du eine eigene Rechtsgrundlage brauchst."
+        "description": "Wie viel von der IP-Adresse eines Besuchers an Ihr Analyse-Backend weitergegeben wird. Anonymisiert kürzt sie, sodass Besucher zählbar bleiben, ohne identifizierbar zu sein. Nicht weitergeben bedeutet, dass das Backend alle als einen einzigen Besucher zählt. Vollständig sendet die genaue Adresse; das sind personenbezogene Daten — dafür brauchen Sie eine eigene Rechtsgrundlage. Das Backend muss der weitergeleiteten Adresse vertrauen: Matomo nutzt sie nur, wenn seine config.ini den Header unter proxy_client_headers[] aufführt, und Pirsch zählt womöglich alle Besucher unter der Adresse dieses Servers — siehe Deployment-Anleitung."
       },
       "smtp__enabled": {
         "label": "Aktiviert",

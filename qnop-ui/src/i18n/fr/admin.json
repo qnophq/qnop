@@ -397,7 +397,7 @@
       "needsHost": "Rien n’est mesuré — {{provider}} est auto-hébergé et a donc besoin de l’adresse de votre serveur.",
       "measuring": "Mesures envoyées à {{provider}}. Les adresses des pages sont réduites à des modèles de route avant d’être transmises.",
       "measuringAt": "Mesures envoyées à {{provider}} sur {{host}}. Les adresses des pages sont réduites à des modèles de route avant d’être transmises.",
-      "trustNote": "qnop n’exécute jamais le code du fournisseur d’analyse dans le navigateur : il construit lui-même chaque mesure — un modèle de route, l’un des quatre événements nommés, la taille de l’écran et la langue — et l’envoie via ce serveur. Le service configuré ici reçoit néanmoins chaque mesure transmise, avec l’identification du navigateur du visiteur et, selon le réglage ci-dessous, son adresse IP : ne l’orientez que vers un serveur de confiance. Un hôte public doit utiliser https."
+      "trustNote": "qnop n’exécute jamais le code du fournisseur d’analyse dans le navigateur : il construit lui-même chaque mesure — au plus un modèle de route, l’un des quatre événements nommés, la taille de l’écran et la langue du navigateur — et l’envoie via ce serveur, qui n’accepte rien d’autre. Le service configuré ici reçoit néanmoins chaque mesure transmise, avec l’identification du navigateur du visiteur et, selon le réglage ci-dessous, son adresse IP : ne l’orientez que vers un serveur de confiance. Un hôte public doit utiliser https."
     },
     "fields": {
       "general__application_name": {
@@ -434,7 +434,7 @@
       },
       "tracking__host": {
         "label": "Hôte",
-        "description": "URL de base du service d’analyse, par ex. https://matomo.example.com. Si le champ est vide, le cloud du fournisseur est utilisé lorsqu’il en propose un (Plausible, PostHog, Pirsch) ; Matomo et Umami sont auto-hébergés et nécessitent toujours ce champ. https est obligatoire, sauf pour une adresse privée."
+        "description": "URL de base du service d’analyse, par ex. https://matomo.example.com. Si le champ est vide, le cloud du fournisseur est utilisé lorsqu’il en propose un (Plausible, PostHog US, Pirsch) ; pour un projet PostHog dans l’UE, saisissez https://eu.i.posthog.com. Matomo et Umami sont auto-hébergés et nécessitent toujours ce champ. https est obligatoire, sauf pour une adresse privée."
       },
       "tracking__site_id": {
         "label": "ID du site",
@@ -454,7 +454,7 @@
       },
       "tracking__forward_client_ip": {
         "label": "Transmettre l’IP du client",
-        "description": "Quelle part de l’adresse IP d’un visiteur est transmise à votre service d’analyse. « Anonymisée » la raccourcit, de sorte que les visiteurs restent dénombrables sans être identifiables. « Ne pas transmettre » signifie que le service d’analyse compte tout le monde comme un seul visiteur. « Adresse complète » envoie l’adresse exacte, qui est une donnée personnelle — il vous faut pour cela votre propre base légale."
+        "description": "Quelle part de l’adresse IP d’un visiteur est transmise à votre service d’analyse. Anonymisée la raccourcit, de sorte que les visiteurs restent dénombrables sans être identifiables. Non transmise signifie que le service compte tout le monde comme un seul visiteur. Complète envoie l’adresse exacte, qui est une donnée personnelle — il vous faut votre propre base juridique. Le service doit faire confiance à l’adresse transmise : Matomo ne l’utilise que si son config.ini mentionne l’en-tête dans proxy_client_headers[], et Pirsch risque de compter tous les visiteurs à l’adresse de ce serveur — voir le guide de déploiement."
       },
       "smtp__enabled": {
         "label": "Activé",

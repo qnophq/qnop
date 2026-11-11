@@ -98,6 +98,17 @@ What a subprocess cannot do on its own is change user, network or kernel limits 
    Running the converter under a separate uid (for example `sudo -u <converter-user>` in the wrapper with a sudoers rule scoped to that single command) additionally keeps it from reading the server process's files and `/proc` entries.
 4. **Disable it.** A deployment that does not need DOCX ingest or PDF export can set `QNOP_OFFICE_BINARY` to a non-existent path; both features then report themselves unavailable in `GET /api/v1/config`.
 
+## Usage tracking (analytics backends)
+
+Usage tracking is off by default and configured under *Administration → Settings → Usage tracking* (ADR-0056). The browser never talks to the analytics backend and loads no analytics script: qnop builds each measurement itself and posts it to `/t/c/…` on its own origin, and the server checks it against the exact shape qnop sends before forwarding it with the visitor's user agent and — per `tracking.forward_client_ip` — a truncated, exact or no `X-Forwarded-For` (issue #910).
+
+- **Transport.** `tracking.host` must be `https://` unless it is a private address (an IP literal in a private range, `localhost`, `*.local`, `*.internal`). Reaching a private host additionally needs `QNOP_TRACKING_ALLOW_PRIVATE_HOST=true` (`qnop.tracking.allow-private-host`).
+- **Visitor addresses through the proxy.** Every measurement reaches the backend from qnop's server, so the backend has to take the visitor's address from `X-Forwarded-For` — otherwise it counts every visitor as one.
+  - **Matomo** uses the header only when told to: add `proxy_client_headers[] = HTTP_X_FORWARDED_FOR` to the `[General]` section of its `config/config.ini.php`. Only do this if requests reach Matomo exclusively through qnop or another proxy you control, since the header is otherwise caller-supplied.
+  - **Umami, Plausible and PostHog** read the forwarded address as part of their documented proxy setups; check the visitor counts on your instance after enabling.
+  - **Pirsch** — known limitation: its identification-code endpoints are designed to be called from the browser, and its documented proxy setups use a server-side API client instead. Through qnop, Pirsch may attribute every visitor to qnop's address. A server-side access-token mode is tracked in issue #944; until then, prefer another backend if unique-visitor counts matter.
+- **PostHog region.** An empty host means PostHog's US cloud. For an EU project set `tracking.host` to `https://eu.i.posthog.com`. Unique-user counts in PostHog are per page load by design (no persistent id is kept), so read page views and events rather than "unique users".
+
 ## Upgrades
 
 1. Read the release notes of every version you skip: <https://github.com/qnophq/qnop/releases>.
