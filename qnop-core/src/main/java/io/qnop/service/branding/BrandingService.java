@@ -23,6 +23,7 @@ package io.qnop.service.branding;
 import io.qnop.entity.ApplicationAsset;
 import io.qnop.entity.BrandingSlot;
 import io.qnop.repository.ApplicationAssetRepository;
+import io.qnop.service.image.ImageHeaderProbe;
 import io.qnop.service.limits.FeatureDisabledException;
 import io.qnop.service.limits.FeatureToggleProperties;
 import java.io.IOException;
@@ -280,13 +281,17 @@ public class BrandingService {
 
   private void enforceDimensions(String contentType, byte[] content) {
     Optional<ImageDimensions> dimensions = ImageDimensions.read(contentType, content);
-    if (BrandingLimits.PNG.equals(contentType) && dimensions.isEmpty()) {
-      throw BrandingValidationException.invalidImage("unreadable PNG");
+    boolean raster =
+        BrandingLimits.PNG.equals(contentType) || BrandingLimits.WEBP.equals(contentType);
+    if (raster && dimensions.isEmpty()) {
+      throw BrandingValidationException.invalidImage("unreadable " + contentType);
     }
     dimensions.ifPresent(
         d -> {
-          if (d.width() > BrandingLimits.MAX_DIMENSION_PX
-              || d.height() > BrandingLimits.MAX_DIMENSION_PX) {
+          // Raster sizes come from the header only (issue #906), so an oversized
+          // declaration is refused before anything allocates its pixels.
+          if (!BrandingLimits.PIXEL_BUDGET.admits(
+              new ImageHeaderProbe.Dimensions(d.width(), d.height()))) {
             throw BrandingValidationException.invalidImage(
                 "dimensions exceed " + BrandingLimits.MAX_DIMENSION_PX + "px");
           }

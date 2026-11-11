@@ -20,6 +20,7 @@
  */
 package io.qnop.service.branding;
 
+import io.qnop.service.image.ImageHeaderProbe;
 import java.awt.image.BufferedImage;
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
@@ -126,10 +127,13 @@ public class BrandingRasterizer {
   }
 
   private Optional<byte[]> fromRaster(byte[] bytes) throws Exception {
-    BufferedImage image = ImageIO.read(new ByteArrayInputStream(bytes));
+    // Decoded only within the upload budget (issue #906) — a stored asset that
+    // predates that check is skipped rather than decoded at any size.
+    BufferedImage image =
+        ImageHeaderProbe.decodeWithinBudget(bytes, BrandingLimits.PIXEL_BUDGET).orElse(null);
     if (image == null) {
-      // No reader for this format — nothing to log loudly about, the upload
-      // validation already accepted it for web serving.
+      // No reader for this format, or over budget — nothing to log loudly
+      // about, the upload validation already accepted it for web serving.
       return Optional.empty();
     }
     ByteArrayOutputStream out = new ByteArrayOutputStream();

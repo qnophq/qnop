@@ -25,6 +25,10 @@ TRUNCATE TABLE annotation_placement, comment, annotation, audit_event,
 -- wiped rows and every later chain verification would report a break.
 UPDATE audit_chain_head SET last_seq = 0, last_hash = repeat('0', 64) WHERE id = 1;
 
+-- Anonymous-review pseudonyms (issue #914) carry no FK to document, so the
+-- CASCADE above does not reach them.
+TRUNCATE TABLE review_pseudonym;
+
 -- Test-created data without migration seeds; CASCADE also clears anything a
 -- test created that references these rows (e.g. team memberships).
 TRUNCATE TABLE team_membership, team, oidc_provider, user_setting, application_asset

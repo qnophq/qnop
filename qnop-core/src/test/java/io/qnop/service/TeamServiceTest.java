@@ -58,6 +58,16 @@ class TeamServiceTest {
   private final TeamService service = new TeamService(teams, memberships, users, slugs, noLimits());
 
   @Test
+  @DisplayName("create rejects a team name with control or bidi-override characters")
+  void createRejectsControlCharactersInName() {
+    for (String name : new String[] {"Core\r\nTeam", "Core\u202ETeam"}) {
+      assertThatThrownBy(() -> service.create(name, null, UUID.randomUUID(), null, null, null))
+          .isInstanceOf(InvalidTextException.class);
+    }
+    verify(teams, never()).save(any());
+  }
+
+  @Test
   @DisplayName("create persists a new team with its initial LEAD and rejects a duplicate name")
   void create() {
     UUID teamId = UUID.randomUUID();
@@ -397,6 +407,41 @@ class TeamServiceTest {
     assertThat(service.addMemberAsLead(teamId, admin, true, target, "MEMBER").teamRole())
         .isEqualTo("MEMBER");
     verify(memberships, never()).existsByTeamIdAndUserIdAndTeamRole(teamId, admin, TeamRole.LEAD);
+  }
+
+  @Test
+  @DisplayName("the lead surface never returns an e-mail address (#917)")
+  void leadAddOmitsEmail() {
+    UUID teamId = UUID.randomUUID();
+    UUID lead = UUID.randomUUID();
+    UUID target = UUID.randomUUID();
+    when(teams.findByIdForUpdate(teamId)).thenReturn(Optional.of(team(teamId)));
+    when(users.findById(target))
+        .thenReturn(Optional.of(User.internal("Al", "al@example.com", "al", "h")));
+    when(memberships.save(any())).thenAnswer(inv -> inv.getArgument(0));
+    when(memberships.existsByTeamIdAndUserIdAndTeamRole(teamId, lead, TeamRole.LEAD))
+        .thenReturn(true);
+
+    assertThat(service.addMemberAsLead(teamId, lead, false, target, "MEMBER").email()).isNull();
+    // The admin console keeps the address.
+    assertThat(service.addMember(teamId, target, "MEMBER").email()).isNotNull();
+  }
+
+  @Test
+  @DisplayName("a lead cannot enrol a disabled account — same 404 as an unknown user (#917)")
+  void leadCannotAddDisabledUser() {
+    UUID teamId = UUID.randomUUID();
+    UUID lead = UUID.randomUUID();
+    UUID target = UUID.randomUUID();
+    User disabled = User.internal("Al", "al@example.com", "al", "h");
+    disabled.setEnabled(false);
+    when(users.findById(target)).thenReturn(Optional.of(disabled));
+    when(memberships.existsByTeamIdAndUserIdAndTeamRole(teamId, lead, TeamRole.LEAD))
+        .thenReturn(true);
+
+    assertThatThrownBy(() -> service.addMemberAsLead(teamId, lead, false, target, "MEMBER"))
+        .isInstanceOf(UserNotFoundException.class);
+    verify(memberships, never()).save(any());
   }
 
   @Test

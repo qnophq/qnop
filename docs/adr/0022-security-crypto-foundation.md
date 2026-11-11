@@ -31,6 +31,8 @@ Crypto choices: **BCrypt** for password hashing; **`Encryptors.delux`** (AES) ke
 - A misconfigured deployment fails at boot instead of running with a public secret — but local `bootRun` now requires real `QNOP_AUTH_*` values (documented in the README and `.env.example`).
 - Token issuance/verification itself is **not** here; #10 ships only the key-derivation foundation (issue #17 builds on it).
 
+- **`qnop.auth.jwt-secret` also keys a non-auth purpose** (amendment 2026-11, issue #914): `PseudonymKeyService` derives the HMAC key that orders anonymous-review pseudonyms (ADR-0038) via HKDF under its own salt and purpose label, independent of every token key. Rotating the secret invalidates tokens as before. Persisted pseudonyms do not change; only the order in which not-yet-labelled participants of anonymous reviews will be numbered does.
+
 ## Alternatives considered
 
 - **Everything in `io.qnop.security` in `qnop-core`** (issue's literal shape). Rejected: forces `spring-security-web` + `jakarta.servlet` into the framework-light core and blurs the web/core boundary.

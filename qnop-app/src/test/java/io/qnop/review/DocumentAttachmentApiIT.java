@@ -35,8 +35,11 @@ import io.qnop.entity.ReviewParticipant;
 import io.qnop.repository.DocumentRepository;
 import io.qnop.repository.ReviewParticipantRepository;
 import io.qnop.testsupport.SeededIntegrationTest;
+import java.nio.ByteBuffer;
+import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
 import java.util.UUID;
+import java.util.zip.CRC32;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.MediaType;
@@ -54,17 +57,34 @@ import org.springframework.test.web.servlet.request.MockMultipartHttpServletRequ
  */
 class DocumentAttachmentApiIT extends SeededIntegrationTest {
 
-  /** A minimal but honest PNG header followed by payload bytes. */
+  /** A minimal but honest PNG header (a 16x16 IHDR) followed by payload bytes. */
   private static final byte[] PNG_BYTES = pngBytes(64);
 
   @Autowired private DocumentRepository documents;
   @Autowired private ReviewParticipantRepository participants;
 
   private static byte[] pngBytes(int size) {
+    return pngBytes(size, 16, 16);
+  }
+
+  /** {@code size} bytes: a PNG signature and an IHDR declaring the given raster, then filler. */
+  private static byte[] pngBytes(int size, int width, int height) {
     byte[] bytes = new byte[size];
-    byte[] signature = {(byte) 0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A};
-    System.arraycopy(signature, 0, bytes, 0, signature.length);
-    Arrays.fill(bytes, signature.length, size, (byte) 0x42);
+    ByteBuffer ihdr = ByteBuffer.allocate(13).putInt(width).putInt(height);
+    ihdr.put((byte) 8).put((byte) 6);
+    CRC32 crc = new CRC32();
+    crc.update("IHDR".getBytes(StandardCharsets.US_ASCII));
+    crc.update(ihdr.array());
+    byte[] header =
+        ByteBuffer.allocate(33)
+            .put(new byte[] {(byte) 0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A})
+            .putInt(13)
+            .put("IHDR".getBytes(StandardCharsets.US_ASCII))
+            .put(ihdr.array())
+            .putInt((int) crc.getValue())
+            .array();
+    System.arraycopy(header, 0, bytes, 0, header.length);
+    Arrays.fill(bytes, header.length, size, (byte) 0x42);
     return bytes;
   }
 
@@ -142,6 +162,33 @@ class DocumentAttachmentApiIT extends SeededIntegrationTest {
   }
 
   @Test
+  void servesANonAsciiFileNameAsUtf8ExtendedParameter() throws Exception {
+    UUID documentId = seedDocument();
+
+    byte[] pdf = "%PDF-1.7 fake but honest header".getBytes();
+    String json =
+        mockMvc
+            .perform(as(uploadRequest(documentId, pdf, "Prüfbericht €.pdf"), AUDITOR_ID))
+            .andExpect(status().isCreated())
+            .andReturn()
+            .getResponse()
+            .getContentAsString();
+    String url = JsonPath.read(json, "$.url");
+
+    String disposition =
+        mockMvc
+            .perform(as(get(url), MEMBER_ID))
+            .andExpect(status().isOk())
+            .andReturn()
+            .getResponse()
+            .getHeader("Content-Disposition");
+    // RFC 5987/6266: the name travels percent-encoded as UTF-8, never as raw non-Latin-1 bytes.
+    assertThat(disposition)
+        .startsWith("attachment")
+        .contains("filename*=UTF-8''Pr%C3%BCfbericht%20%E2%82%AC.pdf");
+  }
+
+  @Test
   void collapsesUnknownBytesToOctetStreamRegardlessOfTheDeclaredName() throws Exception {
     UUID documentId = seedDocument();
 
@@ -172,6 +219,16 @@ class DocumentAttachmentApiIT extends SeededIntegrationTest {
     mockMvc
         .perform(as(uploadRequest(documentId, tooBig, "huge.png"), AUDITOR_ID))
         .andExpect(status().isPayloadTooLarge());
+  }
+
+  @Test
+  void storesAnImageDeclaringMoreThanThePixelBudgetAsDownloadOnly() throws Exception {
+    UUID documentId = seedDocument();
+    byte[] declared = pngBytes(64, 20_000, 20_000);
+    mockMvc
+        .perform(as(uploadRequest(documentId, declared, "wide.png"), AUDITOR_ID))
+        .andExpect(status().isCreated())
+        .andExpect(jsonPath("$.contentType").value("application/octet-stream"));
   }
 
   @Test

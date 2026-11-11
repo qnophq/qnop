@@ -42,6 +42,9 @@ const TONES = {
 
 type Severity = keyof typeof TONES;
 
+/** An absolute http(s) URL — the only kind of banner link the client renders. */
+const HTTP_URL = /^https?:\/\//i;
+
 interface InfoBannerProps {
   banner: InfoBannerModel;
   /**
@@ -70,7 +73,9 @@ export function InfoBanner({ banner, variant = 'bar', onDismiss }: InfoBannerPro
   const tone = TONES[severity] ?? TONES.info;
   const { Icon } = tone;
   const fg = theme.palette.mode === 'dark' ? tone.tint.fgDark : tone.tint.fg;
-  const hasLink = Boolean(banner.linkLabel && banner.linkUrl);
+  // Defence in depth (issue #913): the server already validates the scheme, but the
+  // client only ever renders an absolute http(s) URL as a link.
+  const hasLink = Boolean(banner.linkLabel && banner.linkUrl && HTTP_URL.test(banner.linkUrl));
 
   return (
     <Box
