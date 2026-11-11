@@ -21,6 +21,7 @@
 
 import { StrictMode, useMemo } from 'react';
 import { createRoot } from 'react-dom/client';
+import { CacheProvider } from '@emotion/react';
 import CssBaseline from '@mui/material/CssBaseline';
 import { ThemeProvider } from '@mui/material/styles';
 import { QueryClientProvider } from '@tanstack/react-query';
@@ -41,7 +42,12 @@ import { LanguageSync } from './components/LanguageSync';
 import { TimezoneSync } from './components/TimezoneSync';
 import { router } from './router';
 import { buildTheme } from './theme/theme';
+import { createEmotionCache } from './theme/emotionCache';
 import { useUiStore } from './stores/uiStore';
+
+// One Emotion cache for the app's lifetime, carrying the page's CSP nonce so the
+// policy allows MUI's <style> elements without 'unsafe-inline' (issue #913).
+const emotionCache = createEmotionCache();
 
 function Root() {
   const themeMode = useUiStore((s) => s.themeMode);
@@ -73,6 +79,8 @@ if (!rootElement) {
 
 createRoot(rootElement).render(
   <StrictMode>
-    <Root />
+    <CacheProvider value={emotionCache}>
+      <Root />
+    </CacheProvider>
   </StrictMode>,
 );

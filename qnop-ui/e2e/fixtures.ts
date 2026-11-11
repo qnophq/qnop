@@ -147,9 +147,19 @@ export const test = base.extend<Record<never, never>, WorkerFixtures>({
         // Storage may be unavailable; the app copes with that already.
       }
     });
+    // The preview server enforces the SPA's nonce-based style policy (issue
+    // #913); a style the browser refused is a regression even when the
+    // screenshot happens to look right, so every page fails on one.
+    const cspViolations: string[] = [];
+    page.on('console', (message) => {
+      if (message.type() === 'error' && message.text().includes('Content Security Policy')) {
+        cspViolations.push(message.text());
+      }
+    });
     if (viewport) await page.setViewportSize(viewport);
     await use(page);
     await page.close();
+    baseExpect(cspViolations, 'Content-Security-Policy violations').toEqual([]);
   },
 });
 

@@ -32,6 +32,7 @@ import Stack from '@mui/material/Stack';
 import Typography from '@mui/material/Typography';
 import { ZoomIn } from 'lucide-react';
 import { getCroppedAvatarBlob } from '../../utils/cropImage';
+import { readCspNonce } from '../../utils/cspNonce';
 import { useTranslation } from 'react-i18next';
 
 interface AvatarCropDialogProps {
@@ -100,6 +101,9 @@ export function AvatarCropDialog({
             onCropChange={setCrop}
             onZoomChange={setZoom}
             onCropComplete={onCropComplete}
+            // The cropper injects its own <style>; the SPA's policy only
+            // applies it with the page nonce (issue #913).
+            nonce={readCspNonce()}
           />
         </Box>
         <Stack direction="row" spacing={1.5} sx={{ alignItems: 'center', mt: 2 }}>
