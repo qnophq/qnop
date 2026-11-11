@@ -24,6 +24,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.junit.jupiter.api.Assumptions.assumeTrue;
 
+import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
@@ -31,15 +32,21 @@ import java.nio.file.Path;
 import java.nio.file.attribute.PosixFilePermissions;
 import java.time.Duration;
 import java.util.Arrays;
+import java.util.HashMap;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.stream.Collectors;
+import javax.xml.parsers.DocumentBuilderFactory;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import org.springframework.util.unit.DataSize;
+import org.w3c.dom.Element;
+import org.w3c.dom.NodeList;
 
 /**
  * Process isolation of the office converter (issue #908), exercised against a stub executable that
@@ -109,20 +116,49 @@ class LibreOfficeConverterTest {
   }
 
   @Test
-  void runsWithAHardenedPerRunProfile() throws IOException {
+  void runsWithAHardenedPerRunProfile() throws Exception {
     LibreOfficeConverter converter =
         converter(
             stub("cat \"$profile/user/registrymodifications.xcu\" > \"$outdir/document.pdf\""),
             null,
             null);
 
-    String registry = new String(converter.toPdf(new byte[] {1}, "docx"), UTF8);
+    byte[] registry = converter.toPdf(new byte[] {1}, "docx");
 
-    assertThat(registry)
-        .contains("DisableMacrosExecution\" oor:op=\"fuse\"><value>true</value>")
-        .contains("MacroSecurityLevel\" oor:op=\"fuse\"><value>3</value>")
-        .contains("/org.openoffice.Office.Writer/Content/Update")
-        .contains("Link\" oor:op=\"fuse\"><value>2</value>");
+    // Parsed, not grepped: LibreOffice silently ignores markup or keys it cannot read.
+    String scripting = "/org.openoffice.Office.Common/Security/Scripting";
+    String update = "/org.openoffice.Office.Writer/Content/Update";
+    assertThat(registryEntries(registry))
+        .containsExactlyInAnyOrderEntriesOf(
+            Map.of(
+                scripting + "/DisableMacrosExecution", "true",
+                scripting + "/MacroSecurityLevel", "3",
+                scripting + "/BlockUntrustedRefererLinks", "true",
+                scripting + "/DisableActiveContent", "true",
+                scripting + "/DisablePythonRuntime", "true",
+                update + "/Link", "2",
+                update + "/Field", "false"));
+  }
+
+  /** {@code item@oor:path + "/" + prop@oor:name → value} for every entry in the registry file. */
+  private static Map<String, String> registryEntries(byte[] xml) throws Exception {
+    String oor = "http://openoffice.org/2001/registry";
+    DocumentBuilderFactory factory = DocumentBuilderFactory.newInstance();
+    factory.setNamespaceAware(true);
+    Element root =
+        factory.newDocumentBuilder().parse(new ByteArrayInputStream(xml)).getDocumentElement();
+    assertThat(root.getLocalName()).isEqualTo("items");
+    Map<String, String> entries = new HashMap<>();
+    NodeList items = root.getElementsByTagName("item");
+    for (int i = 0; i < items.getLength(); i++) {
+      Element item = (Element) items.item(i);
+      Element prop = (Element) item.getElementsByTagName("prop").item(0);
+      assertThat(prop.getAttributeNS(oor, "op")).isEqualTo("fuse");
+      String value = prop.getElementsByTagName("value").item(0).getTextContent();
+      String key = item.getAttributeNS(oor, "path") + "/" + prop.getAttributeNS(oor, "name");
+      assertThat(entries.put(key, value)).as("duplicate " + key).isNull();
+    }
+    return entries;
   }
 
   @Test
@@ -142,6 +178,43 @@ class LibreOfficeConverterTest {
       child.get().onExit().get(10, TimeUnit.SECONDS);
       assertThat(child.get().isAlive()).isFalse();
     }
+  }
+
+  @Test
+  void interruptionKillsTheWholeProcessTree() throws Exception {
+    Path pidFile = dir.resolve("child.pid");
+    LibreOfficeConverter converter =
+        converter(stub("sleep 300 &\necho $! > '" + pidFile + "'\nwait"), null, null);
+    converter.isAvailable(); // probe outside the thread under test
+    AtomicReference<Throwable> failure = new AtomicReference<>();
+    AtomicBoolean interruptKept = new AtomicBoolean();
+    Thread caller =
+        new Thread(
+            () -> {
+              try {
+                converter.toPdf(new byte[] {1}, "docx");
+              } catch (Throwable t) {
+                failure.set(t);
+                interruptKept.set(Thread.currentThread().isInterrupted());
+              }
+            });
+    caller.start();
+    long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(10);
+    while (Files.notExists(pidFile) || Files.readString(pidFile).isBlank()) {
+      assertThat(System.nanoTime()).as("stub never started").isLessThan(deadline);
+      Thread.onSpinWait();
+    }
+
+    caller.interrupt();
+    caller.join(TimeUnit.SECONDS.toMillis(20));
+
+    assertThat(failure.get())
+        .isInstanceOf(OfficeConversionException.class)
+        .hasMessageContaining("interrupted");
+    assertThat(interruptKept).isTrue();
+    long childPid = Long.parseLong(Files.readString(pidFile).strip());
+    assertThat(ProcessHandle.of(childPid).map(ProcessHandle::isAlive))
+        .isNotEqualTo(Optional.of(true));
   }
 
   @Test

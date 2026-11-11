@@ -57,6 +57,9 @@ public class LibreOfficeConverter implements OfficeConverter {
   /** Enough for a stack of LibreOffice complaints, far short of anything that fills a log file. */
   private static final int MAX_CAPTURED_OUTPUT = 4_000;
 
+  /** How long to wait for a killed process to be gone before cleaning up after it. */
+  private static final Duration KILL_GRACE = Duration.ofSeconds(5);
+
   /** How long to wait for the reader once the process is already gone. */
   private static final Duration OUTPUT_DRAIN_GRACE = Duration.ofSeconds(2);
 
@@ -86,8 +89,12 @@ public class LibreOfficeConverter implements OfficeConverter {
       <prop oor:name="BlockUntrustedRefererLinks" oor:op="fuse"><value>true</value></prop></item>
       <item oor:path="/org.openoffice.Office.Common/Security/Scripting">\
       <prop oor:name="DisableActiveContent" oor:op="fuse"><value>true</value></prop></item>
+      <item oor:path="/org.openoffice.Office.Common/Security/Scripting">\
+      <prop oor:name="DisablePythonRuntime" oor:op="fuse"><value>true</value></prop></item>
       <item oor:path="/org.openoffice.Office.Writer/Content/Update">\
       <prop oor:name="Link" oor:op="fuse"><value>2</value></prop></item>
+      <item oor:path="/org.openoffice.Office.Writer/Content/Update">\
+      <prop oor:name="Field" oor:op="fuse"><value>false</value></prop></item>
       </oor:items>
       """;
 
@@ -136,9 +143,11 @@ public class LibreOfficeConverter implements OfficeConverter {
         throw e;
       }
       boolean finished = process.waitFor(20, TimeUnit.SECONDS);
-      deleteRecursively(home);
       if (!finished) {
         destroyTree(process);
+      }
+      deleteRecursively(home);
+      if (!finished) {
         log.warn("{} --version did not answer; PDF export stays unavailable", properties.binary());
         return false;
       }
@@ -314,12 +323,31 @@ public class LibreOfficeConverter implements OfficeConverter {
     List<ProcessHandle> descendants = process.descendants().toList();
     process.destroyForcibly();
     descendants.forEach(ProcessHandle::destroyForcibly);
+    // Killing is asynchronous. Waiting (boundedly) for the tree to be gone keeps a
+    // dying process from holding or re-creating files in the workspace while the
+    // caller deletes it.
+    awaitExit(process.toHandle());
+    descendants.forEach(LibreOfficeConverter::awaitExit);
+  }
+
+  private static void awaitExit(ProcessHandle handle) {
+    try {
+      handle.onExit().get(KILL_GRACE.toMillis(), TimeUnit.MILLISECONDS);
+    } catch (InterruptedException e) {
+      Thread.currentThread().interrupt();
+    } catch (java.util.concurrent.ExecutionException | java.util.concurrent.TimeoutException e) {
+      log.warn(
+          "Converter process {} did not exit within {} after being killed",
+          handle.pid(),
+          KILL_GRACE);
+    }
   }
 
   /**
    * Seeds the per-run profile with settings that keep a document from doing anything but render
-   * (issue #908): macros disabled outright, the macro security level at its highest, links and
-   * active content (OLE, DDE) not followed or updated, and links from untrusted documents blocked.
+   * (issue #908): macros and the Python runtime disabled outright, the macro security level at its
+   * highest, links, fields and active content (OLE, DDE) not followed or updated on load, and links
+   * from untrusted documents blocked. Keys an older LibreOffice does not know are ignored by it.
    */
   static void writeHardenedProfile(Path profile) throws IOException {
     Path user = Files.createDirectories(profile.resolve("user"));
