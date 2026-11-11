@@ -26,7 +26,7 @@ import { useTheme } from '@mui/material/styles';
 import { Paperclip } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { axiosInstance } from '../../../api/config';
-import { API_URL_PREFIX } from './attachmentSources';
+import { API_URL_PREFIX, filenameFromContentDisposition } from './attachmentSources';
 
 interface AttachmentLinkProps {
   /** The app-relative target, e.g. `/api/v1/documents/{id}/attachments/{id}`. */
@@ -35,11 +35,10 @@ interface AttachmentLinkProps {
   children: ReactNode;
 }
 
-/** The link label as plain text — doubles as the suggested download file name. */
-function labelText(children: ReactNode): string {
-  if (typeof children === 'string') return children;
-  if (Array.isArray(children)) return children.filter((c) => typeof c === 'string').join('');
-  return '';
+/** One response header as a string — axios lower-cases header names when it parses them. */
+function headerValue(headers: unknown, name: string): string | null {
+  const value = (headers as Record<string, unknown> | undefined)?.[name];
+  return typeof value === 'string' ? value : null;
 }
 
 /**
@@ -68,7 +67,11 @@ export function AttachmentLink({ href, children }: AttachmentLinkProps) {
       const url = URL.createObjectURL(response.data);
       const anchor = document.createElement('a');
       anchor.href = url;
-      anchor.download = labelText(children) || t('markdown.attachmentName');
+      // Named by the server's attachment metadata (issue #911) — the link label is authored
+      // text and must not choose the saved file's name or extension.
+      anchor.download =
+        filenameFromContentDisposition(headerValue(response.headers, 'content-disposition')) ??
+        t('markdown.attachmentName');
       anchor.click();
       URL.revokeObjectURL(url);
     } catch {

@@ -37,6 +37,10 @@ vi.mock('../../../api/config', () => ({
 URL.createObjectURL = vi.fn(() => 'blob:attachment');
 URL.revokeObjectURL = vi.fn();
 
+const DOC = '0190a1b2-c3d4-7e5f-8a9b-0c1d2e3f4a5b';
+const ATT1 = '0190a1b2-c3d4-7e5f-8a9b-0c1d2e3f4a01';
+const ATT2 = '0190a1b2-c3d4-7e5f-8a9b-0c1d2e3f4a02';
+
 function renderMd(md: string) {
   return render(
     <ThemeProvider theme={buildTheme('light')}>
@@ -186,19 +190,20 @@ describe('Markdown render (#427)', () => {
   });
 
   it('loads app attachment sources with the bearer and shows a blob URL (issue #446)', async () => {
-    const { container } = renderMd('![shot](/api/v1/documents/d1/attachments/a1)');
+    const { container } = renderMd(`![shot](/api/v1/documents/${DOC}/attachments/${ATT1})`);
 
     await waitFor(() =>
       expect(container.querySelector('img')).toHaveAttribute('src', 'blob:attachment'),
     );
-    expect(vi.mocked(axiosInstance.get)).toHaveBeenCalledWith('/documents/d1/attachments/a1', {
-      responseType: 'blob',
-    });
+    expect(vi.mocked(axiosInstance.get)).toHaveBeenCalledWith(
+      `/documents/${DOC}/attachments/${ATT1}`,
+      { responseType: 'blob' },
+    );
   });
 
   it('renders an app attachment link as a downloading file chip (issue #446)', () => {
     const { container, getByTestId } = renderMd(
-      '[report.pdf](/api/v1/documents/d1/attachments/a2)',
+      `[report.pdf](/api/v1/documents/${DOC}/attachments/${ATT2})`,
     );
 
     const chip = getByTestId('attachment-link');
@@ -207,6 +212,52 @@ describe('Markdown render (#427)', () => {
     expect(chip).not.toHaveAttribute('target');
     // External links keep the plain new-tab anchor.
     expect(container.querySelector('a[target="_blank"]')).toBeNull();
+  });
+
+  it('names a downloaded attachment after the server file name, not the label (#911)', async () => {
+    const download: string[] = [];
+    const click = vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(function (
+      this: HTMLAnchorElement,
+    ) {
+      download.push(this.download);
+    });
+    vi.mocked(axiosInstance.get).mockResolvedValueOnce({
+      data: new Blob(['pdf']),
+      headers: { 'content-disposition': 'attachment; filename="minutes.pdf"' },
+    } as never);
+    const { getByTestId } = renderMd(`[agenda.exe](/api/v1/documents/${DOC}/attachments/${ATT2})`);
+
+    fireEvent.click(getByTestId('attachment-link'));
+
+    await waitFor(() => expect(download).toEqual(['minutes.pdf']));
+    click.mockRestore();
+  });
+
+  it.each([
+    '/api/v1/documents/' + DOC + '/attachments/' + ATT1 + '/../../../x',
+    '/api/v1/documents/' + DOC + '/attachments/%2e%2e',
+    '/api/v1/users/me',
+    '/api/v1/documents/' + DOC + '/attachments/' + ATT1 + '?x=1',
+  ])('never fetches or links a non-attachment API target: %s (#911)', (target) => {
+    vi.mocked(axiosInstance.get).mockClear();
+    const { container, getByText } = renderMd(`![pic](${target}) and [file](${target})`);
+
+    expect(container.querySelector('img')).toBeNull();
+    expect(container.querySelector('a')).toBeNull();
+    expect(getByText(/file/)).toBeInTheDocument();
+    expect(vi.mocked(axiosInstance.get)).not.toHaveBeenCalled();
+  });
+
+  it('renders a malformed mention target as plain text (#912)', () => {
+    vi.mocked(usersApi.getUserProfileBySlug).mockClear();
+    const { container, queryByTestId, getByText } = renderMdWithMentions(
+      '[look here](mention:%2e%2e/admin) and [x](mention:)',
+    );
+
+    expect(queryByTestId('mention-link')).not.toBeInTheDocument();
+    expect(container.querySelector('a')).toBeNull();
+    expect(getByText(/look here/)).toBeInTheDocument();
+    expect(vi.mocked(usersApi.getUserProfileBySlug)).not.toHaveBeenCalled();
   });
 });
 
